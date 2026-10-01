@@ -1,0 +1,19 @@
+appId: tm.auto.app
+---
+# Whole-value paste through the iOS Paste callout.
+# Before running: printf '7000000' | xcrun simctl pbcopy <udid>
+# Run: maestro --device <udid> test -e OUT=<dir> paste.yaml
+- tapOn: "Фильтры.*"
+- swipe:
+    start: 50%, 70%
+    end: 50%, 30%
+- tapOn: "Мин"
+- longPressOn: "Мин"
+- takeScreenshot: ${OUT}/paste-menu-min
+- tapOn: "Paste"
+- takeScreenshot: ${OUT}/paste-min
+- tapOn: "Макс"
+- longPressOn: "Макс"
+- tapOn: "Paste"
+- takeScreenshot: ${OUT}/paste-min-and-max
+- tapOn: "Назад"

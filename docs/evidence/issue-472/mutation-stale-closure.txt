@@ -1,0 +1,13 @@
+   × Search parameters: price inputs keep every digit typed or pasted > 'Min' price > keeps 7000000 when every digit arrives in one burst, before any render 6ms
+   × Search parameters: price inputs keep every digit typed or pasted > 'Min' price > keeps 7000000 when the digits are fired through the field in one batch 5ms
+   × Search parameters: price inputs keep every digit typed or pasted > 'Min' price > keeps 7000000 when "7000000" is pasted whole 4ms
+   × Search parameters: price inputs keep every digit typed or pasted > 'Min' price > keeps 7000000 when "7,000,000" is pasted whole 6ms
+   × Search parameters: price inputs keep every digit typed or pasted > 'Min' price > keeps 7000000 when "7 000 000" is pasted whole 9ms
+   × Search parameters: price inputs keep every digit typed or pasted > 'Min' price > keeps 7000000 when "7 000 000 TMT" is pasted whole 3ms
+   × Search parameters: price inputs keep every digit typed or pasted > 'Min' price > replaces an existing value with a whole pasted value 2ms
+   × Search parameters: price inputs keep every digit typed or pasted > 'Min' price > keeps the digits typed after a delete in the same burst 2ms
+   × Search parameters: price inputs keep every digit typed or pasted > keeps both whole values when min and max are typed in alternating bursts 4ms
+   × Search parameters: price inputs keep every digit typed or pasted > passes both whole values to Results when Show is pressed after a burst 7ms
+⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed (1)
+      Tests  10 failed | 28 passed (38)

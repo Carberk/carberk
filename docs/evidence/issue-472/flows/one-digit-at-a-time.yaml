@@ -1,0 +1,26 @@
+appId: tm.auto.app
+---
+# Starts on Results and ends back on Results. One digit per inputText command, same order as the burst.
+- tapOn: "Фильтры.*"
+- swipe:
+    start: 50%, 70%
+    end: 50%, 30%
+- tapOn: "Мин"
+- inputText: "7"
+- inputText: "0"
+- inputText: "0"
+- inputText: "0"
+- inputText: "0"
+- inputText: "0"
+- inputText: "0"
+- takeScreenshot: ${OUT}/digits-min
+- tapOn: "Макс"
+- inputText: "7"
+- inputText: "0"
+- inputText: "0"
+- inputText: "0"
+- inputText: "0"
+- inputText: "0"
+- inputText: "0"
+- takeScreenshot: ${OUT}/digits-min-and-max
+- tapOn: "Назад"

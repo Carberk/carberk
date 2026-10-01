@@ -1,0 +1,18 @@
+appId: tm.auto.app
+---
+# Run: maestro --device <udid> test -e OUT=<dir> -e RUN=<n> burst.yaml
+# Starts on Results (the Filters button opens Search parameters) and ends back on Results.
+# Burst: inputText sends the whole string "7000000" to the focused field in one command.
+# scrollUntilVisible reported the price row as visible while it was below the fold, so scroll by swipe.
+- tapOn: "Фильтры.*"
+- swipe:
+    start: 50%, 70%
+    end: 50%, 30%
+- tapOn: "Мин"
+- inputText: "7000000"
+- assertVisible: "7000000"
+- takeScreenshot: ${OUT}/burst-min-${RUN}
+- tapOn: "Макс"
+- inputText: "7000000"
+- takeScreenshot: ${OUT}/burst-min-and-max-${RUN}
+- tapOn: "Назад"
