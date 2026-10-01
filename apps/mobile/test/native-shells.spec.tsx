@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { Checkbox } from "@/components/ui/checkbox";
-
 import { fireEvent, renderMobile } from "./render";
+
+import { Checkbox } from "@/components/ui/checkbox";
 
 // The checkbox module is not mocked here: these specs run against the shell that
 // `native-setup.ts` registers for every spec.
