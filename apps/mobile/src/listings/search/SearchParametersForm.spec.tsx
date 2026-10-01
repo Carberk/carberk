@@ -2,7 +2,7 @@ import type * as Native from "react-native";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { renderMobile, fireEvent, routerMock } from "../../../test/render";
+import { renderMobile, fireEvent, routerMock, within } from "../../../test/render";
 
 import { SearchParametersForm } from "./SearchParametersForm";
 import type { ListingFilter } from "./useListingFilters";
@@ -205,6 +205,30 @@ describe("Search parameters: brand and model in Done mode", () => {
     expect(view.getByText("Toyota models")).toBeTruthy();
     expect(view.getByRole("checkbox", { name: "Camry", checked: true })).toBeTruthy();
     expect(view.getByRole("checkbox", { name: "Corolla", checked: false })).toBeTruthy();
+  });
+
+  it("changes the model selection when a model checkbox is pressed, box and all", () => {
+    const view = open(filled);
+    fireEvent.press(view.getByLabelText("Model: Camry"));
+    const row = (name: string) => view.getByRole("checkbox", { name });
+    // `within` includes the row itself, so two matches are the row plus the
+    // Checkbox box inside it; the box must mirror the row's selected state.
+    const boxesIn = (name: string, checked: boolean) => within(row(name)).getAllByRole("checkbox", { checked });
+    expect(boxesIn("Corolla", false)).toHaveLength(2);
+    expect(boxesIn("Camry", true)).toHaveLength(2);
+
+    fireEvent.press(row("Corolla"));
+
+    expect(boxesIn("Corolla", true)).toHaveLength(2);
+    fireEvent.press(view.getByRole("button", { name: /^Done/ }));
+    expect(lastFilters().modelIds).toEqual(["camry", "corolla"]);
+    expect(view.getByLabelText("Model: 2 selected")).toBeTruthy();
+
+    fireEvent.press(view.getByLabelText("Model: 2 selected"));
+    fireEvent.press(row("Camry"));
+    expect(boxesIn("Camry", false)).toHaveLength(2);
+    fireEvent.press(view.getByRole("button", { name: /^Done/ }));
+    expect(lastFilters().modelIds).toEqual(["corolla"]);
   });
 });
 

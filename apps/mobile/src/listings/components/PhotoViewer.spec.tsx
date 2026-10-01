@@ -136,3 +136,27 @@ describe("Photo viewer", () => {
     ).toBeTruthy();
   });
 });
+
+// Two rendered scroll tests in a row: the second must not see the first one's
+// requests, or a `toContainEqual` in either could pass on the other's leftovers.
+describe("Photo viewer scroll requests", () => {
+  const pagerRequests = () =>
+    scrollRequests.filter((request) => (request as { method: string }).method === "scrollToIndex");
+
+  it("asks the pager to scroll when a thumbnail is tapped", () => {
+    const { screen } = open();
+
+    fireEvent.press(screen.getByRole("button", { name: "Photo 5 of 5" }));
+
+    expect(pagerRequests()).toEqual([{ method: "scrollToIndex", index: 4, animated: false }]);
+  });
+
+  it("starts the next test with no scroll requests left by the one before", () => {
+    expect(scrollRequests).toHaveLength(0);
+    const { screen } = open();
+
+    fireEvent.press(screen.getByRole("button", { name: "Photo 2 of 5" }));
+
+    expect(pagerRequests()).toEqual([{ method: "scrollToIndex", index: 1, animated: false }]);
+  });
+});
