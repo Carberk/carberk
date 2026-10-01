@@ -86,7 +86,7 @@ vi.mock("@react-navigation/native", () => ({
   DefaultTheme: { dark: false, colors: {} },
   DarkTheme: { dark: true, colors: {} },
 }));
-vi.mock("@rn-primitives/separator",async () => ({ Root: (await import("react-native")).View }));
+vi.mock("@rn-primitives/separator", async () => ({ Root: (await import("react-native")).View }));
 
 // Expo modules that load `expo-modules-core`, which needs the native runtime.
 // A spec that exercises one of them mocks it itself and wins over these stubs.

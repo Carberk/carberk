@@ -79,19 +79,21 @@ not copy these stubs into a spec.
 - **Checkbox.** `@/components/ui/checkbox` resolves to the `CheckboxShell` in
   `test/native-overlays.tsx`, because the real `@rn-primitives/checkbox` cannot
   load in Node. The shell is a Pressable with the `checkbox` role. It maps `checked`
-  to `accessibilityState.checked` and a press to `onCheckedChange(!checked)`, and
-  ignores a press when `disabled`. It draws no box. Query it with
+  to `accessibilityState.checked` and a press to `onCheckedChange(!checked)`, then
+  calls the caller's `onPress`, as the primitive's Trigger does. A press when
+  `disabled` calls neither. It draws no box. Query it with
   `getByRole("checkbox", { checked })` and press it with `fireEvent.press`. Where a
   component wraps it in a row that carries its own role and `onPress` (the Model
   picker's `ModelCheckRow`), the row and the shell both match the role, and
   `within(row)` counts the row itself. See `test/native-shells.spec.tsx` and the
   Model picker test in `SearchParametersForm.spec.tsx`.
 - **Navigation themes.** `@react-navigation/native` is stubbed to `DefaultTheme`
-  and `DarkTheme` with empty `colors`, which is all `lib/theme.ts` reads, so a spec
-  can import `@/lib/theme` unmocked. Any other export (`usePreventRemove`,
-  `NavigationContext`, `CommonActions`) is undefined; a spec that needs one
-  mocks the package itself and replaces the whole stub, as
-  `useOtpAuthNavigation.spec.tsx` does.
+  and `DarkTheme` with only `dark` and empty `colors`; other theme fields such as
+  `fonts` are undefined. That is enough for a spec to import `@/lib/theme`
+  unmocked. Reading any other export (`usePreventRemove`, `NavigationContext`,
+  `CommonActions`) throws vitest's `No "<name>" export is defined on the mock`
+  error. A spec that needs one mocks the package itself and replaces the whole
+  stub, as `useOtpAuthNavigation.spec.tsx` does.
 - **Reanimated.** The stub provides only `default.View`, `useSharedValue`,
   `useAnimatedStyle`, `withTiming` and `withSpring`, and no gesture, shared-value
   update or animation runs, so a component that uses `FadeIn` or `Animated.Text`

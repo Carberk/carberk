@@ -23,22 +23,27 @@ export const Container = View;
 
 export const TextContainer = Text;
 
-type CheckboxShellProps = Omit<PressableProps, "onPress"> & {
+type CheckboxShellProps = PressableProps & {
   checked?: boolean;
   onCheckedChange?: (checked: boolean) => void;
 };
 
 // Stands in for `@/components/ui/checkbox`, whose primitive cannot load in Node.
 // Like the primitive it exposes `checked` as the checkbox accessibility state and
-// reports the toggled value through `onCheckedChange` on press. It draws no box.
-export function CheckboxShell({ checked = false, onCheckedChange, disabled, ...props }: CheckboxShellProps) {
+// reports the toggled value through `onCheckedChange` on press, then calls the
+// caller's `onPress`; a disabled shell does neither. It draws no box.
+export function CheckboxShell({ checked = false, onCheckedChange, onPress, disabled, ...props }: CheckboxShellProps) {
   return (
     <Pressable
       accessibilityRole="checkbox"
       {...props}
       disabled={disabled}
       accessibilityState={{ checked, disabled: disabled ?? undefined }}
-      onPress={() => onCheckedChange?.(!checked)}
+      onPress={(event) => {
+        if (disabled) return;
+        onCheckedChange?.(!checked);
+        onPress?.(event);
+      }}
     />
   );
 }
