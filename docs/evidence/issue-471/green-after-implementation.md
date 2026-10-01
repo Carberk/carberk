@@ -12,7 +12,7 @@ pnpm --filter @auto-tm/mobile test \
 
 Result: 4 files passed, 33 tests passed (red: 3 failed, 26 passed, 2 files failed to load).
 
-The full mobile suite on 42a03ac: 167 files, 1293 tests passed, with the seven specs that carried their own `@react-navigation/native` mock and the four that carried their own checkbox mock using the shared shells.
+The full mobile suite on 42a03ac: 167 files, 1293 tests passed, with the seven specs that carried their own `@react-navigation/native` mock and the five that carried their own checkbox mock now using the shared shells. `useOtpAuthNavigation.spec.tsx` keeps its own mock: it records `usePreventRemove` arguments, which the stub does not provide.
 
 ## Each new assertion fails without its fix
 
