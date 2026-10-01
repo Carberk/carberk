@@ -5,8 +5,6 @@ import { renderMobile, fireEvent } from "../../../test/render";
 
 import { BrandModelCard } from "./BrandModelCard";
 
-vi.mock("@react-navigation/native", () => ({ DefaultTheme: { colors: {} }, DarkTheme: { colors: {} } }));
-
 describe("Brand/model card", () => {
   it("uses one compact summary and separate edit and clear actions", () => {
     const onEdit = vi.fn(); const onClear = vi.fn();

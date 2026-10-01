@@ -65,18 +65,45 @@ Nothing changes in node_modules, Metro, Babel or the application runtime.
 The adapter renders native-named host nodes. It keeps children, event handlers,
 accessibility props, disabled input behavior and Pressable's disabled responder
 decision. It uses a fixed 390 by 844 window. FlatList renders all supplied items with its header and empty components;
-Modal renders children only when visible. This is an intentionally small
+Modal renders children only when visible. `RefreshControl` is an inert host
+node: its `refreshing` and `onRefresh` stay props and nothing calls `onRefresh`,
+so a spec cannot simulate a pull and must call the handler itself. This is an intentionally small
 project adapter, not the upstream Jest React Native preset. Add an explicit
 adapter or spec-local mock when a component uses an unsupported native API.
 
 `test/native-setup.ts` also stubs, for every spec, `expo-linking`,
-`expo-secure-store`, Gesture Handler, Reanimated and Worklets; a spec-local
-`vi.mock` of the same module wins. The Reanimated stub provides only
-`default.View`, `useSharedValue`, `useAnimatedStyle`, `withTiming` and
-`withSpring`, and no gesture, shared-value update or animation runs, so a
-component that uses `FadeIn` or `Animated.Text` needs the stub extended. A
-`FlatList` ref records `scrollToIndex` and `scrollToOffset` calls into the
-`scrollRequests` export of `react-native`, which resets before each test.
+`expo-secure-store`, Gesture Handler, Reanimated, Worklets, the Checkbox and
+React Navigation's themes; a spec-local `vi.mock` of the same module wins. Do
+not copy these stubs into a spec.
+
+- **Checkbox.** `@/components/ui/checkbox` resolves to the `CheckboxShell` in
+  `test/native-overlays.tsx`, because the real `@rn-primitives/checkbox` cannot
+  load in Node. The shell is a Pressable with the `checkbox` role. It maps `checked`
+  to `accessibilityState.checked` and a press to `onCheckedChange(!checked)`, and
+  ignores a press when `disabled`. It draws no box. Query it with
+  `getByRole("checkbox", { checked })` and press it with `fireEvent.press`. Where a
+  component wraps it in a row that carries its own role and `onPress` (the Model
+  picker's `ModelCheckRow`), the row and the shell both match the role, and
+  `within(row)` counts the row itself. See `test/native-shells.spec.tsx` and the
+  Model picker test in `SearchParametersForm.spec.tsx`.
+- **Navigation themes.** `@react-navigation/native` is stubbed to `DefaultTheme`
+  and `DarkTheme` with empty `colors`, which is all `lib/theme.ts` reads, so a spec
+  can import `@/lib/theme` unmocked. Any other export (`usePreventRemove`,
+  `NavigationContext`, `CommonActions`) is undefined; a spec that needs one
+  mocks the package itself and replaces the whole stub, as
+  `useOtpAuthNavigation.spec.tsx` does.
+- **Reanimated.** The stub provides only `default.View`, `useSharedValue`,
+  `useAnimatedStyle`, `withTiming` and `withSpring`, and no gesture, shared-value
+  update or animation runs, so a component that uses `FadeIn` or `Animated.Text`
+  needs the stub extended.
+
+A `FlatList` ref records `scrollToIndex` and `scrollToOffset` calls into the
+`scrollRequests` export of `react-native`. Specs and `native-setup.ts` import
+`react-native` through the Vite alias, which Vite inlines as one module instance,
+and `native-setup.ts` empties that array before each test. The copy registered in
+Node's require cache for RNTL is a separate instance with its own array; resetting
+that one does nothing for specs. `PhotoViewer.spec.tsx` proves the reset with an
+empty `scrollRequests` at the start of a second scroll test.
 
 Real app Button, Text, Input, Icon and feature components execute. NativeWind
 `className` passes through and `cssInterop`/`remapProps` are no-ops. Lucide icons,

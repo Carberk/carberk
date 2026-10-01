@@ -16,7 +16,7 @@ Photo viewer, instant loading from cached cards, and Ask the seller on Listing d
 
 ## Red evidence
 
-[red-before-implementation.md](red-before-implementation.md): the specs were run against do-nothing placeholders before any production code: 54 of 72 tests failed on the unmet criteria. The red checkpoint was pushed as 8682a8c. Two later changes to the specs, after production code: `UNSAFE_queryByType(Modal)` checks became `Close`-button checks (the mock Modal element stays in the tree when closed), and non-null assertions became a `first()` helper for lint. Neither weakened an assertion.
+[red-before-implementation.md](red-before-implementation.md): the specs were run against do-nothing placeholders before any production code: 54 of 72 tests failed on the unmet criteria. The red checkpoint was pushed as 8682a8c. The log is unedited, so its command names `listingDetail374.spec.tsx`, which was renamed to `listingDetailPreviewViewerAsk.spec.tsx` in `85d3e7f` (squashed into `0d122e7` on `main`). Two later changes to the specs, after production code: `UNSAFE_queryByType(Modal)` checks became `Close`-button checks (the mock Modal element stays in the tree when closed), and non-null assertions became a `first()` helper for lint. Neither weakened an assertion.
 
 The deep-link skeleton was already #373 behaviour. Its red failure at the placeholder checkpoint was only the missing `detail-skeleton` testID (see `red-before-implementation.md`). The test that stays green against the placeholder by design is `useListingPreview.spec.tsx` "has nothing for a deep link".
 

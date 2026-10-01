@@ -1,16 +1,23 @@
 import { createRequire, Module } from "node:module";
 
+import * as ReactNative from "react-native";
 import { beforeEach, vi } from "vitest";
 
-// vi.mock cannot intercept CommonJS require. Register the same test adapter
-// used by Vite's exact react-native alias before RNTL loads in this worker.
+// vi.mock cannot intercept CommonJS require. Register the test adapter in Node's
+// require cache before RNTL loads in this worker. Node's copy is a different
+// module instance from the one Vite inlines for `react-native` imports, so the
+// two do not share state such as `scrollRequests`.
 const requireNative = createRequire(import.meta.url);
 const nativePath = requireNative.resolve("react-native");
 const nativeModule = new Module(nativePath);
-const nativeHost = requireNative("./native-host.cjs") as { scrollRequests: unknown[] };
-nativeModule.exports = nativeHost;
+nativeModule.exports = requireNative("./native-host.cjs");
 nativeModule.loaded = true;
 requireNative.cache[nativePath] = nativeModule;
+
+// The `react-native` import here goes through the Vite alias, like every spec and
+// component import, so this is the array specs read. A setup file shares the
+// module graph with its test file.
+const scrollRequests = (ReactNative as unknown as { scrollRequests: unknown[] }).scrollRequests;
 
 vi.mock("nativewind", () => ({ cssInterop: vi.fn(), remapProps: vi.fn(),
   useColorScheme: () => ({ colorScheme: "light", setColorScheme: vi.fn() }) }));
@@ -36,7 +43,7 @@ vi.mock("expo-router", () => ({
   useFocusEffect: vi.fn(),
 }));
 beforeEach(() => {
-  nativeHost.scrollRequests.length = 0;
+  scrollRequests.length = 0;
   Object.values(routerMock).forEach((mock) => mock.mockClear());
   Object.keys(routeParams).forEach((key) => Reflect.deleteProperty(routeParams, key));
 });
@@ -71,7 +78,15 @@ vi.mock("@/components/ui/alert-dialog", async () => {
     AlertDialogHeader: shell.Container, AlertDialogTitle: shell.TextContainer,
     AlertDialogDescription: shell.TextContainer, AlertDialogFooter: shell.Container };
 });
-vi.mock("@rn-primitives/separator", async () => ({ Root: (await import("react-native")).View }));
+vi.mock("@/components/ui/checkbox", async () => ({ Checkbox: (await import("./native-overlays")).CheckboxShell }));
+// `lib/theme.ts` derives its schemes from React Navigation's themes, and the real
+// package needs the native runtime. Only the two themes it reads are stubbed; a
+// spec that needs a hook or context from the package mocks it itself and wins.
+vi.mock("@react-navigation/native", () => ({
+  DefaultTheme: { dark: false, colors: {} },
+  DarkTheme: { dark: true, colors: {} },
+}));
+vi.mock("@rn-primitives/separator",async () => ({ Root: (await import("react-native")).View }));
 
 // Expo modules that load `expo-modules-core`, which needs the native runtime.
 // A spec that exercises one of them mocks it itself and wins over these stubs.

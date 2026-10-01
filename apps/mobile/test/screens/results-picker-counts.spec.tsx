@@ -6,7 +6,6 @@ import { renderMobile, routeParams } from "../render";
 import ModelPickerScreen from "../../app/(tabs)/(search)/models";
 import BrandPickerScreen from "../../app/(tabs)/(search)/brands";
 const counts = vi.hoisted(() => ({ models: vi.fn(), brands: vi.fn(), total: vi.fn() }));
-vi.mock("@react-navigation/native", () => ({ DefaultTheme: { colors: {} }, DarkTheme: { colors: {} } }));
 vi.mock("react-native-safe-area-context", async () => ({ SafeAreaView: (await import("react-native")).View }));
 vi.mock("react-native", async (original) => {
   const native = await original<typeof Native>();
@@ -14,7 +13,6 @@ vi.mock("react-native", async (original) => {
   type SectionProps = { sections: { data: unknown[] }[]; renderItem: (arg: { item: unknown }) => ReactNode; ListHeaderComponent?: ReactNode };
   return { ...native, SectionList: ({ sections, renderItem, ListHeaderComponent }: SectionProps) => React.createElement(native.ScrollView, null, ListHeaderComponent, sections.flatMap((section) => section.data.map((item, index) => React.createElement(React.Fragment, { key: index }, renderItem({ item }))))) };
 });
-vi.mock("@/components/ui/checkbox", async () => ({ Checkbox: (await import("react-native")).Pressable }));
 vi.mock("../../src/api/client", () => ({ apiClient: { get: vi.fn() }, ApiError: class ApiError extends Error {} }));
 vi.mock("../../src/listings/search/recentSearches", () => ({ useRecentChoicesStore: (select: (state: unknown) => unknown) => select({ items: [], hydrate: vi.fn(), clear: vi.fn(), record: vi.fn() }) }));
 vi.mock("../../src/listings/search/useRoutePickerActions", () => ({ useRoutePickerActions: () => ({ mode: "show", confirm: vi.fn(), pickBrand: vi.fn(), changeBrand: vi.fn(), moreFilters: vi.fn(), pickRecent: vi.fn() }) }));

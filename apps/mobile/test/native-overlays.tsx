@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, type PropsWithChildren } from "react";
-import { Pressable, View, Text } from "react-native";
+import { Pressable, View, Text, type PressableProps } from "react-native";
 
 // Test shells model visibility and selection only. Portals, animation, native
 // measurement, focus management and dismissal gestures need a device.
@@ -22,3 +22,23 @@ export function Overlay({ open, children }: PropsWithChildren<{ open?: boolean }
 export const Container = View;
 
 export const TextContainer = Text;
+
+type CheckboxShellProps = Omit<PressableProps, "onPress"> & {
+  checked?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
+};
+
+// Stands in for `@/components/ui/checkbox`, whose primitive cannot load in Node.
+// Like the primitive it exposes `checked` as the checkbox accessibility state and
+// reports the toggled value through `onCheckedChange` on press. It draws no box.
+export function CheckboxShell({ checked = false, onCheckedChange, disabled, ...props }: CheckboxShellProps) {
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      {...props}
+      disabled={disabled}
+      accessibilityState={{ checked, disabled: disabled ?? undefined }}
+      onPress={() => onCheckedChange?.(!checked)}
+    />
+  );
+}

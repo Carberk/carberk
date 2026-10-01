@@ -9,7 +9,6 @@ import type { ListingFilter } from "./useListingFilters";
 
 const state = vi.hoisted(() => ({ count: vi.fn(), record: vi.fn(), mode: "ok" as "ok" | "loading" | "error" }));
 
-vi.mock("@react-navigation/native", () => ({ DefaultTheme: { colors: {} }, DarkTheme: { colors: {} } }));
 vi.mock("react-native-safe-area-context", async () => ({
   SafeAreaView: (await import("react-native")).View,
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
@@ -20,7 +19,6 @@ vi.mock("react-native", async (original) => {
   type SectionProps = { sections: { data: unknown[] }[]; renderItem: (arg: { item: unknown }) => ReactNode; ListHeaderComponent?: ReactNode };
   return { ...native, SectionList: ({ sections, renderItem, ListHeaderComponent }: SectionProps) => React.createElement(native.ScrollView, null, ListHeaderComponent, sections.flatMap((section) => section.data.map((item, index) => React.createElement(React.Fragment, { key: index }, renderItem({ item }))))) };
 });
-vi.mock("@/components/ui/checkbox", async () => ({ Checkbox: (await import("react-native")).Pressable }));
 vi.mock("../../api/client", () => ({ apiClient: { get: vi.fn() }, ApiError: class ApiError extends Error {} }));
 vi.mock("@react-native-async-storage/async-storage", () => ({ default: { getItem: vi.fn(async () => null), setItem: vi.fn(async () => undefined), removeItem: vi.fn(async () => undefined) } }));
 vi.mock("./recentSearches", () => ({ useRecentChoicesStore: (select: (s: unknown) => unknown) => select({ items: [], hydrate: vi.fn(), clear: vi.fn(), record: state.record }) }));
