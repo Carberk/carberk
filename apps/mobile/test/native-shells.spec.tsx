@@ -36,6 +36,22 @@ describe("Checkbox shell", () => {
     expect(onCheckedChange).toHaveBeenCalledTimes(2);
   });
 
+  it("calls a caller's onPress after onCheckedChange, as the primitive does", () => {
+    const calls: string[] = [];
+    const screen = renderMobile(
+      <Checkbox
+        accessibilityLabel="Empty"
+        checked={false}
+        onCheckedChange={() => calls.push("onCheckedChange")}
+        onPress={() => calls.push("onPress")}
+      />,
+    );
+
+    fireEvent.press(screen.getByRole("checkbox", { name: "Empty" }));
+
+    expect(calls).toEqual(["onCheckedChange", "onPress"]);
+  });
+
   it("does not report a press when it is disabled", () => {
     const onCheckedChange = vi.fn();
     const screen = renderMobile(
@@ -45,5 +61,16 @@ describe("Checkbox shell", () => {
     fireEvent.press(screen.getByRole("checkbox", { name: "Locked", disabled: true }));
 
     expect(onCheckedChange).not.toHaveBeenCalled();
+  });
+
+  it("does not call a caller's onPress when it is disabled", () => {
+    const onPress = vi.fn();
+    const screen = renderMobile(
+      <Checkbox accessibilityLabel="Locked" checked={false} disabled onCheckedChange={vi.fn()} onPress={onPress} />,
+    );
+
+    fireEvent.press(screen.getByRole("checkbox", { name: "Locked", disabled: true }));
+
+    expect(onPress).not.toHaveBeenCalled();
   });
 });

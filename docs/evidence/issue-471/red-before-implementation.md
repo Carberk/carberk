@@ -45,3 +45,22 @@ Test Files  1 failed (1)
 ```
 
 That is the issue's finding 1: a spec that presses a checkbox through the stand-in gets no `onCheckedChange` call and no checked state.
+
+## Fix round: caller's `onPress` dropped by the checkbox shell
+
+Standards review finding on `1d79c7b`: `CheckboxShell` spreads `{...props}` and then overwrites `onPress`, so a caller's `onPress` never runs. `@rn-primitives/checkbox@1.4.0` (`dist/checkbox.mjs:38-45`) returns early when `disabled`, otherwise calls `onCheckedChange(!checked)` and then the caller's `onPress`.
+
+Only the new assertions are in the tree (`apps/mobile/test/native-shells.spec.tsx`); the shell is unchanged from `1d79c7b`.
+
+```sh
+pnpm --filter @auto-tm/mobile test test/native-shells.spec.tsx
+```
+
+Result: 1 failed, 4 passed (5 tests).
+
+```
+FAIL  test/native-shells.spec.tsx > Checkbox shell > calls a caller's onPress after onCheckedChange, as the primitive does
+AssertionError: expected [ 'onCheckedChange' ] to deeply equal [ 'onCheckedChange', 'onPress' ]
+```
+
+The companion test "does not call a caller's onPress when it is disabled" passes here: it guards the primitive's disabled behaviour once `onPress` is forwarded.
