@@ -12,6 +12,8 @@ import {
   type ConversationRepository,
 } from "../domain/ports/ConversationRepository";
 
+import { ConversationAccessPolicy } from "./ConversationAccessPolicy";
+
 export interface DeleteMessageInput {
   userId: string;
   conversationId: string;
@@ -28,6 +30,8 @@ export class DeleteMessage {
   constructor(
     @Inject(CONVERSATION_REPOSITORY)
     private readonly conversations: ConversationRepository,
+    @Inject(ConversationAccessPolicy)
+    private readonly accessPolicy: ConversationAccessPolicy,
   ) {}
 
   async execute(input: DeleteMessageInput): Promise<DeleteMessageResult> {
@@ -49,6 +53,8 @@ export class DeleteMessage {
         details: { reason: CONVERSATION_ERROR_CODES.NOT_A_PARTICIPANT },
       });
     }
+
+    await this.accessPolicy.assertAccountNotPendingDeletion(input.userId);
 
     const message = await this.conversations.findMessageById(input.messageId);
 

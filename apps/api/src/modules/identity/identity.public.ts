@@ -4,6 +4,7 @@
  */
 import { IDENTITY_TOKENS } from "./identity.tokens";
 
+export { accountDeletionPendingException } from "./application/accountDeletionPendingException";
 export type { ClockPort } from "./domain/ports/ClockPort";
 export type { IdentityCheckPort } from "./domain/ports/IdentityCheckPort";
 export type { Session } from "./domain/Session";

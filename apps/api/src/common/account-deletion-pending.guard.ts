@@ -1,10 +1,10 @@
 import type { CanActivate, ExecutionContext } from "@nestjs/common";
-import { ForbiddenException, Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { AuthSchemas } from "@auto-tm/contracts";
 import type { FastifyRequest } from "fastify";
 
 import {
+  accountDeletionPendingException,
   IDENTITY_CHECK_PORT,
   type IdentityCheckPort,
 } from "../modules/identity/identity.public";
@@ -53,12 +53,7 @@ export class AccountDeletionPendingGuard implements CanActivate {
     if (!userId) return true;
 
     if (await this.identityCheck.isDeletionScheduled(userId)) {
-      throw new ForbiddenException({
-        code: "FORBIDDEN",
-        message:
-          "Your account is scheduled for deletion. Restore it to make changes.",
-        details: { reason: AuthSchemas.ACCOUNT_DELETION_PENDING_REASON },
-      });
+      throw accountDeletionPendingException();
     }
     return true;
   }

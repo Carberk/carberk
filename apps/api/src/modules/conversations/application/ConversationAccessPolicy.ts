@@ -1,7 +1,8 @@
 import { ForbiddenException, Inject, Injectable } from "@nestjs/common";
-import { AdminSchemas, AuthSchemas } from "@auto-tm/contracts";
+import { AdminSchemas } from "@auto-tm/contracts";
 
 import {
+  accountDeletionPendingException,
   IDENTITY_CHECK_PORT,
   IDENTITY_READ_PORT,
   type IdentityCheckPort,
@@ -60,17 +61,13 @@ export class ConversationAccessPolicy {
   }
 
   /**
-   * Refuses a User whose account deletion is scheduled. Realtime sends do not
-   * pass the HTTP guard that enforces this for requests (ADR-0032).
+   * Refuses a User whose account deletion is scheduled. Realtime events do not
+   * pass the HTTP guard that enforces this for requests (ADR-0032), so the use
+   * cases they reach call this themselves.
    */
   async assertAccountNotPendingDeletion(userId: string): Promise<void> {
     if (await this.identityCheck.isDeletionScheduled(userId)) {
-      throw new ForbiddenException({
-        code: "FORBIDDEN",
-        message:
-          "Your account is scheduled for deletion. Restore it to make changes.",
-        details: { reason: AuthSchemas.ACCOUNT_DELETION_PENDING_REASON },
-      });
+      throw accountDeletionPendingException();
     }
   }
 

@@ -19,7 +19,11 @@ export class RecoverAccount {
 
   /**
    * Restores a User whose deletion is scheduled. A User with no scheduled
-   * deletion is left as is, so a retried or repeated restore succeeds.
+   * deletion is left as is, so a repeated restore succeeds.
+   *
+   * The two writes are not in one transaction, so the schedule is cleared
+   * last. Republishing is idempotent: if it fails, the schedule is still set
+   * and a retry republishes again; if the clear fails, the retry repeats both.
    */
   async execute(input: RecoverAccountInput): Promise<void> {
     const user = await this.userRepo.findById(input.userId);
@@ -30,7 +34,7 @@ export class RecoverAccount {
       return;
     }
 
-    await this.userRepo.clearDeletionSchedule(input.userId);
     await this.listingsPort.republishArchivedByDeletionListingsBySeller(input.userId);
+    await this.userRepo.clearDeletionSchedule(input.userId);
   }
 }

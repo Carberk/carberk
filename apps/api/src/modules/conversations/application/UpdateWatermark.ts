@@ -12,6 +12,8 @@ import {
   type ConversationRepository,
 } from "../domain/ports/ConversationRepository";
 
+import { ConversationAccessPolicy } from "./ConversationAccessPolicy";
+
 export interface UpdateWatermarkInput {
   userId: string;
   conversationId: string;
@@ -30,6 +32,8 @@ export class UpdateWatermark {
   constructor(
     @Inject(CONVERSATION_REPOSITORY)
     private readonly conversations: ConversationRepository,
+    @Inject(ConversationAccessPolicy)
+    private readonly accessPolicy: ConversationAccessPolicy,
   ) {}
 
   async execute(input: UpdateWatermarkInput): Promise<UpdateWatermarkResult> {
@@ -51,6 +55,8 @@ export class UpdateWatermark {
         details: { reason: CONVERSATION_ERROR_CODES.NOT_A_PARTICIPANT },
       });
     }
+
+    await this.accessPolicy.assertAccountNotPendingDeletion(input.userId);
 
     const updates: { lastReadAt?: Date; lastDeliveredAt?: Date } = {};
 

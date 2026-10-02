@@ -63,8 +63,8 @@ import { RealtimeModule } from "./modules/realtime/realtime.module";
     ReadinessService,
     { provide: APP_FILTER, useClass: GlobalErrorFilter },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
-    { provide: APP_GUARD, useClass: AccountDeletionPendingGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: AccountDeletionPendingGuard },
   ],
 })
 export class AppModule {}
