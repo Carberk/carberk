@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { renderMobile } from "../../../test/render";
+import { fireEvent, renderMobile } from "../../../test/render";
 
 import { MessageList, type MessageItem } from "./MessageList";
 
@@ -115,6 +115,105 @@ describe("MessageList day separators", () => {
     );
     screen.UNSAFE_getByProps({ inverted: true }).props.onEndReached();
     expect(onLoadOlder).toHaveBeenCalledOnce();
+  });
+});
+
+describe("MessageList older pages", () => {
+  it("shows a loading row at the top of the history while an older page loads", () => {
+    const screen = renderMobile(
+      <MessageList currentUserId={ME} messages={[message("today-1", at(2, 9))]} loadingOlder />,
+    );
+    expect(screen.getByLabelText("Loading earlier messages")).toBeTruthy();
+  });
+
+  it("has no loading row otherwise", () => {
+    const screen = renderMobile(<MessageList currentUserId={ME} messages={[message("today-1", at(2, 9))]} />);
+    expect(screen.queryByLabelText("Loading earlier messages")).toBeNull();
+  });
+
+  it("keeps the Messages and offers Retry when an older page fails", () => {
+    const onRetryOlder = vi.fn();
+    const screen = renderMobile(
+      <MessageList
+        currentUserId={ME}
+        messages={[message("today-1", at(2, 9))]}
+        olderFailed
+        onRetryOlder={onRetryOlder}
+      />,
+    );
+
+    expect(screen.getByText("today-1")).toBeTruthy();
+    expect(screen.getByText("Could not load earlier messages")).toBeTruthy();
+    const retry = screen.getByRole("button", { name: "Retry" });
+    expect(retry.props.style).toMatchObject({ minHeight: 44 });
+    fireEvent.press(retry);
+    expect(onRetryOlder).toHaveBeenCalledOnce();
+  });
+});
+
+describe("MessageList Message actions", () => {
+  it("asks to delete an own Message on long press", () => {
+    const onDelete = vi.fn();
+    const onReport = vi.fn();
+    const screen = renderMobile(
+      <MessageList
+        currentUserId={ME}
+        messages={[message("own-1", at(2, 9), { canDelete: true })]}
+        onDelete={onDelete}
+        onReport={onReport}
+      />,
+    );
+
+    fireEvent(screen.getByLabelText("own-1, 09:00 AM, Sent"), "longPress");
+    expect(onDelete).toHaveBeenCalledWith("own-1");
+    expect(onReport).not.toHaveBeenCalled();
+  });
+
+  it("asks to report the other participant's Message on long press", () => {
+    const onDelete = vi.fn();
+    const onReport = vi.fn();
+    const screen = renderMobile(
+      <MessageList
+        currentUserId={ME}
+        messages={[message("peer-1", at(2, 9), { senderId: PEER })]}
+        onDelete={onDelete}
+        onReport={onReport}
+      />,
+    );
+
+    fireEvent(screen.getByLabelText("peer-1, 09:00 AM"), "longPress");
+    expect(onReport).toHaveBeenCalledWith("peer-1");
+    expect(onDelete).not.toHaveBeenCalled();
+  });
+
+  it("does nothing on long press of a Message already reported", () => {
+    const onReport = vi.fn();
+    const screen = renderMobile(
+      <MessageList
+        currentUserId={ME}
+        messages={[message("peer-1", at(2, 9), { senderId: PEER })]}
+        reportedMessageIds={new Set(["peer-1"])}
+        onReport={onReport}
+      />,
+    );
+
+    expect(screen.getByText("Reported")).toBeTruthy();
+    fireEvent(screen.getByLabelText("peer-1, 09:00 AM, Reported"), "longPress");
+    expect(onReport).not.toHaveBeenCalled();
+  });
+
+  it("opens the photo of an image Message", () => {
+    const onImagePress = vi.fn();
+    const screen = renderMobile(
+      <MessageList
+        currentUserId={ME}
+        messages={[message("img-1", at(2, 9), { kind: "image", text: "", localImageUri: "file:///photo.jpg" })]}
+        onImagePress={onImagePress}
+      />,
+    );
+
+    fireEvent.press(screen.getByRole("imagebutton", { name: "Photo" }));
+    expect(onImagePress).toHaveBeenCalledWith("file:///photo.jpg");
   });
 });
 

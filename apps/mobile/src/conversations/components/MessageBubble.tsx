@@ -258,16 +258,18 @@ export function MessageBubble({
       : isPostRef
         ? t("listing")
         : text;
-  const accessibilityLabel = [
-    content,
-    time,
-    isMine && !isDeleted ? t(STATUS_LABEL_KEYS[status]) : undefined,
-  ]
+  const stateLabel = isMine && !isDeleted ? t(STATUS_LABEL_KEYS[status]) : undefined;
+  const reportedLabel = isReported && !isDeleted ? t("reported") : undefined;
+  const accessibilityLabel = [content, time, stateLabel, reportedLabel]
     .filter(Boolean)
     .join(", ");
   // Image and Listing bubbles hold their own pressable content, which a grouped
-  // accessible element would hide from screen readers.
+  // accessible element would hide from screen readers. Their footer row reads
+  // the time and state instead.
   const groupForAccessibility = !isImage && !isPostRef;
+  const footerLabel = groupForAccessibility
+    ? undefined
+    : [time, stateLabel].filter(Boolean).join(", ");
 
   const metaColorClass =
     isMine && !isDeleted ? "text-primary-foreground/80" : "text-muted-foreground";
@@ -308,6 +310,8 @@ export function MessageBubble({
             </View>
           ) : !isFailed ? (
             <View
+              accessible={!groupForAccessibility}
+              accessibilityLabel={footerLabel}
               className={`flex-row items-center gap-1 mt-1 ${
                 isMine ? "justify-end" : "justify-start"
               }`}

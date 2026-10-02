@@ -9,17 +9,6 @@ const header = readFileSync(
   "utf-8",
 );
 
-describe("ConversationDetailScreen quick replies", () => {
-  it("passes showQuickReplies to MessageComposer", () => {
-    expect(source).toContain("showQuickReplies:");
-  });
-
-  // The rule's cases live in showQuickReplies.spec.ts and the rendered screen spec.
-  it("decides quick replies through the one showQuickReplies rule", () => {
-    expect(source).toContain("showQuickReplies({");
-  });
-});
-
 describe("ConversationDetailScreen conversation mute", () => {
   it("wires the mute mutation hook", () => {
     expect(source).toContain("useMuteConversation");

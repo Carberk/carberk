@@ -31,6 +31,7 @@ const state = vi.hoisted(() => ({
     refetch: vi.fn(),
     hasNextPage: false,
     isFetchingNextPage: false,
+    isFetchNextPageError: false,
     fetchNextPage: vi.fn(),
   },
   mutation: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false },
@@ -159,6 +160,8 @@ beforeEach(() => {
   state.messages.data = { pages: [{ items: [] }] };
   state.messages.refetch.mockReset();
   state.messages.hasNextPage = false;
+  state.messages.isFetchingNextPage = false;
+  state.messages.isFetchNextPageError = false;
   state.messages.fetchNextPage.mockReset();
   state.socket.sendTextMessage.mockReset();
   state.socket.sendImageMessage.mockReset();
@@ -395,6 +398,34 @@ describe("Conversation history", () => {
     expect(await screen.findByText("hello")).toBeTruthy();
     screen.UNSAFE_getByProps({ inverted: true }).props.onEndReached();
     expect(state.messages.fetchNextPage).toHaveBeenCalledOnce();
+  });
+
+  it("shows a loading row while an older page loads", async () => {
+    state.messages.data = { pages: [{ items: [serverMessage("hello", BUYER_ID)], nextCursor: "next" }] };
+    state.messages.hasNextPage = true;
+    state.messages.isFetchingNextPage = true;
+    routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
+    const screen = renderMobile(<ConversationDetailScreen />);
+
+    expect(await screen.findByText("hello")).toBeTruthy();
+    expect(screen.getByLabelText("Loading earlier messages")).toBeTruthy();
+  });
+
+  it("keeps the loaded Messages when an older page fails and retries that page", async () => {
+    // TanStack Query keeps the pages and sets isError when fetchNextPage fails.
+    state.messages.data = { pages: [{ items: [serverMessage("hello", BUYER_ID)], nextCursor: "next" }] };
+    state.messages.hasNextPage = true;
+    state.messages.isError = true;
+    state.messages.isFetchNextPageError = true;
+    state.messages.error = new Error("offline");
+    routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
+    const screen = renderMobile(<ConversationDetailScreen />);
+
+    expect(await screen.findByText("hello")).toBeTruthy();
+    expect(screen.getByText("Could not load earlier messages")).toBeTruthy();
+    fireEvent.press(screen.getByRole("button", { name: "Retry" }));
+    expect(state.messages.fetchNextPage).toHaveBeenCalledOnce();
+    expect(state.messages.refetch).not.toHaveBeenCalled();
   });
 });
 
