@@ -1,4 +1,13 @@
-import { Bell, FileText, List, ScrollText, ShieldCheck, User } from "lucide-react-native";
+import {
+  Bell,
+  CircleHelp,
+  FileText,
+  Info,
+  List,
+  ScrollText,
+  ShieldCheck,
+  User,
+} from "lucide-react-native";
 import { router } from "expo-router";
 import * as Linking from "expo-linking";
 import { ScrollView, View } from "react-native";
@@ -129,7 +138,7 @@ function openLegalPage(locale: string, kind: "terms" | "privacy" | "posting-rule
 }
 
 export default function CabinetScreen() {
-  const { t, i18n } = useTranslation(["account", "common"]);
+  const { t, i18n } = useTranslation(["account", "common", "support"]);
   const { isAuthenticated } = useAuth();
 
   return (
@@ -177,6 +186,12 @@ export default function CabinetScreen() {
         <ThemeRow />
         <MenuDivider />
         <MenuRow
+          icon={CircleHelp}
+          label={t("support:help")}
+          onPress={() => router.push("/help")}
+        />
+        <MenuDivider />
+        <MenuRow
           icon={ShieldCheck}
           label={t("account:termsOfService")}
           onPress={() => openLegalPage(i18n.language, "terms")}
@@ -192,6 +207,12 @@ export default function CabinetScreen() {
           icon={ScrollText}
           label={t("account:postingRules")}
           onPress={() => openLegalPage(i18n.language, "posting-rules")}
+        />
+        <MenuDivider />
+        <MenuRow
+          icon={Info}
+          label={t("support:about")}
+          onPress={() => router.push("/about")}
         />
       </ScrollView>
     </SafeAreaView>

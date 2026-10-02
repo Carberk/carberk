@@ -687,6 +687,16 @@ export const resources: Resource = {
         "Продавцы с подтверждёнными телефонами, честные данные о состоянии и VIN — а проверки AutoTM уже в пилоте.",
       getStarted: "Начать",
     },
+    support: {
+      help: "Помощь",
+      emailUs: "Написать на почту",
+      callUs: "Позвонить нам",
+      includeV: "Укажите номер объявления, например № 123456, и что произошло.",
+      noMailApp: "Не удалось открыть почту. Скопируйте адрес:",
+      noDialer: "Не удалось открыть набор номера. Скопируйте номер:",
+      about: "О приложении",
+      appVersion: "Версия {{version}}",
+    },
   },
   tk: {
     common: {
@@ -1349,6 +1359,16 @@ export const resources: Resource = {
         "Tassyklanan telefon satyjylar, çynsy ýagdaý maglumatlary we VIN — AutoTM barlaglary bolsa pilotda.",
       getStarted: "Başla",
     },
+    support: {
+      help: "Kömek",
+      emailUs: "E-poçta ýaz",
+      callUs: "Bize jaň et",
+      includeV: "Bildiriş belgisini, mysal üçin № 123456, we näme bolandygyny ýazyň.",
+      noMailApp: "Poçta programmasy açylmady. Salgyny göçüriň:",
+      noDialer: "Jaň programmasy açylmady. Belgini göçüriň:",
+      about: "Programma hakda",
+      appVersion: "Wersiýa {{version}}",
+    },
   },
   en: {
     common: {
@@ -2008,6 +2028,16 @@ export const resources: Resource = {
       valueProp3Body:
         "Verified-phone sellers, honest condition disclosures, and VIN history — with AutoTM inspections coming in pilot.",
       getStarted: "Get started",
+    },
+    support: {
+      help: "Help",
+      emailUs: "Email us",
+      callUs: "Call us",
+      includeV: "Tell us the Listing number, for example No. 123456, and what happened.",
+      noMailApp: "Couldn't open a mail app. Copy the address:",
+      noDialer: "Couldn't open the dialer. Copy the number:",
+      about: "About the app",
+      appVersion: "Version {{version}}",
     },
   },
 };
