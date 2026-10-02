@@ -393,6 +393,30 @@ describe("PublishListing", () => {
     expect(variantGenerator.generated).toEqual(["p1.jpg", "p2.jpg"]);
   });
 
+  // #536: User B's Listing publicly exposes its media key, so a known key must
+  // authorize nothing for User A's draft.
+  it("does not publish a draft whose photo key was never presigned for its owner", async () => {
+    seedDraft(draftRepo, {
+      ...validPayload,
+      photos: [
+        {
+          photoId: "00000000-0000-0000-0000-000000000005",
+          key: "pending/user-b-upload/original.jpg",
+          sortOrder: 0,
+        },
+      ],
+    });
+
+    const uc = makeUseCase(draftRepo, prisma, exchangeRates, events, variantGenerator);
+    await expect(
+      uc.execute({ draftId: "draft-1", userId: "user-1" }),
+    ).rejects.toThrow();
+
+    expect(prisma.createdListings).toHaveLength(0);
+    expect(prisma.createdMedia).toHaveLength(0);
+    expect(variantGenerator.generated).toEqual([]);
+  });
+
   it("publishes damaged: false without Known issues", async () => {
     seedDraft(draftRepo, { ...validPayload, conditionDisclosure: { damaged: false } });
 
