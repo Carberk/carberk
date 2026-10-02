@@ -746,10 +746,13 @@ export default function ConversationDetailScreen() {
     setReportedMessageIds((prev) => new Set(prev).add(messageId));
   }, []);
 
-  const { hasNextPage, isFetchingNextPage, fetchNextPage } = messagesQuery;
+  const { hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage } = messagesQuery;
   const loadOlderMessages = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  const retryOlderMessages = useCallback(() => {
+    void fetchNextPage();
+  }, [fetchNextPage]);
 
   const handleSignIn = useCallback(() => {
     useAuthIntentStore.getState().requireSignIn(router, {
@@ -762,7 +765,8 @@ export default function ConversationDetailScreen() {
   }, [router]);
 
   const isLoading = messagesQuery.isPending;
-  const isError = messagesQuery.isError;
+  // A failed older page keeps the loaded pages; only fail the screen with nothing to show.
+  const isError = messagesQuery.isError && !messagesQuery.data;
   // A Conversation that failed to load, with nothing cached to show instead.
   const conversationFailed = conversationQuery.isError && !conversation;
 
@@ -851,6 +855,9 @@ export default function ConversationDetailScreen() {
               router.push(`/(public)/listings/${listingId}`)
             }
             onLoadOlder={loadOlderMessages}
+            loadingOlder={isFetchingNextPage}
+            olderFailed={isFetchNextPageError && !isFetchingNextPage}
+            onRetryOlder={retryOlderMessages}
           />
         ) : null}
       </View>

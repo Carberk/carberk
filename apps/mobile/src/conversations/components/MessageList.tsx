@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { FlatList, View } from "react-native";
+import { FlatList, Pressable, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { buildChatImageUrl } from "../upload/buildChatImageUrl";
@@ -13,6 +13,7 @@ import {
   type PostRefMessageMetadata,
 } from "./MessageBubble";
 
+import { Skeleton } from "@/components/ui/skeleton";
 import { Text } from "@/components/ui/text";
 
 export interface MessageItem {
@@ -41,6 +42,57 @@ interface MessageListProps {
   onPostRefPress?: (listingId: string) => void;
   /** Called at the top of the history to load an older page. */
   onLoadOlder?: () => void;
+  /** An older page is loading. */
+  loadingOlder?: boolean;
+  /** An older page failed; the loaded Messages stay and the top offers Retry. */
+  olderFailed?: boolean;
+  onRetryOlder?: () => void;
+}
+
+function OlderMessagesRow({
+  loading,
+  failed,
+  onRetry,
+}: {
+  loading: boolean;
+  failed: boolean;
+  onRetry?: () => void;
+}) {
+  const { t } = useTranslation();
+
+  if (loading) {
+    return (
+      <View
+        accessible
+        accessibilityRole="progressbar"
+        accessibilityLabel={t("conversations:loadingOlderMessages")}
+        className="items-center py-4"
+      >
+        <Skeleton className="h-4 w-32 rounded" />
+      </View>
+    );
+  }
+  if (failed) {
+    return (
+      <View className="flex-row items-center justify-center gap-2 px-4 py-2">
+        <Text className="text-xs text-muted-foreground">
+          {t("conversations:olderMessagesFailed")}
+        </Text>
+        {onRetry && (
+          <Pressable
+            onPress={onRetry}
+            accessibilityRole="button"
+            accessibilityLabel={t("retry")}
+            style={{ minHeight: 44, minWidth: 44 }}
+            className="items-center justify-center px-2"
+          >
+            <Text className="text-xs font-semibold text-primary underline">{t("retry")}</Text>
+          </Pressable>
+        )}
+      </View>
+    );
+  }
+  return null;
 }
 
 function DaySeparator({ label }: { label: string }) {
@@ -61,6 +113,9 @@ export function MessageList({
   onImagePress,
   onPostRefPress,
   onLoadOlder,
+  loadingOlder = false,
+  olderFailed = false,
+  onRetryOlder,
 }: MessageListProps) {
   const { t, i18n } = useTranslation();
   const reported = reportedMessageIds ?? new Set<string>();
@@ -119,6 +174,10 @@ export function MessageList({
       onEndReached={onLoadOlder}
       onEndReachedThreshold={0.5}
       keyboardShouldPersistTaps="handled"
+      // The list is inverted, so its footer sits above the oldest Message.
+      ListFooterComponent={
+        <OlderMessagesRow loading={loadingOlder} failed={olderFailed} onRetry={onRetryOlder} />
+      }
       ListEmptyComponent={
         <View
           style={{ transform: [{ scaleY: -1 }] }}

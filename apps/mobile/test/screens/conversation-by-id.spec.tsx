@@ -223,6 +223,8 @@ describe("Conversation opened with only its ID", () => {
 
   it("shows ErrorState with Retry when the Messages fail to load", async () => {
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
+    // A first load that fails has no pages to show.
+    state.messages.data = undefined;
     state.messages.isError = true;
     state.messages.error = new Error("offline");
     const screen = renderMobile(<ConversationDetailScreen />);

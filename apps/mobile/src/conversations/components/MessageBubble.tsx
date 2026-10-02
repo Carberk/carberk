@@ -82,6 +82,7 @@ function ImageBubble({
   height?: number;
   onPress?: () => void;
 }) {
+  const { t } = useTranslation();
   const [failed, setFailed] = useState(false);
 
   const displayHeight =
@@ -90,7 +91,12 @@ function ImageBubble({
       : DEFAULT_IMAGE_HEIGHT;
 
   return (
-    <Pressable onPress={onPress} className="overflow-hidden rounded-xl">
+    <Pressable
+      onPress={onPress}
+      accessibilityRole={onPress ? "imagebutton" : "image"}
+      accessibilityLabel={t("photo")}
+      className="overflow-hidden rounded-xl"
+    >
       {failed ? (
         <View
           className="items-center justify-center bg-muted"

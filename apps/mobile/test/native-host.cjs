@@ -22,10 +22,11 @@ Pressable.displayName = "Pressable";
 const scrollRequests = [];
 const slot = (component) => component == null || React.isValidElement(component)
   ? component ?? null : React.createElement(component);
-// Header renders first and the empty component only when there is no data, like
-// the native list. A component or an element is accepted for both.
+// Header renders first, the empty component only when there is no data, and the
+// footer last, like the native list. A component or an element is accepted for each.
 const FlatList = React.forwardRef(({
-  data = [], renderItem, keyExtractor, ListHeaderComponent, ListEmptyComponent, ...props
+  data = [], renderItem, keyExtractor, ListHeaderComponent, ListEmptyComponent, ListFooterComponent,
+  ...props
 }, ref) => {
   React.useImperativeHandle(ref, () => ({
     scrollToIndex: (args) => scrollRequests.push({ method: "scrollToIndex", ...args }),
@@ -34,7 +35,7 @@ const FlatList = React.forwardRef(({
   return React.createElement("RCTScrollView", props, slot(ListHeaderComponent),
     data.map((item, index) => React.createElement(React.Fragment,
       { key: keyExtractor?.(item, index) ?? index }, renderItem({ item, index }))),
-    data.length ? null : slot(ListEmptyComponent));
+    data.length ? null : slot(ListEmptyComponent), slot(ListFooterComponent));
 });
 FlatList.displayName = "FlatList";
 const flatten = (style) => Array.isArray(style)
