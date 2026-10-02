@@ -19,7 +19,7 @@ import { InMemoryMediaWorld } from "./testing/InMemoryMediaWorld";
 
 // Issue #536: two Users, distinct Listings, one consistent in-memory world.
 // User B's Listing publicly exposes its media key (GetListingDetail), so a known
-// key must authorize nothing for User A. See ADR-0077.
+// key must authorize nothing for User A. See ADR-0079.
 
 const USER_A = "user-a";
 const USER_B = "user-b";
@@ -303,7 +303,7 @@ describe("Listing media upload ownership (#536)", () => {
     });
 
     it("does not let a pre-fix duplicate row delete the original owner's objects", async () => {
-      // Created before ADR-0077: A's Listing already holds B's key with no provenance.
+      // Created before ADR-0079: A's Listing already holds B's key with no provenance.
       world.media.push(
         ListingMedia.create({
           id: "legacy-duplicate",

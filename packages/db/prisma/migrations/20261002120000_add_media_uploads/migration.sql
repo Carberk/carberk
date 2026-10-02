@@ -1,4 +1,4 @@
--- #536 / ADR-0077: server-recorded upload provenance.
+-- #536 / ADR-0079: server-recorded upload provenance.
 -- Presign records a media_uploads row for the calling User. A listing_media row
 -- adopts it at most once (listing_media.uploadId is unique), and storage cleanup
 -- authority follows that link instead of the object key.

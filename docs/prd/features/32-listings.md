@@ -51,7 +51,7 @@ Per [ADR-0056](../../adr/0056-listing-contact-phones-are-verified.md), every Lis
 - Upload starts as early as possible and runs in the background relative to the wizard UI. The user can continue later steps while media uploads.
 - Background upload is best-effort only. If the app is backgrounded, killed, or the network drops, uploads may pause/fail; on reopen/reconnect the app retries from the staged compressed file as a whole-file retry.
 - Publish is blocked until at least one photo is attached successfully and there are no required pending or failed uploads.
-- The server records each presigned upload for the User who requested it. Only that User can publish or attach it, and each upload backs one photo; a known or copied storage key authorizes nothing ([ADR-0077](../../adr/0077-server-recorded-upload-provenance-for-listing-media.md)). Retrying the same attach returns the existing photo.
+- The server records each presigned upload for the User who requested it. Only that User can publish or attach it, and each upload backs one photo; a known or copied storage key authorizes nothing ([ADR-0079](../../adr/0079-server-recorded-upload-provenance-for-listing-media.md)). Retrying the same attach returns the existing photo.
 - Phase 1 does not promise byte-level resumable/multipart uploads, full offline listing creation, or guaranteed OS-level background upload.
 - Listing/feed screens use last-seen data while reconnecting, then refresh on app foreground/reconnect. This is not an offline browsing mode promise.
 - Remote listing images are displayed through a native image cache (`expo-image` in mobile) using immutable media URLs. TanStack Query caches listing JSON, not image/video bytes.

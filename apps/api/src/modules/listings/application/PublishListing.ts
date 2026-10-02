@@ -152,7 +152,7 @@ export class PublishListing {
     const attachedPhotos = photos.filter((photo) => photo.key);
 
     // A draft's photo keys are only strings. Each must be an upload this User
-    // presigned and has not adopted elsewhere (ADR-0077); the unique upload link
+    // presigned and has not adopted elsewhere (ADR-0079); the unique upload link
     // on the media row below makes that single-use even under a race.
     const photoKeys = attachedPhotos.map((photo) => photo.key as string);
     if (new Set(photoKeys).size !== photoKeys.length) {

@@ -17,7 +17,7 @@ export interface UploadClaim {
 }
 
 /**
- * The trusted boundary for adopting uploaded media (ADR-0077). A key authorizes
+ * The trusted boundary for adopting uploaded media (ADR-0079). A key authorizes
  * nothing by itself: the server must hold an upload this User presigned, of the
  * expected kind, whose stored object still matches what presign recorded.
  *

@@ -1,4 +1,4 @@
-# ADR-0077: Server-recorded upload provenance for Listing media
+# ADR-0079: Server-recorded upload provenance for Listing media
 
 - **Status**: Accepted
 - **Date**: 2026-10-02

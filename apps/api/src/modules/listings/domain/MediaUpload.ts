@@ -1,7 +1,7 @@
 import type { MediaKind } from "./types";
 
 /**
- * Server-recorded provenance of a presigned upload (ADR-0077). Presign creates
+ * Server-recorded provenance of a presigned upload (ADR-0079). Presign creates
  * one for the calling User; a ListingMedia row adopts it at most once. A storage
  * key with no MediaUpload authorizes nothing.
  */

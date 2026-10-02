@@ -457,7 +457,7 @@ model ListingMedia {
   posterKey  String?
   createdAt  DateTime  @default(now())
 
-  // The server-recorded upload this row adopted (ADR-0077). One row per upload.
+  // The server-recorded upload this row adopted (ADR-0079). One row per upload.
   // Null only for legacy rows that duplicated a key already owned by another
   // row: removing such a row never deletes storage objects.
   uploadId String?      @unique
@@ -467,7 +467,7 @@ model ListingMedia {
   @@map("listing_media")
 }
 
-/// Provenance of a presigned upload (ADR-0077). Presign creates the row for the
+/// Provenance of a presigned upload (ADR-0079). Presign creates the row for the
 /// calling User; a ListingMedia row adopts it at most once. A key without a row
 /// authorizes nothing, and deletion authority follows the adopting row.
 model MediaUpload {

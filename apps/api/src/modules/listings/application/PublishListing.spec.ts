@@ -437,7 +437,7 @@ describe("PublishListing", () => {
 
   // #536: User B's Listing publicly exposes its media key, so a known key must
   // authorize nothing for User A's draft.
-  describe("upload ownership (#536, ADR-0077)", () => {
+  describe("upload ownership (#536, ADR-0079)", () => {
     const photoDraft = (key: string) => ({
       ...validPayload,
       photos: [{ photoId: "00000000-0000-0000-0000-000000000005", key, sortOrder: 0 }],

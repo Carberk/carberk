@@ -53,7 +53,7 @@ export class RemoveMedia {
     // caller that releases an adopted upload gets a key back; a row with no
     // provenance, or whose key another row still references, never does, so a
     // key copied from another Listing can never reach the storage deletes below
-    // (ADR-0077).
+    // (ADR-0079).
     const { removed, ownedKey } = await this.mediaRepo.deleteReleasingUpload(input.mediaId);
     if (!removed) {
       throw new NotFoundException("Media not found");

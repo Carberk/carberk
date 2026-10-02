@@ -99,7 +99,7 @@ export class AttachMedia {
       });
     }
 
-    // A key alone authorizes nothing (ADR-0077): the caller must hold the
+    // A key alone authorizes nothing (ADR-0079): the caller must hold the
     // presigned upload, still unadopted, with a matching object in storage.
     const claims: UploadClaim[] = [{ key: input.key, kind: input.kind }];
     if (input.posterKey !== undefined) {

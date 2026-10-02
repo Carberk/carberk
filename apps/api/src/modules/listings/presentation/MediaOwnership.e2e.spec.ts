@@ -28,7 +28,7 @@ import { LISTING_EVENT_PUBLISHER } from "../domain/ports/ListingEventPublisher";
 import { MEDIA_OBJECT_INSPECTOR } from "../domain/ports/MediaObjectInspector";
 import { MEDIA_STORAGE_PORT } from "../domain/ports/MediaStoragePort";
 
-// Issue #536 / ADR-0077 against real Postgres: the unique upload link, the
+// Issue #536 / ADR-0079 against real Postgres: the unique upload link, the
 // atomic release and the cleanup guard are database behavior, not fakes.
 
 const suite = defineE2eSuite("media-ownership");

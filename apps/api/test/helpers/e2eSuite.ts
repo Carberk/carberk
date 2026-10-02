@@ -159,7 +159,7 @@ export const fakeMediaObjectInspector = {
 
 /**
  * Publication adopts only uploads the server recorded for the draft's owner
- * (ADR-0077). This records a presigned upload per photo key in `payload` and
+ * (ADR-0079). This records a presigned upload per photo key in `payload` and
  * returns the payload with those keys replaced by fresh, globally unique ones,
  * because `media_uploads.key` is unique across suites that share a database.
  * Photos without a key are left as they are.

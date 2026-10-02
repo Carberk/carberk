@@ -69,7 +69,7 @@ export class PresignUpload {
     });
 
     // The caller owns this key from the moment the URL exists. Only a recorded
-    // upload can later be attached or published (ADR-0077).
+    // upload can later be attached or published (ADR-0079).
     await this.uploads.record({
       id: randomUUID(),
       userId: input.userId,

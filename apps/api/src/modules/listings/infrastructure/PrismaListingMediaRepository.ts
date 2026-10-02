@@ -83,7 +83,7 @@ export class PrismaListingMediaRepository implements ListingMediaRepository {
 
       // Releasing the upload makes its key unusable for any later attach. Another
       // row can still reference the key only for legacy duplicates made before
-      // ADR-0077, and their objects must survive this removal.
+      // ADR-0079, and their objects must survive this removal.
       const stillReferenced = await tx.listingMedia.count({ where: { key: row.key } });
       const released = await tx.mediaUpload.deleteMany({
         where: { id: row.uploadId, key: row.key },

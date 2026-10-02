@@ -27,7 +27,7 @@ export class ListingMedia {
     durationMs?: number;
     posterKey?: string;
     createdAt?: Date;
-    /** The MediaUpload this row adopted; absent only on legacy rows (ADR-0077). */
+    /** The MediaUpload this row adopted; absent only on legacy rows (ADR-0079). */
     uploadId?: string;
   }): ListingMedia {
     if (data.posterKey && data.kind !== "video") {
