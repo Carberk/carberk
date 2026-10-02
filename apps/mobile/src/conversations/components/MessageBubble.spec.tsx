@@ -1,125 +1,143 @@
-import { readFileSync } from "fs";
-import { resolve } from "path";
+import type { ComponentProps } from "react";
+import { describe, expect, it, vi } from "vitest";
 
-import { describe, it, expect } from "vitest";
+import { fireEvent, renderMobile } from "../../../test/render";
 
-const source = readFileSync(resolve(__dirname, "./MessageBubble.tsx"), "utf-8");
+import { MessageBubble } from "./MessageBubble";
 
-describe("MessageBubble", () => {
-  it("exports MessageBubble component", () => {
-    expect(source).toContain("export function MessageBubble");
+// 14:05 local time, whatever the machine's time zone.
+const AT_1405 = new Date(2026, 9, 2, 14, 5).toISOString();
+
+function bubble(props: Partial<ComponentProps<typeof MessageBubble>> = {}) {
+  return (
+    <MessageBubble
+      id="m1"
+      text="Is the car still available?"
+      isMine
+      status="sent"
+      createdAt={AT_1405}
+      {...props}
+    />
+  );
+}
+
+describe("MessageBubble time and ticks", () => {
+  it("shows the time and one tick on a sent own Message", () => {
+    const screen = renderMobile(bubble({ status: "sent" }));
+
+    expect(screen.getByText("02:05 PM")).toBeTruthy();
+    expect(screen.getByTestId("message-tick-sent", { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByTestId("message-tick-double", { includeHiddenElements: true })).toBeNull();
+    expect(screen.getByLabelText("Is the car still available?, 02:05 PM, Sent")).toBeTruthy();
   });
 
-  it("accepts text, isMine, status, and createdAt props", () => {
-    expect(source).toContain("text: string");
-    expect(source).toContain("isMine: boolean");
-    expect(source).toContain("status: MessageStatus");
-    expect(source).toContain("createdAt: string");
+  it("shows two ticks in one style for delivered and read", () => {
+    const tickClasses = (screen: ReturnType<typeof renderMobile>) =>
+      screen
+        .getByTestId("message-tick-double", { includeHiddenElements: true })
+        .children.map((child: { props: { className?: string } } | string) =>
+          typeof child === "string" ? child : child.props.className,
+        );
+
+    const delivered = renderMobile(bubble({ status: "delivered" }));
+    expect(delivered.getByLabelText("Is the car still available?, 02:05 PM, Delivered")).toBeTruthy();
+    const deliveredClasses = tickClasses(delivered);
+    delivered.unmount();
+
+    const read = renderMobile(bubble({ status: "read" }));
+    expect(read.getByLabelText("Is the car still available?, 02:05 PM, Read")).toBeTruthy();
+    expect(tickClasses(read)).toEqual(deliveredClasses);
+    expect(deliveredClasses[0]).toEqual(expect.stringContaining("size-3.5"));
   });
 
-  it("supports sent, delivered, and read statuses", () => {
-    expect(source).toContain('"sent"');
-    expect(source).toContain('"delivered"');
-    expect(source).toContain('"read"');
+  it("shows the time without ticks on the other participant's Message", () => {
+    const screen = renderMobile(bubble({ isMine: false }));
+
+    expect(screen.getByText("02:05 PM")).toBeTruthy();
+    expect(screen.queryByTestId(/message-tick/, { includeHiddenElements: true })).toBeNull();
+    expect(screen.getByLabelText("Is the car still available?, 02:05 PM")).toBeTruthy();
   });
 
-  it("renders a delivered/read check icon for own messages", () => {
-    expect(source).toContain("StatusIcon");
-    expect(source).toContain("Check");
-    expect(source).toContain("CheckCheck");
-  });
-
-  it("accepts onRetry callback for failed messages", () => {
-    expect(source).toContain("onRetry?: () => void");
-  });
-
-  it("accepts delete affordance props", () => {
-    expect(source).toContain("deletedAt?: string | null");
-    expect(source).toContain("canDelete?: boolean");
-    expect(source).toContain("onDelete?: () => void");
-  });
-
-  it("aligns own messages to the right", () => {
-    expect(source).toContain('isMine ? "justify-end" : "justify-start"');
-  });
-
-  it("uses primary background for own messages", () => {
-    expect(source).toContain('isMine\n              ? "bg-primary rounded-br-md"');
-  });
-
-  it("uses muted background for peer messages", () => {
-    expect(source).toContain(': "bg-muted rounded-bl-md"');
-  });
-
-  it("renders deleted state with muted style", () => {
-    expect(source).toContain("isDeleted");
-    expect(source).toContain('"bg-muted/60 rounded-md"');
-    expect(source).toContain('t("conversations:messageDeleted")');
-  });
-
-  it("shows pending status text", () => {
-    expect(source).toContain('status === "pending"');
-    expect(source).toContain('t("sending")');
-  });
-
-  it("shows failed status text with retry affordance", () => {
-    expect(source).toContain('status === "failed"');
-    expect(source).toContain('t("failedToSend")');
-    expect(source).toContain("RotateCcw");
-    expect(source).toContain("onRetry");
-  });
-
-  it("has retry accessibility label", () => {
-    expect(source).toContain('accessibilityLabel={t("retry")}');
-  });
-
-  it("uses hitSlop for retry tap target", () => {
-    expect(source).toContain("hitSlop");
-  });
-
-  it("accepts a reported prop", () => {
-    expect(source).toContain("reported?: boolean");
-  });
-
-  it("renders a reported indicator when reported is true", () => {
-    expect(source).toContain("isReported");
-    expect(source).toContain("as={Flag}");
-    expect(source).toContain('t("reported")');
-  });
-
-  it("does not offer report long-press when the message is already reported", () => {
-    expect(source).toContain("!isReported");
+  it("formats the time in the app language", () => {
+    const screen = renderMobile(bubble(), { locale: "ru" });
+    expect(screen.getByText("14:05")).toBeTruthy();
   });
 });
 
-describe("MessageBubble image support", () => {
-  it("accepts kind prop for text, image, or post_ref messages", () => {
-    expect(source).toContain('kind?: "text" | "image" | "post_ref"');
+describe("MessageBubble Read label", () => {
+  it("shows Read under the bubble when asked to", () => {
+    const screen = renderMobile(bubble({ status: "read", showReadLabel: true }));
+    expect(screen.getByText("Read")).toBeTruthy();
   });
 
-  it("accepts image metadata", () => {
-    expect(source).toContain("metadata?: ImageMessageMetadata | PostRefMessageMetadata");
-    expect(source).toContain("key: string");
+  it("has no Read label otherwise", () => {
+    const screen = renderMobile(bubble({ status: "read" }));
+    expect(screen.queryByText("Read")).toBeNull();
+  });
+});
+
+describe("MessageBubble sending and failed", () => {
+  it("shows Sending... on a pending Message", () => {
+    const screen = renderMobile(bubble({ status: "pending" }));
+
+    expect(screen.getByText("Sending...")).toBeTruthy();
+    expect(screen.queryByTestId(/message-tick/, { includeHiddenElements: true })).toBeNull();
+    expect(screen.getByLabelText("Is the car still available?, 02:05 PM, Sending...")).toBeTruthy();
   });
 
-  it("accepts post_ref card callbacks", () => {
-    expect(source).toContain("onPostRefPress?: (listingId: string) => void");
+  it("shows Failed to send and a visible Retry with a 44 pt target", () => {
+    const onRetry = vi.fn();
+    const screen = renderMobile(bubble({ status: "failed", onRetry }));
+
+    expect(screen.getByText("Failed to send")).toBeTruthy();
+    const retry = screen.getByRole("button", { name: "Retry" });
+    expect(screen.getByText("Retry")).toBeTruthy();
+    expect(retry.props.style).toMatchObject({ minHeight: 44, minWidth: 44 });
+    fireEvent.press(retry);
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+});
+
+describe("MessageBubble kinds keep their look and gain the time", () => {
+  it("shows the time on a deleted Message", () => {
+    const screen = renderMobile(bubble({ deletedAt: AT_1405 }));
+
+    expect(screen.getByText("Message deleted")).toBeTruthy();
+    expect(screen.getByText("02:05 PM")).toBeTruthy();
+    expect(screen.getByLabelText("Message deleted, 02:05 PM")).toBeTruthy();
   });
 
-  it("accepts local image URI for pending/failed previews", () => {
-    expect(source).toContain("localImageUri?: string");
+  it("shows the time on an image Message", () => {
+    const screen = renderMobile(
+      bubble({ kind: "image", text: "", localImageUri: "file:///photo.jpg", status: "delivered" }),
+    );
+
+    expect(screen.getByText("02:05 PM")).toBeTruthy();
+    expect(screen.getByTestId("message-tick-double", { includeHiddenElements: true })).toBeTruthy();
   });
 
-  it("accepts image press callback", () => {
-    expect(source).toContain("onImagePress?: () => void");
-  });
+  it("shows the time on a Listing-reference Message", () => {
+    const screen = renderMobile(
+      bubble({
+        kind: "post_ref",
+        isMine: false,
+        text: "",
+        metadata: {
+          listingId: "00000000-0000-4000-8000-0000000000a1",
+          brandId: "00000000-0000-4000-8000-0000000000d1",
+          modelId: "00000000-0000-4000-8000-0000000000d2",
+          year: 2018,
+          displayPriceTmt: 285000,
+          priceCurrency: "TMT",
+          status: "active",
+          available: true,
+        },
+        postRefBrandName: "Toyota",
+        postRefModelName: "Camry",
+      }),
+    );
 
-  it("renders an image bubble for image kind", () => {
-    expect(source).toContain("<ImageBubble");
-    expect(source).toContain('contentFit="cover"');
-  });
-
-  it("builds remote image URL from metadata key", () => {
-    expect(source).toContain("buildChatImageUrl");
+    expect(screen.getByText(/Toyota Camry/)).toBeTruthy();
+    expect(screen.getByText("02:05 PM")).toBeTruthy();
   });
 });

@@ -14,14 +14,9 @@ describe("ConversationDetailScreen quick replies", () => {
     expect(source).toContain("showQuickReplies:");
   });
 
-  it("shows quick replies only when thread is loaded and empty", () => {
-    expect(source).toContain("!isLoading");
-    expect(source).toContain("!isError");
-    expect(source).toContain("allMessages.length === 0");
-  });
-
-  it("hides quick replies when the conversation is blocked", () => {
-    expect(source).toContain("!isBlocked");
+  // The rule's cases live in showQuickReplies.spec.ts and the rendered screen spec.
+  it("decides quick replies through the one showQuickReplies rule", () => {
+    expect(source).toContain("showQuickReplies({");
   });
 });
 

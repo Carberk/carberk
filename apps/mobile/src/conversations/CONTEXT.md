@@ -12,6 +12,10 @@ This area holds the Messages list, the Conversation screen's parts, the chat soc
 
 **Local pending and failed Messages.** The route keeps optimistic Messages in local state, keyed by a client message ID, and drops each one once the server copy with that ID arrives. Failed ones stay local until Retry; they never enter the query cache.
 
+**Quick replies.** `showQuickReplies` is the one rule for the chips above the composer: the buyer sees them until the seller has sent a Message (D7), never the seller, and not while loading, in an error state, while older history is unloaded, or whenever the viewer cannot send (blocked, or a `sendRestriction` that is set or not yet known). A tap only fills the composer (Q4). Change the rule there, not in the route.
+
+**Bubble footer and history.** Every bubble shows its time; own Messages add ✓ (sent) or ✓✓ (delivered or read) in one style, and only the last own Message carries the "Read" label (D6). `buildMessageRows` decides the day separators and that label from the newest-first list, so both stay right when an older page is appended; the list asks for older pages through `onLoadOlder`.
+
 **Push entry.** `src/notifications/useDirectMessagePushRouting.ts` turns a direct-message notification tap into a push of `/conversations/[id]` with the ID alone. It is wired once in the root layout and holds no Conversation data.
 
 **Messages list.** `ConversationList` renders the summaries from `useConversations` in server order and refetches when its screen regains focus, so a row's unread badge clears after the Conversation is read. The row's tick and the Conversation's bubbles share one sent / delivered / read rule, `outgoingStatus.ts`.

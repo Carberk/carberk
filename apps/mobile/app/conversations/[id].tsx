@@ -29,6 +29,7 @@ import { MessageList } from "../../src/conversations/components/MessageList";
 import type { ComposerAttachment } from "../../src/conversations/components/MessageComposer";
 import { ImagePreviewModal } from "../../src/conversations/components/ImagePreviewModal";
 import { useConversationCatalogMaps } from "../../src/conversations/components/useConversationCatalogMaps";
+import { showQuickReplies } from "../../src/conversations/showQuickReplies";
 import type { MessageStatus } from "../../src/conversations/components/MessageBubble";
 import { outgoingStatus } from "../../src/conversations/outgoingStatus";
 import { MessageReportSheet } from "../../src/admin/components/MessageReportSheet";
@@ -695,6 +696,11 @@ export default function ConversationDetailScreen() {
     setReportedMessageIds((prev) => new Set(prev).add(messageId));
   }, []);
 
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = messagesQuery;
+  const loadOlderMessages = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
   const isLoading = messagesQuery.isPending;
   const isError = messagesQuery.isError;
   // A Conversation that failed to load, with nothing cached to show instead.
@@ -775,6 +781,7 @@ export default function ConversationDetailScreen() {
             onPostRefPress={(listingId) =>
               router.push(`/(public)/listings/${listingId}`)
             }
+            onLoadOlder={loadOlderMessages}
           />
         ) : (
           <View className="flex-1 items-center justify-center px-6">
@@ -796,12 +803,14 @@ export default function ConversationDetailScreen() {
                 onSend: handleSend,
                 onSendImage: handleSendImage,
                 disabled: isBlocked || blockUser.isPending || unblockUser.isPending,
-                showQuickReplies:
-                  !isLoading &&
-                  !isError &&
-                  !conversationFailed &&
-                  !isBlocked &&
-                  allMessages.length === 0,
+                showQuickReplies: showQuickReplies({
+                  conversation,
+                  messages: allMessages,
+                  hasOlderMessages: messagesQuery.hasNextPage,
+                  loading: isLoading,
+                  failed: isError || conversationFailed,
+                  blocked: isBlocked,
+                }),
                 onTyping: signalTyping,
                 onStopTyping: stopTyping,
                 conversationId,

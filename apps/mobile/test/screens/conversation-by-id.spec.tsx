@@ -24,8 +24,12 @@ const state = vi.hoisted(() => ({
     isError: false,
     error: null as unknown,
     refetch: vi.fn(),
+    hasNextPage: false,
+    isFetchingNextPage: false,
+    fetchNextPage: vi.fn(),
   },
   mutation: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false },
+  socket: { sendTextMessage: vi.fn(), sendImageMessage: vi.fn() },
 }));
 
 vi.mock("../../src/auth/useViewer", () => ({ useViewer: () => ({ userId: state.viewerId }) }));
@@ -58,8 +62,8 @@ vi.mock("../../src/conversations/socket/useConversationSocket", () => ({
     peerPresence: { online: true },
     signalTyping: vi.fn(),
     stopTyping: vi.fn(),
-    sendTextMessage: vi.fn(),
-    sendImageMessage: vi.fn(),
+    sendTextMessage: state.socket.sendTextMessage,
+    sendImageMessage: state.socket.sendImageMessage,
     markRead: vi.fn(async () => ({ ok: true })),
     deleteMessage: vi.fn(),
   }),
@@ -74,17 +78,20 @@ vi.mock("../../lib/theme", () => ({
   THEME: { light: { mutedForeground: "0 0% 45%" }, dark: { mutedForeground: "0 0% 60%" } },
 }));
 vi.mock("../../src/conversations/upload/chatImageUpload", () => ({
-  uploadChatImageToPresignedUrl: vi.fn(),
-  compressChatImage: vi.fn(),
-  getChatImageStagingPath: vi.fn(),
-  ensureChatStagingDir: vi.fn(),
+  uploadChatImageToPresignedUrl: vi.fn(async () => {}),
+  compressChatImage: vi.fn(async () => ({ uri: "file:///staged.jpg", fileSize: 1000, width: 800, height: 600 })),
+  getChatImageStagingPath: vi.fn(() => "file:///staged.jpg"),
+  ensureChatStagingDir: vi.fn(async () => {}),
   ChatImageUploadError: class extends Error {},
 }));
 vi.mock("expo-image-picker", () => ({
   useMediaLibraryPermissions: () => [{ granted: true }, vi.fn()],
-  launchImageLibraryAsync: vi.fn(),
+  launchImageLibraryAsync: vi.fn(async () => ({ canceled: false, assets: [{ uri: "file:///picked.jpg" }] })),
 }));
-vi.mock("expo-file-system/legacy", () => ({ deleteAsync: vi.fn(async () => {}) }));
+vi.mock("expo-file-system/legacy", () => ({
+  deleteAsync: vi.fn(async () => {}),
+  getInfoAsync: vi.fn(async () => ({ exists: true, size: 1000 })),
+}));
 vi.mock("expo-linking", () => ({
   canOpenURL: vi.fn(async () => true),
   openURL: vi.fn(async () => {}),
@@ -140,6 +147,11 @@ beforeEach(() => {
   state.messages.error = null;
   state.messages.data = { pages: [{ items: [] }] };
   state.messages.refetch.mockReset();
+  state.messages.hasNextPage = false;
+  state.messages.fetchNextPage.mockReset();
+  state.socket.sendTextMessage.mockReset();
+  state.socket.sendImageMessage.mockReset();
+  state.mutation.mutateAsync.mockReset();
   vi.mocked(Linking.openURL).mockClear();
   routeParams.id = CONVERSATION_ID;
 });
@@ -300,5 +312,124 @@ describe("Conversation header Call", () => {
     expect(screen.getByText("Listing unavailable")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /^Open:/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "Call the seller" })).toBeNull();
+  });
+});
+
+const QUICK_REPLY = "Is the car still available?";
+
+function serverMessage(id: string, senderId: string, createdAt = "2026-10-01T10:00:00.000Z") {
+  return { id, conversationId: CONVERSATION_ID, senderId, kind: "text", text: id, createdAt, deletedAt: null };
+}
+
+describe("Conversation quick replies", () => {
+  it("stay for the buyer after the buyer's own Messages", async () => {
+    state.messages.data = { pages: [{ items: [serverMessage("hello", BUYER_ID)], nextCursor: null }] };
+    routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
+    const screen = renderMobile(<ConversationDetailScreen />);
+
+    expect(await screen.findByText(QUICK_REPLY)).toBeTruthy();
+  });
+
+  it("fill the composer on tap and send nothing by themselves", async () => {
+    routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
+    const screen = renderMobile(<ConversationDetailScreen />);
+
+    fireEvent.press(await screen.findByRole("button", { name: QUICK_REPLY }));
+    expect(screen.getByDisplayValue(QUICK_REPLY)).toBeTruthy();
+    expect(state.socket.sendTextMessage).not.toHaveBeenCalled();
+  });
+
+  it("go once the seller has replied", async () => {
+    state.messages.data = {
+      pages: [{ items: [serverMessage("reply", SELLER_ID), serverMessage("hello", BUYER_ID)], nextCursor: null }],
+    };
+    routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
+    const screen = renderMobile(<ConversationDetailScreen />);
+
+    expect(await screen.findByText("Merdan")).toBeTruthy();
+    expect(screen.queryByText(QUICK_REPLY)).toBeNull();
+  });
+
+  it("are never shown to the seller", async () => {
+    state.viewerId = SELLER_ID;
+    routeGet({
+      [`/conversations/${CONVERSATION_ID}`]: () =>
+        conversation({ myRole: "seller", peer: { id: BUYER_ID, displayName: null } }),
+    });
+    const screen = renderMobile(<ConversationDetailScreen />);
+
+    expect(await screen.findByText("Buyer")).toBeTruthy();
+    expect(screen.queryByText(QUICK_REPLY)).toBeNull();
+  });
+
+  it("are not shown when the viewer cannot send", async () => {
+    routeGet({
+      [`/conversations/${CONVERSATION_ID}`]: () => conversation({ sendRestriction: "chat_disabled" }),
+    });
+    const screen = renderMobile(<ConversationDetailScreen />);
+
+    expect(await screen.findByText("Merdan")).toBeTruthy();
+    expect(screen.queryByText(QUICK_REPLY)).toBeNull();
+  });
+});
+
+describe("Conversation history", () => {
+  it("loads older Messages at the top of the history", async () => {
+    state.messages.data = { pages: [{ items: [serverMessage("hello", BUYER_ID)], nextCursor: "next" }] };
+    state.messages.hasNextPage = true;
+    routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
+    const screen = renderMobile(<ConversationDetailScreen />);
+
+    expect(await screen.findByText("hello")).toBeTruthy();
+    screen.UNSAFE_getByProps({ inverted: true }).props.onEndReached();
+    expect(state.messages.fetchNextPage).toHaveBeenCalledOnce();
+  });
+});
+
+describe("Conversation Retry", () => {
+  it("resends a failed text Message with the same client Message ID", async () => {
+    state.socket.sendTextMessage
+      .mockResolvedValueOnce({ ok: false, code: "INTERNAL" })
+      .mockResolvedValueOnce({ ok: true, message: { id: "server-1" } });
+    routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
+    const screen = renderMobile(<ConversationDetailScreen />);
+
+    fireEvent.changeText(await screen.findByPlaceholderText("Message"), "Still there?");
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Send message" }));
+    });
+    expect(await screen.findByText("Failed to send")).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Retry" }));
+    });
+
+    const [first, second] = state.socket.sendTextMessage.mock.calls.map(([args]) => args);
+    expect(second).toEqual({ conversationId: CONVERSATION_ID, text: "Still there?", clientMessageId: first.clientMessageId });
+  });
+
+  it("resends a failed image Message with the same client Message ID", async () => {
+    state.mutation.mutateAsync.mockResolvedValue({ uploadUrl: "https://upload", key: "chat-attachments/k.jpg" });
+    state.socket.sendImageMessage
+      .mockResolvedValueOnce({ ok: false, code: "INTERNAL" })
+      .mockResolvedValueOnce({ ok: true, message: { id: "server-2" } });
+    routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
+    const screen = renderMobile(<ConversationDetailScreen />);
+
+    await act(async () => {
+      // The attach button's label is matched loosely: it reads its key from another namespace today.
+      fireEvent.press(await screen.findByLabelText(/attach/i));
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Send message" }));
+    });
+    expect(await screen.findByText("Failed to send")).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Retry" }));
+    });
+
+    const [first, second] = state.socket.sendImageMessage.mock.calls.map(([args]) => args);
+    expect(second.clientMessageId).toBe(first.clientMessageId);
   });
 });
