@@ -1,4 +1,4 @@
-import { FileText, List, ScrollText, ShieldCheck, User } from "lucide-react-native";
+import { Bell, FileText, List, ScrollText, ShieldCheck, User } from "lucide-react-native";
 import { router } from "expo-router";
 import * as Linking from "expo-linking";
 import { ScrollView, View } from "react-native";
@@ -155,6 +155,13 @@ export default function CabinetScreen() {
         {isAuthenticated ? (
           <>
             <MenuGap />
+            <MenuRow
+              icon={Bell}
+              label={t("account:notifications")}
+              chevron
+              onPress={() => router.push("/notifications")}
+            />
+            <MenuDivider />
             <MenuRow
               icon={List}
               label={t("account:myListings")}

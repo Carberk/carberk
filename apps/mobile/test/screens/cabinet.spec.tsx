@@ -65,6 +65,7 @@ describe("Cabinet signed out", () => {
     expect(view.queryByRole("button", { name: "Retry" })).toBeNull();
     expect(view.queryByRole("button", { name: maskTmPhone(PHONE) })).toBeNull();
     expect(view.queryByRole("button", { name: /My listings/ })).toBeNull();
+    expect(view.queryByRole("button", { name: "Notifications" })).toBeNull();
     expect(view.queryByRole("button", { name: /Log out/ })).toBeNull();
     expect(view.queryByRole("button", { name: /Delete account/ })).toBeNull();
   });
@@ -96,20 +97,45 @@ describe("Cabinet signed out", () => {
 });
 
 describe("Cabinet signed in", () => {
-  it("shows the display name over the masked method, then My listings above the menu rows", () => {
+  it("shows the display name over the masked method, then Notifications and My listings above the menu rows", () => {
     signedIn({ displayName: "Aman" });
     const view = renderMobile(<CabinetScreen />);
     expect(view.getByRole("button", { name: `Aman, ${maskTmPhone(PHONE)}` })).toBeTruthy();
+    expect(view.getByRole("button", { name: "Notifications" })).toBeTruthy();
     expect(view.getByRole("button", { name: "My listings" })).toBeTruthy();
     expectMenuRows(view);
-    // Rendered order: the profile row, My listings, then the menu rows.
+    // Rendered order: the profile row, Notifications, My listings, then the menu rows.
     const text = JSON.stringify(view.toJSON());
-    expect(text.indexOf("Aman")).toBeLessThan(text.indexOf("My listings"));
+    expect(text.indexOf("Aman")).toBeLessThan(text.indexOf("Notifications"));
+    expect(text.indexOf("Notifications")).toBeLessThan(text.indexOf("My listings"));
     expect(text.indexOf("My listings")).toBeLessThan(text.indexOf("Language"));
     expect(text.indexOf("Language")).toBeLessThan(text.indexOf("Posting rules"));
     expect(view.queryByRole("button", { name: /Sign in/ })).toBeNull();
     expect(view.queryByRole("button", { name: /Log out/ })).toBeNull();
     expect(view.queryByRole("button", { name: /Delete account/ })).toBeNull();
+  });
+
+  it("lists Notifications as the first menu row, then My listings", () => {
+    signedIn({ displayName: "Aman" });
+    const view = renderMobile(<CabinetScreen />);
+    const names = view.getAllByRole("button").map((row) => row.props.accessibilityLabel);
+    expect(names.slice(0, 4)).toEqual([`Aman, ${maskTmPhone(PHONE)}`, "Notifications", "My listings", "Language, English"]);
+  });
+
+  it("opens Notifications", () => {
+    signedIn({ displayName: "Aman" });
+    const view = renderMobile(<CabinetScreen />);
+    fireEvent.press(view.getByRole("button", { name: "Notifications" }));
+    expect(routerMock.push).toHaveBeenLastCalledWith("/notifications");
+  });
+
+  it.each([
+    ["ru", "Уведомления"],
+    ["tk", "Habarnamalar"],
+  ])("reads Notifications in %s", (locale, label) => {
+    signedIn({ displayName: "Aman" });
+    const view = renderMobile(<CabinetScreen />, { locale });
+    expect(view.getByRole("button", { name: label })).toBeTruthy();
   });
 
   it("shows the masked method alone when there is no display name", () => {

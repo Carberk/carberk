@@ -14,6 +14,7 @@ Mobile is the primary marketplace client. The route tree, API hooks, feature mod
 - Home is the Search tab's stack root, `/(tabs)/(search)`. Import `HOME_HREF` from `src/navigation/homeHref.ts` for every "go home" navigation instead of writing the literal.
 - The locked five-tab navigation and Auto.ru structural discovery reference follow [ADR-0051](../../docs/adr/0051-auto-ru-inspired-mobile-discovery-before-google-play-review.md). Read the affected approved screen specification before UI work. Do not treat an old Kolesa reference as authority for discovery.
 - Chat sockets complement HTTP state. Push uses native FCM/APNS tokens; provider setup and device delivery require runtime evidence, not just passing hook tests.
+- Cabinet's Notifications screen (`/notifications`, signed in only) states the device notification permission (`granted` is On; anything else is Off) and links to the app's system settings. It re-reads the permission on focus and on return to the foreground, never prompts for it, and has no category switches; the prompt stays after the first chat action.
 
 ## Native verification
 
