@@ -111,6 +111,6 @@ describe("support contacts", () => {
       .filter((file) => !/\.spec\.tsx?$/.test(file))
       .filter((file) => /["'`]\/help["'`]/.test(readFileSync(file, "utf8")))
       .map((file) => relative(root, file));
-    expect(linkers).toEqual(["app/(tabs)/services.tsx"]);
+    expect(linkers).toEqual(["app/(tabs)/services.tsx", "src/navigation/helpHref.ts"]);
   });
 });
