@@ -152,6 +152,10 @@ class FakeIdentityCheckPort implements IdentityCheckPort {
     return this.suspendedUsers.has(userId);
   }
 
+  async isDeletionScheduled(): Promise<boolean> {
+    return false;
+  }
+
   suspend(userId: string) {
     this.suspendedUsers.add(userId);
   }

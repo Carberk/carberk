@@ -24,6 +24,8 @@ import { UnblockUser } from "../application/UnblockUser";
 import { IsBlocked } from "../application/IsBlocked";
 import { RequestSignInMethodChange } from "../application/RequestSignInMethodChange";
 import { ConfirmSignInMethodChange } from "../application/ConfirmSignInMethodChange";
+import { RecoverAccount } from "../application/RecoverAccount";
+import { AllowPendingDeletion } from "../../../common/allow-pending-deletion.decorator";
 import {
   IDENTITY_ERROR_CODES,
   IdentityDomainError,
@@ -44,6 +46,7 @@ export class MeController {
     private readonly requestSignInMethodChange: RequestSignInMethodChange,
     @Inject(ConfirmSignInMethodChange)
     private readonly confirmSignInMethodChange: ConfirmSignInMethodChange,
+    @Inject(RecoverAccount) private readonly recoverAccount: RecoverAccount,
   ) {}
 
   @Get()
@@ -70,6 +73,30 @@ export class MeController {
 
     try {
       await this.deleteMe.execute({ userId });
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === "User not found") {
+        throw new NotFoundException({
+          code: "USER_NOT_FOUND",
+          message: "User not found.",
+        });
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Restores the account after the User confirms (ADR-0032). The session that
+   * signed in during the grace period may call it before anything else.
+   */
+  @Post("restore")
+  @AllowPendingDeletion()
+  @HttpCode(200)
+  async restore(@Req() req: FastifyRequest) {
+    const userId = this.userId(req);
+
+    try {
+      await this.recoverAccount.execute({ userId });
+      return await this.getMe.execute({ userId });
     } catch (err: unknown) {
       if (err instanceof Error && err.message === "User not found") {
         throw new NotFoundException({

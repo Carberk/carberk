@@ -19,7 +19,6 @@ import { PrismaUserRepository } from "../infrastructure/PrismaUserRepository";
 import { PrismaSessionRepository } from "../infrastructure/PrismaSessionRepository";
 import { BcryptHasherAdapter } from "../infrastructure/BcryptHasherAdapter";
 import { SystemClockAdapter } from "../infrastructure/SystemClockAdapter";
-import { RecoverAccount } from "./RecoverAccount";
 import { VerifySignInCode } from "./VerifySignInCode";
 
 const MAX_SESSIONS = 10;
@@ -61,8 +60,6 @@ export class VerifyOtp {
     private readonly jwtService: JwtService,
     @Inject("EventBus")
     private readonly eventBus: { emit: (event: string, payload: unknown) => void },
-    @Inject(RecoverAccount)
-    private readonly recoverAccount: RecoverAccount,
     @Inject(REVIEWER_OTP_BYPASS_CONFIG)
     private readonly reviewerBypassConfig: ReviewerOtpBypassConfig,
     @Inject(CONSTANT_TIME_COMPARATOR_PORT)
@@ -129,11 +126,9 @@ export class VerifyOtp {
         destination.verifiedMethods(now),
       ));
 
-    // Auto-recover account if in deletion grace period
+    // A User in the deletion grace period signs in with the deletion still
+    // scheduled; only the signed-in User confirming restores it (ADR-0032).
     const deletionScheduledAt = user.deletionScheduledAt;
-    if (deletionScheduledAt !== null) {
-      await this.recoverAccount.execute({ userId: user.id });
-    }
 
     // Bind the consumed code to the signed-in User
     await this.otpRequestRepo.markVerified(otpRequest.id, user.id);
@@ -193,9 +188,6 @@ export class VerifyOtp {
     }
 
     const deletionScheduledAt = user.deletionScheduledAt;
-    if (deletionScheduledAt !== null) {
-      await this.recoverAccount.execute({ userId: user.id });
-    }
 
     const result = await this.createSessionResult({
       user,

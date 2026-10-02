@@ -49,6 +49,7 @@ export class ConversationSendPolicy {
       conversation,
       senderId,
     );
+    await this.accessPolicy.assertAccountNotPendingDeletion(senderId);
     const listing = await this.loadContactableListing(conversation.listingId);
     await this.accessPolicy.assertParticipantSafety({
       userId: senderId,

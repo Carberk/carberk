@@ -17,7 +17,19 @@ export class RecoverAccount {
     private readonly listingsPort: AccountDeletionListingsPort,
   ) {}
 
+  /**
+   * Restores a User whose deletion is scheduled. A User with no scheduled
+   * deletion is left as is, so a retried or repeated restore succeeds.
+   */
   async execute(input: RecoverAccountInput): Promise<void> {
+    const user = await this.userRepo.findById(input.userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+    if (user.deletionScheduledAt === null) {
+      return;
+    }
+
     await this.userRepo.clearDeletionSchedule(input.userId);
     await this.listingsPort.republishArchivedByDeletionListingsBySeller(input.userId);
   }

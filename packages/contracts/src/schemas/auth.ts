@@ -120,6 +120,17 @@ export type SignInMethodChangeResponse = z.infer<
   typeof SignInMethodChangeResponseSchema
 >;
 
+// `POST /me/restore` has no request body, uses the bearer access token, and
+// answers with the updated `/me`. Calling it with no scheduled deletion
+// changes nothing and succeeds.
+export const RestoreAccountResponseSchema = MeResponseSchema;
+export type RestoreAccountResponse = z.infer<typeof RestoreAccountResponseSchema>;
+
+// `details.reason` of the 403 a session gets for a marketplace change while
+// its User's deletion is scheduled (ADR-0032). The session may still read
+// `/me`, restore the account, and log out.
+export const ACCOUNT_DELETION_PENDING_REASON = "ACCOUNT_DELETION_PENDING" as const;
+
 // No request body — uses bearer access token; returns 204
 export const DeleteMeResponseSchema = z.object({});
 

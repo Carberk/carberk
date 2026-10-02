@@ -32,4 +32,12 @@ export class PrismaIdentityCheckAdapter implements IdentityCheckPort {
     });
     return row?.suspendedAt != null;
   }
+
+  async isDeletionScheduled(userId: string): Promise<boolean> {
+    const row = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { deletionScheduledAt: true },
+    });
+    return row?.deletionScheduledAt != null;
+  }
 }

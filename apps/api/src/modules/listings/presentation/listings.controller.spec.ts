@@ -29,6 +29,7 @@ function buildController(overrides: {
     isSuspended: vi.fn().mockResolvedValue(false),
     isAdmin: vi.fn().mockResolvedValue(false),
     isInDealership: vi.fn().mockResolvedValue(false),
+    isDeletionScheduled: vi.fn().mockResolvedValue(false),
   };
 
   return new ListingsController(

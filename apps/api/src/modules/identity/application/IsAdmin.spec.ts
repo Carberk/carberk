@@ -19,6 +19,10 @@ class FakeIdentityCheckAdapter implements IdentityCheckPort {
   async isSuspended(): Promise<boolean> {
     return false;
   }
+
+  async isDeletionScheduled(): Promise<boolean> {
+    return false;
+  }
 }
 
 describe("IdentityCheckPort.isAdmin", () => {

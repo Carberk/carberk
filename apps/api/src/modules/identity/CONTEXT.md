@@ -16,6 +16,8 @@ The identity read port answers lists in one read per question: `findUsersByIds` 
 
 Suspension blocks marketplace mutations while preserving permitted reads and account deletion. Deletion has a grace period followed by worker purge; inspect both sides and database history-retention rules before changing the lifecycle.
 
+Restoring a User in the grace period is a separate, confirmed step. Verifying a code (normal or reviewer path) signs the User in and answers `user.deletionScheduledAt` without clearing the schedule or republishing Listings. Only `POST /api/v1/me/restore` (`RecoverAccount`) clears the schedule and republishes the Listings the deletion archived; it answers with `/me` and is idempotent for a User with no scheduled deletion. Until then the session cannot change marketplace data: `AccountDeletionPendingGuard` (global, after `JwtAuthGuard`) answers any signed-in non-read request with 403 `details.reason = ACCOUNT_DELETION_PENDING`, except public routes and routes marked `@AllowPendingDeletion()` (restore, logout-all; logout is public). Realtime message sends skip HTTP guards, so `ConversationSendPolicy` repeats the check. A new check that bypasses HTTP, such as another socket event, must call `IdentityCheckPort.isDeletionScheduled` itself.
+
 ## Start here
 
 - [Module composition](identity.module.ts)

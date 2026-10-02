@@ -320,6 +320,18 @@ describe("MLP AFK e2e smoke", () => {
 
     expect(recoveryRes.body.user.id).toBe(seller.userId);
 
+    // Signing in leaves the deletion scheduled; the User confirms to restore.
+    const sellerAfterSignIn = await prisma.user.findUnique({
+      where: { id: seller.userId },
+    });
+    expect(sellerAfterSignIn?.deletionScheduledAt).not.toBeNull();
+
+    const restoreRes = await request
+      .post("/api/v1/me/restore")
+      .set("Authorization", `Bearer ${recoveryRes.body.accessToken}`)
+      .expect(200);
+    expect(restoreRes.body.deletionScheduledAt).toBeNull();
+
     const sellerAfterRecovery = await prisma.user.findUnique({
       where: { id: seller.userId },
     });
