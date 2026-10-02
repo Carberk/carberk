@@ -123,6 +123,15 @@ type ListingCheck =
       reason: string;
     };
 
+/**
+ * Listing statuses that keep an existing Conversation open for Messages: a
+ * Listing that is sold or removed from sale (`archived`) no longer takes new
+ * Conversations (`OpenConversation`), but its participants may go on talking.
+ * `banned` is refused; a deleted Listing has no summary at all.
+ */
+const OPEN_CONVERSATION_LISTING_STATUSES: ReadonlySet<ListingSummary["status"]> =
+  new Set(["active", "sold", "archived"]);
+
 /** The one place that decides whether a Listing accepts Messages. */
 function checkListing(listing: ListingSummary | null): ListingCheck {
   if (!listing) {
@@ -133,7 +142,7 @@ function checkListing(listing: ListingSummary | null): ListingCheck {
       reason: CONVERSATION_ERROR_CODES.LISTING_NOT_CONTACTABLE,
     };
   }
-  if (listing.status !== "active") {
+  if (!OPEN_CONVERSATION_LISTING_STATUSES.has(listing.status)) {
     return {
       contactable: false,
       restriction: "listing_unavailable",
