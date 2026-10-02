@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { act, fireEvent, renderMobile, routeParams } from "../render";
 import OtpScreen from "../../app/(auth)/otp";
+import { ApiError } from "../../src/api/client";
 
 const pendingSession = {
   accessToken: "pending-access",
@@ -137,6 +138,40 @@ describe("Sign-in code screen for a User whose deletion is scheduled", () => {
     expect(mocks.restore).toHaveBeenCalledTimes(2);
     expect(mocks.storeAuthSession).toHaveBeenCalledTimes(1);
     expect(mocks.navigation.complete).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Account restoration")).toBeNull();
+  });
+
+  it("sends the User back to sign-in when the pending session has expired, instead of offering a doomed retry", async () => {
+    mocks.restore.mockRejectedValueOnce(
+      new ApiError("UNAUTHORIZED", 401, "Unauthorized"),
+    );
+    const screen = await signInWith(pendingSession);
+
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Restore" }));
+    });
+
+    expect(
+      screen.getByText(
+        "Your sign-in has expired. Sign in again to restore your account.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(
+        "We could not restore your account. Check your connection and try again.",
+      ),
+    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "Restore" })).toBeNull();
+
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Sign in again" }));
+    });
+
+    expect(mocks.restore).toHaveBeenCalledTimes(1);
+    expect(mocks.revoke).toHaveBeenCalledWith("pending-refresh");
+    expect(mocks.storeAuthSession).not.toHaveBeenCalled();
+    expect(mocks.navigation.complete).not.toHaveBeenCalled();
+    expect(mocks.navigation.changeMethod).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("Account restoration")).toBeNull();
   });
 
