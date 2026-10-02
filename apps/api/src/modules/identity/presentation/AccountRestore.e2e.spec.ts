@@ -25,7 +25,9 @@ import {
 
 const suite = defineE2eSuite("account-restore");
 const SUITE_USERS = ["member"] as const;
-const PHONE = suite.phone("member");
+// The suite helper's phones carry eight digits after +9936, which the sign-in
+// code endpoints reject, so this suite uses a literal Turkmen mobile number.
+const PHONE = "+99365180518";
 const USER_ID = suite.id("member");
 
 describe("Account restore e2e", () => {
@@ -62,12 +64,18 @@ describe("Account restore e2e", () => {
 
   afterAll(async () => {
     delete process.env["OTP_TEST_MODE"];
-    await cleanSuiteFixtures(prisma, suite, { userAliases: SUITE_USERS });
+    await cleanSuiteFixtures(prisma, suite, {
+      userAliases: SUITE_USERS,
+      extraPhones: [PHONE],
+    });
     await app.close();
   });
 
   beforeEach(async () => {
-    await cleanSuiteFixtures(prisma, suite, { userAliases: SUITE_USERS });
+    await cleanSuiteFixtures(prisma, suite, {
+      userAliases: SUITE_USERS,
+      extraPhones: [PHONE],
+    });
     await prisma.user.create({
       data: { id: USER_ID, phone: PHONE, phoneVerifiedAt: new Date() },
     });
