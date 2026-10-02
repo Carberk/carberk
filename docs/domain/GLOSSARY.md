@@ -52,6 +52,12 @@ A `+993` phone number a seller proved can receive listing-contact SMS codes, so 
 
 _Avoid_: Account phone, login phone, phone verified badge, credential
 
+**Media Upload**
+
+The server's record that one User presigned one photo or video upload, which can back one Listing media item. A storage key without the caller's Media Upload authorizes nothing.
+
+_Avoid_: Pending file, staged key
+
 ## Conversations
 
 **Conversation**
