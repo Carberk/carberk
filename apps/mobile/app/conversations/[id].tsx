@@ -748,8 +748,10 @@ export default function ConversationDetailScreen() {
 
   const { hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage } = messagesQuery;
   const loadOlderMessages = useCallback(() => {
-    if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+    // After a failure the inline row changes the list height and re-fires onEndReached near
+    // the top; only Retry may fetch again, or a failing page loops.
+    if (hasNextPage && !isFetchingNextPage && !isFetchNextPageError) void fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage]);
   const retryOlderMessages = useCallback(() => {
     void fetchNextPage();
   }, [fetchNextPage]);

@@ -429,6 +429,23 @@ describe("Conversation history", () => {
     expect(state.messages.fetchNextPage).toHaveBeenCalledOnce();
     expect(state.messages.refetch).not.toHaveBeenCalled();
   });
+
+  it("does not refetch an older page on reaching the top after it failed, only Retry does", async () => {
+    // The failed row changes the list height, which re-fires onEndReached near the top.
+    state.messages.data = { pages: [{ items: [serverMessage("hello", BUYER_ID)], nextCursor: "next" }] };
+    state.messages.hasNextPage = true;
+    state.messages.isError = true;
+    state.messages.isFetchNextPageError = true;
+    state.messages.error = new Error("offline");
+    routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
+    const screen = renderMobile(<ConversationDetailScreen />);
+
+    expect(await screen.findByText("hello")).toBeTruthy();
+    screen.UNSAFE_getByProps({ inverted: true }).props.onEndReached();
+    expect(state.messages.fetchNextPage).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByRole("button", { name: "Retry" }));
+    expect(state.messages.fetchNextPage).toHaveBeenCalledOnce();
+  });
 });
 
 describe("Conversation Retry", () => {
