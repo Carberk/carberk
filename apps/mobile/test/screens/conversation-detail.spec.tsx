@@ -34,7 +34,8 @@ describe("ConversationDetailScreen", () => {
   });
 
   it("reads the Conversation by ID instead of from route params", () => {
-    expect(source).toContain("useConversation(conversationId)");
+    // Read by ID, and only once a User is signed in.
+    expect(source).toContain("useConversation(readId)");
     expect(source).not.toContain("params.listingId");
     expect(source).not.toContain("params.buyerId");
   });
