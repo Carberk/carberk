@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { LegalDocument } from "./content";
-import { privacyPolicy, termsOfService } from "./content";
+import { postingRules, privacyPolicy, termsOfService } from "./content";
 
 import type { Locale } from "@/i18n/locales";
 import { locales } from "@/i18n/locales";
@@ -23,6 +23,7 @@ interface CopyPromise {
 const documents: [string, Record<Locale, LegalDocument>][] = [
   ["privacy policy", privacyPolicy],
   ["terms of service", termsOfService],
+  ["posting rules", postingRules],
 ];
 
 const privacyPromises: CopyPromise[] = [
@@ -67,11 +68,11 @@ const privacyPromises: CopyPromise[] = [
     },
   },
   {
-    name: "authenticated deletion is available in the app settings",
+    name: "authenticated deletion is on the Profile screen opened from Cabinet",
     phrases: {
-      en: "request account deletion from the app settings",
-      ru: "удалить его можно в настройках приложения",
-      tk: "ony programmanyň sazlamalarynda pozup bilersiňiz",
+      en: "open Cabinet, tap your profile, then tap Delete account at the bottom of the Profile screen",
+      ru: "откройте «Кабинет», нажмите на свой профиль и выберите «Удалить аккаунт» внизу экрана «Профиль»",
+      tk: "«Kabinet» bölümini açyň, profiliňize basyň we «Profil» ekranynyň aşagyndaky «Hasaby poz» düwmesine basyň",
     },
   },
   {
@@ -109,6 +110,14 @@ const privacyPromises: CopyPromise[] = [
 ];
 
 const termsPromises: CopyPromise[] = [
+  {
+    name: "authenticated deletion is on the Profile screen opened from Cabinet",
+    phrases: {
+      en: "in Cabinet, open your profile and tap Delete account",
+      ru: "в «Кабинете» откройте свой профиль и выберите «Удалить аккаунт»",
+      tk: "«Kabinet» bölüminde profiliňizi açyň we «Hasaby poz» düwmesine basyň",
+    },
+  },
   {
     name: "sign-in uses a code sent to a phone number or an email address",
     phrases: {
@@ -221,6 +230,14 @@ describe.each(documents)("%s", (_name, document) => {
     }
   });
 
+  it("does not send Users to app settings to delete their account", () => {
+    for (const locale of locales) {
+      expect(fullText(document[locale])).not.toMatch(
+        /(app|in-app) settings|настройках приложения|programmanyň sazlama/i,
+      );
+    }
+  });
+
   it("uses no internal sign-in vocabulary", () => {
     for (const locale of locales) {
       expect(fullText(document[locale])).not.toMatch(/\bOTPs?\b/i);
@@ -248,6 +265,124 @@ describe("terms of service promises", () => {
   it.each(termsPromises)("states in every locale that $name", ({ phrases }) => {
     for (const locale of locales) {
       expect(fullText(termsOfService[locale])).toContain(phrases[locale]);
+    }
+  });
+});
+
+/**
+ * Every Posting rule maps to something the product or its moderators enforce today.
+ * docs/prd/ops/83-legal.md ("Posting rules") records the mapping; these phrases pin the rules that carry it.
+ */
+const postingRulesPromises: CopyPromise[] = [
+  {
+    name: "a Listing must be a real vehicle the seller owns or may sell",
+    phrases: {
+      en: "a real vehicle that you own or are allowed to sell",
+      ru: "реального автомобиля, который принадлежит вам или который вы вправе продавать",
+      tk: "size degişli ýa-da satmaga hakyňyz bolan hakyky ulag",
+    },
+  },
+  {
+    name: "one Listing per vehicle, no duplicates",
+    phrases: {
+      en: "One vehicle, one listing",
+      ru: "Один автомобиль — одно объявление",
+      tk: "Bir ulag — bir bildiriş",
+    },
+  },
+  {
+    name: "a Listing needs between 1 and 20 photos",
+    phrases: {
+      en: "at least 1 and up to 20 photos",
+      ru: "от 1 до 20 фотографий",
+      tk: "azyndan 1, iň köp 20 surat",
+    },
+  },
+  {
+    name: "photos are JPEG or WebP, at most 5 MB each",
+    phrases: {
+      en: "JPEG or WebP, up to 5 MB each",
+      ru: "JPEG или WebP, не больше 5 МБ каждая",
+      tk: "JPEG ýa-da WebP görnüşinde, her biri 5 MB-dan köp bolmaly däl",
+    },
+  },
+  {
+    name: "the description is at most 2,000 characters",
+    phrases: {
+      en: "up to 2,000 characters",
+      ru: "до 2000 символов",
+      tk: "2000 nyşana çenli",
+    },
+  },
+  {
+    name: "at least one way to contact the seller stays on",
+    phrases: {
+      en: "keep calls, chat or both turned on",
+      ru: "оставьте включёнными звонки, чат или и то и другое",
+      tk: "jaňlary, çaty ýa-da ikisini hem açyk goýuň",
+    },
+  },
+  {
+    name: "Listings go live without review and moderators act on reports",
+    phrases: {
+      en: "A listing appears as soon as you publish it",
+      ru: "Объявление появляется сразу после публикации",
+      tk: "Bildiriş çap edilen badyna görünýär",
+    },
+  },
+  {
+    name: "moderators can block a Listing",
+    phrases: {
+      en: "block the listing",
+      ru: "заблокировать объявление",
+      tk: "bildirişi bloklap",
+    },
+  },
+  {
+    name: "moderators can suspend an account",
+    phrases: {
+      en: "suspend the account",
+      ru: "приостановить аккаунт",
+      tk: "akkaunty togtadyp",
+    },
+  },
+  {
+    name: "support email and phone",
+    phrases: {
+      en: "bagtyyarkowusow.dev@gmail.com",
+      ru: "bagtyyarkowusow.dev@gmail.com",
+      tk: "bagtyyarkowusow.dev@gmail.com",
+    },
+  },
+  {
+    name: "support phone",
+    phrases: {
+      en: "+993 63 98 94 04",
+      ru: "+993 63 98 94 04",
+      tk: "+993 63 98 94 04",
+    },
+  },
+];
+
+describe("posting rules promises", () => {
+  it.each(postingRulesPromises)("states in every locale that $name", ({ phrases }) => {
+    for (const locale of locales) {
+      expect(fullText(postingRules[locale])).toContain(phrases[locale]);
+    }
+  });
+});
+
+describe("posting rules report reasons", () => {
+  // The Listing report sheet's labels (apps/mobile ReportSheet, `common` i18n namespace).
+  const reasons: Record<Locale, string[]> = {
+    en: ["**Spam**", "**Scam or fraud**", "**Misleading information**", "**Wrong category**"],
+    ru: ["**Спам**", "**Мошенничество**", "**Вводящая в заблуждение информация**", "**Неверная категория**"],
+    tk: ["**Spam**", "**Galplyk**", "**Ýalňyş maglumat**", "**Nädogry kategoriýa**"],
+  };
+
+  it.each(locales)("names every Listing report reason in %s", (locale) => {
+    for (const reason of reasons[locale]) {
+      expect(fullText(postingRules[locale])).toContain(reason);
     }
   });
 });

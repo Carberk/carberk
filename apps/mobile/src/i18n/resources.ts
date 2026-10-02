@@ -1033,7 +1033,7 @@ export const resources: Resource = {
       reportReason: "Şikaýat sebäbi",
       selectReason: "Sebäp saýlaň",
       spam: "Spam",
-      scam: "Dolandyryş",
+      scam: "Galplyk",
       misleading: "Ýalňyş maglumat",
       wrongCategory: "Nädogry kategoriýa",
       harassment: "Garsylyk",

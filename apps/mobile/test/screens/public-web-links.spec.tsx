@@ -28,7 +28,7 @@ describe.each(profiles)("%s public web links", (profile, baseUrl) => {
     expect(eas.build[profile].env.EXPO_PUBLIC_WEB_URL).toBe(baseUrl);
   });
 
-  it.each(["en", "ru", "tk"])("opens localized privacy and terms from Cabinet and sign-in in %s", (locale) => {
+  it.each(["en", "ru", "tk"])("opens localized privacy, terms and posting rules from Cabinet and sign-in in %s", (locale) => {
     vi.stubEnv("EXPO_PUBLIC_WEB_URL", baseUrl);
     const cabinet = renderMobile(<CabinetScreen />, { locale });
     fireEvent.press(cabinet.getByRole("button", { name: cabinet.i18n.t("account:privacyPolicy") }));
@@ -36,7 +36,7 @@ describe.each(profiles)("%s public web links", (profile, baseUrl) => {
     fireEvent.press(cabinet.getByRole("button", { name: cabinet.i18n.t("account:termsOfService") }));
     expect(Linking.openURL).toHaveBeenLastCalledWith(`${baseUrl}/${locale}/legal/terms`);
     fireEvent.press(cabinet.getByRole("button", { name: cabinet.i18n.t("account:postingRules") }));
-    expect(Linking.openURL).toHaveBeenLastCalledWith(`${baseUrl}/${locale}/legal/terms`);
+    expect(Linking.openURL).toHaveBeenLastCalledWith(`${baseUrl}/${locale}/legal/posting-rules`);
     cabinet.unmount();
 
     const auth = renderMobile(<AuthEntryScreen method="email" title="Sign in" helper="Email" canSubmit={false} isSubmitting={false} onSubmit={async () => {}}>{null}</AuthEntryScreen>, { locale });

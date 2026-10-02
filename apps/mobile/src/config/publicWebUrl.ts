@@ -4,6 +4,6 @@ export function publicWebUrl(path: string): string {
   return `${baseUrl.replace(/\/+$/, "")}${path}`;
 }
 
-export function legalPageUrl(locale: string, kind: "privacy" | "terms" | "deletion"): string {
+export function legalPageUrl(locale: string, kind: "privacy" | "terms" | "posting-rules" | "deletion"): string {
   return publicWebUrl(`/${locale}/${kind === "deletion" ? "account/delete" : `legal/${kind}`}`);
 }

@@ -61,7 +61,7 @@ This directory contains architecture decisions for AutoTM. ADRs are **immutable 
 | [0049](0049-defer-listing-detail-share-to-chat-until-recipient-selection.md) | Defer listing-detail share to chat until the recipient is chosen | Accepted | 2026-09-17 |
 | [0050](0050-wizard-validation-messages-as-translation-keys.md) | Wizard validation messages are translation keys, not prose | Accepted | 2026-09-18 |
 | [0051](0051-auto-ru-inspired-mobile-discovery-before-google-play-review.md) | Auto.ru-inspired mobile discovery before Google Play review (supersedes ADR-0034 for mobile discovery and conflicting ADR-0035 browse clauses) | Accepted | 2026-09-21 |
-| [0052](0052-seller-condition-disclosure-is-damaged-plus-known-issues.md) | Seller condition disclosure is "Damaged / needs repair" plus known issues (amends ADR-0037 condition disclosure) | Accepted | 2026-09-21 |
+| [0052](0052-seller-condition-disclosure-is-damaged-plus-known-issues.md) | Seller condition disclosure is "Damaged / needs repair" plus known issues (amends ADR-0037 condition disclosure) | Accepted; required-to-publish rule amended by ADR-0080 for New cars | 2026-09-21 |
 | [0053](0053-defer-vin-decoding-until-a-real-decoder-exists.md) | Defer VIN decoding until a real decoder exists (amends ADR-0037 VIN history signal) | Accepted | 2026-09-22 |
 | [0054](0054-phone-or-email-sign-in-share-one-user.md) | Phone or email sign-in share one User (supersedes ADR-0006 phone-only sign-in; amends ADR-0030 reviewer entries) | Accepted | 2026-09-22 |
 | [0055](0055-resend-sends-sign-in-codes-from-the-worker.md) | Resend sends sign-in codes by email from the worker (complements ADR-0054) | Accepted | 2026-09-22 |
@@ -89,6 +89,7 @@ This directory contains architecture decisions for AutoTM. ADRs are **immutable 
 | [0077](0077-mobile-keeps-the-session-when-a-token-refresh-fails-without-a-rejection.md) | Mobile keeps the session when a token refresh fails without a rejection (amends ADR-0063's refresh-failure rule and accepted cost) | Accepted | 2026-10-02 |
 | [0078](0078-the-api-trusts-one-configured-header-for-the-client-ip.md) | The API trusts one configured header for the client IP (amends ADR-0054's per-IP budget; preserves ADR-0039's hosting constraint) | Accepted | 2026-10-02 |
 | [0079](0079-server-recorded-upload-provenance-for-listing-media.md) | Server-recorded upload provenance for Listing media (amends ADR-0008's upload path) | Accepted | 2026-10-02 |
+| [0080](0080-a-new-car-skips-the-damaged-question.md) | A New car skips the "Damaged / needs repair" question (amends ADR-0052's required-to-publish rule) | Accepted | 2026-10-02 |
 
 ## Per-app ADRs
 

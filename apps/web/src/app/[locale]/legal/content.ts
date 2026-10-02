@@ -19,8 +19,8 @@ export const privacyPolicy: Record<Locale, LegalDocument> = {
     title: "Privacy Policy",
     effectiveDate: "September 23, 2026",
     effectiveDateISO: "2026-09-23",
-    lastRevised: "September 23, 2026",
-    lastRevisedISO: "2026-09-23",
+    lastRevised: "October 3, 2026",
+    lastRevisedISO: "2026-10-03",
     sections: [
       {
         title: "1. What we collect",
@@ -65,7 +65,7 @@ Future collections (if features ship): push notification tokens, video uploads, 
         title: "6. Data retention & account deletion",
         body: `Your data is retained while your account is active.
 
-If you are signed in, you can request account deletion from the app settings. On the public [account deletion page](/en/account/delete) on our website, enter a phone number or email address on the account and confirm the request with a code sent to it.
+If you are signed in, you can delete your account in the app: open Cabinet, tap your profile, then tap Delete account at the bottom of the Profile screen. On the public [account deletion page](/en/account/delete) on our website, enter a phone number or email address on the account and confirm the request with a code sent to it.
 
 When you request account deletion:
 - Your account enters a **30-day grace period**.
@@ -105,8 +105,8 @@ When you request account deletion:
     title: "Политика конфиденциальности",
     effectiveDate: "23 сентября 2026 г.",
     effectiveDateISO: "2026-09-23",
-    lastRevised: "23 сентября 2026 г.",
-    lastRevisedISO: "2026-09-23",
+    lastRevised: "3 октября 2026 г.",
+    lastRevisedISO: "2026-10-03",
     sections: [
       {
         title: "1. Какие данные мы собираем",
@@ -147,7 +147,7 @@ When you request account deletion:
         title: "6. Хранение данных и удаление аккаунта",
         body: `Данные хранятся, пока аккаунт активен.
 
-Если вы вошли в аккаунт, удалить его можно в настройках приложения. На общедоступной [странице удаления аккаунта](/ru/account/delete) на нашем сайте укажите номер телефона или адрес почты из аккаунта и подтвердите запрос кодом, отправленным на выбранный способ входа.
+Если вы вошли в аккаунт, удалить его можно в приложении: откройте «Кабинет», нажмите на свой профиль и выберите «Удалить аккаунт» внизу экрана «Профиль». На общедоступной [странице удаления аккаунта](/ru/account/delete) на нашем сайте укажите номер телефона или адрес почты из аккаунта и подтвердите запрос кодом, отправленным на выбранный способ входа.
 
 При удалении аккаунта:
 - Аккаунт переходит в **30-дневный льготный период**.
@@ -187,8 +187,8 @@ When you request account deletion:
     title: "Gizlinlik syýasaty",
     effectiveDate: "23-nji sentýabr 2026",
     effectiveDateISO: "2026-09-23",
-    lastRevised: "23-nji sentýabr 2026",
-    lastRevisedISO: "2026-09-23",
+    lastRevised: "3-nji oktýabr 2026",
+    lastRevisedISO: "2026-10-03",
     sections: [
       {
         title: "1. Haýsy maglumatlary ýygnaýarys",
@@ -229,7 +229,7 @@ When you request account deletion:
         title: "6. Maglumatlary saklamak we akkaunty pozmak",
         body: `Maglumatlar akkaunt işjeň bolança saklanýar.
 
-Akkaunta giren bolsaňyz, ony programmanyň sazlamalarynda pozup bilersiňiz. Saýtymyzdaky köpçülige açyk [akkaunt pozmak sahypasynda](/tk/account/delete) akkauntdaky telefon belgini ýa-da e-poçta salgysyny giriziň we şol giriş usulyna iberilen kod bilen haýyşy tassyklaň.
+Akkaunta giren bolsaňyz, ony programmada pozup bilersiňiz: «Kabinet» bölümini açyň, profiliňize basyň we «Profil» ekranynyň aşagyndaky «Hasaby poz» düwmesine basyň. Saýtymyzdaky köpçülige açyk [akkaunt pozmak sahypasynda](/tk/account/delete) akkauntdaky telefon belgini ýa-da e-poçta salgysyny giriziň we şol giriş usulyna iberilen kod bilen haýyşy tassyklaň.
 
 Akkaunty pozan wagtyňyz:
 - **30 günlük lýgotly döwr** başlaýar.
@@ -272,8 +272,8 @@ export const termsOfService: Record<Locale, LegalDocument> = {
     title: "Terms of Service",
     effectiveDate: "September 23, 2026",
     effectiveDateISO: "2026-09-23",
-    lastRevised: "September 23, 2026",
-    lastRevisedISO: "2026-09-23",
+    lastRevised: "October 3, 2026",
+    lastRevisedISO: "2026-10-03",
     sections: [
       {
         title: "1. Eligibility",
@@ -317,7 +317,7 @@ Every listing shows a contact phone that has been verified. Before you publish o
       },
       {
         title: "10. Termination & account deletion",
-        body: `You may delete your account at any time through the in-app settings, or by requesting deletion on our website with the phone number or email address on your account. Deletion initiates a 30-day grace period during which you may recover your account by signing in again with either your phone number or your email address. After 30 days, your personal data is removed, but your listings and messages are retained with anonymized attribution.
+        body: `You may delete your account at any time in the app (in Cabinet, open your profile and tap Delete account), or by requesting deletion on our website with the phone number or email address on your account. Deletion initiates a 30-day grace period during which you may recover your account by signing in again with either your phone number or your email address. After 30 days, your personal data is removed, but your listings and messages are retained with anonymized attribution.
 
 AutoTM may suspend accounts that violate these terms.`,
       },
@@ -339,8 +339,8 @@ AutoTM may suspend accounts that violate these terms.`,
     title: "Условия использования",
     effectiveDate: "23 сентября 2026 г.",
     effectiveDateISO: "2026-09-23",
-    lastRevised: "23 сентября 2026 г.",
-    lastRevisedISO: "2026-09-23",
+    lastRevised: "3 октября 2026 г.",
+    lastRevisedISO: "2026-10-03",
     sections: [
       {
         title: "1. Допустимый возраст",
@@ -384,7 +384,7 @@ AutoTM may suspend accounts that violate these terms.`,
       },
       {
         title: "10. Расторжение и удаление аккаунта",
-        body: `Вы можете удалить аккаунт в настройках приложения или запросить удаление на нашем сайте, указав номер телефона или адрес почты из аккаунта. Удаление запускает 30-дневный льготный период, в течение которого аккаунт можно восстановить, войдя снова по номеру телефона или по адресу почты. Через 30 дней персональные данные удаляются, объявления и переписка сохраняются с анонимной атрибуцией.
+        body: `Вы можете удалить аккаунт в приложении (в «Кабинете» откройте свой профиль и выберите «Удалить аккаунт») или запросить удаление на нашем сайте, указав номер телефона или адрес почты из аккаунта. Удаление запускает 30-дневный льготный период, в течение которого аккаунт можно восстановить, войдя снова по номеру телефона или по адресу почты. Через 30 дней персональные данные удаляются, объявления и переписка сохраняются с анонимной атрибуцией.
 
 AutoTM может приостановить аккаунт за нарушения.`,
       },
@@ -406,8 +406,8 @@ AutoTM может приостановить аккаунт за нарушен�
     title: "Ulanyş şertleri",
     effectiveDate: "23-nji sentýabr 2026",
     effectiveDateISO: "2026-09-23",
-    lastRevised: "23-nji sentýabr 2026",
-    lastRevisedISO: "2026-09-23",
+    lastRevised: "3-nji oktýabr 2026",
+    lastRevisedISO: "2026-10-03",
     sections: [
       {
         title: "1. Ýaş çägi",
@@ -451,7 +451,7 @@ Her bildirişde tassyklanan habarlaşma belgisi görkezilýär. Bildirişi çap 
       },
       {
         title: "10. Yzyna çykma we akkaunty pozmak",
-        body: `Akkaunty programmanyň sazlamalaryndan pozup bilersiňiz ýa-da saýtymyzda akkauntyňyzdaky telefon belgisi ýa-da e-poçta salgysy bilen pozmagy sorap bilersiňiz. Pozmak 30 günlük lýgotly döwür başlaýar; şol döwürde telefon belgiňiz ýa-da e-poçta salgyňyz bilen gaýtadan girip, akkaunty dikeldip bolýar. 30 günden soň şahsy maglumatlar aýrylýar, bildirişler we çat anonim atanama saklanýar.
+        body: `Akkaunty programmada pozup bilersiňiz («Kabinet» bölüminde profiliňizi açyň we «Hasaby poz» düwmesine basyň) ýa-da saýtymyzda akkauntyňyzdaky telefon belgisi ýa-da e-poçta salgysy bilen pozmagy sorap bilersiňiz. Pozmak 30 günlük lýgotly döwür başlaýar; şol döwürde telefon belgiňiz ýa-da e-poçta salgyňyz bilen gaýtadan girip, akkaunty dikeldip bolýar. 30 günden soň şahsy maglumatlar aýrylýar, bildirişler we çat anonim atanama saklanýar.
 
 AutoTM düzgünleri bozýan akkaunty bloklap biler.`,
       },
@@ -466,6 +466,183 @@ AutoTM düzgünleri bozýan akkaunty bloklap biler.`,
       {
         title: "13. Kanun we habarlaşmak",
         body: "Türkmenistanyň kanunlary. legal@auto.tm",
+      },
+    ],
+  },
+};
+
+/**
+ * Every rule here maps to something the product or its moderators enforce today:
+ * the Listing publish checks, the media upload limits, the Listing report reasons,
+ * and the admin moderation actions (block a Listing, suspend an account).
+ * Do not add a rule that nothing enforces.
+ */
+export const postingRules: Record<Locale, LegalDocument> = {
+  en: {
+    title: "Posting rules",
+    effectiveDate: "October 2, 2026",
+    effectiveDateISO: "2026-10-02",
+    lastRevised: "October 2, 2026",
+    lastRevisedISO: "2026-10-02",
+    sections: [
+      {
+        title: "1. What you may list",
+        body: `- Each listing is for a real vehicle that you own or are allowed to sell.
+- **One vehicle, one listing.** Do not post the same vehicle more than once. Moderators block duplicate listings.
+- Choose the brand, model and year that match the vehicle. They cannot be changed after you publish, and neither can the VIN.`,
+      },
+      {
+        title: "2. Photos",
+        body: `- Use photos of the actual vehicle you are selling. Do not use photos of another vehicle, stock images, or photos copied from other listings.
+- A listing needs at least 1 and up to 20 photos.
+- Photos must be JPEG or WebP, up to 5 MB each. The app resizes and compresses your photos before upload.`,
+      },
+      {
+        title: "3. Price, description and contact",
+        body: `- **Price:** give the real asking price, in TMT, USD or AED. The price must be above zero. A placeholder price is misleading information.
+- **Description:** write a true and complete description, up to 2,000 characters. Say whether the vehicle has been damaged; the app asks you this before you publish. For a used vehicle, give the mileage.
+- **Contact:** keep calls, chat or both turned on, so buyers can reach you. Show only a phone number that you are entitled to use and that reaches you or the person selling the vehicle.`,
+      },
+      {
+        title: "4. What is not allowed",
+        body: `These are the reasons buyers can choose when they report a listing:
+
+- **Spam**: the same vehicle posted again, or a listing that advertises something other than the vehicle.
+- **Scam or fraud**: a listing for a vehicle that does not exist or that you cannot sell, or an attempt to take money from a buyer without a real sale.
+- **Misleading information**: a wrong price, year, mileage or condition, hidden damage, or photos of another vehicle.
+- **Wrong category**: a listing that is not a vehicle for sale, or that names the wrong brand or model.
+
+The [Terms of Service](/en/legal/terms) also forbid stolen vehicles, vehicles with active liens that you do not disclose, and illegally modified vehicles.`,
+      },
+      {
+        title: "5. What happens when a listing breaks the rules",
+        body: `A listing appears as soon as you publish it; there is no review before that. Moderators review the listings that people report.
+
+- If a listing breaks these rules, moderators can block the listing. A blocked listing disappears from search, other people can no longer open it, and you can no longer edit it.
+- For serious or repeated breaches, moderators can suspend the account. While an account is suspended, it cannot publish, edit or republish listings, start chats, or send reports.
+
+Moderators record a reason for every decision. If you think a decision is wrong, contact support.`,
+      },
+      {
+        title: "6. Reporting a listing and contacting support",
+        body: `To report a listing, open it in the app and tap **Report**, or open the menu at the top of the listing and choose **Report**. Pick a reason and send the report. If you choose **Other**, add a short description. You can report listings that are for sale, but not your own.
+
+To contact support:
+
+- Email: bagtyyarkowusow.dev@gmail.com
+- Phone: +993 63 98 94 04`,
+      },
+    ],
+  },
+  ru: {
+    title: "Правила размещения",
+    effectiveDate: "2 октября 2026 г.",
+    effectiveDateISO: "2026-10-02",
+    lastRevised: "2 октября 2026 г.",
+    lastRevisedISO: "2026-10-02",
+    sections: [
+      {
+        title: "1. Что можно размещать",
+        body: `- Каждое объявление — для реального автомобиля, который принадлежит вам или который вы вправе продавать.
+- **Один автомобиль — одно объявление.** Не размещайте один и тот же автомобиль несколько раз. Модераторы блокируют повторные объявления.
+- Укажите марку, модель и год, которые соответствуют автомобилю. После публикации их нельзя изменить, как и VIN.`,
+      },
+      {
+        title: "2. Фотографии",
+        body: `- Используйте фотографии именно того автомобиля, который продаёте. Не используйте фотографии другого автомобиля, стоковые изображения или фотографии из чужих объявлений.
+- В объявлении должно быть от 1 до 20 фотографий.
+- Фотографии — в формате JPEG или WebP, не больше 5 МБ каждая. Приложение само уменьшает и сжимает фотографии перед загрузкой.`,
+      },
+      {
+        title: "3. Цена, описание и контакты",
+        body: `- **Цена:** укажите реальную цену продажи в TMT, USD или AED. Цена должна быть больше нуля. Условная цена считается информацией, вводящей в заблуждение.
+- **Описание:** напишите правдивое и полное описание, до 2000 символов. Укажите, был ли автомобиль повреждён; приложение спросит об этом перед публикацией. Для автомобиля с пробегом укажите пробег.
+- **Контакты:** оставьте включёнными звонки, чат или и то и другое, чтобы покупатели могли с вами связаться. Указывайте только номер телефона, которым вы вправе пользоваться и по которому можно связаться с вами или с тем, кто продаёт автомобиль.`,
+      },
+      {
+        title: "4. Что запрещено",
+        body: `Это причины, которые покупатели могут выбрать, когда жалуются на объявление:
+
+- **Спам**: тот же автомобиль, размещённый повторно, или объявление, которое рекламирует что-то кроме автомобиля.
+- **Мошенничество**: объявление об автомобиле, которого нет или который вы не можете продать, либо попытка получить деньги с покупателя без настоящей продажи.
+- **Вводящая в заблуждение информация**: неверные цена, год, пробег или состояние, скрытые повреждения или фотографии другого автомобиля.
+- **Неверная категория**: объявление, которое не о продаже автомобиля, или с неверной маркой или моделью.
+
+[Условия использования](/ru/legal/terms) также запрещают угнанные автомобили, автомобили с действующим залогом, о котором вы не сообщили, и незаконно переделанные автомобили.`,
+      },
+      {
+        title: "5. Что происходит при нарушении правил",
+        body: `Объявление появляется сразу после публикации; предварительной проверки нет. Модераторы рассматривают объявления, на которые пожаловались.
+
+- Если объявление нарушает эти правила, модераторы могут заблокировать объявление. Заблокированное объявление пропадает из поиска, другие пользователи больше не могут его открыть, а редактировать его больше нельзя.
+- При серьёзных или повторных нарушениях модераторы могут приостановить аккаунт. Пока аккаунт приостановлен, с него нельзя публиковать, редактировать и повторно публиковать объявления, начинать чаты и отправлять жалобы.
+
+Модераторы указывают причину каждого решения. Если вы считаете решение ошибочным, свяжитесь с поддержкой.`,
+      },
+      {
+        title: "6. Как пожаловаться на объявление и связаться с поддержкой",
+        body: `Чтобы пожаловаться на объявление, откройте его в приложении и нажмите **Пожаловаться** или откройте меню вверху объявления и выберите **Пожаловаться**. Выберите причину и отправьте жалобу. Если вы выбрали **Другое**, добавьте короткое описание. Пожаловаться можно на объявления, которые продаются, но не на свои.
+
+Связаться с поддержкой:
+
+- Эл. почта: bagtyyarkowusow.dev@gmail.com
+- Телефон: +993 63 98 94 04`,
+      },
+    ],
+  },
+  tk: {
+    title: "Ýerleşdirme düzgünleri",
+    effectiveDate: "2-nji oktýabr 2026",
+    effectiveDateISO: "2026-10-02",
+    lastRevised: "2-nji oktýabr 2026",
+    lastRevisedISO: "2026-10-02",
+    sections: [
+      {
+        title: "1. Näme ýerleşdirip bolýar",
+        body: `- Her bildiriş size degişli ýa-da satmaga hakyňyz bolan hakyky ulag hakda bolmaly.
+- **Bir ulag — bir bildiriş.** Şol bir ulagy birnäçe gezek ýerleşdirmäň. Moderatorlar gaýtalanýan bildirişleri bloklaýarlar.
+- Ulaga laýyk gelýän markany, modeli we ýyly saýlaň. Çap edeniňizden soň olary, şeýle hem VIN-i üýtgedip bolmaýar.`,
+      },
+      {
+        title: "2. Suratlar",
+        body: `- Satýan ulagyňyzyň öz suratlaryny ulanyň. Başga ulagyň suratlaryny, stok suratlary ýa-da başga bildirişlerden göçürilen suratlary ulanmaň.
+- Bildirişde azyndan 1, iň köp 20 surat bolmaly.
+- Suratlar JPEG ýa-da WebP görnüşinde, her biri 5 MB-dan köp bolmaly däl. Programma suratlary ýüklemezden öň özi kiçeldýär we gysýar.`,
+      },
+      {
+        title: "3. Baha, düşündiriş we habarlaşmak",
+        body: `- **Baha:** hakyky satuw bahasyny TMT, USD ýa-da AED-de görkeziň. Baha noldan uly bolmaly. Şertli baha ýalňyş maglumat hasaplanýar.
+- **Düşündiriş:** dogry we doly düşündiriş ýazyň, 2000 nyşana çenli. Ulaga zeper ýetip-ýetmändigini görkeziň; programma muny çap etmezden öň soraýar. Ulanylan ulag üçin geçen ýoluny görkeziň.
+- **Habarlaşmak:** jaňlary, çaty ýa-da ikisini hem açyk goýuň, alyjylar siz bilen habarlaşyp bilsinler. Diňe ulanmaga hakyňyz bolan we size ýa-da ulagy satýan adama ýetýän telefon belgisini görkeziň.`,
+      },
+      {
+        title: "4. Näme gadagan",
+        body: `Alyjylar bildiriş barada şikaýat edenlerinde şu sebäpleri saýlap bilýärler:
+
+- **Spam**: şol bir ulagyň gaýtadan ýerleşdirilmegi ýa-da ulagdan başga zady mahabatlandyrýan bildiriş.
+- **Galplyk**: bar bolmadyk ýa-da satyp bilmeýän ulagyňyz hakda bildiriş, ýa-da hakyky satuwsyz alyjydan pul almaga synanyşyk.
+- **Ýalňyş maglumat**: nädogry baha, ýyl, geçen ýol ýa-da ýagdaý, gizlenen zeper ýa-da başga ulagyň suratlary.
+- **Nädogry kategoriýa**: ulag satmak hakda däl bildiriş ýa-da nädogry markaly ýa-da modelli bildiriş.
+
+[Ulanyş şertleri](/tk/legal/terms) mundan başga-da ogurlanan ulaglary, aýdylmadyk girewdäki ulaglary we kanunsyz üýtgedilen ulaglary gadagan edýär.`,
+      },
+      {
+        title: "5. Düzgünler bozulanda näme bolýar",
+        body: `Bildiriş çap edilen badyna görünýär; öňünden barlag ýok. Moderatorlar şikaýat edilen bildirişlere seredýärler.
+
+- Bildiriş bu düzgünleri bozýan bolsa, moderatorlar bildirişi bloklap bilerler. Bloklanan bildiriş gözlegden aýrylýar, beýleki ulanyjylar ony indi açyp bilmeýärler we ony indi redaktirläp bolmaýar.
+- Çynlakaý ýa-da gaýtalanýan bozulmalarda moderatorlar akkaunty togtadyp bilerler. Akkaunt togtadylan wagty ondan bildiriş çap edip, redaktirläp ýa-da gaýtadan çap edip, çat başlap we şikaýat iberip bolmaýar.
+
+Moderatorlar her karar üçin sebäbini ýazýarlar. Karar nädogry diýip pikir edýän bolsaňyz, goldaw bilen habarlaşyň.`,
+      },
+      {
+        title: "6. Bildiriş barada şikaýat etmek we goldaw bilen habarlaşmak",
+        body: `Bildiriş barada şikaýat etmek üçin ony programmada açyň we **Şikaýat et** düwmesine basyň ýa-da bildirişiň ýokarsyndaky menýuny açyp, **Şikaýat et** saýlaň. Sebäbi saýlaň we şikaýaty iberiň. **Başga** saýlasaňyz, gysga düşündiriş goşuň. Satuwdaky bildirişler barada şikaýat edip bolýar, ýöne öz bildirişleriňiz barada däl.
+
+Goldaw bilen habarlaşmak:
+
+- E-poçta: bagtyyarkowusow.dev@gmail.com
+- Telefon: +993 63 98 94 04`,
       },
     ],
   },
