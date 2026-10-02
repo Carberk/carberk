@@ -7,6 +7,8 @@ import type { AuthSchemas } from "@auto-tm/contracts";
 
 import { CodeEntryForm } from "../../components/auth/CodeEntryForm";
 import { useRequestOtp } from "../../src/api/identity/useRequestOtp";
+import { useRestoreAccount } from "../../src/api/identity/useRestoreAccount";
+import { useRevokePendingSession } from "../../src/api/identity/useRevokePendingSession";
 import { useVerifyOtp } from "../../src/api/identity/useVerifyOtp";
 import { BrandLogo } from "../../src/auth/BrandLogo";
 import { LocaleSwitcher } from "../../src/auth/LocaleSwitcher";
@@ -21,8 +23,6 @@ import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -47,17 +47,35 @@ export default function OtpScreen() {
     testCode?: string;
   }>();
   const { t, i18n } = useTranslation("auth");
+  // The restore prompt's copy lives in the account namespace.
+  const { t: tAccount } = useTranslation("account");
   const authNavigation = useOtpAuthNavigation(router);
 
   const method = firstParam(params.method);
   const destination = firstParam(params.destination);
-  const [showRestorePrompt, setShowRestorePrompt] = useState(false);
-  const [restoreDate, setRestoreDate] = useState<string | null>(null);
+  // The session of a User whose deletion is scheduled. It is not stored, and
+  // the account is not restored, until the User presses Restore (ADR-0032).
   const [pendingSession, setPendingSession] =
     useState<AuthSchemas.OtpVerifyResponse | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreFailed, setRestoreFailed] = useState(false);
 
   const { mutateAsync: verifyOtpMutate } = useVerifyOtp();
   const { mutateAsync: requestOtpMutate } = useRequestOtp();
+  const { mutateAsync: restoreAccountMutate } = useRestoreAccount();
+  const { mutateAsync: revokePendingSessionMutate } = useRevokePendingSession();
+
+  const restoreDate = useMemo(
+    () =>
+      pendingSession?.user.deletionScheduledAt
+        ? new Intl.DateTimeFormat(i18n.language ?? "ru", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          }).format(new Date(pendingSession.user.deletionScheduledAt))
+        : "",
+    [pendingSession, i18n.language],
+  );
 
   const canonicalDestination = useMemo(() => {
     if (!destination) return null;
@@ -99,15 +117,8 @@ export default function OtpScreen() {
     });
 
     if (result.user.deletionScheduledAt) {
+      setRestoreFailed(false);
       setPendingSession(result);
-      setRestoreDate(
-        new Intl.DateTimeFormat(i18n.language ?? "ru", {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        }).format(new Date(result.user.deletionScheduledAt)),
-      );
-      setShowRestorePrompt(true);
       return;
     }
 
@@ -122,23 +133,34 @@ export default function OtpScreen() {
   }
 
   async function handleRestoreConfirm() {
-    if (!pendingSession) {
-      setShowRestorePrompt(false);
+    if (!pendingSession || isRestoring) return;
+
+    setIsRestoring(true);
+    setRestoreFailed(false);
+    try {
+      await restoreAccountMutate(pendingSession.accessToken);
+      await storeAuthSession({
+        ...pendingSession,
+        user: { ...pendingSession.user, deletionScheduledAt: null },
+      });
+    } catch {
+      // Keep the prompt open so the User can retry; restoring twice is harmless.
+      setRestoreFailed(true);
+      setIsRestoring(false);
       return;
     }
-    try {
-      await storeAuthSession(pendingSession);
-      setPendingSession(null);
-      setShowRestorePrompt(false);
-      authNavigation.complete();
-    } catch {
-      // Keep prompt open so the user can retry if storage fails.
-    }
+    setPendingSession(null);
+    setIsRestoring(false);
+    authNavigation.complete();
   }
 
-  function handleRestoreCancel() {
-    setShowRestorePrompt(false);
+  async function handleRestoreCancel() {
+    if (!pendingSession || isRestoring) return;
+
+    const { refreshToken } = pendingSession;
     setPendingSession(null);
+    setRestoreFailed(false);
+    await revokePendingSessionMutate(refreshToken);
     changeSignInMethod();
   }
 
@@ -183,21 +205,33 @@ export default function OtpScreen() {
       </SafeScreen>
 
       {/* Account restoration prompt during deletion grace */}
-      <AlertDialog open={showRestorePrompt} onOpenChange={setShowRestorePrompt}>
+      <AlertDialog open={pendingSession !== null}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("restoreAccountTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>{tAccount("restoreAccountTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("restoreAccountMessage", { date: restoreDate ?? "" })}
+              {tAccount("restoreAccountMessage", { date: restoreDate })}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {restoreFailed ? (
+            <Text className="text-sm text-destructive" accessibilityLiveRegion="polite">
+              {tAccount("restoreAccountError")}
+            </Text>
+          ) : null}
           <AlertDialogFooter>
-            <AlertDialogCancel onPress={handleRestoreCancel}>
-              <Text>{t("restoreAccountCancel")}</Text>
-            </AlertDialogCancel>
-            <AlertDialogAction onPress={handleRestoreConfirm}>
-              <Text>{t("restoreAccountConfirm")}</Text>
-            </AlertDialogAction>
+            <Button
+              variant="outline"
+              disabled={isRestoring}
+              onPress={() => void handleRestoreCancel()}
+            >
+              <Text>{tAccount("restoreAccountCancel")}</Text>
+            </Button>
+            <Button
+              disabled={isRestoring}
+              onPress={() => void handleRestoreConfirm()}
+            >
+              <Text>{tAccount("restoreAccountConfirm")}</Text>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

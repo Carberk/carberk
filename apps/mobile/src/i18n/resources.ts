@@ -602,6 +602,7 @@ export const resources: Resource = {
       restoreAccountMessage: "Ваш аккаунт запланирован к удалению {{date}}. Войдите, чтобы восстановить его и активировать объявления.",
       restoreAccountCancel: "Отмена",
       restoreAccountConfirm: "Восстановить",
+      restoreAccountError: "Не удалось восстановить аккаунт. Проверьте соединение и попробуйте ещё раз.",
     },
     listings: {
       favorites: "Избранное",
@@ -1229,6 +1230,7 @@ export const resources: Resource = {
       restoreAccountMessage: "Hasabyňyz {{date}} pozmak üçin meýilnamalaşdyryldy. Dikeltmek we bildirişleri işjeň etmek üçin giriň.",
       restoreAccountCancel: "Ýatyr",
       restoreAccountConfirm: "Dikelt",
+      restoreAccountError: "Hasaby dikeltmek başartmady. Internet birikmäňizi barlaň we täzeden synanyşyň.",
     },
     listings: {
       favorites: "Halanlarym",
@@ -1854,6 +1856,7 @@ export const resources: Resource = {
       restoreAccountMessage: "Your account is scheduled for deletion on {{date}}. Sign in to restore it and reactivate your listings.",
       restoreAccountCancel: "Cancel",
       restoreAccountConfirm: "Restore",
+      restoreAccountError: "We could not restore your account. Check your connection and try again.",
     },
     listings: {
       favorites: "Favorites",

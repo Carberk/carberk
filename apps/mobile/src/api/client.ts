@@ -34,6 +34,10 @@ interface RequestOptions<TResponse> {
   schema?: ZodSchema<TResponse>;
   // If false, do not attach Authorization header (used for OTP request/verify pre-login)
   auth?: boolean;
+  // Bearer token of a session that is not stored yet, such as the pending session
+  // of a User whose deletion is scheduled. It replaces the stored session for this
+  // request, and a 401 is never refreshed or retried.
+  accessToken?: string;
   // Per-request timeout override (defaults to 30s)
   timeout?: number;
 }
@@ -142,7 +146,9 @@ async function rawRequest<TResponse>(
     headers["Content-Type"] = "application/json";
   }
 
-  if (opts.auth !== false) {
+  if (opts.accessToken !== undefined) {
+    headers["Authorization"] = `Bearer ${opts.accessToken}`;
+  } else if (opts.auth !== false) {
     let session = await loadAuthSession();
     // Public routes that personalise their response (the feed's `isFavorited`)
     // ignore an expired bearer instead of answering 401, so the 401 refresh
@@ -173,7 +179,12 @@ async function rawRequest<TResponse>(
     opts.timeout ?? DEFAULT_TIMEOUT_MS,
   );
 
-  if (res.status === 401 && opts.auth !== false && !isRetry) {
+  if (
+    res.status === 401 &&
+    opts.auth !== false &&
+    opts.accessToken === undefined &&
+    !isRetry
+  ) {
     await refreshOnce();
     return rawRequest(path, opts, true);
   }
@@ -226,19 +237,19 @@ async function rawRequest<TResponse>(
 }
 
 export const apiClient = {
-  get<T>(path: string, schema?: ZodSchema<T>, opts: { auth?: boolean; timeout?: number } = {}) {
+  get<T>(path: string, schema?: ZodSchema<T>, opts: { auth?: boolean; accessToken?: string; timeout?: number } = {}) {
     return rawRequest<T>(path, { method: "GET", schema, ...opts }, false);
   },
-  post<T>(path: string, body: unknown, schema?: ZodSchema<T>, opts: { auth?: boolean; timeout?: number } = {}) {
+  post<T>(path: string, body: unknown, schema?: ZodSchema<T>, opts: { auth?: boolean; accessToken?: string; timeout?: number } = {}) {
     return rawRequest<T>(path, { method: "POST", body, schema, ...opts }, false);
   },
-  patch<T>(path: string, body: unknown, schema?: ZodSchema<T>, opts: { auth?: boolean; timeout?: number } = {}) {
+  patch<T>(path: string, body: unknown, schema?: ZodSchema<T>, opts: { auth?: boolean; accessToken?: string; timeout?: number } = {}) {
     return rawRequest<T>(path, { method: "PATCH", body, schema, ...opts }, false);
   },
-  put<T>(path: string, body: unknown, schema?: ZodSchema<T>, opts: { auth?: boolean; timeout?: number } = {}) {
+  put<T>(path: string, body: unknown, schema?: ZodSchema<T>, opts: { auth?: boolean; accessToken?: string; timeout?: number } = {}) {
     return rawRequest<T>(path, { method: "PUT", body, schema, ...opts }, false);
   },
-  delete<T>(path: string, schema?: ZodSchema<T>, opts: { auth?: boolean; timeout?: number } = {}) {
+  delete<T>(path: string, schema?: ZodSchema<T>, opts: { auth?: boolean; accessToken?: string; timeout?: number } = {}) {
     return rawRequest<T>(path, { method: "DELETE", schema, ...opts }, false);
   },
 };
