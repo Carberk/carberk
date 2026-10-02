@@ -1,10 +1,15 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { NotFoundException, ForbiddenException, BadRequestException } from "@nestjs/common";
 
 import { Conversation } from "../domain/Conversation";
 import { Message } from "../domain/Message";
 import type { ConversationRepository } from "../domain/ports/ConversationRepository";
+import type {
+  IdentityCheckPort,
+  IdentityReadPort,
+} from "../../identity/identity.public";
 
+import { ConversationAccessPolicy } from "./ConversationAccessPolicy";
 import { DeleteMessage } from "./DeleteMessage";
 
 class FakeConversationRepository implements ConversationRepository {
@@ -99,8 +104,25 @@ class FakeConversationRepository implements ConversationRepository {
   }
 }
 
-function makeUseCase(repo?: FakeConversationRepository) {
-  return new DeleteMessage(repo ?? new FakeConversationRepository());
+function makeUseCase(
+  repo?: FakeConversationRepository,
+  options: { deletionScheduledFor?: string } = {},
+) {
+  const identityCheck = {
+    isSuspended: vi.fn().mockResolvedValue(false),
+    isDeletionScheduled: vi
+      .fn()
+      .mockImplementation(
+        async (userId: string) => userId === options.deletionScheduledFor,
+      ),
+  } as unknown as IdentityCheckPort;
+  const identityRead = {
+    isUserBlockedBy: vi.fn().mockResolvedValue(false),
+  } as unknown as IdentityReadPort;
+  return new DeleteMessage(
+    repo ?? new FakeConversationRepository(),
+    new ConversationAccessPolicy(identityCheck, identityRead),
+  );
 }
 
 function seedConversation(repo: FakeConversationRepository) {
@@ -222,5 +244,26 @@ describe("DeleteMessage", () => {
         messageId: "msg-1",
       }),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it("refuses a User whose account deletion is scheduled and leaves the message", async () => {
+    seedConversation(repo);
+    seedTextMessage(repo, { createdAt: new Date(Date.now() - 60_000) });
+    const uc = makeUseCase(repo, { deletionScheduledFor: "buyer-1" });
+
+    await expect(
+      uc.execute({
+        userId: "buyer-1",
+        conversationId: "conv-1",
+        messageId: "msg-1",
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        code: "FORBIDDEN",
+        details: { reason: "ACCOUNT_DELETION_PENDING" },
+      },
+    });
+
+    expect(repo.messages[0]!.isDeleted()).toBe(false);
   });
 });
