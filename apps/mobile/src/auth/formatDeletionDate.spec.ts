@@ -11,6 +11,10 @@ describe("formatDeletionDate", () => {
     expect(formatDeletionDate(SCHEDULED_AT, "ru")).toBe("26 октября 2026 г");
   });
 
+  it("keeps the Russian period when the date sits mid-sentence", () => {
+    expect(formatDeletionDate(SCHEDULED_AT, "ru", { midSentence: true })).toBe("26 октября 2026 г.");
+  });
+
   it("leaves dates that do not end with a period alone", () => {
     expect(formatDeletionDate(SCHEDULED_AT, "en")).toBe("October 26, 2026");
   });

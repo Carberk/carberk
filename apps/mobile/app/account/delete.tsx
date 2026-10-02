@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import { router } from "expo-router";
 import { ChevronLeft, Trash2 } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
@@ -8,7 +8,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSafeBack } from "../../src/navigation/useSafeBack";
 import { useDeleteAccount } from "../../src/api/identity/useDeleteAccount";
 import { clearAuthSession } from "../../src/auth/session";
-import { HOME_HREF } from "../../src/navigation/homeHref";
+import { formatDeletionDateFromNow } from "../../src/auth/formatDeletionDate";
+import { localeTag } from "../../src/i18n/resources";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,46 +22,49 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { SafeScreen } from "@/components/navigation/SafeScreen";
-
-function formatDeletionDate(locale: string): string {
-  const date = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-  return new Intl.DateTimeFormat(locale, {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  }).format(date);
-}
 
 export default function DeleteAccountScreen() {
   const { t, i18n } = useTranslation("account");
   const queryClient = useQueryClient();
   const deleteAccount = useDeleteAccount();
+  const [understood, setUnderstood] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [showScheduled, setShowScheduled] = useState(false);
-  const goBack = useSafeBack("/(tabs)/services");
+  const goBack = useSafeBack("/profile");
 
-  const locale = i18n.language ?? "ru";
-  const deletionDate = useMemo(() => formatDeletionDate(locale), [locale]);
+  const locale = localeTag(i18n.language);
+  const deletionDate = useMemo(() => formatDeletionDateFromNow(locale), [locale]);
+  // Russian opens this line with the date, so it keeps its "г." period.
+  const erasedOnDate = useMemo(
+    () => formatDeletionDateFromNow(locale, { midSentence: true }),
+    [locale],
+  );
+  const consequences = [
+    t("deleteAccountSignedOut"),
+    t("deleteAccountListingsArchived"),
+    t("deleteAccountChatsStay"),
+    t("deleteAccountErasedOn", { date: erasedOnDate }),
+    t("deleteAccountRestoreBefore"),
+  ];
 
   async function handleDelete() {
     setShowConfirm(false);
 
     try {
       await deleteAccount.mutateAsync();
-      await clearAuthSession();
-      queryClient.clear();
-      setShowScheduled(true);
     } catch {
-      // Error is available via deleteAccount.error; surface inline
+      // The User stays signed in; deleteAccount.isError shows the message inline.
+      return;
     }
-  }
-
-  function handleScheduledDismiss() {
-    setShowScheduled(false);
-    router.replace(HOME_HREF);
+    await clearAuthSession();
+    queryClient.clear();
+    // Cabinet sits under the scheduled screen, so neither Back nor Done can
+    // return to a signed-in screen.
+    router.dismissTo("/(tabs)/services");
+    router.push("/account/deletion-scheduled");
   }
 
   return (
@@ -86,31 +90,52 @@ export default function DeleteAccountScreen() {
           <Text className="text-base text-foreground">
             {t("deleteAccountDescription")}
           </Text>
-          <Text className="text-sm text-muted-foreground">
-            {t("deleteAccountGraceDetail", {
-              date: deletionDate,
-              defaultValue:
-                "After confirmation your account will be scheduled for deletion on {{date}}. You can restore it by logging in again before that date.",
-            })}
-          </Text>
+          <View className="gap-2">
+            <Text className="text-base font-semibold text-foreground">
+              {t("deleteAccountWhatHappens")}
+            </Text>
+            {consequences.map((line) => (
+              <View key={line} className="flex-row gap-2 pl-1">
+                <Text className="text-sm text-muted-foreground">{"•"}</Text>
+                <Text className="flex-1 text-sm text-muted-foreground">{line}</Text>
+              </View>
+            ))}
+          </View>
         </View>
+
+        <Pressable
+          onPress={() => setUnderstood((value) => !value)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: understood }}
+          accessibilityLabel={t("deleteAccountUnderstand")}
+          className="min-h-11 flex-row items-center gap-3 rounded-md active:bg-muted/60"
+        >
+          <Checkbox checked={understood} pointerEvents="none" accessible={false} />
+          <Text className="flex-1 text-base text-foreground">
+            {t("deleteAccountUnderstand")}
+          </Text>
+        </Pressable>
 
         <View className="py-6">
           <Button
             variant="destructive"
             size="pill"
-            disabled={deleteAccount.isPending}
+            disabled={!understood || deleteAccount.isPending}
             onPress={() => setShowConfirm(true)}
             accessibilityLabel={t("deleteAccount")}
           >
-            <Icon as={Trash2} className="size-5 text-destructive-foreground mr-2" />
+            <Icon as={Trash2} className="size-5 mr-2" />
             <Text>{t("deleteAccount")}</Text>
           </Button>
         </View>
 
         {deleteAccount.isError ? (
           <View className="py-2">
-            <Text className="text-sm text-destructive text-center">
+            <Text
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              className="text-sm text-destructive text-center"
+            >
               {t("deleteAccountFailed", { defaultValue: "Could not delete account. Please try again." })}
             </Text>
           </View>
@@ -137,23 +162,6 @@ export default function DeleteAccountScreen() {
               <Text className="text-destructive-foreground">
                 {t("deleteAccountConfirmAction")}
               </Text>
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Post-delete scheduled messaging */}
-      <AlertDialog open={showScheduled} onOpenChange={setShowScheduled}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("deleteAccountScheduledTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("deleteAccountScheduledMessage", { date: deletionDate })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onPress={handleScheduledDismiss}>
-              <Text>{t("common:done", { defaultValue: "Done" })}</Text>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
