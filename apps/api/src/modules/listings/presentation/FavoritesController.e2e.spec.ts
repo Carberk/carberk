@@ -404,11 +404,17 @@ describe("FavoritesController e2e", () => {
         .set("Authorization", `Bearer ${buyerToken}`)
         .expect(200);
       const parsed = ListingsSchemas.MyFavoritesResponseSchema.parse(res.body);
+      // Publication adopts server-recorded uploads, so the stored keys are the
+      // seeded upload keys, not the draft's placeholder names.
+      const stored = await prisma.listingMedia.findMany({
+        where: { listingId },
+        orderBy: { sortOrder: "asc" },
+      });
 
       expect(parsed.items).toHaveLength(1);
       expect(parsed.items[0]).toMatchObject({
         id: listingId,
-        photoKeys: ["a.jpg", "b.jpg"],
+        photoKeys: [stored[0]?.key, stored[1]?.key],
         photoCount: 3,
         mileageKm: 50000,
         condition: "used",
