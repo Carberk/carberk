@@ -18,6 +18,13 @@ import { Button } from "@/components/ui/button";
 
 const OTP_LENGTH = 6;
 
+/** "1:05" for a wait over a minute; the server's backoff grows to 16 minutes. */
+export function formatResendWait(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return `${minutes}:${String(rest).padStart(2, "0")}`;
+}
+
 export interface ResendCodeResult {
   resendInSeconds: number;
   testCode?: string;
@@ -33,12 +40,21 @@ interface CodeEntryFormProps {
   verify: (code: string) => Promise<void>;
   resend: () => Promise<ResendCodeResult>;
   onChangeDestination: () => void;
+  /** Opens Help. Offered only once the daily code limit is reached. */
+  onContactSupport: () => void;
+  /** Sign-in only: leave an email code for the phone entry. */
+  onUsePhoneInstead?: () => void;
 }
 
 /**
  * The Sign-in Code entry shared by sign-in and by adding or replacing a
  * Sign-in Method: six cells that submit when full, the resend countdown, and
  * localized error copy. Screens own the chrome and what happens on success.
+ *
+ * When a resend hits the daily destination limit nothing more can be tried
+ * here today: Resend and code entry stop and Contact support is the one way
+ * forward. An email code that has not arrived gets a hint once the first wait
+ * is over or after a resend (ADR-0055: undelivered email fails silently).
  */
 export function CodeEntryForm({
   method,
@@ -48,6 +64,8 @@ export function CodeEntryForm({
   verify,
   resend,
   onChangeDestination,
+  onContactSupport,
+  onUsePhoneInstead,
 }: CodeEntryFormProps) {
   const otpRef = useRef<OtpCellsRef>(null);
   const { colorScheme } = useColorScheme();
@@ -63,6 +81,8 @@ export function CodeEntryForm({
   const [terminalError, setTerminalError] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const [dailyLimit, setDailyLimit] = useState(false);
+  const [hasResent, setHasResent] = useState(false);
   const lastSubmittedCode = useRef<string | null>(null);
 
   useEffect(() => {
@@ -93,6 +113,7 @@ export function CodeEntryForm({
   }, [code, isVerifying]);
 
   function handleCodeChange(value: string) {
+    if (dailyLimit) return;
     setError(null);
     setCode(value);
   }
@@ -124,7 +145,7 @@ export function CodeEntryForm({
   }
 
   async function resendCode() {
-    if (secondsRemaining > 0 || isResending) {
+    if (secondsRemaining > 0 || isResending || dailyLimit) {
       return;
     }
 
@@ -136,14 +157,22 @@ export function CodeEntryForm({
     try {
       const result = await resend();
       setSecondsRemaining(result.resendInSeconds);
+      setHasResent(true);
       setTestCode(__DEV__ ? result.testCode : undefined);
       requestAnimationFrame(() => otpRef.current?.focus());
     } catch (resendError) {
-      setError(getResendCodeErrorCopy(resendError, t));
+      const copy = getResendCodeErrorCopy(resendError, t);
+      setError(copy.message);
+      setDailyLimit(copy.dailyLimit);
     } finally {
       setIsResending(false);
     }
   }
+
+  const showEmailHint =
+    method === "email" &&
+    !dailyLimit &&
+    (hasResent || secondsRemaining === 0);
 
   return (
     <View className="gap-6">
@@ -154,11 +183,9 @@ export function CodeEntryForm({
         <Text className="text-base leading-normal text-muted-foreground">
           {t("otpSent", { destination: displayedDestination })}
         </Text>
-        {method === "email" ? (
-          <Text className="text-sm leading-normal text-muted-foreground">
-            {t("emailCodeExpiry")}
-          </Text>
-        ) : null}
+        <Text className="text-sm leading-normal text-muted-foreground">
+          {t(method === "email" ? "emailCodeExpiry" : "phoneCodeExpiry")}
+        </Text>
         <Button
           variant="link"
           className="self-start px-0"
@@ -172,7 +199,7 @@ export function CodeEntryForm({
 
       <OtpCells
         ref={otpRef}
-        disabled={isVerifying || isResending || terminalError}
+        disabled={isVerifying || isResending || terminalError || dailyLimit}
         hasError={error !== null}
         length={OTP_LENGTH}
         onChange={handleCodeChange}
@@ -182,13 +209,26 @@ export function CodeEntryForm({
       {error ? (
         <View className="flex-row items-center gap-1.5">
           <Icon as={AlertCircle} className="size-4 text-destructive" />
-          <Text className="flex-1 text-sm leading-snug text-destructive">
+          <Text
+            accessibilityLiveRegion="polite"
+            className="flex-1 text-sm leading-snug text-destructive"
+          >
             {error}
           </Text>
         </View>
       ) : null}
 
-      {terminalError ? null : (
+      {dailyLimit ? (
+        <Button
+          variant="link"
+          className="self-start px-0"
+          onPress={onContactSupport}
+        >
+          <Text>{t("contactSupport")}</Text>
+        </Button>
+      ) : null}
+
+      {terminalError || dailyLimit ? null : (
         <Button
           disabled={secondsRemaining > 0 || isResending}
           variant="link"
@@ -196,14 +236,33 @@ export function CodeEntryForm({
           onPress={resendCode}
         >
           <Text className={secondsRemaining > 0 || isResending ? "text-muted-foreground" : "text-foreground underline"}>
-            {secondsRemaining > 0
-              ? t("resendIn", { seconds: secondsRemaining })
-              : isResending
-                ? t("loading")
-                : t("resendCode")}
+            {secondsRemaining > 60
+              ? t("resendInMinutes", { time: formatResendWait(secondsRemaining) })
+              : secondsRemaining > 0
+                ? t("resendIn", { seconds: secondsRemaining })
+                : isResending
+                  ? t("loading")
+                  : t("resendCode")}
           </Text>
         </Button>
       )}
+
+      {showEmailHint ? (
+        <View className="gap-1">
+          <Text className="text-sm leading-normal text-muted-foreground">
+            {t("emailNotArriving")}
+          </Text>
+          {onUsePhoneInstead ? (
+            <Button
+              variant="link"
+              className="self-start px-0"
+              onPress={onUsePhoneInstead}
+            >
+              <Text>{t("usePhoneInstead")}</Text>
+            </Button>
+          ) : null}
+        </View>
+      ) : null}
 
       {isVerifying ? (
         <View className="flex-row items-center gap-2">
@@ -216,7 +275,7 @@ export function CodeEntryForm({
         </View>
       ) : null}
 
-      {__DEV__ && testCode && !terminalError ? (
+      {__DEV__ && testCode && !terminalError && !dailyLimit ? (
         <Button
           className="self-start h-auto rounded-full px-3 py-1"
           size="sm"

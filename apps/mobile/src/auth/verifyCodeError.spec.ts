@@ -16,6 +16,7 @@ vi.mock("../api/client", () => ({
       public code: string,
       public status: number,
       message?: string,
+      public details?: unknown,
     ) {
       super(message ?? code);
       this.name = "ApiError";
@@ -66,16 +67,36 @@ describe("getVerifyCodeErrorCopy", () => {
 });
 
 describe("getResendCodeErrorCopy", () => {
-  it("maps rate limits and network failures", () => {
-    expect(getResendCodeErrorCopy(new ApiError("RATE_LIMITED", 400), t)).toBe(
-      "rateLimitedCode",
-    );
-    expect(getResendCodeErrorCopy(new ApiError("NETWORK_ERROR", 0), t)).toBe(
-      "offline",
-    );
-    expect(getResendCodeErrorCopy(new ApiError("SERVER", 500), t)).toBe(
-      "verifyFailed",
-    );
+  it.each([
+    ["RATE_LIMITED", 400, undefined, "rateLimitedCode"],
+    ["RATE_LIMITED", 429, { reason: "backoff", retryInSeconds: 120 }, "rateLimitedCode"],
+    ["RATE_LIMITED", 429, { reason: "ip_limit", retryInSeconds: 0 }, "rateLimitedCode"],
+    ["RATE_LIMITED", 429, { reason: "unknown_reason" }, "rateLimitedCode"],
+    ["NETWORK_ERROR", 0, undefined, "offline"],
+    ["SERVER", 500, undefined, "verifyFailed"],
+  ])("maps %s %s %j to retryable copy", (code, status, details, key) => {
+    expect(
+      getResendCodeErrorCopy(new ApiError(code, status, undefined, details), t),
+    ).toEqual({ message: key, dailyLimit: false });
+  });
+
+  it("reports the daily destination limit", () => {
+    expect(
+      getResendCodeErrorCopy(
+        new ApiError("RATE_LIMITED", 429, undefined, {
+          reason: "destination_limit",
+          retryInSeconds: 0,
+        }),
+        t,
+      ),
+    ).toEqual({ message: "dailyCodeLimit", dailyLimit: true });
+  });
+
+  it("shows offline copy for a non-API failure", () => {
+    expect(getResendCodeErrorCopy(new Error("boom"), t)).toEqual({
+      message: "offline",
+      dailyLimit: false,
+    });
   });
 });
 

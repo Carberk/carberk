@@ -68,6 +68,21 @@ describe("useOtpAuthNavigation", () => {
     expect(useAuthIntentStore.getState().intent).not.toBeNull();
   });
 
+  it("lets Use phone instead return to the phone entry without cancelling", () => {
+    const router = fakeRouter();
+    useAuthIntentStore.getState().requireSignIn(router, {
+      returnTo: LISTING_ROUTE,
+      action: { kind: "message", listingId: LISTING_ID },
+    });
+    const { result } = renderHook(() => useOtpAuthNavigation(router));
+
+    act(() => result.current.usePhoneInstead());
+
+    expect(removalGuardEnabled).toBe(false);
+    expect(router.dismissTo).toHaveBeenCalledWith("/(auth)/phone");
+    expect(useAuthIntentStore.getState().intent).not.toBeNull();
+  });
+
   it("replaces an invalid phone OTP route with Phone after disabling the guard", () => {
     const router = fakeRouter();
     useAuthIntentStore.getState().requireSignIn(router, {

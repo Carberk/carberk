@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { ChevronLeft } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
-import { KeyboardAvoidingView, Platform, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import type { AuthSchemas } from "@auto-tm/contracts";
 
@@ -18,6 +18,7 @@ import { formatDeletionDate } from "../../src/auth/formatDeletionDate";
 import { maskTmPhone, normalizeTmPhone } from "../../src/auth/phone";
 import { storeAuthSession } from "../../src/auth/session";
 import { useOtpAuthNavigation } from "../../src/auth/useOtpAuthNavigation";
+import { HELP_HREF } from "../../src/navigation/helpHref";
 
 import { SafeScreen } from "@/components/navigation/SafeScreen";
 import { Text } from "@/components/ui/text";
@@ -200,7 +201,11 @@ export default function OtpScreen() {
               <LocaleSwitcher />
             </View>
 
-            <View className="mt-6 gap-6">
+            <ScrollView
+              className="flex-1"
+              contentContainerClassName="gap-6 pb-6 pt-6"
+              keyboardShouldPersistTaps="handled"
+            >
               <BrandLogo />
 
               <CodeEntryForm
@@ -213,8 +218,14 @@ export default function OtpScreen() {
                 verify={verifyCode}
                 resend={resendCode}
                 onChangeDestination={changeSignInMethod}
+                onContactSupport={() => router.push(HELP_HREF)}
+                onUsePhoneInstead={
+                  method === "email"
+                    ? authNavigation.usePhoneInstead
+                    : undefined
+                }
               />
-            </View>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </SafeScreen>

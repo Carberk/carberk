@@ -1,5 +1,7 @@
 import { ApiError } from "../api/client";
 
+import { isDailyCodeLimit } from "./requestOtpError";
+
 type Translate = (key: string) => string;
 
 export interface VerifyCodeErrorCopy {
@@ -44,13 +46,30 @@ export function getVerifyCodeErrorCopy(
   return { message: error.message || t("verifyFailed"), terminal: false };
 }
 
-export function getResendCodeErrorCopy(error: unknown, t: Translate): string {
-  if (!(error instanceof ApiError)) return t("offline");
-  if (error.code === "NETWORK_ERROR" || error.status === 0) return t("offline");
-  if (error.code === "RATE_LIMITED" || error.status === 429) {
-    return t("rateLimitedCode");
+export interface ResendCodeErrorCopy {
+  message: string;
+  // No more codes can be sent to this destination today, so the code screen
+  // stops offering Resend and code entry and points to Help instead.
+  dailyLimit: boolean;
+}
+
+export function getResendCodeErrorCopy(
+  error: unknown,
+  t: Translate,
+): ResendCodeErrorCopy {
+  if (!(error instanceof ApiError)) {
+    return { message: t("offline"), dailyLimit: false };
   }
-  return t("verifyFailed");
+  if (error.code === "NETWORK_ERROR" || error.status === 0) {
+    return { message: t("offline"), dailyLimit: false };
+  }
+  if (isDailyCodeLimit(error)) {
+    return { message: t("dailyCodeLimit"), dailyLimit: true };
+  }
+  if (error.code === "RATE_LIMITED" || error.status === 429) {
+    return { message: t("rateLimitedCode"), dailyLimit: false };
+  }
+  return { message: t("verifyFailed"), dailyLimit: false };
 }
 
 /**

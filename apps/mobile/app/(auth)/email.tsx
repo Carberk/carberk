@@ -19,7 +19,10 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 
 export default function EmailScreen() {
   const params = useLocalSearchParams<{ email?: string; authRoot?: string }>();
-  const isAuthRoot = firstParam(params.authRoot) === "1";
+  // Whether this entry started authentication is fixed when it mounts. A
+  // later pop back to it (Use phone instead) can arrive without the param,
+  // and that must not cancel the pending intent.
+  const [isAuthRoot] = useState(() => firstParam(params.authRoot) === "1");
   const { t } = useTranslation("auth");
   const [emailInput, setEmailInput] = useState(firstParam(params.email) ?? "");
   const [touched, setTouched] = useState(false);

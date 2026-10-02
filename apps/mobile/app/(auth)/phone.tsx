@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -23,7 +23,10 @@ export default function PhoneScreen() {
     authRoot?: string;
   }>();
   const initialPhone = firstParam(params.phone);
-  const isAuthRoot = firstParam(params.authRoot) === "1";
+  // Whether this entry started authentication is fixed when it mounts. A
+  // later pop back to it (Use phone instead) can arrive without the param,
+  // and that must not cancel the pending intent.
+  const [isAuthRoot] = useState(() => firstParam(params.authRoot) === "1");
   const { t } = useTranslation("auth");
 
   const phone = usePhoneField(t, initialPhone);

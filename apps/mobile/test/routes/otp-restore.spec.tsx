@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { act, fireEvent, renderMobile, routeParams } from "../render";
+import { act, fireEvent, renderMobile, routeParams, routerMock } from "../render";
 import OtpScreen from "../../app/(auth)/otp";
 import { ApiError } from "../../src/api/client";
 
@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   navigation: {
     cancel: vi.fn(),
     changeMethod: vi.fn(),
+    usePhoneInstead: vi.fn(),
     complete: vi.fn(),
     invalidDestination: vi.fn(),
   },
@@ -50,14 +51,33 @@ vi.mock("../../src/auth/useOtpAuthNavigation", () => ({
 }));
 vi.mock("../../src/auth/BrandLogo", () => ({ BrandLogo: () => null }));
 vi.mock("../../src/auth/LocaleSwitcher", () => ({ LocaleSwitcher: () => null }));
-// The code cells need a native text input; this stand-in submits a full code.
+// The code cells need a native text input; this stand-in submits a full code
+// and exposes the actions the screen hands to the form.
 vi.mock("../../components/auth/CodeEntryForm", async () => {
-  const { Pressable, Text } = await import("react-native");
+  const { Pressable, Text, View } = await import("react-native");
   return {
-    CodeEntryForm: ({ verify }: { verify: (code: string) => Promise<void> }) => (
-      <Pressable accessibilityRole="button" accessibilityLabel="Submit code" onPress={() => verify("123456")}>
-        <Text>Submit code</Text>
-      </Pressable>
+    CodeEntryForm: ({
+      verify,
+      onContactSupport,
+      onUsePhoneInstead,
+    }: {
+      verify: (code: string) => Promise<void>;
+      onContactSupport: () => void;
+      onUsePhoneInstead?: () => void;
+    }) => (
+      <View>
+        <Pressable accessibilityRole="button" accessibilityLabel="Submit code" onPress={() => verify("123456")}>
+          <Text>Submit code</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Contact support" onPress={onContactSupport}>
+          <Text>Contact support</Text>
+        </Pressable>
+        {onUsePhoneInstead ? (
+          <Pressable accessibilityRole="button" accessibilityLabel="Use phone instead" onPress={onUsePhoneInstead}>
+            <Text>Use phone instead</Text>
+          </Pressable>
+        ) : null}
+      </View>
     ),
   };
 });
@@ -232,5 +252,31 @@ describe("Sign-in code screen for a User with no scheduled deletion", () => {
     expect(mocks.storeAuthSession).toHaveBeenCalledWith(session);
     expect(mocks.navigation.complete).toHaveBeenCalledTimes(1);
     expect(mocks.restore).not.toHaveBeenCalled();
+  });
+});
+
+describe("Sign-in code screen actions", () => {
+  it("opens Help from Contact support", () => {
+    const screen = renderMobile(<OtpScreen />);
+
+    fireEvent.press(screen.getByRole("button", { name: "Contact support" }));
+
+    expect(routerMock.push).toHaveBeenCalledWith("/help");
+  });
+
+  it("offers Use phone instead on an email code and returns to the phone entry", () => {
+    routeParams.method = "email";
+    routeParams.destination = "aman@example.com";
+    const screen = renderMobile(<OtpScreen />);
+
+    fireEvent.press(screen.getByRole("button", { name: "Use phone instead" }));
+
+    expect(mocks.navigation.usePhoneInstead).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not offer Use phone instead on a phone code", () => {
+    const screen = renderMobile(<OtpScreen />);
+
+    expect(screen.queryByRole("button", { name: "Use phone instead" })).toBeNull();
   });
 });

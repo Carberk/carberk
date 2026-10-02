@@ -9,6 +9,7 @@ type SignInMethod = "phone" | "email";
 type OtpExit =
   | "cancel"
   | "change-method"
+  | "use-phone"
   | "complete"
   | { invalidDestination: SignInMethod };
 
@@ -31,6 +32,13 @@ export function useOtpAuthNavigation(router: Router) {
 
     if (exit === "change-method") {
       router.back();
+      return;
+    }
+
+    // Back to the phone entry already under the email screen, or in place of
+    // this screen when sign-in started on email.
+    if (exit === "use-phone") {
+      router.dismissTo("/(auth)/phone");
       return;
     }
 
@@ -60,6 +68,7 @@ export function useOtpAuthNavigation(router: Router) {
   return {
     cancel: () => setExit("cancel"),
     changeMethod: () => setExit("change-method"),
+    usePhoneInstead: () => setExit("use-phone"),
     complete: () => setExit("complete"),
     invalidDestination: (method: SignInMethod) =>
       setExit({ invalidDestination: method }),
