@@ -420,9 +420,49 @@ describe("SendMessage", () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it("blocks sends when listing is sold", async () => {
+  it.each(["sold", "archived"] as const)(
+    "accepts a text, an image and a retried send when the listing is %s",
+    async (status) => {
+      seedConversation(repo);
+      seedListing(listings, { status });
+      const events = new FakeMessageEventPublisher();
+      const uc = makeUseCase(repo, listings, undefined, undefined, events);
+
+      const text = await uc.execute({
+        senderId: "buyer-1",
+        conversationId: "conv-1",
+        kind: "text",
+        text: "Is it still with you?",
+        clientMessageId: "client-text",
+      });
+      const retry = await uc.execute({
+        senderId: "buyer-1",
+        conversationId: "conv-1",
+        kind: "text",
+        text: "Is it still with you?",
+        clientMessageId: "client-text",
+      });
+      const image = await uc.execute({
+        senderId: "seller-1",
+        conversationId: "conv-1",
+        kind: "image",
+        metadata: { key: "chat/image.jpg", width: 800, height: 600 },
+      });
+
+      expect(retry.message.id).toBe(text.message.id);
+      expect(image.message.kind).toBe("image");
+      expect(repo.messages).toHaveLength(2);
+      expect(events.events.map((e) => [e.senderId, e.recipientId])).toEqual([
+        ["buyer-1", "seller-1"],
+        ["seller-1", "buyer-1"],
+      ]);
+      expect(repo.messages.some((m) => m.kind === "system")).toBe(false);
+    },
+  );
+
+  it("blocks sends when listing is banned", async () => {
     seedConversation(repo);
-    seedListing(listings, { status: "sold" });
+    seedListing(listings, { status: "banned" });
     const uc = makeUseCase(repo, listings);
 
     await expect(
@@ -435,9 +475,29 @@ describe("SendMessage", () => {
     ).rejects.toThrow(ForbiddenException);
   });
 
+  it("blocks sends when chat is off, even after the listing is sold", async () => {
+    seedConversation(repo);
+    seedListing(listings, { status: "sold", allowChat: false });
+    const uc = makeUseCase(repo, listings);
+
+    await expect(
+      uc.execute({
+        senderId: "buyer-1",
+        conversationId: "conv-1",
+        kind: "text",
+        text: "Hello",
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        message: "Chat is disabled for this listing",
+        details: { reason: CONVERSATION_ERROR_CODES.CHAT_DISABLED },
+      },
+    });
+  });
+
   it("checks parent listing contactability before suspension state", async () => {
     seedConversation(repo);
-    seedListing(listings, { status: "sold" });
+    seedListing(listings, { status: "banned" });
     const identity = new FakeIdentityCheckPort();
     identity.suspend("buyer-1");
     const uc = makeUseCase(repo, listings, identity);
@@ -451,12 +511,29 @@ describe("SendMessage", () => {
       }),
     ).rejects.toMatchObject({
       response: {
-        message: "Listing is not available for contact",
+        message: "Listing is no longer available for contact",
         details: {
           reason: CONVERSATION_ERROR_CODES.LISTING_NOT_CONTACTABLE,
         },
       },
     });
+  });
+
+  it("blocks sends when sender is suspended and the listing is sold", async () => {
+    seedConversation(repo);
+    seedListing(listings, { status: "sold" });
+    const identity = new FakeIdentityCheckPort();
+    identity.suspend("buyer-1");
+    const uc = makeUseCase(repo, listings, identity);
+
+    await expect(
+      uc.execute({
+        senderId: "buyer-1",
+        conversationId: "conv-1",
+        kind: "text",
+        text: "Hello",
+      }),
+    ).rejects.toThrow(ForbiddenException);
   });
 
   it("blocks sends when sender is suspended", async () => {

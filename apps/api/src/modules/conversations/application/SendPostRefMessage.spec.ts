@@ -396,9 +396,30 @@ describe("SendPostRefMessage", () => {
     ).rejects.toThrow(ForbiddenException);
   });
 
-  it("blocks sends when parent conversation listing is sold", async () => {
+  it.each(["sold", "archived"] as const)(
+    "sends a Listing reference when the parent conversation listing is %s",
+    async (status) => {
+      seedConversation(repo);
+      seedParentListing(listings, { status });
+      seedReferencedListing(listings);
+      const events = new FakeMessageEventPublisher();
+      const uc = makeUseCase(repo, listings, undefined, undefined, events);
+
+      const result = await uc.execute({
+        senderId: "buyer-1",
+        conversationId: "conv-1",
+        metadata: { listingId: "referenced-listing" },
+        clientMessageId: "client-ref-closed",
+      });
+
+      expect(result.message.kind).toBe("post_ref");
+      expect(events.events).toHaveLength(1);
+    },
+  );
+
+  it("blocks sends when parent conversation listing is banned", async () => {
     seedConversation(repo);
-    seedParentListing(listings, { status: "sold" });
+    seedParentListing(listings, { status: "banned" });
     seedReferencedListing(listings);
     const uc = makeUseCase(repo, listings);
 

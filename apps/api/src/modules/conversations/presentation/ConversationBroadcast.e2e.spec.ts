@@ -34,8 +34,8 @@ import {
 } from "../../../../test/helpers/e2eSuite";
 
 const suite = defineE2eSuite("conversation-broadcast");
-type SuiteUser = "seller-1" | "buyer-1";
-const SUITE_USERS: readonly SuiteUser[] = ["seller-1", "buyer-1"];
+type SuiteUser = "seller-1" | "buyer-1" | "buyer-2";
+const SUITE_USERS: readonly SuiteUser[] = ["seller-1", "buyer-1", "buyer-2"];
 
 // Long enough for a second, unwanted message:new to arrive on a local socket.
 const SETTLE_MS = 300;
@@ -385,6 +385,105 @@ describe("Conversation message broadcast e2e", () => {
         displayName: null,
       });
       expect(res.body.blockedByMe).toBe(true);
+    });
+  });
+
+  describe("after the Listing is sold or removed from sale", () => {
+    it.each(["sold", "archived"] as const)(
+      "keeps an existing Conversation open for HTTP and socket Messages when the Listing is %s",
+      async (status) => {
+        const { buyerToken, sellerToken, conversationId, listingId } =
+          await seedConversation();
+        const peer = await joinedSocket(sellerToken, conversationId);
+        await prisma.listing.update({
+          where: { id: listingId },
+          data: { status },
+        });
+
+        const state = await request
+          .get(`/api/v1/conversations/${conversationId}`)
+          .set("Authorization", `Bearer ${buyerToken}`)
+          .expect(200);
+        expect(state.body.sendRestriction).toBeNull();
+
+        const text = await request
+          .post(`/api/v1/conversations/${conversationId}/messages/rich`)
+          .set("Authorization", `Bearer ${buyerToken}`)
+          .send({ kind: "text", text: "Still there?", clientMessageId: "sold-text" })
+          .expect(201);
+        const retry = await request
+          .post(`/api/v1/conversations/${conversationId}/messages/rich`)
+          .set("Authorization", `Bearer ${buyerToken}`)
+          .send({ kind: "text", text: "Still there?", clientMessageId: "sold-text" })
+          .expect(201);
+        expect(retry.body.id).toBe(text.body.id);
+        await request
+          .post(`/api/v1/conversations/${conversationId}/messages/rich`)
+          .set("Authorization", `Bearer ${buyerToken}`)
+          .send({
+            kind: "image",
+            metadata: { key: "chat-attachments/sold/original.jpg", width: 800, height: 600 },
+          })
+          .expect(201);
+
+        const sender = await joinedSocket(buyerToken, conversationId);
+        const ack = (await sender.socket.emitWithAck("message:send", {
+          conversationId,
+          kind: "text",
+          text: "Over the socket",
+          clientMessageId: "sold-sock",
+        })) as { ok: boolean };
+        expect(ack.ok).toBe(true);
+
+        await waitFor(peer.received, 3);
+        expect(peer.received.map((e) => e.message["kind"])).toEqual([
+          "text",
+          "image",
+          "text",
+        ]);
+        expect(messageSentEvents).toHaveLength(3);
+        expect(
+          await prisma.message.count({
+            where: { conversationId, kind: "system" },
+          }),
+        ).toBe(0);
+      },
+    );
+
+    it("still refuses a Message when chat is switched off, and starting a new Conversation", async () => {
+      const { buyerToken, conversationId, listingId } = await seedConversation();
+      const otherBuyerToken = await createUser("buyer-2");
+      await prisma.listing.update({
+        where: { id: listingId },
+        data: { status: "sold" },
+      });
+
+      await request
+        .post("/api/v1/conversations")
+        .set("Authorization", `Bearer ${otherBuyerToken}`)
+        .send({ listingId })
+        .expect(403);
+      const existing = await request
+        .post("/api/v1/conversations")
+        .set("Authorization", `Bearer ${buyerToken}`)
+        .send({ listingId })
+        .expect(201);
+      expect(existing.body.id).toBe(conversationId);
+
+      await prisma.listing.update({
+        where: { id: listingId },
+        data: { allowChat: false },
+      });
+      await request
+        .post(`/api/v1/conversations/${conversationId}/messages`)
+        .set("Authorization", `Bearer ${buyerToken}`)
+        .send({ text: "Hello" })
+        .expect(403);
+      const state = await request
+        .get(`/api/v1/conversations/${conversationId}`)
+        .set("Authorization", `Bearer ${buyerToken}`)
+        .expect(200);
+      expect(state.body.sendRestriction).toBe("chat_disabled");
     });
   });
 });

@@ -222,7 +222,7 @@ describe("GetConversation", () => {
 
   it.each([
     ["the viewer blocked the peer", { blocks: ["buyer-1>seller-1"] }, "blocked_by_me"],
-    ["the Listing is sold", { listing: { ...listing, status: "sold" as const } }, "listing_unavailable"],
+    ["the Listing is banned", { listing: { ...listing, status: "banned" as const } }, "listing_unavailable"],
     ["chat is off", { listing: { ...listing, allowChat: false } }, "chat_disabled"],
     ["the peer is suspended", { suspended: ["seller-1"] }, "participant_unavailable"],
     ["the peer blocked the viewer", { blocks: ["seller-1>buyer-1"] }, "participant_unavailable"],
@@ -239,6 +239,21 @@ describe("GetConversation", () => {
       expect(result.sendRestriction).toBe(expected);
       expect(result.conversation).toBe(conversation);
       expect(result.lastMessage).toBe(lastMessage);
+    },
+  );
+
+  it.each(["sold", "archived"] as const)(
+    "reports no restriction when the Listing is %s, so the composer stays on",
+    async (status) => {
+      const { useCase } = build({ listing: { ...listing, status } });
+
+      const result = await useCase.execute({
+        userId: "buyer-1",
+        conversationId: "conv-1",
+      });
+
+      expect(result.sendRestriction).toBeNull();
+      expect(result.listing).toMatchObject({ status });
     },
   );
 

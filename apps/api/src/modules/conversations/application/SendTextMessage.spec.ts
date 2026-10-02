@@ -436,33 +436,28 @@ describe("SendTextMessage", () => {
     expect(result.message.body).toBe("a".repeat(1000));
   });
 
-  it("blocks sends when listing is sold", async () => {
-    seedConversation(repo);
-    seedListing(listings, { status: "sold" });
-    const uc = makeUseCase(repo, listings);
+  it.each(["sold", "archived"] as const)(
+    "accepts sends from either participant when listing is %s",
+    async (status) => {
+      seedConversation(repo);
+      seedListing(listings, { status });
+      const uc = makeUseCase(repo, listings);
 
-    await expect(
-      uc.execute({
+      const fromBuyer = await uc.execute({
         senderId: "buyer-1",
         conversationId: "conv-1",
         text: "Hello",
-      }),
-    ).rejects.toThrow(ForbiddenException);
-  });
-
-  it("blocks sends when listing is archived", async () => {
-    seedConversation(repo);
-    seedListing(listings, { status: "archived" });
-    const uc = makeUseCase(repo, listings);
-
-    await expect(
-      uc.execute({
-        senderId: "buyer-1",
+      });
+      const fromSeller = await uc.execute({
+        senderId: "seller-1",
         conversationId: "conv-1",
-        text: "Hello",
-      }),
-    ).rejects.toThrow(ForbiddenException);
-  });
+        text: "Hi",
+      });
+
+      expect(fromBuyer.message.body).toBe("Hello");
+      expect(fromSeller.message.body).toBe("Hi");
+    },
+  );
 
   it("blocks sends when listing is banned", async () => {
     seedConversation(repo);
