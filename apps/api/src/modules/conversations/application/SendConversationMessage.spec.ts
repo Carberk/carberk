@@ -52,6 +52,7 @@ function textMessage(clientMessageId = "client-1") {
 function buildUseCase(overrides: {
   existing?: Message | null;
   saveMessage?: (message: Message) => Promise<void>;
+  senderDeletionScheduled?: boolean;
 } = {}) {
   const calls: string[] = [];
   const repository = {
@@ -70,6 +71,9 @@ function buildUseCase(overrides: {
   } as unknown as ListingsReadPort;
   const identityCheck = {
     isSuspended: vi.fn().mockResolvedValue(false),
+    isDeletionScheduled: vi
+      .fn()
+      .mockResolvedValue(overrides.senderDeletionScheduled ?? false),
   } as unknown as IdentityCheckPort;
   const identityRead = {
     isUserBlockedBy: vi.fn().mockResolvedValue(false),
@@ -145,6 +149,31 @@ describe("SendConversationMessage", () => {
     });
 
     expect(result).toMatchObject({ message: winner, created: false });
+    expect(messageEvents.emitMessageSent).not.toHaveBeenCalled();
+  });
+
+  it("refuses a sender whose account deletion is scheduled, before saving or publishing", async () => {
+    const { repository, messageEvents, useCase } = buildUseCase({
+      senderDeletionScheduled: true,
+    });
+    const createMessage = vi.fn(() => textMessage());
+
+    await expect(
+      useCase.execute({
+        senderId: conversation.buyerId,
+        conversationId: conversation.id,
+        clientMessageId: "client-1",
+        createMessage,
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        code: "FORBIDDEN",
+        details: { reason: "ACCOUNT_DELETION_PENDING" },
+      },
+    });
+
+    expect(createMessage).not.toHaveBeenCalled();
+    expect(repository.saveMessage).not.toHaveBeenCalled();
     expect(messageEvents.emitMessageSent).not.toHaveBeenCalled();
   });
 });

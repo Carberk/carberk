@@ -95,11 +95,23 @@ describe("RecoverAccount", () => {
     expect(listingsPort.republishedSellerId).toBe("user-1");
   });
 
-  it("does not throw when the user does not exist", async () => {
+  it("changes nothing for a User with no scheduled deletion", async () => {
+    const user = makeUser({ deletionScheduledAt: null });
+    userRepo.users.set(user.id, user);
+
+    const uc = makeUseCase(userRepo, listingsPort);
+    await expect(uc.execute({ userId: "user-1" })).resolves.toBeUndefined();
+
+    expect(userRepo.clearedForUserId).toBeNull();
+    expect(listingsPort.republishedSellerId).toBeNull();
+  });
+
+  it("refuses an unknown User", async () => {
     const uc = makeUseCase(userRepo, listingsPort);
 
-    await expect(
-      uc.execute({ userId: "nonexistent" }),
-    ).resolves.toBeUndefined();
+    await expect(uc.execute({ userId: "nonexistent" })).rejects.toThrow(
+      "User not found",
+    );
+    expect(listingsPort.republishedSellerId).toBeNull();
   });
 });

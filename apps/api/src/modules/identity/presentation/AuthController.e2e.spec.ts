@@ -411,14 +411,15 @@ describe("AuthController e2e — POST /api/v1/auth/otp/verify", () => {
     expect(res.body.user.id).toBe(existingUser.id);
   });
 
-  it("recovers an account in deletion grace and clears deletionScheduledAt", async () => {
+  it("signs in an account in the deletion grace period without restoring it", async () => {
     process.env["SIGNUPS_ENABLED"] = "false";
 
+    const scheduledAt = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000);
     const existingUser = await prisma.user.create({
       data: {
         phone: "+99361234567",
         phoneVerifiedAt: new Date(),
-        deletionScheduledAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+        deletionScheduledAt: scheduledAt,
       },
     });
 
@@ -429,9 +430,10 @@ describe("AuthController e2e — POST /api/v1/auth/otp/verify", () => {
       .expect(201);
 
     expect(res.body.user.id).toBe(existingUser.id);
+    expect(res.body.user.deletionScheduledAt).toBe(scheduledAt.toISOString());
 
     const userAfter = await prisma.user.findUnique({ where: { id: existingUser.id } });
-    expect(userAfter?.deletionScheduledAt).toBeNull();
+    expect(userAfter?.deletionScheduledAt).toEqual(scheduledAt);
   });
 });
 
