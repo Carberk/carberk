@@ -7,6 +7,7 @@ import type { AuthSchemas } from "@auto-tm/contracts";
 
 import { CodeEntryForm } from "../../components/auth/CodeEntryForm";
 import { useRequestOtp } from "../../src/api/identity/useRequestOtp";
+import { ApiError } from "../../src/api/client";
 import { useRestoreAccount } from "../../src/api/identity/useRestoreAccount";
 import { useRevokePendingSession } from "../../src/api/identity/useRevokePendingSession";
 import { useVerifyOtp } from "../../src/api/identity/useVerifyOtp";
@@ -59,6 +60,9 @@ export default function OtpScreen() {
     useState<AuthSchemas.OtpVerifyResponse | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
   const [restoreFailed, setRestoreFailed] = useState(false);
+  // The pending access token lives only 15 minutes; once it expires every
+  // restore answers 401, so the only way forward is to sign in again.
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const { mutateAsync: verifyOtpMutate } = useVerifyOtp();
   const { mutateAsync: requestOtpMutate } = useRequestOtp();
@@ -118,6 +122,7 @@ export default function OtpScreen() {
 
     if (result.user.deletionScheduledAt) {
       setRestoreFailed(false);
+      setSessionExpired(false);
       setPendingSession(result);
       return;
     }
@@ -143,9 +148,13 @@ export default function OtpScreen() {
         ...pendingSession,
         user: { ...pendingSession.user, deletionScheduledAt: null },
       });
-    } catch {
-      // Keep the prompt open so the User can retry; restoring twice is harmless.
-      setRestoreFailed(true);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setSessionExpired(true);
+      } else {
+        // Keep the prompt open so the User can retry; restoring twice is harmless.
+        setRestoreFailed(true);
+      }
       setIsRestoring(false);
       return;
     }
@@ -157,9 +166,13 @@ export default function OtpScreen() {
   async function handleRestoreCancel() {
     if (!pendingSession || isRestoring) return;
 
-    const { refreshToken } = pendingSession;
+    await leavePendingSession(pendingSession.refreshToken);
+  }
+
+  async function leavePendingSession(refreshToken: string) {
     setPendingSession(null);
     setRestoreFailed(false);
+    setSessionExpired(false);
     await revokePendingSessionMutate(refreshToken);
     changeSignInMethod();
   }
@@ -213,25 +226,35 @@ export default function OtpScreen() {
               {tAccount("restoreAccountMessage", { date: restoreDate })}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {restoreFailed ? (
+          {restoreFailed || sessionExpired ? (
             <Text className="text-sm text-destructive" accessibilityLiveRegion="polite">
-              {tAccount("restoreAccountError")}
+              {tAccount(
+                sessionExpired ? "restoreAccountExpired" : "restoreAccountError",
+              )}
             </Text>
           ) : null}
           <AlertDialogFooter>
-            <Button
-              variant="outline"
-              disabled={isRestoring}
-              onPress={() => void handleRestoreCancel()}
-            >
-              <Text>{tAccount("restoreAccountCancel")}</Text>
-            </Button>
-            <Button
-              disabled={isRestoring}
-              onPress={() => void handleRestoreConfirm()}
-            >
-              <Text>{tAccount("restoreAccountConfirm")}</Text>
-            </Button>
+            {sessionExpired ? (
+              <Button onPress={() => void handleRestoreCancel()}>
+                <Text>{tAccount("restoreAccountSignInAgain")}</Text>
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  disabled={isRestoring}
+                  onPress={() => void handleRestoreCancel()}
+                >
+                  <Text>{tAccount("restoreAccountCancel")}</Text>
+                </Button>
+                <Button
+                  disabled={isRestoring}
+                  onPress={() => void handleRestoreConfirm()}
+                >
+                  <Text>{tAccount("restoreAccountConfirm")}</Text>
+                </Button>
+              </>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

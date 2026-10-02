@@ -603,6 +603,8 @@ export const resources: Resource = {
       restoreAccountCancel: "Отмена",
       restoreAccountConfirm: "Восстановить",
       restoreAccountError: "Не удалось восстановить аккаунт. Проверьте соединение и попробуйте ещё раз.",
+      restoreAccountExpired: "Время входа истекло. Войдите снова, чтобы восстановить аккаунт.",
+      restoreAccountSignInAgain: "Войти снова",
     },
     listings: {
       favorites: "Избранное",
@@ -1231,6 +1233,8 @@ export const resources: Resource = {
       restoreAccountCancel: "Ýatyr",
       restoreAccountConfirm: "Dikelt",
       restoreAccountError: "Hasaby dikeltmek başartmady. Internet birikmäňizi barlaň we täzeden synanyşyň.",
+      restoreAccountExpired: "Giriş wagty gutardy. Hasaby dikeltmek üçin täzeden giriň.",
+      restoreAccountSignInAgain: "Täzeden girmek",
     },
     listings: {
       favorites: "Halanlarym",
@@ -1857,6 +1861,8 @@ export const resources: Resource = {
       restoreAccountCancel: "Cancel",
       restoreAccountConfirm: "Restore",
       restoreAccountError: "We could not restore your account. Check your connection and try again.",
+      restoreAccountExpired: "Your sign-in has expired. Sign in again to restore your account.",
+      restoreAccountSignInAgain: "Sign in again",
     },
     listings: {
       favorites: "Favorites",
