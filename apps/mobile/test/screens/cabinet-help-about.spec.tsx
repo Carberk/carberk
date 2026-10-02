@@ -1,17 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import CabinetScreen from "../../app/(tabs)/services";
+import { localeStore } from "../../src/locale/localeStore";
+import { themeStore } from "../../src/theme/themeStore";
 import { fireEvent, renderMobile, routerMock } from "../render";
 
 vi.mock("react-native-safe-area-context", async () => ({
   SafeAreaView: (await import("react-native")).View,
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
-// The installed avatar distribution imports an extensionless path Node cannot resolve.
-vi.mock("@rn-primitives/avatar", async () => {
-  const native = await import("react-native");
-  return { Root: native.View, Image: native.Image, Fallback: native.View };
-});
+vi.mock("@react-native-async-storage/async-storage", () => ({
+  default: { getItem: vi.fn(async () => null), setItem: vi.fn(async () => undefined), removeItem: vi.fn(async () => undefined) },
+}));
 
 const auth = vi.hoisted(() => ({ isAuthenticated: false as boolean | null }));
 vi.mock("../../src/auth/useAuth", () => ({ useAuth: () => auth }));
@@ -22,6 +22,11 @@ vi.mock("../../src/api/identity/useMe", () => ({
     isError: false,
   }),
 }));
+
+beforeEach(() => {
+  localeStore.setState({ locale: "en" });
+  themeStore.setState({ theme: "system" });
+});
 
 describe.each([
   ["signed out", false],
@@ -34,8 +39,8 @@ describe.each([
     const labels = screen.getAllByRole("button").map((b) => b.props.accessibilityLabel);
     const theme = labels.findIndex((l) => String(l).startsWith(screen.i18n.t("account:theme")));
     expect(theme).toBeGreaterThan(-1);
-    expect(labels[theme + 1]).toBe("Help");
-    expect(labels.at(-1)).toBe("About the app");
+    expect(labels[theme + 1]).toBe(screen.i18n.t("support:help"));
+    expect(labels.at(-1)).toBe(screen.i18n.t("support:about"));
   });
 
   it("opens Help and About", () => {
