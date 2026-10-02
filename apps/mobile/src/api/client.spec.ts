@@ -369,6 +369,55 @@ describe("apiClient", () => {
     });
   });
 
+  describe("explicit access token", () => {
+    it("sends the given token instead of the stored session and never touches the store", async () => {
+      mockedLoadAuthSession.mockResolvedValue({
+        accessToken: "stored-token",
+        refreshToken: "stored-refresh",
+        user: {
+          id: "u1",
+          phone: "+99361000000",
+          email: null,
+          displayName: null,
+          role: "buyer" as const,
+        },
+        storedAt: new Date().toISOString(),
+      });
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockImplementation(() => Promise.resolve(jsonResponse({ ok: true })));
+
+      await apiClient.post("/me/restore", undefined, undefined, {
+        accessToken: "pending-token",
+      });
+
+      const init = fetchSpy.mock.calls[0]?.[1] as RequestInit;
+      expect((init.headers as Record<string, string>).Authorization).toBe(
+        "Bearer pending-token",
+      );
+      expect(mockedLoadAuthSession).not.toHaveBeenCalled();
+    });
+
+    it("does not refresh or retry a 401, because the token is not the stored session", async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockImplementation(() =>
+          Promise.resolve(
+            jsonResponse({ code: "UNAUTHORIZED", message: "no" }, 401),
+          ),
+        );
+
+      const error = await apiClient
+        .post("/me/restore", undefined, undefined, { accessToken: "pending-token" })
+        .catch((e: ApiError) => e);
+
+      expect(error).toMatchObject({ code: "UNAUTHORIZED", status: 401 });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(mockedStoreAuthSession).not.toHaveBeenCalled();
+      expect(mockedClearAuthSession).not.toHaveBeenCalled();
+    });
+  });
+
   describe("non-401 errors", () => {
     it("passes through without retry", async () => {
       mockedLoadAuthSession.mockResolvedValue(null);
