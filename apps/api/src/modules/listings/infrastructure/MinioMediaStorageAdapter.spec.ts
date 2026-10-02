@@ -8,6 +8,7 @@ const awsMocks = vi.hoisted(() => ({
   clients: [] as Array<{ endpoint: string; sent: unknown[] }>,
   signedClient: undefined as undefined | { endpoint: string; sent: unknown[] },
   signedCommand: undefined as undefined | { input: Record<string, unknown> },
+  sendResult: undefined as undefined | (() => Promise<unknown>),
 }));
 
 vi.mock("@aws-sdk/client-s3", () => {
@@ -20,8 +21,9 @@ vi.mock("@aws-sdk/client-s3", () => {
       awsMocks.clients.push(this);
     }
 
-    async send(command: unknown): Promise<void> {
+    async send(command: unknown): Promise<unknown> {
       this.sent.push(command);
+      return awsMocks.sendResult?.();
     }
   }
 
@@ -41,7 +43,15 @@ vi.mock("@aws-sdk/client-s3", () => {
     }
   }
 
-  return { S3Client, PutObjectCommand, DeleteObjectCommand };
+  class HeadObjectCommand {
+    input: Record<string, unknown>;
+
+    constructor(input: Record<string, unknown>) {
+      this.input = input;
+    }
+  }
+
+  return { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand };
 });
 
 vi.mock("@aws-sdk/s3-request-presigner", () => ({
@@ -61,6 +71,7 @@ function makeAdapter(publicUrl: string, endpoint = "http://minio.internal:9000")
   awsMocks.clients.length = 0;
   awsMocks.signedClient = undefined;
   awsMocks.signedCommand = undefined;
+  awsMocks.sendResult = undefined;
 
   const config = {
     get: vi.fn((key: keyof Env) => {
@@ -164,5 +175,53 @@ describe("MinioMediaStorageAdapter", () => {
 
     expect(awsMocks.clients[0]?.sent).toHaveLength(1);
     expect(awsMocks.clients[1]?.sent).toHaveLength(0);
+  });
+
+  describe("inspect", () => {
+    it("reports the stored content type and size from the private endpoint", async () => {
+      const adapter = makeAdapter("https://media.auto.tm");
+      awsMocks.sendResult = async () => ({ ContentType: "image/jpeg", ContentLength: 2048 });
+
+      const info = await adapter.inspect("pending/uuid/original.jpg");
+
+      expect(info).toEqual({ contentType: "image/jpeg", sizeBytes: 2048 });
+      expect(awsMocks.clients[0]?.sent).toHaveLength(1);
+      expect(awsMocks.clients[0]?.sent[0]).toMatchObject({
+        input: { Bucket: "listing-photos", Key: "pending/uuid/original.jpg" },
+      });
+    });
+
+    it("looks up videos in the video bucket", async () => {
+      const adapter = makeAdapter("https://media.auto.tm");
+      awsMocks.sendResult = async () => ({ ContentType: "video/mp4", ContentLength: 10 });
+
+      await adapter.inspect("pending/uuid/original.mp4");
+
+      expect(awsMocks.clients[0]?.sent[0]).toMatchObject({
+        input: { Bucket: "listing-videos" },
+      });
+    });
+
+    it.each([
+      ["NotFound", { name: "NotFound" }],
+      ["NoSuchKey", { name: "NoSuchKey" }],
+      ["a 404 response", { name: "Unknown", $metadata: { httpStatusCode: 404 } }],
+    ])("returns null when the object is missing (%s)", async (_label, failure) => {
+      const adapter = makeAdapter("https://media.auto.tm");
+      awsMocks.sendResult = async () => {
+        throw Object.assign(new Error("missing"), failure);
+      };
+
+      await expect(adapter.inspect("pending/uuid/original.jpg")).resolves.toBeNull();
+    });
+
+    it("surfaces other storage failures instead of treating the object as missing", async () => {
+      const adapter = makeAdapter("https://media.auto.tm");
+      awsMocks.sendResult = async () => {
+        throw Object.assign(new Error("denied"), { name: "AccessDenied", $metadata: { httpStatusCode: 403 } });
+      };
+
+      await expect(adapter.inspect("pending/uuid/original.jpg")).rejects.toThrow("denied");
+    });
   });
 });

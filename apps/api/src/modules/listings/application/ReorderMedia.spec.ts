@@ -66,6 +66,10 @@ class FakeListingMediaRepository implements ListingMediaRepository {
     this.media = this.media.filter((m) => m.id !== id);
   }
 
+  async deleteReleasingUpload(): Promise<{ removed: boolean; ownedKey: string | null }> {
+    return { removed: false, ownedKey: null };
+  }
+
   async updateSortOrder(
     listingId: string,
     orders: { mediaId: string; sortOrder: number }[],

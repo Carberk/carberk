@@ -63,6 +63,10 @@ class FakeListingMediaRepository implements ListingMediaRepository {
 
   async delete(_id: string): Promise<void> {}
 
+  async deleteReleasingUpload(): Promise<{ removed: boolean; ownedKey: string | null }> {
+    return { removed: false, ownedKey: null };
+  }
+
   async updateSortOrder(_listingId: string, _orders: { mediaId: string; sortOrder: number }[]): Promise<void> {}
 }
 

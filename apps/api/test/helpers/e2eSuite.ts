@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { PrismaService } from "@auto-tm/db";
 
 /**
@@ -148,6 +148,43 @@ export async function seedSuiteCatalog(
   return c;
 }
 
+/**
+ * Stands in for the storage inspector in e2e suites that publish drafts: every
+ * presigned upload "exists" as the small JPEG it declared. Override
+ * `MEDIA_OBJECT_INSPECTOR` with it so no MinIO is needed.
+ */
+export const fakeMediaObjectInspector = {
+  inspect: async () => ({ contentType: "image/jpeg", sizeBytes: 1024 }),
+};
+
+/**
+ * Publication adopts only uploads the server recorded for the draft's owner
+ * (ADR-0077). This records a presigned upload per photo key in `payload` and
+ * returns the payload with those keys replaced by fresh, globally unique ones,
+ * because `media_uploads.key` is unique across suites that share a database.
+ * Photos without a key are left as they are.
+ */
+export async function seedPresignedPhotos(
+  prisma: PrismaService,
+  userId: string,
+  payload: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const photos = payload["photos"];
+  if (!Array.isArray(photos)) return payload;
+
+  const seeded = await Promise.all(
+    photos.map(async (photo: Record<string, unknown>) => {
+      if (typeof photo["key"] !== "string") return photo;
+      const key = `pending/${randomUUID()}/original.jpg`;
+      await prisma.mediaUpload.create({
+        data: { userId, key, kind: "image", contentType: "image/jpeg", sizeBytes: 1024 },
+      });
+      return { ...photo, key };
+    }),
+  );
+  return { ...payload, photos: seeded };
+}
+
 export interface SuiteCleanupOptions {
   /** Suite-local user aliases whose users and user-owned rows get deleted. */
   userAliases: readonly string[];
@@ -203,6 +240,8 @@ export async function cleanSuiteFixtures(
   await prisma.favorite.deleteMany({ where: { user: userScope } });
   // Cascades listing_media + conversations (+participants/messages).
   await prisma.listing.deleteMany({ where: { seller: userScope } });
+  // Uploads go after the listings: a listing_media row references its upload.
+  await prisma.mediaUpload.deleteMany({ where: { user: userScope } });
   await prisma.listingDraft.deleteMany({ where: { user: userScope } });
   if (options.exchangeRatePairs) {
     for (const pair of options.exchangeRatePairs) {

@@ -30,8 +30,11 @@ import { mintUserJwt } from "../../../../test/helpers/mintUserJwt";
 import {
   cleanSuiteFixtures,
   defineE2eSuite,
+  fakeMediaObjectInspector,
+  seedPresignedPhotos,
   seedSuiteCatalog,
 } from "../../../../test/helpers/e2eSuite";
+import { MEDIA_OBJECT_INSPECTOR } from "../../listings/domain/ports/MediaObjectInspector";
 
 const suite = defineE2eSuite("conversation-broadcast");
 type SuiteUser = "seller-1" | "buyer-1";
@@ -68,6 +71,8 @@ describe("Conversation message broadcast e2e", () => {
         }),
       ],
     })
+      .overrideProvider(MEDIA_OBJECT_INSPECTOR)
+      .useValue(fakeMediaObjectInspector)
       .overrideProvider(IMAGE_VARIANT_GENERATOR)
       .useValue({
         generate: async (originalKey: string) => ({
@@ -139,10 +144,7 @@ describe("Conversation message broadcast e2e", () => {
       create: { fromCurrency: "TMT", toCurrency: "TMT", rate: 1 },
       update: { rate: 1 },
     });
-    const draft = await prisma.listingDraft.create({
-      data: {
-        userId: suite.id("seller-1"),
-        payload: {
+    const draftPayload = {
           brandId: suite.catalog.brandId,
           modelId: suite.catalog.modelId,
           cityId: suite.catalog.cityId,
@@ -159,7 +161,12 @@ describe("Conversation message broadcast e2e", () => {
           photos: [
             { photoId: suite.id("photo-1"), key: "photo1.jpg", sortOrder: 0 },
           ],
-        } as Prisma.InputJsonValue,
+        } satisfies Record<string, unknown>;
+    const seededPayload = await seedPresignedPhotos(prisma, suite.id("seller-1"), draftPayload);
+    const draft = await prisma.listingDraft.create({
+      data: {
+        userId: suite.id("seller-1"),
+        payload: seededPayload as Prisma.InputJsonValue,
       },
     });
     const res = await request

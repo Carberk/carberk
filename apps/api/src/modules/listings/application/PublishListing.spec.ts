@@ -1,13 +1,38 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { NotFoundException, ForbiddenException, BadRequestException } from "@nestjs/common";
+import {
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+  ConflictException,
+} from "@nestjs/common";
 
 import { ListingDraft } from "../domain/ListingDraft";
+import { ListingMedia } from "../domain/ListingMedia";
 import type { ListingDraftRepository } from "../domain/ports/ListingDraftRepository";
 import type { ExchangeRatePort } from "../domain/ports/ExchangeRatePort";
 import type { ListingEventPublisher } from "../domain/ports/ListingEventPublisher";
 import type { ImageVariantGenerator } from "../domain/ports/ImageVariantGenerator";
 
 import { PublishListing } from "./PublishListing";
+import { UploadAdoptionGuard } from "./UploadAdoptionGuard";
+import { InMemoryMediaWorld } from "./testing/InMemoryMediaWorld";
+
+/** The media world the next `makeUseCase()` reads uploads and storage from. */
+let world = new InMemoryMediaWorld();
+
+/** A presigned upload by `userId` whose file has reached storage. */
+function presignedUpload(key: string, userId = "user-1"): void {
+  world.uploads.push({
+    id: `upload-${key}`,
+    userId,
+    key,
+    kind: "image",
+    contentType: "image/jpeg",
+    sizeBytes: 1024,
+    createdAt: new Date("2026-05-01T00:00:00Z"),
+  });
+  world.completeUpload(key);
+}
 
 class FakeListingDraftRepository implements ListingDraftRepository {
   drafts: ListingDraft[] = [];
@@ -92,7 +117,19 @@ class FakePrisma {
   createdMedia: Array<Record<string, unknown>> = [];
   deletedDrafts: string[] = [];
 
+  /** When set, the next transaction fails with this error and persists nothing. */
+  failTransaction: (() => Error) | undefined;
+
   $transaction = async <T>(promises: Promise<T>[]): Promise<T[]> => {
+    if (this.failTransaction) {
+      // The real transaction rolls back every statement, so nothing is recorded.
+      await Promise.allSettled(promises);
+      this.createdListings = [];
+      this.createdMedia = [];
+      this.deletedDrafts = [];
+      this.auditLogs = [];
+      throw this.failTransaction();
+    }
     return Promise.all(promises);
   };
 
@@ -170,6 +207,7 @@ function makeUseCase(
     exchangeRates ?? new FakeExchangeRatePort(),
     events ?? new FakeEventPublisher(),
     variantGenerator ?? new FakeImageVariantGenerator(),
+    new UploadAdoptionGuard(world.uploadRepo, world.inspector),
   );
 }
 
@@ -195,6 +233,10 @@ describe("PublishListing", () => {
   let variantGenerator: FakeImageVariantGenerator;
 
   beforeEach(() => {
+    world = new InMemoryMediaWorld();
+    presignedUpload("photo1.jpg");
+    presignedUpload("p1.jpg");
+    presignedUpload("p2.jpg");
     draftRepo = new FakeListingDraftRepository();
     prisma = new FakePrisma();
     exchangeRates = new FakeExchangeRatePort();
@@ -395,26 +437,160 @@ describe("PublishListing", () => {
 
   // #536: User B's Listing publicly exposes its media key, so a known key must
   // authorize nothing for User A's draft.
-  it("does not publish a draft whose photo key was never presigned for its owner", async () => {
-    seedDraft(draftRepo, {
+  describe("upload ownership (#536, ADR-0077)", () => {
+    const photoDraft = (key: string) => ({
       ...validPayload,
-      photos: [
-        {
-          photoId: "00000000-0000-0000-0000-000000000005",
-          key: "pending/user-b-upload/original.jpg",
-          sortOrder: 0,
-        },
-      ],
+      photos: [{ photoId: "00000000-0000-0000-0000-000000000005", key, sortOrder: 0 }],
     });
 
-    const uc = makeUseCase(draftRepo, prisma, exchangeRates, events, variantGenerator);
-    await expect(
-      uc.execute({ draftId: "draft-1", userId: "user-1" }),
-    ).rejects.toThrow();
+    async function publishError() {
+      const uc = makeUseCase(draftRepo, prisma, exchangeRates, events, variantGenerator);
+      return uc.execute({ draftId: "draft-1", userId: "user-1" }).then(
+        () => {
+          throw new Error("Expected publish to be rejected");
+        },
+        (err: unknown) => err,
+      );
+    }
 
-    expect(prisma.createdListings).toHaveLength(0);
-    expect(prisma.createdMedia).toHaveLength(0);
-    expect(variantGenerator.generated).toEqual([]);
+    function expectNothingPublished() {
+      expect(prisma.createdListings).toHaveLength(0);
+      expect(prisma.createdMedia).toHaveLength(0);
+      expect(prisma.deletedDrafts).toEqual([]);
+      expect(variantGenerator.generated).toEqual([]);
+    }
+
+    it("does not publish a draft whose photo key was never presigned", async () => {
+      world.putObject("pending/forged/original.jpg", { contentType: "image/jpeg", sizeBytes: 1024 });
+      seedDraft(draftRepo, photoDraft("pending/forged/original.jpg"));
+
+      const err = await publishError();
+
+      expect(err).toBeInstanceOf(BadRequestException);
+      expect((err as BadRequestException).getResponse()).toMatchObject({
+        code: "UPLOAD_NOT_AVAILABLE",
+      });
+      expectNothingPublished();
+    });
+
+    it("does not publish a key another User presigned and attached to their own Listing", async () => {
+      presignedUpload("pending/user-b-upload/original.jpg", "user-b");
+      world.media.push(
+        ListingMedia.create({
+          id: "victim-media",
+          listingId: "listing-b",
+          kind: "image",
+          key: "pending/user-b-upload/original.jpg",
+          sortOrder: 0,
+          uploadId: "upload-pending/user-b-upload/original.jpg",
+        }),
+      );
+      seedDraft(draftRepo, photoDraft("pending/user-b-upload/original.jpg"));
+
+      const err = await publishError();
+
+      expect(err).toBeInstanceOf(BadRequestException);
+      expect((err as BadRequestException).getResponse()).toMatchObject({
+        code: "UPLOAD_NOT_AVAILABLE",
+      });
+      expectNothingPublished();
+    });
+
+    it("does not publish an upload its owner already attached to another Listing", async () => {
+      world.media.push(
+        ListingMedia.create({
+          id: "earlier-media",
+          listingId: "listing-earlier",
+          kind: "image",
+          key: "photo1.jpg",
+          sortOrder: 0,
+          uploadId: "upload-photo1.jpg",
+        }),
+      );
+      seedDraft(draftRepo, photoDraft("photo1.jpg"));
+
+      const err = await publishError();
+
+      expect(err).toBeInstanceOf(ConflictException);
+      expect((err as ConflictException).getResponse()).toMatchObject({
+        code: "UPLOAD_ALREADY_ATTACHED",
+      });
+      expectNothingPublished();
+    });
+
+    it("does not publish when the uploaded file never reached storage", async () => {
+      world.objects.delete("photo1.jpg");
+      seedDraft(draftRepo, photoDraft("photo1.jpg"));
+
+      const err = await publishError();
+
+      expect((err as BadRequestException).getResponse()).toMatchObject({
+        code: "UPLOAD_OBJECT_INVALID",
+      });
+      expectNothingPublished();
+    });
+
+    it("rejects the same photo key listed twice", async () => {
+      seedDraft(draftRepo, {
+        ...validPayload,
+        photos: [
+          { photoId: "00000000-0000-0000-0000-000000000005", key: "p1.jpg", sortOrder: 0 },
+          { photoId: "00000000-0000-0000-0000-000000000006", key: "p1.jpg", sortOrder: 1 },
+        ],
+      });
+
+      const err = await publishError();
+
+      expect(err).toBeInstanceOf(BadRequestException);
+      expectNothingPublished();
+    });
+
+    it("links each media row to the upload it adopts", async () => {
+      seedDraft(draftRepo, photoDraft("photo1.jpg"));
+
+      const uc = makeUseCase(draftRepo, prisma, exchangeRates, events, variantGenerator);
+      await uc.execute({ draftId: "draft-1", userId: "user-1" });
+
+      expect(prisma.createdMedia[0]).toMatchObject({
+        key: "photo1.jpg",
+        uploadId: "upload-photo1.jpg",
+      });
+    });
+
+    it("reports a conflict, with nothing published, when a concurrent adoption wins the race", async () => {
+      seedDraft(draftRepo, photoDraft("photo1.jpg"));
+      // The unique upload link rejects this transaction; by then the winner's
+      // media row is committed.
+      prisma.failTransaction = () => {
+        world.media.push(
+          ListingMedia.create({
+            id: "winner",
+            listingId: "listing-winner",
+            kind: "image",
+            key: "photo1.jpg",
+            sortOrder: 0,
+            uploadId: "upload-photo1.jpg",
+          }),
+        );
+        return Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
+      };
+
+      const err = await publishError();
+
+      expect(err).toBeInstanceOf(ConflictException);
+      expect((err as ConflictException).getResponse()).toMatchObject({
+        code: "UPLOAD_ALREADY_ATTACHED",
+      });
+      expect(prisma.createdListings).toHaveLength(0);
+    });
+
+    it("rethrows an unrelated unique violation instead of blaming the upload", async () => {
+      seedDraft(draftRepo, photoDraft("photo1.jpg"));
+      const failure = Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
+      prisma.failTransaction = () => failure;
+
+      await expect(publishError()).resolves.toBe(failure);
+    });
   });
 
   it("publishes damaged: false without Known issues", async () => {

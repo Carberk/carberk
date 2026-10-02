@@ -29,8 +29,11 @@ import { mintAdminJwt } from "../../../../test/helpers/mintAdminJwt";
 import {
   cleanSuiteFixtures,
   defineE2eSuite,
+  fakeMediaObjectInspector,
+  seedPresignedPhotos,
   seedSuiteCatalog,
 } from "../../../../test/helpers/e2eSuite";
+import { MEDIA_OBJECT_INSPECTOR } from "../../listings/domain/ports/MediaObjectInspector";
 
 const suite = defineE2eSuite("reports-controller");
 type SuiteUser = "seller-1" | "buyer-1" | "admin-1";
@@ -62,6 +65,8 @@ describe("ReportsController e2e", () => {
         }),
       ],
     })
+      .overrideProvider(MEDIA_OBJECT_INSPECTOR)
+      .useValue(fakeMediaObjectInspector)
       .overrideProvider(IMAGE_VARIANT_GENERATOR)
       .useValue({
         generate: async (originalKey: string) => ({
@@ -141,8 +146,9 @@ describe("ReportsController e2e", () => {
   }
 
   async function seedDraft(alias: SuiteUser, payload: Record<string, unknown>) {
+    const seeded = await seedPresignedPhotos(prisma, suite.id(alias), payload);
     return prisma.listingDraft.create({
-      data: { userId: suite.id(alias), payload: payload as Prisma.InputJsonValue },
+      data: { userId: suite.id(alias), payload: seeded as Prisma.InputJsonValue },
     });
   }
 

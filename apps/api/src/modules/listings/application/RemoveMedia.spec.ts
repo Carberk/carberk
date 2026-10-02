@@ -66,6 +66,16 @@ class FakeListingMediaRepository implements ListingMediaRepository {
     this.media = this.media.filter((m) => m.id !== id);
   }
 
+  async deleteReleasingUpload(
+    id: string,
+  ): Promise<{ removed: boolean; ownedKey: string | null }> {
+    const row = this.media.find((m) => m.id === id);
+    if (!row) return { removed: false, ownedKey: null };
+    this.media = this.media.filter((m) => m.id !== id);
+    const shared = this.media.some((m) => m.key === row.key);
+    return { removed: true, ownedKey: row.uploadId && !shared ? row.key : null };
+  }
+
   async updateSortOrder(
     _listingId: string,
     orders: { mediaId: string; sortOrder: number }[],
@@ -160,6 +170,7 @@ describe("RemoveMedia", () => {
         kind: "image",
         key: "pending/abc/original.jpg",
         sortOrder: 0,
+        uploadId: "upload-1",
       }),
     );
 
@@ -183,6 +194,7 @@ describe("RemoveMedia", () => {
         kind: "image",
         key: "pending/abc/original.jpg",
         sortOrder: 0,
+        uploadId: "upload-1",
       }),
     );
     storage.shouldThrow = true;
@@ -192,6 +204,49 @@ describe("RemoveMedia", () => {
 
     expect(mediaRepo.media).toHaveLength(0);
     expect(storage.deletedKeys).toHaveLength(0);
+  });
+
+  it("removes a row without upload provenance but deletes no storage objects", async () => {
+    seedActiveListing(repo);
+    mediaRepo.media.push(
+      ListingMedia.create({
+        id: "media-1",
+        listingId: "listing-1",
+        kind: "image",
+        key: "pending/abc/original.jpg",
+        sortOrder: 0,
+      }),
+    );
+
+    const uc = makeUseCase(repo, mediaRepo, storage);
+    await uc.execute({ listingId: "listing-1", mediaId: "media-1", userId: "user-1" });
+
+    expect(mediaRepo.media).toHaveLength(0);
+    expect(storage.deletedKeys).toEqual([]);
+  });
+
+  it("returns 404 and deletes nothing when another caller already removed the media", async () => {
+    seedActiveListing(repo);
+    mediaRepo.media.push(
+      ListingMedia.create({
+        id: "media-1",
+        listingId: "listing-1",
+        kind: "image",
+        key: "pending/abc/original.jpg",
+        sortOrder: 0,
+        uploadId: "upload-1",
+      }),
+    );
+    // findById sees the row, then a concurrent remove wins before this delete.
+    const racing = Object.assign(Object.create(mediaRepo) as FakeListingMediaRepository, {
+      deleteReleasingUpload: async () => ({ removed: false, ownedKey: null }),
+    });
+
+    const uc = makeUseCase(repo, racing, storage);
+    await expect(
+      uc.execute({ listingId: "listing-1", mediaId: "media-1", userId: "user-1" }),
+    ).rejects.toThrow(NotFoundException);
+    expect(storage.deletedKeys).toEqual([]);
   });
 
   it("returns 404 for non-owner", async () => {

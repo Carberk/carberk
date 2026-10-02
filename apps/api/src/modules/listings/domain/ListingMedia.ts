@@ -13,6 +13,7 @@ export class ListingMedia {
     readonly durationMs: number | undefined,
     readonly posterKey: string | undefined,
     readonly createdAt: Date,
+    readonly uploadId: string | undefined,
   ) {}
 
   static create(data: {
@@ -26,6 +27,8 @@ export class ListingMedia {
     durationMs?: number;
     posterKey?: string;
     createdAt?: Date;
+    /** The MediaUpload this row adopted; absent only on legacy rows (ADR-0077). */
+    uploadId?: string;
   }): ListingMedia {
     if (data.posterKey && data.kind !== "video") {
       throw new DomainError(
@@ -50,6 +53,7 @@ export class ListingMedia {
       data.durationMs,
       data.posterKey,
       data.createdAt ?? new Date(),
+      data.uploadId,
     );
   }
 }

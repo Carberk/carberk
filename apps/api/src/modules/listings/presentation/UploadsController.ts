@@ -35,6 +35,7 @@ export class UploadsController {
     const parsed = UploadsSchemas.PresignRequestSchema.parse(body);
 
     const result = await this.presignUploadUC.execute({
+      userId,
       kind: parsed.kind,
       contentType: parsed.contentType,
       sizeBytes: parsed.sizeBytes,

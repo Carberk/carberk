@@ -1,12 +1,18 @@
 import { Inject, Injectable, BadRequestException } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 
+import { UPLOAD_CAPS } from "../domain/MediaUpload";
 import {
   MEDIA_STORAGE_PORT,
   type MediaStoragePort,
 } from "../domain/ports/MediaStoragePort";
+import {
+  MEDIA_UPLOAD_REPOSITORY,
+  type MediaUploadRepository,
+} from "../domain/ports/MediaUploadRepository";
 
 export interface PresignUploadInput {
+  userId: string;
   kind: "image" | "video";
   contentType: string;
   sizeBytes: number;
@@ -19,29 +25,17 @@ export interface PresignUploadResult {
   maxSizeBytes: number;
 }
 
-const CAPS: Record<
-  "image" | "video",
-  { maxSizeBytes: number; allowedTypes: string[] }
-> = {
-  image: {
-    maxSizeBytes: 5 * 1024 * 1024, // 5 MB
-    allowedTypes: ["image/jpeg", "image/webp"],
-  },
-  video: {
-    maxSizeBytes: 10 * 1024 * 1024, // 10 MB
-    allowedTypes: ["video/mp4"],
-  },
-};
-
 @Injectable()
 export class PresignUpload {
   constructor(
     @Inject(MEDIA_STORAGE_PORT)
     private readonly storage: MediaStoragePort,
+    @Inject(MEDIA_UPLOAD_REPOSITORY)
+    private readonly uploads: MediaUploadRepository,
   ) {}
 
   async execute(input: PresignUploadInput): Promise<PresignUploadResult> {
-    const cap = CAPS[input.kind];
+    const cap = UPLOAD_CAPS[input.kind];
     if (!cap) {
       throw new BadRequestException("Invalid kind");
     }
@@ -72,6 +66,18 @@ export class PresignUpload {
       contentType: input.contentType,
       sizeBytes: input.sizeBytes,
       expirySeconds: 600,
+    });
+
+    // The caller owns this key from the moment the URL exists. Only a recorded
+    // upload can later be attached or published (ADR-0077).
+    await this.uploads.record({
+      id: randomUUID(),
+      userId: input.userId,
+      key,
+      kind: input.kind,
+      contentType: input.contentType,
+      sizeBytes: input.sizeBytes,
+      createdAt: new Date(),
     });
 
     return {

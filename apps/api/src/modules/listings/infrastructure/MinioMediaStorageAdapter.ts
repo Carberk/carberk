@@ -4,14 +4,17 @@ import {
   S3Client,
   PutObjectCommand,
   DeleteObjectCommand,
+  HeadObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
+import type { StoredObjectInfo } from "../domain/MediaUpload";
+import type { MediaObjectInspector } from "../domain/ports/MediaObjectInspector";
 import type { MediaStoragePort } from "../domain/ports/MediaStoragePort";
 import type { Env } from "../../../env.schema";
 
 @Injectable()
-export class MinioMediaStorageAdapter implements MediaStoragePort {
+export class MinioMediaStorageAdapter implements MediaStoragePort, MediaObjectInspector {
   private readonly s3: S3Client;
   private readonly signingS3: S3Client;
   private readonly publicUrl: string;
@@ -78,6 +81,28 @@ export class MinioMediaStorageAdapter implements MediaStoragePort {
       return `${this.publicUrl}/${key}`;
     }
     return `${this.publicUrl}/${bucket}/${key}`;
+  }
+
+  async inspect(key: string): Promise<StoredObjectInfo | null> {
+    try {
+      const head = await this.s3.send(
+        new HeadObjectCommand({ Bucket: this.inferBucket(key), Key: key }),
+      );
+      return {
+        contentType: head.ContentType ?? null,
+        sizeBytes: head.ContentLength ?? 0,
+      };
+    } catch (err) {
+      const failure = err as { name?: string; $metadata?: { httpStatusCode?: number } };
+      if (
+        failure.name === "NotFound" ||
+        failure.name === "NoSuchKey" ||
+        failure.$metadata?.httpStatusCode === 404
+      ) {
+        return null;
+      }
+      throw err;
+    }
   }
 
   async deleteObject(key: string): Promise<void> {

@@ -49,10 +49,24 @@ export class RemoveMedia {
       throw new NotFoundException("Media not found");
     }
 
-    await this.mediaRepo.delete(input.mediaId);
+    // Deleting the row also releases the upload it adopted, atomically. Only the
+    // caller that releases an adopted upload gets a key back; a row with no
+    // provenance, or whose key another row still references, never does, so a
+    // key copied from another Listing can never reach the storage deletes below
+    // (ADR-0077).
+    const { removed, ownedKey } = await this.mediaRepo.deleteReleasingUpload(input.mediaId);
+    if (!removed) {
+      throw new NotFoundException("Media not found");
+    }
+    if (ownedKey === null) {
+      this.logger.warn(
+        `Media ${input.mediaId} removed without storage cleanup: no exclusive upload provenance`,
+      );
+      return;
+    }
 
     // Best-effort MinIO cleanup — errors are logged but don't fail the use-case
-    const base = media.key.replace(/\/original\.(jpg|webp|jpeg|mp4)$/, "");
+    const base = ownedKey.replace(/\/original\.(jpg|webp|jpeg|mp4)$/, "");
     const suffixes = [
       "original.jpg",
       "original.webp",

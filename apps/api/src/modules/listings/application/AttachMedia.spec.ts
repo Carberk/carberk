@@ -4,11 +4,12 @@ import { NotFoundException, BadRequestException } from "@nestjs/common";
 import { Listing } from "../domain/Listing";
 import { ListingMedia } from "../domain/ListingMedia";
 import type { ListingRepository } from "../domain/ports/ListingRepository";
-import type { ListingMediaRepository } from "../domain/ports/ListingMediaRepository";
 import type { MediaContentClassifierPort } from "../domain/ports/MediaContentClassifierPort";
 import type { ImageVariantGenerator } from "../domain/ports/ImageVariantGenerator";
 
 import { AttachMedia } from "./AttachMedia";
+import { UploadAdoptionGuard } from "./UploadAdoptionGuard";
+import { InMemoryMediaWorld } from "./testing/InMemoryMediaWorld";
 
 class FakeListingRepository implements ListingRepository {
   listings: Listing[] = [];
@@ -43,51 +44,6 @@ class FakeListingRepository implements ListingRepository {
     const existing = this.listings.find((l) => l.id === _id);
     if (existing) {
       this.listings = this.listings.map((l) => (l.id === _id ? l.softDelete(_at) : l));
-    }
-  }
-}
-
-class FakeListingMediaRepository implements ListingMediaRepository {
-  media: ListingMedia[] = [];
-
-  async save(m: ListingMedia): Promise<ListingMedia> {
-    this.media.push(m);
-    return m;
-  }
-
-  async findById(id: string): Promise<ListingMedia | null> {
-    return this.media.find((m) => m.id === id) ?? null;
-  }
-
-  async findByListingId(listingId: string): Promise<ListingMedia[]> {
-    return this.media.filter((m) => m.listingId === listingId);
-  }
-
-  async delete(id: string): Promise<void> {
-    this.media = this.media.filter((m) => m.id !== id);
-  }
-
-  async updateSortOrder(
-    _listingId: string,
-    orders: { mediaId: string; sortOrder: number }[],
-  ): Promise<void> {
-    for (const o of orders) {
-      const idx = this.media.findIndex((m) => m.id === o.mediaId);
-      if (idx >= 0) {
-        const old = this.media[idx]!;
-        this.media[idx] = ListingMedia.create({
-          id: old.id,
-          listingId: old.listingId,
-          kind: old.kind,
-          key: old.key,
-          sortOrder: o.sortOrder,
-          ...(old.width !== undefined ? { width: old.width } : {}),
-          ...(old.height !== undefined ? { height: old.height } : {}),
-          ...(old.durationMs !== undefined ? { durationMs: old.durationMs } : {}),
-          ...(old.posterKey !== undefined ? { posterKey: old.posterKey } : {}),
-          createdAt: old.createdAt,
-        });
-      }
     }
   }
 }
@@ -138,37 +94,49 @@ function seedActiveListing(repo: FakeListingRepository) {
   return listing;
 }
 
-function makeUseCase(
-  repo?: FakeListingRepository,
-  mediaRepo?: FakeListingMediaRepository,
-  classifier?: FakeContentClassifier,
-  variantGen?: FakeVariantGenerator,
-) {
-  return new AttachMedia(
-    repo ?? new FakeListingRepository(),
-    mediaRepo ?? new FakeListingMediaRepository(),
-    classifier ?? new FakeContentClassifier(),
-    variantGen ?? new FakeVariantGenerator(),
-  );
-}
-
 describe("AttachMedia", () => {
   let repo: FakeListingRepository;
-  let mediaRepo: FakeListingMediaRepository;
+  let world: InMemoryMediaWorld;
   let classifier: FakeContentClassifier;
   let variantGen: FakeVariantGenerator;
+  let uc: AttachMedia;
+
+  /** A presigned upload by `user-1` whose file has reached storage. */
+  function presignedUpload(
+    key: string,
+    kind: "image" | "video" = "image",
+    userId = "user-1",
+  ): void {
+    world.uploads.push({
+      id: `upload-${key}`,
+      userId,
+      key,
+      kind,
+      contentType: kind === "image" ? "image/jpeg" : "video/mp4",
+      sizeBytes: 1024,
+      createdAt: new Date("2026-05-01T00:00:00Z"),
+    });
+    world.completeUpload(key);
+  }
 
   beforeEach(() => {
     repo = new FakeListingRepository();
-    mediaRepo = new FakeListingMediaRepository();
+    world = new InMemoryMediaWorld();
     classifier = new FakeContentClassifier();
     variantGen = new FakeVariantGenerator();
+    uc = new AttachMedia(
+      repo,
+      world.mediaRepo,
+      classifier,
+      variantGen,
+      new UploadAdoptionGuard(world.uploadRepo, world.inspector),
+    );
   });
 
   it("attaches an image and calls variant generator", async () => {
     seedActiveListing(repo);
+    presignedUpload("pending/abc/original.jpg");
 
-    const uc = makeUseCase(repo, mediaRepo, classifier, variantGen);
     const result = await uc.execute({
       listingId: "listing-1",
       userId: "user-1",
@@ -181,14 +149,16 @@ describe("AttachMedia", () => {
 
     expect(result.media.listingId).toBe("listing-1");
     expect(result.media.kind).toBe("image");
+    expect(result.media.uploadId).toBe("upload-pending/abc/original.jpg");
     expect(variantGen.called).toBe(true);
-    expect(mediaRepo.media).toHaveLength(1);
+    expect(world.media).toHaveLength(1);
   });
 
   it("attaches a video without calling variant generator", async () => {
     seedActiveListing(repo);
+    presignedUpload("pending/abc/original.mp4", "video");
+    presignedUpload("pending/abc/poster.jpg");
 
-    const uc = makeUseCase(repo, mediaRepo, classifier, variantGen);
     const result = await uc.execute({
       listingId: "listing-1",
       userId: "user-1",
@@ -208,7 +178,7 @@ describe("AttachMedia", () => {
   it("rejects when photo limit (20) is exceeded", async () => {
     seedActiveListing(repo);
     for (let i = 0; i < 20; i++) {
-      mediaRepo.media.push(
+      world.media.push(
         ListingMedia.create({
           id: `media-${i}`,
           listingId: "listing-1",
@@ -218,8 +188,8 @@ describe("AttachMedia", () => {
         }),
       );
     }
+    presignedUpload("pending/extra/original.jpg");
 
-    const uc = makeUseCase(repo, mediaRepo, classifier, variantGen);
     await expect(
       uc.execute({
         listingId: "listing-1",
@@ -233,7 +203,7 @@ describe("AttachMedia", () => {
 
   it("rejects when video limit (1) is exceeded", async () => {
     seedActiveListing(repo);
-    mediaRepo.media.push(
+    world.media.push(
       ListingMedia.create({
         id: "media-video",
         listingId: "listing-1",
@@ -243,8 +213,8 @@ describe("AttachMedia", () => {
         durationMs: 30000,
       }),
     );
+    presignedUpload("pending/extra/original.mp4", "video");
 
-    const uc = makeUseCase(repo, mediaRepo, classifier, variantGen);
     await expect(
       uc.execute({
         listingId: "listing-1",
@@ -258,8 +228,8 @@ describe("AttachMedia", () => {
 
   it("returns 404 for non-owner", async () => {
     seedActiveListing(repo);
+    presignedUpload("pending/abc/original.jpg", "image", "user-2");
 
-    const uc = makeUseCase(repo, mediaRepo, classifier, variantGen);
     await expect(
       uc.execute({
         listingId: "listing-1",
@@ -274,8 +244,8 @@ describe("AttachMedia", () => {
   it("returns 404 for soft-deleted listing", async () => {
     const listing = seedActiveListing(repo);
     repo.listings[0] = listing.softDelete(new Date());
+    presignedUpload("pending/abc/original.jpg");
 
-    const uc = makeUseCase(repo, mediaRepo, classifier, variantGen);
     await expect(
       uc.execute({
         listingId: "listing-1",
@@ -289,9 +259,9 @@ describe("AttachMedia", () => {
 
   it("calls classifier and still attaches when classifier returns unacceptable in S4", async () => {
     seedActiveListing(repo);
+    presignedUpload("pending/abc/original.jpg");
     classifier.result = { isAcceptable: false, confidence: 0.9, reason: "nsfw" };
 
-    const uc = makeUseCase(repo, mediaRepo, classifier, variantGen);
     const result = await uc.execute({
       listingId: "listing-1",
       userId: "user-1",

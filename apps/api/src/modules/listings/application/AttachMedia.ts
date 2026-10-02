@@ -1,9 +1,16 @@
 import { randomUUID } from "node:crypto";
 
-import { Inject, Injectable, NotFoundException, BadRequestException, ForbiddenException } from "@nestjs/common";
+import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from "@nestjs/common";
 
 import { ListingMedia } from "../domain/ListingMedia";
-import { LISTING_ERROR_CODES } from "../domain/types";
+import { DomainError, LISTING_ERROR_CODES } from "../domain/types";
 import {
   LISTING_REPOSITORY,
   type ListingRepository,
@@ -20,6 +27,8 @@ import {
   IMAGE_VARIANT_GENERATOR,
   type ImageVariantGenerator,
 } from "../domain/ports/ImageVariantGenerator";
+
+import { UploadAdoptionGuard, type UploadClaim } from "./UploadAdoptionGuard";
 
 export interface AttachMediaInput {
   listingId: string;
@@ -48,6 +57,8 @@ export class AttachMedia {
     private readonly classifier: MediaContentClassifierPort,
     @Inject(IMAGE_VARIANT_GENERATOR)
     private readonly variantGenerator: ImageVariantGenerator,
+    @Inject(UploadAdoptionGuard)
+    private readonly uploadGuard: UploadAdoptionGuard,
   ) {}
 
   async execute(input: AttachMediaInput): Promise<AttachMediaResult> {
@@ -64,6 +75,14 @@ export class AttachMedia {
 
     const existingMedia = await this.mediaRepo.findByListingId(input.listingId);
 
+    // Retrying an attachment that already succeeded returns that row instead of
+    // adding a duplicate. This needs no new authority: the row is on the
+    // caller's own Listing.
+    const alreadyAttached = existingMedia.find((m) => m.key === input.key);
+    if (alreadyAttached) {
+      return { media: alreadyAttached };
+    }
+
     const photoCount = existingMedia.filter((m) => m.kind === "image").length;
     const videoCount = existingMedia.filter((m) => m.kind === "video").length;
 
@@ -78,6 +97,20 @@ export class AttachMedia {
         code: LISTING_ERROR_CODES.MEDIA_LIMIT_EXCEEDED,
         message: "Maximum 1 video per listing",
       });
+    }
+
+    // A key alone authorizes nothing (ADR-0077): the caller must hold the
+    // presigned upload, still unadopted, with a matching object in storage.
+    const claims: UploadClaim[] = [{ key: input.key, kind: input.kind }];
+    if (input.posterKey !== undefined) {
+      claims.push({ key: input.posterKey, kind: "image" });
+    }
+    const [upload] = await this.uploadGuard.authorize(input.userId, claims);
+    if (!upload) {
+      throw new Error("Upload guard returned no upload for the media key");
+    }
+    if (upload.adopted) {
+      throw this.alreadyAttached();
     }
 
     const classification = await this.classifier.classify(input.key);
@@ -108,13 +141,43 @@ export class AttachMedia {
       kind: input.kind,
       key: input.key,
       sortOrder: input.sortOrder,
+      uploadId: upload.id,
       ...(input.width !== undefined ? { width: input.width } : {}),
       ...(input.height !== undefined ? { height: input.height } : {}),
       ...(input.durationMs !== undefined ? { durationMs: input.durationMs } : {}),
       ...(input.posterKey !== undefined ? { posterKey: input.posterKey } : {}),
     });
 
-    const saved = await this.mediaRepo.save(media);
-    return { media: saved };
+    try {
+      const saved = await this.mediaRepo.save(media);
+      return { media: saved };
+    } catch (err) {
+      if (
+        err instanceof DomainError &&
+        err.code === LISTING_ERROR_CODES.UPLOAD_NOT_AVAILABLE
+      ) {
+        throw new BadRequestException({ code: err.code, message: "Upload is not available for this User" });
+      }
+      if (
+        err instanceof DomainError &&
+        err.code === LISTING_ERROR_CODES.UPLOAD_ALREADY_ATTACHED
+      ) {
+        // A concurrent attach adopted the upload first. If that was this same
+        // retry on this Listing, return its row; anything else is a conflict.
+        const winner = (await this.mediaRepo.findByListingId(input.listingId)).find(
+          (m) => m.uploadId === upload.id,
+        );
+        if (winner) return { media: winner };
+        throw this.alreadyAttached();
+      }
+      throw err;
+    }
+  }
+
+  private alreadyAttached(): ConflictException {
+    return new ConflictException({
+      code: LISTING_ERROR_CODES.UPLOAD_ALREADY_ATTACHED,
+      message: "Upload is already attached to a Listing",
+    });
   }
 }

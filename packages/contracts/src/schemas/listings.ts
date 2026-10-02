@@ -585,6 +585,12 @@ export const ListingsErrorCode = {
   ListingDeleted: "LISTING_DELETED",
   ListingNotFound: "LISTING_NOT_FOUND",
   MediaLimitExceeded: "MEDIA_LIMIT_EXCEEDED",
+  /** The media key was not presigned for this User, or its kind does not match. */
+  UploadNotAvailable: "UPLOAD_NOT_AVAILABLE",
+  /** The upload already belongs to a Listing. Retrying the same attach is not an error. */
+  UploadAlreadyAttached: "UPLOAD_ALREADY_ATTACHED",
+  /** Storage holds no matching object for the presigned upload. */
+  UploadObjectInvalid: "UPLOAD_OBJECT_INVALID",
 } as const;
 export type ListingsErrorCode =
   (typeof ListingsErrorCode)[keyof typeof ListingsErrorCode];

@@ -13,6 +13,8 @@ import supertest from "supertest";
 import { UploadsController } from "./UploadsController";
 import { PresignUpload } from "../application/PresignUpload";
 import { MEDIA_STORAGE_PORT } from "../domain/ports/MediaStoragePort";
+import { MEDIA_UPLOAD_REPOSITORY } from "../domain/ports/MediaUploadRepository";
+import type { NewMediaUpload } from "../domain/MediaUpload";
 import { IdentityModule } from "../../identity/identity.module";
 import { GlobalErrorFilter } from "../../../common/error.filter";
 import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
@@ -36,7 +38,20 @@ class FakeMediaStorage {
   }
 }
 
+class FakeMediaUploadRepository {
+  recorded: NewMediaUpload[] = [];
+
+  async record(upload: NewMediaUpload): Promise<void> {
+    this.recorded.push(upload);
+  }
+
+  async findByKeys(): Promise<[]> {
+    return [];
+  }
+}
+
 describe("UploadsController e2e", () => {
+  const uploads = new FakeMediaUploadRepository();
   let app: NestFastifyApplication;
   let request: ReturnType<typeof supertest>;
 
@@ -57,6 +72,7 @@ describe("UploadsController e2e", () => {
           provide: MEDIA_STORAGE_PORT,
           useClass: FakeMediaStorage,
         },
+        { provide: MEDIA_UPLOAD_REPOSITORY, useValue: uploads },
       ],
     }).compile();
 
@@ -99,6 +115,21 @@ describe("UploadsController e2e", () => {
       expect(res.body.key).toMatch(/original\.jpg$/);
       expect(res.body.expiresIn).toBe(600);
       expect(res.body.maxSizeBytes).toBe(5 * 1024 * 1024);
+    });
+
+    it("records the upload for the calling User", async () => {
+      const res = await request
+        .post("/api/v1/uploads/presign")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({ kind: "image", contentType: "image/jpeg", sizeBytes: 2048 })
+        .expect(201);
+
+      expect(uploads.recorded.find((u) => u.key === res.body.key)).toMatchObject({
+        userId: "user-1",
+        kind: "image",
+        contentType: "image/jpeg",
+        sizeBytes: 2048,
+      });
     });
 
     it("returns presigned URL for video", async () => {

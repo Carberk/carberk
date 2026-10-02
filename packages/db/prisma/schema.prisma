@@ -63,6 +63,7 @@ model User {
   conversationsAsBuyer         Conversation[]            @relation("Buyer")
   conversationsAsSeller        Conversation[]            @relation("Seller")
   listingDrafts                ListingDraft[]
+  mediaUploads                 MediaUpload[]
   totpEnrollment               TotpEnrollment?
   reportsSubmitted             ContentReport[]           @relation("Reporter")
   reportsReviewed              ContentReport[]           @relation("Reviewer")
@@ -456,8 +457,33 @@ model ListingMedia {
   posterKey  String?
   createdAt  DateTime  @default(now())
 
+  // The server-recorded upload this row adopted (ADR-0077). One row per upload.
+  // Null only for legacy rows that duplicated a key already owned by another
+  // row: removing such a row never deletes storage objects.
+  uploadId String?      @unique
+  upload   MediaUpload? @relation(fields: [uploadId], references: [id], onDelete: NoAction)
+
   @@index([listingId, sortOrder])
   @@map("listing_media")
+}
+
+/// Provenance of a presigned upload (ADR-0077). Presign creates the row for the
+/// calling User; a ListingMedia row adopts it at most once. A key without a row
+/// authorizes nothing, and deletion authority follows the adopting row.
+model MediaUpload {
+  id          String        @id @default(uuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key         String        @unique
+  kind        MediaKind
+  contentType String
+  // Null for rows backfilled from media that existed before the table.
+  sizeBytes   Int?
+  createdAt   DateTime      @default(now())
+  media       ListingMedia?
+
+  @@index([userId, createdAt])
+  @@map("media_uploads")
 }
 
 model Favorite {

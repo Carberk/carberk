@@ -17,6 +17,7 @@ import { EventEmitterListingEventPublisher } from "./infrastructure/EventEmitter
 import { PrismaListingDraftRepository } from "./infrastructure/PrismaListingDraftRepository";
 import { PrismaListingRepository } from "./infrastructure/PrismaListingRepository";
 import { PrismaListingMediaRepository } from "./infrastructure/PrismaListingMediaRepository";
+import { PrismaMediaUploadRepository } from "./infrastructure/PrismaMediaUploadRepository";
 import { PrismaExchangeRateRepository } from "./infrastructure/PrismaExchangeRateRepository";
 import { PrismaListingsReadRepository } from "./infrastructure/PrismaListingsReadRepository";
 import { PrismaListingsAdminRepository } from "./infrastructure/PrismaListingsAdminRepository";
@@ -34,6 +35,7 @@ import { UpdateDraft } from "./application/UpdateDraft";
 import { ValidateDraftStep } from "./application/ValidateDraftStep";
 import { ListMyDrafts } from "./application/ListMyDrafts";
 import { DiscardDraft } from "./application/DiscardDraft";
+import { UploadAdoptionGuard } from "./application/UploadAdoptionGuard";
 import { PresignUpload } from "./application/PresignUpload";
 import { PublishListing } from "./application/PublishListing";
 import { MarkSold } from "./application/MarkSold";
@@ -60,6 +62,8 @@ import { LISTING_DRAFT_REPOSITORY } from "./domain/ports/ListingDraftRepository"
 import { LISTING_REPOSITORY } from "./domain/ports/ListingRepository";
 import { LISTING_MEDIA_REPOSITORY } from "./domain/ports/ListingMediaRepository";
 import { IMAGE_VARIANT_GENERATOR } from "./domain/ports/ImageVariantGenerator";
+import { MEDIA_UPLOAD_REPOSITORY } from "./domain/ports/MediaUploadRepository";
+import { MEDIA_OBJECT_INSPECTOR } from "./domain/ports/MediaObjectInspector";
 import { EXCHANGE_RATE_PORT } from "./domain/ports/ExchangeRatePort";
 import { MEDIA_STORAGE_PORT } from "./domain/ports/MediaStoragePort";
 import { LISTINGS_READ_PORT } from "./domain/ports/ListingsReadPort";
@@ -81,6 +85,7 @@ import { SELLER_PROFILE_PORT } from "./domain/ports/SellerProfilePort";
     PrismaListingDraftRepository,
     PrismaListingRepository,
     PrismaListingMediaRepository,
+    PrismaMediaUploadRepository,
     PrismaExchangeRateRepository,
     PrismaListingsReadRepository,
     PrismaListingsAdminRepository,
@@ -128,6 +133,14 @@ import { SELLER_PROFILE_PORT } from "./domain/ports/SellerProfilePort";
       useExisting: MinioMediaStorageAdapter,
     },
     {
+      provide: MEDIA_UPLOAD_REPOSITORY,
+      useClass: PrismaMediaUploadRepository,
+    },
+    {
+      provide: MEDIA_OBJECT_INSPECTOR,
+      useExisting: MinioMediaStorageAdapter,
+    },
+    {
       provide: IMAGE_VARIANT_GENERATOR,
       useClass: SharpImageVariantGenerator,
     },
@@ -166,6 +179,7 @@ import { SELLER_PROFILE_PORT } from "./domain/ports/SellerProfilePort";
     ValidateDraftStep,
     ListMyDrafts,
     DiscardDraft,
+    UploadAdoptionGuard,
     PresignUpload,
     PublishListing,
     MarkSold,

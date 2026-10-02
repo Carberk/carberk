@@ -29,8 +29,11 @@ import { mintAdminJwt } from "../../../../test/helpers/mintAdminJwt";
 import {
   cleanSuiteFixtures,
   defineE2eSuite,
+  fakeMediaObjectInspector,
+  seedPresignedPhotos,
   seedSuiteCatalog,
 } from "../../../../test/helpers/e2eSuite";
+import { MEDIA_OBJECT_INSPECTOR } from "../../listings/domain/ports/MediaObjectInspector";
 
 const suite = defineE2eSuite("mlp-afk-smoke");
 
@@ -57,6 +60,8 @@ describe("MLP AFK e2e smoke", () => {
         }),
       ],
     })
+      .overrideProvider(MEDIA_OBJECT_INSPECTOR)
+      .useValue(fakeMediaObjectInspector)
       .overrideProvider(IMAGE_VARIANT_GENERATOR)
       .useValue({
         generate: async (originalKey: string) => ({
@@ -167,10 +172,11 @@ describe("MLP AFK e2e smoke", () => {
       ],
     } satisfies Record<string, unknown>;
 
+    const seededPayload = await seedPresignedPhotos(prisma, input.sellerId, draftPayload);
     const draft = await prisma.listingDraft.create({
       data: {
         userId: input.sellerId,
-        payload: draftPayload as Prisma.InputJsonValue,
+        payload: seededPayload as Prisma.InputJsonValue,
       },
     });
 

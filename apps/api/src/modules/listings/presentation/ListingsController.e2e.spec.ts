@@ -23,8 +23,11 @@ import { mintUserJwt } from "../../../../test/helpers/mintUserJwt";
 import {
   cleanSuiteFixtures,
   defineE2eSuite,
+  fakeMediaObjectInspector,
+  seedPresignedPhotos,
   seedSuiteCatalog,
 } from "../../../../test/helpers/e2eSuite";
+import { MEDIA_OBJECT_INSPECTOR } from "../domain/ports/MediaObjectInspector";
 import { IMAGE_VARIANT_GENERATOR } from "../domain/ports/ImageVariantGenerator";
 import { LISTING_EVENT_PUBLISHER } from "../domain/ports/ListingEventPublisher";
 
@@ -53,6 +56,8 @@ describe("ListingsController e2e", () => {
         }),
       ],
     })
+      .overrideProvider(MEDIA_OBJECT_INSPECTOR)
+      .useValue(fakeMediaObjectInspector)
       .overrideProvider(IMAGE_VARIANT_GENERATOR)
       .useValue({
         generate: async (originalKey: string) => ({
@@ -114,8 +119,9 @@ describe("ListingsController e2e", () => {
   }
 
   async function seedDraft(alias: SuiteUser, payload: Record<string, unknown>) {
+    const seeded = await seedPresignedPhotos(prisma, suite.id(alias), payload);
     const draft = await prisma.listingDraft.create({
-      data: { userId: suite.id(alias), payload: payload as Prisma.InputJsonValue },
+      data: { userId: suite.id(alias), payload: seeded as Prisma.InputJsonValue },
     });
     return draft;
   }
@@ -917,7 +923,8 @@ describe("ListingsController e2e", () => {
 
       const item = feed.body.items.find((i: { id: string }) => i.id === listingId);
       expect(item).toBeDefined();
-      expect(item.coverMediaKey).toBe("photo1.jpg");
+      const media = await prisma.listingMedia.findFirstOrThrow({ where: { listingId } });
+      expect(item.coverMediaKey).toBe(media.key);
     });
 
     it("paginates feed with cursor", async () => {
