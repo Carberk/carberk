@@ -1,6 +1,5 @@
 export const queryKeys = {
   me: () => ["me"] as const,
-  meBlocked: (userId: string) => [...queryKeys.me(), "blocked", userId] as const,
 
   catalog: {
     all: () => ["catalog"] as const,

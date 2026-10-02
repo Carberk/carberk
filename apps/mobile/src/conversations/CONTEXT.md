@@ -22,7 +22,9 @@ This area holds the Messages list, the Conversation screen's parts, the chat soc
 
 **Messages list.** `ConversationList` renders the summaries from `useConversations` in server order and refetches when its screen regains focus, so a row's unread badge clears after the Conversation is read. The row's tick and the Conversation's bubbles share one sent / delivered / read rule, `outgoingStatus.ts`.
 
-**Screen structure.** The route holds orchestration. `ConversationHeader` (Back, the participant, Call, the ⋯ menu), `ConversationListingCard` (the Listing strip) and `ConversationFooter` (blocked banner, typing indicator, composer) render from props and have their own rendered tests.
+**Blocked by the viewer.** Whether the viewer blocked the other participant comes from the loaded Conversation (`blockedByMe`, or `sendRestriction` of `blocked_by_me`), never from a separate block request. Block and Unblock patch the by-ID entry so the footer switches at once, then refresh it and the list. While blocked, the footer is only the banner with Unblock: no composer, attach, quick replies or typing indicator (#352 D3). Messages stay readable. That the other participant blocked the viewer is not shown.
+
+**Screen structure.** The route holds orchestration. `ConversationHeader` (Back, the participant, Call, the ⋯ button that opens `ConversationMenuSheet`), `ConversationListingCard` (the Listing strip) and `ConversationFooter` (blocked banner, or typing indicator and composer) render from props and have their own rendered tests. The menu holds Mute, Report and Block only (#352 D2); Report opens `ReportSheet` as a User report of the other participant and is hidden when `reportEntryEnabled` is false, as on Listing detail.
 
 ## Start here
 

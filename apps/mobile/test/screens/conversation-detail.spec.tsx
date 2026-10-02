@@ -131,10 +131,4 @@ describe("ConversationDetailScreen realtime text send", () => {
     expect(source).toContain("handleRetry");
     expect(source).toContain('msg.status !== "failed"');
   });
-
-  it("keeps the composer usable while socket connects", () => {
-    expect(source).toContain("<ConversationFooter");
-    expect(source).toContain("disabled: isBlocked || blockUser.isPending || unblockUser.isPending");
-    expect(source).not.toContain("disabled: true");
-  });
 });

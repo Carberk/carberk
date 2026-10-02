@@ -37,21 +37,38 @@ describe("ConversationFooter", () => {
     expect(screen.queryByText("typing...")).toBeNull();
   });
 
-  it("shows the blocked banner with Unblock, and a disabled composer", () => {
+  it("replaces the composer with the blocked banner when the viewer blocked the other participant", () => {
     const onUnblock = vi.fn();
     const screen = renderMobile(
       <ConversationFooter
         isBlocked
         unblockPending={false}
         onUnblock={onUnblock}
-        peerTyping={false}
-        composer={{ ...composer, disabled: true }}
+        peerTyping
+        composer={{ ...composer, initialText: "Is it available?", showQuickReplies: true }}
       />,
     );
 
-    fireEvent.press(screen.getByRole("button", { name: "Unblock" }));
+    expect(screen.getByText("User blocked")).toBeTruthy();
+    expect(screen.getByText("You cannot send messages to this user.")).toBeTruthy();
+    const unblock = screen.getByRole("button", { name: "Unblock" });
+    expect(unblock.props.className).toContain("h-11");
+    fireEvent.press(unblock);
     expect(onUnblock).toHaveBeenCalledOnce();
-    expect(screen.getByRole("button", { name: "Send message", disabled: true })).toBeTruthy();
+
+    // No composer, attach button, quick replies or typing indicator.
+    expect(screen.queryByRole("button", { name: "Send message" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Attach photo" })).toBeNull();
+    expect(screen.queryByDisplayValue("Is it available?")).toBeNull();
+    expect(screen.queryByText("Is the car still available?")).toBeNull();
+    expect(screen.queryByText("typing...")).toBeNull();
+  });
+
+  it("disables Unblock while an unblock is in flight", () => {
+    const screen = renderMobile(
+      <ConversationFooter isBlocked unblockPending onUnblock={vi.fn()} peerTyping={false} composer={composer} />,
+    );
+    expect(screen.getByRole("button", { name: "Unblock", disabled: true })).toBeTruthy();
   });
 
   it("shows the typing indicator while the other participant types", () => {

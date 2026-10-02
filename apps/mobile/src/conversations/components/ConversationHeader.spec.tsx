@@ -104,21 +104,39 @@ describe("ConversationHeader", () => {
     expect(header().queryByLabelText("Notifications muted")).toBeNull();
   });
 
-  it("keeps today's menu: Mute and Block, or Unmute and Unblock", () => {
-    const screen = header();
+  it("opens the menu sheet with Mute, Report and Block from the ⋯ button", () => {
+    const onReport = vi.fn();
+    const screen = header({ onReport });
+    expect(screen.queryByRole("button", { name: "Report" })).toBeNull();
+
     fireEvent.press(screen.getByRole("button", { name: "Conversation actions" }));
-    fireEvent.press(screen.getByText("Mute notifications"));
-    fireEvent.press(screen.getByText("Block user"));
+    fireEvent.press(screen.getByRole("button", { name: "Report" }));
+    expect(onReport).toHaveBeenCalledOnce();
+    // Each item closes the sheet before its action runs.
+    expect(screen.queryByRole("button", { name: "Block user" })).toBeNull();
+
+    fireEvent.press(screen.getByRole("button", { name: "Conversation actions" }));
+    fireEvent.press(screen.getByRole("button", { name: "Mute notifications" }));
+    fireEvent.press(screen.getByRole("button", { name: "Conversation actions" }));
+    fireEvent.press(screen.getByRole("button", { name: "Block user" }));
     expect(handlers.onToggleMute).toHaveBeenCalledOnce();
     expect(handlers.onBlock).toHaveBeenCalledOnce();
+  });
+
+  it("leaves Report out of the menu without a report action", () => {
+    const screen = header();
+    fireEvent.press(screen.getByRole("button", { name: "Conversation actions" }));
+
+    expect(screen.getByRole("button", { name: "Block user" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Report" })).toBeNull();
   });
 
   it("offers Unmute and Unblock when muted and blocked", () => {
     const screen = header({ isMuted: true, isBlocked: true });
     fireEvent.press(screen.getByRole("button", { name: "Conversation actions" }));
-    fireEvent.press(screen.getByText("Unblock user"));
+    expect(screen.getByRole("button", { name: "Unmute notifications" })).toBeTruthy();
+    fireEvent.press(screen.getByRole("button", { name: "Unblock user" }));
     expect(handlers.onUnblock).toHaveBeenCalledOnce();
-    expect(screen.getByText("Unmute notifications")).toBeTruthy();
   });
 
   it("shows skeletons and only Back while loading", () => {

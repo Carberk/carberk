@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { ConversationsSchemas } from "@auto-tm/contracts";
 
@@ -9,7 +10,12 @@ import { useViewer } from "../../src/auth/useViewer";
 import { useAuthIntentStore } from "../../src/auth/intentStore";
 import { ApiError } from "../../src/api/client";
 import { useConversationMessages } from "../../src/api/conversations/useConversationMessages";
-import { useConversation } from "../../src/api/conversations/useConversation";
+import {
+  patchConversationDetail,
+  useConversation,
+} from "../../src/api/conversations/useConversation";
+import { queryKeys } from "../../src/api/queryKeys";
+import { useConfig } from "../../src/api/admin/useConfig";
 import { useSendTextMessage } from "../../src/api/conversations/useSendTextMessage";
 import { useSendImageMessage } from "../../src/api/conversations/useSendImageMessage";
 import { usePresignChatAttachment } from "../../src/api/conversations/usePresignChatAttachment";
@@ -22,7 +28,6 @@ import { useSafeBack } from "../../src/navigation/useSafeBack";
 import { useConversationSocket } from "../../src/conversations/socket/useConversationSocket";
 import { useBlockUser } from "../../src/api/identity/useBlockUser";
 import { useUnblockUser } from "../../src/api/identity/useUnblockUser";
-import { useIsBlocked } from "../../src/api/identity/useIsBlocked";
 import { ConversationListingCard } from "../../src/conversations/components/ConversationListingCard";
 import { ConversationHeader } from "../../src/conversations/components/ConversationHeader";
 import { ConversationFooter } from "../../src/conversations/components/ConversationFooter";
@@ -43,6 +48,7 @@ import { showQuickReplies } from "../../src/conversations/showQuickReplies";
 import type { MessageStatus } from "../../src/conversations/components/MessageBubble";
 import { outgoingStatus } from "../../src/conversations/outgoingStatus";
 import { MessageReportSheet } from "../../src/admin/components/MessageReportSheet";
+import { ReportSheet } from "../../src/admin/components/ReportSheet";
 import {
   uploadChatImageToPresignedUrl,
   ChatImageUploadError,
@@ -117,6 +123,7 @@ export default function ConversationDetailScreen() {
   >(null);
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
   const [messageToReport, setMessageToReport] = useState<string | null>(null);
+  const [reportUserOpen, setReportUserOpen] = useState(false);
   const [reportedMessageIds, setReportedMessageIds] = useState<Set<string>>(
     new Set(),
   );
@@ -139,6 +146,8 @@ export default function ConversationDetailScreen() {
     deleteMessage,
   } = useConversationSocket(conversationId, viewer?.userId);
 
+  const queryClient = useQueryClient();
+  const { data: config } = useConfig();
   const blockUser = useBlockUser();
   const unblockUser = useUnblockUser();
   const muteConversation = useMuteConversation();
@@ -200,11 +209,28 @@ export default function ConversationDetailScreen() {
 
   const otherUserId = conversation?.peer.id;
 
-  const isBlockedQuery = useIsBlocked(otherUserId ?? "", {
-    enabled: !!otherUserId,
-  });
+  // Read from the loaded Conversation, never a separate request (#352 D3).
+  const isBlocked =
+    conversation?.blockedByMe === true ||
+    conversation?.sendRestriction === "blocked_by_me";
 
-  const isBlocked = isBlockedQuery.data?.blocked ?? false;
+  // Block and Unblock patch the by-ID entry so the footer switches at once,
+  // then refresh it and the list from the API.
+  const applyBlocked = useCallback(
+    (blocked: boolean) => {
+      patchConversationDetail(queryClient, conversationId, {
+        blockedByMe: blocked,
+        sendRestriction: blocked ? "blocked_by_me" : null,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.conversations.detail(conversationId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.conversations.list(),
+      });
+    },
+    [conversationId, queryClient],
+  );
 
   const handleBlock = useCallback(() => {
     if (!otherUserId) return;
@@ -213,10 +239,11 @@ export default function ConversationDetailScreen() {
       {
         onSuccess: () => {
           setConfirmAction(null);
+          applyBlocked(true);
         },
       },
     );
-  }, [blockUser, otherUserId]);
+  }, [applyBlocked, blockUser, otherUserId]);
 
   const handleUnblock = useCallback(() => {
     if (!otherUserId) return;
@@ -225,10 +252,11 @@ export default function ConversationDetailScreen() {
       {
         onSuccess: () => {
           setConfirmAction(null);
+          applyBlocked(false);
         },
       },
     );
-  }, [unblockUser, otherUserId]);
+  }, [applyBlocked, unblockUser, otherUserId]);
 
   const handleToggleMute = useCallback(() => {
     if (!conversationId) return;
@@ -765,6 +793,11 @@ export default function ConversationDetailScreen() {
         muteDisabled={muteConversation.isPending}
         onBack={goBack}
         onToggleMute={handleToggleMute}
+        onReport={
+          otherUserId && config?.reportEntryEnabled !== false
+            ? () => setReportUserOpen(true)
+            : undefined
+        }
         onBlock={() => setConfirmAction("block")}
         onUnblock={() => setConfirmAction("unblock")}
       />
@@ -832,7 +865,7 @@ export default function ConversationDetailScreen() {
             ? {
                 onSend: handleSend,
                 onSendImage: handleSendImage,
-                disabled: isBlocked || blockUser.isPending || unblockUser.isPending,
+                disabled: blockUser.isPending || unblockUser.isPending,
                 showQuickReplies: showQuickReplies({
                   conversation,
                   messages: allMessages,
@@ -905,6 +938,16 @@ export default function ConversationDetailScreen() {
         }}
         onReported={handleReported}
       />
+
+      {/* Report the other participant (a User report) */}
+      {otherUserId && (
+        <ReportSheet
+          targetType="user"
+          targetId={otherUserId}
+          open={reportUserOpen}
+          onOpenChange={setReportUserOpen}
+        />
+      )}
 
       {/* Fullscreen image preview */}
       <ImagePreviewModal

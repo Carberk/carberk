@@ -240,7 +240,7 @@ export function MessageComposer({
           className="h-11 w-11"
           disabled={disabled || isCompressing || !conversationId}
           onPress={handlePickImage}
-          accessibilityLabel={t("attachImage")}
+          accessibilityLabel={t("attachImage", { ns: "conversations" })}
         >
           {isCompressing ? (
             <ActivityIndicator size="small" className="text-foreground" />

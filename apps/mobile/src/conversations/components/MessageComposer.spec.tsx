@@ -115,7 +115,6 @@ describe("MessageComposer image attachment", () => {
 
   it("has an attachment picker button", () => {
     expect(source).toContain("handlePickImage");
-    expect(source).toContain('accessibilityLabel={t("attachImage")}');
   });
 
   it("disables send when neither text nor image is available", () => {

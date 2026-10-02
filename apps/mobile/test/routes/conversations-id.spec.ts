@@ -26,11 +26,6 @@ describe("ConversationDetailScreen conversation mute", () => {
     expect(source).toContain("handleToggleMute");
   });
 
-  it("exposes mute and unmute menu items in the thread header", () => {
-    expect(header).toContain('t("muteConversation")');
-    expect(header).toContain('t("unmuteConversation")');
-  });
-
   it("shows an understated muted indicator in the header", () => {
     expect(header).toContain("BellOff");
     expect(header).toContain('t("conversationMuted")');

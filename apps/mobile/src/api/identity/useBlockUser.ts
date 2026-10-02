@@ -14,11 +14,8 @@ export function useBlockUser() {
         input,
         IdentitySchemas.BlockUserResponseSchema,
       ),
-    onSuccess: (_data, variables) => {
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.meBlocked(variables.userId),
-      });
     },
   });
 }

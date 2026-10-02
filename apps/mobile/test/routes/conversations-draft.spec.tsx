@@ -43,9 +43,7 @@ vi.mock("../../src/api/conversations/useMuteConversation", () => ({
 }));
 vi.mock("../../src/api/identity/useBlockUser", () => ({ useBlockUser: () => mocks.mutation }));
 vi.mock("../../src/api/identity/useUnblockUser", () => ({ useUnblockUser: () => mocks.mutation }));
-vi.mock("../../src/api/identity/useIsBlocked", () => ({
-  useIsBlocked: () => ({ data: { blocked: false } }),
-}));
+vi.mock("../../src/api/admin/useConfig", () => ({ useConfig: () => ({ data: undefined }) }));
 vi.mock("../../src/api/catalog/useBrands", () => ({ useBrands: () => ({ data: undefined }) }));
 vi.mock("../../src/api/catalog/useModels", () => ({ useModels: () => ({ data: undefined }) }));
 vi.mock("../../src/navigation/useSafeBack", () => ({ useSafeBack: () => vi.fn() }));

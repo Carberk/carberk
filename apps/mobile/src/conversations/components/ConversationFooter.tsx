@@ -17,7 +17,10 @@ interface ConversationFooterProps {
   composer?: ComponentProps<typeof MessageComposer>;
 }
 
-/** The blocked banner, typing indicator and composer under the Messages. */
+/**
+ * Under the Messages: the typing indicator and composer, or, when the viewer
+ * blocked the other participant, only the blocked banner with Unblock (#352 D3).
+ */
 export function ConversationFooter({
   isBlocked,
   unblockPending,
@@ -27,31 +30,33 @@ export function ConversationFooter({
 }: ConversationFooterProps) {
   const { t } = useTranslation();
 
+  if (isBlocked) {
+    return (
+      <View className="px-4 py-3 border-t border-border bg-muted">
+        <View className="flex-row items-center justify-between gap-3">
+          <View className="flex-1">
+            <Text className="text-sm font-medium text-foreground">
+              {t("blockedStateTitle")}
+            </Text>
+            <Text className="text-xs text-muted-foreground">
+              {t("blockedStateDescription")}
+            </Text>
+          </View>
+          <Button
+            variant="outline"
+            className="h-11"
+            onPress={onUnblock}
+            disabled={unblockPending}
+          >
+            <Text>{t("blockedStateUnblock")}</Text>
+          </Button>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <>
-      {isBlocked && (
-        <View className="px-4 py-3 border-t border-border bg-muted">
-          <View className="flex-row items-center justify-between gap-3">
-            <View className="flex-1">
-              <Text className="text-sm font-medium text-foreground">
-                {t("blockedStateTitle")}
-              </Text>
-              <Text className="text-xs text-muted-foreground">
-                {t("blockedStateDescription")}
-              </Text>
-            </View>
-            <Button
-              variant="outline"
-              size="sm"
-              onPress={onUnblock}
-              disabled={unblockPending}
-            >
-              <Text>{t("blockedStateUnblock")}</Text>
-            </Button>
-          </View>
-        </View>
-      )}
-
       <TypingIndicator visible={peerTyping} />
 
       {composer && <MessageComposer {...composer} />}
