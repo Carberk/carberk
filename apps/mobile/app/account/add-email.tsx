@@ -35,6 +35,12 @@ export default function AddEmailScreen() {
 
     if (!canonicalEmail || isSubmitting) return;
 
+    // Replacing an address with itself would only spend a code.
+    if (me?.email && canonicalEmail === normalizeEmail(me.email)) {
+      setRequestError(t("sameEmailError"));
+      return;
+    }
+
     setRequestError(null);
 
     try {
@@ -44,6 +50,7 @@ export default function AddEmailScreen() {
         pathname: "/account/verify-sign-in-method",
         params: {
           method: "email",
+          kind: isChange ? "change" : "add",
           destination: canonicalEmail,
           resendInSeconds: String(result.resendInSeconds),
           ...(__DEV__ && result.testCode ? { testCode: result.testCode } : {}),

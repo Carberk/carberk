@@ -7,20 +7,12 @@ function read(path: string) {
   return readFileSync(resolve(__dirname, "../..", path), "utf8");
 }
 
-const profile = read("app/profile.tsx");
 const addPhone = read("app/account/add-phone.tsx");
 const addEmail = read("app/account/add-email.tsx");
 const verify = read("app/account/verify-sign-in-method.tsx");
 
 describe("Profile Sign-in Methods", () => {
-  it("shows masked phone and email rows that open the add/change flow", () => {
-    expect(profile).toContain("maskTmPhone(data.phone)");
-    expect(profile).toContain("maskEmail(data.email)");
-    expect(profile).toContain('href="/account/add-phone"');
-    expect(profile).toContain('href="/account/add-email"');
-    expect(profile).toContain('value ? t("change") : t("add")');
-  });
-
+  // Profile's rows are covered by rendered tests in profile.spec.tsx.
   it("requests the code through the signed-in Sign-in Method endpoint", () => {
     for (const source of [addPhone, addEmail]) {
       expect(source).toContain("useRequestSignInMethodChange");

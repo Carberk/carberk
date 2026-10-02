@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../api/client";
 
-import { getResendCodeErrorCopy, getVerifyCodeErrorCopy } from "./verifyCodeError";
+import {
+  getResendCodeErrorCopy,
+  getVerifyCodeErrorCopy,
+  isSignInMethodTaken,
+} from "./verifyCodeError";
 
 // The real client imports React Native, which the node test environment
 // cannot load.
@@ -72,5 +76,13 @@ describe("getResendCodeErrorCopy", () => {
     expect(getResendCodeErrorCopy(new ApiError("SERVER", 500), t)).toBe(
       "verifyFailed",
     );
+  });
+});
+
+describe("isSignInMethodTaken", () => {
+  it("recognises only SIGN_IN_METHOD_TAKEN", () => {
+    expect(isSignInMethodTaken(new ApiError("SIGN_IN_METHOD_TAKEN", 409))).toBe(true);
+    expect(isSignInMethodTaken(new ApiError("INVALID_OTP", 400))).toBe(false);
+    expect(isSignInMethodTaken(new Error("SIGN_IN_METHOD_TAKEN"))).toBe(false);
   });
 });

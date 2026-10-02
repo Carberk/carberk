@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ScrollView, View } from "react-native";
 import { router } from "expo-router";
 import {
-  CheckCircle2,
   ChevronLeft,
-  ChevronRight,
   LogOut,
+  Mail,
+  Phone,
   Trash2,
   User,
 } from "lucide-react-native";
@@ -17,8 +17,9 @@ import { useAuth } from "../src/auth/useAuth";
 import { useLogout } from "../src/auth/useLogout";
 import { maskEmail } from "../src/auth/email";
 import { maskTmPhone } from "../src/auth/phone";
-import { localeTag } from "../src/i18n/resources";
+import { signInMethodNoticeStore } from "../src/auth/signInMethodNotice";
 
+import { ChangeSignInMethodSheet } from "@/components/account/ChangeSignInMethodSheet";
 import { MenuDivider, MenuGap, MenuRow } from "@/components/account/MenuRow";
 import {
   AlertDialog,
@@ -31,11 +32,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Text } from "@/components/ui/text";
 import { SafeScreen } from "@/components/navigation/SafeScreen";
@@ -54,47 +52,102 @@ function LoadingState() {
   );
 }
 
-interface SignInMethodRowProps {
-  label: string;
-  /** Masked value, or null when the User has not added this method. */
-  value: string | null;
-  href: "/account/add-phone" | "/account/add-email";
-}
+type SignInMethod = "phone" | "email";
 
-function SignInMethodRow({ label, value, href }: SignInMethodRowProps) {
+const ENTRY_HREF = {
+  phone: "/account/add-phone",
+  email: "/account/add-email",
+} as const;
+
+/**
+ * The phone and email rows. A row with a value asks before it opens the change
+ * screen; an empty row shows Add and opens the add screen directly. There is
+ * no control that removes a method.
+ */
+function SignInMethods({ phone, email }: { phone: string | null; email: string | null }) {
   const { t } = useTranslation("account");
-  const action = value ? t("change") : t("add");
+  const [confirming, setConfirming] = useState(false);
+  // Keeps the sheet's copy while it animates closed.
+  const [sheetMethod, setSheetMethod] = useState<SignInMethod>("phone");
+
+  function open(method: SignInMethod, hasValue: boolean) {
+    if (!hasValue) {
+      router.push(ENTRY_HREF[method]);
+      return;
+    }
+    setSheetMethod(method);
+    setConfirming(true);
+  }
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${label}, ${value ?? t("notAdded")}. ${action}`}
-      className="min-h-14 flex-row items-center gap-3 py-2 active:opacity-70"
-      onPress={() => router.push(href)}
-    >
-      <View className="flex-1 gap-0.5">
-        <Text className="text-sm text-muted-foreground">{label}</Text>
-        {value ? (
-          <View className="flex-row flex-wrap items-center gap-x-2">
-            <Text className="text-base font-medium text-foreground">
-              {value}
-            </Text>
-            <View className="flex-row items-center gap-1">
-              <Icon as={CheckCircle2} className="size-3.5 text-success-500" />
-              <Text className="text-xs text-muted-foreground">
-                {t("verified")}
-              </Text>
-            </View>
-          </View>
-        ) : (
-          <Text className="text-base text-muted-foreground">
-            {t("notAdded")}
-          </Text>
-        )}
-      </View>
-      <Text className="text-sm font-medium text-foreground">{action}</Text>
-      <Icon as={ChevronRight} className="size-5 text-muted-foreground" />
-    </Pressable>
+    <>
+      <Text className="px-4 pb-1 pt-2.5 text-[13px] text-muted-foreground">
+        {t("signInMethods")}
+      </Text>
+      <MenuRow
+        icon={Phone}
+        label={t("phone")}
+        value={phone ? maskTmPhone(phone) : t("add")}
+        valueTone={phone ? "default" : "link"}
+        chevron
+        onPress={() => open("phone", Boolean(phone))}
+      />
+      <MenuDivider />
+      <MenuRow
+        icon={Mail}
+        label={t("email")}
+        value={email ? maskEmail(email) : t("add")}
+        valueTone={email ? "default" : "link"}
+        chevron
+        onPress={() => open("email", Boolean(email))}
+      />
+      <SignInMethodNoticeLine />
+
+      <ChangeSignInMethodSheet
+        method={sheetMethod}
+        open={confirming}
+        onOpenChange={(next) => {
+          if (!next) setConfirming(false);
+        }}
+        onContinue={() => {
+          setConfirming(false);
+          router.push(ENTRY_HREF[sheetMethod]);
+        }}
+      />
+    </>
+  );
+}
+
+const NOTICE_MS = 4000;
+
+/**
+ * "Added" or "Changed" after the code screen returns here. It sits in the page
+ * under the rows, so it never covers a button or the sheet, and clears itself.
+ */
+function SignInMethodNoticeLine() {
+  const { t } = useTranslation("account");
+  const notice = signInMethodNoticeStore((state) => state.notice);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => signInMethodNoticeStore.getState().clear(), NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  // The line keeps its height when empty, so the rows below never jump.
+  return (
+    <View className="min-h-7 justify-center px-4">
+      {notice ? (
+        <Text
+          accessibilityLiveRegion="polite"
+          accessibilityRole="alert"
+          className="text-[13px] text-muted-foreground"
+          numberOfLines={1}
+        >
+          {t(notice.kind === "added" ? "methodAdded" : "methodChanged", { value: notice.value })}
+        </Text>
+      ) : null}
+    </View>
   );
 }
 
@@ -153,54 +206,13 @@ function AccountActions() {
   );
 }
 
-function formatMemberSince(isoDate: string, locale: string): string {
-  const d = new Date(isoDate);
-  const tag = localeTag(locale);
-  try {
-    return d.toLocaleDateString(tag, {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  } catch {
-    return d.toLocaleDateString("ru-RU", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  }
-}
-
 export default function ProfileScreen() {
-  const { t, i18n } = useTranslation(["account", "common"]);
+  const { t } = useTranslation(["account", "common"]);
   const { data, isPending, isError, error, refetch } = useMe();
   const goBack = useSafeBack("/(tabs)/services");
 
-  const roleLabel = useMemo(() => {
-    if (!data) return "";
-    const map: Record<string, string> = {
-      buyer: t("account:roleBuyer"),
-      seller: t("account:roleSeller"),
-      moderator: t("account:roleModerator"),
-      admin: t("account:roleAdmin"),
-    };
-    return map[data.role] ?? data.role;
-  }, [data, t]);
-
-  // Only a real name yields a meaningful initial — the first character of a
-  // phone number is "+", which reads as an add-photo affordance.
-  // Without a display name the header falls back to a Sign-in Method, masked
-  // like the rows below.
-  const fallbackName = data?.phone
-    ? maskTmPhone(data.phone)
-    : data?.email
-      ? maskEmail(data.email)
-      : "";
-
-  const avatarInitial = useMemo(() => {
-    if (data?.displayName) return data.displayName.charAt(0).toUpperCase();
-    return undefined;
-  }, [data]);
+  // Without a name the avatar shows the person icon, never a method's first character.
+  const avatarInitial = data?.displayName?.charAt(0).toUpperCase();
 
   return (
     <SafeScreen>
@@ -226,75 +238,35 @@ export default function ProfileScreen() {
           className="flex-1"
           contentContainerClassName="pb-6"
         >
-          <View className="px-4 pt-4 pb-4 gap-4">
-            {/* Identity card */}
-            <View className="items-center gap-3 py-6">
-              <Avatar
-                className="size-24"
-                alt={data.displayName ?? fallbackName}
-              >
-                {data.avatarUrl ? (
-                  <AvatarImage source={{ uri: data.avatarUrl }} />
-                ) : null}
-                <AvatarFallback>
-                  {avatarInitial ? (
-                    <Text className="text-3xl font-heading text-foreground">
-                      {avatarInitial}
-                    </Text>
-                  ) : (
-                    <Icon as={User} className="size-10 text-muted-foreground" />
-                  )}
-                </AvatarFallback>
-              </Avatar>
+          {/* Avatar, and the name only when the User has one. The name and
+              photo editors attach here later. */}
+          <View className="items-center gap-2.5 px-4 pb-5 pt-2">
+            <Avatar
+              className="size-[72px]"
+              alt={data.displayName ?? t("account:profile")}
+            >
+              {data.avatarUrl ? (
+                <AvatarImage source={{ uri: data.avatarUrl }} />
+              ) : null}
+              <AvatarFallback>
+                {avatarInitial ? (
+                  <Text className="text-2xl font-heading text-foreground">
+                    {avatarInitial}
+                  </Text>
+                ) : (
+                  <Icon as={User} className="size-8 text-muted-foreground" />
+                )}
+              </AvatarFallback>
+            </Avatar>
 
-              <Text className="text-xl font-heading text-foreground">
-                {data.displayName ?? fallbackName}
+            {data.displayName ? (
+              <Text className="text-xl font-semibold text-foreground">
+                {data.displayName}
               </Text>
-
-              <Badge variant="secondary">
-                <Text>{roleLabel}</Text>
-              </Badge>
-            </View>
-
-            <View className="gap-2">
-              <View className="gap-0.5 px-1">
-                <Text className="text-base font-semibold text-foreground">
-                  {t("account:signInMethods")}
-                </Text>
-                <Text className="text-sm text-muted-foreground">
-                  {t("account:signInMethodsHelper")}
-                </Text>
-              </View>
-              <Card>
-                <CardContent className="gap-1">
-                  <SignInMethodRow
-                    label={t("account:phone")}
-                    value={data.phone ? maskTmPhone(data.phone) : null}
-                    href="/account/add-phone"
-                  />
-                  <Separator />
-                  <SignInMethodRow
-                    label={t("account:email")}
-                    value={data.email ? maskEmail(data.email) : null}
-                    href="/account/add-email"
-                  />
-                </CardContent>
-              </Card>
-            </View>
-
-            <Card>
-              <CardContent className="gap-1">
-                <View className="flex-row items-center justify-between py-2">
-                  <Text className="text-sm text-muted-foreground">
-                    {t("account:memberSince")}
-                  </Text>
-                  <Text className="text-base text-foreground font-medium">
-                    {formatMemberSince(data.createdAt, i18n.language)}
-                  </Text>
-                </View>
-              </CardContent>
-            </Card>
+            ) : null}
           </View>
+
+          <SignInMethods phone={data.phone} email={data.email} />
 
           <AccountActions />
         </ScrollView>

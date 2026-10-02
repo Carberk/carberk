@@ -18,6 +18,8 @@ interface MenuRowProps {
   sub?: string;
   /** The current value, shown at the end of the row. */
   value?: string;
+  /** `link` shows the value as an action, such as Add on an empty Sign-in Method. */
+  valueTone?: "default" | "link";
   chevron?: boolean;
   size?: "default" | "large";
   variant?: "default" | "danger";
@@ -35,6 +37,7 @@ export function MenuRow({
   lead,
   sub,
   value,
+  valueTone = "default",
   chevron = false,
   size = "default",
   variant = "default",
@@ -67,7 +70,17 @@ export function MenuRow({
           </Text>
         ) : null}
       </View>
-      {value ? <Text className="text-[15px] text-muted-foreground">{value}</Text> : null}
+      {value ? (
+        <Text
+          numberOfLines={1}
+          className={cn(
+            "shrink text-[15px]",
+            valueTone === "link" ? "text-info-600 dark:text-info-400" : "text-muted-foreground",
+          )}
+        >
+          {value}
+        </Text>
+      ) : null}
       {chevron ? <Icon as={ChevronRight} className="size-[18px] text-muted-foreground opacity-60" /> : null}
     </Pressable>
   );

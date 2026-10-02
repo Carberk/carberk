@@ -1,14 +1,16 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { ChevronLeft } from "lucide-react-native";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { KeyboardAvoidingView, Platform, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { CodeEntryForm } from "../../components/auth/CodeEntryForm";
 import { useRequestSignInMethodChange } from "../../src/api/identity/useRequestSignInMethodChange";
 import { useVerifySignInMethodChange } from "../../src/api/identity/useVerifySignInMethodChange";
-import { normalizeEmail } from "../../src/auth/email";
+import { maskEmail, normalizeEmail } from "../../src/auth/email";
 import { maskTmPhone, normalizeTmPhone } from "../../src/auth/phone";
+import { signInMethodNoticeStore } from "../../src/auth/signInMethodNotice";
+import { isSignInMethodTaken } from "../../src/auth/verifyCodeError";
 import { useSafeBack } from "../../src/navigation/useSafeBack";
 
 import { SafeScreen } from "@/components/navigation/SafeScreen";
@@ -25,14 +27,17 @@ function parseInitialSeconds(value: string | undefined): number {
 }
 
 // Confirms the code sent to a new phone or email. Success stores the new
-// Sign-in Method on the same User and returns to Profile still signed in;
-// SIGN_IN_METHOD_TAKEN stops here and asks for a different value.
+// Sign-in Method on the same User and returns to Profile still signed in,
+// which says it was added or changed. SIGN_IN_METHOD_TAKEN opens the refused
+// state on top of Profile instead of an inline error.
 export default function VerifySignInMethodScreen() {
   const params = useLocalSearchParams<{
     method?: string;
     destination?: string;
     resendInSeconds?: string;
     testCode?: string;
+    /** "add" or "change", set by the entry screen. */
+    kind?: string;
   }>();
   const { t } = useTranslation("auth");
   const goBack = useSafeBack("/profile");
@@ -40,6 +45,15 @@ export default function VerifySignInMethodScreen() {
   const { mutateAsync: requestCode } = useRequestSignInMethodChange();
 
   const method = firstParam(params.method) === "email" ? "email" : "phone";
+  const kind = firstParam(params.kind) === "add" ? "added" : "changed";
+  // False once the User has left; a late refusal is then dropped.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const destination = firstParam(params.destination);
   const identifier = useMemo(() => {
     if (!destination) return null;
@@ -64,8 +78,26 @@ export default function VerifySignInMethodScreen() {
   async function verifyCode(code: string) {
     if (!identifier) return;
 
-    await verifyChange({ ...identifier, code });
-    router.dismissTo("/profile");
+    try {
+      await verifyChange({ ...identifier, code });
+    } catch (error) {
+      if (!isSignInMethodTaken(error)) throw error;
+      // Nothing changed on the account, so a refusal the User left behind
+      // needs no screen.
+      if (!mounted.current) return;
+      router.dismissTo("/profile");
+      router.push({ pathname: "/account/sign-in-method-taken", params: { method } });
+      return;
+    }
+
+    // The change is applied even if the User already pressed Back. Profile
+    // still shows the line when they reach it, but a User who has moved on is
+    // not pulled back there.
+    signInMethodNoticeStore.getState().show({
+      kind,
+      value: identifier.phone ? maskTmPhone(identifier.phone) : maskEmail(identifier.email ?? ""),
+    });
+    if (mounted.current) router.dismissTo("/profile");
   }
 
   async function resendCode() {
