@@ -23,7 +23,7 @@ function useTabConfig() {
     { name: "(search)", label: t("search"), icon: Search },
     { name: "favorites", label: t("favorites"), icon: Heart },
     { name: "sell", label: t("sell"), icon: Plus },
-    { name: "chat", label: t("chat"), icon: MessageSquare },
+    { name: "chat", label: t("messages"), icon: MessageSquare },
     { name: "services", label: t("cabinet"), icon: User },
   ] as const;
 }

@@ -14,6 +14,8 @@ This area holds the Messages list, the Conversation screen's parts, the chat soc
 
 **Push entry.** `src/notifications/useDirectMessagePushRouting.ts` turns a direct-message notification tap into a push of `/conversations/[id]` with the ID alone. It is wired once in the root layout and holds no Conversation data.
 
+**Messages list.** `ConversationList` renders the summaries from `useConversations` in server order and refetches when its screen regains focus, so a row's unread badge clears after the Conversation is read. The row's tick and the Conversation's bubbles share one sent / delivered / read rule, `outgoingStatus.ts`.
+
 **Screen structure.** The route holds orchestration. `ConversationHeader` (Back, the participant, Call, the ⋯ menu), `ConversationListingCard` (the Listing strip) and `ConversationFooter` (blocked banner, typing indicator, composer) render from props and have their own rendered tests.
 
 ## Start here

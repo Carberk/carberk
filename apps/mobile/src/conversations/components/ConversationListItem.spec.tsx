@@ -1,120 +1,213 @@
-import { readFileSync } from "fs";
-import { resolve } from "path";
-
 import { describe, it, expect } from "vitest";
 
 import { fireEvent, renderMobile, routerMock } from "../../../test/render";
 import { queryKeys } from "../../api/queryKeys";
+import type { ConversationSummaryData } from "../../api/conversations/useConversation";
 
 import { ConversationListItem } from "./ConversationListItem";
 
-const source = readFileSync(resolve(__dirname, "./ConversationListItem.tsx"), "utf-8");
+const BUYER = "00000000-0000-4000-8000-0000000000b1";
+const SELLER = "00000000-0000-4000-8000-0000000000b2";
+const CONVERSATION = "00000000-0000-4000-8000-0000000000c1";
+
+const listing = {
+  id: "00000000-0000-4000-8000-0000000000a1",
+  brandId: "00000000-0000-4000-8000-0000000000d1",
+  modelId: "00000000-0000-4000-8000-0000000000e1",
+  year: 2018,
+  displayPriceTmt: 285000,
+  priceCurrency: "TMT" as const,
+  coverMediaKey: "listings/a1/cover.jpg",
+  status: "active" as const,
+};
+
+function message(senderId: string, overrides: Partial<NonNullable<ConversationSummaryData["lastMessage"]>> = {}) {
+  return {
+    id: "00000000-0000-4000-8000-0000000000f1",
+    conversationId: CONVERSATION,
+    senderId,
+    kind: "text" as const,
+    text: "Yes, it is still for sale",
+    createdAt: "2026-10-01T10:00:00.000Z",
+    ...overrides,
+  };
+}
+
+/** The viewer is the buyer unless `myRole` says otherwise; the peer is Merdan, the seller. */
+function summary(overrides: Partial<ConversationSummaryData> = {}): ConversationSummaryData {
+  return {
+    id: CONVERSATION,
+    listing,
+    buyerId: BUYER,
+    sellerId: SELLER,
+    myRole: "buyer",
+    peer: { id: SELLER, displayName: "Merdan" },
+    blockedByMe: false,
+    lastMessage: message(SELLER),
+    updatedAt: "2026-10-01T10:00:00.000Z",
+    unreadCount: 0,
+    ...overrides,
+  };
+}
+
+function renderRow(conversation: ConversationSummaryData, locale = "en") {
+  return renderMobile(
+    <ConversationListItem conversation={conversation} brandName="Toyota" modelName="Camry" />,
+    { locale },
+  );
+}
 
 describe("ConversationListItem", () => {
-  it("exports ConversationListItem component", () => {
-    expect(source).toContain("export function ConversationListItem");
+  it("shows the other participant, the Listing line and the last Message", () => {
+    const row = renderRow(summary());
+
+    expect(row.getByText("Merdan")).toBeTruthy();
+    expect(row.getByText(/^2018 Toyota Camry · 285,000 TMT$/)).toBeTruthy();
+    expect(row.getByText("Yes, it is still for sale")).toBeTruthy();
+    expect(row.getByTestId("conversation-row-thumbnail").props.className).not.toContain("opacity");
+    expect(row.queryByText("You are buyer")).toBeNull();
+    expect(row.queryByText("You are seller")).toBeNull();
   });
 
-  it("uses Pressable as the tap target", () => {
-    expect(source).toContain("<Pressable");
-    expect(source).toContain('accessibilityRole="button"');
+  it("keeps the Listing line to one line", () => {
+    const row = renderRow(summary());
+    expect(row.getByText(/^2018 Toyota Camry/).props.numberOfLines).toBe(1);
   });
 
-  it("displays listing cover image when available", () => {
-    expect(source).toContain('source={{ uri: imageUrl }}');
-    expect(source).toContain("contentFit=\"cover\"");
+  it("shows a bold preview and the unread count when there are unread Messages", () => {
+    const row = renderRow(summary({ unreadCount: 2 }));
+
+    expect(row.getByText("2")).toBeTruthy();
+    expect(row.getByText("Yes, it is still for sale").props.className).toContain("font-semibold");
   });
 
-  it("shows listing title with year and fallback ids", () => {
-    expect(source).toContain("listing.year");
-    expect(source).toContain("listing.brandId");
-    expect(source).toContain("listing.modelId");
+  it("caps the unread badge at 99+", () => {
+    const row = renderRow(summary({ unreadCount: 150 }));
+    expect(row.getByText("99+")).toBeTruthy();
   });
 
-  it("shows listing price", () => {
-    expect(source).toContain("displayPriceTmt");
+  it("shows a regular preview with no badge when everything is read", () => {
+    const row = renderRow(summary());
+    expect(row.getByText("Yes, it is still for sale").props.className).not.toContain("font-semibold");
+    expect(row.queryByTestId("conversation-row-unread")).toBeNull();
   });
 
-  it("shows last message preview when available", () => {
-    expect(source).toContain("conversation.lastMessage");
-    expect(source).toContain("lastMessage.text");
-    expect(source).toContain('numberOfLines={1}');
+  it("shows the muted bell for a muted Conversation only", () => {
+    expect(renderRow(summary({ mutedAt: "2026-09-30T10:00:00.000Z" })).getByTestId("conversation-row-muted")).toBeTruthy();
+    expect(renderRow(summary({ mutedAt: null })).queryByTestId("conversation-row-muted")).toBeNull();
   });
 
-  it("handles deleted last message preview", () => {
-    expect(source).toContain("lastMessage.deletedAt");
-    expect(source).toContain("messageDeleted");
+  it("shows one tick for the viewer's own sent last Message", () => {
+    const row = renderRow(summary({ lastMessage: message(BUYER) }));
+    expect(row.getByTestId("conversation-row-tick-sent")).toBeTruthy();
   });
 
-  it("shows image label for image-kind last message", () => {
-    expect(source).toContain('Enums.MessageKind.Image');
-    expect(source).toContain('t("photo")');
+  it("shows two ticks once the other participant received or read the viewer's last Message", () => {
+    const delivered = renderRow(summary({ lastMessage: message(BUYER), peerLastDeliveredAt: "2026-10-01T10:00:05.000Z" }));
+    expect(delivered.getByTestId("conversation-row-tick-delivered")).toBeTruthy();
+
+    const read = renderRow(summary({ lastMessage: message(BUYER), peerLastReadAt: "2026-10-01T10:00:05.000Z" }));
+    expect(read.getByTestId("conversation-row-tick-read")).toBeTruthy();
   });
 
-  it("shows listing label for post_ref-kind last message", () => {
-    expect(source).toContain('Enums.MessageKind.PostRef');
-    expect(source).toContain('t("listing")');
+  it("shows no tick when the last Message is the other participant's", () => {
+    const row = renderRow(summary({ peerLastReadAt: "2026-10-01T10:00:05.000Z" }));
+    expect(row.queryByTestId(/^conversation-row-tick/)).toBeNull();
   });
 
-  it("renders an unread badge when unreadCount is greater than zero", () => {
-    expect(source).toContain("unreadCount");
-    expect(source).toContain("bg-primary");
+  it("works out the viewer's own Messages from the seller side too", () => {
+    const row = renderRow(summary({ myRole: "seller", peer: { id: BUYER, displayName: "Aman" }, lastMessage: message(SELLER) }));
+    expect(row.getByTestId("conversation-row-tick-sent")).toBeTruthy();
   });
 
-  it("shows conversation updated time", () => {
-    expect(source).toContain("formatConversationTime");
-    expect(source).toContain("conversation.updatedAt");
+  it("dims the thumbnail and shows a Sold badge for a sold Listing", () => {
+    const row = renderRow(summary({ listing: { ...listing, status: "sold" } }));
+    expect(row.getByText("Sold")).toBeTruthy();
+    expect(row.getByTestId("conversation-row-thumbnail").props.className).toContain("opacity-60");
   });
 
-  it("shows user role in conversation", () => {
-    expect(source).toContain("conversation.myRole");
-    expect(source).toContain('t("youAreBuyer")');
-    expect(source).toContain('t("youAreSeller")');
+  it("dims the thumbnail and shows Removed from sale for an archived Listing", () => {
+    const row = renderRow(summary({ listing: { ...listing, status: "archived" } }));
+    expect(row.getByText("Removed from sale")).toBeTruthy();
+    expect(row.getByTestId("conversation-row-thumbnail").props.className).toContain("opacity-60");
   });
 
-  it("shows listing status when not active", () => {
-    expect(source).toContain("Enums.ListingStatus.Active");
-    expect(source).toContain("listing.status");
+  it("dims the thumbnail and reads Unavailable for any other closed Listing", () => {
+    for (const status of ["pending_review", "rejected", "banned"] as const) {
+      const row = renderRow(summary({ listing: { ...listing, status } }));
+      expect(row.getByText("Unavailable")).toBeTruthy();
+      expect(row.getByTestId("conversation-row-thumbnail").props.className).toContain("opacity-60");
+    }
   });
 
-  it("navigates to conversation detail on press", () => {
-    expect(source).toContain('router.push({');
-    expect(source).toContain('pathname: "/conversations/[id]"');
-    expect(source).toContain("id: conversation.id");
+  it("replaces the preview with User blocked when the viewer blocked the other participant", () => {
+    const row = renderRow(summary({ blockedByMe: true }));
+    expect(row.getByText("User blocked")).toBeTruthy();
+    expect(row.queryByText("Yes, it is still for sale")).toBeNull();
   });
 
-  it("handles null listing gracefully", () => {
-    expect(source).toContain('t("chat")');
-    expect(source).toContain("listing");
-    expect(source).toContain("?");
+  it("shows the unavailable label and a placeholder with no Listing", () => {
+    const row = renderRow(summary({ listing: null }));
+    expect(row.getByText("Listing unavailable")).toBeTruthy();
+    expect(row.getByTestId("conversation-row-placeholder")).toBeTruthy();
   });
 
-  it("has a minimum tap target size via Pressable", () => {
-    expect(source).toContain("px-4 py-3");
+  it("shows a placeholder when the Listing has no photo", () => {
+    const row = renderRow(summary({ listing: { ...listing, coverMediaKey: undefined } }));
+    expect(row.getByTestId("conversation-row-placeholder")).toBeTruthy();
+  });
+
+  it("names a seller with no display name Private seller, and a buyer Buyer", () => {
+    expect(renderRow(summary({ peer: { id: SELLER, displayName: null } })).getByText("Private seller")).toBeTruthy();
+    expect(
+      renderRow(summary({ myRole: "seller", peer: { id: BUYER, displayName: "  " } })).getByText("Buyer"),
+    ).toBeTruthy();
+  });
+
+  it("keeps the photo, Listing and deleted previews", () => {
+    expect(renderRow(summary({ lastMessage: message(SELLER, { kind: "image", text: null }) })).getByText("Photo")).toBeTruthy();
+    expect(renderRow(summary({ lastMessage: message(SELLER, { kind: "post_ref", text: null }) })).getByText("Listing")).toBeTruthy();
+    expect(
+      renderRow(summary({ lastMessage: message(SELLER, { deletedAt: "2026-10-01T10:01:00.000Z" }) })).getByText("Message deleted"),
+    ).toBeTruthy();
+  });
+
+  it("reads the name, the Listing, the preview and the unread count as one label", () => {
+    const row = renderRow(summary({ unreadCount: 3 }));
+    expect(row.getByRole("button").props.accessibilityLabel).toBe(
+      "Merdan, 2018 Toyota Camry · 285,000 TMT, Yes, it is still for sale, Unread: 3",
+    );
+  });
+
+  it("leaves the unread count out of the label when everything is read", () => {
+    const row = renderRow(summary({ blockedByMe: true }));
+    expect(row.getByRole("button").props.accessibilityLabel).toBe(
+      "Merdan, 2018 Toyota Camry · 285,000 TMT, User blocked",
+    );
+  });
+
+  it("shows Russian and Turkmen copy", () => {
+    const ru = renderRow(summary({ listing: { ...listing, status: "sold" }, blockedByMe: true }), "ru");
+    expect(ru.getByText("Продано")).toBeTruthy();
+    expect(ru.getByText("Пользователь заблокирован")).toBeTruthy();
+
+    const tk = renderRow(summary({ listing: null, peer: { id: SELLER, displayName: null } }), "tk");
+    expect(tk.getByText("Şahsy satyjy")).toBeTruthy();
+    expect(tk.getByText("Bildiriş elýeterli däl")).toBeTruthy();
   });
 });
 
 describe("ConversationListItem press", () => {
   it("opens the Conversation by ID and seeds the by-ID cache with the row's summary", () => {
-    const summary = {
-      id: "00000000-0000-4000-8000-0000000000c1",
-      listing: null,
-      buyerId: "00000000-0000-4000-8000-0000000000b1",
-      sellerId: "00000000-0000-4000-8000-0000000000b2",
-      myRole: "buyer" as const,
-      peer: { id: "00000000-0000-4000-8000-0000000000b2", displayName: "Merdan" },
-      blockedByMe: false,
-      updatedAt: "2026-10-01T10:00:00.000Z",
-      unreadCount: 0,
-    };
-    const screen = renderMobile(<ConversationListItem conversation={summary} />);
+    const conversation = summary();
+    const row = renderRow(conversation);
 
-    fireEvent.press(screen.getByRole("button"));
+    fireEvent.press(row.getByRole("button"));
 
     expect(routerMock.push).toHaveBeenCalledWith({
       pathname: "/conversations/[id]",
-      params: { id: summary.id },
+      params: { id: conversation.id },
     });
-    expect(screen.queryClient.getQueryData(queryKeys.conversations.detail(summary.id))).toEqual(summary);
+    expect(row.queryClient.getQueryData(queryKeys.conversations.detail(conversation.id))).toEqual(conversation);
   });
 });

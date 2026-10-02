@@ -1,26 +1,31 @@
-import { useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   FlatList,
   RefreshControl,
   View,
 } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import { MessageSquare } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 
 import { useConversations } from "../../api/conversations/useConversations";
+import { HOME_HREF } from "../../navigation/homeHref";
 
 import { ConversationListItem } from "./ConversationListItem";
 import { useConversationCatalogMaps } from "./useConversationCatalogMaps";
 
 import { ErrorState } from "@/components/ErrorState";
+import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Text } from "@/components/ui/text";
 
 function LoadingSkeleton() {
   return (
-    <View className="flex-1 px-4 py-3 gap-3">
+    <View className="flex-1">
       {Array.from({ length: 6 }).map((_, i) => (
-        <View key={i} className="flex-row items-center gap-3">
-          <Skeleton className="w-14 h-14 rounded-lg" />
+        <View key={i} testID="conversation-row-skeleton" className="flex-row items-center gap-3 px-4 py-3">
+          <Skeleton className="w-16 h-16 rounded-xl" />
           <View className="flex-1 gap-2">
             <Skeleton className="h-4 w-3/4 rounded" />
             <Skeleton className="h-3 w-1/2 rounded" />
@@ -33,12 +38,17 @@ function LoadingSkeleton() {
 
 function EmptyState() {
   const { t } = useTranslation();
+  const router = useRouter();
   return (
-    <View className="flex-1 items-center justify-center px-6 gap-2">
-      <Text className="text-base text-foreground">{t("noConversationsYet")}</Text>
-      <Text className="text-sm text-muted-foreground text-center">
-        {t("startByMessaging")}
-      </Text>
+    <View className="flex-1 items-center justify-center gap-4 px-6 py-12">
+      <View className="size-16 items-center justify-center rounded-full bg-muted">
+        <Icon as={MessageSquare} className="size-8 text-muted-foreground" />
+      </View>
+      <Text className="text-center text-lg font-semibold text-foreground">{t("noConversationsYet")}</Text>
+      <Text className="text-center text-sm text-muted-foreground">{t("startByMessaging")}</Text>
+      <Button variant="secondary" size="pill" onPress={() => router.navigate(HOME_HREF)}>
+        <Text>{t("browseListings")}</Text>
+      </Button>
     </View>
   );
 }
@@ -50,7 +60,6 @@ export function ConversationList() {
     isError,
     error,
     refetch,
-    isRefetching,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -61,9 +70,25 @@ export function ConversationList() {
     conversations.map((c) => c.listing),
   );
 
+  // The spinner answers a pull only, not the refetch when the tab regains focus.
+  const [pulling, setPulling] = useState(false);
   const handleRefresh = useCallback(() => {
-    void refetch();
+    setPulling(true);
+    void refetch().finally(() => setPulling(false));
   }, [refetch]);
+
+  // Unread badges clear after a Conversation is read, so the list refetches each
+  // time the screen regains focus. The first focus is the mount, which already loads.
+  const focusedBefore = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!focusedBefore.current) {
+        focusedBefore.current = true;
+        return;
+      }
+      void refetch();
+    }, [refetch]),
+  );
 
   const handleEndReached = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -76,7 +101,7 @@ export function ConversationList() {
   }
 
   if (isError && !data) {
-    return <ErrorState error={error} onRetry={handleRefresh} />;
+    return <ErrorState error={error} onRetry={() => void refetch()} />;
   }
 
   if (conversations.length === 0) {
@@ -85,6 +110,7 @@ export function ConversationList() {
 
   return (
     <FlatList
+      testID="conversation-list"
       data={conversations}
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => (
@@ -96,7 +122,7 @@ export function ConversationList() {
       )}
       refreshControl={
         <RefreshControl
-          refreshing={isRefetching}
+          refreshing={pulling}
           onRefresh={handleRefresh}
         />
       }

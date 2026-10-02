@@ -30,6 +30,7 @@ import type { ComposerAttachment } from "../../src/conversations/components/Mess
 import { ImagePreviewModal } from "../../src/conversations/components/ImagePreviewModal";
 import { useConversationCatalogMaps } from "../../src/conversations/components/useConversationCatalogMaps";
 import type { MessageStatus } from "../../src/conversations/components/MessageBubble";
+import { outgoingStatus } from "../../src/conversations/outgoingStatus";
 import { MessageReportSheet } from "../../src/admin/components/MessageReportSheet";
 import {
   uploadChatImageToPresignedUrl,
@@ -75,21 +76,6 @@ interface LocalMessage {
 
 function generateClientMessageId(): string {
   return `client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function computeOutgoingStatus(
-  messageCreatedAt: string,
-  peerLastReadAt?: string,
-  peerLastDeliveredAt?: string,
-): Extract<MessageStatus, "sent" | "delivered" | "read"> {
-  const created = new Date(messageCreatedAt).getTime();
-  if (peerLastReadAt && new Date(peerLastReadAt).getTime() >= created) {
-    return "read";
-  }
-  if (peerLastDeliveredAt && new Date(peerLastDeliveredAt).getTime() >= created) {
-    return "delivered";
-  }
-  return "sent";
 }
 
 export default function ConversationDetailScreen() {
@@ -289,7 +275,7 @@ export default function ConversationDetailScreen() {
               createdAt: m.createdAt,
               status:
                 m.senderId === viewerId
-                  ? computeOutgoingStatus(
+                  ? outgoingStatus(
                       m.createdAt,
                       peerLastReadAt,
                       peerLastDeliveredAt,

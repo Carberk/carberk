@@ -4,6 +4,7 @@ import { ArrowLeft, BellOff, MoreHorizontal, Phone } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 
 import type { ConversationDetail } from "../../api/conversations/useConversation";
+import { usePeerName } from "../usePeerName";
 
 import { PeerPresenceLabel, type PeerPresence } from "./PeerPresenceLabel";
 
@@ -33,17 +34,6 @@ interface ConversationHeaderProps {
   onToggleMute: () => void;
   onBlock: () => void;
   onUnblock: () => void;
-}
-
-/** The name shown for the other participant, with the role fallback when they have none. */
-function usePeerName(conversation: ConversationDetail | undefined) {
-  const { t } = useTranslation();
-  const { t: tConv } = useTranslation("conversations");
-  if (!conversation) return undefined;
-  const displayName = conversation.peer.displayName?.trim();
-  if (displayName) return displayName;
-  // The viewer's peer is the seller when the viewer is the buyer.
-  return conversation.myRole === "buyer" ? t("privateSeller") : tConv("peerBuyer");
 }
 
 export function ConversationHeader({

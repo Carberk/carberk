@@ -24,9 +24,13 @@ function AnonymousChatEntry() {
   };
 
   return (
-    <View className="flex-1 items-center justify-center px-6 gap-4">
-      <Icon as={MessageSquare} className="size-8 text-muted-foreground" />
-      <Text className="text-base text-foreground">{t("signInToSee")}</Text>
+    <View className="flex-1 items-center justify-center gap-4 px-6 py-12">
+      <View className="size-16 items-center justify-center rounded-full bg-muted">
+        <Icon as={MessageSquare} className="size-8 text-muted-foreground" />
+      </View>
+      <Text className="text-center text-lg font-semibold text-foreground">
+        {t("messagesSignedOutTitle")}
+      </Text>
       <Button variant="brand" size="pill" onPress={handleSignIn}>
         <Text>{t("signIn")}</Text>
       </Button>
@@ -62,7 +66,7 @@ export default function ChatScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]}>
       <View className="px-4 pt-6 pb-3">
-        <Text className="text-2xl font-heading text-foreground">{t("chat")}</Text>
+        <Text className="text-2xl font-heading text-foreground">{t("messages")}</Text>
       </View>
 
       <ChatContent isAuthenticated={isAuthenticated} />
