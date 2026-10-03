@@ -202,3 +202,73 @@ describe("MessageBubble kinds keep their look and gain the time", () => {
     expect(screen.getByLabelText("Is the car still available?, 02:05 PM, Reported")).toBeTruthy();
   });
 });
+
+describe("MessageBubble reported dimming", () => {
+  const LISTING = {
+    listingId: "00000000-0000-4000-8000-0000000000a1",
+    brandId: "00000000-0000-4000-8000-0000000000d1",
+    modelId: "00000000-0000-4000-8000-0000000000d2",
+    year: 2018,
+    displayPriceTmt: 285000,
+    priceCurrency: "TMT" as const,
+    status: "active" as const,
+    available: true,
+  };
+  const IMAGE = { kind: "image" as const, text: "", localImageUri: "file:///photo.jpg" };
+  const POST_REF = {
+    kind: "post_ref" as const,
+    text: "",
+    metadata: LISTING,
+    postRefBrandName: "Toyota",
+    postRefModelName: "Camry",
+  };
+
+  /** The class string of the bubble container, found from any node inside it. */
+  function bubbleClassName(node: { parent: unknown }): string {
+    let current = node as { parent: unknown; props?: { className?: string } } | null;
+    while (current) {
+      const className = current.props?.className;
+      if (typeof className === "string" && className.includes("max-w-[80%]")) return className;
+      current = current.parent as typeof current;
+    }
+    throw new Error("No bubble container above the node");
+  }
+
+  it("dims a reported text Message", () => {
+    const screen = renderMobile(bubble({ isMine: false, reported: true }));
+
+    expect(bubbleClassName(screen.getByText("Reported"))).toContain("opacity-60");
+  });
+
+  it("dims a reported image Message", () => {
+    const screen = renderMobile(bubble({ ...IMAGE, isMine: false, reported: true }));
+
+    expect(bubbleClassName(screen.getByText("Reported"))).toContain("opacity-60");
+  });
+
+  it("dims a reported Listing-reference Message", () => {
+    const screen = renderMobile(bubble({ ...POST_REF, isMine: false, reported: true }));
+
+    expect(bubbleClassName(screen.getByText("Reported"))).toContain("opacity-60");
+  });
+
+  it("does not dim a Message that is not reported", () => {
+    const screen = renderMobile(bubble({ isMine: false }));
+
+    expect(bubbleClassName(screen.getByText("Is the car still available?"))).not.toMatch(/opacity-/);
+  });
+
+  it("does not dim a deleted Message", () => {
+    const screen = renderMobile(bubble({ isMine: false, reported: true, deletedAt: AT_1405 }));
+
+    expect(bubbleClassName(screen.getByText("Message deleted"))).not.toMatch(/opacity-/);
+  });
+
+  it("keeps a pending Message at its own dimming", () => {
+    const screen = renderMobile(bubble({ status: "pending" }));
+
+    const className = bubbleClassName(screen.getByText("Sending..."));
+    expect(className).toContain("opacity-70");
+    expect(className).not.toContain("opacity-60");
+  });
+});

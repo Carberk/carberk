@@ -97,6 +97,7 @@ vi.mock("@rn-primitives/avatar", async () => {
 // Expo modules that load `expo-modules-core`, which needs the native runtime.
 // A spec that exercises one of them mocks it itself and wins over these stubs.
 vi.mock("expo-linking", () => ({ canOpenURL: vi.fn(async () => false), openURL: vi.fn(async () => {}) }));
+vi.mock("expo-clipboard", () => ({ setStringAsync: vi.fn(async () => true) }));
 vi.mock("expo-secure-store", () => ({
   getItemAsync: vi.fn(async () => null),
   setItemAsync: vi.fn(async () => {}),

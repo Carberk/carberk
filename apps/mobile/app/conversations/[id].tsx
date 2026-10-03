@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -740,6 +741,14 @@ export default function ConversationDetailScreen() {
     setMessageToDelete(null);
   }, []);
 
+  const copyMessage = useCallback(
+    async (text: string) => {
+      await Clipboard.setStringAsync(text);
+      showToast({ title: t("conversations:messageCopied") });
+    },
+    [showToast, t],
+  );
+
   const confirmReportMessage = useCallback((messageId: string) => {
     setMessageToReport(messageId);
   }, []);
@@ -859,6 +868,8 @@ export default function ConversationDetailScreen() {
             onRetry={handleRetry}
             onDelete={confirmDeleteMessage}
             onReport={confirmReportMessage}
+            onCopy={copyMessage}
+            reportEnabled={config?.reportEntryEnabled !== false}
             onImagePress={(uri) => setPreviewUri(uri)}
             onPostRefPress={(listingId) =>
               router.push(`/(public)/listings/${listingId}`)
@@ -924,9 +935,9 @@ export default function ConversationDetailScreen() {
       <AlertDialog open={!!messageToDelete} onOpenChange={cancelDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("deleteMessageTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>{t("conversations:deleteMessageTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("deleteMessageDescription")}
+              {t("conversations:deleteMessageDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

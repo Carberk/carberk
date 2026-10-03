@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { FlatList, Pressable, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -6,6 +6,7 @@ import { buildChatImageUrl } from "../upload/buildChatImageUrl";
 import { buildMessageRows, type MessageRow } from "../messageRows";
 import { formatMessageDay } from "../messageTime";
 
+import { MessageActionsSheet } from "./MessageActionsSheet";
 import {
   MessageBubble,
   type MessageStatus,
@@ -35,6 +36,9 @@ interface MessageListProps {
   messages: MessageItem[];
   currentUserId: string;
   reportedMessageIds?: Set<string>;
+  /** Report message is offered only while reporting is switched on for the environment. */
+  reportEnabled?: boolean;
+  onCopy?: (text: string) => void;
   onRetry?: (tempId: string) => void;
   onDelete?: (messageId: string) => void;
   onReport?: (messageId: string) => void;
@@ -107,6 +111,8 @@ export function MessageList({
   messages,
   currentUserId,
   reportedMessageIds,
+  reportEnabled = true,
+  onCopy,
   onRetry,
   onDelete,
   onReport,
@@ -119,9 +125,25 @@ export function MessageList({
 }: MessageListProps) {
   const { t, i18n } = useTranslation();
   const reported = reportedMessageIds ?? new Set<string>();
+  const [actionTargetId, setActionTargetId] = useState<string | null>(null);
   const rows = useMemo(
     () => buildMessageRows(messages, currentUserId),
     [messages, currentUserId],
+  );
+
+  /** What a long press offers on a Message (D4); none means no sheet. */
+  const actionsFor = useCallback(
+    (item: MessageItem) => {
+      const isMine = item.senderId === currentUserId;
+      const live = !item.deletedAt && item.status !== "pending" && item.status !== "failed";
+      const kind = item.kind ?? "text";
+      return {
+        copy: live && kind === "text",
+        report: live && !isMine && reportEnabled && !reported.has(item.id),
+        delete: live && isMine && !!item.canDelete,
+      };
+    },
+    [currentUserId, reportEnabled, reported],
   );
 
   const renderItem = useCallback(
@@ -140,15 +162,14 @@ export function MessageList({
           status={item.status}
           createdAt={item.createdAt}
           deletedAt={item.deletedAt}
-          canDelete={item.canDelete}
-          canReport={item.senderId !== currentUserId && !item.deletedAt}
           reported={reported.has(item.id)}
           showReadLabel={showReadLabel}
           postRefBrandName={item.postRefBrandName}
           postRefModelName={item.postRefModelName}
           onRetry={item.status === "failed" ? () => onRetry?.(item.id) : undefined}
-          onDelete={item.canDelete && !item.deletedAt ? () => onDelete?.(item.id) : undefined}
-          onReport={item.senderId !== currentUserId && !item.deletedAt ? () => onReport?.(item.id) : undefined}
+          onOpenActions={
+            Object.values(actionsFor(item)).some(Boolean) ? () => setActionTargetId(item.id) : undefined
+          }
           onImagePress={item.kind === "image" && !item.deletedAt ? () => {
             const uri = item.localImageUri ?? (item.metadata && "key" in item.metadata && item.metadata.key
               ? buildChatImageUrl(item.metadata.key)
@@ -159,12 +180,17 @@ export function MessageList({
         />
       </>
     ),
-    [currentUserId, reported, onRetry, onDelete, onReport, onImagePress, onPostRefPress, i18n.language, t],
+    [currentUserId, reported, actionsFor, onRetry, onImagePress, onPostRefPress, i18n.language, t],
   );
 
   const keyExtractor = useCallback((row: MessageRow<MessageItem>) => row.message.id, []);
 
+  const actionTarget = messages.find((item) => item.id === actionTargetId);
+  const targetActions = actionTarget ? actionsFor(actionTarget) : null;
+  const actionsOpen = targetActions !== null && Object.values(targetActions).some(Boolean);
+
   return (
+    <>
     <FlatList
       data={rows}
       renderItem={renderItem}
@@ -189,5 +215,18 @@ export function MessageList({
         </View>
       }
     />
+    <MessageActionsSheet
+      open={actionsOpen}
+      onOpenChange={(open) => {
+        if (!open) setActionTargetId(null);
+      }}
+      canCopy={targetActions?.copy ?? false}
+      canReport={targetActions?.report ?? false}
+      canDelete={targetActions?.delete ?? false}
+      onCopy={() => targetActions?.copy && actionTarget && onCopy?.(actionTarget.text)}
+      onReport={() => targetActions?.report && actionTarget && onReport?.(actionTarget.id)}
+      onDelete={() => targetActions?.delete && actionTarget && onDelete?.(actionTarget.id)}
+    />
+    </>
   );
 }

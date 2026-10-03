@@ -26,6 +26,8 @@ export interface PostRefCardProps {
   loading?: boolean;
   error?: string | null;
   onPress?: (listingId: string) => void;
+  /** Long press on the card; an unavailable card has no press target, so the bubble handles it. */
+  onLongPress?: () => void;
 }
 
 export function PostRefCard({
@@ -42,6 +44,7 @@ export function PostRefCard({
   loading,
   error,
   onPress,
+  onLongPress,
 }: PostRefCardProps) {
   const { t, i18n } = useTranslation();
 
@@ -145,6 +148,7 @@ export function PostRefCard({
   return (
     <Pressable
       onPress={() => onPress?.(listingId)}
+      onLongPress={onLongPress}
       accessibilityRole="button"
       accessibilityLabel={`${t("open")}: ${title}`}
     >

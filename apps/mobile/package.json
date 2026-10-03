@@ -36,6 +36,7 @@
     "clsx": "^2.1.1",
     "expo": "~55.0.31",
     "expo-camera": "^55.0.23",
+    "expo-clipboard": "~55.0.17",
     "expo-constants": "~55.0.17",
     "expo-file-system": "^55.0.26",
     "expo-font": "~55.0.8",

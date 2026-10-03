@@ -33,14 +33,12 @@ interface MessageBubbleProps {
   status: MessageStatus;
   createdAt: string;
   deletedAt?: string | null;
-  canDelete?: boolean;
-  canReport?: boolean;
   reported?: boolean;
   /** The "Read" label under the bubble; only the last own Message carries it (D6). */
   showReadLabel?: boolean;
   onRetry?: () => void;
-  onDelete?: () => void;
-  onReport?: () => void;
+  /** Long press, or the TalkBack long-press action; set only when the Message offers an action (D4). */
+  onOpenActions?: () => void;
   onImagePress?: () => void;
   postRefBrandName?: string;
   postRefModelName?: string;
@@ -76,11 +74,13 @@ function ImageBubble({
   width,
   height,
   onPress,
+  onLongPress,
 }: {
   uri: string;
   width?: number;
   height?: number;
   onPress?: () => void;
+  onLongPress?: () => void;
 }) {
   const { t } = useTranslation();
   const [failed, setFailed] = useState(false);
@@ -93,6 +93,7 @@ function ImageBubble({
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
       accessibilityRole={onPress ? "imagebutton" : "image"}
       accessibilityLabel={t("photo")}
       className="overflow-hidden rounded-xl"
@@ -125,6 +126,7 @@ interface BubbleContentProps {
   metadata?: ImageMessageMetadata | PostRefMessageMetadata;
   isMine: boolean;
   onImagePress?: () => void;
+  onLongPress?: () => void;
   postRefBrandName?: string;
   postRefModelName?: string;
   onPostRefPress?: (listingId: string) => void;
@@ -145,6 +147,7 @@ function BubbleContent({
   metadata,
   isMine,
   onImagePress,
+  onLongPress,
   postRefBrandName,
   postRefModelName,
   onPostRefPress,
@@ -171,6 +174,7 @@ function BubbleContent({
         width={imageMeta?.width}
         height={imageMeta?.height}
         onPress={onImagePress}
+        onLongPress={onLongPress}
       />
     );
   }
@@ -190,6 +194,7 @@ function BubbleContent({
         brandName={postRefBrandName}
         modelName={postRefModelName}
         onPress={onPostRefPress}
+        onLongPress={onLongPress}
       />
     );
   }
@@ -222,13 +227,10 @@ export function MessageBubble({
   metadata,
   localImageUri,
   deletedAt,
-  canDelete,
-  canReport,
   reported,
   showReadLabel = false,
   onRetry,
-  onDelete,
-  onReport,
+  onOpenActions,
   onImagePress,
   postRefBrandName,
   postRefModelName,
@@ -248,14 +250,14 @@ export function MessageBubble({
       : undefined);
   const time = formatMessageTime(createdAt, i18n.language);
 
-  let longPressAction: (() => void) | undefined;
-  if (!isDeleted && !isReported) {
-    if (canDelete) {
-      longPressAction = onDelete;
-    } else if (canReport) {
-      longPressAction = onReport;
-    }
-  }
+  // A deleted, pending or failed Message has no actions sheet.
+  const longPressAction = isDeleted || isPending || isFailed ? undefined : onOpenActions;
+  const accessibilityActions = longPressAction
+    ? [{ name: "longpress", label: t("conversations:messageActions") }]
+    : undefined;
+  const handleAccessibilityAction = (event: { nativeEvent: { actionName: string } }) => {
+    if (event.nativeEvent.actionName === "longpress") longPressAction?.();
+  };
 
   const content = isDeleted
     ? t("conversations:messageDeleted")
@@ -289,12 +291,14 @@ export function MessageBubble({
             : isMine
               ? "bg-primary rounded-br-md"
               : "bg-muted rounded-bl-md"
-        } ${isPending ? "opacity-70" : ""}`}
+        } ${isPending ? "opacity-70" : isReported && !isDeleted ? "opacity-60" : ""}`}
       >
         <Pressable
           onLongPress={longPressAction}
           accessible={groupForAccessibility}
           accessibilityLabel={groupForAccessibility ? accessibilityLabel : undefined}
+          accessibilityActions={groupForAccessibility ? accessibilityActions : undefined}
+          onAccessibilityAction={groupForAccessibility ? handleAccessibilityAction : undefined}
         >
           <BubbleContent
             isDeleted={isDeleted}
@@ -305,6 +309,7 @@ export function MessageBubble({
             metadata={metadata}
             isMine={isMine}
             onImagePress={onImagePress}
+            onLongPress={longPressAction}
             postRefBrandName={postRefBrandName}
             postRefModelName={postRefModelName}
             onPostRefPress={onPostRefPress}
@@ -318,6 +323,8 @@ export function MessageBubble({
             <View
               accessible={!groupForAccessibility}
               accessibilityLabel={footerLabel}
+              accessibilityActions={groupForAccessibility ? undefined : accessibilityActions}
+              onAccessibilityAction={groupForAccessibility ? undefined : handleAccessibilityAction}
               className={`flex-row items-center gap-1 mt-1 ${
                 isMine ? "justify-end" : "justify-start"
               }`}

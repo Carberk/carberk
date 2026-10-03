@@ -5,6 +5,7 @@ import * as Linking from "expo-linking";
 import { Image } from "expo-image";
 import { Modal } from "react-native";
 import type { ConversationsSchemas, ListingsSchemas } from "@auto-tm/contracts";
+import { waitFor } from "@testing-library/react-native";
 
 import { act, fireEvent, renderMobile, routeParams, routerMock, within } from "../render";
 import ConversationDetailScreen from "../../app/conversations/[id]";
@@ -38,6 +39,9 @@ const state = vi.hoisted(() => ({
   },
   mutation: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false },
   socket: { sendTextMessage: vi.fn(), sendImageMessage: vi.fn() },
+  toast: vi.fn(),
+  clipboard: vi.fn(async (_text: string) => true),
+  reportSheet: { current: null as null | { messageId: string; open: boolean; onReported: (id: string) => void } },
 }));
 
 vi.mock("../../src/auth/useViewer", () => ({
@@ -83,8 +87,14 @@ vi.mock("../../src/conversations/socket/useConversationSocket", () => ({
 vi.mock("../../src/conversations/components/useConversationCatalogMaps", () => ({
   useConversationCatalogMaps: () => ({ brandName: () => undefined, modelName: () => undefined }),
 }));
-vi.mock("../../src/admin/components/MessageReportSheet", () => ({ MessageReportSheet: () => null }));
-vi.mock("@/components/ui/toast", () => ({ useToast: () => ({ show: vi.fn() }) }));
+vi.mock("../../src/admin/components/MessageReportSheet", () => ({
+  MessageReportSheet: (props: { messageId: string; open: boolean; onReported: (id: string) => void }) => {
+    state.reportSheet.current = props;
+    return null;
+  },
+}));
+vi.mock("@/components/ui/toast", () => ({ useToast: () => ({ show: state.toast }) }));
+vi.mock("expo-clipboard", () => ({ setStringAsync: state.clipboard }));
 vi.mock("../../lib/theme", () => ({
   THEME: { light: { mutedForeground: "0 0% 45%" }, dark: { mutedForeground: "0 0% 60%" } },
 }));
@@ -167,6 +177,9 @@ beforeEach(() => {
   state.socket.sendTextMessage.mockReset();
   state.socket.sendImageMessage.mockReset();
   state.mutation.mutateAsync.mockReset();
+  state.toast.mockReset();
+  state.clipboard.mockClear();
+  state.reportSheet.current = null;
   vi.mocked(Linking.openURL).mockClear();
   routeParams.id = CONVERSATION_ID;
   useAuthIntentStore.setState({ intent: null, replayAction: null, replayReturnTo: null });
@@ -335,8 +348,8 @@ describe("Conversation header Call", () => {
 
 const QUICK_REPLY = "Is the car still available?";
 
-function serverMessage(id: string, senderId: string, createdAt = "2026-10-01T10:00:00.000Z") {
-  return { id, conversationId: CONVERSATION_ID, senderId, kind: "text", text: id, createdAt, deletedAt: null };
+function serverMessage(id: string, senderId: string, createdAt = "2026-10-01T10:00:00.000Z", text = id) {
+  return { id, conversationId: CONVERSATION_ID, senderId, kind: "text", text, createdAt, deletedAt: null };
 }
 
 describe("Conversation quick replies", () => {
@@ -823,5 +836,71 @@ describe("Conversation not available", () => {
 
     expect(await screen.findByText("Conversation not found")).toBeTruthy();
     expect(screen.queryByText("Merdan")).toBeNull();
+  });
+});
+
+describe("Conversation Message actions", () => {
+  const PEER_TEXT = "Call me after five";
+
+  async function openPeerSheet(routes: Record<string, () => unknown> = {}) {
+    state.messages.data = { pages: [{ items: [serverMessage("peer-1", SELLER_ID, undefined, PEER_TEXT)], nextCursor: null }] };
+    routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation(), ...routes });
+    const screen = renderMobile(<ConversationDetailScreen />);
+    fireEvent(await screen.findByLabelText(new RegExp(`^${PEER_TEXT}`)), "longPress");
+    return screen;
+  }
+
+  it("copies the Message text, closes the sheet and shows Copied", async () => {
+    const screen = await openPeerSheet();
+
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Copy" }));
+    });
+    expect(state.clipboard).toHaveBeenCalledWith(PEER_TEXT);
+    expect(state.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Copied" }));
+    expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+  });
+
+  it("shows Copied below the Conversation header at the height it is drawn", async () => {
+    const screen = await openPeerSheet();
+    fireEvent(screen.getByRole("button", { name: "Go back" }), "layout", { nativeEvent: { layout: { height: 96 } } });
+
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Copy" }));
+    });
+    expect(state.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Copied", topClearance: 96 }));
+  });
+
+  it("opens the report reasons for the Message, then shows Reported and offers Copy only", async () => {
+    const screen = await openPeerSheet();
+
+    fireEvent.press(screen.getByRole("button", { name: "Report message" }));
+    expect(state.reportSheet.current).toMatchObject({ messageId: "peer-1", open: true });
+
+    await act(async () => {
+      state.reportSheet.current?.onReported("peer-1");
+    });
+    expect(screen.getByText("Reported")).toBeTruthy();
+
+    fireEvent(screen.getByLabelText(new RegExp(`^${PEER_TEXT}.*Reported`)), "longPress");
+    expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Report message" })).toBeNull();
+  });
+
+  it("hides Report message when reporting is switched off for the environment", async () => {
+    const screen = await openPeerSheet({ "/config": () => ({ reportEntryEnabled: false }) });
+
+    expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Report message" })).toBeNull());
+  });
+
+  it("keeps the delete confirmation for an own Message", async () => {
+    state.messages.data = { pages: [{ items: [serverMessage("own-1", BUYER_ID, new Date().toISOString(), "Hello")], nextCursor: null }] };
+    routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
+    const screen = renderMobile(<ConversationDetailScreen />);
+
+    fireEvent(await screen.findByLabelText(/^Hello/), "longPress");
+    fireEvent.press(screen.getByRole("button", { name: "Delete" }));
+    expect(screen.getByText("Delete message?")).toBeTruthy();
   });
 });
