@@ -197,3 +197,55 @@ describe("Entering the value the User already has", () => {
     expect(view.getByText(view.i18n.t("account:samePhoneError"))).toBeTruthy();
   });
 });
+
+describe("Email field feedback", () => {
+  const ERROR = "Enter a valid email address.";
+  const HINT = "Enter your email address.";
+
+  it("keeps the hint under an empty field the User has not typed in, even after leaving it", () => {
+    state.me = { phone: "+99365123456", email: null };
+    const view = renderMobile(<AddEmailScreen />);
+    const field = view.getByLabelText("Email");
+    expect(view.getByText(HINT)).toBeTruthy();
+    // The field opens focused; focus leaving it is not the User's input.
+    fireEvent(field, "blur");
+    expect(view.queryByText(ERROR)).toBeNull();
+    expect(view.getByText(HINT)).toBeTruthy();
+    expect(field.props["aria-invalid"]).toBe(false);
+  });
+
+  it("keeps the hint while the User is still typing", () => {
+    const view = renderMobile(<AddEmailScreen />);
+    fireEvent.changeText(view.getByLabelText("Email"), "aman@");
+    expect(view.queryByText(ERROR)).toBeNull();
+    expect(view.getByText(HINT)).toBeTruthy();
+  });
+
+  it("shows the error once the User leaves an invalid address", () => {
+    const view = renderMobile(<AddEmailScreen />);
+    const field = view.getByLabelText("Email");
+    fireEvent.changeText(field, "aman@");
+    fireEvent(field, "blur");
+    expect(view.getByText(ERROR)).toBeTruthy();
+    expect(view.getByLabelText("Email").props["aria-invalid"]).toBe(true);
+  });
+
+  it("shows the error when the User clears what they typed and leaves", () => {
+    const view = renderMobile(<AddEmailScreen />);
+    const field = view.getByLabelText("Email");
+    fireEvent.changeText(field, "a");
+    fireEvent.changeText(field, "");
+    fireEvent(field, "blur");
+    expect(view.getByText(ERROR)).toBeTruthy();
+  });
+
+  it("returns to the hint once the address is valid", () => {
+    const view = renderMobile(<AddEmailScreen />);
+    const field = view.getByLabelText("Email");
+    fireEvent.changeText(field, "aman@");
+    fireEvent(field, "blur");
+    fireEvent.changeText(field, "new@example.com");
+    expect(view.queryByText(ERROR)).toBeNull();
+    expect(view.getByText(HINT)).toBeTruthy();
+  });
+});

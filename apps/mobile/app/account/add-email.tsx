@@ -21,6 +21,9 @@ export default function AddEmailScreen() {
   const { data: me } = useMe();
   const isChange = Boolean(me?.email);
   const [emailInput, setEmailInput] = useState("");
+  // The field opens focused, so focus leaving it is not input. It only counts
+  // as touched once the User has typed or tried to submit.
+  const [hasTyped, setHasTyped] = useState(false);
   const [touched, setTouched] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
   const { mutateAsync: requestCode, isPending: isSubmitting } =
@@ -87,9 +90,12 @@ export default function AddEmailScreen() {
           returnKeyType="send"
           aria-invalid={showError || requestError !== null}
           value={emailInput}
-          onBlur={() => setTouched(true)}
+          onBlur={() => {
+            if (hasTyped) setTouched(true);
+          }}
           onChangeText={(value) => {
             setEmailInput(value);
+            setHasTyped(true);
             setRequestError(null);
           }}
           onSubmitEditing={() => void handleSubmit()}
