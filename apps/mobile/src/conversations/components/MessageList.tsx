@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { FlatList, Pressable, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -51,6 +51,8 @@ interface MessageListProps {
   /** An older page failed; the loaded Messages stay and the top offers Retry. */
   olderFailed?: boolean;
   onRetryOlder?: () => void;
+  /** Shown after the last Message (the list is inverted, so this is its header). */
+  afterLast?: ReactNode;
 }
 
 function OlderMessagesRow({
@@ -122,6 +124,7 @@ export function MessageList({
   loadingOlder = false,
   olderFailed = false,
   onRetryOlder,
+  afterLast,
 }: MessageListProps) {
   const { t, i18n } = useTranslation();
   const reported = reportedMessageIds ?? new Set<string>();
@@ -197,6 +200,7 @@ export function MessageList({
       keyExtractor={keyExtractor}
       contentContainerStyle={{ paddingVertical: 8 }}
       inverted
+      ListHeaderComponent={afterLast ? <>{afterLast}</> : null}
       onEndReached={onLoadOlder}
       onEndReachedThreshold={0.5}
       keyboardShouldPersistTaps="handled"

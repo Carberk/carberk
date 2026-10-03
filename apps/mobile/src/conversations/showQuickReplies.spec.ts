@@ -67,6 +67,22 @@ describe("showQuickReplies", () => {
     },
   );
 
+  it.each(["sold", "archived"] as const)("hides them when the Listing is %s", (status) => {
+    expect(
+      showQuickReplies(
+        input({ conversation: { myRole: "buyer", sellerId: SELLER, sendRestriction: null, listing: { status } } }),
+      ),
+    ).toBe(false);
+  });
+
+  it("shows them while the Listing is active", () => {
+    expect(
+      showQuickReplies(
+        input({ conversation: { myRole: "buyer", sellerId: SELLER, sendRestriction: null, listing: { status: "active" } } }),
+      ),
+    ).toBe(true);
+  });
+
   it("hides them until the send restriction is known", () => {
     expect(
       showQuickReplies(

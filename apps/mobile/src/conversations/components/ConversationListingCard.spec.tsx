@@ -36,11 +36,40 @@ describe("ConversationListingCard", () => {
     expect(screen.queryByText(new RegExp(listing.brandId))).toBeNull();
   });
 
-  it("keeps today's status text for a non-active Listing", () => {
+  it("dims the thumbnail, mutes the price and shows a Sold badge, still opening the Listing", () => {
     const screen = renderMobile(
       <ConversationListingCard listing={{ ...listing, status: "sold" }} brandName="Toyota" modelName="Camry" />,
     );
+
     expect(screen.getByText("Sold")).toBeTruthy();
+    expect(screen.getByTestId("conversation-listing-thumbnail").props.className).toContain("opacity-60");
+    expect(screen.getByText("285,000 TMT").props.className).toContain("text-muted-foreground");
+    // The label replaces the children for screen readers, so it carries the badge.
+    fireEvent.press(screen.getByRole("button", { name: "Open: 2018 Toyota Camry, 285,000 TMT, Sold" }));
+    expect(routerMock.push).toHaveBeenCalledWith(`/(public)/listings/${listing.id}`);
+  });
+
+  it("shows the Removed from sale badge for an archived Listing", () => {
+    const screen = renderMobile(
+      <ConversationListingCard listing={{ ...listing, status: "archived" }} brandName="Toyota" modelName="Camry" />,
+    );
+    expect(screen.getByText("Removed from sale")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open: 2018 Toyota Camry, 285,000 TMT, Removed from sale" })).toBeTruthy();
+    expect(screen.getByTestId("conversation-listing-thumbnail").props.className).toContain("opacity-60");
+  });
+
+  it("keeps an active Listing undimmed and without a badge", () => {
+    const screen = renderMobile(<ConversationListingCard listing={listing} brandName="Toyota" modelName="Camry" />);
+    expect(screen.queryByText("Sold")).toBeNull();
+    expect(screen.getByTestId("conversation-listing-thumbnail").props.className).not.toContain("opacity-60");
+  });
+
+  it("is not tappable when the Listing is no longer available, though it is still shown", () => {
+    const screen = renderMobile(
+      <ConversationListingCard listing={listing} unavailable brandName="Toyota" modelName="Camry" />,
+    );
+    expect(screen.getByText("2018 Toyota Camry")).toBeTruthy();
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
   it("shows the unavailable label and is not tappable without a Listing", () => {
