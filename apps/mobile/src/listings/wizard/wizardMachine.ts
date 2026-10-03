@@ -100,7 +100,7 @@ function computeValidatedSteps(
  * draft saved by the eight-step wizard (whose names and order differ) resumes
  * correctly: every data step whose schema passes counts as complete.
  */
-function completedSteps(
+export function completedSteps(
   payload: WizardSchemas.WizardDraftPayload,
 ): WizardSchemas.WizardStep[] {
   return DATA_STEPS.filter((step) => isStepValid(step, payload));

@@ -2,6 +2,7 @@ import type { ListingsSchemas } from "@auto-tm/contracts";
 import { describe, expect, it, vi } from "vitest";
 
 import { renderMobile } from "../../../test/render";
+
 import { DraftCard } from "./DraftCard";
 
 // Native progress animations need a device. Keep its supplied value queryable.
@@ -21,7 +22,7 @@ const savedFields = {
 };
 function card(payload: ListingsSchemas.ListingDraft["payload"]) {
   const draft: ListingsSchemas.ListingDraft = {
-    id, payload, createdAt: "2026-10-03T00:00:00Z", updatedAt: "2026-10-03T00:00:00Z",
+    id, userId: id, payload, createdAt: "2026-10-03T00:00:00Z", updatedAt: "2026-10-03T00:00:00Z",
   };
   return <DraftCard draft={draft} onResume={vi.fn()} onDiscard={vi.fn()} />;
 }
