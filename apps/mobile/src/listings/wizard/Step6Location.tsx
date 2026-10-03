@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { useRegions } from "../../api/catalog/useRegions";
 import { useCities } from "../../api/catalog/useCities";
 
+import { DescriptionField } from "./DescriptionField";
 
 import { CatalogPickerSheet } from "@/components/listings/wizard/CatalogPickerSheet";
 import { PickerRow } from "@/components/listings/wizard/PickerRow";
@@ -18,6 +19,8 @@ interface Step6LocationProps {
   payload: WizardSchemas.WizardDraftPayload;
   onChange: (updates: Partial<WizardSchemas.WizardDraftPayload>) => void;
   fieldErrors?: Record<string, string>;
+  /** Show every field's error, after the seller first taps Continue on this step. */
+  showErrors?: boolean;
   disabled?: boolean;
 }
 
@@ -155,13 +158,32 @@ export default function Step6Location({
   payload,
   onChange,
   fieldErrors,
+  showErrors = false,
   disabled = false,
 }: Step6LocationProps) {
   const { t } = useTranslation();
   const picker = useLocationPicker(payload);
+  // Like Car: a field's error shows once the seller has touched it, and every
+  // error shows after the first Continue tap.
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
+  const markTouched = (field: string) =>
+    setTouchedFields((current) => (current[field] ? current : { ...current, [field]: true }));
+  const visibleError = (field: string) =>
+    showErrors || touchedFields[field] ? fieldErrors?.[field] : undefined;
 
   return (
     <View className="gap-5 py-5">
+      <DescriptionField
+        payload={payload}
+        onChange={(updates) => {
+          markTouched("description");
+          onChange(updates);
+        }}
+        onBlur={() => markTouched("description")}
+        error={visibleError("description")}
+        disabled={disabled}
+      />
+
       <PickerRow
         label={t("region")}
         required
@@ -169,8 +191,11 @@ export default function Step6Location({
         placeholder={t("selectRegion")}
         disabled={disabled}
         locked={disabled}
-        error={fieldErrors?.regionId}
-        onPress={() => picker.setRegionOpen(true)}
+        error={visibleError("regionId")}
+        onPress={() => {
+          markTouched("regionId");
+          picker.setRegionOpen(true);
+        }}
       />
 
       <PickerRow
@@ -180,8 +205,11 @@ export default function Step6Location({
         placeholder={t("selectCity")}
         disabled={disabled || !payload.regionId}
         locked={disabled}
-        error={fieldErrors?.cityId}
-        onPress={() => picker.setCityOpen(true)}
+        error={visibleError("cityId")}
+        onPress={() => {
+          markTouched("cityId");
+          picker.setCityOpen(true);
+        }}
       />
 
       <View className="gap-1.5">
@@ -195,9 +223,10 @@ export default function Step6Location({
             </View>
             <Input
               value={payload.locationText ?? ""}
-              onChangeText={(text) =>
-                onChange({ locationText: text || undefined })
-              }
+              onChangeText={(text) => {
+                markTouched("locationText");
+                onChange({ locationText: text || undefined });
+              }}
               placeholder={t("areaPlaceholder")}
               editable={!disabled}
               className="pl-10"
@@ -205,9 +234,9 @@ export default function Step6Location({
           </View>,
           disabled,
         )}
-        {fieldErrors?.locationText && (
+        {visibleError("locationText") && (
           <Text className="text-sm text-destructive" accessibilityLiveRegion="polite">
-            {fieldErrors.locationText}
+            {visibleError("locationText")}
           </Text>
         )}
       </View>

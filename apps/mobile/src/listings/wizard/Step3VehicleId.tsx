@@ -12,6 +12,7 @@ import {
   shouldShowVehicleFieldError,
   type VehicleField,
 } from "./vehicleFieldErrorVisibility";
+import { VinField } from "./VinField";
 
 import { CatalogPickerSheet } from "@/components/listings/wizard/CatalogPickerSheet";
 import { PickerRow } from "@/components/listings/wizard/PickerRow";
@@ -381,6 +382,13 @@ export default function Step3VehicleId({
         fieldErrors={fieldErrors}
         showErrors={showErrors}
         touchedFields={touchedFields}
+      />
+
+      <VinField
+        payload={payload}
+        onChange={onChange}
+        disabled={disabled}
+        error={showErrors ? fieldErrors?.vin : undefined}
       />
 
       <VehicleIdSheets payload={payload} picker={picker} />

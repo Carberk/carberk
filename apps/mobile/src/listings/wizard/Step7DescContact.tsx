@@ -16,7 +16,6 @@ import { Icon } from "@/components/ui/icon";
 interface Step7DescContactProps {
   payload: WizardSchemas.WizardDraftPayload;
   onChange: (updates: Partial<WizardSchemas.WizardDraftPayload>) => void;
-  fieldErrors?: Record<string, string>;
   disabled?: boolean;
   defaultPhone?: string;
 }
@@ -59,55 +58,6 @@ function ReviewSummary({
           : "—"}
       </Text>
       <Text className="text-sm text-muted-foreground">{cityName}</Text>
-    </View>
-  );
-}
-
-function DescriptionInput({
-  payload,
-  onChange,
-  fieldErrors,
-  disabled,
-}: {
-  payload: WizardSchemas.WizardDraftPayload;
-  onChange: (updates: Partial<WizardSchemas.WizardDraftPayload>) => void;
-  fieldErrors?: Record<string, string>;
-  disabled: boolean;
-}) {
-  const { t } = useTranslation();
-  const descriptionLength = payload.description?.length ?? 0;
-
-  return (
-    <View className="gap-1.5">
-      <View className="flex-row items-center justify-between">
-        <Text className="text-sm font-medium text-foreground">
-          {t("description")} *
-        </Text>
-        <Text className="text-xs text-muted-foreground">
-          {descriptionLength}/2000
-        </Text>
-      </View>
-      {wrapDisabled(
-        <Input
-          value={payload.description ?? ""}
-          onChangeText={(text) =>
-            onChange({ description: text || undefined })
-          }
-          placeholder={t("descriptionPlaceholder")}
-          multiline
-          numberOfLines={4}
-          editable={!disabled}
-          className="h-auto min-h-[96px] py-2"
-          maxLength={2000}
-          accessibilityLabel={t("description")}
-        />,
-        disabled,
-      )}
-      {fieldErrors?.description ? (
-        <Text className="text-sm text-destructive" accessibilityLiveRegion="polite">
-          {fieldErrors.description}
-        </Text>
-      ) : null}
     </View>
   );
 }
@@ -220,19 +170,12 @@ function ContactMethods({
 export default function Step7DescContact({
   payload,
   onChange,
-  fieldErrors,
   disabled = false,
   defaultPhone = "",
 }: Step7DescContactProps) {
   return (
     <View className="gap-5 py-5">
       <ReviewSummary payload={payload} />
-      <DescriptionInput
-        payload={payload}
-        onChange={onChange}
-        fieldErrors={fieldErrors}
-        disabled={disabled}
-      />
       <ContactPhoneInput
         payload={payload}
         onChange={onChange}

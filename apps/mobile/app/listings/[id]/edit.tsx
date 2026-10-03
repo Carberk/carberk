@@ -12,7 +12,6 @@ import {
   opLabel,
   type OpState,
 } from "../../../src/listings/edit/useSaveListingEdit";
-import Step1Vin from "../../../src/listings/wizard/Step1Vin";
 import Step2Photos from "../../../src/listings/wizard/Step2Photos";
 import Step3VehicleId from "../../../src/listings/wizard/Step3VehicleId";
 import Step4Specs from "../../../src/listings/wizard/Step4Specs";
@@ -34,17 +33,6 @@ import {
 import { useToast } from "@/components/ui/toast";
 import { Text } from "@/components/ui/text";
 import { Button } from "@/components/ui/button";
-
-const STEP_KEY_MAP: Record<WizardSchemas.WizardStep, string> = {
-  vin: "vin",
-  photos: "photos",
-  vehicle: "vehicle",
-  specs: "specs",
-  price: "price",
-  location: "location",
-  contact: "contact",
-  review: "review",
-};
 
 function listingToPayload(
   listing: ListingsSchemas.ListingDetail,
@@ -296,7 +284,7 @@ function EditListingSession({ listingId }: { listingId: string }) {
   return (
     <WizardLayout
       routeTitle={t("editListing")}
-      stepTitle={t(STEP_KEY_MAP[currentStep] ?? currentStep)}
+      stepTitle={t(`wizardSteps.${currentStep}`)}
       stepNumber={ctx.stepNumber}
       stepCount={ctx.stepCount}
       onBack={() => {}}
@@ -322,14 +310,6 @@ function EditListingSession({ listingId }: { listingId: string }) {
       isDiscarding={false}
       discardError={null}
     >
-      {currentStep === "vin" && (
-        <Step1Vin
-          payload={machineState.payload}
-          onChange={handlePayloadChange}
-          fieldErrors={fieldErrors}
-          disabled={true}
-        />
-      )}
       {currentStep === "photos" && (
         <Step2Photos
           photos={uploadQueue.photos}
@@ -370,13 +350,13 @@ function EditListingSession({ listingId }: { listingId: string }) {
           payload={machineState.payload}
           onChange={handlePayloadChange}
           fieldErrors={fieldErrors}
+          showErrors={attemptedSteps.location === true}
         />
       )}
       {currentStep === "contact" && (
         <Step7DescContact
           payload={machineState.payload}
           onChange={handlePayloadChange}
-          fieldErrors={fieldErrors}
           defaultPhone={sessionListing.contactPhone ?? ""}
         />
       )}

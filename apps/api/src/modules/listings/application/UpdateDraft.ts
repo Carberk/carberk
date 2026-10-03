@@ -48,8 +48,10 @@ export class UpdateDraft {
       changedFields.length > 0
         ? WizardSchemas.getInvalidatedSteps(changedFields)
         : [];
+    // Drafts saved by the eight-step wizard may still name its `vin` step.
     const newValidatedSteps = clientValidated.filter(
-      (s): s is WizardSchemas.WizardStep => !invalidatedSteps.includes(s),
+      (s): s is WizardSchemas.WizardStep =>
+        WizardSchemas.WIZARD_STEPS.includes(s) && !invalidatedSteps.includes(s),
     );
 
     // Merge payload: keep all existing fields, overwrite with new ones,
