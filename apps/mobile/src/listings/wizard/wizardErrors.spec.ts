@@ -8,7 +8,7 @@ import { translateWizardError, translateWizardFieldErrors } from "./wizardErrors
 
 /** Every step, paired with a payload that fails it. */
 const INVALID_PAYLOADS: [WizardSchemas.WizardStep, unknown][] = [
-  ["vin", { vin: "x".repeat(18) }],
+  ["vehicle", { vin: "x".repeat(18) }],
   ["photos", {}],
   ["vehicle", {}],
   ["specs", {}],
@@ -17,9 +17,9 @@ const INVALID_PAYLOADS: [WizardSchemas.WizardStep, unknown][] = [
   ["price", {}],
   ["price", { priceAmount: -1, priceCurrency: "TMT" }],
   ["location", {}],
-  ["location", { regionId: "no", cityId: "no", locationText: "x".repeat(201) }],
+  ["location", { description: "x".repeat(2001), regionId: "no", cityId: "no", locationText: "x".repeat(201) }],
   ["contact", {}],
-  ["contact", { description: "ok", allowCalls: false, allowChat: false }],
+  ["contact", { allowCalls: false, allowChat: false }],
 ];
 
 function collectEmittedKeys(): string[] {

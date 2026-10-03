@@ -59,7 +59,7 @@ afterEach(() => vi.useRealTimers());
 
 function renderWizard() {
   const screen = renderMobile(<ToastProvider><SellScreen /></ToastProvider>);
-  let header = screen.getByText("Review").parent;
+  let header = screen.getByText("Check and publish").parent;
   while (header && !header.props.className?.includes("border-b")) header = header.parent;
   if (!header) throw new Error("Wizard header missing");
   const measuredHeader = header;
@@ -76,7 +76,7 @@ describe("Sell publish toast header boundary", () => {
     measure(146);
     await act(async () => { fireEvent.press(screen.getByRole("button", { name: "Publish" })); });
     expect(screen.getByText("Publish failed")).toBeTruthy();
-    expect(screen.getByText("Review")).toBeTruthy();
+    expect(screen.getByText("Check and publish")).toBeTruthy();
     expect(routerMock.replace).not.toHaveBeenCalled();
     expect(top()).toBe(59 + 146 + 8);
   });

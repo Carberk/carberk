@@ -2,7 +2,7 @@ import { useState } from "react";
 import { View, ScrollView, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { Check, AlertCircle, Eye, ListChecks } from "lucide-react-native";
-import type { WizardSchemas, ListingsSchemas } from "@auto-tm/contracts";
+import { WizardSchemas, type ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
 import { useBrands } from "../../api/catalog/useBrands";
@@ -30,16 +30,9 @@ interface Step8ReviewProps {
 
 function useStepLabels() {
   const { t } = useTranslation();
-  return {
-    vin: t("vin"),
-    photos: t("photos"),
-    vehicle: t("vehicle"),
-    specs: t("specs"),
-    price: t("price"),
-    location: t("location"),
-    contact: t("contact"),
-    review: t("review"),
-  } as Record<WizardSchemas.WizardStep, string>;
+  return Object.fromEntries(
+    WizardSchemas.WIZARD_STEPS.map((step) => [step, t(`wizardSteps.${step}`)]),
+  ) as Record<WizardSchemas.WizardStep, string>;
 }
 
 type ViewMode = "checklist" | "preview";
@@ -201,17 +194,9 @@ function ChecklistView({
         {payload.generationId && (
           <Text className="text-sm text-muted-foreground">{t("generation")}: {payload.generationId}</Text>
         )}
-      </ReviewSection>
-
-      {/* Photos */}
-      <ReviewSection
-        title={stepLabels.photos}
-        isValid={validatedSteps.includes("photos")}
-        onEdit={() => onGoToStep("photos")}
-      >
-        <Text className="text-sm text-foreground">
-          {t("photosUploadedCount", { count: uploadedPhotos.length })}
-        </Text>
+        {payload.vin && (
+          <Text className="text-sm text-muted-foreground">{t("vin")}: {payload.vin}</Text>
+        )}
       </ReviewSection>
 
       {/* Specs */}
@@ -246,6 +231,17 @@ function ChecklistView({
         )}
       </ReviewSection>
 
+      {/* Photos */}
+      <ReviewSection
+        title={stepLabels.photos}
+        isValid={validatedSteps.includes("photos")}
+        onEdit={() => onGoToStep("photos")}
+      >
+        <Text className="text-sm text-foreground">
+          {t("photosUploadedCount", { count: uploadedPhotos.length })}
+        </Text>
+      </ReviewSection>
+
       {/* Price */}
       <ReviewSection
         title={stepLabels.price}
@@ -269,6 +265,9 @@ function ChecklistView({
         isValid={validatedSteps.includes("location")}
         onEdit={() => onGoToStep("location")}
       >
+        <Text className="text-sm text-foreground" numberOfLines={2}>
+          {payload.description || t("noDescription")}
+        </Text>
         <Text className="text-sm text-foreground">
           {regionName && cityName ? `${regionName}, ${cityName}` : t("notSet")}
         </Text>
@@ -283,9 +282,6 @@ function ChecklistView({
         isValid={validatedSteps.includes("contact")}
         onEdit={() => onGoToStep("contact")}
       >
-        <Text className="text-sm text-foreground" numberOfLines={2}>
-          {payload.description || t("noDescription")}
-        </Text>
         <Text className="text-sm text-muted-foreground">
           {payload.allowCalls ? t("callsAllowed") : t("noCalls")} ·{" "}
           {payload.allowChat ? t("chatAllowed") : t("noChat")}

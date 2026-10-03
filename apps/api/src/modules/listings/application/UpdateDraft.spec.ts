@@ -77,7 +77,7 @@ describe("UpdateDraft", () => {
     const draft = ListingDraft.create({
       id: "draft-1",
       userId: "user-1",
-      payload: { vin: "WBA123", validatedSteps: ["vin"] },
+      payload: { vin: "WBA123", validatedSteps: ["vehicle"] },
     });
     repo.drafts.push(draft);
 
@@ -88,7 +88,7 @@ describe("UpdateDraft", () => {
       payload: { vin: "WBA123" },
     });
 
-    expect((result.draft.payload as any).validatedSteps).toEqual(["vin"]);
+    expect((result.draft.payload as any).validatedSteps).toEqual(["vehicle"]);
   });
 
   it("invalidates downstream steps when a field changes", async () => {
@@ -99,7 +99,7 @@ describe("UpdateDraft", () => {
         brandId: "old-brand",
         modelId: "old-model",
         year: 2020,
-        validatedSteps: ["vin", "photos", "vehicle", "specs"],
+        validatedSteps: ["vehicle", "specs", "photos", "price"],
       },
     });
     repo.drafts.push(draft);
@@ -115,10 +115,8 @@ describe("UpdateDraft", () => {
       },
     });
 
-    expect((result.draft.payload as any).validatedSteps).toEqual([
-      "vin",
-      "photos",
-    ]);
+    // Car is first, so a new brand invalidates every step.
+    expect((result.draft.payload as any).validatedSteps).toEqual([]);
   });
 
   it("accepts client-provided validatedSteps and applies invalidation", async () => {
@@ -128,7 +126,7 @@ describe("UpdateDraft", () => {
       payload: {
         priceAmount: 100000,
         priceCurrency: "TMT",
-        validatedSteps: ["vin", "photos", "vehicle", "specs", "price"],
+        validatedSteps: ["vehicle", "specs", "photos", "price"],
       },
     });
     repo.drafts.push(draft);
@@ -139,16 +137,57 @@ describe("UpdateDraft", () => {
       userId: "user-1",
       payload: {
         priceAmount: 200000,
-        validatedSteps: ["vin", "photos", "vehicle", "specs", "price", "location", "contact"],
+        validatedSteps: ["vehicle", "specs", "photos", "price", "location", "contact"],
       },
     });
 
     // price changed -> invalidate price, location, contact
     expect((result.draft.payload as any).validatedSteps).toEqual([
-      "vin",
-      "photos",
       "vehicle",
       "specs",
+      "photos",
     ]);
+  });
+
+  it("invalidates Description and place when the description changes", async () => {
+    repo.drafts.push(ListingDraft.create({
+      id: "draft-1",
+      userId: "user-1",
+      payload: {
+        description: "Old text",
+        validatedSteps: ["vehicle", "specs", "photos", "price", "location", "contact"],
+      },
+    }));
+
+    const result = await makeUseCase(repo).execute({
+      draftId: "draft-1",
+      userId: "user-1",
+      payload: { description: "New text" },
+    });
+
+    expect((result.draft.payload as any).validatedSteps).toEqual([
+      "vehicle",
+      "specs",
+      "photos",
+      "price",
+    ]);
+  });
+
+  it("drops step names the seven-step wizard no longer has and keeps the VIN", async () => {
+    // Saved by the eight-step wizard, which had a VIN step.
+    repo.drafts.push(ListingDraft.create({
+      id: "draft-1",
+      userId: "user-1",
+      payload: { vin: "WBA1234567890ABCD", allowChat: true, validatedSteps: ["vin", "photos"] },
+    }));
+
+    const result = await makeUseCase(repo).execute({
+      draftId: "draft-1",
+      userId: "user-1",
+      payload: { vin: "WBA1234567890ABCD", allowChat: false },
+    });
+
+    expect(result.draft.payload).toMatchObject({ vin: "WBA1234567890ABCD" });
+    expect((result.draft.payload as any).validatedSteps).toEqual(["photos"]);
   });
 });

@@ -287,8 +287,23 @@ describe("DraftsController e2e", () => {
       await request
         .post(`/api/v1/listings/drafts/${created.body.id}/validate-step`)
         .set("Authorization", `Bearer ${token2}`)
-        .send({ step: "vin", payload: {} })
+        .send({ step: "vehicle", payload: {} })
         .expect(404);
+    });
+
+    it("rejects the eight-step wizard's removed vin step", async () => {
+      const token = await createUser("user-1");
+      const created = await request
+        .post("/api/v1/listings/drafts")
+        .set("Authorization", `Bearer ${token}`)
+        .send({})
+        .expect(201);
+
+      await request
+        .post(`/api/v1/listings/drafts/${created.body.id}/validate-step`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ step: "vin", payload: {} })
+        .expect(400);
     });
   });
 

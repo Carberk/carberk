@@ -49,7 +49,6 @@ vi.mock("react-native-safe-area-context", async () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 vi.mock("@/components/ui/progress", async () => ({ Progress: (await import("react-native")).View }));
-vi.mock("../../src/listings/wizard/Step1Vin", () => ({ default: () => null }));
 vi.mock("../../src/listings/wizard/Step2Photos", () => ({ default: () => null }));
 vi.mock("../../src/listings/wizard/Step3VehicleId", () => ({ default: () => null }));
 vi.mock("../../src/listings/wizard/Step5Price", () => ({ default: () => null }));
@@ -159,7 +158,7 @@ describe("Listing edit save across a background refetch", () => {
     expect(screen.getByText("Damaged / needs repair: Yes")).toBeTruthy();
 
     // The seller changes their answer after the failure, then another refetch lands.
-    fireEvent.press(screen.getByRole("button", { name: /^Edit Spec/ }));
+    fireEvent.press(screen.getByRole("button", { name: "Edit Details and condition" }));
     fireEvent.press(screen.getByRole("radio", { name: "Damaged / needs repair: No" }));
     fixture.listing = { ...api.detail(), favoriteCount: 2 };
     screen.rerender(<EditListingScreen />);

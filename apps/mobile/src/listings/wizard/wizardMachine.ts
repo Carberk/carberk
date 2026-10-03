@@ -73,7 +73,7 @@ function stepIndex(step: WizardMachineStep): number {
 
 function getStepAtIndex(index: number): WizardMachineStep {
   const clamped = Math.max(0, Math.min(index, WIZARD_STEPS.length - 1));
-  return WIZARD_STEPS[clamped] ?? "vin";
+  return WIZARD_STEPS[clamped] ?? "vehicle";
 }
 
 function isStepValid(
@@ -96,16 +96,14 @@ function computeValidatedSteps(
 }
 
 /**
- * Map legacy numeric currentStep (1-7) to WizardStep names.
- * Returns null if the input is not a valid legacy step.
+ * Completion comes from the saved fields, not from stored step names, so a
+ * draft saved by the eight-step wizard (whose names and order differ) resumes
+ * correctly: every data step whose schema passes counts as complete.
  */
-export function mapLegacyStep(
-  legacyStep: number | undefined,
-): WizardSchemas.WizardStep | null {
-  if (typeof legacyStep !== "number") return null;
-  const idx = legacyStep - 1;
-  if (idx < 0 || idx >= WIZARD_STEPS.length) return null;
-  return WIZARD_STEPS[idx] ?? null;
+function completedSteps(
+  payload: WizardSchemas.WizardDraftPayload,
+): WizardSchemas.WizardStep[] {
+  return DATA_STEPS.filter((step) => isStepValid(step, payload));
 }
 
 // ── Initial state ──
@@ -117,7 +115,7 @@ export function createInitialState(): WizardMachineState {
     listingId: null,
     mode: "create",
     editEntryAtReview: false,
-    currentStep: "vin",
+    currentStep: "vehicle",
     payload: {},
     validatedSteps: [],
     saveError: null,
@@ -146,13 +144,7 @@ export function wizardMachineReducer(
                 }),
             }
           : action.payload;
-      const legacyStep = mapLegacyStep(action.payload.currentStep);
-      const validatedSteps =
-        action.payload.validatedSteps && Array.isArray(action.payload.validatedSteps)
-          ? action.payload.validatedSteps.filter((s): s is WizardSchemas.WizardStep =>
-              WIZARD_STEPS.includes(s as WizardSchemas.WizardStep),
-            )
-          : [];
+      const validatedSteps = completedSteps(payload);
 
       if (mode === "edit" && action.entryStep === "review") {
         return {
@@ -175,17 +167,15 @@ export function wizardMachineReducer(
         };
       }
 
-      // Resume at the step indicated by the draft, or the first unvalidated data step
-      let resumeStep: WizardMachineStep = action.entryStep ?? legacyStep ?? "vin";
-      const resumeIdx = stepIndex(resumeStep);
-      for (let i = 0; i <= resumeIdx; i++) {
-        const step = getStepAtIndex(i);
-        if (step === "review") break;
-        if (!validatedSteps.includes(step)) {
-          resumeStep = step;
-          break;
-        }
-      }
+      // Resume at the first incomplete step up to the entry step; with no
+      // entry step, at the first incomplete step or at review when all are done.
+      // `currentStep` in the payload is not a real position yet; a later slice
+      // saves the step the seller left.
+      const target: WizardMachineStep = action.entryStep ?? "review";
+      const resumeStep =
+        WIZARD_STEPS.slice(0, stepIndex(target)).find(
+          (step) => !validatedSteps.includes(step),
+        ) ?? target;
 
       return {
         ...state,

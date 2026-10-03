@@ -10,12 +10,15 @@ import {
 import { PHONE_TM_PATTERN } from "./auth";
 
 // ── Wizard step enum ──
+// Seven steps in founder order (#354 D2): Car (`vehicle`, VIN included),
+// Details and condition (`specs`), Photos, Price, Description and place
+// (`location`, description included), Contact, Check and publish (`review`).
+// The eight-step wizard's `vin` step no longer exists.
 
 export const WizardStepSchema = z.enum([
-  "vin",
-  "photos",
   "vehicle",
   "specs",
+  "photos",
   "price",
   "location",
   "contact",
@@ -23,16 +26,7 @@ export const WizardStepSchema = z.enum([
 ]);
 export type WizardStep = z.infer<typeof WizardStepSchema>;
 
-export const WIZARD_STEPS: WizardStep[] = [
-  "vin",
-  "photos",
-  "vehicle",
-  "specs",
-  "price",
-  "location",
-  "contact",
-  "review",
-];
+export const WIZARD_STEPS: WizardStep[] = [...WizardStepSchema.options];
 
 // ── Validation message keys ──
 // Step schemas emit stable dotted keys, not English prose, so every client can
@@ -107,11 +101,6 @@ const KEY = WIZARD_ERROR_KEYS;
 // Each schema validates exactly the fields required for its step.
 // They are refinements of ListingDraftPayloadSchema — partial, step-scoped.
 
-export const StepVinSchema = z.object({
-  vin: z.string().max(WIZARD_LIMITS.vinMaxLength, KEY.vinTooLong).optional(),
-});
-export type StepVinInput = z.infer<typeof StepVinSchema>;
-
 export const StepPhotosSchema = z.object({
   photos: z
     .array(DraftPhotoSchema, { required_error: KEY.photosRequired })
@@ -129,6 +118,7 @@ export const StepVehicleSchema = z.object({
     .int(KEY.yearWholeNumber)
     .min(WIZARD_LIMITS.yearMin, KEY.yearTooEarly)
     .max(WIZARD_LIMITS.yearMax, KEY.yearTooLate),
+  vin: z.string().max(WIZARD_LIMITS.vinMaxLength, KEY.vinTooLong).optional(),
 });
 export type StepVehicleInput = z.infer<typeof StepVehicleSchema>;
 
@@ -176,6 +166,10 @@ export const StepPriceSchema = z.object({
 export type StepPriceInput = z.infer<typeof StepPriceSchema>;
 
 export const StepLocationSchema = z.object({
+  description: z
+    .string({ required_error: KEY.descriptionRequired })
+    .min(1, KEY.descriptionRequired)
+    .max(WIZARD_LIMITS.descriptionMaxLength, KEY.descriptionTooLong),
   regionId: z.string({ required_error: KEY.regionRequired }).uuid({ message: KEY.regionRequired }),
   cityId: z.string({ required_error: KEY.cityRequired }).uuid({ message: KEY.cityRequired }),
   locationText: z
@@ -187,10 +181,6 @@ export type StepLocationInput = z.infer<typeof StepLocationSchema>;
 
 export const StepContactSchema = z
   .object({
-    description: z
-      .string({ required_error: KEY.descriptionRequired })
-      .min(1, KEY.descriptionRequired)
-      .max(WIZARD_LIMITS.descriptionMaxLength, KEY.descriptionTooLong),
     // Required even when calls are off (D7). The same rule as `PhoneTm`, with
     // translatable keys; whether the number is confirmed is the server's check
     // on publish, not this schema's (ADR-0081).
@@ -218,16 +208,10 @@ export type StepReviewInput = z.infer<typeof StepReviewSchema>;
 // Maps each step to the steps that must be valid before it can be reached.
 // Used for navigation gating and invalidation cascading.
 
-const STEP_DEPENDENCIES: Record<WizardStep, WizardStep[]> = {
-  vin: [],
-  photos: ["vin"],
-  vehicle: ["vin", "photos"],
-  specs: ["vin", "photos", "vehicle"],
-  price: ["vin", "photos", "vehicle", "specs"],
-  location: ["vin", "photos", "vehicle", "specs", "price"],
-  contact: ["vin", "photos", "vehicle", "specs", "price", "location"],
-  review: ["vin", "photos", "vehicle", "specs", "price", "location", "contact"],
-};
+// Every step depends on all earlier ones.
+const STEP_DEPENDENCIES = Object.fromEntries(
+  WIZARD_STEPS.map((step, index) => [step, WIZARD_STEPS.slice(0, index)]),
+) as Record<WizardStep, WizardStep[]>;
 
 export function getStepDependencies(step: WizardStep): WizardStep[] {
   return STEP_DEPENDENCIES[step];
@@ -238,7 +222,7 @@ export function getStepDependencies(step: WizardStep): WizardStep[] {
 // A field change invalidates its own step and all downstream steps that depend on it.
 
 const FIELD_TO_STEP: Record<string, WizardStep> = {
-  vin: "vin",
+  vin: "vehicle",
   photos: "photos",
   brandId: "vehicle",
   modelId: "vehicle",
@@ -260,7 +244,7 @@ const FIELD_TO_STEP: Record<string, WizardStep> = {
   regionId: "location",
   cityId: "location",
   locationText: "location",
-  description: "contact",
+  description: "location",
   contactPhone: "contact",
   allowCalls: "contact",
   allowChat: "contact",
@@ -343,9 +327,6 @@ export function validateStep(
   let result: z.SafeParseReturnType<unknown, unknown>;
 
   switch (step) {
-    case "vin":
-      result = StepVinSchema.safeParse(payload, parseOptions);
-      break;
     case "photos":
       result = StepPhotosSchema.safeParse(payload, parseOptions);
       break;
