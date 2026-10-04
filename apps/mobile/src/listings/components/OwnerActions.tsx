@@ -14,6 +14,12 @@ import { useArchiveListing } from "../../api/listings/useArchiveListing";
 import { useDeleteListing } from "../../api/listings/useDeleteListing";
 import { useMarkSold } from "../../api/listings/useMarkSold";
 import { useRepublishListing } from "../../api/listings/useRepublishListing";
+import {
+  OWNER_ACTION_CONFIRM,
+  OWNER_ACTION_LABEL,
+  ownerListingActions,
+  type ConfirmedOwnerAction,
+} from "../ownerListingActions";
 
 import {
   AlertDialog,
@@ -35,11 +41,10 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 
-type ConfirmAction =
-  | { kind: "markSold"; titleKey: string; descriptionKey: string }
-  | { kind: "archive"; titleKey: string; descriptionKey: string }
-  | { kind: "republish"; titleKey: string; descriptionKey: string }
-  | { kind: "delete"; titleKey: string; descriptionKey: string };
+type ListingConfirmAction = Exclude<ConfirmedOwnerAction, "deleteDraft">;
+
+/** Edit and Mark as sold sit in the bar; the rest of the status's actions go in ⋯. */
+const MENU_ACTIONS = new Set<string>(["remove", "relist", "delete"]);
 
 interface OwnerActionsProps {
   listingId: string;
@@ -50,7 +55,7 @@ interface OwnerActionsProps {
 export function OwnerActions({ listingId, status, mode }: OwnerActionsProps) {
   const router = useRouter();
   const { t } = useTranslation();
-  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(
+  const [confirmAction, setConfirmAction] = useState<ListingConfirmAction | null>(
     null,
   );
 
@@ -62,6 +67,9 @@ export function OwnerActions({ listingId, status, mode }: OwnerActionsProps) {
   const isActive = status === Enums.ListingStatus.Active;
   const isSold = status === Enums.ListingStatus.Sold;
   const isArchived = status === Enums.ListingStatus.Archived;
+  const menuActions = ownerListingActions(status).filter(
+    (action): action is ListingConfirmAction => MENU_ACTIONS.has(action),
+  );
 
   // Bar and overflow are separate instances; any in-flight lifecycle request
   // disables both.
@@ -71,20 +79,20 @@ export function OwnerActions({ listingId, status, mode }: OwnerActionsProps) {
   const handleConfirm = () => {
     if (!confirmAction) return;
 
-    switch (confirmAction.kind) {
+    switch (confirmAction) {
       case "markSold":
         markSold.mutate(listingId, {
           onSuccess: () => setConfirmAction(null),
           onError: () => setConfirmAction(null),
         });
         break;
-      case "archive":
+      case "remove":
         archive.mutate(listingId, {
           onSuccess: () => setConfirmAction(null),
           onError: () => setConfirmAction(null),
         });
         break;
-      case "republish":
+      case "relist":
         republish.mutate(listingId, {
           onSuccess: () => setConfirmAction(null),
           onError: () => setConfirmAction(null),
@@ -119,7 +127,7 @@ export function OwnerActions({ listingId, status, mode }: OwnerActionsProps) {
             disabled={isPending || !(isActive || isSold || isArchived)}
           >
             <Icon as={Pencil} className="size-4 text-foreground" />
-            <Text>{t("edit")}</Text>
+            <Text>{t(OWNER_ACTION_LABEL.edit)}</Text>
           </Button>
 
           {isActive && (
@@ -127,22 +135,17 @@ export function OwnerActions({ listingId, status, mode }: OwnerActionsProps) {
               variant="secondary"
               size="sm"
               className="flex-1 min-w-[45%]"
-              onPress={() =>
-                setConfirmAction({
-                  kind: "markSold",
-                  titleKey: "markAsSold",
-                  descriptionKey: "markAsSoldDescription",
-                })
-              }
+              onPress={() => setConfirmAction("markSold")}
               disabled={isPending}
             >
               <Icon as={CheckCircle} className="size-4 text-foreground" />
-              <Text>{t("markAsSold")}</Text>
+              <Text>{t(OWNER_ACTION_LABEL.markSold)}</Text>
             </Button>
           )}
         </View>
       )}
-      {mode === "menu" && (
+      {/* No ⋯ when the status allows nothing, as for a blocked Listing. */}
+      {mode === "menu" && menuActions.length > 0 && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -155,50 +158,17 @@ export function OwnerActions({ listingId, status, mode }: OwnerActionsProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            {(isActive || isSold) && (
+            {menuActions.map((action) => (
               <DropdownMenuItem
+                key={action}
                 accessibilityRole="button"
+                variant={action === "delete" ? "destructive" : undefined}
                 disabled={isPending}
-                onPress={() =>
-                  setConfirmAction({
-                    kind: "archive",
-                    titleKey: "archiveListing",
-                    descriptionKey: "archiveListingDescription",
-                  })
-                }
+                onPress={() => setConfirmAction(action)}
               >
-                <Text>{t("archiveListing")}</Text>
+                <Text>{t(OWNER_ACTION_LABEL[action])}</Text>
               </DropdownMenuItem>
-            )}
-            {isArchived && (
-              <DropdownMenuItem
-                accessibilityRole="button"
-                disabled={isPending}
-                onPress={() =>
-                  setConfirmAction({
-                    kind: "republish",
-                    titleKey: "republishListing",
-                    descriptionKey: "republishListingDescription",
-                  })
-                }
-              >
-                <Text>{t("republishListing")}</Text>
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem
-              accessibilityRole="button"
-              variant="destructive"
-              disabled={isPending}
-              onPress={() =>
-                setConfirmAction({
-                  kind: "delete",
-                  titleKey: "deleteListing",
-                  descriptionKey: "deleteListingDescription",
-                })
-              }
-            >
-              <Text>{t("delete")}</Text>
-            </DropdownMenuItem>
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
       )}
@@ -218,10 +188,10 @@ export function OwnerActions({ listingId, status, mode }: OwnerActionsProps) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirmAction ? t(confirmAction.titleKey) : ""}
+              {confirmAction ? t(OWNER_ACTION_CONFIRM[confirmAction].title) : ""}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmAction ? t(confirmAction.descriptionKey) : ""}
+              {confirmAction ? t(OWNER_ACTION_CONFIRM[confirmAction].description) : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -232,12 +202,12 @@ export function OwnerActions({ listingId, status, mode }: OwnerActionsProps) {
               disabled={isPending}
               onPress={handleConfirm}
               className={
-                confirmAction?.kind === "delete" ? "bg-destructive" : undefined
+                confirmAction === "delete" ? "bg-destructive" : undefined
               }
             >
               <Text
                 className={
-                  confirmAction?.kind === "delete"
+                  confirmAction === "delete"
                     ? "text-destructive-foreground"
                     : undefined
                 }

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Pressable, View } from "react-native";
 import { Image } from "expo-image";
-import { ImageOff, Trash2 } from "lucide-react-native";
+import { ImageOff, MoreHorizontal } from "lucide-react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
@@ -12,16 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Progress } from "@/components/ui/progress";
 import { Text } from "@/components/ui/text";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 function formatDate(iso: string, locale: string): string {
   const d = new Date(iso);
@@ -38,8 +28,8 @@ interface DraftCardProps {
   brandName?: string;
   modelName?: string;
   onResume: (draft: ListingDraft) => void;
-  onDiscard: (draftId: string) => void;
-  isDiscarding?: boolean;
+  /** Opens the ⋯ sheet; the card passes the title the sheet shows. */
+  onMore: (draft: ListingDraft, title: string) => void;
 }
 
 export function DraftCard({
@@ -47,10 +37,8 @@ export function DraftCard({
   brandName,
   modelName,
   onResume,
-  onDiscard,
-  isDiscarding,
+  onMore,
 }: DraftCardProps) {
-  const [showConfirm, setShowConfirm] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
   const { t, i18n } = useTranslation();
 
@@ -83,15 +71,17 @@ export function DraftCard({
 
   const { filled, total, percent: progressPercent } = draftProgress(payload);
 
+  // ⋯ sits beside the tappable row, not inside it, so a screen reader reaches
+  // it on its own instead of folding it into the row's label.
   return (
-    <>
+    <View className="flex-row items-start pr-1">
       <Pressable
-        className="active:opacity-90"
+        className="flex-1 active:opacity-90"
         onPress={() => onResume(draft)}
         accessibilityRole="button"
         accessibilityLabel={`${t("continueListing")} ${identity}`}
       >
-        <View className="flex-row gap-3 px-4 py-3">
+        <View className="flex-row gap-3 py-3 pl-4">
           {/* Cover image */}
           <View className="h-[100px] w-[140px] shrink-0 overflow-hidden rounded-lg bg-muted">
             {imageUrl && !imageFailed ? (
@@ -110,7 +100,7 @@ export function DraftCard({
           </View>
 
           {/* Text content */}
-          <View className="min-w-0 flex-1 justify-between py-0.5">
+          <View className="min-w-0 flex-1 justify-between gap-2 py-0.5">
             <View className="gap-1">
               <Text
                 className="text-base font-semibold text-foreground leading-5"
@@ -135,57 +125,18 @@ export function DraftCard({
               </View>
               <Progress value={progressPercent} className="h-1" />
             </View>
-
-            <View className="flex-row gap-2 pt-1">
-              <Button
-                variant="default"
-                size="sm"
-                className="flex-1"
-                onPress={() => onResume(draft)}
-              >
-                <Text numberOfLines={1}>{t("continue")}</Text>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onPress={() => setShowConfirm(true)}
-                disabled={isDiscarding}
-                accessibilityLabel={t("discard")}
-              >
-                <Icon as={Trash2} className="size-4 text-destructive" />
-              </Button>
-            </View>
           </View>
         </View>
       </Pressable>
-
-      <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("discardListingTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("discardListingDescription")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDiscarding} onPress={() => setShowConfirm(false)}>
-              <Text>{t("cancel")}</Text>
-            </AlertDialogCancel>
-            <AlertDialogAction
-              disabled={isDiscarding}
-              onPress={() => {
-                onDiscard(draft.id);
-                setShowConfirm(false);
-              }}
-              className="bg-destructive"
-            >
-              <Text className="text-destructive-foreground">
-                {isDiscarding ? t("discarding") : t("discard")}
-              </Text>
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="mt-2 h-11 w-11"
+        onPress={() => onMore(draft, identity)}
+        accessibilityLabel={t("myListingsActionsFor", { title: identity })}
+      >
+        <Icon as={MoreHorizontal} className="size-5 text-foreground" />
+      </Button>
+    </View>
   );
 }

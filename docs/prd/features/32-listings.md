@@ -112,7 +112,7 @@ That is the whole screen. Video is added below the photos only when the video me
 - **Owner viewing their own Listing:** no Call or Message bar.
   - A status card with views and saves. Only owners see these counts; buyers never see view counts.
   - The original currency under the price.
-  - Edit and Mark sold in the bottom bar; Archive and Delete in ⋯ (Republish for archived Listings). Share is hidden, as above.
+  - Edit and Mark as sold in the bottom bar; Remove from sale and Delete in ⋯ (Relist and Delete for a removed Listing, Delete alone for a sold one), named as in My listings. Share is hidden, as above.
 - **Sold / Removed from sale (`sold`, `archived`):** closed for new contact.
   - A banner on the photo and a greyed price.
   - ♡, the contact bar, Ask the seller and Report listing are hidden.
@@ -141,9 +141,9 @@ That is the whole screen. Video is added below the photos only when the video me
 
 ### Mark sold
 
-- Button in My Listings: "Mark as sold"
-- Confirm modal: "This car is sold. Is the buyer from AutoTM?" (yes / no — analytics signal)
-- Listing transitions to `sold` state and is auto-archived after 14 days. Buyers see it labelled Sold on detail and in Favorites, then Removed from sale once archived; it never appears in Home or Results.
+- "Mark as sold" in My listings' ⋯ sheet and in Listing detail's owner bar.
+- Confirm: "Mark as sold?" / "Buyers will see it as Sold. A sold Listing cannot be put back on sale." It asks nothing about where the buyer came from.
+- The Listing transitions to `sold` and stays there; nothing archives it automatically. Buyers see it labelled Sold on detail and in Favorites; it never appears in Home or Results. The owner can only delete it.
 - Garage entry (if linked) auto-updates to `status=sold`
 
 ### Listing states
@@ -153,7 +153,7 @@ That is the whole screen. Video is added below the photos only when the video me
 | `draft` | Owner only | Continue / discard |
 | `active` | Public | Favorite, Message, owner-edit |
 | `sold` | Detail and Favorites only, labelled Sold; never in Home or Results | Closed for new contact: no Call, Message, Ask the seller, ♡ or Report, and no new Conversation. An existing Conversation stays open for Messages, with a Sold badge and a banner linking to other cars of the same model |
-| `archived` | Owner + admin; a buyer reaching it from Favorites or a link sees it closed, labelled Removed from sale; never in Home or Results | Closed for new contact, as `sold`; an existing Conversation behaves as for `sold` (badge, banner, composer on); owner can republish |
+| `archived` | Owner + admin; a buyer reaching it from Favorites or a link sees it closed, labelled Removed from sale; never in Home or Results | Closed for new contact, as `sold`; an existing Conversation behaves as for `sold` (badge, banner, composer on); owner can relist |
 | `banned` | Owner sees a generic ban notice; not in feed/search/favorites or non-owner detail | New contact and Messages disabled; existing Conversations stay readable, with a one-line notice in place of the composer; owner edit/mark-sold/archive/republish/delete blocked until admin unban |
 | deleted (soft-deleted) | Not shown on any buyer surface; a buyer reaching it gets "This listing is no longer available" | No contact; existing Conversations stay readable, with a one-line notice in place of the composer |
 
@@ -172,15 +172,18 @@ Chat switched off on a Listing (`allowChat` off) also leaves an existing Convers
 | Wizard | Network slow | Show progress + "Slow connection" badge |
 | Listing detail | Loading | Card fields from the tapped card's cache; the rest behind skeletons; contact bar disabled until loaded |
 | Listing detail | Signed out | Call works; ♡, Message, Ask the seller and Report listing lead to sign-in, then finish the action here |
-| Listing detail | Owner viewing own | No contact bar; status card with views and saves; Edit / Mark sold in the bar; Archive / Delete in ⋯ |
+| Listing detail | Owner viewing own | No contact bar; status card with views and saves; Edit / Mark as sold in the bar; Remove from sale / Delete in ⋯ |
 | Listing detail | Sold / Removed from sale | Banner on the photo, greyed price; contact, ♡, Ask and Report hidden; "See other Brand Model" link |
 | Listing detail | Deleted, or banned for a buyer | "This listing is no longer available", with Go to Home and Back |
 | Listing detail | Banned, owner | Generic ban notice; admin reasons stay internal |
 | Listing detail | Opened from a report (admin view) | All actions + moderation toolbar |
 | Conversation | Listing sold / Removed from sale | Badge on the Listing card and an inline banner linking to other cars of the same model; composer on ([34](34-conversations.md#closed-and-sold-listings)) |
 | Conversation | Listing banned or deleted, or chat switched off | One-line notice in place of the composer; history readable |
-| My listings | Empty | "List your first car" CTA |
-| My listings | Has drafts | "Continue draft" pinned at top |
+| My listings | Tabs | Active · Drafts · Archive, each with its count: Active counts active and blocked Listings, Archive sold and removed ones. No number while the counts load, after a failure or at zero. Opens on the tab its route names, Active by default |
+| My listings | Rows | Archive rows are labelled Sold or Removed from sale. A Listing row opens the Listing in owner view; a draft row resumes the wizard |
+| My listings | Row actions | ⋯ opens a sheet with what the state allows: active — Edit, Mark as sold, Remove from sale, Delete; removed — Relist, Edit, Delete; sold — Delete; draft — Continue, Delete draft. Every action except Edit and Continue asks first. Success moves the row, updates the counts and shows a toast; failure keeps the row and says "Action failed. Try again." |
+| My listings | Blocked Listing | In Active, labelled Blocked with "Blocked by moderation. Buyers do not see it."; no ⋯, no tap, no reason and no appeal |
+| My listings | Loading / error / empty | Skeleton rows; the shared error state with Retry; per tab "No active listings" (with List a car), "No drafts" (with Start listing) or "Archive is empty" |
 
 ## Data references
 

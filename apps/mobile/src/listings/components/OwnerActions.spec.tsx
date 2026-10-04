@@ -28,28 +28,49 @@ it("keeps Edit and Mark sold in the sticky bar and navigates Edit", () => {
   );
   expect(screen.queryByRole("button", { name: "Mark as sold" })).toBeNull();
 });
-it.each(["active", "sold", "archived"] as const)(
-  "puts status-aware lifecycle actions, and no Share, in overflow for %s",
-  (status) => {
+it.each([
+  ["active", ["Remove from sale", "Delete"]],
+  ["archived", ["Relist", "Delete"]],
+  ["sold", ["Delete"]],
+] as const)(
+  "puts the shared My listings action names, and no Share, in overflow for %s",
+  (status, expected) => {
     const screen = renderMobile(
       <OwnerActions listingId="listing-373" status={status} mode="menu" />,
     );
     expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
     fireEvent.press(screen.getByRole("button", { name: "More options" }));
-    expect(screen.getByRole("button", { name: "Delete" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Share" })).toBeNull();
-    expect(
-      screen.getByRole("button", {
-        name: status === "archived" ? "Republish listing" : "Archive listing",
-      }),
-    ).toBeTruthy();
-    expect(
-      screen.queryByRole("button", {
-        name: status === "archived" ? "Archive listing" : "Republish listing",
-      }),
-    ).toBeNull();
+    for (const name of ["Remove from sale", "Relist", "Delete"]) {
+      expect(screen.queryByRole("button", { name }) !== null).toBe((expected as readonly string[]).includes(name));
+    }
+    for (const old of ["Archive listing", "Republish listing", "Share"]) {
+      expect(screen.queryByRole("button", { name: old })).toBeNull();
+    }
   },
 );
+it("shows no overflow for a blocked Listing, which allows no owner action", () => {
+  const screen = renderMobile(
+    <OwnerActions listingId="listing-373" status="banned" mode="menu" />,
+  );
+  expect(screen.queryByRole("button", { name: "More options" })).toBeNull();
+});
+it("asks with the shared copy, without the buyer question", () => {
+  const screen = renderMobile(
+    <OwnerActions listingId="listing-373" status="active" mode="bar" />,
+  );
+  fireEvent.press(screen.getByRole("button", { name: "Mark as sold" }));
+  expect(screen.getByText("Mark as sold?")).toBeTruthy();
+  expect(screen.getByText("Buyers will see it as Sold. A sold Listing cannot be put back on sale.")).toBeTruthy();
+  expect(screen.queryByText(/buyer from AutoTM/)).toBeNull();
+});
+it("names the overflow actions in Russian", () => {
+  const screen = renderMobile(
+    <OwnerActions listingId="listing-373" status="archived" mode="menu" />,
+    { locale: "ru" },
+  );
+  fireEvent.press(screen.getByRole("button", { name: "Другие действия" }));
+  expect(screen.getByRole("button", { name: "Вернуть в продажу" })).toBeTruthy();
+});
 it("requires confirmation before Mark sold, supports cancel and exposes failure", async () => {
   api.post.mockRejectedValue(new Error("offline"));
   const screen = renderMobile(

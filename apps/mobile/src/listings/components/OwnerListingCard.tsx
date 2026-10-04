@@ -1,22 +1,20 @@
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { Image } from "expo-image";
-import { Pencil } from "lucide-react-native";
+import { MoreHorizontal } from "lucide-react-native";
 import { Enums } from "@auto-tm/contracts";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
 import { buildVariantUrl } from "../detail/buildVariantUrl";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
+import { cn } from "@/lib/utils";
 import { formatPrice } from "@/src/listings/formatPrice";
-import { listingStatusLabel } from "@/src/listings/listingStatusLabel";
 
 type ListingSummary = ListingsSchemas.ListingSummary;
-type ListingStatus = ListingsSchemas.ListingSummary["status"];
 
 interface OwnerListingCardProps {
   listing: ListingSummary;
@@ -24,31 +22,36 @@ interface OwnerListingCardProps {
   modelName?: string;
   cityName?: string;
   onOpen: (id: string) => void;
-  onEdit: (id: string) => void;
+  /** Opens the ⋯ sheet; the card passes the title the sheet shows. */
+  onMore: (listing: ListingSummary, title: string) => void;
 }
 
-function statusBadgeVariant(
-  status: ListingStatus,
-): "default" | "secondary" | "destructive" | "outline" {
+/** The row label: none for an active Listing, which is the norm in Active. */
+function statusLabelKey(status: ListingSummary["status"]): string | null {
   switch (status) {
-    case Enums.ListingStatus.Active:
-      return "default";
     case Enums.ListingStatus.Sold:
-      return "secondary";
+      return "myListingsStatusSold";
     case Enums.ListingStatus.Archived:
-      return "outline";
+      return "removedFromSale";
+    case Enums.ListingStatus.Banned:
+      return "myListingsStatusBlocked";
     default:
-      return "secondary";
+      return null;
   }
 }
 
+/**
+ * A My listings row. Tapping it opens the Listing in owner view and ⋯ opens
+ * the actions its status allows. A blocked Listing shows a neutral note and
+ * offers nothing: no ⋯, no tap, no reason and no appeal.
+ */
 export function OwnerListingCard({
   listing,
   brandName,
   modelName,
   cityName,
   onOpen,
-  onEdit,
+  onMore,
 }: OwnerListingCardProps) {
   const { t, i18n } = useTranslation();
   const [imageFailed, setImageFailed] = useState(false);
@@ -56,83 +59,98 @@ export function OwnerListingCard({
     ? buildVariantUrl(listing.coverMediaKey, "list")
     : null;
 
-  const titleParts = [
+  const title = [
     listing.year ? String(listing.year) : null,
     brandName ?? listing.brandId,
     modelName ?? listing.modelId,
-  ].filter(Boolean);
+  ].filter(Boolean).join(" ");
 
-  const label = listingStatusLabel(listing.status, t);
+  const isBlocked = listing.status === Enums.ListingStatus.Banned;
+  const isActive = listing.status === Enums.ListingStatus.Active;
+  const labelKey = statusLabelKey(listing.status);
 
-  return (
-    <Pressable
-      className="active:opacity-90"
-      onPress={() => onOpen(listing.id)}
-      accessibilityRole="button"
-      accessibilityLabel={`${t("open")} ${label.toLowerCase()}`}
-    >
-      <View className="flex-row gap-3 px-4 py-3">
-        {/* Cover image */}
-        <View className="h-[100px] w-[140px] shrink-0 overflow-hidden rounded-lg bg-muted">
-          {imageUrl && !imageFailed ? (
-            <Image
-              source={{ uri: imageUrl }}
-              className="h-[100px] w-[140px]"
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              onError={() => setImageFailed(true)}
-            />
-          ) : (
-            <View className="h-full w-full items-center justify-center">
-              <Text className="text-xs text-muted-foreground">{t("noPhoto")}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Text content */}
-        <View className="min-w-0 flex-1 justify-between py-0.5">
-          <View className="gap-1">
-            <Text
-              className="text-base font-semibold text-foreground leading-5"
-              numberOfLines={2}
-            >
-              {titleParts.join(" ")}
-            </Text>
-            <Text className="text-lg font-heading text-primary" numberOfLines={1}>
-              {formatPrice(listing.displayPriceTmt, i18n.language)}
-            </Text>
+  const body = (
+    <View className="flex-row gap-3 py-3 pl-4">
+      <View
+        className={cn(
+          "h-[100px] w-[140px] shrink-0 overflow-hidden rounded-lg bg-muted",
+          isActive ? "opacity-100" : "opacity-60",
+        )}
+      >
+        {imageUrl && !imageFailed ? (
+          <Image
+            source={{ uri: imageUrl }}
+            className="h-[100px] w-[140px]"
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            onError={() => setImageFailed(true)}
+          />
+        ) : (
+          <View className="h-full w-full items-center justify-center">
+            <Text className="text-xs text-muted-foreground">{t("noPhoto")}</Text>
           </View>
-
-          <View className="flex-row flex-wrap items-center gap-2">
-            <Badge variant={statusBadgeVariant(listing.status)} className="shrink-0 px-2 py-0.5">
-              <Text className="text-xs">{label}</Text>
-            </Badge>
-            <Text className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={1}>
-              {cityName ?? listing.cityId}
-            </Text>
-          </View>
-
-          <View className="flex-row gap-2 pt-1">
-            <Button
-              variant="secondary"
-              size="sm"
-              className="flex-1"
-              onPress={() => onOpen(listing.id)}
-            >
-              <Text numberOfLines={1}>{t("open")}</Text>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1"
-              onPress={() => onEdit(listing.id)}
-            >
-              <Icon as={Pencil} className="size-4 text-foreground" />
-              <Text numberOfLines={1}>{t("edit")}</Text>
-            </Button>
-          </View>
-        </View>
+        )}
       </View>
-    </Pressable>
+
+      <View className="min-w-0 flex-1 gap-1 py-0.5">
+        <Text
+          className="text-base font-semibold leading-5 text-foreground"
+          numberOfLines={2}
+        >
+          {title}
+        </Text>
+        <Text
+          className={cn("text-lg font-heading", isActive ? "text-primary" : "text-muted-foreground")}
+          numberOfLines={1}
+        >
+          {formatPrice(listing.displayPriceTmt, i18n.language)}
+        </Text>
+        <View className="flex-row flex-wrap items-center gap-x-2">
+          {labelKey ? (
+            <Text
+              className={cn("text-xs font-semibold", isBlocked ? "text-destructive" : "text-foreground")}
+            >
+              {t(labelKey)}
+            </Text>
+          ) : null}
+          <Text className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={1}>
+            {cityName ?? listing.cityId}
+          </Text>
+        </View>
+        {isBlocked ? (
+          <Text className="text-xs text-muted-foreground">{t("myListingsBlockedNote")}</Text>
+        ) : null}
+      </View>
+    </View>
+  );
+
+  // ⋯ sits beside the tappable row, not inside it, so a screen reader reaches
+  // it on its own instead of folding it into the row's label.
+  return (
+    <View className="flex-row items-start pr-1">
+      {isBlocked ? (
+        <View accessible className="flex-1 pr-12">{body}</View>
+      ) : (
+        <>
+          <Pressable
+            className="flex-1 active:opacity-90"
+            onPress={() => onOpen(listing.id)}
+            accessibilityRole="button"
+            accessibilityLabel={labelKey ? `${title}, ${t(labelKey)}` : title}
+          >
+            {body}
+          </Pressable>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="mt-2 h-11 w-11"
+            onPress={() => onMore(listing, title)}
+            accessibilityLabel={t("myListingsActionsFor", { title })}
+          >
+            <Icon as={MoreHorizontal} className="size-5 text-foreground" />
+          </Button>
+        </>
+      )}
+    </View>
   );
 }
