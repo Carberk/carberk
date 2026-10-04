@@ -278,7 +278,7 @@ describe("issue 373 approved detail content", () => {
     expect(screen.getByText("19 views")).toBeTruthy();
     expect(screen.getByText("4 saves")).toBeTruthy();
     expect(screen.getByText("10,000 USD")).toBeTruthy();
-    for (const name of ["Edit", "Mark as sold", "Archive listing", "Delete"])
+    for (const name of ["Edit", "Mark as sold", "Remove from sale", "Delete"])
       expect(screen.queryByRole("button", { name })).toBeNull();
   });
 });
@@ -347,25 +347,25 @@ describe("issue 373 screen controls", () => {
     expect(screen.getByRole("button", { name: "More options" })).toBeTruthy();
   });
 
-  it("shows sticky owner Edit and Mark sold, with Archive and Delete in overflow", () => {
+  it("shows sticky owner Edit and Mark sold, with Remove from sale and Delete in overflow", () => {
     state.viewer = { userId: fixture().sellerId };
     const screen = renderMobile(<ListingDetailScreen />);
     expect(screen.queryByRole("button", { name: "Call" })).toBeNull();
     expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Mark as sold" })).toBeTruthy();
     expect(
-      screen.queryByRole("button", { name: "Archive listing" }),
+      screen.queryByRole("button", { name: "Remove from sale" }),
     ).toBeNull();
     expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
     fireEvent.press(screen.getByRole("button", { name: "More options" }));
     expect(
-      screen.getByRole("button", { name: "Archive listing" }),
+      screen.getByRole("button", { name: "Remove from sale" }),
     ).toBeTruthy();
     expect(screen.getByRole("button", { name: "Delete" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Report" })).toBeNull();
   });
 
-  it.each(["Mark as sold", "Archive listing"] as const)(
+  it.each(["Mark as sold", "Remove from sale"] as const)(
     "disables every lifecycle control in the bar and overflow while %s is in flight",
     async (started) => {
       state.viewer = { userId: fixture().sellerId };
@@ -387,7 +387,7 @@ describe("issue 373 screen controls", () => {
       for (const name of [
         "Edit",
         "Mark as sold",
-        "Archive listing",
+        "Remove from sale",
         "Delete",
       ])
         expect(

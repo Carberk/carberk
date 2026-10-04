@@ -24,7 +24,7 @@ function card(payload: ListingsSchemas.ListingDraft["payload"]) {
   const draft: ListingsSchemas.ListingDraft = {
     id, userId: id, payload, createdAt: "2026-10-03T00:00:00Z", updatedAt: "2026-10-03T00:00:00Z",
   };
-  return <DraftCard draft={draft} onResume={vi.fn()} onDiscard={vi.fn()} />;
+  return <DraftCard draft={draft} onResume={vi.fn()} onMore={vi.fn()} />;
 }
 
 describe("DraftCard rendered progress", () => {
