@@ -5,21 +5,31 @@ import { ChevronRight } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import { Enums, type ConversationsSchemas } from "@auto-tm/contracts";
 
+import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Text } from "@/components/ui/text";
+import { closedListingBannerKey } from "@/src/listings/detail/closedListing";
 import { buildVariantUrl } from "@/src/listings/detail/buildVariantUrl";
 import { formatPrice } from "@/src/listings/formatPrice";
 import { listingStatusLabel } from "@/src/listings/listingStatusLabel";
 
 type ConversationListingCardProps =
-  | { loading: true; listing?: undefined; brandName?: undefined; modelName?: undefined }
+  | {
+      loading: true;
+      listing?: undefined;
+      brandName?: undefined;
+      modelName?: undefined;
+      unavailable?: undefined;
+    }
   | {
       loading?: false;
       /** Null when the Listing is banned or deleted. */
       listing: ConversationsSchemas.ConversationListingCard | null;
       brandName?: string;
       modelName?: string;
+      /** The Listing is banned or deleted: the strip stays readable but opens nothing. */
+      unavailable?: boolean;
     };
 
 /** The Listing strip pinned under the Conversation header. */
@@ -42,7 +52,7 @@ export function ConversationListingCard(props: ConversationListingCardProps) {
     );
   }
 
-  const { listing, brandName, modelName } = props;
+  const { listing, brandName, modelName, unavailable = false } = props;
 
   if (!listing) {
     return (
@@ -65,15 +75,22 @@ export function ConversationListingCard(props: ConversationListingCardProps) {
     ? buildVariantUrl(listing.coverMediaKey, "thumbnail")
     : null;
 
+  const closedKey = closedListingBannerKey(listing.status);
+  const Wrapper = unavailable ? View : Pressable;
+
   return (
-    <Pressable
-      onPress={() => router.push(`/(public)/listings/${listing.id}`)}
-      className="flex-row items-center gap-3 px-4 py-2.5 border-b border-border active:bg-muted/50"
-      accessibilityRole="button"
-      accessibilityLabel={`${t("open")}: ${[title, priceText].filter(Boolean).join(", ")}`}
+    <Wrapper
+      {...(unavailable
+        ? {}
+        : {
+            onPress: () => router.push(`/(public)/listings/${listing.id}`),
+            accessibilityRole: "button" as const,
+            accessibilityLabel: `${t("open")}: ${[title, priceText, closedKey && t(closedKey)].filter(Boolean).join(", ")}`,
+          })}
+      className={`flex-row items-center gap-3 px-4 py-2.5 border-b border-border${unavailable ? "" : " active:bg-muted/50"}`}
     >
       <View
-        className="h-14 w-14 rounded-lg bg-muted overflow-hidden"
+        className={`h-14 w-14 rounded-lg bg-muted overflow-hidden${closedKey ? " opacity-60" : ""}`}
         testID="conversation-listing-thumbnail"
       >
         {imageUrl ? (
@@ -93,17 +110,29 @@ export function ConversationListingCard(props: ConversationListingCardProps) {
         <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
           {title}
         </Text>
-        <Text className="text-sm text-muted-foreground">{priceText}</Text>
-        {listing.status !== Enums.ListingStatus.Active && (
-          <Text className="text-xs text-muted-foreground">
-            {listingStatusLabel(listing.status, t)}
-          </Text>
+        <Text
+          className={`text-sm ${closedKey ? "text-muted-foreground" : "text-foreground"}`}
+        >
+          {priceText}
+        </Text>
+        {closedKey ? (
+          <Badge variant="secondary" className="self-start">
+            <Text>{t(closedKey)}</Text>
+          </Badge>
+        ) : (
+          listing.status !== Enums.ListingStatus.Active && (
+            <Text className="text-xs text-muted-foreground">
+              {listingStatusLabel(listing.status, t)}
+            </Text>
+          )
         )}
       </View>
 
-      <View testID="conversation-listing-chevron">
-        <Icon as={ChevronRight} className="size-5 text-muted-foreground" />
-      </View>
-    </Pressable>
+      {!unavailable && (
+        <View testID="conversation-listing-chevron">
+          <Icon as={ChevronRight} className="size-5 text-muted-foreground" />
+        </View>
+      )}
+    </Wrapper>
   );
 }
