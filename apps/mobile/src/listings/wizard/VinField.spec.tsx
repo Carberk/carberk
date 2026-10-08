@@ -65,7 +65,7 @@ describe("VIN field", () => {
       fireEvent.changeText(input, vin);
       fireEvent.changeText(input, "  ");
       expect(onChange).toHaveBeenNthCalledWith(1, { vin });
-      expect(onChange).toHaveBeenNthCalledWith(2, { vin: undefined });
+      expect(onChange).toHaveBeenNthCalledWith(2, { vin: null });
     },
   );
 });

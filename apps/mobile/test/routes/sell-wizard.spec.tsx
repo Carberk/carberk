@@ -15,11 +15,13 @@ const fixture = vi.hoisted(() => {
     id,
     payloads: {
       empty: {},
+      withVin: { vin: "WBA1234567890ABCD" },
       atPlace: { ...car, ...details, ...photos, ...price },
       complete: { ...car, ...details, ...photos, ...price, ...place, ...contact },
     } as Record<string, Record<string, unknown>>,
     payload: {} as Record<string, unknown>,
     mutation: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false, error: null },
+    save: vi.fn(),
   };
 });
 vi.mock("@react-navigation/native", async () => ({
@@ -36,12 +38,12 @@ vi.mock("../../src/api/listings/usePublishDraft", () => ({ usePublishDraft: () =
 vi.mock("../../src/api/listings/useDiscardDraft", () => ({ useDiscardDraft: () => fixture.mutation }));
 vi.mock("../../src/listings/wizard/useWizardAutosave", () => ({
   useWizardAutosave: () => ({
-    save: vi.fn(), forceSave: vi.fn().mockResolvedValue(undefined), retrySave: vi.fn(),
+    save: fixture.save, forceSave: vi.fn().mockResolvedValue(undefined), retrySave: vi.fn(),
     saveStatus: "idle", saveError: null,
   }),
 }));
 vi.mock("../../src/listings/uploadStaging/useUploadQueue", () => ({ useUploadQueue: () => ({
-  photos: [], publishGate: { canPublish: true, blockers: [] },
+  photos: [], isReady: true, publishGate: { canPublish: true, blockers: [] },
 }) }));
 vi.mock("../../src/listings/uploadStaging/stagingDir", () => ({ deleteDraftDir: vi.fn() }));
 vi.mock("../../src/auth/useAuth", () => ({ useAuth: () => ({ isAuthenticated: true, phone: "+99365000000" }) }));
@@ -82,6 +84,7 @@ function resume(payload: keyof typeof fixture.payloads) {
 
 beforeEach(() => {
   fixture.payload = {};
+  fixture.save.mockClear();
 });
 
 describe("Sell wizard", () => {
@@ -93,6 +96,16 @@ describe("Sell wizard", () => {
     expect(screen.getByLabelText("VIN")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /skip/i })).toBeNull();
     expect(screen.queryByText(/skip/i)).toBeNull();
+  });
+
+  it("saves a cleared VIN as null so reopening the draft no longer restores it", () => {
+    resume("withVin");
+    const screen = renderMobile(<SellScreen />);
+
+    fireEvent.changeText(screen.getByLabelText("VIN"), "");
+
+    // null survives JSON.stringify; an omitted key would leave the stored VIN in place.
+    expect(fixture.save).toHaveBeenCalledWith(expect.objectContaining({ vin: null }));
   });
 
   it("opens Description and place without errors and shows Description's once the seller leaves it empty", () => {

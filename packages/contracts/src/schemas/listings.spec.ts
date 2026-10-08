@@ -7,6 +7,7 @@ import {
   FeedListingSummarySchema,
   FeedResponseSchema,
   ListingDetailSchema,
+  ListingDraftPayloadSchema,
   MyListingsResponseSchema,
 } from "./listings";
 
@@ -233,5 +234,11 @@ describe("FeedListingSummarySchema for the Results card", () => {
       allowChat: false,
       seller: { displayName: "Aman", nameNumber: 4821, deleted: false },
     });
+  });
+});
+
+describe("ListingDraftPayloadSchema", () => {
+  it("accepts null as a cleared VIN so a draft update can remove the stored one", () => {
+    expect(ListingDraftPayloadSchema.parse({ vin: null }).vin).toBeNull();
   });
 });

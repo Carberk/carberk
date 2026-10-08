@@ -5,6 +5,7 @@ import type { FastifyRequest } from "fastify";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ValidateDraftStep } from "../application/ValidateDraftStep";
+import type { UpdateDraft } from "../application/UpdateDraft";
 
 import { DraftsController } from "./DraftsController";
 
@@ -52,6 +53,38 @@ describe("DraftsController validate-step", () => {
     } finally {
       errorSpy.mockRestore();
     }
+  });
+});
+
+describe("DraftsController updateDraft", () => {
+  function controllerWithUpdate(updateDraft = vi.fn()) {
+    const unused = {} as never;
+    return new DraftsController(
+      unused,
+      { execute: updateDraft } as unknown as UpdateDraft,
+      unused,
+      unused,
+      unused,
+      { isSuspended: async () => false } as never,
+    );
+  }
+
+  it("accepts a null VIN as a clearing update and hands it to the use case", async () => {
+    const updateDraft = vi.fn().mockResolvedValue({
+      draft: {
+        id: "draft-1",
+        userId: "user-1",
+        payload: {},
+        createdAt: new Date("2026-10-09T00:00:00Z"),
+        updatedAt: new Date("2026-10-09T00:00:00Z"),
+      },
+    });
+
+    await controllerWithUpdate(updateDraft).updateDraft("draft-1", { vin: null }, req);
+
+    expect(updateDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ draftId: "draft-1", payload: { vin: null } }),
+    );
   });
 });
 

@@ -119,7 +119,7 @@ describe("Car step", () => {
     fireEvent.changeText(screen.getByLabelText("VIN"), "  ");
 
     expect(onChange).toHaveBeenNthCalledWith(1, { vin: "WBA1234567890ABCD" });
-    expect(onChange).toHaveBeenNthCalledWith(2, { vin: undefined });
+    expect(onChange).toHaveBeenNthCalledWith(2, { vin: null });
   });
 
   it("shows a VIN error under the field after the first Continue tap", () => {

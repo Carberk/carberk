@@ -31,7 +31,9 @@ export function VinField({ payload, onChange, error, disabled }: VinFieldProps) 
         <Input
           value={payload.vin ?? ""}
           onChangeText={(text) =>
-            onChange({ vin: text.trim() === "" ? undefined : text.replace(/[a-z]/g, (letter) => letter.toUpperCase()) })
+            // null (not an omitted key) reaches the draft update, so clearing the
+            // field removes the stored VIN instead of leaving the old value.
+            onChange({ vin: text.trim() === "" ? null : text.replace(/[a-z]/g, (letter) => letter.toUpperCase()) })
           }
           placeholder="WBA1234567890ABCD"
           editable={!disabled}

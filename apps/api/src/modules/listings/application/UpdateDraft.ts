@@ -61,6 +61,10 @@ export class UpdateDraft {
       ...input.payload,
       validatedSteps: newValidatedSteps,
     };
+    // An explicit null VIN clears the stored one; a missing key keeps it.
+    if (input.payload.vin === null) {
+      delete (mergedPayload as Record<string, unknown>)["vin"];
+    }
 
     const updated = existing.updatePayload(mergedPayload, new Date());
     const saved = await this.drafts.update(updated);

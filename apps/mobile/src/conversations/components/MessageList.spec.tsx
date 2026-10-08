@@ -22,7 +22,7 @@ interface RenderedNode {
   children: (RenderedNode | string)[] | null;
 }
 
-/** Every text in render order. Cells are in data order, newest first; the list draws them bottom-up. */
+/** Every text in render order. Rows are in data order, newest first; the inverted list draws each row above the previous one. */
 function texts(json: ReturnType<ReturnType<typeof renderMobile>["toJSON"]>): string[] {
   const out: string[] = [];
   const walk = (node: RenderedNode | string | null) => {
@@ -63,15 +63,43 @@ describe("MessageList day separators", () => {
     const order = texts(screen.toJSON()).filter((s) =>
       ["Today", "Yesterday", "September 28", "today-2", "today-1", "yesterday-1", "older-1"].includes(s),
     );
-    // Newest first in the tree: each separator sits just before (so above) its day's oldest Message.
+    // The inverted list draws each row directly above the previous one, so the
+    // separator row sits directly after (so above) its day's oldest Message.
     expect(order).toEqual([
       "today-2",
-      "Today",
       "today-1",
-      "Yesterday",
+      "Today",
       "yesterday-1",
-      "September 28",
+      "Yesterday",
       "older-1",
+      "September 28",
+    ]);
+  });
+
+  it("renders each day separator as its own row directly above the day's oldest Message", () => {
+    const screen = renderMobile(
+      <MessageList
+        currentUserId={ME}
+        messages={[
+          message("today-2", at(2, 9, 30), { senderId: PEER }),
+          message("today-1", at(2, 9, 0)),
+          message("yesterday-1", at(1, 20, 0), { senderId: PEER }),
+        ]}
+      />,
+    );
+
+    // An inverted VirtualizedList cell lays its children out bottom-up, so a
+    // separator nested in the Message cell would land below the bubble. Each
+    // separator must be a sibling row instead; the row after the oldest
+    // Message of a day renders directly above it.
+    const list = screen.UNSAFE_getByProps({ inverted: true });
+    const keys = (list.props.data as Array<{ key: string }>).map((row) => row.key);
+    expect(keys).toEqual([
+      "today-2",
+      "today-1",
+      "today-1:day",
+      "yesterday-1",
+      "yesterday-1:day",
     ]);
   });
 
@@ -94,8 +122,8 @@ describe("MessageList day separators", () => {
     const firstPage = [message("today-1", at(2, 9)), message("yesterday-2", at(1, 21))];
     const screen = renderMobile(<MessageList currentUserId={ME} messages={firstPage} />);
     expect(texts(screen.toJSON()).filter((s) => ["Yesterday", "yesterday-2"].includes(s))).toEqual([
-      "Yesterday",
       "yesterday-2",
+      "Yesterday",
     ]);
 
     screen.rerender(
@@ -108,7 +136,7 @@ describe("MessageList day separators", () => {
     expect(screen.getAllByText("Yesterday")).toHaveLength(1);
     expect(
       texts(screen.toJSON()).filter((s) => ["Yesterday", "yesterday-2", "yesterday-1", "September 29"].includes(s)),
-    ).toEqual(["yesterday-2", "Yesterday", "yesterday-1", "September 29"]);
+    ).toEqual(["yesterday-2", "yesterday-1", "Yesterday", "September 29"]);
   });
 
   it("asks for older Messages at the top of the history", () => {

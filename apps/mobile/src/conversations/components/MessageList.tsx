@@ -3,7 +3,7 @@ import { FlatList, Pressable, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { buildChatImageUrl } from "../upload/buildChatImageUrl";
-import { buildMessageRows, type MessageRow } from "../messageRows";
+import { buildMessageRows, type MessageListRow } from "../messageRows";
 import { formatMessageDay } from "../messageTime";
 
 import { MessageActionsSheet } from "./MessageActionsSheet";
@@ -130,7 +130,7 @@ export function MessageList({
   afterLast,
 }: MessageListProps) {
   const { t, i18n } = useTranslation();
-  const listRef = useRef<FlatList<MessageRow<MessageItem>>>(null);
+  const listRef = useRef<FlatList<MessageListRow<MessageItem>>>(null);
   useEffect(() => {
     if (sendCount > 0) listRef.current?.scrollToOffset({ offset: 0, animated: false });
   }, [sendCount]);
@@ -157,43 +157,49 @@ export function MessageList({
   );
 
   const renderItem = useCallback(
-    ({ item: { message: item, startsDay, showReadLabel } }: { item: MessageRow<MessageItem> }) => (
-      <>
-        {startsDay && (
-          <DaySeparator label={formatMessageDay(item.createdAt, i18n.language, t)} />
-        )}
+    ({ item }: { item: MessageListRow<MessageItem> }) => {
+      // A day separator is its own row: an inverted cell lays its children out
+      // bottom-up, so nesting the separator in the Message cell would put it
+      // below the bubble.
+      if (item.kind === "separator") {
+        return (
+          <DaySeparator label={formatMessageDay(item.day, i18n.language, t)} />
+        );
+      }
+      const message = item.message;
+      return (
         <MessageBubble
-          id={item.id}
-          text={item.text}
-          kind={item.kind ?? "text"}
-          metadata={item.metadata}
-          localImageUri={item.localImageUri}
-          isMine={item.senderId === currentUserId}
-          status={item.status}
-          createdAt={item.createdAt}
-          deletedAt={item.deletedAt}
-          reported={reported.has(item.id)}
-          showReadLabel={showReadLabel}
-          postRefBrandName={item.postRefBrandName}
-          postRefModelName={item.postRefModelName}
-          onRetry={item.status === "failed" ? () => onRetry?.(item.id) : undefined}
+          id={message.id}
+          text={message.text}
+          kind={message.kind ?? "text"}
+          metadata={message.metadata}
+          localImageUri={message.localImageUri}
+          isMine={message.senderId === currentUserId}
+          status={message.status}
+          createdAt={message.createdAt}
+          deletedAt={message.deletedAt}
+          reported={reported.has(message.id)}
+          showReadLabel={item.showReadLabel}
+          postRefBrandName={message.postRefBrandName}
+          postRefModelName={message.postRefModelName}
+          onRetry={message.status === "failed" ? () => onRetry?.(message.id) : undefined}
           onOpenActions={
-            Object.values(actionsFor(item)).some(Boolean) ? () => setActionTargetId(item.id) : undefined
+            Object.values(actionsFor(message)).some(Boolean) ? () => setActionTargetId(message.id) : undefined
           }
-          onImagePress={item.kind === "image" && !item.deletedAt ? () => {
-            const uri = item.localImageUri ?? (item.metadata && "key" in item.metadata && item.metadata.key
-              ? buildChatImageUrl(item.metadata.key)
+          onImagePress={message.kind === "image" && !message.deletedAt ? () => {
+            const uri = message.localImageUri ?? (message.metadata && "key" in message.metadata && message.metadata.key
+              ? buildChatImageUrl(message.metadata.key)
               : undefined);
             if (uri) onImagePress?.(uri);
           } : undefined}
-          onPostRefPress={item.kind === "post_ref" && !item.deletedAt ? onPostRefPress : undefined}
+          onPostRefPress={message.kind === "post_ref" && !message.deletedAt ? onPostRefPress : undefined}
         />
-      </>
-    ),
+      );
+    },
     [currentUserId, reported, actionsFor, onRetry, onImagePress, onPostRefPress, i18n.language, t],
   );
 
-  const keyExtractor = useCallback((row: MessageRow<MessageItem>) => row.message.id, []);
+  const keyExtractor = useCallback((row: MessageListRow<MessageItem>) => row.key, []);
 
   const actionTarget = messages.find((item) => item.id === actionTargetId);
   const targetActions = actionTarget ? actionsFor(actionTarget) : null;

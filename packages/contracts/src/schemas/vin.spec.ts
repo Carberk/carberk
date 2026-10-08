@@ -7,8 +7,9 @@ describe("Optional VIN", () => {
     expect(StepVehicleSchema.safeParse({ ...vehicle, vin }).success).toBe(false);
     expect(validateStep("vehicle", { ...vehicle, vin }).valid).toBe(false);
   });
-  it.each([undefined, "", "WBA1234567890ABCD", "wba1234567890abcd"])("accepts optional or valid VIN %s", (vin) => {
+  it.each([undefined, null, "", "WBA1234567890ABCD", "wba1234567890abcd"])("accepts optional or valid VIN %s", (vin) => {
     expect(StepVehicleSchema.safeParse({ ...vehicle, vin }).success).toBe(true);
+    expect(validateStep("vehicle", { ...vehicle, vin }).valid).toBe(true);
   });
 });
 

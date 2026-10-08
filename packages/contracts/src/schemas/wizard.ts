@@ -125,7 +125,8 @@ export const VinSchema = z.string()
       (vin) => vin.length > WIZARD_LIMITS.vinMaxLength || /^(?:[A-HJ-NPR-Z0-9]{17})?$/.test(vin),
       KEY.vinInvalid,
     ))
-  .optional();
+  // null is a cleared VIN on the draft update; validate and store it like absence.
+  .nullish();
 
 export const StepVehicleSchema = z.object({
   brandId: z.string({ required_error: KEY.brandRequired }).uuid({ message: KEY.brandRequired }),

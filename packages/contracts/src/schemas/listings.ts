@@ -196,7 +196,8 @@ export type DraftPhoto = z.infer<typeof DraftPhotoSchema>;
 
 export const ListingDraftPayloadSchema = z.object({
   currentStep: z.number().int().min(1).max(7).optional(),
-  vin: z.string().optional(),
+  // null clears a stored VIN on update; omitting the key keeps it.
+  vin: z.string().nullish(),
   photos: z.array(DraftPhotoSchema).optional(),
   brandId: z.string().uuid().optional(),
   modelId: z.string().uuid().optional(),

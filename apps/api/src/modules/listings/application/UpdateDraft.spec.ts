@@ -60,6 +60,42 @@ describe("UpdateDraft", () => {
     expect(result.draft.payload).toMatchObject({ vin: "new", brandId: "b1" });
   });
 
+  it("clears the stored VIN when the update sets it to null", async () => {
+    const draft = ListingDraft.create({
+      id: "draft-1",
+      userId: "user-1",
+      payload: { vin: "WBA1234567890ABCD" },
+    });
+    repo.drafts.push(draft);
+
+    const uc = makeUseCase(repo);
+    const result = await uc.execute({
+      draftId: "draft-1",
+      userId: "user-1",
+      payload: { vin: null },
+    });
+
+    expect(result.draft.payload).not.toHaveProperty("vin");
+  });
+
+  it("keeps the stored VIN when the update omits it", async () => {
+    const draft = ListingDraft.create({
+      id: "draft-1",
+      userId: "user-1",
+      payload: { vin: "WBA1234567890ABCD" },
+    });
+    repo.drafts.push(draft);
+
+    const uc = makeUseCase(repo);
+    const result = await uc.execute({
+      draftId: "draft-1",
+      userId: "user-1",
+      payload: { brandId: "b1" },
+    });
+
+    expect(result.draft.payload).toMatchObject({ vin: "WBA1234567890ABCD", brandId: "b1" });
+  });
+
   it("throws NotFoundException for non-existent draft", async () => {
     const uc = makeUseCase(repo);
     await expect(
