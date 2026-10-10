@@ -63,6 +63,9 @@ export function ZoomableImage({
   const savedY = useSharedValue(0);
   const focalX = useSharedValue(0);
   const focalY = useSharedValue(0);
+  // While two fingers pinch, the pinch alone moves the photo: on iOS an
+  // active one-finger pan is not cancelled when a second finger lands.
+  const pinching = useSharedValue(false);
 
   // Read through a ref, so a new callback each render never rebuilds the
   // gestures, which would cancel a pinch in progress.
@@ -100,6 +103,7 @@ export function ZoomableImage({
 
     const pinch = Gesture.Pinch()
       .onStart((event) => {
+        pinching.value = true;
         savedScale.value = scale.value;
         savedX.value = translateX.value;
         savedY.value = translateY.value;
@@ -126,6 +130,9 @@ export function ZoomableImage({
           height,
         );
       })
+      .onFinalize(() => {
+        pinching.value = false;
+      })
       .onEnd(() => {
         const fitted = scale.value < FITTED;
         if (fitted) {
@@ -146,19 +153,18 @@ export function ZoomableImage({
     const pan = Gesture.Pan()
       .enabled(zoomed)
       .maxPointers(1)
-      .onStart(() => {
-        savedX.value = translateX.value;
-        savedY.value = translateY.value;
-      })
-      .onUpdate((event) => {
+      // Moves by each step rather than from the start point, so a finger left
+      // down after a pinch carries on from where the pinch put the photo.
+      .onChange((event) => {
+        if (pinching.value) return;
         translateX.value = clampTranslation(
-          savedX.value + event.translationX,
+          translateX.value + event.changeX,
           scale.value,
           photo.width,
           width,
         );
         translateY.value = clampTranslation(
-          savedY.value + event.translationY,
+          translateY.value + event.changeY,
           scale.value,
           photo.height,
           height,
@@ -217,6 +223,7 @@ export function ZoomableImage({
     savedY,
     focalX,
     focalY,
+    pinching,
   ]);
 
   const style = useAnimatedStyle(() => ({
