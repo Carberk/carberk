@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { Pressable } from "react-native";
+import { Image, Pressable } from "react-native";
 
 import { fireEvent, renderMobile, first } from "../../../test/render";
 import { mediaFixture } from "../../../test/fixtures/listing";
@@ -13,13 +13,20 @@ vi.mock("./ZoomableImage", () => ({
   ZoomableImage: ({
     active,
     onZoomChange,
+    onZoomStart,
     children,
   }: {
     active: boolean;
     onZoomChange: (zoomed: boolean) => void;
+    onZoomStart?: () => void;
     children: React.ReactNode;
   }) => (
     <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={active ? "Start zoom on active photo" : "Start zoom on other photo"}
+        onPress={() => onZoomStart?.()}
+      />
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={active ? "Zoom in active photo" : "Zoom in other photo"}
@@ -35,10 +42,18 @@ vi.mock("./ZoomableImage", () => ({
   ),
 }));
 
-function open() {
+function open(count = 3, initialIndex = 0) {
   return renderMobile(
-    <PhotoViewer visible media={mediaFixture(3)} initialIndex={0} onClose={vi.fn()} />,
+    <PhotoViewer visible media={mediaFixture(count)} initialIndex={initialIndex} onClose={vi.fn()} />,
   );
+}
+
+/** The photo URLs the pages ask for, leaving out the thumbnail strip. */
+function pageSources(screen: ReturnType<typeof open>) {
+  return screen
+    .UNSAFE_getAllByType(Image)
+    .map((image) => image.props.source.uri as string)
+    .filter((uri) => !uri.includes("thumbnail"));
 }
 
 describe("Photo viewer while a photo is zoomed", () => {
@@ -59,6 +74,34 @@ describe("Photo viewer while a photo is zoomed", () => {
     const screen = open();
 
     expect(screen.getAllByRole("button", { name: "Zoom in active photo" })).toHaveLength(1);
-    expect(screen.getAllByRole("button", { name: "Zoom in other photo" })).toHaveLength(2);
+    // Only the neighbour of the first photo is loaded, not the third (#816).
+    expect(screen.getAllByRole("button", { name: "Zoom in other photo" })).toHaveLength(1);
+  });
+});
+
+describe("Photo viewer on a slow connection (#816)", () => {
+  it("loads only the photo on screen and its neighbours, at the gallery's size", () => {
+    const screen = open(20, 5);
+
+    expect(pageSources(screen)).toEqual([
+      "https://media.test/4/detail.jpg",
+      "https://media.test/5/detail.jpg",
+      "https://media.test/6/detail.jpg",
+    ]);
+  });
+
+  it("asks for the 2400 px photo only once a zoom starts, over the cached detail size", () => {
+    const screen = open(3, 0);
+    expect(pageSources(screen).some((uri) => uri.includes("fullscreen"))).toBe(false);
+
+    fireEvent.press(screen.getByRole("button", { name: "Start zoom on active photo" }));
+
+    const sharpened = screen
+      .UNSAFE_getAllByType(Image)
+      .find((image) => image.props.source.uri === "https://media.test/0/fullscreen.jpg");
+    expect(sharpened?.props.placeholder).toEqual({ uri: "https://media.test/0/detail.jpg" });
+    expect(sharpened?.props.placeholderContentFit).toBe("contain");
+    // The neighbour stays at the detail size.
+    expect(pageSources(screen)).toContain("https://media.test/1/detail.jpg");
   });
 });

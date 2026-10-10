@@ -10,6 +10,7 @@ import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
 import { GalleryBanner, GalleryCounter, GalleryImage } from "./GalleryImage";
+import { isNearPhoto } from "./photoWindow";
 import { PhotoViewer } from "./PhotoViewer";
 
 import { Text } from "@/components/ui/text";
@@ -69,18 +70,23 @@ export function PhotoGallery({
           onPress={() => setViewerIndex(index)}
           className="active:opacity-90"
         >
-          <View style={{ width: screenWidth, height: screenWidth * 0.65 }}>
-            <GalleryImage
-              item={item}
-              variant="detail"
-              style={{ width: "100%", height: "100%" }}
-              contentFit="cover"
-            />
+          <View className="bg-muted" style={{ width: screenWidth, height: screenWidth * 0.65 }}>
+            {isNearPhoto(index, activeIndex) && (
+              <GalleryImage
+                item={item}
+                variant="detail"
+                // The first photo is the card's: its `list` size is cached and shows at once.
+                placeholderVariant={index === 0 ? "list" : undefined}
+                priority={index === activeIndex ? "high" : "low"}
+                style={{ width: "100%", height: "100%" }}
+                contentFit="cover"
+              />
+            )}
           </View>
         </Pressable>
       );
     },
-    [screenWidth, media.length, t],
+    [screenWidth, media.length, activeIndex, t],
   );
 
   if (media.length === 0) {
@@ -99,6 +105,9 @@ export function PhotoGallery({
         data={media}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
+        extraData={activeIndex}
+        initialNumToRender={1}
+        windowSize={3}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}

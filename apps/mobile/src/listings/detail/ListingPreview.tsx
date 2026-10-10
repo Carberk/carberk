@@ -50,13 +50,15 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
   const closed = !isOwner && isClosedForContact(summary.status);
   const bannerKey = closed ? closedListingBannerKey(summary.status) : null;
   const coverKey = summary.photoKeys[0] ?? summary.coverMediaKey;
-  // The card decoded the `list` variant already, so asking for the same one
-  // shows the photo at once.
+  // The card decoded the `list` size already, so it shows at once while the
+  // `detail` size the gallery opens on loads behind it. The gallery then finds
+  // that size cached, and the photo never blanks when the full detail arrives.
   const imageUri = coverKey
     ? useOriginalImage
       ? buildOriginalUrl(coverKey)
-      : buildVariantUrl(coverKey, "list")
+      : buildVariantUrl(coverKey, "detail")
     : null;
+  const placeholderUri = coverKey ? buildVariantUrl(coverKey, "list") : null;
 
   const title = [
     [names.brandName(summary.brandId), names.modelName(summary.modelId)]
@@ -100,8 +102,11 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
           <View style={{ width, height: width * 0.65 }}>
             <Image
               source={{ uri: imageUri }}
+              placeholder={placeholderUri ? { uri: placeholderUri } : undefined}
+              placeholderContentFit="cover"
               style={{ width: "100%", height: "100%" }}
               contentFit="cover"
+              priority="high"
               cachePolicy="memory-disk"
               onError={() => setUseOriginalImage(true)}
             />

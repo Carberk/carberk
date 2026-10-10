@@ -15,6 +15,7 @@ import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
 import { GalleryImage } from "./GalleryImage";
+import { isNearPhoto } from "./photoWindow";
 import { ZoomableImage } from "./ZoomableImage";
 
 import { Button } from "@/components/ui/button";
@@ -44,7 +45,11 @@ export interface PhotoViewerProps {
 /**
  * Black full-screen photo viewer (approved Listing detail content, AR-11-004):
  * an `n / N` counter, ✕, swipe paging, pinch zoom, a thumbnail strip, and
- * caller-supplied ♡ and contact actions. A React Native Modal sits above the
+ * caller-supplied ♡ and contact actions. Pages show the gallery's `detail`
+ * size, already cached for the photo that was tapped, and load only the
+ * photo on screen and its neighbours. The 2400 px `fullscreen` size loads
+ * only once a zoom starts on a photo, and sharpens it in place; the zoom
+ * itself never waits for it. A React Native Modal sits above the
  * navigation stack, so anything that leaves this screen must close it first;
  * the slots get `close` for that.
  */
@@ -98,11 +103,23 @@ function ViewerContent({
   const { width, height } = useWindowDimensions();
   const [index, setIndex] = useState(initialIndex);
   const [zoomed, setZoomed] = useState(false);
+  // Photos zoomed at least once, which show the `fullscreen` size from then on.
+  const [sharp, setSharp] = useState<ReadonlySet<string>>(() => new Set());
+  // Each loaded photo's width / height, for photos the API sent no size for.
+  const [loadedRatios, setLoadedRatios] = useState<Record<string, number>>({});
   const [pagerHeight, setPagerHeight] = useState(height * 0.6);
   const pagerRef = useRef<FlatList<ListingMedia>>(null);
   const stripRef = useRef<FlatList<ListingMedia>>(null);
 
   const close = useCallback(() => onClose(indexRef.current), [onClose, indexRef]);
+
+  const sharpen = useCallback((id: string) => {
+    setSharp((current) => (current.has(id) ? current : new Set(current).add(id)));
+  }, []);
+
+  const rememberRatio = useCallback((id: string, ratio: number) => {
+    setLoadedRatios((current) => (current[id] === ratio ? current : { ...current, [id]: ratio }));
+  }, []);
 
   const moveTo = useCallback(
     (next: number) => {
@@ -177,21 +194,37 @@ function ViewerContent({
             index: position,
           })}
           onMomentumScrollEnd={handleSwipeEnd}
-          renderItem={({ item, index: position }) => (
-            <ZoomableImage
-              width={width}
-              height={pagerHeight}
-              active={position === index}
-              onZoomChange={setZoomed}
-            >
-              <GalleryImage
-                item={item}
-                variant="fullscreen"
-                contentFit="contain"
-                style={{ width: "100%", height: "100%" }}
-              />
-            </ZoomableImage>
-          )}
+          extraData={{ index, sharp, loadedRatios }}
+          initialNumToRender={1}
+          windowSize={3}
+          renderItem={({ item, index: position }) => {
+            if (!isNearPhoto(position, index)) {
+              return <View style={{ width, height: pagerHeight }} />;
+            }
+            const isSharp = sharp.has(item.id);
+            return (
+              <ZoomableImage
+                width={width}
+                height={pagerHeight}
+                aspectRatio={
+                  item.width && item.height ? item.width / item.height : loadedRatios[item.id]
+                }
+                active={position === index}
+                onZoomChange={setZoomed}
+                onZoomStart={() => sharpen(item.id)}
+              >
+                <GalleryImage
+                  item={item}
+                  variant={isSharp ? "fullscreen" : "detail"}
+                  placeholderVariant={isSharp ? "detail" : undefined}
+                  priority={position === index ? "high" : "low"}
+                  contentFit="contain"
+                  style={{ width: "100%", height: "100%" }}
+                  onAspectRatio={(ratio) => rememberRatio(item.id, ratio)}
+                />
+              </ZoomableImage>
+            );
+          }}
         />
       </View>
 
