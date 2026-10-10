@@ -58,33 +58,56 @@ export function GalleryCounter({
   );
 }
 
+type Variant = "thumbnail" | "list" | "detail" | "fullscreen";
+
+function variantUri(item: ListingMedia, variant: Variant): string {
+  return item.variants[variant] || buildVariantUrl(item.key, variant);
+}
+
 /**
  * One Listing photo at a given size variant. Falls back to the original upload
- * when the variant is missing or fails to load.
+ * when the variant is missing or fails to load. `placeholderVariant` names a
+ * smaller size that is usually cached already (the card's `list`, or the
+ * gallery's `detail` under the viewer's `fullscreen`): it shows at once, drawn
+ * with the same fit so the sharper photo replaces it in place without a jump
+ * or a blank frame.
  */
 export function GalleryImage({
   item,
   variant,
+  placeholderVariant,
+  priority = "normal",
   contentFit,
   style,
+  onAspectRatio,
 }: {
   item: ListingMedia;
-  variant: "thumbnail" | "detail" | "fullscreen";
+  variant: Variant;
+  placeholderVariant?: Exclude<Variant, "fullscreen">;
+  /** `high` for the photo on screen, `low` for a neighbour loading ahead. */
+  priority?: "low" | "normal" | "high";
   contentFit: "cover" | "contain";
   style: ExpoImageStyle;
+  /** Reports the loaded photo's width / height. */
+  onAspectRatio?: (aspectRatio: number) => void;
 }) {
   const [useOriginalImage, setUseOriginalImage] = useState(false);
-  const generatedUri = buildVariantUrl(item.key, variant);
-  const sourceUri = useOriginalImage
-    ? buildOriginalUrl(item.key)
-    : item.variants[variant] || generatedUri;
+  const sourceUri = useOriginalImage ? buildOriginalUrl(item.key) : variantUri(item, variant);
+  const placeholderUri = placeholderVariant ? variantUri(item, placeholderVariant) : undefined;
 
   return (
     <Image
       source={{ uri: sourceUri }}
+      placeholder={placeholderUri ? { uri: placeholderUri } : undefined}
+      placeholderContentFit={contentFit}
       style={style}
       contentFit={contentFit}
+      priority={priority}
       cachePolicy="memory-disk"
+      onLoad={(event) => {
+        const { width, height } = event.source;
+        if (width > 0 && height > 0) onAspectRatio?.(width / height);
+      }}
       onError={() => setUseOriginalImage(true)}
     />
   );

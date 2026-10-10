@@ -91,7 +91,7 @@ describe("PhotoGallery", () => {
   it("renders the no-media fallback", () => {
     expect(renderMobile(<PhotoGallery media={[]} />).getByText("No photos")).toBeTruthy();
   });
-  it("opens a full-screen image and falls back to the original after a load error", () => {
+  it("opens the viewer on the gallery's cached size and falls back to the original after a load error", () => {
     const media: ListingsSchemas.ListingMedia[] = [{ id: "image-1", kind: "image", key: "listings/a.jpg", sortOrder: 0,
       variants: { thumbnail: "https://media/thumbnail.jpg", list: "https://media/list.jpg", detail: "https://media/detail.jpg", fullscreen: "https://media/fullscreen.jpg" } }];
     const screen = renderMobile(<PhotoGallery media={media} />);
@@ -100,9 +100,11 @@ describe("PhotoGallery", () => {
     if (!opener) throw new Error("Gallery opener missing");
     fireEvent.press(opener);
     const images = screen.UNSAFE_getAllByType(Image);
-    const fullscreen = images.find((image) => image.props.source.uri === "https://media/fullscreen.jpg");
-    if (!fullscreen) throw new Error("Fullscreen image missing");
-    fireEvent(fullscreen, "error");
+    // The 2400 px size waits for a zoom (#816); the viewer's page is the last detail image.
+    expect(images.some((image) => image.props.source.uri === "https://media/fullscreen.jpg")).toBe(false);
+    const page = images.filter((image) => image.props.source.uri === "https://media/detail.jpg").at(-1);
+    if (!page) throw new Error("Viewer page missing");
+    fireEvent(page, "error");
     expect(screen.UNSAFE_getAllByType(Image).some((image) => image.props.source.uri.endsWith("/listings/a.jpg"))).toBe(true);
   });
 });

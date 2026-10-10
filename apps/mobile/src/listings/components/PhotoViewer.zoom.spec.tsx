@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { Pressable } from "react-native";
+import { Image, Pressable } from "react-native";
 
 import { fireEvent, renderMobile, first } from "../../../test/render";
 import { mediaFixture } from "../../../test/fixtures/listing";
@@ -13,13 +13,20 @@ vi.mock("./ZoomableImage", () => ({
   ZoomableImage: ({
     active,
     onZoomChange,
+    onZoomStart,
     children,
   }: {
     active: boolean;
     onZoomChange: (zoomed: boolean) => void;
+    onZoomStart?: () => void;
     children: React.ReactNode;
   }) => (
     <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={active ? "Start zoom on active photo" : "Start zoom on other photo"}
+        onPress={() => onZoomStart?.()}
+      />
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={active ? "Zoom in active photo" : "Zoom in other photo"}
@@ -35,10 +42,25 @@ vi.mock("./ZoomableImage", () => ({
   ),
 }));
 
-function open() {
+function open(count = 3, initialIndex = 0) {
   return renderMobile(
-    <PhotoViewer visible media={mediaFixture(3)} initialIndex={0} onClose={vi.fn()} />,
+    <PhotoViewer visible media={mediaFixture(count)} initialIndex={initialIndex} onClose={vi.fn()} />,
   );
+}
+
+/** The photo at `uri` finishes loading, as expo-image reports it. */
+function load(screen: ReturnType<typeof open>, uri: string) {
+  const image = screen.UNSAFE_getAllByType(Image).find((node) => node.props.source.uri === uri);
+  if (!image) throw new Error(`No image for ${uri}`);
+  fireEvent(image, "load", { source: { url: uri, width: 1200, height: 800 } });
+}
+
+/** The photo URLs the pages ask for, leaving out the thumbnail strip. */
+function pageSources(screen: ReturnType<typeof open>) {
+  return screen
+    .UNSAFE_getAllByType(Image)
+    .map((image) => image.props.source.uri as string)
+    .filter((uri) => !uri.includes("thumbnail"));
 }
 
 describe("Photo viewer while a photo is zoomed", () => {
@@ -59,6 +81,56 @@ describe("Photo viewer while a photo is zoomed", () => {
     const screen = open();
 
     expect(screen.getAllByRole("button", { name: "Zoom in active photo" })).toHaveLength(1);
-    expect(screen.getAllByRole("button", { name: "Zoom in other photo" })).toHaveLength(2);
+    load(screen, "https://media.test/0/detail.jpg");
+    // Only the neighbour of the first photo is loaded, not the third (#816).
+    expect(screen.getAllByRole("button", { name: "Zoom in other photo" })).toHaveLength(1);
+  });
+});
+
+describe("Photo viewer on a slow connection (#816)", () => {
+  it("loads the photo on screen first, then its neighbours, at the gallery's size", () => {
+    const screen = open(20, 5);
+    expect(pageSources(screen)).toEqual(["https://media.test/5/detail.jpg"]);
+
+    load(screen, "https://media.test/5/detail.jpg");
+
+    expect(pageSources(screen)).toEqual([
+      "https://media.test/4/detail.jpg",
+      "https://media.test/5/detail.jpg",
+      "https://media.test/6/detail.jpg",
+    ]);
+  });
+
+  it("keeps each photo's load priority when the viewer moves, so no download restarts", () => {
+    const screen = open(20, 5);
+    const priorityOf = (n: number) =>
+      screen
+        .UNSAFE_getAllByType(Image)
+        .find((image) => image.props.source.uri === `https://media.test/${n}/detail.jpg`)?.props
+        .priority;
+    load(screen, "https://media.test/5/detail.jpg");
+    expect([priorityOf(5), priorityOf(6)]).toEqual(["high", "low"]);
+
+    fireEvent(screen.getByTestId("photo-viewer-pager"), "momentumScrollEnd", {
+      nativeEvent: { contentOffset: { x: 390 * 6, y: 0 } },
+    });
+
+    expect([priorityOf(5), priorityOf(6), priorityOf(7)]).toEqual(["high", "low", "low"]);
+  });
+
+  it("asks for the 2400 px photo only once a zoom starts, over the cached detail size", () => {
+    const screen = open(3, 0);
+    load(screen, "https://media.test/0/detail.jpg");
+    expect(pageSources(screen).some((uri) => uri.includes("fullscreen"))).toBe(false);
+
+    fireEvent.press(screen.getByRole("button", { name: "Start zoom on active photo" }));
+
+    const sharpened = screen
+      .UNSAFE_getAllByType(Image)
+      .find((image) => image.props.source.uri === "https://media.test/0/fullscreen.jpg");
+    expect(sharpened?.props.placeholder).toEqual({ uri: "https://media.test/0/detail.jpg" });
+    expect(sharpened?.props.placeholderContentFit).toBe("contain");
+    // The neighbour stays at the detail size.
+    expect(pageSources(screen)).toContain("https://media.test/1/detail.jpg");
   });
 });

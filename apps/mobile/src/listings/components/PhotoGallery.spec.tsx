@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Modal } from "react-native";
+import { Image, Modal } from "react-native";
 import * as RN from "react-native";
 
 import { fireEvent, renderMobile, within, first } from "../../../test/render";
@@ -71,5 +71,28 @@ describe("Photo gallery and viewer", () => {
 
     expect(screen.getByText("No photos")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
+  });
+
+  it("loads the first photo behind the card's cached size, then only its neighbour (#816)", () => {
+    const screen = renderMobile(<PhotoGallery media={mediaFixture(20)} />);
+    const sources = () => screen.UNSAFE_getAllByType(Image).map((image) => image.props.source.uri);
+    // Nothing shares the first photo's bandwidth until it has loaded.
+    expect(sources()).toEqual(["https://media.test/0/detail.jpg"]);
+
+    fireEvent(first(screen.UNSAFE_getAllByType(Image)), "load", {
+      source: { url: "https://media.test/0/detail.jpg", width: 1200, height: 800 },
+    });
+
+    const photos = screen.UNSAFE_getAllByType(Image).map((image) => image.props);
+    expect(photos.map((photo) => photo.source.uri)).toEqual([
+      "https://media.test/0/detail.jpg",
+      "https://media.test/1/detail.jpg",
+    ]);
+    expect(photos[0]).toEqual(expect.objectContaining({
+      placeholder: { uri: "https://media.test/0/list.jpg" },
+      placeholderContentFit: "cover",
+      priority: "high",
+    }));
+    expect(photos[1]).toEqual(expect.objectContaining({ placeholder: undefined, priority: "low" }));
   });
 });
