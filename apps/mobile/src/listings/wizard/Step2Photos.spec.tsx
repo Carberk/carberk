@@ -1,6 +1,5 @@
 import * as Linking from "expo-linking";
 import { describe, expect, it, vi } from "vitest";
-import { Pressable, StyleSheet, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 
@@ -9,6 +8,26 @@ import type { StagedPhoto } from "../uploadStaging/types";
 
 import Step2Photos from "./Step2Photos";
 
+// The pan's callbacks are recorded on a host view, so a spec can run a drag the
+// way Gesture Handler would: start after the long press, update, finalize.
+vi.mock("react-native-gesture-handler", async () => {
+  const React = await import("react");
+  const { View } = await import("react-native");
+  const Pan = () => {
+    const recorded: Record<string, unknown> = {};
+    const gesture: unknown = new Proxy(recorded, {
+      get: (target, key: string) => key === "recorded" ? target
+        : (value: unknown) => { target[key] = value; return gesture; },
+    });
+    return gesture;
+  };
+  return {
+    GestureHandlerRootView: View,
+    GestureDetector: ({ gesture, children }: { gesture: { recorded: unknown }; children: React.ReactNode }) =>
+      React.createElement(View, { testID: "photo-drag", pan: gesture.recorded } as object, children),
+    Gesture: { Pan },
+  };
+});
 vi.mock("expo-image-picker", () => ({ launchImageLibraryAsync: vi.fn(), launchCameraAsync: vi.fn(), getCameraPermissionsAsync: vi.fn(), requestCameraPermissionsAsync: vi.fn() }));
 vi.mock("expo-file-system/legacy", () => ({ documentDirectory: "file:///documents/",
   getInfoAsync: vi.fn(async () => ({ exists: true })), copyAsync: vi.fn(async () => {}),
@@ -19,6 +38,23 @@ const photo = (photoId: string, sortOrder: number): StagedPhoto => ({ photoId, s
 const defaults = () => ({ photos: [], onAddPhoto: vi.fn<(uri: string) => Promise<void>>(async () => {}), onRemovePhoto: vi.fn(),
   onReorderPhotos: vi.fn(), onRetryPhoto: vi.fn(), isCompressing: false, isUploading: false });
 
+type PanCallbacks = Record<string, ((event?: unknown) => void) | number | boolean>;
+function pan(screen: ReturnType<typeof renderMobile>, index: number): PanCallbacks {
+  const detector = screen.getAllByTestId("photo-drag")[index];
+  if (!detector) throw new Error(`No drag on photo ${index + 1}`);
+  return detector.props.pan as PanCallbacks;
+}
+/** Long-press photo `index`, move it by dx, dy and lift, as Gesture Handler reports it. */
+function dragPhoto(screen: ReturnType<typeof renderMobile>, index: number, { dx, dy }: { dx: number; dy: number }) {
+  const callbacks = pan(screen, index);
+  const call = (name: string, event?: unknown) => (callbacks[name] as (event?: unknown) => void)(event);
+  act(() => {
+    call("onStart");
+    call("onUpdate", { translationX: dx, translationY: dy });
+    call("onFinalize");
+  });
+}
+
 describe("Step2Photos", () => {
   it("shows an empty state and photo validation error", () => {
     const screen = renderMobile(<Step2Photos {...defaults()} fieldErrors={{ photos: "Add a photo" }} showErrors />);
@@ -28,21 +64,38 @@ describe("Step2Photos", () => {
     expect(screen.getByRole("button", { name: "Library" })).toBeTruthy();
   });
 
-  it("reorders photos through the thumbnail drag lifecycle", () => {
-    const props = { ...defaults(), photos: [photo("a", 0), photo("b", 1), photo("c", 2)] };
+  it("drags a photo from the first row to the second, and the others make room (#820)", () => {
+    const ids = ["a", "b", "c", "d", "e", "f"];
+    const props = { ...defaults(), photos: ids.map((id, n) => photo(id, n)) };
     const screen = renderMobile(<Step2Photos {...props} />);
-    // Drag areas have no accessible label. Locate the actual Pressable carrying
-    // onLongPress, then send native coordinates through its event handlers.
-    const drag = screen.UNSAFE_getAllByType(Pressable).find((node) => node.props.onLongPress);
-    if (!drag) throw new Error("Photo drag target missing");
-    fireEvent(drag, "longPress", { nativeEvent: { pageX: 10, pageY: 10 } });
-    fireEvent(drag, "touchMove", { nativeEvent: { touches: [{ pageX: 130, pageY: 10 }] } });
-    const tileStyle = () => StyleSheet.flatten(screen.UNSAFE_getAllByType(View)
-      .find((node) => StyleSheet.flatten(node.props.style)?.width === 111)?.props.style);
-    expect(tileStyle()?.transform).toEqual([{ translateX: 120 }, { translateY: 0 }, { scale: 1.04 }]);
-    fireEvent(drag, "pressOut");
-    expect(tileStyle()?.transform).toBeUndefined();
-    expect(props.onReorderPhotos).toHaveBeenCalledWith(["b", "a", "c"]);
+
+    // 390 pt wide: 111 pt tiles, 119 pt apart. Photo 1 goes one row down and one column on.
+    dragPhoto(screen, 0, { dx: 119, dy: 119 });
+
+    expect(props.onReorderPhotos).toHaveBeenCalledWith(["b", "c", "d", "e", "a", "f"]);
+  });
+
+  it("drags a photo back onto the cover slot (#820)", () => {
+    const ids = ["a", "b", "c", "d", "e", "f"];
+    const props = { ...defaults(), photos: ids.map((id, n) => photo(id, n)) };
+    const screen = renderMobile(<Step2Photos {...props} />);
+
+    dragPhoto(screen, 4, { dx: -119, dy: -119 });
+
+    expect(props.onReorderPhotos).toHaveBeenCalledWith(["e", "a", "b", "c", "d", "f"]);
+  });
+
+  it("holds the drag back while the grid is disabled, and a drop on its own slot changes nothing", () => {
+    const props = { ...defaults(), photos: [photo("a", 0), photo("b", 1)] };
+    const screen = renderMobile(<Step2Photos {...props} />);
+    expect(pan(screen, 0).enabled).toBe(true);
+
+    dragPhoto(screen, 1, { dx: 10, dy: 5 });
+    expect(props.onReorderPhotos).not.toHaveBeenCalled();
+
+    screen.rerender(<Step2Photos {...props} disabled />);
+    expect(pan(screen, 0).enabled).toBe(false);
+    expect(pan(screen, 0).activateAfterLongPress).toBe(250);
   });
 
   it("removes a selected photo and renders the in-progress state", () => {
@@ -227,14 +280,10 @@ describe("Step2Photos photo actions sheet", () => {
     expect(sheet(screen).getByRole("button", { name: "Remove" })).toBeTruthy();
   });
 
-  it("still reorders by long-press drag", () => {
+  it("opens no sheet when a drag ends", () => {
     const props = three();
     const screen = renderMobile(<Step2Photos {...props} />);
-    const drag = screen.UNSAFE_getAllByType(Pressable).find((node) => node.props.onLongPress);
-    if (!drag) throw new Error("Photo drag target missing");
-    fireEvent(drag, "longPress", { nativeEvent: { pageX: 10, pageY: 10 } });
-    fireEvent(drag, "touchMove", { nativeEvent: { touches: [{ pageX: 130, pageY: 10 }] } });
-    fireEvent(drag, "pressOut");
+    dragPhoto(screen, 0, { dx: 119, dy: 0 });
 
     expect(props.onReorderPhotos).toHaveBeenCalledWith(["b", "a", "c"]);
     expect(screen.queryByTestId("photo-actions-sheet")).toBeNull();

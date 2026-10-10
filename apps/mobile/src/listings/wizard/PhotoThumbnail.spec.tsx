@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { Image } from "expo-image";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 import { renderMobile, fireEvent } from "../../../test/render";
 import type { StagedPhoto } from "../uploadStaging/types";
 
-import { PhotoThumbnail } from "./PhotoThumbnail";
+import { PhotoThumbnail, type PhotoDrag } from "./PhotoThumbnail";
 
 const props = () => ({ photo: { photoId: "photo-a", sortOrder: 0, state: "attached", retryCount: 0,
   localUri: "file:///photo-a.jpg" } satisfies StagedPhoto, index: 0, total: 2,
-  onRemove: vi.fn(), onOpenActions: vi.fn(),
-  onDragStart: vi.fn(), onDragMove: vi.fn(), onDragEnd: vi.fn() });
+  onRemove: vi.fn(), onOpenActions: vi.fn(), dragEnabled: true, onDragStart: vi.fn(), onDrop: vi.fn(),
+  drag: { from: { value: -1 }, to: { value: -1 }, x: { value: 0 }, y: { value: 0 } } as unknown as PhotoDrag });
 
 describe("PhotoThumbnail", () => {
   it("supplies square dimensions and a cover label for the first tile", () => {
@@ -27,24 +27,6 @@ describe("PhotoThumbnail", () => {
     const screen = renderMobile(<PhotoThumbnail {...callbacks} />);
     fireEvent.press(screen.getByLabelText("Remove: Photo 1 of 2"));
     expect(callbacks.onRemove).toHaveBeenCalledWith("photo-a");
-  });
-  it("forwards long-press, move and end coordinates", () => {
-    const callbacks = props();
-    const screen = renderMobile(<PhotoThumbnail {...callbacks} />);
-    const drag = screen.UNSAFE_getAllByType(Pressable).find((node) => node.props.onLongPress);
-    if (!drag) throw new Error("Photo drag target missing");
-    fireEvent(drag, "longPress", { nativeEvent: { pageX: 20, pageY: 30 } });
-    fireEvent(drag, "touchMove", { nativeEvent: { touches: [{ pageX: 40, pageY: 50 }] } });
-    screen.rerender(<PhotoThumbnail {...callbacks} isDragging dragOffset={{ x: 20, y: 20 }} />);
-    const tileStyle = () => StyleSheet.flatten(screen.UNSAFE_getAllByType(View)
-      .find((node) => StyleSheet.flatten(node.props.style)?.width === 111)?.props.style);
-    expect(tileStyle()?.transform).toEqual([{ translateX: 20 }, { translateY: 20 }, { scale: 1.04 }]);
-    fireEvent(drag, "pressOut");
-    screen.rerender(<PhotoThumbnail {...callbacks} isDragging={false} dragOffset={{ x: 20, y: 20 }} />);
-    expect(tileStyle()?.transform).toBeUndefined();
-    expect(callbacks.onDragStart).toHaveBeenCalledWith(0, 20, 30);
-    expect(callbacks.onDragMove).toHaveBeenCalledWith(40, 50);
-    expect(callbacks.onDragEnd).toHaveBeenCalledOnce();
   });
   it("opens the photo's actions when the tile is tapped", () => {
     const callbacks = props();
