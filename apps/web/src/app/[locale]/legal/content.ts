@@ -281,8 +281,8 @@ export const termsOfService: Record<Locale, LegalDocument> = {
     title: "Terms of Service",
     effectiveDate: "September 23, 2026",
     effectiveDateISO: "2026-09-23",
-    lastRevised: "October 6, 2026",
-    lastRevisedISO: "2026-10-06",
+    lastRevised: "October 11, 2026",
+    lastRevisedISO: "2026-10-11",
     sections: [
       {
         title: "1. Eligibility",
@@ -314,7 +314,7 @@ Every listing shows a contact phone that has been verified. Before you publish o
       },
       {
         title: "7. Disclaimer",
-        body: "Carberk is a marketplace platform. We do not own, inspect, or warrant the vehicles listed (except where Phase 2 inspection reports explicitly apply). All transactions are solely between users.",
+        body: "Carberk is a marketplace platform. We do not own, inspect, or warrant the vehicles listed (except where Phase 2 inspection reports explicitly apply). All transactions are solely between users.\n\nBrand names and logos belong to their owners and are used only to identify vehicles. Carberk is not affiliated with them. A brand owner can ask us to remove its logo by writing to the address in section 13.",
       },
       {
         title: "8. Inspection reports (Phase 2)",
@@ -348,8 +348,8 @@ Carberk may suspend accounts that violate these terms.`,
     title: "Условия использования",
     effectiveDate: "23 сентября 2026 г.",
     effectiveDateISO: "2026-09-23",
-    lastRevised: "6 октября 2026 г.",
-    lastRevisedISO: "2026-10-06",
+    lastRevised: "11 октября 2026 г.",
+    lastRevisedISO: "2026-10-11",
     sections: [
       {
         title: "1. Допустимый возраст",
@@ -381,7 +381,7 @@ Carberk may suspend accounts that violate these terms.`,
       },
       {
         title: "7. Ограничение ответственности",
-        body: "Carberk — площадка. Мы не владеем, не проверяем и не гарантируем автомобили (кроме случаев с отчётами осмотра Фазы 2). Сделки — между пользователями.",
+        body: "Carberk — площадка. Мы не владеем, не проверяем и не гарантируем автомобили (кроме случаев с отчётами осмотра Фазы 2). Сделки — между пользователями.\n\nНазвания и логотипы марок принадлежат их владельцам и используются только для обозначения автомобилей. Carberk не связан с ними. Владелец марки может попросить убрать её логотип, написав по адресу из раздела 13.",
       },
       {
         title: "8. Отчёты осмотра (Фаза 2)",
@@ -415,8 +415,8 @@ Carberk может приостановить аккаунт за нарушен
     title: "Ulanyş şertleri",
     effectiveDate: "23-nji sentýabr 2026",
     effectiveDateISO: "2026-09-23",
-    lastRevised: "6-njy oktýabr 2026",
-    lastRevisedISO: "2026-10-06",
+    lastRevised: "11-nji oktýabr 2026",
+    lastRevisedISO: "2026-10-11",
     sections: [
       {
         title: "1. Ýaş çägi",
@@ -448,7 +448,7 @@ Her bildirişde tassyklanan habarlaşma belgisi görkezilýär. Bildirişi çap 
       },
       {
         title: "7. Jogapkärçiliginiň çäklendirilmesi",
-        body: "Carberk — bazar meýdany. Maşynlary eýelemeýäris, barlamayarys, kepillendirmeýäris (2-nji tapgyr barlag hasabatlaryndan başga). Söwda — ulanyjylaryň arasynda.",
+        body: "Carberk — bazar meýdany. Maşynlary eýelemeýäris, barlamayarys, kepillendirmeýäris (2-nji tapgyr barlag hasabatlaryndan başga). Söwda — ulanyjylaryň arasynda.\n\nMarkalaryň atlary we nyşanlary olaryň eýelerine degişlidir we diňe awtoulaglary kesgitlemek üçin ulanylýar. Carberk olar bilen baglanyşykly däl. Markanyň eýesi 13-nji bölümdäki salga ýazyp, nyşanyny aýyrmagy haýyş edip biler.",
       },
       {
         title: "8. Barlag hasabatlary (2-nji tapgyr)",

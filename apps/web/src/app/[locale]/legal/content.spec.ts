@@ -135,6 +135,14 @@ const privacyPromises: CopyPromise[] = [
 
 const termsPromises: CopyPromise[] = [
   {
+    name: "brand names and logos belong to their owners, identify vehicles only, and come down on request",
+    phrases: {
+      en: "Brand names and logos belong to their owners and are used only to identify vehicles. Carberk is not affiliated with them. A brand owner can ask us to remove its logo",
+      ru: "Названия и логотипы марок принадлежат их владельцам и используются только для обозначения автомобилей. Carberk не связан с ними. Владелец марки может попросить убрать её логотип",
+      tk: "Markalaryň atlary we nyşanlary olaryň eýelerine degişlidir we diňe awtoulaglary kesgitlemek üçin ulanylýar. Carberk olar bilen baglanyşykly däl. Markanyň eýesi 13-nji bölümdäki salga ýazyp, nyşanyny aýyrmagy haýyş edip biler",
+    },
+  },
+  {
     name: "authenticated deletion is on the Profile screen opened from Cabinet",
     phrases: {
       en: "in Cabinet, open your profile and tap Delete account",

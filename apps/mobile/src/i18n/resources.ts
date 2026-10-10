@@ -585,8 +585,6 @@ export const resources: Resource = {
       moreFilters: "Другие фильтры",
       failedToLoadListingCount: "Не удалось загрузить число объявлений",
       doneWithCount: "Готово · {{count}} объявлений",
-      brandLogosNotice:
-        "Названия и логотипы марок принадлежат их владельцам и используются только для обозначения автомобилей. Carberk не связан с ними.",
 
       area: "Район / ориентир",
       clear: "Очистить",
@@ -1419,8 +1417,6 @@ export const resources: Resource = {
       moreFilters: "Beýleki filtrler",
       failedToLoadListingCount: "Bildirişleriň sanyny ýüklemek başartmady",
       doneWithCount: "Tamam · {{count}} bildiriş",
-      brandLogosNotice:
-        "Markalaryň atlary we nyşanlary olaryň eýelerine degişlidir we diňe awtoulaglary kesgitlemek üçin ulanylýar. Carberk olar bilen baglanyşykly däl.",
 
       area: "Sebit / orientir",
       clear: "Arassala",
@@ -2253,8 +2249,6 @@ export const resources: Resource = {
       moreFilters: "More filters",
       failedToLoadListingCount: "Could not load listing count",
       doneWithCount: "Done · {{count}} listings",
-      brandLogosNotice:
-        "Brand names and logos belong to their owners and are used only to identify vehicles. Carberk is not affiliated with them.",
       editListing: "Edit listing",
       changesSaved: "Changes saved",
       couldNotSaveAllChanges: "Couldn't save all changes. Try again.",
