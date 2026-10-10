@@ -1042,17 +1042,8 @@
     {
       "slug": "international",
       "tier": "D",
-      "source": "commons",
-      "commonsFile": "File:International Harvester Company logo.svg",
-      "pageRevisionId": 1217491956,
-      "sourceUrl": "https://commons.wikimedia.org/w/index.php?title=File%3AInternational_Harvester_Company_logo.svg&oldid=1217491956",
-      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/5/5e/International_Harvester_Company_logo.svg",
-      "licence": "PD-shape",
-      "licenceUrl": "https://commons.wikimedia.org/wiki/Template:PD-shape",
-      "trademark": "Trademark of the International manufacturer; shown only to identify the vehicle make. This manifest licenses the file, not the mark.",
-      "retrievedAt": "2026-10-11",
-      "sha256Master": "f05935521c919cb3aa34cff769f426cebac65fff8c40b62fc985552a9bf9ff05",
-      "transform": "alpha"
+      "source": null,
+      "reason": "The catalog row is Navistar International trucks (1986 on). File:International Harvester Company logo.svg (PD-shape) is the IH emblem, which went to Case IH (now CNH Industrial) in 1985 and is not Navistar's mark; it belongs on an International Harvester brand for pre-1986 IH machinery instead. No Commons file tagged PD-textlogo or PD-shape shows the Navistar International diamond (checked 2026-10-11)."
     },
     {
       "slug": "smart",
