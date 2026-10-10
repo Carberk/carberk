@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
@@ -7,32 +8,50 @@ import Animated, {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
-import { clampScale, clampTranslation, doubleTapScale } from "./zoomMath";
+import {
+  clampScale,
+  clampTranslation,
+  doubleTapScale,
+  fittedSize,
+  focalTranslation,
+} from "./zoomMath";
 
 export interface ZoomableImageProps {
   width: number;
   height: number;
+  /** The photo's width / height, so panning stops at its edges; the frame's shape until known. */
+  aspectRatio?: number;
   /** True for the photo the viewer is on; any other photo snaps back to fitted. */
   active: boolean;
   onZoomChange: (zoomed: boolean) => void;
+  /** Called as a zoom begins, so the viewer can start loading the sharper photo. */
+  onZoomStart?: () => void;
   children: ReactNode;
 }
 
 /** Below this a pinch counts as back at fitted size. */
 const FITTED = 1.02;
 
+const noop = () => {};
+
 /**
  * Pinch, drag and double-tap zoom for one photo. Gestures run on the UI thread
  * through Gesture Handler and Reanimated shared values; only the zoomed or
  * fitted flag crosses back to React, so the viewer can lock paging while a
- * photo is zoomed. Dragging is enabled only while zoomed, so a fitted photo
- * never competes with the pager's swipe.
+ * photo is zoomed. A double-tap or pinch zooms around the point under the
+ * finger, and a zoomed photo pans only until its own edge reaches the frame,
+ * so a letterboxed photo never shows the bands around it. One-finger
+ * dragging is enabled only while zoomed, so a fitted photo never competes
+ * with the pager's swipe. The detector sits on the untransformed frame, so
+ * touch points are frame coordinates at any zoom.
  */
 export function ZoomableImage({
   width,
   height,
+  aspectRatio,
   active,
   onZoomChange,
+  onZoomStart = noop,
   children,
 }: ZoomableImageProps) {
   const [zoomed, setZoomed] = useState(false);
@@ -42,6 +61,16 @@ export function ZoomableImage({
   const translateY = useSharedValue(0);
   const savedX = useSharedValue(0);
   const savedY = useSharedValue(0);
+  const focalX = useSharedValue(0);
+  const focalY = useSharedValue(0);
+
+  // Read through a ref, so a new callback each render never rebuilds the
+  // gestures, which would cancel a pinch in progress.
+  const zoomStartRef = useRef(onZoomStart);
+  useEffect(() => {
+    zoomStartRef.current = onZoomStart;
+  }, [onZoomStart]);
+  const startZoom = useCallback(() => zoomStartRef.current(), []);
 
   const reportZoom = useCallback(
     (next: boolean) => {
@@ -65,9 +94,37 @@ export function ZoomableImage({
   }, [active, scale, savedScale, translateX, translateY, savedX, savedY]);
 
   const gesture = useMemo(() => {
+    const photo = fittedSize(width, height, aspectRatio);
+    const centreX = width / 2;
+    const centreY = height / 2;
+
     const pinch = Gesture.Pinch()
+      .onStart((event) => {
+        savedScale.value = scale.value;
+        savedX.value = translateX.value;
+        savedY.value = translateY.value;
+        focalX.value = event.focalX - centreX;
+        focalY.value = event.focalY - centreY;
+        scheduleOnRN(startZoom);
+      })
       .onUpdate((event) => {
-        scale.value = clampScale(savedScale.value * event.scale);
+        const next = clampScale(savedScale.value * event.scale);
+        scale.value = next;
+        // The start point stays under the fingers, and moving both fingers pans.
+        const movedX = event.focalX - centreX - focalX.value;
+        const movedY = event.focalY - centreY - focalY.value;
+        translateX.value = clampTranslation(
+          focalTranslation(focalX.value, savedScale.value, savedX.value, next) + movedX,
+          next,
+          photo.width,
+          width,
+        );
+        translateY.value = clampTranslation(
+          focalTranslation(focalY.value, savedScale.value, savedY.value, next) + movedY,
+          next,
+          photo.height,
+          height,
+        );
       })
       .onEnd(() => {
         const fitted = scale.value < FITTED;
@@ -80,25 +137,30 @@ export function ZoomableImage({
           savedY.value = 0;
         } else {
           savedScale.value = scale.value;
-          savedX.value = clampTranslation(translateX.value, scale.value, width);
-          savedY.value = clampTranslation(translateY.value, scale.value, height);
-          translateX.value = withTiming(savedX.value);
-          translateY.value = withTiming(savedY.value);
+          savedX.value = translateX.value;
+          savedY.value = translateY.value;
         }
         scheduleOnRN(reportZoom, !fitted);
       });
 
     const pan = Gesture.Pan()
       .enabled(zoomed)
+      .maxPointers(1)
+      .onStart(() => {
+        savedX.value = translateX.value;
+        savedY.value = translateY.value;
+      })
       .onUpdate((event) => {
         translateX.value = clampTranslation(
           savedX.value + event.translationX,
           scale.value,
+          photo.width,
           width,
         );
         translateY.value = clampTranslation(
           savedY.value + event.translationY,
           scale.value,
+          photo.height,
           height,
         );
       })
@@ -109,15 +171,33 @@ export function ZoomableImage({
 
     const doubleTap = Gesture.Tap()
       .numberOfTaps(2)
-      .onEnd((_event, success) => {
+      .onEnd((event, success) => {
         if (!success) return;
         const next = doubleTapScale(scale.value);
+        let x = 0;
+        let y = 0;
+        if (next > 1) {
+          scheduleOnRN(startZoom);
+          // The tapped point stays under the finger.
+          x = clampTranslation(
+            focalTranslation(event.x - centreX, scale.value, translateX.value, next),
+            next,
+            photo.width,
+            width,
+          );
+          y = clampTranslation(
+            focalTranslation(event.y - centreY, scale.value, translateY.value, next),
+            next,
+            photo.height,
+            height,
+          );
+        }
         scale.value = withTiming(next);
         savedScale.value = next;
-        translateX.value = withTiming(0);
-        translateY.value = withTiming(0);
-        savedX.value = 0;
-        savedY.value = 0;
+        translateX.value = withTiming(x);
+        translateY.value = withTiming(y);
+        savedX.value = x;
+        savedY.value = y;
         scheduleOnRN(reportZoom, next > 1);
       });
 
@@ -126,13 +206,17 @@ export function ZoomableImage({
     zoomed,
     width,
     height,
+    aspectRatio,
     reportZoom,
+    startZoom,
     scale,
     savedScale,
     translateX,
     translateY,
     savedX,
     savedY,
+    focalX,
+    focalY,
   ]);
 
   const style = useAnimatedStyle(() => ({
@@ -145,7 +229,9 @@ export function ZoomableImage({
 
   return (
     <GestureDetector gesture={gesture}>
-      <Animated.View style={[{ width, height }, style]}>{children}</Animated.View>
+      <View style={{ width, height, overflow: "hidden" }}>
+        <Animated.View style={[{ width, height }, style]}>{children}</Animated.View>
+      </View>
     </GestureDetector>
   );
 }
