@@ -80,7 +80,7 @@
       "slug": "genesis",
       "tier": "A",
       "source": null,
-      "reason": "No Commons file tagged PD-textlogo or PD-shape found for the Genesis Motor logo (checked 2026-09-30)."
+      "reason": "No Commons file tagged PD-textlogo or PD-shape shows the Genesis Motor logo; File:Genesis Motor Logo.svg is CC BY-SA 4.0, which is not accepted (checked 2026-10-11)."
     },
     {
       "slug": "volkswagen",
@@ -235,8 +235,17 @@
     {
       "slug": "chrysler",
       "tier": "A",
-      "source": null,
-      "reason": "Founder excluded the Simple Icons 16.33.0 chrysler wordmark on 2026-09-30: too thin at 30 px. Former CC0-1.0 source: https://github.com/simple-icons/simple-icons/blob/16.33.0/icons/chrysler.svg; master sha256: 760fe7ef4fccc504bee0a9f4ac91e2ca23bffd9c294aa92a3922538b50c3c403."
+      "source": "commons",
+      "commonsFile": "File:Chrysler logo 1962.png",
+      "pageRevisionId": 994361807,
+      "sourceUrl": "https://commons.wikimedia.org/w/index.php?title=File%3AChrysler_logo_1962.png&oldid=994361807",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/e/e3/Chrysler_logo_1962.png",
+      "licence": "PD-textlogo",
+      "licenceUrl": "https://commons.wikimedia.org/wiki/Template:PD-textlogo",
+      "trademark": "Trademark of the Chrysler manufacturer; shown only to identify the vehicle make. This manifest licenses the file, not the mark.",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "03fe3741421ff52781d9d30e321f1be05b6d33b831dabdfb51dd2667d81f84e9",
+      "transform": "alpha"
     },
     {
       "slug": "man",
@@ -301,14 +310,32 @@
     {
       "slug": "waz",
       "tier": "C",
-      "source": null,
-      "reason": "Duplicate of Lada; catalog clean-up is out of scope. Lada has its own Simple Icons entry."
+      "source": "simple-icons",
+      "simpleIconsSlug": "lada",
+      "simpleIconsVersion": "16.33.0",
+      "sourceUrl": "https://github.com/simple-icons/simple-icons/blob/16.33.0/icons/lada.svg",
+      "upstreamSource": "https://www.lada.ru",
+      "licence": "CC0-1.0",
+      "licenceUrl": "https://github.com/simple-icons/simple-icons/blob/develop/LICENSE.md",
+      "trademark": "Trademark of AvtoVAZ (VAZ, sold as Lada); shown only to identify the vehicle make. This manifest licenses the file, not the mark.",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "2b7c49423d526cc3f9b2a02d113a84095d5de2130ebc63c867e434cb2a4b147b",
+      "transform": "alpha"
     },
     {
       "slug": "dodge",
       "tier": "A",
-      "source": null,
-      "reason": "The only current Dodge mark tagged PD (File:Dodge logo.svg) is a thin wordmark, about 11 px tall in a 90 px tile, too small for a 30 px icon."
+      "source": "commons",
+      "commonsFile": "File:Dodge 1962 logo.svg",
+      "pageRevisionId": 1154338566,
+      "sourceUrl": "https://commons.wikimedia.org/w/index.php?title=File%3ADodge_1962_logo.svg&oldid=1154338566",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/c/cf/Dodge_1962_logo.svg",
+      "licence": "PD-shape",
+      "licenceUrl": "https://commons.wikimedia.org/wiki/Template:PD-shape",
+      "trademark": "Trademark of the Dodge manufacturer; shown only to identify the vehicle make. This manifest licenses the file, not the mark.",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "6e4e9c3cab9951f2d0e8a5d2c2699d52a2632a3949f31290a852cb1340f2ead3",
+      "transform": "alpha"
     },
     {
       "slug": "honda",
@@ -433,44 +460,62 @@
     {
       "slug": "howo",
       "tier": "D",
-      "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "source": "commons",
+      "commonsFile": "File:Sinotruk logo 2.png",
+      "pageRevisionId": 907636570,
+      "sourceUrl": "https://commons.wikimedia.org/w/index.php?title=File%3ASinotruk_logo_2.png&oldid=907636570",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/c/c5/Sinotruk_logo_2.png",
+      "licence": "PD-textlogo",
+      "licenceUrl": "https://commons.wikimedia.org/wiki/Template:PD-textlogo",
+      "trademark": "Trademark of the Sinotruk (HOWO) manufacturer; shown only to identify the vehicle make. This manifest licenses the file, not the mark.",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "403964779211fa2544d94fd857545fad0d1e96562738af4494122b9308dde980",
+      "transform": "luminance"
     },
     {
       "slug": "uaz",
       "tier": "C",
       "source": null,
-      "reason": "The only Commons logo (File:Logo de la UAZ.svg) is CC BY-SA 4.0, which is not accepted."
+      "reason": "No Commons file shows the UAZ logo. File:Logo de la UAZ.svg is the emblem of the Universidad Autónoma de Zacatecas, not the carmaker (checked 2026-10-11)."
     },
     {
       "slug": "ural",
       "tier": "C",
       "source": null,
-      "reason": "No Commons file found (checked 2026-09-30)."
+      "reason": "No Commons file tagged PD-textlogo or PD-shape; File:UralAZ logo.jpg is CC BY-SA 3.0, which is not accepted (checked 2026-10-11)."
     },
     {
       "slug": "maz",
       "tier": "C",
       "source": null,
-      "reason": "No MAZ logo file tagged PD found; the tagged hits are unrelated organisations (checked 2026-09-30)."
+      "reason": "The MAZ emblem on Commons (File:Minsky automoblie plant.png) is tagged PD-ineligible, which is not accepted; File:MAZ-Logo.svg and File:Maz Maz.svg are unrelated (checked 2026-10-11)."
     },
     {
       "slug": "iveco",
       "tier": "D",
-      "source": null,
-      "reason": "Founder excluded the Simple Icons 16.33.0 iveco wordmark on 2026-09-30: too thin at 30 px. Former CC0-1.0 source: https://github.com/simple-icons/simple-icons/blob/16.33.0/icons/iveco.svg; master sha256: 24b581068086f82937486f53b2f6220bb0830368693ff258aa675aae94c9068c."
+      "source": "commons",
+      "commonsFile": "File:IVECO.svg",
+      "pageRevisionId": 1114766415,
+      "sourceUrl": "https://commons.wikimedia.org/w/index.php?title=File%3AIVECO.svg&oldid=1114766415",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/1/1f/IVECO.svg",
+      "licence": "PD-textlogo",
+      "licenceUrl": "https://commons.wikimedia.org/wiki/Template:PD-textlogo",
+      "trademark": "Trademark of the Iveco manufacturer; shown only to identify the vehicle make. This manifest licenses the file, not the mark.",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "3b0bd3c53e6374484f55fdc3dcf41f3cf69a43b5bab665b6c7505092e3cd942c",
+      "transform": "alpha"
     },
     {
       "slug": "gaz",
       "tier": "C",
       "source": null,
-      "reason": "No GAZ logo file tagged PD found; the tagged hits are unrelated companies (checked 2026-09-30)."
+      "reason": "File:GAZ logo.png (PD-textlogo) is an unrelated German company; the GAZ deer (File:GAZ symbol.png) is CC BY-SA 4.0, which is not accepted (checked 2026-10-11)."
     },
     {
       "slug": "kogel",
       "tier": "D",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon. The only Commons file tagged PD-textlogo (File:Kögel Fahrzeugwerke logo.svg) is a thin wordmark, 14 px tall in a 90 px tile, too small for a 30 px icon (checked 2026-10-11)."
     },
     {
       "slug": "scania",
@@ -491,7 +536,7 @@
       "slug": "forland",
       "tier": "D",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Forland file on Commons; File:Foton Motor logo.svg is the parent Foton mark, already used for foton (checked 2026-10-11)."
     },
     {
       "slug": "chery",
@@ -512,7 +557,7 @@
       "slug": "mtz",
       "tier": "E",
       "source": null,
-      "reason": "Commons has only a thin wordmark (File:MTZ-Logo.svg); letter fallback by tier policy."
+      "reason": "File:MTZ-Logo.svg is the logo of the Motortechnische Zeitschrift magazine, not Minsk Tractor Works; File:Logo-Belarus.png is a thin wordmark; letter fallback (checked 2026-10-11)."
     },
     {
       "slug": "land-rover",
@@ -533,7 +578,7 @@
       "slug": "golden-dragon",
       "tier": "D",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "File:Golden Dragon logo 2.png (PD-textlogo) is a small emblem above a long wordmark; the emblem is unreadable at 30 px (checked 2026-10-11)."
     },
     {
       "slug": "changan",
@@ -559,26 +604,35 @@
     {
       "slug": "xcmg",
       "tier": "E",
-      "source": null,
-      "reason": "Commons has only a thin wordmark (File:XCMG logo.svg); letter fallback by tier policy."
+      "source": "commons",
+      "commonsFile": "File:XCMG logo.svg",
+      "pageRevisionId": 954986965,
+      "sourceUrl": "https://commons.wikimedia.org/w/index.php?title=File%3AXCMG_logo.svg&oldid=954986965",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/f/f9/XCMG_logo.svg",
+      "licence": "PD-textlogo",
+      "licenceUrl": "https://commons.wikimedia.org/wiki/Template:PD-textlogo",
+      "trademark": "Trademark of the XCMG manufacturer; shown only to identify the vehicle make. This manifest licenses the file, not the mark.",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "289f3c71049bfab9dc6a7bb6face1926b184fe88ab705d366874e09d8d3ce739",
+      "transform": "alpha"
     },
     {
       "slug": "schmitz",
       "tier": "D",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
     },
     {
       "slug": "fekon",
       "tier": "D",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
     },
     {
       "slug": "tadano-faun",
       "tier": "E",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon. Commons has only light-weight Tadano/Faun wordmarks tagged PD-textlogo, 13 to 17 px tall in a 90 px tile, too small for a 30 px icon (checked 2026-10-11)."
     },
     {
       "slug": "fiat",
@@ -631,8 +685,17 @@
     {
       "slug": "saab",
       "tier": "A",
-      "source": null,
-      "reason": "The tagged files show the Saab AB aircraft logo or a grey NEVS badge, not the Saab Automobile emblem."
+      "source": "commons",
+      "commonsFile": "File:Saab wordmark blue.svg",
+      "pageRevisionId": 1114767949,
+      "sourceUrl": "https://commons.wikimedia.org/w/index.php?title=File%3ASaab_wordmark_blue.svg&oldid=1114767949",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/d/d9/Saab_wordmark_blue.svg",
+      "licence": "PD-textlogo",
+      "licenceUrl": "https://commons.wikimedia.org/wiki/Template:PD-textlogo",
+      "trademark": "Trademark of the Saab manufacturer; shown only to identify the vehicle make. This manifest licenses the file, not the mark.",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "c611a8fec505d4a7596ce548cfc9295d412d5416b9113416ebf30fb091cb8c8f",
+      "transform": "alpha"
     },
     {
       "slug": "isuzu",
@@ -653,7 +716,7 @@
       "slug": "new-holland",
       "tier": "E",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon. The only Commons file tagged PD-textlogo (File:New Holland Logo 2023.png) is a thin wordmark, 12 px tall in a 90 px tile, too small for a 30 px icon (checked 2026-10-11)."
     },
     {
       "slug": "yamaha",
@@ -674,7 +737,7 @@
       "slug": "raf",
       "tier": "C",
       "source": null,
-      "reason": "No Commons file found (checked 2026-09-30)."
+      "reason": "No Commons file shows the RAF (Riga) logo; File:RAF-Logo.svg is an unrelated star tagged PD-ineligible (checked 2026-10-11)."
     },
     {
       "slug": "москвич",
@@ -695,7 +758,7 @@
       "slug": "cmc",
       "tier": "D",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Commons file tagged PD-textlogo or PD-shape shows the China Motor Corporation mark; the CMC-titled files belong to other companies (checked 2026-10-11)."
     },
     {
       "slug": "pontiac",
@@ -737,7 +800,7 @@
       "slug": "liugong",
       "tier": "E",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon. The only Commons file tagged PD-textlogo (File:LiuGong logo.svg) is a thin wordmark, 14 px tall in a 90 px tile, too small for a 30 px icon (checked 2026-10-11)."
     },
     {
       "slug": "zaz",
@@ -803,13 +866,13 @@
       "slug": "camc",
       "tier": "D",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
     },
     {
       "slug": "zonda",
       "tier": "D",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon. The only Commons file tagged PD-textlogo (File:Zonda-CN.png) is a thin wordmark, 14 px tall in a 90 px tile, too small for a 30 px icon (checked 2026-10-11)."
     },
     {
       "slug": "ssangyong",
@@ -830,13 +893,22 @@
       "slug": "lifan",
       "tier": "B",
       "source": null,
-      "reason": "The only tagged file (File:Logo Chongqing Lifan.svg) is a blue circular mark that could not be confirmed as the Lifan car emblem."
+      "reason": "File:Logo Chongqing Lifan.svg is an unrelated H-in-circle mark and File:Livan Automotive logo.svg is the successor brand Livan, not Lifan (checked 2026-10-11)."
     },
     {
       "slug": "buick",
       "tier": "A",
-      "source": null,
-      "reason": "The only tagged emblem file (File:Buick-logo.svg, PD-textlogo) sets the emblem in a heavy square frame with a wordmark, so it was rejected on review; the other tagged file is a wordmark only."
+      "source": "commons",
+      "commonsFile": "File:Buick logo 1980.png",
+      "pageRevisionId": 1100611628,
+      "sourceUrl": "https://commons.wikimedia.org/w/index.php?title=File%3ABuick_logo_1980.png&oldid=1100611628",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/0/03/Buick_logo_1980.png",
+      "licence": "PD-textlogo",
+      "licenceUrl": "https://commons.wikimedia.org/wiki/Template:PD-textlogo",
+      "trademark": "Trademark of the Buick manufacturer; shown only to identify the vehicle make. This manifest licenses the file, not the mark.",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "4c5b9a10129c47098a62affa50aca5aa5ea58f28af611fb93d50cdddf60ddfb4",
+      "transform": "luminance"
     },
     {
       "slug": "alfa-romeo",
@@ -965,13 +1037,22 @@
       "slug": "komatsu",
       "tier": "E",
       "source": null,
-      "reason": "Commons has only a thin wordmark (File:Komatsu company logos.svg); letter fallback by tier policy."
+      "reason": "No Simple Icons icon. The only Commons file tagged PD-textlogo (File:Komatsu company logos.svg) is a thin wordmark, 15 px tall in a 90 px tile, too small for a 30 px icon (checked 2026-10-11)."
     },
     {
       "slug": "international",
       "tier": "D",
-      "source": null,
-      "reason": "Commons has only thin Navistar International wordmarks; letter fallback by tier policy."
+      "source": "commons",
+      "commonsFile": "File:International Harvester Company logo.svg",
+      "pageRevisionId": 1217491956,
+      "sourceUrl": "https://commons.wikimedia.org/w/index.php?title=File%3AInternational_Harvester_Company_logo.svg&oldid=1217491956",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/5/5e/International_Harvester_Company_logo.svg",
+      "licence": "PD-shape",
+      "licenceUrl": "https://commons.wikimedia.org/wiki/Template:PD-shape",
+      "trademark": "Trademark of the International manufacturer; shown only to identify the vehicle make. This manifest licenses the file, not the mark.",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "f05935521c919cb3aa34cff769f426cebac65fff8c40b62fc985552a9bf9ff05",
+      "transform": "alpha"
     },
     {
       "slug": "smart",
@@ -998,7 +1079,7 @@
       "slug": "ppm",
       "tier": "D",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
     },
     {
       "slug": "gmc",
@@ -1085,13 +1166,13 @@
       "slug": "balkancar",
       "tier": "E",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
     },
     {
       "slug": "jawa",
       "tier": "E",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
     },
     {
       "slug": "seat",
@@ -1127,13 +1208,13 @@
       "slug": "hidromek",
       "tier": "E",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
     },
     {
       "slug": "ozan",
       "tier": "D",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
     },
     {
       "slug": "jetour",
@@ -1154,61 +1235,88 @@
       "slug": "heli",
       "tier": "E",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon; the only PD-textlogo Heli file is a JPEG (File:Heli logo.jpg), outside the SVG/PNG rule (checked 2026-10-11)."
     },
     {
       "slug": "jungheinrich",
       "tier": "E",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon. The only Commons file tagged PD-textlogo (File:Jungheinrich-Logo.svg) is a thin wordmark, 11 px tall in a 90 px tile, too small for a 30 px icon (checked 2026-10-11)."
     },
     {
       "slug": "bobcat",
       "tier": "E",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
     },
     {
       "slug": "jaguar",
       "tier": "A",
-      "source": null,
-      "reason": "The only current Jaguar mark tagged PD (File:Jaguar 2024.svg) is a thin wordmark, about 9 px tall in a 90 px tile, too small for a 30 px icon."
+      "source": "commons",
+      "commonsFile": "File:Jaguar 1966 logo.svg",
+      "pageRevisionId": 1131122530,
+      "sourceUrl": "https://commons.wikimedia.org/w/index.php?title=File%3AJaguar_1966_logo.svg&oldid=1131122530",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/b/b6/Jaguar_1966_logo.svg",
+      "licence": "PD-shape",
+      "licenceUrl": "https://commons.wikimedia.org/wiki/Template:PD-shape",
+      "trademark": "Trademark of the Jaguar manufacturer; shown only to identify the vehicle make. This manifest licenses the file, not the mark.",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "562dc55f78b42fb39aa0ef7ed7e05a17500ee4e034e2af04b5c7ea05ba1651d6",
+      "transform": "alpha"
     },
     {
       "slug": "foton-lovol",
       "tier": "E",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon. The only Commons file tagged PD-textlogo (File:Weichai Lovol logo.png) is a thin wordmark, 12 px tall in a 90 px tile, too small for a 30 px icon (checked 2026-10-11)."
     },
     {
       "slug": "sdlg",
       "tier": "E",
-      "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "source": "commons",
+      "commonsFile": "File:SDLG logo.svg",
+      "pageRevisionId": 1117280241,
+      "sourceUrl": "https://commons.wikimedia.org/w/index.php?title=File%3ASDLG_logo.svg&oldid=1117280241",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/3/36/SDLG_logo.svg",
+      "licence": "PD-textlogo",
+      "licenceUrl": "https://commons.wikimedia.org/wiki/Template:PD-textlogo",
+      "trademark": "Trademark of the SDLG manufacturer; shown only to identify the vehicle make. This manifest licenses the file, not the mark.",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "905efc5190f782985dac97a8f2eac7f3c379ccd906138918b2e85fc835cac643",
+      "transform": "alpha"
     },
     {
       "slug": "kara",
       "tier": "D",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
     },
     {
       "slug": "hamm",
       "tier": "E",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Commons file tagged PD-textlogo or PD-shape; File:WIRTGEN Hamm Logo.png is CC BY-SA 4.0, which is not accepted (checked 2026-10-11)."
     },
     {
       "slug": "case",
       "tier": "E",
-      "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "source": "commons",
+      "commonsFile": "File:Logo Case IH.png",
+      "pageRevisionId": 1231977557,
+      "sourceUrl": "https://commons.wikimedia.org/w/index.php?title=File%3ALogo_Case_IH.png&oldid=1231977557",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/a/a5/Logo_Case_IH.png",
+      "licence": "PD-textlogo",
+      "licenceUrl": "https://commons.wikimedia.org/wiki/Template:PD-textlogo",
+      "trademark": "Trademark of the Case IH manufacturer; shown only to identify the vehicle make. This manifest licenses the file, not the mark.",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "ef27ff5c316b1648442191daaaf6d1962438537f47a1f17dede7d30e3496f7bc",
+      "transform": "alpha"
     },
     {
       "slug": "voyah",
       "tier": "B",
       "source": null,
-      "reason": "No Commons file found (checked 2026-09-30)."
+      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
     },
     {
       "slug": "lixiang",
@@ -1235,7 +1343,7 @@
       "slug": "sem",
       "tier": "E",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
     },
     {
       "slug": "haval",
@@ -1247,7 +1355,7 @@
       "slug": "avatr",
       "tier": "B",
       "source": null,
-      "reason": "The only tagged file (File:Avatr Technology logo.svg) renders clipped, so it was rejected on review."
+      "reason": "File:Avatr Technology Logo.png (PD-textlogo) has hairline strokes that vanish at 30 px, and File:Avatr Technology logo.svg renders clipped (checked 2026-10-11)."
     },
     {
       "slug": "great-wall",
@@ -1283,25 +1391,34 @@
       "slug": "kato",
       "tier": "E",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon. The only Commons file tagged PD-textlogo (File:KATO Works Logo.png) is a thin wordmark, 6 px tall in a 90 px tile, too small for a 30 px icon (checked 2026-10-11)."
     },
     {
       "slug": "yto",
       "tier": "E",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
     },
     {
       "slug": "shantui",
       "tier": "E",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon. The only Commons file tagged PD-textlogo (File:SHANTUI Logo.svg) is a thin wordmark, 12 px tall in a 90 px tile, too small for a 30 px icon (checked 2026-10-11)."
     },
     {
       "slug": "bomag",
       "tier": "E",
-      "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "source": "commons",
+      "commonsFile": "File:BOMAG 201x logo.svg",
+      "pageRevisionId": 1114802605,
+      "sourceUrl": "https://commons.wikimedia.org/w/index.php?title=File%3ABOMAG_201x_logo.svg&oldid=1114802605",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/8/87/BOMAG_201x_logo.svg",
+      "licence": "PD-textlogo",
+      "licenceUrl": "https://commons.wikimedia.org/wiki/Template:PD-textlogo",
+      "trademark": "Trademark of the BOMAG manufacturer; shown only to identify the vehicle make. This manifest licenses the file, not the mark.",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "ffc3927ea46da88d3c0da7aa20c4d065f868218e888d568406ae3393160da150",
+      "transform": "alpha"
     },
     {
       "slug": "cadillac",
@@ -1322,7 +1439,7 @@
       "slug": "liebherr",
       "tier": "E",
       "source": null,
-      "reason": "Commons has only thin wordmarks; letter fallback by tier policy."
+      "reason": "No Simple Icons icon. Commons has only thin Liebherr wordmarks tagged PD-textlogo (about 10 px tall in a 90 px tile); File:Liebherr Gak.svg is not a usable logo (checked 2026-10-11)."
     },
     {
       "slug": "lugong",
@@ -1334,7 +1451,7 @@
       "slug": "zoomlion",
       "tier": "E",
       "source": null,
-      "reason": "Letter fallback by tier policy (research 2026-09-22, section 1); no Simple Icons icon, and Commons was not searched in this pass."
+      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
     },
     {
       "slug": "jac",
@@ -1355,7 +1472,7 @@
       "slug": "hongqi",
       "tier": "B",
       "source": null,
-      "reason": "No Commons file tagged PD-textlogo or PD-shape found (checked 2026-09-30)."
+      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
     }
   ]
 }
