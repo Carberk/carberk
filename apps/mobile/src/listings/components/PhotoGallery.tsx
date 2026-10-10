@@ -77,7 +77,9 @@ export function PhotoGallery({
                 variant="detail"
                 // The first photo is the card's: its `list` size is cached and shows at once.
                 placeholderVariant={index === 0 ? "list" : undefined}
-                priority={index === activeIndex ? "high" : "low"}
+                // Fixed per photo: expo-image restarts a download whose priority
+                // changes, so a neighbour keeps `low` once it is on screen.
+                priority={index === 0 ? "high" : "low"}
                 style={{ width: "100%", height: "100%" }}
                 contentFit="cover"
               />

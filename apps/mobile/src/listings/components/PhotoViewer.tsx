@@ -217,7 +217,8 @@ function ViewerContent({
                   item={item}
                   variant={isSharp ? "fullscreen" : "detail"}
                   placeholderVariant={isSharp ? "detail" : undefined}
-                  priority={position === index ? "high" : "low"}
+                  // Fixed per photo, as a changed priority restarts the download.
+                  priority={position === initialIndex ? "high" : "low"}
                   contentFit="contain"
                   style={{ width: "100%", height: "100%" }}
                   onAspectRatio={(ratio) => rememberRatio(item.id, ratio)}

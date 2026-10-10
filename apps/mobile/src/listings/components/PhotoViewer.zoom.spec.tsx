@@ -90,6 +90,22 @@ describe("Photo viewer on a slow connection (#816)", () => {
     ]);
   });
 
+  it("keeps each photo's load priority when the viewer moves, so no download restarts", () => {
+    const screen = open(20, 5);
+    const priorityOf = (n: number) =>
+      screen
+        .UNSAFE_getAllByType(Image)
+        .find((image) => image.props.source.uri === `https://media.test/${n}/detail.jpg`)?.props
+        .priority;
+    expect([priorityOf(5), priorityOf(6)]).toEqual(["high", "low"]);
+
+    fireEvent(screen.getByTestId("photo-viewer-pager"), "momentumScrollEnd", {
+      nativeEvent: { contentOffset: { x: 390 * 6, y: 0 } },
+    });
+
+    expect([priorityOf(5), priorityOf(6), priorityOf(7)]).toEqual(["high", "low", "low"]);
+  });
+
   it("asks for the 2400 px photo only once a zoom starts, over the cached detail size", () => {
     const screen = open(3, 0);
     expect(pageSources(screen).some((uri) => uri.includes("fullscreen"))).toBe(false);
