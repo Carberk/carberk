@@ -19,6 +19,7 @@ import {
   createStagedPhoto,
   appendPhotoToQueue,
   findPhotoById,
+  nextInGridOrder,
   collectPhotosToResume,
   transitionUploadQueueToWaitingForNetwork,
 } from "./queueState";
@@ -46,6 +47,14 @@ async function verifyStagingFileExists(localUri: string): Promise<boolean> {
 }
 
 const UPLOAD_TIMEOUT_MS = 60_000;
+
+interface CompressionJob {
+  sourceUri: string;
+  /** The draft the photo was picked into. */
+  stagingKey: string;
+  /** Ends the photo's part of `isCompressing` and settles its `addPhoto`. */
+  settle: () => void;
+}
 
 async function uploadFileToPresignedUrl(
   uploadUrl: string,
@@ -104,9 +113,18 @@ export function useUploadQueue(
   queueRef.current = queue;
   activeStagingKey.current = stagingKey;
 
+  // Picked photos compress one at a time and upload two at a time, each taking
+  // the waiting photo that comes first in the grid. The cover finishes first,
+  // progress follows the grid, and a reorder changes what goes next (#819).
   const MAX_CONCURRENT = 2;
   const runningUploads = useRef(0);
   const uploadQueue = useRef<string[]>([]);
+  const compressing = useRef(false);
+  // Picked photos waiting to be compressed: photo id → its job.
+  const compressionWaiting = useRef(new Map<string, CompressionJob>());
+  const compressPhotoRef = useRef<(photoId: string, job: CompressionJob) => Promise<void>>(
+    async () => {},
+  );
   // Photo ids waiting in `uploadQueue` or being uploaded right now.
   const uploadsInFlight = useRef(new Set<string>());
   const networkAvailable = useRef(true);
@@ -119,8 +137,9 @@ export function useUploadQueue(
       runningUploads.current < MAX_CONCURRENT &&
       uploadQueue.current.length > 0
     ) {
-      const nextId = uploadQueue.current.shift();
-      if (!nextId) continue;
+      const nextId = nextInGridOrder(queueRef.current, uploadQueue.current);
+      if (!nextId) break;
+      uploadQueue.current = uploadQueue.current.filter((photoId) => photoId !== nextId);
       runningUploads.current += 1;
       uploadPhotoRef.current(nextId).finally(() => {
         runningUploads.current -= 1;
@@ -128,6 +147,20 @@ export function useUploadQueue(
         processUploadQueue();
       });
     }
+  }, []);
+
+  const processCompressions = useCallback(() => {
+    if (compressing.current) return;
+    const nextId = nextInGridOrder(queueRef.current, compressionWaiting.current.keys());
+    const job = nextId === undefined ? undefined : compressionWaiting.current.get(nextId);
+    if (nextId === undefined || !job) return;
+    compressionWaiting.current.delete(nextId);
+    compressing.current = true;
+    compressPhotoRef.current(nextId, job).finally(() => {
+      compressing.current = false;
+      job.settle();
+      processCompressions();
+    });
   }, []);
 
   // Queue photos for upload, leaving out any already waiting or uploading. A
@@ -155,6 +188,8 @@ export function useUploadQueue(
     if (queueRef.current.stagingKey !== stagingKey) {
       for (const photoId of uploadQueue.current) uploadsInFlight.current.delete(photoId);
       uploadQueue.current = [];
+      for (const job of compressionWaiting.current.values()) job.settle();
+      compressionWaiting.current.clear();
       queueRef.current = { stagingKey, photos: [] };
       setQueue(queueRef.current);
       initializedStagingKey.current = null;
@@ -324,21 +359,13 @@ export function useUploadQueue(
     return cleanup;
   }, [enqueueUploads]);
 
-  const addPhoto = useCallback(
-    async (sourceUri: string) => {
-      const photoId = generateUUID();
-      const nextSortOrder = queueRef.current.photos.length;
-
-      queueRef.current = appendPhotoToQueue(
-        queueRef.current,
-        createStagedPhoto(photoId, nextSortOrder),
-      );
-      setQueue(queueRef.current);
-
+  const compressPicked = useCallback(
+    async (photoId: string, { sourceUri, stagingKey: jobKey }: CompressionJob) => {
+      // Removed while it waited, or left behind by another draft.
+      if (jobKey !== activeStagingKey.current || !findPhotoById(queueRef.current, photoId)) return;
       try {
-        startCompression();
-        await ensureDraftDir(stagingKey);
-        const destinationUri = getStagingPath(stagingKey, photoId);
+        await ensureDraftDir(jobKey);
+        const destinationUri = getStagingPath(jobKey, photoId);
         const compressed = await compressPhoto(sourceUri, destinationUri);
 
         const destExists = await verifyStagingFileExists(destinationUri);
@@ -362,27 +389,59 @@ export function useUploadQueue(
         const uploadError = buildUploadError(err, t);
         queueRef.current = transitionPhotoToFailed(queueRef.current, photoId, uploadError);
         setQueue(queueRef.current);
-      } finally {
-        endCompression();
       }
     },
-    [stagingKey, enqueueUploads, startCompression, endCompression],
+    [enqueueUploads, t],
   );
 
+  compressPhotoRef.current = compressPicked;
+
+  /** Adds a tile at the end of the grid at once; settles once the photo is compressed. */
+  const addPhoto = useCallback(
+    (sourceUri: string) => {
+      const photoId = generateUUID();
+      const nextSortOrder = queueRef.current.photos.length;
+
+      queueRef.current = appendPhotoToQueue(
+        queueRef.current,
+        createStagedPhoto(photoId, nextSortOrder),
+      );
+      setQueue(queueRef.current);
+
+      startCompression();
+      return new Promise<void>((resolve) => {
+        compressionWaiting.current.set(photoId, {
+          sourceUri,
+          stagingKey,
+          settle: () => {
+            endCompression();
+            resolve();
+          },
+        });
+        processCompressions();
+      });
+    },
+    [stagingKey, processCompressions, startCompression, endCompression],
+  );
+
+  // Both write `queueRef` at once: the next compression and upload are picked
+  // from it, possibly before React renders.
   const removePhoto = useCallback(
     (photoId: string) => {
       const photo = findPhotoById(queueRef.current, photoId);
       if (photo?.localUri) {
         void FileSystem.deleteAsync(photo.localUri, { idempotent: true });
       }
-      setQueue((prev) => removePhotoFromQueue(prev, photoId));
+      queueRef.current = removePhotoFromQueue(queueRef.current, photoId);
+      setQueue(queueRef.current);
     },
     [],
   );
 
   const reorderPhotos = useCallback(
     (photoIds: string[]) => {
-      setQueue((prev) => reorderPhotosInQueue(prev, photoIds));
+      queueRef.current = reorderPhotosInQueue(queueRef.current, photoIds);
+      setQueue(queueRef.current);
     },
     [],
   );

@@ -80,6 +80,9 @@ function usePhotoPicker(onAddPhoto: (uri: string) => Promise<void>) {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsMultipleSelection: true,
+      // Numbered badges on iOS, and photos returned in the order tapped, which
+      // becomes the grid order (#819).
+      orderedSelection: true,
       quality: 1,
     });
     if (!result.canceled) {

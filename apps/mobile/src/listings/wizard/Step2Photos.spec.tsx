@@ -64,6 +64,19 @@ describe("Step2Photos", () => {
     expect(FileSystem.deleteAsync).toHaveBeenCalledWith(props.onAddPhoto.mock.calls[0]?.[0], { idempotent: true });
   });
 
+  it("adds library photos in the order they were tapped in the picker (#819)", async () => {
+    const props = defaults();
+    vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({ canceled: false,
+      assets: [1, 2, 3].map((n) => ({ uri: `file:///picker/${n}.jpg`, width: 100, height: 100 })) });
+    vi.mocked(FileSystem.copyAsync).mockClear();
+    const screen = renderMobile(<Step2Photos {...props} />);
+    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Library" })); });
+    expect(ImagePicker.launchImageLibraryAsync).toHaveBeenCalledWith(expect.objectContaining({ orderedSelection: true }));
+    const copiedTo = new Map(vi.mocked(FileSystem.copyAsync).mock.calls.map(([{ from, to }]) => [to, from]));
+    expect(props.onAddPhoto.mock.calls.map(([uri]) => copiedTo.get(uri))).toEqual(
+      ["file:///picker/1.jpg", "file:///picker/2.jpg", "file:///picker/3.jpg"]);
+  });
+
   it("disables adding at twenty photos", () => {
     const screen = renderMobile(<Step2Photos {...defaults()} photos={Array.from({ length: 20 }, (_, i) => photo(String(i), i))} />);
     expect(screen.getByRole("button", { name: "Camera", disabled: true })).toBeTruthy();
