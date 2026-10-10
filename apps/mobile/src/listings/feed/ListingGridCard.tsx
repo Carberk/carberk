@@ -53,7 +53,7 @@ export const ListingGridCard = memo(function ListingGridCard({
   const { t, i18n } = useTranslation();
   const coverKey = listing.photoKeys[0] ?? listing.coverMediaKey;
   const press = usePressScale("surface");
-  const { favorited, pending, toggle } = useListingFavorite({
+  const { favorited, toggle } = useListingFavorite({
     listingId: listing.id,
     isFavorited: listing.isFavorited ?? false,
     isAuthenticated,
@@ -122,9 +122,8 @@ export const ListingGridCard = memo(function ListingGridCard({
         <PhotoFavoriteButton
           favorited={favorited}
           onPress={toggle}
-          disabled={pending}
           accessibilityLabel={t("favorite")}
-          accessibilityState={{ selected: favorited, disabled: pending }}
+          accessibilityState={{ selected: favorited }}
         />
       </MotionView>
     </EnterOnce>

@@ -30,6 +30,7 @@ const twMerge = extendTailwindMerge({
       shadow: [{ shadow: ["raised", "floating", "overlay"] }],
       h: [{ h: controlHeights }],
       "min-h": [{ "min-h": controlHeights }],
+      "min-w": [{ "min-w": controlHeights }],
     },
   },
 });

@@ -141,6 +141,14 @@ describe("Favorites large card", () => {
     expect(within(view.getByTestId("listing-meta")).getByRole("button", { name: "Remove from Favorites" })).toBeTruthy();
   });
 
+  it("keeps the ♥ a control-sized square on the date line, where no Call stretches it (#813)", () => {
+    const { view } = renderCard({}, { isOwn: true });
+    const heart = within(view.getByTestId("listing-meta")).getByRole("button", { name: "Remove from Favorites" });
+    expect(heart.props.className).toMatch(/\baspect-square\b/);
+    expect(heart.props.className).toMatch(/\bmin-w-control-md\b/);
+    expect(heart.props.className).toMatch(/\bmin-h-control-md\b/);
+  });
+
   it.each([
     ["sold", "Sold"],
     ["archived", "Removed from sale"],

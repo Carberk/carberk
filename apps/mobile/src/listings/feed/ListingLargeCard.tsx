@@ -41,15 +41,18 @@ interface ListingLargeCardProps {
   enterOrder?: number;
 }
 
-/** The square tonal action beside Call: one glyph, the same height and radius as Call. */
+/**
+ * The square tonal action beside Call: one glyph, the same height and radius
+ * as Call. The minimum width keeps it square where no Call stretches the row.
+ */
 export function SquareAction({ children, ...props }: Omit<ButtonProps, "variant" | "size" | "children"> & { children: ReactNode }) {
-  return <Button variant="secondary" className="aspect-square px-0" {...props}>{children}</Button>;
+  return <Button variant="secondary" className="aspect-square min-w-control-md px-0" {...props}>{children}</Button>;
 }
 
 function FavoriteAction({ listingId, isFavorited, isAuthenticated, returnTo }: { listingId: string; isFavorited: boolean; isAuthenticated: boolean | null; returnTo: AuthHref }) {
   const { t } = useTranslation();
-  const { favorited, pending, toggle } = useListingFavorite({ listingId, isFavorited, isAuthenticated, returnTo });
-  return <SquareAction onPress={toggle} disabled={pending} accessibilityLabel={t("favorite")} accessibilityState={{ selected: favorited, disabled: pending }}>
+  const { favorited, toggle } = useListingFavorite({ listingId, isFavorited, isAuthenticated, returnTo });
+  return <SquareAction onPress={toggle} accessibilityLabel={t("favorite")} accessibilityState={{ selected: favorited }}>
     <Pop active={favorited}>
       <Icon as={Heart} className={favorited ? "size-5 text-brand-500 fill-brand-500" : "size-5 text-foreground"} strokeWidth={2} />
     </Pop>

@@ -1,4 +1,3 @@
-import { ActivityIndicator } from "react-native";
 import { Heart } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 
@@ -7,6 +6,7 @@ import { useListingFavorite } from "../useListingFavorite";
 
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
+import { Pop } from "@/components/ui/motion";
 
 interface ViewerFavoriteProps {
   listingId: string;
@@ -41,7 +41,7 @@ export function ViewerFavorite({
       className="active:bg-white/20"
       accessibilityLabel={t("favorite")}
       accessibilityState={{ selected: favorite.favorited }}
-      disabled={favorite.pending || isAuthenticated === null}
+      disabled={isAuthenticated === null}
       onPress={() => {
         // A React Native Modal sits above the navigation stack and would hide
         // the sign-in screen, so leave the viewer before opening it.
@@ -49,16 +49,14 @@ export function ViewerFavorite({
         favorite.toggle();
       }}
     >
-      {favorite.pending ? (
-        <ActivityIndicator size="small" color="white" />
-      ) : (
+      <Pop active={favorite.favorited}>
         <Icon
           as={Heart}
           className={
             favorite.favorited ? "size-6 text-primary fill-primary" : "size-6 text-white"
           }
         />
-      )}
+      </Pop>
     </Button>
   );
 }

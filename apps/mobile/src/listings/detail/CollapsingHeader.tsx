@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { View } from "react-native";
 import { Heart, MoreHorizontal } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import type { ListingsSchemas } from "@auto-tm/contracts";
@@ -19,6 +19,7 @@ import {
 } from "@/components/navigation/StackHeader";
 import { GlassGroup } from "@/components/ui/glass-surface";
 import { Icon } from "@/components/ui/icon";
+import { Pop } from "@/components/ui/motion";
 import { Text } from "@/components/ui/text";
 import {
   DropdownMenu,
@@ -93,12 +94,10 @@ export function CollapsingHeader({
                 tone="glass"
                 accessibilityLabel={t("favorite")}
                 accessibilityState={{ selected: favorite.favorited }}
-                disabled={favorite.pending || isAuthenticated === null}
+                disabled={isAuthenticated === null}
                 onPress={favorite.toggle}
               >
-                {favorite.pending ? (
-                  <ActivityIndicator size="small" />
-                ) : (
+                <Pop active={favorite.favorited}>
                   <Icon
                     as={Heart}
                     className={
@@ -107,7 +106,7 @@ export function CollapsingHeader({
                         : "size-5 text-foreground"
                     }
                   />
-                )}
+                </Pop>
               </HeaderCircleButton>
             )}
             {canReport && (

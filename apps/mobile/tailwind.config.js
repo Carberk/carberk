@@ -94,6 +94,8 @@ module.exports = {
       transitionDuration: mobileTailwindTheme.transitionDuration,
       height: mobileTailwindTheme.height,
       minHeight: mobileTailwindTheme.height,
+      // A square control (`aspect-square`) keeps its control size where no sibling stretches it.
+      minWidth: mobileTailwindTheme.height,
       borderWidth: {
         hairline: hairlineWidth(),
       },
