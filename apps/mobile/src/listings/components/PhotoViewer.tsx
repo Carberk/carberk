@@ -107,6 +107,10 @@ function ViewerContent({
   const [sharp, setSharp] = useState<ReadonlySet<string>>(() => new Set());
   // Each loaded photo's width / height, for photos the API sent no size for.
   const [loadedRatios, setLoadedRatios] = useState<Record<string, number>>({});
+  // As in the gallery, neighbours start once the opening photo has loaded.
+  const openingId = media[initialIndex]?.id;
+  const loadNeighbours =
+    index !== initialIndex || (openingId !== undefined && loadedRatios[openingId] !== undefined);
   const [pagerHeight, setPagerHeight] = useState(height * 0.6);
   const pagerRef = useRef<FlatList<ListingMedia>>(null);
   const stripRef = useRef<FlatList<ListingMedia>>(null);
@@ -194,11 +198,11 @@ function ViewerContent({
             index: position,
           })}
           onMomentumScrollEnd={handleSwipeEnd}
-          extraData={{ index, sharp, loadedRatios }}
+          extraData={{ index, sharp, loadedRatios, loadNeighbours }}
           initialNumToRender={1}
           windowSize={3}
           renderItem={({ item, index: position }) => {
-            if (!isNearPhoto(position, index)) {
+            if (position !== index && !(loadNeighbours && isNearPhoto(position, index))) {
               return <View style={{ width, height: pagerHeight }} />;
             }
             const isSharp = sharp.has(item.id);

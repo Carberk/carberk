@@ -73,8 +73,15 @@ describe("Photo gallery and viewer", () => {
     expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
   });
 
-  it("loads only the first photo and its neighbour, the first behind the card's cached size (#816)", () => {
+  it("loads the first photo behind the card's cached size, then only its neighbour (#816)", () => {
     const screen = renderMobile(<PhotoGallery media={mediaFixture(20)} />);
+    const sources = () => screen.UNSAFE_getAllByType(Image).map((image) => image.props.source.uri);
+    // Nothing shares the first photo's bandwidth until it has loaded.
+    expect(sources()).toEqual(["https://media.test/0/detail.jpg"]);
+
+    fireEvent(first(screen.UNSAFE_getAllByType(Image)), "load", {
+      source: { url: "https://media.test/0/detail.jpg", width: 1200, height: 800 },
+    });
 
     const photos = screen.UNSAFE_getAllByType(Image).map((image) => image.props);
     expect(photos.map((photo) => photo.source.uri)).toEqual([
