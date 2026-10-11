@@ -25,8 +25,8 @@ The contact sheet renders the actual importer outputs in both appearances. It is
 | `schmitz` | manufacturer | [Schmitz Cargobull](https://www.cargobull.com/) |
 | `fekon` | manufacturer | [Guangzhou Fekon Motorcycle](https://fekon.en.alibaba.com/company_profile.html) |
 | `tadano-faun` | manufacturer | [Tadano Faun](https://commons.wikimedia.org/wiki/File:Tadano_Faun_logo_2014.svg) |
-| `prisep` | category | [Carberk category illustration: trailer](https://github.com/bagtyyarkovusov/auto.tm-rewrite/blob/agent/batch-6-brand-logo-coverage/packages/db/prisma/seed/brand-logo-masters/prisep.png) |
-| `container` | category | [Carberk category illustration: shipping container](https://github.com/bagtyyarkovusov/auto.tm-rewrite/blob/agent/batch-6-brand-logo-coverage/packages/db/prisma/seed/brand-logo-masters/container.png) |
+| `prisep` | category | [Carberk category illustration: trailer](https://github.com/bagtyyarkovusov/auto.tm-rewrite/blob/31a885f569fd9219f9565421b23de7fe959cbda1/packages/db/prisma/seed/brand-logo-masters/prisep.png) |
+| `container` | category | [Carberk category illustration: shipping container](https://github.com/bagtyyarkovusov/auto.tm-rewrite/blob/31a885f569fd9219f9565421b23de7fe959cbda1/packages/db/prisma/seed/brand-logo-masters/container.png) |
 | `iž` | manufacturer | [Izh automotive / IzhAvto](https://1000logos.net/izh-logo/) |
 | `new-holland` | manufacturer | [New Holland Agriculture](https://commons.wikimedia.org/wiki/File:New_Holland_Logo_2023.png) |
 | `raf` | manufacturer | [Raf](https://logos-world.net/raf-logo/) |

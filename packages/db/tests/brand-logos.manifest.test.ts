@@ -381,6 +381,19 @@ describe("committed brand logo manifest", () => {
     }
   });
 
+  it("pins authored category artwork to durable commit URLs with matching source hashes", () => {
+    const recorded = JSON.parse(readFileSync(new URL("../prisma/seed/brand-logos.manifest.json", import.meta.url), "utf8")) as {
+      entries: { artworkKind?: string; sourceUrl: string; upstreamSource: string; upstreamSha256: string; sha256Master: string }[];
+    };
+    const categories = recorded.entries.filter(entry => entry.artworkKind === "category");
+    expect(categories).toHaveLength(2);
+    for (const entry of categories) {
+      expect(entry.sourceUrl).toMatch(/\/blob\/[0-9a-f]{40}\//);
+      expect(entry.upstreamSource).toBe(entry.sourceUrl);
+      expect(entry.upstreamSha256).toBe(entry.sha256Master);
+    }
+  });
+
   it("pins every Simple Icons entry to the installed package: same icon, source and bytes", () => {
     const installed = JSON.parse(
       readFileSync(new URL("../node_modules/simple-icons/package.json", import.meta.url), "utf-8"),
