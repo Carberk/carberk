@@ -234,6 +234,7 @@ describe("useUploadQueue — in grid order (#819)", () => {
     }), { wrapper });
     await waitFor(() => expect(result.current.isReady).toBe(true));
     act(() => { void result.current.addPhoto(picked(1)); });
+    await waitFor(() => expect(compressions.has(picked(1))).toBe(true));
     await finishCompression(1);
     await answerPresign();
     await waitFor(() => expect(result.current.photos[1]?.state).toBe("uploaded"));
@@ -261,6 +262,7 @@ describe("useUploadQueue — in grid order (#819)", () => {
         mockGetInfoAsync.mockResolvedValueOnce({ exists: false, uri: "", isDirectory: false });
         await finishCompression(3);
       }
+      await waitFor(() => expect(presigns).toHaveLength(1));
       await answerPresign();
       await waitFor(() => expect(result.current.photos.find((photo) => photo.photoId === second)?.state).toBe("uploaded"));
       // Repeated wake-ups/resume must not duplicate the already-started PUT.
