@@ -36,7 +36,7 @@ Mount the global provider stack, navigation container, and portal infrastructure
 - Status bar: adaptive via `expo-status-bar` `style` prop driven by `colorScheme`
 
 ### Typography
-- None at this layer.
+- The launch credit uses Geist Regular at 13 pt and remains subordinate to the incumbent SVG wordmark.
 
 ### Spacing
 - None at this layer; safe-area insets are consumed by downstream screens.
