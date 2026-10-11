@@ -7,7 +7,7 @@ import { buildOriginalUrl, buildVariantUrl } from "./buildVariantUrl";
 describe("buildVariantUrl", () => {
   it("builds detail variant from original key", () => {
     const url = buildVariantUrl("listings/l1/m1/original.webp", "detail");
-    expect(url).toBe("https://media.autotm.tm/listing-photos/listings/l1/m1/detail.webp");
+    expect(url).toBe("https://media.autotm.tm/listing-photos/listings/l1/m1/detail.webp?v=webp-natural-1");
   });
 
   it("builds fullscreen variant from webp original", () => {
@@ -16,7 +16,7 @@ describe("buildVariantUrl", () => {
       "fullscreen",
     );
     expect(url).toBe(
-      "https://media.autotm.tm/listing-photos/listings/l1/m1/fullscreen.webp",
+      "https://media.autotm.tm/listing-photos/listings/l1/m1/fullscreen.webp?v=webp-natural-1",
     );
   });
 
