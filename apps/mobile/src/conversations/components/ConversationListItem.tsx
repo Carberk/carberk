@@ -177,7 +177,10 @@ export function ConversationListItem({
           <View className="flex-row items-center gap-1 shrink-0">
             {tick ? (
               <View testID={`conversation-row-tick-${tick}`}>
-                <Icon as={tick === "sent" ? Check : CheckCheck} className="size-3.5 text-muted-foreground" />
+                <Icon
+                  as={tick === "sent" ? Check : CheckCheck}
+                  className={cn("size-3.5", tick === "read" ? "text-message-read" : "text-muted-foreground")}
+                />
               </View>
             ) : null}
             <Text className="text-caption text-muted-foreground">

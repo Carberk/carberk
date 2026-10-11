@@ -52,9 +52,9 @@ describe("The page tone under the tab bar", () => {
     expect(view.UNSAFE_queryAllByType(ScrollEdgeFade)).toHaveLength(1);
   });
 
-  it("stays on a screen that stops above the tab bar, where only the page is behind the glass", async () => {
+  it("stays on a screen that stops above the tab bar (Sell, with its pinned button), where only the page is behind the glass", async () => {
     const { TabScreen, ScrollEdgeFade } = await onDevice({ liquidGlass: true });
-    const view = renderMobile(<TabScreen><Text>Favorites</Text></TabScreen>);
+    const view = renderMobile(<TabScreen><Text>Sell</Text></TabScreen>);
     expect(view.UNSAFE_queryAllByType(ScrollEdgeFade)).toHaveLength(1);
   });
 

@@ -1,5 +1,5 @@
 import { AlertCircle, RefreshCw } from "lucide-react-native";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -12,12 +12,15 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 
+import { WizardScrollLock } from "./wizardScrollLock";
+
 import { BackButton } from "@/components/navigation/StackHeader";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Progress } from "@/components/ui/progress";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
+
 
 interface FooterAction {
   label: string;
@@ -518,6 +521,7 @@ export function WizardLayout({
   uploadStatus,
   onUploadStatusPress,
 }: WizardLayoutProps) {
+  const [scrollLocked, setScrollLocked] = useState(false);
   return (
     <SafeAreaView className="flex-1 bg-background">
       {/* Android is edge to edge, so the window does not resize for the keyboard: the
@@ -549,9 +553,15 @@ export function WizardLayout({
         onRetrySave={onRetrySave}
       />
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 16 }}>
-        <View className="w-full px-5">{children}</View>
-      </ScrollView>
+      <WizardScrollLock.Provider value={setScrollLocked}>
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{ paddingBottom: 16 }}
+          scrollEnabled={!scrollLocked}
+        >
+          <View className="w-full px-5">{children}</View>
+        </ScrollView>
+      </WizardScrollLock.Provider>
 
       {/* The action sits on the page below the step, never over it: the step ends
           above the button, and the safe area keeps the button off the system inset. */}

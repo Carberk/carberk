@@ -1,8 +1,10 @@
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useFocusEffect } from "expo-router";
+import { ActivityIndicator } from "react-native";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderMobile, act, fireEvent, routerMock, within } from "../render";
+import { TAB_BAR_SPACE, clearsTabBar, listContentPaddingBottom, rootPaddingBottom } from "../tabBarClearance";
 import FavoritesScreen from "../../app/(tabs)/favorites";
 import { useAuthIntentStore } from "../../src/auth/intentStore";
 import { useHideSoldStore } from "../../src/listings/favorites/useFavoritesView";
@@ -383,5 +385,29 @@ describe("Favorites screen", () => {
     const view = await renderFavorites({ locale });
     expect(view.getByRole("switch", { name: toggle })).toBeTruthy();
     expect(view.getByText(hidden)).toBeTruthy();
+  });
+});
+
+describe("Favorites under the glass tab bar", () => {
+  it("runs the list under the bar and ends it with the bar's space, so the glass shows the cards", async () => {
+    const view = await renderFavorites();
+    expect(rootPaddingBottom(view.UNSAFE_root as never)).toBe(0);
+    expect(listContentPaddingBottom(view.getByTestId("favorites-list") as never)).toBe(TAB_BAR_SPACE + 16);
+  });
+
+  it("keeps the empty, signed-out and loading states clear of the bar", async () => {
+    server.active = [page([], { total: 0, inactive: 0 })];
+    const empty = await renderFavorites();
+    expect(clearsTabBar(empty.getByText("No favorites yet") as never)).toBe(true);
+    empty.unmount();
+
+    state.auth = false;
+    const signedOut = await renderFavorites();
+    expect(clearsTabBar(signedOut.getByRole("button", { name: "Sign in" }) as never)).toBe(true);
+    signedOut.unmount();
+
+    state.auth = null;
+    const loading = await renderFavorites();
+    expect(clearsTabBar(loading.UNSAFE_getByType(ActivityIndicator) as never)).toBe(true);
   });
 });

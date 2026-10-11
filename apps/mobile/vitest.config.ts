@@ -16,7 +16,8 @@ export default defineConfig({
     setupFiles: ["./test/native-setup.ts", "./test/setup.ts"],
     // Expo Router turns every non-`+`-prefixed file under app/ into a route, so
     // test files must never live there. Route-level specs go in test/routes/.
-    exclude: ["**/node_modules/**", "**/dist/**", "app/**"],
+    // scripts/*.test.mjs run under node --test (pnpm test:native-session).
+    exclude: ["**/node_modules/**", "**/dist/**", "app/**", "scripts/**"],
     env: {
       EXPO_PUBLIC_API_URL: "http://localhost:3006/api/v1",
       EXPO_PUBLIC_MEDIA_URL: "https://media.autotm.tm",

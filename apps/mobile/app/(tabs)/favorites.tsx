@@ -14,7 +14,8 @@ import { HideSoldToggle } from "../../src/listings/favorites/HideSoldToggle";
 import { useFavoritesView } from "../../src/listings/favorites/useFavoritesView";
 import { HOME_HREF } from "../../src/navigation/homeHref";
 import { LargeTitle } from "../../components/navigation/ScreenHeader";
-import { TabScreen } from "../../components/navigation/TabScreen";
+import { TabBarClear, TabScreen } from "../../components/navigation/TabScreen";
+import { useTabBarSpace } from "../../components/navigation/tabBarHeight";
 
 import { ErrorState } from "@/components/ErrorState";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,7 @@ function FavoritesContent({ view }: { view: ReturnType<typeof useFavoritesView> 
   const { t } = useTranslation();
   const viewer = useViewer();
   const { state, hideSold, setHideSold, showSwitch, items, counts, remove, query } = view;
+  const tabBarSpace = useTabBarSpace();
 
   const handlePress = useCallback(
     (id: string) => {
@@ -96,29 +98,31 @@ function FavoritesContent({ view }: { view: ReturnType<typeof useFavoritesView> 
 
   if (state === "loading") {
     return (
-      <>
+      <TabBarClear>
         {toggle}
         <View accessibilityLabel={t("loading")} className="gap-3">
           {[0, 1, 2].map((id) => <FavoriteListingCardSkeleton key={id} />)}
         </View>
-      </>
+      </TabBarClear>
     );
   }
 
   if (state === "error") {
     return (
-      <>
+      <TabBarClear>
         {toggle}
         <ErrorState error={query.error} onRetry={() => query.refetch()} />
-      </>
+      </TabBarClear>
     );
   }
 
   if (state === "empty") {
     return (
-      <CenteredMessage title={t("noFavoritesYet")} hint={t("favoritesSaveLater")}>
-        <BrowseListingsButton />
-      </CenteredMessage>
+      <TabBarClear>
+        <CenteredMessage title={t("noFavoritesYet")} hint={t("favoritesSaveLater")}>
+          <BrowseListingsButton />
+        </CenteredMessage>
+      </TabBarClear>
     );
   }
 
@@ -143,6 +147,7 @@ function FavoritesContent({ view }: { view: ReturnType<typeof useFavoritesView> 
       )}
       ItemSeparatorComponent={() => <View className="h-3" />}
       ListHeaderComponent={toggle}
+      contentContainerStyle={{ paddingBottom: tabBarSpace + 16 }}
       ListEmptyComponent={
         state === "noActive" ? (
           <CenteredMessage icon={false} title={t("favoritesNoActiveTitle")} hint={t("favoritesNoActiveHint")}>
@@ -205,19 +210,21 @@ export default function FavoritesScreen() {
   const { t } = useTranslation();
 
   return (
-    <TabScreen>
+    <TabScreen underTabBar>
       {isAuthenticated === true ? (
         <SignedInFavorites />
       ) : (
         <>
           <Title />
           {isAuthenticated === false ? (
-            <AnonymousFavoritesEntry />
+            <TabBarClear>
+              <AnonymousFavoritesEntry />
+            </TabBarClear>
           ) : (
-            <View className="flex-1 items-center justify-center gap-3">
+            <TabBarClear className="items-center justify-center gap-3">
               <ActivityIndicator />
               <Text className="text-callout text-muted-foreground">{t("loading")}</Text>
-            </View>
+            </TabBarClear>
           )}
         </>
       )}
