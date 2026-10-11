@@ -45,6 +45,7 @@ import {
   resolveOnboardingGate,
   type OnboardingDecision,
 } from "../src/onboarding/onboardingGate";
+import { LaunchEntrance } from "../src/launch/LaunchEntrance";
 import { themeStore } from "../src/theme/themeStore";
 
 import { ToastProvider } from "@/components/ui/toast";
@@ -250,13 +251,14 @@ export default function RootLayout() {
     return () => unsub();
   }, []);
 
-  // The native launch screen stays up until `OnboardingLaunch` lets it go.
+  // The presentation mounts while startup runs; readiness alone mounts navigation.
   if (!appReady) {
-    return null;
+    return <LaunchEntrance ready={false} />;
   }
 
   return (
     // Gesture Handler needs one root view above every gesture (the tab bar's slide, the photo zoom).
+    <LaunchEntrance ready={true}>
     <GestureHandlerRootView style={{ flex: 1 }}>
     <QueryClientProvider client={queryClient}>
       <AppNavigationEffects />
@@ -291,5 +293,6 @@ export default function RootLayout() {
       </ThemeProvider>
     </QueryClientProvider>
     </GestureHandlerRootView>
+    </LaunchEntrance>
   );
 }
