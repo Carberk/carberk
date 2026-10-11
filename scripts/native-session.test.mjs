@@ -6,7 +6,7 @@ import {
   missingFromBundle,
   parseArgs,
   railwayEnvironmentName,
-} from "./native-session.mjs";
+} from "../apps/mobile/scripts/native-session.mjs";
 
 const EAS = {
   build: {

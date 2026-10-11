@@ -42,7 +42,7 @@
     "test:worktree-gc": "node --test scripts/worktree-gc.test.mjs",
     "agent:github": "node scripts/agent-github.mjs",
     "test:agent-github": "node --test scripts/agent-github.test.mjs",
-    "test:native-session": "node --test apps/mobile/scripts/native-session*.test.mjs"
+    "test:native-session": "node --test scripts/native-session*.test.mjs"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

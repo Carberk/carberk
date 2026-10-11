@@ -6,7 +6,7 @@ import { spawn } from "node:child_process";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-const helper = fileURLToPath(new URL("./native-session.mjs", import.meta.url));
+const helper = fileURLToPath(new URL("../apps/mobile/scripts/native-session.mjs", import.meta.url));
 
 async function fixture(t, mode) {
   const dir = fs.mkdtempSync("/tmp/native-session-test-");
