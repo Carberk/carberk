@@ -109,6 +109,19 @@ afterEach(() => {
 });
 
 describe("Startup resource failures", () => {
+  it("keeps the launch cover until the saved theme has settled", async () => {
+    let resolveTheme!: (theme: string) => void;
+    const pendingTheme = new Promise<string>((resolve) => { resolveTheme = resolve; });
+    vi.mocked(AsyncStorage.getItem).mockImplementation(async (key: string) =>
+      key === "@auto-tm/theme" ? pendingTheme : "en",
+    );
+    const screen = await launchApp();
+    expect(screen.queryByTestId("(tabs)")).toBeNull();
+    expect(screen.getByText("By Alpha Motors")).toBeTruthy();
+    await act(async () => resolveTheme("dark"));
+    expect(screen.getByTestId("(tabs)")).toBeTruthy();
+  });
+
   it("mounts the destination when bundled fonts fail instead of holding launch forever", async () => {
     fontState.loaded = false;
     fontState.error = new Error("font unavailable");
