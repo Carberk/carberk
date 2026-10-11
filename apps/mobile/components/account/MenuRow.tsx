@@ -104,7 +104,7 @@ export function MenuRow({
           className={cn(
             "shrink text-body",
             valueTone === "link"
-              ? "font-medium text-info-600 dark:text-info-400"
+              ? "font-medium text-link"
               : "text-muted-foreground",
           )}
         >
