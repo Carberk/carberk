@@ -14,7 +14,9 @@
     "test:unit": "vitest run --passWithNoTests",
     "validate:eas-env": "tsx scripts/validate-eas-build-env.ts",
     "build:android:local": "node scripts/local-android-release.mjs",
-    "eas-build-post-install": "pnpm validate:eas-env && pnpm --filter @auto-tm/contracts build"
+    "eas-build-post-install": "pnpm validate:eas-env && pnpm --filter @auto-tm/contracts build",
+    "native:metro": "node scripts/native-session.mjs metro",
+    "native:ios": "node scripts/native-session.mjs ios"
   },
   "dependencies": {
     "@auto-tm/contracts": "workspace:*",
