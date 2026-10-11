@@ -73,7 +73,8 @@ export function LaunchEntrance({ ready, children }: PropsWithChildren<{ ready: b
             setLaidOut(true);
           }}
         >
-          <StatusBar style="light" />
+          {/* Destination mounts later; keep the entrance last in the native status-bar stack. */}
+          <StatusBar key={ready ? "destination-ready" : "startup"} style="light" />
           <Animated.View style={[StyleSheet.absoluteFill, iconStyle]} className="items-center justify-center">
             {/* Same 160 pt artwork and center as the configured native splash. */}
             <Image source={splashIcon} style={{ width: 160, height: 160 }} />
