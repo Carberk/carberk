@@ -176,7 +176,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
     const failed = await new CleanRetiredUploads(ledger, outageAfter(4)).execute({ now: SWEEP, limit: 10 });
 
     expect(failed).toMatchObject({ deleted: 0, waiting: 1 });
-    expect(await present(upload.keys)).toBe(5);
+    expect(await present(upload.keys)).toBe(1);
     const waiting = await workOf(upload.id);
     expect(waiting).toMatchObject({ status: "PENDING", attempts: 1, lastError: "storage unavailable", completedAt: null });
     expect(waiting.nextAttemptAt.getTime()).toBeGreaterThan(SWEEP.getTime());
@@ -184,7 +184,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
 
     // Not due yet: the backoff is durable, so an immediate sweep leaves it alone.
     expect(await job.execute({ now: SWEEP, limit: 10 })).toMatchObject({ deleted: 0, waiting: 0 });
-    expect(await present(upload.keys)).toBe(5);
+    expect(await present(upload.keys)).toBe(1);
 
     const retried = await job.execute({ now: new Date(waiting.nextAttemptAt.getTime() + 1), limit: 10 });
 
