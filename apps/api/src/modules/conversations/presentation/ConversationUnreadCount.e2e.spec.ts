@@ -72,10 +72,10 @@ describe("Conversation unread count e2e", () => {
       .useValue({
         generate: async (originalKey: string) => ({
           variants: {
-            thumbnail: `${originalKey}/thumbnail.jpg`,
-            list: `${originalKey}/list.jpg`,
-            detail: `${originalKey}/detail.jpg`,
-            fullscreen: `${originalKey}/fullscreen.jpg`,
+            thumbnail: `${originalKey}/thumbnail.webp`,
+            list: `${originalKey}/list.webp`,
+            detail: `${originalKey}/detail.webp`,
+            fullscreen: `${originalKey}/fullscreen.webp`,
           },
         }),
       })
@@ -140,7 +140,7 @@ describe("Conversation unread count e2e", () => {
       allowCalls: true,
       allowChat: true,
       conditionDisclosure: { damaged: false },
-      photos: [0, 1, 2].map((index) => ({ photoId: suite.id(`photo-${index + 1}`), key: `photo1.jpg-${index}`, sortOrder: index })),
+      photos: [0, 1, 2].map((index) => ({ photoId: suite.id(`photo-${index + 1}`), key: `photo1.webp-${index}`, sortOrder: index })),
     } satisfies Record<string, unknown>);
     const draft = await prisma.listingDraft.create({
       data: {

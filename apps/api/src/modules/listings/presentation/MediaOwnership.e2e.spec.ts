@@ -42,7 +42,7 @@ class FakeObjectStore {
   objects = new Map<string, { contentType: string; sizeBytes: number }>();
   deleted: string[] = [];
 
-  put(key: string, contentType = "image/jpeg", sizeBytes = 2048): void {
+  put(key: string, contentType = "image/webp", sizeBytes = 2048): void {
     this.objects.set(key, { contentType, sizeBytes });
   }
 
@@ -95,10 +95,10 @@ describe("Listing media upload ownership e2e (#536)", () => {
         generate: async (originalKey: string) => {
           await generationHook?.(originalKey);
           return { variants: {
-            thumbnail: `${originalKey}/thumbnail.jpg`,
-            list: `${originalKey}/list.jpg`,
-            detail: `${originalKey}/detail.jpg`,
-            fullscreen: `${originalKey}/fullscreen.jpg`,
+            thumbnail: `${originalKey}/thumbnail.webp`,
+            list: `${originalKey}/list.webp`,
+            detail: `${originalKey}/detail.webp`,
+            fullscreen: `${originalKey}/fullscreen.webp`,
           } };
         },
       })
@@ -148,7 +148,7 @@ describe("Listing media upload ownership e2e (#536)", () => {
         priceAmount: 100000,
         priceCurrency: "TMT",
         publishedAt: new Date(),
-        media: { create: [0, 1, 2].map((i) => ({ kind: "image", key: `review-floor/${name}-${i}.jpg`, sortOrder: i + 10 })) },
+        media: { create: [0, 1, 2].map((i) => ({ kind: "image", key: `review-floor/${name}-${i}.webp`, sortOrder: i + 10 })) },
       },
     });
   }
@@ -158,7 +158,7 @@ describe("Listing media upload ownership e2e (#536)", () => {
     const res = await request
       .post("/api/v1/uploads/presign")
       .set("Authorization", `Bearer ${tokens[alias]}`)
-      .send({ kind: "image", contentType: "image/jpeg", sizeBytes: 2048 })
+      .send({ kind: "image", contentType: "image/webp", sizeBytes: 2048 })
       .expect(201);
     store.put(res.body.key);
     return res.body.key as string;
@@ -293,9 +293,9 @@ describe("Listing media upload ownership e2e (#536)", () => {
 
     it("rejects a key that was never presigned", async () => {
       const listingA = await createListing("user-a", "listing-a");
-      store.put("pending/forged-in-e2e/original.jpg");
+      store.put("pending/forged-in-e2e/original.webp");
 
-      const rejected = await attach("user-a", listingA.id, "pending/forged-in-e2e/original.jpg").expect(400);
+      const rejected = await attach("user-a", listingA.id, "pending/forged-in-e2e/original.webp").expect(400);
 
       expect(rejected.body.code).toBe("UPLOAD_NOT_AVAILABLE");
     });
@@ -305,7 +305,7 @@ describe("Listing media upload ownership e2e (#536)", () => {
       const res = await request
         .post("/api/v1/uploads/presign")
         .set("Authorization", `Bearer ${tokens["user-a"]}`)
-        .send({ kind: "image", contentType: "image/jpeg", sizeBytes: 2048 })
+        .send({ kind: "image", contentType: "image/webp", sizeBytes: 2048 })
         .expect(201);
 
       const rejected = await attach("user-a", listingA.id, res.body.key).expect(400);
@@ -338,7 +338,7 @@ describe("Listing media upload ownership e2e (#536)", () => {
       const listingB = await createListing("user-b", "listing-b");
       const victimKey = await presignAndPut("user-b");
       const victim = await attach("user-b", listingB.id, victimKey).expect(201);
-      const siblingKey = victimKey.replace(/original\.jpg$/, "original.mp4");
+      const siblingKey = victimKey.replace(/original\.webp$/, "original.mp4");
       let removedId = victim.body.id as string;
       let removedUser: SuiteUser = "user-b";
       let removedListing = listingB.id;
@@ -371,7 +371,7 @@ describe("Listing media upload ownership e2e (#536)", () => {
   it("cannot clean a legacy chat sibling owned outside listing_media", async () => {
     const listing = await createListing("user-a", "listing-a");
     const directory = `chat-attachments/${suite.id("conversation")}/${suite.id("chat-upload")}/`;
-    const victimKey = `${directory}original.jpg`;
+    const victimKey = `${directory}original.webp`;
     const attackerKey = `${directory}original.mp4`;
     // The victim's chat object has no ListingMedia row. Only the legacy forged
     // video key is backfilled, just as the applied migration would do.

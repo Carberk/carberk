@@ -98,7 +98,7 @@ describe("ConversationsController rich message routes", () => {
       id: "msg-img",
       conversationId: "conv-1",
       senderId: "buyer-1",
-      metadata: { key: "chat/image.jpg" },
+      metadata: { key: "chat/image.webp" },
     });
     const sendMessage = {
       execute: vi.fn().mockResolvedValue({ message, listing: null }),
@@ -107,12 +107,12 @@ describe("ConversationsController rich message routes", () => {
 
     const result = await controller.sendMessage(
       "conv-1",
-      { kind: "image", metadata: { key: "chat/image.jpg" } },
+      { kind: "image", metadata: { key: "chat/image.webp" } },
       authReq("buyer-1") as never,
     );
 
     expect(result.kind).toBe("image");
-    expect(result.metadata).toEqual({ key: "chat/image.jpg" });
+    expect(result.metadata).toEqual({ key: "chat/image.webp" });
   });
 
   it("sends a post_ref message", async () => {
@@ -128,7 +128,7 @@ describe("ConversationsController rich message routes", () => {
         year: 2021,
         displayPriceTmt: 200000,
         priceCurrency: "TMT",
-        coverMediaKey: "cover.jpg",
+        coverMediaKey: "cover.webp",
         status: "active",
       },
     });
@@ -147,7 +147,7 @@ describe("ConversationsController rich message routes", () => {
           priceAmount: 200000,
           priceCurrency: "TMT",
           displayPriceTmt: 200000,
-          coverMediaKey: "cover.jpg",
+          coverMediaKey: "cover.webp",
           cityId: "city-2",
           publishedAt: new Date("2026-05-01T00:00:00Z"),
           allowChat: true,
@@ -185,7 +185,7 @@ describe("ConversationsController rich message routes", () => {
         year: 2021,
         displayPriceTmt: 200000,
         priceCurrency: "TMT",
-        coverMediaKey: "cover.jpg",
+        coverMediaKey: "cover.webp",
         status: "active",
       },
     });
@@ -204,7 +204,7 @@ describe("ConversationsController rich message routes", () => {
           priceAmount: 200000,
           priceCurrency: "TMT",
           displayPriceTmt: 200000,
-          coverMediaKey: "cover.jpg",
+          coverMediaKey: "cover.webp",
           cityId: "city-2",
           publishedAt: new Date("2026-05-01T00:00:00Z"),
           allowChat: true,
@@ -241,8 +241,8 @@ describe("ConversationsController rich message routes", () => {
   it("presigns a chat attachment upload", async () => {
     const presignChatAttachmentUpload = {
       execute: vi.fn().mockResolvedValue({
-        uploadUrl: "https://media.auto.tm/presigned/chat-attachments/conv-1/uuid/original.jpg",
-        key: "chat-attachments/conv-1/uuid/original.jpg",
+        uploadUrl: "https://media.auto.tm/presigned/chat-attachments/conv-1/uuid/original.webp",
+        key: "chat-attachments/conv-1/uuid/original.webp",
         expiresIn: 600,
         maxSizeBytes: 5 * 1024 * 1024,
       }),
@@ -251,16 +251,16 @@ describe("ConversationsController rich message routes", () => {
 
     const result = await controller.presignChatAttachment(
       "conv-1",
-      { contentType: "image/jpeg", sizeBytes: 1024 },
+      { contentType: "image/webp", sizeBytes: 1024 },
       authReq("buyer-1") as never,
     );
 
-    expect(result.key).toBe("chat-attachments/conv-1/uuid/original.jpg");
+    expect(result.key).toBe("chat-attachments/conv-1/uuid/original.webp");
     expect(result.uploadUrl).toContain("presigned");
     expect(presignChatAttachmentUpload.execute).toHaveBeenCalledWith({
       userId: "buyer-1",
       conversationId: "conv-1",
-      contentType: "image/jpeg",
+      contentType: "image/webp",
       sizeBytes: 1024,
     });
   });
@@ -398,7 +398,7 @@ describe("ConversationsController list conversations", () => {
               displayName: "Seller One",
               nameNumber: 2057,
               avatarIndex: 7,
-              avatarKey: "avatars/seller-1/a.jpg",
+              avatarKey: "avatars/seller-1/a.webp",
               deleted: false,
             },
             blockedByMe: true,
@@ -422,7 +422,7 @@ describe("ConversationsController list conversations", () => {
       displayName: "Seller One",
       nameNumber: 2057,
       avatarIndex: 7,
-      avatarKey: "avatars/seller-1/a.jpg",
+      avatarKey: "avatars/seller-1/a.webp",
       deleted: false,
     });
     expect(result.items[0]!.blockedByMe).toBe(true);

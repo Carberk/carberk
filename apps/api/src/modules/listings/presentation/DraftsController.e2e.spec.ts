@@ -181,7 +181,7 @@ describe("DraftsController e2e", () => {
         .set("Authorization", `Bearer ${token}`)
         .send({})
         .expect(201);
-      const photos = [{ photoId: suite.id("draft-photo-1"), key: "draft-photo-1.jpg", sortOrder: 0 }];
+      const photos = [{ photoId: suite.id("draft-photo-1"), key: "draft-photo-1.webp", sortOrder: 0 }];
 
       const saved = await request
         .patch(`/api/v1/listings/drafts/${created.body.id}`)

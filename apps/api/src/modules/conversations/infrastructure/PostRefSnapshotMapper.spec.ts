@@ -19,7 +19,7 @@ function makeListing(overrides?: Partial<ListingSummary>): ListingSummary {
     priceAmount: 200000,
     priceCurrency: "TMT",
     displayPriceTmt: 200000,
-    coverMediaKey: "cover.jpg",
+    coverMediaKey: "cover.webp",
     cityId: "city-1",
     publishedAt: new Date("2026-05-01T00:00:00Z"),
     allowChat: true,
@@ -39,7 +39,7 @@ describe("buildPostRefSnapshot", () => {
       year: 2021,
       displayPriceTmt: 200000,
       priceCurrency: "TMT",
-      coverMediaKey: "cover.jpg",
+      coverMediaKey: "cover.webp",
       status: "active",
     });
   });

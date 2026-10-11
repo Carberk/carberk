@@ -19,13 +19,13 @@ export const mediaFixture = (count: number): ListingsSchemas.ListingMedia[] =>
   Array.from({ length: count }, (_, index) => ({
     id: `00000000-0000-4000-8000-0000000003${String(index).padStart(2, "0")}`,
     kind: "image" as const,
-    key: `listing-${index}/original.jpg`,
+    key: `listing-${index}/original.webp`,
     sortOrder: index,
     variants: {
-      thumbnail: `https://media.test/${index}/thumbnail.jpg`,
-      list: `https://media.test/${index}/list.jpg`,
-      detail: `https://media.test/${index}/detail.jpg`,
-      fullscreen: `https://media.test/${index}/fullscreen.jpg`,
+      thumbnail: `https://media.test/${index}/thumbnail.webp`,
+      list: `https://media.test/${index}/list.webp`,
+      detail: `https://media.test/${index}/detail.webp`,
+      fullscreen: `https://media.test/${index}/fullscreen.webp`,
     },
   }));
 
@@ -42,8 +42,8 @@ export const summaryFixture = (
   priceAmount: 10000,
   priceCurrency: "USD",
   displayPriceTmt: 35000,
-  coverMediaKey: "listing-0/original.jpg",
-  photoKeys: ["listing-0/original.jpg", "listing-1/original.jpg"],
+  coverMediaKey: "listing-0/original.webp",
+  photoKeys: ["listing-0/original.webp", "listing-1/original.webp"],
   photoCount: 12,
   mileageKm: 12000,
   condition: "used",

@@ -42,8 +42,8 @@ describe("usePresignChatAttachment", () => {
 
   it("posts presign request and returns upload URL and key", async () => {
     mockPost.mockResolvedValue({
-      uploadUrl: "https://minio.example.com/chat-attachments/conv-1/key/original.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256",
-      key: "chat-attachments/conv-1/key/original.jpg",
+      uploadUrl: "https://minio.example.com/chat-attachments/conv-1/key/original.webp?X-Amz-Algorithm=AWS4-HMAC-SHA256",
+      key: "chat-attachments/conv-1/key/original.webp",
       expiresIn: 300,
       maxSizeBytes: 5 * 1024 * 1024,
     });
@@ -52,15 +52,15 @@ describe("usePresignChatAttachment", () => {
 
     result.current.mutate({
       conversationId: "conv-1",
-      request: { contentType: "image/jpeg", sizeBytes: 1_024_000 },
+      request: { contentType: "image/webp", sizeBytes: 1_024_000 },
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(result.current.data?.key).toBe("chat-attachments/conv-1/key/original.jpg");
+    expect(result.current.data?.key).toBe("chat-attachments/conv-1/key/original.webp");
     expect(mockPost).toHaveBeenCalledWith(
       "/conversations/conv-1/attachments/presign",
-      { contentType: "image/jpeg", sizeBytes: 1_024_000 },
+      { contentType: "image/webp", sizeBytes: 1_024_000 },
       expect.any(Object),
     );
   });
@@ -81,7 +81,7 @@ describe("usePresignChatAttachment", () => {
 
     result.current.mutate({
       conversationId: "conv-1",
-      request: { contentType: "image/jpeg", sizeBytes: 1_024_000 },
+      request: { contentType: "image/webp", sizeBytes: 1_024_000 },
     });
 
     await waitFor(() => expect(result.current.isError).toBe(true));

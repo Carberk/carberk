@@ -249,7 +249,7 @@ function seedListing(
     priceAmount: 100000,
     priceCurrency: "TMT" as const,
     displayPriceTmt: 100000,
-    coverMediaKey: "cover.jpg",
+    coverMediaKey: "cover.webp",
     cityId: "city-1",
     publishedAt: new Date("2026-05-01T00:00:00Z"),
     allowChat: true,

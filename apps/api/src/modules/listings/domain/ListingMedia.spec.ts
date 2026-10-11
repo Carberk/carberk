@@ -8,7 +8,7 @@ describe("ListingMedia", () => {
       id: "media-1",
       listingId: "listing-1",
       kind: "image",
-      key: "listings/listing-1/media-1/original.jpg",
+      key: "listings/listing-1/media-1/original.webp",
       sortOrder: 0,
       width: 1920,
       height: 1080,
@@ -25,11 +25,11 @@ describe("ListingMedia", () => {
       key: "listings/listing-1/media-2/original.mp4",
       sortOrder: 1,
       durationMs: 30000,
-      posterKey: "listings/listing-1/media-2/poster.jpg",
+      posterKey: "listings/listing-1/media-2/poster.webp",
     });
     expect(media.kind).toBe("video");
     expect(media.durationMs).toBe(30000);
-    expect(media.posterKey).toBe("listings/listing-1/media-2/poster.jpg");
+    expect(media.posterKey).toBe("listings/listing-1/media-2/poster.webp");
   });
 
   it("rejects posterKey on image media", () => {
@@ -40,7 +40,7 @@ describe("ListingMedia", () => {
         kind: "image",
         key: "key",
         sortOrder: 0,
-        posterKey: "poster.jpg",
+        posterKey: "poster.webp",
       }),
     ).toThrowError(LISTING_ERROR_CODES.INVALID_TRANSITION);
   });

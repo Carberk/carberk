@@ -5,9 +5,9 @@ import { generateOpenApiDocument } from "./openapi";
 
 describe("upload object refusal contract", () => {
   it("declares client photo references and rejects an internal upload id", () => {
-    expect(UploadObjectInvalidDetailsSchema.parse({ key: "pending/photo/original.jpg" })).toEqual({ key: "pending/photo/original.jpg" });
-    expect(UploadObjectInvalidDetailsSchema.safeParse({ key: "photo.jpg", uploadId: "private-id" }).success).toBe(false);
-    expect(UploadObjectInvalidDetailsSchema.safeParse({ key: "photo.jpg", photoId: "00000000-0000-4000-8000-000000000005" }).success).toBe(true);
+    expect(UploadObjectInvalidDetailsSchema.parse({ key: "pending/photo/original.webp" })).toEqual({ key: "pending/photo/original.webp" });
+    expect(UploadObjectInvalidDetailsSchema.safeParse({ key: "photo.webp", uploadId: "private-id" }).success).toBe(false);
+    expect(UploadObjectInvalidDetailsSchema.safeParse({ key: "photo.webp", photoId: "00000000-0000-4000-8000-000000000005" }).success).toBe(true);
   });
 
   it("uses one refusal schema in attach, publish and Profile Photo OpenAPI responses", () => {

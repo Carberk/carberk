@@ -207,19 +207,14 @@ export function smokeDraftBody({ catalogue, photoKeys, sellerPhone, now }) {
   };
 }
 
-/** A 1x1 JPEG. Real bytes, so the signed PUT and the media read are real. */
-const TINY_JPEG = Buffer.from(
-  "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0a" +
-    "HBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAA" +
-    "AAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==",
-  "base64",
-);
+/** A 1x1 WebP. Real bytes exercise the signed PUT and media read. */
+const TINY_WEBP = Buffer.from("UklGRjwAAABXRUJQVlA4IDAAAADQAQCdASoBAAEAAUAmJaACdLoB+AADsAD+8ut//NgVzXPv9//S4P0uD9Lg/9KQAAA=", "base64");
 
 async function uploadSignedImage(apiUrl, token, presignPath, extraBody = {}) {
   const presign = expectStatus(
     await request(apiUrl, "POST", presignPath, {
       token,
-      body: { contentType: "image/jpeg", sizeBytes: TINY_JPEG.length,
+      body: { contentType: "image/webp", sizeBytes: TINY_WEBP.length,
         ...(presignPath === "/api/v1/uploads/presign" ? { writeProtocol: "conditional-v1" } : {}),
         ...extraBody },
     }),
@@ -228,8 +223,8 @@ async function uploadSignedImage(apiUrl, token, presignPath, extraBody = {}) {
   );
   const put = await fetch(presign.uploadUrl, {
     method: "PUT",
-    headers: presign.headers ?? { "content-type": "image/jpeg" },
-    body: TINY_JPEG,
+    headers: presign.headers ?? { "content-type": "image/webp" },
+    body: TINY_WEBP,
   });
   if (put.status !== 200) throw new Error(`signed PUT returned ${put.status}`);
   return presign.key;

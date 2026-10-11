@@ -37,7 +37,7 @@ const LOCAL_NEW_1 = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
 const LOCAL_NEW_2 = "3b241101-e2bb-4255-8caf-4136c566a962";
 
 function persistedKey(id: string): string {
-  return `listings/${LISTING_ID}/${id}/original.jpg`;
+  return `listings/${LISTING_ID}/${id}/original.webp`;
 }
 const KEY_A = persistedKey(PERSISTED_A);
 const KEY_B = persistedKey(PERSISTED_B);
@@ -48,10 +48,10 @@ function persisted(id: string, sortOrder: number): ListingsSchemas.ListingMedia 
     kind: "image",
     key: persistedKey(id),
     variants: {
-      thumbnail: "t.jpg",
-      list: "l.jpg",
-      detail: "d.jpg",
-      fullscreen: "f.jpg",
+      thumbnail: "t.webp",
+      list: "l.webp",
+      detail: "d.webp",
+      fullscreen: "f.webp",
     },
     sortOrder,
     width: 1920,
@@ -222,7 +222,7 @@ describe("useSaveListingEdit server media IDs", () => {
   it("repairs an older one-photo Listing before saving its field changes", async () => {
     const seed = [persisted(PERSISTED_A, 0)];
     const api = createMediaApi(seed, true);
-    const photos = [staged(PERSISTED_A, KEY_A, 0), staged(LOCAL_NEW_1, "pending/new-1/original.jpg", 1), staged(LOCAL_NEW_2, "pending/new-2/original.jpg", 2)];
+    const photos = [staged(PERSISTED_A, KEY_A, 0), staged(LOCAL_NEW_1, "pending/new-1/original.webp", 1), staged(LOCAL_NEW_2, "pending/new-2/original.webp", 2)];
     const { result } = renderSave({ photos, seed, payload: { description: "Repaired Listing" } });
     await result.current.save().catch(() => undefined);
     await waitFor(() => expect(result.current.status).toBe("succeeded"));
@@ -232,7 +232,7 @@ describe("useSaveListingEdit server media IDs", () => {
   it("replaces a photo at the twenty-photo cap without crossing either limit", async () => {
     const seed = Array.from({ length: 20 }, (_, i) => persisted(`550e8400-e29b-41d4-a716-${String(i + 100).padStart(12, "0")}`, i));
     const api = createMediaApi(seed, true);
-    const photos = [...seed.slice(1).map((m, i) => staged(m.id, m.key, i)), staged(LOCAL_NEW_1, "pending/replacement/original.jpg", 19)];
+    const photos = [...seed.slice(1).map((m, i) => staged(m.id, m.key, i)), staged(LOCAL_NEW_1, "pending/replacement/original.webp", 19)];
     const { result } = renderSave({ photos, seed, payload: { description: "Replaced photo" } });
     await result.current.save().catch(() => undefined);
     await waitFor(() => expect(result.current.status).toBe("succeeded"));
@@ -242,7 +242,7 @@ describe("useSaveListingEdit server media IDs", () => {
   it("reorders a new attachment by the ID attach returned, not its local staging UUID", async () => {
     const seed = [persisted(PERSISTED_A, 0)];
     const api = createMediaApi(seed);
-    const newKey = "pending/9f1c/original.jpg";
+    const newKey = "pending/9f1c/original.webp";
     const photos = [
       // The seller dragged the new photo ahead of the existing one: it is the cover.
       staged(LOCAL_NEW_1, newKey, 0),
@@ -270,8 +270,8 @@ describe("useSaveListingEdit server media IDs", () => {
       persisted(PERSISTED_B, 1),
     ];
     const api = createMediaApi(seed);
-    const key1 = "pending/aaa/original.jpg";
-    const key2 = "pending/bbb/original.jpg";
+    const key1 = "pending/aaa/original.webp";
+    const key2 = "pending/bbb/original.webp";
     // A removed; B and two new photos remain, with the second new photo as cover.
     const photos = [
       staged(LOCAL_NEW_2, key2, 0),
@@ -294,7 +294,7 @@ describe("useSaveListingEdit server media IDs", () => {
     const seed = [persisted(PERSISTED_A, 0)];
     const api = createMediaApi(seed);
     api.failures.reorder = 1;
-    const newKey = "pending/9f1c/original.jpg";
+    const newKey = "pending/9f1c/original.webp";
     const photos = [
       staged(PERSISTED_A, KEY_A, 0),
       staged(LOCAL_NEW_1, newKey, 1),
@@ -324,8 +324,8 @@ describe("useSaveListingEdit server media IDs", () => {
   it("keeps earlier attachments when a later attach fails and does not duplicate them on retry", async () => {
     const seed = [persisted(PERSISTED_A, 0)];
     const api = createMediaApi(seed);
-    const key1 = "pending/aaa/original.jpg";
-    const key2 = "pending/bbb/original.jpg";
+    const key1 = "pending/aaa/original.webp";
+    const key2 = "pending/bbb/original.webp";
     api.failures.attachKeys.add(key2);
     const photos = [
       staged(PERSISTED_A, KEY_A, 0),
@@ -352,7 +352,7 @@ describe("useSaveListingEdit server media IDs", () => {
     const seed = [persisted(PERSISTED_A, 0)];
     const api = createMediaApi(seed);
     api.failures.reorder = 1;
-    const newKey = "pending/9f1c/original.jpg";
+    const newKey = "pending/9f1c/original.webp";
     const photos = [
       staged(PERSISTED_A, KEY_A, 0),
       staged(LOCAL_NEW_1, newKey, 1),
@@ -378,7 +378,7 @@ describe("useSaveListingEdit server media IDs", () => {
     const seed = [persisted(PERSISTED_A, 0)];
     const api = createMediaApi(seed);
     api.failures.reorder = 1;
-    const newKey = "pending/9f1c/original.jpg";
+    const newKey = "pending/9f1c/original.webp";
     const photos = [
       staged(PERSISTED_A, KEY_A, 0),
       staged(LOCAL_NEW_1, newKey, 1),
@@ -402,7 +402,7 @@ describe("useSaveListingEdit server media IDs", () => {
     const seed = [persisted(PERSISTED_A, 0)];
     const api = createMediaApi(seed);
     api.failures.reorder = 1;
-    const newKey = "pending/9f1c/original.jpg";
+    const newKey = "pending/9f1c/original.webp";
     const photos = [
       staged(PERSISTED_A, KEY_A, 0),
       staged(LOCAL_NEW_1, newKey, 1),
@@ -424,7 +424,7 @@ describe("useSaveListingEdit server media IDs", () => {
     const seed = [persisted(PERSISTED_A, 0)];
     const api = createMediaApi(seed);
     api.failures.reorder = 1;
-    const newKey = "pending/9f1c/original.jpg";
+    const newKey = "pending/9f1c/original.webp";
     const photos = [
       staged(PERSISTED_A, KEY_A, 0),
       staged(LOCAL_NEW_1, newKey, 1),
@@ -450,7 +450,7 @@ describe("useSaveListingEdit server media IDs", () => {
     const seed = [persisted(PERSISTED_A, 0), persisted(PERSISTED_B, 1)];
     const api = createMediaApi(seed);
     api.failures.reorder = 1;
-    const newKey = "pending/9f1c/original.jpg";
+    const newKey = "pending/9f1c/original.webp";
     const photos = [staged(PERSISTED_A, KEY_A, 0), staged(PERSISTED_B, KEY_B, 1)];
     const withNew = [...photos, staged(LOCAL_NEW_1, newKey, 2)];
 
@@ -493,7 +493,7 @@ describe("useSaveListingEdit server media IDs", () => {
       const seed = [persisted(PERSISTED_A, 0)];
       const api = createMediaApi(seed);
       api.failures.reorder = 1;
-      const newKey = "pending/9f1c/original.jpg";
+      const newKey = "pending/9f1c/original.webp";
       const photos = [staged(PERSISTED_A, KEY_A, 0), staged(LOCAL_NEW_1, newKey, 1)];
 
       const { result, rerender } = renderSave({ photos, seed });
@@ -513,8 +513,8 @@ describe("useSaveListingEdit server media IDs", () => {
       const seed = [persisted(PERSISTED_A, 0)];
       const api = createMediaApi(seed);
       api.failures.reorder = 1;
-      const key1 = "pending/aaa/original.jpg";
-      const key2 = "pending/bbb/original.jpg";
+      const key1 = "pending/aaa/original.webp";
+      const key2 = "pending/bbb/original.webp";
       const photos = [staged(PERSISTED_A, KEY_A, 0), staged(LOCAL_NEW_1, key1, 1)];
 
       const { result, rerender } = renderSave({ photos, seed });
@@ -564,7 +564,7 @@ describe("useSaveListingEdit server media IDs", () => {
       const seed = [persisted(PERSISTED_A, 0)];
       const api = createMediaApi(seed);
       api.failures.reorder = 1;
-      const newKey = "pending/9f1c/original.jpg";
+      const newKey = "pending/9f1c/original.webp";
       const photos = [staged(PERSISTED_A, KEY_A, 0), staged(LOCAL_NEW_1, newKey, 1)];
 
       const { result, rerender } = renderSave({
@@ -594,7 +594,7 @@ describe("useSaveListingEdit server media IDs", () => {
     it("runs one save when Save is pressed twice in the same render", async () => {
       const seed = [persisted(PERSISTED_A, 0)];
       const api = createMediaApi(seed);
-      const newKey = "pending/9f1c/original.jpg";
+      const newKey = "pending/9f1c/original.webp";
       const photos = [staged(PERSISTED_A, KEY_A, 0), staged(LOCAL_NEW_1, newKey, 1)];
 
       const { result } = renderSave({ photos, seed });
@@ -611,8 +611,8 @@ describe("useSaveListingEdit server media IDs", () => {
       const seed = [persisted(PERSISTED_A, 0)];
       const api = createMediaApi(seed);
       api.failures.reorder = 1;
-      const key1 = "pending/aaa/original.jpg";
-      const key2 = "pending/bbb/original.jpg";
+      const key1 = "pending/aaa/original.webp";
+      const key2 = "pending/bbb/original.webp";
       const photos = [staged(PERSISTED_A, KEY_A, 0), staged(LOCAL_NEW_1, key1, 1)];
 
       const { result, rerender } = renderSave({ photos, seed });

@@ -68,7 +68,7 @@ beforeEach(async () => {
     http.get("*/me", () => HttpResponse.json(currentMe)),
     http.post("*/uploads/presign", async ({ request }) => {
       requests.presigns.push(await request.json());
-      return HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: `pending/new${requests.presigns.length}/original.jpg`, expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"', "content-type": "image/jpeg" } });
+      return HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: `pending/new${requests.presigns.length}/original.webp`, expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"', "content-type": "image/webp" } });
     }),
     http.put("*/me/photo", async ({ request }) => {
       const body = await request.json() as { key: string };
@@ -146,7 +146,7 @@ describe("Profile photo", () => {
 
   it.each(["upload", "remove"])("retries %s with refreshed credentials without reopening the picker", async (operation) => {
     choosePhoto();
-    if (operation === "remove") currentMe = { ...me, avatarKey: "pending/old/original.jpg" };
+    if (operation === "remove") currentMe = { ...me, avatarKey: "pending/old/original.webp" };
     let refreshes = 0;
     const sent: string[] = [];
     const respond = ({ request }: { request: Request }) => {
@@ -154,7 +154,7 @@ describe("Profile photo", () => {
       sent.push(auth);
       if (auth !== "Bearer fresh") return HttpResponse.json({ code: "UNAUTHORIZED" }, { status: 401 });
       if (sent.filter((value) => value === "Bearer fresh").length === 1) return HttpResponse.json({ code: "INTERNAL" }, { status: 500 });
-      currentMe = { ...me, avatarKey: operation === "remove" ? null : "pending/new2/original.jpg" };
+      currentMe = { ...me, avatarKey: operation === "remove" ? null : "pending/new2/original.webp" };
       return HttpResponse.json(currentMe);
     };
     server.use(http.post("*/auth/refresh", () => {
@@ -220,18 +220,18 @@ describe("Profile photo", () => {
     expect(view.queryByText("Camera access is off")).toBeNull();
   });
 
-  it("uploads a small JPEG with real byte progress, disables the avatar, and updates Profile and Cabinet", async () => {
+  it("uploads a small WebP with real byte progress, disables the avatar, and updates Profile and Cabinet", async () => {
     choosePhoto();
     let presign: unknown;
     let attached: unknown;
     server.use(
       http.post("*/uploads/presign", async ({ request }) => {
         presign = await request.json();
-        return HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: "pending/new/original.jpg", expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"', "content-type": "image/jpeg" } });
+        return HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: "pending/new/original.webp", expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"', "content-type": "image/webp" } });
       }),
       http.put("*/me/photo", async ({ request }) => {
         attached = await request.json();
-        currentMe = { ...me, avatarKey: "pending/new/original.jpg" };
+        currentMe = { ...me, avatarKey: "pending/new/original.webp" };
         return HttpResponse.json(currentMe);
       }),
       http.get("*/me/listings/counts", () => HttpResponse.json({ active: 0, sold: 0, archived: 0, banned: 0, drafts: 0, total: 0 })),
@@ -242,9 +242,9 @@ describe("Profile photo", () => {
     fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     expect(await view.findByText("Uploading photo")).toBeTruthy();
     await vi.waitFor(() => expect(picker.sent).toHaveLength(1));
-    expect(presign).toEqual({ kind: "image", writeProtocol: "conditional-v1", contentType: "image/jpeg", sizeBytes: 2048 });
-    expect(picker.sent[0]).toMatchObject({ url: "https://storage.example/photo", options: { httpMethod: "PUT", uploadType: 0, headers: { "if-match": '"etag"', "content-type": "image/jpeg" } } });
-    expect(picker.saves).toContainEqual({ format: "jpeg", compress: 0.8 });
+    expect(presign).toEqual({ kind: "image", writeProtocol: "conditional-v1", contentType: "image/webp", sizeBytes: 2048 });
+    expect(picker.sent[0]).toMatchObject({ url: "https://storage.example/photo", options: { httpMethod: "PUT", uploadType: 0, headers: { "if-match": '"etag"', "content-type": "image/webp" } } });
+    expect(picker.saves).toContainEqual({ format: "webp", compress: 0.8 });
     act(() => { picker.progress({ totalBytesSent: 512, totalBytesExpectedToSend: 2048 }); });
     expect(view.getByRole("progressbar").props.accessibilityValue).toEqual({ min: 0, max: 100, now: 25 });
     expect(view.getByText("Uploading photo... 25%").props.accessibilityLiveRegion).toBe("polite");
@@ -256,12 +256,12 @@ describe("Profile photo", () => {
     expect(view.getByText("Uploading photo... 75%")).toBeTruthy();
     await act(async () => { picker.finish(); });
     expect(await view.findByText("Photo updated")).toBeTruthy();
-    expect(attached).toEqual({ key: "pending/new/original.jpg" });
+    expect(attached).toEqual({ key: "pending/new/original.webp" });
     const photos = view.UNSAFE_queryAllByType("Image" as never);
-    expect(photos[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/new/thumbnail.jpg" });
+    expect(photos[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/new/thumbnail.webp" });
     view.rerender(<ToastProvider><CabinetScreen /></ToastProvider>);
     await view.findByRole("button", { name: "Aman, +993 65 XX-XX-56" });
-    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/new/thumbnail.jpg" });
+    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/new/thumbnail.webp" });
   });
 
   it("falls back to the assigned car mark when the local preview fails while preserving upload progress", async () => {
@@ -281,7 +281,7 @@ describe("Profile photo", () => {
   });
 
   it.each(["storage", "attachment"])("keeps the earlier avatar on %s failure, retries the same photo and can cancel", async (phase) => {
-    currentMe = { ...me, avatarKey: "pending/old/original.jpg" };
+    currentMe = { ...me, avatarKey: "pending/old/original.webp" };
     choosePhoto();
     if (phase === "attachment") server.use(http.put("*/me/photo", () => HttpResponse.json({ code: "INTERNAL" }, { status: 500 })));
     const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
@@ -292,7 +292,7 @@ describe("Profile photo", () => {
     await act(async () => { picker.finish(phase === "storage" ? 500 : 200); });
     const error = await view.findByText("Couldn't upload the photo.");
     expect(error.props.accessibilityLiveRegion).toBe("assertive");
-    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/old/thumbnail.jpg" });
+    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/old/thumbnail.webp" });
     fireEvent.press(view.getByRole("button", { name: "Retry" }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(2));
     expect(picker.library).toHaveBeenCalledOnce();
@@ -345,7 +345,7 @@ describe("Profile photo", () => {
   });
 
   it("removes a photo immediately without confirmation and restores the same assigned car mark", async () => {
-    currentMe = { ...me, avatarKey: "pending/old/original.jpg" };
+    currentMe = { ...me, avatarKey: "pending/old/original.webp" };
     let deleted = false;
     server.use(http.delete("*/me/photo", () => {
       deleted = true;
@@ -365,7 +365,7 @@ describe("Profile photo", () => {
   });
 
   it("keeps the photo if removal fails and Retry removes it without a picker", async () => {
-    currentMe = { ...me, avatarKey: "pending/old/original.jpg" };
+    currentMe = { ...me, avatarKey: "pending/old/original.webp" };
     let removes = 0;
     server.use(http.delete("*/me/photo", () => {
       removes += 1;
@@ -378,7 +378,7 @@ describe("Profile photo", () => {
     fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
     fireEvent.press(view.getByRole("button", { name: "Remove photo" }));
     expect(await view.findByText("Couldn't remove the photo.")).toBeTruthy();
-    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/old/thumbnail.jpg" });
+    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/old/thumbnail.webp" });
     fireEvent.press(view.getByRole("button", { name: "Retry" }));
     expect(await view.findByText("Photo removed")).toBeTruthy();
     expect(removes).toBe(2);
@@ -391,7 +391,7 @@ describe("Profile photo", () => {
       const body = await request.json();
       requests.sets.push(body);
       if (requests.sets.length === 1) return HttpResponse.json({ code: "UPLOAD_ALREADY_ATTACHED", details: { reason: "UPLOAD_PREPARING" } }, { status: 409 });
-      currentMe = { ...me, avatarKey: "pending/new1/original.jpg" };
+      currentMe = { ...me, avatarKey: "pending/new1/original.webp" };
       return HttpResponse.json(currentMe);
     }));
     const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
@@ -406,7 +406,7 @@ describe("Profile photo", () => {
     expect(view.getByRole("progressbar").props.accessibilityValue.now).toBe(100);
     await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
     await vi.waitFor(() => expect(view.getByText("Photo updated")).toBeTruthy());
-    expect(requests.sets).toEqual([{ key: "pending/new1/original.jpg" }, { key: "pending/new1/original.jpg" }]);
+    expect(requests.sets).toEqual([{ key: "pending/new1/original.webp" }, { key: "pending/new1/original.webp" }]);
     expect(picker.sent).toHaveLength(1);
     expect(picker.library).toHaveBeenCalledOnce();
   });
@@ -437,13 +437,13 @@ describe("Profile photo", () => {
     await act(async () => { picker.finish(); });
     expect(await view.findByText("Photo updated")).toBeTruthy();
     expect(requests.presigns).toHaveLength(2);
-    expect(requests.sets).toEqual([{ key: "pending/new1/original.jpg" }, { key: "pending/new2/original.jpg" }]);
+    expect(requests.sets).toEqual([{ key: "pending/new1/original.webp" }, { key: "pending/new2/original.webp" }]);
     expect(picker.library).toHaveBeenCalledOnce();
   });
 
   it.each(["USER_SUSPENDED", "FORBIDDEN"])("keeps the earlier photo for 403 %s and offers no futile retry", async (code) => {
     choosePhoto();
-    currentMe = { ...me, avatarKey: "pending/old/original.jpg" };
+    currentMe = { ...me, avatarKey: "pending/old/original.webp" };
     server.use(http.put("*/me/photo", () => HttpResponse.json({ code, details: { reason: "USER_SUSPENDED" } }, { status: 403 })));
     const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
@@ -454,7 +454,7 @@ describe("Profile photo", () => {
     expect(await view.findByText("Your account is restricted. Contact support if you think this is a mistake.")).toBeTruthy();
     expect(view.queryByRole("button", { name: "Retry" })).toBeNull();
     expect(view.getByRole("button", { name: "Cancel" })).toBeTruthy();
-    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/old/thumbnail.jpg" });
+    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/old/thumbnail.webp" });
   });
 
   it("finishes after leaving Profile and shows the result on return", async () => {
@@ -471,7 +471,7 @@ describe("Profile photo", () => {
     await vi.waitFor(() => expect(requests.sets).toHaveLength(1));
     view.rerender(<ToastProvider><ProfileScreen /></ToastProvider>);
     expect(await view.findByText("Photo updated")).toBeTruthy();
-    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/new1/thumbnail.jpg" });
+    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/new1/thumbnail.webp" });
   });
 
   it.each(["storage", "attachment"])("never attaches or caches the previous User's photo when signing out during %s", async (phase) => {
@@ -481,7 +481,7 @@ describe("Profile photo", () => {
     server.use(http.put("*/me/photo", ({ request }) => {
       sentTo.push(request.headers.get("authorization") ?? "");
       if (phase === "attachment") return new Promise<Response>((resolve) => { complete = resolve; });
-      return HttpResponse.json({ ...me, avatarKey: "pending/new1/original.jpg" });
+      return HttpResponse.json({ ...me, avatarKey: "pending/new1/original.webp" });
     }));
     const content = <ToastProvider><ProfileScreen /></ToastProvider>;
     const view = renderMobile(content);
@@ -501,7 +501,7 @@ describe("Profile photo", () => {
     expect(view.queryByText("Uploading photo")).toBeNull();
     expect(view.UNSAFE_queryAllByType("Image" as never)).toHaveLength(0);
     await act(async () => {
-      if (phase === "attachment") complete?.(HttpResponse.json({ ...me, avatarKey: "pending/new1/original.jpg" }));
+      if (phase === "attachment") complete?.(HttpResponse.json({ ...me, avatarKey: "pending/new1/original.webp" }));
       else picker.finish();
     });
     await vi.waitFor(() => expect(view.queryByText("Uploading photo")).toBeNull());
@@ -527,7 +527,7 @@ describe("Profile photo", () => {
     await view.findByText("Merdan");
     await act(async () => { complete(); });
     expect(view.queryByRole("alert")).toBeNull();
-    expect(picker.deletes).toContainEqual(expect.stringMatching(/^file:\/\/\/cache\/profile-photo-\d+\.jpg$/));
+    expect(picker.deletes).toContainEqual(expect.stringMatching(/^file:\/\/\/cache\/profile-photo-\d+\.webp$/));
     expect(requests.presigns).toHaveLength(0);
     expect(requests.sets).toHaveLength(0);
     expect(view.getByText("Merdan")).toBeTruthy();
@@ -594,7 +594,7 @@ describe("Profile photo", () => {
       await vi.waitFor(() => expect(picker.sent).toHaveLength(2));
       expect(picker.sent[0]?.uri).toBe(picker.sent[1]?.uri);
       expect(picker.library).toHaveBeenCalledOnce();
-      server.use(http.put("*/me/photo", () => HttpResponse.json({ ...me, avatarKey: "pending/new2/original.jpg" })));
+      server.use(http.put("*/me/photo", () => HttpResponse.json({ ...me, avatarKey: "pending/new2/original.webp" })));
       await act(async () => { picker.finish(); });
       await vi.waitFor(() => expect(view.getByText("Photo updated")).toBeTruthy());
     }
@@ -659,7 +659,7 @@ describe("Profile photo", () => {
     if (ending === "preparing") server.use(http.put("*/me/photo", () => {
       attempts += 1;
       if (attempts === 1) return HttpResponse.json({ code: "UPLOAD_ALREADY_ATTACHED", details: { reason: "UPLOAD_PREPARING" } }, { status: 409 });
-      return HttpResponse.json({ ...me, avatarKey: "pending/new1/original.jpg" });
+      return HttpResponse.json({ ...me, avatarKey: "pending/new1/original.webp" });
     }));
     const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
@@ -681,7 +681,7 @@ describe("Profile photo", () => {
 
   it("announces removal start and result once on iOS", async () => {
     const announce = vi.spyOn(AccessibilityInfo, "announceForAccessibility");
-    currentMe = { ...me, avatarKey: "pending/old/original.jpg" };
+    currentMe = { ...me, avatarKey: "pending/old/original.webp" };
     server.use(http.delete("*/me/photo", () => HttpResponse.json(me)));
     const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
@@ -692,7 +692,7 @@ describe("Profile photo", () => {
   });
 
   it("ignores a late removal failure after another User signs in", async () => {
-    currentMe = { ...me, avatarKey: "pending/old/original.jpg" };
+    currentMe = { ...me, avatarKey: "pending/old/original.webp" };
     let complete: ((response: Response) => void) | undefined;
     server.use(http.delete("*/me/photo", () => new Promise<Response>((resolve) => { complete = resolve; })));
     const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
@@ -729,7 +729,7 @@ describe("Profile photo", () => {
 
   it("does not upload if a legacy server omits the conditional write headers", async () => {
     choosePhoto();
-    server.use(http.post("*/uploads/presign", () => HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: "pending/new/original.jpg", expiresIn: 600, maxSizeBytes: 5242880 })));
+    server.use(http.post("*/uploads/presign", () => HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: "pending/new/original.webp", expiresIn: 600, maxSizeBytes: 5242880 })));
     const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
     fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
@@ -748,7 +748,7 @@ describe("Profile photo", () => {
     if (state === "unsupported") picker.readable = false;
     const removing = state === "removed" || state === "remove failed";
     if (removing) {
-      currentMe = { ...me, avatarKey: "pending/old/original.jpg" };
+      currentMe = { ...me, avatarKey: "pending/old/original.webp" };
       server.use(http.delete("*/me/photo", () => {
         if (state === "remove failed") return HttpResponse.json({ code: "INTERNAL" }, { status: 500 });
         currentMe = { ...me };
@@ -758,7 +758,7 @@ describe("Profile photo", () => {
     let attachAttempts = 0;
     if (state === "preparing" || state === "attached to listing") server.use(http.put("*/me/photo", () => {
       attachAttempts += 1;
-      if (attachAttempts > 1) return HttpResponse.json({ ...me, avatarKey: "pending/new1/original.jpg" });
+      if (attachAttempts > 1) return HttpResponse.json({ ...me, avatarKey: "pending/new1/original.webp" });
       return HttpResponse.json({ code: "UPLOAD_ALREADY_ATTACHED", details: { reason: state === "preparing" ? "UPLOAD_PREPARING" : "UPLOAD_ATTACHED_TO_LISTING" } }, { status: 409 });
     }));
     const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>, { locale });

@@ -16,3 +16,5 @@ Auth behavior belongs to identity use-cases. In particular, pending admin TOTP e
 - [Generator](scripts/generate-openapi.ts)
 - [Build and exports](package.json)
 - [TOTP enrollment and tests](../../apps/api/src/modules/identity/application/EnrollAdminTotp.ts)
+
+Chat photo presign declares only `image/webp`; Listing/Profile Photo presign enforces the same format in the API domain. Video and brand-logo upload formats retain their own constraints. [ADR-0096](../../docs/adr/0096-webp-only-photos.md) owns the photo format and five-object manifest choice.

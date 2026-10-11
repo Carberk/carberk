@@ -311,7 +311,7 @@ describe("ListMyConversations", () => {
       priceAmount: 100000,
       priceCurrency: "TMT" as const,
       displayPriceTmt: 100000,
-      coverMediaKey: "cover.jpg",
+      coverMediaKey: "cover.webp",
       cityId: "city-1",
       publishedAt: new Date("2026-05-01T00:00:00Z"),
       allowChat: true,
@@ -589,13 +589,13 @@ describe("ListMyConversations", () => {
     it("passes a peer's photo key through", async () => {
       seedListing();
       seedConversation();
-      identity.addUser("seller-1", "Seller One", { avatarKey: "avatars/seller-1/a.jpg" });
+      identity.addUser("seller-1", "Seller One", { avatarKey: "avatars/seller-1/a.webp" });
 
       const result = await makeUseCase(repo, listings, identity).execute({
         userId: "buyer-1",
       });
 
-      expect(result.items[0]!.peer.avatarKey).toBe("avatars/seller-1/a.jpg");
+      expect(result.items[0]!.peer.avatarKey).toBe("avatars/seller-1/a.webp");
     });
 
     it("marks a peer purged after account deletion, keeping the number and index", async () => {

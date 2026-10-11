@@ -80,10 +80,10 @@ describe("Conversation message broadcast e2e", () => {
       .useValue({
         generate: async (originalKey: string) => ({
           variants: {
-            thumbnail: `${originalKey}/thumbnail.jpg`,
-            list: `${originalKey}/list.jpg`,
-            detail: `${originalKey}/detail.jpg`,
-            fullscreen: `${originalKey}/fullscreen.jpg`,
+            thumbnail: `${originalKey}/thumbnail.webp`,
+            list: `${originalKey}/list.webp`,
+            detail: `${originalKey}/detail.webp`,
+            fullscreen: `${originalKey}/fullscreen.webp`,
           },
         }),
       })
@@ -162,7 +162,7 @@ describe("Conversation message broadcast e2e", () => {
           allowCalls: true,
           allowChat: true,
           conditionDisclosure: { damaged: false },
-          photos: [0, 1, 2].map((index) => ({ photoId: suite.id(`photo-${index + 1}`), key: `photo1.jpg-${index}`, sortOrder: index })),
+          photos: [0, 1, 2].map((index) => ({ photoId: suite.id(`photo-${index + 1}`), key: `photo1.webp-${index}`, sortOrder: index })),
         } satisfies Record<string, unknown>;
     const seededPayload = await seedPresignedPhotos(prisma, suite.id("seller-1"), draftPayload);
     const draft = await prisma.listingDraft.create({
@@ -219,11 +219,11 @@ describe("Conversation message broadcast e2e", () => {
     const presign = await request
       .post(`/api/v1/conversations/${conversationId}/attachments/presign`)
       .set("Authorization", `Bearer ${token}`)
-      .send({ contentType: "image/jpeg", sizeBytes: body.length })
+      .send({ contentType: "image/webp", sizeBytes: body.length })
       .expect(201);
     const put = await fetch(presign.body.uploadUrl as string, {
       method: "PUT",
-      headers: { "Content-Type": "image/jpeg" },
+      headers: { "Content-Type": "image/webp" },
       body: new Uint8Array(body),
     });
     expect(put.status).toBe(200);
@@ -317,7 +317,7 @@ describe("Conversation message broadcast e2e", () => {
     const { buyerToken, sellerToken, conversationId } = await seedConversation();
     const peer = await joinedSocket(sellerToken, conversationId);
     const sender = await joinedSocket(buyerToken, conversationId);
-    const key = `chat-attachments/${conversationId}/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.jpg`;
+    const key = `chat-attachments/${conversationId}/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.webp`;
 
     const res = await request
       .post(`/api/v1/conversations/${conversationId}/messages/rich`)

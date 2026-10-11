@@ -582,7 +582,7 @@ export default function ConversationDetailScreen() {
         const presignResponse = await presignChatAttachment.mutateAsync({
           conversationId,
           request: {
-            contentType: "image/jpeg",
+            contentType: "image/webp",
             sizeBytes: attachment.fileSize,
           },
         });
@@ -669,7 +669,7 @@ export default function ConversationDetailScreen() {
           const presignResponse = await presignChatAttachment.mutateAsync({
             conversationId,
             request: {
-              contentType: "image/jpeg",
+              contentType: "image/webp",
               sizeBytes: fileSize,
             },
           });

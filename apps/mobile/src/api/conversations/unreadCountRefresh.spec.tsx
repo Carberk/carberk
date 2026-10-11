@@ -74,7 +74,7 @@ describe("the Messages tab count refreshes where the Conversation list does", ()
 
     result.current.mutate({
       conversationId: CONVERSATION,
-      metadata: { key: "chat/a.jpg", width: 10, height: 10 },
+      metadata: { key: "chat/a.webp", width: 10, height: 10 },
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));

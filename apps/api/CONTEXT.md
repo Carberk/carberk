@@ -20,3 +20,5 @@ Cloud deployment follows ADR-0039. Only the API pre-deploy command owns producti
 - [Readiness implementation](src/common/readiness.ts)
 - [API integration tests](test)
 - [Deployment contract](../../docs/adr/0039-phased-cloud-first-hosting.md)
+
+`PHOTO_CONVERSION_MAINTENANCE=true` starts only health listeners for the [photo conversion runbook](../../packages/db/scripts/convert-photos-webp.md). Business HTTP routes return 503 and no Socket.IO server starts. `/readyz` identifies maintenance with business readiness false while allowing the deployment health check to replace old writers.

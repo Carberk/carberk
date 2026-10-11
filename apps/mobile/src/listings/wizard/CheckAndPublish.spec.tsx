@@ -23,8 +23,8 @@ vi.mock("../../api/catalog/useCityGroups", () => ({
 
 const photo = (n: number, state: StagedPhoto["state"] = "attached"): StagedPhoto => ({
   photoId: `photo-${n}`,
-  localUri: `file:///staged/photo-${n}.jpg`,
-  key: state === "attached" ? `photo-${n}.jpg` : undefined,
+  localUri: `file:///staged/photo-${n}.webp`,
+  key: state === "attached" ? `photo-${n}.webp` : undefined,
   state,
   sortOrder: n,
   retryCount: 0,
@@ -58,7 +58,7 @@ describe("Check and publish, the card preview", () => {
     const screen = check();
     const card = within(screen.getByTestId("check-preview"));
 
-    expect(screen.getByTestId("check-preview-cover").props.source).toEqual({ uri: "file:///staged/photo-0.jpg" });
+    expect(screen.getByTestId("check-preview-cover").props.source).toEqual({ uri: "file:///staged/photo-0.webp" });
     expect(card.getByText("185,000 TMT")).toBeTruthy();
     expect(card.getByText("Toyota Camry, 2020")).toBeTruthy();
     expect(card.getByText("45,000 km · Automatic · Petrol")).toBeTruthy();

@@ -10,7 +10,7 @@ import { createCleanRichMessage } from "./RichMessageFactory";
 import { FakeChatAttachmentCleaner } from "./testing/FakeChatAttachmentCleaner";
 
 const CONVERSATION_ID = "7d0c1a52-3b64-4e8f-9a17-5c2e8f1b6d90";
-const KEY = `chat-attachments/${CONVERSATION_ID}/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.jpg`;
+const KEY = `chat-attachments/${CONVERSATION_ID}/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.webp`;
 
 function cleanerReturning(result: ChatAttachmentCleanResult) {
   const cleaner = new FakeChatAttachmentCleaner();
@@ -59,10 +59,10 @@ describe("createCleanRichMessage", () => {
   );
 
   it.each([
-    ["another Conversation's attachment", "chat-attachments/11111111-2222-4333-8444-555555555555/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.jpg"],
-    ["a Listing photo", "pending/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.jpg"],
-    ["a path that climbs out of the Conversation", `chat-attachments/${CONVERSATION_ID}/../other/original.jpg`],
-    ["an absolute URL", "https://example.com/original.jpg"],
+    ["another Conversation's attachment", "chat-attachments/11111111-2222-4333-8444-555555555555/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.webp"],
+    ["a Listing photo", "pending/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.webp"],
+    ["a path that climbs out of the Conversation", `chat-attachments/${CONVERSATION_ID}/../other/original.webp`],
+    ["an absolute URL", "https://example.com/original.webp"],
   ])("refuses %s without touching storage", async (_label, key) => {
     const cleaner = cleanerReturning("clean");
 

@@ -47,7 +47,7 @@ describe("MessageMapper", () => {
       senderId: "sender-1",
       kind: "image",
       body: null,
-      metadata: { key: "chat/image.jpg", width: 800, height: 600 },
+      metadata: { key: "chat/image.webp", width: 800, height: 600 },
       createdAt: new Date("2026-01-01T00:00:00Z"),
       deletedAt: null,
       clientMessageId: null,
@@ -55,7 +55,7 @@ describe("MessageMapper", () => {
 
     expect(message.kind).toBe("image");
     expect(message.metadata).toEqual({
-      key: "chat/image.jpg",
+      key: "chat/image.webp",
       width: 800,
       height: 600,
     });
@@ -75,7 +75,7 @@ describe("MessageMapper", () => {
         year: 2020,
         displayPriceTmt: 100000,
         priceCurrency: "TMT",
-        coverMediaKey: "cover.jpg",
+        coverMediaKey: "cover.webp",
         status: "active",
       },
       createdAt: new Date("2026-01-01T00:00:00Z"),
@@ -91,7 +91,7 @@ describe("MessageMapper", () => {
       year: 2020,
       displayPriceTmt: 100000,
       priceCurrency: "TMT",
-      coverMediaKey: "cover.jpg",
+      coverMediaKey: "cover.webp",
       status: "active",
     });
   });
@@ -120,7 +120,7 @@ describe("MessageMapper", () => {
       senderId: "sender-1",
       kind: "image",
       body: null,
-      metadata: { key: "chat-attachments/conv-1/uuid/original.jpg", width: 800, height: 600 },
+      metadata: { key: "chat-attachments/conv-1/uuid/original.webp", width: 800, height: 600 },
       createdAt: new Date("2026-01-01T00:00:00Z"),
       deletedAt: new Date("2026-01-01T00:01:00Z"),
       clientMessageId: null,

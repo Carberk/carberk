@@ -87,7 +87,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
   function manifest(key: string): string[] {
     const directory = key.slice(0, key.lastIndexOf("/") + 1);
     return [key, ...["thumbnail", "list", "detail", "fullscreen"]
-      .flatMap((name) => [`${directory}${name}.jpg`, `${directory}${name}.webp`])];
+      .map((name) => `${directory}${name}.webp`)];
   }
 
   async function exists(Key: string): Promise<boolean> {
@@ -110,7 +110,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
       where: { id: userId }, update: {},
       create: { id: userId, phone: `+9936${String(Math.floor(Math.random() * 1e7)).padStart(7, "0")}`, phoneVerifiedAt: new Date(), role: "buyer" },
     });
-    const key = `pending/${randomUUID()}/original.jpg`;
+    const key = `pending/${randomUUID()}/original.webp`;
     const keys = manifest(key);
     for (const Key of keys) {
       objectKeys.add(Key);
@@ -119,7 +119,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
       }));
     }
     const upload = await prisma.mediaUpload.create({ data: {
-      userId, key, kind: "image", contentType: "image/jpeg", sizeBytes: 2048,
+      userId, key, kind: "image", contentType: "image/webp", sizeBytes: 2048,
       writeProtocol: "conditional-v1", objectKeys: keys,
       ...(options.preparing
         ? { state: "PREPARING", claimToken: randomUUID(), claimTargetType: "listing", claimTargetId: randomUUID(),
@@ -195,7 +195,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
 
     const afterCrash = await workOf(upload.id);
     expect(afterCrash).toMatchObject({ status: "PENDING", attempts: 1 });
-    expect(await present(upload.keys)).toBe(9);
+    expect(await present(upload.keys)).toBe(5);
     const restarted = new CleanRetiredUploads(new PrismaRetiredUploadLedger(prisma), new S3RetiredObjectStore(s3));
 
     await restarted.execute({ now: new Date(afterCrash.nextAttemptAt.getTime() + 1), limit: 10 });
@@ -208,7 +208,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
     const upload = await retiredUpload({ preparing: true });
     // Attach owns an existing Listing; publish owns one that does not exist yet.
     await prisma.mediaUpload.update({ where: { id: upload.id }, data: { claimTargetId: (await listing()).id } });
-    const thumbnail = `${upload.directory}thumbnail.jpg`;
+    const thumbnail = `${upload.directory}thumbnail.webp`;
     // The generator read what it is about to replace, then stalled past its deadline.
     const read = await s3.send(new HeadObjectCommand({ Bucket: RETIRED_UPLOAD_BUCKET, Key: thumbnail }));
 
@@ -237,7 +237,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
       state: "AVAILABLE", claimToken: null, claimDeadline: null, claimTargetType: null, claimTargetId: null, retiredAt: null,
     });
     expect(await prisma.mediaUploadCleanup.count({ where: { uploadId: upload.id } })).toBe(0);
-    expect(await present(upload.keys)).toBe(9);
+    expect(await present(upload.keys)).toBe(5);
   });
 
   it.each(["listing", "profile", "legacy-key"] as const)("touches nothing a live %s owner references when a publish deadline expires", async (owner) => {
@@ -247,7 +247,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
     } else {
       await prisma.listingMedia.create({ data: {
         listingId: (await listing()).id, kind: "image", sortOrder: 0,
-        key: owner === "legacy-key" ? `${upload.directory}list.jpg` : upload.key,
+        key: owner === "legacy-key" ? `${upload.directory}list.webp` : upload.key,
         ...(owner === "listing" ? { uploadId: upload.id } : {}),
       } });
     }
@@ -255,7 +255,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
     expect(await job.execute({ now: SWEEP, limit: 10 })).toEqual({ cancelledPreparations: 0, deleted: 0, waiting: 0 });
     expect(await prisma.mediaUpload.findUniqueOrThrow({ where: { id: upload.id } })).toEqual(before);
     expect(await prisma.mediaUploadCleanup.count({ where: { uploadId: upload.id } })).toBe(0);
-    expect(await present(upload.keys)).toBe(9);
+    expect(await present(upload.keys)).toBe(5);
   });
 
   it("leaves a preparation that is still inside its deadline alone", async () => {
@@ -264,23 +264,23 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
 
     expect(await job.execute({ now: SWEEP, limit: 10 })).toMatchObject({ cancelledPreparations: 0, deleted: 0 });
     expect(await stateOf(upload.id)).toBe("PREPARING");
-    expect(await present(upload.keys)).toBe(9);
+    expect(await present(upload.keys)).toBe(5);
   });
 
   describe("no live claimant loses storage", () => {
     it.each([
       ["a legacy Listing media key with no upload", async (directory: string) => {
         await prisma.listingMedia.create({ data: {
-          listingId: (await listing()).id, kind: "image", key: `${directory}list.jpg`, sortOrder: 0,
+          listingId: (await listing()).id, kind: "image", key: `${directory}list.webp`, sortOrder: 0,
         } });
       }],
       ["a Listing video poster", async (directory: string) => {
         await prisma.listingMedia.create({ data: {
-          listingId: (await listing()).id, kind: "video", key: "legacy/video.mp4", posterKey: `${directory}original.jpg`, sortOrder: 0,
+          listingId: (await listing()).id, kind: "video", key: "legacy/video.mp4", posterKey: `${directory}original.webp`, sortOrder: 0,
         } });
       }],
       ["a Profile Photo key", async (directory: string) => {
-        await prisma.user.update({ where: { id: userId }, data: { avatarKey: `${directory}original.jpg` } });
+        await prisma.user.update({ where: { id: userId }, data: { avatarKey: `${directory}original.webp` } });
       }],
     ])("blocks while %s is retained under the directory, then deletes once it is gone", async (_label, retain) => {
       const upload = await retiredUpload();
@@ -288,7 +288,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
 
       expect(await job.execute({ now: SWEEP, limit: 10 })).toMatchObject({ deleted: 0, waiting: 1 });
 
-      expect(await present(upload.keys)).toBe(9);
+      expect(await present(upload.keys)).toBe(5);
       const blocked = await workOf(upload.id);
       expect(blocked.status).toBe("PENDING");
       expect(blocked.lastError).toMatch(/reference|claim/i);
@@ -305,7 +305,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
     it.each([
       ["a Listing media row", async (upload: { id: string; key: string }) => {
         await prisma.listingMedia.create({ data: {
-          listingId: (await listing()).id, kind: "image", key: "elsewhere/original.jpg", sortOrder: 0, uploadId: upload.id,
+          listingId: (await listing()).id, kind: "image", key: "elsewhere/original.webp", sortOrder: 0, uploadId: upload.id,
         } });
       }],
       ["a Profile Photo", async (upload: { id: string }) => {
@@ -317,7 +317,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
 
       expect(await job.execute({ now: SWEEP, limit: 10 })).toMatchObject({ deleted: 0, waiting: 1 });
 
-      expect(await present(upload.keys)).toBe(9);
+      expect(await present(upload.keys)).toBe(5);
       expect(await stateOf(upload.id)).toBe("ADOPTED");
       expect(await workOf(upload.id)).toMatchObject({ status: "PENDING" });
     });
@@ -327,7 +327,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
 
       expect(await job.execute({ now: SWEEP, limit: 10 })).toMatchObject({ deleted: 0, waiting: 0 });
 
-      expect(await present(upload.keys)).toBe(9);
+      expect(await present(upload.keys)).toBe(5);
       expect(await workOf(upload.id)).toMatchObject({ status: "LEGACY_PENDING", attempts: 0 });
     });
   });
@@ -344,7 +344,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
 
     // While the User still shows the photo there is no work, and nothing is deleted.
     expect(await job.execute({ now: SWEEP, limit: 10 })).toMatchObject({ deleted: 0, waiting: 0 });
-    expect(await present(photo.keys)).toBe(9);
+    expect(await present(photo.keys)).toBe(5);
 
     // Only this suite's User is due in the year 2000, so the purge touches no one else.
     expect(await new PurgeExpiredAccounts(prisma).execute({ now: SWEEP })).toEqual({ purgedCount: 1 });
@@ -361,7 +361,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
     });
     expect([...work.objectKeys].sort()).toEqual([...photo.keys].sort());
     // The purge only records the work; the bytes go in the sweep, with its retries.
-    expect(await present(photo.keys)).toBe(9);
+    expect(await present(photo.keys)).toBe(5);
 
     expect(await job.execute({ now: SWEEP, limit: 10 })).toMatchObject({ deleted: 1, waiting: 0 });
 
@@ -438,6 +438,6 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
     expect(capped.nextAttemptAt.getTime() - SWEEP.getTime()).toBeLessThanOrEqual(6 * HOUR);
     expect(capped.nextAttemptAt.getTime() - SWEEP.getTime()).toBeGreaterThanOrEqual(later);
     expect(capped).toMatchObject({ status: "PENDING", attempts: 61 });
-    expect(await present(upload.keys)).toBe(9);
+    expect(await present(upload.keys)).toBe(5);
   });
 });

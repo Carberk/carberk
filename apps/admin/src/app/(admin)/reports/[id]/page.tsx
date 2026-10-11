@@ -88,7 +88,7 @@ export default async function ReportDetailPage({ params }: PageProps) {
   const mediaOrigin = (runtimeMediaOrigin ?? "").trim().replace(/\/$/, "");
   const photoBaseKey = report.target.avatarKey?.replace(/\/original\.(jpg|webp|jpeg)$/, "");
   const photoUrl = mediaOrigin && photoBaseKey
-    ? `${mediaOrigin}/listing-photos/${photoBaseKey}/thumbnail.jpg`
+    ? `${mediaOrigin}/listing-photos/${photoBaseKey}/thumbnail.webp`
     : undefined;
 
   const canRemovePhoto = configResult.ok && moderationEnabled &&

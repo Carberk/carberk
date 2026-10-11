@@ -27,7 +27,7 @@ describe("useRemoveProfilePhoto", () => {
     }));
     const session = await capturePhotoSession();
     const { client, result } = setupPhotoHook(useRemoveProfilePhoto);
-    client.setQueryData(queryKeys.me(), { ...PHOTO_ME, avatarKey: "pending/old/original.jpg" });
+    client.setQueryData(queryKeys.me(), { ...PHOTO_ME, avatarKey: "pending/old/original.webp" });
     await act(() => result.current.mutateAsync(session));
     expect(sent).toEqual({ body: "", auth: "Bearer aman" });
     expect(client.getQueryData(queryKeys.me())).toEqual(PHOTO_ME);
@@ -38,13 +38,13 @@ describe("useRemoveProfilePhoto", () => {
     server.use(http.delete("*/me/photo", () => HttpResponse.error()));
     const session = await capturePhotoSession();
     const { client, result } = setupPhotoHook(useRemoveProfilePhoto);
-    client.setQueryData(queryKeys.me(), { ...PHOTO_ME, avatarKey: "pending/old/original.jpg" });
+    client.setQueryData(queryKeys.me(), { ...PHOTO_ME, avatarKey: "pending/old/original.webp" });
     onlineManager.setOnline(false);
     let error: unknown;
     act(() => { void result.current.mutateAsync(session).catch((e: unknown) => { error = e; }); });
     await vi.waitFor(() => expect(error).toBeDefined(), { timeout: 500 });
     expect(result.current.isPaused).toBe(false);
-    expect(client.getQueryData(queryKeys.me())).toEqual({ ...PHOTO_ME, avatarKey: "pending/old/original.jpg" });
+    expect(client.getQueryData(queryKeys.me())).toEqual({ ...PHOTO_ME, avatarKey: "pending/old/original.webp" });
     session.dispose();
   });
 

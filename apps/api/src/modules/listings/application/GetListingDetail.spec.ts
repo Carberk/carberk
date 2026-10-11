@@ -230,7 +230,7 @@ describe("GetListingDetail", () => {
       displayName: "Aýgül",
       nameNumber: 3310,
       avatarIndex: 11,
-      avatarKey: "avatars/user-1/a.jpg",
+      avatarKey: "avatars/user-1/a.webp",
       memberSince: new Date("2024-06-10T12:00:00Z"),
     }));
 
@@ -243,7 +243,7 @@ describe("GetListingDetail", () => {
       displayName: "Aýgül",
       nameNumber: 3310,
       avatarIndex: 11,
-      avatarKey: "avatars/user-1/a.jpg",
+      avatarKey: "avatars/user-1/a.webp",
       deleted: false,
       memberSince: "2024-06-10T12:00:00.000Z",
     });
@@ -318,7 +318,7 @@ describe("GetListingDetail", () => {
       id: "media-1",
       listingId: "listing-1",
       kind: "image",
-      key: "listings/listing-1/media-1/original.jpg",
+      key: "listings/listing-1/media-1/original.webp",
       sortOrder: 0,
     });
     mediaRepo.media.push(media);
@@ -328,7 +328,7 @@ describe("GetListingDetail", () => {
 
     expect(result.media).toHaveLength(1);
     expect(result.media[0]!.variants.thumbnail).toBe(
-      "https://media.auto.tm/listings/listing-1/media-1/thumbnail.jpg",
+      "https://media.auto.tm/listings/listing-1/media-1/thumbnail.webp",
     );
   });
 

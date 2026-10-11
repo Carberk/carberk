@@ -33,7 +33,7 @@ export const UPLOAD_CAPS: Record<
 > = {
   image: {
     maxSizeBytes: 5 * 1024 * 1024, // 5 MB
-    allowedTypes: ["image/jpeg", "image/webp"],
+    allowedTypes: ["image/webp"],
   },
   video: {
     maxSizeBytes: 10 * 1024 * 1024, // 10 MB

@@ -19,14 +19,14 @@ interface VariantSpec {
   name: "thumbnail" | "list" | "detail" | "fullscreen";
   width: number;
   height: number;
-  fit: "cover" | "contain";
+  fit: "cover" | "inside";
 }
 
 const VARIANTS: VariantSpec[] = [
   { name: "thumbnail", width: 200, height: 200, fit: "cover" },
   { name: "list", width: 600, height: 400, fit: "cover" },
-  { name: "detail", width: 1200, height: 800, fit: "contain" },
-  { name: "fullscreen", width: 2400, height: 1600, fit: "contain" },
+  { name: "detail", width: 1200, height: 800, fit: "inside" },
+  { name: "fullscreen", width: 2400, height: 1600, fit: "inside" },
 ];
 
 function requireVariantKey(
@@ -128,22 +128,6 @@ export class SharpImageVariantGenerator implements ImageVariantGenerator {
         })
         .toBuffer());
 
-      // JPEG variant
-      const jpegKey = `${base}/${spec.name}.jpg`;
-      const jpegBuffer = await this.prepare(() => sharp(resized)
-        .jpeg({ quality: 85, progressive: true })
-        .toBuffer());
-      if (conditional) {
-        await conditional.write(jpegKey, jpegBuffer, "image/jpeg");
-      } else await this.s3.send(
-        new PutObjectCommand({
-          Bucket: bucket,
-          Key: jpegKey,
-          Body: jpegBuffer,
-          ContentType: "image/jpeg",
-        }),
-      );
-
       // WebP variant
       const webpKey = `${base}/${spec.name}.webp`;
       const webpBuffer = await this.prepare(() => sharp(resized)
@@ -160,7 +144,7 @@ export class SharpImageVariantGenerator implements ImageVariantGenerator {
         }),
       );
 
-      variantKeys[spec.name] = jpegKey;
+      variantKeys[spec.name] = webpKey;
     }
 
     return {

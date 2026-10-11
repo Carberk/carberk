@@ -3,9 +3,15 @@ import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { Logger } from "nestjs-pino";
 
+import { waitForMediaConversionMaintenance } from "./media-conversion-maintenance";
+
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
+  if (process.env["PHOTO_CONVERSION_MAINTENANCE"] === "true") {
+    await waitForMediaConversionMaintenance();
+    return;
+  }
   const app = await NestFactory.createApplicationContext(AppModule, {
     abortOnError: false,
     bufferLogs: true,

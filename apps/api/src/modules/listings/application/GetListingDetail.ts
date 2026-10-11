@@ -172,9 +172,9 @@ function buildVariants(
 
   const base = key.replace(/\/original\.(jpg|webp|jpeg)$/, "");
   return {
-    thumbnail: resolveUrl(`${base}/thumbnail.jpg`),
-    list: resolveUrl(`${base}/list.jpg`),
-    detail: resolveUrl(`${base}/detail.jpg`),
-    fullscreen: resolveUrl(`${base}/fullscreen.jpg`),
+    thumbnail: resolveUrl(`${base}/thumbnail.webp`),
+    list: resolveUrl(`${base}/list.webp`),
+    detail: resolveUrl(`${base}/detail.webp`),
+    fullscreen: resolveUrl(`${base}/fullscreen.webp`),
   };
 }

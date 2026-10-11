@@ -36,15 +36,15 @@ describe("useProfilePhotoUpload", () => {
   it.each(["image/heic", "image/heif", "image/avif", "image/gif", "image/bmp"])("re-encodes a readable Android %s library photo instead of refusing its source type", async (mimeType) => {
     const previousPlatform = Platform.OS;
     Platform.OS = "android";
-    server.use(http.post("*/uploads/presign", () => HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: "pending/new/original.jpg", expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"' } })),
-      http.put("*/me/photo", () => HttpResponse.json({ ...PHOTO_ME, avatarKey: "pending/new/original.jpg" })));
+    server.use(http.post("*/uploads/presign", () => HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: "pending/new/original.webp", expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"' } })),
+      http.put("*/me/photo", () => HttpResponse.json({ ...PHOTO_ME, avatarKey: "pending/new/original.webp" })));
     choosePhoto({ mimeType });
     try {
       const { result } = setupPhotoHook(useProfilePhotoUpload);
       let picking!: Promise<void>;
       act(() => { picking = result.current.pick("library"); });
       await vi.waitFor(() => expect(photoDevice.sent).toHaveLength(1));
-      expect(photoDevice.saves).toContainEqual({ format: "jpeg", compress: 0.8 });
+      expect(photoDevice.saves).toContainEqual({ format: "webp", compress: 0.8 });
       await act(async () => { photoDevice.finish(); await picking; });
       expect(result.current.state.status).toBe("idle");
     } finally { Platform.OS = previousPlatform; }
@@ -71,8 +71,8 @@ describe("useProfilePhotoUpload", () => {
     ["square", 1024, 1024, 1024, 1024, 0, 0],
     ["EXIF-rotated portrait", 1920, 1080, 1080, 1920, 0, 199],
   ])("uploads a full 512-square centre crop for a %s pick", async (_shape, pickedWidth, pickedHeight, decodedWidth, decodedHeight, originX, originY) => {
-    server.use(http.post("*/uploads/presign", () => HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: "pending/new/original.jpg", expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"' } })),
-      http.put("*/me/photo", () => HttpResponse.json({ ...PHOTO_ME, avatarKey: "pending/new/original.jpg" })));
+    server.use(http.post("*/uploads/presign", () => HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: "pending/new/original.webp", expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"' } })),
+      http.put("*/me/photo", () => HttpResponse.json({ ...PHOTO_ME, avatarKey: "pending/new/original.webp" })));
     choosePhoto({ width: Number(pickedWidth), height: Number(pickedHeight) });
     photoDevice.dimensions = { width: Number(decodedWidth), height: Number(decodedHeight) };
     const { result } = setupPhotoHook(useProfilePhotoUpload);
@@ -109,8 +109,8 @@ describe("useProfilePhotoUpload", () => {
   });
 
   it("releases a rejected native transfer before retrying the retained photo", async () => {
-    server.use(http.post("*/uploads/presign", () => HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: "pending/new/original.jpg", expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"' } })),
-      http.put("*/me/photo", () => HttpResponse.json({ ...PHOTO_ME, avatarKey: "pending/new/original.jpg" })));
+    server.use(http.post("*/uploads/presign", () => HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: "pending/new/original.webp", expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"' } })),
+      http.put("*/me/photo", () => HttpResponse.json({ ...PHOTO_ME, avatarKey: "pending/new/original.webp" })));
     choosePhoto();
     const { result } = setupPhotoHook(useProfilePhotoUpload);
     let picking!: Promise<void>;
@@ -127,8 +127,8 @@ describe("useProfilePhotoUpload", () => {
   });
 
   it("keeps rapid Retry taps in one transfer instead of sharing a selection across competing jobs", async () => {
-    server.use(http.post("*/uploads/presign", () => HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: "pending/new/original.jpg", expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"' } })),
-      http.put("*/me/photo", () => HttpResponse.json({ ...PHOTO_ME, avatarKey: "pending/new/original.jpg" })));
+    server.use(http.post("*/uploads/presign", () => HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: "pending/new/original.webp", expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"' } })),
+      http.put("*/me/photo", () => HttpResponse.json({ ...PHOTO_ME, avatarKey: "pending/new/original.webp" })));
     choosePhoto();
     const { result } = setupPhotoHook(useProfilePhotoUpload);
     let picking!: Promise<void>;
@@ -150,7 +150,7 @@ describe("useProfilePhotoUpload", () => {
     server.use(
       http.post("*/uploads/presign", () => {
         presigns += 1;
-        return HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: "pending/new/original.jpg", expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"' } });
+        return HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: "pending/new/original.webp", expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"' } });
       }),
       http.delete("*/me/photo", () => { removals += 1; return HttpResponse.json({ code: "INTERNAL" }, { status: 500 }); }),
     );
@@ -171,7 +171,7 @@ describe("useProfilePhotoUpload", () => {
     await act(() => next.result.current.retry());
     expect(next.result.current.state.status).toBe("idle");
     expect({ presigns, removals, picks: photoDevice.library.mock.calls.length, permissions: photoDevice.permission.mock.calls.length }).toEqual(previousCalls);
-    if (operation === "upload") expect(photoDevice.deletes).toContainEqual(expect.stringMatching(/^file:\/\/\/cache\/profile-photo-\d+\.jpg$/));
+    if (operation === "upload") expect(photoDevice.deletes).toContainEqual(expect.stringMatching(/^file:\/\/\/cache\/profile-photo-\d+\.webp$/));
   });
 
   it("requests camera access and opens a square crop when permission is granted", async () => {

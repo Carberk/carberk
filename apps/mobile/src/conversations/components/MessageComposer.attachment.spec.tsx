@@ -12,7 +12,7 @@ vi.mock("expo-image-picker", () => ({
   useMediaLibraryPermissions: () => [{ granted: true }, async () => ({ granted: true })],
   launchImageLibraryAsync: async () => ({
     canceled: picker.canceled,
-    assets: picker.canceled ? [] : [{ uri: "file:///picked.jpg" }],
+    assets: picker.canceled ? [] : [{ uri: "file:///picked.webp" }],
   }),
 }));
 vi.mock("expo-file-system/legacy", () => ({
@@ -22,12 +22,12 @@ vi.mock("expo-file-system/legacy", () => ({
   deleteAsync: removedFiles,
 }));
 vi.mock("expo-image-manipulator", () => ({
-  SaveFormat: { JPEG: "jpeg" },
+  SaveFormat: { JPEG: "jpeg", WEBP: "webp" },
   ImageManipulator: {
     manipulate: () => ({
       resize: () => {},
       renderAsync: async () => ({
-        saveAsync: async () => ({ uri: "file:///compressed.jpg", width: 1200, height: 800 }),
+        saveAsync: async () => ({ uri: "file:///compressed.webp", width: 1200, height: 800 }),
       }),
     }),
   },
@@ -58,7 +58,7 @@ describe("Conversation attachment removal", () => {
     fireEvent.press(remove);
     expect(view.queryByRole("button", { name: removeLabel })).toBeNull();
     expect(view.getByDisplayValue("Held question")).toBeTruthy();
-    expect(removedFiles).toHaveBeenLastCalledWith(expect.stringMatching(/^file:\/\/\/doc\/chat-staging\/conversation\/picker-.*\.jpg$/), { idempotent: true });
+    expect(removedFiles).toHaveBeenLastCalledWith(expect.stringMatching(/^file:\/\/\/doc\/chat-staging\/conversation\/picker-.*\.webp$/), { idempotent: true });
     fireEvent.press(view.getByRole("button", { name: sendLabel, disabled: false }));
     expect(onSend).toHaveBeenCalledWith("Held question");
     expect(onSendImage).not.toHaveBeenCalled();
@@ -79,7 +79,7 @@ describe("Conversation attachment removal", () => {
     await attach(view);
     fireEvent.press(view.getByRole("button", { name: "Send message", disabled: false }));
     expect(onSendImage).toHaveBeenCalledWith({
-      uri: expect.stringMatching(/^file:\/\/\/doc\/chat-staging\/conversation\/picker-.*\.jpg$/),
+      uri: expect.stringMatching(/^file:\/\/\/doc\/chat-staging\/conversation\/picker-.*\.webp$/),
       width: 1200, height: 800, fileSize: 1024,
     });
     expect(onSend).not.toHaveBeenCalled();

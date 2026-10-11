@@ -10,11 +10,20 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { Logger } from "nestjs-pino";
 
+import { createMediaConversionMaintenanceServer } from "./common/media-conversion-maintenance";
+
 import { AppModule } from "./app.module";
 import { registerAcceptLanguageHook } from "./common/accept-language";
 import { RealtimeIoAdapter } from "./modules/realtime/infrastructure/RealtimeIoAdapter";
 
 async function bootstrap() {
+  if (process.env["PHOTO_CONVERSION_MAINTENANCE"] === "true") {
+    const server = createMediaConversionMaintenanceServer();
+    await server.listen({ port: Number(process.env["PORT"] ?? 3006), host: "0.0.0.0" });
+    const stop = () => { void server.close().then(() => process.exit(0)); };
+    process.once("SIGTERM", stop); process.once("SIGINT", stop);
+    return;
+  }
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),

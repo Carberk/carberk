@@ -18,7 +18,7 @@ export function buildVariantUrl(
     return `${MEDIA_URL}/${bucket}/${key}`;
   }
   const base = key.replace(/\/original\.(jpg|webp|jpeg)$/, "");
-  return `${MEDIA_URL}/${bucket}/${base}/${variant}.jpg`;
+  return `${MEDIA_URL}/${bucket}/${base}/${variant}.webp`;
 }
 
 export function buildOriginalUrl(key: string): string {

@@ -110,8 +110,8 @@ async function loadPhoto(slug: string): Promise<Buffer> {
 }
 
 /**
- * Writes original.jpg plus every variant for one media key, so both the feed
- * (list.jpg) and the detail gallery (detail/fullscreen) resolve.
+ * Writes original.webp plus every variant for one media key, so both the feed
+ * (list.webp) and the detail gallery (detail/fullscreen) resolve.
  *
  * Variants are resized from the real photograph rather than generated, so the
  * UI is evaluated against the aspect ratios and detail levels it will see in
@@ -130,16 +130,16 @@ async function uploadPhotoSet(
         ? 1600
         : VARIANT_WIDTHS[variant as (typeof VARIANTS)[number]];
     const body = await sharp(source)
-      .resize(width, Math.round((width * 3) / 4), { fit: "cover" })
-      .jpeg({ quality: 82, mozjpeg: true })
+      .resize({ width, withoutEnlargement: true })
+      .webp({ quality: 80 })
       .toBuffer();
 
     await s3.send(
       new PutObjectCommand({
         Bucket: PHOTO_BUCKET,
-        Key: `${baseKey}/${variant}.jpg`,
+        Key: `${baseKey}/${variant}.webp`,
         Body: body,
-        ContentType: "image/jpeg",
+        ContentType: "image/webp",
       }),
     );
   }
@@ -652,7 +652,7 @@ async function main(): Promise<void> {
     for (const [order, slug] of car.photos.entries()) {
       const baseKey = `fixture/${car.slug}-${order}`;
       const { width, height } = await uploadPhotoSet(baseKey, slug);
-      media.push({ key: `${baseKey}/original.jpg`, sortOrder: order, width, height });
+      media.push({ key: `${baseKey}/original.webp`, sortOrder: order, width, height });
     }
 
     await prisma.listing.create({

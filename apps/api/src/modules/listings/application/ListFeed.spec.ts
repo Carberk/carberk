@@ -151,7 +151,7 @@ function sellerProfile(overrides: Partial<SellerProfile> = {}): SellerProfile {
     displayName: null,
     nameNumber: 2057,
     avatarIndex: 7,
-    avatarKey: "avatars/seller/a.jpg",
+    avatarKey: "avatars/seller/a.webp",
     deleted: false,
     memberSince: new Date("2025-01-01T00:00:00.000Z"),
     ...overrides,
@@ -205,12 +205,12 @@ describe("ListFeed", () => {
   });
 
   it("includes coverMediaKey when listing has media", async () => {
-    ranking.items = [seedListing({ id: "l1", coverMediaKey: "listings/l1/m1/original.jpg" })];
+    ranking.items = [seedListing({ id: "l1", coverMediaKey: "listings/l1/m1/original.webp" })];
 
     const uc = makeUseCase(ranking, exchangeRates);
     const result = await uc.execute({});
 
-    expect(result.items[0]!.coverMediaKey).toBe("listings/l1/m1/original.jpg");
+    expect(result.items[0]!.coverMediaKey).toBe("listings/l1/m1/original.webp");
   });
 
   it("omits coverMediaKey when listing has no media", async () => {

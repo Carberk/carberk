@@ -9,7 +9,7 @@ import {
 
 const id = "550e8400-e29b-41d4-a716-446655440000";
 const completePayload = {
-  photos: [0, 1, 2].map((index) => ({ photoId: index === 0 ? id : `550e8400-e29b-41d4-a716-${String(900 + index).padStart(12, "0")}`, key: index === 0 ? "uploads/abc.jpg" : `support-${index}.jpg`, sortOrder: index })),
+  photos: [0, 1, 2].map((index) => ({ photoId: index === 0 ? id : `550e8400-e29b-41d4-a716-${String(900 + index).padStart(12, "0")}`, key: index === 0 ? "uploads/abc.webp" : `support-${index}.webp`, sortOrder: index })),
   brandId: id, modelId: id, year: 2020,
   condition: "used" as const, mileageKm: 10000, conditionDisclosure: { damaged: false },
   priceAmount: 100000, priceCurrency: "TMT" as const,

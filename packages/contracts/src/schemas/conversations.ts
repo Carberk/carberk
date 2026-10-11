@@ -109,7 +109,7 @@ export type SendPostRefMessageRequest = z.infer<
 // ── Chat attachment upload ──
 
 export const PresignChatAttachmentRequestSchema = z.object({
-  contentType: z.enum(["image/jpeg", "image/webp"]),
+  contentType: z.enum(["image/webp"]),
   sizeBytes: z.number().int().positive().max(5 * 1024 * 1024),
 });
 export type PresignChatAttachmentRequest = z.infer<

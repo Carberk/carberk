@@ -9,7 +9,7 @@ export interface CompressionResult {
 }
 
 const MAX_DIMENSION = 2400;
-const JPEG_QUALITY = 0.8;
+const WEBP_QUALITY = 0.8;
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
 export class CompressionError extends Error {
@@ -42,12 +42,15 @@ export async function compressPhoto(
       const longSide = Math.min(target.maxDimension, Math.max(target.width, target.height));
       context.resize(target.width >= target.height ? { width: longSide } : { height: longSide });
     } else {
-      context.resize({ width: MAX_DIMENSION });
+      const decoded = await context.renderAsync();
+      const longSide = Math.min(MAX_DIMENSION, Math.max(decoded.width, decoded.height));
+      context.resize(decoded.width >= decoded.height ? { width: longSide } : { height: longSide });
+      decoded.release?.();
     }
     const rendered = await context.renderAsync();
     const result = await rendered.saveAsync({
-      format: SaveFormat.JPEG,
-      compress: JPEG_QUALITY,
+      format: SaveFormat.WEBP,
+      compress: WEBP_QUALITY,
     });
 
     // Check file size and re-compress with lower quality if needed
@@ -59,7 +62,7 @@ export async function compressPhoto(
       const recompressContext = ImageManipulator.manipulate(finalUri);
       const recompressed = await recompressContext.renderAsync();
       const recompressResult = await recompressed.saveAsync({
-        format: SaveFormat.JPEG,
+        format: SaveFormat.WEBP,
         compress: 0.6,
       });
       finalUri = recompressResult.uri;

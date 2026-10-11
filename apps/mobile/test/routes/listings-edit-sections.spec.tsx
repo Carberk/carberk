@@ -47,7 +47,7 @@ vi.mock("expo-file-system/legacy", () => ({
   uploadAsync: vi.fn(),
 }));
 vi.mock("expo-image-picker", () => ({ launchImageLibraryAsync: vi.fn(), launchCameraAsync: vi.fn() }));
-vi.mock("expo-image-manipulator", () => ({ SaveFormat: { JPEG: "jpeg" }, ImageManipulator: { manipulate: vi.fn() } }));
+vi.mock("expo-image-manipulator", () => ({ SaveFormat: { JPEG: "jpeg", WEBP: "webp" }, ImageManipulator: { manipulate: vi.fn() } }));
 // The app-state and connectivity listeners are the OS's; nothing fires them here.
 vi.mock("../../src/listings/uploadStaging/appStateResume", () => ({ setupUploadResume: () => () => undefined }));
 vi.mock("@react-native-community/netinfo", () => ({ default: { addEventListener: () => () => {} } }));
@@ -60,7 +60,7 @@ vi.mock("react-native-safe-area-context", async () => ({
 }));
 
 const { id, coverId, secondId } = fixture;
-const variants = { thumbnail: "t.jpg", list: "l.jpg", detail: "d.jpg", fullscreen: "f.jpg" };
+const variants = { thumbnail: "t.webp", list: "l.webp", detail: "d.webp", fullscreen: "f.webp" };
 type Screen = ReturnType<typeof renderMobile>;
 
 /** The published Listing on the fake server, and what the app sent to change it. */
@@ -74,9 +74,9 @@ function createListingApi(overrides: Record<string, unknown> = {}) {
     acceptsExchange: false, installmentAvailable: false,
     conditionDisclosure: { damaged: false },
     media: [
-      { id: coverId, kind: "image", key: `listings/${id}/${coverId}/original.jpg`, variants, sortOrder: 0 },
-      { id: secondId, kind: "image", key: `listings/${id}/${secondId}/original.jpg`, variants, sortOrder: 1 },
-      ...[2, 3].map((index) => ({ id: `550e8400-e29b-41d4-a716-${String(900 + index).padStart(12, "0")}`, kind: "image", key: `support-${index}.jpg`, variants, sortOrder: index })),
+      { id: coverId, kind: "image", key: `listings/${id}/${coverId}/original.webp`, variants, sortOrder: 0 },
+      { id: secondId, kind: "image", key: `listings/${id}/${secondId}/original.webp`, variants, sortOrder: 1 },
+      ...[2, 3].map((index) => ({ id: `550e8400-e29b-41d4-a716-${String(900 + index).padStart(12, "0")}`, kind: "image", key: `support-${index}.webp`, variants, sortOrder: index })),
     ],
     viewCount: 0, favoriteCount: 0, publishedAt: "2026-09-30T00:00:00.000Z",
     createdAt: "2026-09-30T00:00:00.000Z", updatedAt: "2026-09-30T00:00:00.000Z",

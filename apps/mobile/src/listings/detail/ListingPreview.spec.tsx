@@ -56,9 +56,9 @@ describe("Listing detail preview, from the tapped card's cached data", () => {
     // The card already decoded the `list` size, so it shows at once while the
     // gallery's `detail` size loads behind it (#816).
     const photo = screen.UNSAFE_getByType(Image).props;
-    expect(photo.placeholder).toEqual({ uri: "https://media.autotm.tm/listing-photos/listing-0/list.jpg" });
+    expect(photo.placeholder).toEqual({ uri: "https://media.autotm.tm/listing-photos/listing-0/list.webp" });
     expect(photo.placeholderContentFit).toBe("cover");
-    expect(photo.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/listing-0/detail.jpg" });
+    expect(photo.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/listing-0/detail.webp" });
     expect(photo.priority).toBe("high");
   });
 

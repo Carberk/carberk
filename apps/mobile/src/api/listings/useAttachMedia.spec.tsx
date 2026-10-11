@@ -42,7 +42,7 @@ describe("useAttachMedia", () => {
           id: "550e8400-e29b-41d4-a716-446655440001",
           listingId: "550e8400-e29b-41d4-a716-446655440000",
           kind: "image",
-          key: "listings/l1/m1/original.jpg",
+          key: "listings/l1/m1/original.webp",
           sortOrder: 0,
           width: 1920,
           height: 1080,
@@ -56,7 +56,7 @@ describe("useAttachMedia", () => {
     });
 
     result.current.mutate({
-      key: "listings/l1/m1/original.jpg",
+      key: "listings/l1/m1/original.webp",
       kind: "image",
       sortOrder: 0,
     });
@@ -64,7 +64,7 @@ describe("useAttachMedia", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(result.current.data?.id).toBe("550e8400-e29b-41d4-a716-446655440001");
-    expect(result.current.data?.key).toBe("listings/l1/m1/original.jpg");
+    expect(result.current.data?.key).toBe("listings/l1/m1/original.webp");
   });
 
   it("surfaces a contract violation when API returns garbage", async () => {
@@ -79,7 +79,7 @@ describe("useAttachMedia", () => {
     });
 
     result.current.mutate({
-      key: "listings/l1/m1/original.jpg",
+      key: "listings/l1/m1/original.webp",
       kind: "image",
       sortOrder: 0,
     });

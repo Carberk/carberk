@@ -69,10 +69,10 @@ class FakeVariantGenerator implements ImageVariantGenerator {
     await this.during?.();
     return {
       variants: {
-        thumbnail: `${originalKey}/thumbnail.jpg`,
-        list: `${originalKey}/list.jpg`,
-        detail: `${originalKey}/detail.jpg`,
-        fullscreen: `${originalKey}/fullscreen.jpg`,
+        thumbnail: `${originalKey}/thumbnail.webp`,
+        list: `${originalKey}/list.webp`,
+        detail: `${originalKey}/detail.webp`,
+        fullscreen: `${originalKey}/fullscreen.webp`,
       },
     };
   }
@@ -115,7 +115,7 @@ describe("AttachMedia", () => {
       userId,
       key,
       kind,
-      contentType: kind === "image" ? "image/jpeg" : "video/mp4",
+      contentType: kind === "image" ? "image/webp" : "video/mp4",
       sizeBytes: 1024,
       createdAt: new Date("2026-05-01T00:00:00Z"),
     });
@@ -138,7 +138,7 @@ describe("AttachMedia", () => {
   });
 
   describe("common upload claim (#721, ADR-0088)", () => {
-    const key = "pending/abc/original.jpg";
+    const key = "pending/abc/original.webp";
     const input = { listingId: "listing-1", userId: "user-1", key, kind: "image" as const, sortOrder: 0 };
 
     beforeEach(() => {
@@ -202,10 +202,10 @@ describe("AttachMedia", () => {
           await gate;
           return {
             variants: {
-              thumbnail: `${originalKey}/thumbnail.jpg`,
-              list: `${originalKey}/list.jpg`,
-              detail: `${originalKey}/detail.jpg`,
-              fullscreen: `${originalKey}/fullscreen.jpg`,
+              thumbnail: `${originalKey}/thumbnail.webp`,
+              list: `${originalKey}/list.webp`,
+              detail: `${originalKey}/detail.webp`,
+              fullscreen: `${originalKey}/fullscreen.webp`,
             },
           };
         }
@@ -292,12 +292,12 @@ describe("AttachMedia", () => {
 
   it("attaches an image and calls variant generator", async () => {
     seedActiveListing(repo);
-    presignedUpload("pending/abc/original.jpg");
+    presignedUpload("pending/abc/original.webp");
 
     const result = await uc.execute({
       listingId: "listing-1",
       userId: "user-1",
-      key: "pending/abc/original.jpg",
+      key: "pending/abc/original.webp",
       kind: "image",
       sortOrder: 0,
       width: 1200,
@@ -306,7 +306,7 @@ describe("AttachMedia", () => {
 
     expect(result.media.listingId).toBe("listing-1");
     expect(result.media.kind).toBe("image");
-    expect(result.media.uploadId).toBe("upload-pending/abc/original.jpg");
+    expect(result.media.uploadId).toBe("upload-pending/abc/original.webp");
     expect(variantGen.called).toBe(true);
     expect(world.media).toHaveLength(1);
   });
@@ -314,7 +314,7 @@ describe("AttachMedia", () => {
   it("attaches a video without calling variant generator", async () => {
     seedActiveListing(repo);
     presignedUpload("pending/abc/original.mp4", "video");
-    presignedUpload("pending/abc/poster.jpg");
+    presignedUpload("pending/abc/poster.webp");
 
     const result = await uc.execute({
       listingId: "listing-1",
@@ -323,13 +323,13 @@ describe("AttachMedia", () => {
       kind: "video",
       sortOrder: 0,
       durationMs: 30000,
-      posterKey: "pending/abc/poster.jpg",
+      posterKey: "pending/abc/poster.webp",
     });
 
     expect(result.media.kind).toBe("video");
     expect(variantGen.called).toBe(false);
     expect(result.media.durationMs).toBe(30000);
-    expect(result.media.posterKey).toBe("pending/abc/poster.jpg");
+    expect(result.media.posterKey).toBe("pending/abc/poster.webp");
   });
 
   it("rejects when photo limit (20) is exceeded", async () => {
@@ -340,18 +340,18 @@ describe("AttachMedia", () => {
           id: `media-${i}`,
           listingId: "listing-1",
           kind: "image",
-          key: `pending/${i}/original.jpg`,
+          key: `pending/${i}/original.webp`,
           sortOrder: i,
         }),
       );
     }
-    presignedUpload("pending/extra/original.jpg");
+    presignedUpload("pending/extra/original.webp");
 
     await expect(
       uc.execute({
         listingId: "listing-1",
         userId: "user-1",
-        key: "pending/extra/original.jpg",
+        key: "pending/extra/original.webp",
         kind: "image",
         sortOrder: 21,
       }),
@@ -385,13 +385,13 @@ describe("AttachMedia", () => {
 
   it("returns 404 for non-owner", async () => {
     seedActiveListing(repo);
-    presignedUpload("pending/abc/original.jpg", "image", "user-2");
+    presignedUpload("pending/abc/original.webp", "image", "user-2");
 
     await expect(
       uc.execute({
         listingId: "listing-1",
         userId: "user-2",
-        key: "pending/abc/original.jpg",
+        key: "pending/abc/original.webp",
         kind: "image",
         sortOrder: 0,
       }),
@@ -401,13 +401,13 @@ describe("AttachMedia", () => {
   it("returns 404 for soft-deleted listing", async () => {
     const listing = seedActiveListing(repo);
     repo.listings[0] = listing.softDelete(new Date());
-    presignedUpload("pending/abc/original.jpg");
+    presignedUpload("pending/abc/original.webp");
 
     await expect(
       uc.execute({
         listingId: "listing-1",
         userId: "user-1",
-        key: "pending/abc/original.jpg",
+        key: "pending/abc/original.webp",
         kind: "image",
         sortOrder: 0,
       }),
@@ -416,13 +416,13 @@ describe("AttachMedia", () => {
 
   it("calls classifier and still attaches when classifier returns unacceptable in S4", async () => {
     seedActiveListing(repo);
-    presignedUpload("pending/abc/original.jpg");
+    presignedUpload("pending/abc/original.webp");
     classifier.result = { isAcceptable: false, confidence: 0.9, reason: "nsfw" };
 
     const result = await uc.execute({
       listingId: "listing-1",
       userId: "user-1",
-      key: "pending/abc/original.jpg",
+      key: "pending/abc/original.webp",
       kind: "image",
       sortOrder: 0,
     });

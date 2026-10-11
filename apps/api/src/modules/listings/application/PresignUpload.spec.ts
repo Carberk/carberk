@@ -56,13 +56,13 @@ describe("PresignUpload", () => {
     const result = await uc.execute({
       userId: "user-1",
       kind: "image",
-      contentType: "image/jpeg",
+      contentType: "image/webp",
       sizeBytes: 1024,
     });
 
     expect(result.uploadUrl).toContain("presigned");
     expect(result.key).toContain("pending/");
-    expect(result.key).toMatch(/original\.jpg$/);
+    expect(result.key).toMatch(/original\.webp$/);
     expect(result.expiresIn).toBe(600);
     expect(result.maxSizeBytes).toBe(5 * 1024 * 1024);
   });
@@ -105,7 +105,7 @@ describe("PresignUpload", () => {
       uc.execute({
         userId: "user-1",
         kind: "image",
-        contentType: "image/jpeg",
+        contentType: "image/webp",
         sizeBytes: 6 * 1024 * 1024,
       }),
     ).rejects.toThrow(BadRequestException);
@@ -128,12 +128,12 @@ describe("PresignUpload", () => {
     await uc.execute({
       userId: "user-1",
       kind: "image",
-      contentType: "image/jpeg",
+      contentType: "image/webp",
       sizeBytes: 2048,
     });
 
     expect(storage.lastCall).toBeDefined();
-    expect(storage.lastCall!.contentType).toBe("image/jpeg");
+    expect(storage.lastCall!.contentType).toBe("image/webp");
     expect(storage.lastCall!.sizeBytes).toBe(2048);
     expect(storage.lastCall!.expirySeconds).toBe(600);
   });

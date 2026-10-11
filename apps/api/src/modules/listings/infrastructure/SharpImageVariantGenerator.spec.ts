@@ -113,7 +113,7 @@ describe("SharpImageVariantGenerator", () => {
   });
 
   it("strips GPS and all EXIF from the stored original and every variant, keeping the photo upright", async () => {
-    const key = "pending/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.jpg";
+    const key = "pending/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.webp";
     const input = await photoWithGps();
     const inputMeta = await sharp(input).metadata();
     expect(inputMeta.exif).toBeDefined();
@@ -122,11 +122,10 @@ describe("SharpImageVariantGenerator", () => {
     const bucket = fakeBucket({ [key]: input });
     await generatorWith(bucket).generate(key);
 
-    const base = key.replace("/original.jpg", "");
+    const base = key.replace("/original.webp", "");
     const served = [
       key,
       ...["thumbnail", "list", "detail", "fullscreen"].flatMap((v) => [
-        `${base}/${v}.jpg`,
         `${base}/${v}.webp`,
       ]),
     ];
@@ -143,11 +142,11 @@ describe("SharpImageVariantGenerator", () => {
     expect({ width: original.width, height: original.height }).toEqual({ width: 200, height: 300 });
   });
   it("leaves an original without metadata untouched, so a retried publish keeps its size", async () => {
-    const key = "pending/1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f/original.jpg";
+    const key = "pending/1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f/original.webp";
     const input = await sharp({
       create: { width: 300, height: 200, channels: 3, background: { r: 10, g: 120, b: 200 } },
     })
-      .jpeg({ quality: 80 })
+      .webp({ quality: 80 })
       .toBuffer();
     expect((await sharp(input).metadata()).exif).toBeUndefined();
 
@@ -161,7 +160,7 @@ describe("SharpImageVariantGenerator", () => {
   // failure (UPLOAD_OBJECT_INVALID), so publish names the photo and retires
   // only that upload; transport failures stay transient and retryable.
   it("reports bytes that are not an image as UPLOAD_OBJECT_INVALID", async () => {
-    const key = "pending/2a3b4c5d-6e7f-8a9b-0c1d-2e3f4a5b6c7d/original.jpg";
+    const key = "pending/2a3b4c5d-6e7f-8a9b-0c1d-2e3f4a5b6c7d/original.webp";
     const bucket = fakeBucket({ [key]: Buffer.from("this is not an image at all") });
 
     const err = await generatorWith(bucket).generate(key).catch((e: unknown) => e);
@@ -171,7 +170,7 @@ describe("SharpImageVariantGenerator", () => {
   });
 
   it("reports a truncated JPEG whose header is readable as permanently unusable", async () => {
-    const key = "pending/truncated/original.jpg";
+    const key = "pending/truncated/original.webp";
     const full = await sharp({ create: { width: 100, height: 100, channels: 3, background: "red" } }).jpeg().toBuffer();
     const scan = full.indexOf(Buffer.from([0xff, 0xda]));
     const truncated = full.subarray(0, scan + 16);
@@ -182,14 +181,14 @@ describe("SharpImageVariantGenerator", () => {
   });
 
   it("reports an image over Sharp's pixel limit as permanently unusable", async () => {
-    const key = "pending/huge/original.jpg";
+    const key = "pending/huge/original.webp";
     await expect(generatorWith(fakeBucket({ [key]: hugePixelPng() })).generate(key)).rejects.toMatchObject({
       code: LISTING_ERROR_CODES.UPLOAD_OBJECT_INVALID,
     });
   });
 
   it.each(["metadata", "toBuffer"] as const)("keeps a resource failure during %s retryable", async (stage) => {
-    const key = "pending/resource/original.jpg";
+    const key = "pending/resource/original.webp";
     const input = await sharp({ create: { width: 10, height: 10, channels: 3, background: "red" } }).jpeg().toBuffer();
     const failure = new Error("VipsRegion: unable to allocate memory");
     const mock = vi.spyOn(sharp.prototype, stage).mockRejectedValueOnce(failure);
@@ -219,7 +218,7 @@ describe("SharpImageVariantGenerator", () => {
   }, 20000);
 
   it("keeps a missing stored object a transient error, not UPLOAD_OBJECT_INVALID", async () => {
-    const key = "pending/4c5d6e7f-8a9b-0c1d-2e3f-4a5b6c7d8e9f/original.jpg";
+    const key = "pending/4c5d6e7f-8a9b-0c1d-2e3f-4a5b6c7d8e9f/original.webp";
     const bucket = fakeBucket({});
 
     const err = await generatorWith(bucket).generate(key).catch((e: unknown) => e);

@@ -167,7 +167,7 @@ describe("RemoveMedia", () => {
   it("keeps all three photos when removal would leave a published Listing with two", async () => {
     seedActiveListing(repo);
     for (let i = 0; i < 3; i++) mediaRepo.media.push(ListingMedia.create({
-      id: `floor-${i}`, listingId: "listing-1", kind: "image", key: `floor-${i}.jpg`, sortOrder: i,
+      id: `floor-${i}`, listingId: "listing-1", kind: "image", key: `floor-${i}.webp`, sortOrder: i,
     }));
     await expect(makeUseCase(repo, mediaRepo, storage).execute({
       listingId: "listing-1", mediaId: "floor-0", userId: "user-1",
@@ -178,7 +178,7 @@ describe("RemoveMedia", () => {
 
   const keepMinimumPhotos = () => {
     for (let i = 0; i < 3; i++) mediaRepo.media.push(ListingMedia.create({
-      id: `kept-${i}`, listingId: "listing-1", kind: "image", key: `kept-${i}.jpg`, sortOrder: i + 1,
+      id: `kept-${i}`, listingId: "listing-1", kind: "image", key: `kept-${i}.webp`, sortOrder: i + 1,
     }));
   };
 
@@ -189,7 +189,7 @@ describe("RemoveMedia", () => {
         id: "media-1",
         listingId: "listing-1",
         kind: "image",
-        key: "pending/00000000-0000-4000-8000-000000000001/original.jpg",
+        key: "pending/00000000-0000-4000-8000-000000000001/original.webp",
         sortOrder: 0,
         uploadId: "upload-1",
       }),
@@ -211,7 +211,7 @@ describe("RemoveMedia", () => {
         id: "media-1",
         listingId: "listing-1",
         kind: "image",
-        key: "pending/00000000-0000-4000-8000-000000000001/original.jpg",
+        key: "pending/00000000-0000-4000-8000-000000000001/original.webp",
         sortOrder: 0,
       }),
     );
@@ -231,7 +231,7 @@ describe("RemoveMedia", () => {
         id: "media-1",
         listingId: "listing-1",
         kind: "image",
-        key: "pending/00000000-0000-4000-8000-000000000001/original.jpg",
+        key: "pending/00000000-0000-4000-8000-000000000001/original.webp",
         sortOrder: 0,
         uploadId: "upload-1",
       }),
@@ -269,7 +269,7 @@ describe("RemoveMedia", () => {
         id: "media-1",
         listingId: "listing-2",
         kind: "image",
-        key: "pending/00000000-0000-4000-8000-000000000001/original.jpg",
+        key: "pending/00000000-0000-4000-8000-000000000001/original.webp",
         sortOrder: 0,
       }),
     );

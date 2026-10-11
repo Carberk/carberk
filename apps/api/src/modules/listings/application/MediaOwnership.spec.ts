@@ -61,10 +61,10 @@ const acceptingClassifier: MediaContentClassifierPort = {
 const fakeVariants: ImageVariantGenerator = {
   generate: async (originalKey: string) => ({
     variants: {
-      thumbnail: `${originalKey}/thumbnail.jpg`,
-      list: `${originalKey}/list.jpg`,
-      detail: `${originalKey}/detail.jpg`,
-      fullscreen: `${originalKey}/fullscreen.jpg`,
+      thumbnail: `${originalKey}/thumbnail.webp`,
+      list: `${originalKey}/list.webp`,
+      detail: `${originalKey}/detail.webp`,
+      fullscreen: `${originalKey}/fullscreen.webp`,
     },
   }),
 };
@@ -111,7 +111,7 @@ describe("Listing media upload ownership (#536)", () => {
     const presigned = await presign.execute({
       userId,
       kind: "image",
-      contentType: "image/jpeg",
+      contentType: "image/webp",
       sizeBytes: 2048,
     });
     world.completeUpload(presigned.key);
@@ -172,7 +172,7 @@ describe("Listing media upload ownership (#536)", () => {
       const presigned = await presign.execute({
         userId: USER_A,
         kind: "image",
-        contentType: "image/jpeg",
+        contentType: "image/webp",
         sizeBytes: 2048,
       });
 
@@ -181,7 +181,7 @@ describe("Listing media upload ownership (#536)", () => {
         userId: USER_A,
         key: presigned.key,
         kind: "image",
-        contentType: "image/jpeg",
+        contentType: "image/webp",
         sizeBytes: 2048,
       });
     });
@@ -214,8 +214,8 @@ describe("Listing media upload ownership (#536)", () => {
     });
 
     it("rejects a key that was never presigned", async () => {
-      world.putObject("pending/forged-by-user-a/original.jpg", {
-        contentType: "image/jpeg",
+      world.putObject("pending/forged-by-user-a/original.webp", {
+        contentType: "image/webp",
         sizeBytes: 2048,
       });
 
@@ -223,7 +223,7 @@ describe("Listing media upload ownership (#536)", () => {
         attach.execute({
           listingId: LISTING_A,
           userId: USER_A,
-          key: "pending/forged-by-user-a/original.jpg",
+          key: "pending/forged-by-user-a/original.webp",
           kind: "image",
           sortOrder: 0,
         }),
@@ -237,7 +237,7 @@ describe("Listing media upload ownership (#536)", () => {
       const own = await presign.execute({
         userId: USER_A,
         kind: "image",
-        contentType: "image/jpeg",
+        contentType: "image/webp",
         sizeBytes: 2048,
       });
       world.completeUpload(own.key);
@@ -248,7 +248,7 @@ describe("Listing media upload ownership (#536)", () => {
 
       const wrongKind = await attempt(own.key, "video");
       const foreign = await attempt(victimKey, "image");
-      const unknown = await attempt("pending/never-presigned/original.jpg", "image");
+      const unknown = await attempt("pending/never-presigned/original.webp", "image");
 
       expect(foreign).toEqual(wrongKind);
       expect(foreign).toEqual(unknown);
@@ -291,7 +291,7 @@ describe("Listing media upload ownership (#536)", () => {
 
       await remove.execute({ listingId: LISTING_A, userId: USER_A, mediaId: own.media.id });
 
-      const victimPrefix = victimKey.replace(/original\.jpg$/, "");
+      const victimPrefix = victimKey.replace(/original\.webp$/, "");
       expect(world.deletedKeys.some((k) => k.startsWith(victimPrefix))).toBe(false);
       expect(objectsUnder(victimPrefix)).toContain(victimKey);
     });
@@ -326,7 +326,7 @@ describe("Listing media upload ownership (#536)", () => {
     });
 
     it("keeps a victim's image when a backfilled attacker video uses its directory", async () => {
-      const siblingKey = victimKey.replace(/original\.jpg$/, "original.mp4");
+      const siblingKey = victimKey.replace(/original\.webp$/, "original.mp4");
       world.seedAdoptedMedia({
         userId: USER_A, listingId: LISTING_A, mediaId: "legacy-sibling", key: siblingKey, kind: "video",
       });
@@ -345,8 +345,8 @@ describe("Listing media upload ownership (#536)", () => {
     ])("cannot clean another namespace or broad legacy key: %s", async (key) => {
       world.seedAdoptedMedia({ userId: USER_A, listingId: LISTING_A,
         mediaId: "legacy-outside-listings", key, kind: "video" });
-      const victimOriginal = key.replace(/original\.mp4$/, "original.jpg");
-      world.putObject(victimOriginal, { contentType: "image/jpeg", sizeBytes: 1024 });
+      const victimOriginal = key.replace(/original\.mp4$/, "original.webp");
+      world.putObject(victimOriginal, { contentType: "image/webp", sizeBytes: 1024 });
 
       await remove.execute({ listingId: LISTING_A, userId: USER_A, mediaId: "legacy-outside-listings" });
 
@@ -357,7 +357,7 @@ describe("Listing media upload ownership (#536)", () => {
     it("cannot release a mismatched upload id and key", async () => {
       const own = await uploadAndAttach(USER_A, LISTING_A);
       const ownUpload = world.uploads.find((upload) => upload.id === own.media.uploadId)!;
-      ownUpload.key = "pending/00000000-0000-4000-8000-000000000001/original.jpg";
+      ownUpload.key = "pending/00000000-0000-4000-8000-000000000001/original.webp";
       const uploadCount = world.uploads.length;
 
       await remove.execute({ listingId: LISTING_A, userId: USER_A, mediaId: own.media.id });
@@ -391,16 +391,16 @@ describe("Listing media upload ownership (#536)", () => {
       return presign.execute({
         userId: USER_A,
         kind: "image",
-        contentType: "image/jpeg",
+        contentType: "image/webp",
         sizeBytes: 2048,
       });
     }
 
     it.each([
       ["never uploaded", undefined],
-      ["empty", { contentType: "image/jpeg", sizeBytes: 0 }],
+      ["empty", { contentType: "image/webp", sizeBytes: 0 }],
       ["wrong content type", { contentType: "text/html", sizeBytes: 2048 }],
-      ["over the image cap", { contentType: "image/jpeg", sizeBytes: 5 * 1024 * 1024 + 1 }],
+      ["over the image cap", { contentType: "image/webp", sizeBytes: 5 * 1024 * 1024 + 1 }],
     ])("rejects an object that is %s", async (_name, object) => {
       const { key } = await presigned();
       if (object) world.putObject(key, object);
@@ -435,7 +435,7 @@ describe("Listing media upload ownership (#536)", () => {
       const { key } = await presign.execute({
         userId: USER_A,
         kind: "image",
-        contentType: "image/jpeg",
+        contentType: "image/webp",
         sizeBytes: 2048,
       });
       world.completeUpload(key);
@@ -469,7 +469,7 @@ describe("Listing media upload ownership (#536)", () => {
       const { key } = await presign.execute({
         userId: USER_A,
         kind: "image",
-        contentType: "image/jpeg",
+        contentType: "image/webp",
         sizeBytes: 2048,
       });
       world.completeUpload(key);
@@ -519,7 +519,7 @@ describe("Listing media upload ownership (#536)", () => {
     it("keeps every other User's objects intact through a mixed concurrent run", async () => {
       const victim = await uploadAndAttach(USER_B, LISTING_B);
       const mine = await uploadAndAttach(USER_A, LISTING_A);
-      const victimPrefix = victim.key.replace(/original\.jpg$/, "");
+      const victimPrefix = victim.key.replace(/original\.webp$/, "");
 
       await Promise.allSettled([
         remove.execute({ listingId: LISTING_A, userId: USER_A, mediaId: mine.media.id }),

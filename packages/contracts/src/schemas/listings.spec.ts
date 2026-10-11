@@ -73,11 +73,11 @@ describe("ListingDetailSchema seller", () => {
     const parsed = SellerSchema.parse({
       ...seller,
       displayName: "Aman",
-      avatarKey: "avatars/u1/photo.jpg",
+      avatarKey: "avatars/u1/photo.webp",
     });
 
     expect(parsed.displayName).toBe("Aman");
-    expect(parsed.avatarKey).toBe("avatars/u1/photo.jpg");
+    expect(parsed.avatarKey).toBe("avatars/u1/photo.webp");
   });
 
   it("requires the name number, the avatar index and the deleted flag", () => {
@@ -199,7 +199,7 @@ describe("FeedListingSummarySchema for the Results card", () => {
       seller: {
         ...cardSummary.seller,
         avatarIndex: 3,
-        avatarKey: "avatars/u1/a.jpg",
+        avatarKey: "avatars/u1/a.webp",
         phone: "+99365000000",
       },
     });
