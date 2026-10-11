@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Image } from "expo-image";
 
 import { fireEvent, first, renderMobile, routerMock, within } from "../../../test/render";
+import { contrast, cssTokens, rgb, type ThemeName } from "../../../test/tokens";
 import { queryKeys } from "../../api/queryKeys";
 import type { ConversationSummaryData } from "../../api/conversations/useConversation";
 
@@ -135,6 +136,24 @@ describe("ConversationListItem", () => {
 
     const read = renderRow(summary({ lastMessage: message(BUYER), peerLastReadAt: "2026-10-01T10:00:05.000Z" }));
     expect(read.getByTestId("conversation-row-tick-read")).toBeTruthy();
+  });
+
+  it("colours the read ✓✓ blue and leaves sent and delivered grey (#821)", () => {
+    const iconClass = (row: Row, id: string) => {
+      const icon = row.getByTestId(id).findAll((node: { props: { className?: unknown } }) => String(node.props.className ?? "").includes("size-3.5"))[0];
+      return String(icon?.props.className ?? "");
+    };
+    const sent = renderRow(summary({ lastMessage: message(BUYER) }));
+    expect(iconClass(sent, "conversation-row-tick-sent")).toContain("text-muted-foreground");
+    const delivered = renderRow(summary({ lastMessage: message(BUYER), peerLastDeliveredAt: "2026-10-01T10:00:05.000Z" }));
+    expect(iconClass(delivered, "conversation-row-tick-delivered")).toContain("text-muted-foreground");
+    const read = renderRow(summary({ lastMessage: message(BUYER), peerLastReadAt: "2026-10-01T10:00:05.000Z" }));
+    expect(iconClass(read, "conversation-row-tick-read")).toContain("text-message-read");
+  });
+
+  it.each(["light", "dark"] as ThemeName[])("reads the read ✓✓ on the %s page at 3:1 or better (#821)", (theme) => {
+    const tokens = cssTokens(theme);
+    expect(contrast(rgb(tokens["message-read"] ?? ""), rgb(tokens.background ?? ""))).toBeGreaterThanOrEqual(3);
   });
 
   it("shows no tick when the last Message is the other participant's", () => {

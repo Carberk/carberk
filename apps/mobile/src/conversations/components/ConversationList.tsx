@@ -47,7 +47,15 @@ function EmptyState() {
   );
 }
 
-export function ConversationList() {
+interface ConversationListProps {
+  /**
+   * Space the floating tab bar needs below the content, on the Messages tab
+   * where the list runs under the bar; 0 where there is no tab bar.
+   */
+  tabBarSpace?: number;
+}
+
+export function ConversationList({ tabBarSpace = 0 }: ConversationListProps) {
   const {
     data,
     isPending,
@@ -90,16 +98,19 @@ export function ConversationList() {
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  // States that do not scroll keep the bar's space below them.
+  const clear = { flex: 1, paddingBottom: tabBarSpace } as const;
+
   if (isPending) {
-    return <LoadingSkeleton />;
+    return <View style={clear}><LoadingSkeleton /></View>;
   }
 
   if (isError && !data) {
-    return <ErrorState error={error} onRetry={() => void refetch()} />;
+    return <View style={clear}><ErrorState error={error} onRetry={() => void refetch()} /></View>;
   }
 
   if (conversations.length === 0) {
-    return <EmptyState />;
+    return <View style={clear}><EmptyState /></View>;
   }
 
   return (
@@ -120,6 +131,7 @@ export function ConversationList() {
           onRefresh={handleRefresh}
         />
       }
+      contentContainerStyle={tabBarSpace > 0 ? { paddingBottom: tabBarSpace + 16 } : undefined}
       onEndReached={handleEndReached}
       onEndReachedThreshold={0.5}
       ListFooterComponent={

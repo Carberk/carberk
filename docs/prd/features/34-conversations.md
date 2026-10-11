@@ -44,7 +44,7 @@ Starting a **new** Conversation about a sold Listing stays closed (see [Closed a
 - Composer at bottom: text input, attach (image), send button
 - **Quick replies** appear above the composer (see below)
 - Typing indicator: "Илья is typing…" below messages
-- **Read state (D6):** ticks under your own sent Messages (sent / delivered / read), and a "Read" label under the last own Message once it is read.
+- **Read state (D6):** ticks under your own sent Messages (sent / delivered / read), and a "Read" label under the last own Message once it is read. Sent ✓ and delivered ✓✓ are grey; read ✓✓ are blue, in the chat and on the Chats list, so read is not mistaken for delivered (#821).
 - Last-seen: "был(а) в 14:32" under seller's name in header
 - **Back (D9):** from a Conversation opened by a push notification, Back goes to the Messages list, not out of the app or to a previous tab.
 

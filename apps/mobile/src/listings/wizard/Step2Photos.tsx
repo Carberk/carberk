@@ -1,10 +1,7 @@
 import { ListingsSchemas } from "@auto-tm/contracts";
-import { useCallback, useRef, useState } from "react";
-import {
-  View,
-  ActivityIndicator,
-  useWindowDimensions,
-} from "react-native";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { View, ActivityIndicator } from "react-native";
+import { useSharedValue } from "react-native-reanimated";
 import * as ImagePicker from "expo-image-picker";
 import * as Linking from "expo-linking";
 import * as FileSystem from "expo-file-system/legacy";
@@ -21,12 +18,9 @@ import { NEEDS_ATTENTION_STATES, countUploads } from "../uploadStaging/uploadCou
 
 import { PhotoActionSheet } from "./PhotoActionSheet";
 import { canRetryPhoto, photoFailureReason, photoPosition } from "./photoLabels";
-import { PhotoThumbnail } from "./PhotoThumbnail";
-import {
-  getDragTargetIndex,
-  getPhotoTileSize,
-  reorderPhotoIdsByIndex,
-} from "./photoGridLayout";
+import { PhotoThumbnail, type PhotoDrag } from "./PhotoThumbnail";
+import { reorderPhotoIdsByIndex } from "./photoGridLayout";
+import { useWizardScrollLock } from "./wizardScrollLock";
 
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
@@ -80,6 +74,9 @@ function usePhotoPicker(onAddPhoto: (uri: string) => Promise<void>) {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsMultipleSelection: true,
+      // Numbered badges on iOS, and photos returned in the order tapped, which
+      // becomes the grid order (#819).
+      orderedSelection: true,
       quality: 1,
     });
     if (!result.canceled) {
@@ -225,60 +222,45 @@ function PhotoGrid({
   onReorderPhotos: (photoIds: string[]) => void;
   onOpenActions: (photoId: string) => void;
 }) {
-  const { width } = useWindowDimensions();
-  const tileSize = getPhotoTileSize(width);
-  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const dragStart = useRef<{
-    index: number;
-    pageX: number;
-    pageY: number;
-  } | null>(null);
-  const dragLatest = useRef<{ pageX: number; pageY: number } | null>(null);
+  const lockScroll = useWizardScrollLock();
+  const from = useSharedValue(-1);
+  const to = useSharedValue(-1);
+  const x = useSharedValue(0);
+  const y = useSharedValue(0);
+  const drag = useMemo<PhotoDrag>(() => ({ from, to, x, y }), [from, to, x, y]);
 
-  const handleDragStart = useCallback(
-    (index: number, pageX: number, pageY: number) => {
-      if (disabled) return;
-      dragStart.current = { index, pageX, pageY };
-      dragLatest.current = { pageX, pageY };
-      setDragOffset({ x: 0, y: 0 });
-      setDraggingIndex(index);
-    },
-    [disabled],
-  );
+  const pendingDrop = useRef<string[] | null>(null);
+  const resetDrag = useCallback(() => {
+    from.value = -1;
+    to.value = -1;
+    x.value = 0;
+    y.value = 0;
+  }, [from, to, x, y]);
+  useLayoutEffect(() => {
+    const expected = pendingDrop.current;
+    if (!expected) return;
+    const ids = photos.map((photo) => photo.photoId);
+    if (ids.length === expected.length && ids.some((id, index) => id !== expected[index])) return;
+    pendingDrop.current = null;
+    resetDrag();
+  }, [photos, resetDrag]);
 
-  const handleDragMove = useCallback((pageX: number, pageY: number) => {
-    const start = dragStart.current;
-    if (!start) return;
-    dragLatest.current = { pageX, pageY };
-    setDragOffset({ x: pageX - start.pageX, y: pageY - start.pageY });
-  }, []);
+  const handleDragStart = useCallback(() => lockScroll(true), [lockScroll]);
 
-  const handleDragEnd = useCallback(() => {
-    const start = dragStart.current;
-    const latest = dragLatest.current;
-    dragStart.current = null;
-    dragLatest.current = null;
-    setDraggingIndex(null);
-    setDragOffset({ x: 0, y: 0 });
-    if (!start || !latest) return;
-
-    const targetIndex = getDragTargetIndex({
-      fromIndex: start.index,
-      dx: latest.pageX - start.pageX,
-      dy: latest.pageY - start.pageY,
-      count: photos.length,
-      tileSize,
-    });
-    const reorderedIds = reorderPhotoIdsByIndex(
-      photos.map((photo) => photo.photoId),
-      start.index,
-      targetIndex,
-    );
-    if (targetIndex !== start.index) {
+  const handleDrop = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      lockScroll(false);
+      if (toIndex === fromIndex) {
+        resetDrag();
+        return;
+      }
+      const reorderedIds = reorderPhotoIdsByIndex(photos.map((photo) => photo.photoId), fromIndex, toIndex);
+      // Keep the UI-thread positions until React commits these new slots.
+      pendingDrop.current = reorderedIds;
       onReorderPhotos(reorderedIds);
-    }
-  }, [onReorderPhotos, photos, tileSize]);
+    },
+    [lockScroll, resetDrag, onReorderPhotos, photos],
+  );
 
   return (
     <View
@@ -293,11 +275,10 @@ function PhotoGrid({
           total={photos.length}
           onRemove={onRemove}
           onOpenActions={onOpenActions}
+          drag={drag}
+          dragEnabled={!disabled}
           onDragStart={handleDragStart}
-          onDragMove={handleDragMove}
-          onDragEnd={handleDragEnd}
-          isDragging={draggingIndex === index}
-          dragOffset={draggingIndex === index ? dragOffset : undefined}
+          onDrop={handleDrop}
         />
       ))}
     </View>

@@ -182,6 +182,24 @@ export function reorderPhotos(queue: UploadQueue, photoIds: string[]): UploadQue
   return { ...queue, photos: reordered };
 }
 
+/**
+ * The photo among `photoIds` that comes first in the grid. A photo no longer
+ * in the queue comes before all of them, so its leftover work clears at once.
+ */
+export function nextInGridOrder(queue: UploadQueue, photoIds: Iterable<string>): string | undefined {
+  const position = new Map(queue.photos.map((p, index) => [p.photoId, index]));
+  let next: string | undefined;
+  let nextPosition = Infinity;
+  for (const photoId of photoIds) {
+    const at = position.get(photoId) ?? -1;
+    if (at < nextPosition) {
+      next = photoId;
+      nextPosition = at;
+    }
+  }
+  return next;
+}
+
 export function getPhotosReadyForUpload(queue: UploadQueue): StagedPhoto[] {
   return queue.photos.filter((p) => p.state === "compressed");
 }

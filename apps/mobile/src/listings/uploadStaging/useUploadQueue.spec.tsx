@@ -89,7 +89,206 @@ function wrapper({ children }: { children: React.ReactNode }) {
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }
 
-describe("useUploadQueue — parallel batch compression", () => {
+describe("useUploadQueue — in grid order (#819)", () => {
+  /** Compressions wait until the test finishes them, by source photo. */
+  let compressions: Map<string, () => void>;
+  let compressionFailures: Map<string, () => void>;
+  /** Presign requests wait until the test answers them, in the order asked. */
+  let presigns: (() => void)[];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    compressions = new Map();
+    compressionFailures = new Map();
+    presigns = [];
+    mockReadDirectoryAsync.mockResolvedValue([]);
+    mockListLocalPhotoIds.mockResolvedValue([]);
+    mockGetInfoAsync.mockResolvedValue({
+      exists: true, uri: "", size: 1024, isDirectory: false, modificationTime: 0,
+    });
+    mockUploadAsync.mockResolvedValue({ status: 200, headers: {}, body: "", mimeType: "image/jpeg" });
+    mockCompressPhoto.mockImplementation((sourceUri: string, destinationUri: string) =>
+      new Promise((resolve, reject) => {
+        compressionFailures.set(sourceUri, () => reject(new Error("compression failed")));
+        compressions.set(sourceUri, () => resolve({ uri: destinationUri, width: 100, height: 100, fileSize: 1024 }));
+      }));
+    mockPresignMutateAsync.mockImplementation(() =>
+      new Promise((resolve) => {
+        presigns.push(() => resolve({ uploadUrl: "http://localhost/presigned", key: "test-key" }));
+      }));
+  });
+
+  const picked = (n: number) => `file:///picker/photo${n}.jpg`;
+  const compressedSources = () => mockCompressPhoto.mock.calls.map(([source]) => source);
+  /** The staged files sent so far, as grid photo numbers counted from 1. */
+  function uploadedPhotos(ids: string[]) {
+    return mockUploadAsync.mock.calls.map(([, localUri]) =>
+      ids.findIndex((id) => (localUri as string).includes(id)) + 1);
+  }
+
+  async function pick(count: number) {
+    const hook = renderHook(() => useUploadQueue("grid-order", { photos: [] }), { wrapper });
+    await waitFor(() => expect(hook.result.current.isReady).toBe(true));
+    act(() => {
+      for (let n = 1; n <= count; n += 1) void hook.result.current.addPhoto(picked(n));
+    });
+    await waitFor(() => expect(hook.result.current.photos).toHaveLength(count));
+    return hook;
+  }
+
+  async function finishCompression(n: number) {
+    await act(async () => {
+      compressions.get(picked(n))?.();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+
+  async function answerPresign() {
+    await act(async () => {
+      presigns.shift()?.();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+
+  it("compresses one picked photo at a time, cover first", async () => {
+    const { result } = await pick(4);
+
+    expect(compressedSources()).toEqual([picked(1)]);
+    expect(result.current.isCompressing).toBe(true);
+
+    await finishCompression(1);
+    expect(compressedSources()).toEqual([picked(1), picked(2)]);
+    await finishCompression(2);
+    await finishCompression(3);
+    await finishCompression(4);
+
+    expect(compressedSources()).toEqual([picked(1), picked(2), picked(3), picked(4)]);
+    expect(result.current.isCompressing).toBe(false);
+  });
+
+  it("compresses a photo moved forward before the ones it passed", async () => {
+    const { result } = await pick(3);
+    const [first, second, third] = result.current.photos.map((photo) => photo.photoId) as [string, string, string];
+
+    act(() => result.current.reorderPhotos([first, third, second]));
+    await finishCompression(1);
+
+    expect(compressedSources()).toEqual([picked(1), picked(3)]);
+  });
+
+  it("uploads the cover first and the rest in grid order, following a reorder", async () => {
+    const { result } = await pick(4);
+    const ids = result.current.photos.map((photo) => photo.photoId);
+    const [first, second, third, fourth] = ids as [string, string, string, string];
+    for (const n of [1, 2, 3, 4]) await finishCompression(n);
+    // Only the cover starts; the later uploads wait for it to finish.
+    expect(presigns).toHaveLength(1);
+
+    act(() => result.current.reorderPhotos([first, second, fourth, third]));
+    await answerPresign();
+    await answerPresign();
+    await answerPresign();
+    await answerPresign();
+
+    expect(uploadedPhotos(ids)).toEqual([1, 2, 4, 3]);
+    expect(result.current.photos.map((photo) => photo.state)).toEqual(["uploaded", "uploaded", "uploaded", "uploaded"]);
+  });
+
+  it("finishes the cover before starting the other seven uploads (#819)", async () => {
+    const uploads = new Map<string, () => void>();
+    mockUploadAsync.mockImplementation((_url, localUri) => new Promise((resolve) => {
+      uploads.set(localUri, () => resolve({ status: 200, headers: {}, body: "", mimeType: "image/jpeg" }));
+    }));
+    const { result } = await pick(8);
+    const ids = result.current.photos.map((photo) => photo.photoId);
+    for (let n = 1; n <= 8; n += 1) await finishCompression(n);
+    await answerPresign();
+    await answerPresign();
+
+    // A slow cover cannot be overtaken by a fast second upload.
+    expect(uploadedPhotos(ids)).toEqual([1]);
+    expect(result.current.photos.map((photo) => photo.state)).toEqual([
+      "uploading", "compressed", "compressed", "compressed", "compressed", "compressed", "compressed", "compressed",
+    ]);
+    await act(async () => { uploads.get(result.current.photos[0]?.localUri ?? "")?.(); });
+    await waitFor(() => expect(result.current.photos[0]?.state).toBe("uploaded"));
+    expect(presigns).toHaveLength(2);
+    await answerPresign();
+    await answerPresign();
+    expect(uploadedPhotos(ids)).toEqual([1, 2, 3]);
+    // Two later photos can upload together after the cover is visible.
+    await act(async () => { uploads.get(result.current.photos[2]?.localUri ?? "")?.(); });
+    await waitFor(() => expect(result.current.photos[2]?.state).toBe("uploaded"));
+    expect(result.current.photos[1]?.state).toBe("uploading");
+    expect(result.current.photos.map((photo) => photo.photoId)).toEqual(ids);
+    for (let n = 1; n < 8; n += 1) {
+      await answerPresign();
+      await act(async () => { uploads.get(result.current.photos[n]?.localUri ?? "")?.(); });
+    }
+    await waitFor(() => expect(result.current.photos.every((photo) => photo.state === "uploaded")).toBe(true));
+  });
+
+  it("uploads followers of a restored lost cover without retrying the lost photo", async () => {
+    const { result } = renderHook(() => useUploadQueue("grid-order", {
+      photos: [{ photoId: "lost-cover", sortOrder: 0 }],
+    }), { wrapper });
+    await waitFor(() => expect(result.current.isReady).toBe(true));
+    act(() => { void result.current.addPhoto(picked(1)); });
+    await waitFor(() => expect(compressions.has(picked(1))).toBe(true));
+    await finishCompression(1);
+    await answerPresign();
+    await waitFor(() => expect(result.current.photos[1]?.state).toBe("uploaded"));
+    expect(result.current.photos[0]).toMatchObject({ photoId: "lost-cover", state: "lost" });
+    expect(mockUploadAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["remove", "reorder", "compression failure", "missing destination"])(
+    "releases compressed followers when a moved cover ends through %s", async (release) => {
+      const { result } = await pick(3);
+      const ids = result.current.photos.map((photo) => photo.photoId);
+      const [first, second, third] = ids as [string, string, string];
+      await finishCompression(1);
+      await finishCompression(2);
+      act(() => result.current.reorderPhotos([third, second, first]));
+      await answerPresign();
+      expect(result.current.photos.find((photo) => photo.photoId === first)?.state).toBe("uploaded");
+      expect(presigns).toHaveLength(0);
+
+      if (release === "remove") act(() => result.current.removePhoto(third));
+      else if (release === "reorder") act(() => result.current.reorderPhotos([second, third, first]));
+      else if (release === "compression failure") {
+        await act(async () => { compressionFailures.get(picked(3))?.(); });
+      } else {
+        mockGetInfoAsync.mockResolvedValueOnce({ exists: false, uri: "", isDirectory: false });
+        await finishCompression(3);
+      }
+      await waitFor(() => expect(presigns).toHaveLength(1));
+      await answerPresign();
+      await waitFor(() => expect(result.current.photos.find((photo) => photo.photoId === second)?.state).toBe("uploaded"));
+      // Repeated wake-ups/resume must not duplicate the already-started PUT.
+      act(() => result.current.reorderPhotos(result.current.photos.map((photo) => photo.photoId)));
+      const resume = mockSetupUploadResume.mock.calls.at(-1)?.[0].resumePendingUploads;
+      act(() => resume?.());
+      await act(async () => undefined);
+      expect(uploadedPhotos(ids)).toEqual([1, 2]);
+      expect(result.current.photos.map((photo) => photo.photoId)).toEqual(
+        release === "remove" ? [second, first] : release === "reorder" ? [second, third, first] : [third, second, first],
+      );
+    },
+  );
+
+  it("skips a photo removed while it waited to be compressed", async () => {
+    const { result } = await pick(3);
+    const second = result.current.photos[1]?.photoId ?? "";
+
+    act(() => result.current.removePhoto(second));
+    await finishCompression(1);
+
+    expect(compressedSources()).toEqual([picked(1), picked(3)]);
+  });
+});
+
+describe("useUploadQueue — batch compression", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockReadDirectoryAsync.mockResolvedValue([]);
@@ -152,7 +351,7 @@ describe("useUploadQueue — parallel batch compression", () => {
     expect(result.current.isCompressing).toBe(false);
   });
 
-  it("sets isCompressing=false when the last parallel compression fails", async () => {
+  it("sets isCompressing=false when the last compression fails", async () => {
     const controllers = new Map<string, { resolve: () => void; reject: (err: Error) => void }>();
 
     mockCompressPhoto.mockImplementation((sourceUri: string, destinationUri: string) => {
@@ -199,7 +398,7 @@ describe("useUploadQueue — parallel batch compression", () => {
     expect(result.current.isCompressing).toBe(false);
   });
 
-  it("continues other compressions independently when one fails", async () => {
+  it("moves on to the next photo when a compression fails", async () => {
     const controllers = new Map<string, { resolve: () => void; reject: (err: Error) => void }>();
 
     mockCompressPhoto.mockImplementation((sourceUri: string, destinationUri: string) => {
@@ -231,26 +430,23 @@ describe("useUploadQueue — parallel batch compression", () => {
 
     await waitFor(() => expect(result.current.photos).toHaveLength(3));
 
-    // Fail photo 2
-    act(() => {
-      controllers.get(uri2)?.reject(new Error("compress failed"));
+    // Photo 1 fails; the next photo in the grid compresses.
+    await act(async () => {
+      controllers.get(uri1)?.reject(new Error("compress failed"));
     });
-    await waitFor(() => expect(result.current.photos[1]?.state).toBe("failed"));
-
-    // Photo 1 and 3 should still be in "selected" (compressing)
-    expect(result.current.photos[0]?.state).toBe("selected");
-    expect(result.current.photos[2]?.state).toBe("selected");
+    await waitFor(() => expect(result.current.photos[0]?.state).toBe("failed"));
+    await waitFor(() => expect(controllers.has(uri2)).toBe(true));
+    expect(controllers.has(uri3)).toBe(false);
     expect(result.current.isCompressing).toBe(true);
 
-    // Resolve photo 1 — upload finishes immediately in mocks
     act(() => {
-      controllers.get(uri1)?.resolve();
+      controllers.get(uri2)?.resolve();
     });
-    await waitFor(() => expect(result.current.photos[0]?.state).toBe("uploaded"));
+    await waitFor(() => expect(result.current.photos[1]?.state).toBe("uploaded"));
     // Photo 3 is still compressing
     expect(result.current.isCompressing).toBe(true);
 
-    // Resolve photo 3
+    await waitFor(() => expect(controllers.has(uri3)).toBe(true));
     act(() => {
       controllers.get(uri3)?.resolve();
     });
