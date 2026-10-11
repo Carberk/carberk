@@ -47,7 +47,7 @@ Mount the global provider stack, navigation container, and portal infrastructure
 
 ## States
 
-- **Loading**: Native splash (Expo-managed) until JS bundle loads; no custom splash.
+- **Loading**: Native splash hands off to the matching one-time Carberk entrance with subordinate "By Alpha Motors" credit, approved in #833. Destination readiness remains independent of presentation.
 - **Error**: Unhandled JS error crashes to Expo error boundary (red screen in dev).
 - **Offline**: `onlineManager` pauses queries; refetchOnReconnect resumes.
 
