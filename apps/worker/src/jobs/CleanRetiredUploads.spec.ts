@@ -176,6 +176,13 @@ describe("CleanRetiredUploads (#721)", () => {
     expect(result).toMatchObject({ deleted: 0, waiting: 1 });
   });
 
+  it("retains exact historical nine-object cleanup authority while new WebP uploads use five", () => {
+    const historical = work({ key: `${DIRECTORY}original.jpg`, objectKeys: [`${DIRECTORY}original.jpg`, ...["thumbnail", "list", "detail", "fullscreen"].flatMap((name) => [`${DIRECTORY}${name}.jpg`, `${DIRECTORY}${name}.webp`])] });
+    expect(deletionDirectory(historical)).toBe(DIRECTORY);
+    expect(deletionDirectory(work())).toBe(DIRECTORY);
+    expect(deletionDirectory({ ...historical, objectKeys: [...historical.objectKeys, `${DIRECTORY}extra.jpg`] })).toBeNull();
+  });
+
   it("grants authority only over the strict owned pending UUID directory", () => {
     expect(deletionDirectory(work())).toBe(DIRECTORY);
     expect(deletionDirectory(work({
