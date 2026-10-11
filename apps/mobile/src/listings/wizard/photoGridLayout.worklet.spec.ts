@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { runInNewContext } from "node:vm";
+
 import { expect, it } from "vitest";
 
 import type { getDragTargetIndex } from "./photoGridLayout";
@@ -10,7 +11,7 @@ it("can drag across rows using the native serialized worklet (#820)", () => {
   const { transformFileSync } = require("@babel/core") as {
     transformFileSync: (filename: string, options: Record<string, unknown>) => { code: string };
   };
-  const transformed = transformFileSync(fileURLToPath(new URL("./photoGridLayout.ts", import.meta.url)), {
+  const transformed = transformFileSync(fileURLToPath(new URL("./photoGridLayout.ts", import.meta.url).href), {
     babelrc: false,
     configFile: false,
     presets: [require.resolve("babel-preset-expo")],
