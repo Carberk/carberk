@@ -8,8 +8,6 @@
     "dev": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "native:metro": "node scripts/native-session.mjs metro",
-    "native:ios": "node scripts/native-session.mjs ios",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

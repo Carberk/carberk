@@ -141,7 +141,7 @@ export function useUploadQueue(
       // it first with two slots would still let a faster second photo overtake
       // it. A failed cover releases the queue so its retry cannot stall others.
       const cover = queueRef.current.photos[0];
-      const coverPending = cover && !["uploaded", "attached", "failed"].includes(cover.state);
+      const coverPending = cover && !["uploaded", "attached", "failed", "lost"].includes(cover.state);
       if (coverPending && (!uploadQueue.current.includes(cover.photoId) || runningUploads.current > 0)) break;
       const nextId = coverPending ? cover.photoId : nextInGridOrder(queueRef.current, uploadQueue.current);
       if (!nextId) break;
@@ -395,9 +395,10 @@ export function useUploadQueue(
         const uploadError = buildUploadError(err, t);
         queueRef.current = transitionPhotoToFailed(queueRef.current, photoId, uploadError);
         setQueue(queueRef.current);
+        processUploadQueue();
       }
     },
-    [enqueueUploads, t],
+    [enqueueUploads, processUploadQueue, t],
   );
 
   compressPhotoRef.current = compressPicked;
@@ -440,16 +441,18 @@ export function useUploadQueue(
       }
       queueRef.current = removePhotoFromQueue(queueRef.current, photoId);
       setQueue(queueRef.current);
+      processUploadQueue();
     },
-    [],
+    [processUploadQueue],
   );
 
   const reorderPhotos = useCallback(
     (photoIds: string[]) => {
       queueRef.current = reorderPhotosInQueue(queueRef.current, photoIds);
       setQueue(queueRef.current);
+      processUploadQueue();
     },
-    [],
+    [processUploadQueue],
   );
 
   const retryPhoto = useCallback(
