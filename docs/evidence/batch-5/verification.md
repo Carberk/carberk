@@ -1,6 +1,6 @@
 # Batch 5 verification
 
-PR #827, issues #819 / #820 / #821. Code checked at `12b7b633` after the worklet runtime fix `f4720cae` and its test URL typecheck repair, including the merge of `origin/main` at `e7cb113b`. Android native proof is the remaining acceptance gate.
+PR #827, issues #819 / #820 / #821. Code checked at `256b7a2a` after the worklet runtime fix and test URL repair, including the clean merge of `origin/main` at `9336faeacbf688a25b38d2ca37b9a702dc70eb38`. Android manual verification is delegated to the founder for the new cloud build; it is untested by the agent and does not block this release under the founder instruction on issue #820.
 
 ## Regression evidence
 
@@ -31,9 +31,9 @@ The founder explicitly selected shared staging for this check. SDK 55 existing d
 | Tap opens Make cover / Move / Remove / Cancel sheet | [Photo 3 sheet](03-tap-action-sheet.png) | pass |
 | Read blue ticks on list, light and dark | [Light list](04-messages-read-light.png), [dark list](07-messages-read-dark.png) | pass |
 | Read blue ticks and Read label on own bubbles, light and dark | [Light conversation](05-bubble-read-light.png), [dark conversation](06-bubble-read-dark.png) | pass |
-| Held cross-row drag, live neighbour shift, locked scrolling and stable drop | User explicitly authorized Kimi computer-control tool, invoked from this Codex model. 1000ms hold: [row1 to row3](09-ios-row1-to-row3.png), [back to row1](10-ios-row3-to-row1.png), [cover](11-ios-drop-cover.png), [native recording](ios-drag-native.mp4). Grid shifts while held, page remains stationary and drops keep the target order. | iOS pass |
+| Held cross-row drag, live neighbour shift, locked scrolling and stable drop | User explicitly authorized Kimi computer-control tool, invoked from this Codex model. 1000ms hold: [row 1 to row 3](09-ios-row 1-to-row 3.png), [back to row 1](10-ios-row 3-to-row 1.png), [cover](11-ios-drop-cover.png), [native recording](ios-drag-native.mp4). Grid shifts while held, page remains stationary and drops keep the target order. | iOS pass |
 | Scroll restored after drag | Short swipe with no hold moves the page, revealing the actions hint: [after drop](12-ios-scroll-restored.png). Tap sheet was proved earlier. | iOS pass |
-| Android gesture behavior | Reusable SDK 55 debug client on emulator-5554, Batch5 Metro 8083 against staging. App boots to language onboarding after cached bundle warm relaunch. Dedicated test-control permission is pending because permitted computer-control clicks do not enter the Qt guest surface | missing native evidence |
+| Android gesture behavior | Founder instruction on [issue #820](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/820): "no need to use i will drag test msylef for that pass". Functionality remains required; the founder owns manual verification on the new cloud build. | untested by agent; founder delegated |
 
 ## Documentation and API lookup
 
@@ -45,10 +45,16 @@ Context7 resolution for Expo ImagePicker was unavailable after one narrower retr
 
 The hosted `pr` run at `f4720cae` rejected the new test because React Native global `URL` and Node `URL` types differed. Passing `.href` to `fileURLToPath` fixes that test-only collision; repository typecheck passes again. Runtime worklet hoisting lookup used [official Reanimated documentation](https://docs.swmansion.com/react-native-reanimated/docs/guides/worklets/#hoisting) after the Context7 quota failure; worklets are not hoisted, matching the captured undefined helper.
 
-## Android recoverable checkpoint
+## Android manual verification ownership
 
-Android emulator `emulator-5554`, host process PID 11238, Kimi window 4562. The debug client is `tm.auto.app` version 2.0.4, installed by the launch agent. No release binary was built or tested. Batch5 Metro 8083 compiled the Android bundle, and native logs show `Running "main"`; a warm relaunch reached language onboarding. Staging fixture sign-in and Android drag proof have not occurred yet.
+The founder explicitly delegated Android drag testing to themselves on the new cloud build and removed the agent native pass as a release blocker. There is no pending test-control permission and no claimed Android pass. Earlier bounded attempts booted an SDK 55 debug client on emulator-5554 against staging but did not perform fixture sign-in or establish gesture proof; Cua/Kimi Qt input did not produce a reliable guest interaction. No local release binary was built or tested. No further Android touch or boot was performed after the founder instruction.
 
-Cua cannot select either the running `qemu-system-aarch64` app name or its executable path, returning `Invalid app`. Kimi reads the correct emulator main window and activates it with `ok:true, foreground_changed:true`. Its subsequent fresh-screenshot coordinate clicks report delivery through `background_targeted` but do not change the guest UI. The exposed click tool has no force-foreground/global-route argument, and never automatically repeats a delivered click without an observed effect. Two bounded observed routes failed; no adb touch was used. Root requested explicit adb test-control permission under Cua's documented technology restriction and is keeping that question pending.
+## Founder iPhone report and source verification
 
-Resume this same clean detached worktree, keep the existing debug APK, and complete staging fixture sign-in followed by row 1 → row 3 → row 1 → cover, neighbour movement, scroll lock/restoration and tap sheet on Android. Keep #820 unverified until that native proof exists. The iOS simulator was handed to the launch agent; theme was restored to light and owned Metro 8082 was stopped. Root owns the final independent review and merge.
+The founder then reported that dragging from a lower row to the first still failed, and identified the iPhone simulator. Read-only inspection of assigned simulator `D8081755-61D5-42FE-AFAD-E44DAAF6BA7F` found Carberk PID 24558 with `-RCT_jsLocation 127.0.0.1:8084`. Port 8084 had stopped; only the unrelated user's Metro 8081 was listening. The launch-polish checkout at `a8cb9ba5677f096b23daf6a4be80e7bfd8c8d276` still had the old `PhotoThumbnail` `onLongPress` and `onTouchMove` implementation at lines 92/93. [Prior cached screen](14-ios-cached-older-bundle.png) records the inspected state. This was the earlier implementation, rather than Batch 5's verified Gesture Handler code.
+
+The guarded Batch 5 helper then started fresh staging Metro 8082 at `256b7a2a`, verified API/socket/media origins, and relaunched only the assigned iPhone with the 8082 argument. A 500 ms hold moved the grass photo from row 3 column 2 to row 1 column 2. Neighbours shifted and the page stayed stationary: [rechecked first-row drop](13-ios-lower-row-to-first-500 ms.png), [native recording](ios-lower-row-recheck.mp4). The reverse move restored the pre-test order. Existing screenshots 09 through 12 retain lower-row/cover/scroll proof from the earlier verified session.
+
+The founder independently confirmed on the corrected bundle: "dragging is working it passed". The report is resolved by loading the correct source; no additional production change was needed. Subsequent native gestures stopped after that confirmation. Android remains untested by the agent and delegated to the founder.
+
+All repository unit/typecheck, affected mobile lint, Expo dependency/iOS export and documentation gates were rerun after the main integration. The mobile suite passes 3332 tests across 304 files; API 2013 plus one existing skipped test, DB 64 and worker 194 pass. The unrelated intermittent profile-photo progress-bar failure did not recur in this run. Container-backed tests belong to the required hosted `pr` check.
