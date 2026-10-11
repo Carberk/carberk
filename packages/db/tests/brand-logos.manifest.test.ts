@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
@@ -98,11 +98,25 @@ describe("brand logo manifest schema", () => {
     expect(problemsOf(manifestOf({ ...simpleIconsEntry, source }))).toMatch(/source/);
   });
 
-  it("rejects a Commons entry whose licence is not PD-textlogo or PD-shape", () => {
-    for (const licence of ["CC BY-SA 4.0", "CC0", "fair use", "PD-old", ""]) {
-      expect(problemsOf(manifestOf({ ...commonsEntry, licence }))).toMatch(/licence/);
+  it("accepts identifying artwork independently of recorded license categories", () => {
+    for (const licence of ["CC BY-SA 4.0", "CC0", "PD-ineligible", "manufacturer artwork"]) {
+      expect(() => parseBrandLogoManifest(manifestOf({ ...commonsEntry, licence }))).not.toThrow();
     }
   });
+
+  it("accepts bundled artwork with pinned provenance and no license metadata", () => {
+    expect(() => parseBrandLogoManifest(manifestOf({
+      slug: "genesis", tier: "A", source: "bundled", masterFile: "genesis.svg",
+      sourceUrl: "https://www.genesis.com/logo", trademark: "Genesis Motor",
+      retrievedAt: "2026-10-11", sha256Master: SHA, transform: "alpha",
+    }))).not.toThrow();
+  });
+
+  it.each(["../genesis.svg", "/genesis.svg", "sub/genesis.svg", "genesis.svg?x"])(
+    "refuses the unsafe bundled master path %s", (masterFile) => {
+      expect(problemsOf(manifestOf({ ...commonsEntry, source: "bundled", masterFile }))).toMatch(/masterFile/);
+    },
+  );
 
   it("accepts PD-shape", () => {
     expect(() =>
@@ -110,8 +124,8 @@ describe("brand logo manifest schema", () => {
     ).not.toThrow();
   });
 
-  it("rejects a Simple Icons entry whose licence is not CC0-1.0", () => {
-    expect(problemsOf(manifestOf({ ...simpleIconsEntry, licence: "MIT" }))).toMatch(/licence/);
+  it("does not use the recorded Simple Icons license as a coverage gate", () => {
+    expect(() => parseBrandLogoManifest(manifestOf({ ...simpleIconsEntry, licence: "manufacturer artwork" }))).not.toThrow();
   });
 
   it("rejects a Commons download that is not from upload.wikimedia.org", () => {
@@ -176,11 +190,11 @@ describe("brand logo manifest schema", () => {
 
   it("reports every problem at once", () => {
     const problems = problemsOf(
-      manifestOf({ ...simpleIconsEntry, tier: "Z", sha256Master: "x" }, { ...commonsEntry, licence: "CC" }),
+      manifestOf({ ...simpleIconsEntry, tier: "Z", sha256Master: "x" }, { ...commonsEntry, downloadUrl: "http://example.com/logo.svg" }),
     );
     expect(problems).toMatch(/tier/);
     expect(problems).toMatch(/sha256Master/);
-    expect(problems).toMatch(/licence/);
+    expect(problems).toMatch(/downloadUrl/);
   });
 });
 
@@ -213,6 +227,33 @@ describe("master checksum and format", () => {
     expect(() => assertMasterFormat(entry, png)).not.toThrow();
     expect(() => assertMasterFormat(entry, html)).toThrow(MasterIntegrityError);
     expect(() => assertMasterFormat(entry, new Uint8Array())).toThrow(MasterIntegrityError);
+  });
+
+  it("accepts JPEG and WebP manufacturer artwork", () => {
+    const entry = entryFor(svg);
+    expect(() => assertMasterFormat(entry, Uint8Array.from([0xff, 0xd8, 0xff, 0xe0]))).not.toThrow();
+    const webp = new TextEncoder().encode("RIFFxxxxWEBPVP8 ");
+    expect(() => assertMasterFormat(entry, webp)).not.toThrow();
+    expect(() => assertMasterFormat(entry, new TextEncoder().encode("RIFFxxxxWAVE"))).toThrow(MasterIntegrityError);
+  });
+});
+
+describe("bundled manufacturer artwork", () => {
+  it("reads the pinned master locally and refuses altered bytes", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "brand-logo-bundled-"));
+    const bytes = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>');
+    const entry = {
+      ...commonsEntry, source: "bundled", masterFile: "genesis.svg", sha256Master: sha256Hex(bytes),
+    } as unknown as Parameters<ReturnType<typeof createMasterProvider>["load"]>[0];
+    try {
+      await writeFile(join(dir, "genesis.svg"), bytes);
+      const provider = createMasterProvider({ cacheDir: dir, bundledDir: dir });
+      expect(Buffer.from(await provider.load(entry))).toEqual(Buffer.from(bytes));
+      await writeFile(join(dir, "genesis.svg"), new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"/>'));
+      await expect(provider.load(entry)).rejects.toThrow(MasterIntegrityError);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
 
