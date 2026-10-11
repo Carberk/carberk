@@ -178,8 +178,8 @@ describe("useUploadQueue — in grid order (#819)", () => {
     const ids = result.current.photos.map((photo) => photo.photoId);
     const [first, second, third, fourth] = ids as [string, string, string, string];
     for (const n of [1, 2, 3, 4]) await finishCompression(n);
-    // Two uploads run at once; photos 3 and 4 wait for a slot.
-    expect(presigns).toHaveLength(2);
+    // Only the cover starts; the later uploads wait for it to finish.
+    expect(presigns).toHaveLength(1);
 
     act(() => result.current.reorderPhotos([first, second, fourth, third]));
     await answerPresign();

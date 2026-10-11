@@ -137,7 +137,13 @@ export function useUploadQueue(
       runningUploads.current < MAX_CONCURRENT &&
       uploadQueue.current.length > 0
     ) {
-      const nextId = nextInGridOrder(queueRef.current, uploadQueue.current);
+      // Hold every other upload until the current cover has finished. Starting
+      // it first with two slots would still let a faster second photo overtake
+      // it. A failed cover releases the queue so its retry cannot stall others.
+      const cover = queueRef.current.photos[0];
+      const coverPending = cover && !["uploaded", "attached", "failed"].includes(cover.state);
+      if (coverPending && (!uploadQueue.current.includes(cover.photoId) || runningUploads.current > 0)) break;
+      const nextId = coverPending ? cover.photoId : nextInGridOrder(queueRef.current, uploadQueue.current);
       if (!nextId) break;
       uploadQueue.current = uploadQueue.current.filter((photoId) => photoId !== nextId);
       runningUploads.current += 1;

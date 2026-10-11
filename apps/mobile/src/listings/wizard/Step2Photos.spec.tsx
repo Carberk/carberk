@@ -1,3 +1,5 @@
+import { useRef } from "react";
+import * as Reanimated from "react-native-reanimated";
 import * as Linking from "expo-linking";
 import { describe, expect, it, vi } from "vitest";
 import * as ImagePicker from "expo-image-picker";
@@ -73,6 +75,29 @@ describe("Step2Photos", () => {
     dragPhoto(screen, 0, { dx: 119, dy: 119 });
 
     expect(props.onReorderPhotos).toHaveBeenCalledWith(["b", "c", "d", "e", "a", "f"]);
+  });
+
+  it("keeps the dragged photo at its drop position until the reordered grid commits (#820)", () => {
+    const values: { value: number }[] = [];
+    const sharedValue = vi.spyOn(Reanimated, "useSharedValue").mockImplementation(((initial: number) => {
+      const ref = useRef({ value: initial });
+      if (!values.includes(ref.current)) values.push(ref.current);
+      return ref.current;
+    }) as typeof Reanimated.useSharedValue);
+    try {
+      const ids = ["a", "b", "c", "d", "e", "f"];
+      const props = { ...defaults(), photos: ids.map((id, n) => photo(id, n)) };
+      const screen = renderMobile(<Step2Photos {...props} />);
+      dragPhoto(screen, 0, { dx: 119, dy: 119 });
+      // Native shared values still describe the drop while the parent has the
+      // old grid; otherwise the photo visibly snaps back before React commits.
+      expect(values.map((value) => value.value)).toEqual([0, 4, 119, 119]);
+      screen.rerender(<Step2Photos {...props} photos={["b", "c", "d", "e", "a", "f"].map((id, n) => photo(id, n))} />);
+      expect(values.map((value) => value.value)).toEqual([-1, -1, 0, 0]);
+      expect(screen.getByRole("button", { name: /Photo 5 of 6/ })).toBeTruthy();
+    } finally {
+      sharedValue.mockRestore();
+    }
   });
 
   it("drags a photo back onto the cover slot (#820)", () => {
