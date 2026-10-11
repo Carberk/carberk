@@ -62,7 +62,7 @@ export function rewriteReferences(value: unknown, mappings: ReadonlyMap<string, 
 
 const PHOTO_FIELDS = new Set(["key", "posterKey", "avatarKey", "avatarUrl", "coverMediaKey", "photoKeys", "objectKeys", "thumbnail", "list", "detail", "fullscreen"]);
 function assertReferencesInventoried(value: unknown, mappings: ReadonlyMap<string, string>, field = "") {
-  if (typeof value === "string" && PHOTO_FIELDS.has(field) && /\.(jpg|jpeg)(?:[?#].*)?$/i.test(value) && rewriteReferences(value, mappings) === value) throw new Error(`JPEG reference has no inventoried object: ${value}`);
+  if (typeof value === "string" && PHOTO_FIELDS.has(field) && /\.(jpg|jpeg)(?:[?#].*)?$/i.test(value) && rewriteReferences(value, mappings) === value) throw new Error(`JPEG reference has no inventoried object in field ${field}`);
   if (Array.isArray(value)) for (const entry of value) assertReferencesInventoried(entry, mappings, field);
   else if (value && typeof value === "object") for (const [name, entry] of Object.entries(value)) assertReferencesInventoried(entry, mappings, name);
 }
@@ -104,6 +104,22 @@ async function snapshotRows(pool: Pool, mappings: ReadonlyMap<string, string>, i
     }
   }
   return rows;
+}
+
+function validatePlan(plan: Plan) {
+  if (plan.version !== 1 || !Array.isArray(plan.objects) || !Array.isArray(plan.rows)) throw new Error("Invalid photo conversion plan");
+  for (const object of plan.objects) {
+    if (!BUCKETS.some((bucket) => bucket === object.bucket) || typeof object.key !== "string" || !/\.(jpg|jpeg|webp)$/i.test(object.key) || typeof object.etag !== "string" || !object.etag) throw new Error("Invalid inventoried photo object");
+  }
+  const mappings = mappingsFor(plan.objects);
+  for (const row of plan.rows) {
+    const spec = TABLES.find((candidate) => candidate.table === row.table);
+    if (!spec || row.idColumn !== spec.id || typeof row.id !== "string" || !row.before || !row.after || !equal(Object.keys(row.before).sort(), [...spec.columns].sort())) throw new Error("Invalid photo reference row in plan");
+    const expected = rewriteReferences(row.before, mappings) as Record<string, unknown>;
+    if (row.table === "media_uploads" && String(expected["key"]).endsWith(".webp")) expected["contentType"] = "image/webp";
+    if (Array.isArray(expected["objectKeys"])) expected["objectKeys"] = [...new Set(expected["objectKeys"])];
+    if (!equal(expected, row.after)) throw new Error("Plan changes data beyond photo references");
+  }
 }
 
 async function readObject(s3: S3Client, bucket: string, key: string, etag?: string) {
@@ -284,7 +300,8 @@ export async function main(args = process.argv.slice(2)) {
       return;
     }
     const plan = JSON.parse(await readFile(path, "utf8")) as Plan;
-    if (plan.version !== 1 || plan.endpoint !== endpoint || plan.databaseFingerprint !== hash(database)) throw new Error("Plan belongs to a different store/database");
+    validatePlan(plan);
+    if (plan.endpoint !== endpoint || plan.databaseFingerprint !== hash(database)) throw new Error("Plan belongs to a different store/database");
     const journalPath = `${path}.journal.jsonl`;
     const events = await loadEvents(journalPath);
     if (mode === "apply" || mode === "delete-jpeg") await assertConditionalStorage(s3);

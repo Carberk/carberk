@@ -45,7 +45,7 @@ describe("WebP operator conversion on real Postgres and conditional MinIO", () =
     for (const [name, value] of Object.entries({ DATABASE_URL: databaseUrl, MINIO_ENDPOINT: endpoint, MINIO_ACCESS_KEY: "minioadmin", MINIO_SECRET_KEY: "minioadmin", PHOTO_CONVERSION_WRITERS_PAUSED: "yes" })) vi.stubEnv(name, value);
     directory = await mkdtemp(join(tmpdir(), "webp-operator-real-"));
     await pool.query(`INSERT INTO users (id, role, "createdAt", "updatedAt") VALUES ('webp-user','seller',now(),now())`);
-    await pool.query(`INSERT INTO media_uploads (id,"userId",key,kind,"contentType","sizeBytes","createdAt", "objectKeys", "writeProtocol") VALUES ('webp-upload','webp-user',$1,'image','image/jpeg',100,now(),$2,'conditional-v1')`, [key, ["original.jpg", "thumbnail.jpg", "thumbnail.webp", "list.jpg", "list.webp", "detail.jpg", "detail.webp", "fullscreen.jpg", "fullscreen.webp"].map((file) => `${prefix}/${file}`)]);
+    await pool.query(`INSERT INTO media_uploads (id,"userId",key,kind,"contentType","sizeBytes","createdAt", "objectKeys", "writeProtocol", state) VALUES ('webp-upload','webp-user',$1,'image','image/jpeg',100,now(),$2,'conditional-v1','ADOPTED')`, [key, ["original.jpg", "thumbnail.jpg", "thumbnail.webp", "list.jpg", "list.webp", "detail.jpg", "detail.webp", "fullscreen.jpg", "fullscreen.webp"].map((file) => `${prefix}/${file}`)]);
     await pool.query(`UPDATE users SET "avatarKey"=$1,"avatarUploadId"='webp-upload' WHERE id='webp-user'`, [key]);
     await pool.query(`INSERT INTO listing_drafts (id,"userId",payload,"createdAt","updatedAt") VALUES ('webp-draft','webp-user',$1,now(),now())`, [JSON.stringify({ photos: [{ photoId: "photo-1", key, sortOrder: 0 }], description: "Keep vehicle content" })]);
     const original = await sharp({ create: { width: 160, height: 120, channels: 3, background: "red" } }).jpeg().withExif({ IFD0: { Make: "Camera" } }).toBuffer();
@@ -78,4 +78,22 @@ describe("WebP operator conversion on real Postgres and conditional MinIO", () =
     const stored = await s3.send(new ListObjectsV2Command({ Bucket: "listing-photos" }));
     expect(stored.Contents?.map((object) => object.Key).sort()).toEqual(["detail", "fullscreen", "list", "original", "thumbnail"].map((name) => `${prefix}/${name}.webp`));
   });
+
+  it("rolls back earlier profile rewrites when a later JSON reference changes concurrently", async () => {
+    const second = "pending/31b0b4e0-4d4a-4d2c-8bd6-705555cb7585";
+    const key = `${second}/original.jpg`;
+    await pool.query(`INSERT INTO users (id,role,"avatarKey","createdAt","updatedAt") VALUES ('webp-user2','seller',$1,now(),now())`, [key]);
+    await pool.query(`INSERT INTO listing_drafts (id,"userId",payload,"createdAt","updatedAt") VALUES ('webp-draft2','webp-user2',$1,now(),now())`, [JSON.stringify({ photos: [{ key }], description: "Original" })]);
+    const original = await sharp({ create: { width: 160, height: 120, channels: 3, background: "red" } }).jpeg().toBuffer();
+    await s3.send(new PutObjectCommand({ Bucket: "listing-photos", Key: key, Body: original, ContentType: "image/jpeg" }));
+    const plan = join(directory, "cas-plan.json");
+    await main(["dry-run", plan]);
+    await pool.query(`UPDATE listing_drafts SET payload=$1 WHERE id='webp-draft2'`, [JSON.stringify({ photos: [{ key }], description: "Edited by seller" })]);
+    await expect(main(["apply", plan])).rejects.toThrow("Concurrent change");
+    expect((await pool.query(`SELECT "avatarKey" FROM users WHERE id='webp-user2'`)).rows[0].avatarKey).toBe(key);
+    expect((await pool.query(`SELECT payload FROM listing_drafts WHERE id='webp-draft2'`)).rows[0].payload.description).toBe("Edited by seller");
+    await expect(main(["delete-jpeg", plan])).rejects.toThrow("old photo references");
+    expect((await s3.send(new GetObjectCommand({ Bucket: "listing-photos", Key: key }))).Body).toBeDefined();
+  });
+
 });
