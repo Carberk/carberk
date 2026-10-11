@@ -80,11 +80,22 @@ describe("parseArgs", () => {
       env: "staging",
       port: 8827,
     });
-    assert.deepEqual(parseArgs(["ios", "--udid", "ABC"]), { command: "ios", udid: "ABC", port: 8081 });
+    assert.deepEqual(parseArgs(["ios", "--udid", "ABC", "--port", "8841"]), { command: "ios", udid: "ABC", port: 8841 });
   });
 
   it("rejects unknown flags and a bad port", () => {
     assert.throws(() => parseArgs(["metro", "--prod"]), /Unknown option/);
     assert.throws(() => parseArgs(["metro", "--port", "x"]), /--port/);
   });
+});
+
+for (const args of [["metro", "--env", "staging"], ["ios", "--udid", "ABC"], ["metro", "--port", "65536"], ["metro", "--port"]]) {
+  it(`requires an explicit valid port: ${args.join(" ")}`, () => {
+    assert.throws(() => parseArgs(args), /--port/);
+  });
+}
+it("rejects media origins carrying credentials or query values", () => {
+  for (const media of ["https://user:secret@media.example", "https://media.example/?secret=value"]) {
+    assert.throws(() => expoPublicEnv({ ...API_VARIABLES, MINIO_PUBLIC_URL: media }, EAS), /MINIO_PUBLIC_URL/);
+  }
 });
