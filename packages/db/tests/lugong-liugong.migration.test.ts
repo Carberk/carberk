@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -68,8 +68,7 @@ describe(`${MIGRATION} — Testcontainers`, () => {
   });
 
   async function applyMigration() {
-    // In the red checkpoint, absence means the old catalog behavior remains.
-    if (existsSync(migrationFile)) await db.query(readFileSync(migrationFile, "utf8"));
+    await db.query(readFileSync(migrationFile, "utf8"));
   }
 
   it("moves references to existing canonical models without dropping vehicle content", async () => {
