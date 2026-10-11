@@ -3,10 +3,13 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
-import { Client } from "pg";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Client, Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-const MIGRATION = "20261011120000_add_listing_media_thumb_hash";
+import { PrismaClient } from "../generated/prisma/client/client";
+
+const MIGRATION = "20261011140000_add_listing_media_thumb_hash";
 const migrationsDir = new URL("../prisma/migrations", import.meta.url).pathname;
 // rgbaToThumbHash(1, 1, [255, 0, 0, 255]), generated with evanw/thumbhash's
 // reference encoder: https://github.com/evanw/thumbhash/blob/main/js/thumbhash.js
@@ -40,15 +43,21 @@ describe("ListingMedia optional ThumbHash schema", () => {
 describe(`${MIGRATION} PostgreSQL upgrade`, () => {
   let container: StartedPostgreSqlContainer;
   let db: Client;
+  let pool: Pool;
+  let prisma: PrismaClient;
 
   beforeAll(async () => {
     container = await new PostgreSqlContainer("postgres:16-alpine")
       .withUsername("auto_tm").withPassword("auto_tm_pass").withDatabase("auto_tm_test").start();
     db = new Client({ connectionString: container.getConnectionUri() });
     await db.connect();
+    pool = new Pool({ connectionString: container.getConnectionUri() });
+    prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
   }, 120_000);
 
   afterAll(async () => {
+    await prisma?.$disconnect();
+    await pool?.end();
     await db?.end();
     await container?.stop();
   });
@@ -80,10 +89,13 @@ describe(`${MIGRATION} PostgreSQL upgrade`, () => {
         VALUES ('city', 'region', 'city', 'City', 'City', 'City', now());
       INSERT INTO listings (id, "sellerId", "brandId", "modelId", "cityId", "priceAmount", "updatedAt")
         VALUES ('listing', 'seller', 'brand', 'model', 'city', 100, now());
+      INSERT INTO media_uploads (id, "userId", key, kind, "contentType", "sizeBytes", state)
+        VALUES ('upload', 'seller', 'legacy/photo.webp', 'image', 'image/webp', 4567, 'ADOPTED');
       INSERT INTO listing_media (id, "listingId", kind, key, "sortOrder", width, height, "durationMs", "posterKey")
-        VALUES ('photo', 'listing', 'photo', 'legacy/photo.webp', 0, 1280, 960, null, null),
+        VALUES ('photo', 'listing', 'image', 'legacy/photo.webp', 0, 1280, 960, null, null),
                ('video', 'listing', 'video', 'legacy/video.mp4', 1, 1920, 1080, 1234, 'legacy/poster.webp'),
-               ('unknown-size', 'listing', 'photo', 'legacy/unknown.jpg', 2, null, null, null, null);
+               ('unknown-size', 'listing', 'image', 'legacy/unknown.jpg', 2, null, null, null, null);
+      UPDATE listing_media SET "uploadId" = 'upload' WHERE id = 'photo';
       INSERT INTO conversations (id, "listingId", "buyerId", "sellerId", "updatedAt")
         VALUES ('conversation', 'listing', 'seller', 'seller', now());
       INSERT INTO messages (id, "conversationId", "senderId", kind, metadata)
@@ -111,11 +123,18 @@ describe(`${MIGRATION} PostgreSQL upgrade`, () => {
     await insertLegacyRows();
     await applyHistory(name => name >= MIGRATION);
 
-    await db.query('UPDATE listing_media SET "thumbHash" = $1 WHERE id = $2', [GENERATED_HASH, "photo"]);
-    expect((await db.query('SELECT "thumbHash", key, width, height FROM listing_media WHERE id = $1', ["photo"])).rows)
-      .toEqual([{ thumbHash: GENERATED_HASH, key: "legacy/photo.webp", width: 1280, height: 960 }]);
+    expect(await prisma.listingMedia.findUnique({ where: { id: "photo" } }))
+      .toMatchObject({ thumbHash: null, key: "legacy/photo.webp", width: 1280, height: 960 });
+    await prisma.listingMedia.update({
+      where: { id: "photo" },
+      // Spread permits the test-first checkpoint to compile against the old
+      // generated client. Its runtime still rejects an unsupported hash field.
+      data: { key: "legacy/photo.webp", ...{ thumbHash: GENERATED_HASH } },
+    });
+    expect(await prisma.listingMedia.findUnique({ where: { id: "photo" } }))
+      .toMatchObject({ thumbHash: GENERATED_HASH, key: "legacy/photo.webp", width: 1280, height: 960 });
     const created = await db.query(`INSERT INTO listing_media (id, "listingId", kind, key, "sortOrder")
-      VALUES ('old-api', 'listing', 'photo', 'old-api/photo.jpg', 3) RETURNING "thumbHash"`);
+      VALUES ('old-api', 'listing', 'image', 'old-api/photo.jpg', 3) RETURNING "thumbHash"`);
     expect(created.rows).toEqual([{ thumbHash: null }]);
   });
 
