@@ -97,6 +97,21 @@ async function photoWithGps(): Promise<Buffer> {
 }
 
 describe("SharpImageVariantGenerator", () => {
+  it("writes only four WebP derivatives with natural detail and fullscreen proportions", async () => {
+    const key = "pending/natural/original.webp";
+    const input = await sharp({ create: { width: 1920, height: 1440, channels: 3, background: "red" } }).webp().toBuffer();
+    const bucket = fakeBucket({ [key]: input });
+    const result = await generatorWith(bucket).generate(key);
+    expect([...bucket.objects.keys()]).toHaveLength(5);
+    expect([...bucket.objects.keys()].every((stored) => stored.endsWith(".webp"))).toBe(true);
+    for (const name of ["detail", "fullscreen"] as const) {
+      const meta = await sharp(bucket.objects.get(result.variants[name])!).metadata();
+      expect(Math.abs(meta.width! - meta.height! * 4 / 3)).toBeLessThanOrEqual(1);
+      const stats = await sharp(bucket.objects.get(result.variants[name])!).stats();
+      expect(stats.channels[0]!.min).toBeGreaterThan(200);
+    }
+  });
+
   it("strips GPS and all EXIF from the stored original and every variant, keeping the photo upright", async () => {
     const key = "pending/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.jpg";
     const input = await photoWithGps();
