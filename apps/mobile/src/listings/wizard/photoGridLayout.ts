@@ -8,6 +8,12 @@ export function getPhotoTileSize(screenWidth: number): number {
   return Math.max(84, Math.min(136, Math.floor((screenWidth - 56) / 3)));
 }
 
+// Worklet closures capture helpers at initialization; worklets are not hoisted.
+function clamp(value: number, min: number, max: number): number {
+  "worklet";
+  return Math.min(max, Math.max(min, value));
+}
+
 export function getDragTargetIndex({
   fromIndex,
   dx,
@@ -68,9 +74,4 @@ export function shiftedIndex(index: number, fromIndex: number, toIndex: number):
   if (fromIndex < toIndex && index > fromIndex && index <= toIndex) return index - 1;
   if (toIndex < fromIndex && index >= toIndex && index < fromIndex) return index + 1;
   return index;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  "worklet";
-  return Math.min(max, Math.max(min, value));
 }
