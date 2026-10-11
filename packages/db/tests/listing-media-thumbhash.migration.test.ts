@@ -87,7 +87,7 @@ describe(`${MIGRATION} PostgreSQL upgrade`, () => {
       INSERT INTO conversations (id, "listingId", "buyerId", "sellerId", "updatedAt")
         VALUES ('conversation', 'listing', 'seller', 'seller', now());
       INSERT INTO messages (id, "conversationId", "senderId", kind, metadata)
-        VALUES ('message', 'conversation', 'seller', 'photo', '{"key":"chat/photo.webp","width":640,"height":480}');
+        VALUES ('message', 'conversation', 'seller', 'image', '{"key":"chat/photo.webp","width":640,"height":480}');
     `);
   }
 
