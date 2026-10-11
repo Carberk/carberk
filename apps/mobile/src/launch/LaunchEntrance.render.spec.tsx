@@ -3,8 +3,12 @@ import { Text } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
 
 import { act, fireEvent, renderMobile } from "../../test/render";
-import { useReduceMotion } from "@/lib/motion";
+
 import { LaunchEntrance } from "./LaunchEntrance";
+
+import { useReduceMotion } from "@/lib/motion";
+
+vi.mock("expo-status-bar", async () => ({ StatusBar: (await import("react-native")).View }));
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -22,6 +26,7 @@ describe("cold-launch identity", () => {
     const screen = renderMobile(destination(false));
     expect(screen.getByText("By Alpha Motors")).toBeTruthy();
     expect(screen.getByText("Destination route")).toBeTruthy();
+    fireEvent(screen.getByTestId("launch-entrance"), "layout");
     act(() => vi.advanceTimersByTime(2000));
     expect(screen.getByText("By Alpha Motors")).toBeTruthy();
     screen.rerender(destination(true));
@@ -41,6 +46,7 @@ describe("cold-launch identity", () => {
   it("enters once, does not restart on readiness changes, and leaves a settled destination", () => {
     const screen = renderMobile(destination(false));
     expect(screen.getByText("By Alpha Motors")).toBeTruthy();
+    fireEvent(screen.getByTestId("launch-entrance"), "layout");
     act(() => vi.advanceTimersByTime(650));
     screen.rerender(destination(true));
     act(() => vi.advanceTimersByTime(180));
@@ -56,6 +62,7 @@ describe("cold-launch identity", () => {
     const screen = renderMobile(destination(false));
     expect(screen.getByText("By Alpha Motors")).toBeTruthy();
     expect(screen.getByLabelText("Carberk")).toBeTruthy();
+    fireEvent(screen.getByTestId("launch-entrance"), "layout");
     screen.rerender(destination(true));
     expect(screen.queryByText("By Alpha Motors")).toBeNull();
     expect(screen.getByText("Destination route")).toBeTruthy();

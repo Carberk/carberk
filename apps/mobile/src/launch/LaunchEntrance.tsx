@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, type PropsWithChildren } from "react";
 import { Image, StyleSheet, View } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 
 import splashIcon from "../../assets/images/splash-icon.png";
 import { BrandLogo } from "../auth/BrandLogo";
+
 import { Text } from "@/components/ui/text";
 import { useReduceMotion } from "@/lib/motion";
 
@@ -15,6 +17,7 @@ const EXIT_MS = 180;
 export function LaunchEntrance({ ready, children }: PropsWithChildren<{ ready: boolean }>) {
   const reducedMotion = useReduceMotion();
   const [entered, setEntered] = useState(reducedMotion);
+  const [laidOut, setLaidOut] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const handedOff = useRef(false);
   const icon = useSharedValue(reducedMotion ? 0 : 1);
@@ -27,6 +30,7 @@ export function LaunchEntrance({ ready, children }: PropsWithChildren<{ ready: b
   const overlayStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
   useEffect(() => {
+    if (!laidOut) return;
     if (reducedMotion) {
       icon.value = 0;
       wordmark.value = 1;
@@ -40,7 +44,7 @@ export function LaunchEntrance({ ready, children }: PropsWithChildren<{ ready: b
     // This timer controls the overlay only. It never decides app readiness.
     const timer = setTimeout(() => setEntered(true), ENTRANCE_MS);
     return () => clearTimeout(timer);
-  }, [reducedMotion, icon, wordmark, credit]);
+  }, [laidOut, reducedMotion, icon, wordmark, credit]);
 
   useEffect(() => {
     if (!ready || !entered || dismissed) return;
@@ -59,15 +63,17 @@ export function LaunchEntrance({ ready, children }: PropsWithChildren<{ ready: b
       {!dismissed ? (
         <Animated.View
           testID="launch-entrance"
-          pointerEvents="none"
+          pointerEvents="auto"
           className="absolute inset-0 items-center justify-center bg-[#17191D]"
           style={overlayStyle}
           onLayout={() => {
             if (handedOff.current) return;
             handedOff.current = true;
             SplashScreen.hide();
+            setLaidOut(true);
           }}
         >
+          <StatusBar style="light" />
           <Animated.View style={[StyleSheet.absoluteFill, iconStyle]} className="items-center justify-center">
             {/* Same 160 pt artwork and center as the configured native splash. */}
             <Image source={splashIcon} style={{ width: 160, height: 160 }} />
