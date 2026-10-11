@@ -191,6 +191,40 @@ describe("useUploadQueue — in grid order (#819)", () => {
     expect(result.current.photos.map((photo) => photo.state)).toEqual(["uploaded", "uploaded", "uploaded", "uploaded"]);
   });
 
+  it("finishes the cover before starting the other seven uploads (#819)", async () => {
+    const uploads = new Map<string, () => void>();
+    mockUploadAsync.mockImplementation((_url, localUri) => new Promise((resolve) => {
+      uploads.set(localUri, () => resolve({ status: 200, headers: {}, body: "", mimeType: "image/jpeg" }));
+    }));
+    const { result } = await pick(8);
+    const ids = result.current.photos.map((photo) => photo.photoId);
+    for (let n = 1; n <= 8; n += 1) await finishCompression(n);
+    await answerPresign();
+    await answerPresign();
+
+    // A slow cover cannot be overtaken by a fast second upload.
+    expect(uploadedPhotos(ids)).toEqual([1]);
+    expect(result.current.photos.map((photo) => photo.state)).toEqual([
+      "uploading", "compressed", "compressed", "compressed", "compressed", "compressed", "compressed", "compressed",
+    ]);
+    await act(async () => { uploads.get(result.current.photos[0]?.localUri ?? "")?.(); });
+    await waitFor(() => expect(result.current.photos[0]?.state).toBe("uploaded"));
+    expect(presigns).toHaveLength(2);
+    await answerPresign();
+    await answerPresign();
+    expect(uploadedPhotos(ids)).toEqual([1, 2, 3]);
+    // Two later photos can upload together after the cover is visible.
+    await act(async () => { uploads.get(result.current.photos[2]?.localUri ?? "")?.(); });
+    await waitFor(() => expect(result.current.photos[2]?.state).toBe("uploaded"));
+    expect(result.current.photos[1]?.state).toBe("uploading");
+    expect(result.current.photos.map((photo) => photo.photoId)).toEqual(ids);
+    for (let n = 1; n < 8; n += 1) {
+      await answerPresign();
+      await act(async () => { uploads.get(result.current.photos[n]?.localUri ?? "")?.(); });
+    }
+    await waitFor(() => expect(result.current.photos.every((photo) => photo.state === "uploaded")).toBe(true));
+  });
+
   it("skips a photo removed while it waited to be compressed", async () => {
     const { result } = await pick(3);
     const second = result.current.photos[1]?.photoId ?? "";
