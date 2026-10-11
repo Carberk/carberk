@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { getInfoAsync, readDirectoryAsync, uploadAsync } from "expo-file-system/legacy";
+import { deleteAsync, getInfoAsync, readDirectoryAsync, uploadAsync } from "expo-file-system/legacy";
 
 import { setupUploadResume } from "./appStateResume";
 import { compressPhoto } from "./compressor";
@@ -60,7 +60,7 @@ vi.mock("./compressor", () => ({
 vi.mock("./stagingDir", () => ({
   ensureDraftDir: vi.fn(() => Promise.resolve()),
   getDraftDir: vi.fn((stagingKey: string) => `file:///doc/listing-staging/${stagingKey}/`),
-  getStagingPath: vi.fn((stagingKey: string, photoId: string) => `file:///doc/listing-staging/${stagingKey}/${photoId}.jpg`),
+  getStagingPath: vi.fn((stagingKey: string, photoId: string) => `file:///doc/listing-staging/${stagingKey}/${photoId}.webp`),
   listLocalPhotoIds: vi.fn(() => Promise.resolve([])),
   deleteDraftDir: vi.fn(() => Promise.resolve()),
 }));
@@ -106,7 +106,7 @@ describe("useUploadQueue — in grid order (#819)", () => {
     mockGetInfoAsync.mockResolvedValue({
       exists: true, uri: "", size: 1024, isDirectory: false, modificationTime: 0,
     });
-    mockUploadAsync.mockResolvedValue({ status: 200, headers: {}, body: "", mimeType: "image/jpeg" });
+    mockUploadAsync.mockResolvedValue({ status: 200, headers: {}, body: "", mimeType: "image/webp" });
     mockCompressPhoto.mockImplementation((sourceUri: string, destinationUri: string) =>
       new Promise((resolve, reject) => {
         compressionFailures.set(sourceUri, () => reject(new Error("compression failed")));
@@ -197,7 +197,7 @@ describe("useUploadQueue — in grid order (#819)", () => {
   it("finishes the cover before starting the other seven uploads (#819)", async () => {
     const uploads = new Map<string, () => void>();
     mockUploadAsync.mockImplementation((_url, localUri) => new Promise((resolve) => {
-      uploads.set(localUri, () => resolve({ status: 200, headers: {}, body: "", mimeType: "image/jpeg" }));
+      uploads.set(localUri, () => resolve({ status: 200, headers: {}, body: "", mimeType: "image/webp" }));
     }));
     const { result } = await pick(8);
     const ids = result.current.photos.map((photo) => photo.photoId);
@@ -299,7 +299,7 @@ describe("useUploadQueue — batch compression", () => {
       isDirectory: false,
       modificationTime: 0,
     });
-    mockUploadAsync.mockResolvedValue({ status: 200, headers: {}, body: "", mimeType: "image/jpeg" });
+    mockUploadAsync.mockResolvedValue({ status: 200, headers: {}, body: "", mimeType: "image/webp" });
     mockPresignMutateAsync.mockResolvedValue({ uploadUrl: "http://localhost/presigned", key: "test-key" });
   });
 
@@ -616,7 +616,7 @@ describe("useUploadQueue — batch compression", () => {
   });
 
   describe("local photos from an earlier session", () => {
-    const payload = { photos: [{ photoId: "server-1", key: "listings/l1/server-1/original.jpg", sortOrder: 0 }] };
+    const payload = { photos: [{ photoId: "server-1", key: "listings/l1/server-1/original.webp", sortOrder: 0 }] };
 
     it("restores them by default", async () => {
       mockListLocalPhotoIds.mockResolvedValueOnce(["left-behind"]);
@@ -639,7 +639,7 @@ describe("useUploadQueue — batch compression", () => {
       expect(mockPresignMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ sizeBytes: 1024 }));
       expect(mockUploadAsync).toHaveBeenCalledWith(
         "http://localhost/presigned",
-        "file:///doc/listing-staging/draft-9/left-behind.jpg",
+        "file:///doc/listing-staging/draft-9/left-behind.webp",
         expect.anything(),
       );
     });
@@ -648,7 +648,7 @@ describe("useUploadQueue — batch compression", () => {
       mockListLocalPhotoIds.mockResolvedValueOnce(["left-behind"]);
       mockPresignMutateAsync.mockResolvedValue({
         uploadUrl: "http://localhost/conditional", key: "conditional-key",
-        headers: { "if-match": '"placeholder"', "content-type": "image/jpeg", "cache-control": "no-store" },
+        headers: { "if-match": '"placeholder"', "content-type": "image/webp", "cache-control": "no-store" },
       });
       const { result } = renderHook(() => useUploadQueue("draft-9", payload), { wrapper });
       await waitFor(() => expect(result.current.photos.find((p) => p.photoId === "left-behind"))
@@ -656,8 +656,8 @@ describe("useUploadQueue — batch compression", () => {
 
       expect(mockPresignMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ writeProtocol: "conditional-v1" }));
       expect(mockUploadAsync).toHaveBeenCalledWith("http://localhost/conditional",
-        "file:///doc/listing-staging/draft-9/left-behind.jpg", expect.objectContaining({
-          httpMethod: "PUT", headers: { "if-match": '"placeholder"', "content-type": "image/jpeg", "cache-control": "no-store" },
+        "file:///doc/listing-staging/draft-9/left-behind.webp", expect.objectContaining({
+          httpMethod: "PUT", headers: { "if-match": '"placeholder"', "content-type": "image/webp", "cache-control": "no-store" },
         }));
     });
 
@@ -807,6 +807,7 @@ describe("useUploadQueue — batch compression", () => {
 describe("useUploadQueue — upgrading 2.0.3 staged JPEGs", () => {
   it("re-encodes before presign/PUT, preserving photo identity/order and replacing old metadata", async () => {
     vi.clearAllMocks();
+    vi.mocked(deleteAsync).mockResolvedValue(undefined);
     const photoId = "legacy-photo";
     const legacy = "file:///doc/listing-staging/upgrade/legacy-photo.jpg";
     const destination = "file:///doc/listing-staging/upgrade/legacy-photo.webp";
@@ -835,4 +836,20 @@ describe("useUploadQueue — upgrading 2.0.3 staged JPEGs", () => {
     expect(mockUploadAsync).toHaveBeenCalledWith("http://localhost/upgrade", destination,
       expect.objectContaining({ headers: { "Content-Type": "image/webp" } }));
   });
+});
+
+
+it("never presigns or PUTs a corrupt legacy JPEG when recompression fails", async () => {
+  vi.clearAllMocks();
+  mockGetStagingPath.mockImplementation((draft, id) => `file:///doc/listing-staging/${draft}/${id}.webp`);
+  mockListLocalPhotoIds.mockResolvedValue(["broken"]);
+  mockGetInfoAsync.mockImplementation(async (uri) => uri.endsWith(".webp")
+    ? { exists: false, uri, isDirectory: false }
+    : { exists: true, uri, size: 2048, isDirectory: false, modificationTime: 0 });
+  mockCompressPhoto.mockRejectedValue(new Error("Cannot decode JPEG"));
+  const { result } = renderHook(() => useUploadQueue("broken-draft", {}), { wrapper });
+  await waitFor(() => expect(result.current.photos[0]?.state).toBe("failed"));
+  expect(mockPresignMutateAsync).not.toHaveBeenCalled();
+  expect(mockUploadAsync).not.toHaveBeenCalled();
+  expect(result.current.publishGate.canPublish).toBe(false);
 });

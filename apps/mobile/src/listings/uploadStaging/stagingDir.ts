@@ -41,9 +41,9 @@ export async function listLocalPhotoIds(stagingKey: string): Promise<string[]> {
     return [];
   }
   const files = await FileSystem.readDirectoryAsync(dir);
-  return files
+  return [...new Set(files
     .filter((f) => /\.(jpg|webp)$/.test(f))
-    .map((f) => f.replace(/\.(jpg|webp)$/, ""));
+    .map((f) => f.replace(/\.(jpg|webp)$/, "")))];
 }
 
 export async function listOrphanDirs(existingDraftIds: string[]): Promise<string[]> {

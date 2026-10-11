@@ -65,7 +65,7 @@ async function uploadFileToPresignedUrl(
     httpMethod: "PUT",
     uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
     headers: headers ?? {
-      "Content-Type": "image/jpeg",
+      "Content-Type": "image/webp",
     },
   });
 
@@ -292,7 +292,27 @@ export function useUploadQueue(
         return;
       }
 
-      const fileInfo = await FileSystem.getInfoAsync(photo.localUri);
+      let fileInfo = await FileSystem.getInfoAsync(photo.localUri);
+      let fileSize = photo.fileSize;
+      try {
+        // 2.0.3 staged JPEGs use the same photo identity. Decode/encode them;
+        // renaming or changing the MIME alone would upload mislabeled bytes.
+        if (!fileInfo.exists && photo.localUri === getStagingPath(stagingKey, photoId)) {
+          const legacyUri = photo.localUri.replace(/\.webp$/, ".jpg");
+          if ((await FileSystem.getInfoAsync(legacyUri)).exists) {
+            const converted = await compressPhoto(legacyUri, photo.localUri);
+            fileInfo = await FileSystem.getInfoAsync(converted.uri);
+            if (!fileInfo.exists || fileInfo.size <= 0 || fileInfo.size > 5 * 1024 * 1024 || converted.width <= 0 || converted.height <= 0 || Math.max(converted.width, converted.height) > 2400) throw new CompressionError("Invalid converted photo", "MANIPULATION_FAILED");
+            fileSize = fileInfo.size;
+            queueRef.current = updatePhotoState(queueRef.current, photoId, "compressed", { ...converted, localUri: converted.uri, fileSize });
+            setQueue(queueRef.current);
+            await FileSystem.deleteAsync(legacyUri, { idempotent: true }).catch(() => undefined);
+          }
+        }
+      } catch (err) {
+        transitionToFailed(photoId, buildUploadError(err, t));
+        return;
+      }
       if (!fileInfo.exists) {
         transitionToFailed(photoId, {
           code: "LOCAL_FILE_MISSING",
@@ -308,9 +328,9 @@ export function useUploadQueue(
 
         const presignResult = await presignMutation.mutateAsync({
           kind: "image",
-          contentType: "image/jpeg",
+          contentType: "image/webp",
           // A photo restored from staging has no recorded size; its file does.
-          sizeBytes: photo.fileSize ?? fileInfo.size,
+          sizeBytes: fileSize ?? fileInfo.size,
           writeProtocol: "conditional-v1",
         });
 
@@ -335,7 +355,7 @@ export function useUploadQueue(
         endUpload();
       }
     },
-    [presignMutation, transitionToFailed, transitionToPresigned, transitionToUploading, transitionToUploaded],
+    [stagingKey, presignMutation, transitionToFailed, transitionToPresigned, transitionToUploading, transitionToUploaded],
   );
 
   uploadPhotoRef.current = uploadPhoto;

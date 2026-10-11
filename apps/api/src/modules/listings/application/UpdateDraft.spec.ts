@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { NotFoundException } from "@nestjs/common";
 import { UpdateDraft } from "./UpdateDraft";
+import type { MediaUpload } from "../domain/MediaUpload";
 import { ListingDraft } from "../domain/ListingDraft";
 import type { ListingDraftRepository } from "../domain/ports/ListingDraftRepository";
 
@@ -36,7 +37,7 @@ class FakeListingDraftRepository implements ListingDraftRepository {
 }
 
 function makeUseCase(repo?: FakeListingDraftRepository) {
-  return new UpdateDraft(repo ?? new FakeListingDraftRepository());
+  return new UpdateDraft(repo ?? new FakeListingDraftRepository(), { record: async () => {}, findByKeys: async () => [] });
 }
 
 describe("UpdateDraft", () => {
@@ -247,4 +248,22 @@ describe("UpdateDraft converted-photo autosave compatibility", () => {
     await expect(makeUseCase(repo).execute({ draftId: "d", userId: "u", payload: { photos: [{ photoId: "p", key: "someone/original.jpg", sortOrder: 0 }] } })).rejects.toThrow();
     expect(repo.drafts[0]?.payload).toEqual({});
   });
+});
+
+
+it.each([
+  ["owned available converted upload", "u", "AVAILABLE", "image/webp", false, true],
+  ["another user's upload", "other", "AVAILABLE", "image/webp", false, false],
+  ["retired upload", "u", "RETIRED", "image/webp", false, false],
+  ["already adopted upload", "u", "ADOPTED", "image/webp", true, false],
+  ["unconverted JPEG provenance", "u", "AVAILABLE", "image/jpeg", false, false],
+] as const)("resolves only authoritative legacy aliases: %s", async (_name, userId, state, contentType, adopted, allowed) => {
+  const repo = new FakeListingDraftRepository();
+  repo.drafts.push(ListingDraft.create({ id: "d", userId: "u", payload: {} }));
+  const prefix = "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585";
+  const upload: MediaUpload = { id: "upload", key: `${prefix}/original.webp`, userId, state, contentType, adopted, kind: "image", sizeBytes: 123, createdAt: new Date() };
+  const useCase = new UpdateDraft(repo, { record: async () => {}, findByKeys: async (keys) => keys.includes(upload.key) ? [upload] : [] });
+  const operation = useCase.execute({ draftId: "d", userId: "u", payload: { photos: [{ photoId: "photo", sortOrder: 0, key: `${prefix}/original.jpg` }] } });
+  if (allowed) expect((await operation).draft.payload).toMatchObject({ photos: [{ photoId: "photo", sortOrder: 0, key: upload.key }] });
+  else { await expect(operation).rejects.toThrow(); expect(repo.drafts[0]?.payload).toEqual({}); }
 });
