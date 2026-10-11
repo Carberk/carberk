@@ -1,4 +1,4 @@
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 
@@ -6,7 +6,8 @@ import { useAuth } from "../../src/auth/useAuth";
 import { useAuthIntentStore } from "../../src/auth/intentStore";
 import { ConversationList } from "../../src/conversations/components/ConversationList";
 import { LargeTitle } from "../../components/navigation/ScreenHeader";
-import { TabScreen } from "../../components/navigation/TabScreen";
+import { TabBarClear, TabScreen } from "../../components/navigation/TabScreen";
+import { useTabBarSpace } from "../../components/navigation/tabBarHeight";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -33,20 +34,21 @@ function AnonymousChatEntry() {
 
 function ChatContent({ isAuthenticated }: { isAuthenticated: boolean | null }) {
   const { t } = useTranslation();
+  const tabBarSpace = useTabBarSpace();
 
   if (isAuthenticated === false) {
-    return <AnonymousChatEntry />;
+    return <TabBarClear><AnonymousChatEntry /></TabBarClear>;
   }
 
   if (isAuthenticated === true) {
-    return <ConversationList />;
+    return <ConversationList tabBarSpace={tabBarSpace} />;
   }
 
   return (
-    <View className="flex-1 items-center justify-center gap-3">
+    <TabBarClear className="items-center justify-center gap-3">
       <ActivityIndicator />
       <Text className="text-callout text-muted-foreground">{t("loading")}</Text>
-    </View>
+    </TabBarClear>
   );
 }
 
@@ -55,7 +57,7 @@ export default function ChatScreen() {
   const { t } = useTranslation();
 
   return (
-    <TabScreen>
+    <TabScreen underTabBar>
       <LargeTitle title={t("messages")} />
 
       <ChatContent isAuthenticated={isAuthenticated} />

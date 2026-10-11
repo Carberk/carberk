@@ -479,6 +479,8 @@ model ListingMedia {
   height     Int?
   durationMs Int?
   posterKey  String?
+  /// Optional base64 ThumbHash; legacy media stays null until an explicit backfill.
+  thumbHash  String?
   createdAt  DateTime  @default(now())
 
   // The server-recorded upload this row adopted (ADR-0079). One row per upload.

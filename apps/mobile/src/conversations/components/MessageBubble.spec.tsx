@@ -31,7 +31,7 @@ describe("MessageBubble time and ticks", () => {
     expect(screen.getByLabelText("Is the car still available?, 02:05 PM, Sent")).toBeTruthy();
   });
 
-  it("shows two ticks in one style for delivered and read", () => {
+  it("shows two ticks for delivered and read, the read ones in another colour", () => {
     const tickClasses = (screen: ReturnType<typeof renderMobile>) =>
       screen
         .getByTestId("message-tick-double", { includeHiddenElements: true })
@@ -46,7 +46,8 @@ describe("MessageBubble time and ticks", () => {
 
     const read = renderMobile(bubble({ status: "read" }));
     expect(read.getByLabelText("Is the car still available?, 02:05 PM, Read")).toBeTruthy();
-    expect(tickClasses(read)).toEqual(deliveredClasses);
+    expect(tickClasses(read)).not.toEqual(deliveredClasses);
+    expect(tickClasses(read)[0]).toEqual(expect.stringContaining("size-3.5"));
     expect(deliveredClasses[0]).toEqual(expect.stringContaining("size-3.5"));
   });
 
