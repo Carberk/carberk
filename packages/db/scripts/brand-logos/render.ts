@@ -15,13 +15,6 @@ export interface RenderedLogo {
 const PADDING = 0.08;
 /** Pixels with less alpha than this do not count as ink when measuring the mark. */
 const INK_ALPHA = 20;
-/**
- * The shorter side of the mark must fill at least this share of the tile. A
- * thinner mark (a long wordmark, or a broken file) is a few pixels tall at
- * 30 px, so the import refuses it rather than store an unreadable icon.
- */
-export const MIN_INK_SHARE = 0.1;
-
 const LIMIT_INPUT_PIXELS = 4096 * 4096;
 const DEFAULT_SVG_DENSITY = 72;
 const MAX_SVG_DENSITY = 10_000;
@@ -134,13 +127,6 @@ export async function renderLogoMasks(
   const ink = await measureInk(largest.png);
   if (ink.width === 0) {
     throw new Error("the master renders as an empty mask (no ink)");
-  }
-  const shorter = Math.min(ink.width, ink.height);
-  if (shorter < MIN_INK_SHARE * largest.size) {
-    const aspect = (Math.max(ink.width, ink.height) / shorter).toFixed(1);
-    throw new Error(
-      `the mark is too wide or tall to read at 30 px (${aspect}:1, a wordmark rather than an emblem)`,
-    );
   }
   return rendered;
 }

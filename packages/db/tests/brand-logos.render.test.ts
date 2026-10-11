@@ -151,11 +151,13 @@ describe("logo masks", () => {
     }
   });
 
-  it("refuses a wide wordmark that would be unreadable at 30 px", async () => {
+  it("keeps a wide manufacturer wordmark instead of replacing it with a letter", async () => {
     const wordmark = enc(
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 60"><rect width="1000" height="60"/></svg>',
     );
-    await expect(renderLogoMasks(wordmark, "alpha")).rejects.toThrow(/wordmark|aspect|too wide/i);
+    const rendered = await renderLogoMasks(wordmark, "alpha");
+    expect(rendered.map((logo) => logo.size)).toEqual([30, 60, 90]);
+    for (const logo of rendered) expect((await inkOf(logo.png)).covered).toBeGreaterThan(0);
   });
 
   it("refuses a master that renders to nothing", async () => {
