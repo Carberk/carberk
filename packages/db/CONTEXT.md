@@ -8,7 +8,7 @@ The schema, migration history, generated-client boundary, and seed inputs live h
 
 `listings.damaged` is the seller's "Damaged / needs repair" answer (ADR-0052). It is nullable only so its migration applies to existing rows; the API requires it, and the fixture and reviewer seeds set it on every Listing. The earlier accident, mileage-accurate, owner-count, and service-history columns were dropped without data migration, so environments are reseeded.
 
-The Lugong/LiuGong correction migration moves the 12 legacy CLG aliases from Shandong Lugong to LiuGong. It preserves Listing content, Generation IDs and draft payloads, reuses an existing LiuGong Model when present, and retains a moved Model ID otherwise. It stops before any change if an affected SavedSearch exists, because a mixed-manufacturer search needs an explicit meaning-preserving correction. The seed keeps the ten actual Lugong models and identifies the existing `john` Brand as John Deere without changing its ID or slug.
+The Lugong/LiuGong correction migration moves the 12 legacy CLG aliases from Shandong Lugong to LiuGong. It preserves Listing content, Generation IDs and draft payloads, reuses an existing LiuGong Model when present, and retains a moved Model ID otherwise. It stops before any change if an affected SavedSearch exists, including a brand-only Lugong or LiuGong search, because changing the matched manufacturer set needs an explicit meaning-preserving correction. The seed keeps the ten actual Lugong models and identifies the existing `john` Brand as John Deere without changing its ID or slug.
 
 `Brand.logoKey` is a nullable object key in the `catalog-assets` bucket (see the catalog overview for the layout). Null means no logo.
 

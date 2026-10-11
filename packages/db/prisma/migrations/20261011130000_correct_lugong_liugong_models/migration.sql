@@ -21,7 +21,11 @@ BEGIN
   IF lugong_id IS NOT NULL AND liugong_id IS NOT NULL THEN
     IF EXISTS (
       SELECT 1 FROM saved_searches s JOIN models m
-      ON s.filters->>'modelId' = m.id OR (s.filters->'modelIds') ? m.id
+      ON s.filters->>'modelId' = m.id OR (s.filters->'modelIds') ? m.id OR (
+        s.filters->>'brandId' IN (lugong_id, liugong_id)
+        AND coalesce(s.filters->>'modelId', '') = ''
+        AND coalesce(s.filters->'modelIds', 'null'::jsonb) IN ('null'::jsonb, '[]'::jsonb)
+      )
       WHERE m."brandId" = lugong_id AND m.slug = ANY(aliases)
     ) THEN
       RAISE EXCEPTION 'Affected saved search requires explicit catalog correction before this migration';
