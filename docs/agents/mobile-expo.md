@@ -155,6 +155,26 @@ adb logcat -d | grep -c "finishDrawing of relaunch.*tm.auto.app"
 
 After each, the app must stay on the same screen, signed in, and Profile > Choose from library must open the picker. Module state survives a recreation and component state does not, so a screen that must not flash a loading state reads what the app already knows (`src/auth/sessionSnapshot.ts`).
 
+## iOS simulator against staging or a PR backend
+
+Start every simulator session with the two guarded commands in `apps/mobile/scripts/native-session.mjs`. Hand-typed `expo start` and `expo run:ios` lines are the failure path: a missing `EXPO_PUBLIC_MEDIA_URL` leaves every feed, Favorites and My listings photo grey while Listing detail still loads, and a missing API URL silently falls back to `localhost`.
+
+```bash
+pnpm --filter @auto-tm/mobile native:metro -- --env staging --port 8081
+pnpm --filter @auto-tm/mobile native:ios -- --udid "$SIMULATOR_UUID" --port 8081
+```
+
+- **`native:metro`** resolves the API, socket and media origins from that environment's Railway `api` service and the static values from `eas.json`. It refuses production and checks `/readyz` and the media host before starting. It then reads the served bundle back. `OK: Metro serves …` is the completion signal; on `FAIL` it stops Metro. Use `--env pr-<N>` for a PR environment. Run it in a visible terminal tab and keep it running.
+- **`native:ios`** builds the development client with `xcodebuild` and installs and launches it with `simctl`. Run it once per native change (new native package, `app.config.js`, Expo SDK); a JavaScript change needs only Metro. An installed client relaunches with `xcrun simctl launch "$SIMULATOR_UUID" tm.auto.app -RCT_jsLocation 127.0.0.1:<port>`.
+
+Gotchas the scripts already handle, kept here for when one changes:
+
+- `expo run:ios` fails under Xcode 27 with `Can't determine id of Simulator app`, because Xcode 27 ships no `Simulator.app` for Expo to look up. The simulators still run; build with `xcodebuild` instead.
+- CocoaPods needs a UTF-8 locale (`LANG=en_US.UTF-8`); without it `pod install` fails with `Unicode Normalization not appropriate for ASCII-8BIT`.
+- Xcode 27 rejects pod targets below iOS 15, and expo-router's link preview uses an iOS 16 API. The local simulator build passes `IPHONEOS_DEPLOYMENT_TARGET=16.0`; the shipped app keeps Expo's minimum.
+- Editing `tailwind.config.js` crashes Metro (`Cannot read properties of undefined (reading 'addedFiles')` from NativeWind's watcher). Rerun `native:metro`, which starts with `--clear`.
+- A fresh terminal tab can be eaten by an oh-my-zsh update prompt, which swallows the first typed character. Read the tab's first lines: the script prints the origins it resolved, so a mangled command shows.
+
 ## Railway PR backend sessions
 
 [ADR-0075](../adr/0075-railway-pr-backends-for-agent-native-sessions.md) uses staging-based Railway PR environments with demo data and mock SMS. The hosted required `pr` check runs container-backed tests. Locally run `pnpm test:unit`, typecheck, affected lint and applicable exports. Keep Docker stopped for native proof. The coordinator assigns explicit simulator UUIDs and distinct Metro ports, with up to two sessions when capacity permits (simultaneous two-app capacity is unproven), and one heavy local phase at a time.
@@ -171,22 +191,14 @@ After each, the app must stay on the same screen, signed in, and Profile > Choos
    The guarded command executes inside the PR API container with its private Postgres and MinIO connections. The image includes the entry point, bucket bootstrap, db seed scripts, generated client, fixture manifest and their runtime dependencies. It bootstraps all four MinIO buckets, reference catalog, fixture users and listings with 0, 1 and 2 photos, then licensed brand logos. Reruns converge without duplicates but are not a no-op: fixture users and listings are deleted and recreated with the same IDs, cascading to their sessions, drafts, favourites, conversations, saved searches and listings created as a fixture seller; sessions end and `publicNumber` advances. Do not reseed during another agent's live session. It rejects production, staging, missing or malformed names, nonmock SMS, wrong project, nonprivate data origins and inherited staging/other-PR media hosts before launching any step or constructing a client. The entry point and the fixture step run the same guard, `packages/db/scripts/native-pr-seed-guard.cjs`, and a malformed connection URL is refused by variable name without printing its value. Do not print variable values or credentials in evidence. Fixture phones include buyer `+99361000009` and seller `+99361000001`.
 
    `--remote` is the only mode. There is no local mode: `node scripts/native-pr-seed.mjs` without `--remote`, and `pnpm native:seed`, refuse and print this command, because a local run could not be bound to the PR environment's database. `railway run` executes locally and cannot reach the private hostnames this guard requires. Do not enable a public Postgres proxy for a native session; remove an owned unused proxy without touching database data.
-5. Point Metro at the PR API URL including `/api/v1`:
+5. Start Metro and the development client as in [iOS simulator against staging or a PR backend](#ios-simulator-against-staging-or-a-pr-backend), with `--env pr-<PR>` and the assigned port and simulator UUID:
 
    ```bash
-   EXPO_PUBLIC_API_URL="$PR_API_URL/api/v1" \
-   EXPO_PUBLIC_WS_URL="wss://$PR_API_HOST/ws/chat" \
-   EXPO_PUBLIC_MEDIA_URL="https://$PR_MINIO_HOST" \
-   pnpm --filter @auto-tm/mobile exec expo start --dev-client --port "$METRO_PORT"
+   pnpm --filter @auto-tm/mobile native:metro -- --env pr-"$PR" --port "$METRO_PORT"
+   pnpm --filter @auto-tm/mobile native:ios -- --udid "$SIMULATOR_UUID" --port "$METRO_PORT"
    ```
 
-   `$PR_API_HOST` and `$PR_MINIO_HOST` are the PR API and MinIO public hosts. Without `EXPO_PUBLIC_MEDIA_URL` the app builds no photo URLs and renders no photos. For an installed iOS development client, launch the assigned simulator UUID with the Metro host and port as a launch argument:
-
-   ```bash
-   xcrun simctl launch "$SIMULATOR_UUID" tm.auto.app -RCT_jsLocation 127.0.0.1:"$METRO_PORT"
-   ```
-
-   `RCT_jsLocation` chooses Metro; the `EXPO_PUBLIC_*` variables choose the backend. Restart Metro with `--clear` if an old API origin remains in the bundle. Expo Go cannot run this app.
+   `RCT_jsLocation` (set by `native:ios`) chooses Metro; the `EXPO_PUBLIC_*` values `native:metro` resolves choose the backend. Expo Go cannot run this app.
 6. Log in with a fixture phone. Read the mock OTP from this PR API service's logs with `railway logs --project "$PR_PROJECT_ID" --environment "$PR_ENVIRONMENT_ID" --service "$PR_API_SERVICE_ID" --lines 200`, looking for the last four digits of the request's phone and its time (the line reads `[mock] OTP for ***0009 (req 1a2b3c4d): <code>`; the tag is the first eight characters of the `requestId` the code request returned). Do not put OTPs or access tokens in PR evidence. Capture the loaded feed and a fixture detail/gallery to prove media and API traffic. Record environment ID, successful deployment ID/backend SHA, screenshot paths and the process check showing Docker absent.
 7. Stop only this session's Metro process. Revoke an environment-scoped disposable token when finished. Keep reusable coordinator credentials outside the repo. Railway automatically deletes the environment on PR merge/close; verify that its exact environment ID disappears. Close disposable proof PRs promptly and record deletion evidence. Do not close an active implementation PR just to collect cleanup evidence.
 
