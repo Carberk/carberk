@@ -10,6 +10,7 @@ import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
 import { GalleryBanner, GalleryCounter, GalleryImage } from "./GalleryImage";
+import { isNearPhoto } from "./photoWindow";
 import { PhotoViewer } from "./PhotoViewer";
 
 import { Text } from "@/components/ui/text";
@@ -35,6 +36,10 @@ export function PhotoGallery({
   const { t } = useTranslation();
   const { width: screenWidth } = useWindowDimensions();
   const [activeIndex, setActiveIndex] = useState(0);
+  // Neighbours wait until the first photo has loaded, so on a slow connection
+  // they never share its bandwidth; once the buyer swipes they load anyway.
+  const [firstLoaded, setFirstLoaded] = useState(false);
+  const loadNeighbours = firstLoaded || activeIndex !== 0;
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const listRef = useRef<FlatList<ListingMedia>>(null);
 
@@ -69,18 +74,26 @@ export function PhotoGallery({
           onPress={() => setViewerIndex(index)}
           className="active:opacity-90"
         >
-          <View style={{ width: screenWidth, height: screenWidth * 0.65 }}>
-            <GalleryImage
-              item={item}
-              variant="detail"
-              style={{ width: "100%", height: "100%" }}
-              contentFit="cover"
-            />
+          <View className="bg-muted" style={{ width: screenWidth, height: screenWidth * 0.65 }}>
+            {(index === activeIndex || (loadNeighbours && isNearPhoto(index, activeIndex))) && (
+              <GalleryImage
+                item={item}
+                variant="detail"
+                // The first photo is the card's: its `list` size is cached and shows at once.
+                placeholderVariant={index === 0 ? "list" : undefined}
+                // Fixed per photo: expo-image restarts a download whose priority
+                // changes, so a neighbour keeps `low` once it is on screen.
+                priority={index === 0 ? "high" : "low"}
+                style={{ width: "100%", height: "100%" }}
+                contentFit="cover"
+                onAspectRatio={index === 0 ? () => setFirstLoaded(true) : undefined}
+              />
+            )}
           </View>
         </Pressable>
       );
     },
-    [screenWidth, media.length, t],
+    [screenWidth, media.length, activeIndex, loadNeighbours, t],
   );
 
   if (media.length === 0) {
@@ -99,6 +112,9 @@ export function PhotoGallery({
         data={media}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
+        extraData={{ activeIndex, loadNeighbours }}
+        initialNumToRender={1}
+        windowSize={3}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
