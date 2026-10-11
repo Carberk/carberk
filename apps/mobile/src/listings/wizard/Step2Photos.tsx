@@ -1,5 +1,5 @@
 import { ListingsSchemas } from "@auto-tm/contracts";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { View, ActivityIndicator } from "react-native";
 import { useSharedValue } from "react-native-reanimated";
 import * as ImagePicker from "expo-image-picker";
@@ -229,21 +229,37 @@ function PhotoGrid({
   const y = useSharedValue(0);
   const drag = useMemo<PhotoDrag>(() => ({ from, to, x, y }), [from, to, x, y]);
 
+  const pendingDrop = useRef<string[] | null>(null);
+  const resetDrag = useCallback(() => {
+    from.value = -1;
+    to.value = -1;
+    x.value = 0;
+    y.value = 0;
+  }, [from, to, x, y]);
+  useLayoutEffect(() => {
+    const expected = pendingDrop.current;
+    if (!expected) return;
+    const ids = photos.map((photo) => photo.photoId);
+    if (ids.length === expected.length && ids.some((id, index) => id !== expected[index])) return;
+    pendingDrop.current = null;
+    resetDrag();
+  }, [photos, resetDrag]);
+
   const handleDragStart = useCallback(() => lockScroll(true), [lockScroll]);
 
   const handleDrop = useCallback(
     (fromIndex: number, toIndex: number) => {
       lockScroll(false);
-      from.value = -1;
-      to.value = -1;
-      x.value = 0;
-      y.value = 0;
-      if (toIndex === fromIndex) return;
-      onReorderPhotos(
-        reorderPhotoIdsByIndex(photos.map((photo) => photo.photoId), fromIndex, toIndex),
-      );
+      if (toIndex === fromIndex) {
+        resetDrag();
+        return;
+      }
+      const reorderedIds = reorderPhotoIdsByIndex(photos.map((photo) => photo.photoId), fromIndex, toIndex);
+      // Keep the UI-thread positions until React commits these new slots.
+      pendingDrop.current = reorderedIds;
+      onReorderPhotos(reorderedIds);
     },
-    [lockScroll, from, to, x, y, onReorderPhotos, photos],
+    [lockScroll, resetDrag, onReorderPhotos, photos],
   );
 
   return (

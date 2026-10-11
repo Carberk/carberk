@@ -94,7 +94,7 @@ describe("Step2Photos", () => {
       expect(values.map((value) => value.value)).toEqual([0, 4, 119, 119]);
       screen.rerender(<Step2Photos {...props} photos={["b", "c", "d", "e", "a", "f"].map((id, n) => photo(id, n))} />);
       expect(values.map((value) => value.value)).toEqual([-1, -1, 0, 0]);
-      expect(screen.getByRole("button", { name: /Photo 5 of 6/ })).toBeTruthy();
+      expect(screen.getByRole("button", { name: /^Photo 5 of 6/ })).toBeTruthy();
     } finally {
       sharedValue.mockRestore();
     }
