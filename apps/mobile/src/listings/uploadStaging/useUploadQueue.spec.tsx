@@ -802,3 +802,37 @@ describe("useUploadQueue — batch compression", () => {
     });
   });
 });
+
+
+describe("useUploadQueue — upgrading 2.0.3 staged JPEGs", () => {
+  it("re-encodes before presign/PUT, preserving photo identity/order and replacing old metadata", async () => {
+    vi.clearAllMocks();
+    const photoId = "legacy-photo";
+    const legacy = "file:///doc/listing-staging/upgrade/legacy-photo.jpg";
+    const destination = "file:///doc/listing-staging/upgrade/legacy-photo.webp";
+    let converted = false;
+    mockGetStagingPath.mockImplementation((draft, id) => `file:///doc/listing-staging/${draft}/${id}.webp`);
+    mockListLocalPhotoIds.mockResolvedValue([photoId]);
+    mockGetInfoAsync.mockImplementation(async (uri) => uri === destination && !converted
+      ? { exists: false, uri, isDirectory: false }
+      : { exists: true, uri, size: converted ? 345 : 2048, isDirectory: false, modificationTime: 0 });
+    mockCompressPhoto.mockImplementation(async (source, target) => {
+      expect(source).toBe(legacy); expect(target).toBe(destination);
+      converted = true;
+      return { uri: destination, width: 900, height: 1200, fileSize: 345 };
+    });
+    mockPresignMutateAsync.mockImplementation(async (input) => {
+      expect(converted).toBe(true);
+      expect(input).toMatchObject({ contentType: "image/webp", sizeBytes: 345, writeProtocol: "conditional-v1" });
+      return { uploadUrl: "http://localhost/upgrade", key: "pending/owned/original.webp" };
+    });
+    mockUploadAsync.mockResolvedValue({ status: 200, headers: {}, body: "", mimeType: "image/webp" });
+    const photos = [0, 1, 2].map((n) => ({ photoId: `remote-${n}`, key: `remote-${n}.webp`, sortOrder: n }));
+    photos.push({ photoId, key: "", sortOrder: 3 });
+    const { result } = renderHook(() => useUploadQueue("upgrade", { photos }), { wrapper });
+    await waitFor(() => expect(result.current.photos[3]).toMatchObject({ photoId, sortOrder: 3, state: "uploaded", width: 900, height: 1200, fileSize: 345 }));
+    expect(result.current.publishGate.canPublish).toBe(true);
+    expect(mockUploadAsync).toHaveBeenCalledWith("http://localhost/upgrade", destination,
+      expect.objectContaining({ headers: { "Content-Type": "image/webp" } }));
+  });
+});

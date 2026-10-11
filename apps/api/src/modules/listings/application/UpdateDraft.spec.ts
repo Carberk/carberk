@@ -231,3 +231,20 @@ describe("UpdateDraft", () => {
     expect((result.draft.payload as any).validatedSteps).toEqual(["photos"]);
   });
 });
+
+
+describe("UpdateDraft converted-photo autosave compatibility", () => {
+  it("keeps the canonical converted key when an old client autosaves its known JPEG alias", async () => {
+    const repo = new FakeListingDraftRepository();
+    repo.drafts.push(ListingDraft.create({ id: "d", userId: "u", payload: { photos: [{ photoId: "p", key: "demo-inventory/photo/original.webp", sortOrder: 0 }] } }));
+    const result = await makeUseCase(repo).execute({ draftId: "d", userId: "u", payload: { description: "New text", photos: [{ photoId: "p", key: "demo-inventory/photo/original.jpg", sortOrder: 1 }] } });
+    expect(result.draft.payload).toMatchObject({ description: "New text", photos: [{ photoId: "p", key: "demo-inventory/photo/original.webp", sortOrder: 1 }] });
+  });
+
+  it("refuses an unknown JPEG alias instead of persisting a nonexistent replacement", async () => {
+    const repo = new FakeListingDraftRepository();
+    repo.drafts.push(ListingDraft.create({ id: "d", userId: "u", payload: {} }));
+    await expect(makeUseCase(repo).execute({ draftId: "d", userId: "u", payload: { photos: [{ photoId: "p", key: "someone/original.jpg", sortOrder: 0 }] } })).rejects.toThrow();
+    expect(repo.drafts[0]?.payload).toEqual({});
+  });
+});
