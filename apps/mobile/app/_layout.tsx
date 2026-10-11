@@ -200,7 +200,7 @@ export default function RootLayout() {
     theme === "system" ? (osColorScheme ?? "light") : theme;
   const scheme = resolvedScheme === "dark" ? "dark" : "light";
   const [i18nReady, setI18nReady] = useState(false);
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     "Geist-Light": require("../assets/fonts/Geist-Light.ttf"),
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -217,18 +217,18 @@ export default function RootLayout() {
     "GeistMono-Medium": require("../assets/fonts/GeistMono-Medium.ttf"),
   });
   const [onboarding, setOnboarding] = useState<OnboardingDecision | null>(null);
-  const appReady = fontsLoaded && i18nReady && onboarding !== null;
+  const appReady = (fontsLoaded || !!fontError) && i18nReady && onboarding !== null;
 
   useEffect(() => {
     // Started first: the gate reads storage before anything in this launch
     // can write to it. It answers within a second.
     void resolveOnboardingGate().then(setOnboarding);
-    void localeStore.getState().hydrate().then(() => {
-      void initI18n().then(() => {
-        setI18nReady(true);
-      });
-    });
-    void hydrateTheme();
+    void localeStore.getState().hydrate()
+      .catch((error) => console.warn("[launch] locale storage unavailable", error))
+      .then(() => initI18n())
+      .catch((error) => console.warn("[launch] locale initialization failed", error))
+      .finally(() => setI18nReady(true));
+    void hydrateTheme().catch((error) => console.warn("[launch] theme storage unavailable", error));
   }, [hydrateTheme]);
 
   useEffect(() => {
