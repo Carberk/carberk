@@ -48,6 +48,7 @@ describe("WebP operator conversion on real Postgres and conditional MinIO", () =
     await pool.query(`INSERT INTO media_uploads (id,"userId",key,kind,"contentType","sizeBytes","createdAt", "objectKeys", "writeProtocol", state) VALUES ('webp-upload','webp-user',$1,'image','image/jpeg',100,now(),$2,'conditional-v1','ADOPTED')`, [key, ["original.jpg", "thumbnail.jpg", "thumbnail.webp", "list.jpg", "list.webp", "detail.jpg", "detail.webp", "fullscreen.jpg", "fullscreen.webp"].map((file) => `${prefix}/${file}`)]);
     await pool.query(`UPDATE users SET "avatarKey"=$1,"avatarUploadId"='webp-upload' WHERE id='webp-user'`, [key]);
     await pool.query(`INSERT INTO listing_drafts (id,"userId",payload,"createdAt","updatedAt") VALUES ('webp-draft','webp-user',$1,now(),now())`, [JSON.stringify({ photos: [{ photoId: "photo-1", key, sortOrder: 0 }], description: "Keep vehicle content" })]);
+    await pool.query(`INSERT INTO audit_logs (id,action,"targetType","targetId",details,"createdAt") VALUES ('webp-audit','profile-photo-set','user','webp-user',$1,now())`, [JSON.stringify({ before: { avatarKey: key }, note: "Immutable audit history" })]);
     const original = await sharp({ create: { width: 160, height: 120, channels: 3, background: "red" } }).jpeg().withExif({ IFD0: { Make: "Camera" } }).toBuffer();
     const padded = await sharp(original).resize(240, 160, { fit: "contain", withoutEnlargement: true }).webp().toBuffer();
     await s3.send(new PutObjectCommand({ Bucket: "listing-photos", Key: `${prefix}/detail.webp`, Body: padded, ContentType: "image/webp", CacheControl: "public,max-age=31536000,immutable" }));
@@ -57,6 +58,7 @@ describe("WebP operator conversion on real Postgres and conditional MinIO", () =
 
   it("converts in place, CAS verifies JSON/arrays against real schema, resumes and conditionally deletes JPEGs", async () => {
     const plan = join(directory, "plan.json");
+    const auditBefore = (await pool.query(`SELECT row_to_json(audit_logs) AS record FROM audit_logs WHERE id='webp-audit'`)).rows[0].record;
     const oldUrl = `${endpoint}/listing-photos/${prefix}/detail.webp`;
     const oldCachedBytes = Buffer.from(await (await fetch(oldUrl)).arrayBuffer());
     expect((await sharp(oldCachedBytes).metadata()).width).toBe(240);
@@ -76,6 +78,7 @@ describe("WebP operator conversion on real Postgres and conditional MinIO", () =
     expect((await sharp(oldCachedBytes).metadata()).width).toBe(240);
     await main(["delete-jpeg", plan]); await main(["delete-jpeg", plan]);
     const stored = await s3.send(new ListObjectsV2Command({ Bucket: "listing-photos" }));
+    expect((await pool.query(`SELECT row_to_json(audit_logs) AS record FROM audit_logs WHERE id='webp-audit'`)).rows[0].record).toEqual(auditBefore);
     expect(stored.Contents?.map((object) => object.Key).sort()).toEqual(["detail", "fullscreen", "list", "original", "thumbnail"].map((name) => `${prefix}/${name}.webp`));
   });
 

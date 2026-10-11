@@ -28,12 +28,11 @@ const TABLES = [
   { table: "media_upload_cleanups", id: "uploadId", columns: ["key", "objectKeys"] },
   { table: "content_reports", id: "id", columns: ["messageContext"] },
   { table: "notification_history", id: "id", columns: ["data"] },
-  { table: "audit_logs", id: "id", columns: ["details"] },
 ] as const;
 
 type Stored = { bucket: string; key: string; etag: string };
 type Row = { table: string; idColumn: string; id: string; before: Record<string, unknown>; after: Record<string, unknown> };
-type Plan = { version: 1; endpoint: string; databaseFingerprint: string; objects: Stored[]; rows: Row[] };
+type Plan = { auditHistoryReferenceCount?: number; version: 1; endpoint: string; databaseFingerprint: string; objects: Stored[]; rows: Row[] };
 type Event = { type: "prepared" | "written" | "deleted"; bucket: string; key: string; hash?: string; etag?: string };
 const hash = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const isJpeg = (key: string) => /\.(jpg|jpeg)$/i.test(key);
@@ -120,6 +119,11 @@ function validatePlan(plan: Plan) {
     if (Array.isArray(expected["objectKeys"])) expected["objectKeys"] = [...new Set(expected["objectKeys"])];
     if (!equal(expected, row.after)) throw new Error("Plan changes data beyond photo references");
   }
+}
+
+async function auditHistoryReferenceCount(pool: Pool) {
+  const result = await pool.query('SELECT "details" FROM "audit_logs"');
+  return result.rows.filter((row: { details: unknown }) => /\.(jpg|jpeg)(?:["?#]|$)/i.test(JSON.stringify(row.details))).length;
 }
 
 async function readObject(s3: S3Client, bucket: string, key: string, etag?: string) {
@@ -294,9 +298,9 @@ export async function main(args = process.argv.slice(2)) {
   try {
     if (mode === "dry-run") {
       const objects = await inventory(s3);
-      const plan: Plan = { version: 1, endpoint, databaseFingerprint: hash(database), objects, rows: await snapshotRows(pool, mappingsFor(objects), true) };
+      const plan: Plan = { auditHistoryReferenceCount: await auditHistoryReferenceCount(pool), version: 1, endpoint, databaseFingerprint: hash(database), objects, rows: await snapshotRows(pool, mappingsFor(objects), true) };
       await writeFile(path, JSON.stringify(plan, null, 2), { flag: "wx", mode: 0o600 });
-      console.log(`Inventory only: ${objects.length} source objects, ${plan.rows.length} reference rows. Plan ${path}`);
+      console.log(`Inventory only: ${objects.length} source objects, ${plan.rows.length} reference rows. Plan ${path}; ${plan.auditHistoryReferenceCount} audit snapshots preserved unchanged`);
       return;
     }
     const plan = JSON.parse(await readFile(path, "utf8")) as Plan;
