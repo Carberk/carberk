@@ -357,14 +357,14 @@ describe("committed brand logo manifest", () => {
     expect(manifest.entries).toHaveLength(catalogSlugs.length);
   });
 
-  it("uses only Simple Icons CC0 icons and Commons files tagged PD-textlogo or PD-shape", () => {
+  it("records a source and checksum for selected artwork, or an explicit unresolved identity", () => {
     for (const entry of manifest.entries) {
-      if (entry.source === "simple-icons") expect(entry.licence).toBe("CC0-1.0");
-      else if (entry.source === "commons") {
-        expect(["PD-textlogo", "PD-shape"]).toContain(entry.licence);
-      } else {
-        expect(entry.source).toBeNull();
+      if (entry.source === null) {
         expect(entry.reason.trim().length).toBeGreaterThan(0);
+      } else {
+        expect(entry.sourceUrl).toMatch(/^https:\/\//);
+        expect(entry.sha256Master).toMatch(/^[0-9a-f]{64}$/);
+        if (entry.source === "bundled") expect(entry.masterFile).toMatch(/\.(svg|png|jpe?g|webp)$/);
       }
     }
     expect(manifest.entries.some((e) => e.source === "simple-icons")).toBe(true);

@@ -3,10 +3,10 @@ import { readFileSync } from "node:fs";
 /**
  * The provenance manifest for brand logos: one entry per catalog brand.
  *
- * The parser is the licensing gate. It accepts exactly two kinds of source,
- * Simple Icons icons (CC0-1.0) and Wikimedia Commons files whose file page
- * carries `PD-textlogo` or `PD-shape`, and it records why every other brand
- * has no logo. Nothing else can be imported, whatever the manifest says.
+ * Source records establish which identifying artwork was selected and pin
+ * its bytes. Recorded license categories are descriptive metadata, not a
+ * coverage gate. Bundled masters allow additional verified manufacturer art
+ * without introducing third-party logo services into the app.
  */
 
 export const LOGO_TIERS = ["A", "B", "C", "D", "E", "F"] as const;
@@ -21,9 +21,6 @@ export type LogoTier = (typeof LOGO_TIERS)[number];
 export const LOGO_TRANSFORMS = ["alpha", "luminance"] as const;
 export type LogoTransform = (typeof LOGO_TRANSFORMS)[number];
 
-export const COMMONS_LICENCES = ["PD-textlogo", "PD-shape"] as const;
-export type CommonsLicence = (typeof COMMONS_LICENCES)[number];
-
 interface EntryBase {
   slug: string;
   tier: LogoTier;
@@ -32,8 +29,9 @@ interface EntryBase {
 interface SourcedEntryBase extends EntryBase {
   /** Where a person can check the file: the icon on GitHub, or a pinned Commons file page. */
   sourceUrl: string;
-  licenceUrl: string;
-  /** Who owns the mark. The licence covers the file, not the trademark. */
+  licence?: string;
+  licenceUrl?: string;
+  /** Manufacturer identity, or the explicit identity of a category illustration. */
   trademark: string;
   /** ISO date the file was checked. */
   retrievedAt: string;
@@ -48,16 +46,20 @@ export interface SimpleIconsLogoEntry extends SourcedEntryBase {
   simpleIconsVersion: string;
   /** The brand's own page, as recorded by Simple Icons. */
   upstreamSource: string | null;
-  licence: "CC0-1.0";
 }
 
 export interface CommonsLogoEntry extends SourcedEntryBase {
   source: "commons";
   commonsFile: string;
-  /** Revision of the file page on which the licence tag was verified. */
+  /** Revision of the file page used for the source record. */
   pageRevisionId: number;
   downloadUrl: string;
-  licence: CommonsLicence;
+}
+
+export interface BundledLogoEntry extends SourcedEntryBase {
+  source: "bundled";
+  /** A plain filename under the repository's brand-logo-masters directory. */
+  masterFile: string;
 }
 
 export interface NoLogoEntry extends EntryBase {
@@ -65,7 +67,7 @@ export interface NoLogoEntry extends EntryBase {
   reason: string;
 }
 
-export type SourcedLogoEntry = SimpleIconsLogoEntry | CommonsLogoEntry;
+export type SourcedLogoEntry = SimpleIconsLogoEntry | CommonsLogoEntry | BundledLogoEntry;
 export type ManifestEntry = SourcedLogoEntry | NoLogoEntry;
 
 export interface BrandLogoManifest {
@@ -89,6 +91,10 @@ const COMMONS_PAGE_HOST = "commons.wikimedia.org";
 const SHA256 = /^[0-9a-f]{64}$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const OBJECT_KEY_SLUG = /^[\p{Ll}\p{Lo}0-9]+(?:-[\p{Ll}\p{Lo}0-9]+)*$/u;
+
+export function isBundledMasterName(value: unknown): value is string {
+  return typeof value === "string" && /^[\p{Ll}\p{Lo}0-9-]+\.(?:svg|png|jpe?g|webp)$/u.test(value);
+}
 
 type Json = Record<string, unknown>;
 
@@ -125,7 +131,7 @@ function isRealDate(value: unknown): boolean {
 }
 
 function checkSourcedFields(raw: Json, at: string, problems: string[]): void {
-  if (httpsUrl(raw["licenceUrl"]) === null) problems.push(`${at}: licenceUrl must be an https URL`);
+  if (httpsUrl(raw["sourceUrl"]) === null) problems.push(`${at}: sourceUrl must be an https URL`);
   if (!nonEmpty(raw["trademark"])) problems.push(`${at}: trademark must name the mark's owner`);
   if (!isRealDate(raw["retrievedAt"])) problems.push(`${at}: retrievedAt must be a YYYY-MM-DD date`);
   if (typeof raw["sha256Master"] !== "string" || !SHA256.test(raw["sha256Master"])) {
@@ -140,7 +146,6 @@ function checkSourcedFields(raw: Json, at: string, problems: string[]): void {
 }
 
 function checkSimpleIcons(raw: Json, at: string, problems: string[]): void {
-  if (raw["licence"] !== "CC0-1.0") problems.push(`${at}: licence must be CC0-1.0 for simple-icons`);
   if (typeof raw["simpleIconsSlug"] !== "string" || !/^[a-z0-9]+$/.test(raw["simpleIconsSlug"])) {
     problems.push(`${at}: simpleIconsSlug must be a Simple Icons slug`);
   }
@@ -159,9 +164,6 @@ function checkSimpleIcons(raw: Json, at: string, problems: string[]): void {
 }
 
 function checkCommons(raw: Json, at: string, problems: string[]): void {
-  if (!(COMMONS_LICENCES as readonly unknown[]).includes(raw["licence"])) {
-    problems.push(`${at}: licence must be ${COMMONS_LICENCES.join(" or ")} for commons`);
-  }
   if (typeof raw["commonsFile"] !== "string" || !raw["commonsFile"].startsWith("File:")) {
     problems.push(`${at}: commonsFile must be a "File:..." title`);
   }
@@ -208,11 +210,15 @@ export function parseBrandLogoManifest(input: unknown): BrandLogoManifest {
       case "commons":
         checkCommons(raw, at, problems);
         break;
+      case "bundled":
+        checkSourcedFields(raw, at, problems);
+        if (!isBundledMasterName(raw["masterFile"])) problems.push(`${at}: masterFile must be a plain supported-image filename`);
+        break;
       case null:
         if (!nonEmpty(raw["reason"])) problems.push(`${at}: an entry with no source needs a reason`);
         break;
       default:
-        problems.push(`${at}: source must be "simple-icons", "commons" or null`);
+        problems.push(`${at}: source must be "simple-icons", "commons", "bundled" or null`);
     }
   });
 

@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, realpath, rename, writeFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 
 import {
   COMMONS_DOWNLOAD_HOST,
+  isBundledMasterName,
+  type BundledLogoEntry,
   type CommonsLogoEntry,
   type SimpleIconsLogoEntry,
   type SourcedLogoEntry,
@@ -40,21 +42,26 @@ export function verifyMasterSha(entry: SourcedLogoEntry, bytes: Uint8Array): voi
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const SVG_START = /^(?:<\?xml|<svg|<!--|<!doctype\s+svg)/i;
 
-/** Throws MasterIntegrityError unless the bytes are an SVG or PNG file (never an HTML error page). */
+/** Checks supported image signatures before decoding; rejects HTML error pages. */
 export function assertMasterFormat(entry: SourcedLogoEntry, bytes: Uint8Array): void {
   if (bytes.byteLength === 0) {
     throw new MasterIntegrityError(`${entry.slug}: the master file is empty`);
   }
   if (PNG_SIGNATURE.every((byte, i) => bytes[i] === byte)) return;
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return;
+  if (bytes.byteLength >= 12 && new TextDecoder().decode(bytes.slice(0, 4)) === "RIFF" &&
+    new TextDecoder().decode(bytes.slice(8, 12)) === "WEBP") return;
   // TextDecoder drops a leading byte order mark, so it never hides the SVG start.
   const text = new TextDecoder("utf-8").decode(bytes).trimStart();
   if (SVG_START.test(text) && /<svg[\s>]/i.test(text)) return;
-  throw new MasterIntegrityError(`${entry.slug}: the master file is neither an SVG nor a PNG`);
+  throw new MasterIntegrityError(`${entry.slug}: the master file is not SVG, PNG, JPEG or WebP`);
 }
 
 export interface MasterProviderOptions {
   /** Gitignored directory where downloaded Commons files are cached. */
   cacheDir: string;
+  /** Repository-pinned masters; injectable for local filesystem tests. */
+  bundledDir?: string;
   /** Hosts a download may come from. Defaults to upload.wikimedia.org. */
   allowedHosts?: readonly string[];
   fetchFn?: typeof fetch;
@@ -134,6 +141,14 @@ export function createMasterProvider(options: MasterProviderOptions): MasterProv
   const allowedHosts = options.allowedHosts ?? [COMMONS_DOWNLOAD_HOST];
   const fetchFn = options.fetchFn ?? fetch;
 
+  async function loadBundled(entry: BundledLogoEntry): Promise<Uint8Array> {
+    if (!isBundledMasterName(entry.masterFile)) throw new MasterIntegrityError(`${entry.slug}: unsafe bundled masterFile`);
+    const directory = await realpath(options.bundledDir ?? new URL("../../prisma/seed/brand-logo-masters", import.meta.url).pathname);
+    const file = await realpath(join(directory, entry.masterFile));
+    if (relative(directory, file) !== entry.masterFile) throw new MasterIntegrityError(`${entry.slug}: bundled master leaves its directory`);
+    return new Uint8Array(await readFile(file));
+  }
+
   async function loadCommons(entry: CommonsLogoEntry): Promise<Uint8Array> {
     const url = new URL(entry.downloadUrl);
     if (!allowedHosts.includes(url.hostname)) {
@@ -164,8 +179,8 @@ export function createMasterProvider(options: MasterProviderOptions): MasterProv
 
   return {
     async load(entry) {
-      const bytes =
-        entry.source === "simple-icons" ? await loadSimpleIcon(entry) : await loadCommons(entry);
+      const bytes = entry.source === "simple-icons" ? await loadSimpleIcon(entry)
+        : entry.source === "bundled" ? await loadBundled(entry) : await loadCommons(entry);
       assertMasterFormat(entry, bytes);
       verifyMasterSha(entry, bytes);
       return bytes;
