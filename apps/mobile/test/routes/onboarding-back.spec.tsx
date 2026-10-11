@@ -172,7 +172,7 @@ describe("Onboarding on launch", () => {
     expect(launch.push).toHaveBeenCalledTimes(1);
     expect(launch.push).toHaveBeenCalledWith(LANGUAGE);
     expect(launch.stored[FLAG]).toBe("pending");
-    // The Language screen lets the launch screen go, so Home is not seen first.
+    // Only the entrance layout releases native; navigation never does.
     expect(SplashScreen.hide).not.toHaveBeenCalled();
   });
 
@@ -193,7 +193,7 @@ describe("Onboarding on launch", () => {
     expect(screen.getByTestId("(tabs)")).toBeTruthy();
     expect(launch.push).not.toHaveBeenCalled();
     expect(launch.stored[FLAG]).toBe("true");
-    expect(SplashScreen.hide).toHaveBeenCalled();
+    expect(SplashScreen.hide).not.toHaveBeenCalled();
   });
 
   it("lets a deep link win on a fresh install and keeps onboarding for the next plain start", async () => {
@@ -202,7 +202,7 @@ describe("Onboarding on launch", () => {
 
     expect(screen.getByTestId("(tabs)")).toBeTruthy();
     expect(launch.push).not.toHaveBeenCalled();
-    expect(SplashScreen.hide).toHaveBeenCalled();
+    expect(SplashScreen.hide).not.toHaveBeenCalled();
     expect(launch.stored[FLAG]).toBe("pending");
   });
 
@@ -219,7 +219,7 @@ describe("Onboarding on launch", () => {
 
     expect(screen.getByTestId("(tabs)")).toBeTruthy();
     expect(launch.push).not.toHaveBeenCalled();
-    expect(SplashScreen.hide).toHaveBeenCalled();
+    expect(SplashScreen.hide).not.toHaveBeenCalled();
   });
 });
 
@@ -239,34 +239,34 @@ describe("OnboardingLaunch", () => {
     expect(launch.push).toHaveBeenCalledWith(LANGUAGE);
   });
 
-  it("lets the launch screen go at once, without pushing, when nothing is owed or a deep link won", () => {
+  it("leaves native handoff to the entrance when nothing is owed or a deep link won", () => {
     const skip = renderMobile(<OnboardingLaunch decision="skip" />);
-    expect(SplashScreen.hide).toHaveBeenCalledTimes(1);
+    expect(SplashScreen.hide).not.toHaveBeenCalled();
     expect(launch.push).not.toHaveBeenCalled();
     skip.unmount();
 
     launch.pathname = "/listings/550e8400-e29b-41d4-a716-446655440000";
     renderMobile(<OnboardingLaunch decision="show" />);
     expect(launch.push).not.toHaveBeenCalled();
-    expect(SplashScreen.hide).toHaveBeenCalledTimes(2);
+    expect(SplashScreen.hide).not.toHaveBeenCalled();
   });
 
-  it("still lets the launch screen go when the push itself throws", () => {
+  it("leaves native handoff to the entrance when the push itself throws", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     launch.push.mockImplementation(() => {
       throw new Error("router is down");
     });
     renderMobile(<OnboardingLaunch decision="show" />);
 
-    // The splash goes at once instead of waiting out the fallback timer.
-    expect(SplashScreen.hide).toHaveBeenCalledTimes(1);
+    // Navigation failure cannot release native before the entrance has laid out.
+    expect(SplashScreen.hide).not.toHaveBeenCalled();
     act(() => {
       vi.advanceTimersByTime(1000);
     });
-    expect(SplashScreen.hide).toHaveBeenCalledTimes(1);
+    expect(SplashScreen.hide).not.toHaveBeenCalled();
   });
 
-  it("clears the fallback timer when the launch gate leaves the tree", () => {
+  it("never releases native from a navigation fallback timer", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const screen = renderMobile(<OnboardingLaunch decision="show" />);
     screen.unmount();
