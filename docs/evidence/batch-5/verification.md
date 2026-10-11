@@ -1,6 +1,6 @@
 # Batch 5 verification
 
-PR #827, issues #819 / #820 / #821. Code checked after the worklet runtime fix `f4720cae` and its test URL typecheck repair, including the merge of `origin/main` at `e7cb113b`. Android native proof is the remaining acceptance gate.
+PR #827, issues #819 / #820 / #821. Code checked at `12b7b633` after the worklet runtime fix `f4720cae` and its test URL typecheck repair, including the merge of `origin/main` at `e7cb113b`. Android native proof is the remaining acceptance gate.
 
 ## Regression evidence
 
@@ -33,7 +33,7 @@ The founder explicitly selected shared staging for this check. SDK 55 existing d
 | Read blue ticks and Read label on own bubbles, light and dark | [Light conversation](05-bubble-read-light.png), [dark conversation](06-bubble-read-dark.png) | pass |
 | Held cross-row drag, live neighbour shift, locked scrolling and stable drop | User explicitly authorized Kimi computer-control tool, invoked from this Codex model. 1000ms hold: [row1 to row3](09-ios-row1-to-row3.png), [back to row1](10-ios-row3-to-row1.png), [cover](11-ios-drop-cover.png), [native recording](ios-drag-native.mp4). Grid shifts while held, page remains stationary and drops keep the target order. | iOS pass |
 | Scroll restored after drag | Short swipe with no hold moves the page, revealing the actions hint: [after drop](12-ios-scroll-restored.png). Tap sheet was proved earlier. | iOS pass |
-| Android gesture behavior | Reusable SDK55 development client is assigned on emulator-5554; launch agent owns it temporarily, then hands it over for the remaining gesture proof | missing native evidence |
+| Android gesture behavior | Reusable SDK 55 debug client on emulator-5554, Batch5 Metro 8083 against staging. App boots to language onboarding after cached bundle warm relaunch. Dedicated test-control permission is pending because permitted computer-control clicks do not enter the Qt guest surface | missing native evidence |
 
 ## Documentation and API lookup
 
@@ -44,3 +44,11 @@ Context7 `/websites/swmansion_react-native-reanimated` confirms shared-value upd
 Context7 resolution for Expo ImagePicker was unavailable after one narrower retry because its monthly quota was exhausted. Fallback to [official SDK 55 ImagePicker documentation](https://docs.expo.dev/versions/v55.0.0/sdk/imagepicker/) confirms `orderedSelection` is supported on iOS 15+, shows numbered badges in tap order and returns assets in that order. Native picker screenshot independently proves the option on this client.
 
 The hosted `pr` run at `f4720cae` rejected the new test because React Native global `URL` and Node `URL` types differed. Passing `.href` to `fileURLToPath` fixes that test-only collision; repository typecheck passes again. Runtime worklet hoisting lookup used [official Reanimated documentation](https://docs.swmansion.com/react-native-reanimated/docs/guides/worklets/#hoisting) after the Context7 quota failure; worklets are not hoisted, matching the captured undefined helper.
+
+## Android recoverable checkpoint
+
+Android emulator `emulator-5554`, host process PID 11238, Kimi window 4562. The debug client is `tm.auto.app` version 2.0.4, installed by the launch agent. No release binary was built or tested. Batch5 Metro 8083 compiled the Android bundle, and native logs show `Running "main"`; a warm relaunch reached language onboarding. Staging fixture sign-in and Android drag proof have not occurred yet.
+
+Cua cannot select either the running `qemu-system-aarch64` app name or its executable path, returning `Invalid app`. Kimi reads the correct emulator main window and activates it with `ok:true, foreground_changed:true`. Its subsequent fresh-screenshot coordinate clicks report delivery through `background_targeted` but do not change the guest UI. The exposed click tool has no force-foreground/global-route argument, and never automatically repeats a delivered click without an observed effect. Two bounded observed routes failed; no adb touch was used. Root requested explicit adb test-control permission under Cua's documented technology restriction and is keeping that question pending.
+
+Resume this same clean detached worktree, keep the existing debug APK, and complete staging fixture sign-in followed by row 1 → row 3 → row 1 → cover, neighbour movement, scroll lock/restoration and tap sheet on Android. Keep #820 unverified until that native proof exists. The iOS simulator was handed to the launch agent; theme was restored to light and owned Metro 8082 was stopped. Root owns the final independent review and merge.
