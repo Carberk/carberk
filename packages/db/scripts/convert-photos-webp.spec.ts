@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { main } from "./convert-photos-webp";
 
-const state = vi.hoisted(() => ({ objects: new Map<string, { body: Buffer; contentType: string; etag: string }>(), rows: new Map<string, Record<string, unknown>[]>(), ignoreConditions: false }));
+const state = vi.hoisted(() => ({ objects: new Map<string, { body: Buffer; contentType: string; etag: string; cacheControl?: string; lastModified?: Date }>(), rows: new Map<string, Record<string, unknown>[]>(), ignoreConditions: false }));
 const must = <T>(value: T | null | undefined): T => { if (value == null) throw new Error("Missing fixture value"); return value; };
 const missing = () => Object.assign(new Error("NotFound"), { name: "NotFound" });
 const conflict = () => Object.assign(new Error("PreconditionFailed"), { $metadata: { httpStatusCode: 412 } });
@@ -19,7 +19,7 @@ vi.mock("@aws-sdk/client-s3", async (original) => ({ ...await original<typeof S3
   destroy() {}
   async send(command: unknown) {
     if (command instanceof GetBucketVersioningCommand) return {};
-    if (command instanceof ListObjectsV2Command) return { Contents: [...state.objects.entries()].filter(([key]) => key.startsWith(command.input.Bucket + "/")).map(([key, value]) => ({ Key: key.slice(must(command.input.Bucket).length + 1), ETag: value.etag })) };
+    if (command instanceof ListObjectsV2Command) return { Contents: [...state.objects.entries()].filter(([key]) => key.startsWith(command.input.Bucket + "/")).map(([key, value]) => ({ Key: key.slice(must(command.input.Bucket).length + 1), ETag: value.etag, Size: value.body.length, LastModified: value.lastModified ?? new Date("2000-01-01") })) };
     if (command instanceof GetObjectCommand || command instanceof HeadObjectCommand || command instanceof PutObjectCommand || command instanceof DeleteObjectCommand) {
       const key = `${command.input.Bucket}/${command.input.Key}`;
       const object = state.objects.get(key);
@@ -32,7 +32,7 @@ vi.mock("@aws-sdk/client-s3", async (original) => ({ ...await original<typeof S3
       }
       if (command instanceof DeleteObjectCommand) { state.objects.delete(key); return {}; }
       if (!object) throw missing();
-      return { ETag: object.etag, ContentType: object.contentType, Body: { transformToByteArray: async () => object.body } };
+      return { ETag: object.etag, ContentType: object.contentType, ContentLength: object.body.length, CacheControl: object.cacheControl, LastModified: object.lastModified ?? new Date("2000-01-01"), Body: { transformToByteArray: async () => object.body } };
     }
     throw new Error("Unexpected storage command");
   }
@@ -75,7 +75,7 @@ beforeEach(async () => {
   state.rows.set("messages", [{ id: "message-1", metadata: { key: chat, snapshot: { coverMediaKey: `${prefix}/original.jpg` }, width: 120, height: 90 } }]);
   state.rows.set("audit_logs", [{ id: "audit-1", details: { before: { avatarKey: `${prefix}/original.jpg` }, removedPhotoKey: "removed/photo.jpg" } }]);
   state.rows.set("content_reports", [{ id: "report-1", messageContext: { key: chat, body: "Historical report content" } }]);
-  state.rows.set("media_uploads", [{ id: "upload-1", key: `${prefix}/original.jpg`, objectKeys: ["original.jpg", "thumbnail.jpg", "thumbnail.webp", "list.jpg", "list.webp", "detail.jpg", "detail.webp", "fullscreen.jpg", "fullscreen.webp"].map((name) => `${prefix}/${name}`), contentType: "image/jpeg", sizeBytes: original.length }]);
+  state.rows.set("media_uploads", [{ id: "upload-1", state: "ADOPTED", writeProtocol: "conditional-v1", createdAt: new Date("2000-01-01"), claimToken: null, key: `${prefix}/original.jpg`, objectKeys: ["original.jpg", "thumbnail.jpg", "thumbnail.webp", "list.jpg", "list.webp", "detail.jpg", "detail.webp", "fullscreen.jpg", "fullscreen.webp"].map((name) => `${prefix}/${name}`), contentType: "image/jpeg", sizeBytes: original.length }]);
 });
 afterEach(async () => { vi.unstubAllEnvs(); await rm(directory, { recursive: true, force: true }); });
 
@@ -115,6 +115,21 @@ describe("stored photo conversion", () => {
     await expect(main(["apply", plan])).rejects.toThrow("Concurrent change");
     await expect(main(["delete-jpeg", plan])).rejects.toThrow("old photo references");
     expect([...state.objects.keys()].filter((key) => key.endsWith(".jpg"))).toHaveLength(6);
+  });
+
+  it("classifies expired unadopted conditional placeholders separately and refuses referenced empty photos", async () => {
+    for (const table of ["listing_media", "users", "messages", "content_reports"]) state.rows.set(table, []);
+    const upload = must(must(state.rows.get("media_uploads"))[0]); upload["state"] = "AVAILABLE";
+    for (const file of ["original.jpg", "thumbnail.jpg", "thumbnail.webp", "list.jpg", "list.webp", "detail.jpg", "detail.webp", "fullscreen.jpg", "fullscreen.webp"]) {
+      state.objects.set(`listing-photos/${prefix}/${file}`, { body: Buffer.alloc(0), contentType: "application/octet-stream", etag: `"empty-${file}"`, cacheControl: "no-store", lastModified: new Date("2000-01-01") });
+    }
+    await main(["dry-run", plan]);
+    const inventory = JSON.parse(await readFile(plan, "utf8"));
+    expect(inventory.placeholderUploads).toHaveLength(1);
+    expect(inventory.objects).toEqual([]);
+    await expect(main(["apply", plan])).rejects.toThrow("retire-placeholders");
+    state.rows.set("users", [{ id: "user-1", avatarKey: `${prefix}/original.jpg`, avatarUrl: null }]);
+    await expect(main(["dry-run", join(directory, "referenced.json")])).rejects.toThrow("Referenced empty photo");
   });
 
   it("normalizes existing WebP originals and refuses empty or corrupt photos", async () => {
