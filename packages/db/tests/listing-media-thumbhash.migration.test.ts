@@ -89,8 +89,8 @@ describe(`${MIGRATION} PostgreSQL upgrade`, () => {
         VALUES ('city', 'region', 'city', 'City', 'City', 'City', now());
       INSERT INTO listings (id, "sellerId", "brandId", "modelId", "cityId", "priceAmount", "updatedAt")
         VALUES ('listing', 'seller', 'brand', 'model', 'city', 100, now());
-      INSERT INTO media_uploads (id, "userId", key, kind, "contentType", "sizeBytes", state)
-        VALUES ('upload', 'seller', 'legacy/photo.webp', 'image', 'image/webp', 4567, 'ADOPTED');
+      INSERT INTO media_uploads (id, "userId", key, kind, "contentType", "sizeBytes", state, "claimTargetType", "claimTargetId")
+        VALUES ('upload', 'seller', 'legacy/photo.webp', 'image', 'image/webp', 4567, 'ADOPTED', 'listing', 'listing');
       INSERT INTO listing_media (id, "listingId", kind, key, "sortOrder", width, height, "durationMs", "posterKey")
         VALUES ('photo', 'listing', 'image', 'legacy/photo.webp', 0, 1280, 960, null, null),
                ('video', 'listing', 'video', 'legacy/video.mp4', 1, 1920, 1080, 1234, 'legacy/poster.webp'),
