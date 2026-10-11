@@ -35,7 +35,7 @@ interface SourcedEntryBase extends EntryBase {
   trademark: string;
   /** ISO date the file was checked. */
   retrievedAt: string;
-  /** sha256 of the master file exactly as delivered by the source. */
+  /** sha256 of the selected master; bundled art may record cleaned source pixels. */
   sha256Master: string;
   transform: LogoTransform;
 }

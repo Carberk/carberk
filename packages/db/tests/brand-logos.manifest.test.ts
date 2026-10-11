@@ -370,6 +370,17 @@ describe("committed brand logo manifest", () => {
     expect(manifest.entries.some((e) => e.source === "simple-icons")).toBe(true);
   });
 
+  it("loads all 54 added identifying masters from the repository with matching checksums", async () => {
+    const provider = createMasterProvider({ cacheDir: join(tmpdir(), "unused-bundled-logo-cache") });
+    const bundled = manifest.entries.filter((entry) => entry.source === "bundled");
+    expect(bundled).toHaveLength(54);
+    expect(manifest.entries.filter((entry) => entry.source === null)).toEqual([]);
+    for (const entry of bundled) {
+      const master = await provider.load(entry);
+      expect(sha256Hex(master), entry.slug).toBe(entry.sha256Master);
+    }
+  });
+
   it("pins every Simple Icons entry to the installed package: same icon, source and bytes", () => {
     const installed = JSON.parse(
       readFileSync(new URL("../node_modules/simple-icons/package.json", import.meta.url), "utf-8"),

@@ -79,8 +79,17 @@
     {
       "slug": "genesis",
       "tier": "A",
-      "source": null,
-      "reason": "No Commons file tagged PD-textlogo or PD-shape shows the Genesis Motor logo; File:Genesis Motor Logo.svg is CC BY-SA 4.0, which is not accepted (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "genesis.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Genesis_Motor_Logo.svg",
+      "trademark": "Genesis Motor",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "39c90b953656881611a454bd0554f5f34dfe6d6b66118042adf841b63b4a144f",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/6/6d/Genesis_Motor_Logo.svg",
+      "upstreamSha256": "655db388b38eb401c0b1629a18e1578da3ce38718d1774a8341e4452442beae7",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "volkswagen",
@@ -475,20 +484,47 @@
     {
       "slug": "uaz",
       "tier": "C",
-      "source": null,
-      "reason": "No Commons file shows the UAZ logo. File:Logo de la UAZ.svg is the emblem of the Universidad Autónoma de Zacatecas, not the carmaker (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "uaz.png",
+      "sourceUrl": "https://github.com/filippofilip95/car-logos-dataset/blob/master/logos/data.json",
+      "trademark": "UAZ",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "8bd1070239c943d77c42726d5c82fd1a32b19ae6dff1067e8d5f45128a3d657f",
+      "transform": "alpha",
+      "upstreamSource": "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/original/uaz.png",
+      "upstreamSha256": "0d80aabeb311381893595ac94ec84e44a88eb8c949686a8f7c32501579d84793",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "ural",
       "tier": "C",
-      "source": null,
-      "reason": "No Commons file tagged PD-textlogo or PD-shape; File:UralAZ logo.jpg is CC BY-SA 3.0, which is not accepted (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "ural.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:UralAZ_logo.jpg",
+      "trademark": "UralAZ / Ural Automotive Plant",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "4156c632138cf6c17ca5f40e008b21ab15bd6667a2df240c225c9aeab74bf8f4",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/d/d3/UralAZ_logo.jpg",
+      "upstreamSha256": "2168c584a6a659909135d1c013a8088f4d7299664ec6d53d4c55ac0e8dcc965a",
+      "normalization": "light mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "maz",
       "tier": "C",
-      "source": null,
-      "reason": "The MAZ emblem on Commons (File:Minsky automoblie plant.png) is tagged PD-ineligible, which is not accepted; File:MAZ-Logo.svg and File:Maz Maz.svg are unrelated (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "maz.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Minsky_automoblie_plant.png",
+      "trademark": "Minsk Automobile Plant",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "bf46ab2bca0c2983c5fb7dc0d80cd2fc6c2d633ac43417318d26ac013d98b23b",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/3/3d/Minsky_automoblie_plant.png",
+      "upstreamSha256": "d85ff2c17b254c7a0841a82c6edafb3c29204a3015a2779c79006305425a5345",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "iveco",
@@ -508,14 +544,32 @@
     {
       "slug": "gaz",
       "tier": "C",
-      "source": null,
-      "reason": "No Commons file tagged PD-textlogo or PD-shape shows the GAZ deer. File:GAZ logo.png (PD-textlogo) belongs to an unrelated German battery maker, and File:GAZ symbol.png is the CC BY-SA 4.0 logo of an unrelated Ukrainian opera (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "gaz.png",
+      "sourceUrl": "https://github.com/filippofilip95/car-logos-dataset/blob/master/logos/data.json",
+      "trademark": "GAZ",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "953816435adfa83f80e384bc6c3bb0ad35e35a7fa65a74e8564f88866eaadec7",
+      "transform": "alpha",
+      "upstreamSource": "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/original/gaz.png",
+      "upstreamSha256": "c87f06f2591c6ca15d74f41e98cf04ff938adb0ba1bc3ce34d517e782c51de50",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "kogel",
       "tier": "D",
-      "source": null,
-      "reason": "No Simple Icons icon. The only Commons file tagged PD-textlogo (File:Kögel Fahrzeugwerke logo.svg) is a thin wordmark, 14 px tall in a 90 px tile, too small for a 30 px icon (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "kogel.png",
+      "sourceUrl": "https://www.koegel.com/",
+      "trademark": "Kögel Trailer",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "4acfbe63d689dcf4ed3d18a59a47aad81e44dba17aaaf5d17c1a128f5f5b45df",
+      "transform": "alpha",
+      "upstreamSource": "https://www.koegel.com/wp-content/uploads/2023/01/Koegel-Logo_512x512px.png",
+      "upstreamSha256": "05036956fc36577c2cb3f2a2f135c7557c18498007d93f17f632941c958832eb",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "scania",
@@ -535,8 +589,17 @@
     {
       "slug": "forland",
       "tier": "D",
-      "source": null,
-      "reason": "No Forland file on Commons; File:Foton Motor logo.svg is the parent Foton mark, already used for foton (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "forland.png",
+      "sourceUrl": "https://www.forland.ae/",
+      "trademark": "Foton Forland",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "fbbf691fee2d29dcc2ab2749969d42ceaaa1973405409d758e8b8ffc785973a8",
+      "transform": "alpha",
+      "upstreamSource": "https://www.forland.ae/logo/header-logo.svg",
+      "upstreamSha256": "e6e0a2a71ccb7e4a5fe43bd8bc138640e47c76401722b6cf2a41b9b3e712cf2a",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "chery",
@@ -556,8 +619,17 @@
     {
       "slug": "mtz",
       "tier": "E",
-      "source": null,
-      "reason": "File:MTZ-Logo.svg is the logo of the Motortechnische Zeitschrift magazine, not Minsk Tractor Works; File:Logo-Belarus.png is a thin wordmark; letter fallback (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "mtz.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Logo-Belarus.png",
+      "trademark": "Minsk Tractor Works / BELARUS",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "d71489fd6702443ebd468f1b01a849639217406e09ac03b87f6226e41804b158",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/e/e4/Logo-Belarus.png",
+      "upstreamSha256": "c8cc5aad960afd5cecad7d3a5f8f7f7f832e57ffd93dd8c5ca58195f21eeb9a0",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "land-rover",
@@ -577,14 +649,32 @@
     {
       "slug": "golden-dragon",
       "tier": "D",
-      "source": null,
-      "reason": "File:Golden Dragon logo 2.png (PD-textlogo) is a small emblem above a long wordmark; the emblem is unreadable at 30 px (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "golden-dragon.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Golden_Dragon_logo_2.png",
+      "trademark": "Xiamen Golden Dragon Bus",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "ca23d8c2df47da65fda1eb6506398ec301e2d623a33bce352765f3e7e5323be6",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/4/46/Golden_Dragon_logo_2.png",
+      "upstreamSha256": "865efd0bb2c68eda54945bcc1aed2db5c5ce26241c88d9bcee802048d815e525",
+      "normalization": "alpha mask; crop=[0.3,0,0.4,0.73]; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "changan",
       "tier": "B",
-      "source": null,
-      "reason": "Commons has only a CC BY-SA/GFDL icon (File:Changan icon.svg) and a joint-venture logo, neither accepted."
+      "source": "bundled",
+      "masterFile": "changan.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Changan_icon.svg",
+      "trademark": "Changan Automobile",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "e5ccb83740563e67571db31fbe226acbe1d0977d4ceafe5508f7d2b79cad713b",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/0/00/Changan_icon.svg",
+      "upstreamSha256": "7ae66ece4e89e0c1a12182bce23659bd5b165d2c573cc1df419d2eebeb9360e9",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "jcb",
@@ -619,20 +709,47 @@
     {
       "slug": "schmitz",
       "tier": "D",
-      "source": null,
-      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "schmitz.png",
+      "sourceUrl": "https://www.cargobull.com/",
+      "trademark": "Schmitz Cargobull",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "b1610953fe47f2538926d63e8b60126fbd32e9d36e05258a5060c68ae7b7ff82",
+      "transform": "alpha",
+      "upstreamSource": "https://www.cargobull.com/en/-/media/project/scb-sites/shared/scb-logo.svg",
+      "upstreamSha256": "987196cfa96868829beb9e874008ef40bfb3eefe80b1e48298fdaee158fd3d71",
+      "normalization": "alpha mask; crop=[0.72,0,0.28,0.7]; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "fekon",
       "tier": "D",
-      "source": null,
-      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "fekon.png",
+      "sourceUrl": "https://fekon.en.alibaba.com/company_profile.html",
+      "trademark": "Guangzhou Fekon Motorcycle",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "fd13665013421c6155280d7f18f29dc08877dd8a450b5950e1a75284f3944107",
+      "transform": "alpha",
+      "upstreamSource": "https://sc04.alicdn.com/kf/HTB11_mfLXXXXXchXXXXq6xXFXXXC.jpg",
+      "upstreamSha256": "9d453c47c7c464e05875ffe8803b2a4a3af44dbc669df22da9f0884492909bd7",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "tadano-faun",
       "tier": "E",
-      "source": null,
-      "reason": "No Simple Icons icon. Commons has only light-weight Tadano/Faun wordmarks tagged PD-textlogo, 13 to 17 px tall in a 90 px tile, too small for a 30 px icon (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "tadano-faun.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Tadano_Faun_logo_2014.svg",
+      "trademark": "Tadano Faun",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "1a296b955507298e031be4709c8a332fb50e2845fef170d1177732d3766e19ac",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/5/52/Tadano_Faun_logo_2014.svg",
+      "upstreamSha256": "619487eaf2169e8eae0269e8d346dbe50c55b01f966710eafcba20f7f22249ec",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "fiat",
@@ -652,14 +769,32 @@
     {
       "slug": "prisep",
       "tier": "F",
-      "source": null,
-      "reason": "Not a brand or a duplicate catalog row; clean-up is out of scope for issue #377. Letter fallback."
+      "source": "bundled",
+      "masterFile": "prisep.png",
+      "sourceUrl": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/blob/agent/batch-6-brand-logo-coverage/packages/db/prisma/seed/brand-logo-masters/prisep.png",
+      "trademark": "Carberk category illustration: trailer",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "bf2dd5c19c8dcd27afd2fa2c0047c9bbdf876936955f9e909ab8b8e815bdd36f",
+      "transform": "alpha",
+      "upstreamSource": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/blob/agent/batch-6-brand-logo-coverage/packages/db/prisma/seed/brand-logo-masters/prisep.png",
+      "upstreamSha256": "88a62bf2dcff339e5918b656ff89e3392046bf359c6f6f223bd192d904983ccb",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "category"
     },
     {
       "slug": "container",
       "tier": "F",
-      "source": null,
-      "reason": "Not a brand or a duplicate catalog row; clean-up is out of scope for issue #377. Letter fallback."
+      "source": "bundled",
+      "masterFile": "container.png",
+      "sourceUrl": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/blob/agent/batch-6-brand-logo-coverage/packages/db/prisma/seed/brand-logo-masters/container.png",
+      "trademark": "Carberk category illustration: shipping container",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "647ca38ff3b1c8fe6324ed5ca82103e67ebe0e803cbc2838c55de3c28af67b7b",
+      "transform": "alpha",
+      "upstreamSource": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/blob/agent/batch-6-brand-logo-coverage/packages/db/prisma/seed/brand-logo-masters/container.png",
+      "upstreamSha256": "f266e1fa521c7622bf305a66ec12d8683fde9cbbe13b37d7b0e965c2ef133dc4",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "category"
     },
     {
       "slug": "saipa",
@@ -679,8 +814,17 @@
     {
       "slug": "iž",
       "tier": "C",
-      "source": null,
-      "reason": "No eligible Simple Icons icon or Commons SVG/PNG tagged PD-textlogo/PD-shape selected. File:ИЖ логотип.jpg at revision 1275195737 is CC0, which is outside the Commons licensing rule; File:ИЖ!.JPG at revision 1265979675 is CC BY-SA/GFDL and depicts a tape-recorder mark."
+      "source": "bundled",
+      "masterFile": "iž.png",
+      "sourceUrl": "https://1000logos.net/izh-logo/",
+      "trademark": "Izh automotive / IzhAvto",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "a05f6333f03459b850727d8de0506b84b888f1e85d17b77d046f5da86b1a6617",
+      "transform": "alpha",
+      "upstreamSource": "https://1000logos.net/wp-content/uploads/2024/01/Izh-logo.png",
+      "upstreamSha256": "07aed98943a26be8e016670a4429f74e3fe9199522243b88698f1b0982bcbcb3",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "saab",
@@ -715,8 +859,17 @@
     {
       "slug": "new-holland",
       "tier": "E",
-      "source": null,
-      "reason": "No Simple Icons icon. The only Commons file tagged PD-textlogo (File:New Holland Logo 2023.png) is a thin wordmark, 12 px tall in a 90 px tile, too small for a 30 px icon (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "new-holland.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:New_Holland_Logo_2023.png",
+      "trademark": "New Holland Agriculture",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "6aae32250820fa2e8bd2ae619ff485e3dceae1c0195780187937416875141135",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/7/74/New_Holland_Logo_2023.png",
+      "upstreamSha256": "7827e2c06ab80fdad5f9f9b40a5d46b781e8de3f7411e530ef31aca7165399dd",
+      "normalization": "alpha mask; crop=[0,0,0.24,1]; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "yamaha",
@@ -736,8 +889,17 @@
     {
       "slug": "raf",
       "tier": "C",
-      "source": null,
-      "reason": "No Commons file shows the RAF (Riga) logo; File:RAF-Logo.svg is an unrelated star tagged PD-ineligible (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "raf.png",
+      "sourceUrl": "https://logos-world.net/raf-logo/",
+      "trademark": "Raf",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "098f26a3341e4b6e7a21f98815186b8073877080839aae12d3d70805f5a7e470",
+      "transform": "alpha",
+      "upstreamSource": "https://logos-world.net/wp-content/uploads/2023/09/RAF-Logo.png",
+      "upstreamSha256": "5dc2d4e26fd39bd19c1ccabb40b9d84867b529bee6251d90d965e487794c6ef4",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "москвич",
@@ -757,8 +919,17 @@
     {
       "slug": "cmc",
       "tier": "D",
-      "source": null,
-      "reason": "No Commons file tagged PD-textlogo or PD-shape shows the China Motor Corporation mark; the CMC-titled files belong to other companies (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "cmc.png",
+      "sourceUrl": "https://www.china-motor.com.tw/",
+      "trademark": "China Motor Corporation",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "cbfbe23752fb7af2cc0fa816c8c715fff5f6512d316e5ca6865e8a03c1edaab2",
+      "transform": "alpha",
+      "upstreamSource": "https://www.china-motor.com.tw/images/nav/cmc_logo.png",
+      "upstreamSha256": "a75a825f30a3f36c1bab808f7b874bf9c6e25e64d4025fc6b23a142794b637fb",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "pontiac",
@@ -778,8 +949,17 @@
     {
       "slug": "kuba",
       "tier": "F",
-      "source": null,
-      "reason": "Not a brand or a duplicate catalog row; clean-up is out of scope for issue #377. Letter fallback."
+      "source": "bundled",
+      "masterFile": "kuba.png",
+      "sourceUrl": "https://www.kubamotor.com.tr/page/medya",
+      "trademark": "Kuba Motor",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "f3cdeb2796ae3a3a960e9dabffaa7a46bcddc0a7c452cce3ea73247ad8b4eaff",
+      "transform": "alpha",
+      "upstreamSource": "https://www.kubamotor.com.tr/images/logo.svg?la=tr-TR",
+      "upstreamSha256": "9edae103dd36fdacfb957e6239b3cc72ff0f407472f604c3c6743c6ea324f084",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "tofaş",
@@ -799,8 +979,17 @@
     {
       "slug": "liugong",
       "tier": "E",
-      "source": null,
-      "reason": "No Simple Icons icon. The only Commons file tagged PD-textlogo (File:LiuGong logo.svg) is a thin wordmark, 14 px tall in a 90 px tile, too small for a 30 px icon (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "liugong.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:LiuGong_logo.svg",
+      "trademark": "Guangxi LiuGong Machinery",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "dfafa61ff929693d2927aa04881eb79b6f9fd1321e3ab33f9e5c98c7b758fc51",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/8/8f/LiuGong_logo.svg",
+      "upstreamSha256": "eca41969afb13418c16a77b92d9d2c1a3df4b0cf852d41ebef8a6afbccc12049",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "zaz",
@@ -865,14 +1054,32 @@
     {
       "slug": "camc",
       "tier": "D",
-      "source": null,
-      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "camc.png",
+      "sourceUrl": "https://www.camc.cc/",
+      "trademark": "CAMC / Hualing Xingma / Hanma Technology",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "b087eff2406f5b2d6879ca632869e281547010dc5091f81e4bbe7a1f9488c43f",
+      "transform": "alpha",
+      "upstreamSource": "https://www.camc.cc/img/logo.d085cbb4.png",
+      "upstreamSha256": "fe4cd699b947ca776bfda20a3ffa09a63cc0943d5a161e029ec6d562b6ab4bd7",
+      "normalization": "alpha mask; crop=[0,0,0.31,1]; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "zonda",
       "tier": "D",
-      "source": null,
-      "reason": "No Simple Icons icon. The only Commons file tagged PD-textlogo (File:Zonda-CN.png) is a thin wordmark, 14 px tall in a 90 px tile, too small for a 30 px icon (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "zonda.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Zonda-CN.png",
+      "trademark": "Zonda Bus / Zhongda",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "80f0445ff364e8c5e13d7ba6e674c91d44eb95766d3f8f250b01d7c6a4812ef1",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/0/0c/Zonda-CN.png",
+      "upstreamSha256": "c81e3182ea072156ba976a54b8ab00d90f4687df106069f6b3f1d49532b17460",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "ssangyong",
@@ -892,8 +1099,17 @@
     {
       "slug": "lifan",
       "tier": "B",
-      "source": null,
-      "reason": "File:Logo Chongqing Lifan.svg is an unrelated H-in-circle mark and File:Livan Automotive logo.svg is the successor brand Livan, not Lifan (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "lifan.png",
+      "sourceUrl": "https://github.com/filippofilip95/car-logos-dataset/blob/master/logos/data.json",
+      "trademark": "Lifan",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "e0955951c6cc473ae6e3b41ce92b4aa72ef6258d2e52eaf0877344f12405e623",
+      "transform": "alpha",
+      "upstreamSource": "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/original/lifan.png",
+      "upstreamSha256": "c704239c58a04e5575f3c9375912915b465612725e2a3282cab1d59510a4a023",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "buick",
@@ -913,8 +1129,17 @@
     {
       "slug": "alfa-romeo",
       "tier": "A",
-      "source": null,
-      "reason": "Commons has only tagged model wordmarks, no badge file tagged PD-textlogo or PD-shape (checked 2026-09-30)."
+      "source": "bundled",
+      "masterFile": "alfa-romeo.png",
+      "sourceUrl": "https://github.com/filippofilip95/car-logos-dataset/blob/master/logos/data.json",
+      "trademark": "Alfa Romeo",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "c0a5d8c57b135b2a4ddbefaa76968818e7bf59ce5aa77a6fdc2fd49abbda31d7",
+      "transform": "alpha",
+      "upstreamSource": "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/optimized/alfa-romeo.png",
+      "upstreamSha256": "e2457c7b7214c9e918f3790f637dce9b1f92ee8b4fa93e389646413c1e46d16a",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "byd",
@@ -934,8 +1159,17 @@
     {
       "slug": "belarus",
       "tier": "F",
-      "source": null,
-      "reason": "Not a brand or a duplicate catalog row; clean-up is out of scope for issue #377. Letter fallback."
+      "source": "bundled",
+      "masterFile": "belarus.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Logo-Belarus.png",
+      "trademark": "BELARUS, Minsk Tractor Works product brand",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "d71489fd6702443ebd468f1b01a849639217406e09ac03b87f6226e41804b158",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/e/e4/Logo-Belarus.png",
+      "upstreamSha256": "c8cc5aad960afd5cecad7d3a5f8f7f7f832e57ffd93dd8c5ca58195f21eeb9a0",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "porsche",
@@ -985,8 +1219,17 @@
     {
       "slug": "roewe",
       "tier": "A",
-      "source": null,
-      "reason": "The only Roewe logo file on Commons (File:Roewe logo.JPG) is CC BY 4.0, which is not accepted."
+      "source": "bundled",
+      "masterFile": "roewe.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Roewe_logo.JPG",
+      "trademark": "SAIC Roewe",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "a7725db4c1ff608c1b219e978e9a1f129afe897da1769f6aaee15af135bd2636",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/6/6f/Roewe_logo.JPG",
+      "upstreamSha256": "e8cce2d03016cf503a1a2d730d482485942934cd3eb9f7310c13c732499d5ba1",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "mg",
@@ -1036,14 +1279,32 @@
     {
       "slug": "komatsu",
       "tier": "E",
-      "source": null,
-      "reason": "No Simple Icons icon. The only Commons file tagged PD-textlogo (File:Komatsu company logos.svg) is a thin wordmark, 15 px tall in a 90 px tile, too small for a 30 px icon (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "komatsu.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Komatsu_company_logos.svg",
+      "trademark": "Komatsu",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "07ca505688cb241042f0eb41fccfc424518f6e92d82e7bda5a886d50459f56db",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/b/b7/Komatsu_company_logos.svg",
+      "upstreamSha256": "255a25f2af832344e3039ecd369d9e8c406f91d1060f5e1f5199418a115ce914",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "international",
       "tier": "D",
-      "source": null,
-      "reason": "The catalog row is Navistar International trucks (1986 on). File:International Harvester Company logo.svg (PD-shape) is the IH emblem, which went to Case IH (now CNH Industrial) in 1985 and is not Navistar's mark; it belongs on an International Harvester brand for pre-1986 IH machinery instead. No Commons file tagged PD-textlogo or PD-shape shows the Navistar International diamond (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "international.png",
+      "sourceUrl": "https://news.international.com/logos?l=5",
+      "trademark": "International Motors / Navistar International trucks",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "914a1012b31d3d273391b29d6f003b35d606ae4e1428984aca66f64b6371ca34",
+      "transform": "alpha",
+      "upstreamSource": "https://news.international.com/download/International_Symbol_Black_RGB.png",
+      "upstreamSha256": "23d3ccef1c23005af6a59c41776b85425973437104e118aa7147ad9535cb7afb",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "smart",
@@ -1063,14 +1324,32 @@
     {
       "slug": "john",
       "tier": "F",
-      "source": null,
-      "reason": "Not a brand or a duplicate catalog row; clean-up is out of scope for issue #377. Letter fallback."
+      "source": "bundled",
+      "masterFile": "john.png",
+      "sourceUrl": "https://www.deere.com/en-us/our-company/newsroom",
+      "trademark": "John Deere / Deere & Company",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "727c27eba168ab86f805819cc79f7113600355539b931afbce416c93af85647b",
+      "transform": "alpha",
+      "upstreamSource": "https://www.deere.com/resource/image/1456694/landscape_ratio4x3/1066/800/f3e7cc8214f2406117a9d3d51705b709/0AF65A9A8F8127209A10B2226AAE83F4/john-deere-logo-brand-jpg.webp",
+      "upstreamSha256": "edbea388f1856f12605606bc18a2cc00da446e85dd420e2099e43aed1f88534d",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "ppm",
       "tier": "D",
-      "source": null,
-      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "ppm.png",
+      "sourceUrl": "https://www.prapatsiri.com/terexppmprapatsiri",
+      "trademark": "Potain Poclain Manutention / Terex PPM",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "fae9d1098e0a2d6f49772cad543fa53e3298554454d701575f89847a8a433422",
+      "transform": "alpha",
+      "upstreamSource": "https://image.makewebcdn.com/makeweb/0/A9aJYM9sO/DefaultData/TEREX_PPM.png?v=202405291424",
+      "upstreamSha256": "612fdadb0ced6ee7b253d90858057b17d92115180d8f7005ca7462899913d938",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "gmc",
@@ -1150,20 +1429,47 @@
     {
       "slug": "паз",
       "tier": "C",
-      "source": null,
-      "reason": "No eligible SVG/PNG master selected. Commons File:Павловский автозавод - логотип.jpg at revision 1063728838 is tagged PD-textlogo, but its JPEG master is outside the importer SVG/PNG format rule."
+      "source": "bundled",
+      "masterFile": "паз.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:%D0%9F%D0%B0%D0%B2%D0%BB%D0%BE%D0%B2%D1%81%D0%BA%D0%B8%D0%B9_%D0%B0%D0%B2%D1%82%D0%BE%D0%B7%D0%B0%D0%B2%D0%BE%D0%B4_-_%D0%BB%D0%BE%D0%B3%D0%BE%D1%82%D0%B8%D0%BF.jpg",
+      "trademark": "Pavlovo Bus / PAZ",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "284344c296562d3dc7fc78d8c264f0d719002d5ef445564d7516dba64ba603ad",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/6/66/%D0%9F%D0%B0%D0%B2%D0%BB%D0%BE%D0%B2%D1%81%D0%BA%D0%B8%D0%B9_%D0%B0%D0%B2%D1%82%D0%BE%D0%B7%D0%B0%D0%B2%D0%BE%D0%B4_-_%D0%BB%D0%BE%D0%B3%D0%BE%D1%82%D0%B8%D0%BF.jpg",
+      "upstreamSha256": "fe40ed27a043f31f9bd00ca686159458838f3f9dc3a192a4b5e7c215b14165b4",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "balkancar",
       "tier": "E",
-      "source": null,
-      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "balkancar.png",
+      "sourceUrl": "https://balkancar.org/",
+      "trademark": "Balkancar",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "739e3fa21a4dc3422838a3b71283f30e119c41208d6c59223595eb3067a7e6f6",
+      "transform": "alpha",
+      "upstreamSource": "https://balkancar.org/wp-content/uploads/2023/08/blakancar-small-logo-red.png",
+      "upstreamSha256": "1e831760a19edd592b09e11dd717f65b651dca1f7d6b72af40a28931e27f5f03",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "jawa",
       "tier": "E",
-      "source": null,
-      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "jawa.png",
+      "sourceUrl": "https://www.jawa.eu/",
+      "trademark": "JAWA Moto",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "593ad340f4bd575ca03198d1ee514ea9ed22563bf25c8b1a80133f0991761198",
+      "transform": "alpha",
+      "upstreamSource": "https://www.jawa.eu/data/filecache/96/logo.png",
+      "upstreamSha256": "5bb0fbee86525c4a01f2572333275049aedc4be6d22d5dd159bf559862a1d6d8",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "seat",
@@ -1198,14 +1504,32 @@
     {
       "slug": "hidromek",
       "tier": "E",
-      "source": null,
-      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "hidromek.png",
+      "sourceUrl": "https://www.hidromek.com.tr/",
+      "trademark": "Hidromek",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "7bcd26588eb01795f9e854abd2bdc834607e8a629598132ba4f6b46accf3a361",
+      "transform": "alpha",
+      "upstreamSource": "https://www.hidromek.com.tr/assets/img/companies/0.svg",
+      "upstreamSha256": "8a2ad2eb17798c04707ea08f4d5a7aceb5571f335bbbcca0d54c53dabd86c91a",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "ozan",
       "tier": "D",
-      "source": null,
-      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "ozan.png",
+      "sourceUrl": "https://tmcars.info/cars/4383863982/ozan-200-14-2014",
+      "trademark": "Ozan full-name identifying label; manufacturer emblem not verified",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "bc107a51281ed7418f043f8854b8f773fb9da6966a064b6ae4cf0ffe3e3b13b6",
+      "transform": "alpha",
+      "upstreamSource": "https://tmcars.info/cars/4383863982/ozan-200-14-2014",
+      "upstreamSha256": "b0c34a872cc46806521aa9fe362849fb31260ffaddce3607679a4316ae0e9bd7",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "identifying-label"
     },
     {
       "slug": "jetour",
@@ -1225,20 +1549,47 @@
     {
       "slug": "heli",
       "tier": "E",
-      "source": null,
-      "reason": "No Simple Icons icon; the only PD-textlogo Heli file is a JPEG (File:Heli logo.jpg), outside the SVG/PNG rule (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "heli.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Heli_logo.jpg",
+      "trademark": "Anhui Heli",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "af687bd7f50d52be3d02903bb15101e2d35019b93d834175a8c5dd3122861934",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/8/82/Heli_logo.jpg",
+      "upstreamSha256": "69b65ea875999cfe50dd2d39f01afd29da02461d31a1b28db4b6e2e1c92c2d5c",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "jungheinrich",
       "tier": "E",
-      "source": null,
-      "reason": "No Simple Icons icon. The only Commons file tagged PD-textlogo (File:Jungheinrich-Logo.svg) is a thin wordmark, 11 px tall in a 90 px tile, too small for a 30 px icon (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "jungheinrich.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Jungheinrich-Logo.svg",
+      "trademark": "Jungheinrich",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "5cd6ab64da78f4603ce76186ab056ed35da226b370a17b29e68b5c4d0f640273",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/c/c8/Jungheinrich-Logo.svg",
+      "upstreamSha256": "0540009a9934370ceb5263c063b801793d91039467fa68291a25b755540b31ee",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "bobcat",
       "tier": "E",
-      "source": null,
-      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "bobcat.png",
+      "sourceUrl": "https://www.bobcat.com/",
+      "trademark": "Bobcat Company",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "271a33f11105a151be5c87e720776079b9ec9175e1bbf6df3ed15bef45a7a738",
+      "transform": "alpha",
+      "upstreamSource": "https://td-resources.s3.eu-west-1.amazonaws.com/images/logo_white.png",
+      "upstreamSha256": "925a1a9e72b68b39ceeb85a0ea93e97fe84c92ced7c23b257f6653441f0978fd",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "jaguar",
@@ -1258,8 +1609,17 @@
     {
       "slug": "foton-lovol",
       "tier": "E",
-      "source": null,
-      "reason": "No Simple Icons icon. The only Commons file tagged PD-textlogo (File:Weichai Lovol logo.png) is a thin wordmark, 12 px tall in a 90 px tile, too small for a 30 px icon (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "foton-lovol.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Weichai_Lovol_logo.png",
+      "trademark": "Weichai Lovol / formerly Foton Lovol",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "12861b9c195d6cfd555cb28d0252d1a10dd602cedf38bea486cb19d502ad503e",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/a/a4/Weichai_Lovol_logo.png",
+      "upstreamSha256": "a05e5b16b6bb1a562aa9f4623b87a1dba0c042048c04c50e5c1d311533f94717",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "sdlg",
@@ -1279,14 +1639,32 @@
     {
       "slug": "kara",
       "tier": "D",
-      "source": null,
-      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "kara.png",
+      "sourceUrl": "https://karamachinery.ir/",
+      "trademark": "Kara Machinery Arena",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "b85157f7e4baaec61f7735f59121b6e1b026698a7cfa0a906eb1edb5d67420e1",
+      "transform": "alpha",
+      "upstreamSource": "https://api.karamachinery.ir/api/media/file/kara_logo.png",
+      "upstreamSha256": "06a89214d1755653baf84f8a1c6084b2d750cb0d7fb0c2105563b6115ff9f556",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "hamm",
       "tier": "E",
-      "source": null,
-      "reason": "No Commons file tagged PD-textlogo or PD-shape; File:WIRTGEN Hamm Logo.png is CC BY-SA 4.0, which is not accepted (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "hamm.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:WIRTGEN_Hamm_Logo.png",
+      "trademark": "Hamm / Wirtgen Group",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "035d784f9dcb71ab6f8be21722641509dd96d16fd30c89fc727dcdbbaeb7659c",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/1/1f/WIRTGEN_Hamm_Logo.png",
+      "upstreamSha256": "4e8be57846e170a9f96b384ff103e8ddc539fa5401b771c844d4d9c38b76e341",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "case",
@@ -1306,8 +1684,17 @@
     {
       "slug": "voyah",
       "tier": "B",
-      "source": null,
-      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "voyah.png",
+      "sourceUrl": "https://www.voyah-global.com/",
+      "trademark": "Dongfeng Voyah",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "d7fa86b820a49b04aaac1ce68df65291968695f911396c38a71f07b91692a138",
+      "transform": "alpha",
+      "upstreamSource": "https://www.voyah-global.com/static/js/index-3ac2eb2b.js",
+      "upstreamSha256": "d8dc5406c0ec39c124529d7a5796de3d69c2d02015cd819612227c3b96e79f7c",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "lixiang",
@@ -1327,26 +1714,62 @@
     {
       "slug": "soueast",
       "tier": "B",
-      "source": null,
-      "reason": "The only tagged file is a 15:1 wordmark PNG, too thin for a 30 px icon."
+      "source": "bundled",
+      "masterFile": "soueast.png",
+      "sourceUrl": "https://www.soueast-motor.com/",
+      "trademark": "Soueast Motor",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "e259e30a2109eecf76fb76d01454955db09f84bfc34eee8d497e1191043ee92d",
+      "transform": "alpha",
+      "upstreamSource": "https://www.soueast-motor.com/img/new/logo.png",
+      "upstreamSha256": "79e7b88de2564f2fc32952b086ae5f4ff57338dc9c3b8bcfe7ba8531c522920b",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "sem",
       "tier": "E",
-      "source": null,
-      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "sem.png",
+      "sourceUrl": "https://www.semmachinery.com/",
+      "trademark": "Shandong Engineering Machinery / Caterpillar SEM",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "9ab2ddf391087e38d3c8daf2e0dbab3199ff5fce1593396c2ae4d369aea340d2",
+      "transform": "alpha",
+      "upstreamSource": "https://www.semmachinery.com/SEM/public/images/logo-cn.png",
+      "upstreamSha256": "bb3f5fc297d7cc543d7cbfd30ff9e74bf2fdb8a6c36014aa0ac3a0ab61550385",
+      "normalization": "yellow mask; crop=[0,0,0.34,0.6]; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "haval",
       "tier": "B",
-      "source": null,
-      "reason": "The only Haval mark tagged PD (File:Haval 2023 logo.svg) is a thin wordmark, about 9 px tall in a 90 px tile, too small for a 30 px icon."
+      "source": "bundled",
+      "masterFile": "haval.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Haval_2023_logo.svg",
+      "trademark": "Great Wall Haval",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "7e355d613dd18802b8c183425b9dd38cd50ea6aed3cf20293fcba6cfd3a0e7e7",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/d/da/Haval_2023_logo.svg",
+      "upstreamSha256": "785466470dc6e99f1b35a700ae6aeb81bacaa471b94d78e0938d9118d4486300",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "avatr",
       "tier": "B",
-      "source": null,
-      "reason": "File:Avatr Technology Logo.png (PD-textlogo) has hairline strokes that vanish at 30 px, and File:Avatr Technology logo.svg renders clipped (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "avatr.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Avatr_Technology_Logo.png",
+      "trademark": "Avatr Technology",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "c44fd06f36bf8dd1a0a34506b3c1e37da66ba6d31045e0a118e782f7f1c1c2ec",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/5/57/Avatr_Technology_Logo.png",
+      "upstreamSha256": "45c818a4812db53e648ee0c5cb44d715d9d3a4f5674051fe230052eb14b897c9",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "great-wall",
@@ -1381,20 +1804,47 @@
     {
       "slug": "kato",
       "tier": "E",
-      "source": null,
-      "reason": "No Simple Icons icon. The only Commons file tagged PD-textlogo (File:KATO Works Logo.png) is a thin wordmark, 6 px tall in a 90 px tile, too small for a 30 px icon (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "kato.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:KATO_Works_Logo.png",
+      "trademark": "Kato Works",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "d28766f23044a6c1b5a9bb68dada3338d4c771d0de7143836dd2d222db2149e2",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/7/7d/KATO_Works_Logo.png",
+      "upstreamSha256": "0212d25767c9362c3a6dbb5b80f24f8710b5c2fc07cfec75b7cbcf4d4182e306",
+      "normalization": "light mask; crop=[0,0,0.3,1]; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "yto",
       "tier": "E",
-      "source": null,
-      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "yto.png",
+      "sourceUrl": "https://ytocorp.com/",
+      "trademark": "YTO Group",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "fc3b1129bb1674c0c90ddcccb973cbbe07d28d37f4e2e47e7361e03bc9588ac1",
+      "transform": "alpha",
+      "upstreamSource": "https://ytocorp.com/images/logo.png",
+      "upstreamSha256": "e9f7cb2fa8d9112e175f0daf941249c4b15949074d02d35ab460050d4ad90c7b",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "shantui",
       "tier": "E",
-      "source": null,
-      "reason": "No Simple Icons icon. The only Commons file tagged PD-textlogo (File:SHANTUI Logo.svg) is a thin wordmark, 12 px tall in a 90 px tile, too small for a 30 px icon (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "shantui.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:SHANTUI_Logo.svg",
+      "trademark": "Shantui Construction Machinery",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "16a390ec08d9f194673a8a8a558a3928bd3d1dee70b4667fc513cebb74d17b9b",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/e/ec/SHANTUI_Logo.svg",
+      "upstreamSha256": "f78d7b603230e328eccdf59925287e3e92390ea2debd81bf07397f2e398d56d5",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "bomag",
@@ -1429,20 +1879,47 @@
     {
       "slug": "liebherr",
       "tier": "E",
-      "source": null,
-      "reason": "No Simple Icons icon. Commons has only thin Liebherr wordmarks tagged PD-textlogo (about 10 px tall in a 90 px tile); File:Liebherr Gak.svg is not a usable logo (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "liebherr.png",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Liebherr_logo.svg",
+      "trademark": "Liebherr",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "00c7d7954f3f7f6e647de3c07104c831b562ed67abe46c35c6d87dc361743226",
+      "transform": "alpha",
+      "upstreamSource": "https://upload.wikimedia.org/wikipedia/commons/6/66/Liebherr_logo.svg",
+      "upstreamSha256": "6c218d88e033c5280aaf86355613b84e7253090b8760643e45e33cf4515cf788",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "lugong",
       "tier": "F",
-      "source": null,
-      "reason": "Not a brand or a duplicate catalog row; clean-up is out of scope for issue #377. Letter fallback."
+      "source": "bundled",
+      "masterFile": "lugong.png",
+      "sourceUrl": "https://www.lugong.net/",
+      "trademark": "Shandong Lugong Machinery",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "c8e6522502ca4c7bbf3b8dc05076cfc979f638faa06b39b316970d909183dc69",
+      "transform": "alpha",
+      "upstreamSource": "https://www.lugong.net/wp-content/uploads/2022/03/logo.png",
+      "upstreamSha256": "7dd942d9acb620ace3e568d8ef3a731408d4191194cf9de963b0cc238738e668",
+      "normalization": "alpha mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "zoomlion",
       "tier": "E",
-      "source": null,
-      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "zoomlion.png",
+      "sourceUrl": "https://www.zoomlion.com/",
+      "trademark": "Zoomlion Heavy Industry",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "de7cedfa1aaf287ac23a7795925fafd4098818e629efaaeb699a3e1c235ccf82",
+      "transform": "alpha",
+      "upstreamSource": "https://www.zoomlion.com/images/header_logo.png",
+      "upstreamSha256": "372e0c5f1335c090bdaf2c4b93f1040d769afcceb2dc804e2e37d3686045b706",
+      "normalization": "dark mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     },
     {
       "slug": "jac",
@@ -1462,8 +1939,17 @@
     {
       "slug": "hongqi",
       "tier": "B",
-      "source": null,
-      "reason": "No Simple Icons icon and no Commons file tagged PD-textlogo or PD-shape found (checked 2026-10-11)."
+      "source": "bundled",
+      "masterFile": "hongqi.png",
+      "sourceUrl": "https://www.hongqi-auto.com/pages/brand/brand.html",
+      "trademark": "FAW Hongqi",
+      "retrievedAt": "2026-10-11",
+      "sha256Master": "1f32f220c44feb0197ab86259124a773b14f74c51230b05c57b0a525c171b715",
+      "transform": "alpha",
+      "upstreamSource": "https://www.hongqi-auto.com/images/common/logo.png",
+      "upstreamSha256": "2f4b650f3ec25c5a9cd88bbf113ff0955f57a658ba18239f2aa1004ef5b29856",
+      "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
+      "artworkKind": "manufacturer"
     }
   ]
 }

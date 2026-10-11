@@ -3,6 +3,7 @@ import { mkdir, readFile, realpath, rename, writeFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   COMMONS_DOWNLOAD_HOST,
@@ -143,7 +144,7 @@ export function createMasterProvider(options: MasterProviderOptions): MasterProv
 
   async function loadBundled(entry: BundledLogoEntry): Promise<Uint8Array> {
     if (!isBundledMasterName(entry.masterFile)) throw new MasterIntegrityError(`${entry.slug}: unsafe bundled masterFile`);
-    const directory = await realpath(options.bundledDir ?? new URL("../../prisma/seed/brand-logo-masters", import.meta.url).pathname);
+    const directory = await realpath(options.bundledDir ?? fileURLToPath(new URL("../../prisma/seed/brand-logo-masters", import.meta.url)));
     const file = await realpath(join(directory, entry.masterFile));
     if (relative(directory, file) !== entry.masterFile) throw new MasterIntegrityError(`${entry.slug}: bundled master leaves its directory`);
     return new Uint8Array(await readFile(file));
