@@ -73,6 +73,8 @@ beforeEach(async () => {
   state.rows.set("listing_media", [{ id: "media-1", key: `${prefix}/original.jpg`, posterKey: null }]);
   state.rows.set("users", [{ id: "user-1", avatarKey: `${prefix}/original.jpg`, avatarUrl: null }]);
   state.rows.set("messages", [{ id: "message-1", metadata: { key: chat, snapshot: { coverMediaKey: `${prefix}/original.jpg` }, width: 120, height: 90 } }]);
+  state.rows.set("audit_logs", [{ id: "audit-1", details: { before: { avatarKey: `${prefix}/original.jpg` }, removedPhotoKey: "removed/photo.jpg" } }]);
+  state.rows.set("content_reports", [{ id: "report-1", messageContext: { key: chat, body: "Historical report content" } }]);
   state.rows.set("media_uploads", [{ id: "upload-1", key: `${prefix}/original.jpg`, objectKeys: ["original.jpg", "thumbnail.jpg", "thumbnail.webp", "list.jpg", "list.webp", "detail.jpg", "detail.webp", "fullscreen.jpg", "fullscreen.webp"].map((name) => `${prefix}/${name}`), contentType: "image/jpeg", sizeBytes: original.length }]);
 });
 afterEach(async () => { vi.unstubAllEnvs(); await rm(directory, { recursive: true, force: true }); });
@@ -81,18 +83,30 @@ describe("stored photo conversion", () => {
   it("inventories without writes, preserves identities/references, resumes, then deletes only after verification", async () => {
     await main(["dry-run", plan]);
     expect(state.objects.size).toBe(6);
-    expect(JSON.parse(await readFile(plan, "utf8")).rows).toHaveLength(4);
+    const inventory = JSON.parse(await readFile(plan, "utf8"));
+    expect(inventory.rows).toHaveLength(5);
+    expect(inventory.auditHistoryReferenceCount).toBe(1);
     await main(["apply", plan]); await main(["apply", plan]); await main(["verify", plan]);
     expect(state.rows.get("listing_media")?.[0]).toEqual({ id: "media-1", key: `${prefix}/original.webp`, posterKey: null });
     expect(state.rows.get("users")?.[0]?.["id"]).toBe("user-1");
     expect(state.rows.get("messages")?.[0]).toEqual({ id: "message-1", metadata: { key: "chat-attachments/conversation/photo/original.webp", snapshot: { coverMediaKey: `${prefix}/original.webp` }, width: 120, height: 90 } });
     expect(state.rows.get("media_uploads")?.[0]?.["objectKeys"]).toHaveLength(5);
+    expect(state.rows.get("content_reports")?.[0]).toEqual({ id: "report-1", messageContext: { key: "chat-attachments/conversation/photo/original.webp", body: "Historical report content" } });
+    expect(state.rows.get("audit_logs")?.[0]).toEqual({ id: "audit-1", details: { before: { avatarKey: `${prefix}/original.jpg` }, removedPhotoKey: "removed/photo.jpg" } });
     const detail = await sharp(must(state.objects.get(`listing-photos/${prefix}/detail.webp`)).body).metadata();
     expect([detail.width, detail.height]).toEqual([120, 90]);
     expect([...state.objects.keys()].filter((key) => key.endsWith(".jpg"))).toHaveLength(6);
     await main(["delete-jpeg", plan]); await main(["delete-jpeg", plan]);
     expect([...state.objects.keys()].filter((key) => key.endsWith(".jpg"))).toEqual([]);
     expect(state.objects.size).toBe(6);
+  });
+
+  it("preserves append-only audit snapshots while live report and profile references move to WebP", async () => {
+    const auditBefore = structuredClone(state.rows.get("audit_logs"));
+    await main(["dry-run", plan]); await main(["apply", plan]);
+    expect(state.rows.get("audit_logs")).toEqual(auditBefore);
+    expect(state.rows.get("users")?.[0]?.["avatarKey"]).toBe(`${prefix}/original.webp`);
+    expect(state.rows.get("content_reports")?.[0]?.["messageContext"]).toEqual({ key: "chat-attachments/conversation/photo/original.webp", body: "Historical report content" });
   });
 
   it("refuses a changed reference rather than overwriting user content or deleting JPEGs", async () => {
