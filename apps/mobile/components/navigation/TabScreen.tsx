@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { ViewProps } from "react-native";
+import { View, type ViewProps } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ScrollEdgeFade } from "./ScrollEdgeFade";
@@ -13,8 +13,10 @@ type TabScreenProps = ViewProps & {
   /**
    * Lets the content run under the floating tab bar. The screen's scrolling
    * list then ends with `useTabBarSpace()` of padding itself, so its last row
-   * can be scrolled clear of the bar. Without it the screen stops above the
-   * bar, which is right for a screen with a button pinned to its bottom.
+   * can be scrolled clear of the bar, and a state that does not scroll
+   * (empty, error, loading) sits in a `TabBarClear`. Without it the screen
+   * stops above the bar, which is right for a screen with a button pinned to
+   * its bottom; the glass then shows only the page.
    */
   underTabBar?: boolean;
   /**
@@ -62,5 +64,19 @@ export function TabScreen({
       {edgeFade && !glassOverContent ? <ScrollEdgeFade height={space} /> : null}
       {overlay}
     </SafeAreaView>
+  );
+}
+
+/**
+ * Content that does not scroll (an empty, error or loading state) on an
+ * `underTabBar` screen: it fills the screen and keeps the tab bar's space
+ * below it, so a centred message is centred above the bar, not behind it.
+ */
+export function TabBarClear({ className, style, children, ...props }: ViewProps & { className?: string }) {
+  const space = useTabBarSpace();
+  return (
+    <View className={cn("flex-1", className)} style={[{ paddingBottom: space }, style]} {...props}>
+      {children}
+    </View>
   );
 }
