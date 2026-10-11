@@ -16,6 +16,17 @@ function viewer(screen: ReturnType<typeof renderMobile>) {
 }
 
 describe("Photo gallery and viewer", () => {
+  it.each([[900, 1600], [1920, 1080]])("shows the complete %sx%s vehicle photo inside the existing fixed gallery frame", (width, height) => {
+    const media = mediaFixture(1).map((photo) => ({ ...photo, width, height }));
+    const screen = renderMobile(<PhotoGallery media={media} />);
+    const image = first(screen.UNSAFE_getAllByType(Image));
+    expect(image.props.contentFit).toBe("contain");
+    expect(image.props.placeholderContentFit).toBe("contain");
+    const frame = screen.UNSAFE_getAllByType(RN.View).find((view) => view.props.className === "bg-muted");
+    expect(frame?.props.style).toEqual({ width: 390, height: 253.5 });
+    expect(image.props.source.uri).toBe("https://media.test/0/detail.webp?v=webp-natural-1");
+  });
+
   it("opens the viewer at the photo that was tapped", () => {
     const screen = renderMobile(<PhotoGallery media={mediaFixture(3)} />);
     expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
