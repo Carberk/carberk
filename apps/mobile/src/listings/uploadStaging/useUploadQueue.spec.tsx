@@ -92,12 +92,14 @@ function wrapper({ children }: { children: React.ReactNode }) {
 describe("useUploadQueue — in grid order (#819)", () => {
   /** Compressions wait until the test finishes them, by source photo. */
   let compressions: Map<string, () => void>;
+  let compressionFailures: Map<string, () => void>;
   /** Presign requests wait until the test answers them, in the order asked. */
   let presigns: (() => void)[];
 
   beforeEach(() => {
     vi.clearAllMocks();
     compressions = new Map();
+    compressionFailures = new Map();
     presigns = [];
     mockReadDirectoryAsync.mockResolvedValue([]);
     mockListLocalPhotoIds.mockResolvedValue([]);
@@ -106,7 +108,8 @@ describe("useUploadQueue — in grid order (#819)", () => {
     });
     mockUploadAsync.mockResolvedValue({ status: 200, headers: {}, body: "", mimeType: "image/jpeg" });
     mockCompressPhoto.mockImplementation((sourceUri: string, destinationUri: string) =>
-      new Promise((resolve) => {
+      new Promise((resolve, reject) => {
+        compressionFailures.set(sourceUri, () => reject(new Error("compression failed")));
         compressions.set(sourceUri, () => resolve({ uri: destinationUri, width: 100, height: 100, fileSize: 1024 }));
       }));
     mockPresignMutateAsync.mockImplementation(() =>
@@ -224,6 +227,53 @@ describe("useUploadQueue — in grid order (#819)", () => {
     }
     await waitFor(() => expect(result.current.photos.every((photo) => photo.state === "uploaded")).toBe(true));
   });
+
+  it("uploads followers of a restored lost cover without retrying the lost photo", async () => {
+    const { result } = renderHook(() => useUploadQueue("grid-order", {
+      photos: [{ photoId: "lost-cover", sortOrder: 0 }],
+    }), { wrapper });
+    await waitFor(() => expect(result.current.isReady).toBe(true));
+    act(() => { void result.current.addPhoto(picked(1)); });
+    await finishCompression(1);
+    await answerPresign();
+    await waitFor(() => expect(result.current.photos[1]?.state).toBe("uploaded"));
+    expect(result.current.photos[0]).toMatchObject({ photoId: "lost-cover", state: "lost" });
+    expect(mockUploadAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["remove", "reorder", "compression failure", "missing destination"])(
+    "releases compressed followers when a moved cover ends through %s", async (release) => {
+      const { result } = await pick(3);
+      const ids = result.current.photos.map((photo) => photo.photoId);
+      const [first, second, third] = ids as [string, string, string];
+      await finishCompression(1);
+      await finishCompression(2);
+      act(() => result.current.reorderPhotos([third, second, first]));
+      await answerPresign();
+      expect(result.current.photos.find((photo) => photo.photoId === first)?.state).toBe("uploaded");
+      expect(presigns).toHaveLength(0);
+
+      if (release === "remove") act(() => result.current.removePhoto(third));
+      else if (release === "reorder") act(() => result.current.reorderPhotos([second, third, first]));
+      else if (release === "compression failure") {
+        await act(async () => { compressionFailures.get(picked(3))?.(); });
+      } else {
+        mockGetInfoAsync.mockResolvedValueOnce({ exists: false, uri: "", isDirectory: false });
+        await finishCompression(3);
+      }
+      await answerPresign();
+      await waitFor(() => expect(result.current.photos.find((photo) => photo.photoId === second)?.state).toBe("uploaded"));
+      // Repeated wake-ups/resume must not duplicate the already-started PUT.
+      act(() => result.current.reorderPhotos(result.current.photos.map((photo) => photo.photoId)));
+      const resume = mockSetupUploadResume.mock.calls.at(-1)?.[0].resumePendingUploads;
+      act(() => resume?.());
+      await act(async () => undefined);
+      expect(uploadedPhotos(ids)).toEqual([1, 2]);
+      expect(result.current.photos.map((photo) => photo.photoId)).toEqual(
+        release === "remove" ? [second, first] : release === "reorder" ? [second, third, first] : [third, second, first],
+      );
+    },
+  );
 
   it("skips a photo removed while it waited to be compressed", async () => {
     const { result } = await pick(3);
