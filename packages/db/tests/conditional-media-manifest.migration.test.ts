@@ -115,7 +115,7 @@ for (const populated of [true, false]) {
         .rejects.toThrow("media_uploads_conditional_manifest_check");
     });
 
-    it.each([webpManifest, oldManifest])("refuses conditional video and missing original membership for %j", async (objects) => {
+    it.each([[webpManifest], [oldManifest]])("refuses conditional video and missing original membership for %j", async (objects) => {
       await expect(insertUpload(randomUUID(), objects, "video"))
         .rejects.toThrow("media_uploads_conditional_manifest_check");
       await expect(insertUpload(randomUUID(), objects, "image", "conditional-v1", "missing.webp"))
