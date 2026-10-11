@@ -15,6 +15,8 @@ const FLAG = "@auto-tm/onboarding-completed";
 const LOCALE = "@auto-tm/locale";
 const LANGUAGE = "/(onboarding)/language";
 
+const fontState = vi.hoisted(() => ({ loaded: true, error: null as Error | null }));
+
 const launch = vi.hoisted(() => ({
   pathname: "/",
   stored: {} as Record<string, string>,
@@ -45,7 +47,7 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
     removeItem: vi.fn(async () => {}),
   },
 }));
-vi.mock("expo-font", () => ({ useFonts: () => [true] }));
+vi.mock("expo-font", () => ({ useFonts: () => [fontState.loaded, fontState.error] }));
 vi.mock("expo-splash-screen", () => ({ preventAutoHideAsync: vi.fn(), hide: vi.fn() }));
 vi.mock("expo-status-bar", () => ({ StatusBar: () => null }));
 vi.mock("expo-localization", () => ({ getLocales: () => [{ languageCode: "en" }] }));
@@ -88,6 +90,8 @@ async function launchApp() {
 
 beforeEach(() => {
   createRequire(import.meta.url).extensions[".ttf"] = (module) => { module.exports = {}; };
+  fontState.loaded = true;
+  fontState.error = null;
   launch.pathname = "/";
   launch.stored = {};
   launch.push.mockClear();
@@ -102,6 +106,28 @@ afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.mocked(AsyncStorage.getItem).mockImplementation(async (key: string) => launch.stored[key] ?? null);
+});
+
+describe("Startup resource failures", () => {
+  it("mounts the destination when bundled fonts fail instead of holding launch forever", async () => {
+    fontState.loaded = false;
+    fontState.error = new Error("font unavailable");
+    launch.stored = { [LOCALE]: "en" };
+    const screen = await launchApp();
+    expect(screen.getByTestId("(tabs)")).toBeTruthy();
+    expect(screen.getByText("By Alpha Motors")).toBeTruthy();
+  });
+
+  it("mounts the destination if locale storage fails and keeps deep-link precedence", async () => {
+    launch.pathname = "/listings/linked";
+    vi.mocked(AsyncStorage.getItem).mockImplementation(async (key: string) => {
+      if (key === LOCALE) throw new Error("locale storage unavailable");
+      return null;
+    });
+    const screen = await launchApp();
+    expect(screen.getByTestId("(tabs)")).toBeTruthy();
+    expect(launch.push).not.toHaveBeenCalled();
+  });
 });
 
 describe("Root Back anchor", () => {
