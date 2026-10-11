@@ -99,4 +99,20 @@ describe(`${MIGRATION} — Testcontainers`, () => {
     expect((await db.query("SELECT \"modelId\" FROM listings WHERE id='moved'")).rows).toEqual([{ modelId: "old-4180" }]);
     expect((await db.query("SELECT \"nameEn\" FROM brands WHERE id='john'")).rows).toEqual([{ nameEn: "John" }]);
   });
+
+  it.each([
+    { brandId: "lugong" },
+    { brandId: "lugong", modelIds: [] },
+    { brandId: "lugong", modelIds: null },
+    { brandId: "liugong" },
+    { brandId: "liugong", modelIds: [] },
+  ])("refuses affected brand-only saved search %j before changing rows", async filters => {
+    await db.query('INSERT INTO saved_searches (id, "userId", filters, "updatedAt") VALUES ($1, $2, $3, now())',
+      ["brand-search", "seller", JSON.stringify(filters)]);
+    await expect(applyMigration()).rejects.toThrow(/saved.search/i);
+    expect((await db.query('SELECT "brandId", "modelId" FROM listings WHERE id=\'moved\'')).rows).toEqual([{ brandId: "lugong", modelId: "old-4180" }]);
+    expect((await db.query('SELECT "brandId" FROM models WHERE id=\'old-4180\'')).rows).toEqual([{ brandId: "lugong" }]);
+    expect((await db.query('SELECT "nameEn" FROM brands WHERE id=\'john\'')).rows).toEqual([{ nameEn: "John" }]);
+  });
+
 });
