@@ -99,4 +99,26 @@ describe("WebP operator conversion on real Postgres and conditional MinIO", () =
     expect((await s3.send(new GetObjectCommand({ Bucket: "listing-photos", Key: key }))).Body).toBeDefined();
   });
 
+
+  it("retires expired unadopted placeholders into durable cleanup without accepting empty WebP photos", async () => {
+    const prefix = "pending/51b0b4e0-4d4a-4d2c-8bd6-705555cb7585";
+    const key = `${prefix}/original.jpg`;
+    const keys = [key, ...["thumbnail", "list", "detail", "fullscreen"].flatMap((name) => [`${prefix}/${name}.jpg`, `${prefix}/${name}.webp`])];
+    await pool.query(`INSERT INTO users (id,role,"createdAt","updatedAt") VALUES ('placeholder-user','seller',now(),now())`);
+    await pool.query(`INSERT INTO media_uploads (id,"userId",key,kind,"contentType","sizeBytes","createdAt","objectKeys","writeProtocol",state) VALUES ('placeholder-upload','placeholder-user',$1,'image','image/jpeg',100,'2000-01-01',$2,'conditional-v1','AVAILABLE')`, [key, keys]);
+    for (const Key of keys) await s3.send(new PutObjectCommand({ Bucket: "listing-photos", Key, Body: Buffer.alloc(0), CacheControl: "no-store" }));
+    // Boundary time only: real object metadata and PG provenance still decide eligibility.
+    const clock = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 601_000);
+    try {
+      const plan = join(directory, "placeholder-plan.json");
+      await main(["dry-run", plan]);
+      await expect(main(["apply", plan])).rejects.toThrow("retire-placeholders");
+      await main(["retire-placeholders", plan]); await main(["retire-placeholders", plan]);
+      expect((await pool.query(`SELECT state FROM media_uploads WHERE id='placeholder-upload'`)).rows[0].state).toBe("RETIRED");
+      const work = (await pool.query(`SELECT status,"objectKeys" FROM media_upload_cleanups WHERE "uploadId"='placeholder-upload'`)).rows[0];
+      expect(work.status).toBe("PENDING"); expect(work.objectKeys).toHaveLength(9);
+      expect((await s3.send(new GetObjectCommand({ Bucket: "listing-photos", Key: key }))).ContentLength).toBe(0);
+    } finally { clock.mockRestore(); }
+  });
+
 });

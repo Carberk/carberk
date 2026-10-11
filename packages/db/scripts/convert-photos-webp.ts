@@ -32,8 +32,9 @@ const TABLES = [
 
 type Stored = { bucket: string; key: string; etag: string };
 type Row = { table: string; idColumn: string; id: string; before: Record<string, unknown>; after: Record<string, unknown> };
-type Plan = { auditHistoryReferenceCount?: number; version: 1; endpoint: string; databaseFingerprint: string; objects: Stored[]; rows: Row[] };
-type Event = { type: "prepared" | "written" | "deleted"; bucket: string; key: string; hash?: string; etag?: string };
+type PlaceholderUpload = { uploadId: string; key: string; before: Record<string, unknown>; objects: Stored[] };
+type Plan = { placeholderUploads?: PlaceholderUpload[]; placeholderChats?: Stored[]; auditHistoryReferenceCount?: number; version: 1; endpoint: string; databaseFingerprint: string; objects: Stored[]; rows: Row[] };
+type Event = { type: "prepared" | "written" | "deleted" | "placeholder-deleted" | "placeholder-prepared"; bucket: string; key: string; hash?: string; etag?: string };
 const hash = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const isJpeg = (key: string) => /\.(jpg|jpeg)$/i.test(key);
 const webpKey = (key: string) => key.replace(/\.(jpg|jpeg)$/i, ".webp");
@@ -89,11 +90,13 @@ async function inventory(s3: S3Client): Promise<Stored[]> {
   return objects.sort((a, b) => `${a.bucket}/${a.key}`.localeCompare(`${b.bucket}/${b.key}`));
 }
 
-async function snapshotRows(pool: Pool, mappings: ReadonlyMap<string, string>, includeUploads = false): Promise<Row[]> {
+async function snapshotRows(pool: Pool, mappings: ReadonlyMap<string, string>, includeUploads = false, ignoredUploads = new Set<string>()): Promise<Row[]> {
   const rows: Row[] = [];
   for (const spec of TABLES) {
-    const result = await pool.query(`SELECT ${[spec.id, ...spec.columns].map(quote).join(",")} FROM ${quote(spec.table)} ORDER BY ${quote(spec.id)}`);
+    const stateColumn = spec.table === "media_uploads" ? ["state"] : spec.table === "media_upload_cleanups" ? ["status"] : [];
+    const result = await pool.query(`SELECT ${[spec.id, ...spec.columns, ...stateColumn].map(quote).join(",")} FROM ${quote(spec.table)} ORDER BY ${quote(spec.id)}`);
     for (const row of result.rows as Record<string, unknown>[]) {
+      if (row["state"] === "DELETED" || row["status"] === "DONE" || ignoredUploads.has(String(row[spec.id]))) continue;
       const before = Object.fromEntries(spec.columns.map((column) => [column, row[column]]));
       assertReferencesInventoried(before, mappings);
       const after = rewriteReferences(before, mappings) as Record<string, unknown>;
@@ -105,11 +108,24 @@ async function snapshotRows(pool: Pool, mappings: ReadonlyMap<string, string>, i
   return rows;
 }
 
+function ownedPlaceholderManifest(key: string, keys: string[]) {
+  const prefix = /^(pending\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/)original\.(jpg|webp)$/.exec(key)?.[1];
+  if (!prefix) return false;
+  const actual = [...keys].sort();
+  const legacy = [key, ...VARIANTS.flatMap((variant) => [`${prefix}${variant.name}.jpg`, `${prefix}${variant.name}.webp`])].sort();
+  const webp = [key, ...VARIANTS.map((variant) => `${prefix}${variant.name}.webp`)].sort();
+  return equal(actual, legacy) || (key.endsWith(".webp") && equal(actual, webp));
+}
+
 function validatePlan(plan: Plan) {
   if (plan.version !== 1 || !Array.isArray(plan.objects) || !Array.isArray(plan.rows)) throw new Error("Invalid photo conversion plan");
   for (const object of plan.objects) {
     if (!BUCKETS.some((bucket) => bucket === object.bucket) || typeof object.key !== "string" || !/\.(jpg|jpeg|webp)$/i.test(object.key) || typeof object.etag !== "string" || !object.etag) throw new Error("Invalid inventoried photo object");
   }
+  for (const placeholder of plan.placeholderUploads ?? []) {
+    if (placeholder.before["id"] !== placeholder.uploadId || placeholder.before["key"] !== placeholder.key || placeholder.before["state"] !== "AVAILABLE" || placeholder.before["writeProtocol"] !== "conditional-v1" || placeholder.objects.some((object) => object.bucket !== "listing-photos") || !ownedPlaceholderManifest(placeholder.key, placeholder.objects.map((object) => object.key)) || !equal([...placeholder.objects.map((object) => object.key)].sort(), [...placeholder.before["objectKeys"] as string[]].sort())) throw new Error("Invalid placeholder upload authority in plan");
+  }
+  for (const object of plan.placeholderChats ?? []) if (object.bucket !== "chat-attachments" || !/^chat-attachments\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/original\.(jpg|webp)$/.test(object.key)) throw new Error("Invalid chat placeholder namespace in plan");
   const mappings = mappingsFor(plan.objects);
   for (const row of plan.rows) {
     const spec = TABLES.find((candidate) => candidate.table === row.table);
@@ -244,6 +260,102 @@ async function convertObjects(s3: S3Client, plan: Plan, path: string, events: Ev
   }
 }
 
+function containsReference(value: unknown, keys: ReadonlySet<string>): boolean {
+  if (typeof value === "string") {
+    const path = value.split(/[?#]/, 1)[0] ?? "";
+    return keys.has(path) || [...keys].some((key) => path.endsWith(`/${key}`));
+  }
+  if (Array.isArray(value)) return value.some((entry) => containsReference(entry, keys));
+  return !!value && typeof value === "object" && Object.values(value).some((entry) => containsReference(entry, keys));
+}
+
+async function hasLiveReference(pool: Pool, keys: ReadonlySet<string>) {
+  for (const spec of TABLES.filter((table) => table.table !== "media_uploads" && table.table !== "media_upload_cleanups")) {
+    const result = await pool.query(`SELECT ${spec.columns.map(quote).join(",")} FROM ${quote(spec.table)}`);
+    if (result.rows.some((row: Record<string, unknown>) => containsReference(row, keys))) return true;
+  }
+  return false;
+}
+
+async function placeholderMetadata(s3: S3Client, object: Stored, noStore: boolean) {
+  const head = await s3.send(new HeadObjectCommand({ Bucket: object.bucket, Key: object.key, IfMatch: object.etag }));
+  if (head.ETag !== object.etag || head.ContentLength !== 0 || !head.LastModified || head.LastModified.getTime() > Date.now() - 600_000 || (noStore && head.CacheControl !== "no-store")) throw new Error("Empty object lacks expired placeholder metadata");
+  return head;
+}
+
+async function classifyPlaceholders(s3: S3Client, pool: Pool, objects: Stored[]) {
+  const placeholderUploads: PlaceholderUpload[] = [];
+  const placeholderChats: Stored[] = [];
+  const removed = new Set<string>();
+  const uploads = await pool.query('SELECT "id","key","state","writeProtocol","objectKeys","createdAt","claimToken" FROM "media_uploads"');
+  for (const object of objects.filter((candidate) => /\/original\.(jpg|webp)$/i.test(candidate.key))) {
+    const head = await s3.send(new HeadObjectCommand({ Bucket: object.bucket, Key: object.key }));
+    if (head.ContentLength !== 0) continue;
+    const uuid = "[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
+    if (await hasLiveReference(pool, new Set([object.key]))) throw new Error("Referenced empty photo is not a disposable placeholder");
+    if (object.bucket === "chat-attachments") {
+      const match = new RegExp(`^chat-attachments/(${uuid})/${uuid}/original\\.(jpg|webp)$`).exec(object.key);
+      const info = await placeholderMetadata(s3, object, false);
+      if (!match || !["image/jpeg", "image/webp"].includes(info.ContentType ?? "")) throw new Error("Unproven empty chat object");
+      const conversation = await pool.query('SELECT "id" FROM "conversations" WHERE "id"=$1', [match[1]]);
+      if (conversation.rowCount !== 1) throw new Error("Empty chat object has no Conversation provenance");
+      placeholderChats.push(object); removed.add(`${object.bucket}/${object.key}`); continue;
+    }
+    const directory = new RegExp(`^(pending/${uuid}/)original\\.(jpg|webp)$`).exec(object.key)?.[1];
+    const upload = uploads.rows.find((row: Record<string, unknown>) => row["key"] === object.key) as Record<string, unknown> | undefined;
+    if (!directory || !upload || upload["state"] !== "AVAILABLE" || upload["writeProtocol"] !== "conditional-v1" || upload["claimToken"] !== null || !Number.isFinite(new Date(String(upload["createdAt"])).getTime()) || new Date(String(upload["createdAt"])).getTime() > Date.now() - 600_000) throw new Error("Empty Listing photo has no expired unadopted conditional authority");
+    const group = objects.filter((candidate) => candidate.bucket === object.bucket && candidate.key.startsWith(directory));
+    const webp = [object.key, ...VARIANTS.map((variant) => `${directory}${variant.name}.webp`)];
+    const legacy = [object.key, ...VARIANTS.flatMap((variant) => [`${directory}${variant.name}.jpg`, `${directory}${variant.name}.webp`])];
+    const keys = [...group.map((member) => member.key)].sort();
+    const exact = equal(keys, legacy.sort()) || (object.key.endsWith(".webp") && equal(keys, webp.sort()));
+    const listed = await s3.send(new ListObjectsV2Command({ Bucket: object.bucket, Prefix: directory }));
+    if (!exact || listed.IsTruncated || !equal(keys, (listed.Contents ?? []).map((member) => member.Key).sort()) || !equal(keys, [...upload["objectKeys"] as string[]].sort())) throw new Error("Empty Listing upload lacks its exact issued manifest");
+    if (await hasLiveReference(pool, new Set(keys))) throw new Error("Referenced empty photo is not a disposable placeholder");
+    const adopter = await pool.query('SELECT "id" FROM "listing_media" WHERE "uploadId"=$1 UNION ALL SELECT "id" FROM "users" WHERE "avatarUploadId"=$1', [upload["id"]]);
+    if (adopter.rowCount) throw new Error("Adopted empty photo cannot be retired as a placeholder");
+    for (const member of group) { await placeholderMetadata(s3, member, true); removed.add(`${member.bucket}/${member.key}`); }
+    placeholderUploads.push({ uploadId: String(upload["id"]), key: object.key, before: upload, objects: group });
+  }
+  return { objects: objects.filter((object) => !removed.has(`${object.bucket}/${object.key}`)), placeholderUploads, placeholderChats };
+}
+
+async function retirePlaceholders(s3: S3Client, pool: Pool, plan: Plan, path: string, events: Event[]) {
+  for (const placeholder of plan.placeholderUploads ?? []) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const current = await client.query('SELECT "id","key","state","writeProtocol","objectKeys","createdAt","claimToken" FROM "media_uploads" WHERE "id"=$1 FOR UPDATE', [placeholder.uploadId]);
+      const row = current.rows[0] as Record<string, unknown> | undefined;
+      if (row && row["key"] === placeholder.key && ["RETIRED", "DELETED"].includes(String(row["state"]))) {
+        if (!equal(row, { ...placeholder.before, state: row["state"] })) throw new Error("Retired placeholder provenance changed");
+        const cleanup = await client.query('SELECT "key","objectKeys","writeProtocol" FROM "media_upload_cleanups" WHERE "uploadId"=$1', [placeholder.uploadId]);
+        if (cleanup.rowCount !== 1 || cleanup.rows[0].key !== placeholder.key || cleanup.rows[0].writeProtocol !== "conditional-v1" || !equal([...cleanup.rows[0].objectKeys].sort(), placeholder.objects.map((object) => object.key).sort())) throw new Error("Retired placeholder has no matching cleanup work");
+        await client.query("COMMIT"); continue;
+      }
+      if (!row || !equal(row, placeholder.before) || await hasLiveReference(pool, new Set(placeholder.objects.map((object) => object.key)))) throw new Error("Placeholder authority or references changed");
+      const adopters = await client.query('SELECT "id" FROM "listing_media" WHERE "uploadId"=$1 UNION ALL SELECT "id" FROM "users" WHERE "avatarUploadId"=$1', [placeholder.uploadId]);
+      if (adopters.rowCount) throw new Error("Placeholder acquired an adopter");
+      for (const object of placeholder.objects) await placeholderMetadata(s3, object, true);
+      await client.query('UPDATE "media_uploads" SET "state"=\'RETIRED\',"retiredAt"=now() WHERE "id"=$1', [placeholder.uploadId]);
+      await client.query('INSERT INTO "media_upload_cleanups" ("uploadId","key","objectKeys","writeProtocol","status","attempts","nextAttemptAt","createdAt") VALUES ($1,$2,$3,\'conditional-v1\',\'PENDING\',0,now(),now())', [placeholder.uploadId, placeholder.key, placeholder.objects.map((object) => object.key)]);
+      await client.query("COMMIT");
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+  }
+  for (const object of plan.placeholderChats ?? []) {
+    if (await hasLiveReference(pool, new Set([object.key]))) throw new Error("Chat placeholder acquired a live reference");
+    const current = await existingEtag(s3, object.bucket, object.key);
+    if (current === undefined && events.some((event) => (event.type === "placeholder-prepared" || event.type === "placeholder-deleted") && event.bucket === object.bucket && event.key === object.key)) continue;
+    const info = await placeholderMetadata(s3, object, false);
+    if (!["image/jpeg", "image/webp"].includes(info.ContentType ?? "")) throw new Error("Chat placeholder MIME metadata changed");
+    await journal(path, { type: "placeholder-prepared", bucket: object.bucket, key: object.key, etag: object.etag });
+    await s3.send(new DeleteObjectCommand({ Bucket: object.bucket, Key: object.key, IfMatch: object.etag }));
+    if (await existingEtag(s3, object.bucket, object.key)) throw new Error("Chat placeholder deletion did not persist");
+    await journal(path, { type: "placeholder-deleted", bucket: object.bucket, key: object.key });
+  }
+}
+
+
 async function updateRows(pool: Pool, plan: Plan, s3: S3Client) {
   const client = await pool.connect();
   try {
@@ -288,7 +400,7 @@ async function verify(s3: S3Client, pool: Pool, plan: Plan, events: Event[]) {
 export async function main(args = process.argv.slice(2)) {
   const mode = args[0] ?? "dry-run";
   const path = resolve(args[1] ?? "photo-webp-plan.json");
-  if (!["dry-run", "apply", "verify", "delete-jpeg"].includes(mode)) throw new Error("Usage: convert-photos-webp.ts dry-run|apply|verify|delete-jpeg PLAN.json");
+  if (!["dry-run", "retire-placeholders", "apply", "verify", "delete-jpeg"].includes(mode)) throw new Error("Usage: convert-photos-webp.ts dry-run|retire-placeholders|apply|verify|delete-jpeg PLAN.json");
   const required = (name: string) => { const value = process.env[name]; if (!value) throw new Error(`Missing ${name}`); return value; };
   const endpoint = required("MINIO_ENDPOINT");
   const database = required("DATABASE_URL");
@@ -297,10 +409,11 @@ export async function main(args = process.argv.slice(2)) {
   const pool = new Pool({ connectionString: database });
   try {
     if (mode === "dry-run") {
-      const objects = await inventory(s3);
-      const plan: Plan = { auditHistoryReferenceCount: await auditHistoryReferenceCount(pool), version: 1, endpoint, databaseFingerprint: hash(database), objects, rows: await snapshotRows(pool, mappingsFor(objects), true) };
+      const classified = await classifyPlaceholders(s3, pool, await inventory(s3));
+      const { objects, placeholderUploads, placeholderChats } = classified;
+      const plan: Plan = { auditHistoryReferenceCount: await auditHistoryReferenceCount(pool), version: 1, endpoint, databaseFingerprint: hash(database), objects, placeholderUploads, placeholderChats, rows: await snapshotRows(pool, mappingsFor(objects), true, new Set(placeholderUploads.map((upload) => upload.uploadId))) };
       await writeFile(path, JSON.stringify(plan, null, 2), { flag: "wx", mode: 0o600 });
-      console.log(`Inventory only: ${objects.length} source objects, ${plan.rows.length} reference rows. Plan ${path}; ${plan.auditHistoryReferenceCount} audit snapshots preserved unchanged`);
+      console.log(`Inventory only: ${objects.length} source objects, ${plan.rows.length} reference rows. Plan ${path}; ${plan.auditHistoryReferenceCount} audit snapshots preserved unchanged; ${placeholderUploads.length} upload and ${placeholderChats.length} chat placeholders require retirement`);
       return;
     }
     const plan = JSON.parse(await readFile(path, "utf8")) as Plan;
@@ -308,6 +421,8 @@ export async function main(args = process.argv.slice(2)) {
     if (plan.endpoint !== endpoint || plan.databaseFingerprint !== hash(database)) throw new Error("Plan belongs to a different store/database");
     const journalPath = `${path}.journal.jsonl`;
     const events = await loadEvents(journalPath);
+    if (mode === "retire-placeholders") { await assertConditionalStorage(s3); await retirePlaceholders(s3, pool, plan, journalPath, events); console.log("Placeholders retired. Keep API paused, run existing worker cleanup, pause worker again, then take a fresh inventory."); return; }
+    if ((plan.placeholderUploads?.length ?? 0) + (plan.placeholderChats?.length ?? 0)) throw new Error("Run retire-placeholders and existing cleanup, then take a fresh inventory before photo conversion");
     if (mode === "apply" || mode === "delete-jpeg") await assertConditionalStorage(s3);
     if (mode === "apply") { await convertObjects(s3, plan, journalPath, events); await updateRows(pool, plan, s3); }
     await verify(s3, pool, plan, events);

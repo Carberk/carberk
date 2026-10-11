@@ -19,7 +19,7 @@ vi.mock("@aws-sdk/client-s3", async (original) => ({ ...await original<typeof S3
   destroy() {}
   async send(command: unknown) {
     if (command instanceof GetBucketVersioningCommand) return {};
-    if (command instanceof ListObjectsV2Command) return { Contents: [...state.objects.entries()].filter(([key]) => key.startsWith(command.input.Bucket + "/")).map(([key, value]) => ({ Key: key.slice(must(command.input.Bucket).length + 1), ETag: value.etag, Size: value.body.length, LastModified: value.lastModified ?? new Date("2000-01-01") })) };
+    if (command instanceof ListObjectsV2Command) return { Contents: [...state.objects.entries()].filter(([key]) => key.startsWith(command.input.Bucket + "/") && key.slice(must(command.input.Bucket).length + 1).startsWith(command.input.Prefix ?? "")).map(([key, value]) => ({ Key: key.slice(must(command.input.Bucket).length + 1), ETag: value.etag, Size: value.body.length, LastModified: value.lastModified ?? new Date("2000-01-01") })) };
     if (command instanceof GetObjectCommand || command instanceof HeadObjectCommand || command instanceof PutObjectCommand || command instanceof DeleteObjectCommand) {
       const key = `${command.input.Bucket}/${command.input.Key}`;
       const object = state.objects.get(key);
@@ -43,17 +43,25 @@ vi.mock("pg", () => ({ Pool: class {
   async connect() { return { query: this.query.bind(this), release() {} }; }
   async query(sql: string, values: unknown[] = []) {
     if (["BEGIN", "COMMIT", "ROLLBACK"].includes(sql)) return { rows: [], rowCount: 0 };
+    if (sql.includes("UNION ALL")) {
+      const rows = [...(state.rows.get("listing_media") ?? []).filter((row) => row["uploadId"] === values[0]), ...(state.rows.get("users") ?? []).filter((row) => row["avatarUploadId"] === values[0])]; return { rows, rowCount: rows.length };
+    }
+    if (sql.startsWith('INSERT INTO "media_upload_cleanups"')) {
+      const rows = state.rows.get("media_upload_cleanups") ?? [];
+      rows.push({ uploadId: values[0], key: values[1], objectKeys: values[2], writeProtocol: "conditional-v1", status: "PENDING" }); state.rows.set("media_upload_cleanups", rows); return { rows: [], rowCount: 1 };
+    }
     const table = /(?:FROM|UPDATE) "([^"]+)"/.exec(sql)?.[1];
     const rows = state.rows.get(table ?? "") ?? [];
     if (sql.startsWith("UPDATE")) {
       const row = rows.find((candidate) => candidate["id"] === values[values.length - 1]);
       if (!row) throw new Error("Missing fake row");
+      if (sql.includes('"state"=\'RETIRED\'')) row["state"] = "RETIRED";
       const columns = [...sql.slice(0, sql.indexOf(" WHERE")).matchAll(/"([^"]+)"=\$/g)].map((match) => must(match[1]));
       columns.forEach((column, index) => { const value = values[index]; row[column] = typeof value === "string" && value.startsWith("{") ? JSON.parse(value) : value; });
       return { rows: [], rowCount: 1 };
     }
     const columns = [...sql.slice(0, sql.indexOf(" FROM")).matchAll(/"([^"]+)"/g)].map((match) => must(match[1]));
-    const selected = values.length ? rows.filter((row) => row["id"] === values[0]) : rows;
+    const selected = values.length ? rows.filter((row) => (row["id"] ?? row["uploadId"]) === values[0]) : rows;
     return { rows: selected.map((row) => Object.fromEntries(columns.map((column) => [column, row[column] ?? null]))), rowCount: selected.length };
   }
 } }));
@@ -119,17 +127,48 @@ describe("stored photo conversion", () => {
 
   it("classifies expired unadopted conditional placeholders separately and refuses referenced empty photos", async () => {
     for (const table of ["listing_media", "users", "messages", "content_reports"]) state.rows.set(table, []);
+    state.objects.delete("chat-attachments/chat-attachments/conversation/photo/original.jpg");
     const upload = must(must(state.rows.get("media_uploads"))[0]); upload["state"] = "AVAILABLE";
     for (const file of ["original.jpg", "thumbnail.jpg", "thumbnail.webp", "list.jpg", "list.webp", "detail.jpg", "detail.webp", "fullscreen.jpg", "fullscreen.webp"]) {
       state.objects.set(`listing-photos/${prefix}/${file}`, { body: Buffer.alloc(0), contentType: "application/octet-stream", etag: `"empty-${file}"`, cacheControl: "no-store", lastModified: new Date("2000-01-01") });
     }
+    upload["state"] = "ADOPTED";
+    await expect(main(["dry-run", join(directory, "adopted.json")])).rejects.toThrow("unadopted conditional authority");
+    upload["state"] = "AVAILABLE"; upload["createdAt"] = new Date();
+    await expect(main(["dry-run", join(directory, "unexpired.json")])).rejects.toThrow("expired unadopted");
+    upload["createdAt"] = new Date("2000-01-01");
+    state.rows.set("users", [{ id: "user-1", avatarKey: null, avatarUrl: null, avatarUploadId: "upload-1" }]);
+    await expect(main(["dry-run", join(directory, "linked.json")])).rejects.toThrow("Adopted empty");
+    state.rows.set("users", []);
     await main(["dry-run", plan]);
     const inventory = JSON.parse(await readFile(plan, "utf8"));
     expect(inventory.placeholderUploads).toHaveLength(1);
     expect(inventory.objects).toEqual([]);
     await expect(main(["apply", plan])).rejects.toThrow("retire-placeholders");
+    await main(["retire-placeholders", plan]); await main(["retire-placeholders", plan]);
+    expect(upload["state"]).toBe("RETIRED");
+    expect(state.rows.get("media_upload_cleanups")?.[0]?.["objectKeys"]).toHaveLength(9);
+    expect([...state.objects.values()].every((object) => object.body.length === 0)).toBe(true);
     state.rows.set("users", [{ id: "user-1", avatarKey: `${prefix}/original.jpg`, avatarUrl: null }]);
     await expect(main(["dry-run", join(directory, "referenced.json")])).rejects.toThrow("Referenced empty photo");
+  });
+
+  it("conditionally deletes only expired orphan chat placeholders and stops on a newly added Message reference", async () => {
+    const conversationId = "61b0b4e0-4d4a-4d2c-8bd6-705555cb7585";
+    const key = `chat-attachments/${conversationId}/71b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.jpg`;
+    state.objects.set(`chat-attachments/${key}`, { body: Buffer.alloc(0), etag: '"chat-empty"', contentType: "image/jpeg", lastModified: new Date("2000-01-01") });
+    state.rows.set("messages", []); state.rows.set("content_reports", []);
+    state.rows.set("conversations", [{ id: conversationId }]);
+    await main(["dry-run", plan]);
+    expect(JSON.parse(await readFile(plan, "utf8")).placeholderChats).toHaveLength(1);
+    state.rows.set("messages", [{ id: "new-message", metadata: { key } }]);
+    await expect(main(["retire-placeholders", plan])).rejects.toThrow("live reference");
+    expect(state.objects.has(`chat-attachments/${key}`)).toBe(true);
+    state.rows.set("messages", []);
+    await main(["retire-placeholders", plan]); await main(["retire-placeholders", plan]);
+    expect(state.objects.has(`chat-attachments/${key}`)).toBe(false);
+    expect(state.rows.get("conversations")).toEqual([{ id: conversationId }]);
+    expect([...state.objects.values()].filter((object) => object.body.length > 0)).toHaveLength(6);
   });
 
   it("normalizes existing WebP originals and refuses empty or corrupt photos", async () => {
