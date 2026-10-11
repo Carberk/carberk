@@ -101,7 +101,7 @@ describe("Photo gallery and viewer", () => {
     ]);
     expect(photos[0]).toEqual(expect.objectContaining({
       placeholder: { uri: "https://media.test/0/list.webp?v=webp-natural-1" },
-      placeholderContentFit: "cover",
+      placeholderContentFit: "contain",
       priority: "high",
     }));
     expect(photos[1]).toEqual(expect.objectContaining({ placeholder: undefined, priority: "low" }));
