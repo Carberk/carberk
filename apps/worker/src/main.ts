@@ -4,7 +4,6 @@ import { NestFactory } from "@nestjs/core";
 import { Logger } from "nestjs-pino";
 
 import { waitForMediaConversionMaintenance } from "./media-conversion-maintenance";
-
 import { AppModule } from "./app.module";
 
 async function bootstrap() {

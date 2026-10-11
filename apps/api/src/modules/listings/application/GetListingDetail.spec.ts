@@ -328,7 +328,7 @@ describe("GetListingDetail", () => {
 
     expect(result.media).toHaveLength(1);
     expect(result.media[0]!.variants.thumbnail).toBe(
-      "https://media.auto.tm/listings/listing-1/media-1/thumbnail.webp",
+      "https://media.auto.tm/listings/listing-1/media-1/thumbnail.webp?v=webp-natural-1",
     );
   });
 

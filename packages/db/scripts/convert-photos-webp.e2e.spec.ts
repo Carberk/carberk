@@ -4,12 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { CreateBucketCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { CreateBucketCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, PutBucketPolicyCommand, S3Client } from "@aws-sdk/client-s3";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { Pool } from "pg";
 import sharp from "sharp";
 import { GenericContainer, Wait, type StartedTestContainer } from "testcontainers";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+const must = <T>(value: T | null | undefined): T => { if (value == null) throw new Error("Missing fixture value"); return value; };
 
 import { main } from "./convert-photos-webp";
 
@@ -20,6 +22,7 @@ describe("WebP operator conversion on real Postgres and conditional MinIO", () =
   let pool: Pool;
   let s3: S3Client;
   let directory: string;
+  let endpoint: string;
   const prefix = "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585";
   const key = `${prefix}/original.jpg`;
 
@@ -33,9 +36,12 @@ describe("WebP operator conversion on real Postgres and conditional MinIO", () =
     const databaseUrl = postgres.getConnectionUri();
     execFileSync("pnpm", ["prisma", "migrate", "deploy"], { cwd: fileURLToPath(new URL("..", import.meta.url)), env: { ...process.env, DATABASE_URL: databaseUrl }, stdio: "pipe" });
     pool = new Pool({ connectionString: databaseUrl });
-    const endpoint = `http://${minio.getHost()}:${minio.getMappedPort(9000)}`;
+    endpoint = `http://${minio.getHost()}:${minio.getMappedPort(9000)}`;
     s3 = new S3Client({ endpoint, region: "us-east-1", forcePathStyle: true, credentials: { accessKeyId: "minioadmin", secretAccessKey: "minioadmin" } });
-    for (const Bucket of ["listing-photos", "chat-attachments"]) await s3.send(new CreateBucketCommand({ Bucket }));
+    for (const Bucket of ["listing-photos", "chat-attachments"]) {
+      await s3.send(new CreateBucketCommand({ Bucket }));
+      await s3.send(new PutBucketPolicyCommand({ Bucket, Policy: JSON.stringify({ Version: "2012-10-17", Statement: [{ Effect: "Allow", Principal: "*", Action: "s3:GetObject", Resource: `arn:aws:s3:::${Bucket}/*` }] }) }));
+    }
     for (const [name, value] of Object.entries({ DATABASE_URL: databaseUrl, MINIO_ENDPOINT: endpoint, MINIO_ACCESS_KEY: "minioadmin", MINIO_SECRET_KEY: "minioadmin", PHOTO_CONVERSION_WRITERS_PAUSED: "yes" })) vi.stubEnv(name, value);
     directory = await mkdtemp(join(tmpdir(), "webp-operator-real-"));
     await pool.query(`INSERT INTO users (id, role, "createdAt", "updatedAt") VALUES ('webp-user','seller',now(),now())`);
@@ -43,20 +49,31 @@ describe("WebP operator conversion on real Postgres and conditional MinIO", () =
     await pool.query(`UPDATE users SET "avatarKey"=$1,"avatarUploadId"='webp-upload' WHERE id='webp-user'`, [key]);
     await pool.query(`INSERT INTO listing_drafts (id,"userId",payload,"createdAt","updatedAt") VALUES ('webp-draft','webp-user',$1,now(),now())`, [JSON.stringify({ photos: [{ photoId: "photo-1", key, sortOrder: 0 }], description: "Keep vehicle content" })]);
     const original = await sharp({ create: { width: 160, height: 120, channels: 3, background: "red" } }).jpeg().withExif({ IFD0: { Make: "Camera" } }).toBuffer();
+    const padded = await sharp(original).resize(240, 160, { fit: "contain", withoutEnlargement: true }).webp().toBuffer();
+    await s3.send(new PutObjectCommand({ Bucket: "listing-photos", Key: `${prefix}/detail.webp`, Body: padded, ContentType: "image/webp", CacheControl: "public,max-age=31536000,immutable" }));
     for (const file of ["original", "thumbnail", "list", "detail", "fullscreen"]) await s3.send(new PutObjectCommand({ Bucket: "listing-photos", Key: `${prefix}/${file}.jpg`, Body: original, ContentType: "image/jpeg" }));
   });
   afterAll(async () => { vi.unstubAllEnvs(); await pool?.end(); s3?.destroy(); await minio?.stop(); await postgres?.stop(); if (directory) await rm(directory, { recursive: true, force: true }); });
 
   it("converts in place, CAS verifies JSON/arrays against real schema, resumes and conditionally deletes JPEGs", async () => {
     const plan = join(directory, "plan.json");
+    const oldUrl = `${endpoint}/listing-photos/${prefix}/detail.webp`;
+    const oldCachedBytes = Buffer.from(await (await fetch(oldUrl)).arrayBuffer());
+    expect((await sharp(oldCachedBytes).metadata()).width).toBe(240);
     await main(["dry-run", plan]); await main(["apply", plan]); await main(["apply", plan]); await main(["verify", plan]);
     expect((await pool.query(`SELECT id,"avatarKey" FROM users WHERE id='webp-user'`)).rows[0]).toEqual({ id: "webp-user", avatarKey: `${prefix}/original.webp` });
     const upload = (await pool.query(`SELECT "objectKeys","contentType","sizeBytes" FROM media_uploads WHERE id='webp-upload'`)).rows[0];
     expect(upload.objectKeys).toHaveLength(5); expect(upload.contentType).toBe("image/webp");
     expect((await pool.query(`SELECT payload FROM listing_drafts WHERE id='webp-draft'`)).rows[0].payload).toEqual({ photos: [{ photoId: "photo-1", key: `${prefix}/original.webp`, sortOrder: 0 }], description: "Keep vehicle content" });
     const detail = await s3.send(new GetObjectCommand({ Bucket: "listing-photos", Key: `${prefix}/detail.webp` }));
-    const meta = await sharp(Buffer.from(await detail.Body!.transformToByteArray())).metadata();
+    const meta = await sharp(Buffer.from(await must(detail.Body).transformToByteArray())).metadata();
     expect([meta.width, meta.height]).toEqual([160, 120]); expect(meta.exif).toBeUndefined();
+    const freshUrl = `${oldUrl}?v=webp-natural-1`;
+    const fresh = await fetch(freshUrl);
+    expect(fresh.status).toBe(200);
+    expect((await sharp(Buffer.from(await fresh.arrayBuffer())).metadata()).width).toBe(160);
+    // Existing caches still hold the old URI's bytes; new clients use the distinct versioned URI.
+    expect((await sharp(oldCachedBytes).metadata()).width).toBe(240);
     await main(["delete-jpeg", plan]); await main(["delete-jpeg", plan]);
     const stored = await s3.send(new ListObjectsV2Command({ Bucket: "listing-photos" }));
     expect(stored.Contents?.map((object) => object.Key).sort()).toEqual(["detail", "fullscreen", "list", "original", "thumbnail"].map((name) => `${prefix}/${name}.webp`));

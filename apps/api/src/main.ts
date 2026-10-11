@@ -11,7 +11,6 @@ import { ConfigService } from "@nestjs/config";
 import { Logger } from "nestjs-pino";
 
 import { createMediaConversionMaintenanceServer } from "./common/media-conversion-maintenance";
-
 import { AppModule } from "./app.module";
 import { registerAcceptLanguageHook } from "./common/accept-language";
 import { RealtimeIoAdapter } from "./modules/realtime/infrastructure/RealtimeIoAdapter";

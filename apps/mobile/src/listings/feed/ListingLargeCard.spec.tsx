@@ -110,14 +110,14 @@ describe("Results photo strip", () => {
     const frames = view.getAllByTestId("listing-photo");
     expect(frames).toHaveLength(length);
     expect(frames.map((frame) => frame.findByType(Image).props.source)).toEqual([
-      { uri: "https://media.autotm.tm/listing-photos/photo-0.webp/detail.webp" },
-      { uri: "https://media.autotm.tm/listing-photos/photo-1.webp/detail.webp" },
-      { uri: "https://media.autotm.tm/listing-photos/photo-2.webp/detail.webp" },
-      { uri: "https://media.autotm.tm/listing-photos/photo-3.webp/detail.webp" },
-      { uri: "https://media.autotm.tm/listing-photos/photo-4.webp/detail.webp" },
-      { uri: "https://media.autotm.tm/listing-photos/photo-5.webp/detail.webp" },
-      { uri: "https://media.autotm.tm/listing-photos/photo-6.webp/detail.webp" },
-      { uri: "https://media.autotm.tm/listing-photos/photo-7.webp/detail.webp" },
+      { uri: "https://media.autotm.tm/listing-photos/photo-0.webp/detail.webp?v=webp-natural-1" },
+      { uri: "https://media.autotm.tm/listing-photos/photo-1.webp/detail.webp?v=webp-natural-1" },
+      { uri: "https://media.autotm.tm/listing-photos/photo-2.webp/detail.webp?v=webp-natural-1" },
+      { uri: "https://media.autotm.tm/listing-photos/photo-3.webp/detail.webp?v=webp-natural-1" },
+      { uri: "https://media.autotm.tm/listing-photos/photo-4.webp/detail.webp?v=webp-natural-1" },
+      { uri: "https://media.autotm.tm/listing-photos/photo-5.webp/detail.webp?v=webp-natural-1" },
+      { uri: "https://media.autotm.tm/listing-photos/photo-6.webp/detail.webp?v=webp-natural-1" },
+      { uri: "https://media.autotm.tm/listing-photos/photo-7.webp/detail.webp?v=webp-natural-1" },
     ].slice(0, length));
     expect(view.queryByTestId("listing-photo-more")).toBeNull();
     expect(view.queryByTestId("listing-photo-strip") === null).toBe(length === 1);

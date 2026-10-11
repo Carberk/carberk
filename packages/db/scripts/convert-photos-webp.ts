@@ -45,16 +45,26 @@ const quote = (identifier: string) => `"${identifier}"`;
 /** Rewrite exact storage keys and their URL suffixes, recursively through saved snapshots. */
 export function rewriteReferences(value: unknown, mappings: ReadonlyMap<string, string>): unknown {
   if (typeof value === "string") {
-    const direct = mappings.get(value);
-    if (direct) return direct;
+    const boundary = value.search(/[?#]/);
+    const path = boundary < 0 ? value : value.slice(0, boundary);
+    const suffix = boundary < 0 ? "" : value.slice(boundary);
+    const direct = mappings.get(path);
+    if (direct) return direct + suffix;
     for (const [oldKey, newKey] of mappings) {
-      if (value.endsWith(`/${oldKey}`)) return value.slice(0, -oldKey.length) + newKey;
+      if (path.endsWith(`/${oldKey}`)) return path.slice(0, -oldKey.length) + newKey + suffix;
     }
     return value;
   }
   if (Array.isArray(value)) return value.map((entry) => rewriteReferences(entry, mappings));
   if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([name, entry]) => [name, rewriteReferences(entry, mappings)]));
   return value;
+}
+
+const PHOTO_FIELDS = new Set(["key", "posterKey", "avatarKey", "avatarUrl", "coverMediaKey", "photoKeys", "objectKeys", "thumbnail", "list", "detail", "fullscreen"]);
+function assertReferencesInventoried(value: unknown, mappings: ReadonlyMap<string, string>, field = "") {
+  if (typeof value === "string" && PHOTO_FIELDS.has(field) && /\.(jpg|jpeg)(?:[?#].*)?$/i.test(value) && rewriteReferences(value, mappings) === value) throw new Error(`JPEG reference has no inventoried object: ${value}`);
+  if (Array.isArray(value)) for (const entry of value) assertReferencesInventoried(entry, mappings, field);
+  else if (value && typeof value === "object") for (const [name, entry] of Object.entries(value)) assertReferencesInventoried(entry, mappings, name);
 }
 
 function mappingsFor(objects: Stored[]) {
@@ -86,6 +96,7 @@ async function snapshotRows(pool: Pool, mappings: ReadonlyMap<string, string>, i
     const result = await pool.query(`SELECT ${[spec.id, ...spec.columns].map(quote).join(",")} FROM ${quote(spec.table)} ORDER BY ${quote(spec.id)}`);
     for (const row of result.rows as Record<string, unknown>[]) {
       const before = Object.fromEntries(spec.columns.map((column) => [column, row[column]]));
+      assertReferencesInventoried(before, mappings);
       const after = rewriteReferences(before, mappings) as Record<string, unknown>;
       if (spec.table === "media_uploads" && String(after["key"]).endsWith(".webp")) after["contentType"] = "image/webp";
       if (Array.isArray(after["objectKeys"])) after["objectKeys"] = [...new Set(after["objectKeys"])];

@@ -40,7 +40,7 @@ describe("getPhotoUri", () => {
         "detail",
       ),
     ).toBe(
-      "https://media.autotm.tm/listing-photos/listings/listing-1/media-1/detail.webp",
+      "https://media.autotm.tm/listing-photos/listings/listing-1/media-1/detail.webp?v=webp-natural-1",
     );
   });
 });

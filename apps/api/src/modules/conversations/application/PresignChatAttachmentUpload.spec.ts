@@ -263,7 +263,7 @@ describe("PresignChatAttachmentUpload", () => {
     ).rejects.toThrow(ForbiddenException);
   });
 
-  it("rejects unsupported content type", async () => {
+  it.each(["image/jpeg", "image/png"])("rejects unsupported content type %s", async (contentType) => {
     seedConversation(repo);
     const uc = makeUseCase(repo, storage, identityCheck);
 
@@ -271,7 +271,7 @@ describe("PresignChatAttachmentUpload", () => {
       uc.execute({
         userId: "buyer-1",
         conversationId: "conv-1",
-        contentType: "image/png",
+        contentType,
         sizeBytes: 1024,
       }),
     ).rejects.toThrow(BadRequestException);

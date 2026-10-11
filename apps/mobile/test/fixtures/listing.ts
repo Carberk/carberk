@@ -22,10 +22,10 @@ export const mediaFixture = (count: number): ListingsSchemas.ListingMedia[] =>
     key: `listing-${index}/original.webp`,
     sortOrder: index,
     variants: {
-      thumbnail: `https://media.test/${index}/thumbnail.webp`,
-      list: `https://media.test/${index}/list.webp`,
-      detail: `https://media.test/${index}/detail.webp`,
-      fullscreen: `https://media.test/${index}/fullscreen.webp`,
+      thumbnail: `https://media.test/${index}/thumbnail.webp?v=webp-natural-1`,
+      list: `https://media.test/${index}/list.webp?v=webp-natural-1`,
+      detail: `https://media.test/${index}/detail.webp?v=webp-natural-1`,
+      fullscreen: `https://media.test/${index}/fullscreen.webp?v=webp-natural-1`,
     },
   }));
 

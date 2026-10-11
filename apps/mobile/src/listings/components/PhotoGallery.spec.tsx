@@ -77,19 +77,19 @@ describe("Photo gallery and viewer", () => {
     const screen = renderMobile(<PhotoGallery media={mediaFixture(20)} />);
     const sources = () => screen.UNSAFE_getAllByType(Image).map((image) => image.props.source.uri);
     // Nothing shares the first photo's bandwidth until it has loaded.
-    expect(sources()).toEqual(["https://media.test/0/detail.webp"]);
+    expect(sources()).toEqual(["https://media.test/0/detail.webp?v=webp-natural-1"]);
 
     fireEvent(first(screen.UNSAFE_getAllByType(Image)), "load", {
-      source: { url: "https://media.test/0/detail.webp", width: 1200, height: 800 },
+      source: { url: "https://media.test/0/detail.webp?v=webp-natural-1", width: 1200, height: 800 },
     });
 
     const photos = screen.UNSAFE_getAllByType(Image).map((image) => image.props);
     expect(photos.map((photo) => photo.source.uri)).toEqual([
-      "https://media.test/0/detail.webp",
-      "https://media.test/1/detail.webp",
+      "https://media.test/0/detail.webp?v=webp-natural-1",
+      "https://media.test/1/detail.webp?v=webp-natural-1",
     ]);
     expect(photos[0]).toEqual(expect.objectContaining({
-      placeholder: { uri: "https://media.test/0/list.webp" },
+      placeholder: { uri: "https://media.test/0/list.webp?v=webp-natural-1" },
       placeholderContentFit: "cover",
       priority: "high",
     }));

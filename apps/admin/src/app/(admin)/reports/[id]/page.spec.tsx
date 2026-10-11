@@ -93,7 +93,7 @@ describe("ReportDetailPage profile photo", () => {
     await renderPage();
 
     const photo = screen.getByRole("img", { name: "Фото профиля" });
-    expect(photo.getAttribute("src")).toBe("https://media.example.test/listing-photos/pending/u1-photo/thumbnail.webp");
+    expect(photo.getAttribute("src")).toBe("https://media.example.test/listing-photos/pending/u1-photo/thumbnail.webp?v=webp-natural-1");
     expect(screen.getByText("Удалить фото профиля")).toBeDefined();
     expect(screen.getByRole("button", { name: "Удалить фото" })).toBeDefined();
   });
@@ -226,7 +226,7 @@ describe("ReportDetailPage profile photo", () => {
     mockDetail(userReport({ target: { ...userReport().target, avatarKey: `pending/u1-photo/original.${extension}` } }));
     await renderPage();
     expect(screen.getByRole("img", { name: "Фото профиля" }).getAttribute("src"))
-      .toBe("https://media.example.test/listing-photos/pending/u1-photo/thumbnail.webp");
+      .toBe("https://media.example.test/listing-photos/pending/u1-photo/thumbnail.webp?v=webp-natural-1");
   });
 
   it("shows no extra avatar on an actioned report that had only an Assigned Avatar", async () => {

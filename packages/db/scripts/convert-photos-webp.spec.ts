@@ -4,20 +4,22 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { DeleteObjectCommand, GetBucketVersioningCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand } from "@aws-sdk/client-s3";
+import type * as S3Sdk from "@aws-sdk/client-s3";
 import sharp from "sharp";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { main } from "./convert-photos-webp";
 
 const state = vi.hoisted(() => ({ objects: new Map<string, { body: Buffer; contentType: string; etag: string }>(), rows: new Map<string, Record<string, unknown>[]>(), ignoreConditions: false }));
+const must = <T>(value: T | null | undefined): T => { if (value == null) throw new Error("Missing fixture value"); return value; };
 const missing = () => Object.assign(new Error("NotFound"), { name: "NotFound" });
 const conflict = () => Object.assign(new Error("PreconditionFailed"), { $metadata: { httpStatusCode: 412 } });
 
-vi.mock("@aws-sdk/client-s3", async (original) => ({ ...await original<typeof import("@aws-sdk/client-s3")>(), S3Client: class {
+vi.mock("@aws-sdk/client-s3", async (original) => ({ ...await original<typeof S3Sdk>(), S3Client: class {
   destroy() {}
   async send(command: unknown) {
     if (command instanceof GetBucketVersioningCommand) return {};
-    if (command instanceof ListObjectsV2Command) return { Contents: [...state.objects.entries()].filter(([key]) => key.startsWith(command.input.Bucket + "/")).map(([key, value]) => ({ Key: key.slice(command.input.Bucket!.length + 1), ETag: value.etag })) };
+    if (command instanceof ListObjectsV2Command) return { Contents: [...state.objects.entries()].filter(([key]) => key.startsWith(command.input.Bucket + "/")).map(([key, value]) => ({ Key: key.slice(must(command.input.Bucket).length + 1), ETag: value.etag })) };
     if (command instanceof GetObjectCommand || command instanceof HeadObjectCommand || command instanceof PutObjectCommand || command instanceof DeleteObjectCommand) {
       const key = `${command.input.Bucket}/${command.input.Key}`;
       const object = state.objects.get(key);
@@ -46,11 +48,11 @@ vi.mock("pg", () => ({ Pool: class {
     if (sql.startsWith("UPDATE")) {
       const row = rows.find((candidate) => candidate["id"] === values[values.length - 1]);
       if (!row) throw new Error("Missing fake row");
-      const columns = [...sql.slice(0, sql.indexOf(" WHERE")).matchAll(/"([^"]+)"=\$/g)].map((match) => match[1]!);
+      const columns = [...sql.slice(0, sql.indexOf(" WHERE")).matchAll(/"([^"]+)"=\$/g)].map((match) => must(match[1]));
       columns.forEach((column, index) => { const value = values[index]; row[column] = typeof value === "string" && value.startsWith("{") ? JSON.parse(value) : value; });
       return { rows: [], rowCount: 1 };
     }
-    const columns = [...sql.slice(0, sql.indexOf(" FROM")).matchAll(/"([^"]+)"/g)].map((match) => match[1]!);
+    const columns = [...sql.slice(0, sql.indexOf(" FROM")).matchAll(/"([^"]+)"/g)].map((match) => must(match[1]));
     const selected = values.length ? rows.filter((row) => row["id"] === values[0]) : rows;
     return { rows: selected.map((row) => Object.fromEntries(columns.map((column) => [column, row[column] ?? null]))), rowCount: selected.length };
   }
@@ -85,7 +87,7 @@ describe("stored photo conversion", () => {
     expect(state.rows.get("users")?.[0]?.["id"]).toBe("user-1");
     expect(state.rows.get("messages")?.[0]).toEqual({ id: "message-1", metadata: { key: "chat-attachments/conversation/photo/original.webp", snapshot: { coverMediaKey: `${prefix}/original.webp` }, width: 120, height: 90 } });
     expect(state.rows.get("media_uploads")?.[0]?.["objectKeys"]).toHaveLength(5);
-    const detail = await sharp(state.objects.get(`listing-photos/${prefix}/detail.webp`)!.body).metadata();
+    const detail = await sharp(must(state.objects.get(`listing-photos/${prefix}/detail.webp`)).body).metadata();
     expect([detail.width, detail.height]).toEqual([120, 90]);
     expect([...state.objects.keys()].filter((key) => key.endsWith(".jpg"))).toHaveLength(6);
     await main(["delete-jpeg", plan]); await main(["delete-jpeg", plan]);
@@ -95,7 +97,7 @@ describe("stored photo conversion", () => {
 
   it("refuses a changed reference rather than overwriting user content or deleting JPEGs", async () => {
     await main(["dry-run", plan]);
-    state.rows.get("messages")![0]!["metadata"] = { key: "new-photo.webp" };
+    must(must(state.rows.get("messages"))[0])["metadata"] = { key: "new-photo.webp" };
     await expect(main(["apply", plan])).rejects.toThrow("Concurrent change");
     await expect(main(["delete-jpeg", plan])).rejects.toThrow("old photo references");
     expect([...state.objects.keys()].filter((key) => key.endsWith(".jpg"))).toHaveLength(6);
@@ -105,10 +107,10 @@ describe("stored photo conversion", () => {
     const bytes = await sharp({ create: { width: 90, height: 120, channels: 3, background: "red" } }).webp().withExif({ IFD0: { Make: "Camera" } }).toBuffer();
     state.objects.set("listing-photos/legacy/original.webp", { body: bytes, contentType: "image/webp", etag: '"legacy"' });
     await main(["dry-run", plan]); await main(["apply", plan]); await main(["apply", plan]);
-    const original = await sharp(state.objects.get("listing-photos/legacy/original.webp")!.body).metadata();
+    const original = await sharp(must(state.objects.get("listing-photos/legacy/original.webp")).body).metadata();
     expect(original.exif).toBeUndefined();
     expect([original.width, original.height]).toEqual([90, 120]);
-    expect((await sharp(state.objects.get("listing-photos/legacy/fullscreen.webp")!.body).metadata()).width).toBe(90);
+    expect((await sharp(must(state.objects.get("listing-photos/legacy/fullscreen.webp")).body).metadata()).width).toBe(90);
     state.objects.set("chat-attachments/empty.jpg", { body: Buffer.alloc(0), contentType: "image/jpeg", etag: '"empty"' });
     const nextPlan = join(directory, "empty-plan.json");
     await main(["dry-run", nextPlan]);

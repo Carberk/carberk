@@ -113,7 +113,7 @@ describe("Seller block from GET /listings/:id", () => {
     expect(await view.findByText("Aman")).toBeTruthy();
     expect(view.getByText("Private seller")).toBeTruthy();
     expect(view.UNSAFE_getByType(Image).props.source).toEqual({
-      uri: "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.webp",
+      uri: "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.webp?v=webp-natural-1",
     });
   });
 
@@ -157,7 +157,7 @@ describe("Conversation header from GET /conversations/:id", () => {
 
     expect(await view.findByText("Aman")).toBeTruthy();
     expect(view.UNSAFE_getByType(Image).props.source).toEqual({
-      uri: "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.webp",
+      uri: "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.webp?v=webp-natural-1",
     });
   });
 
@@ -194,7 +194,7 @@ describe("Messages rows from GET /conversations", () => {
     expect(view.getByText("Deleted user")).toBeTruthy();
     expect(marks(view)[0]).toBe(KEY_MARK);
     const photo = first(view.UNSAFE_getAllByType(Image));
-    expect(photo.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.webp" });
+    expect(photo.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.webp?v=webp-natural-1" });
     expect(photo.props.style).toMatchObject({ width: 24, height: 24 });
     expect(personIcons(view)).toHaveLength(1);
     // Three rows, one request: no row asks the API for its own participant.

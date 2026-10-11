@@ -207,9 +207,9 @@ describe("Messages tab", () => {
 
     const badges = view.UNSAFE_getAllByType(Image).map((image) => image.props.source.uri);
     expect(badges).toEqual([
-      "https://media.autotm.tm/listing-photos/avatars/u0/thumbnail.webp",
-      "https://media.autotm.tm/listing-photos/avatars/u1/thumbnail.webp",
-      "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.webp",
+      "https://media.autotm.tm/listing-photos/avatars/u0/thumbnail.webp?v=webp-natural-1",
+      "https://media.autotm.tm/listing-photos/avatars/u1/thumbnail.webp?v=webp-natural-1",
+      "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.webp?v=webp-natural-1",
     ]);
     expect(api.get).toHaveBeenCalledTimes(1);
     expect(api.get).toHaveBeenCalledWith("/conversations?limit=20", expect.anything());

@@ -258,10 +258,10 @@ describe("Profile photo", () => {
     expect(await view.findByText("Photo updated")).toBeTruthy();
     expect(attached).toEqual({ key: "pending/new/original.webp" });
     const photos = view.UNSAFE_queryAllByType("Image" as never);
-    expect(photos[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/new/thumbnail.webp" });
+    expect(photos[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/new/thumbnail.webp?v=webp-natural-1" });
     view.rerender(<ToastProvider><CabinetScreen /></ToastProvider>);
     await view.findByRole("button", { name: "Aman, +993 65 XX-XX-56" });
-    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/new/thumbnail.webp" });
+    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/new/thumbnail.webp?v=webp-natural-1" });
   });
 
   it("falls back to the assigned car mark when the local preview fails while preserving upload progress", async () => {
@@ -292,7 +292,7 @@ describe("Profile photo", () => {
     await act(async () => { picker.finish(phase === "storage" ? 500 : 200); });
     const error = await view.findByText("Couldn't upload the photo.");
     expect(error.props.accessibilityLiveRegion).toBe("assertive");
-    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/old/thumbnail.webp" });
+    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/old/thumbnail.webp?v=webp-natural-1" });
     fireEvent.press(view.getByRole("button", { name: "Retry" }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(2));
     expect(picker.library).toHaveBeenCalledOnce();
@@ -378,7 +378,7 @@ describe("Profile photo", () => {
     fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
     fireEvent.press(view.getByRole("button", { name: "Remove photo" }));
     expect(await view.findByText("Couldn't remove the photo.")).toBeTruthy();
-    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/old/thumbnail.webp" });
+    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/old/thumbnail.webp?v=webp-natural-1" });
     fireEvent.press(view.getByRole("button", { name: "Retry" }));
     expect(await view.findByText("Photo removed")).toBeTruthy();
     expect(removes).toBe(2);
@@ -454,7 +454,7 @@ describe("Profile photo", () => {
     expect(await view.findByText("Your account is restricted. Contact support if you think this is a mistake.")).toBeTruthy();
     expect(view.queryByRole("button", { name: "Retry" })).toBeNull();
     expect(view.getByRole("button", { name: "Cancel" })).toBeTruthy();
-    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/old/thumbnail.webp" });
+    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/old/thumbnail.webp?v=webp-natural-1" });
   });
 
   it("finishes after leaving Profile and shows the result on return", async () => {
@@ -471,7 +471,7 @@ describe("Profile photo", () => {
     await vi.waitFor(() => expect(requests.sets).toHaveLength(1));
     view.rerender(<ToastProvider><ProfileScreen /></ToastProvider>);
     expect(await view.findByText("Photo updated")).toBeTruthy();
-    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/new1/thumbnail.webp" });
+    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/new1/thumbnail.webp?v=webp-natural-1" });
   });
 
   it.each(["storage", "attachment"])("never attaches or caches the previous User's photo when signing out during %s", async (phase) => {

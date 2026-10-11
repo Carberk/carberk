@@ -92,10 +92,10 @@ describe("PresignUpload", () => {
     expect(result.key).toMatch(/original\.webp$/);
   });
 
-  it("rejects unsupported content type", async () => {
+  it.each(["image/jpeg", "image/png"])("rejects unsupported content type %s", async (contentType) => {
     const uc = makeUseCase(storage);
     await expect(
-      uc.execute({ userId: "user-1", kind: "image", contentType: "image/png", sizeBytes: 1024 }),
+      uc.execute({ userId: "user-1", kind: "image", contentType, sizeBytes: 1024 }),
     ).rejects.toThrow(BadRequestException);
   });
 

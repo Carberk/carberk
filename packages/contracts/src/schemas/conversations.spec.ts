@@ -117,7 +117,7 @@ describe("SendMessageRequestSchema", () => {
 });
 
 describe("PresignChatAttachmentRequestSchema", () => {
-  it("accepts a valid jpeg request", () => {
+  it("accepts a valid WebP request", () => {
     const parsed = PresignChatAttachmentRequestSchema.parse({
       contentType: "image/webp",
       sizeBytes: 1024,
@@ -136,10 +136,10 @@ describe("PresignChatAttachmentRequestSchema", () => {
     expect(parsed.contentType).toBe("image/webp");
   });
 
-  it("rejects unsupported content types", () => {
+  it.each(["image/jpeg", "image/png"])("rejects unsupported content type %s", (contentType) => {
     expect(() =>
       PresignChatAttachmentRequestSchema.parse({
-        contentType: "image/png",
+        contentType,
         sizeBytes: 1024,
       }),
     ).toThrow();
