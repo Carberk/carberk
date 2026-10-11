@@ -19,6 +19,8 @@ const AT_1405 = new Date(2026, 9, 2, 14, 5).toISOString();
 const TEXT = "Is the car still available?";
 const IMAGE = { kind: "image" as const, text: "", localImageUri: "file:///photo.jpg" };
 const AA = 4.5;
+/** Non-text graphics such as the read ✓✓ (77 Accessibility). */
+const GRAPHIC = 3;
 const THEMES: ThemeName[] = ["light", "dark"];
 /** The founder's sketch (#775 F): brand colour at about 12% (light) and 22% (dark) over the page. */
 const SKETCH: Record<ThemeName, string> = { light: "#F1D6D4", dark: "#411112" };
@@ -41,7 +43,7 @@ function bubbleOf(node: Node): Node {
 
 /** The colour class of a node as a token name and an opacity: "text-foreground/70" is foreground at 0.7. */
 function colourClass(className: string, prefix: "text" | "bg") {
-  const pattern = new RegExp(`^${prefix}-(message-own|primary-foreground|muted-foreground|foreground|destructive|primary|muted)(?:/(\\d+))?$`);
+  const pattern = new RegExp(`^${prefix}-(message-own|message-read|primary-foreground|muted-foreground|foreground|destructive|primary|muted)(?:/(\\d+))?$`);
   const found = className.split(/\s+/).map((name) => pattern.exec(name)).find(Boolean);
   if (!found) throw new Error(`No ${prefix} colour class in "${className}"`);
   return { token: found[1] ?? "", alpha: found[2] ? Number(found[2]) / 100 : 1 };
@@ -85,7 +87,7 @@ describe("own Message bubble tint (#775 F)", () => {
     expect(classOf(text(renderMobile(bubble()), TEXT)).split(/\s+/)).toContain("text-foreground");
   });
 
-  it("draws the time, the ticks and the state labels in one quiet colour", () => {
+  it("draws the time, the sent and delivered ticks and the state labels in one quiet colour", () => {
     const sent = renderMobile(bubble({ status: "sent" }));
     const quiet = colourClass(classOf(text(sent, "02:05 PM")), "text");
     expect(quiet.token).toBe("foreground");
@@ -93,9 +95,9 @@ describe("own Message bubble tint (#775 F)", () => {
     expect(colourClass(classOf(tick(sent, "message-tick-sent")), "text")).toEqual(quiet);
     sent.unmount();
 
-    const read = renderMobile(bubble({ status: "read" }));
-    expect(colourClass(classOf(tick(read, "message-tick-double")), "text")).toEqual(quiet);
-    read.unmount();
+    const delivered = renderMobile(bubble({ status: "delivered" }));
+    expect(colourClass(classOf(tick(delivered, "message-tick-double")), "text")).toEqual(quiet);
+    delivered.unmount();
 
     const pending = renderMobile(bubble({ status: "pending" }));
     expect(colourClass(classOf(text(pending, "Sending...")), "text")).toEqual(quiet);
@@ -103,6 +105,16 @@ describe("own Message bubble tint (#775 F)", () => {
 
     const reported = renderMobile(bubble({ reported: true }));
     expect(colourClass(classOf(text(reported, "Reported")), "text")).toEqual(quiet);
+  });
+
+  it("colours the read ✓✓ with the read token, so it differs from delivered (#821)", () => {
+    const read = renderMobile(bubble({ status: "read" }));
+    expect(colourClass(classOf(tick(read, "message-tick-double")), "text")).toEqual({ token: "message-read", alpha: 1 });
+  });
+
+  it.each(THEMES)("reads the read ✓✓ on the %s tint at 3:1 or better (#821)", (theme) => {
+    const read = renderMobile(bubble({ status: "read" }));
+    expect(contrastOnBubble(tick(read, "message-tick-double"), theme)).toBeGreaterThanOrEqual(GRAPHIC);
   });
 
   it("draws Failed to send and Retry on an own Message in the destructive colour", () => {
@@ -128,10 +140,6 @@ describe("own Message bubble tint (#775 F)", () => {
     expect(contrastOnBubble(tick(sent, "message-tick-sent"), theme)).toBeGreaterThanOrEqual(AA);
     sent.unmount();
 
-    const read = renderMobile(bubble({ status: "read" }));
-    expect(contrastOnBubble(tick(read, "message-tick-double"), theme)).toBeGreaterThanOrEqual(AA);
-    read.unmount();
-
     const photo = renderMobile(bubble({ ...IMAGE, status: "delivered" }));
     expect(contrastOnBubble(text(photo, "02:05 PM"), theme)).toBeGreaterThanOrEqual(AA);
     expect(contrastOnBubble(tick(photo, "message-tick-double"), theme)).toBeGreaterThanOrEqual(AA);
@@ -150,6 +158,13 @@ describe("own Message bubble tint (#775 F)", () => {
     expect(tints.light.messageOwn).toBe(cssTokens("light")["message-own"]);
     expect(tints.dark.messageOwn).toBe(cssTokens("dark")["message-own"]);
     expect(tints.light.messageOwn).toBeTruthy();
+  });
+
+  it("keeps lib/theme.ts in step with global.css for the read tick", () => {
+    const tokens = THEME as unknown as Record<ThemeName, { messageRead?: string }>;
+    expect(tokens.light.messageRead).toBe(cssTokens("light")["message-read"]);
+    expect(tokens.dark.messageRead).toBe(cssTokens("dark")["message-read"]);
+    expect(tokens.light.messageRead).toBeTruthy();
   });
 });
 

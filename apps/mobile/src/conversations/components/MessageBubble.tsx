@@ -52,7 +52,7 @@ const DEFAULT_IMAGE_HEIGHT = 192;
 const OWN_META_CLASS = "text-foreground/70";
 const TICK_CLASS = `size-3.5 ${OWN_META_CLASS}`;
 
-/** ✓ sent, ✓✓ delivered or read, in one style (D6); read adds the label under the bubble. */
+/** ✓ sent and ✓✓ delivered in the quiet colour; a read ✓✓ is blue (D6, #821). */
 function StatusTick({ status }: { status: MessageStatus }) {
   if (status === "sent") {
     return (
@@ -64,7 +64,7 @@ function StatusTick({ status }: { status: MessageStatus }) {
   if (status === "delivered" || status === "read") {
     return (
       <View testID="message-tick-double">
-        <Icon as={CheckCheck} className={TICK_CLASS} />
+        <Icon as={CheckCheck} className={status === "read" ? "size-3.5 text-message-read" : TICK_CLASS} />
       </View>
     );
   }
