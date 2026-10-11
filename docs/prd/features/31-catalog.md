@@ -23,6 +23,8 @@ Without curated catalog data, every listing devolves into freeform text. Search 
 - **Color picker**: swatches (visual circles with hex) + name; tap to select
 - **Region picker**: TM regions list; tap to drill down to cities
 - All picker labels resolve to user's preferred locale
+- Manufacturer marks identify the selected brand beside its localized name. Source selection is based on brand identity and usable artwork; a fixed license-category allowlist does not restrict identifying coverage. Retain source records and integrity pins internally.
+- Generic category rows use category illustrations, while an unverified manufacturer emblem may use an explicitly recorded full-name label. Neither is presented as recovered official manufacturer artwork.
 
 ### Admin-facing
 
