@@ -28,6 +28,19 @@ function makeListing(overrides?: Partial<ListingSummary>): ListingSummary {
 }
 
 describe("buildPostRefSnapshot", () => {
+  it("carries the cover's server ThumbHash beside its key, so the chat card previews it", () => {
+    const snapshot = buildPostRefSnapshot(makeListing({ coverThumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" }));
+
+    expect(snapshot).toMatchObject({ coverMediaKey: "cover.webp", coverThumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" });
+  });
+
+  it("sends no cover ThumbHash for a Listing without a cover", () => {
+    const snapshot = buildPostRefSnapshot(makeListing({ coverMediaKey: undefined, coverThumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" }));
+
+    expect(snapshot).not.toHaveProperty("coverThumbHash");
+    expect(snapshot).not.toHaveProperty("coverMediaKey");
+  });
+
   it("builds a full snapshot from a listing summary", () => {
     const listing = makeListing();
     const snapshot = buildPostRefSnapshot(listing);

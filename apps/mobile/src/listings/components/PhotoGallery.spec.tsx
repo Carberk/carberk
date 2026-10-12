@@ -120,15 +120,17 @@ describe("Photo gallery and viewer", () => {
     }));
   });
 
-  it("shows the viewer's thumbnails with their ThumbHash while they load", () => {
+  it("shows the viewer's thumbnails over their ThumbHash while they load", () => {
     const media = mediaFixture(2).map((photo) => ({ ...photo, thumbHash: "2yMBBYCIh4iHiHeAiId4dXh3f4f4" }));
     const screen = renderMobile(<PhotoGallery media={media} />);
 
     fireEvent.press(first(screen.getAllByRole("button", { name: "Photo 1 of 2" })));
 
-    const thumbnails = viewer(screen).UNSAFE_getAllByType(Image)
-      .map((image) => image.props)
-      .filter((props) => String(props.source.uri ?? "").includes("thumbnail.webp"));
-    expect(thumbnails.map((props) => props.placeholder)).toEqual([{ thumbhash: "2yMBBYCIh4iHiHeAiId4dXh3f4f4" }, { thumbhash: "2yMBBYCIh4iHiHeAiId4dXh3f4f4" }]);
+    const sources = viewer(screen).UNSAFE_getAllByType(Image).map((image) => image.props.source as { uri?: string; thumbhash?: string });
+    const thumbnails = sources.filter((source) => source.uri?.includes("thumbnail.webp"));
+    const blurs = sources.filter((source) => source.thumbhash === "2yMBBYCIh4iHiHeAiId4dXh3f4f4");
+    expect(thumbnails).toHaveLength(2);
+    // Every photo in the viewer, page or thumbnail, has its blur under it until it loads.
+    expect(blurs).toHaveLength(sources.length - blurs.length);
   });
 });

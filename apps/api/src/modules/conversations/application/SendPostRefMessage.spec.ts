@@ -126,6 +126,7 @@ class FakeListingsReadPort implements ListingsReadPort {
     priceCurrency: "TMT" | "USD" | "AED";
     displayPriceTmt: number;
     coverMediaKey?: string;
+    coverThumbHash?: string;
     cityId: string;
     publishedAt: Date;
     allowChat: boolean;
@@ -337,6 +338,20 @@ describe("SendPostRefMessage", () => {
     });
     expect(result.message.clientMessageId).toBe("client-ref-1");
     expect(repo.messages).toHaveLength(1);
+  });
+
+  it("stores the referenced Listing cover's server ThumbHash in the snapshot", async () => {
+    seedConversation(repo);
+    seedParentListing(listings);
+    const referenced = seedReferencedListing(listings, { coverThumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" });
+
+    const result = await makeUseCase(repo, listings).execute({
+      senderId: "buyer-1",
+      conversationId: "conv-1",
+      metadata: { listingId: referenced.id, coverThumbHash: "2yMBBYCIh4iHiHeAiId4dXh3f4f4" } as { listingId: string },
+    });
+
+    expect(result.message.metadata).toMatchObject({ coverMediaKey: "cover.webp", coverThumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" });
   });
 
   it("emits MessageSent after saving a post reference", async () => {

@@ -293,3 +293,28 @@ describe("MessageBubble image preview", () => {
   });
 });
 
+describe("MessageBubble Listing-reference preview", () => {
+  it("shows the cover's ThumbHash on the chat Listing card while the cover loads", () => {
+    const screen = renderMobile(
+      bubble({
+        kind: "post_ref",
+        isMine: false,
+        text: "",
+        metadata: {
+          listingId: "00000000-0000-4000-8000-0000000000a1",
+          brandId: "00000000-0000-4000-8000-0000000000d1",
+          modelId: "00000000-0000-4000-8000-0000000000d2",
+          displayPriceTmt: 285000,
+          priceCurrency: "TMT",
+          coverMediaKey: "pending/a/original.webp",
+          coverThumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH",
+          status: "active",
+          available: true,
+        },
+      }),
+    );
+
+    expect(screen.UNSAFE_getByType(Image).props.placeholder).toEqual({ thumbhash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" });
+  });
+});
+
