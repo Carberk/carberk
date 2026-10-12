@@ -1320,7 +1320,7 @@ describe("Conversation keyboard ownership", () => {
       expect(region.props.className).toBe("flex-1");
       expect(within(region).getByRole("button", { name: "Remove" })).toBe(remove);
       // The pending photo's preview is drawn inside the region, above the composer row.
-      expect(region.findAll((node: { type: unknown }) => node.type === "Image").map((node: { props: { source?: unknown } }) => node.props.source)).toContainEqual({ uri: "file:///staged.jpg" });
+      expect(region.findAll((node: { type: unknown }) => node.type === "Image").map((node: { props: { source?: unknown } }) => node.props.source)).toContainEqual({ uri: "file:///staged.webp" });
       expect(within(region).getByRole("button", { name: "Send message", disabled: false })).toBeTruthy();
     } finally { Platform.OS = previousOS; }
   });
