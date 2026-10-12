@@ -12,12 +12,16 @@ import { useReduceMotion } from "@/lib/motion";
 
 const ENTRANCE_MS = 650;
 const EXIT_MS = 180;
+/** Upper bound on holding native launch when the C-dot never reports load or error. */
+const RELEASE_FALLBACK_MS = 400;
 
 /** Owns only launch presentation. Startup and navigation continue underneath it. */
 export function LaunchEntrance({ ready, children }: PropsWithChildren<{ ready: boolean }>) {
   const reducedMotion = useReduceMotion();
   const [entered, setEntered] = useState(reducedMotion);
   const [laidOut, setLaidOut] = useState(false);
+  const [cDotSettled, setCDotSettled] = useState(false);
+  const [released, setReleased] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const handedOff = useRef(false);
   const icon = useSharedValue(reducedMotion ? 0 : 1);
@@ -29,8 +33,26 @@ export function LaunchEntrance({ ready, children }: PropsWithChildren<{ ready: b
   const creditStyle = useAnimatedStyle(() => ({ opacity: credit.value, transform: [{ translateY: (1 - credit.value) * 4 }] }));
   const overlayStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
+  // Release native launch only once its React twin is laid out and the C-dot has painted,
+  // so no bare background frame shows between them. The fallback keeps launch from hanging.
   useEffect(() => {
-    if (!laidOut) return;
+    if (!laidOut || handedOff.current) return;
+    const release = () => {
+      if (handedOff.current) return;
+      handedOff.current = true;
+      SplashScreen.hide();
+      setReleased(true);
+    };
+    if (cDotSettled) {
+      release();
+      return;
+    }
+    const timer = setTimeout(release, RELEASE_FALLBACK_MS);
+    return () => clearTimeout(timer);
+  }, [laidOut, cDotSettled]);
+
+  useEffect(() => {
+    if (!released) return;
     if (reducedMotion) {
       icon.value = 0;
       wordmark.value = 1;
@@ -44,7 +66,7 @@ export function LaunchEntrance({ ready, children }: PropsWithChildren<{ ready: b
     // This timer controls the overlay only. It never decides app readiness.
     const timer = setTimeout(() => setEntered(true), ENTRANCE_MS);
     return () => clearTimeout(timer);
-  }, [laidOut, reducedMotion, icon, wordmark, credit]);
+  }, [released, reducedMotion, icon, wordmark, credit]);
 
   useEffect(() => {
     if (!ready || !entered || dismissed) return;
@@ -66,18 +88,19 @@ export function LaunchEntrance({ ready, children }: PropsWithChildren<{ ready: b
           pointerEvents="auto"
           className="absolute inset-0 items-center justify-center bg-[#17191D]"
           style={overlayStyle}
-          onLayout={() => {
-            if (handedOff.current) return;
-            handedOff.current = true;
-            SplashScreen.hide();
-            setLaidOut(true);
-          }}
+          onLayout={() => setLaidOut(true)}
         >
           {/* Destination mounts later; keep the entrance last in the native status-bar stack. */}
           <StatusBar key={ready ? "destination-ready" : "startup"} style="light" />
           <Animated.View style={[StyleSheet.absoluteFill, iconStyle]} className="items-center justify-center">
             {/* Same 160 pt artwork and center as the configured native splash. */}
-            <Image source={splashIcon} style={{ width: 160, height: 160 }} />
+            <Image
+              testID="launch-c-dot"
+              source={splashIcon}
+              style={{ width: 160, height: 160 }}
+              onLoad={() => setCDotSettled(true)}
+              onError={() => setCDotSettled(true)}
+            />
           </Animated.View>
           <Animated.View style={wordmarkStyle}>
             <BrandLogo width={240} height={44} />

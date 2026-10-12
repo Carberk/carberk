@@ -62,7 +62,8 @@ describe("cold-launch identity", () => {
     fireEvent(screen.getByTestId("launch-c-dot"), "load");
     act(() => vi.advanceTimersByTime(649));
     expect(screen.getByText("By Alpha Motors")).toBeTruthy();
-    act(() => vi.advanceTimersByTime(1 + 180));
+    act(() => vi.advanceTimersByTime(1));
+    act(() => vi.advanceTimersByTime(180));
     expect(screen.queryByText("By Alpha Motors")).toBeNull();
   });
 
@@ -79,7 +80,8 @@ describe("cold-launch identity", () => {
     expect(SplashScreen.hide).not.toHaveBeenCalled();
     act(() => vi.advanceTimersByTime(400));
     expect(SplashScreen.hide).toHaveBeenCalledOnce();
-    act(() => vi.advanceTimersByTime(650 + 180));
+    act(() => vi.advanceTimersByTime(650));
+    act(() => vi.advanceTimersByTime(180));
     expect(screen.queryByText("By Alpha Motors")).toBeNull();
   });
 
