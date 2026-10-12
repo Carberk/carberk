@@ -13,8 +13,8 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "test": "pnpm test:agent-github && pnpm test:native-pr-seed && pnpm test:worktree-gc && pnpm test:agent-docs && pnpm test:glossary && turbo run test && pnpm test:reviewer-flow-smoke",
-    "test:unit": "pnpm test:agent-github && turbo run test:unit",
+    "test": "pnpm test:agent-github && pnpm test:native-pr-seed && pnpm test:native-session && pnpm test:worktree-gc && pnpm test:agent-docs && pnpm test:glossary && turbo run test && pnpm test:reviewer-flow-smoke",
+    "test:unit": "pnpm test:agent-github && pnpm test:native-session && turbo run test:unit",
     "typecheck": "turbo run typecheck",
     "check:glossary": "node scripts/check-domain-glossary.mjs",
     "test:glossary": "node --test scripts/check-domain-glossary.test.mjs",
@@ -41,7 +41,8 @@
     "worktree:gc:apply": "node scripts/worktree-gc.mjs --apply",
     "test:worktree-gc": "node --test scripts/worktree-gc.test.mjs",
     "agent:github": "node scripts/agent-github.mjs",
-    "test:agent-github": "node --test scripts/agent-github.test.mjs"
+    "test:agent-github": "node --test scripts/agent-github.test.mjs",
+    "test:native-session": "node --test scripts/native-session*.test.mjs"
   },
   "devDependencies": {
     "tsx": "^4.19.2",
