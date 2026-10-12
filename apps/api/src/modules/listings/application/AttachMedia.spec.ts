@@ -161,6 +161,19 @@ describe("AttachMedia", () => {
       expect(world.stateOfKey(key)).toBe("ADOPTED");
     });
 
+    it("answers a double-tapped attach with the same media when the twin commits between its reads", async () => {
+      const first = await uc.execute(input);
+      const read = world.mediaRepo.findByListingId.bind(world.mediaRepo);
+      let staleReads = 1;
+      world.mediaRepo.findByListingId = async (listingId: string) =>
+        staleReads-- > 0 ? [] : read(listingId);
+
+      const second = await uc.execute(input);
+
+      expect(second.media.id).toBe(first.media.id);
+      expect(await world.mediaRepo.findByListingId("listing-1")).toHaveLength(1);
+    });
+
     it("keeps the photo's server-computed ThumbHash on the attached media", async () => {
       const result = await uc.execute(input);
 

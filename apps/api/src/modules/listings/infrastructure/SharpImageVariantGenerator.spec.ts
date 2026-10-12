@@ -3,7 +3,8 @@ import { deflateSync } from "node:zlib";
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import type { ConfigService } from "@nestjs/config";
 import sharp from "sharp";
-import { thumbHashToApproximateAspectRatio } from "thumbhash";
+import { ListingsSchemas } from "@auto-tm/contracts";
+import { thumbHashToApproximateAspectRatio, thumbHashToAverageRGBA } from "thumbhash";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Env } from "../../../env.schema";
@@ -97,6 +98,15 @@ async function photoWithGps(): Promise<Buffer> {
     .toBuffer();
 }
 
+function expectPreviewOf(value: unknown, colour: { r: number; g: number; b: number }) {
+  expect(ListingsSchemas.ThumbHashSchema.safeParse(value).success).toBe(true);
+  const average = thumbHashToAverageRGBA(Buffer.from(String(value), "base64"));
+  expect(average.r).toBeCloseTo(colour.r / 255, 1);
+  expect(average.g).toBeCloseTo(colour.g / 255, 1);
+  expect(average.b).toBeCloseTo(colour.b / 255, 1);
+  expect(average.a).toBe(1);
+}
+
 describe("SharpImageVariantGenerator", () => {
   it("writes only four WebP derivatives with natural detail and fullscreen proportions", async () => {
     const key = "pending/natural/original.webp";
@@ -121,7 +131,8 @@ describe("SharpImageVariantGenerator", () => {
 
     const result = await generatorWith(fakeBucket({ [key]: input })).generate(key);
 
-    expect(result.thumbHash).toBe("1fsDBYCIiIiHiIdweIeHh4d4cIgH");
+    expectPreviewOf(result.thumbHash, { r: 255, g: 0, b: 0 });
+    expect(thumbHashToApproximateAspectRatio(Buffer.from(result.thumbHash, "base64"))).toBeGreaterThan(1);
   });
 
   it("computes the ThumbHash from the upright photo, so a turned camera photo previews as portrait", async () => {

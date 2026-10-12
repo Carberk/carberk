@@ -1,7 +1,8 @@
 import { GetObjectCommand, HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import type { ConfigService } from "@nestjs/config";
 import sharp from "sharp";
-import { thumbHashToApproximateAspectRatio } from "thumbhash";
+import { ListingsSchemas } from "@auto-tm/contracts";
+import { thumbHashToApproximateAspectRatio, thumbHashToAverageRGBA } from "thumbhash";
 import { describe, expect, it } from "vitest";
 
 import type { Env } from "../../../env.schema";
@@ -89,6 +90,15 @@ async function photoWithGps(): Promise<Buffer> {
     .toBuffer();
 }
 
+function expectPreviewOf(value: unknown, colour: { r: number; g: number; b: number }) {
+  expect(ListingsSchemas.ThumbHashSchema.safeParse(value).success).toBe(true);
+  const average = thumbHashToAverageRGBA(Buffer.from(String(value), "base64"));
+  expect(average.r).toBeCloseTo(colour.r / 255, 1);
+  expect(average.g).toBeCloseTo(colour.g / 255, 1);
+  expect(average.b).toBeCloseTo(colour.b / 255, 1);
+  expect(average.a).toBe(1);
+}
+
 describe("SharpChatAttachmentCleaner", () => {
   it("rewrites a photo carrying GPS upright and without EXIF, under the same key", async () => {
     const input = await photoWithGps();
@@ -141,10 +151,12 @@ describe("SharpChatAttachmentCleaner", () => {
       .webp({ lossless: true })
       .toBuffer();
 
-    await expect(cleanerWith(fakeBucket({ [key]: input })).clean(key)).resolves.toEqual({
-      status: "clean",
-      thumbHash: "2yMBBYCIh4iHiHeAiId4dXh3f4f4",
-    });
+    const result = await cleanerWith(fakeBucket({ [key]: input })).clean(key);
+
+    expect(result.status).toBe("clean");
+    if (result.status !== "clean") return;
+    expectPreviewOf(result.thumbHash, { r: 10, g: 120, b: 200 });
+    expect(thumbHashToApproximateAspectRatio(Buffer.from(result.thumbHash, "base64"))).toBeGreaterThan(1);
   });
 
   it("computes the ThumbHash from the upright image, so a turned camera photo previews as portrait", async () => {

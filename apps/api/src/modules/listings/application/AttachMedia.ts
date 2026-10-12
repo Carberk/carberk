@@ -118,6 +118,10 @@ export class AttachMedia {
       throw new Error("Upload guard returned no upload for the media key");
     }
     if (upload.adopted) {
+      const winner = (await this.mediaRepo.findByListingId(input.listingId)).find(
+        (media) => media.uploadId === upload.id,
+      );
+      if (winner) return { media: winner };
       throw this.alreadyAttached();
     }
 
