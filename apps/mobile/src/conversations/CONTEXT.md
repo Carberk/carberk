@@ -46,4 +46,4 @@ This area holds the Messages list, the Conversation screen's parts, the chat soc
 - [Screen tests](../../test/screens/conversation-by-id.spec.tsx)
 - [Parent application](../../CONTEXT.md)
 
-**Image previews.** An image Message's server ThumbHash (`metadata.thumbHash`, #824) is the bubble's expo-image placeholder, so a photo on a slow connection shows its blurred colours at once. The Conversation screen keeps the hash when it maps history into local Messages; an older Message without one has no placeholder.
+**Image previews.** An image Message's server ThumbHash (`metadata.thumbHash`, #824) is the bubble's expo-image placeholder, so a photo on a slow connection shows its blurred colours at once. The Conversation screen keeps the hash when it maps history into local Messages; an older Message without one has no placeholder. A Listing-reference card shows its snapshot's `coverThumbHash` the same way. The `coverMediaKey` hashes on the Messages list and the Conversation header are deferred to #847.
