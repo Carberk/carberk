@@ -34,7 +34,7 @@ const api = createServer((request, response) => {
           id: "r1", status: "pending", reason: "other", createdAt: "2026-10-07T12:00:00Z",
           reporter: { available: true, label: "Отправитель" },
           target: { targetType: "user", available: true, label: "Пользователь", targetId: "u1",
-            role: "buyer", avatarKey: "pending/u1-photo/original.jpg", avatarIndex: 3 },
+            role: "buyer", avatarKey: "pending/u1-photo/original.webp", avatarIndex: 3 },
           pendingReportsOnTargetCount: 1,
         };
   response.end(JSON.stringify(body));
@@ -76,7 +76,7 @@ try {
   });
   assert.equal(report.status, 200);
   const html = await report.text();
-  assert.ok(html.includes(`src="${runtimeMediaOrigin}/listing-photos/pending/u1-photo/thumbnail.jpg"`),
+  assert.ok(html.includes(`src="${runtimeMediaOrigin}/listing-photos/pending/u1-photo/thumbnail.webp?v=webp-natural-1"`),
     "Built report must use the admin service's runtime media origin, not its build-time value");
   log(`PASS standalone Dockerfile layout + runtime media origin: Assigned Avatar HTTP 200; layout=${layout}`);
 } finally {

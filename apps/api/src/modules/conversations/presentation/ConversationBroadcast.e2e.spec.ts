@@ -196,10 +196,10 @@ describe("Conversation message broadcast e2e", () => {
     };
   }
 
-  /** A 300x200 camera photo with a GPS position, stored rotated (EXIF Orientation 6). */
+  /** A 300x200 WebP camera photo with a GPS position, stored rotated (EXIF Orientation 6). */
   async function photoWithGps(): Promise<Buffer> {
     return sharp({ create: { width: 300, height: 200, channels: 3, background: { r: 200, g: 30, b: 30 } } })
-      .jpeg()
+      .webp()
       .withExif({
         IFD0: { Make: "TestCam" },
         IFD3: {
