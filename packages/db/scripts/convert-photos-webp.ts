@@ -34,7 +34,12 @@ type Stored = { bucket: string; key: string; etag: string };
 type Row = { table: string; idColumn: string; id: string; before: Record<string, unknown>; after: Record<string, unknown> };
 type PlaceholderUpload = { uploadId: string; key: string; before: Record<string, unknown>; objects: Stored[] };
 type Plan = { placeholderUploads?: PlaceholderUpload[]; placeholderChats?: Stored[]; auditHistoryReferenceCount?: number; version: 1; endpoint: string; databaseFingerprint: string; objects: Stored[]; rows: Row[] };
-type Event = { type: "prepared" | "written" | "deleted" | "placeholder-deleted" | "placeholder-prepared"; bucket: string; key: string; hash?: string; etag?: string };
+type Event = { type: "prepared" | "written" | "deleted" | "placeholder-deleted" | "placeholder-prepared" | "tombstone-prepared" | "tombstoned"; bucket: string; key: string; hash?: string; etag?: string };
+// MinIO honours If-Match on PUT but ignores it on DeleteObject, so a delete is fenced by
+// first replacing the exact expected object with a recognisable tombstone (If-Match),
+// then deleting the tombstone while writers stay paused.
+export const TOMBSTONE_CONTENT_TYPE = "application/x-carberk-conversion-tombstone";
+const tombstoneBody = (bucket: string, key: string) => Buffer.from(`carberk-webp-conversion-tombstone v1\n${bucket}/${key}\n${randomUUID()}\n`);
 const hash = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const isJpeg = (key: string) => /\.(jpg|jpeg)$/i.test(key);
 const webpKey = (key: string) => key.replace(/\.(jpg|jpeg)$/i, ".webp");
@@ -207,6 +212,8 @@ async function writeVerified(s3: S3Client, path: string, events: Event[], bucket
   await journal(path, event); events.push(event);
 }
 
+const statusOf = (error: unknown) => (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
+
 async function assertConditionalStorage(s3: S3Client) {
   for (const bucket of BUCKETS) {
     const versioning = await s3.send(new GetBucketVersioningCommand({ Bucket: bucket }));
@@ -214,18 +221,72 @@ async function assertConditionalStorage(s3: S3Client) {
     const key = `.webp-conversion-probe/${randomUUID()}`;
     const initial = await s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: Buffer.from("probe"), IfNoneMatch: "*" }));
     if (!initial.ETag) throw new Error("Probe returned no ETag");
+    let removed = false;
     try {
       for (const command of [
         new PutObjectCommand({ Bucket: bucket, Key: key, Body: Buffer.from("wrong"), IfMatch: '"wrong"' }),
         new PutObjectCommand({ Bucket: bucket, Key: key, Body: Buffer.from("wrong"), IfNoneMatch: "*" }),
-        new DeleteObjectCommand({ Bucket: bucket, Key: key, IfMatch: '"wrong"' }),
+        new PutObjectCommand({ Bucket: bucket, Key: key, Body: tombstoneBody(bucket, key), ContentType: TOMBSTONE_CONTENT_TYPE, IfMatch: '"wrong"' }),
       ]) {
         try { await s3.send(command); }
-        catch (error) { if ((error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 412) continue; throw error; }
+        catch (error) { if (statusOf(error) === 412) continue; throw error; }
         throw new Error(`Store ignores conditional writes/deletes: ${bucket}`);
       }
-    } finally { await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key, IfMatch: initial.ETag })); }
+      const unchanged = await existingEtag(s3, bucket, key);
+      if (unchanged !== initial.ETag) throw new Error(`Store ignores conditional writes/deletes: ${bucket}`);
+      await deleteThroughTombstone(s3, bucket, key, initial.ETag);
+      removed = true;
+    } finally {
+      // Never leave a probe behind; its random key is written by nothing else.
+      if (!removed) {
+        const current = await existingEtag(s3, bucket, key).catch(() => undefined);
+        if (current) await deleteThroughTombstone(s3, bucket, key, current).catch(() => undefined);
+      }
+    }
   }
+}
+
+/** Fenced delete without journal, for the converter's own probe key. */
+async function deleteThroughTombstone(s3: S3Client, bucket: string, key: string, expectedEtag: string) {
+  try { await s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: tombstoneBody(bucket, key), ContentType: TOMBSTONE_CONTENT_TYPE, IfMatch: expectedEtag })); }
+  catch (error) { if (statusOf(error) === 412) throw new Error(`Source changed before deletion: ${key}`); throw error; }
+  await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+  if (await existingEtag(s3, bucket, key) !== undefined) throw new Error(`Deletion did not persist: ${bucket}/${key}`);
+}
+
+/**
+ * Deletes exactly the inventoried object: an If-Match tombstone PUT refuses any change
+ * (412), the journal records the tombstone, a plain DeleteObject removes it and a read
+ * proves it is gone. Reruns continue from our journaled tombstone; anything else refuses.
+ */
+async function journaledTombstoneDelete(s3: S3Client, path: string, events: Event[], object: Stored) {
+  const { bucket, key } = object;
+  const ours = (type: Event["type"]) => events.filter((event) => event.type === type && event.bucket === bucket && event.key === key);
+  const current = await existingEtag(s3, bucket, key);
+  if (current === undefined) {
+    if (ours("tombstoned").length) return;
+    throw new Error(`Missing without a converter tombstone: ${key}`);
+  }
+  if (current === object.etag) {
+    const body = tombstoneBody(bucket, key);
+    const prepared: Event = { type: "tombstone-prepared", bucket, key, hash: hash(body), etag: object.etag };
+    await journal(path, prepared); events.push(prepared);
+    let written;
+    try { written = await s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: TOMBSTONE_CONTENT_TYPE, IfMatch: object.etag })); }
+    catch (error) { if (statusOf(error) === 412) throw new Error(`Source changed before deletion: ${key}`); throw error; }
+    if (!written.ETag) throw new Error(`Tombstone returned no ETag: ${key}`);
+    const tombstoned: Event = { type: "tombstoned", bucket, key, hash: hash(body), etag: written.ETag };
+    await journal(path, tombstoned); events.push(tombstoned);
+  } else if (!ours("tombstoned").some((event) => event.etag === current)) {
+    // A tombstone written before its journal entry is recognised only by its exact prepared body.
+    const stored = await readObject(s3, bucket, key, current);
+    const prepared = ours("tombstone-prepared").find((event) => event.hash === hash(stored.bytes));
+    if (!prepared || stored.contentType !== TOMBSTONE_CONTENT_TYPE) throw new Error(`Source changed before deletion: ${key}`);
+    const tombstoned: Event = { type: "tombstoned", bucket, key, hash: prepared.hash, etag: current };
+    await journal(path, tombstoned); events.push(tombstoned);
+  }
+  await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+  if (await existingEtag(s3, bucket, key) !== undefined) throw new Error(`Deletion did not persist: ${bucket}/${key}`);
 }
 
 async function convertObjects(s3: S3Client, plan: Plan, path: string, events: Event[]) {
@@ -344,13 +405,14 @@ async function retirePlaceholders(s3: S3Client, pool: Pool, plan: Plan, path: st
   }
   for (const object of plan.placeholderChats ?? []) {
     if (await hasLiveReference(pool, new Set([object.key]))) throw new Error("Chat placeholder acquired a live reference");
+    if (events.some((event) => event.type === "placeholder-deleted" && event.bucket === object.bucket && event.key === object.key)) continue;
     const current = await existingEtag(s3, object.bucket, object.key);
-    if (current === undefined && events.some((event) => (event.type === "placeholder-prepared" || event.type === "placeholder-deleted") && event.bucket === object.bucket && event.key === object.key)) continue;
-    const info = await placeholderMetadata(s3, object, false);
-    if (!["image/jpeg", "image/webp"].includes(info.ContentType ?? "")) throw new Error("Chat placeholder MIME metadata changed");
-    await journal(path, { type: "placeholder-prepared", bucket: object.bucket, key: object.key, etag: object.etag });
-    await s3.send(new DeleteObjectCommand({ Bucket: object.bucket, Key: object.key, IfMatch: object.etag }));
-    if (await existingEtag(s3, object.bucket, object.key)) throw new Error("Chat placeholder deletion did not persist");
+    if (current === object.etag) {
+      const info = await placeholderMetadata(s3, object, false);
+      if (!["image/jpeg", "image/webp"].includes(info.ContentType ?? "")) throw new Error("Chat placeholder MIME metadata changed");
+      await journal(path, { type: "placeholder-prepared", bucket: object.bucket, key: object.key, etag: object.etag });
+    }
+    await journaledTombstoneDelete(s3, path, events, object);
     await journal(path, { type: "placeholder-deleted", bucket: object.bucket, key: object.key });
   }
 }
@@ -430,9 +492,7 @@ export async function main(args = process.argv.slice(2)) {
       for (const object of plan.objects.filter((candidate) => isJpeg(candidate.key))) {
         if (events.some((event) => event.type === "deleted" && event.bucket === object.bucket && event.key === object.key)) continue;
         if (!events.some((event) => event.type === "written" && event.bucket === object.bucket && event.key === webpKey(object.key))) throw new Error(`No verified replacement for ${object.key}`);
-        const current = await existingEtag(s3, object.bucket, object.key);
-        if (current !== undefined && current !== object.etag) throw new Error(`Source changed before deletion: ${object.key}`);
-        if (current) await s3.send(new DeleteObjectCommand({ Bucket: object.bucket, Key: object.key, IfMatch: object.etag }));
+        await journaledTombstoneDelete(s3, journalPath, events, object);
         await journal(journalPath, { type: "deleted", bucket: object.bucket, key: object.key });
       }
       const remaining = (await inventory(s3)).filter((object) => isJpeg(object.key));
