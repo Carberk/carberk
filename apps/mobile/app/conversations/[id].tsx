@@ -333,6 +333,7 @@ export default function ConversationDetailScreen() {
                 displayPriceTmt: m.metadata.displayPriceTmt,
                 priceCurrency: m.metadata.priceCurrency,
                 coverMediaKey: m.metadata.coverMediaKey,
+                ...(m.metadata.coverThumbHash ? { coverThumbHash: m.metadata.coverThumbHash } : {}),
                 status: m.metadata.status,
                 available: m.metadata.available ?? true,
               };

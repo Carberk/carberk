@@ -7,7 +7,9 @@ import { mediaFixture } from "../../../test/fixtures/listing";
 import { GalleryImage } from "./GalleryImage";
 
 const HASH = "1fsDBYCIiIiHiIdweIeHh4d4cIgH";
-const item = { ...mediaFixture(1)[0]!, thumbHash: HASH };
+const [photoFixture] = mediaFixture(1);
+if (!photoFixture) throw new Error("Missing media fixture");
+const item = { ...photoFixture, thumbHash: HASH };
 const style = { width: "100%", height: "100%" } as const;
 
 const images = (screen: ReturnType<typeof renderMobile>) => screen.UNSAFE_getAllByType(Image);

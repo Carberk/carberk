@@ -90,7 +90,12 @@ export class PrismaListingsReadRepository
     }
 
     const [card] = await this.toCards([row]);
-    return card ? toListingSummary(card) : null;
+    if (!card) return null;
+    const summary = toListingSummary(card);
+    // The cover is the first media item; only a photo has a hash.
+    const cover = row.media[0];
+    if (cover?.kind === "image" && cover.thumbHash !== null) summary.coverThumbHash = cover.thumbHash;
+    return summary;
   }
 
   async getListingSummaries(ids: string[]): Promise<ListingSummary[]> {

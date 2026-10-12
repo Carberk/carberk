@@ -35,7 +35,10 @@ describe("buildPostRefSnapshot", () => {
   });
 
   it("sends no cover ThumbHash for a Listing without a cover", () => {
-    const snapshot = buildPostRefSnapshot(makeListing({ coverMediaKey: undefined, coverThumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" }));
+    const listing = makeListing({ coverThumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" });
+    delete listing.coverMediaKey;
+
+    const snapshot = buildPostRefSnapshot(listing);
 
     expect(snapshot).not.toHaveProperty("coverThumbHash");
     expect(snapshot).not.toHaveProperty("coverMediaKey");

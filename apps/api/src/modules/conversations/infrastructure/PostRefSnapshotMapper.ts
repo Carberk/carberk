@@ -19,6 +19,7 @@ export function buildPostRefSnapshot(
 
   if (listing.coverMediaKey) {
     snapshot.coverMediaKey = listing.coverMediaKey;
+    if (listing.coverThumbHash) snapshot.coverThumbHash = listing.coverThumbHash;
   }
 
   return snapshot;

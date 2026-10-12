@@ -1,5 +1,6 @@
 // Operator script (#824): fills the ThumbHash of every existing Listing photo
-// and image Message that has none, from the stored WebP original. Runbook:
+// and image Message that has none, from the stored WebP original, and the
+// cover ThumbHash of Listing-reference Messages from their Listing's photo. Runbook:
 // backfill-thumbhashes.md. Run only after the WebP conversion has completed.
 import "dotenv/config";
 
@@ -17,9 +18,10 @@ const JPEG = /\.jpe?g$/i;
 /** Standard padded base64, as the contracts' ThumbHashSchema accepts. */
 const CANONICAL_BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 
-type MediaRow = { id: string; kind: string; key: string; posterKey: string | null; thumbHash: string | null };
+type MediaRow = { id: string; listingId: string; kind: string; key: string; posterKey: string | null; thumbHash: string | null };
 type MessageRow = { id: string; kind: string; metadata: Record<string, unknown> | null; deletedAt: Date | null };
 type Candidate = { table: "listing_media" | "messages"; id: string; bucket: string; key: string };
+type CoverCandidate = { id: string; coverMediaKey: string; thumbHash: string | null };
 
 /**
  * The same encoding as the API's `computeThumbHash`: a 100 px downscale of
@@ -45,7 +47,7 @@ const isLiveImage = (row: MessageRow) => row.kind === "image" && row.deletedAt =
 
 async function readState(pool: Pool) {
   const media = (await pool.query(
-    `SELECT "id", "kind"::text AS "kind", "key", "posterKey", "thumbHash" FROM "listing_media" ORDER BY "id"`,
+    `SELECT "id", "listingId", "kind"::text AS "kind", "key", "posterKey", "thumbHash" FROM "listing_media" ORDER BY "id"`,
   )).rows as MediaRow[];
   const messages = (await pool.query(
     `SELECT "id", "kind"::text AS "kind", "metadata", "deletedAt" FROM "messages" WHERE "metadata" IS NOT NULL ORDER BY "id"`,
@@ -94,8 +96,31 @@ function candidates(state: Awaited<ReturnType<typeof readState>>): Candidate[] {
   ];
 }
 
-const counts = (list: Candidate[]) =>
-  `${list.filter((c) => c.table === "listing_media").length} Listing photos and ${list.filter((c) => c.table === "messages").length} image Messages`;
+/**
+ * Listing-reference Messages whose snapshot names a cover photo of its Listing
+ * but carries no cover hash. A video cover has no photo row, so it never needs one.
+ */
+function coverCandidates(state: Awaited<ReturnType<typeof readState>>): CoverCandidate[] {
+  const photos = new Map(state.media.filter((row) => row.kind === "image").map((row) => [`${row.listingId}/${row.key}`, row]));
+  return state.messages.flatMap((row) => {
+    const listingId = row.metadata?.["listingId"];
+    const coverMediaKey = row.metadata?.["coverMediaKey"];
+    if (row.kind !== "post_ref" || row.deletedAt !== null || typeof coverMediaKey !== "string" || "coverThumbHash" in (row.metadata ?? {})) return [];
+    const photo = photos.get(`${String(listingId)}/${coverMediaKey}`);
+    return photo ? [{ id: row.id, coverMediaKey, thumbHash: photo.thumbHash }] : [];
+  });
+}
+
+const counts = (list: Candidate[], covers: CoverCandidate[]) =>
+  `${list.filter((c) => c.table === "listing_media").length} Listing photos, ${list.filter((c) => c.table === "messages").length} image Messages and ${covers.length} Listing-reference Messages`;
+
+/** Whether the row still exists, is live and still names this key; a row deleted mid-run is not repair work. */
+async function stillReferenced(pool: Pool, candidate: Candidate): Promise<boolean> {
+  const result = candidate.table === "listing_media"
+    ? await pool.query(`SELECT "id" FROM "listing_media" WHERE "id" = $1 AND "key" = $2`, [candidate.id, candidate.key])
+    : await pool.query(`SELECT "id" FROM "messages" WHERE "id" = $1 AND "deletedAt" IS NULL AND "metadata"->>'key' = $2`, [candidate.id, candidate.key]);
+  return result.rows.length > 0;
+}
 
 async function fill(s3: S3Client, pool: Pool, candidate: Candidate): Promise<boolean> {
   const object = await s3.send(new GetObjectCommand({ Bucket: candidate.bucket, Key: candidate.key }));
@@ -117,7 +142,8 @@ async function fill(s3: S3Client, pool: Pool, candidate: Candidate): Promise<boo
 
 function verify(state: Awaited<ReturnType<typeof readState>>) {
   const missing = candidates(state);
-  if (missing.length) throw new Error(`${counts(missing)} still lack a ThumbHash`);
+  const covers = coverCandidates(state);
+  if (missing.length || covers.length) throw new Error(`${counts(missing, covers)} still lack a ThumbHash`);
   const malformed = [
     ...state.media.filter((row) => row.thumbHash !== null && !isThumbHash(row.thumbHash)).map((row) => `listing_media/${row.id}`),
     ...state.messages.filter((row) => isLiveImage(row) && !isThumbHash(row.metadata?.["thumbHash"])).map((row) => `messages/${row.id}`),
@@ -141,7 +167,7 @@ export async function main(args = process.argv.slice(2)) {
     const jpeg = await conversionGate(s3, state);
     const pending = candidates(state);
     if (mode === "dry-run") {
-      console.log(`Dry run, nothing written: ${counts(pending)} need a ThumbHash.`);
+      console.log(`Dry run, nothing written: ${counts(pending, coverCandidates(state))} need a ThumbHash.`);
       console.log(jpeg.length
         ? `Apply will refuse: ${jpeg.length} JPEG references or objects remain; finish the WebP conversion first.`
         : "WebP conversion complete: no JPEG reference or object remains.");
@@ -157,14 +183,26 @@ export async function main(args = process.argv.slice(2)) {
     }
     const failures: string[] = [];
     let filled = 0;
+    let gone = 0;
     for (const candidate of pending) {
       try {
         if (await fill(s3, pool, candidate)) filled += 1;
       } catch (error) {
+        if (!(await stillReferenced(pool, candidate))) { gone += 1; continue; }
         failures.push(`${candidate.table}/${candidate.id} (${candidate.bucket}/${candidate.key}): ${error instanceof Error ? error.message : String(error)}`);
       }
     }
-    console.log(`Filled ${filled} of ${pending.length} missing ThumbHashes.`);
+    // Cover hashes come from the Listing photos, so they follow the photo pass.
+    let covers = 0;
+    for (const cover of coverCandidates(await readState(pool))) {
+      if (cover.thumbHash === null) continue; // its photo failed above and is listed there
+      const result = await pool.query(
+        `UPDATE "messages" SET "metadata" = jsonb_set("metadata", '{coverThumbHash}', to_jsonb($1::text)) WHERE "id" = $2 AND "metadata"->>'coverMediaKey' = $3 AND NOT ("metadata" ? 'coverThumbHash')`,
+        [cover.thumbHash, cover.id, cover.coverMediaKey],
+      );
+      if ((result.rowCount ?? 0) > 0) covers += 1;
+    }
+    console.log(`Filled ${filled} of ${pending.length} missing ThumbHashes and ${covers} Listing-reference cover hashes; skipped ${gone} rows deleted during the run.`);
     if (failures.length) throw new Error(`${failures.length} photos could not be hashed; repair them and rerun apply:\n${failures.join("\n")}`);
   } finally {
     await pool.end();

@@ -59,6 +59,8 @@ export type PostRefMessageMetadata = {
   displayPriceTmt: number;
   priceCurrency: CurrencyCode;
   coverMediaKey?: string;
+  /** Server-computed ThumbHash of `coverMediaKey` (#824); never taken from the sender. */
+  coverThumbHash?: string;
   status: PostRefListingStatus;
 };
 

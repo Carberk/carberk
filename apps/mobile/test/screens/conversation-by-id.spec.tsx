@@ -534,6 +534,29 @@ describe("Conversation persisted image addressing", () => {
     expect(within(photo).UNSAFE_getByType(Image).props.placeholder).toEqual({ thumbhash: "2yMBBYCIh4iHiHeAiId4dXh3f4f4" });
   });
 
+  it("shows the server's cover ThumbHash on a persisted Listing-reference card", async () => {
+    const persistedRef: ConversationsSchemas.MessageSummary = {
+      id: "00000000-0000-4000-8000-0000000000e3",
+      conversationId: CONVERSATION_ID,
+      senderId: SELLER_ID,
+      kind: "post_ref",
+      text: null,
+      metadata: {
+        listingId: LISTING_ID, brandId: "brand-1", modelId: "model-1", displayPriceTmt: 285000, priceCurrency: "TMT",
+        coverMediaKey: "pending/a/original.webp", coverThumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH", status: "active", available: true,
+      },
+      createdAt: "2026-10-01T09:00:00.000Z",
+    };
+    state.messages.data = { pages: [{ items: [persistedRef], nextCursor: null }] };
+    routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation(), [`/listings/${LISTING_ID}`]: () => listingDetail() });
+    const screen = renderMobile(<ConversationDetailScreen />);
+
+    await waitFor(() => {
+      const placeholders = screen.UNSAFE_getAllByType(Image).map((image) => image.props.placeholder as unknown);
+      expect(placeholders).toContainEqual({ thumbhash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" });
+    });
+  });
+
   it("opens the same persisted object in the real fullscreen viewer and closes it", async () => {
     const { screen, photo } = await openStoredImage();
 

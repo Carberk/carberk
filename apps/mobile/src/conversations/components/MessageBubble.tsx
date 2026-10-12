@@ -197,6 +197,7 @@ function BubbleContent({
         displayPriceTmt={metadata.displayPriceTmt}
         priceCurrency={metadata.priceCurrency}
         coverMediaKey={metadata.coverMediaKey}
+        coverThumbHash={metadata.coverThumbHash}
         status={metadata.status}
         available={metadata.available}
         brandName={postRefBrandName}

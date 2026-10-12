@@ -72,11 +72,14 @@ function variantUri(item: ListingMedia, variant: Variant): string {
  * with the same fit so the sharper photo replaces it in place without a jump
  * or a blank frame.
  *
- * A photo with a ThumbHash shows its blurred colours before anything loads.
- * Without a smaller size it is the photo's placeholder. With one, expo-image
- * takes a single placeholder (and never a hash from a list), so the blur is
- * drawn underneath instead, with the same fit: the cached smaller size still
- * appears over it at once, and the sharper photo over both.
+ * A photo with a ThumbHash shows its blurred colours before anything loads,
+ * drawn in an Image underneath with the same fit. expo-image takes a single
+ * placeholder and never selects a hash from a list, so the cached smaller
+ * size stays the photo's own placeholder and appears over the blur at once.
+ * Whenever a hash is set the tree is the same, so a zoom that swaps in the
+ * fullscreen size changes only the photo's props and it sharpens in place.
+ * The blur goes once the photo has loaded: a hash decodes at an approximate
+ * aspect ratio, so beside a contain-fit photo it would show as bands.
  */
 export function GalleryImage({
   item,
@@ -101,32 +104,32 @@ export function GalleryImage({
   const sourceUri = useOriginalImage ? buildOriginalUrl(item.key) : variantUri(item, variant);
   const placeholderUri = placeholderVariant ? variantUri(item, placeholderVariant) : undefined;
   const thumbHash = item.thumbHash;
-  const placeholder = placeholderUri
-    ? { uri: placeholderUri }
-    : thumbHash ? { thumbhash: thumbHash } : undefined;
-  const layered = Boolean(thumbHash && placeholderUri);
+  const [loaded, setLoaded] = useState(false);
 
   const photo = (
     <Image
       source={{ uri: sourceUri }}
-      placeholder={placeholder}
+      placeholder={placeholderUri ? { uri: placeholderUri } : undefined}
       placeholderContentFit={contentFit}
-      style={layered ? StyleSheet.absoluteFill : style}
+      style={thumbHash ? StyleSheet.absoluteFill : style}
       contentFit={contentFit}
       priority={priority}
       cachePolicy="memory-disk"
       onLoad={(event) => {
+        setLoaded(true);
         const { width, height } = event.source;
         if (width > 0 && height > 0) onAspectRatio?.(width / height);
       }}
       onError={() => setUseOriginalImage(true)}
     />
   );
-  if (!layered) return photo;
+  if (!thumbHash) return photo;
 
   return (
     <View style={style as ComponentProps<typeof View>["style"]}>
-      <Image source={{ thumbhash: thumbHash }} style={StyleSheet.absoluteFill} contentFit={contentFit} />
+      {loaded ? null : (
+        <Image source={{ thumbhash: thumbHash }} style={StyleSheet.absoluteFill} contentFit={contentFit} />
+      )}
       {photo}
     </View>
   );
