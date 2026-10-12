@@ -90,6 +90,7 @@ const detail = {
     displayName: "Aman",
     nameNumber: 4821,
     avatarIndex: 0,
+    avatarKey: null,
     deleted: false,
     memberSince: "2026-01-01T00:00:00.000Z",
   },

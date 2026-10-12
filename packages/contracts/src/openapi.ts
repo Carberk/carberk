@@ -67,6 +67,7 @@ import {
 } from "./schemas/catalog";
 import {
   ListingSummarySchema,
+  ListingSummaryBaseSchema,
   FeedListingSummarySchema,
   ListingDetailSchema,
   ListingMediaSchema,
@@ -1128,7 +1129,7 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
     tags: ["Listings"],
     request: { params: z.object({ id: z.string().uuid() }) },
     responses: {
-      201: { description: "The published Listing", content: { "application/json": { schema: S(ListingSummarySchema.pick({
+      201: { description: "The published Listing", content: { "application/json": { schema: S(ListingSummaryBaseSchema.pick({
         id: true, sellerId: true, status: true, brandId: true, modelId: true,
         priceAmount: true, priceCurrency: true,
       }).extend({ publishedAt: z.string().datetime() })) } } },
