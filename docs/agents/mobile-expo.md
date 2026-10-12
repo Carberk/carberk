@@ -68,13 +68,13 @@ pnpm --filter @auto-tm/mobile native:metro -- --env pr-842 --port 8842
 pnpm --filter @auto-tm/mobile native:ios -- --udid <SIMULATOR_UUID> --port 8842
 ```
 
-`--env staging` selects staging. The Railway CLI must support `variables --project`; set `RAILWAY_CLI` to the intended binary if an older CLI precedes it on PATH. For this host, `/Users/bagtyyar/.railway/bin/railway` is 5.63.4 and supports the flag. The helper rebuilds contracts before starting Metro, disables dotenv overrides, and refuses an occupied port without stopping its process. Its failure cleanup signals only the Metro process group it created. Stop that Metro session before handing back native work.
+`--env staging` selects staging. The Railway CLI must support `variables --project`; set `RAILWAY_CLI` to the intended binary if an older CLI precedes it on PATH. For this host, `/Users/bagtyyar/.railway/bin/railway` is 5.63.4 and supports the flag. The helper rebuilds contracts before starting Metro, disables dotenv overrides, refuses an API, socket or media origin outside `*.up.railway.app`, and refuses a port held on any address, including loopback, without stopping its process. Its failure cleanup signals only the Metro process group it created. Stop that Metro session before handing back native work.
 
 Run `native:ios` from the same worktree after Metro reports its guarded bundle is ready. It verifies the selected bundle against the public-origin receipt in gitignored `.expo/` before any native build. Select a simulator that this session owns; an install and launch replace the app on that selected simulator. Preserve other device and Metro sessions.
 
 The iOS helper uses `expo prebuild`, UTF-8 CocoaPods, `xcodebuild` Debug for `iphonesimulator`, and `simctl` for the explicitly selected simulator. This bypasses Expo's Simulator.app discovery failure observed on this Xcode 27 host. `IPHONEOS_DEPLOYMENT_TARGET=16.0` is a command-line override for this local simulator build only, covering older pod targets and Router link preview. Shipped Expo platform minimums remain in app configuration. This route installs development clients; release binaries and store operations use their own workflows.
 
-The helper restored for [issue 841](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/841) reuses the implementation and eight tests preserved at `255a06ec3c90e04ae58f1d0e0adbb02b385976a9`, with explicit ports and process/origin guards. See [Expo CLI](https://docs.expo.dev/more/expo-cli/) and [Railway variable reference](https://docs.railway.com/cli/variable). Context7 lookups were unavailable after retry; installed CLI help and those official references supplied the fallback.
+See [Expo CLI](https://docs.expo.dev/more/expo-cli/) and [Railway variable reference](https://docs.railway.com/cli/variable).
 
 ## Known SDK 55 pitfalls
 
