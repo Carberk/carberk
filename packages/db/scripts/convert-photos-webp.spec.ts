@@ -10,7 +10,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { main } from "./convert-photos-webp";
 
-const state = vi.hoisted(() => ({ objects: new Map<string, { body: Buffer; contentType: string; etag: string; cacheControl?: string; lastModified?: Date }>(), rows: new Map<string, Record<string, unknown>[]>(), ignoreConditions: false }));
+// Storage is modelled on the pinned MinIO: conditional PUTs answer 412, DeleteObject ignores If-Match.
+const state = vi.hoisted(() => ({ objects: new Map<string, { body: Buffer; contentType: string; etag: string; cacheControl?: string; lastModified?: Date }>(), rows: new Map<string, Record<string, unknown>[]>(), ignoreConditions: false, beforePut: undefined as ((key: string, contentType: string | undefined) => void) | undefined, deleteFault: undefined as { key: string; when: "before" | "after" } | undefined }));
+const TOMBSTONE_TYPE = "application/x-carberk-conversion-tombstone";
 const must = <T>(value: T | null | undefined): T => { if (value == null) throw new Error("Missing fixture value"); return value; };
 const missing = () => Object.assign(new Error("NotFound"), { name: "NotFound" });
 const conflict = () => Object.assign(new Error("PreconditionFailed"), { $metadata: { httpStatusCode: 412 } });
@@ -22,15 +24,23 @@ vi.mock("@aws-sdk/client-s3", async (original) => ({ ...await original<typeof S3
     if (command instanceof ListObjectsV2Command) return { Contents: [...state.objects.entries()].filter(([key]) => key.startsWith(command.input.Bucket + "/") && key.slice(must(command.input.Bucket).length + 1).startsWith(command.input.Prefix ?? "")).map(([key, value]) => ({ Key: key.slice(must(command.input.Bucket).length + 1), ETag: value.etag, Size: value.body.length, LastModified: value.lastModified ?? new Date("2000-01-01") })) };
     if (command instanceof GetObjectCommand || command instanceof HeadObjectCommand || command instanceof PutObjectCommand || command instanceof DeleteObjectCommand) {
       const key = `${command.input.Bucket}/${command.input.Key}`;
+      if (command instanceof PutObjectCommand) state.beforePut?.(key, command.input.ContentType);
       const object = state.objects.get(key);
-      if (!state.ignoreConditions && command.input.IfMatch && object?.etag !== command.input.IfMatch) throw conflict();
+      if (!state.ignoreConditions && !(command instanceof DeleteObjectCommand) && command.input.IfMatch && object?.etag !== command.input.IfMatch) throw conflict();
       if (command instanceof PutObjectCommand) {
         if (!state.ignoreConditions && command.input.IfNoneMatch === "*" && object) throw conflict();
         const body = Buffer.from(command.input.Body as Buffer);
         const etag = '"' + createHash("sha256").update(body).digest("hex") + '"';
         state.objects.set(key, { body, etag, contentType: command.input.ContentType ?? "application/octet-stream" }); return { ETag: etag };
       }
-      if (command instanceof DeleteObjectCommand) { state.objects.delete(key); return {}; }
+      if (command instanceof DeleteObjectCommand) {
+        const fault = state.deleteFault?.key === key ? state.deleteFault : undefined;
+        if (fault) state.deleteFault = undefined;
+        if (fault?.when === "before") throw new Error("connection reset before delete");
+        state.objects.delete(key);
+        if (fault?.when === "after") throw new Error("delete response lost");
+        return {};
+      }
       if (!object) throw missing();
       return { ETag: object.etag, ContentType: object.contentType, ContentLength: object.body.length, CacheControl: object.cacheControl, LastModified: object.lastModified ?? new Date("2000-01-01"), Body: { transformToByteArray: async () => object.body } };
     }
@@ -72,7 +82,7 @@ const prefix = "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585";
 
 beforeEach(async () => {
   directory = await mkdtemp(join(tmpdir(), "webp-conversion-")); plan = join(directory, "plan.json");
-  state.objects.clear(); state.rows.clear(); state.ignoreConditions = false;
+  state.objects.clear(); state.rows.clear(); state.ignoreConditions = false; state.beforePut = undefined; state.deleteFault = undefined;
   for (const [name, value] of Object.entries({ DATABASE_URL: "postgresql://fake", MINIO_ENDPOINT: "http://fake", MINIO_ACCESS_KEY: "fake", MINIO_SECRET_KEY: "fake", PHOTO_CONVERSION_WRITERS_PAUSED: "yes" })) vi.stubEnv(name, value);
   const original = await sharp({ create: { width: 120, height: 90, channels: 3, background: "red" } }).jpeg().toBuffer();
   for (const name of ["original", "thumbnail", "list", "detail", "fullscreen"]) state.objects.set(`listing-photos/${prefix}/${name}.jpg`, { body: original, contentType: "image/jpeg", etag: `"${name}"` });
@@ -107,6 +117,43 @@ describe("stored photo conversion", () => {
     await main(["delete-jpeg", plan]); await main(["delete-jpeg", plan]);
     expect([...state.objects.keys()].filter((key) => key.endsWith(".jpg"))).toEqual([]);
     expect(state.objects.size).toBe(6);
+    expect([...state.objects.values()].some((object) => object.contentType === TOMBSTONE_TYPE)).toBe(false);
+    const events = (await readFile(`${plan}.journal.jsonl`, "utf8")).trim().split("\n").map((line) => JSON.parse(line) as { type: string; key: string });
+    expect(events.filter((event) => event.type === "tombstoned").map((event) => event.key).sort()).toEqual(events.filter((event) => event.type === "deleted").map((event) => event.key).sort());
+  });
+
+  it("refuses a JPEG that changes between its read and the tombstone PUT, which the store answers with 412", async () => {
+    await main(["dry-run", plan]); await main(["apply", plan]);
+    const target = `listing-photos/${prefix}/detail.jpg`;
+    const edited = Buffer.from("changed after inventory");
+    state.beforePut = (key, contentType) => {
+      if (key !== target || contentType !== TOMBSTONE_TYPE) return;
+      state.beforePut = undefined;
+      state.objects.set(key, { body: edited, contentType: "image/jpeg", etag: '"concurrent"' });
+    };
+    await expect(main(["delete-jpeg", plan])).rejects.toThrow(`Source changed before deletion: ${prefix}/detail.jpg`);
+    expect(state.objects.get(target)).toMatchObject({ body: edited, etag: '"concurrent"' });
+    await expect(main(["delete-jpeg", plan])).rejects.toThrow(`Source changed before deletion: ${prefix}/detail.jpg`);
+    expect(state.objects.get(target)?.etag).toBe('"concurrent"');
+  });
+
+  it("resumes an interrupted tombstone delete and counts a journaled tombstone that is already gone as deleted", async () => {
+    await main(["dry-run", plan]); await main(["apply", plan]);
+    state.deleteFault = { key: `listing-photos/${prefix}/detail.jpg`, when: "before" };
+    await expect(main(["delete-jpeg", plan])).rejects.toThrow("connection reset before delete");
+    expect(state.objects.get(`listing-photos/${prefix}/detail.jpg`)?.contentType).toBe(TOMBSTONE_TYPE);
+    state.deleteFault = { key: `listing-photos/${prefix}/list.jpg`, when: "after" };
+    await expect(main(["delete-jpeg", plan])).rejects.toThrow("delete response lost");
+    expect(state.objects.has(`listing-photos/${prefix}/list.jpg`)).toBe(false);
+    await main(["delete-jpeg", plan]);
+    expect([...state.objects.keys()].filter((key) => key.endsWith(".jpg"))).toEqual([]);
+    expect([...state.objects.values()].some((object) => object.contentType === TOMBSTONE_TYPE)).toBe(false);
+  });
+
+  it("refuses a planned JPEG that disappeared without the converter's journaled tombstone", async () => {
+    await main(["dry-run", plan]); await main(["apply", plan]);
+    state.objects.delete(`listing-photos/${prefix}/detail.jpg`);
+    await expect(main(["delete-jpeg", plan])).rejects.toThrow(`Missing without a converter tombstone: ${prefix}/detail.jpg`);
   });
 
   it("preserves append-only audit snapshots while live report and profile references move to WebP", async () => {
@@ -165,6 +212,15 @@ describe("stored photo conversion", () => {
     await expect(main(["retire-placeholders", plan])).rejects.toThrow("live reference");
     expect(state.objects.has(`chat-attachments/${key}`)).toBe(true);
     state.rows.set("messages", []);
+    const placeholder = must(state.objects.get(`chat-attachments/${key}`));
+    state.beforePut = (target, contentType) => {
+      if (target !== `chat-attachments/${key}` || contentType !== TOMBSTONE_TYPE) return;
+      state.beforePut = undefined;
+      state.objects.set(target, { ...placeholder, body: Buffer.from("late upload"), etag: '"late-upload"' });
+    };
+    await expect(main(["retire-placeholders", plan])).rejects.toThrow("Source changed before deletion");
+    expect(state.objects.get(`chat-attachments/${key}`)?.etag).toBe('"late-upload"');
+    state.objects.set(`chat-attachments/${key}`, placeholder);
     await main(["retire-placeholders", plan]); await main(["retire-placeholders", plan]);
     expect(state.objects.has(`chat-attachments/${key}`)).toBe(false);
     expect(state.rows.get("conversations")).toEqual([{ id: conversationId }]);
@@ -190,5 +246,12 @@ describe("stored photo conversion", () => {
     await main(["dry-run", plan]); state.ignoreConditions = true;
     await expect(main(["apply", plan])).rejects.toThrow("ignores conditional");
     expect(state.rows.get("listing_media")?.[0]?.["key"]).toBe(`${prefix}/original.jpg`);
+    await expect(main(["delete-jpeg", plan])).rejects.toThrow("ignores conditional");
+    expect([...state.objects.keys()].filter((key) => key.endsWith(".jpg"))).toHaveLength(6);
+  });
+
+  it("proves the tombstone delete path on a probe key and leaves no probe object behind", async () => {
+    await main(["dry-run", plan]); await main(["apply", plan]);
+    expect([...state.objects.keys()].filter((key) => key.includes(".webp-conversion-probe/"))).toEqual([]);
   });
 });

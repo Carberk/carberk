@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { CreateBucketCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, PutBucketPolicyCommand, S3Client } from "@aws-sdk/client-s3";
+import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, PutBucketPolicyCommand, S3Client } from "@aws-sdk/client-s3";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { Pool } from "pg";
 import sharp from "sharp";
@@ -99,6 +99,37 @@ describe("WebP operator conversion on real Postgres and conditional MinIO", () =
     expect((await s3.send(new GetObjectCommand({ Bucket: "listing-photos", Key: key }))).Body).toBeDefined();
   });
 
+
+  it("refuses to delete a JPEG that a writer replaces before the tombstone PUT, through MinIO's own 412", async () => {
+    const racePrefix = "pending/41b0b4e0-4d4a-4d2c-8bd6-705555cb7585";
+    const target = `${racePrefix}/original.jpg`;
+    const original = await sharp({ create: { width: 160, height: 120, channels: 3, background: "blue" } }).jpeg().toBuffer();
+    await s3.send(new PutObjectCommand({ Bucket: "listing-photos", Key: target, Body: original, ContentType: "image/jpeg" }));
+    const plan = join(directory, "race-plan.json");
+    await main(["dry-run", plan]); await main(["apply", plan]);
+    const edited = await sharp({ create: { width: 10, height: 10, channels: 3, background: "green" } }).jpeg().toBuffer();
+    const send = S3Client.prototype.send as unknown as (this: S3Client, command: unknown) => Promise<unknown>;
+    let raced = false;
+    // A real plain PUT lands between the converter's ETag read and its tombstone PUT.
+    const spy = vi.spyOn(S3Client.prototype, "send").mockImplementation(async function (this: S3Client, command: unknown) {
+      if (!raced && command instanceof PutObjectCommand && command.input.Key === target && command.input.ContentType === "application/x-carberk-conversion-tombstone") {
+        raced = true;
+        await send.call(this, new PutObjectCommand({ Bucket: "listing-photos", Key: target, Body: edited, ContentType: "image/jpeg" }));
+      }
+      return send.call(this, command);
+    } as never);
+    try {
+      await expect(main(["delete-jpeg", plan])).rejects.toThrow(`Source changed before deletion: ${target}`);
+    } finally { spy.mockRestore(); }
+    expect(raced).toBe(true);
+    const kept = await s3.send(new GetObjectCommand({ Bucket: "listing-photos", Key: target }));
+    expect(Buffer.from(await must(kept.Body).transformToByteArray()).equals(edited)).toBe(true);
+    expect(kept.ContentType).toBe("image/jpeg");
+    const probes = await s3.send(new ListObjectsV2Command({ Bucket: "listing-photos", Prefix: ".webp-conversion-probe/" }));
+    expect(probes.Contents ?? []).toEqual([]);
+    // Leave the store as the later placeholder test expects: no unconverted race JPEG.
+    await s3.send(new DeleteObjectCommand({ Bucket: "listing-photos", Key: target }));
+  });
 
   it("retires expired unadopted placeholders into durable cleanup without accepting empty WebP photos", async () => {
     const prefix = "pending/51b0b4e0-4d4a-4d2c-8bd6-705555cb7585";
