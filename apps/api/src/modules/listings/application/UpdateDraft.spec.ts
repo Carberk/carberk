@@ -242,6 +242,24 @@ describe("UpdateDraft converted-photo autosave compatibility", () => {
     expect(result.draft.payload).toMatchObject({ description: "New text", photos: [{ photoId: "p", key: "demo-inventory/photo/original.webp", sortOrder: 1 }] });
   });
 
+  it.each([
+    "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.jpg",
+    "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.jpeg",
+    "demo-inventory/photo/original.jpg",
+  ])("keeps autosaving an unconverted draft that resends its stored JPEG key %s", async (key) => {
+    const repo = new FakeListingDraftRepository();
+    repo.drafts.push(ListingDraft.create({ id: "d", userId: "u", payload: { photos: [{ photoId: "p", key, sortOrder: 0 }] } }));
+    const result = await makeUseCase(repo).execute({ draftId: "d", userId: "u", payload: { description: "New text", photos: [{ photoId: "p", key, sortOrder: 0 }] } });
+    expect(result.draft.payload).toMatchObject({ description: "New text", photos: [{ photoId: "p", key, sortOrder: 0 }] });
+  });
+
+  it("refuses a JPEG key that another saved photo holds", async () => {
+    const repo = new FakeListingDraftRepository();
+    const key = "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.jpg";
+    repo.drafts.push(ListingDraft.create({ id: "d", userId: "u", payload: { photos: [{ photoId: "other", key, sortOrder: 0 }] } }));
+    await expect(makeUseCase(repo).execute({ draftId: "d", userId: "u", payload: { photos: [{ photoId: "p", key, sortOrder: 0 }] } })).rejects.toThrow();
+  });
+
   it("refuses an unknown JPEG alias instead of persisting a nonexistent replacement", async () => {
     const repo = new FakeListingDraftRepository();
     repo.drafts.push(ListingDraft.create({ id: "d", userId: "u", payload: {} }));

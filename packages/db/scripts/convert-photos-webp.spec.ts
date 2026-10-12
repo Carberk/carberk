@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { main } from "./convert-photos-webp";
 
 // Storage is modelled on the pinned MinIO: conditional PUTs answer 412, DeleteObject ignores If-Match.
-const state = vi.hoisted(() => ({ objects: new Map<string, { body: Buffer; contentType: string; etag: string; cacheControl?: string; lastModified?: Date }>(), rows: new Map<string, Record<string, unknown>[]>(), ignoreConditions: false, beforePut: undefined as ((key: string, contentType: string | undefined) => void) | undefined, deleteFault: undefined as { key: string; when: "before" | "after" } | undefined }));
+const state = vi.hoisted(() => ({ objects: new Map<string, { body: Buffer; contentType: string; etag: string; cacheControl?: string; lastModified?: Date }>(), rows: new Map<string, Record<string, unknown>[]>(), ignoreConditions: false, beforePut: undefined as ((key: string, contentType: string | undefined) => void) | undefined, deleteFault: undefined as { key: string; when: "before" | "after" } | undefined, afterPut: undefined as ((key: string, contentType: string | undefined) => void) | undefined }));
 const TOMBSTONE_TYPE = "application/x-carberk-conversion-tombstone";
 const must = <T>(value: T | null | undefined): T => { if (value == null) throw new Error("Missing fixture value"); return value; };
 const missing = () => Object.assign(new Error("NotFound"), { name: "NotFound" });
@@ -31,7 +31,9 @@ vi.mock("@aws-sdk/client-s3", async (original) => ({ ...await original<typeof S3
         if (!state.ignoreConditions && command.input.IfNoneMatch === "*" && object) throw conflict();
         const body = Buffer.from(command.input.Body as Buffer);
         const etag = '"' + createHash("sha256").update(body).digest("hex") + '"';
-        state.objects.set(key, { body, etag, contentType: command.input.ContentType ?? "application/octet-stream" }); return { ETag: etag };
+        state.objects.set(key, { body, etag, contentType: command.input.ContentType ?? "application/octet-stream" });
+        state.afterPut?.(key, command.input.ContentType);
+        return { ETag: etag };
       }
       if (command instanceof DeleteObjectCommand) {
         const fault = state.deleteFault?.key === key ? state.deleteFault : undefined;
@@ -82,7 +84,7 @@ const prefix = "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585";
 
 beforeEach(async () => {
   directory = await mkdtemp(join(tmpdir(), "webp-conversion-")); plan = join(directory, "plan.json");
-  state.objects.clear(); state.rows.clear(); state.ignoreConditions = false; state.beforePut = undefined; state.deleteFault = undefined;
+  state.objects.clear(); state.rows.clear(); state.ignoreConditions = false; state.beforePut = undefined; state.deleteFault = undefined; state.afterPut = undefined;
   for (const [name, value] of Object.entries({ DATABASE_URL: "postgresql://fake", MINIO_ENDPOINT: "http://fake", MINIO_ACCESS_KEY: "fake", MINIO_SECRET_KEY: "fake", PHOTO_CONVERSION_WRITERS_PAUSED: "yes" })) vi.stubEnv(name, value);
   const original = await sharp({ create: { width: 120, height: 90, channels: 3, background: "red" } }).jpeg().toBuffer();
   for (const name of ["original", "thumbnail", "list", "detail", "fullscreen"]) state.objects.set(`listing-photos/${prefix}/${name}.jpg`, { body: original, contentType: "image/jpeg", etag: `"${name}"` });
@@ -253,5 +255,21 @@ describe("stored photo conversion", () => {
   it("proves the tombstone delete path on a probe key and leaves no probe object behind", async () => {
     await main(["dry-run", plan]); await main(["apply", plan]);
     expect([...state.objects.keys()].filter((key) => key.includes(".webp-conversion-probe/"))).toEqual([]);
+  });
+
+  it("binds a plan to its database by host, port, name and user, never by password", async () => {
+    const url = "postgresql://converter:first-secret@db.internal:5432/autotm";
+    vi.stubEnv("DATABASE_URL", url);
+    await main(["dry-run", plan]);
+    const saved = await readFile(plan, "utf8");
+    expect(saved).not.toContain("first-secret");
+    expect(JSON.parse(saved).databaseFingerprint).not.toBe(createHash("sha256").update(url).digest("hex"));
+    vi.stubEnv("DATABASE_URL", "postgresql://converter:rotated-secret@db.internal:5432/autotm");
+    // A rotated password passes the binding check and reaches verification itself.
+    await expect(main(["verify", plan])).rejects.toThrow("Replacement has not been written");
+    for (const other of ["postgresql://converter:first-secret@db.other:5432/autotm", "postgresql://converter:first-secret@db.internal:5433/autotm", "postgresql://converter:first-secret@db.internal:5432/other", "postgresql://someone:first-secret@db.internal:5432/autotm"]) {
+      vi.stubEnv("DATABASE_URL", other);
+      await expect(main(["verify", plan])).rejects.toThrow("Plan belongs to a different store/database");
+    }
   });
 });
