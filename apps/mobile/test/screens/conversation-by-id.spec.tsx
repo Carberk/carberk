@@ -1243,7 +1243,12 @@ describe("First chat action notifications", () => {
 });
 
 describe("Conversation keyboard ownership", () => {
-  it.each(["android", "ios"] as const)("keeps the message and Send controls inside the active %s avoidance region", async (os) => {
+  // A KeyboardAvoidingView compares its onLayout frame, which is relative to its
+  // parent, with the keyboard's screen position. A region around the footer alone
+  // therefore pads too little (#843: the iOS composer sat fully behind the keys).
+  // The one active region must be the whole screen column, directly under the
+  // safe-area screen, whose own frame is in screen coordinates.
+  it.each(["android", "ios"] as const)("pads the whole %s screen column, so the composer and the latest Message sit above the keys", async (os) => {
     const previousOS = Platform.OS;
     Platform.OS = os;
     state.messages.data = { pages: [{ items: [serverMessage("Read while typing", SELLER_ID)] }] };
@@ -1254,15 +1259,20 @@ describe("Conversation keyboard ownership", () => {
       fireEvent.changeText(field, "Above the keyboard");
       const active = screen.UNSAFE_getAllByType(KeyboardAvoidingView).filter((view) => view.props.enabled !== false);
       expect(active).toHaveLength(1);
-      expect(within(active[0]).getByDisplayValue("Above the keyboard")).toBeTruthy();
-      expect(within(active[0]).getByRole("button", { name: "Send message", disabled: false })).toBeTruthy();
-      if (os === "android") {
-        expect(within(active[0]).getByText("Read while typing")).toBeTruthy();
-        expect(active[0].props.behavior).toBe("padding");
-        expect(active[0].props.className).toBe("flex-1");
-      } else {
-        expect(active[0].props.behavior).toBe("padding");
-      }
+      const region = active[0];
+      expect(region.props.behavior).toBe("padding");
+      expect(region.props.className).toBe("flex-1");
+      expect(region.props.keyboardVerticalOffset ?? 0).toBe(0);
+      // Its parent is the screen root that applies the safe-area insets as padding.
+      expect(Object.keys(region.parent?.props.style ?? {})).toEqual(
+        expect.arrayContaining(["paddingTop", "paddingBottom"]),
+      );
+      expect(within(region).getByText("Read while typing")).toBeTruthy();
+      expect(within(region).getByDisplayValue("Above the keyboard")).toBeTruthy();
+      expect(within(region).getByRole("button", { name: "Send message", disabled: false })).toBeTruthy();
+      expect(within(region).getByLabelText(/attach/i)).toBeTruthy();
+      // No second, footer-local region anywhere in the screen, even a disabled one.
+      expect(screen.UNSAFE_getAllByType(KeyboardAvoidingView)).toHaveLength(1);
     } finally { Platform.OS = previousOS; }
   });
 });

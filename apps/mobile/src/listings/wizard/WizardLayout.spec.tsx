@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { AccessibilityInfo, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput } from "react-native";
+import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput } from "react-native";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fireEvent, renderMobile, within } from "../../../test/render";
@@ -379,9 +379,33 @@ describe("WizardLayout keyboard", () => {
     } finally { Platform.OS = previousOS; }
   });
 
-  it("leaves the iOS layout without keyboard avoidance, as before", () => {
-    const screen = renderMobile(layout("Price", 4, { children: <TextInput value="85000" onChangeText={() => {}} /> }));
-    expect(screen.UNSAFE_getByType(KeyboardAvoidingView).props.enabled).toBe(false);
+  // #843: on iOS the action bar sat behind the keyboard and a low field such as the
+  // description could too. Both platforms pad the whole column now.
+  it.each(["ios", "android"] as const)("pads the whole %s column, so the field and Continue ride above the keys", (os) => {
+    const previousOS = Platform.OS;
+    Platform.OS = os;
+    try {
+      const screen = renderMobile(layout("Description", 6, { children: <TextInput value="One owner" multiline onChangeText={() => {}} /> }));
+      const avoidance = screen.UNSAFE_getByType(KeyboardAvoidingView);
+      expect(avoidance.props.enabled).not.toBe(false);
+      expect(avoidance.props.behavior).toBe("padding");
+      expect(avoidance.props.keyboardVerticalOffset ?? 0).toBe(0);
+      expect(within(avoidance).getByDisplayValue("One owner")).toBeTruthy();
+      expect(within(avoidance).getByRole("button", { name: "Continue" })).toBeTruthy();
+    } finally { Platform.OS = previousOS; }
+  });
+
+  it("scrolls the step to the focused field when the keyboard opens", () => {
+    const addListener = vi.spyOn(Keyboard, "addListener");
+    try {
+      const screen = renderMobile(layout("Description", 6, { children: <TextInput value="One owner" multiline onChangeText={() => {}} /> }));
+      expect(addListener).toHaveBeenCalledWith("keyboardDidShow", expect.any(Function));
+      // The step's scroll view reports its offset and height to the reveal.
+      const scroll = screen.UNSAFE_getByType(ScrollView);
+      expect(scroll.props.onScroll).toEqual(expect.any(Function));
+      expect(scroll.props.onLayout).toEqual(expect.any(Function));
+      expect(scroll.props.scrollEventThrottle).toBe(16);
+    } finally { addListener.mockRestore(); }
   });
 });
 

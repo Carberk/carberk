@@ -1,4 +1,5 @@
 import { mobileType } from "@auto-tm/ui/tokens";
+import { KeyboardAvoidingView, Platform } from "react-native";
 import { describe, expect, it, vi } from "vitest";
 
 import { fireEvent, renderMobile } from "../../../test/render";
@@ -98,5 +99,21 @@ describe("Message composer row alignment (#775 F)", () => {
       expect(spacing(button, "h")).toBe(TOUCH_TARGET);
       expect(spacing(button, "w")).toBe(TOUCH_TARGET);
     }
+  });
+});
+
+describe("Message composer keyboard avoidance (#843)", () => {
+  // The composer sits at the bottom of the Conversation screen, which owns the one
+  // avoidance region. A region of its own would measure its frame in the footer's
+  // coordinates against the keyboard's screen position and leave it behind the keys.
+  it.each(["ios", "android"] as const)("adds no keyboard avoidance of its own on %s", (os) => {
+    const previousOS = Platform.OS;
+    Platform.OS = os;
+    try {
+      const screen = renderMobile(<MessageComposer onSend={vi.fn()} conversationId="c1" showQuickReplies />);
+      expect(screen.UNSAFE_queryAllByType(KeyboardAvoidingView)).toHaveLength(0);
+      expect(screen.getByRole("button", { name: "Attach photo" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Send message" })).toBeTruthy();
+    } finally { Platform.OS = previousOS; }
   });
 });

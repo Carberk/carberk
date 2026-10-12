@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { act, fireEvent, renderMobile, routeParams, routerMock } from "../render";
+import { KEYBOARD_PLATFORMS, activeKeyboardRegion, onPlatform } from "../keyboardAvoidance";
+import { act, fireEvent, renderMobile, routeParams, routerMock, within } from "../render";
 import OtpScreen from "../../app/(auth)/otp";
 import { ApiError } from "../../src/api/client";
 
@@ -306,4 +307,13 @@ describe("Sign-in code screen actions", () => {
 
     expect(screen.queryByRole("button", { name: "Use phone instead" })).toBeNull();
   });
+});
+
+describe("Sign-in code keyboard (#843)", () => {
+  it.each(KEYBOARD_PLATFORMS)("keeps the code form above the %s keyboard", (os) =>
+    onPlatform(os, () => {
+      const screen = renderMobile(<ToastProvider><OtpScreen /></ToastProvider>);
+      const region = activeKeyboardRegion(screen);
+      expect(within(region).getByRole("button", { name: "Submit code" })).toBeTruthy();
+    }));
 });
