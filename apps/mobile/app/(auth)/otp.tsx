@@ -201,7 +201,7 @@ export default function OtpScreen() {
     <>
       <SafeScreen>
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior="padding"
           className="flex-1"
         >
           <View className="flex-1 px-4">

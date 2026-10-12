@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform,
   View,
 } from "react-native";
 import { useColorScheme } from "nativewind";
@@ -117,7 +116,7 @@ export default function DisplayNameScreen() {
   return (
     <SafeScreen>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior="padding"
         className="flex-1"
       >
         <StackHeader

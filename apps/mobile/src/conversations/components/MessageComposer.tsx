@@ -2,8 +2,6 @@ import { useState, useCallback, useEffect } from "react";
 import {
   View,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ActivityIndicator,
 } from "react-native";
@@ -180,10 +178,8 @@ export function MessageComposer({
   }, [onStopTyping]);
 
   return (
-    <KeyboardAvoidingView
-      enabled={Platform.OS === "ios"}
-      behavior="padding"
-    >
+    // The Conversation screen owns keyboard avoidance for its whole column (#843).
+    <View>
       {showQuickReplies && (
         <QuickReplies onSelect={setText} disabled={disabled} />
       )}
@@ -294,6 +290,6 @@ export function MessageComposer({
           />
         </Button>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }

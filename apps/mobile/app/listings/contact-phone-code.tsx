@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { AlertCircle } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { KeyboardAvoidingView, ScrollView, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { formatResendWait } from "../../components/auth/CodeEntryForm";
@@ -227,7 +227,7 @@ export default function ContactPhoneCodeScreen() {
   return (
     <SafeScreen>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior="padding"
         className="flex-1"
       >
         <StackHeader

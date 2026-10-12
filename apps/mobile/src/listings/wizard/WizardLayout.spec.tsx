@@ -368,7 +368,7 @@ describe("WizardLayout keyboard", () => {
     try {
       const screen = renderMobile(layout("Price", 4, { children: <TextInput value="85000" onChangeText={() => {}} /> }));
       const avoidance = screen.UNSAFE_getByType(KeyboardAvoidingView);
-      expect(avoidance.props.enabled).toBe(true);
+      expect(avoidance.props.enabled).not.toBe(false);
       expect(avoidance.props.behavior).toBe("padding");
       expect(within(avoidance).getByDisplayValue("85000")).toBeTruthy();
       expect(within(avoidance).getByRole("button", { name: "Continue" })).toBeTruthy();

@@ -1,5 +1,5 @@
 import { AlertCircle, RefreshCw } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next";
 import { WizardScrollLock } from "./wizardScrollLock";
 
 import { BackButton } from "@/components/navigation/StackHeader";
+import { useKeepFocusedInputVisible } from "@/components/navigation/useKeepFocusedInputVisible";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Progress } from "@/components/ui/progress";
@@ -522,12 +523,17 @@ export function WizardLayout({
   onUploadStatusPress,
 }: WizardLayoutProps) {
   const [scrollLocked, setScrollLocked] = useState(false);
+  // The step shrinks when the keyboard opens; a field low in it, such as the
+  // description, is scrolled back above the action bar.
+  const scrollRef = useRef<ScrollView>(null);
+  const keepFieldVisible = useKeepFocusedInputVisible(scrollRef, 0);
   return (
     <SafeAreaView className="flex-1 bg-background">
-      {/* Android is edge to edge, so the window does not resize for the keyboard: the
-          whole column pads, the step scrolls and the action bar rides above the keys.
-          iOS keeps its layout. */}
-      <KeyboardAvoidingView enabled={Platform.OS === "android"} behavior="padding" className="flex-1">
+      {/* The whole column pads for the keyboard on both platforms (Android is edge to edge,
+          so its window does not resize): the step scrolls and the action bar rides above the
+          keys. It sits directly in the screen root, whose frame starts at the top of the
+          window, so it needs no offset (#843). */}
+      <KeyboardAvoidingView behavior="padding" className="flex-1">
       <WizardHeader
         routeTitle={routeTitle}
         stepTitle={stepTitle}
@@ -555,9 +561,11 @@ export function WizardLayout({
 
       <WizardScrollLock.Provider value={setScrollLocked}>
         <ScrollView
+          ref={scrollRef}
           className="flex-1"
           contentContainerStyle={{ paddingBottom: 16 }}
           scrollEnabled={!scrollLocked}
+          {...keepFieldVisible}
         >
           <View className="w-full px-5">{children}</View>
         </ScrollView>
