@@ -31,6 +31,12 @@ Command: `pnpm --filter @auto-tm/mobile exec vitest run <the nine specs> -t keyb
 
 The render adapter proves the region's configuration and what it contains. It does not prove native layout.
 
+## Review fix round (`8798a725`)
+
+- **Wizard reveal test.** It now emits `keyboardDidShow`, stubs the focused field and the scroll view's measurements, advances the reveal timer and asserts `scrollTo({ y: 196 })`. With `ref={scrollRef}` removed from `WizardLayout.tsx`, as a temporary uncommitted break, it fails: `scrollTo` is not called.
+- **Focus moved to the description with the keyboard already open (Android).** No new `keyboardDidShow` fires, but no reveal is needed. In RN 0.83.10, `ReactScrollView.requestChildFocus` (`ReactAndroid/.../views/scroll/ReactScrollView.java:510`) calls `scrollToChild` for the newly focused field, which scrolls it into the scroll view's current, already shrunk, viewport. No code change. The final Android session checks it on device (state 9 in the review).
+- **Pending photo.** A Conversation test on both platforms picks a photo and finds its preview, Remove and Send inside the one avoidance region.
+
 ## Phone field digits under fast typing
 
 `usePhoneField` reformats a controlled value on every change. If keystrokes arrive faster than the JavaScript round trip, the native text can be overwritten by an older formatted value. This is the known React Native controlled-input race, and it needs automation speed (Maestro `inputText`), not human typing. It is recorded as an automation-only artefact with no code change. The final native session should confirm it by typing by hand.
