@@ -26,6 +26,14 @@ export function railwayEnvironmentName(value) {
   throw new Error(`Unknown --env "${value}": use staging or pr-<number>`);
 }
 
+/** Staging and PR origins are Railway-generated; the same rule as requireRailwayHost in easBuildProfileValidation.ts. */
+function requireRailwayHost(name, hostname) {
+  const host = hostname.toLowerCase();
+  if (host !== "up.railway.app" && !host.endsWith(".up.railway.app")) {
+    throw new Error(`${name} must use a Railway-generated *.up.railway.app host; refusing ${hostname}`);
+  }
+}
+
 /** The EXPO_PUBLIC_* values for Metro, from the api service's variables and eas.json. */
 export function expoPublicEnv(apiVariables, easJson) {
   const domain = apiVariables.RAILWAY_PUBLIC_DOMAIN;
@@ -38,6 +46,8 @@ export function expoPublicEnv(apiVariables, easJson) {
   if (mediaUrl.username || mediaUrl.password || mediaUrl.search || mediaUrl.hash || mediaUrl.hostname.endsWith(".internal")) {
     throw new Error("The api service must have a public, credential-free MINIO_PUBLIC_URL");
   }
+  requireRailwayHost("RAILWAY_PUBLIC_DOMAIN (API and socket origin)", domain);
+  requireRailwayHost("MINIO_PUBLIC_URL (media origin)", mediaUrl.hostname);
   const staticEnv = Object.fromEntries(
     Object.entries({ ...easJson.build.base.env, ...easJson.build.staging.env }).filter(([key]) =>
       key.startsWith("EXPO_PUBLIC_"),
@@ -94,9 +104,14 @@ async function reachable(target) {
   }
 }
 
+/** A child stopped by a signal keeps exitCode null and sets signalCode instead. */
+function exited(child) {
+  return child.exitCode !== null || child.signalCode !== null;
+}
+
 async function waitForMetro(port, child) {
   for (let attempt = 0; attempt < 180; attempt += 1) {
-    if (child.exitCode !== null) throw new Error("Metro exited before it was ready");
+    if (exited(child)) throw new Error("Metro exited before it was ready");
     try {
       const status = await (await fetch(`http://127.0.0.1:${port}/status`, { signal: AbortSignal.timeout(2000) })).text();
       if (status.includes("running")) return;
@@ -106,6 +121,20 @@ async function waitForMetro(port, child) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
   throw new Error("Metro did not report running within 3 minutes");
+}
+
+/** Claim the port only on a free wildcard, IPv4 loopback and IPv6 loopback; macOS lets a wildcard bind beside a loopback holder. */
+async function requireFreePort(port) {
+  for (const host of [undefined, "127.0.0.1", "::1"]) {
+    await new Promise((resolve, reject) => {
+      const server = net.createServer();
+      server.once("error", (error) => {
+        if (host === "::1" && ["EADDRNOTAVAIL", "EAFNOSUPPORT"].includes(error.code)) resolve();
+        else reject(new Error(`Port ${port} is occupied or unavailable; leave its process running and select another port`));
+      });
+      server.listen({ port, host, exclusive: true }, () => server.close(resolve));
+    });
+  }
 }
 
 async function metro({ env: target, port }) {
@@ -136,11 +165,7 @@ async function metro({ env: target, port }) {
   if (media === 0 || media >= 500) throw new Error(`Media host ${publicEnv.EXPO_PUBLIC_MEDIA_URL} is unreachable`);
   console.log(`    readyz 200, media host answers ${media}`);
 
-  await new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once("error", () => reject(new Error(`Port ${port} is occupied or unavailable; leave its process running and select another port`)));
-    server.listen(port, () => server.close(resolve));
-  });
+  await requireFreePort(port);
 
   run("Rebuild @auto-tm/contracts dist (Metro resolves it)", "pnpm", ["--filter", "@auto-tm/contracts", "build"], {
     cwd: repoRoot,
@@ -154,7 +179,7 @@ async function metro({ env: target, port }) {
     stdio: "inherit",
   });
   const stop = () => {
-    if (child.exitCode !== null) return;
+    if (exited(child)) return;
     try {
       if (process.platform === "win32") child.kill("SIGINT");
       else process.kill(-child.pid, "SIGINT");

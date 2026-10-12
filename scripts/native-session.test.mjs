@@ -15,8 +15,8 @@ const EAS = {
   },
 };
 const API_VARIABLES = {
-  RAILWAY_PUBLIC_DOMAIN: "api-staging.example",
-  MINIO_PUBLIC_URL: "https://minio-staging.example/",
+  RAILWAY_PUBLIC_DOMAIN: "api-staging.up.railway.app",
+  MINIO_PUBLIC_URL: "https://minio-staging.up.railway.app/",
   DATABASE_URL: "postgres://secret@internal/db",
 };
 
@@ -41,9 +41,9 @@ describe("expoPublicEnv", () => {
       EXPO_PUBLIC_CUSTOM_SCHEME: "autotm",
       EXPO_PUBLIC_ENV: "staging",
       EXPO_PUBLIC_WEB_URL: "https://staging.example",
-      EXPO_PUBLIC_API_URL: "https://api-staging.example/api/v1",
-      EXPO_PUBLIC_WS_URL: "wss://api-staging.example/ws/chat",
-      EXPO_PUBLIC_MEDIA_URL: "https://minio-staging.example",
+      EXPO_PUBLIC_API_URL: "https://api-staging.up.railway.app/api/v1",
+      EXPO_PUBLIC_WS_URL: "wss://api-staging.up.railway.app/ws/chat",
+      EXPO_PUBLIC_MEDIA_URL: "https://minio-staging.up.railway.app",
     });
   });
 
@@ -54,6 +54,18 @@ describe("expoPublicEnv", () => {
       /https MINIO_PUBLIC_URL/,
     );
     assert.throws(() => expoPublicEnv({ MINIO_PUBLIC_URL: "https://m.example" }, EAS), /RAILWAY_PUBLIC_DOMAIN/);
+  });
+
+  it("refuses production or any non-Railway origin under a staging or PR name", () => {
+    const production = [
+      { ...API_VARIABLES, RAILWAY_PUBLIC_DOMAIN: "api.autotm.bagtyyar.dev" },
+      { ...API_VARIABLES, MINIO_PUBLIC_URL: "https://media.autotm.bagtyyar.dev" },
+      { ...API_VARIABLES, RAILWAY_PUBLIC_DOMAIN: "up.railway.app.evil.example" },
+      { ...API_VARIABLES, MINIO_PUBLIC_URL: "https://minio.up.railway.app.evil.example" },
+    ];
+    for (const variables of production) {
+      assert.throws(() => expoPublicEnv(variables, EAS), /\*\.up\.railway\.app/);
+    }
   });
 });
 
