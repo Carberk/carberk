@@ -41,6 +41,11 @@ type Event = { type: "prepared" | "written" | "deleted" | "placeholder-deleted" 
 export const TOMBSTONE_CONTENT_TYPE = "application/x-carberk-conversion-tombstone";
 const tombstoneBody = (bucket: string, key: string) => Buffer.from(`carberk-webp-conversion-tombstone v1\n${bucket}/${key}\n${randomUUID()}\n`);
 const hash = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
+/** Binds a plan to host, port, database and user; the password never enters the plan. */
+export function databaseFingerprint(databaseUrl: string) {
+  const url = new URL(databaseUrl);
+  return hash(JSON.stringify([url.hostname.toLowerCase(), url.port || "5432", decodeURIComponent(url.pathname.replace(/^\//, "")), decodeURIComponent(url.username)]));
+}
 const isJpeg = (key: string) => /\.(jpg|jpeg)$/i.test(key);
 const webpKey = (key: string) => key.replace(/\.(jpg|jpeg)$/i, ".webp");
 const canonical = (value: unknown): string => JSON.stringify(value, (_key, entry: unknown) => entry && typeof entry === "object" && !Array.isArray(entry) ? Object.fromEntries(Object.entries(entry).sort(([a], [b]) => a.localeCompare(b))) : entry);
@@ -473,14 +478,14 @@ export async function main(args = process.argv.slice(2)) {
     if (mode === "dry-run") {
       const classified = await classifyPlaceholders(s3, pool, await inventory(s3));
       const { objects, placeholderUploads, placeholderChats } = classified;
-      const plan: Plan = { auditHistoryReferenceCount: await auditHistoryReferenceCount(pool), version: 1, endpoint, databaseFingerprint: hash(database), objects, placeholderUploads, placeholderChats, rows: await snapshotRows(pool, mappingsFor(objects), true, new Set(placeholderUploads.map((upload) => upload.uploadId))) };
+      const plan: Plan = { auditHistoryReferenceCount: await auditHistoryReferenceCount(pool), version: 1, endpoint, databaseFingerprint: databaseFingerprint(database), objects, placeholderUploads, placeholderChats, rows: await snapshotRows(pool, mappingsFor(objects), true, new Set(placeholderUploads.map((upload) => upload.uploadId))) };
       await writeFile(path, JSON.stringify(plan, null, 2), { flag: "wx", mode: 0o600 });
       console.log(`Inventory only: ${objects.length} source objects, ${plan.rows.length} reference rows. Plan ${path}; ${plan.auditHistoryReferenceCount} audit snapshots preserved unchanged; ${placeholderUploads.length} upload and ${placeholderChats.length} chat placeholders require retirement`);
       return;
     }
     const plan = JSON.parse(await readFile(path, "utf8")) as Plan;
     validatePlan(plan);
-    if (plan.endpoint !== endpoint || plan.databaseFingerprint !== hash(database)) throw new Error("Plan belongs to a different store/database");
+    if (plan.endpoint !== endpoint || plan.databaseFingerprint !== databaseFingerprint(database)) throw new Error("Plan belongs to a different store/database");
     const journalPath = `${path}.journal.jsonl`;
     const events = await loadEvents(journalPath);
     if (mode === "retire-placeholders") { await assertConditionalStorage(s3); await retirePlaceholders(s3, pool, plan, journalPath, events); console.log("Placeholders retired. Keep API paused, run existing worker cleanup, pause worker again, then take a fresh inventory."); return; }

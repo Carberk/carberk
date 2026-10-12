@@ -77,13 +77,19 @@ export class UpdateDraft {
     return { draft: saved };
   }
 
-  /** Old autosaves may still carry JPEG keys after the operator converted them. */
+  /**
+   * Old autosaves may still carry JPEG keys after the operator converted them.
+   * Before conversion, a draft resending the JPEG key it already stores for the
+   * same photo keeps that key unchanged.
+   */
   private async canonicalizePhotoAliases(payload: ListingsSchemas.ListingDraftPayload, stored: ListingsSchemas.ListingDraftPayload, userId: string) {
-    if (!payload.photos?.some((photo) => photo.key?.endsWith(".jpg"))) return payload;
-    const candidates = payload.photos.flatMap((photo) => photo.key && /^pending\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/original\.jpg$/.test(photo.key) ? [photo.key.replace(/\.jpg$/, ".webp")] : []);
+    const unchanged = (photo: ListingsSchemas.DraftPhoto) => stored.photos?.some((existing) => existing.photoId === photo.photoId && existing.key === photo.key) ?? false;
+    const aliases = payload.photos?.filter((photo) => photo.key?.endsWith(".jpg") && !unchanged(photo)) ?? [];
+    if (!payload.photos || !aliases.length) return payload;
+    const candidates = aliases.flatMap((photo) => photo.key && /^pending\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/original\.jpg$/.test(photo.key) ? [photo.key.replace(/\.jpg$/, ".webp")] : []);
     const uploads = candidates.length ? await this.uploads.findByKeys(candidates) : [];
     const photos = payload.photos.map((photo) => {
-      if (!photo.key?.endsWith(".jpg")) return photo;
+      if (!photo.key || !aliases.includes(photo)) return photo;
       const canonical = photo.key.replace(/\.jpg$/, ".webp");
       const knownDraftPhoto = stored.photos?.some((existing) => existing.photoId === photo.photoId && existing.key === canonical);
       const ownedUpload = uploads.some((upload) => upload.key === canonical && upload.userId === userId && upload.kind === "image" && upload.contentType === "image/webp" && upload.state === "AVAILABLE" && !upload.adopted);

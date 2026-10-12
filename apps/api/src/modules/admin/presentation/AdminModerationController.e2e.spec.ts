@@ -362,10 +362,10 @@ describe("AdminModerationController e2e smoke", () => {
 
   describe("moderator removes a reported User's Profile Photo (#642)", () => {
     const ownerId = suite.id("photo-owner");
-    const photoKey = `pending/${suite.id("photo-directory")}/original.jpg`;
+    const photoKey = `pending/${suite.id("photo-directory")}/original.webp`;
     const directory = photoKey.slice(0, photoKey.lastIndexOf("/") + 1);
     const objectKeys = [photoKey, ...["thumbnail", "list", "detail", "fullscreen"]
-      .flatMap((name) => [`${directory}${name}.jpg`, `${directory}${name}.webp`])];
+      .map((name) => `${directory}${name}.webp`)];
 
     /**
      * A User whose Profile Photo was adopted. The upload pipeline belongs to
@@ -381,7 +381,7 @@ describe("AdminModerationController e2e smoke", () => {
       });
       const upload = await prisma.mediaUpload.create({
         data: {
-          userId: ownerId, key: photoKey, kind: "image", contentType: "image/jpeg", sizeBytes: 2048,
+          userId: ownerId, key: photoKey, kind: "image", contentType: "image/webp", sizeBytes: 2048,
           writeProtocol: "conditional-v1", objectKeys,
           state: "ADOPTED", claimTargetType: "profile", claimTargetId: ownerId,
         },

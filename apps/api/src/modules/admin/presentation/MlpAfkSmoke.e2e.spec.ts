@@ -68,10 +68,10 @@ describe("MLP AFK e2e smoke", () => {
       .useValue({
         generate: async (originalKey: string) => ({
           variants: {
-            thumbnail: `${originalKey}/thumbnail.jpg`,
-            list: `${originalKey}/list.jpg`,
-            detail: `${originalKey}/detail.jpg`,
-            fullscreen: `${originalKey}/fullscreen.jpg`,
+            thumbnail: `${originalKey}/thumbnail.webp`,
+            list: `${originalKey}/list.webp`,
+            detail: `${originalKey}/detail.webp`,
+            fullscreen: `${originalKey}/fullscreen.webp`,
           },
         }),
       })

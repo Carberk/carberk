@@ -16,7 +16,7 @@ import type { AuditLogRepository, AuditLogRow } from "../domain/ports/AuditLogRe
 import type { ContentReportRepository } from "../domain/ports/ContentReportRepository";
 import { RemoveUserPhoto } from "./RemoveUserPhoto";
 
-const KEY = "pending/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.jpg";
+const KEY = "pending/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.webp";
 const TX = { name: "moderation transaction" };
 
 class FakeReports {

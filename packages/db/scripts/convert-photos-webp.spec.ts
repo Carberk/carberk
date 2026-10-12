@@ -257,6 +257,48 @@ describe("stored photo conversion", () => {
     expect([...state.objects.keys()].filter((key) => key.includes(".webp-conversion-probe/"))).toEqual([]);
   });
 
+  it("recognises its own tombstone after a crash between the tombstone PUT and its journal entry, and refuses anything else at that key", async () => {
+    await main(["dry-run", plan]); await main(["apply", plan]);
+    const target = `listing-photos/${prefix}/detail.jpg`;
+    const crashAfterTombstone = () => { state.afterPut = (key, contentType) => { if (key !== target || contentType !== TOMBSTONE_TYPE) return; state.afterPut = undefined; throw new Error("crashed after tombstone PUT"); }; };
+    const journaled = async () => (await readFile(`${plan}.journal.jsonl`, "utf8")).trim().split("\n").map((line) => JSON.parse(line) as { type: string; bucket: string; key: string; hash?: string });
+    crashAfterTombstone();
+    await expect(main(["delete-jpeg", plan])).rejects.toThrow("crashed after tombstone PUT");
+    const tombstone = must(state.objects.get(target));
+    expect(tombstone.contentType).toBe(TOMBSTONE_TYPE);
+    const events = await journaled();
+    const ofTarget = events.filter((event) => `${event.bucket}/${event.key}` === target);
+    expect(ofTarget.map((event) => event.type)).toEqual(["tombstone-prepared"]);
+    expect(ofTarget[0]?.hash).toBe(createHash("sha256").update(tombstone.body).digest("hex"));
+
+    // Foreign bytes, or our exact bytes under another content type, are not our tombstone.
+    state.objects.set(target, { body: Buffer.from("someone else's object"), contentType: TOMBSTONE_TYPE, etag: '"foreign"' });
+    await expect(main(["delete-jpeg", plan])).rejects.toThrow(`Source changed before deletion: ${prefix}/detail.jpg`);
+    expect(state.objects.get(target)?.etag).toBe('"foreign"');
+    state.objects.set(target, { ...tombstone, contentType: "image/jpeg", etag: '"retyped"' });
+    await expect(main(["delete-jpeg", plan])).rejects.toThrow(`Source changed before deletion: ${prefix}/detail.jpg`);
+    expect(state.objects.get(target)?.etag).toBe('"retyped"');
+    expect((await journaled()).filter((event) => `${event.bucket}/${event.key}` === target).map((event) => event.type)).toEqual(["tombstone-prepared"]);
+
+    state.objects.set(target, tombstone);
+    await main(["delete-jpeg", plan]);
+    expect(state.objects.has(target)).toBe(false);
+    expect([...state.objects.keys()].filter((key) => key.endsWith(".jpg"))).toEqual([]);
+    expect((await journaled()).filter((event) => `${event.bucket}/${event.key}` === target).map((event) => event.type)).toEqual(["tombstone-prepared", "tombstoned", "deleted"]);
+  });
+
+  it.each(["apply", "retire-placeholders", "delete-jpeg"])("refuses %s unless the operator confirms writers are paused", async (mode) => {
+    await main(["dry-run", plan]);
+    const before = new Map([...state.objects].map(([key, value]) => [key, value.etag]));
+    const rowsBefore = structuredClone([...state.rows]);
+    for (const value of [undefined, "", "no", "true", "YES"]) {
+      if (value === undefined) delete process.env["PHOTO_CONVERSION_WRITERS_PAUSED"]; else vi.stubEnv("PHOTO_CONVERSION_WRITERS_PAUSED", value);
+      await expect(main([mode, plan])).rejects.toThrow("PHOTO_CONVERSION_WRITERS_PAUSED=yes");
+    }
+    expect(new Map([...state.objects].map(([key, value]) => [key, value.etag]))).toEqual(before);
+    expect([...state.rows]).toEqual(rowsBefore);
+  });
+
   it("binds a plan to its database by host, port, name and user, never by password", async () => {
     const url = "postgresql://converter:first-secret@db.internal:5432/autotm";
     vi.stubEnv("DATABASE_URL", url);
