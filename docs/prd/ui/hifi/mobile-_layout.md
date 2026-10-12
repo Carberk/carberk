@@ -12,7 +12,7 @@ Mode: light + dark
 
 ## Purpose
 
-Mount the global provider stack, navigation container, and portal infrastructure so every downstream screen inherits theme, query client, toast, and safe-area behavior. This is a chrome-only surface with no user-visible UI of its own.
+Mount the global provider stack, navigation container, and portal infrastructure so every downstream screen inherits theme, query client, toast, and safe-area behavior. The shell also owns the cold-launch entrance approved in issue #833.
 
 ## Layout
 
@@ -36,7 +36,7 @@ Mount the global provider stack, navigation container, and portal infrastructure
 - Status bar: adaptive via `expo-status-bar` `style` prop driven by `colorScheme`
 
 ### Typography
-- None at this layer.
+- The launch credit uses Geist Regular at 13 pt and remains subordinate to the incumbent SVG wordmark.
 
 ### Spacing
 - None at this layer; safe-area insets are consumed by downstream screens.
@@ -84,7 +84,7 @@ None — all primitives used at defaults. `PortalHost` is a required RNR primiti
 Providers mounted; `(tabs)` index shown. Status bar color matches OS scheme.
 
 ### Loading
-Native Expo splash screen until JS bundle loads; no custom splash.
+Native Expo splash hands off on the first layout to the matching React entrance, using the existing C-dot at 160 pt on #17191D. The incumbent red wordmark replaces the C-dot and carries the exact subordinate credit "By Alpha Motors", 13 pt Geist Regular in #AEB4BF, 20 pt below the wordmark. The entrance remains dark in both themes to match native; the settled destination crossfades into its saved light/dark theme. No splash route is pushed.
 
 ### Empty
 N/A — no own UI.
@@ -96,6 +96,8 @@ Unhandled JS error crashes to Expo error boundary (red screen in dev). No custom
 `onlineManager` pauses queries; refetchOnReconnect resumes. Offline is surfaced per-screen, not at root.
 
 ## Motion
+
+Issue #833 adds one cold-launch sequence, while local startup proceeds. Wordmark fade starts at 80 ms and lasts 460 ms; the credit starts at 260 ms and fades/rises 4 pt over 300 ms. At 650 ms the entrance has settled. Once the destination is ready, the overlay exits over 180 ms. Navigation, auth and deep links never wait on animation completion. Reduced Motion shows a stable wordmark and credit and removes the ready overlay immediately. No loop or launch network dependency is introduced.
 
 | Element | Animation | Duration | Easing |
 |---|---|---|---|

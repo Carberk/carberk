@@ -137,14 +137,14 @@ export function AuthEntryScreen({
             <Text className={cn("mt-auto pt-6 text-caption leading-normal text-muted-foreground", keyboardOpen ? "pb-14" : "pb-6")}>
               {t("legalPrefix")} {" "}
               <Text
-                className="font-medium text-info-500 underline"
+                className="font-medium text-link underline"
                 onPress={() => openLegalPage("terms")}
               >
                 {t("terms")}
               </Text>{" "}
               {t("legalAnd")} {" "}
               <Text
-                className="font-medium text-info-500 underline"
+                className="font-medium text-link underline"
                 onPress={() => openLegalPage("privacy")}
               >
                 {t("privacy")}

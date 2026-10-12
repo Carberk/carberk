@@ -139,7 +139,7 @@ Values are from `apps/mobile/global.css`.
 
 Dots use the foreground, not red: red is kept for the one action on the screen and the one accent in the picture.
 
-The white splash route (`(onboarding)/index.tsx`) is removed. A first launch opens Language under the native launch screen, so there is no second splash to theme.
+The white splash route (`(onboarding)/index.tsx`) is removed. A first launch opens Language under the root launch entrance from #833; no splash route is pushed.
 
 ## Illustrations
 
@@ -183,7 +183,7 @@ Style, so later illustrations match:
 | State | Behaviour |
 |---|---|
 | Default | As specified. |
-| Loading | The only wait is the launch gate reading storage, behind the native launch screen, for at most 1 s. Screens have no data to load. |
+| Loading | The only wait is the launch gate reading storage, behind the launch entrance, for at most 1 s. Screens have no data to load. |
 | Empty | N/A: no lists or user data. |
 | Error | Reading storage fails or takes over 1 s: go to Home, do not show onboarding, log a warning. A late answer is still stored, so a fresh install on slow storage sees onboarding at its next start. Writing the flag fails on Skip/finish: still go to Home; onboarding may show once more next start. Onboarding never blocks the app. |
 | Offline | N/A: onboarding makes no network request. Home handles offline after it. |
@@ -218,7 +218,7 @@ Transform and opacity only, on the UI thread, with tokens from `apps/mobile/lib/
 | Entrance | When Language and Find open: the app's `Enter` (opacity 0→1 and an 8 dp rise, `duration.base`, `easing.enter`) on the panel, with Find's title and body one step later. Chat has no entrance of its own: it slides in with the pager, and a fade after the slide would land late on a swipe. |
 | Language picture | On choosing a language the three files cross-fade, `duration.fast` (150 ms). |
 | Main button label (Next → Browse listings) | The text swaps with the page; the button does not resize. No cross-fade in this version. |
-| Entering and leaving | The group opens above Home with no animation, under the native launch screen, which the Language screen then hides. Once open, the group's animation is set to `fade`, so `router.dismissTo` fades to Home. |
+| Entering and leaving | The group opens above Home with no animation, under the root launch entrance, whose first layout releases native. Once open, the group's animation is set to `fade`, so `router.dismissTo` fades to Home. |
 
 No looping animation, no autoplay between pages, no delay before a control works.
 
@@ -304,7 +304,7 @@ No open severity 3–4 finding.
 ## Implementation notes
 
 - Files: `app/_layout.tsx`, `app/(onboarding)/{_layout,language,value-prop}.tsx`, `components/onboarding/{IllustrationPanel,LanguageRows,PagerDots,useOnboardingLayout}`, `src/onboarding/{onboardingFlag,onboardingGate,OnboardingLaunch}`, `src/i18n/resources.ts`, `assets/onboarding/*.svg`. `app/(onboarding)/index.tsx` is removed.
-- Specs: `src/onboarding/onboardingGate.spec.ts` (who sees onboarding, including a rejected session read answering skip), `src/onboarding/onboardingFlag.spec.ts`, `test/routes/onboarding-back.spec.tsx` (launch, deep link, a stored session across mount and remount, OnboardingLaunch's push and splash fallback), `test/routes/onboarding-flow.spec.tsx` (pager, Skip, final button, language, accessibility focus, three languages, large text), `test/routes/onboarding-guard.spec.tsx` (onboarding routes redirect to the tabs once completed or signed in), `test/routes/onboarding-padding.spec.tsx`, `test/routes/otp-restore.spec.tsx` (signing in stores the completed flag at once), `src/i18n/resources.spec.ts` (key parity and banned claims).
+- Specs: `src/onboarding/onboardingGate.spec.ts` (who sees onboarding, including a rejected session read answering skip), `src/onboarding/onboardingFlag.spec.ts`, `test/routes/onboarding-back.spec.tsx` (launch, deep link, a stored session across mount and remount, OnboardingLaunch's push and layout-owned splash release), `test/routes/onboarding-flow.spec.tsx` (pager, Skip, final button, language, accessibility focus, three languages, large text), `test/routes/onboarding-guard.spec.tsx` (onboarding routes redirect to the tabs once completed or signed in), `test/routes/onboarding-padding.spec.tsx`, `test/routes/otp-restore.spec.tsx` (signing in stores the completed flag at once), `src/i18n/resources.spec.ts` (key parity and banned claims).
 - The pager is one route with the page index in component state; Android Back is handled with `BackHandler` while the screen is focused.
 - Both screens cap their content column with the shared `ONBOARDING_MAX_WIDTH_CLASS` literal, kept in step with `ONBOARDING_MAX_WIDTH` in `useOnboardingLayout`.
 - The onboarding group's layout re-checks the flag and the session when it mounts and redirects a completed or signed-in launch to the tabs, so a link into the group cannot dead-end on Android Back.
@@ -320,7 +320,7 @@ PR 760 removed the old gate for two reasons that this one respects: the storage 
 - `resolveOnboardingGate` starts first in the root layout's launch effect, beside fonts and i18n, and answers `show` or `skip` within 1 s. The native launch screen is already held for fonts and i18n, so the gate normally adds no wait.
 - The flag has three states. Nothing stored: the gate decides. `pending`: this install is owed onboarding. `true`: done, skipped, or never owed.
 - With nothing stored, a session or any other stored app data means the person already used the app: the gate writes `true` and answers `skip`. Otherwise it writes `pending` and answers `show`. `pending` is what keeps onboarding owed after the first launch, when a chosen language is already in storage.
-- On `show`, and only when the launch opened Home (path `/`, so not a deep link), `OnboardingLaunch` pushes `/(onboarding)/language` above the tabs. The Language screen hides the launch screen when it mounts; a 1 s fallback hides it anyway. The fallback is armed before the push and cancelled on unmount, so a push that throws cannot leave the launch screen up.
+- On `show`, and only when the launch opened Home (path `/`, so not a deep link), `OnboardingLaunch` pushes `/(onboarding)/language` above the tabs. `LaunchEntrance` owns native release on its first layout and the presentation exit independently of this push. Language never releases native; a failed push still reaches Home under the entrance.
 - Signing in settles onboarding at once: the OTP screen stores `completed` when it stores the session (including an account restore), so an established user never owes onboarding between signing in and the next gate run.
 - A session the gate cannot read is not "no session": like every other storage failure it answers `skip` without storing anything, so a broken keychain never looks like a fresh install.
 - Skip and the final button write `true` and call `router.dismissTo(HOME_HREF)`, which pops back to the tabs already underneath. After that the root stack is the tabs alone.

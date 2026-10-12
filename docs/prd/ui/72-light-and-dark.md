@@ -85,6 +85,7 @@ Or with Tailwind classnames:
 - Text colors (theme-aware)
 - Some illustrations need light/dark variants (empty states with gradients)
 - Photo overlays may darken in dark mode for better contrast
+- Functional links and read ticks use the themed `link` blue (`--message-read`): `#2563EB` light, `#60A5FA` dark. They are not the same-hex info status colour
 
 ## OG / share images
 

@@ -67,6 +67,8 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Functional text links and read indicators share the same light/dark blue.
+        link: themed("message-read"),
         // The fill of a Message the user sent: a soft tint of the brand colour;
         // and the ✓✓ once the other person has read it.
         message: {

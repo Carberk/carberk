@@ -115,7 +115,7 @@ The mobile `Button` (`apps/mobile/components/ui/button.tsx`) reads the mobile su
 | `outline` | Raised surface with a divider-coloured edge | Foreground, medium |
 | `ghost` | None; tonal fill while pressed | Foreground, medium |
 | `destructive` | Destructive colour | Bold |
-| `link` | None | Brand red, medium |
+| `link` | None | Functional blue600 light / blue400 dark (`text-link`), medium |
 
 | Size | Height (dp) | Radius (dp) | Use |
 |---|---|---|---|

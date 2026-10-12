@@ -59,12 +59,12 @@ describe("EAS build configuration", () => {
     expect(requireFreshAppConfig().expo.android.allowBackup).toBe(false);
   });
 
-  it("names the push-retry release 2.0.3, above the 1.0.0 the existing Play app's testers have", () => {
+  it("names the refined-launch release 2.0.4 in app metadata and every inherited build profile", () => {
     const easJson = JSON.parse(readFileSync(resolve(mobileRoot, "eas.json"), "utf-8"));
 
-    expect(requireFreshAppConfig().expo.version).toBe("2.0.3");
+    expect(requireFreshAppConfig().expo.version).toBe("2.0.4");
     // The About screen reads the config version; the build env carries the same one.
-    expect(easJson.build.base.env.EXPO_PUBLIC_APP_VERSION).toBe("2.0.3");
+    expect(easJson.build.base.env.EXPO_PUBLIC_APP_VERSION).toBe("2.0.4");
   });
 
   it("gives every store build a new version code, since Play refuses a repeated one", () => {

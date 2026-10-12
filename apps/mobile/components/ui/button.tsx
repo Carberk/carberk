@@ -92,7 +92,7 @@ const buttonTextVariants = cva(
         secondary: 'text-foreground disabled:text-muted-foreground',
         ghost: 'text-foreground group-active:text-foreground disabled:text-muted-foreground',
         link: cn(
-          'text-info-600 group-active:underline disabled:text-muted-foreground dark:text-info-400',
+          'text-link group-active:underline disabled:text-muted-foreground',
           Platform.select({ web: 'underline-offset-4 hover:underline group-hover:underline' })
         ),
       },
