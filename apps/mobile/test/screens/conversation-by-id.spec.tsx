@@ -9,6 +9,7 @@ import * as Notifications from "expo-notifications";
 import type { ConversationsSchemas, ListingsSchemas } from "@auto-tm/contracts";
 import { waitFor } from "@testing-library/react-native";
 
+import { activeKeyboardRegion } from "../keyboardAvoidance";
 import { act, fireEvent, renderMobile, routeParams, routerMock, within } from "../render";
 import ConversationDetailScreen from "../../app/conversations/[id]";
 import { queryKeys } from "../../src/api/queryKeys";
@@ -1273,6 +1274,25 @@ describe("Conversation keyboard ownership", () => {
       expect(within(region).getByLabelText(/attach/i)).toBeTruthy();
       // No second, footer-local region anywhere in the screen, even a disabled one.
       expect(screen.UNSAFE_getAllByType(KeyboardAvoidingView)).toHaveLength(1);
+    } finally { Platform.OS = previousOS; }
+  });
+
+  it.each(["android", "ios"] as const)("keeps a pending photo and its Remove inside the %s avoidance region", async (os) => {
+    const previousOS = Platform.OS;
+    Platform.OS = os;
+    routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
+    try {
+      const screen = renderMobile(<ConversationDetailScreen />);
+      await act(async () => {
+        fireEvent.press(await screen.findByLabelText(/attach/i));
+      });
+      const remove = await screen.findByRole("button", { name: "Remove" });
+      const region = activeKeyboardRegion(screen);
+      expect(region.props.className).toBe("flex-1");
+      expect(within(region).getByRole("button", { name: "Remove" })).toBe(remove);
+      // The pending photo's preview is drawn inside the region, above the composer row.
+      expect(region.findAll((node: { type: unknown }) => node.type === "Image").map((node: { props: { source?: unknown } }) => node.props.source)).toContainEqual({ uri: "file:///staged.jpg" });
+      expect(within(region).getByRole("button", { name: "Send message", disabled: false })).toBeTruthy();
     } finally { Platform.OS = previousOS; }
   });
 });

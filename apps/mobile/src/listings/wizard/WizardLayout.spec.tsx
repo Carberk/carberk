@@ -2,7 +2,7 @@ import type { ComponentProps } from "react";
 import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput } from "react-native";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fireEvent, renderMobile, within } from "../../../test/render";
+import { act, fireEvent, renderMobile, within } from "../../../test/render";
 
 import { WizardLayout } from "./WizardLayout";
 import { useWizardScrollLock } from "./wizardScrollLock";
@@ -396,16 +396,36 @@ describe("WizardLayout keyboard", () => {
   });
 
   it("scrolls the step to the focused field when the keyboard opens", () => {
-    const addListener = vi.spyOn(Keyboard, "addListener");
+    let keyboardDidShow: (() => void) | undefined;
+    const addListener = vi.spyOn(Keyboard, "addListener").mockImplementation(((event: string, listener: () => void) => {
+      if (event === "keyboardDidShow") keyboardDidShow = listener;
+      return { remove() {} };
+    }) as unknown as typeof Keyboard.addListener);
+    const textInput = TextInput as unknown as { State?: unknown };
+    const previousState = textInput.State;
+    // The description is focused, 600 to 680 dp down the window.
+    textInput.State = { currentlyFocusedInput: () => ({ measureInWindow: (cb: (x: number, y: number, w: number, h: number) => void) => cb(0, 600, 390, 80) }) };
+    const scrollTo = vi.fn();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     try {
-      const screen = renderMobile(layout("Description", 6, { children: <TextInput value="One owner" multiline onChangeText={() => {}} /> }));
-      expect(addListener).toHaveBeenCalledWith("keyboardDidShow", expect.any(Function));
-      // The step's scroll view reports its offset and height to the reveal.
-      const scroll = screen.UNSAFE_getByType(ScrollView);
-      expect(scroll.props.onScroll).toEqual(expect.any(Function));
-      expect(scroll.props.onLayout).toEqual(expect.any(Function));
-      expect(scroll.props.scrollEventThrottle).toBe(16);
-    } finally { addListener.mockRestore(); }
+      // The step's scroll view starts 100 dp down the window.
+      const screen = renderMobile(
+        layout("Description", 6, { children: <TextInput value="One owner" multiline onChangeText={() => {}} /> }),
+        { createNodeMock: (element) => (element as { type: unknown }).type === "RCTScrollView"
+          ? { measureInWindow: (cb: (x: number, y: number, w: number, h: number) => void) => cb(0, 100, 390, 400), scrollTo }
+          : null },
+      );
+      // The keyboard shrank the step to 400 dp.
+      fireEvent(screen.UNSAFE_getByType(ScrollView), "layout", { nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 400 } } });
+      expect(keyboardDidShow).toEqual(expect.any(Function));
+      act(() => { keyboardDidShow?.(); vi.advanceTimersByTime(200); });
+      // The field ends 580 dp into the content; 400 - 16 dp stay visible, so scroll by 196.
+      expect(scrollTo).toHaveBeenCalledWith({ y: 196, animated: true });
+    } finally {
+      vi.useRealTimers();
+      textInput.State = previousState;
+      addListener.mockRestore();
+    }
   });
 });
 
