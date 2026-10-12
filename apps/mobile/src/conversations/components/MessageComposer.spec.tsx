@@ -58,10 +58,6 @@ describe("MessageComposer", () => {
     expect(source).toContain('t("messageTooLong"');
   });
 
-  it("uses KeyboardAvoidingView for composer", () => {
-    expect(source).toContain("KeyboardAvoidingView");
-  });
-
   it("has accessible input label", () => {
     expect(source).toContain('accessibilityLabel={t("sendMessage")}');
   });

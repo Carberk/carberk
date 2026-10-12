@@ -8,7 +8,8 @@ import VerifySignInMethodScreen from "../../app/account/verify-sign-in-method";
 import type { CodeEntryForm } from "../../components/auth/CodeEntryForm";
 import { ApiError } from "../../src/api/client";
 import { profileNoticeStore } from "../../src/identity/profileNotice";
-import { act, fireEvent, renderMobile, routeParams, routerMock } from "../render";
+import { KEYBOARD_PLATFORMS, activeKeyboardRegion, onPlatform } from "../keyboardAvoidance";
+import { act, fireEvent, renderMobile, routeParams, routerMock, within } from "../render";
 
 type CodeEntryProps = ComponentProps<typeof CodeEntryForm>;
 
@@ -278,4 +279,20 @@ describe("Email field feedback", () => {
     expect(view.queryByText(ERROR)).toBeNull();
     expect(view.getByText(HINT)).toBeTruthy();
   });
+});
+
+describe("Sign-in Method keyboard (#843)", () => {
+  it.each(KEYBOARD_PLATFORMS)("keeps the new phone and Get code above the %s keyboard", (os) =>
+    onPlatform(os, () => {
+      const view = renderMobile(<AddPhoneScreen />);
+      const region = activeKeyboardRegion(view);
+      expect(within(region).getByLabelText("Phone number")).toBeTruthy();
+      expect(within(region).getByRole("button", { name: "Get code" })).toBeTruthy();
+    }));
+
+  it.each(KEYBOARD_PLATFORMS)("keeps the code form above the %s keyboard", (os) =>
+    onPlatform(os, () => {
+      const { view } = openVerify({ method: "phone", destination: "+99361000000", kind: "change" });
+      activeKeyboardRegion(view);
+    }));
 });

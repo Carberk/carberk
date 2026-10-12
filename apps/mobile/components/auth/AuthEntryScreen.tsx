@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   type LayoutChangeEvent,
-  Platform,
   ScrollView,
   View,
 } from "react-native";
@@ -75,7 +74,7 @@ export function AuthEntryScreen({
   return (
     <SafeScreen>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior="padding"
         className="flex-1"
       >
         <View className="flex-1 px-4">
