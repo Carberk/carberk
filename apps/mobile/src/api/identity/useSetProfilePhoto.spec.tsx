@@ -18,7 +18,7 @@ vi.mock("expo-secure-store", async () => {
 });
 
 beforeEach(signInPhotoUser);
-const request: IdentitySchemas.SetProfilePhotoRequest = { key: "pending/new/original.jpg" };
+const request: IdentitySchemas.SetProfilePhotoRequest = { key: "pending/new/original.webp" };
 
 describe("useSetProfilePhoto", () => {
   it("sends the shared request schema and caches the full updated me response", async () => {
@@ -30,14 +30,14 @@ describe("useSetProfilePhoto", () => {
     const session = await capturePhotoSession();
     const { client, result } = setupPhotoHook(useSetProfilePhoto);
     await act(() => result.current.mutateAsync({ request, session }));
-    expect(sent).toEqual({ body: { key: "pending/new/original.jpg" }, auth: "Bearer aman" });
-    expect(client.getQueryData(queryKeys.me())).toEqual({ ...PHOTO_ME, avatarKey: "pending/new/original.jpg" });
+    expect(sent).toEqual({ body: { key: "pending/new/original.webp" }, auth: "Bearer aman" });
+    expect(client.getQueryData(queryKeys.me())).toEqual({ ...PHOTO_ME, avatarKey: "pending/new/original.webp" });
     session.dispose();
   });
 
   it.each([
-    ["malformed", { avatarKey: "pending/new/original.jpg" }],
-    ["another User", { ...PHOTO_ME, id: "00000000-0000-4000-8000-00000000000b", avatarKey: "pending/new/original.jpg" }],
+    ["malformed", { avatarKey: "pending/new/original.webp" }],
+    ["another User", { ...PHOTO_ME, id: "00000000-0000-4000-8000-00000000000b", avatarKey: "pending/new/original.webp" }],
   ])("rejects a %s answer and keeps the prior me", async (_kind, response) => {
     server.use(http.put("*/me/photo", () => HttpResponse.json(response)));
     const session = await capturePhotoSession();

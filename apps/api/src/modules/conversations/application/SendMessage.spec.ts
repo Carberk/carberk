@@ -202,7 +202,7 @@ class FakeIdentityReadPort implements IdentityReadPort {
   }
 }
 
-const IMAGE_KEY = "chat-attachments/conv-1/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.jpg";
+const IMAGE_KEY = "chat-attachments/conv-1/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.webp";
 
 class FakeMessageEventPublisher implements MessageEventPublisher {
   events: MessageSentEvent[] = [];
@@ -273,7 +273,7 @@ function seedListing(
     priceAmount: 100000,
     priceCurrency: "TMT" as const,
     displayPriceTmt: 100000,
-    coverMediaKey: "cover.jpg",
+    coverMediaKey: "cover.webp",
     cityId: "city-1",
     publishedAt: new Date("2026-05-01T00:00:00Z"),
     allowChat: true,
@@ -353,6 +353,7 @@ describe("SendMessage", () => {
       key: IMAGE_KEY,
       width: 800,
       height: 600,
+      thumbHash: "2yMBBYCIh4iHiHeAiId4dXh3f4f4",
     });
   });
 
@@ -468,7 +469,7 @@ describe("SendMessage", () => {
       seedListing(listings);
       const events = new FakeMessageEventPublisher();
       const cleaner = new FakeChatAttachmentCleaner();
-      cleaner.result = result;
+      cleaner.result = { status: result };
       const uc = makeUseCase(repo, listings, undefined, undefined, events, cleaner);
 
       const error = await uc

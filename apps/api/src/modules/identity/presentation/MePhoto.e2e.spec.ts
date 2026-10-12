@@ -42,20 +42,17 @@ type SuiteUser = "owner" | "other";
 const SUITE_USERS: readonly SuiteUser[] = ["owner", "other"];
 const OWNER = suite.id("owner");
 const BUCKET = "listing-photos";
-const VARIANTS = ["thumbnail", "list", "detail", "fullscreen"].flatMap((name) => [
-  `${name}.jpg`,
-  `${name}.webp`,
-]);
+const VARIANTS = ["thumbnail", "list", "detail", "fullscreen"].map((name) => `${name}.webp`);
 
 function manifest(key: string): string[] {
   const directory = key.slice(0, key.lastIndexOf("/") + 1);
   return [key, ...VARIANTS.map((name) => `${directory}${name}`)];
 }
 
-/** A camera photo carrying a GPS position, as a phone would upload it. */
+/** A WebP camera photo carrying a GPS position, as a phone would upload it. */
 function photoWithGps(): Promise<Buffer> {
   return sharp({ create: { width: 640, height: 480, channels: 3, background: { r: 30, g: 90, b: 200 } } })
-    .jpeg()
+    .webp()
     .withExif({
       IFD0: { Make: "TestCam" },
       IFD3: {
@@ -155,7 +152,7 @@ describe("PUT and DELETE /api/v1/me/photo e2e (#642)", () => {
       .set("Authorization", `Bearer ${tokens[alias]}`)
       .send({
         kind: "image",
-        contentType: "image/jpeg",
+        contentType: "image/webp",
         sizeBytes: photo.length,
         writeProtocol: "conditional-v1",
         ...body,
@@ -171,7 +168,7 @@ describe("PUT and DELETE /api/v1/me/photo e2e (#642)", () => {
     const signed = await presign(alias);
     const put = await fetch(signed.uploadUrl, {
       method: "PUT",
-      headers: { "content-type": "image/jpeg", ...signed.headers },
+      headers: { "content-type": "image/webp", ...signed.headers },
       body: new Uint8Array(photo),
     });
     expect(put.status).toBe(200);
@@ -259,7 +256,7 @@ describe("PUT and DELETE /api/v1/me/photo e2e (#642)", () => {
     }));
 
     const bodies = [];
-    for (const key of ["pending/11111111-1111-4111-8111-111111111111/original.jpg", othersKey, video.body.key]) {
+    for (const key of ["pending/11111111-1111-4111-8111-111111111111/original.webp", othersKey, video.body.key]) {
       const res = await setPhoto("owner", key).expect(400);
       // Everything the caller can tell apart; the timestamp differs per request.
       const { timestamp: _timestamp, ...answer } = res.body as Record<string, unknown>;
@@ -277,11 +274,11 @@ describe("PUT and DELETE /api/v1/me/photo e2e (#642)", () => {
     const res = await request
       .post("/api/v1/uploads/presign")
       .set("Authorization", `Bearer ${tokens.owner}`)
-      .send({ kind: "image", contentType: "image/jpeg", sizeBytes: photo.length })
+      .send({ kind: "image", contentType: "image/webp", sizeBytes: photo.length })
       .expect(201);
     ownedKeys.add(res.body.key);
     await fetch(res.body.uploadUrl, {
-      method: "PUT", headers: { "content-type": "image/jpeg" }, body: new Uint8Array(photo),
+      method: "PUT", headers: { "content-type": "image/webp" }, body: new Uint8Array(photo),
     });
 
     const refused = await setPhoto("owner", res.body.key).expect(400);
@@ -296,7 +293,7 @@ describe("PUT and DELETE /api/v1/me/photo e2e (#642)", () => {
     const wrongType = await presign("owner");
     await s3.send(new PutObjectCommand({
       Bucket: BUCKET, Key: tooLarge.key, Body: Buffer.alloc(5 * 1024 * 1024 + 1, 1),
-      ContentType: "image/jpeg", IfMatch: tooLarge.headers!["if-match"],
+      ContentType: "image/webp", IfMatch: tooLarge.headers!["if-match"],
     }));
     await s3.send(new PutObjectCommand({
       Bucket: BUCKET, Key: wrongType.key, Body: photo,
@@ -464,7 +461,7 @@ describe("PUT and DELETE /api/v1/me/photo e2e (#642)", () => {
   });
 
   it("answers 401 on both routes without a session", async () => {
-    await setPhoto(null, "pending/x/original.jpg").expect(401);
+    await setPhoto(null, "pending/x/original.webp").expect(401);
     await removePhoto(null).expect(401);
   });
 

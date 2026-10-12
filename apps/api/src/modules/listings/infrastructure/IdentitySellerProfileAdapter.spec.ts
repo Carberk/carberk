@@ -13,7 +13,7 @@ function user(id: string, overrides: Partial<IdentityUserSummary> = {}): Identit
     displayName: null,
     nameNumber: 1000,
     avatarIndex: 3,
-    avatarKey: "avatars/a.jpg",
+    avatarKey: "avatars/a.webp",
     deleted: false,
     role: "user",
     suspendedAt: null,

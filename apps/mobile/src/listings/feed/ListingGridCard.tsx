@@ -8,7 +8,7 @@ import type { AuthHref } from "../../auth/intentStore";
 import { useListingFavorite } from "../useListingFavorite";
 
 import { listingGridCardText } from "./listingGridCardText";
-import { ListingPhoto, PhotoChip, PhotoFavoriteButton } from "./ListingPhoto";
+import { ListingPhoto, PhotoChip, PhotoFavoriteButton, cardPhotoThumbHash } from "./ListingPhoto";
 
 import { EnterOnce, MotionView, usePressScale } from "@/components/ui/motion";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -84,7 +84,7 @@ export const ListingGridCard = memo(function ListingGridCard({
             .join(", ")}
         >
           <View className="aspect-photo w-full overflow-hidden rounded-2xl bg-secondary">
-            <ListingPhoto mediaKey={coverKey} emptyLabel={t("noPhoto")} />
+            <ListingPhoto mediaKey={coverKey} thumbHash={cardPhotoThumbHash(listing, coverKey)} emptyLabel={t("noPhoto")} />
             {listing.photoCount > 1 ? (
               <PhotoChip
                 icon={Camera}

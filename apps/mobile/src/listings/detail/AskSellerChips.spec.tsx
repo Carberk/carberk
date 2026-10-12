@@ -50,7 +50,7 @@ const conversation = {
     year: 2020,
     displayPriceTmt: 35000,
     priceCurrency: "TMT",
-    coverMediaKey: "listing-0/original.jpg",
+    coverMediaKey: "listing-0/original.webp",
     status: "active",
   },
 };

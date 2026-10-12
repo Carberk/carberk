@@ -11,8 +11,8 @@ import type { MediaContentClassifierPort } from "../domain/ports/MediaContentCla
 
 import { ProfilePhotoUploadAdapter } from "./ProfilePhotoUploadAdapter";
 
-const KEY = "pending/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.jpg";
-const SECOND_KEY = "pending/1c0a4d2f-3e5b-4d7c-9f20-4b6c8d0e2f3a/original.jpg";
+const KEY = "pending/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.webp";
+const SECOND_KEY = "pending/1c0a4d2f-3e5b-4d7c-9f20-4b6c8d0e2f3a/original.webp";
 const FIVE_MB = 5 * 1024 * 1024;
 
 class FakeVariantGenerator implements ImageVariantGenerator {
@@ -25,11 +25,12 @@ class FakeVariantGenerator implements ImageVariantGenerator {
     await this.during?.(originalKey);
     return {
       variants: {
-        thumbnail: `${originalKey}/thumbnail.jpg`,
-        list: `${originalKey}/list.jpg`,
-        detail: `${originalKey}/detail.jpg`,
-        fullscreen: `${originalKey}/fullscreen.jpg`,
+        thumbnail: `${originalKey}/thumbnail.webp`,
+        list: `${originalKey}/list.webp`,
+        detail: `${originalKey}/detail.webp`,
+        fullscreen: `${originalKey}/fullscreen.webp`,
       },
+      thumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH",
     };
   }
 }
@@ -53,7 +54,7 @@ describe("ProfilePhotoUploadAdapter", () => {
       userId: options.userId ?? "user-1",
       key,
       kind,
-      contentType: kind === "image" ? "image/jpeg" : "video/mp4",
+      contentType: kind === "image" ? "image/webp" : "video/mp4",
       sizeBytes: 1024,
       writeProtocol: "conditional-v1",
       createdAt: new Date("2026-05-01T00:00:00Z"),
@@ -147,7 +148,7 @@ describe("ProfilePhotoUploadAdapter", () => {
     });
 
     it.each([
-      ["a made-up key", () => "pending/made-up/original.jpg"],
+      ["a made-up key", () => "pending/made-up/original.webp"],
       ["a key another User presigned", () => {
         presignedUpload(KEY, { userId: "user-2" });
         return KEY;
@@ -184,8 +185,8 @@ describe("ProfilePhotoUploadAdapter", () => {
 
     it.each([
       ["missing", undefined],
-      ["empty", { contentType: "image/jpeg", sizeBytes: 0 }],
-      ["over 5 MB", { contentType: "image/jpeg", sizeBytes: FIVE_MB + 1 }],
+      ["empty", { contentType: "image/webp", sizeBytes: 0 }],
+      ["over 5 MB", { contentType: "image/webp", sizeBytes: FIVE_MB + 1 }],
       ["of another content type than presigned", { contentType: "image/png", sizeBytes: 1024 }],
     ])("refuses a key whose stored object is %s and changes nothing", async (_name, object) => {
       presignedUpload(KEY, { stored: false });
@@ -202,7 +203,7 @@ describe("ProfilePhotoUploadAdapter", () => {
 
     it("accepts a stored object of exactly 5 MB", async () => {
       presignedUpload(KEY, { stored: false });
-      world.putObject(KEY, { contentType: "image/jpeg", sizeBytes: FIVE_MB });
+      world.putObject(KEY, { contentType: "image/webp", sizeBytes: FIVE_MB });
 
       await expect(photos.adopt({ userId: "user-1", key: KEY })).resolves.toEqual({ key: KEY });
     });

@@ -69,7 +69,7 @@ export const fileSystemFake = {
 };
 
 export const imageManipulatorFake = {
-  SaveFormat: { JPEG: "jpeg" },
+  SaveFormat: { JPEG: "jpeg", WEBP: "webp" },
   ImageManipulator: { manipulate: (source: string) => {
     const saved = photoDevice.savedImages.find((image) => image.uri === source);
     let dimensions = saved ? { width: saved.width, height: saved.height } : { ...photoDevice.dimensions };
@@ -90,7 +90,7 @@ export const imageManipulatorFake = {
         if (!photoDevice.readable) throw new Error("Not a picture");
         return { ...dimensions, release: () => {}, saveAsync: async (options: unknown) => {
           photoDevice.saves.push(options);
-          const saved = { uri: `file:///compressed-${photoDevice.saves.length}.jpg`, ...dimensions };
+          const saved = { uri: `file:///compressed-${photoDevice.saves.length}.webp`, ...dimensions };
           photoDevice.savedImages.push(saved);
           return saved;
         } };

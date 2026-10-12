@@ -314,6 +314,10 @@ export class PublishListing {
       const failure = preparations.find((result) => result.status === "rejected" && result.reason instanceof UnusablePhotoError)
         ?? preparations.find((result) => result.status === "rejected");
       if (failure?.status === "rejected") throw failure.reason;
+      const thumbHashByKey = new Map(attachedPhotos.map((photo, index) => {
+        const prepared = preparations[index];
+        return [photo.key as string, prepared?.status === "fulfilled" ? prepared.value.thumbHash : undefined];
+      }));
 
       // The Listing, its media, the draft removal, the audit entry and the
       // adoption of every upload commit together or not at all.
@@ -363,6 +367,7 @@ export class PublishListing {
               key: photo.key as string,
               sortOrder: photo.sortOrder,
               uploadId: uploadIdByKey.get(photo.key as string) as string,
+              thumbHash: thumbHashByKey.get(photo.key as string) ?? null,
             },
           });
         }

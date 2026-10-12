@@ -286,6 +286,25 @@ describe("ListMyFavorites", () => {
     expect(result.nextCursor).toBeNull();
   });
 
+  it("sends each favorite card photo's ThumbHash beside its key", async () => {
+    seedSummary({
+      id: "listing-1",
+      photoKeys: ["a", "b"],
+      photoThumbHashes: [null, "2yMBBYCIh4iHiHeAiId4dXh3f4f4"],
+      galleryKeys: ["a", "b", "c"],
+      galleryThumbHashes: [null, "2yMBBYCIh4iHiHeAiId4dXh3f4f4", "1fsDBYCIiIiHiIdweIeHh4d4cIgH"],
+      photoCount: 3,
+    });
+    await favorites.add("user-1", "listing-1");
+
+    const [item] = (await makeUseCase(favorites, listingsRead).execute({ userId: "user-1" })).items;
+
+    expect(item).toMatchObject({
+      photoThumbHashes: [null, "2yMBBYCIh4iHiHeAiId4dXh3f4f4"],
+      galleryThumbHashes: [null, "2yMBBYCIh4iHiHeAiId4dXh3f4f4", "1fsDBYCIiIiHiIdweIeHh4d4cIgH"],
+    });
+  });
+
   it("returns card fields and contact preferences on favorite items", async () => {
     seedSummary({
       id: "listing-1",

@@ -9,7 +9,7 @@ import EditListingScreen from "../../app/listings/[id]/edit";
 
 const fixture = vi.hoisted(() => {
   const id = "550e8400-e29b-41d4-a716-446655440000";
-  const variants = { thumbnail: "t.jpg", list: "l.jpg", detail: "d.jpg", fullscreen: "f.jpg" };
+  const variants = { thumbnail: "t.webp", list: "l.webp", detail: "d.webp", fullscreen: "f.webp" };
   return {
     id,
     /** Paths that exist in the fake document directory. */
@@ -20,7 +20,7 @@ const fixture = vi.hoisted(() => {
       displayPriceTmt: 100000, description: "Legacy listing", regionId: id, cityId: id,
       allowCalls: true, allowChat: true, acceptsExchange: false, installmentAvailable: false,
       conditionDisclosure: { damaged: false },
-      media: [{ id, kind: "image", key: "photo.jpg", variants, sortOrder: 0 }],
+      media: [{ id, kind: "image", key: "photo.webp", variants, sortOrder: 0 }],
       viewCount: 0, favoriteCount: 0, publishedAt: "2026-09-30T00:00:00.000Z",
       createdAt: "2026-09-30T00:00:00.000Z", updatedAt: "2026-09-30T00:00:00.000Z",
       seller: { displayName: "Seller", nameNumber: 2057, avatarIndex: 7, avatarKey: null, deleted: false, memberSince: "2026-01-01T00:00:00.000Z" },
@@ -48,7 +48,7 @@ vi.mock("expo-file-system/legacy", () => {
     FileSystemUploadType: { BINARY_CONTENT: "BINARY_CONTENT" },
   };
 });
-vi.mock("expo-image-manipulator", () => ({ SaveFormat: { JPEG: "jpeg" }, ImageManipulator: { manipulate: vi.fn() } }));
+vi.mock("expo-image-manipulator", () => ({ SaveFormat: { JPEG: "jpeg", WEBP: "webp" }, ImageManipulator: { manipulate: vi.fn() } }));
 vi.mock("../../src/listings/uploadStaging/appStateResume", () => ({ setupUploadResume: () => () => undefined }));
 vi.mock("../../src/api/listings/useListingDetail", () => ({ useListingDetail: () => ({ data: fixture.listing }) }));
 vi.mock("../../src/listings/edit/useSaveListingEdit", () => ({
@@ -92,7 +92,7 @@ beforeEach(() => {
 describe("reopening the Listing editor", () => {
   it("does not restore a photo an earlier edit session left in staging", async () => {
     // A save that later left the screen by back gesture, or an app kill, kept this file.
-    fixture.files.add(`${stagingDir}7c9e6679-7425-40de-944b-e07fc1f90ae7.jpg`);
+    fixture.files.add(`${stagingDir}7c9e6679-7425-40de-944b-e07fc1f90ae7.webp`);
 
     const screen = renderMobile(<EditListingScreen />);
     await waitFor(() => expect([...fixture.files]).toEqual([]));

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import type { ComponentProps } from "react";
@@ -71,6 +71,15 @@ function variantUri(item: ListingMedia, variant: Variant): string {
  * gallery's `detail` under the viewer's `fullscreen`): it shows at once, drawn
  * with the same fit so the sharper photo replaces it in place without a jump
  * or a blank frame.
+ *
+ * A photo with a ThumbHash shows its blurred colours before anything loads,
+ * drawn in an Image underneath with the same fit. expo-image takes a single
+ * placeholder and never selects a hash from a list, so the cached smaller
+ * size stays the photo's own placeholder and appears over the blur at once.
+ * Whenever a hash is set the tree is the same, so a zoom that swaps in the
+ * fullscreen size changes only the photo's props and it sharpens in place.
+ * The blur goes once the photo has loaded: a hash decodes at an approximate
+ * aspect ratio, so beside a contain-fit photo it would show as bands.
  */
 export function GalleryImage({
   item,
@@ -94,21 +103,34 @@ export function GalleryImage({
   const [useOriginalImage, setUseOriginalImage] = useState(false);
   const sourceUri = useOriginalImage ? buildOriginalUrl(item.key) : variantUri(item, variant);
   const placeholderUri = placeholderVariant ? variantUri(item, placeholderVariant) : undefined;
+  const thumbHash = item.thumbHash;
+  const [loaded, setLoaded] = useState(false);
 
-  return (
+  const photo = (
     <Image
       source={{ uri: sourceUri }}
       placeholder={placeholderUri ? { uri: placeholderUri } : undefined}
       placeholderContentFit={contentFit}
-      style={style}
+      style={thumbHash ? StyleSheet.absoluteFill : style}
       contentFit={contentFit}
       priority={priority}
       cachePolicy="memory-disk"
       onLoad={(event) => {
+        setLoaded(true);
         const { width, height } = event.source;
         if (width > 0 && height > 0) onAspectRatio?.(width / height);
       }}
       onError={() => setUseOriginalImage(true)}
     />
+  );
+  if (!thumbHash) return photo;
+
+  return (
+    <View style={style as ComponentProps<typeof View>["style"]}>
+      {loaded ? null : (
+        <Image source={{ thumbhash: thumbHash }} style={StyleSheet.absoluteFill} contentFit={contentFit} />
+      )}
+      {photo}
+    </View>
   );
 }

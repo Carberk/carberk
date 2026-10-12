@@ -55,12 +55,7 @@ export class PresignUpload {
       );
     }
 
-    const ext =
-      input.contentType === "image/webp"
-        ? "webp"
-        : input.contentType === "video/mp4"
-          ? "mp4"
-          : "jpg";
+    const ext = input.kind === "image" ? "webp" : "mp4";
 
     const key = `pending/${randomUUID()}/original.${ext}`;
 
@@ -75,7 +70,7 @@ export class PresignUpload {
       ...(input.writeProtocol ? { writeProtocol: input.writeProtocol } : {}),
     });
     if (input.writeProtocol && (!signed.headers?.["if-match"] ||
-      signed.objectKeys?.length !== 9 ||
+      signed.objectKeys?.length !== 5 ||
       !imageUploadObjectKeys(key).every((member) => signed.objectKeys?.includes(member)))) {
       throw new BadRequestException("Storage did not supply conditional upload authority");
     }

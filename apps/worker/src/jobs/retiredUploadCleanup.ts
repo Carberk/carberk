@@ -35,13 +35,13 @@ export const RETIRED_OBJECT_STORE = Symbol("RetiredObjectStore");
 
 const OWNED_ORIGINAL =
   /^(pending\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/)original\.(jpg|webp)$/;
-const VARIANTS = ["thumbnail", "list", "detail", "fullscreen"].flatMap((name) => [`${name}.jpg`, `${name}.webp`]);
+const VARIANTS = ["thumbnail", "list", "detail", "fullscreen"].map((name) => `${name}.webp`);
 
 /**
  * The one directory this work may delete, or null when it carries no deletion
  * authority. Authority needs all of: the fenced write protocol, an original in
  * image presign's own `pending/<UUID v4>/` directory, and a manifest that is
- * exactly that original and its eight variants. Legacy uploads, chat and
+ * exactly the WebP original and its four variants, or the unchanged historical nine-object set. Legacy uploads, chat and
  * made-up prefixes, and any manifest reaching elsewhere authorize nothing. The
  * rule is repeated here, away from the API that wrote the record, on purpose.
  */
@@ -50,8 +50,8 @@ export function deletionDirectory(work: CleanupWork): string | null {
   const directory = OWNED_ORIGINAL.exec(work.key)?.[1];
   if (!directory) return null;
   const expected = new Set([work.key, ...VARIANTS.map((name) => `${directory}${name}`)]);
-  const exact = work.objectKeys.length === expected.size &&
-    new Set(work.objectKeys).size === expected.size &&
-    work.objectKeys.every((key) => expected.has(key));
+  const historical = new Set([work.key, ...["thumbnail", "list", "detail", "fullscreen"].flatMap((name) => [`${directory}${name}.jpg`, `${directory}${name}.webp`])]);
+  const matches = (manifest: Set<string>) => work.objectKeys.length === manifest.size && new Set(work.objectKeys).size === manifest.size && work.objectKeys.every((key) => manifest.has(key));
+  const exact = (work.key.endsWith(".webp") && matches(expected)) || matches(historical);
   return exact ? directory : null;
 }

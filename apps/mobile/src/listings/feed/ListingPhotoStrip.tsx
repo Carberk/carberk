@@ -21,11 +21,14 @@ export const STRIP_HEIGHT_SHARE = 0.4575;
 /** The seam between two photos, in dp: a thin line of the card, as on Auto.ru. */
 export const STRIP_GAP = 2;
 
-type Tile = { kind: "photo"; key: string } | { kind: "more"; count: number };
+type Tile = { kind: "photo"; key: string; thumbHash?: string } | { kind: "more"; count: number };
 
-/** The tiles of a strip: every photo key in order, then "+N" when the Listing has more photos than keys. */
-export function stripTiles(photoKeys: readonly string[], photoCount: number): Tile[] {
-  const tiles: Tile[] = photoKeys.map((key) => ({ kind: "photo", key }));
+/** The tiles of a strip: every photo key in order with its ThumbHash, then "+N" when the Listing has more photos than keys. */
+export function stripTiles(photoKeys: readonly string[], photoCount: number, thumbHashes: readonly (string | null)[] = []): Tile[] {
+  const tiles: Tile[] = photoKeys.map((key, index) => {
+    const thumbHash = thumbHashes[index];
+    return thumbHash ? { kind: "photo", key, thumbHash } : { kind: "photo", key };
+  });
   const more = photoCount - photoKeys.length;
   if (photoKeys.length > 0 && more > 0) tiles.push({ kind: "more", count: more });
   return tiles;
@@ -33,6 +36,8 @@ export function stripTiles(photoKeys: readonly string[], photoCount: number): Ti
 
 interface ListingPhotoStripProps {
   photoKeys: readonly string[];
+  /** ThumbHashes parallel to `photoKeys`; a missing or null slot has no blurred preview. */
+  thumbHashes?: readonly (string | null)[];
   photoCount: number;
   /** The seller stated the car is new: a quiet chip says so on the photos. */
   condition?: Enums.ListingCondition;
@@ -65,13 +70,13 @@ interface ListingPhotoStripProps {
  * The photo count and a seller-stated "New" sit on the photos' bottom edge,
  * fixed while the photos move under them; they take no touches.
  */
-export function ListingPhotoStrip({ photoKeys, photoCount, condition, onOpen, onPressIn, onPressOut }: ListingPhotoStripProps) {
+export function ListingPhotoStrip({ photoKeys, thumbHashes, photoCount, condition, onOpen, onPressIn, onPressOut }: ListingPhotoStripProps) {
   const { t } = useTranslation();
   const { width: screenWidth } = useWindowDimensions();
   const cardWidth = screenWidth - CARD_INSET * 2;
   const height = Math.round(cardWidth * STRIP_HEIGHT_SHARE);
   const photoWidth = Math.round(cardWidth * STRIP_PHOTO_SHARE);
-  const tiles = useMemo(() => stripTiles(photoKeys, photoCount), [photoKeys, photoCount]);
+  const tiles = useMemo(() => stripTiles(photoKeys, photoCount, thumbHashes), [photoKeys, photoCount, thumbHashes]);
   const interval = photoWidth + STRIP_GAP;
 
   // Photos meet square at a thin seam; only the strip's two outer ends are rounded.
@@ -81,7 +86,7 @@ export function ListingPhotoStrip({ photoKeys, photoCount, condition, onOpen, on
     accessible={false} onPress={onOpen} onPressIn={onPressIn} onPressOut={onPressOut}
   >{item.kind === "photo"
     ? <View testID="listing-photo" style={{ width: photoWidth, height }} className={cn("overflow-hidden bg-secondary", ends)}>
-      <ListingPhoto mediaKey={item.key} emptyLabel={t("noPhotos")} variant="detail" />
+      <ListingPhoto mediaKey={item.key} thumbHash={item.thumbHash} emptyLabel={t("noPhotos")} variant="detail" />
     </View>
     : <View testID="listing-photo-more" style={{ width: photoWidth, height }} className={cn("items-center justify-center gap-0.5 bg-secondary", ends)}>
       <Text className="font-heading text-title font-semibold text-foreground" style={tabularFigures}>{`+${item.count}`}</Text>
@@ -103,7 +108,8 @@ export function ListingPhotoStrip({ photoKeys, photoCount, condition, onOpen, on
     return <View testID="listing-photos" style={{ height, marginTop: STRIP_INSET }}>
       <Pressable accessible={false} onPress={onOpen} onPressIn={onPressIn} onPressOut={onPressOut}
         testID="listing-photo" className="mx-2 h-full overflow-hidden rounded-xl bg-secondary">
-        <ListingPhoto mediaKey={only?.kind === "photo" ? only.key : undefined} emptyLabel={t("noPhotos")} variant="detail" />
+        <ListingPhoto mediaKey={only?.kind === "photo" ? only.key : undefined} thumbHash={only?.kind === "photo" ? only.thumbHash : undefined}
+          emptyLabel={t("noPhotos")} variant="detail" />
       </Pressable>
       {chips}
     </View>;

@@ -131,10 +131,10 @@ describe("MinioMediaStorageAdapter", () => {
   it("resolves public URL for listing photo keys", () => {
     const adapter = makeAdapter("https://media.auto.tm");
 
-    const url = adapter.resolvePublicUrl("pending/uuid/original.jpg");
+    const url = adapter.resolvePublicUrl("pending/uuid/original.webp");
 
     expect(url).toBe(
-      "https://media.auto.tm/listing-photos/pending/uuid/original.jpg",
+      "https://media.auto.tm/listing-photos/pending/uuid/original.webp",
     );
   });
 
@@ -152,15 +152,15 @@ describe("MinioMediaStorageAdapter", () => {
     const adapter = makeAdapter("https://media.auto.tm");
 
     const url = adapter.resolvePublicUrl(
-      "chat-attachments/conv-1/uuid/original.jpg",
+      "chat-attachments/conv-1/uuid/original.webp",
     );
 
     expect(url).toBe(
-      "https://media.auto.tm/chat-attachments/chat-attachments/conv-1/uuid/original.jpg",
+      "https://media.auto.tm/chat-attachments/chat-attachments/conv-1/uuid/original.webp",
     );
   });
 
-  it.each(["http://media.example.com/photo.jpg", "https://cdn.example.com/photo.jpg"])(
+  it.each(["http://media.example.com/photo.webp", "https://cdn.example.com/photo.webp"])(
     "preserves an already-public URL %s",
     (url) => {
       expect(makeAdapter("https://media.auto.tm").resolvePublicUrl(url)).toBe(url);
@@ -169,8 +169,8 @@ describe("MinioMediaStorageAdapter", () => {
 
   it("addresses the same bucket and full key used by chat upload", async () => {
     const adapter = makeAdapter("https://media.auto.tm");
-    const key = "chat-attachments/conv-1/uuid/original.jpg";
-    const result = await adapter.presignUpload({ key, contentType: "image/jpeg", sizeBytes: 1024 });
+    const key = "chat-attachments/conv-1/uuid/original.webp";
+    const result = await adapter.presignUpload({ key, contentType: "image/webp", sizeBytes: 1024 });
 
     expect(result.key).toBe(key);
     expect(awsMocks.signedCommand?.input).toMatchObject({ Bucket: "chat-attachments", Key: key });
@@ -182,10 +182,10 @@ describe("MinioMediaStorageAdapter", () => {
   it("strips trailing slash from public URL", () => {
     const adapter = makeAdapter("https://media.auto.tm/");
 
-    const url = adapter.resolvePublicUrl("pending/uuid/original.jpg");
+    const url = adapter.resolvePublicUrl("pending/uuid/original.webp");
 
     expect(url).toBe(
-      "https://media.auto.tm/listing-photos/pending/uuid/original.jpg",
+      "https://media.auto.tm/listing-photos/pending/uuid/original.webp",
     );
   });
 
@@ -196,8 +196,8 @@ describe("MinioMediaStorageAdapter", () => {
     );
 
     const result = await adapter.presignUpload({
-      key: "pending/uuid/original.jpg",
-      contentType: "image/jpeg",
+      key: "pending/uuid/original.webp",
+      contentType: "image/webp",
       sizeBytes: 1024,
     });
 
@@ -208,11 +208,11 @@ describe("MinioMediaStorageAdapter", () => {
     expect(awsMocks.signedClient?.endpoint).toBe("https://media.auto.tm");
     expect(awsMocks.signedCommand?.input).toMatchObject({
       Bucket: "listing-photos",
-      Key: "pending/uuid/original.jpg",
-      ContentType: "image/jpeg",
+      Key: "pending/uuid/original.webp",
+      ContentType: "image/webp",
     });
     expect(result.url).toBe(
-      "https://media.auto.tm/signed/listing-photos/pending/uuid/original.jpg",
+      "https://media.auto.tm/signed/listing-photos/pending/uuid/original.webp",
     );
   });
 
@@ -220,8 +220,8 @@ describe("MinioMediaStorageAdapter", () => {
     const adapter = makeAdapter("https://media.auto.tm");
     awsMocks.sendResult = async () => ({ ETag: '"placeholder"' });
     const result = await adapter.presignUpload({
-      key: "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.jpg",
-      contentType: "image/jpeg",
+      key: "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.webp",
+      contentType: "image/webp",
       sizeBytes: 1024,
       ...{ writeProtocol: "conditional-v1" as const },
     });
@@ -232,7 +232,7 @@ describe("MinioMediaStorageAdapter", () => {
     expect(result.headers?.["cache-control"]).toBe("no-store");
   });
 
-  it("initializes the fixed original and eight variants before issuing conditional upload authority (#725)", async () => {
+  it("initializes the fixed original and four variants before issuing conditional upload authority (#725)", async () => {
     const adapter = makeAdapter("https://media.auto.tm");
     const initialized = new Set<string>();
     awsMocks.sendResult = async () => {
@@ -243,20 +243,16 @@ describe("MinioMediaStorageAdapter", () => {
       return { ETag: '"placeholder"' };
     };
     await adapter.presignUpload({
-      key: "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.jpg",
-      contentType: "image/jpeg", sizeBytes: 1024,
+      key: "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.webp",
+      contentType: "image/webp", sizeBytes: 1024,
       ...{ writeProtocol: "conditional-v1" as const },
     });
 
     expect([...initialized].sort()).toEqual([
-      "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.jpg",
-      "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/thumbnail.jpg",
+      "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.webp",
       "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/thumbnail.webp",
-      "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/list.jpg",
       "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/list.webp",
-      "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/detail.jpg",
       "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/detail.webp",
-      "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/fullscreen.jpg",
       "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/fullscreen.webp",
     ].sort());
   });
@@ -266,8 +262,8 @@ describe("MinioMediaStorageAdapter", () => {
     awsMocks.sendResult = async () => { throw new Error("storage unavailable"); };
 
     await expect(adapter.presignUpload({
-      key: "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.jpg",
-      contentType: "image/jpeg", sizeBytes: 1024,
+      key: "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.webp",
+      contentType: "image/webp", sizeBytes: 1024,
       ...{ writeProtocol: "conditional-v1" as const },
     })).rejects.toThrow("storage unavailable");
     expect(awsMocks.signedCommand).toBeUndefined();
@@ -277,8 +273,8 @@ describe("MinioMediaStorageAdapter", () => {
     const adapter = makeAdapter("https://media.auto.tm");
     awsMocks.versioning = status;
     await expect(adapter.presignUpload({
-      key: "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.jpg",
-      contentType: "image/jpeg", sizeBytes: 1024, writeProtocol: "conditional-v1",
+      key: "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.webp",
+      contentType: "image/webp", sizeBytes: 1024, writeProtocol: "conditional-v1",
     })).rejects.toThrow("unversioned bucket");
     expect(awsMocks.signedCommand).toBeUndefined();
   });
@@ -287,8 +283,8 @@ describe("MinioMediaStorageAdapter", () => {
     const adapter = makeAdapter("https://media.auto.tm");
     awsMocks.conditionalSupported = false;
     await expect(adapter.presignUpload({
-      key: "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.jpg",
-      contentType: "image/jpeg", sizeBytes: 1024, writeProtocol: "conditional-v1",
+      key: "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.webp",
+      contentType: "image/webp", sizeBytes: 1024, writeProtocol: "conditional-v1",
     })).rejects.toThrow("does not enforce conditional writes");
     expect(awsMocks.signedCommand).toBeUndefined();
   });
@@ -299,7 +295,7 @@ describe("MinioMediaStorageAdapter", () => {
       "http://minio.railway.internal:9000",
     );
 
-    await adapter.deleteObject("pending/uuid/original.jpg");
+    await adapter.deleteObject("pending/uuid/original.webp");
 
     expect(awsMocks.clients[0]?.sent).toHaveLength(1);
     expect(awsMocks.clients[1]?.sent).toHaveLength(0);
@@ -308,14 +304,14 @@ describe("MinioMediaStorageAdapter", () => {
   describe("inspect", () => {
     it("reports the stored content type and size from the private endpoint", async () => {
       const adapter = makeAdapter("https://media.auto.tm");
-      awsMocks.sendResult = async () => ({ ContentType: "image/jpeg", ContentLength: 2048 });
+      awsMocks.sendResult = async () => ({ ContentType: "image/webp", ContentLength: 2048 });
 
-      const info = await adapter.inspect("pending/uuid/original.jpg");
+      const info = await adapter.inspect("pending/uuid/original.webp");
 
-      expect(info).toEqual({ contentType: "image/jpeg", sizeBytes: 2048 });
+      expect(info).toEqual({ contentType: "image/webp", sizeBytes: 2048 });
       expect(awsMocks.clients[0]?.sent).toHaveLength(1);
       expect(awsMocks.clients[0]?.sent[0]).toMatchObject({
-        input: { Bucket: "listing-photos", Key: "pending/uuid/original.jpg" },
+        input: { Bucket: "listing-photos", Key: "pending/uuid/original.webp" },
       });
     });
 
@@ -340,7 +336,7 @@ describe("MinioMediaStorageAdapter", () => {
         throw Object.assign(new Error("missing"), failure);
       };
 
-      await expect(adapter.inspect("pending/uuid/original.jpg")).resolves.toBeNull();
+      await expect(adapter.inspect("pending/uuid/original.webp")).resolves.toBeNull();
     });
 
     it("surfaces other storage failures instead of treating the object as missing", async () => {
@@ -349,7 +345,7 @@ describe("MinioMediaStorageAdapter", () => {
         throw Object.assign(new Error("denied"), { name: "AccessDenied", $metadata: { httpStatusCode: 403 } });
       };
 
-      await expect(adapter.inspect("pending/uuid/original.jpg")).rejects.toThrow("denied");
+      await expect(adapter.inspect("pending/uuid/original.webp")).rejects.toThrow("denied");
     });
   });
 });

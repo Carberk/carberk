@@ -23,6 +23,8 @@
     "listing-prices:recompute": "tsx scripts/recompute-listing-prices.ts",
     "reviewer:scenario": "tsx scripts/reviewer-scenario.ts",
     "demo-inventory": "tsx scripts/demo-inventory.ts",
+    "photos:convert-webp": "tsx scripts/convert-photos-webp.ts",
+    "photos:backfill-thumbhashes": "tsx scripts/backfill-thumbhashes.ts",
     "demo-inventory:credits": "tsx scripts/demo-inventory-credits.ts",
     "ui:fixture": "tsx scripts/ui-fixture.ts",
     "logos:import": "tsx scripts/import-brand-logos.ts",
@@ -36,7 +38,8 @@
     "@auto-tm/contracts": "workspace:*",
     "@prisma/client": "^7.6.0",
     "@prisma/adapter-pg": "^7.6.0",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "thumbhash": "0.1.1"
   },
   "peerDependencies": {
     "@nestjs/common": "^11.1.0"

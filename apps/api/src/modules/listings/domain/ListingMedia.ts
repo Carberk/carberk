@@ -14,6 +14,8 @@ export class ListingMedia {
     readonly posterKey: string | undefined,
     readonly createdAt: Date,
     readonly uploadId: string | undefined,
+    /** Server-computed ThumbHash of a photo (#824); absent until it has one. */
+    readonly thumbHash: string | undefined,
   ) {}
 
   static create(data: {
@@ -29,6 +31,7 @@ export class ListingMedia {
     createdAt?: Date;
     /** The MediaUpload this row adopted; absent only on legacy rows (ADR-0079). */
     uploadId?: string;
+    thumbHash?: string;
   }): ListingMedia {
     if (data.posterKey && data.kind !== "video") {
       throw new DomainError(
@@ -54,6 +57,7 @@ export class ListingMedia {
       data.posterKey,
       data.createdAt ?? new Date(),
       data.uploadId,
+      data.thumbHash,
     );
   }
 }

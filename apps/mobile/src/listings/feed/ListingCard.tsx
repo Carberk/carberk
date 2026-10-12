@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { formatPrice } from "../formatPrice";
 
-import { ListingPhoto } from "./ListingPhoto";
+import { ListingPhoto, cardPhotoThumbHash } from "./ListingPhoto";
 
 import { Badge } from "@/components/ui/badge";
 import { PressableScale } from "@/components/ui/pressable-scale";
@@ -49,7 +49,12 @@ export function ListingCard({
       onPress={() => onPress(listing.id)}
     >
       <View className="aspect-photo w-32 shrink-0 overflow-hidden rounded-lg bg-secondary">
-        <ListingPhoto mediaKey={listing.coverMediaKey} emptyLabel={t("noPhoto")} compact />
+        <ListingPhoto
+          mediaKey={listing.coverMediaKey}
+          thumbHash={cardPhotoThumbHash(listing, listing.coverMediaKey)}
+          emptyLabel={t("noPhoto")}
+          compact
+        />
       </View>
 
       <View className="min-w-0 flex-1 justify-between py-1 pr-2">

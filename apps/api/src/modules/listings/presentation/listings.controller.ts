@@ -346,6 +346,7 @@ export class ListingsController {
       height: result.media.height,
       durationMs: result.media.durationMs,
       posterKey: result.media.posterKey,
+      ...(result.media.thumbHash !== undefined ? { thumbHash: result.media.thumbHash } : {}),
       createdAt: result.media.createdAt.toISOString(),
     };
   }

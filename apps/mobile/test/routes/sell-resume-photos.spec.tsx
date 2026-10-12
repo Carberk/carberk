@@ -9,10 +9,10 @@ import { act, fireEvent, renderMobile } from "../render";
 const fixture = vi.hoisted(() => {
   const id = "550e8400-e29b-41d4-a716-446655440000";
   const photoId = "11111111-1111-4111-8111-111111111111";
-  const savedPhoto = { photoId, key: `${photoId}.jpg`, sortOrder: 0 };
+  const savedPhoto = { photoId, key: `${photoId}.webp`, sortOrder: 0 };
   const savedPhotos = [savedPhoto, ...[1, 2].map((index) => ({
     ...savedPhoto, photoId: `${photoId.slice(0, -12)}${String(900 + index).padStart(12, "0")}`,
-    key: `support-${photoId}-${index}.jpg`, sortOrder: index,
+    key: `support-${photoId}-${index}.webp`, sortOrder: index,
   }))];
   return {
     id,
@@ -114,10 +114,10 @@ async function openDraftFromSellTab() {
 }
 
 beforeEach(() => {
-  fixture.staged = { [`draft-${id}`]: [`${photoId}.jpg`] };
+  fixture.staged = { [`draft-${id}`]: [`${photoId}.webp`] };
   fixture.listing = null;
   fixture.patch.mockReset().mockResolvedValue({});
-  fixture.presign.mockReset().mockResolvedValue({ uploadUrl: "http://localhost/put", key: "uploaded-again.jpg" });
+  fixture.presign.mockReset().mockResolvedValue({ uploadUrl: "http://localhost/put", key: "uploaded-again.webp" });
   fixture.upload.mockReset().mockResolvedValue({ status: 200 });
   fixture.mutation.mutateAsync.mockReset().mockResolvedValue({ id });
 });

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ListingStatus, MessageKind } from "../enums";
 
 import { PublicIdentitySchema } from "./identity";
+import { ThumbHashSchema } from "./listings";
 
 // ── Shared enums as Zod schemas ──
 
@@ -30,10 +31,21 @@ export type SendTextMessageRequest = z.infer<
 
 // ── Rich message metadata ──
 
-export const ImageMessageMetadataSchema = z.object({
+/**
+ * What a client sends for an image Message. Unknown keys, a `thumbHash`
+ * included, are stripped rather than refused, so installed clients keep
+ * sending and no client can supply the hash the server returns.
+ */
+export const ImageMessageSendMetadataSchema = z.object({
   key: z.string().min(1),
   width: z.number().int().nonnegative().optional(),
   height: z.number().int().nonnegative().optional(),
+});
+export type ImageMessageSendMetadata = z.infer<typeof ImageMessageSendMetadataSchema>;
+
+/** Image Message metadata in responses; `thumbHash` is server-computed. */
+export const ImageMessageMetadataSchema = ImageMessageSendMetadataSchema.extend({
+  thumbHash: ThumbHashSchema.optional(),
 });
 export type ImageMessageMetadata = z.infer<typeof ImageMessageMetadataSchema>;
 
@@ -45,6 +57,8 @@ export const PostRefMessageMetadataSchema = z.object({
   displayPriceTmt: z.number().nonnegative(),
   priceCurrency: z.enum(["TMT", "USD", "AED"]),
   coverMediaKey: z.string().optional(),
+  /** Server-computed ThumbHash of `coverMediaKey`; absent in older snapshots. */
+  coverThumbHash: ThumbHashSchema.optional(),
   status: ListingStatusSchema,
   available: z.boolean().default(true),
 });
@@ -68,7 +82,7 @@ export const SendMessageRequestSchema = z.discriminatedUnion("kind", [
   }),
   z.object({
     kind: z.literal(MessageKind.Image),
-    metadata: ImageMessageMetadataSchema,
+    metadata: ImageMessageSendMetadataSchema,
     clientMessageId: z.string().optional(),
   }),
 ]);
@@ -84,7 +98,7 @@ export const SendMessageSocketRequestSchema = z.discriminatedUnion("kind", [
   z.object({
     conversationId: z.string().uuid(),
     kind: z.literal(MessageKind.Image),
-    metadata: ImageMessageMetadataSchema,
+    metadata: ImageMessageSendMetadataSchema,
     clientMessageId: z.string().optional(),
   }),
 ]);
@@ -109,7 +123,7 @@ export type SendPostRefMessageRequest = z.infer<
 // ── Chat attachment upload ──
 
 export const PresignChatAttachmentRequestSchema = z.object({
-  contentType: z.enum(["image/jpeg", "image/webp"]),
+  contentType: z.enum(["image/webp"]),
   sizeBytes: z.number().int().positive().max(5 * 1024 * 1024),
 });
 export type PresignChatAttachmentRequest = z.infer<

@@ -22,7 +22,7 @@ describe("PostRefMessageMetadataSchema", () => {
       year: 2021,
       displayPriceTmt: 200000,
       priceCurrency: "TMT",
-      coverMediaKey: "cover.jpg",
+      coverMediaKey: "cover.webp",
       status: "active",
       available: true,
     });
@@ -101,7 +101,7 @@ describe("SendMessageRequestSchema", () => {
     expect(() =>
       SendMessageRequestSchema.parse({
         kind: "image",
-        metadata: { key: "chat/image.jpg" },
+        metadata: { key: "chat/image.webp" },
       }),
     ).not.toThrow();
   });
@@ -117,13 +117,13 @@ describe("SendMessageRequestSchema", () => {
 });
 
 describe("PresignChatAttachmentRequestSchema", () => {
-  it("accepts a valid jpeg request", () => {
+  it("accepts a valid WebP request", () => {
     const parsed = PresignChatAttachmentRequestSchema.parse({
-      contentType: "image/jpeg",
+      contentType: "image/webp",
       sizeBytes: 1024,
     });
 
-    expect(parsed.contentType).toBe("image/jpeg");
+    expect(parsed.contentType).toBe("image/webp");
     expect(parsed.sizeBytes).toBe(1024);
   });
 
@@ -136,10 +136,10 @@ describe("PresignChatAttachmentRequestSchema", () => {
     expect(parsed.contentType).toBe("image/webp");
   });
 
-  it("rejects unsupported content types", () => {
+  it.each(["image/jpeg", "image/png"])("rejects unsupported content type %s", (contentType) => {
     expect(() =>
       PresignChatAttachmentRequestSchema.parse({
-        contentType: "image/png",
+        contentType,
         sizeBytes: 1024,
       }),
     ).toThrow();
@@ -148,7 +148,7 @@ describe("PresignChatAttachmentRequestSchema", () => {
   it("rejects oversized requests", () => {
     expect(() =>
       PresignChatAttachmentRequestSchema.parse({
-        contentType: "image/jpeg",
+        contentType: "image/webp",
         sizeBytes: 6 * 1024 * 1024,
       }),
     ).toThrow();
@@ -158,13 +158,13 @@ describe("PresignChatAttachmentRequestSchema", () => {
 describe("PresignChatAttachmentResponseSchema", () => {
   it("accepts a valid response", () => {
     const parsed = PresignChatAttachmentResponseSchema.parse({
-      uploadUrl: "https://media.auto.tm/presigned/chat-attachments/conv-1/uuid/original.jpg",
-      key: "chat-attachments/conv-1/uuid/original.jpg",
+      uploadUrl: "https://media.auto.tm/presigned/chat-attachments/conv-1/uuid/original.webp",
+      key: "chat-attachments/conv-1/uuid/original.webp",
       expiresIn: 600,
       maxSizeBytes: 5 * 1024 * 1024,
     });
 
-    expect(parsed.key).toBe("chat-attachments/conv-1/uuid/original.jpg");
+    expect(parsed.key).toBe("chat-attachments/conv-1/uuid/original.webp");
     expect(parsed.expiresIn).toBe(600);
   });
 });

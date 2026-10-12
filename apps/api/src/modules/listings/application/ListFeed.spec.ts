@@ -151,7 +151,7 @@ function sellerProfile(overrides: Partial<SellerProfile> = {}): SellerProfile {
     displayName: null,
     nameNumber: 2057,
     avatarIndex: 7,
-    avatarKey: "avatars/seller/a.jpg",
+    avatarKey: "avatars/seller/a.webp",
     deleted: false,
     memberSince: new Date("2025-01-01T00:00:00.000Z"),
     ...overrides,
@@ -205,12 +205,12 @@ describe("ListFeed", () => {
   });
 
   it("includes coverMediaKey when listing has media", async () => {
-    ranking.items = [seedListing({ id: "l1", coverMediaKey: "listings/l1/m1/original.jpg" })];
+    ranking.items = [seedListing({ id: "l1", coverMediaKey: "listings/l1/m1/original.webp" })];
 
     const uc = makeUseCase(ranking, exchangeRates);
     const result = await uc.execute({});
 
-    expect(result.items[0]!.coverMediaKey).toBe("listings/l1/m1/original.jpg");
+    expect(result.items[0]!.coverMediaKey).toBe("listings/l1/m1/original.webp");
   });
 
   it("omits coverMediaKey when listing has no media", async () => {
@@ -367,6 +367,29 @@ describe("ListFeed", () => {
       photoCount: 5,
     });
     expect(result.items[1]).toMatchObject({ photoKeys: [], galleryKeys: [], photoCount: 0 });
+  });
+
+  it("sends each card photo's ThumbHash beside its key and none for a Listing without hashes", async () => {
+    ranking.items = [seedListing({ id: "l1" }), seedListing({ id: "l2" })];
+    const cards = new FakeListingCardReadPort();
+    cards.photos.set("l1", {
+      coverMediaKey: "a",
+      photoKeys: ["a", "b"],
+      photoThumbHashes: ["1fsDBYCIiIiHiIdweIeHh4d4cIgH", null],
+      galleryKeys: ["a", "b", "c"],
+      galleryThumbHashes: ["1fsDBYCIiIiHiIdweIeHh4d4cIgH", null, "2yMBBYCIh4iHiHeAiId4dXh3f4f4"],
+      photoCount: 3,
+    });
+    cards.photos.set("l2", { coverMediaKey: "x", photoKeys: ["x"], galleryKeys: ["x"], photoCount: 1 });
+
+    const result = await makeUseCase(ranking, exchangeRates, undefined, undefined, cards).execute({});
+
+    expect(result.items[0]).toMatchObject({
+      photoThumbHashes: ["1fsDBYCIiIiHiIdweIeHh4d4cIgH", null],
+      galleryThumbHashes: ["1fsDBYCIiIiHiIdweIeHh4d4cIgH", null, "2yMBBYCIh4iHiHeAiId4dXh3f4f4"],
+    });
+    expect(JSON.parse(JSON.stringify(result.items[1]))).not.toHaveProperty("photoThumbHashes");
+    expect(JSON.parse(JSON.stringify(result.items[1]))).not.toHaveProperty("galleryThumbHashes");
   });
 
   it("returns mileageKm, condition, transmissionId, and engineTypeId when set", async () => {

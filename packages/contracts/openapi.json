@@ -994,6 +994,15 @@
             },
             "maxItems": 2
           },
+          "photoThumbHashes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "nullable": true,
+              "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+            },
+            "maxItems": 2
+          },
           "photoCount": {
             "type": "integer",
             "minimum": 0
@@ -1106,6 +1115,15 @@
             },
             "maxItems": 2
           },
+          "photoThumbHashes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "nullable": true,
+              "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+            },
+            "maxItems": 2
+          },
           "photoCount": {
             "type": "integer",
             "minimum": 0
@@ -1144,6 +1162,15 @@
             "type": "array",
             "items": {
               "type": "string"
+            },
+            "maxItems": 8
+          },
+          "galleryThumbHashes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "nullable": true,
+              "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
             },
             "maxItems": 8
           },
@@ -1423,6 +1450,10 @@
                 },
                 "posterKey": {
                   "type": "string"
+                },
+                "thumbHash": {
+                  "type": "string",
+                  "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                 }
               },
               "required": [
@@ -1618,6 +1649,10 @@
           },
           "posterKey": {
             "type": "string"
+          },
+          "thumbHash": {
+            "type": "string",
+            "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
           }
         },
         "required": [
@@ -1648,7 +1683,8 @@
                 "maximum": 7
               },
               "vin": {
-                "type": "string"
+                "type": "string",
+                "nullable": true
               },
               "photos": {
                 "type": "array",
@@ -1815,7 +1851,8 @@
             "maximum": 7
           },
           "vin": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "photos": {
             "type": "array",
@@ -1968,7 +2005,8 @@
                 "maximum": 7
               },
               "vin": {
-                "type": "string"
+                "type": "string",
+                "nullable": true
               },
               "photos": {
                 "type": "array",
@@ -2120,7 +2158,8 @@
             "maximum": 7
           },
           "vin": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "photos": {
             "type": "array",
@@ -2503,6 +2542,15 @@
                   },
                   "maxItems": 2
                 },
+                "photoThumbHashes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "nullable": true,
+                    "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+                  },
+                  "maxItems": 2
+                },
                 "photoCount": {
                   "type": "integer",
                   "minimum": 0
@@ -2541,6 +2589,15 @@
                   "type": "array",
                   "items": {
                     "type": "string"
+                  },
+                  "maxItems": 8
+                },
+                "galleryThumbHashes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "nullable": true,
+                    "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                   },
                   "maxItems": 8
                 },
@@ -2901,6 +2958,15 @@
                   },
                   "maxItems": 2
                 },
+                "photoThumbHashes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "nullable": true,
+                    "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+                  },
+                  "maxItems": 2
+                },
                 "photoCount": {
                   "type": "integer",
                   "minimum": 0
@@ -3024,7 +3090,8 @@
                       "maximum": 7
                     },
                     "vin": {
-                      "type": "string"
+                      "type": "string",
+                      "nullable": true
                     },
                     "photos": {
                       "type": "array",
@@ -3255,6 +3322,15 @@
             },
             "maxItems": 2
           },
+          "photoThumbHashes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "nullable": true,
+              "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+            },
+            "maxItems": 2
+          },
           "photoCount": {
             "type": "integer",
             "minimum": 0
@@ -3288,6 +3364,22 @@
           },
           "isFavorited": {
             "type": "boolean"
+          },
+          "galleryKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 8
+          },
+          "galleryThumbHashes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "nullable": true,
+              "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+            },
+            "maxItems": 8
           },
           "contactPhone": {
             "type": "string"
@@ -3383,6 +3475,15 @@
                   },
                   "maxItems": 2
                 },
+                "photoThumbHashes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "nullable": true,
+                    "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+                  },
+                  "maxItems": 2
+                },
                 "photoCount": {
                   "type": "integer",
                   "minimum": 0
@@ -3416,6 +3517,22 @@
                 },
                 "isFavorited": {
                   "type": "boolean"
+                },
+                "galleryKeys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 8
+                },
+                "galleryThumbHashes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "nullable": true,
+                    "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+                  },
+                  "maxItems": 8
                 },
                 "contactPhone": {
                   "type": "string"
@@ -3798,6 +3915,10 @@
                       "height": {
                         "type": "integer",
                         "minimum": 0
+                      },
+                      "thumbHash": {
+                        "type": "string",
+                        "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                       }
                     },
                     "required": [
@@ -3838,6 +3959,10 @@
                       },
                       "coverMediaKey": {
                         "type": "string"
+                      },
+                      "coverThumbHash": {
+                        "type": "string",
+                        "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                       },
                       "status": {
                         "type": "string",
@@ -4099,6 +4224,10 @@
                             "height": {
                               "type": "integer",
                               "minimum": 0
+                            },
+                            "thumbHash": {
+                              "type": "string",
+                              "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                             }
                           },
                           "required": [
@@ -4139,6 +4268,10 @@
                             },
                             "coverMediaKey": {
                               "type": "string"
+                            },
+                            "coverThumbHash": {
+                              "type": "string",
+                              "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                             },
                             "status": {
                               "type": "string",
@@ -4305,6 +4438,10 @@
                         "height": {
                           "type": "integer",
                           "minimum": 0
+                        },
+                        "thumbHash": {
+                          "type": "string",
+                          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                         }
                       },
                       "required": [
@@ -4345,6 +4482,10 @@
                         },
                         "coverMediaKey": {
                           "type": "string"
+                        },
+                        "coverThumbHash": {
+                          "type": "string",
+                          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                         },
                         "status": {
                           "type": "string",
@@ -4471,6 +4612,10 @@
                   "height": {
                     "type": "integer",
                     "minimum": 0
+                  },
+                  "thumbHash": {
+                    "type": "string",
+                    "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                   }
                 },
                 "required": [
@@ -4511,6 +4656,10 @@
                   },
                   "coverMediaKey": {
                     "type": "string"
+                  },
+                  "coverThumbHash": {
+                    "type": "string",
+                    "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                   },
                   "status": {
                     "type": "string",
@@ -4678,6 +4827,10 @@
                   "height": {
                     "type": "integer",
                     "minimum": 0
+                  },
+                  "thumbHash": {
+                    "type": "string",
+                    "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                   }
                 },
                 "required": [
@@ -4718,6 +4871,10 @@
                   },
                   "coverMediaKey": {
                     "type": "string"
+                  },
+                  "coverThumbHash": {
+                    "type": "string",
+                    "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                   },
                   "status": {
                     "type": "string",
@@ -4806,7 +4963,6 @@
           "contentType": {
             "type": "string",
             "enum": [
-              "image/jpeg",
               "image/webp"
             ]
           },
@@ -5015,6 +5171,10 @@
                       "height": {
                         "type": "integer",
                         "minimum": 0
+                      },
+                      "thumbHash": {
+                        "type": "string",
+                        "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                       }
                     },
                     "required": [
@@ -5055,6 +5215,10 @@
                       },
                       "coverMediaKey": {
                         "type": "string"
+                      },
+                      "coverThumbHash": {
+                        "type": "string",
+                        "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                       },
                       "status": {
                         "type": "string",
@@ -5191,6 +5355,10 @@
                   "height": {
                     "type": "integer",
                     "minimum": 0
+                  },
+                  "thumbHash": {
+                    "type": "string",
+                    "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                   }
                 },
                 "required": [
@@ -5231,6 +5399,10 @@
                   },
                   "coverMediaKey": {
                     "type": "string"
+                  },
+                  "coverThumbHash": {
+                    "type": "string",
+                    "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                   },
                   "status": {
                     "type": "string",
@@ -5359,6 +5531,10 @@
           "height": {
             "type": "integer",
             "minimum": 0
+          },
+          "thumbHash": {
+            "type": "string",
+            "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
           }
         },
         "required": [
@@ -5399,6 +5575,10 @@
           },
           "coverMediaKey": {
             "type": "string"
+          },
+          "coverThumbHash": {
+            "type": "string",
+            "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
           },
           "status": {
             "type": "string",
@@ -5442,6 +5622,10 @@
               "height": {
                 "type": "integer",
                 "minimum": 0
+              },
+              "thumbHash": {
+                "type": "string",
+                "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
               }
             },
             "required": [
@@ -5482,6 +5666,10 @@
               },
               "coverMediaKey": {
                 "type": "string"
+              },
+              "coverThumbHash": {
+                "type": "string",
+                "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
               },
               "status": {
                 "type": "string",
@@ -5738,6 +5926,10 @@
                       "height": {
                         "type": "integer",
                         "minimum": 0
+                      },
+                      "thumbHash": {
+                        "type": "string",
+                        "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                       }
                     },
                     "required": [
@@ -5778,6 +5970,10 @@
                       },
                       "coverMediaKey": {
                         "type": "string"
+                      },
+                      "coverThumbHash": {
+                        "type": "string",
+                        "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                       },
                       "status": {
                         "type": "string",
@@ -5954,6 +6150,10 @@
                       "height": {
                         "type": "integer",
                         "minimum": 0
+                      },
+                      "thumbHash": {
+                        "type": "string",
+                        "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                       }
                     },
                     "required": [
@@ -5994,6 +6194,10 @@
                       },
                       "coverMediaKey": {
                         "type": "string"
+                      },
+                      "coverThumbHash": {
+                        "type": "string",
+                        "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                       },
                       "status": {
                         "type": "string",
@@ -8629,6 +8833,10 @@
                                 "height": {
                                   "type": "integer",
                                   "minimum": 0
+                                },
+                                "thumbHash": {
+                                  "type": "string",
+                                  "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                                 }
                               },
                               "required": [
@@ -8669,6 +8877,10 @@
                                 },
                                 "coverMediaKey": {
                                   "type": "string"
+                                },
+                                "coverThumbHash": {
+                                  "type": "string",
+                                  "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                                 },
                                 "status": {
                                   "type": "string",
@@ -9078,6 +9290,10 @@
                                       "height": {
                                         "type": "integer",
                                         "minimum": 0
+                                      },
+                                      "thumbHash": {
+                                        "type": "string",
+                                        "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                                       }
                                     },
                                     "required": [
@@ -9118,6 +9334,10 @@
                                       },
                                       "coverMediaKey": {
                                         "type": "string"
+                                      },
+                                      "coverThumbHash": {
+                                        "type": "string",
+                                        "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                                       },
                                       "status": {
                                         "type": "string",
@@ -9413,6 +9633,10 @@
                                 "height": {
                                   "type": "integer",
                                   "minimum": 0
+                                },
+                                "thumbHash": {
+                                  "type": "string",
+                                  "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                                 }
                               },
                               "required": [
@@ -9453,6 +9677,10 @@
                                 },
                                 "coverMediaKey": {
                                   "type": "string"
+                                },
+                                "coverThumbHash": {
+                                  "type": "string",
+                                  "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                                 },
                                 "status": {
                                   "type": "string",
@@ -9820,6 +10048,10 @@
                                   "height": {
                                     "type": "integer",
                                     "minimum": 0
+                                  },
+                                  "thumbHash": {
+                                    "type": "string",
+                                    "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                                   }
                                 },
                                 "required": [
@@ -9860,6 +10092,10 @@
                                   },
                                   "coverMediaKey": {
                                     "type": "string"
+                                  },
+                                  "coverThumbHash": {
+                                    "type": "string",
+                                    "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                                   },
                                   "status": {
                                     "type": "string",
@@ -10074,6 +10310,10 @@
                             "height": {
                               "type": "integer",
                               "minimum": 0
+                            },
+                            "thumbHash": {
+                              "type": "string",
+                              "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                             }
                           },
                           "required": [
@@ -10114,6 +10354,10 @@
                             },
                             "coverMediaKey": {
                               "type": "string"
+                            },
+                            "coverThumbHash": {
+                              "type": "string",
+                              "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                             },
                             "status": {
                               "type": "string",
@@ -14433,6 +14677,10 @@
                     },
                     "posterKey": {
                       "type": "string"
+                    },
+                    "thumbHash": {
+                      "type": "string",
+                      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
                     },
                     "createdAt": {
                       "type": "string",

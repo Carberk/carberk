@@ -18,9 +18,9 @@ vi.mock("../../conversations/useOpenListingConversation", () => ({
   useOpenListingConversation: (listingId: string) => ({ ...conversation, open: () => conversation.open(listingId) }),
 }));
 
-const listing: ListingsSchemas.ListingSummary = { id: "listing", sellerId: "seller", status: "active", brandId: "brand", modelId: "model", year: 2018, priceAmount: 2, priceCurrency: "USD", displayPriceTmt: 70000, photoKeys: ["one.jpg", "two.jpg"], photoCount: 7, cityId: "city", publishedAt: "2026-09-30T04:00:00.000Z" };
+const listing: ListingsSchemas.ListingSummary = { id: "listing", sellerId: "seller", status: "active", brandId: "brand", modelId: "model", year: 2018, priceAmount: 2, priceCurrency: "USD", displayPriceTmt: 70000, photoKeys: ["one.webp", "two.webp"], photoCount: 7, cityId: "city", publishedAt: "2026-09-30T04:00:00.000Z" };
 /** A feed item as the current API sends it: the gallery, contact preferences and the seller's name. */
-const feedItem: ListingsSchemas.FeedListingSummary = { ...listing, galleryKeys: ["one.jpg", "two.jpg"], photoCount: 2, allowCalls: true, allowChat: true, seller: { displayName: "Aman Durdyýew", nameNumber: 4821, deleted: false } };
+const feedItem: ListingsSchemas.FeedListingSummary = { ...listing, galleryKeys: ["one.webp", "two.webp"], photoCount: 2, allowCalls: true, allowChat: true, seller: { displayName: "Aman Durdyýew", nameNumber: 4821, deleted: false } };
 const returnTo = "/(tabs)/(search)/results" as const;
 
 function renderCard(item: ListingsSchemas.FeedListingSummary, { isAuthenticated = false as boolean | null, viewerId = null as string | null, locale = "en" } = {}) {
@@ -58,7 +58,7 @@ describe("Large Listing card", () => {
     expect(view.queryByText(/Phone verified/)).toBeNull();
   });
   it("shows a single full-width photo, with no strip and no count, for a one-photo Listing", () => {
-    const view = renderMobile(<ListingLargeCard listing={{ ...listing, photoKeys: ["one.jpg"], photoCount: 1 }} isAuthenticated={false} returnTo={returnTo} onPress={vi.fn()} />);
+    const view = renderMobile(<ListingLargeCard listing={{ ...listing, photoKeys: ["one.webp"], photoCount: 1 }} isAuthenticated={false} returnTo={returnTo} onPress={vi.fn()} />);
     expect(view.getAllByTestId("listing-photo")).toHaveLength(1); expect(view.queryByTestId("listing-photo-strip")).toBeNull();
     expect(view.queryByText(/No photo/)).toBeNull(); expect(view.queryByLabelText(/Photos:/)).toBeNull();
   });
@@ -105,25 +105,25 @@ describe("Results photo strip", () => {
     expect(onPress).toHaveBeenCalledTimes(2);
   });
   it.each([1, 2, 5, 8])("shows all %i gallery photos in the seller's order", (length) => {
-    const keys = Array.from({ length }, (_, index) => `photo-${index}.jpg`);
+    const keys = Array.from({ length }, (_, index) => `photo-${index}.webp`);
     const { view } = renderCard({ ...feedItem, galleryKeys: keys, photoCount: length });
     const frames = view.getAllByTestId("listing-photo");
     expect(frames).toHaveLength(length);
     expect(frames.map((frame) => frame.findByType(Image).props.source)).toEqual([
-      { uri: "https://media.autotm.tm/listing-photos/photo-0.jpg/detail.jpg" },
-      { uri: "https://media.autotm.tm/listing-photos/photo-1.jpg/detail.jpg" },
-      { uri: "https://media.autotm.tm/listing-photos/photo-2.jpg/detail.jpg" },
-      { uri: "https://media.autotm.tm/listing-photos/photo-3.jpg/detail.jpg" },
-      { uri: "https://media.autotm.tm/listing-photos/photo-4.jpg/detail.jpg" },
-      { uri: "https://media.autotm.tm/listing-photos/photo-5.jpg/detail.jpg" },
-      { uri: "https://media.autotm.tm/listing-photos/photo-6.jpg/detail.jpg" },
-      { uri: "https://media.autotm.tm/listing-photos/photo-7.jpg/detail.jpg" },
+      { uri: "https://media.autotm.tm/listing-photos/photo-0.webp/detail.webp?v=webp-natural-1" },
+      { uri: "https://media.autotm.tm/listing-photos/photo-1.webp/detail.webp?v=webp-natural-1" },
+      { uri: "https://media.autotm.tm/listing-photos/photo-2.webp/detail.webp?v=webp-natural-1" },
+      { uri: "https://media.autotm.tm/listing-photos/photo-3.webp/detail.webp?v=webp-natural-1" },
+      { uri: "https://media.autotm.tm/listing-photos/photo-4.webp/detail.webp?v=webp-natural-1" },
+      { uri: "https://media.autotm.tm/listing-photos/photo-5.webp/detail.webp?v=webp-natural-1" },
+      { uri: "https://media.autotm.tm/listing-photos/photo-6.webp/detail.webp?v=webp-natural-1" },
+      { uri: "https://media.autotm.tm/listing-photos/photo-7.webp/detail.webp?v=webp-natural-1" },
     ].slice(0, length));
     expect(view.queryByTestId("listing-photo-more")).toBeNull();
     expect(view.queryByTestId("listing-photo-strip") === null).toBe(length === 1);
   });
   it("snaps one photo per swipe, at a photo's width plus the seam, without stealing the vertical scroll", () => {
-    const { view } = renderCard({ ...feedItem, galleryKeys: ["a.jpg", "b.jpg", "c.jpg"], photoCount: 3 });
+    const { view } = renderCard({ ...feedItem, galleryKeys: ["a.webp", "b.webp", "c.webp"], photoCount: 3 });
     const strip = view.getByTestId("listing-photo-strip");
     const width = StyleSheet.flatten(view.getAllByTestId("listing-photo")[0]?.props.style).width as number;
     expect(strip.props.horizontal).toBe(true);
@@ -133,7 +133,7 @@ describe("Results photo strip", () => {
     expect(strip.props.nestedScrollEnabled).toBe(true);
   });
   it("sets the photos in from the card's top and left edges, and lets a swipe carry them through that gap", () => {
-    const { view } = renderCard({ ...feedItem, galleryKeys: ["a.jpg", "b.jpg", "c.jpg"], photoCount: 3 });
+    const { view } = renderCard({ ...feedItem, galleryKeys: ["a.webp", "b.webp", "c.webp"], photoCount: 3 });
     const strip = view.getByTestId("listing-photo-strip");
     const frame = StyleSheet.flatten(view.getByTestId("listing-photos").props.style);
     // The gap is padding on the scrolling content. The frame around it keeps the card's full width, so nothing clips a moving photo short of the card's edges.
@@ -145,7 +145,7 @@ describe("Results photo strip", () => {
     expect(strip.props.getItemLayout(null, 2).offset).toBe(STRIP_INSET + interval * 2);
   });
   it("shows about three fifths of the first photo, so over a third of the second shows at rest", () => {
-    const { view } = renderCard({ ...feedItem, galleryKeys: ["a.jpg", "b.jpg", "c.jpg"], photoCount: 3 });
+    const { view } = renderCard({ ...feedItem, galleryKeys: ["a.webp", "b.webp", "c.webp"], photoCount: 3 });
     const cardWidth = 390; // The window the test host reports (test/native-host.cjs); the card spans it.
     const photo = StyleSheet.flatten(view.getAllByTestId("listing-photo")[0]?.props.style) as { width: number; height: number };
     const secondShown = cardWidth - STRIP_INSET - photo.width - STRIP_GAP;
@@ -155,7 +155,7 @@ describe("Results photo strip", () => {
     expect(photo.width / photo.height).toBeCloseTo(4 / 3, 1);
   });
   it("ends with a +N photos tile when the Listing has more photos than keys, and the tile opens the Listing", () => {
-    const { view, onPress } = renderCard({ ...feedItem, galleryKeys: Array.from({ length: 8 }, (_, index) => `photo-${index}.jpg`), photoCount: 12 });
+    const { view, onPress } = renderCard({ ...feedItem, galleryKeys: Array.from({ length: 8 }, (_, index) => `photo-${index}.webp`), photoCount: 12 });
     expect(view.getAllByTestId("listing-photo")).toHaveLength(8);
     expect(view.getByText("+4")).toBeTruthy(); expect(view.getByText("Photos")).toBeTruthy();
     fireEvent.press(view.getByTestId("listing-photo-more"));

@@ -3,7 +3,7 @@ import * as FileSystem from "expo-file-system/legacy";
 const STAGING_ROOT = `${FileSystem.documentDirectory}listing-staging/`;
 
 export function getStagingPath(stagingKey: string, photoId: string): string {
-  return `${STAGING_ROOT}${stagingKey}/${photoId}.jpg`;
+  return `${STAGING_ROOT}${stagingKey}/${photoId}.webp`;
 }
 
 export function getDraftDir(stagingKey: string): string {
@@ -41,9 +41,9 @@ export async function listLocalPhotoIds(stagingKey: string): Promise<string[]> {
     return [];
   }
   const files = await FileSystem.readDirectoryAsync(dir);
-  return files
-    .filter((f) => f.endsWith(".jpg"))
-    .map((f) => f.replace(".jpg", ""));
+  return [...new Set(files
+    .filter((f) => /\.(jpg|webp)$/.test(f))
+    .map((f) => f.replace(/\.(jpg|webp)$/, "")))];
 }
 
 export async function listOrphanDirs(existingDraftIds: string[]): Promise<string[]> {

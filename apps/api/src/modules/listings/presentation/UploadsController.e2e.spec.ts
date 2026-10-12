@@ -101,7 +101,7 @@ describe("UploadsController e2e", () => {
     it("returns 401 without bearer token", async () => {
       await request
         .post("/api/v1/uploads/presign")
-        .send({ kind: "image", contentType: "image/jpeg", sizeBytes: 1024 })
+        .send({ kind: "image", contentType: "image/webp", sizeBytes: 1024 })
         .expect(401);
     });
 
@@ -109,12 +109,12 @@ describe("UploadsController e2e", () => {
       const res = await request
         .post("/api/v1/uploads/presign")
         .set("Authorization", `Bearer ${getToken()}`)
-        .send({ kind: "image", contentType: "image/jpeg", sizeBytes: 1024 })
+        .send({ kind: "image", contentType: "image/webp", sizeBytes: 1024 })
         .expect(201);
 
       expect(res.body.uploadUrl).toContain("presigned");
       expect(res.body.key).toContain("pending/");
-      expect(res.body.key).toMatch(/original\.jpg$/);
+      expect(res.body.key).toMatch(/original\.webp$/);
       expect(res.body.expiresIn).toBe(600);
       expect(res.body.maxSizeBytes).toBe(5 * 1024 * 1024);
     });
@@ -123,13 +123,13 @@ describe("UploadsController e2e", () => {
       const res = await request
         .post("/api/v1/uploads/presign")
         .set("Authorization", `Bearer ${getToken()}`)
-        .send({ kind: "image", contentType: "image/jpeg", sizeBytes: 2048 })
+        .send({ kind: "image", contentType: "image/webp", sizeBytes: 2048 })
         .expect(201);
 
       expect(uploads.recorded.find((u) => u.key === res.body.key)).toMatchObject({
         userId: "user-1",
         kind: "image",
-        contentType: "image/jpeg",
+        contentType: "image/webp",
         sizeBytes: 2048,
       });
     });
@@ -171,7 +171,7 @@ describe("UploadsController e2e", () => {
         .set("Authorization", `Bearer ${getToken()}`)
         .send({
           kind: "image",
-          contentType: "image/jpeg",
+          contentType: "image/webp",
           sizeBytes: 6 * 1024 * 1024,
         })
         .expect(400);

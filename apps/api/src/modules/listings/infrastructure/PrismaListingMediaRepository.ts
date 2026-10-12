@@ -26,6 +26,7 @@ export class PrismaListingMediaRepository implements ListingMediaRepository {
       posterKey: media.posterKey ?? null,
       createdAt: media.createdAt,
       uploadId: media.uploadId ?? null,
+      thumbHash: media.thumbHash ?? null,
     };
     const uploadId = media.uploadId;
     if (!uploadId) return this.toDomain(await this.prisma.listingMedia.create({ data }));
@@ -133,6 +134,7 @@ export class PrismaListingMediaRepository implements ListingMediaRepository {
     posterKey: string | null;
     createdAt: Date;
     uploadId: string | null;
+    thumbHash: string | null;
   }): ListingMedia {
     return ListingMedia.create({
       id: row.id,
@@ -146,6 +148,7 @@ export class PrismaListingMediaRepository implements ListingMediaRepository {
       ...(row.posterKey !== null ? { posterKey: row.posterKey } : {}),
       createdAt: row.createdAt,
       ...(row.uploadId !== null ? { uploadId: row.uploadId } : {}),
+      ...(row.thumbHash !== null ? { thumbHash: row.thumbHash } : {}),
     });
   }
 }

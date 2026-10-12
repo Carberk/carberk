@@ -20,7 +20,7 @@ export async function compressProfilePhoto(sourceUri: string, destinationUri: st
     context.resize({ width, height });
     context.crop({ originX: Math.floor((width - SIDE) / 2), originY: Math.floor((height - SIDE) / 2), width: SIDE, height: SIDE });
     square = await context.renderAsync();
-    const saved = await square.saveAsync({ format: SaveFormat.JPEG, compress: 1 });
+    const saved = await square.saveAsync({ format: SaveFormat.WEBP, compress: 1 });
     intermediateUri = saved.uri;
     return await compressPhoto(saved.uri, destinationUri, { maxDimension: SIDE, width: SIDE, height: SIDE });
   } catch (error) {

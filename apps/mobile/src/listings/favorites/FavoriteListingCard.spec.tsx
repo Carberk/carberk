@@ -16,7 +16,7 @@ vi.mock("../../api/client", () => ({ apiClient: { post: vi.fn(), delete: vi.fn()
 
 const favorite: ListingsSchemas.FavoriteListingSummary = {
   id: "listing", sellerId: "seller", status: "active", brandId: "brand", modelId: "model", year: 2018,
-  priceAmount: 2, priceCurrency: "USD", displayPriceTmt: 70000, photoKeys: ["one.jpg", "two.jpg"], photoCount: 7,
+  priceAmount: 2, priceCurrency: "USD", displayPriceTmt: 70000, photoKeys: ["one.webp", "two.webp"], photoCount: 7,
   cityId: "city", publishedAt: "2026-09-30T04:00:00.000Z", isFavorited: true,
   contactPhone: "+99365000000", allowCalls: true, allowChat: true,
 };
@@ -64,7 +64,7 @@ describe("Favorites large card", () => {
   });
 
   it("swipes through the gallery the API sends, as on Results, before the count tile", () => {
-    const galleryKeys = ["1.jpg", "2.jpg", "3.jpg", "4.jpg", "5.jpg", "6.jpg"];
+    const galleryKeys = ["1.webp", "2.webp", "3.webp", "4.webp", "5.webp", "6.webp"];
     const { view } = renderCard({ galleryKeys });
     expect(view.getAllByTestId("listing-photo")).toHaveLength(6);
     // Seven photos and six keys: one more behind a "+1" tile.
@@ -72,7 +72,7 @@ describe("Favorites large card", () => {
   });
 
   it("shows every photo and no count tile when the gallery holds them all", () => {
-    const { view } = renderCard({ galleryKeys: ["1.jpg", "2.jpg", "3.jpg"], photoCount: 3 });
+    const { view } = renderCard({ galleryKeys: ["1.webp", "2.webp", "3.webp"], photoCount: 3 });
     expect(view.getAllByTestId("listing-photo")).toHaveLength(3);
     expect(view.queryByTestId("listing-photo-more")).toBeNull();
   });

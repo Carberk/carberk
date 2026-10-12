@@ -19,6 +19,8 @@ export interface ImageMessageMetadata {
   key: string;
   width?: number;
   height?: number;
+  /** Server-computed (#824); absent on older Messages. */
+  thumbHash?: string;
 }
 
 export type PostRefMessageMetadata = ConversationsSchemas.PostRefMessageMetadata;
@@ -75,12 +77,15 @@ function ImageBubble({
   uri,
   width,
   height,
+  thumbHash,
   onPress,
   onLongPress,
 }: {
   uri: string;
   width?: number;
   height?: number;
+  /** The server's ThumbHash: a blurred preview that shows at once while the photo loads. */
+  thumbHash?: string;
   onPress?: () => void;
   onLongPress?: () => void;
 }) {
@@ -110,6 +115,8 @@ function ImageBubble({
       ) : (
         <Image
           source={{ uri }}
+          placeholder={thumbHash ? { thumbhash: thumbHash } : undefined}
+          placeholderContentFit="cover"
           style={{ width: BUBBLE_MAX_WIDTH, height: displayHeight }}
           contentFit="cover"
           onError={() => setFailed(true)}
@@ -173,6 +180,7 @@ function BubbleContent({
         uri={imageUri}
         width={imageMeta?.width}
         height={imageMeta?.height}
+        thumbHash={imageMeta?.thumbHash}
         onPress={onImagePress}
         onLongPress={onLongPress}
       />
@@ -189,6 +197,7 @@ function BubbleContent({
         displayPriceTmt={metadata.displayPriceTmt}
         priceCurrency={metadata.priceCurrency}
         coverMediaKey={metadata.coverMediaKey}
+        coverThumbHash={metadata.coverThumbHash}
         status={metadata.status}
         available={metadata.available}
         brandName={postRefBrandName}

@@ -190,7 +190,7 @@ describe("UserAvatar profile photo", () => {
   });
   it("builds the photo variant from its key and falls back on a load error", () => {
     const view = renderMobile(<UserAvatar size={72} avatarIndex={3} avatarKey="pending/u1/original.jpg" />);
-    expect(view.UNSAFE_getByType(Image).props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/u1/thumbnail.jpg" });
+    expect(view.UNSAFE_getByType(Image).props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/u1/thumbnail.webp?v=webp-natural-1" });
     fireEvent(view.UNSAFE_getByType(Image), "error");
     expect(view.UNSAFE_queryByType(Image)).toBeNull();
     expect(firstPath(view)).toBe("M3 15v-3.4h8.5V8H16l2.4 3.6 2.6.6V15");

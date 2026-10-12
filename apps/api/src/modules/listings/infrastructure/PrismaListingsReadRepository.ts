@@ -34,7 +34,7 @@ import {
 const CARD_INCLUDE = {
   media: {
     orderBy: { sortOrder: "asc" as const },
-    select: { key: true, kind: true },
+    select: { key: true, kind: true, thumbHash: true },
   },
 };
 
@@ -56,13 +56,14 @@ type CardRow = {
   contactPhone: string | null;
   allowCalls: boolean;
   allowChat: boolean;
-  media: Array<{ key: string; kind: MediaKind }>;
+  media: Array<{ key: string; kind: MediaKind; thumbHash: string | null }>;
 };
 
 type CardPhotoRow = {
   listingId: string;
   key: string;
   kind: MediaKind;
+  thumbHash: string | null;
   photoCount: number;
 };
 
@@ -89,7 +90,12 @@ export class PrismaListingsReadRepository
     }
 
     const [card] = await this.toCards([row]);
-    return card ? toListingSummary(card) : null;
+    if (!card) return null;
+    const summary = toListingSummary(card);
+    // The cover is the first media item; only a photo has a hash.
+    const cover = row.media[0];
+    if (cover?.kind === "image" && cover.thumbHash !== null) summary.coverThumbHash = cover.thumbHash;
+    return summary;
   }
 
   async getListingSummaries(ids: string[]): Promise<ListingSummary[]> {
@@ -108,12 +114,13 @@ export class PrismaListingsReadRepository
     if (listingIds.length === 0) return new Map();
 
     const rows = await this.prisma.$queryRaw<CardPhotoRow[]>`
-      SELECT "listingId", "key", "kind"::text AS "kind", "photoCount"
+      SELECT "listingId", "key", "kind"::text AS "kind", "thumbHash", "photoCount"
       FROM (
         SELECT
           m."listingId",
           m."key",
           m."kind",
+          m."thumbHash",
           m."sortOrder",
           m."id",
           ROW_NUMBER() OVER (
@@ -133,11 +140,11 @@ export class PrismaListingsReadRepository
 
     const byListing = new Map<
       string,
-      { photoCount: number; media: Array<{ key: string; kind: MediaKind }> }
+      { photoCount: number; media: Array<{ key: string; kind: MediaKind; thumbHash: string | null }> }
     >();
     for (const row of rows) {
       const entry = byListing.get(row.listingId) ?? { photoCount: row.photoCount, media: [] };
-      entry.media.push({ key: row.key, kind: row.kind });
+      entry.media.push({ key: row.key, kind: row.kind, thumbHash: row.thumbHash });
       byListing.set(row.listingId, entry);
     }
 

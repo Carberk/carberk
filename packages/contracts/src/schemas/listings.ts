@@ -52,9 +52,62 @@ export const VinHistorySchema = z.discriminatedUnion("decoded", [
 ]);
 export type VinHistory = z.infer<typeof VinHistorySchema>;
 
+// ── ThumbHash (server-computed photo placeholder) ──
+
+/** Bounds of a ThumbHash from the reference encoder (evanw/thumbhash). */
+export const THUMBHASH_MIN_BYTES = 17;
+export const THUMBHASH_MAX_BYTES = 25;
+
+const CANONICAL_BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+
+function base64ByteLength(value: string): number {
+  const padding = value.endsWith("==") ? 2 : value.endsWith("=") ? 1 : 0;
+  return (value.length / 4) * 3 - padding;
+}
+
+/**
+ * A photo's ThumbHash: standard, padded base64 (RFC 4648 section 4, `+` and
+ * `/`) of 17 to 25 bytes, which expo-image takes as
+ * `placeholder={{ thumbhash }}`. Only the server computes it; no client input
+ * schema accepts one. Checked without `Buffer`, so React Native can parse it.
+ */
+export const ThumbHashSchema = z
+  .string()
+  .regex(CANONICAL_BASE64, "ThumbHash must be standard padded base64")
+  .refine(
+    (value) => {
+      const bytes = base64ByteLength(value);
+      return bytes >= THUMBHASH_MIN_BYTES && bytes <= THUMBHASH_MAX_BYTES;
+    },
+    { message: `ThumbHash must hold ${THUMBHASH_MIN_BYTES} to ${THUMBHASH_MAX_BYTES} bytes` },
+  );
+export type ThumbHash = z.infer<typeof ThumbHashSchema>;
+
+/** One hash per key, in key order; null where that photo has no hash yet. */
+const ThumbHashSlotsSchema = (max: number) => z.array(ThumbHashSchema.nullable()).max(max);
+
+/** Rejects a hash list that is not parallel to its key list. */
+function checkParallel(
+  ctx: z.RefinementCtx,
+  keys: readonly string[] | undefined,
+  hashes: readonly (string | null)[] | undefined,
+  keysField: string,
+  hashesField: string,
+) {
+  if (hashes === undefined) return;
+  if (keys === undefined || keys.length !== hashes.length) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [hashesField],
+      message: `${hashesField} must have one slot per ${keysField} entry`,
+    });
+  }
+}
+
 // ── ListingSummary (cross-context read surface) ──
 
-export const ListingSummarySchema = z.object({
+/** The summary fields; `ListingSummarySchema` adds the parallel-array check. */
+export const ListingSummaryBaseSchema = z.object({
   id: z.string().uuid(),
   sellerId: z.string().uuid(),
   status: ListingStatusSchema,
@@ -67,6 +120,8 @@ export const ListingSummarySchema = z.object({
   coverMediaKey: z.string().optional(),
   /** Keys of the first two photos by `sortOrder`; empty when the Listing has no photos. */
   photoKeys: z.array(z.string()).max(2),
+  /** ThumbHashes parallel to `photoKeys`. Absent from older APIs. */
+  photoThumbHashes: ThumbHashSlotsSchema(2).optional(),
   photoCount: z.number().int().nonnegative(),
   mileageKm: z.number().int().nonnegative().optional(),
   condition: ListingConditionSchema.optional(),
@@ -77,6 +132,21 @@ export const ListingSummarySchema = z.object({
   /** Present only when the request carries a signed-in viewer. */
   isFavorited: z.boolean().optional(),
 });
+
+function checkSummaryHashes(
+  value: {
+    photoKeys: string[];
+    photoThumbHashes?: (string | null)[] | undefined;
+    galleryKeys?: string[] | undefined;
+    galleryThumbHashes?: (string | null)[] | undefined;
+  },
+  ctx: z.RefinementCtx,
+) {
+  checkParallel(ctx, value.photoKeys, value.photoThumbHashes, "photoKeys", "photoThumbHashes");
+  checkParallel(ctx, value.galleryKeys, value.galleryThumbHashes, "galleryKeys", "galleryThumbHashes");
+}
+
+export const ListingSummarySchema = ListingSummaryBaseSchema.superRefine(checkSummaryHashes);
 export type ListingSummary = z.infer<typeof ListingSummarySchema>;
 
 // ── Feed item (ListingSummary + what the Results card needs) ──
@@ -87,13 +157,15 @@ export type ListingSummary = z.infer<typeof ListingSummarySchema>;
  * The contact phone is never in a feed item: a caller reads it from Listing
  * detail.
  */
-export const FeedListingSummarySchema = ListingSummarySchema.extend({
+export const FeedListingSummarySchema = ListingSummaryBaseSchema.extend({
   /**
    * Keys of the first eight photos by `sortOrder` for the Results photo strip;
    * empty when the Listing has no photos. Absent from older APIs, so a client
    * falls back to `photoKeys`.
    */
   galleryKeys: z.array(z.string()).max(8).optional(),
+  /** ThumbHashes parallel to `galleryKeys`; never sent without them. */
+  galleryThumbHashes: ThumbHashSlotsSchema(8).optional(),
   /** Whether the seller takes calls and chat messages. */
   allowCalls: z.boolean().optional(),
   allowChat: z.boolean().optional(),
@@ -102,22 +174,24 @@ export const FeedListingSummarySchema = ListingSummarySchema.extend({
    * `formatDisplayName`; a `deleted` seller has no name. No avatar fields.
    */
   seller: PublicIdentitySchema.pick({ displayName: true, nameNumber: true, deleted: true }).optional(),
-});
+}).superRefine(checkSummaryHashes);
 export type FeedListingSummary = z.infer<typeof FeedListingSummarySchema>;
 
 // ── Favorites item (ListingSummary + contact preferences) ──
 
-export const FavoriteListingSummarySchema = ListingSummarySchema.extend({
+export const FavoriteListingSummarySchema = ListingSummaryBaseSchema.extend({
   /**
    * Keys of the first eight photos by `sortOrder` for the card's photo strip,
    * as on a feed item. Absent from older APIs, so a client falls back to
    * `photoKeys`.
    */
   galleryKeys: z.array(z.string()).max(8).optional(),
+  /** ThumbHashes parallel to `galleryKeys`; never sent without them. */
+  galleryThumbHashes: ThumbHashSlotsSchema(8).optional(),
   contactPhone: z.string().optional(),
   allowCalls: z.boolean(),
   allowChat: z.boolean(),
-});
+}).superRefine(checkSummaryHashes);
 export type FavoriteListingSummary = z.infer<typeof FavoriteListingSummarySchema>;
 
 // ── ListingMedia ──
@@ -140,6 +214,8 @@ export const ListingMediaSchema = z.object({
   sortOrder: z.number().int().nonnegative(),
   durationMs: z.number().int().positive().optional(),
   posterKey: z.string().optional(),
+  /** Server-computed; absent until the photo has one. */
+  thumbHash: ThumbHashSchema.optional(),
 });
 export type ListingMedia = z.infer<typeof ListingMediaSchema>;
 
@@ -319,6 +395,8 @@ export const AttachMediaResponseSchema = z.object({
   height: z.number().int().positive().optional(),
   durationMs: z.number().int().positive().optional(),
   posterKey: z.string().optional(),
+  /** Server-computed; absent until the photo has one. */
+  thumbHash: ThumbHashSchema.optional(),
   createdAt: z.string().datetime(),
 });
 export type AttachMediaResponse = z.infer<typeof AttachMediaResponseSchema>;

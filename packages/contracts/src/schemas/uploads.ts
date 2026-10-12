@@ -21,3 +21,6 @@ export const PresignResponseSchema = z.object({
   headers: z.record(z.string(), z.string()).optional(),
 });
 export type PresignResponse = z.infer<typeof PresignResponseSchema>;
+
+/** Change the served URI when regenerated WebP derivatives must bypass older disk/CDN entries. */
+export const PHOTO_VARIANT_CACHE_VERSION = "webp-natural-1";

@@ -32,7 +32,7 @@ import {
 } from "./chatImageUpload";
 
 vi.mock("expo-image-manipulator", () => ({
-  SaveFormat: { JPEG: "jpeg" },
+  SaveFormat: { JPEG: "jpeg", WEBP: "webp" },
   ImageManipulator: {
     manipulate: vi.fn(),
   },
@@ -56,7 +56,7 @@ const mockUploadAsync = vi.mocked(uploadAsync);
 
 function mockManipulatorChain(result: { uri: string; width: number; height: number }) {
   const saveAsync = vi.fn().mockResolvedValue(result);
-  const renderAsync = vi.fn().mockResolvedValue({ saveAsync });
+  const renderAsync = vi.fn().mockResolvedValue({ saveAsync, width: result.width, height: result.height });
   const context = {
     resize: vi.fn().mockReturnThis(),
     renderAsync,
@@ -75,7 +75,7 @@ function setupHappyPath(finalUri: string) {
 describe("getChatImageStagingPath", () => {
   it("returns a deterministic staging path under the conversation directory", () => {
     expect(getChatImageStagingPath("conv-1", "msg-1")).toBe(
-      "file:///doc/chat-staging/conv-1/msg-1.jpg",
+      "file:///doc/chat-staging/conv-1/msg-1.webp",
     );
   });
 });
@@ -112,7 +112,7 @@ describe("compressChatImage", () => {
   it("throws a non-retryable error when the source file is missing", async () => {
     mockGetInfoAsync.mockResolvedValueOnce({ exists: false, uri: "", isDirectory: false });
 
-    await expect(compressChatImage("file:///tmp/source.jpg", "file:///tmp/dest.jpg")).rejects.toSatisfy(
+    await expect(compressChatImage("file:///tmp/source.webp", "file:///tmp/dest.webp")).rejects.toSatisfy(
       (err: unknown) => {
         expect(err).toBeInstanceOf(ChatImageUploadError);
         expect((err as ChatImageUploadError).code).toBe("file_missing");
@@ -123,39 +123,39 @@ describe("compressChatImage", () => {
   });
 
   it("returns compressed image metadata on the happy path", async () => {
-    setupHappyPath("file:///tmp/compressed.jpg");
+    setupHappyPath("file:///tmp/compressed.webp");
 
-    const result = await compressChatImage("file:///tmp/source.jpg", "file:///tmp/dest.jpg");
+    const result = await compressChatImage("file:///tmp/source.webp", "file:///tmp/dest.webp");
 
-    expect(result.uri).toBe("file:///tmp/dest.jpg");
+    expect(result.uri).toBe("file:///tmp/dest.webp");
     expect(result.width).toBe(1000);
     expect(result.height).toBe(800);
     expect(mockCopyAsync).toHaveBeenCalledWith({
-      from: "file:///tmp/compressed.jpg",
-      to: "file:///tmp/dest.jpg",
+      from: "file:///tmp/compressed.webp",
+      to: "file:///tmp/dest.webp",
     });
   });
 
   it("re-compresses with quality 0.6 when the first output exceeds 5MB", async () => {
     mockGetInfoAsync.mockResolvedValueOnce({ exists: true, uri: "", size: 1024, isDirectory: false, modificationTime: 0 });
-    mockManipulatorChain({ uri: "file:///tmp/compressed.jpg", width: 1000, height: 800 });
-    mockManipulatorChain({ uri: "file:///tmp/recompressed.jpg", width: 1000, height: 800 });
+    mockManipulatorChain({ uri: "file:///tmp/compressed.webp", width: 1000, height: 800 });
+    mockManipulatorChain({ uri: "file:///tmp/recompressed.webp", width: 1000, height: 800 });
     mockGetInfoAsync
       .mockResolvedValueOnce({ exists: true, uri: "", size: 6 * 1024 * 1024, isDirectory: false, modificationTime: 0 })
       .mockResolvedValueOnce({ exists: true, uri: "", size: 3 * 1024 * 1024, isDirectory: false, modificationTime: 0 })
       .mockResolvedValueOnce({ exists: true, uri: "", size: 3 * 1024 * 1024, isDirectory: false, modificationTime: 0 });
 
-    const result = await compressChatImage("file:///tmp/source.jpg", "file:///tmp/dest.jpg");
+    const result = await compressChatImage("file:///tmp/source.webp", "file:///tmp/dest.webp");
 
-    expect(result.uri).toBe("file:///tmp/dest.jpg");
+    expect(result.uri).toBe("file:///tmp/dest.webp");
     expect(mockManipulate).toHaveBeenCalledTimes(2);
   });
 
   it("throws a retryable compression_failed error when copyAsync fails", async () => {
-    setupHappyPath("file:///tmp/compressed.jpg");
+    setupHappyPath("file:///tmp/compressed.webp");
     mockCopyAsync.mockRejectedValueOnce(new Error("Permission denied"));
 
-    await expect(compressChatImage("file:///tmp/source.jpg", "file:///tmp/dest.jpg")).rejects.toSatisfy(
+    await expect(compressChatImage("file:///tmp/source.webp", "file:///tmp/dest.webp")).rejects.toSatisfy(
       (err: unknown) => {
         expect(err).toBeInstanceOf(ChatImageUploadError);
         expect((err as ChatImageUploadError).code).toBe("compression_failed");
@@ -166,15 +166,15 @@ describe("compressChatImage", () => {
   });
 
   it("throws a retryable compression_failed error when the destination is missing after transfer", async () => {
-    setupHappyPath("file:///tmp/compressed.jpg");
+    setupHappyPath("file:///tmp/compressed.webp");
     mockGetInfoAsync.mockReset();
     mockGetInfoAsync
       .mockResolvedValueOnce({ exists: true, uri: "", size: 1024, isDirectory: false, modificationTime: 0 })
       .mockResolvedValueOnce({ exists: true, uri: "", size: 1024, isDirectory: false, modificationTime: 0 })
       .mockResolvedValueOnce({ exists: false, uri: "", isDirectory: false });
-    mockManipulatorChain({ uri: "file:///tmp/compressed.jpg", width: 1000, height: 800 });
+    mockManipulatorChain({ uri: "file:///tmp/compressed.webp", width: 1000, height: 800 });
 
-    await expect(compressChatImage("file:///tmp/source.jpg", "file:///tmp/dest.jpg")).rejects.toSatisfy(
+    await expect(compressChatImage("file:///tmp/source.webp", "file:///tmp/dest.webp")).rejects.toSatisfy(
       (err: unknown) => {
         expect(err).toBeInstanceOf(ChatImageUploadError);
         expect((err as ChatImageUploadError).code).toBe("compression_failed");
@@ -192,7 +192,7 @@ describe("uploadChatImageToPresignedUrl", () => {
   it("throws a non-retryable error when the local file is missing", async () => {
     mockGetInfoAsync.mockResolvedValueOnce({ exists: false, uri: "", isDirectory: false });
 
-    await expect(uploadChatImageToPresignedUrl("https://up", "file:///tmp/missing.jpg")).rejects.toSatisfy(
+    await expect(uploadChatImageToPresignedUrl("https://up", "file:///tmp/missing.webp")).rejects.toSatisfy(
       (err: unknown) => {
         expect(err).toBeInstanceOf(ChatImageUploadError);
         expect((err as ChatImageUploadError).code).toBe("file_missing");
@@ -204,24 +204,24 @@ describe("uploadChatImageToPresignedUrl", () => {
 
   it("PUTs the file as binary content and returns on 2xx", async () => {
     mockGetInfoAsync.mockResolvedValueOnce({ exists: true, uri: "", size: 1024, isDirectory: false, modificationTime: 0 });
-    mockUploadAsync.mockResolvedValueOnce({ status: 200, body: "", headers: {}, mimeType: "image/jpeg" });
+    mockUploadAsync.mockResolvedValueOnce({ status: 200, body: "", headers: {}, mimeType: "image/webp" });
 
-    await uploadChatImageToPresignedUrl("https://up", "file:///tmp/image.jpg");
+    await uploadChatImageToPresignedUrl("https://up", "file:///tmp/image.webp");
 
-    expect(mockUploadAsync).toHaveBeenCalledWith("https://up", "file:///tmp/image.jpg", {
+    expect(mockUploadAsync).toHaveBeenCalledWith("https://up", "file:///tmp/image.webp", {
       httpMethod: "PUT",
       uploadType: expect.anything(),
       headers: {
-        "Content-Type": "image/jpeg",
+        "Content-Type": "image/webp",
       },
     });
   });
 
   it("throws a retryable put_failed error on non-2xx status", async () => {
     mockGetInfoAsync.mockResolvedValueOnce({ exists: true, uri: "", size: 1024, isDirectory: false, modificationTime: 0 });
-    mockUploadAsync.mockResolvedValueOnce({ status: 403, body: "", headers: {}, mimeType: "image/jpeg" });
+    mockUploadAsync.mockResolvedValueOnce({ status: 403, body: "", headers: {}, mimeType: "image/webp" });
 
-    await expect(uploadChatImageToPresignedUrl("https://up", "file:///tmp/image.jpg")).rejects.toSatisfy(
+    await expect(uploadChatImageToPresignedUrl("https://up", "file:///tmp/image.webp")).rejects.toSatisfy(
       (err: unknown) => {
         expect(err).toBeInstanceOf(ChatImageUploadError);
         expect((err as ChatImageUploadError).code).toBe("put_failed");

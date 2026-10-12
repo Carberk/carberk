@@ -21,6 +21,8 @@ const BaseSchema = z.object({
   /** Baked at image build from RAILWAY_GIT_COMMIT_SHA; surfaced by /healthz. */
   AUTOTM_COMMIT_SHA: z.string().min(1).default("unknown"),
   PORT: z.coerce.number().int().positive().default(3006),
+  /** Operator-only startup mode: no business request handlers or queue consumers run. */
+  PHOTO_CONVERSION_MAINTENANCE: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   LOG_LEVEL: z.enum(["error", "warn", "info", "debug"]).default("info"),
 
   DATABASE_URL: z.string().url(),

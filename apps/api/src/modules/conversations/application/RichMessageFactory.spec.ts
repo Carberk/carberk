@@ -10,7 +10,9 @@ import { createCleanRichMessage } from "./RichMessageFactory";
 import { FakeChatAttachmentCleaner } from "./testing/FakeChatAttachmentCleaner";
 
 const CONVERSATION_ID = "7d0c1a52-3b64-4e8f-9a17-5c2e8f1b6d90";
-const KEY = `chat-attachments/${CONVERSATION_ID}/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.jpg`;
+const KEY = `chat-attachments/${CONVERSATION_ID}/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.webp`;
+
+const THUMB_HASH = "2yMBBYCIh4iHiHeAiId4dXh3f4f4";
 
 function cleanerReturning(result: ChatAttachmentCleanResult) {
   const cleaner = new FakeChatAttachmentCleaner();
@@ -38,19 +40,35 @@ async function rejection(promise: Promise<unknown>): Promise<ConversationDomainE
 
 describe("createCleanRichMessage", () => {
   it("cleans the stored image before the image message exists", async () => {
-    const cleaner = cleanerReturning("clean");
+    const cleaner = cleanerReturning({ status: "clean", thumbHash: THUMB_HASH });
 
     const message = await imageMessage(cleaner, KEY);
 
     expect(cleaner.cleaned).toEqual([KEY]);
     expect(message.kind).toBe("image");
-    expect(message.metadata).toEqual({ key: KEY, width: 800, height: 600 });
+    expect(message.metadata).toEqual({ key: KEY, width: 800, height: 600, thumbHash: THUMB_HASH });
   });
 
-  it.each<ChatAttachmentCleanResult>(["missing", "invalid"])(
+  it("keeps the ThumbHash the server computed, never one the sender supplied", async () => {
+    const cleaner = cleanerReturning({ status: "clean", thumbHash: THUMB_HASH });
+
+    const message = await createCleanRichMessage(cleaner, {
+      id: "msg-3",
+      conversationId: CONVERSATION_ID,
+      senderId: "buyer-1",
+      input: {
+        kind: "image",
+        metadata: { key: KEY, thumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" } as { key: string },
+      },
+    });
+
+    expect(message.metadata).toEqual({ key: KEY, thumbHash: THUMB_HASH });
+  });
+
+  it.each(["missing", "invalid"] as const)(
     "refuses an image message whose stored image is %s",
-    async (result) => {
-      const cleaner = cleanerReturning(result);
+    async (status) => {
+      const cleaner = cleanerReturning({ status });
 
       const error = await rejection(imageMessage(cleaner, KEY));
 
@@ -59,12 +77,12 @@ describe("createCleanRichMessage", () => {
   );
 
   it.each([
-    ["another Conversation's attachment", "chat-attachments/11111111-2222-4333-8444-555555555555/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.jpg"],
-    ["a Listing photo", "pending/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.jpg"],
-    ["a path that climbs out of the Conversation", `chat-attachments/${CONVERSATION_ID}/../other/original.jpg`],
-    ["an absolute URL", "https://example.com/original.jpg"],
+    ["another Conversation's attachment", "chat-attachments/11111111-2222-4333-8444-555555555555/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.webp"],
+    ["a Listing photo", "pending/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.webp"],
+    ["a path that climbs out of the Conversation", `chat-attachments/${CONVERSATION_ID}/../other/original.webp`],
+    ["an absolute URL", "https://example.com/original.webp"],
   ])("refuses %s without touching storage", async (_label, key) => {
-    const cleaner = cleanerReturning("clean");
+    const cleaner = cleanerReturning({ status: "clean", thumbHash: THUMB_HASH });
 
     const error = await rejection(imageMessage(cleaner, key));
 
@@ -73,7 +91,7 @@ describe("createCleanRichMessage", () => {
   });
 
   it("creates a text message without touching storage", async () => {
-    const cleaner = cleanerReturning("clean");
+    const cleaner = cleanerReturning({ status: "clean", thumbHash: THUMB_HASH });
 
     const message = await createCleanRichMessage(cleaner, {
       id: "msg-2",

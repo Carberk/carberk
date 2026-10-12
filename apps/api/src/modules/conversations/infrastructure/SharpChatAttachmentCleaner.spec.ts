@@ -1,6 +1,7 @@
 import { GetObjectCommand, HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import type { ConfigService } from "@nestjs/config";
 import sharp from "sharp";
+import { thumbHashToApproximateAspectRatio } from "thumbhash";
 import { describe, expect, it } from "vitest";
 
 import type { Env } from "../../../env.schema";
@@ -94,7 +95,7 @@ describe("SharpChatAttachmentCleaner", () => {
     expect((await sharp(input).metadata()).exif).toBeDefined();
     const bucket = fakeBucket({ [KEY]: input });
 
-    await expect(cleanerWith(bucket).clean(KEY)).resolves.toBe("clean");
+    await expect(cleanerWith(bucket).clean(KEY)).resolves.toMatchObject({ status: "clean" });
 
     const stored = await sharp(bucket.objects.get(KEY)!).metadata();
     expect(stored.exif).toBeUndefined();
@@ -110,7 +111,7 @@ describe("SharpChatAttachmentCleaner", () => {
     expect((await sharp(input).metadata()).exif).toBeDefined();
     const bucket = fakeBucket({ [key]: input });
 
-    await expect(cleanerWith(bucket).clean(key)).resolves.toBe("clean");
+    await expect(cleanerWith(bucket).clean(key)).resolves.toMatchObject({ status: "clean" });
 
     const stored = await sharp(bucket.objects.get(key)!).metadata();
     expect(stored.format).toBe("webp");
@@ -126,22 +127,43 @@ describe("SharpChatAttachmentCleaner", () => {
       .toBuffer();
     const bucket = fakeBucket({ [KEY]: input });
 
-    await expect(cleanerWith(bucket).clean(KEY)).resolves.toBe("clean");
+    await expect(cleanerWith(bucket).clean(KEY)).resolves.toMatchObject({ status: "clean" });
 
     expect(bucket.puts).toHaveLength(0);
     expect(Buffer.compare(bucket.objects.get(KEY)!, input)).toBe(0);
   });
 
+  it("returns the image's ThumbHash as standard padded base64 with a clean result", async () => {
+    const key = KEY.replace("original.jpg", "original.webp");
+    const input = await sharp({
+      create: { width: 300, height: 200, channels: 3, background: { r: 10, g: 120, b: 200 } },
+    })
+      .webp({ lossless: true })
+      .toBuffer();
+
+    await expect(cleanerWith(fakeBucket({ [key]: input })).clean(key)).resolves.toEqual({
+      status: "clean",
+      thumbHash: "2yMBBYCIh4iHiHeAiId4dXh3f4f4",
+    });
+  });
+
+  it("computes the ThumbHash from the upright image, so a turned camera photo previews as portrait", async () => {
+    const result = await cleanerWith(fakeBucket({ [KEY]: await photoWithGps() })).clean(KEY);
+
+    if (result.status !== "clean") throw new Error(`expected clean, got ${result.status}`);
+    expect(thumbHashToApproximateAspectRatio(Buffer.from(result.thumbHash, "base64"))).toBeLessThan(1);
+  });
+
   it("reports a key with no stored object as missing", async () => {
     const bucket = fakeBucket({});
 
-    await expect(cleanerWith(bucket).clean(KEY)).resolves.toBe("missing");
+    await expect(cleanerWith(bucket).clean(KEY)).resolves.toEqual({ status: "missing" });
   });
 
   it("reports a stored object that is not an image as invalid and does not rewrite it", async () => {
     const bucket = fakeBucket({ [KEY]: Buffer.from("not an image") });
 
-    await expect(cleanerWith(bucket).clean(KEY)).resolves.toBe("invalid");
+    await expect(cleanerWith(bucket).clean(KEY)).resolves.toEqual({ status: "invalid" });
     expect(bucket.puts).toHaveLength(0);
   });
 
@@ -153,14 +175,14 @@ describe("SharpChatAttachmentCleaner", () => {
       .toBuffer();
     const bucket = fakeBucket({ [KEY]: png });
 
-    await expect(cleanerWith(bucket).clean(KEY)).resolves.toBe("invalid");
+    await expect(cleanerWith(bucket).clean(KEY)).resolves.toEqual({ status: "invalid" });
     expect(bucket.puts).toHaveLength(0);
   });
 
   it("reports a stored object over the 5 MB cap as invalid without fetching its body", async () => {
     const bucket = fakeBucket({ [KEY]: Buffer.alloc(5 * 1024 * 1024 + 1) });
 
-    await expect(cleanerWith(bucket).clean(KEY)).resolves.toBe("invalid");
+    await expect(cleanerWith(bucket).clean(KEY)).resolves.toEqual({ status: "invalid" });
     expect(bucket.gets).toEqual([]);
     expect(bucket.reads).toEqual([]);
     expect(bucket.puts).toHaveLength(0);
@@ -172,7 +194,7 @@ describe("SharpChatAttachmentCleaner", () => {
       { headContentLength: 0 },
     );
 
-    await expect(cleanerWith(bucket).clean(KEY)).resolves.toBe("invalid");
+    await expect(cleanerWith(bucket).clean(KEY)).resolves.toEqual({ status: "invalid" });
     expect(bucket.gets).toEqual([KEY]);
     expect(bucket.reads).toEqual([]);
     expect(bucket.destroyed).toEqual([KEY]);
@@ -211,7 +233,7 @@ describe("SharpChatAttachmentCleaner", () => {
       { headContentLength: 100, getContentLength: 100 },
     );
 
-    await expect(cleanerWith(bucket).clean(KEY)).resolves.toBe("invalid");
+    await expect(cleanerWith(bucket).clean(KEY)).resolves.toEqual({ status: "invalid" });
     expect(bucket.puts).toHaveLength(0);
   });
 
@@ -224,7 +246,7 @@ describe("SharpChatAttachmentCleaner", () => {
       .toBuffer();
     const bucket = fakeBucket({ [KEY]: huge });
 
-    await expect(cleanerWith(bucket).clean(KEY)).resolves.toBe("invalid");
+    await expect(cleanerWith(bucket).clean(KEY)).resolves.toEqual({ status: "invalid" });
     expect(bucket.puts).toHaveLength(0);
   });
 });

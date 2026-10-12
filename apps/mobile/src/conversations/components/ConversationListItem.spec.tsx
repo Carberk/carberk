@@ -54,7 +54,7 @@ const badgePhotos = (row: Row) => within(row.getByTestId("conversation-row-peer-
 // The first stroke of the key, the mark for avatar index 7.
 const KEY_MARK = "M11.5 12H21M17 12v3M20 12v2.4M6.5 12h.01";
 const PHOTO_KEY = "avatars/u2/original.jpg";
-const PHOTO_URL = "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.jpg";
+const PHOTO_URL = "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.webp?v=webp-natural-1";
 
 /** Merdan, avatar index 7, name number 2057, no photo. */
 function peer(id: string, updates: Partial<ConversationSummaryData["peer"]> = {}): ConversationSummaryData["peer"] {
@@ -301,7 +301,7 @@ describe("ConversationListItem avatar badge", () => {
   it("still leads the row with the Listing thumbnail, whose photo the badge does not replace", () => {
     const row = renderRow(summary({ peer: peer(SELLER, { avatarKey: PHOTO_KEY }) }));
     const thumbnail = within(row.getByTestId("conversation-row-thumbnail")).UNSAFE_getByType(Image);
-    expect(thumbnail.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/listings/a1/cover.jpg/thumbnail.jpg" });
+    expect(thumbnail.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/listings/a1/cover.jpg/thumbnail.webp?v=webp-natural-1" });
     // The badge sits beside the clipped thumbnail, not inside it, so it is not clipped or dimmed.
     expect(within(row.getByTestId("conversation-row-thumbnail")).queryByTestId("conversation-row-peer-avatar")).toBeNull();
   });

@@ -118,14 +118,14 @@ vi.mock("../../lib/theme", () => ({
 }));
 vi.mock("../../src/conversations/upload/chatImageUpload", () => ({
   uploadChatImageToPresignedUrl: vi.fn(async () => {}),
-  compressChatImage: vi.fn(async () => ({ uri: "file:///staged.jpg", fileSize: 1000, width: 800, height: 600 })),
-  getChatImageStagingPath: vi.fn(() => "file:///staged.jpg"),
+  compressChatImage: vi.fn(async () => ({ uri: "file:///staged.webp", fileSize: 1000, width: 800, height: 600 })),
+  getChatImageStagingPath: vi.fn(() => "file:///staged.webp"),
   ensureChatStagingDir: vi.fn(async () => {}),
   ChatImageUploadError: class extends Error {},
 }));
 vi.mock("expo-image-picker", () => ({
   useMediaLibraryPermissions: () => [{ granted: true }, vi.fn()],
-  launchImageLibraryAsync: vi.fn(async () => ({ canceled: false, assets: [{ uri: "file:///picked.jpg" }] })),
+  launchImageLibraryAsync: vi.fn(async () => ({ canceled: false, assets: [{ uri: "file:///picked.webp" }] })),
 }));
 vi.mock("expo-file-system/legacy", () => ({
   deleteAsync: vi.fn(async () => {}),
@@ -491,10 +491,10 @@ describe("Conversation history", () => {
 });
 
 describe("Conversation persisted image addressing", () => {
-  const storedKey = `chat-attachments/${CONVERSATION_ID}/00000000-0000-4000-8000-0000000000e1/original.jpg`;
+  const storedKey = `chat-attachments/${CONVERSATION_ID}/00000000-0000-4000-8000-0000000000e1/original.webp`;
   const expectedUri = `https://media.autotm.tm/chat-attachments/${storedKey}`;
 
-  async function openStoredImage() {
+  async function openStoredImage(thumbHash?: string) {
     // A history response has a storage key, with no local staging URI or ready-made URL.
     const persistedImage: ConversationsSchemas.MessageSummary = {
       id: "00000000-0000-4000-8000-0000000000e2",
@@ -502,7 +502,7 @@ describe("Conversation persisted image addressing", () => {
       senderId: SELLER_ID,
       kind: "image",
       text: null,
-      metadata: { key: storedKey, width: 800, height: 600 },
+      metadata: { key: storedKey, width: 800, height: 600, ...(thumbHash ? { thumbHash } : {}) },
       createdAt: "2026-10-01T09:00:00.000Z",
     };
     state.messages.data = { pages: [{ items: [persistedImage], nextCursor: null }] };
@@ -526,6 +526,35 @@ describe("Conversation persisted image addressing", () => {
     expect(state.readMessages).toHaveBeenLastCalledWith({ conversationId: CONVERSATION_ID });
     expect(within(photo).UNSAFE_getByType(Image).props.source).toEqual({ uri: expectedUri });
     expect(screen.queryByLabelText("Close")).toBeNull();
+  });
+
+  it("shows the server's ThumbHash in the bubble while a persisted image loads", async () => {
+    const { photo } = await openStoredImage("2yMBBYCIh4iHiHeAiId4dXh3f4f4");
+
+    expect(within(photo).UNSAFE_getByType(Image).props.placeholder).toEqual({ thumbhash: "2yMBBYCIh4iHiHeAiId4dXh3f4f4" });
+  });
+
+  it("shows the server's cover ThumbHash on a persisted Listing-reference card", async () => {
+    const persistedRef: ConversationsSchemas.MessageSummary = {
+      id: "00000000-0000-4000-8000-0000000000e3",
+      conversationId: CONVERSATION_ID,
+      senderId: SELLER_ID,
+      kind: "post_ref",
+      text: null,
+      metadata: {
+        listingId: LISTING_ID, brandId: "brand-1", modelId: "model-1", displayPriceTmt: 285000, priceCurrency: "TMT",
+        coverMediaKey: "pending/a/original.webp", coverThumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH", status: "active", available: true,
+      },
+      createdAt: "2026-10-01T09:00:00.000Z",
+    };
+    state.messages.data = { pages: [{ items: [persistedRef], nextCursor: null }] };
+    routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation(), [`/listings/${LISTING_ID}`]: () => listingDetail() });
+    const screen = renderMobile(<ConversationDetailScreen />);
+
+    await waitFor(() => {
+      const placeholders = screen.UNSAFE_getAllByType(Image).map((image) => image.props.placeholder as unknown);
+      expect(placeholders).toContainEqual({ thumbhash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" });
+    });
   });
 
   it("opens the same persisted object in the real fullscreen viewer and closes it", async () => {
@@ -566,7 +595,7 @@ describe("Conversation Retry", () => {
   });
 
   it("resends a failed image Message with the same client Message ID", async () => {
-    state.mutation.mutateAsync.mockResolvedValue({ uploadUrl: "https://upload", key: "chat-attachments/k.jpg" });
+    state.mutation.mutateAsync.mockResolvedValue({ uploadUrl: "https://upload", key: "chat-attachments/k.webp" });
     state.socket.sendImageMessage
       .mockResolvedValueOnce({ ok: false, code: "INTERNAL" })
       .mockResolvedValueOnce({ ok: true, message: { id: "server-2" } });
@@ -1118,7 +1147,7 @@ describe("Conversation about a closed Listing", () => {
 
     expect(state.mutation.mutateAsync).toHaveBeenCalledWith({
       conversationId: CONVERSATION_ID,
-      request: { contentType: "image/jpeg", sizeBytes: 1000 },
+      request: { contentType: "image/webp", sizeBytes: 1000 },
     });
     expect(state.socket.sendImageMessage).not.toHaveBeenCalled();
     expect(await screen.findByText("You can't send messages in this Conversation")).toBeTruthy();
@@ -1135,7 +1164,7 @@ describe("Conversation about a closed Listing", () => {
     );
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: readConversation });
     state.mutation.mutateAsync
-      .mockResolvedValueOnce({ uploadUrl: "https://upload", key: "chat-attachments/k.jpg" })
+      .mockResolvedValueOnce({ uploadUrl: "https://upload", key: "chat-attachments/k.webp" })
       .mockImplementationOnce(async () => {
         restricted = true;
         throw new ApiError("FORBIDDEN", 403, "Forbidden");
@@ -1161,7 +1190,7 @@ describe("Conversation about a closed Listing", () => {
     expect(state.mutation.mutateAsync).toHaveBeenCalledTimes(2);
     expect(state.mutation.mutateAsync).toHaveBeenLastCalledWith({
       conversationId: CONVERSATION_ID,
-      request: { contentType: "image/jpeg", sizeBytes: 1000 },
+      request: { contentType: "image/webp", sizeBytes: 1000 },
     });
     expect(state.socket.sendImageMessage).toHaveBeenCalledTimes(1);
     expect(await screen.findByText("You can't send messages in this Conversation")).toBeTruthy();
@@ -1221,7 +1250,7 @@ describe("First chat action notifications", () => {
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
     state.socket.sendTextMessage.mockResolvedValue({ ok: true, message: { id: "server-first" } });
     state.socket.sendImageMessage.mockResolvedValue({ ok: true, message: { id: "server-first-image" } });
-    state.mutation.mutateAsync.mockResolvedValue({ uploadUrl: "https://upload", key: "chat-attachments/first.jpg" });
+    state.mutation.mutateAsync.mockResolvedValue({ uploadUrl: "https://upload", key: "chat-attachments/first.webp" });
     state.post.mockResolvedValue({});
     try {
       const screen = renderMobile(<ConversationDetailScreen />);
@@ -1282,16 +1311,16 @@ describe("Acknowledged Message transport coverage", () => {
     expect(screen.getAllByText("HTTP still visible")).toHaveLength(1);
   });
   it.each([false, true])("keeps an acknowledged image visible without an echo, HTTP=%s", async (http) => {
-    state.mutation.mutateAsync.mockResolvedValue({ uploadUrl: "https://upload", key: "chat-attachments/ack.jpg" });
+    state.mutation.mutateAsync.mockResolvedValue({ uploadUrl: "https://upload", key: "chat-attachments/ack.webp" });
     state.socket.sendImageMessage.mockResolvedValue(http ? { ok: false, code: "NOT_CONNECTED" } : { ok: true, message: { id: "image-ack" } });
-    state.mutation.mutate.mockImplementation((_input, options) => options?.onSuccess?.({ ...serverMessage("image-ack", BUYER_ID, new Date().toISOString()), kind: "image", text: null, metadata: { key: "chat-attachments/ack.jpg" } }));
+    state.mutation.mutate.mockImplementation((_input, options) => options?.onSuccess?.({ ...serverMessage("image-ack", BUYER_ID, new Date().toISOString()), kind: "image", text: null, metadata: { key: "chat-attachments/ack.webp" } }));
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
     const screen = renderMobile(<ConversationDetailScreen />);
     await screen.findByPlaceholderText("Message");
     await act(async () => { fireEvent.press(screen.getByLabelText(/attach/i)); });
     await act(async () => { fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
     expect(screen.getAllByRole("imagebutton", { name: "Photo" })).toHaveLength(1);
-    expect(within(screen.getByRole("imagebutton", { name: "Photo" })).UNSAFE_getByType(Image).props.source.uri).toContain("chat-attachments/ack.jpg");
+    expect(within(screen.getByRole("imagebutton", { name: "Photo" })).UNSAFE_getByType(Image).props.source.uri).toContain("chat-attachments/ack.webp");
   });
 });
 

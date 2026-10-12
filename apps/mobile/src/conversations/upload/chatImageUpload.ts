@@ -43,7 +43,7 @@ export function getChatImageStagingPath(
   conversationId: string,
   clientMessageId: string,
 ): string {
-  return `${getChatStagingDir(conversationId)}${clientMessageId}.jpg`;
+  return `${getChatStagingDir(conversationId)}${clientMessageId}.webp`;
 }
 
 export async function ensureChatStagingDir(conversationId: string): Promise<void> {
@@ -55,7 +55,7 @@ export async function ensureChatStagingDir(conversationId: string): Promise<void
 }
 
 const MAX_DIMENSION = 2400;
-const JPEG_QUALITY = 0.8;
+const WEBP_QUALITY = 0.8;
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 
 export async function compressChatImage(
@@ -73,11 +73,14 @@ export async function compressChatImage(
 
   try {
     const context = ImageManipulator.manipulate(sourceUri);
-    context.resize({ width: MAX_DIMENSION });
+    const decoded = await context.renderAsync();
+    const longSide = Math.min(MAX_DIMENSION, Math.max(decoded.width, decoded.height));
+    context.resize(decoded.width >= decoded.height ? { width: longSide } : { height: longSide });
+    decoded.release?.();
     const rendered = await context.renderAsync();
     const result = await rendered.saveAsync({
-      format: SaveFormat.JPEG,
-      compress: JPEG_QUALITY,
+      format: SaveFormat.WEBP,
+      compress: WEBP_QUALITY,
     });
 
     let finalUri = result.uri;
@@ -88,7 +91,7 @@ export async function compressChatImage(
       const recompressContext = ImageManipulator.manipulate(finalUri);
       const recompressed = await recompressContext.renderAsync();
       const recompressResult = await recompressed.saveAsync({
-        format: SaveFormat.JPEG,
+        format: SaveFormat.WEBP,
         compress: 0.6,
       });
       finalUri = recompressResult.uri;
@@ -157,7 +160,7 @@ export async function uploadChatImageToPresignedUrl(
     httpMethod: "PUT",
     uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
     headers: {
-      "Content-Type": "image/jpeg",
+      "Content-Type": "image/webp",
     },
   });
 

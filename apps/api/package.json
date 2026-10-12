@@ -40,6 +40,7 @@
     "sharp": "^0.34.1",
     "slugify": "^1.6.9",
     "socket.io": "^4.8.1",
+    "thumbhash": "0.1.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {

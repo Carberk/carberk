@@ -68,10 +68,10 @@ describe("FavoritesController e2e", () => {
       .useValue({
         generate: async (originalKey: string) => ({
           variants: {
-            thumbnail: `${originalKey}/thumbnail.jpg`,
-            list: `${originalKey}/list.jpg`,
-            detail: `${originalKey}/detail.jpg`,
-            fullscreen: `${originalKey}/fullscreen.jpg`,
+            thumbnail: `${originalKey}/thumbnail.webp`,
+            list: `${originalKey}/list.webp`,
+            detail: `${originalKey}/detail.webp`,
+            fullscreen: `${originalKey}/fullscreen.webp`,
           },
         }),
       })
@@ -142,7 +142,7 @@ describe("FavoritesController e2e", () => {
     allowCalls: true,
     allowChat: true,
     conditionDisclosure: { damaged: false },
-    photos: publicationPhotos(suite.id("photo-1"), "photo1.jpg"),
+    photos: publicationPhotos(suite.id("photo-1"), "photo1.webp"),
   };
 
   describe("POST /api/v1/listings/:id/favorite", () => {
@@ -387,9 +387,9 @@ describe("FavoritesController e2e", () => {
       const draft = await seedDraft("seller-1", {
         ...validPayload,
         photos: [
-          { photoId: suite.id("photo-a"), key: "a.jpg", sortOrder: 0 },
-          { photoId: suite.id("photo-b"), key: "b.jpg", sortOrder: 1 },
-          { photoId: suite.id("photo-c"), key: "c.jpg", sortOrder: 2 },
+          { photoId: suite.id("photo-a"), key: "a.webp", sortOrder: 0 },
+          { photoId: suite.id("photo-b"), key: "b.webp", sortOrder: 1 },
+          { photoId: suite.id("photo-c"), key: "c.webp", sortOrder: 2 },
         ],
       });
 
@@ -522,7 +522,7 @@ describe("FavoritesController e2e", () => {
       for (let i = 0; i < 3; i++) {
         const draft = await seedDraft("seller-1", {
           ...validPayload,
-          photos: publicationPhotos(suite.id(`photo-${i}`), `photo${i}.jpg`),
+          photos: publicationPhotos(suite.id(`photo-${i}`), `photo${i}.webp`),
         });
         const publishRes = await request
           .post(`/api/v1/listings/drafts/${draft.id}/publish`)
@@ -572,7 +572,7 @@ describe("FavoritesController e2e", () => {
         for (const [i, status] of statuses.entries()) {
           const draft = await seedDraft("seller-1", {
             ...validPayload,
-            photos: publicationPhotos(suite.id(`photo-s${i}`), `s${i}.jpg`),
+            photos: publicationPhotos(suite.id(`photo-s${i}`), `s${i}.webp`),
           });
           const publishRes = await request
             .post(`/api/v1/listings/drafts/${draft.id}/publish`)

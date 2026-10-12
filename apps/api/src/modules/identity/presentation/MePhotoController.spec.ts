@@ -19,7 +19,7 @@ import { InMemoryProfilePhotos } from "../application/testing/InMemoryProfilePho
 import { InMemoryUsers } from "../application/testing/InMemoryUsers";
 import { MePhotoController } from "./MePhotoController";
 
-const KEY = "pending/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.jpg";
+const KEY = "pending/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.webp";
 
 function requestFor(sub?: string): FastifyRequest {
   return { user: sub ? { sub } : undefined } as unknown as FastifyRequest;

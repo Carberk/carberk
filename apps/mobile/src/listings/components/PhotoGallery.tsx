@@ -85,7 +85,7 @@ export function PhotoGallery({
                 // changes, so a neighbour keeps `low` once it is on screen.
                 priority={index === 0 ? "high" : "low"}
                 style={{ width: "100%", height: "100%" }}
-                contentFit="cover"
+                contentFit="contain"
                 onAspectRatio={index === 0 ? () => setFirstLoaded(true) : undefined}
               />
             )}

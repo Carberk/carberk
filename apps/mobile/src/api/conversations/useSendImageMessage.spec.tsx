@@ -47,7 +47,7 @@ function makeMessageResponse(id: string, overrides?: Record<string, unknown>) {
     senderId: "user-1",
     kind: "image",
     text: null,
-    metadata: { key: "chat-attachments/conv-1/msg-1/original.jpg" },
+    metadata: { key: "chat-attachments/conv-1/msg-1/original.webp" },
     createdAt: "2026-06-01T12:00:00.000Z",
     ...overrides,
   };
@@ -65,7 +65,7 @@ describe("useSendImageMessage", () => {
 
     result.current.mutate({
       conversationId: "conv-1",
-      metadata: { key: "chat-attachments/conv-1/msg-1/original.jpg", width: 800, height: 600 },
+      metadata: { key: "chat-attachments/conv-1/msg-1/original.webp", width: 800, height: 600 },
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -75,7 +75,7 @@ describe("useSendImageMessage", () => {
       "/conversations/conv-1/messages/rich",
       {
         kind: "image",
-        metadata: { key: "chat-attachments/conv-1/msg-1/original.jpg", width: 800, height: 600 },
+        metadata: { key: "chat-attachments/conv-1/msg-1/original.webp", width: 800, height: 600 },
       },
       expect.any(Object),
     );

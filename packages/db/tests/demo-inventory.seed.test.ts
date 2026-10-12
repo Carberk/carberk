@@ -43,8 +43,8 @@ const REAL_SELLER = "0a000000-0000-4000-8000-000000000001";
 const REAL_BUYER = "0a000000-0000-4000-8000-000000000002";
 const REAL_LISTING = "0a000000-0000-4000-8000-000000000101";
 const REAL_CONVERSATION = "0a000000-0000-4000-8000-000000000201";
-const REAL_OBJECT = "pending/0a000000-0000-4000-8000-000000000301/original.jpg";
-const REAL_CHAT_PHOTO = `chat-attachments/${REAL_CONVERSATION}/0a000000-0000-4000-8000-000000000401/original.jpg`;
+const REAL_OBJECT = "pending/0a000000-0000-4000-8000-000000000301/original.webp";
+const REAL_CHAT_PHOTO = `chat-attachments/${REAL_CONVERSATION}/0a000000-0000-4000-8000-000000000401/original.webp`;
 
 const photoCount = DEMO_CARS.reduce(
   (sum, car) => sum + (DEMO_PHOTO_MANIFEST.listings[car.slug]?.photos.length ?? 0),
@@ -180,8 +180,8 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
         { id: REAL_BUYER, phone: "+99365550002", phoneVerifiedAt: FIRST_RUN, displayName: "Real Buyer", role: "buyer" },
       ],
     });
-    await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: REAL_OBJECT, Body: "real photo", ContentType: "image/jpeg" }));
-    await s3.send(new PutObjectCommand({ Bucket: CHAT_BUCKET, Key: REAL_CHAT_PHOTO, Body: "real chat photo", ContentType: "image/jpeg" }));
+    await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: REAL_OBJECT, Body: "real photo", ContentType: "image/webp" }));
+    await s3.send(new PutObjectCommand({ Bucket: CHAT_BUCKET, Key: REAL_CHAT_PHOTO, Body: "real chat photo", ContentType: "image/webp" }));
     await db.listing.create({
       data: {
         id: REAL_LISTING,
@@ -233,9 +233,9 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
     await s3.send(
       new PutObjectCommand({
         Bucket: CHAT_BUCKET,
-        Key: `chat-attachments/${conversation.id}/0a000000-0000-4000-8000-000000000402/original.jpg`,
+        Key: `chat-attachments/${conversation.id}/0a000000-0000-4000-8000-000000000402/original.webp`,
         Body: "chat photo",
-        ContentType: "image/jpeg",
+        ContentType: "image/webp",
       }),
     );
     await db.contentReport.createMany({
@@ -338,10 +338,10 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
     expect(keys.size).toBe(photoCount * 5);
     for (const row of media) {
       expect(row.key.startsWith(DEMO_OBJECT_PREFIX)).toBe(true);
-      expect(row.key.endsWith("/original.jpg")).toBe(true);
-      const base = row.key.replace(/\/original\.jpg$/, "");
+      expect(row.key.endsWith("/original.webp")).toBe(true);
+      const base = row.key.replace(/\/original\.webp$/, "");
       for (const name of ["original", "thumbnail", "list", "detail", "fullscreen"]) {
-        expect(keys.has(`${base}/${name}.jpg`), `${base}/${name}.jpg`).toBe(true);
+        expect(keys.has(`${base}/${name}.webp`), `${base}/${name}.webp`).toBe(true);
       }
     }
 
