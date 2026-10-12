@@ -15,7 +15,7 @@ The founder approved WebP-only photos in #817/#823 and extended #823 to complete
 
 All new Listing, chat and Profile Photo uploads encode WebP on the phone and presign only `image/webp`, within the existing 2400 px long-side and 5 MB limits. Listing and Profile Photo uploads store one WebP original and four WebP derivatives, and their conditional upload manifests contain exactly these five keys. Listing clients and the API serve WebP URLs.
 
-Thumbnail and list derivatives retain their fixed cover framing. Detail and fullscreen derivatives resize inside their maximum dimensions without enlargement, preserving the original proportions and adding no opaque padding. Conversion regenerates derivatives from originals and never trims black edges or removes vehicle pixels. Existing UI framing and native fit behavior retain their approved specifications.
+Thumbnail and list derivatives retain their fixed cover framing. Detail and fullscreen derivatives resize inside their maximum dimensions without enlargement, preserving the original proportions and adding no opaque padding. Conversion regenerates derivatives from originals and never trims black edges or removes vehicle pixels. Existing UI framing and native fit behavior retain their approved specifications, with one founder-approved exception (2026-10-12): the Listing detail gallery shows the whole photo (`contentFit="contain"`) instead of the earlier cover crop, so a photo that is not 3:2 shows neutral side or top bands rather than losing vehicle content.
 
 Staging and production convert existing photos through a dry-run inventory, durable per-object journal, conditional object writes, compare-and-swap database updates and read-back verification before JPEG deletion. Preserve Listing, Media Upload, User and Message identities, content, ordering and ownership; update photo references in scalar fields, JSON snapshots and upload manifests. Production is never reseeded. Live rollout and the EAS cloud release follow successful staging verification and the founder's existing authorization; no local release build or store submission is included.
 
@@ -27,6 +27,7 @@ This supersedes only ADR-0008's JPEG-plus-WebP photo format choice and ADR-0088'
 
 - Each Listing photo needs five stored objects rather than nine.
 - Galleries use derivatives with the original proportions, without resize canvas bars.
+- The Listing detail gallery shows each photo whole; portrait and other non-3:2 photos are no longer cropped there.
 - Phone uploads, stored objects and served photo URLs use one format.
 
 ### Negative / accepted costs

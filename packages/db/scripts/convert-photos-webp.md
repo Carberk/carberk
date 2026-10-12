@@ -12,7 +12,7 @@ Normal startup remains unchanged when the flag is absent or `false`. Restore bot
 
 ## Inventory and apply
 
-The script reads `DATABASE_URL`, `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, and optional `MINIO_REGION`. Keep each environment's plan and journal in protected persistent operator storage or transfer them there before redeploying. They contain private snapshot/reference data, use mode 0600, and contain no credentials. A fingerprint binds the plan to its database; it also pins the storage endpoint.
+The script reads `DATABASE_URL`, `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, and optional `MINIO_REGION`. Keep each environment's plan and journal in protected persistent operator storage or transfer them there before redeploying. They contain private snapshot/reference data, use mode 0600, and contain no credentials. A SHA-256 fingerprint of the database host, port, name and user, never the password, binds the plan to its database, so a rotated password keeps the plan valid while another database refuses it; the plan also pins the storage endpoint.
 
 ```sh
 pnpm --filter @auto-tm/db exec tsx scripts/convert-photos-webp.ts dry-run /protected/staging-photos.json
