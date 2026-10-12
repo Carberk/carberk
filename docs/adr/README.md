@@ -26,7 +26,7 @@ This directory contains architecture decisions for AutoTM. ADRs are **immutable 
 | [0014](0014-mobile-component-library.md) | Mobile component library — React Native Reusables on top of NativeWind v4 (complements ADR-0002) | Accepted | 2026-05-16 |
 | [0015](0015-mobile-data-fetching.md) | Mobile data fetching — TanStack Query v5 + custom fetch wrapper (complements ADR-0002, ADR-0012) | Accepted | 2026-05-16 |
 | [0016](0016-typescript-runtime-boundaries.md) | TypeScript runtime boundaries for workspace packages | Accepted | 2026-05-17 |
-| [0017](0017-context7-as-canonical-doc-source.md) | Context7 MCP as the canonical doc source for AI agents | Accepted | 2026-05-17 |
+| [0017](0017-context7-as-canonical-doc-source.md) | Context7 MCP as the canonical doc source for AI agents | Superseded by ADR-0096 | 2026-05-17 |
 | [0018](0018-api-port-3006.md) | API runs on port 3006 in development | Accepted | 2026-05-17 |
 | [0019](0019-context-md-describes-current-state.md) | CONTEXT.md describes current state, not aspirational spec | Accepted | 2026-05-17 |
 | [0020](0020-document-hierarchy-and-mutability.md) | Document hierarchy and mutability rules | Accepted | 2026-05-17 |
@@ -77,7 +77,7 @@ This directory contains architecture decisions for AutoTM. ADRs are **immutable 
 | [0065](0065-small-changes-skip-the-issue-ceremony.md) | Small changes skip the issue ceremony (amends ADR-0058 re-review and separate-axes rules, ADR-0064's both-verdicts rule, and one-branch-per-issue for batch PRs; extends ADR-0058 with no-issue PRs) | Accepted | 2026-09-28 |
 | [0066](0066-retire-sandcastle-queue-agents-replace-unattended-dispatch.md) | Retire Sandcastle; queue agents replace unattended dispatch (supersedes ADR-0028 and ADR-0033; amends ADR-0041's `.sandcastle/` retention and ADR-0058's Sandcastle boundaries) | Accepted | 2026-09-29 |
 | [0067](0067-targeted-intermediate-reviews-and-final-verification.md) | Target intermediate reviews and verify the final commit (amends ADR-0058's checkpoint and review procedure) | Accepted | 2026-09-29 |
-| [0068](0068-resolve-context7-ids-at-lookup-time.md) | Resolve Context7 IDs at lookup time (amends ADR-0017's ID selection shortcut) | Accepted | 2026-09-29 |
+| [0068](0068-resolve-context7-ids-at-lookup-time.md) | Resolve Context7 IDs at lookup time (amends ADR-0017's ID selection shortcut) | Superseded by ADR-0096 | 2026-09-29 |
 | [0069](0069-queue-implementers-run-in-host-created-worktrees.md) | Queue implementers run in host-created worktrees (amends ADR-0058's one worktree per issue and resume-the-found-worktree rules and ADR-0064's restatement of them; complements ADR-0066's queue sessions) | Accepted | 2026-09-29 |
 | [0070](0070-test-first-behaviour-and-ui-evidence.md) | Test-first behaviour and UI evidence | Accepted | 2026-09-30 |
 | [0071](0071-codex-queue-models-and-owned-worktrees.md) | Codex queue models and owned worktrees (amends ADR-0069 for Codex only) | Accepted | 2026-09-30 |
@@ -105,6 +105,7 @@ This directory contains architecture decisions for AutoTM. ADRs are **immutable 
 | [0093](0093-carberk-is-the-public-product-name.md) | Carberk is the public product name; internal identifiers and domains keep their AutoTM names | Accepted | 2026-10-09 |
 | [0094](0094-one-orchestrator-implements-batched-pull-requests-trial.md) | One orchestrator session implements batched pull requests (trial), amends ADR-0058, ADR-0064, ADR-0069, ADR-0082, ADR-0084, ADR-0085, ADR-0091's docs push and the AGENTS.md quota rule for run-batch | Accepted | 2026-10-10 |
 | [0095](0095-listing-detail-drops-the-sms-verification-caption.md) | Listing detail drops the SMS verification caption, supersedes one line of ADR-0056 | Accepted | 2026-10-11 |
+| [0096](0096-agents-look-up-official-documentation-only-past-their-training-cutoff.md) | Agents look up official documentation only past their training cutoff (supersedes ADR-0017 and ADR-0068; amends ADR-0059's Context7 access requirement) | Accepted | 2026-10-12 |
 
 ## Per-app ADRs
 

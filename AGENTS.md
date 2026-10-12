@@ -17,7 +17,7 @@ Use the [glossary](docs/domain/GLOSSARY.md) when interpreting or changing domain
 | Implement a batch of issues in this session (ADR-0094 trial) | [`run-batch`](.claude/skills/run-batch/SKILL.md) |
 | Small fix without an issue, or a fix for a review finding | [Small changes](docs/agents/coding-workflow.md#small-changes-adr-0065) ([ADR-0065](docs/adr/0065-small-changes-skip-the-issue-ceremony.md)) |
 | API domain logic, cross-context ownership, or domain documentation | [Domain guidance](docs/agents/domain.md) |
-| External library, framework, SDK, API, CLI, or cloud service | [Documentation lookups](docs/agents/documentation-lookups.md); resolve and query Context7 before relying on library APIs |
+| External library, framework, SDK, API, CLI, or cloud service | [Documentation lookups](docs/agents/documentation-lookups.md); read official docs for versions published after your training cutoff ([ADR-0096](docs/adr/0096-agents-look-up-official-documentation-only-past-their-training-cutoff.md)) |
 | Mobile work, especially packages, Metro, or native runtime failures | [Mobile/Expo checks](docs/agents/mobile-expo.md) |
 | Mobile styling or components | [NativeWind conventions](docs/agents/nativewind-v4.md) |
 | Mobile API calls or caching | [Mobile data fetching](docs/agents/mobile-data-fetching.md) |

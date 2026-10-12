@@ -3,7 +3,7 @@ name: queue-reviewer
 description: Independent read-only Standards or Spec reviewer pinned to one commit SHA. Launched by the run-queue orchestrator.
 model: claude-opus-5-5
 effort: high
-tools: Read, Grep, Glob, Bash, WebFetch, mcp__plugin_context7_context7__resolve-library-id, mcp__plugin_context7_context7__query-docs
+tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 isolation: worktree
 ---
 

@@ -14,7 +14,7 @@ Keep the pushed `agent/issue-<N>` reservation branch and working tree exactly as
 
 ### Pushed checkpoint without a draft PR
 
-Keep the remote branch and checkpoint. Comment on the issue with the exact branch and SHA, completed acceptance criteria, verification state, current failure, interrupted commands, repair attempts, documentation and Context7 state, and one concrete recovery action. The next run resumes this attempt and creates the one draft PR; it never opens a replacement branch or PR.
+Keep the remote branch and checkpoint. Comment on the issue with the exact branch and SHA, completed acceptance criteria, verification state, current failure, interrupted commands, repair attempts, documentation and docs-lookup state, and one concrete recovery action. The next run resumes this attempt and creates the one draft PR; it never opens a replacement branch or PR.
 
 ### After the draft PR exists
 
@@ -26,7 +26,7 @@ Update its single `Execution state` to `blocked` with:
 - current failure and root cause;
 - interrupted commands and whether their result is unknown;
 - repair attempts;
-- documentation and Context7 state; and
+- documentation and docs-lookup state; and
 - one concrete next action.
 
 Keep the remote branch and PR open. Never open a replacement PR or directly close the issue.
