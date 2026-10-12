@@ -65,7 +65,7 @@ Distinct hues so error is NOT confused with brand red:
 green.500   #10B981   success
 amber.500   #F59E0B   warning
 rose.500    #F43F5E   error  ← intentionally NOT red (distinct from brand)
-blue.500    #3B82F6   info / link
+blue.500    #3B82F6   info
 ```
 
 ### Semantic mappings
@@ -91,6 +91,7 @@ success: green.500
 warning: amber.500
 error:   rose.500
 info:    blue.500
+link:    { light: #2563EB, dark: #60A5FA }  // mobile `link`, from --message-read; also read ticks
 
 overlayScrim: rgba(0,0,0,0.5)
 ```
