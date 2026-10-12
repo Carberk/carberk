@@ -332,6 +332,25 @@ describe("GetListingDetail", () => {
     );
   });
 
+  it("gives a photo its ThumbHash and leaves the field out for a photo without one", async () => {
+    seedListing();
+    mediaRepo.media.push(
+      ListingMedia.create({
+        id: "media-1", listingId: "listing-1", kind: "image",
+        key: "listings/listing-1/media-1/original.webp", sortOrder: 0, thumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH",
+      }),
+      ListingMedia.create({
+        id: "media-2", listingId: "listing-1", kind: "image",
+        key: "listings/listing-1/media-2/original.webp", sortOrder: 1,
+      }),
+    );
+
+    const result = await makeUseCase(repo, mediaRepo, exchangeRates, storage, favorites).execute({ listingId: "listing-1" });
+
+    expect(result.media[0]!.thumbHash).toBe("1fsDBYCIiIiHiIdweIeHh4d4cIgH");
+    expect(JSON.parse(JSON.stringify(result.media[1]))).not.toHaveProperty("thumbHash");
+  });
+
   it("returns video url for all variant slots on video media", async () => {
     seedListing();
     const media = ListingMedia.create({

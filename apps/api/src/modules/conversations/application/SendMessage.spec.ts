@@ -468,7 +468,7 @@ describe("SendMessage", () => {
       seedListing(listings);
       const events = new FakeMessageEventPublisher();
       const cleaner = new FakeChatAttachmentCleaner();
-      cleaner.result = result;
+      cleaner.result = { status: result };
       const uc = makeUseCase(repo, listings, undefined, undefined, events, cleaner);
 
       const error = await uc

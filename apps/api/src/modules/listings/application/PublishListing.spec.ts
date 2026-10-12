@@ -100,6 +100,7 @@ class FakeEventPublisher implements ListingEventPublisher {
 
 class FakeImageVariantGenerator implements ImageVariantGenerator {
   generated: string[] = [];
+  hashes: Record<string, string> = {};
   /** Runs while the generator holds an upload, before it returns. */
   during: ((originalKey: string) => Promise<void> | void) | undefined;
 
@@ -113,6 +114,8 @@ class FakeImageVariantGenerator implements ImageVariantGenerator {
         detail: originalKey.replace("original.webp", "detail.webp"),
         fullscreen: originalKey.replace("original.webp", "fullscreen.webp"),
       },
+      // A distinct hash per photo, so a test can tell which row got which.
+      thumbHash: this.hashes[originalKey] ?? "1fsDBYCIiIiHiIdweIeHh4d4cIgH",
     };
   }
 }
@@ -475,6 +478,19 @@ describe("PublishListing", () => {
     expect(error).toBeInstanceOf(BadRequestException);
     expect((error as BadRequestException).getResponse()).toMatchObject({ code: "INVALID_DRAFT_PAYLOAD", details: { formErrors: ["MEDIA_LIMIT_EXCEEDED"] } });
     expect(prisma.createdListings).toEqual([]);
+  });
+
+  it("stores each published photo's server-computed ThumbHash on its own media row", async () => {
+    seedDraft(draftRepo, validPayload);
+    variantGenerator.hashes = { "photo2.webp": "2yMBBYCIh4iHiHeAiId4dXh3f4f4" };
+
+    await makeUseCase(draftRepo, prisma, exchangeRates, events, variantGenerator).execute({ draftId: "draft-1", userId: "user-1" });
+
+    expect(prisma.createdMedia.map((row) => [row["key"], row["thumbHash"]])).toEqual([
+      ["photo1.webp", "1fsDBYCIiIiHiIdweIeHh4d4cIgH"],
+      ["photo2.webp", "2yMBBYCIh4iHiHeAiId4dXh3f4f4"],
+      ["photo3.webp", "1fsDBYCIiIiHiIdweIeHh4d4cIgH"],
+    ]);
   });
 
   it("publishes a valid draft", async () => {

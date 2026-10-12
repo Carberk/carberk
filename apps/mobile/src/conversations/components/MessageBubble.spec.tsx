@@ -1,4 +1,5 @@
 import type { ComponentProps } from "react";
+import { Image } from "react-native";
 import { describe, expect, it, vi } from "vitest";
 
 import { fireEvent, renderMobile } from "../../../test/render";
@@ -273,3 +274,22 @@ describe("MessageBubble reported dimming", () => {
     expect(className).not.toContain("opacity-60");
   });
 });
+
+describe("MessageBubble image preview", () => {
+  it("shows the photo's ThumbHash while a received image loads", () => {
+    const screen = renderMobile(
+      bubble({ kind: "image", text: "", isMine: false, metadata: { key: "chat-attachments/c/m/original.webp", width: 800, height: 600, thumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" } }),
+    );
+
+    expect(screen.UNSAFE_getByType(Image).props.placeholder).toEqual({ thumbhash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" });
+  });
+
+  it("has no placeholder for an image Message from before ThumbHashes", () => {
+    const screen = renderMobile(
+      bubble({ kind: "image", text: "", isMine: false, metadata: { key: "chat-attachments/c/m/original.webp" } }),
+    );
+
+    expect(screen.UNSAFE_getByType(Image).props.placeholder).toBeUndefined();
+  });
+});
+

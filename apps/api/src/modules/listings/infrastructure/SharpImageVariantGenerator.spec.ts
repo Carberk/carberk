@@ -3,6 +3,7 @@ import { deflateSync } from "node:zlib";
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import type { ConfigService } from "@nestjs/config";
 import sharp from "sharp";
+import { thumbHashToApproximateAspectRatio } from "thumbhash";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Env } from "../../../env.schema";
@@ -110,6 +111,26 @@ describe("SharpImageVariantGenerator", () => {
       const stats = await sharp(bucket.objects.get(result.variants[name])!).stats();
       expect(stats.channels[0]!.min).toBeGreaterThan(200);
     }
+  });
+
+  it("returns the photo's ThumbHash as standard padded base64, for an instant blurred preview", async () => {
+    const key = "pending/thumbhash/original.webp";
+    const input = await sharp({ create: { width: 1920, height: 1440, channels: 3, background: "red" } })
+      .webp({ lossless: true })
+      .toBuffer();
+
+    const result = await generatorWith(fakeBucket({ [key]: input })).generate(key);
+
+    expect(result.thumbHash).toBe("1fsDBYCIiIiHiIdweIeHh4d4cIgH");
+  });
+
+  it("computes the ThumbHash from the upright photo, so a turned camera photo previews as portrait", async () => {
+    const key = "pending/2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d/original.webp";
+
+    const result = await generatorWith(fakeBucket({ [key]: await photoWithGps() })).generate(key);
+
+    const ratio = thumbHashToApproximateAspectRatio(Buffer.from(result.thumbHash, "base64"));
+    expect(ratio).toBeLessThan(1);
   });
 
   it("strips GPS and all EXIF from the stored original and every variant, keeping the photo upright", async () => {

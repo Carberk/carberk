@@ -369,6 +369,29 @@ describe("ListFeed", () => {
     expect(result.items[1]).toMatchObject({ photoKeys: [], galleryKeys: [], photoCount: 0 });
   });
 
+  it("sends each card photo's ThumbHash beside its key and none for a Listing without hashes", async () => {
+    ranking.items = [seedListing({ id: "l1" }), seedListing({ id: "l2" })];
+    const cards = new FakeListingCardReadPort();
+    cards.photos.set("l1", {
+      coverMediaKey: "a",
+      photoKeys: ["a", "b"],
+      photoThumbHashes: ["1fsDBYCIiIiHiIdweIeHh4d4cIgH", null],
+      galleryKeys: ["a", "b", "c"],
+      galleryThumbHashes: ["1fsDBYCIiIiHiIdweIeHh4d4cIgH", null, "2yMBBYCIh4iHiHeAiId4dXh3f4f4"],
+      photoCount: 3,
+    });
+    cards.photos.set("l2", { coverMediaKey: "x", photoKeys: ["x"], galleryKeys: ["x"], photoCount: 1 });
+
+    const result = await makeUseCase(ranking, exchangeRates, undefined, undefined, cards).execute({});
+
+    expect(result.items[0]).toMatchObject({
+      photoThumbHashes: ["1fsDBYCIiIiHiIdweIeHh4d4cIgH", null],
+      galleryThumbHashes: ["1fsDBYCIiIiHiIdweIeHh4d4cIgH", null, "2yMBBYCIh4iHiHeAiId4dXh3f4f4"],
+    });
+    expect(JSON.parse(JSON.stringify(result.items[1]))).not.toHaveProperty("photoThumbHashes");
+    expect(JSON.parse(JSON.stringify(result.items[1]))).not.toHaveProperty("galleryThumbHashes");
+  });
+
   it("returns mileageKm, condition, transmissionId, and engineTypeId when set", async () => {
     ranking.items = [
       seedListing({
