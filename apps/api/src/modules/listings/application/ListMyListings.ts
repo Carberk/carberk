@@ -50,6 +50,7 @@ export class ListMyListings {
         displayPriceTmt: item.displayPriceTmt,
         coverMediaKey: item.coverMediaKey,
         photoKeys: item.photoKeys,
+        ...(item.photoThumbHashes ? { photoThumbHashes: item.photoThumbHashes } : {}),
         photoCount: item.photoCount,
         mileageKm: item.mileageKm,
         condition: item.condition,

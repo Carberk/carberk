@@ -494,7 +494,7 @@ describe("Conversation persisted image addressing", () => {
   const storedKey = `chat-attachments/${CONVERSATION_ID}/00000000-0000-4000-8000-0000000000e1/original.webp`;
   const expectedUri = `https://media.autotm.tm/chat-attachments/${storedKey}`;
 
-  async function openStoredImage() {
+  async function openStoredImage(thumbHash?: string) {
     // A history response has a storage key, with no local staging URI or ready-made URL.
     const persistedImage: ConversationsSchemas.MessageSummary = {
       id: "00000000-0000-4000-8000-0000000000e2",
@@ -502,7 +502,7 @@ describe("Conversation persisted image addressing", () => {
       senderId: SELLER_ID,
       kind: "image",
       text: null,
-      metadata: { key: storedKey, width: 800, height: 600 },
+      metadata: { key: storedKey, width: 800, height: 600, ...(thumbHash ? { thumbHash } : {}) },
       createdAt: "2026-10-01T09:00:00.000Z",
     };
     state.messages.data = { pages: [{ items: [persistedImage], nextCursor: null }] };
@@ -526,6 +526,12 @@ describe("Conversation persisted image addressing", () => {
     expect(state.readMessages).toHaveBeenLastCalledWith({ conversationId: CONVERSATION_ID });
     expect(within(photo).UNSAFE_getByType(Image).props.source).toEqual({ uri: expectedUri });
     expect(screen.queryByLabelText("Close")).toBeNull();
+  });
+
+  it("shows the server's ThumbHash in the bubble while a persisted image loads", async () => {
+    const { photo } = await openStoredImage("2yMBBYCIh4iHiHeAiId4dXh3f4f4");
+
+    expect(within(photo).UNSAFE_getByType(Image).props.placeholder).toEqual({ thumbhash: "2yMBBYCIh4iHiHeAiId4dXh3f4f4" });
   });
 
   it("opens the same persisted object in the real fullscreen viewer and closes it", async () => {

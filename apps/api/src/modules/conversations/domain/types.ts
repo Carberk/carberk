@@ -36,6 +36,8 @@ export type ImageMessageMetadata = {
   key: string;
   width?: number | undefined;
   height?: number | undefined;
+  /** Server-computed from the cleaned image (#824); never taken from the sender. */
+  thumbHash?: string | undefined;
 };
 
 export const CURRENCY_CODES = ["TMT", "USD", "AED"] as const;

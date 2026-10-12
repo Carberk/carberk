@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import type { ComponentProps } from "react";
@@ -71,6 +71,12 @@ function variantUri(item: ListingMedia, variant: Variant): string {
  * gallery's `detail` under the viewer's `fullscreen`): it shows at once, drawn
  * with the same fit so the sharper photo replaces it in place without a jump
  * or a blank frame.
+ *
+ * A photo with a ThumbHash shows its blurred colours before anything loads.
+ * Without a smaller size it is the photo's placeholder. With one, expo-image
+ * takes a single placeholder (and never a hash from a list), so the blur is
+ * drawn underneath instead, with the same fit: the cached smaller size still
+ * appears over it at once, and the sharper photo over both.
  */
 export function GalleryImage({
   item,
@@ -94,13 +100,18 @@ export function GalleryImage({
   const [useOriginalImage, setUseOriginalImage] = useState(false);
   const sourceUri = useOriginalImage ? buildOriginalUrl(item.key) : variantUri(item, variant);
   const placeholderUri = placeholderVariant ? variantUri(item, placeholderVariant) : undefined;
+  const thumbHash = item.thumbHash;
+  const placeholder = placeholderUri
+    ? { uri: placeholderUri }
+    : thumbHash ? { thumbhash: thumbHash } : undefined;
+  const layered = Boolean(thumbHash && placeholderUri);
 
-  return (
+  const photo = (
     <Image
       source={{ uri: sourceUri }}
-      placeholder={placeholderUri ? { uri: placeholderUri } : undefined}
+      placeholder={placeholder}
       placeholderContentFit={contentFit}
-      style={style}
+      style={layered ? StyleSheet.absoluteFill : style}
       contentFit={contentFit}
       priority={priority}
       cachePolicy="memory-disk"
@@ -110,5 +121,13 @@ export function GalleryImage({
       }}
       onError={() => setUseOriginalImage(true)}
     />
+  );
+  if (!layered) return photo;
+
+  return (
+    <View style={style as ComponentProps<typeof View>["style"]}>
+      <Image source={{ thumbhash: thumbHash }} style={StyleSheet.absoluteFill} contentFit={contentFit} />
+      {photo}
+    </View>
   );
 }

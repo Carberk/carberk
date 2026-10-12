@@ -311,6 +311,11 @@ describe("Conversation message broadcast e2e", () => {
     expect(senderDevice.received).toHaveLength(1);
     expect(senderDevice.received[0]?.message).toMatchObject(expected);
     expect(messageSentEvents).toHaveLength(1);
+    // The server's ThumbHash of the cleaned image (#824), the same on every surface.
+    const thumbHash = res.body.metadata.thumbHash as string;
+    expect(thumbHash).toMatch(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/);
+    expect(peer.received[0]?.message).toMatchObject({ metadata: { thumbHash } });
+    expect(senderDevice.received[0]?.message).toMatchObject({ metadata: { thumbHash } });
   });
 
   it("refuses an image that was never uploaded, over HTTP and over the socket, and delivers nothing", async () => {

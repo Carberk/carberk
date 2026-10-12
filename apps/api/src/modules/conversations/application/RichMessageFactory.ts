@@ -52,7 +52,7 @@ export function createRichMessage(data: {
  * An image message hands its key to the other participant, who loads the
  * stored image as it is. So the image is cleaned of metadata first, and a key
  * that is not this Conversation's own attachment, or has no usable image
- * behind it, is refused.
+ * behind it, is refused. The stored metadata carries the cleaner's ThumbHash.
  */
 export async function createCleanRichMessage(
   cleaner: ChatAttachmentCleaner,
@@ -67,14 +67,29 @@ export async function createCleanRichMessage(
       );
     }
     const result = await cleaner.clean(key);
-    if (result !== "clean") {
+    if (result.status !== "clean") {
       throw new ConversationDomainError(
         CONVERSATION_ERROR_CODES.IMAGE_ATTACHMENT_NOT_USABLE,
-        result === "missing"
+        result.status === "missing"
           ? "Image has not been uploaded"
           : "Uploaded file is not a usable image",
       );
     }
+    // Only the server's hash is stored: whatever the sender put in metadata
+    // beyond its key and size is dropped.
+    const { width, height } = data.input.metadata;
+    return createRichMessage({
+      ...data,
+      input: {
+        ...data.input,
+        metadata: {
+          key,
+          ...(width !== undefined ? { width } : {}),
+          ...(height !== undefined ? { height } : {}),
+          thumbHash: result.thumbHash,
+        },
+      },
+    });
   }
   return createRichMessage(data);
 }

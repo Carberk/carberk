@@ -137,6 +137,7 @@ export class GetListingDetail {
         sortOrder: m.sortOrder,
         durationMs: m.durationMs,
         posterKey: m.posterKey,
+        ...(m.thumbHash !== undefined ? { thumbHash: m.thumbHash } : {}),
       })),
       viewCount: listing.viewCount,
       favoriteCount: listing.favoriteCount,

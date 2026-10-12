@@ -11,12 +11,22 @@ export interface CardPhotos {
   coverMediaKey?: string;
   /** Keys of the first photos (`image` media) in `sortOrder`, capped at `CARD_PHOTO_KEY_LIMIT`. */
   photoKeys: string[];
+  /** ThumbHashes parallel to `photoKeys`, null for a photo without one; absent while none has one. */
+  photoThumbHashes?: (string | null)[];
   /** Keys of the first photos in `sortOrder`, capped at `CARD_GALLERY_KEY_LIMIT`. */
   galleryKeys: string[];
+  /** ThumbHashes parallel to `galleryKeys`, as `photoThumbHashes` is to `photoKeys`. */
+  galleryThumbHashes?: (string | null)[];
   photoCount: number;
 }
 
-type CardMedia = ReadonlyArray<{ key: string; kind: MediaKind }>;
+type CardMedia = ReadonlyArray<{ key: string; kind: MediaKind; thumbHash?: string | null }>;
+
+/** One slot per photo, or nothing when no photo in the list has a hash yet. */
+function thumbHashSlots(photos: CardMedia): (string | null)[] | undefined {
+  const slots = photos.map((photo) => photo.thumbHash ?? null);
+  return slots.some((slot) => slot !== null) ? slots : undefined;
+}
 
 /**
  * Derives the card photo fields from ALL of a Listing's media, ordered by
@@ -40,13 +50,19 @@ export function toCardPhotosFromFirstMedia(
   firstMedia: CardMedia,
   photoCount: number,
 ): CardPhotos {
-  const photoKeys = firstMedia.filter((m) => m.kind === "image").map((m) => m.key);
+  const photos = firstMedia.filter((m) => m.kind === "image");
+  const cardPhotos = photos.slice(0, CARD_PHOTO_KEY_LIMIT);
+  const galleryPhotos = photos.slice(0, CARD_GALLERY_KEY_LIMIT);
+  const photoThumbHashes = thumbHashSlots(cardPhotos);
+  const galleryThumbHashes = thumbHashSlots(galleryPhotos);
   const cover = firstMedia[0]?.key;
 
   return {
     ...(cover ? { coverMediaKey: cover } : {}),
-    photoKeys: photoKeys.slice(0, CARD_PHOTO_KEY_LIMIT),
-    galleryKeys: photoKeys.slice(0, CARD_GALLERY_KEY_LIMIT),
+    photoKeys: cardPhotos.map((m) => m.key),
+    ...(photoThumbHashes ? { photoThumbHashes } : {}),
+    galleryKeys: galleryPhotos.map((m) => m.key),
+    ...(galleryThumbHashes ? { galleryThumbHashes } : {}),
     photoCount,
   };
 }

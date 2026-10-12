@@ -6,6 +6,8 @@ export interface ImageVariantGenerator {
       detail: string;
       fullscreen: string;
     };
+    /** The upright photo's ThumbHash, standard padded base64 (#824). */
+    thumbHash: string;
   }>;
 }
 

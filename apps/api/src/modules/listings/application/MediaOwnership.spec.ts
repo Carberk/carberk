@@ -66,6 +66,7 @@ const fakeVariants: ImageVariantGenerator = {
       detail: `${originalKey}/detail.webp`,
       fullscreen: `${originalKey}/fullscreen.webp`,
     },
+    thumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH",
   }),
 };
 

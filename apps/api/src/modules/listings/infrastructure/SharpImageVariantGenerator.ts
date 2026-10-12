@@ -8,6 +8,7 @@ import {
 import sharp from "sharp";
 
 import { ImageTooLargeAfterCleaningError, stripImageMetadata } from "../../../common/stripImageMetadata";
+import { computeThumbHash } from "../../../common/thumbHash";
 import { UPLOAD_CAPS } from "../domain/MediaUpload";
 import { DomainError, LISTING_ERROR_CODES } from "../domain/types";
 import type { ImageVariantGenerator } from "../domain/ports/ImageVariantGenerator";
@@ -71,6 +72,7 @@ export class SharpImageVariantGenerator implements ImageVariantGenerator {
       detail: string;
       fullscreen: string;
     };
+    thumbHash: string;
   }> {
     const bucket = this.inferBucket(originalKey);
     const conditional = options?.writeProtocol === "conditional-v1"
@@ -147,7 +149,11 @@ export class SharpImageVariantGenerator implements ImageVariantGenerator {
       variantKeys[spec.name] = webpKey;
     }
 
+    // The blurred preview comes from the same cleaned, upright source.
+    const thumbHash = await this.prepare(() => computeThumbHash(buffer));
+
     return {
+      thumbHash,
       variants: {
         thumbnail: requireVariantKey(variantKeys, "thumbnail"),
         list: requireVariantKey(variantKeys, "list"),

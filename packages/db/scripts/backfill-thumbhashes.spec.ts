@@ -44,7 +44,7 @@ vi.mock("pg", () => ({ Pool: class {
     if (text.startsWith('UPDATE "listing_media"')) {
       const [hash, id, key] = values as string[];
       const row = state.media.find((candidate) => candidate.id === id && candidate.key === key && candidate.thumbHash === null);
-      if (row) { row.thumbHash = hash!; state.writes += 1; }
+      if (row) { row.thumbHash = String(hash); state.writes += 1; }
       return { rowCount: row ? 1 : 0 };
     }
     if (text.startsWith('UPDATE "messages"')) {
@@ -156,7 +156,9 @@ describe("ThumbHash backfill operator script", () => {
   it("fails verification on a stored hash that is not standard padded base64", async () => {
     await seedConvertedEnvironment();
     await main(["apply"]);
-    state.media[1]!.thumbHash = "1fsDBYCIiIiHiIdweIeHh4d4cIgH".replace(/=*$/, "").replace("+", "-") + "_";
+    const hashed = state.media.find((row) => row.id === "m2");
+    if (!hashed) throw new Error("Missing fixture row");
+    hashed.thumbHash = "1fsDBYCIiIiHiIdweIeHh4d4cIgH_";
 
     await expect(main(["verify"])).rejects.toThrow(/m2/);
   });

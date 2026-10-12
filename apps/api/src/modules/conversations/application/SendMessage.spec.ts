@@ -353,6 +353,7 @@ describe("SendMessage", () => {
       key: IMAGE_KEY,
       width: 800,
       height: 600,
+      thumbHash: "2yMBBYCIh4iHiHeAiId4dXh3f4f4",
     });
   });
 

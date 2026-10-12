@@ -24,6 +24,7 @@
     "reviewer:scenario": "tsx scripts/reviewer-scenario.ts",
     "demo-inventory": "tsx scripts/demo-inventory.ts",
     "photos:convert-webp": "tsx scripts/convert-photos-webp.ts",
+    "photos:backfill-thumbhashes": "tsx scripts/backfill-thumbhashes.ts",
     "demo-inventory:credits": "tsx scripts/demo-inventory-credits.ts",
     "ui:fixture": "tsx scripts/ui-fixture.ts",
     "logos:import": "tsx scripts/import-brand-logos.ts",
