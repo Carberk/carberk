@@ -6,6 +6,7 @@ import { useFocusEffect } from "expo-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { act, fireEvent, renderMobile, routerMock } from "../render";
+import { TAB_BAR_SPACE, clearsTabBar, listContentPaddingBottom, rootPaddingBottom } from "../tabBarClearance";
 import ChatScreen from "../../app/(tabs)/chat";
 import { AutoTmTabBar } from "../../components/navigation/AutoTmTabBar";
 import { useAuthIntentStore } from "../../src/auth/intentStore";
@@ -249,5 +250,24 @@ describe("Messages tab permission timing", () => {
     await act(async () => { await Promise.resolve(); });
     expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
     view.unmount();
+  });
+});
+
+describe("Messages under the glass tab bar", () => {
+  it("runs the Conversation list under the bar and ends it with the bar's space", async () => {
+    const view = await renderScreen();
+    expect(rootPaddingBottom(view.UNSAFE_root as never)).toBe(0);
+    expect(listContentPaddingBottom(view.getByTestId("conversation-list") as never)).toBe(TAB_BAR_SPACE + 16);
+  });
+
+  it("keeps the empty and signed-out states clear of the bar", async () => {
+    api.get.mockReset().mockResolvedValue(page([]));
+    const empty = await renderScreen();
+    expect(clearsTabBar(empty.getByText("No conversations yet") as never)).toBe(true);
+    empty.unmount();
+
+    state.auth = false;
+    const signedOut = await renderScreen();
+    expect(clearsTabBar(signedOut.getByText("Sign in to see your Messages") as never)).toBe(true);
   });
 });

@@ -1,10 +1,11 @@
 import type { ComponentProps } from "react";
-import { AccessibilityInfo, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput } from "react-native";
+import { AccessibilityInfo, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput } from "react-native";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fireEvent, renderMobile, within } from "../../../test/render";
 
 import { WizardLayout } from "./WizardLayout";
+import { useWizardScrollLock } from "./wizardScrollLock";
 
 vi.mock("react-native-safe-area-context", async () => ({
   SafeAreaView: (await import("react-native")).View,
@@ -381,5 +382,29 @@ describe("WizardLayout keyboard", () => {
   it("leaves the iOS layout without keyboard avoidance, as before", () => {
     const screen = renderMobile(layout("Price", 4, { children: <TextInput value="85000" onChangeText={() => {}} /> }));
     expect(screen.UNSAFE_getByType(KeyboardAvoidingView).props.enabled).toBe(false);
+  });
+});
+
+describe("WizardLayout scroll lock (#820)", () => {
+  function Dragger() {
+    const lockScroll = useWizardScrollLock();
+    return (
+      <>
+        <Pressable accessibilityRole="button" accessibilityLabel="Start drag" onPress={() => lockScroll(true)} />
+        <Pressable accessibilityRole="button" accessibilityLabel="End drag" onPress={() => lockScroll(false)} />
+      </>
+    );
+  }
+
+  it("stops the step scrolling while a photo is dragged", () => {
+    const screen = renderMobile(layout("Photos", 2, { children: <Dragger /> }));
+    const scroll = () => screen.UNSAFE_getByType(ScrollView);
+    expect(scroll().props.scrollEnabled).toBe(true);
+
+    fireEvent.press(screen.getByRole("button", { name: "Start drag" }));
+    expect(scroll().props.scrollEnabled).toBe(false);
+
+    fireEvent.press(screen.getByRole("button", { name: "End drag" }));
+    expect(scroll().props.scrollEnabled).toBe(true);
   });
 });
