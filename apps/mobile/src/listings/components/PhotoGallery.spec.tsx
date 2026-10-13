@@ -15,14 +15,13 @@ function viewer(screen: Awaited<ReturnType<typeof renderMobile>>) {
 }
 
 describe("Photo gallery and viewer", () => {
-  it.each([[900, 1600], [1920, 1080]])("shows the complete %sx%s vehicle photo inside the existing fixed gallery frame", async (width, height) => {
+  it.each([[900, 1600], [1920, 1080]])("shows the complete %sx%s vehicle photo inside the fixed 4:3 gallery frame", async (width, height) => {
     const media = mediaFixture(1).map((photo) => ({ ...photo, width, height }));
     const screen = await renderMobile(<PhotoGallery media={media} />);
     const image = first(getAllHosts(screen.container, "Image"));
     expect(image.props.contentFit).toBe("contain");
     expect(image.props.placeholderContentFit).toBe("contain");
-    const frame = getAllHosts(screen.container, "View").find((view) => view.props.className === "bg-muted");
-    expect(frame?.props.style).toEqual({ width: 390, height: 253.5 });
+    expect(first(screen.getAllByTestId("listing-photo-frame")).props.style).toEqual({ width: 390, height: 292.5 });
     expect(image.props.source.uri).toBe("https://media.test/0/detail.webp?v=webp-natural-1");
   });
 

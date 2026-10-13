@@ -98,12 +98,13 @@ describe("instant loading from a tapped card", () => {
     state.preview = summaryFixture();
   });
 
-  it("shows the card's photo, title, price, spec line, city and date before the detail arrives", async () => {
+  it("shows the card's photo, title, price, known specifications, city and date before the detail arrives", async () => {
     const screen = await renderMobile(<ListingDetailScreen />);
 
     expect(screen.getByText("Toyota Camry, 2020")).toBeTruthy();
     expect(screen.getByText("35,000 TMT")).toBeTruthy();
-    expect(screen.getByText("12,000 km · Automatic · Petrol")).toBeTruthy();
+    expect(screen.getByText("12,000 km")).toBeTruthy();
+    expect(screen.getByText("Automatic")).toBeTruthy();
     expect(screen.getByText("20 Sep · Ashgabat")).toBeTruthy();
     expect(screen.getByTestId("detail-skeleton-body")).toBeTruthy();
   });
