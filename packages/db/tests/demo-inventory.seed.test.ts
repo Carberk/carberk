@@ -98,10 +98,16 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
   beforeAll(async () => {
     // "An empty migrated database with the catalog seeded": the real migrations and catalog seed,
     // run while MinIO starts.
+    // TEMPORARY (#851): phase timings for the hosted run; removed before review.
+    const t0 = Date.now();
+    const mark = (label: string) => console.info(`[seed-test timing] ${label} at ${Date.now() - t0}ms`);
     const migrateAndSeedCatalog = async (started: StartedPostgreSqlContainer) => {
+      mark("postgres started");
       const env = { ...process.env, DATABASE_URL: started.getConnectionUri() };
       await run(`${packageDir}node_modules/.bin/prisma`, ["migrate", "deploy"], { cwd: packageDir, env });
+      mark("migrated");
       await run(`${packageDir}node_modules/.bin/tsx`, ["src/seed.ts"], { cwd: packageDir, env });
+      mark("catalog seeded");
       return started;
     };
     [postgres, minio] = await Promise.all([
@@ -116,7 +122,11 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
         .withCommand(["server", "/data"])
         .withExposedPorts(9000)
         .withWaitStrategy(Wait.forHttp("/minio/health/live", 9000))
-        .start(),
+        .start()
+        .then((started) => {
+          mark("minio started");
+          return started;
+        }),
     ]);
 
     pool = new Pool({ connectionString: postgres.getConnectionUri() });
@@ -149,8 +159,8 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
 
     // The download is stubbed: no test reaches Commons. The stub photo carries EXIF and an
     // orientation tag, as a real camera file would, so the seed has metadata to remove.
-    // It is small on purpose: every seed resizes each of about 300 photos into five files, and a
-    // full-size frame makes that run for minutes on a CI runner without testing anything more.
+    // It is small on purpose: preparing it into five files is real work (see the `preparePhoto`
+    // mock above), and a full-size frame makes that slower without testing anything more.
     const stub = await sharp({ create: { width: 480, height: 320, channels: 3, background: "#7a8fa3" } })
       .jpeg()
       .withExif({ IFD0: { Artist: "A Real Photographer", Copyright: "CC BY-SA 4.0" } })
@@ -168,6 +178,7 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
         return stub;
       },
     };
+    mark("beforeAll done");
   }, 300_000);
 
   afterAll(async () => {
@@ -498,7 +509,20 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
   });
 
   it("refuses to remove when a seeded seller has gained a Sign-in Method, and deletes nothing", async () => {
-    await seedDemoInventory({ prisma: db, storage, photos, now: FIRST_RUN });
+    // Every seller and two cars: the refusal turns on a seller, and the full inventory's seed and
+    // removal are covered above.
+    const cars = DEMO_CARS.slice(0, 2);
+    const listings = Object.fromEntries(cars.map((car) => [car.slug, must(DEMO_PHOTO_MANIFEST.listings[car.slug])]));
+    const seeded = await seedDemoInventory({
+      prisma: db,
+      storage,
+      photos,
+      now: FIRST_RUN,
+      cars,
+      manifest: { ...DEMO_PHOTO_MANIFEST, listings },
+    });
+    expect(seeded.exitCode, seeded.message).toBe(0);
+    expect(await db.user.count({ where: { id: { startsWith: DEMO_ID_PREFIX } } })).toBe(DEMO_SELLERS.length);
     await db.user.update({
       where: { id: demoSellerId(2) },
       data: { phone: "+99365550009", phoneVerifiedAt: FIRST_RUN },
