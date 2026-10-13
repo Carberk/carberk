@@ -68,6 +68,12 @@ type Screen = Awaited<ReturnType<typeof renderMobile>>;
 /** A 390 dp wide screen holds a 4:3 photo frame 292.5 dp tall. */
 const FRAME = { width: 390, height: 292.5 };
 const HASH = "1fsDBYCIiIiHiIdweIeHh4d4cIgH";
+/** ThumbHashes of covers that are not about 4:3, made with `thumbhash` 0.1.1. */
+const OTHER_SHAPES = [
+  ["16:9", "HggKNJpwd4dweHiIiIdwcAf3eA=="],
+  ["square", "HwgKNxpwd4dwiHiHiHiIeIiHCAiIgI8I"],
+  ["portrait", "H/gJNRpwd4CIiId4h3h4d3BwCPd3"],
+] as const;
 
 /** The tapped card's photos, as the loaded detail returns them. */
 function cardMedia(dimensions?: { width: number; height: number }) {
@@ -83,18 +89,46 @@ function cardMedia(dimensions?: { width: number; height: number }) {
   }));
 }
 
-/** The first photo frame on screen, flattened to its size and fit. */
+const COVER_DETAIL = buildVariantUrl("listing-0/original.webp", "detail");
+const COVER_LIST = buildVariantUrl("listing-0/original.webp", "list");
+
+/** The first photo frame on screen, flattened to its size and its photo's fit. */
 function hero(screen: Screen) {
   const frame = first(screen.getAllByTestId("listing-photo-frame"));
-  const image = queryAllHosts(frame, "Image").find((node) => "uri" in (node.props.source ?? {}));
+  const image = queryAllHosts(frame, "Image").find((node) => node.props.source?.uri === COVER_DETAIL);
   const { width, height } = [frame.props.style].flat().reduce((all, part) => ({ ...all, ...part }), {});
   return {
     frame: { width, height },
     surface: frame.props.className,
     contentFit: image?.props.contentFit,
-    placeholderContentFit: image?.props.placeholderContentFit,
+    contentPosition: image?.props.contentPosition,
+    placeholder: image?.props.placeholder,
     uri: image?.props.source.uri,
   };
+}
+
+/** What the first photo frame shows under its photo until the photo loads. */
+function underlay(screen: Screen) {
+  const frame = first(screen.getAllByTestId("listing-photo-frame"));
+  return queryAllHosts(frame, "Image")
+    .filter((node) => node.props.source?.uri !== COVER_DETAIL)
+    .map((node) => ({
+      source: node.props.source?.thumbhash ? "blur" : node.props.source?.uri === COVER_LIST ? "list" : node.props.source?.uri,
+      contentFit: node.props.contentFit,
+      contentPosition: node.props.contentPosition,
+    }));
+}
+
+async function loadPhoto(screen: Screen) {
+  const frame = first(screen.getAllByTestId("listing-photo-frame"));
+  const photo = queryAllHosts(frame, "Image").find((node) => node.props.source?.uri === COVER_DETAIL);
+  if (!photo) throw new Error("no cover photo");
+  await fireEvent(photo, "load", { source: { url: COVER_DETAIL, width: 1200, height: 900 } });
+}
+
+/** The loaded detail's media, its cover carrying `thumbHash`. */
+function mediaWithCoverHash(thumbHash: string) {
+  return cardMedia().map((photo, index) => (index === 0 ? { ...photo, thumbHash } : photo));
 }
 
 /** Each Specifications cell and row, in order, as its testID and layout class. */
@@ -131,8 +165,9 @@ describe("the Listing detail photo frame from tap to loaded (#864)", () => {
       frame: FRAME,
       surface: "bg-muted",
       contentFit: "contain",
-      placeholderContentFit: "contain",
-      uri: buildVariantUrl("listing-0/original.webp", "detail"),
+      contentPosition: "bottom",
+      placeholder: undefined,
+      uri: COVER_DETAIL,
     });
     expect(after).toEqual(before);
   });
@@ -162,6 +197,34 @@ describe("the Listing detail photo frame from tap to loaded (#864)", () => {
     await fireEvent(photo, "load", { source: { url: photo.props.source.uri, width: 1067, height: 800 } });
 
     expect(blur()).toHaveLength(0);
+  });
+
+  it("shows an about 4:3 cover's blurred colours across the frame and the card's 3:2 crop at the centre, where that part of the photo lands", async () => {
+    state.preview = summaryFixture({ photoThumbHashes: [HASH, null] });
+    const screen = await renderMobile(<ListingDetailScreen />);
+    const expected = [
+      { source: "blur", contentFit: "cover", contentPosition: undefined },
+      { source: "list", contentFit: "contain", contentPosition: undefined },
+    ];
+    expect(underlay(screen)).toEqual(expected);
+    await loadPhoto(screen);
+    expect(underlay(screen)).toEqual([]);
+
+    await loadDetail(screen, fixture({ media: mediaWithCoverHash(HASH) }));
+    expect(underlay(screen)).toEqual(expected);
+    await loadPhoto(screen);
+    expect(underlay(screen)).toEqual([]);
+  });
+
+  it.each(OTHER_SHAPES)("never shows the card's 3:2 crop of a %s cover: its blurred colours take its own shape, pinned as the photo is", async (_shape, hash) => {
+    state.preview = summaryFixture({ photoThumbHashes: [hash, null] });
+    const screen = await renderMobile(<ListingDetailScreen />);
+    const expected = [{ source: "blur", contentFit: "contain", contentPosition: "bottom" }];
+    expect(underlay(screen)).toEqual(expected);
+
+    await loadDetail(screen, fixture({ media: mediaWithCoverHash(hash) }));
+    expect(underlay(screen)).toEqual(expected);
+    expect(hero(screen)).toMatchObject({ contentFit: "contain", contentPosition: "bottom", placeholder: undefined });
   });
 
   it("gives a Listing without photos the same frame, before and after detail loads", async () => {
