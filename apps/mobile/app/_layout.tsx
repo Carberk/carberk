@@ -201,6 +201,7 @@ export default function RootLayout() {
   const scheme = resolvedScheme === "dark" ? "dark" : "light";
   const [i18nReady, setI18nReady] = useState(false);
   const [themeReady, setThemeReady] = useState(false);
+  const [startupAppearanceReady, setStartupAppearanceReady] = useState(false);
   const [fontsLoaded, fontError] = useFonts({
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     "Geist-Light": require("../assets/fonts/Geist-Light.ttf"),
@@ -218,7 +219,7 @@ export default function RootLayout() {
     "GeistMono-Medium": require("../assets/fonts/GeistMono-Medium.ttf"),
   });
   const [onboarding, setOnboarding] = useState<OnboardingDecision | null>(null);
-  const appReady = (fontsLoaded || !!fontError) && i18nReady && themeReady && appliedScheme === scheme && onboarding !== null;
+  const appReady = (fontsLoaded || !!fontError) && i18nReady && startupAppearanceReady && onboarding !== null;
 
   useEffect(() => {
     // Started first: the gate reads storage before anything in this launch
@@ -237,6 +238,11 @@ export default function RootLayout() {
   useEffect(() => {
     setColorScheme(theme);
   }, [theme, setColorScheme]);
+  useEffect(() => {
+    // Only startup waits for the native styling system. Later theme changes
+    // update the mounted screens without resetting navigation or local drafts.
+    if (themeReady && appliedScheme === scheme) setStartupAppearanceReady(true);
+  }, [themeReady, appliedScheme, scheme]);
   useEffect(() => {
     const sub = AppState.addEventListener("change", onAppStateChange);
     return () => sub.remove();
