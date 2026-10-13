@@ -1,6 +1,9 @@
 import { Text } from "react-native";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { PhotoActionSheet } from "../../src/listings/wizard/PhotoActionSheet";
+import type { StagedPhoto } from "../../src/listings/uploadStaging/types";
+
 import { act, fireEvent, renderMobile } from "../../test/render";
 
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -13,7 +16,7 @@ vi.unmock("@/components/ui/sheet");
 // what the backdrop depends on: Close reports `onOpenChange(false)` through the Root.
 vi.mock("@rn-primitives/dialog", async () => {
   const React = await import("react");
-  const { View } = await import("react-native");
+  const { View, Text } = await import("react-native");
   const Open = React.createContext({ open: false, onOpenChange: (_open: boolean) => {} });
   const Box = ({ children }: React.PropsWithChildren) => <View>{children}</View>;
   const Close = ({ children }: { children: React.ReactNode }) => {
@@ -24,7 +27,7 @@ vi.mock("@rn-primitives/dialog", async () => {
     <Open.Provider value={{ open, onOpenChange }}>{children}</Open.Provider>;
   const Present = ({ forceMount, children }: React.PropsWithChildren<{ forceMount?: boolean }>) =>
     React.useContext(Open).open || forceMount ? <View>{children}</View> : null;
-  return { Root, Close, useRootContext: () => React.useContext(Open), Portal: Present, Overlay: Present, Content: Present, Trigger: Box, Title: Box, Description: Box };
+  return { Root, Close, useRootContext: () => React.useContext(Open), Portal: Present, Overlay: Present, Content: Present, Trigger: Box, Title: Text, Description: Text };
 });
 vi.mock("react-native-screens", async () => ({ FullWindowOverlay: (await import("react-native")).View }));
 vi.mock("@/components/ui/native-only-animated-view", async () => ({ NativeOnlyAnimatedView: (await import("react-native")).View }));
@@ -91,7 +94,31 @@ describe("Sheet dismissal", () => {
     view.rerender(sheet(false));
     act(() => vi.advanceTimersByTime(100));
     view.rerender(sheet(true));
-    act(() => vi.advanceTimersByTime(1000));
+    act(() => vi.advanceTimersByTime(50));
+    view.rerender(sheet(false));
+    act(() => vi.advanceTimersByTime(70));
+    // First exit would finish now. The second exit still owes 150 ms.
     expect(view.getByText("Options", hidden)).toBeTruthy();
+    act(() => vi.advanceTimersByTime(149));
+    expect(view.getByText("Options", hidden)).toBeTruthy();
+    act(() => vi.advanceTimersByTime(1));
+    expect(view.queryByText("Options", hidden)).toBeNull();
+  });
+});
+
+
+describe("Photo actions dismissal", () => {
+  it("retains the selected photo's title and actions after the parent clears selection", () => {
+    const photo: StagedPhoto = { photoId: "photo-1", state: "uploaded", sortOrder: 1, retryCount: 0 };
+    const actions = { onOpenChange: vi.fn(), onSetAsCover: vi.fn(), onMoveEarlier: vi.fn(), onMoveLater: vi.fn(), onRemove: vi.fn(), onRetry: vi.fn() };
+    const sheet = (selected: StagedPhoto | null) => <PhotoActionSheet open={selected !== null} photo={selected} index={1} total={3} {...actions} />;
+    const view = renderMobile(sheet(photo));
+    expect(view.getByText("Photo 2 of 3")).toBeTruthy();
+    expect(view.getByText("Set as cover")).toBeTruthy();
+    view.rerender(sheet(null));
+    expect(view.getByText("Photo 2 of 3", hidden)).toBeTruthy();
+    expect(view.getByText("Set as cover", hidden)).toBeTruthy();
+    act(() => vi.advanceTimersByTime(220));
+    expect(view.queryByText("Photo 2 of 3", hidden)).toBeNull();
   });
 });

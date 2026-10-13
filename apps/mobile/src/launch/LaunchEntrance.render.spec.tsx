@@ -28,6 +28,20 @@ function paint(screen: ReturnType<typeof renderMobile>) {
 }
 
 describe("cold-launch identity", () => {
+  it("holds the completed wordmark and credit for 450 ms even when the destination is ready", () => {
+    const screen = renderMobile(destination(true));
+    paint(screen);
+    act(() => vi.advanceTimersByTime(620));
+    act(() => vi.advanceTimersByTime(30));
+    act(() => vi.advanceTimersByTime(180));
+    expect(screen.getByText("By Alpha Motors")).toBeTruthy();
+    act(() => vi.advanceTimersByTime(239));
+    expect(screen.getByText("By Alpha Motors")).toBeTruthy();
+    act(() => vi.advanceTimersByTime(1));
+    act(() => vi.advanceTimersByTime(180));
+    expect(screen.queryByText("By Alpha Motors")).toBeNull();
+  });
+
   it("shows the exact credit while startup is pending and mounts the destination independently", () => {
     const screen = renderMobile(destination(false));
     expect(screen.getByText("By Alpha Motors")).toBeTruthy();
@@ -60,7 +74,7 @@ describe("cold-launch identity", () => {
     expect(SplashScreen.hide).not.toHaveBeenCalled();
     expect(screen.getByText("By Alpha Motors")).toBeTruthy();
     fireEvent(screen.getByTestId("launch-c-dot"), "load");
-    act(() => vi.advanceTimersByTime(649));
+    act(() => vi.advanceTimersByTime(1069));
     expect(screen.getByText("By Alpha Motors")).toBeTruthy();
     act(() => vi.advanceTimersByTime(1));
     act(() => vi.advanceTimersByTime(180));
@@ -80,7 +94,7 @@ describe("cold-launch identity", () => {
     expect(SplashScreen.hide).not.toHaveBeenCalled();
     act(() => vi.advanceTimersByTime(400));
     expect(SplashScreen.hide).toHaveBeenCalledOnce();
-    act(() => vi.advanceTimersByTime(650));
+    act(() => vi.advanceTimersByTime(1070));
     act(() => vi.advanceTimersByTime(180));
     expect(screen.queryByText("By Alpha Motors")).toBeNull();
   });
@@ -89,7 +103,7 @@ describe("cold-launch identity", () => {
     const screen = renderMobile(destination(false));
     expect(screen.getByText("By Alpha Motors")).toBeTruthy();
     paint(screen);
-    act(() => vi.advanceTimersByTime(650));
+    act(() => vi.advanceTimersByTime(1070));
     screen.rerender(destination(true));
     act(() => vi.advanceTimersByTime(180));
     expect(screen.queryByText("By Alpha Motors")).toBeNull();
