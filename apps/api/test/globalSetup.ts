@@ -64,9 +64,17 @@ async function withAdmin<T>(baseDatabaseUrl: string, work: (admin: PrismaService
 export default async function setup({ config, provide }: GlobalSetupContext) {
   const baseDatabaseUrl = runEnv("DATABASE_URL");
   const baseRedisUrl = runEnv("REDIS_URL");
-  if (process.env["AUTO_TM_TEST_DATABASES"] === "off" || !baseDatabaseUrl || !baseRedisUrl) {
+  if (process.env["AUTO_TM_TEST_DATABASES"] === "off" || (!baseDatabaseUrl && !baseRedisUrl)) {
     provide("apiTestDatabases", undefined);
     return;
+  }
+  // Spec files run in parallel. Without per-worker databases they would share
+  // one database, and one spec's unscoped cleanup would wipe another's rows.
+  if (!baseDatabaseUrl || !baseRedisUrl) {
+    throw new Error(
+      `API specs need both DATABASE_URL and REDIS_URL for per-worker databases; ${baseDatabaseUrl ? "REDIS_URL" : "DATABASE_URL"} is unset. ` +
+        "Set it, or run unit specs with pnpm test:unit.",
+    );
   }
 
   const workers = workerCount(config);
