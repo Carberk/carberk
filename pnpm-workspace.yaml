@@ -1,3 +1,80 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# React Native/Expo needs flat node_modules: Metro expects npm/yarn-style
+# hoisting. pnpm 11+ reads this only from here, not from .npmrc.
+shamefullyHoist: true
+
+# ADR-0048. pnpm 11+ ignores the `pnpm` field of package.json.
+overrides:
+  react-native-css-interop: 0.2.4
+
+# One range for each dependency that two or more workspace packages declare;
+# their package.json files say `catalog:`. A package that needs a different
+# range declares it directly: mobile's react, react-dom and tailwindcss 3
+# follow Expo SDK 55 and NativeWind 4, and packages/db's @nestjs/common is a
+# looser peer range.
+catalog:
+  "@aws-sdk/client-s3": ^3.1048.0
+  "@nestjs/common": ^11.1.16
+  "@nestjs/config": ^4.0.0
+  "@nestjs/core": ^11.1.16
+  "@tailwindcss/postcss": ^4.1.0
+  "@testing-library/react": ^16.3.2
+  "@types/node": ^22.10.0
+  "@types/react": ^19.0.0
+  "@types/react-dom": ^19.0.0
+  class-variance-authority: ^0.7.1
+  clsx: ^2.1.1
+  eslint: ^9.18.0
+  happy-dom: ^20.9.0
+  ioredis: ^5.4.2
+  nestjs-pino: ^4.3.0
+  next: ^16.2.2
+  postcss: ^8.4.49
+  react: ^19.0.0
+  react-dom: ^19.0.0
+  reflect-metadata: ^0.2.2
+  shadcn: ^4.7.0
+  socket.io-client: ^4.8.3
+  tailwind-merge: ^2.5.4
+  tailwindcss: ^4.1.0
+  tsx: ^4.19.2
+  tw-animate-css: ^1.4.0
+  typescript: ^5.7.3
+  vitest: ^2.1.8
+  zod: ^3.23.8
+
+# Dependency install scripts. pnpm fails the install on any script not listed
+# here, so a new one has to be reviewed before it can run.
+allowBuilds:
+  # Downloads the Prisma schema engine that `prisma migrate` runs, including
+  # the API image's migrate pre-deploy as a user that cannot download it later.
+  "@prisma/engines": true
+  # Checks the Node.js and package manager versions Prisma 7 supports.
+  prisma: true
+  # Writes Firebase web defaults only when FIREBASE_WEBAPP_CONFIG is set; unused.
+  "@firebase/util": false
+  # Prints an Open Collective message.
+  "@nestjs/core": false
+  # Checks that the prebuilt native binding loads; the platform package
+  # (@swc/core-<platform>) already provides it.
+  "@swc/core": false
+  # Optional native speedups for ssh2 (via Testcontainers); ssh2 falls back to JS.
+  cpu-features: false
+  ssh2: false
+  # Validates the binary from the @esbuild/<platform> package, which the JS API
+  # and bin shim load directly.
+  esbuild: false
+  # Looks for the prebuilt @msgpackr-extract/<platform> binary, which loads at
+  # runtime without this step; msgpackr falls back to JS without it.
+  msgpackr-extract: false
+  # Copies the service worker into directories set by `msw.workerDirectory`;
+  # no workspace sets it.
+  msw: false
+  # Only warns when a dependent declares protobufjs with the wrong range prefix.
+  protobufjs: false
+  # Builds from source only when no prebuilt @img/sharp-<platform> binary
+  # matches; every supported target has one.
+  sharp: false

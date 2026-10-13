@@ -6,9 +6,9 @@
   "license": "UNLICENSED",
   "engines": {
     "node": ">=22.11.0",
-    "pnpm": ">=9.0.0"
+    "pnpm": "^12.11.2"
   },
-  "packageManager": "pnpm@9.12.0",
+  "packageManager": "pnpm@12.11.2",
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
@@ -44,17 +44,12 @@
     "test:agent-github": "node --test scripts/agent-github.test.mjs"
   },
   "devDependencies": {
-    "tsx": "^4.19.2",
+    "tsx": "catalog:",
     "turbo": "^2.3.3",
-    "typescript": "^5.7.3"
+    "typescript": "catalog:"
   },
   "workspaces": [
     "apps/*",
     "packages/*"
-  ],
-  "pnpm": {
-    "overrides": {
-      "react-native-css-interop": "0.2.4"
-    }
-  }
+  ]
 }

@@ -15,11 +15,11 @@
   "dependencies": {
     "@auto-tm/contracts": "workspace:*",
     "@auto-tm/db": "workspace:*",
-    "@aws-sdk/client-s3": "^3.1048.0",
+    "@aws-sdk/client-s3": "catalog:",
     "@aws-sdk/s3-request-presigner": "^3.1048.0",
-    "@nestjs/common": "^11.1.16",
-    "@nestjs/config": "^4.0.0",
-    "@nestjs/core": "^11.1.16",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
     "@nestjs/event-emitter": "^3.0.1",
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/bullmq": "^11.0.4",
@@ -31,16 +31,16 @@
     "@socket.io/redis-adapter": "^8.3.0",
     "bcryptjs": "^3.0.3",
     "fastify": "^5.8.5",
-    "ioredis": "^5.4.2",
-    "nestjs-pino": "^4.3.0",
+    "ioredis": "catalog:",
+    "nestjs-pino": "catalog:",
     "otplib": "^13.4.1",
     "pino-http": "^10.4.0",
-    "reflect-metadata": "^0.2.2",
+    "reflect-metadata": "catalog:",
     "rxjs": "^7.8.1",
     "sharp": "^0.34.1",
     "slugify": "^1.6.9",
     "socket.io": "^4.8.1",
-    "zod": "^3.23.8"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@auto-tm/eslint-config": "workspace:*",
@@ -51,13 +51,13 @@
     "@swc/core": "^1.15.33",
     "@swc/helpers": "^0.5.21",
     "@types/bcryptjs": "^3.0.0",
-    "@types/node": "^22.10.0",
+    "@types/node": "catalog:",
     "@types/supertest": "^7.2.0",
     "chokidar": "^5.0.0",
-    "socket.io-client": "^4.8.3",
+    "socket.io-client": "catalog:",
     "supertest": "^7.2.2",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.3",
-    "vitest": "^2.1.8"
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }
