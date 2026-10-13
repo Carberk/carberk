@@ -24,10 +24,18 @@ import { SharpLogoImageProcessor } from "./SharpLogoImageProcessor";
 /**
  * ADR-0072 runtime verification against real PostgreSQL and real MinIO, with
  * two independent PostgreSQL clients and deliberately delayed storage cleanup.
- * Run only against isolated services: the suite clears the catalog brands and
- * every object under `brands/` and `pending/` in `catalog-assets`.
+ * The suite clears the catalog brands of its worker's own database
+ * (test/globalSetup.ts). MinIO is shared by spec files running in parallel, so
+ * every brand here has a `races-` slug, and the suite clears only the objects
+ * under `brands/races-` and `pending/brands/races-` in `catalog-assets`.
  */
 const BUCKET = "catalog-assets";
+const SLUG_PREFIX = "races-";
+const TOYOTA = `${SLUG_PREFIX}toyota`;
+const BMW = `${SLUG_PREFIX}bmw`;
+const KIA = `${SLUG_PREFIX}kia`;
+const AUDI = `${SLUG_PREFIX}audi`;
+const SEAT = `${SLUG_PREFIX}seat`;
 const FILES = ["logo.png", "mono@1x.png", "mono@2x.png", "mono@3x.png"];
 
 const endpoint = process.env["MINIO_ENDPOINT"] ?? "http://localhost:9000";
@@ -177,7 +185,7 @@ describe("brand logo cleanup races (ADR-0072) - real PostgreSQL and MinIO", () =
     await stack.prisma.listing.deleteMany();
     await stack.prisma.model.deleteMany();
     await stack.prisma.brand.deleteMany();
-    for (const prefix of ["brands/", "pending/"]) {
+    for (const prefix of [`brands/${SLUG_PREFIX}`, `pending/brands/${SLUG_PREFIX}`]) {
       const keys = await listKeys(prefix);
       for (let i = 0; i < keys.length; i += 1000) {
         await s3.send(
@@ -241,32 +249,32 @@ describe("brand logo cleanup races (ADR-0072) - real PostgreSQL and MinIO", () =
   const directoryOf = (key: string) => key.slice(0, key.lastIndexOf("/") + 1);
 
   it("removes every file of an imported version, leaving other versions untouched", async () => {
-    const brand = await createBrand("toyota");
+    const brand = await createBrand(TOYOTA);
     const active = `imp-0123456789ab-${randomUUID()}`;
-    const key = await putImported("toyota", active);
-    const sibling = await putImported("toyota", `imp-ffffffffffff-${randomUUID()}`);
-    const adminVersion = `brands/toyota/v1790000000000-${randomUUID()}/logo.png`;
+    const key = await putImported(TOYOTA, active);
+    const sibling = await putImported(TOYOTA, `imp-ffffffffffff-${randomUUID()}`);
+    const adminVersion = `brands/${TOYOTA}/v1790000000000-${randomUUID()}/logo.png`;
     await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: adminVersion, Body: await logoPng() }));
     await stack.prisma.brand.update({ where: { id: brand.id }, data: { logoKey: key } });
 
     await stack.removeLogo.execute({ brandId: brand.id }, adminId);
 
-    expect(await listKeys(`brands/toyota/${active}/`)).toEqual([]);
+    expect(await listKeys(`brands/${TOYOTA}/${active}/`)).toEqual([]);
     expect(await listKeys(directoryOf(sibling))).toHaveLength(4);
     expect(await exists(adminVersion)).toBe(true);
   });
 
   it("survives a delayed deletion when identical content is activated again in the same millisecond", async () => {
-    const brand = await createBrand("toyota");
+    const brand = await createBrand(TOYOTA);
     freezeClock();
     const bytes = await logoPng(90, 7);
-    const first = await confirmLogo(stack, brand.id, "toyota", bytes);
+    const first = await confirmLogo(stack, brand.id, TOYOTA, bytes);
 
     const gate = delayCleanup(stack);
     const removing = stack.removeLogo.execute({ brandId: brand.id }, adminId);
     await gate.reached;
     await untilKey(brand.id, (key) => key === null);
-    const second = await confirmLogo(other, brand.id, "toyota", bytes);
+    const second = await confirmLogo(other, brand.id, TOYOTA, bytes);
     gate.release();
     await removing;
 
@@ -278,18 +286,18 @@ describe("brand logo cleanup races (ADR-0072) - real PostgreSQL and MinIO", () =
   });
 
   it("survives a delayed replacement cleanup when the brand is replaced again", async () => {
-    const brand = await createBrand("bmw");
+    const brand = await createBrand(BMW);
     const bytes = await logoPng(90, 11);
-    const first = await confirmLogo(stack, brand.id, "bmw", bytes);
+    const first = await confirmLogo(stack, brand.id, BMW, bytes);
 
     const gate = delayCleanup(stack);
-    const pending = `pending/brands/bmw/${randomUUID()}`;
+    const pending = `pending/brands/${BMW}/${randomUUID()}`;
     await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: pending, Body: bytes, ContentType: "image/png" }));
     const replacing = stack.setLogo.execute({ brandId: brand.id, key: pending }, adminId);
     await gate.reached;
     await untilKey(brand.id, (key) => key !== null && key !== first);
     const second = (await stack.prisma.brand.findUniqueOrThrow({ where: { id: brand.id } })).logoKey as string;
-    const third = await confirmLogo(other, brand.id, "bmw", bytes);
+    const third = await confirmLogo(other, brand.id, BMW, bytes);
     gate.release();
     await replacing;
 
@@ -301,15 +309,15 @@ describe("brand logo cleanup races (ADR-0072) - real PostgreSQL and MinIO", () =
 
   it("keeps a recreated brand's logo when the old brand's cleanup finishes late", async () => {
     freezeClock();
-    const brand = await createBrand("kia");
-    const first = await confirmLogo(stack, brand.id, "kia", await logoPng(90, 3));
+    const brand = await createBrand(KIA);
+    const first = await confirmLogo(stack, brand.id, KIA, await logoPng(90, 3));
 
     const gate = delayCleanup(stack);
     const deleting = stack.deleteBrand.execute({ id: brand.id }, adminId);
     await gate.reached;
     expect(await stack.prisma.brand.findUnique({ where: { id: brand.id } })).toBeNull();
-    const recreated = await createBrand("kia");
-    const second = await confirmLogo(other, recreated.id, "kia", await logoPng(90, 3));
+    const recreated = await createBrand(KIA);
+    const second = await confirmLogo(other, recreated.id, KIA, await logoPng(90, 3));
     gate.release();
     await deleting;
 
@@ -319,12 +327,12 @@ describe("brand logo cleanup races (ADR-0072) - real PostgreSQL and MinIO", () =
   }, 30_000);
 
   it("never leaves the active logo without its object across overlapping set and remove calls", async () => {
-    const brand = await createBrand("audi");
+    const brand = await createBrand(AUDI);
     const results = await Promise.allSettled(
       Array.from({ length: 6 }, async (_, index) => {
         const via = index % 2 === 0 ? stack : other;
         if (index % 3 === 2) return via.removeLogo.execute({ brandId: brand.id }, adminId);
-        return confirmLogo(via, brand.id, "audi", await logoPng(90, index + 1));
+        return confirmLogo(via, brand.id, AUDI, await logoPng(90, index + 1));
       }),
     );
 
@@ -333,12 +341,12 @@ describe("brand logo cleanup races (ADR-0072) - real PostgreSQL and MinIO", () =
     if (final !== null) expect(await exists(final)).toBe(true);
     // Every activated directory was returned by the next swap and deleted once,
     // so no losing object is left behind: only the active logo remains.
-    expect(await listKeys("brands/audi/")).toEqual(final === null ? [] : [final]);
+    expect(await listKeys(`brands/${AUDI}/`)).toEqual(final === null ? [] : [final]);
   });
 
   it("does not delete the active logo when a cleanup request fails after the swap", async () => {
-    const brand = await createBrand("seat");
-    const first = await confirmLogo(stack, brand.id, "seat", await logoPng(90, 5));
+    const brand = await createBrand(SEAT);
+    const first = await confirmLogo(stack, brand.id, SEAT, await logoPng(90, 5));
     const client = (stack.storage as unknown as { s3: S3Client }).s3;
     const original = client.send.bind(client) as (command: unknown) => Promise<unknown>;
     vi.spyOn(client, "send").mockImplementation((async (command: SdkCommand) => {
@@ -347,7 +355,7 @@ describe("brand logo cleanup races (ADR-0072) - real PostgreSQL and MinIO", () =
       return result;
     }) as never);
 
-    const second = await confirmLogo(stack, brand.id, "seat", await logoPng(90, 6));
+    const second = await confirmLogo(stack, brand.id, SEAT, await logoPng(90, 6));
 
     expect(second).not.toBe(first);
     expect(await exists(second)).toBe(true);
