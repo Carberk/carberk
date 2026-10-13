@@ -30,6 +30,7 @@
     "@auto-tm/eslint-config": "workspace:*",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@typescript/native": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "eslint": "catalog:"

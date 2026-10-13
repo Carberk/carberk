@@ -1,7 +1,7 @@
 {
   "extends": "@auto-tm/tsconfig/nextjs.json",
   "compilerOptions": {
-    "baseUrl": ".",
+    "types": ["node"],
     "paths": {
       "@/*": ["./src/*"]
     }

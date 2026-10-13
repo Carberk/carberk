@@ -44,6 +44,7 @@
     "test:agent-github": "node --test scripts/agent-github.test.mjs"
   },
   "devDependencies": {
+    "@typescript/native": "catalog:",
     "tsx": "catalog:",
     "turbo": "^2.3.3",
     "typescript": "catalog:"
