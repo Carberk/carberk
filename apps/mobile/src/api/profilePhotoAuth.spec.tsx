@@ -54,13 +54,13 @@ describe("Profile photo uses the shared authentication lifecycle", () => {
       http.put("*/me/photo", ({ request }) => {
         if (request.headers.get("authorization") !== "Bearer fresh") return HttpResponse.json({ code: "UNAUTHENTICATED" }, { status: 401 });
         writes += 1;
-        return HttpResponse.json({ ...PHOTO_ME, avatarKey: "pending/new/original.jpg" });
+        return HttpResponse.json({ ...PHOTO_ME, avatarKey: "pending/new/original.webp" });
       }),
     );
     const session = await capturePhotoSession();
     const { result, client } = await setupPhotoHook(useSetProfilePhoto);
     let photoRequest!: Promise<unknown>;
-    await act(() => { photoRequest = result.current.mutateAsync({ request: { key: "pending/new/original.jpg" }, session }).catch((error: unknown) => error); });
+    await act(() => { photoRequest = result.current.mutateAsync({ request: { key: "pending/new/original.webp" }, session }).catch((error: unknown) => error); });
     await vi.waitFor(() => expect(refreshes).toBe(1));
     const unrelatedRequest = apiClient.get("/probe").catch((error: unknown) => error);
     // Let the unrelated request join the same pending refresh before disposal.
@@ -108,7 +108,7 @@ describe("Profile photo uses the shared authentication lifecycle", () => {
     server.use(
       http.post("*/auth/refresh", () => { started = true; return new Promise<Response>((resolve) => { complete = resolve; }); }),
       http.get("*/probe", () => HttpResponse.json({ ok: true })),
-      http.put("*/me/photo", () => { sets += 1; return HttpResponse.json({ ...PHOTO_ME, avatarKey: "pending/new/original.jpg" }); }),
+      http.put("*/me/photo", () => { sets += 1; return HttpResponse.json({ ...PHOTO_ME, avatarKey: "pending/new/original.webp" }); }),
     );
     const publicRequest = apiClient.get("/probe");
     await vi.waitFor(() => expect(started).toBe(true));
@@ -116,7 +116,7 @@ describe("Profile photo uses the shared authentication lifecycle", () => {
     const { result } = await setupPhotoHook(useSetProfilePhoto);
     let photoRequest!: Promise<unknown>;
     await act(async () => {
-      photoRequest = result.current.mutateAsync({ request: { key: "pending/new/original.jpg" }, session }).catch((error: unknown) => error);
+      photoRequest = result.current.mutateAsync({ request: { key: "pending/new/original.webp" }, session }).catch((error: unknown) => error);
       // Drain native-storage microtasks so this request joins the pending refresh.
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
@@ -144,12 +144,12 @@ describe("Profile photo uses the shared authentication lifecycle", () => {
         const auth = request.headers.get("authorization");
         events.push(`presign:${auth}`);
         if (operation === "presign" && auth !== "Bearer fresh") return HttpResponse.json({ code: "UNAUTHORIZED" }, { status: 401 });
-        return HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: "pending/new/original.jpg", expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"' } });
+        return HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: "pending/new/original.webp", expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"' } });
       }),
       http.put("*/me/photo", ({ request }) => {
         const auth = request.headers.get("authorization"); events.push(`set:${auth}`);
         if (operation === "set" && auth !== "Bearer fresh") return HttpResponse.json({ code: "UNAUTHORIZED" }, { status: 401 });
-        return HttpResponse.json({ ...PHOTO_ME, avatarKey: "pending/new/original.jpg" });
+        return HttpResponse.json({ ...PHOTO_ME, avatarKey: "pending/new/original.webp" });
       }),
       http.delete("*/me/photo", ({ request }) => {
         const auth = request.headers.get("authorization"); events.push(`remove:${auth}`);
@@ -169,7 +169,7 @@ describe("Profile photo uses the shared authentication lifecycle", () => {
       const session = await capturePhotoSession();
       const { result } = await setupPhotoHook(() => ({ set: useSetProfilePhoto(), remove: useRemoveProfilePhoto() }));
       let error: unknown;
-      await act(async () => { await (operation === "set" ? result.current.set.mutateAsync({ request: { key: "pending/new/original.jpg" }, session }) : result.current.remove.mutateAsync(session)).catch((e: unknown) => { error = e; }); });
+      await act(async () => { await (operation === "set" ? result.current.set.mutateAsync({ request: { key: "pending/new/original.webp" }, session }) : result.current.remove.mutateAsync(session)).catch((e: unknown) => { error = e; }); });
       expect(error).toBeUndefined();
       session.dispose();
     }

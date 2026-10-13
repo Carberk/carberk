@@ -64,6 +64,14 @@ describe("ListMyListings", () => {
     return summary;
   }
 
+  it("sends the owner's card photo ThumbHashes beside their keys", async () => {
+    seedSummary({ coverMediaKey: "a", photoKeys: ["a", "b"], photoThumbHashes: ["1fsDBYCIiIiHiIdweIeHh4d4cIgH", null], galleryKeys: ["a", "b"], photoCount: 2 });
+
+    const result = await makeUseCase(port).execute({ userId: "user-1" });
+
+    expect(result.items[0]).toMatchObject({ photoThumbHashes: ["1fsDBYCIiIiHiIdweIeHh4d4cIgH", null] });
+  });
+
   it("returns owner's listings", async () => {
     seedSummary();
     const uc = makeUseCase(port);

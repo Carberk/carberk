@@ -2,6 +2,7 @@ import { Image } from "expo-image";
 import { CameraOff, Car, Heart, type LucideIcon } from "lucide-react-native";
 import { useState } from "react";
 import { View, type PressableProps, type ViewProps } from "react-native";
+import type { ListingsSchemas } from "@auto-tm/contracts";
 
 import { buildOriginalUrl, buildVariantUrl } from "../detail/buildVariantUrl";
 
@@ -33,14 +34,31 @@ interface ListingPhotoProps {
    * `detail` (1200 x 800) stays sharp in the tall frames of the Results strip.
    */
   variant?: "list" | "detail";
+  /** The photo's ThumbHash: a blurred preview that shows at once while the photo loads. */
+  thumbHash?: string | undefined;
+}
+
+/**
+ * The ThumbHash a card has for one of its photo keys: the summary carries a
+ * hash per `photoKeys` entry, so a cover that is not one of those photos (a
+ * video's poster) has none.
+ */
+export function cardPhotoThumbHash(
+  listing: Pick<ListingsSchemas.ListingSummary, "photoKeys" | "photoThumbHashes">,
+  key: string | undefined,
+): string | undefined {
+  if (!key) return undefined;
+  const index = listing.photoKeys.indexOf(key);
+  return index < 0 ? undefined : listing.photoThumbHashes?.[index] ?? undefined;
 }
 
 /**
  * One Listing photo filling its frame. The list-size variant loads first and
  * the original upload replaces it when the variant is missing. The frame owns
- * the size, the radius and the tonal tone that shows while the picture loads.
+ * the size, the radius and the tonal tone that shows while the picture loads;
+ * a photo with a ThumbHash shows its blurred colours there instead.
  */
-export function ListingPhoto({ mediaKey, emptyLabel, compact = false, variant = "list" }: ListingPhotoProps) {
+export function ListingPhoto({ mediaKey, emptyLabel, compact = false, variant = "list", thumbHash }: ListingPhotoProps) {
   const [original, setOriginal] = useState(false);
 
   if (!mediaKey) return <NoPhoto label={emptyLabel} compact={compact} />;
@@ -48,6 +66,8 @@ export function ListingPhoto({ mediaKey, emptyLabel, compact = false, variant = 
   return (
     <Image
       source={{ uri: original ? buildOriginalUrl(mediaKey) : buildVariantUrl(mediaKey, variant) }}
+      placeholder={thumbHash ? { thumbhash: thumbHash } : undefined}
+      placeholderContentFit="cover"
       className="h-full w-full"
       contentFit="cover"
       cachePolicy="memory-disk"

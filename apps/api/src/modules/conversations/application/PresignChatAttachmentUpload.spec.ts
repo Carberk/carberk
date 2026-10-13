@@ -178,13 +178,13 @@ describe("PresignChatAttachmentUpload", () => {
     const result = await uc.execute({
       userId: "buyer-1",
       conversationId: "conv-1",
-      contentType: "image/jpeg",
+      contentType: "image/webp",
       sizeBytes: 1024,
     });
 
     expect(result.uploadUrl).toContain("presigned");
     expect(result.key).toContain("chat-attachments/conv-1/");
-    expect(result.key).toMatch(/original\.jpg$/);
+    expect(result.key).toMatch(/original\.webp$/);
     expect(result.expiresIn).toBe(600);
     expect(result.maxSizeBytes).toBe(5 * 1024 * 1024);
   });
@@ -210,12 +210,12 @@ describe("PresignChatAttachmentUpload", () => {
     await uc.execute({
       userId: "buyer-1",
       conversationId: "conv-1",
-      contentType: "image/jpeg",
+      contentType: "image/webp",
       sizeBytes: 2048,
     });
 
     expect(storage.lastCall).toBeDefined();
-    expect(storage.lastCall!.contentType).toBe("image/jpeg");
+    expect(storage.lastCall!.contentType).toBe("image/webp");
     expect(storage.lastCall!.sizeBytes).toBe(2048);
     expect(storage.lastCall!.expirySeconds).toBe(600);
     expect(storage.lastCall!.key).toContain("chat-attachments/conv-1/");
@@ -228,7 +228,7 @@ describe("PresignChatAttachmentUpload", () => {
       uc.execute({
         userId: "buyer-1",
         conversationId: "conv-missing",
-        contentType: "image/jpeg",
+        contentType: "image/webp",
         sizeBytes: 1024,
       }),
     ).rejects.toThrow(NotFoundException);
@@ -242,7 +242,7 @@ describe("PresignChatAttachmentUpload", () => {
       uc.execute({
         userId: "random-user",
         conversationId: "conv-1",
-        contentType: "image/jpeg",
+        contentType: "image/webp",
         sizeBytes: 1024,
       }),
     ).rejects.toThrow(ForbiddenException);
@@ -257,13 +257,13 @@ describe("PresignChatAttachmentUpload", () => {
       uc.execute({
         userId: "buyer-1",
         conversationId: "conv-1",
-        contentType: "image/jpeg",
+        contentType: "image/webp",
         sizeBytes: 1024,
       }),
     ).rejects.toThrow(ForbiddenException);
   });
 
-  it("rejects unsupported content type", async () => {
+  it.each(["image/jpeg", "image/png"])("rejects unsupported content type %s", async (contentType) => {
     seedConversation(repo);
     const uc = makeUseCase(repo, storage, identityCheck);
 
@@ -271,7 +271,7 @@ describe("PresignChatAttachmentUpload", () => {
       uc.execute({
         userId: "buyer-1",
         conversationId: "conv-1",
-        contentType: "image/png",
+        contentType,
         sizeBytes: 1024,
       }),
     ).rejects.toThrow(BadRequestException);
@@ -285,7 +285,7 @@ describe("PresignChatAttachmentUpload", () => {
       uc.execute({
         userId: "buyer-1",
         conversationId: "conv-1",
-        contentType: "image/jpeg",
+        contentType: "image/webp",
         sizeBytes: 6 * 1024 * 1024,
       }),
     ).rejects.toThrow(BadRequestException);
@@ -299,7 +299,7 @@ describe("PresignChatAttachmentUpload", () => {
       uc.execute({
         userId: "buyer-1",
         conversationId: "conv-1",
-        contentType: "image/jpeg",
+        contentType: "image/webp",
         sizeBytes: 0,
       }),
     ).rejects.toThrow(BadRequestException);

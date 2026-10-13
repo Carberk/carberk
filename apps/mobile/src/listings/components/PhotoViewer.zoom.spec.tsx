@@ -80,7 +80,7 @@ describe("Photo viewer while a photo is zoomed", () => {
     const screen = await open();
 
     expect(screen.getAllByRole("button", { name: "Zoom in active photo" })).toHaveLength(1);
-    await load(screen, "https://media.test/0/detail.jpg");
+    await load(screen, "https://media.test/0/detail.webp?v=webp-natural-1");
     // Only the neighbour of the first photo is loaded, not the third (#816).
     expect(screen.getAllByRole("button", { name: "Zoom in other photo" })).toHaveLength(1);
   });
@@ -89,14 +89,14 @@ describe("Photo viewer while a photo is zoomed", () => {
 describe("Photo viewer on a slow connection (#816)", () => {
   it("loads the photo on screen first, then its neighbours, at the gallery's size", async () => {
     const screen = await open(20, 5);
-    expect(pageSources(screen)).toEqual(["https://media.test/5/detail.jpg"]);
+    expect(pageSources(screen)).toEqual(["https://media.test/5/detail.webp?v=webp-natural-1"]);
 
-    await load(screen, "https://media.test/5/detail.jpg");
+    await load(screen, "https://media.test/5/detail.webp?v=webp-natural-1");
 
     expect(pageSources(screen)).toEqual([
-      "https://media.test/4/detail.jpg",
-      "https://media.test/5/detail.jpg",
-      "https://media.test/6/detail.jpg",
+      "https://media.test/4/detail.webp?v=webp-natural-1",
+      "https://media.test/5/detail.webp?v=webp-natural-1",
+      "https://media.test/6/detail.webp?v=webp-natural-1",
     ]);
   });
 
@@ -104,9 +104,9 @@ describe("Photo viewer on a slow connection (#816)", () => {
     const screen = await open(20, 5);
     const priorityOf = (n: number) =>
       getAllHosts(screen.container, "Image")
-        .find((image) => image.props.source.uri === `https://media.test/${n}/detail.jpg`)?.props
+        .find((image) => image.props.source.uri === `https://media.test/${n}/detail.webp?v=webp-natural-1`)?.props
         .priority;
-    await load(screen, "https://media.test/5/detail.jpg");
+    await load(screen, "https://media.test/5/detail.webp?v=webp-natural-1");
     expect([priorityOf(5), priorityOf(6)]).toEqual(["high", "low"]);
 
     await fireEvent(screen.getByTestId("photo-viewer-pager"), "momentumScrollEnd", {
@@ -118,16 +118,16 @@ describe("Photo viewer on a slow connection (#816)", () => {
 
   it("asks for the 2400 px photo only once a zoom starts, over the cached detail size", async () => {
     const screen = await open(3, 0);
-    await load(screen, "https://media.test/0/detail.jpg");
+    await load(screen, "https://media.test/0/detail.webp?v=webp-natural-1");
     expect(pageSources(screen).some((uri) => uri.includes("fullscreen"))).toBe(false);
 
     await fireEvent.press(screen.getByRole("button", { name: "Start zoom on active photo" }));
 
     const sharpened = getAllHosts(screen.container, "Image")
-      .find((image) => image.props.source.uri === "https://media.test/0/fullscreen.jpg");
-    expect(sharpened?.props.placeholder).toEqual({ uri: "https://media.test/0/detail.jpg" });
+      .find((image) => image.props.source.uri === "https://media.test/0/fullscreen.webp?v=webp-natural-1");
+    expect(sharpened?.props.placeholder).toEqual({ uri: "https://media.test/0/detail.webp?v=webp-natural-1" });
     expect(sharpened?.props.placeholderContentFit).toBe("contain");
     // The neighbour stays at the detail size.
-    expect(pageSources(screen)).toContain("https://media.test/1/detail.jpg");
+    expect(pageSources(screen)).toContain("https://media.test/1/detail.webp?v=webp-natural-1");
   });
 });

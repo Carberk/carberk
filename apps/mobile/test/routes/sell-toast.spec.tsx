@@ -13,7 +13,7 @@ import { ToastProvider } from "@/components/ui/toast";
 
 const fixture = vi.hoisted(() => {
   const id = "550e8400-e29b-41d4-a716-446655440000";
-  const photos = [0, 1, 2].map((index) => ({ photoId: index === 0 ? id : `550e8400-e29b-41d4-a716-${String(900 + index).padStart(12, "0")}`, key: index === 0 ? "photo.jpg" : `support-${index}.jpg`, sortOrder: index, state: "uploaded" }));
+  const photos = [0, 1, 2].map((index) => ({ photoId: index === 0 ? id : `550e8400-e29b-41d4-a716-${String(900 + index).padStart(12, "0")}`, key: index === 0 ? "photo.webp" : `support-${index}.webp`, sortOrder: index, state: "uploaded" }));
   return {
     id, photos, publish: vi.fn(), forceSave: vi.fn(), flush: vi.fn(), save: vi.fn(),
     drafts: { items: [{ id, payload: {

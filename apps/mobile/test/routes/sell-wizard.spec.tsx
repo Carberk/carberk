@@ -7,7 +7,7 @@ const fixture = vi.hoisted(() => {
   const id = "550e8400-e29b-41d4-a716-446655440000";
   const car = { brandId: id, modelId: id, year: 2020 };
   const details = { condition: "used", mileageKm: 10000, conditionDisclosure: { damaged: false } };
-  const photos = { photos: [0, 1, 2].map((index) => ({ photoId: index === 0 ? id : `550e8400-e29b-41d4-a716-${String(900 + index).padStart(12, "0")}`, key: index === 0 ? "photo.jpg" : `support-${index}.jpg`, sortOrder: index })) };
+  const photos = { photos: [0, 1, 2].map((index) => ({ photoId: index === 0 ? id : `550e8400-e29b-41d4-a716-${String(900 + index).padStart(12, "0")}`, key: index === 0 ? "photo.webp" : `support-${index}.webp`, sortOrder: index })) };
   const price = { priceAmount: 100000, priceCurrency: "TMT" };
   const place = { description: "One owner", regionId: id, cityId: id };
   const contact = { contactPhone: "+99365000000", allowCalls: true, allowChat: true };

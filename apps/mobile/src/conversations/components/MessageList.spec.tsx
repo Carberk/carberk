@@ -333,7 +333,7 @@ describe("MessageList Message actions", () => {
 
   it("offers Report message only for the other participant's image Message", async () => {
     const { screen } = await renderList([
-      message("img-1", at(2, 9), { senderId: PEER, kind: "image", text: "", localImageUri: "file:///photo.jpg" }),
+      message("img-1", at(2, 9), { senderId: PEER, kind: "image", text: "", localImageUri: "file:///photo.webp" }),
     ]);
 
     await longPressPhoto(screen);
@@ -343,7 +343,7 @@ describe("MessageList Message actions", () => {
 
   it("offers Delete only for an own image Message inside the delete window", async () => {
     const { screen } = await renderList([
-      message("img-1", at(2, 9), { kind: "image", text: "", localImageUri: "file:///photo.jpg", canDelete: true }),
+      message("img-1", at(2, 9), { kind: "image", text: "", localImageUri: "file:///photo.webp", canDelete: true }),
     ]);
 
     await longPressPhoto(screen);
@@ -353,7 +353,7 @@ describe("MessageList Message actions", () => {
 
   it("opens no sheet for a reported image Message or an own one past the window", async () => {
     const { screen } = await renderList(
-      [message("img-1", at(2, 9), { senderId: PEER, kind: "image", text: "", localImageUri: "file:///photo.jpg" })],
+      [message("img-1", at(2, 9), { senderId: PEER, kind: "image", text: "", localImageUri: "file:///photo.webp" })],
       { reportedMessageIds: new Set(["img-1"]) },
     );
 
@@ -467,13 +467,13 @@ describe("MessageList Message actions", () => {
     const screen = await renderMobile(
       <MessageList
         currentUserId={ME}
-        messages={[message("img-1", at(2, 9), { kind: "image", text: "", localImageUri: "file:///photo.jpg" })]}
+        messages={[message("img-1", at(2, 9), { kind: "image", text: "", localImageUri: "file:///photo.webp" })]}
         onImagePress={onImagePress}
       />,
     );
 
     await fireEvent.press(screen.getByRole("imagebutton", { name: "Photo" }));
-    expect(onImagePress).toHaveBeenCalledWith("file:///photo.jpg");
+    expect(onImagePress).toHaveBeenCalledWith("file:///photo.webp");
   });
 });
 

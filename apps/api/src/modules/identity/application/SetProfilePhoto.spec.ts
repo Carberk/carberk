@@ -6,8 +6,8 @@ import { InMemoryProfilePhotos } from "./testing/InMemoryProfilePhotos";
 import { InMemoryUsers } from "./testing/InMemoryUsers";
 import { SetProfilePhoto } from "./SetProfilePhoto";
 
-const KEY = "pending/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.jpg";
-const SECOND_KEY = "pending/1c0a4d2f-3e5b-4d7c-9f20-4b6c8d0e2f3a/original.jpg";
+const KEY = "pending/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.webp";
+const SECOND_KEY = "pending/1c0a4d2f-3e5b-4d7c-9f20-4b6c8d0e2f3a/original.webp";
 
 describe("SetProfilePhoto", () => {
   let users: InMemoryUsers;

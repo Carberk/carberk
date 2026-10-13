@@ -14,11 +14,11 @@ const fixture = vi.hoisted(() => {
   const id = "550e8400-e29b-41d4-a716-446655440000";
   const persistedId = "550e8400-e29b-41d4-a716-446655440001";
   const localId = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
-  const variants = { thumbnail: "t.jpg", list: "l.jpg", detail: "d.jpg", fullscreen: "f.jpg" };
+  const variants = { thumbnail: "t.webp", list: "l.webp", detail: "d.webp", fullscreen: "f.webp" };
   return {
     id, persistedId, localId, variants,
-    persistedKey: `listings/${id}/${persistedId}/original.jpg`,
-    newKey: "pending/9f1c/original.jpg",
+    persistedKey: `listings/${id}/${persistedId}/original.webp`,
+    newKey: "pending/9f1c/original.webp",
     listing: undefined as unknown as Record<string, unknown>,
     photos: [] as unknown[],
     show: vi.fn(),
@@ -145,7 +145,7 @@ describe("Listing edit save across a background refetch", () => {
     fixture.photos = [
       { photoId: fixture.localId, key: fixture.newKey, state: "uploaded", sortOrder: 0, retryCount: 0 },
       { photoId: fixture.persistedId, key: fixture.persistedKey, state: "attached", sortOrder: 1, retryCount: 0 },
-      { photoId: "550e8400-e29b-41d4-a716-000000000901", key: "pending/support/original.jpg", state: "uploaded", sortOrder: 2, retryCount: 0 },
+      { photoId: "550e8400-e29b-41d4-a716-000000000901", key: "pending/support/original.webp", state: "uploaded", sortOrder: 2, retryCount: 0 },
     ];
 
     const screen = await renderMobile(<EditListingScreen />);
@@ -175,9 +175,9 @@ describe("Listing edit save across a background refetch", () => {
     await waitFor(() => expect(routerMock.replace).toHaveBeenCalledWith(`/(public)/listings/${fixture.id}`));
 
     expect(api.fields.conditionDisclosure).toEqual(expect.objectContaining({ damaged: false }));
-    expect(api.requests.attach).toEqual([fixture.newKey, "pending/support/original.jpg"]);
+    expect(api.requests.attach).toEqual([fixture.newKey, "pending/support/original.webp"]);
     expect(api.requests.remove).toEqual([]);
-    expect(api.media().map((m) => m.key)).toEqual([fixture.newKey, fixture.persistedKey, "pending/support/original.jpg"]);
+    expect(api.media().map((m) => m.key)).toEqual([fixture.newKey, fixture.persistedKey, "pending/support/original.webp"]);
     expect(fixture.show).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
   });
 });

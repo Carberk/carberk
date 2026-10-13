@@ -8,7 +8,8 @@ import ProfileScreen from "../../app/profile";
 import { clearAuthSession, storeAuthSession } from "../../src/auth/session";
 import { profileNoticeStore } from "../../src/identity/profileNotice";
 import { server } from "../msw";
-import { act, fireEvent, renderMobile, routerMock, queryAllHosts } from "../render";
+import { KEYBOARD_PLATFORMS, activeKeyboardRegion, onPlatform } from "../keyboardAvoidance";
+import { act, fireEvent, renderMobile, routerMock, within, queryAllHosts } from "../render";
 
 import { ToastProvider } from "@/components/ui/toast";
 
@@ -316,3 +317,13 @@ describe("Accessibility", () => {
 // Profile loads these native modules; only this spec supplies its stand-ins.
 vi.mock("expo-file-system/legacy", async () => (await import("../profile-photo-device")).fileSystemFake);
 vi.mock("expo-image-manipulator", async () => (await import("../profile-photo-device")).imageManipulatorFake);
+
+describe("Name editor keyboard (#843)", () => {
+  it.each(KEYBOARD_PLATFORMS)("keeps the name field and Save above the %s keyboard", (os) =>
+    onPlatform(os, async () => {
+      const view = await openEditor();
+      const region = activeKeyboardRegion(view);
+      expect(within(region).getByLabelText("Name")).toBeTruthy();
+      expect(within(region).getByRole("button", { name: "Save" })).toBeTruthy();
+    }));
+});

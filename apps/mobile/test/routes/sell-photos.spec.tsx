@@ -24,7 +24,7 @@ const fixture = vi.hoisted(() => {
     payloads: {
       // Car and Details are done, so a resumed draft opens on Photos.
       atPhotos: { ...car, ...details },
-      complete: { ...car, ...details, photos: Object.values(ids).map((photoId, sortOrder) => ({ photoId, key: `${photoId}.jpg`, sortOrder })), ...rest },
+      complete: { ...car, ...details, photos: Object.values(ids).map((photoId, sortOrder) => ({ photoId, key: `${photoId}.webp`, sortOrder })), ...rest },
     } as Record<string, Record<string, unknown>>,
     payload: {} as Record<string, unknown>,
     queuePhotos: [] as StagedPhoto[],
@@ -87,9 +87,9 @@ vi.mock("../../src/api/catalog/useModels", () => ({ useModels: () => ({ data: { 
 
 const { ids } = fixture;
 const staged = (photoId: string, sortOrder: number, state: StagedPhoto["state"], extra: Partial<StagedPhoto> = {}): StagedPhoto => ({
-  photoId, sortOrder, state, retryCount: 0, localUri: `file:///${photoId}.jpg`, ...extra,
+  photoId, sortOrder, state, retryCount: 0, localUri: `file:///${photoId}.webp`, ...extra,
 });
-const keyed = (photoId: string, sortOrder: number) => staged(photoId, sortOrder, "uploaded", { key: `${photoId}.jpg` });
+const keyed = (photoId: string, sortOrder: number) => staged(photoId, sortOrder, "uploaded", { key: `${photoId}.webp` });
 
 function resume(payload: "atPhotos" | "complete") {
   if (payload === "complete") {
@@ -163,7 +163,7 @@ describe("Sell wizard, Photos step", () => {
 
     expect(fixture.forceSave).toHaveBeenCalled();
     for (const [payload] of [...fixture.forceSave.mock.calls, ...fixture.save.mock.calls]) {
-      expect(payload.photos).toEqual([{ photoId: ids.b, key: `${ids.b}.jpg`, sortOrder: 1 }]);
+      expect(payload.photos).toEqual([{ photoId: ids.b, key: `${ids.b}.webp`, sortOrder: 1 }]);
     }
   });
 
@@ -184,9 +184,9 @@ describe("Sell wizard, Photos step", () => {
 
     expect(fixture.forceSave).toHaveBeenCalledWith(expect.objectContaining({
       photos: [
-        { photoId: ids.b, key: `${ids.b}.jpg`, sortOrder: 0 },
-        { photoId: ids.a, key: `${ids.a}.jpg`, sortOrder: 1 },
-        { photoId: ids.c, key: `${ids.c}.jpg`, sortOrder: 2 },
+        { photoId: ids.b, key: `${ids.b}.webp`, sortOrder: 0 },
+        { photoId: ids.a, key: `${ids.a}.webp`, sortOrder: 1 },
+        { photoId: ids.c, key: `${ids.c}.webp`, sortOrder: 2 },
       ],
     }));
   });

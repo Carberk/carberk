@@ -212,7 +212,7 @@ function SectionRow({
       {needsSeller ? (
         <Text key="fill-in" className="text-callout font-medium text-destructive">{action}</Text>
       ) : (
-        <Text key="change" className="text-callout font-medium text-info-500">{action}</Text>
+        <Text key="change" className="text-callout font-medium text-link">{action}</Text>
       )}
     </Pressable>
   );
@@ -341,7 +341,7 @@ export default function CheckAndPublish({
         {t("publishRulesPrefix")}
         <Text
           accessibilityRole="link"
-          className="text-caption font-medium text-info-500 underline"
+          className="text-caption font-medium text-link underline"
           onPress={() => void Linking.openURL(legalPageUrl(resolveLocale(i18n.language), "posting-rules"))}
         >
           {t("publishRulesLink")}

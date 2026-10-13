@@ -9,7 +9,7 @@ const contact = { contactPhone: "+99361234567", allowCalls: true, allowChat: tru
 const completePayload = {
   brandId: id, modelId: id, year: 2020,
   condition: "used" as const, mileageKm: 10000, conditionDisclosure: { damaged: false },
-  photos: [0, 1, 2].map((index) => ({ photoId: index === 0 ? id : `550e8400-e29b-41d4-a716-${String(900 + index).padStart(12, "0")}`, key: index === 0 ? "pending/car.jpg" : `support-${index}.jpg`, sortOrder: index })),
+  photos: [0, 1, 2].map((index) => ({ photoId: index === 0 ? id : `550e8400-e29b-41d4-a716-${String(900 + index).padStart(12, "0")}`, key: index === 0 ? "pending/car.webp" : `support-${index}.webp`, sortOrder: index })),
   priceAmount: 100000, priceCurrency: "TMT" as const,
   regionId: id, cityId: id, description: "Great car",
   ...contact,

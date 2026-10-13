@@ -1,3 +1,5 @@
+import { UploadsSchemas } from "@auto-tm/contracts";
+
 const MEDIA_URL = (
   process.env["EXPO_PUBLIC_MEDIA_URL"] ?? ""
 ).replace(/\/$/, "");
@@ -18,7 +20,7 @@ export function buildVariantUrl(
     return `${MEDIA_URL}/${bucket}/${key}`;
   }
   const base = key.replace(/\/original\.(jpg|webp|jpeg)$/, "");
-  return `${MEDIA_URL}/${bucket}/${base}/${variant}.jpg`;
+  return `${MEDIA_URL}/${bucket}/${base}/${variant}.webp?v=${UploadsSchemas.PHOTO_VARIANT_CACHE_VERSION}`;
 }
 
 export function buildOriginalUrl(key: string): string {

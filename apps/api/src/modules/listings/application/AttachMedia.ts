@@ -118,6 +118,10 @@ export class AttachMedia {
       throw new Error("Upload guard returned no upload for the media key");
     }
     if (upload.adopted) {
+      const winner = (await this.mediaRepo.findByListingId(input.listingId)).find(
+        (media) => media.uploadId === upload.id,
+      );
+      if (winner) return { media: winner };
       throw this.alreadyAttached();
     }
 
@@ -166,12 +170,12 @@ export class AttachMedia {
         return { media: ListingMedia.create(details) };
       }
 
-      if (input.kind === "image") {
-        await this.variantGenerator.generate(input.key, { writeProtocol: upload.writeProtocol ?? "legacy" });
-      }
+      const thumbHash = input.kind === "image"
+        ? (await this.variantGenerator.generate(input.key, { writeProtocol: upload.writeProtocol ?? "legacy" })).thumbHash
+        : undefined;
 
       const saved = await this.mediaRepo.save(
-        ListingMedia.create({ ...details, uploadId: upload.id }),
+        ListingMedia.create({ ...details, uploadId: upload.id, ...(thumbHash !== undefined ? { thumbHash } : {}) }),
         { token: reservation.token, ...(poster ? { posterUploadId: poster.id } : {}) },
       );
       return { media: saved };

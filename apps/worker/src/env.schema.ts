@@ -14,6 +14,8 @@ const BaseSchema = z.object({
     .default("development"),
   /** Baked at image build from RAILWAY_GIT_COMMIT_SHA; used in boot logs. */
   AUTOTM_COMMIT_SHA: z.string().min(1).default("unknown"),
+  /** Operator-only startup mode: no business request handlers or queue consumers run. */
+  PHOTO_CONVERSION_MAINTENANCE: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   LOG_LEVEL: z.enum(["error", "warn", "info", "debug"]).default("info"),
 
   DATABASE_URL: z.string().url(),

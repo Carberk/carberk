@@ -13,8 +13,8 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "test": "pnpm test:agent-github && pnpm test:native-pr-seed && pnpm test:worktree-gc && pnpm test:agent-docs && pnpm test:glossary && turbo run test && pnpm test:reviewer-flow-smoke",
-    "test:unit": "pnpm test:agent-github && turbo run test:unit",
+    "test": "pnpm test:agent-github && pnpm test:native-pr-seed && pnpm test:native-session && pnpm test:worktree-gc && pnpm test:agent-docs && pnpm test:glossary && turbo run test && pnpm test:reviewer-flow-smoke",
+    "test:unit": "pnpm test:agent-github && pnpm test:native-session && turbo run test:unit",
     "test:api": "turbo run test --filter=@auto-tm/api --filter=@auto-tm/worker",
     "test:db": "turbo run test --filter=@auto-tm/db",
     "test:frontend": "turbo run test --filter=@auto-tm/mobile --filter=@auto-tm/web --filter=@auto-tm/admin --filter=@auto-tm/contracts --filter=@auto-tm/sms-gateway",
@@ -45,7 +45,8 @@
     "worktree:gc:apply": "node scripts/worktree-gc.mjs --apply",
     "test:worktree-gc": "node --test scripts/worktree-gc.test.mjs",
     "agent:github": "node scripts/agent-github.mjs",
-    "test:agent-github": "node --test scripts/agent-github.test.mjs"
+    "test:agent-github": "node --test scripts/agent-github.test.mjs",
+    "test:native-session": "node --test scripts/native-session*.test.mjs"
   },
   "devDependencies": {
     "@typescript/native": "catalog:",

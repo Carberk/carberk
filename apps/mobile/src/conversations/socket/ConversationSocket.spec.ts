@@ -203,7 +203,7 @@ describe("ConversationSocket", () => {
       senderId: USER_ID,
       kind: "image",
       text: null,
-      metadata: { key: "chat-attachments/conv-1/msg-1/original.jpg" },
+      metadata: { key: "chat-attachments/conv-1/msg-1/original.webp" },
       createdAt: "2026-06-01T12:00:00.000Z",
       clientMessageId: "client-1",
     });
@@ -214,7 +214,7 @@ describe("ConversationSocket", () => {
       },
     );
 
-    const metadata = { key: "chat-attachments/conv-1/msg-1/original.jpg", width: 800, height: 600 };
+    const metadata = { key: "chat-attachments/conv-1/msg-1/original.webp", width: 800, height: 600 };
     const result = await socket.sendImageMessage({
       conversationId: CONV_ID,
       metadata,

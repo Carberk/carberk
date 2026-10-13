@@ -228,13 +228,13 @@ export async function seedDemoInventory(deps: {
         const base = `${DEMO_OBJECT_PREFIX}${car.slug}/${String(order + 1).padStart(2, "0")}`;
         const prepared = await preparePhoto(await photos.load(photo));
         for (const file of prepared.files) {
-          const key = `${base}/${file.name}.jpg`;
-          await uploads.add(() => storage.put(key, file.body, "image/jpeg"));
+          const key = `${base}/${file.name}.webp`;
+          await uploads.add(() => storage.put(key, file.body, "image/webp"));
           expectedKeys.add(key);
         }
         media.push({
           id: demoMediaId(index, order),
-          key: `${base}/original.jpg`,
+          key: `${base}/original.webp`,
           sortOrder: order,
           width: prepared.width,
           height: prepared.height,

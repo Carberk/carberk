@@ -293,7 +293,7 @@ describe("Contact step", () => {
   it("draws Another number in the link colour the other text links use", async () => {
     const { screen } = await renderStep({ accountPhone: "+99365000000", confirmedPhones: [] });
     const className = screen.getByText("Another number").props.className as string;
-    expect(className).toContain("text-info-500");
+    expect(className).toContain("text-link");
     expect(className).not.toContain("text-primary");
   });
 

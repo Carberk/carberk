@@ -80,3 +80,43 @@ describe("toCardPhotosFromFirstMedia", () => {
     });
   });
 });
+
+describe("card photo ThumbHashes", () => {
+  it("gives each card photo its ThumbHash in key order, null where a photo has none yet", () => {
+    const result = toCardPhotos([
+      { key: "clip", kind: "video", thumbHash: null },
+      { key: "p1", kind: "image", thumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" },
+      { key: "p2", kind: "image", thumbHash: null },
+      { key: "p3", kind: "image", thumbHash: "2yMBBYCIh4iHiHeAiId4dXh3f4f4" },
+    ]);
+
+    expect(result).toEqual({
+      coverMediaKey: "clip",
+      photoKeys: ["p1", "p2"],
+      photoThumbHashes: ["1fsDBYCIiIiHiIdweIeHh4d4cIgH", null],
+      galleryKeys: ["p1", "p2", "p3"],
+      galleryThumbHashes: ["1fsDBYCIiIiHiIdweIeHh4d4cIgH", null, "2yMBBYCIh4iHiHeAiId4dXh3f4f4"],
+      photoCount: 3,
+    });
+  });
+
+  it("sends no ThumbHash lists while none of the card photos has a hash", () => {
+    const result = toCardPhotos([
+      { key: "p1", kind: "image", thumbHash: null },
+      { key: "p2", kind: "image" },
+    ]);
+
+    expect(result).toEqual({ coverMediaKey: "p1", photoKeys: ["p1", "p2"], galleryKeys: ["p1", "p2"], photoCount: 2 });
+  });
+
+  it("keeps the two-photo list without hashes when only a later gallery photo has one", () => {
+    const result = toCardPhotos([
+      { key: "p1", kind: "image" },
+      { key: "p2", kind: "image" },
+      { key: "p3", kind: "image", thumbHash: "2yMBBYCIh4iHiHeAiId4dXh3f4f4" },
+    ]);
+
+    expect(result.photoThumbHashes).toBeUndefined();
+    expect(result.galleryThumbHashes).toEqual([null, null, "2yMBBYCIh4iHiHeAiId4dXh3f4f4"]);
+  });
+});

@@ -9,11 +9,36 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { act, renderMobile } from "../render";
 import RootLayout, { unstable_settings } from "../../app/_layout";
+import { themeStore } from "../../src/theme/themeStore";
 import { OnboardingLaunch } from "../../src/onboarding/OnboardingLaunch";
 
 const FLAG = "@auto-tm/onboarding-completed";
 const LOCALE = "@auto-tm/locale";
 const LANGUAGE = "/(onboarding)/language";
+
+const appearance = vi.hoisted(() => ({
+  current: "light", hold: false, destinations: [] as string[],
+  listeners: new Set<() => void>(),
+}));
+vi.mock("nativewind", async () => {
+  const React = await import("react");
+  return {
+    cssInterop: vi.fn(), remapProps: vi.fn(),
+    useColorScheme: () => ({
+      colorScheme: React.useSyncExternalStore(
+        (listener) => { appearance.listeners.add(listener); return () => { appearance.listeners.delete(listener); }; },
+        () => appearance.current,
+      ),
+      setColorScheme: (scheme: string) => {
+        if (appearance.hold) return;
+        appearance.current = scheme === "system" ? "light" : scheme;
+        for (const listener of appearance.listeners) listener();
+      },
+    }),
+  };
+});
+
+const fontState = vi.hoisted(() => ({ loaded: true, error: null as Error | null }));
 
 const launch = vi.hoisted(() => ({
   pathname: "/",
@@ -45,7 +70,7 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
     removeItem: vi.fn(async () => {}),
   },
 }));
-vi.mock("expo-font", () => ({ useFonts: () => [true] }));
+vi.mock("expo-font", () => ({ useFonts: () => [fontState.loaded, fontState.error] }));
 vi.mock("expo-splash-screen", () => ({ preventAutoHideAsync: vi.fn(), hide: vi.fn() }));
 vi.mock("expo-status-bar", () => ({ StatusBar: () => null }));
 vi.mock("expo-localization", () => ({ getLocales: () => [{ languageCode: "en" }] }));
@@ -67,7 +92,10 @@ vi.mock("expo-router", async () => {
   // to do; the dismissal path runs on the production screens in onboarding-flow.spec.
   const native = await import("react-native");
   const Stack = Object.assign(({ children }: React.PropsWithChildren) => <native.View>{children}</native.View>, {
-    Screen: ({ name }: { name: string }) => <native.View testID={name} />,
+    Screen: ({ name }: { name: string }) => {
+      if (name === "(tabs)") appearance.destinations.push(appearance.current);
+      return <native.View testID={name} />;
+    },
   });
   return {
     Stack,
@@ -88,6 +116,11 @@ async function launchApp() {
 
 beforeEach(() => {
   createRequire(import.meta.url).extensions[".ttf"] = (module) => { module.exports = {}; };
+  appearance.current = "light";
+  appearance.hold = false;
+  appearance.destinations = [];
+  fontState.loaded = true;
+  fontState.error = null;
   launch.pathname = "/";
   launch.stored = {};
   launch.push.mockClear();
@@ -102,6 +135,66 @@ afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.mocked(AsyncStorage.getItem).mockImplementation(async (key: string) => launch.stored[key] ?? null);
+});
+
+describe("Startup resource failures", () => {
+  it("mounts the first destination with the saved Light appearance already applied", async () => {
+    appearance.current = "dark";
+    appearance.hold = true;
+    launch.stored = { "@auto-tm/theme": "light", [LOCALE]: "en" };
+    const screen = await launchApp();
+    expect(screen.queryByTestId("(tabs)")).toBeNull();
+    await act(() => {
+      appearance.current = "light";
+      appearance.hold = false;
+      for (const listener of appearance.listeners) listener();
+    });
+    expect(screen.getByTestId("(tabs)")).toBeTruthy();
+    expect(appearance.destinations.length).toBeGreaterThan(0);
+    expect(appearance.destinations.every((scheme) => scheme === "light")).toBe(true);
+  });
+
+  it("keeps navigation mounted when the person changes theme after startup", async () => {
+    launch.stored = { "@auto-tm/theme": "light", [LOCALE]: "en" };
+    const screen = await launchApp();
+    expect(screen.getByTestId("(tabs)")).toBeTruthy();
+    appearance.hold = true;
+    await act(() => themeStore.getState().setTheme("dark"));
+    expect(screen.getByTestId("(tabs)")).toBeTruthy();
+  });
+
+  it("keeps the launch cover until the saved theme has settled", async () => {
+    let resolveTheme!: (theme: string) => void;
+    const pendingTheme = new Promise<string>((resolve) => { resolveTheme = resolve; });
+    vi.mocked(AsyncStorage.getItem).mockImplementation(async (key: string) =>
+      key === "@auto-tm/theme" ? pendingTheme : "en",
+    );
+    const screen = await launchApp();
+    expect(screen.queryByTestId("(tabs)")).toBeNull();
+    expect(screen.getByText("By Alpha Motors")).toBeTruthy();
+    await act(async () => resolveTheme("dark"));
+    expect(screen.getByTestId("(tabs)")).toBeTruthy();
+  });
+
+  it("mounts the destination when bundled fonts fail instead of holding launch forever", async () => {
+    fontState.loaded = false;
+    fontState.error = new Error("font unavailable");
+    launch.stored = { [LOCALE]: "en" };
+    const screen = await launchApp();
+    expect(screen.getByTestId("(tabs)")).toBeTruthy();
+    expect(screen.getByText("By Alpha Motors")).toBeTruthy();
+  });
+
+  it("mounts the destination if locale storage fails and keeps deep-link precedence", async () => {
+    launch.pathname = "/listings/linked";
+    vi.mocked(AsyncStorage.getItem).mockImplementation(async (key: string) => {
+      if (key === LOCALE) throw new Error("locale storage unavailable");
+      return null;
+    });
+    const screen = await launchApp();
+    expect(screen.getByTestId("(tabs)")).toBeTruthy();
+    expect(launch.push).not.toHaveBeenCalled();
+  });
 });
 
 describe("Root Back anchor", () => {
@@ -133,7 +226,7 @@ describe("Onboarding on launch", () => {
     expect(launch.push).toHaveBeenCalledTimes(1);
     expect(launch.push).toHaveBeenCalledWith(LANGUAGE);
     expect(launch.stored[FLAG]).toBe("pending");
-    // The Language screen lets the launch screen go, so Home is not seen first.
+    // Only the entrance layout releases native; navigation never does.
     expect(SplashScreen.hide).not.toHaveBeenCalled();
   });
 
@@ -154,7 +247,7 @@ describe("Onboarding on launch", () => {
     expect(screen.getByTestId("(tabs)")).toBeTruthy();
     expect(launch.push).not.toHaveBeenCalled();
     expect(launch.stored[FLAG]).toBe("true");
-    expect(SplashScreen.hide).toHaveBeenCalled();
+    expect(SplashScreen.hide).not.toHaveBeenCalled();
   });
 
   it("lets a deep link win on a fresh install and keeps onboarding for the next plain start", async () => {
@@ -163,7 +256,7 @@ describe("Onboarding on launch", () => {
 
     expect(screen.getByTestId("(tabs)")).toBeTruthy();
     expect(launch.push).not.toHaveBeenCalled();
-    expect(SplashScreen.hide).toHaveBeenCalled();
+    expect(SplashScreen.hide).not.toHaveBeenCalled();
     expect(launch.stored[FLAG]).toBe("pending");
   });
 
@@ -180,7 +273,7 @@ describe("Onboarding on launch", () => {
 
     expect(screen.getByTestId("(tabs)")).toBeTruthy();
     expect(launch.push).not.toHaveBeenCalled();
-    expect(SplashScreen.hide).toHaveBeenCalled();
+    expect(SplashScreen.hide).not.toHaveBeenCalled();
   });
 });
 
@@ -200,34 +293,34 @@ describe("OnboardingLaunch", () => {
     expect(launch.push).toHaveBeenCalledWith(LANGUAGE);
   });
 
-  it("lets the launch screen go at once, without pushing, when nothing is owed or a deep link won", async () => {
+  it("leaves native handoff to the entrance when nothing is owed or a deep link won", async () => {
     const skip = await renderMobile(<OnboardingLaunch decision="skip" />);
-    expect(SplashScreen.hide).toHaveBeenCalledTimes(1);
+    expect(SplashScreen.hide).not.toHaveBeenCalled();
     expect(launch.push).not.toHaveBeenCalled();
     await skip.unmount();
 
     launch.pathname = "/listings/550e8400-e29b-41d4-a716-446655440000";
     await renderMobile(<OnboardingLaunch decision="show" />);
     expect(launch.push).not.toHaveBeenCalled();
-    expect(SplashScreen.hide).toHaveBeenCalledTimes(2);
+    expect(SplashScreen.hide).not.toHaveBeenCalled();
   });
 
-  it("still lets the launch screen go when the push itself throws", async () => {
+  it("leaves native handoff to the entrance when the push itself throws", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     launch.push.mockImplementation(() => {
       throw new Error("router is down");
     });
     await renderMobile(<OnboardingLaunch decision="show" />);
 
-    // The splash goes at once instead of waiting out the fallback timer.
-    expect(SplashScreen.hide).toHaveBeenCalledTimes(1);
+    // Navigation failure cannot release native before the entrance has laid out.
+    expect(SplashScreen.hide).not.toHaveBeenCalled();
     await act(() => {
       vi.advanceTimersByTime(1000);
     });
-    expect(SplashScreen.hide).toHaveBeenCalledTimes(1);
+    expect(SplashScreen.hide).not.toHaveBeenCalled();
   });
 
-  it("clears the fallback timer when the launch gate leaves the tree", async () => {
+  it("never releases native from a navigation fallback timer", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const screen = await renderMobile(<OnboardingLaunch decision="show" />);
     await screen.unmount();

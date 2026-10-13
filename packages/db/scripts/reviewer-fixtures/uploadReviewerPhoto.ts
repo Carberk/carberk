@@ -17,11 +17,11 @@ export async function uploadReviewerPhoto(key: string, fixtureIndex: number): Pr
   let dimensions = { width: 0, height: 0 };
   try {
     for (const [variant, width] of Object.entries(WIDTHS)) {
-      const output = await sharp(source).autoOrient().resize({ width, withoutEnlargement: true }).jpeg({ quality: 82 }).toBuffer({ resolveWithObject: true });
+      const output = await sharp(source).autoOrient().resize({ width, withoutEnlargement: true }).webp({ quality: 80 }).toBuffer({ resolveWithObject: true });
       // No keepMetadata/withMetadata: sharp strips all input metadata by default.
       await s3.send(new PutObjectCommand({
-        Bucket: "listing-photos", Key: key.replace(/original\.jpg$/, `${variant}.jpg`),
-        Body: output.data, ContentType: "image/jpeg",
+        Bucket: "listing-photos", Key: key.replace(/original\.webp$/, `${variant}.webp`),
+        Body: output.data, ContentType: "image/webp",
       }));
       if (variant === "original") dimensions = { width: output.info.width, height: output.info.height };
     }

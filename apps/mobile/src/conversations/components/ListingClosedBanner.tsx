@@ -58,7 +58,7 @@ export function ListingClosedBanner({
           accessibilityLabel={linkLabel}
         >
           <Text>{linkLabel}</Text>
-          <Icon as={ChevronRight} className="size-4 text-info-600 dark:text-info-400" />
+          <Icon as={ChevronRight} className="size-4 text-link" />
         </Button>
       )}
     </View>

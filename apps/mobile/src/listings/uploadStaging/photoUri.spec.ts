@@ -20,27 +20,27 @@ describe("getPhotoUri", () => {
     expect(
       getPhotoUri(
         photo({
-          localUri: "file:///local/photo.jpg",
-          key: "pending/p1/original.jpg",
+          localUri: "file:///local/photo.webp",
+          key: "pending/p1/original.webp",
         }),
       ),
-    ).toBe("file:///local/photo.jpg");
+    ).toBe("file:///local/photo.webp");
   });
 
   it("uses the pending original object because draft uploads have no generated variants yet", () => {
-    expect(getPhotoUri(photo({ key: "pending/p1/original.jpg" }))).toBe(
-      "https://media.autotm.tm/listing-photos/pending/p1/original.jpg",
+    expect(getPhotoUri(photo({ key: "pending/p1/original.webp" }))).toBe(
+      "https://media.autotm.tm/listing-photos/pending/p1/original.webp",
     );
   });
 
   it("uses generated variants for attached listing media", () => {
     expect(
       getPhotoUri(
-        photo({ key: "listings/listing-1/media-1/original.jpg" }),
+        photo({ key: "listings/listing-1/media-1/original.webp" }),
         "detail",
       ),
     ).toBe(
-      "https://media.autotm.tm/listing-photos/listings/listing-1/media-1/detail.jpg",
+      "https://media.autotm.tm/listing-photos/listings/listing-1/media-1/detail.webp?v=webp-natural-1",
     );
   });
 });

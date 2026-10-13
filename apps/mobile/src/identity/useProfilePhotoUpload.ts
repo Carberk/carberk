@@ -78,7 +78,7 @@ export function useProfilePhotoUpload() {
         profilePhotoUploadStore.setState({ state: { status: "unsupported" } });
         return;
       }
-      photo.compressed ??= await compressProfilePhoto(asset.uri, `${FileSystem.cacheDirectory}profile-photo-${Date.now()}.jpg`);
+      photo.compressed ??= await compressProfilePhoto(asset.uri, `${FileSystem.cacheDirectory}profile-photo-${Date.now()}.webp`);
       await photo.session.current();
       const compressed = photo.compressed;
       if (compressed.fileSize > MAX_BYTES) {
@@ -95,7 +95,7 @@ export function useProfilePhotoUpload() {
       }
       await photo.session.current();
       const presign = await apiClient.post("/uploads/presign", {
-        kind: "image", contentType: "image/jpeg", sizeBytes: compressed.fileSize, writeProtocol: "conditional-v1",
+        kind: "image", contentType: "image/webp", sizeBytes: compressed.fileSize, writeProtocol: "conditional-v1",
       } satisfies UploadsSchemas.PresignRequest, UploadsSchemas.PresignResponseSchema, { assertSession: () => photo.session.current() });
       await photo.session.current();
       if (!presign.headers || !Object.entries(presign.headers).some(([name, value]) => name.toLowerCase() === "if-match" && value.length > 0)) {

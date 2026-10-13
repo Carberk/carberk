@@ -14,14 +14,14 @@ import {
 const DIRECTORY = "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/";
 const NOW = new Date("2026-10-07T12:00:00Z");
 
-function manifest(directory = DIRECTORY, extension = "jpg"): string[] {
+function manifest(directory = DIRECTORY, extension = "webp"): string[] {
   return [`${directory}original.${extension}`, ...["thumbnail", "list", "detail", "fullscreen"]
-    .flatMap((name) => [`${directory}${name}.jpg`, `${directory}${name}.webp`])];
+    .map((name) => `${directory}${name}.webp`)];
 }
 
 function work(overrides: Partial<CleanupWork> = {}): CleanupWork {
   return {
-    uploadId: "upload-1", key: `${DIRECTORY}original.jpg`, objectKeys: manifest(),
+    uploadId: "upload-1", key: `${DIRECTORY}original.webp`, objectKeys: manifest(),
     writeProtocol: "conditional-v1", attempts: 1, ...overrides,
   };
 }
@@ -97,7 +97,7 @@ describe("CleanRetiredUploads (#721)", () => {
 
   it("keeps failed work, records why, and finishes it on a later run after a partial deletion", async () => {
     const { ledger, store, job } = setup();
-    store.failAt = `${DIRECTORY}detail.jpg`;
+    store.failAt = `${DIRECTORY}detail.webp`;
 
     const failed = await job.execute({ now: NOW, limit: 10 });
 
@@ -105,7 +105,7 @@ describe("CleanRetiredUploads (#721)", () => {
     expect(ledger.completed).toEqual([]);
     expect(ledger.failures).toEqual([{ uploadId: "upload-1", reason: "storage unavailable" }]);
     // Some objects are gone and some remain: the work is not complete.
-    expect(store.objects.has(`${DIRECTORY}original.jpg`)).toBe(false);
+    expect(store.objects.has(`${DIRECTORY}original.webp`)).toBe(false);
     expect(store.objects.has(`${DIRECTORY}fullscreen.webp`)).toBe(true);
 
     store.failAt = undefined;
@@ -119,7 +119,7 @@ describe("CleanRetiredUploads (#721)", () => {
   it("takes no more than its limit in one run and carries on past a failure", async () => {
     const items = [1, 2, 3].map((n) => {
       const directory = `pending/0000000${n}-4d4a-4d2c-8bd6-705555cb7585/`;
-      return work({ uploadId: `upload-${n}`, key: `${directory}original.jpg`, objectKeys: manifest(directory) });
+      return work({ uploadId: `upload-${n}`, key: `${directory}original.webp`, objectKeys: manifest(directory) });
     });
     const { ledger, store, job } = setup(items);
     store.failAt = items[0]?.objectKeys[3];
@@ -140,7 +140,7 @@ describe("CleanRetiredUploads (#721)", () => {
     const result = await job.execute({ now: NOW, limit: 10 });
 
     expect(store.calls).toEqual([]);
-    expect(store.objects.size).toBe(9);
+    expect(store.objects.size).toBe(5);
     expect(ledger.completed).toEqual([]);
     expect(ledger.failures).toEqual([
       { uploadId: "upload-1", reason: "a Listing media key is still under this directory" },
@@ -151,18 +151,18 @@ describe("CleanRetiredUploads (#721)", () => {
   it.each([
     ["an unfenced legacy upload", work({ writeProtocol: "legacy" })],
     ["a chat attachment", work({
-      key: "chat-attachments/c1/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.jpg",
+      key: "chat-attachments/c1/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.webp",
       objectKeys: manifest("chat-attachments/c1/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/"),
     })],
-    ["a made-up prefix", work({ key: "pending/original.jpg", objectKeys: manifest("pending/") })],
+    ["a made-up prefix", work({ key: "pending/original.webp", objectKeys: manifest("pending/") })],
     ["a directory that is not a UUID", work({
-      key: "pending/not-a-uuid/original.jpg", objectKeys: manifest("pending/not-a-uuid/"),
+      key: "pending/not-a-uuid/original.webp", objectKeys: manifest("pending/not-a-uuid/"),
     })],
     ["a video original", work({ key: `${DIRECTORY}original.mp4`, objectKeys: manifest(DIRECTORY, "mp4") })],
     ["a manifest reaching into another directory", work({
-      objectKeys: [...manifest().slice(0, 8), "pending/9f1c2d3e-4d4a-4d2c-8bd6-705555cb7585/list.jpg"],
+      objectKeys: [...manifest().slice(0, 4), "pending/9f1c2d3e-4d4a-4d2c-8bd6-705555cb7585/list.webp"],
     })],
-    ["a manifest with an extra key", work({ objectKeys: [...manifest(), `${DIRECTORY}extra.jpg`] })],
+    ["a manifest with an extra key", work({ objectKeys: [...manifest(), `${DIRECTORY}extra.webp`] })],
     ["an empty manifest", work({ objectKeys: [] })],
   ])("never deletes for %s", async (_label, item) => {
     const { ledger, store, job } = setup([item]);
@@ -174,6 +174,13 @@ describe("CleanRetiredUploads (#721)", () => {
     expect(ledger.completed).toEqual([]);
     expect(ledger.failures).toHaveLength(1);
     expect(result).toMatchObject({ deleted: 0, waiting: 1 });
+  });
+
+  it("retains exact historical nine-object cleanup authority while new WebP uploads use five", () => {
+    const historical = work({ key: `${DIRECTORY}original.jpg`, objectKeys: [`${DIRECTORY}original.jpg`, ...["thumbnail", "list", "detail", "fullscreen"].flatMap((name) => [`${DIRECTORY}${name}.jpg`, `${DIRECTORY}${name}.webp`])] });
+    expect(deletionDirectory(historical)).toBe(DIRECTORY);
+    expect(deletionDirectory(work())).toBe(DIRECTORY);
+    expect(deletionDirectory({ ...historical, objectKeys: [...historical.objectKeys, `${DIRECTORY}extra.jpg`] })).toBeNull();
   });
 
   it("grants authority only over the strict owned pending UUID directory", () => {

@@ -9,6 +9,7 @@ import {
 import sharp from "sharp";
 
 import { stripImageMetadata } from "../../../common/stripImageMetadata";
+import { computeThumbHash } from "../../../common/thumbHash";
 import type { Env } from "../../../env.schema";
 import { CHAT_ATTACHMENT_MAX_SIZE_BYTES } from "../domain/ChatAttachment";
 import type {
@@ -51,26 +52,29 @@ export class SharpChatAttachmentCleaner implements ChatAttachmentCleaner {
 
   async clean(key: string): Promise<ChatAttachmentCleanResult> {
     const input = await this.read(key);
-    if (input === null) return "missing";
-    if (input === "too-large") return "invalid";
+    if (input === null) return { status: "missing" };
+    if (input === "too-large") return { status: "invalid" };
 
     const format = key.endsWith(".webp") ? "webp" : "jpeg";
     let cleaned: Buffer | null;
+    let thumbHash: string;
     try {
       // The key's extension is the sender's claim; the bytes must agree.
       const stored = await sharp(input, { limitInputPixels: MAX_PIXELS }).metadata();
-      if (stored.format !== format) return "invalid";
+      if (stored.format !== format) return { status: "invalid" };
       cleaned = await stripImageMetadata(
         input,
         format,
         CHAT_ATTACHMENT_MAX_SIZE_BYTES,
         MAX_PIXELS,
       );
+      // The blurred preview comes from the same cleaned, upright image.
+      thumbHash = await computeThumbHash(cleaned ?? input, MAX_PIXELS);
     } catch (err) {
       this.logger.warn(
         `Chat attachment ${key} is not a usable image: ${err instanceof Error ? err.message : String(err)}`,
       );
-      return "invalid";
+      return { status: "invalid" };
     }
 
     // The image stays readable at this key, so it is replaced in place.
@@ -84,7 +88,7 @@ export class SharpChatAttachmentCleaner implements ChatAttachmentCleaner {
         }),
       );
     }
-    return "clean";
+    return { status: "clean", thumbHash };
   }
 
   /**

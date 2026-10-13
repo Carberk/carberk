@@ -201,15 +201,15 @@ describe("Messages tab", () => {
     const ids = ["c1", "c2", "c3"].map((tail) => `00000000-0000-4000-8000-0000000000${tail}`);
     api.get.mockReset().mockResolvedValue(page(ids.map((id, index) => ({
       ...conversation(id, 0),
-      peer: { ...conversation(id, 0).peer, avatarKey: `avatars/u${index}/original.jpg` },
+      peer: { ...conversation(id, 0).peer, avatarKey: `avatars/u${index}/original.webp` },
     }))));
     const view = await renderScreen();
 
     const badges = getAllHosts(view.container, "Image").map((image) => image.props.source.uri);
     expect(badges).toEqual([
-      "https://media.autotm.tm/listing-photos/avatars/u0/thumbnail.jpg",
-      "https://media.autotm.tm/listing-photos/avatars/u1/thumbnail.jpg",
-      "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.jpg",
+      "https://media.autotm.tm/listing-photos/avatars/u0/thumbnail.webp?v=webp-natural-1",
+      "https://media.autotm.tm/listing-photos/avatars/u1/thumbnail.webp?v=webp-natural-1",
+      "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.webp?v=webp-natural-1",
     ]);
     expect(api.get).toHaveBeenCalledTimes(1);
     expect(api.get).toHaveBeenCalledWith("/conversations?limit=20", expect.anything());

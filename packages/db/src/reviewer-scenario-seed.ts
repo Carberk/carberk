@@ -479,7 +479,7 @@ export async function runReviewerScenarioSeed(
       await store.upsertListingMedia({
         id: `${listingId.slice(0, -3)}${String(100 + index).padStart(3, "0")}`,
         listingId,
-        key: `reviewer-scenario/${listingId}/${index}/original.jpg`,
+        key: `reviewer-scenario/${listingId}/${index}/original.webp`,
         sortOrder: index,
         fixtureIndex: index,
       });

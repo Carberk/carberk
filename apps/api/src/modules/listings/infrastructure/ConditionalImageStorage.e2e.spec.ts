@@ -44,18 +44,17 @@ describe("conditional image protocol on digest-pinned hosted MinIO (#725)", () =
 
   function manifest(key: string): string[] {
     const base = key.slice(0, key.lastIndexOf("/") + 1);
-    return [key, `${base}thumbnail.jpg`, `${base}thumbnail.webp`, `${base}list.jpg`, `${base}list.webp`,
-      `${base}detail.jpg`, `${base}detail.webp`, `${base}fullscreen.jpg`, `${base}fullscreen.webp`];
+    return [key, `${base}thumbnail.webp`, `${base}list.webp`, `${base}detail.webp`, `${base}fullscreen.webp`];
   }
 
   async function issue(protocol: "legacy" | "conditional-v1" = "conditional-v1") {
-    const key = `pending/${randomUUID()}/original.jpg`;
+    const key = `pending/${randomUUID()}/original.webp`;
     for (const member of manifest(key)) owned.add(member);
     const photo = await sharp({ create: { width: 32, height: 48, channels: 3, background: "red" } })
-      .jpeg().withExif({ IFD0: { Make: "TestCam" }, IFD3: {
+      .webp().withExif({ IFD0: { Make: "TestCam" }, IFD3: {
         GPSLatitudeRef: "N", GPSLatitude: "37/1 56/1 0/1", GPSLongitudeRef: "E", GPSLongitude: "58/1 23/1 0/1",
       } }).toBuffer();
-    const signed = await adapter.presignUpload({ key, contentType: "image/jpeg", sizeBytes: photo.length,
+    const signed = await adapter.presignUpload({ key, contentType: "image/webp", sizeBytes: photo.length,
       ...(protocol === "conditional-v1" ? { writeProtocol: "conditional-v1" as const } : {}) });
     const headers = "headers" in signed ? signed.headers as Record<string, string> : {};
     return { key, photo, signed, headers };
@@ -63,7 +62,7 @@ describe("conditional image protocol on digest-pinned hosted MinIO (#725)", () =
 
   async function upload(fixture: Awaited<ReturnType<typeof issue>>) {
     const response = await fetch(fixture.signed.url, { method: "PUT",
-      headers: { "content-type": "image/jpeg", ...fixture.headers }, body: new Uint8Array(fixture.photo) });
+      headers: { "content-type": "image/webp", ...fixture.headers }, body: new Uint8Array(fixture.photo) });
     expect(response.status).toBe(200);
   }
 
@@ -79,7 +78,7 @@ describe("conditional image protocol on digest-pinned hosted MinIO (#725)", () =
     }
   }
 
-  it("initializes all nine objects and enforces the actual signed header, replay and deleted-key refusal", async () => {
+  it("initializes all five objects and enforces the actual signed header, replay and deleted-key refusal", async () => {
     const fixture = await issue();
     expect(fixture.headers["if-match"]).toBeTruthy();
     expect(new URL(fixture.signed.url).searchParams.get("X-Amz-SignedHeaders")?.split(";"))
@@ -166,7 +165,7 @@ describe("conditional image protocol on digest-pinned hosted MinIO (#725)", () =
     (generator as unknown as { s3: unknown }).s3 = transport;
     const generate = generator.generate.bind(generator) as (key: string, opts: { writeProtocol: "conditional-v1" }) => Promise<unknown>;
     await generate(fixture.key, { writeProtocol: "conditional-v1" });
-    expect(writes).toHaveLength(9);
+    expect(writes).toHaveLength(5);
     expect(writes.every((match) => typeof match === "string" && match.length > 0)).toBe(true);
     for (const Key of manifest(fixture.key)) {
       const stored = await s3.send(new GetObjectCommand({ Bucket: bucket, Key }));

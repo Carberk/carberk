@@ -126,6 +126,7 @@ class FakeListingsReadPort implements ListingsReadPort {
     priceCurrency: "TMT" | "USD" | "AED";
     displayPriceTmt: number;
     coverMediaKey?: string;
+    coverThumbHash?: string;
     cityId: string;
     publishedAt: Date;
     allowChat: boolean;
@@ -268,7 +269,7 @@ function seedParentListing(
     priceAmount: 100000,
     priceCurrency: "TMT" as const,
     displayPriceTmt: 100000,
-    coverMediaKey: "cover-parent.jpg",
+    coverMediaKey: "cover-parent.webp",
     cityId: "city-1",
     publishedAt: new Date("2026-05-01T00:00:00Z"),
     allowChat: true,
@@ -292,7 +293,7 @@ function seedReferencedListing(
     priceAmount: 200000,
     priceCurrency: "TMT" as const,
     displayPriceTmt: 200000,
-    coverMediaKey: "cover.jpg",
+    coverMediaKey: "cover.webp",
     cityId: "city-2",
     publishedAt: new Date("2026-05-01T00:00:00Z"),
     allowChat: true,
@@ -337,6 +338,20 @@ describe("SendPostRefMessage", () => {
     });
     expect(result.message.clientMessageId).toBe("client-ref-1");
     expect(repo.messages).toHaveLength(1);
+  });
+
+  it("stores the referenced Listing cover's server ThumbHash in the snapshot", async () => {
+    seedConversation(repo);
+    seedParentListing(listings);
+    const referenced = seedReferencedListing(listings, { coverThumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" });
+
+    const result = await makeUseCase(repo, listings).execute({
+      senderId: "buyer-1",
+      conversationId: "conv-1",
+      metadata: { listingId: referenced.id, coverThumbHash: "2yMBBYCIh4iHiHeAiId4dXh3f4f4" } as { listingId: string },
+    });
+
+    expect(result.message.metadata).toMatchObject({ coverMediaKey: "cover.webp", coverThumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" });
   });
 
   it("emits MessageSent after saving a post reference", async () => {

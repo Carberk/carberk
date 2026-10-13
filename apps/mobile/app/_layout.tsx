@@ -45,6 +45,7 @@ import {
   resolveOnboardingGate,
   type OnboardingDecision,
 } from "../src/onboarding/onboardingGate";
+import { LaunchEntrance } from "../src/launch/LaunchEntrance";
 import { themeStore } from "../src/theme/themeStore";
 
 import { ToastProvider } from "@/components/ui/toast";
@@ -192,14 +193,16 @@ function PushTokenSyncOnBoot() {
 
 export default function RootLayout() {
   const osColorScheme = useOsColorScheme();
-  const { setColorScheme } = useNativeWindColorScheme();
+  const { colorScheme: appliedScheme, setColorScheme } = useNativeWindColorScheme();
   const theme = themeStore((state) => state.theme);
   const hydrateTheme = themeStore((state) => state.hydrate);
   const resolvedScheme =
     theme === "system" ? (osColorScheme ?? "light") : theme;
   const scheme = resolvedScheme === "dark" ? "dark" : "light";
   const [i18nReady, setI18nReady] = useState(false);
-  const [fontsLoaded] = useFonts({
+  const [themeReady, setThemeReady] = useState(false);
+  const [startupAppearanceReady, setStartupAppearanceReady] = useState(false);
+  const [fontsLoaded, fontError] = useFonts({
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     "Geist-Light": require("../assets/fonts/Geist-Light.ttf"),
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -216,23 +219,30 @@ export default function RootLayout() {
     "GeistMono-Medium": require("../assets/fonts/GeistMono-Medium.ttf"),
   });
   const [onboarding, setOnboarding] = useState<OnboardingDecision | null>(null);
-  const appReady = fontsLoaded && i18nReady && onboarding !== null;
+  const appReady = (fontsLoaded || !!fontError) && i18nReady && startupAppearanceReady && onboarding !== null;
 
   useEffect(() => {
     // Started first: the gate reads storage before anything in this launch
     // can write to it. It answers within a second.
     void resolveOnboardingGate().then(setOnboarding);
-    void localeStore.getState().hydrate().then(() => {
-      void initI18n().then(() => {
-        setI18nReady(true);
-      });
-    });
-    void hydrateTheme();
+    void localeStore.getState().hydrate()
+      .catch((error) => console.warn("[launch] locale storage unavailable", error))
+      .then(() => initI18n())
+      .catch((error) => console.warn("[launch] locale initialization failed", error))
+      .finally(() => setI18nReady(true));
+    void hydrateTheme()
+      .catch((error) => console.warn("[launch] theme storage unavailable", error))
+      .finally(() => setThemeReady(true));
   }, [hydrateTheme]);
 
   useEffect(() => {
     setColorScheme(theme);
   }, [theme, setColorScheme]);
+  useEffect(() => {
+    // Only startup waits for the native styling system. Later theme changes
+    // update the mounted screens without resetting navigation or local drafts.
+    if (themeReady && appliedScheme === scheme) setStartupAppearanceReady(true);
+  }, [themeReady, appliedScheme, scheme]);
   useEffect(() => {
     const sub = AppState.addEventListener("change", onAppStateChange);
     return () => sub.remove();
@@ -250,13 +260,14 @@ export default function RootLayout() {
     return () => unsub();
   }, []);
 
-  // The native launch screen stays up until `OnboardingLaunch` lets it go.
+  // The presentation mounts while startup runs; readiness alone mounts navigation.
   if (!appReady) {
-    return null;
+    return <LaunchEntrance ready={false} />;
   }
 
   return (
     // Gesture Handler needs one root view above every gesture (the tab bar's slide, the photo zoom).
+    <LaunchEntrance ready={true}>
     <GestureHandlerRootView style={{ flex: 1 }}>
     <QueryClientProvider client={queryClient}>
       <AppNavigationEffects />
@@ -291,5 +302,6 @@ export default function RootLayout() {
       </ThemeProvider>
     </QueryClientProvider>
     </GestureHandlerRootView>
+    </LaunchEntrance>
   );
 }

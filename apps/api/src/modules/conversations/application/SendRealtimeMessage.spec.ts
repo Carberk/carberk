@@ -37,7 +37,7 @@ describe("SendRealtimeMessage", () => {
 
   it("removes an image's metadata before the socket message is created", async () => {
     const key =
-      "chat-attachments/conversation-1/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.jpg";
+      "chat-attachments/conversation-1/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.webp";
     const sender = {
       execute: vi.fn(async (input: Parameters<SendConversationMessage["execute"]>[0]) => ({
         message: await input.createMessage({

@@ -17,7 +17,7 @@ const fixture = vi.hoisted(() => {
     mileageKm: 10000,
     conditionDisclosure: { damaged: false },
   };
-  const photos = { photos: [0, 1, 2].map((index) => ({ photoId: index === 0 ? id : `550e8400-e29b-41d4-a716-${String(900 + index).padStart(12, "0")}`, key: index === 0 ? "photo.jpg" : `support-${index}.jpg`, sortOrder: index })) };
+  const photos = { photos: [0, 1, 2].map((index) => ({ photoId: index === 0 ? id : `550e8400-e29b-41d4-a716-${String(900 + index).padStart(12, "0")}`, key: index === 0 ? "photo.webp" : `support-${index}.webp`, sortOrder: index })) };
   const price = { priceAmount: 100000, priceCurrency: "TMT" };
   const place = { description: "One owner", regionId: id, cityId: id };
   const contact = { allowCalls: true, allowChat: true };
@@ -81,7 +81,7 @@ vi.mock("../../src/listings/wizard/useWizardAutosave", () => ({
   }),
 }));
 vi.mock("../../src/listings/uploadStaging/useUploadQueue", () => ({ useUploadQueue: () => ({
-  photos: [0, 1, 2].map((index) => ({ photoId: index === 0 ? fixture.id : `550e8400-e29b-41d4-a716-${String(900 + index).padStart(12, "0")}`, key: index === 0 ? "photo.jpg" : `support-${index}.jpg`, sortOrder: index, state: "uploaded" })),
+  photos: [0, 1, 2].map((index) => ({ photoId: index === 0 ? fixture.id : `550e8400-e29b-41d4-a716-${String(900 + index).padStart(12, "0")}`, key: index === 0 ? "photo.webp" : `support-${index}.webp`, sortOrder: index, state: "uploaded" })),
   publishGate: { canPublish: true, blockers: [] }, isReady: true,
 }) }));
 vi.mock("../../src/listings/uploadStaging/stagingDir", () => ({ deleteDraftDir: vi.fn() }));

@@ -100,7 +100,8 @@ export function SignInEntryScreen({ initialMethod }: { initialMethod: SignInMeth
   const destination = isPhone ? phone.canonicalPhone : canonicalEmail;
   const showError = isPhone ? phone.showError : emailTouched && canonicalEmail === null || emailError !== null;
   const emailShowError = emailTouched && canonicalEmail === null || emailError !== null;
-  const emailHelper = emailError ?? (emailShowError ? t("emailFormatError") : t("emailInputHelper"));
+  const phoneHelper = phone.helperText === t("phoneInputHelper") ? t("phoneHelper") : phone.helperText;
+  const emailHelper = emailError ?? (emailShowError ? t("emailFormatError") : t("emailHelper"));
   const previousIsPhone = previousMethod === "phone";
   const previousError = previousIsPhone ? phone.showError : emailShowError;
   const previousValue = previousIsPhone ? phone.display : email;
@@ -132,8 +133,6 @@ export function SignInEntryScreen({ initialMethod }: { initialMethod: SignInMeth
   return (
     <AuthEntryScreen
       method={method}
-      title={t(isPhone ? "phoneTitle" : "emailTitle")}
-      helper={t(isPhone ? "phoneHelper" : "emailHelper")}
       canSubmit={destination !== null && !isSubmitting}
       isSubmitting={isSubmitting}
       onMethodChange={selectMethod}
@@ -171,7 +170,7 @@ export function SignInEntryScreen({ initialMethod }: { initialMethod: SignInMeth
           />
         </View>
         <SignInMethodContent method={method}
-          phone={<Text className={phone.showError ? "text-callout leading-snug text-destructive" : "text-callout leading-snug text-muted-foreground"}>{phone.helperText}</Text>}
+          phone={<Text className={phone.showError ? "text-callout leading-snug text-destructive" : "text-callout leading-snug text-muted-foreground"}>{phoneHelper}</Text>}
           email={<Text className={emailShowError ? "text-callout leading-snug text-destructive" : "text-callout leading-snug text-muted-foreground"}>{emailHelper}</Text>}
         />
       </Animated.View>
@@ -186,7 +185,7 @@ export function SignInEntryScreen({ initialMethod }: { initialMethod: SignInMeth
             {previousValue || t(previousIsPhone ? "phonePlaceholder" : "emailPlaceholder")}
           </Text>
         </View>
-        <Text className={previousError ? "text-callout leading-snug text-destructive" : "text-callout leading-snug text-muted-foreground"}>{previousIsPhone ? phone.helperText : emailHelper}</Text>
+        <Text className={previousError ? "text-callout leading-snug text-destructive" : "text-callout leading-snug text-muted-foreground"}>{previousIsPhone ? phoneHelper : emailHelper}</Text>
       </Animated.View>
       </View>
     </AuthEntryScreen>

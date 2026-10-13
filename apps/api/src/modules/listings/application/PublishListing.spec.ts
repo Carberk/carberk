@@ -33,7 +33,7 @@ function presignedUpload(key: string, userId = "user-1"): void {
     userId,
     key,
     kind: "image",
-    contentType: "image/jpeg",
+    contentType: "image/webp",
     sizeBytes: 1024,
     createdAt: new Date("2026-05-01T00:00:00Z"),
   });
@@ -100,6 +100,7 @@ class FakeEventPublisher implements ListingEventPublisher {
 
 class FakeImageVariantGenerator implements ImageVariantGenerator {
   generated: string[] = [];
+  hashes: Record<string, string> = {};
   /** Runs while the generator holds an upload, before it returns. */
   during: ((originalKey: string) => Promise<void> | void) | undefined;
 
@@ -108,11 +109,13 @@ class FakeImageVariantGenerator implements ImageVariantGenerator {
     await this.during?.(originalKey);
     return {
       variants: {
-        thumbnail: originalKey.replace("original.jpg", "thumbnail.jpg"),
-        list: originalKey.replace("original.jpg", "list.jpg"),
-        detail: originalKey.replace("original.jpg", "detail.jpg"),
-        fullscreen: originalKey.replace("original.jpg", "fullscreen.jpg"),
+        thumbnail: originalKey.replace("original.webp", "thumbnail.webp"),
+        list: originalKey.replace("original.webp", "list.webp"),
+        detail: originalKey.replace("original.webp", "detail.webp"),
+        fullscreen: originalKey.replace("original.webp", "fullscreen.webp"),
       },
+      // A distinct hash per photo, so a test can tell which row got which.
+      thumbHash: this.hashes[originalKey] ?? "1fsDBYCIiIiHiIdweIeHh4d4cIgH",
     };
   }
 }
@@ -267,11 +270,11 @@ describe("PublishListing", () => {
     world = new InMemoryMediaWorld();
     contactPhones = new InMemoryContactPhones();
     clock = { now: () => new Date() };
-    presignedUpload("photo1.jpg");
-    presignedUpload("photo2.jpg");
-    presignedUpload("photo3.jpg");
-    presignedUpload("p1.jpg");
-    presignedUpload("p2.jpg");
+    presignedUpload("photo1.webp");
+    presignedUpload("photo2.webp");
+    presignedUpload("photo3.webp");
+    presignedUpload("p1.webp");
+    presignedUpload("p2.webp");
     draftRepo = new FakeListingDraftRepository();
     prisma = new FakePrisma();
     exchangeRates = new FakeExchangeRatePort();
@@ -294,9 +297,9 @@ describe("PublishListing", () => {
     allowCalls: true,
     allowChat: true,
     photos: [
-      { photoId: "00000000-0000-0000-0000-000000000005", key: "photo1.jpg", sortOrder: 0 },
-      { photoId: "00000000-0000-0000-0000-000000000006", key: "photo2.jpg", sortOrder: 1 },
-      { photoId: "00000000-0000-0000-0000-000000000007", key: "photo3.jpg", sortOrder: 2 },
+      { photoId: "00000000-0000-0000-0000-000000000005", key: "photo1.webp", sortOrder: 0 },
+      { photoId: "00000000-0000-0000-0000-000000000006", key: "photo2.webp", sortOrder: 1 },
+      { photoId: "00000000-0000-0000-0000-000000000007", key: "photo3.webp", sortOrder: 2 },
     ],
     conditionDisclosure: {
       damaged: true,
@@ -467,7 +470,7 @@ describe("PublishListing", () => {
   it("refuses twenty-one attached photos without publication", async () => {
     const photos = Array.from({ length: 21 }, (_, index) => ({
       photoId: `00000000-0000-0000-0000-${String(100 + index).padStart(12, "0")}`,
-      key: `cap-${index}.jpg`, sortOrder: index,
+      key: `cap-${index}.webp`, sortOrder: index,
     }));
     photos.forEach((photo) => presignedUpload(photo.key));
     seedDraft(draftRepo, { ...validPayload, photos });
@@ -475,6 +478,19 @@ describe("PublishListing", () => {
     expect(error).toBeInstanceOf(BadRequestException);
     expect((error as BadRequestException).getResponse()).toMatchObject({ code: "INVALID_DRAFT_PAYLOAD", details: { formErrors: ["MEDIA_LIMIT_EXCEEDED"] } });
     expect(prisma.createdListings).toEqual([]);
+  });
+
+  it("stores each published photo's server-computed ThumbHash on its own media row", async () => {
+    seedDraft(draftRepo, validPayload);
+    variantGenerator.hashes = { "photo2.webp": "2yMBBYCIh4iHiHeAiId4dXh3f4f4" };
+
+    await makeUseCase(draftRepo, prisma, exchangeRates, events, variantGenerator).execute({ draftId: "draft-1", userId: "user-1" });
+
+    expect(prisma.createdMedia.map((row) => [row["key"], row["thumbHash"]])).toEqual([
+      ["photo1.webp", "1fsDBYCIiIiHiIdweIeHh4d4cIgH"],
+      ["photo2.webp", "2yMBBYCIh4iHiHeAiId4dXh3f4f4"],
+      ["photo3.webp", "1fsDBYCIiIiHiIdweIeHh4d4cIgH"],
+    ]);
   });
 
   it("publishes a valid draft", async () => {
@@ -492,7 +508,7 @@ describe("PublishListing", () => {
       knownIssuesText: validPayload.conditionDisclosure.knownIssuesText,
     });
     expect(prisma.createdMedia).toHaveLength(3);
-    expect(variantGenerator.generated).toEqual(["photo1.jpg", "photo2.jpg", "photo3.jpg"]);
+    expect(variantGenerator.generated).toEqual(["photo1.webp", "photo2.webp", "photo3.webp"]);
     expect(prisma.deletedDrafts).toContain("draft-1");
     expect(prisma.auditLogs).toHaveLength(1);
     expect(prisma.auditLogs[0]).toMatchObject({
@@ -636,9 +652,9 @@ describe("PublishListing", () => {
     seedDraft(draftRepo, {
       ...validPayload,
       photos: [
-        { photoId: "00000000-0000-0000-0000-000000000005", key: "p1.jpg", sortOrder: 0 },
-        { photoId: "00000000-0000-0000-0000-000000000006", key: "p2.jpg", sortOrder: 1 },
-        { photoId: "00000000-0000-0000-0000-000000000007", key: "photo3.jpg", sortOrder: 2 },
+        { photoId: "00000000-0000-0000-0000-000000000005", key: "p1.webp", sortOrder: 0 },
+        { photoId: "00000000-0000-0000-0000-000000000006", key: "p2.webp", sortOrder: 1 },
+        { photoId: "00000000-0000-0000-0000-000000000007", key: "photo3.webp", sortOrder: 2 },
       ],
     });
 
@@ -646,7 +662,7 @@ describe("PublishListing", () => {
     await uc.execute({ draftId: "draft-1", userId: "user-1" });
 
     expect(prisma.createdMedia).toHaveLength(3);
-    expect(variantGenerator.generated).toEqual(["p1.jpg", "p2.jpg", "photo3.jpg"]);
+    expect(variantGenerator.generated).toEqual(["p1.webp", "p2.webp", "photo3.webp"]);
   });
 
   // #536: User B's Listing publicly exposes its media key, so a known key must
@@ -678,8 +694,8 @@ describe("PublishListing", () => {
     }
 
     it("does not publish a draft whose photo key was never presigned", async () => {
-      world.putObject("pending/forged/original.jpg", { contentType: "image/jpeg", sizeBytes: 1024 });
-      seedDraft(draftRepo, photoDraft("pending/forged/original.jpg"));
+      world.putObject("pending/forged/original.webp", { contentType: "image/webp", sizeBytes: 1024 });
+      seedDraft(draftRepo, photoDraft("pending/forged/original.webp"));
 
       const err = await publishError();
 
@@ -691,18 +707,18 @@ describe("PublishListing", () => {
     });
 
     it("does not publish a key another User presigned and attached to their own Listing", async () => {
-      presignedUpload("pending/user-b-upload/original.jpg", "user-b");
+      presignedUpload("pending/user-b-upload/original.webp", "user-b");
       world.media.push(
         ListingMedia.create({
           id: "victim-media",
           listingId: "listing-b",
           kind: "image",
-          key: "pending/user-b-upload/original.jpg",
+          key: "pending/user-b-upload/original.webp",
           sortOrder: 0,
-          uploadId: "upload-pending/user-b-upload/original.jpg",
+          uploadId: "upload-pending/user-b-upload/original.webp",
         }),
       );
-      seedDraft(draftRepo, photoDraft("pending/user-b-upload/original.jpg"));
+      seedDraft(draftRepo, photoDraft("pending/user-b-upload/original.webp"));
 
       const err = await publishError();
 
@@ -719,12 +735,12 @@ describe("PublishListing", () => {
           id: "earlier-media",
           listingId: "listing-earlier",
           kind: "image",
-          key: "photo1.jpg",
+          key: "photo1.webp",
           sortOrder: 0,
-          uploadId: "upload-photo1.jpg",
+          uploadId: "upload-photo1.webp",
         }),
       );
-      seedDraft(draftRepo, photoDraft("photo1.jpg"));
+      seedDraft(draftRepo, photoDraft("photo1.webp"));
 
       const err = await publishError();
 
@@ -736,28 +752,28 @@ describe("PublishListing", () => {
     });
 
     it("does not publish when the uploaded file never reached storage", async () => {
-      world.objects.delete("photo1.jpg");
-      seedDraft(draftRepo, photoDraft("photo1.jpg"));
+      world.objects.delete("photo1.webp");
+      seedDraft(draftRepo, photoDraft("photo1.webp"));
 
       const err = await publishError();
 
       expect((err as BadRequestException).getResponse()).toMatchObject({
         code: "UPLOAD_OBJECT_INVALID",
-        details: { key: "photo1.jpg", photoId: "00000000-0000-0000-0000-000000000005" },
+        details: { key: "photo1.webp", photoId: "00000000-0000-0000-0000-000000000005" },
       });
       expectNothingPublished();
       // A conditional PUT may still be in flight. Missing bytes authorize no retirement.
-      expect(world.claimOf("upload-photo1.jpg").state).toBe("AVAILABLE");
+      expect(world.claimOf("upload-photo1.webp").state).toBe("AVAILABLE");
       expect(world.cleanups).toEqual([]);
-      expect(world.claimOf("upload-photo2.jpg").state).toBe("AVAILABLE");
-      expect(world.claimOf("upload-photo3.jpg").state).toBe("AVAILABLE");
+      expect(world.claimOf("upload-photo2.webp").state).toBe("AVAILABLE");
+      expect(world.claimOf("upload-photo3.webp").state).toBe("AVAILABLE");
     });
 
     it.each([0, null])("keeps an incomplete conditional PUT adoptable and accepts its completed retry (%s)", async (size) => {
-      const upload = world.uploads.find((u) => u.key === "photo1.jpg")!;
+      const upload = world.uploads.find((u) => u.key === "photo1.webp")!;
       upload.writeProtocol = "conditional-v1";
       if (size === null) world.objects.delete(upload.key);
-      else world.putObject(upload.key, { contentType: "image/jpeg", sizeBytes: size });
+      else world.putObject(upload.key, { contentType: "image/webp", sizeBytes: size });
       seedDraft(draftRepo, photoDraft(upload.key));
       await publishError();
       expect(world.claimOf(upload.id).state).toBe("AVAILABLE");
@@ -769,34 +785,34 @@ describe("PublishListing", () => {
     });
 
     it("re-inspects a positive mismatch before retirement, leaving a corrected object adoptable", async () => {
-      seedDraft(draftRepo, photoDraft("photo1.jpg"));
+      seedDraft(draftRepo, photoDraft("photo1.webp"));
       const inspect = world.inspector.inspect;
       let first = true;
       world.inspector.inspect = async (key) => {
-        if (key === "photo1.jpg" && first) {
+        if (key === "photo1.webp" && first) {
           first = false;
           return { contentType: "image/png", sizeBytes: 100 };
         }
         return inspect(key);
       };
       await publishError();
-      expect(world.claimOf("upload-photo1.jpg").state).toBe("AVAILABLE");
+      expect(world.claimOf("upload-photo1.webp").state).toBe("AVAILABLE");
       expect(world.cleanups).toEqual([]);
     });
 
     it.each([
       { contentType: "image/png", sizeBytes: 100 },
-      { contentType: "image/jpeg", sizeBytes: 5 * 1024 * 1024 + 1 },
+      { contentType: "image/webp", sizeBytes: 5 * 1024 * 1024 + 1 },
     ])("retires only the positively mismatched object and names the draft photo (%s)", async (object) => {
-      seedDraft(draftRepo, photoDraft("photo1.jpg"));
-      world.putObject("photo1.jpg", object);
+      seedDraft(draftRepo, photoDraft("photo1.webp"));
+      world.putObject("photo1.webp", object);
       const err = await publishError();
       expect((err as BadRequestException).getResponse()).toMatchObject({
         code: "UPLOAD_OBJECT_INVALID",
-        details: { key: "photo1.jpg", photoId: "00000000-0000-0000-0000-000000000005" },
+        details: { key: "photo1.webp", photoId: "00000000-0000-0000-0000-000000000005" },
       });
-      expect(world.claimOf("upload-photo1.jpg").state).toBe("RETIRED");
-      expect(world.cleanups).toEqual(["upload-photo1.jpg"]);
+      expect(world.claimOf("upload-photo1.webp").state).toBe("RETIRED");
+      expect(world.cleanups).toEqual(["upload-photo1.webp"]);
       expectNothingPublished();
     });
 
@@ -804,9 +820,9 @@ describe("PublishListing", () => {
       seedDraft(draftRepo, {
         ...validPayload,
         photos: [
-          { photoId: "00000000-0000-0000-0000-000000000005", key: "p1.jpg", sortOrder: 0 },
-          { photoId: "00000000-0000-0000-0000-000000000006", key: "p1.jpg", sortOrder: 1 },
-          { photoId: "00000000-0000-0000-0000-000000000007", key: "photo3.jpg", sortOrder: 2 },
+          { photoId: "00000000-0000-0000-0000-000000000005", key: "p1.webp", sortOrder: 0 },
+          { photoId: "00000000-0000-0000-0000-000000000006", key: "p1.webp", sortOrder: 1 },
+          { photoId: "00000000-0000-0000-0000-000000000007", key: "photo3.webp", sortOrder: 2 },
         ],
       });
 
@@ -818,19 +834,19 @@ describe("PublishListing", () => {
     });
 
     it("links each media row to the upload it adopts", async () => {
-      seedDraft(draftRepo, photoDraft("photo1.jpg"));
+      seedDraft(draftRepo, photoDraft("photo1.webp"));
 
       const uc = makeUseCase(draftRepo, prisma, exchangeRates, events, variantGenerator);
       await uc.execute({ draftId: "draft-1", userId: "user-1" });
 
       expect(prisma.createdMedia[0]).toMatchObject({
-        key: "photo1.jpg",
-        uploadId: "upload-photo1.jpg",
+        key: "photo1.webp",
+        uploadId: "upload-photo1.webp",
       });
     });
 
     // #721, ADR-0088: the common claim, not the unique link, decides the adopter.
-    const DRAFT_KEYS = ["p1.jpg", "p2.jpg", "photo3.jpg"];
+    const DRAFT_KEYS = ["p1.webp", "p2.webp", "photo3.webp"];
     const threePhotoDraft = () => ({
       ...validPayload,
       photos: DRAFT_KEYS.map((key, sortOrder) => ({
@@ -850,7 +866,7 @@ describe("PublishListing", () => {
       const { listing } = await uc.execute({ draftId: "draft-1", userId: "user-1" });
 
       expect(seen).toEqual(Array(3).fill("PREPARING,PREPARING,PREPARING"));
-      expect(world.claimOf("upload-p1.jpg")).toMatchObject({
+      expect(world.claimOf("upload-p1.webp")).toMatchObject({
         state: "ADOPTED", target: { type: "listing", id: listing.id },
       });
       expect(draftStates()).toEqual(["ADOPTED", "ADOPTED", "ADOPTED"]);
@@ -859,7 +875,7 @@ describe("PublishListing", () => {
     it("publishes and generates nothing when a Profile Photo is preparing one of the photos", async () => {
       seedDraft(draftRepo, threePhotoDraft());
       await world.claims.reserve({
-        userId: "user-1", uploadIds: ["upload-p2.jpg"], target: { type: "profile", id: "user-1" },
+        userId: "user-1", uploadIds: ["upload-p2.webp"], target: { type: "profile", id: "user-1" },
       });
 
       const err = await publishError();
@@ -874,10 +890,10 @@ describe("PublishListing", () => {
     });
 
     it("reports an unavailable upload, with nothing published, when its reservation was retired meanwhile", async () => {
-      seedDraft(draftRepo, photoDraft("photo1.jpg"));
+      seedDraft(draftRepo, photoDraft("photo1.webp"));
       variantGenerator.during = async () => {
         // What the storage scanner does to a stranded preparation.
-        await world.claims.retire(null, "upload-photo1.jpg");
+        await world.claims.retire(null, "upload-photo1.webp");
       };
 
       const err = await publishError();
@@ -890,7 +906,7 @@ describe("PublishListing", () => {
     });
 
     it("rethrows a failed transaction, releases what it had reserved, and lets a retry publish the same photos", async () => {
-      seedDraft(draftRepo, photoDraft("photo1.jpg"));
+      seedDraft(draftRepo, photoDraft("photo1.webp"));
       const failure = Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
       prisma.failTransaction = () => failure;
 
@@ -906,7 +922,7 @@ describe("PublishListing", () => {
       expect(prisma.createdListings).toHaveLength(0);
       // #735 / ADR-0089: a transient failure releases the reservation instead of
       // retiring every photo; nothing is recorded for deletion.
-      const draftUploads = ["upload-photo1.jpg", "upload-photo2.jpg", "upload-photo3.jpg"];
+      const draftUploads = ["upload-photo1.webp", "upload-photo2.webp", "upload-photo3.webp"];
       expect(draftUploads.map((id) => world.claimOf(id).state)).toEqual(["AVAILABLE", "AVAILABLE", "AVAILABLE"]);
       expect(world.cleanups).toEqual([]);
 
@@ -920,7 +936,7 @@ describe("PublishListing", () => {
       seedDraft(draftRepo, threePhotoDraft());
       let failed = false;
       variantGenerator.during = (key) => {
-        if (!failed && key === "p2.jpg") {
+        if (!failed && key === "p2.webp") {
           failed = true;
           throw new Error("Sharp failed");
         }
@@ -942,8 +958,8 @@ describe("PublishListing", () => {
       const { listing } = await uc.execute({ draftId: "draft-1", userId: "user-1" });
       expect(listing.status).toBe("active");
       expect(variantGenerator.generated).toEqual([
-        "p1.jpg", "p2.jpg", "photo3.jpg",
-        "p1.jpg", "p2.jpg", "photo3.jpg",
+        "p1.webp", "p2.webp", "photo3.webp",
+        "p1.webp", "p2.webp", "photo3.webp",
       ]);
     });
 
@@ -954,8 +970,8 @@ describe("PublishListing", () => {
       const hold = new Promise<void>((resolve) => { unblock = resolve; });
       const running = new Promise<void>((resolve) => { started = resolve; });
       variantGenerator.during = async (key) => {
-        if (key === "p1.jpg") { started(); await hold; }
-        if (key === "p2.jpg") throw permanent
+        if (key === "p1.webp") { started(); await hold; }
+        if (key === "p2.webp") throw permanent
           ? new DomainError(LISTING_ERROR_CODES.UPLOAD_OBJECT_INVALID, "Corrupt image")
           : new Error("storage unavailable");
       };
@@ -964,7 +980,7 @@ describe("PublishListing", () => {
       await new Promise<void>((resolve) => setImmediate(resolve));
       const whileRunning = draftStates();
       const cleanupWhileRunning = [...world.cleanups];
-      const competing = await world.claims.reserve({ userId: "user-1", uploadIds: ["upload-p1.jpg"],
+      const competing = await world.claims.reserve({ userId: "user-1", uploadIds: ["upload-p1.webp"],
         target: { type: "profile", id: "user-1" } }).catch((error: unknown) => error);
       unblock();
       await pending;
@@ -977,7 +993,7 @@ describe("PublishListing", () => {
     it("names the photo and retires only that upload when generation proves it permanently unusable", async () => {
       seedDraft(draftRepo, threePhotoDraft());
       variantGenerator.during = (key) => {
-        if (key === "p2.jpg") {
+        if (key === "p2.webp") {
           // The contract with ImageVariantGenerator: bytes that can never be an
           // image are reported as UPLOAD_OBJECT_INVALID, not a transient error.
           throw new DomainError(
@@ -992,12 +1008,12 @@ describe("PublishListing", () => {
       expect(err).toBeInstanceOf(BadRequestException);
       expect((err as BadRequestException).getResponse()).toMatchObject({
         code: "UPLOAD_OBJECT_INVALID",
-        details: { key: "p2.jpg", photoId: "00000000-0000-0000-0000-000000000006" },
+        details: { key: "p2.webp", photoId: "00000000-0000-0000-0000-000000000006" },
       });
       expect(prisma.createdListings).toHaveLength(0);
       // Only the unusable upload is retired; the others are released and stay adoptable.
       expect(draftStates()).toEqual(["AVAILABLE", "RETIRED", "AVAILABLE"]);
-      expect(world.cleanups).toEqual(["upload-p2.jpg"]);
+      expect(world.cleanups).toEqual(["upload-p2.webp"]);
     });
 
     it("keeps the released photos unadoptable by another target while a retry is in flight", async () => {
@@ -1012,11 +1028,11 @@ describe("PublishListing", () => {
         releaseGeneration = resolve;
       });
       variantGenerator.during = async (key) => {
-        if (!failed && key === "p2.jpg") {
+        if (!failed && key === "p2.webp") {
           failed = true;
           throw new Error("Sharp failed");
         }
-        if (failed && key === "p1.jpg") {
+        if (failed && key === "p1.webp") {
           signalInFlight();
           await hold;
         }
@@ -1041,7 +1057,7 @@ describe("PublishListing", () => {
         await expect(
           world.claims.reserve({
             userId: "user-1",
-            uploadIds: ["upload-p1.jpg"],
+            uploadIds: ["upload-p1.webp"],
             target: { type: "listing", id: "listing-other" },
           }),
         ).rejects.toMatchObject({ code: "UPLOAD_ALREADY_ATTACHED" });

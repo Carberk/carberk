@@ -8,6 +8,7 @@ import * as Notifications from "expo-notifications";
 import type { ConversationsSchemas, ListingsSchemas } from "@auto-tm/contracts";
 import { waitFor } from "@testing-library/react-native";
 
+import { activeKeyboardRegion } from "../keyboardAvoidance";
 import { act, fireEvent, renderMobile, routeParams, routerMock, within, getAllHosts, getHost, first } from "../render";
 import ConversationDetailScreen from "../../app/conversations/[id]";
 import { queryKeys } from "../../src/api/queryKeys";
@@ -117,14 +118,14 @@ vi.mock("../../lib/theme", () => ({
 }));
 vi.mock("../../src/conversations/upload/chatImageUpload", () => ({
   uploadChatImageToPresignedUrl: vi.fn(async () => {}),
-  compressChatImage: vi.fn(async () => ({ uri: "file:///staged.jpg", fileSize: 1000, width: 800, height: 600 })),
-  getChatImageStagingPath: vi.fn(() => "file:///staged.jpg"),
+  compressChatImage: vi.fn(async () => ({ uri: "file:///staged.webp", fileSize: 1000, width: 800, height: 600 })),
+  getChatImageStagingPath: vi.fn(() => "file:///staged.webp"),
   ensureChatStagingDir: vi.fn(async () => {}),
   ChatImageUploadError: class extends Error {},
 }));
 vi.mock("expo-image-picker", () => ({
   useMediaLibraryPermissions: () => [{ granted: true }, vi.fn()],
-  launchImageLibraryAsync: vi.fn(async () => ({ canceled: false, assets: [{ uri: "file:///picked.jpg" }] })),
+  launchImageLibraryAsync: vi.fn(async () => ({ canceled: false, assets: [{ uri: "file:///picked.webp" }] })),
 }));
 vi.mock("expo-file-system/legacy", () => ({
   deleteAsync: vi.fn(async () => {}),
@@ -490,10 +491,10 @@ describe("Conversation history", () => {
 });
 
 describe("Conversation persisted image addressing", () => {
-  const storedKey = `chat-attachments/${CONVERSATION_ID}/00000000-0000-4000-8000-0000000000e1/original.jpg`;
+  const storedKey = `chat-attachments/${CONVERSATION_ID}/00000000-0000-4000-8000-0000000000e1/original.webp`;
   const expectedUri = `https://media.autotm.tm/chat-attachments/${storedKey}`;
 
-  async function openStoredImage() {
+  async function openStoredImage(thumbHash?: string) {
     // A history response has a storage key, with no local staging URI or ready-made URL.
     const persistedImage: ConversationsSchemas.MessageSummary = {
       id: "00000000-0000-4000-8000-0000000000e2",
@@ -501,7 +502,7 @@ describe("Conversation persisted image addressing", () => {
       senderId: SELLER_ID,
       kind: "image",
       text: null,
-      metadata: { key: storedKey, width: 800, height: 600 },
+      metadata: { key: storedKey, width: 800, height: 600, ...(thumbHash ? { thumbHash } : {}) },
       createdAt: "2026-10-01T09:00:00.000Z",
     };
     state.messages.data = { pages: [{ items: [persistedImage], nextCursor: null }] };
@@ -525,6 +526,35 @@ describe("Conversation persisted image addressing", () => {
     expect(state.readMessages).toHaveBeenLastCalledWith({ conversationId: CONVERSATION_ID });
     expect(getHost(photo, "Image").props.source).toEqual({ uri: expectedUri });
     expect(screen.queryByLabelText("Close")).toBeNull();
+  });
+
+  it("shows the server's ThumbHash in the bubble while a persisted image loads", async () => {
+    const { photo } = await openStoredImage("2yMBBYCIh4iHiHeAiId4dXh3f4f4");
+
+    expect(getHost(photo, "Image").props.placeholder).toEqual({ thumbhash: "2yMBBYCIh4iHiHeAiId4dXh3f4f4" });
+  });
+
+  it("shows the server's cover ThumbHash on a persisted Listing-reference card", async () => {
+    const persistedRef: ConversationsSchemas.MessageSummary = {
+      id: "00000000-0000-4000-8000-0000000000e3",
+      conversationId: CONVERSATION_ID,
+      senderId: SELLER_ID,
+      kind: "post_ref",
+      text: null,
+      metadata: {
+        listingId: LISTING_ID, brandId: "brand-1", modelId: "model-1", displayPriceTmt: 285000, priceCurrency: "TMT",
+        coverMediaKey: "pending/a/original.webp", coverThumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH", status: "active", available: true,
+      },
+      createdAt: "2026-10-01T09:00:00.000Z",
+    };
+    state.messages.data = { pages: [{ items: [persistedRef], nextCursor: null }] };
+    routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation(), [`/listings/${LISTING_ID}`]: () => listingDetail() });
+    const screen = await renderMobile(<ConversationDetailScreen />);
+
+    await waitFor(() => {
+      const placeholders = getAllHosts(screen.container, "Image").map((image) => image.props.placeholder as unknown);
+      expect(placeholders).toContainEqual({ thumbhash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" });
+    });
   });
 
   it("opens the same persisted object in the real fullscreen viewer and closes it", async () => {
@@ -565,7 +595,7 @@ describe("Conversation Retry", () => {
   });
 
   it("resends a failed image Message with the same client Message ID", async () => {
-    state.mutation.mutateAsync.mockResolvedValue({ uploadUrl: "https://upload", key: "chat-attachments/k.jpg" });
+    state.mutation.mutateAsync.mockResolvedValue({ uploadUrl: "https://upload", key: "chat-attachments/k.webp" });
     state.socket.sendImageMessage
       .mockResolvedValueOnce({ ok: false, code: "INTERNAL" })
       .mockResolvedValueOnce({ ok: true, message: { id: "server-2" } });
@@ -1118,7 +1148,7 @@ describe("Conversation about a closed Listing", () => {
 
     expect(state.mutation.mutateAsync).toHaveBeenCalledWith({
       conversationId: CONVERSATION_ID,
-      request: { contentType: "image/jpeg", sizeBytes: 1000 },
+      request: { contentType: "image/webp", sizeBytes: 1000 },
     });
     expect(state.socket.sendImageMessage).not.toHaveBeenCalled();
     expect(await screen.findByText("You can't send messages in this Conversation")).toBeTruthy();
@@ -1135,7 +1165,7 @@ describe("Conversation about a closed Listing", () => {
     );
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: readConversation });
     state.mutation.mutateAsync
-      .mockResolvedValueOnce({ uploadUrl: "https://upload", key: "chat-attachments/k.jpg" })
+      .mockResolvedValueOnce({ uploadUrl: "https://upload", key: "chat-attachments/k.webp" })
       .mockImplementationOnce(async () => {
         restricted = true;
         throw new ApiError("FORBIDDEN", 403, "Forbidden");
@@ -1161,7 +1191,7 @@ describe("Conversation about a closed Listing", () => {
     expect(state.mutation.mutateAsync).toHaveBeenCalledTimes(2);
     expect(state.mutation.mutateAsync).toHaveBeenLastCalledWith({
       conversationId: CONVERSATION_ID,
-      request: { contentType: "image/jpeg", sizeBytes: 1000 },
+      request: { contentType: "image/webp", sizeBytes: 1000 },
     });
     expect(state.socket.sendImageMessage).toHaveBeenCalledTimes(1);
     expect(await screen.findByText("You can't send messages in this Conversation")).toBeTruthy();
@@ -1221,7 +1251,7 @@ describe("First chat action notifications", () => {
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
     state.socket.sendTextMessage.mockResolvedValue({ ok: true, message: { id: "server-first" } });
     state.socket.sendImageMessage.mockResolvedValue({ ok: true, message: { id: "server-first-image" } });
-    state.mutation.mutateAsync.mockResolvedValue({ uploadUrl: "https://upload", key: "chat-attachments/first.jpg" });
+    state.mutation.mutateAsync.mockResolvedValue({ uploadUrl: "https://upload", key: "chat-attachments/first.webp" });
     state.post.mockResolvedValue({});
     try {
       const screen = await renderMobile(<ConversationDetailScreen />);
@@ -1243,7 +1273,12 @@ describe("First chat action notifications", () => {
 });
 
 describe("Conversation keyboard ownership", () => {
-  it.each(["android", "ios"] as const)("keeps the message and Send controls inside the active %s avoidance region", async (os) => {
+  // A KeyboardAvoidingView compares its onLayout frame, which is relative to its
+  // parent, with the keyboard's screen position. A region around the footer alone
+  // therefore pads too little (#843: the iOS composer sat fully behind the keys).
+  // The one active region must be the whole screen column, directly under the
+  // safe-area screen, whose own frame is in screen coordinates.
+  it.each(["android", "ios"] as const)("pads the whole %s screen column, so the composer and the latest Message sit above the keys", async (os) => {
     const previousOS = Platform.OS;
     Platform.OS = os;
     state.messages.data = { pages: [{ items: [serverMessage("Read while typing", SELLER_ID)] }] };
@@ -1254,16 +1289,39 @@ describe("Conversation keyboard ownership", () => {
       await fireEvent.changeText(field, "Above the keyboard");
       const active = getAllHosts(screen.container, "KeyboardAvoidingView").filter((view) => view.props.enabled !== false);
       expect(active).toHaveLength(1);
-      const avoiding = first(active);
-      expect(within(avoiding).getByDisplayValue("Above the keyboard")).toBeTruthy();
-      expect(within(avoiding).getByRole("button", { name: "Send message", disabled: false })).toBeTruthy();
-      if (os === "android") {
-        expect(within(avoiding).getByText("Read while typing")).toBeTruthy();
-        expect(avoiding.props.behavior).toBe("padding");
-        expect(avoiding.props.className).toBe("flex-1");
-      } else {
-        expect(avoiding.props.behavior).toBe("padding");
-      }
+      const region = first(active);
+      expect(region.props.behavior).toBe("padding");
+      expect(region.props.className).toBe("flex-1");
+      expect(region.props.keyboardVerticalOffset ?? 0).toBe(0);
+      // Its parent is the screen root that applies the safe-area insets as padding.
+      expect(Object.keys(region.parent?.props.style ?? {})).toEqual(
+        expect.arrayContaining(["paddingTop", "paddingBottom"]),
+      );
+      expect(within(region).getByText("Read while typing")).toBeTruthy();
+      expect(within(region).getByDisplayValue("Above the keyboard")).toBeTruthy();
+      expect(within(region).getByRole("button", { name: "Send message", disabled: false })).toBeTruthy();
+      expect(within(region).getByLabelText(/attach/i)).toBeTruthy();
+      // No second, footer-local region anywhere in the screen, even a disabled one.
+      expect(getAllHosts(screen.container, "KeyboardAvoidingView")).toHaveLength(1);
+    } finally { Platform.OS = previousOS; }
+  });
+
+  it.each(["android", "ios"] as const)("keeps a pending photo and its Remove inside the %s avoidance region", async (os) => {
+    const previousOS = Platform.OS;
+    Platform.OS = os;
+    routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
+    try {
+      const screen = await renderMobile(<ConversationDetailScreen />);
+      await act(async () => {
+        await fireEvent.press(await screen.findByLabelText(/attach/i));
+      });
+      const remove = await screen.findByRole("button", { name: "Remove" });
+      const region = activeKeyboardRegion(screen);
+      expect(region.props.className).toBe("flex-1");
+      expect(within(region).getByRole("button", { name: "Remove" })).toBe(remove);
+      // The pending photo's preview is drawn inside the region, above the composer row.
+      expect(getAllHosts(region, "Image").map((node: { props: { source?: unknown } }) => node.props.source)).toContainEqual({ uri: "file:///staged.webp" });
+      expect(within(region).getByRole("button", { name: "Send message", disabled: false })).toBeTruthy();
     } finally { Platform.OS = previousOS; }
   });
 });
@@ -1283,16 +1341,16 @@ describe("Acknowledged Message transport coverage", () => {
     expect(screen.getAllByText("HTTP still visible")).toHaveLength(1);
   });
   it.each([false, true])("keeps an acknowledged image visible without an echo, HTTP=%s", async (http) => {
-    state.mutation.mutateAsync.mockResolvedValue({ uploadUrl: "https://upload", key: "chat-attachments/ack.jpg" });
+    state.mutation.mutateAsync.mockResolvedValue({ uploadUrl: "https://upload", key: "chat-attachments/ack.webp" });
     state.socket.sendImageMessage.mockResolvedValue(http ? { ok: false, code: "NOT_CONNECTED" } : { ok: true, message: { id: "image-ack" } });
-    state.mutation.mutate.mockImplementation((_input, options) => options?.onSuccess?.({ ...serverMessage("image-ack", BUYER_ID, new Date().toISOString()), kind: "image", text: null, metadata: { key: "chat-attachments/ack.jpg" } }));
+    state.mutation.mutate.mockImplementation((_input, options) => options?.onSuccess?.({ ...serverMessage("image-ack", BUYER_ID, new Date().toISOString()), kind: "image", text: null, metadata: { key: "chat-attachments/ack.webp" } }));
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
     const screen = await renderMobile(<ConversationDetailScreen />);
     await screen.findByPlaceholderText("Message");
     await act(async () => { void fireEvent.press(screen.getByLabelText(/attach/i)); });
     await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
     expect(screen.getAllByRole("imagebutton", { name: "Photo" })).toHaveLength(1);
-    expect(getHost(screen.getByRole("imagebutton", { name: "Photo" }), "Image").props.source.uri).toContain("chat-attachments/ack.jpg");
+    expect(getHost(screen.getByRole("imagebutton", { name: "Photo" }), "Image").props.source.uri).toContain("chat-attachments/ack.webp");
   });
 });
 

@@ -44,7 +44,7 @@ function jpegHasCommentSegment(input: Buffer): boolean {
  * app's own 80. An animated WebP keeps all of its frames; sharp cannot rotate
  * a multi-frame image, so an animation is stored as its pixels are and only
  * its orientation tag goes. Returns null for
- * an image that carries none, so a second pass neither re-encodes it nor
+ * an image already in the requested format that carries none, so a second pass neither re-encodes it nor
  * changes its size. Throws when the bytes are not a readable image, or hold
  * more than `maxPixels` pixels when that is given.
  */
@@ -62,6 +62,7 @@ export async function stripImageMetadata(
   const meta = await open(false).metadata();
   const animated = format === "webp" && (meta.pages ?? 1) > 1;
   const carriesMetadata =
+    meta.format !== format ||
     meta.exif !== undefined ||
     meta.xmp !== undefined ||
     meta.iptc !== undefined ||

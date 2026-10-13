@@ -5,7 +5,7 @@ import { getInfoAsync, moveAsync, copyAsync, deleteAsync } from "expo-file-syste
 import { compressPhoto, CompressionError } from "./compressor";
 
 vi.mock("expo-image-manipulator", () => ({
-  SaveFormat: { JPEG: "jpeg" },
+  SaveFormat: { JPEG: "jpeg", WEBP: "webp" },
   ImageManipulator: {
     manipulate: vi.fn(),
   },
@@ -26,7 +26,7 @@ const mockDeleteAsync = vi.mocked(deleteAsync);
 
 function mockManipulatorChain(result: { uri: string; width: number; height: number }) {
   const saveAsync = vi.fn().mockResolvedValue(result);
-  const renderAsync = vi.fn().mockResolvedValue({ saveAsync });
+  const renderAsync = vi.fn().mockResolvedValue({ saveAsync, width: result.width, height: result.height });
   const context = {
     resize: vi.fn().mockReturnThis(),
     renderAsync,
@@ -65,7 +65,7 @@ describe("compressPhoto", () => {
     mockGetInfoAsync.mockResolvedValueOnce({ exists: false, uri: "", isDirectory: false });
 
     await expect(
-      compressPhoto("file:///tmp/source.jpg", "file:///tmp/dest.jpg"),
+      compressPhoto("file:///tmp/source.webp", "file:///tmp/dest.webp"),
     ).rejects.toSatisfy((err: unknown) => {
       expect(err).toBeInstanceOf(CompressionError);
       expect((err as CompressionError).code).toBe("SOURCE_MISSING");
@@ -76,15 +76,15 @@ describe("compressPhoto", () => {
     expect(mockManipulate).not.toHaveBeenCalled();
   });
 
-  it("calls ImageManipulator.manipulate with max 2400px width and JPEG quality 0.8", async () => {
-    setupHappyPath("file:///tmp/compressed.jpg");
+  it("calls ImageManipulator.manipulate with at most 2400px long side and WebP quality 0.8", async () => {
+    setupHappyPath("file:///tmp/compressed.webp");
 
-    await compressPhoto("file:///tmp/source.jpg", "file:///tmp/dest.jpg");
+    await compressPhoto("file:///tmp/source.webp", "file:///tmp/dest.webp");
 
-    expect(mockManipulate).toHaveBeenCalledWith("file:///tmp/source.jpg");
+    expect(mockManipulate).toHaveBeenCalledWith("file:///tmp/source.webp");
     const context = mockManipulate.mock.results[0]?.value as { resize: ReturnType<typeof vi.fn> } | undefined;
     expect(context).toBeDefined();
-    expect((context as NonNullable<typeof context>).resize).toHaveBeenCalledWith({ width: 2400 });
+    expect((context as NonNullable<typeof context>).resize).toHaveBeenCalledWith({ width: 1000 });
   });
 
   it.each([
@@ -92,8 +92,8 @@ describe("compressPhoto", () => {
     [1024, 2048, { height: 512 }],
     [128, 256, { height: 256 }],
   ])("bounds a profile photo's long side without upscaling %s x %s", async (width, height, resize) => {
-    setupHappyPath("file:///tmp/compressed.jpg");
-    await compressPhoto("file:///tmp/source.jpg", "file:///tmp/dest.jpg", { maxDimension: 512, width, height });
+    setupHappyPath("file:///tmp/compressed.webp");
+    await compressPhoto("file:///tmp/source.webp", "file:///tmp/dest.webp", { maxDimension: 512, width, height });
     const context = mockManipulate.mock.results[0]?.value as { resize: ReturnType<typeof vi.fn> };
     expect(context.resize).toHaveBeenCalledWith(resize);
   });
@@ -101,12 +101,12 @@ describe("compressPhoto", () => {
   it("re-compresses with quality 0.6 when file size > 5MB", async () => {
     mockGetInfoAsync.mockResolvedValueOnce({ exists: true, uri: "", size: 1024, isDirectory: false, modificationTime: 0 });
     mockManipulatorChain({
-      uri: "file:///tmp/compressed.jpg",
+      uri: "file:///tmp/compressed.webp",
       width: 1000,
       height: 800,
     });
     mockManipulatorChain({
-      uri: "file:///tmp/recompressed.jpg",
+      uri: "file:///tmp/recompressed.webp",
       width: 1000,
       height: 800,
     });
@@ -115,28 +115,28 @@ describe("compressPhoto", () => {
       .mockResolvedValueOnce({ exists: true, uri: "", size: 3 * 1024 * 1024, isDirectory: false, modificationTime: 0 })
       .mockResolvedValueOnce({ exists: true, uri: "", size: 3 * 1024 * 1024, isDirectory: false, modificationTime: 0 });
 
-    await compressPhoto("file:///tmp/source.jpg", "file:///tmp/dest.jpg");
+    await compressPhoto("file:///tmp/source.webp", "file:///tmp/dest.webp");
 
     expect(mockManipulate).toHaveBeenCalledTimes(2);
-    expect(mockManipulate).toHaveBeenLastCalledWith("file:///tmp/compressed.jpg");
+    expect(mockManipulate).toHaveBeenLastCalledWith("file:///tmp/compressed.webp");
   });
 
   it("copies file to destination when different", async () => {
-    setupHappyPath("file:///tmp/compressed.jpg");
+    setupHappyPath("file:///tmp/compressed.webp");
 
-    await compressPhoto("file:///tmp/source.jpg", "file:///tmp/dest.jpg");
+    await compressPhoto("file:///tmp/source.webp", "file:///tmp/dest.webp");
 
     expect(mockCopyAsync).toHaveBeenCalledWith({
-      from: "file:///tmp/compressed.jpg",
-      to: "file:///tmp/dest.jpg",
+      from: "file:///tmp/compressed.webp",
+      to: "file:///tmp/dest.webp",
     });
     expect(mockMoveAsync).not.toHaveBeenCalled();
   });
 
   it("does not move file when destination matches", async () => {
-    setupHappyPath("file:///tmp/dest.jpg");
+    setupHappyPath("file:///tmp/dest.webp");
 
-    await compressPhoto("file:///tmp/source.jpg", "file:///tmp/dest.jpg");
+    await compressPhoto("file:///tmp/source.webp", "file:///tmp/dest.webp");
 
     expect(mockMoveAsync).not.toHaveBeenCalled();
     expect(mockCopyAsync).not.toHaveBeenCalled();
@@ -144,10 +144,10 @@ describe("compressPhoto", () => {
   });
 
   it("throws CompressionError when destination file is missing after copy", async () => {
-    setupHappyPath("file:///tmp/compressed.jpg", false);
+    setupHappyPath("file:///tmp/compressed.webp", false);
 
     await expect(
-      compressPhoto("file:///tmp/source.jpg", "file:///tmp/dest.jpg"),
+      compressPhoto("file:///tmp/source.webp", "file:///tmp/dest.webp"),
     ).rejects.toSatisfy((err: unknown) => {
       expect(err).toBeInstanceOf(CompressionError);
       expect((err as CompressionError).code).toBe("DESTINATION_MISSING");
@@ -156,19 +156,19 @@ describe("compressPhoto", () => {
   });
 
   it("cleans up source file after successful copy", async () => {
-    setupHappyPath("file:///tmp/compressed.jpg");
+    setupHappyPath("file:///tmp/compressed.webp");
 
-    await compressPhoto("file:///tmp/source.jpg", "file:///tmp/dest.jpg");
+    await compressPhoto("file:///tmp/source.webp", "file:///tmp/dest.webp");
 
-    expect(mockDeleteAsync).toHaveBeenCalledWith("file:///tmp/compressed.jpg", { idempotent: true });
+    expect(mockDeleteAsync).toHaveBeenCalledWith("file:///tmp/compressed.webp", { idempotent: true });
   });
 
   it("throws DESTINATION_MISSING when copyAsync fails", async () => {
-    setupHappyPath("file:///tmp/compressed.jpg");
+    setupHappyPath("file:///tmp/compressed.webp");
     mockCopyAsync.mockRejectedValueOnce(new Error("Permission denied"));
 
     await expect(
-      compressPhoto("file:///tmp/source.jpg", "file:///tmp/dest.jpg"),
+      compressPhoto("file:///tmp/source.webp", "file:///tmp/dest.webp"),
     ).rejects.toSatisfy((err: unknown) => {
       expect(err).toBeInstanceOf(CompressionError);
       expect((err as CompressionError).code).toBe("DESTINATION_MISSING");
@@ -182,11 +182,11 @@ describe("compressPhoto", () => {
   });
 
   it("does not throw when deleteAsync fails after successful move", async () => {
-    setupHappyPath("file:///tmp/compressed.jpg");
+    setupHappyPath("file:///tmp/compressed.webp");
     mockDeleteAsync.mockRejectedValueOnce(new Error("Cleanup failed"));
 
     await expect(
-      compressPhoto("file:///tmp/source.jpg", "file:///tmp/dest.jpg"),
+      compressPhoto("file:///tmp/source.webp", "file:///tmp/dest.webp"),
     ).resolves.toBeDefined();
   });
 });

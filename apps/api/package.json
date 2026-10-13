@@ -40,6 +40,7 @@
     "sharp": "catalog:",
     "slugify": "^1.6.9",
     "socket.io": "^4.8.1",
+    "thumbhash": "0.1.1",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -9,9 +9,9 @@ import {
 } from "./wizardMachine";
 
 const validUuid = "550e8400-e29b-41d4-a716-446655440000";
-const validPhoto = { photoId: validUuid, key: "uploads/abc.jpg", sortOrder: 0 };
+const validPhoto = { photoId: validUuid, key: "uploads/abc.webp", sortOrder: 0 };
 const validPhotos = [validPhoto, ...[1, 2].map((index) => ({
-  photoId: `550e8400-e29b-41d4-a716-${String(index).padStart(12, "0")}`, key: `uploads/support-${index}.jpg`, sortOrder: index,
+  photoId: `550e8400-e29b-41d4-a716-${String(index).padStart(12, "0")}`, key: `uploads/support-${index}.webp`, sortOrder: index,
 }))];
 const completePayload = {
   photos: validPhotos,

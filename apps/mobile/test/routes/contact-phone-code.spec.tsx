@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../../src/api/client";
 import ContactPhoneCodeScreen from "../../app/listings/contact-phone-code";
-import { act, fireEvent, renderMobile, routeParams, routerMock } from "../render";
+import { KEYBOARD_PLATFORMS, activeKeyboardRegion, onPlatform } from "../keyboardAvoidance";
+import { act, fireEvent, renderMobile, routeParams, routerMock, within } from "../render";
 
 const mocks = vi.hoisted(() => ({
   confirm: vi.fn(),
@@ -322,4 +323,14 @@ describe("contact-phone-code screen", () => {
     });
     expect(routerMock.dismissTo).toHaveBeenCalledWith("/listings/manage");
   });
+});
+
+describe("contact-phone-code keyboard (#843)", () => {
+  it.each(KEYBOARD_PLATFORMS)("keeps the code above the %s keyboard", (os) =>
+    onPlatform(os, async () => {
+      const screen = await renderMobile(<ContactPhoneCodeScreen />);
+      const region = activeKeyboardRegion(screen);
+      expect(within(region).getByLabelText("Code")).toBeTruthy();
+      expect(within(region).getByText("Code sent to +993 61 XX-XX-01")).toBeTruthy();
+    }));
 });

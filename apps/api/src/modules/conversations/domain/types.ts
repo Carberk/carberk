@@ -36,6 +36,8 @@ export type ImageMessageMetadata = {
   key: string;
   width?: number | undefined;
   height?: number | undefined;
+  /** Server-computed from the cleaned image (#824); never taken from the sender. */
+  thumbHash?: string | undefined;
 };
 
 export const CURRENCY_CODES = ["TMT", "USD", "AED"] as const;
@@ -57,6 +59,8 @@ export type PostRefMessageMetadata = {
   displayPriceTmt: number;
   priceCurrency: CurrencyCode;
   coverMediaKey?: string;
+  /** Server-computed ThumbHash of `coverMediaKey` (#824); never taken from the sender. */
+  coverThumbHash?: string;
   status: PostRefListingStatus;
 };
 

@@ -74,11 +74,11 @@ describe("Message", () => {
         id: "msg-img",
         conversationId: "conv-1",
         senderId: "sender-1",
-        metadata: { key: "chat/image.jpg", width: 800, height: 600 },
+        metadata: { key: "chat/image.webp", width: 800, height: 600 },
       });
       expect(msg.kind).toBe("image");
       expect(msg.metadata).toEqual({
-        key: "chat/image.jpg",
+        key: "chat/image.webp",
         width: 800,
         height: 600,
       });

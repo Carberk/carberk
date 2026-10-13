@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AdminSchemas, Enums, ErrorCode } from "@auto-tm/contracts";
+import { AdminSchemas, Enums, ErrorCode, UploadsSchemas } from "@auto-tm/contracts";
 
 import { getReportDetail, getConfig } from "../../actions";
 import { UserReportPhoto } from "../../components/UserReportPhoto";
@@ -88,7 +88,7 @@ export default async function ReportDetailPage({ params }: PageProps) {
   const mediaOrigin = (runtimeMediaOrigin ?? "").trim().replace(/\/$/, "");
   const photoBaseKey = report.target.avatarKey?.replace(/\/original\.(jpg|webp|jpeg)$/, "");
   const photoUrl = mediaOrigin && photoBaseKey
-    ? `${mediaOrigin}/listing-photos/${photoBaseKey}/thumbnail.jpg`
+    ? `${mediaOrigin}/listing-photos/${photoBaseKey}/thumbnail.webp?v=${UploadsSchemas.PHOTO_VARIANT_CACHE_VERSION}`
     : undefined;
 
   const canRemovePhoto = configResult.ok && moderationEnabled &&

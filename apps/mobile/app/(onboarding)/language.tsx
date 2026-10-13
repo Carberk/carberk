@@ -1,5 +1,4 @@
 import { router, useIsFocused } from "expo-router";
-import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { BackHandler, ScrollView, View } from "react-native";
@@ -34,11 +33,6 @@ export default function LanguagePickerScreen() {
     if (localeStore.getState().locale === null) setLocale(locale);
     router.push("/(onboarding)/value-prop");
   }
-
-  // A first launch opens this screen under the native launch screen.
-  useEffect(() => {
-    SplashScreen.hide();
-  }, []);
 
   // Home is underneath. Back here leaves the app; it does not skip onboarding.
   useEffect(() => {

@@ -11,7 +11,7 @@ import { useDisplayName } from "../../identity/useDisplayName";
 import { formatPrice } from "../formatPrice";
 import { useListingFavorite } from "../useListingFavorite";
 
-import { feedCardFields, feedCardPhotoKeys } from "./feedCardFields";
+import { feedCardFields, feedCardPhotoKeys, feedCardPhotoThumbHashes } from "./feedCardFields";
 import { formatListingDate } from "./formatListingDate";
 import { CARD_INSET, ListingPhotoStrip, STRIP_HEIGHT_SHARE, STRIP_INSET } from "./ListingPhotoStrip";
 import { listingSpecLine } from "./listingSpecLine";
@@ -128,7 +128,7 @@ export const ListingLargeCard = memo(function ListingLargeCard(props: ListingLar
 
   return <EnterOnce order={enterOrder}>
     <MotionView style={press.style} className="overflow-hidden rounded-3xl bg-card">
-      <ListingPhotoStrip photoKeys={feedCardPhotoKeys(listing)} photoCount={listing.photoCount} condition={listing.condition}
+      <ListingPhotoStrip photoKeys={feedCardPhotoKeys(listing)} thumbHashes={feedCardPhotoThumbHashes(listing)} photoCount={listing.photoCount} condition={listing.condition}
         onOpen={() => onPress(listing.id)} {...press.handlers} />
       <Pressable onPress={() => onPress(listing.id)} {...press.handlers} accessibilityRole="button" accessibilityLabel={[title, price].filter(Boolean).join(", ")}>
         <View className="items-start gap-1 px-4 pt-3.5">

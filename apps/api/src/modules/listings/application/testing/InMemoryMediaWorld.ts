@@ -267,7 +267,7 @@ export class InMemoryMediaWorld {
   }): void {
     const uploadId = input.uploadId ?? `upload-${input.mediaId}`;
     const kind = input.kind ?? "image";
-    const contentType = kind === "image" ? "image/jpeg" : "video/mp4";
+    const contentType = kind === "image" ? "image/webp" : "video/mp4";
     this.uploads.push({
       id: uploadId,
       userId: input.userId,

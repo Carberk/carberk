@@ -11,10 +11,10 @@ import { act, fireEvent, renderMobile, routerMock, within } from "../render";
 const fixture = vi.hoisted(() => {
   const id = "550e8400-e29b-41d4-a716-446655440000";
   const photoId = "11111111-1111-4111-8111-111111111111";
-  const savedPhoto = { photoId, key: `${photoId}.jpg`, sortOrder: 0 };
+  const savedPhoto = { photoId, key: `${photoId}.webp`, sortOrder: 0 };
   const savedPhotos = [savedPhoto, ...[1, 2].map((index) => ({
     ...savedPhoto, photoId: `${photoId.slice(0, -12)}${String(900 + index).padStart(12, "0")}`,
-    key: `support-${photoId}-${index}.jpg`, sortOrder: index,
+    key: `support-${photoId}-${index}.webp`, sortOrder: index,
   }))];
   const complete = {
     brandId: id, modelId: id, year: 2020,
@@ -132,10 +132,10 @@ async function openCheck() {
 
 beforeEach(() => {
   fixture.payload = fixture.complete;
-  fixture.staged = { [`draft-${id}`]: [`${photoId}.jpg`] };
+  fixture.staged = { [`draft-${id}`]: [`${photoId}.webp`] };
   fixture.stagingRead = null;
   fixture.patch.mockReset().mockResolvedValue({});
-  fixture.presign.mockReset().mockResolvedValue({ uploadUrl: "http://localhost/put", key: "uploaded-again.jpg" });
+  fixture.presign.mockReset().mockResolvedValue({ uploadUrl: "http://localhost/put", key: "uploaded-again.webp" });
   fixture.upload.mockReset().mockResolvedValue({ status: 200 });
   fixture.show.mockReset();
   fixture.mutation.mutateAsync.mockReset().mockResolvedValue({ id });
@@ -407,7 +407,7 @@ describe("Check and publish: what blocks publishing (#588)", () => {
 
   it("counts the photos still uploading, and lets Publish go when they finish", async () => {
     // A second photo was compressed but not uploaded when the app closed.
-    fixture.staged[`draft-${id}`] = [`${photoId}.jpg`, `${secondPhoto}.jpg`];
+    fixture.staged[`draft-${id}`] = [`${photoId}.webp`, `${secondPhoto}.webp`];
     let finishPresign = (_value: { uploadUrl: string; key: string }) => {};
     fixture.presign.mockImplementation(() => new Promise((resolve) => { finishPresign = resolve; }));
     const screen = await openCheck();
@@ -415,7 +415,7 @@ describe("Check and publish: what blocks publishing (#588)", () => {
     expect(await screen.findByText("Photos still uploading: 1")).toBeTruthy();
     expect(disabled(screen)).toBe(true);
 
-    await act(async () => { finishPresign({ uploadUrl: "http://localhost/put", key: `${secondPhoto}.jpg` }); });
+    await act(async () => { finishPresign({ uploadUrl: "http://localhost/put", key: `${secondPhoto}.webp` }); });
     await pause(20);
 
     expect(screen.queryByText(/Photos still uploading/)).toBeNull();
@@ -440,7 +440,7 @@ describe("Check and publish: what blocks publishing (#588)", () => {
       ...fixture.complete,
       photos: [...fixture.savedPhotos, { photoId: lostPhoto, sortOrder: 3 }],
     };
-    fixture.staged[`draft-${id}`] = [`${photoId}.jpg`, `${secondPhoto}.jpg`];
+    fixture.staged[`draft-${id}`] = [`${photoId}.webp`, `${secondPhoto}.webp`];
     fixture.presign.mockImplementation(() => new Promise(() => {}));
     const screen = await openCheck();
     await screen.findByText("Photos still uploading: 1");

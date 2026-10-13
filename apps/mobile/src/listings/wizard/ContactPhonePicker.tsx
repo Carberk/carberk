@@ -236,7 +236,7 @@ export function ContactPhonePicker({
           onPress={onAnotherNumber}
           className="min-h-12 flex-row items-center gap-3 py-3 active:opacity-70"
         >
-          <Text className="flex-1 text-body text-info-500">
+          <Text className="flex-1 text-body text-link">
             {t("anotherNumber")}
           </Text>
           <Icon as={ChevronRight} className="size-4 text-muted-foreground" />

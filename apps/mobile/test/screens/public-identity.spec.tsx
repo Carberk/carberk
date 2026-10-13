@@ -106,13 +106,13 @@ describe("Seller block from GET /listings/:id", () => {
   });
 
   it("shows a seller's own name and photo", async () => {
-    serve(`/listings/${LISTING_ID}`, listingJson(identityJson({ displayName: "Aman", avatarKey: "avatars/u2/original.jpg" })));
+    serve(`/listings/${LISTING_ID}`, listingJson(identityJson({ displayName: "Aman", avatarKey: "avatars/u2/original.webp" })));
     const view = await renderMobile(<ListingSeller />);
 
     expect(await view.findByText("Aman")).toBeTruthy();
     expect(view.getByText("Private seller")).toBeTruthy();
     expect(getHost(view.container, "Image").props.source).toEqual({
-      uri: "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.jpg",
+      uri: "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.webp?v=webp-natural-1",
     });
   });
 
@@ -149,14 +149,14 @@ describe("Conversation header from GET /conversations/:id", () => {
 
   it("shows a participant's own name and photo", async () => {
     serve(`/conversations/${CONVERSATION_ID}`, {
-      ...conversationJson(CONVERSATION_ID, identityJson({ displayName: "Aman", avatarKey: "avatars/u2/original.jpg" })),
+      ...conversationJson(CONVERSATION_ID, identityJson({ displayName: "Aman", avatarKey: "avatars/u2/original.webp" })),
       sendRestriction: null,
     });
     const view = await renderMobile(<OpenConversationHeader />);
 
     expect(await view.findByText("Aman")).toBeTruthy();
     expect(getHost(view.container, "Image").props.source).toEqual({
-      uri: "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.jpg",
+      uri: "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.webp?v=webp-natural-1",
     });
   });
 
@@ -181,7 +181,7 @@ describe("Messages rows from GET /conversations", () => {
     serve("/conversations", {
       items: [
         conversationJson(CONVERSATION_ID, identityJson()),
-        conversationJson(second, identityJson({ displayName: "Aman", avatarKey: "avatars/u2/original.jpg" })),
+        conversationJson(second, identityJson({ displayName: "Aman", avatarKey: "avatars/u2/original.webp" })),
         conversationJson(third, identityJson({ deleted: true })),
       ],
       nextCursor: null,
@@ -193,7 +193,7 @@ describe("Messages rows from GET /conversations", () => {
     expect(view.getByText("Deleted user")).toBeTruthy();
     expect(marks(view)[0]).toBe(KEY_MARK);
     const photo = first(getAllHosts(view.container, "Image"));
-    expect(photo.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.jpg" });
+    expect(photo.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.webp?v=webp-natural-1" });
     expect(photo.props.style).toMatchObject({ width: 24, height: 24 });
     expect(personIcons(view)).toHaveLength(1);
     // Three rows, one request: no row asks the API for its own participant.

@@ -32,7 +32,7 @@ export interface PresignChatAttachmentUploadResult {
 
 const CHAT_ATTACHMENT_CONSTRAINTS = {
   maxSizeBytes: CHAT_ATTACHMENT_MAX_SIZE_BYTES,
-  allowedTypes: ["image/jpeg", "image/webp"] as const,
+  allowedTypes: ["image/webp"] as const,
   presignExpirySeconds: 600,
 };
 
@@ -90,7 +90,7 @@ export class PresignChatAttachmentUpload {
       });
     }
 
-    const ext = input.contentType === "image/webp" ? "webp" : "jpg";
+    const ext = "webp";
     const key = chatAttachmentKey(input.conversationId, randomUUID(), ext);
 
     const { url } = await this.storage.presignUpload({

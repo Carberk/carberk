@@ -120,9 +120,9 @@ Rows stay visible; the screens they open handle offline.
 | Element | Animation | Duration | Easing |
 |---|---|---|---|
 | Row press | background to `bg-secondary` | instant | — |
-| Language and Theme sheets | bottom-sheet slide | `OptionPickerSheet` default | `OptionPickerSheet` default |
+| Language and Theme sheets | surface, handle, title and rows slide together; scrim fades alongside | 300 ms enter / 220 ms exit | decelerating enter / accelerating exit |
 
-Reduced motion: the sheet follows the system setting.
+Reduced Motion uses a 150 ms fade without spatial movement. A rapid reopen reverses the current transition and cancels pending removal.
 
 ## Accessibility
 

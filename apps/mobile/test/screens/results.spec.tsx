@@ -31,7 +31,7 @@ vi.mock("../../src/api/catalog/useTransmissions", () => ({ useTransmissions: () 
 vi.mock("../../src/api/catalog/useEngineTypes", () => ({ useEngineTypes: () => ({ data: { items: [{ id: "petrol", name: "Petrol" }] } }) }));
 const listing = {
   id: "listing-1", sellerId: "seller", status: "active", brandId: "toyota", modelId: "camry", year: 2018,
-  priceAmount: 1, priceCurrency: "USD", displayPriceTmt: 70000, photoKeys: ["one.jpg", "two.jpg"], photoCount: 7,
+  priceAmount: 1, priceCurrency: "USD", displayPriceTmt: 70000, photoKeys: ["one.webp", "two.webp"], photoCount: 7,
   mileageKm: 80000, transmissionId: "auto", engineTypeId: "petrol", cityId: "ashgabat", publishedAt: "2026-09-30T04:00:00.000Z",
 };
 vi.mock("../../src/api/listings/useListings", () => ({ useListings: (options: unknown) => {

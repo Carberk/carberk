@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import type { TFunction } from "i18next";
 
 vi.mock("expo-image-manipulator", () => ({
-  SaveFormat: { JPEG: "jpeg" },
+  SaveFormat: { JPEG: "jpeg", WEBP: "webp" },
   ImageManipulator: {
     manipulate: vi.fn(),
   },

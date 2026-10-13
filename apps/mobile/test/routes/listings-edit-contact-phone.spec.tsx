@@ -11,8 +11,8 @@ const CONFIRMED_PHONE = "+99361111111";
 
 const fixture = vi.hoisted(() => {
   const id = "550e8400-e29b-41d4-a716-446655440000";
-  const media = [{ id, kind: "image", key: "photo.jpg", variants: {
-    thumbnail: "t.jpg", list: "l.jpg", detail: "d.jpg", fullscreen: "f.jpg",
+  const media = [{ id, kind: "image", key: "photo.webp", variants: {
+    thumbnail: "t.webp", list: "l.webp", detail: "d.webp", fullscreen: "f.webp",
   }, sortOrder: 0 }];
   return {
     id,
@@ -36,7 +36,7 @@ const fixture = vi.hoisted(() => {
       createdAt: "2026-09-30T00:00:00.000Z", updatedAt: "2026-09-30T00:00:00.000Z",
       seller: { displayName: "Seller", nameNumber: 2057, avatarIndex: 7, avatarKey: null, deleted: false, memberSince: "2026-01-01T00:00:00.000Z" },
     } as Record<string, unknown>,
-    photos: [0, 1, 2].map((index) => ({ photoId: index === 0 ? id : `550e8400-e29b-41d4-a716-${String(900 + index).padStart(12, "0")}`, key: index === 0 ? "photo.jpg" : `support-${index}.jpg`, state: "uploaded", sortOrder: index, retryCount: 0 })),
+    photos: [0, 1, 2].map((index) => ({ photoId: index === 0 ? id : `550e8400-e29b-41d4-a716-${String(900 + index).padStart(12, "0")}`, key: index === 0 ? "photo.webp" : `support-${index}.webp`, state: "uploaded", sortOrder: index, retryCount: 0 })),
   };
 });
 

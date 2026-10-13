@@ -84,12 +84,13 @@ Press scale: 0.96 for buttons, chips and icon buttons; 0.985 for cards and rows;
 | Favorite heart | Scales up and settles (`pop`) as it fills |
 | List and card entrance | A screen's content: a short fade and 8 dp rise on first mount. The first cards of a list replacing their skeletons: a fade with a 4 dp settle, 24 ms apart. Never per card on scroll |
 | Skeleton to content | The skeleton pulses in opacity (`pulse`); content fades in (`base`) |
-| Sheet and dialog | Slide or scale in with the scrim fading (`slow`, `enter`); leave faster (`base`, `exit`) |
+| Sheet | Complete panel slides as one with coordinated scrim fade, 300 ms / `enter`; leaves in 220 ms / `exit`. Rapid reopen reverses the current transition. Closing retains the committed contents and panel layout even when a parent clears its selected step or photo. |
+| Dialog | Scales in with scrim fading (`slow`, `enter`); leaves faster (`base`, `exit`) |
 | Sticky header and bottom bar | Background and title fade with scroll position, driven by the scroll offset |
 | Toast | Fades and rises from the edge it sits on (`base`) |
 | Wizard step | Progress animates to the new value (`settle`) |
 
-Reduce Motion: every spring and timing carries `ReduceMotion.System`, so values jump to their end state. Loops (the skeleton pulse) and entrances do not start. Sheets and toasts fade instead of moving.
+Reduce Motion: every spring and timing carries `ReduceMotion.System`, so values jump to their end state. Loops (the skeleton pulse) and entrances do not start. Sheets use a 150 ms fade, without translation, while retaining the exit until the fade completes. Toasts fade instead of moving.
 
 Sign-in method selection (#717) uses Expo Haptics ~55.0.18: Android system Clock_Tick, selectionAsync elsewhere, with best-effort failures ignored. A tap on the already selected method emits no tick. Its native Android manifest adds VIBRATE; haptics may be suppressed by the device/system settings. Tab haptics remain owned by separate #718 until merged; no tab implementation is claimed here.
 

@@ -351,10 +351,10 @@ describe("Language choice", () => {
     expect(routerMock.push).toHaveBeenCalledWith("/(onboarding)/value-prop");
   });
 
-  it("lets the launch screen go when it mounts", async () => {
+  it("does not release native before the entrance owns its layout handoff", async () => {
     await renderMobile(<LanguagePickerScreen />);
 
-    expect(SplashScreen.hide).toHaveBeenCalled();
+    expect(SplashScreen.hide).not.toHaveBeenCalled();
   });
 });
 

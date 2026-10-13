@@ -19,6 +19,8 @@ export interface PostRefCardProps {
   displayPriceTmt: number;
   priceCurrency: string;
   coverMediaKey?: string;
+  /** The server's ThumbHash of the cover: a blurred preview while it loads (#824). */
+  coverThumbHash?: string | undefined;
   status: Enums.ListingStatus;
   available: boolean;
   brandName?: string;
@@ -37,6 +39,7 @@ export function PostRefCard({
   year,
   displayPriceTmt,
   coverMediaKey,
+  coverThumbHash,
   status,
   available,
   brandName,
@@ -106,6 +109,8 @@ export function PostRefCard({
         {imageUrl ? (
           <Image
             source={{ uri: imageUrl }}
+            placeholder={coverThumbHash ? { thumbhash: coverThumbHash } : undefined}
+            placeholderContentFit="cover"
             className="w-full h-full"
             contentFit="cover"
           />

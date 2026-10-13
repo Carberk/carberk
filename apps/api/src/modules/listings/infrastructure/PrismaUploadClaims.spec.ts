@@ -9,7 +9,7 @@ function database(adopters: number) {
   const tx = {
     $queryRaw: async (sql: TemplateStringsArray) => sql.join("").includes("AS total")
       ? [{ total: BigInt(adopters) }]
-      : [{ id: "upload-1", userId: "owner", key: "pending/photo/original.jpg", state: "AVAILABLE",
+      : [{ id: "upload-1", userId: "owner", key: "pending/photo/original.webp", state: "AVAILABLE",
           claimToken: null, claimTargetType: null, claimTargetId: null, writeProtocol: "conditional-v1", objectKeys: [] }],
     $executeRaw: async (sql: TemplateStringsArray) => { writes.push(sql.join("")); return 1; },
   };

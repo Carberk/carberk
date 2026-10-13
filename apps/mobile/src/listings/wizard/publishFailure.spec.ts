@@ -31,7 +31,7 @@ describe("publishFailureOf (#588)", () => {
   });
 
   it("is photoUnavailable for a permanently unusable photo", () => {
-    expect(publishFailureOf(new ApiError("UPLOAD_OBJECT_INVALID", 400, "Corrupt image", { key: "photo.jpg" }))).toBe("photoUnavailable");
+    expect(publishFailureOf(new ApiError("UPLOAD_OBJECT_INVALID", 400, "Corrupt image", { key: "photo.webp" }))).toBe("photoUnavailable");
   });
 
   it("is server for every other refusal or error", () => {

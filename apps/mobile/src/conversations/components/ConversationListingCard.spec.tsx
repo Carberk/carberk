@@ -11,7 +11,7 @@ const listing = {
   year: 2018,
   displayPriceTmt: 285000,
   priceCurrency: "USD" as const,
-  coverMediaKey: "listings/a.jpg",
+  coverMediaKey: "listings/a.webp",
   status: "active" as const,
 };
 

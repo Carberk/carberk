@@ -67,7 +67,7 @@ describe("computePublishGate", () => {
 
   it("returns canPublish=true with three keyed attached photos", () => {
     const result = computePublishGate(
-      makeQueue([0, 1, 2].map((i) => makePhoto({ photoId: `p${i}`, key: `p${i}.jpg`, state: "attached" }))),
+      makeQueue([0, 1, 2].map((i) => makePhoto({ photoId: `p${i}`, key: `p${i}.webp`, state: "attached" }))),
     );
     expect(result.canPublish).toBe(true);
     expect(result.blockers).toHaveLength(0);

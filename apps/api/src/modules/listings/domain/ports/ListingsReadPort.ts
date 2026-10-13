@@ -12,6 +12,8 @@ export interface ListingSummary {
   priceCurrency: "TMT" | "USD" | "AED";
   displayPriceTmt: number;
   coverMediaKey?: string;
+  /** Server-computed ThumbHash of the cover photo (#824), from `getListingSummary`; absent for a video cover or an unhashed photo. */
+  coverThumbHash?: string;
   cityId: string;
   publishedAt: Date;
   allowChat: boolean;

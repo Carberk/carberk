@@ -73,9 +73,9 @@ describe("common upload claim on Postgres (#721)", () => {
   });
 
   async function presigned(protocol: "legacy" | "conditional-v1" = "legacy", userId = OWNER) {
-    const key = `pending/${randomUUID()}/original.jpg`;
+    const key = `pending/${randomUUID()}/original.webp`;
     const upload = await prisma.mediaUpload.create({ data: {
-      userId, key, kind: "image", contentType: "image/jpeg", sizeBytes: 2048,
+      userId, key, kind: "image", contentType: "image/webp", sizeBytes: 2048,
       writeProtocol: protocol,
       objectKeys: protocol === "conditional-v1" ? imageUploadObjectKeys(key) : [],
     } });

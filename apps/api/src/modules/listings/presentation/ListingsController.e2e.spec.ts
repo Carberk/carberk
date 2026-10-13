@@ -66,10 +66,10 @@ describe("ListingsController e2e", () => {
       .useValue({
         generate: async (originalKey: string) => ({
           variants: {
-            thumbnail: `${originalKey}/thumbnail.jpg`,
-            list: `${originalKey}/list.jpg`,
-            detail: `${originalKey}/detail.jpg`,
-            fullscreen: `${originalKey}/fullscreen.jpg`,
+            thumbnail: `${originalKey}/thumbnail.webp`,
+            list: `${originalKey}/list.webp`,
+            detail: `${originalKey}/detail.webp`,
+            fullscreen: `${originalKey}/fullscreen.webp`,
           },
         }),
       })
@@ -161,7 +161,7 @@ describe("ListingsController e2e", () => {
     description: "Great car",
     allowCalls: true,
     allowChat: true,
-    photos: publicationPhotos(suite.id("photo-1"), "photo1.jpg"),
+    photos: publicationPhotos(suite.id("photo-1"), "photo1.webp"),
     conditionDisclosure: {
       damaged: true,
       knownIssuesText: "Small scratch",
@@ -706,7 +706,7 @@ describe("ListingsController e2e", () => {
       expect(res.body.priceAmount).toBe(validPayload.priceAmount);
       expect(res.body.displayPriceTmt).toBe(validPayload.priceAmount);
       expect(res.body.media).toHaveLength(3);
-      expect(res.body.media[0].variants.thumbnail).toContain("thumbnail.jpg");
+      expect(res.body.media[0].variants.thumbnail).toContain("thumbnail.webp");
     });
 
     it("returns 404 for soft-deleted listing", async () => {
@@ -1099,7 +1099,7 @@ describe("ListingsController e2e", () => {
       for (let i = 0; i < 25; i++) {
         const draft = await seedDraft("user-1", {
           ...validPayload,
-          photos: publicationPhotos(suite.id(`photo-${i}`), `photo${i}.jpg`),
+          photos: publicationPhotos(suite.id(`photo-${i}`), `photo${i}.webp`),
         });
         await request
           .post(`/api/v1/listings/drafts/${draft.id}/publish`)
@@ -1208,7 +1208,7 @@ describe("ListingsController e2e", () => {
         ...validPayload,
         brandId: brand2.id,
         modelId: suite.id("model-2"),
-        photos: publicationPhotos(suite.id("photo-2"), "photo2.jpg"),
+        photos: publicationPhotos(suite.id("photo-2"), "photo2.webp"),
       });
 
       const publish1 = await request
@@ -1283,7 +1283,7 @@ describe("ListingsController e2e", () => {
           ...validPayload,
           brandId: i % 2 === 0 ? validPayload.brandId : brand2.id,
           modelId: i % 2 === 0 ? validPayload.modelId : suite.id("model-2"),
-          photos: publicationPhotos(suite.id(`photo-${i}`), `photo${i}.jpg`),
+          photos: publicationPhotos(suite.id(`photo-${i}`), `photo${i}.webp`),
         });
         await request
           .post(`/api/v1/listings/drafts/${draft.id}/publish`)
@@ -1569,7 +1569,7 @@ describe("ListingsController e2e", () => {
       for (let i = 0; i < 3; i++) {
         const draft = await seedDraft("user-1", {
           ...validPayload,
-          photos: publicationPhotos(suite.id(`photo-${i}`), `photo${i}.jpg`),
+          photos: publicationPhotos(suite.id(`photo-${i}`), `photo${i}.webp`),
         });
         await request
           .post(`/api/v1/listings/drafts/${draft.id}/publish`)
@@ -1615,7 +1615,7 @@ describe("ListingsController e2e", () => {
         ...validPayload,
         brandId: brand2.id,
         modelId: suite.id("model-2"),
-        photos: publicationPhotos(suite.id("photo-2"), "photo2.jpg"),
+        photos: publicationPhotos(suite.id("photo-2"), "photo2.webp"),
       });
 
       await request
@@ -1702,7 +1702,7 @@ describe("ListingsController e2e", () => {
         const draft = await seedDraft("user-1", {
           ...validPayload,
           ...price,
-          photos: publicationPhotos(suite.id(`photo-${i}`), `photo${i}.jpg`),
+          photos: publicationPhotos(suite.id(`photo-${i}`), `photo${i}.webp`),
         });
         await request
           .post(`/api/v1/listings/drafts/${draft.id}/publish`)
@@ -1742,7 +1742,7 @@ describe("ListingsController e2e", () => {
         ...validPayload,
         priceAmount: 20000,
         priceCurrency: "USD",
-        photos: publicationPhotos(suite.id("photo-2"), "photo2.jpg"),
+        photos: publicationPhotos(suite.id("photo-2"), "photo2.webp"),
       });
 
       await request

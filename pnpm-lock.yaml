@@ -465,6 +465,9 @@ importers:
       socket.io:
         specifier: ^4.8.1
         version: 4.8.3(supports-color@8.1.1)
+      thumbhash:
+        specifier: 0.1.1
+        version: 0.1.1
       zod:
         specifier: 'catalog:'
         version: 3.25.76
@@ -999,6 +1002,9 @@ importers:
       pg:
         specifier: ^8.13.1
         version: 8.20.0
+      thumbhash:
+        specifier: 0.1.1
+        version: 0.1.1
     devDependencies:
       '@auto-tm/eslint-config':
         specifier: workspace:*
@@ -10710,6 +10716,9 @@ packages:
 
   through@2.3.8:
     resolution: {integrity: sha512-w89qg7PI8wAdvX60bMDP+bFoD5Dvhm9oLheFp5O4a2QF0cSBGsBX4qZmadPMvVqlLJBBci+WqGGOAPvcDeNSVg==}
+
+  thumbhash@0.1.1:
+    resolution: {integrity: sha512-kH5pKeIIBPQXAOni2AiY/Cu/NKdkFREdpH+TLdM0g6WA7RriCv0kPLgP731ady67MhTAqrVG/4mnEeibVuCJcg==}
 
   time-span@5.1.0:
     resolution: {integrity: sha512-75voc/9G4rDIJleOo4jPvN4/YC4GRZrY8yy1uU4lwrB3XEQbWve8zXoO5No4eFrGcTAMYyoY67p8jRQdtA1HbA==}
@@ -22808,6 +22817,8 @@ snapshots:
   throat@5.0.0: {}
 
   through@2.3.8: {}
+
+  thumbhash@0.1.1: {}
 
   time-span@5.1.0:
     dependencies:

@@ -90,18 +90,18 @@ describe("PhotoGallery", () => {
     expect((await renderMobile(<PhotoGallery media={[]} />)).getByText("No photos")).toBeTruthy();
   });
   it("opens the viewer on the gallery's cached size and falls back to the original after a load error", async () => {
-    const media: ListingsSchemas.ListingMedia[] = [{ id: "image-1", kind: "image", key: "listings/a.jpg", sortOrder: 0,
-      variants: { thumbnail: "https://media/thumbnail.jpg", list: "https://media/list.jpg", detail: "https://media/detail.jpg", fullscreen: "https://media/fullscreen.jpg" } }];
+    const media: ListingsSchemas.ListingMedia[] = [{ id: "image-1", kind: "image", key: "listings/a.webp", sortOrder: 0,
+      variants: { thumbnail: "https://media/thumbnail.webp?v=webp-natural-1", list: "https://media/list.webp?v=webp-natural-1", detail: "https://media/detail.webp?v=webp-natural-1", fullscreen: "https://media/fullscreen.webp?v=webp-natural-1" } }];
     const screen = await renderMobile(<PhotoGallery media={media} />);
-    expect(getHost(screen.container, "Image").props.source.uri).toBe("https://media/detail.jpg");
+    expect(getHost(screen.container, "Image").props.source.uri).toBe("https://media/detail.webp?v=webp-natural-1");
     await fireEvent.press(screen.getByRole("button", { name: "Photo 1 of 1" }));
     const images = getAllHosts(screen.container, "Image");
     // The 2400 px size waits for a zoom (#816); the viewer's page is the last detail image.
-    expect(images.some((image) => image.props.source.uri === "https://media/fullscreen.jpg")).toBe(false);
-    const page = images.filter((image) => image.props.source.uri === "https://media/detail.jpg").at(-1);
+    expect(images.some((image) => image.props.source.uri === "https://media/fullscreen.webp?v=webp-natural-1")).toBe(false);
+    const page = images.filter((image) => image.props.source.uri === "https://media/detail.webp?v=webp-natural-1").at(-1);
     if (!page) throw new Error("Viewer page missing");
     await fireEvent(page, "error");
-    expect(getAllHosts(screen.container, "Image").some((image) => image.props.source.uri.endsWith("/listings/a.jpg"))).toBe(true);
+    expect(getAllHosts(screen.container, "Image").some((image) => image.props.source.uri.endsWith("/listings/a.webp"))).toBe(true);
   });
 });
 

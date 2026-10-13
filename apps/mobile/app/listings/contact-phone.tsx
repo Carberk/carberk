@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { KeyboardAvoidingView, ScrollView, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { formatResendWait } from "../../components/auth/CodeEntryForm";
@@ -120,7 +120,7 @@ export default function ContactPhoneScreen() {
   return (
     <SafeScreen>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior="padding"
         className="flex-1"
       >
         <StackHeader

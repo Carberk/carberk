@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, View } from "react-native";
+import { KeyboardAvoidingView, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -80,7 +80,7 @@ interface LocalMessage {
   kind: "text" | "image" | "post_ref";
   text: string;
   metadata?:
-    | { key: string; width?: number; height?: number }
+    | { key: string; width?: number; height?: number; thumbHash?: string }
     | ConversationsSchemas.PostRefMessageMetadata;
   localImageUri?: string;
   imageFileSize?: number;
@@ -318,6 +318,7 @@ export default function ConversationDetailScreen() {
                 key: m.metadata.key,
                 width: m.metadata.width,
                 height: m.metadata.height,
+                ...(m.metadata.thumbHash ? { thumbHash: m.metadata.thumbHash } : {}),
               };
             } else if (
               kind === "post_ref" &&
@@ -332,6 +333,7 @@ export default function ConversationDetailScreen() {
                 displayPriceTmt: m.metadata.displayPriceTmt,
                 priceCurrency: m.metadata.priceCurrency,
                 coverMediaKey: m.metadata.coverMediaKey,
+                ...(m.metadata.coverThumbHash ? { coverThumbHash: m.metadata.coverThumbHash } : {}),
                 status: m.metadata.status,
                 available: m.metadata.available ?? true,
               };
@@ -582,7 +584,7 @@ export default function ConversationDetailScreen() {
         const presignResponse = await presignChatAttachment.mutateAsync({
           conversationId,
           request: {
-            contentType: "image/jpeg",
+            contentType: "image/webp",
             sizeBytes: attachment.fileSize,
           },
         });
@@ -669,7 +671,7 @@ export default function ConversationDetailScreen() {
           const presignResponse = await presignChatAttachment.mutateAsync({
             conversationId,
             request: {
-              contentType: "image/jpeg",
+              contentType: "image/webp",
               sizeBytes: fileSize,
             },
           });
@@ -858,8 +860,13 @@ export default function ConversationDetailScreen() {
 
   return (
     <SafeScreen>
-      {/* Android needs the whole flex layout to shrink, not the footer's local frame. */}
-      <KeyboardAvoidingView enabled={Platform.OS === "android"} behavior="padding" className="flex-1">
+      {/* The whole column pads for the keyboard on both platforms, so the composer and the
+          latest Message ride above it. A KeyboardAvoidingView compares its onLayout frame,
+          which is relative to its parent, with the keyboard's screen position: this one sits
+          directly in the screen root, whose frame starts at the top of the window, so it needs
+          no offset. A region around the footer alone measured from the footer's own origin and
+          left the composer behind the keys (#756 on Android, #843 on iOS). */}
+      <KeyboardAvoidingView behavior="padding" className="flex-1">
       <ConversationHeader
         conversation={conversation}
         loading={conversationQuery.isPending && !signedOut && !notFound}

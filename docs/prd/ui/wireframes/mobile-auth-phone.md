@@ -8,6 +8,33 @@ WIREFRAME — Mobile Phone Auth Screen
 Platform: mobile
 ==============================================
 
+## Compact sign-in entry for Carberk 2.0.4
+
+The founder-approved integration change in PR #848 supersedes the historical
+layout and copy below for sign-in entry only. Phone and email remain an in-place
+switch in the same mounted entry; OTP and account add/change screens keep their
+existing presentation.
+
+- Keep Close and the RU/TK/EN locale switch in the header.
+- Use a smaller Carberk wordmark, 110 × 20 dp, with 12 dp above the form and
+  16 dp between the logo, method switch, heading, field group and Get code.
+  Omit the logo at accessibility text sizes, retaining scroll access.
+- Use one heading in both modes: "Вход в Carberk", "Carberk-e giriň", or
+  "Sign in to Carberk". Keep the visible localized field label and fixed +993
+  phone prefix. Do not repeat an instruction to enter the phone number.
+- Put one delivery helper beneath the input: "Мы отправим код по SMS.",
+  "Kody SMS bilen ibereris.", or "We'll send a code by SMS." Email uses
+  "Мы отправим код на электронную почту.", "Kody e-poçta ibereris.", or
+  "We'll email you a code." Validation and request errors replace the helper.
+- Keep Get code immediately after the field group, using the existing brand
+  button, enabled/loading rules, target size and theme tokens.
+- Place accessible Terms and Privacy links 16 dp below the form instead of
+  anchoring them to the screen bottom. Retain keyboard avoidance and scrolling
+  for small screens, accessibility text and longer errors. The input and CTA
+  should be visible together above an ordinary small-screen keyboard.
+- Apply the same composition in RU/TK/EN and light/dark themes. Preserve local
+  values, focus, method-switch behavior, normalization and the OTP contract.
+
 ## Purpose
 
 Collect a Turkmenistan mobile phone number and request an SMS OTP code.

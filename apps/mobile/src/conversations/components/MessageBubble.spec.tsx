@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { fireEvent, getAllHosts, renderMobile } from "../../../test/render";
+import { fireEvent, renderMobile, getHost, getAllHosts } from "../../../test/render";
 
 import { MessageBubble } from "./MessageBubble";
 
@@ -271,6 +271,49 @@ describe("MessageBubble reported dimming", () => {
     const className = bubbleClassName(screen.getByText("Sending..."));
     expect(className).toContain("opacity-70");
     expect(className).not.toContain("opacity-60");
+  });
+});
+
+describe("MessageBubble image preview", () => {
+  it("shows the photo's ThumbHash while a received image loads", async () => {
+    const screen = await renderMobile(
+      bubble({ kind: "image", text: "", isMine: false, metadata: { key: "chat-attachments/c/m/original.webp", width: 800, height: 600, thumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" } }),
+    );
+
+    expect(getHost(screen.container, "Image").props.placeholder).toEqual({ thumbhash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" });
+  });
+
+  it("has no placeholder for an image Message from before ThumbHashes", async () => {
+    const screen = await renderMobile(
+      bubble({ kind: "image", text: "", isMine: false, metadata: { key: "chat-attachments/c/m/original.webp" } }),
+    );
+
+    expect(getHost(screen.container, "Image").props.placeholder).toBeUndefined();
+  });
+});
+
+describe("MessageBubble Listing-reference preview", () => {
+  it("shows the cover's ThumbHash on the chat Listing card while the cover loads", async () => {
+    const screen = await renderMobile(
+      bubble({
+        kind: "post_ref",
+        isMine: false,
+        text: "",
+        metadata: {
+          listingId: "00000000-0000-4000-8000-0000000000a1",
+          brandId: "00000000-0000-4000-8000-0000000000d1",
+          modelId: "00000000-0000-4000-8000-0000000000d2",
+          displayPriceTmt: 285000,
+          priceCurrency: "TMT",
+          coverMediaKey: "pending/a/original.webp",
+          coverThumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH",
+          status: "active",
+          available: true,
+        },
+      }),
+    );
+
+    expect(getHost(screen.container, "Image").props.placeholder).toEqual({ thumbhash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" });
   });
 });
 

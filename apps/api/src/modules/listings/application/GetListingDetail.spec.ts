@@ -230,7 +230,7 @@ describe("GetListingDetail", () => {
       displayName: "Aýgül",
       nameNumber: 3310,
       avatarIndex: 11,
-      avatarKey: "avatars/user-1/a.jpg",
+      avatarKey: "avatars/user-1/a.webp",
       memberSince: new Date("2024-06-10T12:00:00Z"),
     }));
 
@@ -243,7 +243,7 @@ describe("GetListingDetail", () => {
       displayName: "Aýgül",
       nameNumber: 3310,
       avatarIndex: 11,
-      avatarKey: "avatars/user-1/a.jpg",
+      avatarKey: "avatars/user-1/a.webp",
       deleted: false,
       memberSince: "2024-06-10T12:00:00.000Z",
     });
@@ -318,7 +318,7 @@ describe("GetListingDetail", () => {
       id: "media-1",
       listingId: "listing-1",
       kind: "image",
-      key: "listings/listing-1/media-1/original.jpg",
+      key: "listings/listing-1/media-1/original.webp",
       sortOrder: 0,
     });
     mediaRepo.media.push(media);
@@ -328,8 +328,27 @@ describe("GetListingDetail", () => {
 
     expect(result.media).toHaveLength(1);
     expect(result.media[0]!.variants.thumbnail).toBe(
-      "https://media.auto.tm/listings/listing-1/media-1/thumbnail.jpg",
+      "https://media.auto.tm/listings/listing-1/media-1/thumbnail.webp?v=webp-natural-1",
     );
+  });
+
+  it("gives a photo its ThumbHash and leaves the field out for a photo without one", async () => {
+    seedListing();
+    mediaRepo.media.push(
+      ListingMedia.create({
+        id: "media-1", listingId: "listing-1", kind: "image",
+        key: "listings/listing-1/media-1/original.webp", sortOrder: 0, thumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH",
+      }),
+      ListingMedia.create({
+        id: "media-2", listingId: "listing-1", kind: "image",
+        key: "listings/listing-1/media-2/original.webp", sortOrder: 1,
+      }),
+    );
+
+    const result = await makeUseCase(repo, mediaRepo, exchangeRates, storage, favorites).execute({ listingId: "listing-1" });
+
+    expect(result.media[0]!.thumbHash).toBe("1fsDBYCIiIiHiIdweIeHh4d4cIgH");
+    expect(JSON.parse(JSON.stringify(result.media[1]))).not.toHaveProperty("thumbHash");
   });
 
   it("returns video url for all variant slots on video media", async () => {

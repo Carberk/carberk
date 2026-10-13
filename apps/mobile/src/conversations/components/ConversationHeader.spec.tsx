@@ -32,8 +32,8 @@ const position = (view: View, piece: string) => JSON.stringify(view.toJSON()).in
 
 // The first stroke of the key, the mark for avatar index 7.
 const KEY_MARK = "M11.5 12H21M17 12v3M20 12v2.4M6.5 12h.01";
-const PHOTO_KEY = "avatars/u2/original.jpg";
-const PHOTO_URL = "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.jpg";
+const PHOTO_KEY = "avatars/u2/original.webp";
+const PHOTO_URL = "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.webp?v=webp-natural-1";
 
 /** Merdan Ataýew, avatar index 7, name number 2057, no photo. */
 function peer(id: string, updates: Partial<ConversationDetail["peer"]> = {}): ConversationDetail["peer"] {

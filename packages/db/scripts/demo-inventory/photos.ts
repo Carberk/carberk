@@ -89,14 +89,14 @@ export function createCommonsPhotoSource(
 
 /**
  * The variants `GetListingDetail` builds URLs for, with the sizes and fit of the API's
- * `SharpImageVariantGenerator`. Keep them the same, so demo photos crop and letterbox exactly as a
+ * `SharpImageVariantGenerator`. Keep them the same, so demo photos crop and preserve proportions exactly as a
  * seller's own upload does.
  */
 const VARIANTS = [
   { name: "thumbnail", width: 200, height: 200, fit: "cover" },
   { name: "list", width: 600, height: 400, fit: "cover" },
-  { name: "detail", width: 1200, height: 800, fit: "contain" },
-  { name: "fullscreen", width: 2400, height: 1600, fit: "contain" },
+  { name: "detail", width: 1200, height: 800, fit: "inside" },
+  { name: "fullscreen", width: 2400, height: 1600, fit: "inside" },
 ] as const;
 
 export const OBJECTS_PER_PHOTO = VARIANTS.length + 1;
@@ -104,7 +104,7 @@ export const OBJECTS_PER_PHOTO = VARIANTS.length + 1;
 export interface PreparedPhoto {
   width: number;
   height: number;
-  /** `original` first, then each variant. All JPEG. */
+  /** `original` first, then each variant. All WebP. */
   files: { name: string; body: Buffer }[];
 }
 
@@ -115,7 +115,7 @@ export interface PreparedPhoto {
  * keep it, and `autoOrient` applies and removes the orientation tag.
  */
 export async function preparePhoto(source: Buffer): Promise<PreparedPhoto> {
-  const original = await sharp(source).autoOrient().jpeg({ quality: 85, progressive: true }).toBuffer();
+  const original = await sharp(source).autoOrient().webp({ quality: 80 }).toBuffer();
   const meta = await sharp(original).metadata();
   if (meta.exif || meta.xmp || meta.iptc || (meta.orientation ?? 1) !== 1) {
     throw new DemoInventoryError("A demo photo still carries metadata after cleaning");
@@ -126,7 +126,7 @@ export async function preparePhoto(source: Buffer): Promise<PreparedPhoto> {
       name: variant.name,
       body: await sharp(original)
         .resize(variant.width, variant.height, { fit: variant.fit, withoutEnlargement: true })
-        .jpeg({ quality: 85, progressive: true })
+        .webp({ quality: 80 })
         .toBuffer(),
     });
   }

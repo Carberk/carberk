@@ -9,7 +9,7 @@ import { useOpenListingConversation } from "../../conversations/useOpenListingCo
 import { formatPrice } from "../formatPrice";
 import { formatListingDate } from "../feed/formatListingDate";
 import { PhotoChip } from "../feed/ListingPhoto";
-import { feedCardPhotoKeys } from "../feed/feedCardFields";
+import { feedCardPhotoKeys, feedCardPhotoThumbHashes } from "../feed/feedCardFields";
 import { SquareAction } from "../feed/ListingLargeCard";
 import { CARD_INSET, ListingPhotoStrip, STRIP_HEIGHT_SHARE, STRIP_INSET } from "../feed/ListingPhotoStrip";
 import { listingSpecLine } from "../feed/listingSpecLine";
@@ -106,7 +106,7 @@ export const FavoriteListingCard = memo(function FavoriteListingCard(props: Favo
     <MotionView testID="favorite-card" style={press.style} className="overflow-hidden rounded-3xl bg-card">
       <View>
         <View testID="listing-photos-frame" className={cn(closedLabel && "opacity-50")}>
-          <ListingPhotoStrip photoKeys={feedCardPhotoKeys(listing)} photoCount={listing.photoCount}
+          <ListingPhotoStrip photoKeys={feedCardPhotoKeys(listing)} thumbHashes={feedCardPhotoThumbHashes(listing)} photoCount={listing.photoCount}
             onOpen={() => onPress(listing.id)} {...press.handlers} />
         </View>
         {closedLabel ? <PhotoChip label={closedLabel} tone={sold ? "solid" : "quiet"} className="left-4 top-4" /> : null}

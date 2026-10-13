@@ -71,7 +71,7 @@ describe("issue 373 approved detail content", () => {
           {
             id: "photo",
             kind: "image",
-            key: "photo.jpg",
+            key: "photo.webp",
             sortOrder: 0,
             variants: { thumbnail: "", list: "", detail: "", fullscreen: "" },
           },

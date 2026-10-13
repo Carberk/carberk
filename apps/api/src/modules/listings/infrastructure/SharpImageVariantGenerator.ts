@@ -8,6 +8,7 @@ import {
 import sharp from "sharp";
 
 import { ImageTooLargeAfterCleaningError, stripImageMetadata } from "../../../common/stripImageMetadata";
+import { computeThumbHash } from "../../../common/thumbHash";
 import { UPLOAD_CAPS } from "../domain/MediaUpload";
 import { DomainError, LISTING_ERROR_CODES } from "../domain/types";
 import type { ImageVariantGenerator } from "../domain/ports/ImageVariantGenerator";
@@ -19,14 +20,14 @@ interface VariantSpec {
   name: "thumbnail" | "list" | "detail" | "fullscreen";
   width: number;
   height: number;
-  fit: "cover" | "contain";
+  fit: "cover" | "inside";
 }
 
 const VARIANTS: VariantSpec[] = [
   { name: "thumbnail", width: 200, height: 200, fit: "cover" },
   { name: "list", width: 600, height: 400, fit: "cover" },
-  { name: "detail", width: 1200, height: 800, fit: "contain" },
-  { name: "fullscreen", width: 2400, height: 1600, fit: "contain" },
+  { name: "detail", width: 1200, height: 800, fit: "inside" },
+  { name: "fullscreen", width: 2400, height: 1600, fit: "inside" },
 ];
 
 function requireVariantKey(
@@ -71,6 +72,7 @@ export class SharpImageVariantGenerator implements ImageVariantGenerator {
       detail: string;
       fullscreen: string;
     };
+    thumbHash: string;
   }> {
     const bucket = this.inferBucket(originalKey);
     const conditional = options?.writeProtocol === "conditional-v1"
@@ -128,22 +130,6 @@ export class SharpImageVariantGenerator implements ImageVariantGenerator {
         })
         .toBuffer());
 
-      // JPEG variant
-      const jpegKey = `${base}/${spec.name}.jpg`;
-      const jpegBuffer = await this.prepare(() => sharp(resized)
-        .jpeg({ quality: 85, progressive: true })
-        .toBuffer());
-      if (conditional) {
-        await conditional.write(jpegKey, jpegBuffer, "image/jpeg");
-      } else await this.s3.send(
-        new PutObjectCommand({
-          Bucket: bucket,
-          Key: jpegKey,
-          Body: jpegBuffer,
-          ContentType: "image/jpeg",
-        }),
-      );
-
       // WebP variant
       const webpKey = `${base}/${spec.name}.webp`;
       const webpBuffer = await this.prepare(() => sharp(resized)
@@ -160,10 +146,14 @@ export class SharpImageVariantGenerator implements ImageVariantGenerator {
         }),
       );
 
-      variantKeys[spec.name] = jpegKey;
+      variantKeys[spec.name] = webpKey;
     }
 
+    // The blurred preview comes from the same cleaned, upright source.
+    const thumbHash = await this.prepare(() => computeThumbHash(buffer));
+
     return {
+      thumbHash,
       variants: {
         thumbnail: requireVariantKey(variantKeys, "thumbnail"),
         list: requireVariantKey(variantKeys, "list"),

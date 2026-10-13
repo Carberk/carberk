@@ -494,3 +494,12 @@ describe("EnvSchema deploy metadata", () => {
     expect(env.AUTOTM_COMMIT_SHA).toBe("unknown");
   });
 });
+
+
+describe("photo conversion maintenance setting", () => {
+  it("defaults off and accepts only explicit true or false", () => {
+    expect(EnvSchema.parse(baseEnv).PHOTO_CONVERSION_MAINTENANCE).toBe(false);
+    expect(EnvSchema.parse({ ...baseEnv, PHOTO_CONVERSION_MAINTENANCE: "true" }).PHOTO_CONVERSION_MAINTENANCE).toBe(true);
+    expect(EnvSchema.safeParse({ ...baseEnv, PHOTO_CONVERSION_MAINTENANCE: "yes" }).success).toBe(false);
+  });
+});

@@ -5,8 +5,8 @@ import EditListingScreen from "../../app/listings/[id]/edit";
 
 const fixture = vi.hoisted(() => {
   const id = "550e8400-e29b-41d4-a716-446655440000";
-  const media = [0, 1, 2].map((index) => ({ id: index === 0 ? id : `550e8400-e29b-41d4-a716-${String(900 + index).padStart(12, "0")}`, kind: "image", key: index === 0 ? "photo.jpg" : `support-${index}.jpg`, variants: {
-    thumbnail: "t.jpg", list: "l.jpg", detail: "d.jpg", fullscreen: "f.jpg",
+  const media = [0, 1, 2].map((index) => ({ id: index === 0 ? id : `550e8400-e29b-41d4-a716-${String(900 + index).padStart(12, "0")}`, kind: "image", key: index === 0 ? "photo.webp" : `support-${index}.webp`, variants: {
+    thumbnail: "t.webp", list: "l.webp", detail: "d.webp", fullscreen: "f.webp",
   }, sortOrder: index }));
   return {
     savedPhotos: media.map((m) => ({ photoId: m.id, key: m.key, sortOrder: m.sortOrder, state: "attached", retryCount: 0 })),
@@ -25,7 +25,7 @@ const fixture = vi.hoisted(() => {
       seller: { displayName: "Seller", nameNumber: 2057, avatarIndex: 7, avatarKey: null, deleted: false, memberSince: "2026-01-01T00:00:00.000Z" },
     },
     listing: {} as Record<string, unknown>,
-    saved: { photoId: id, key: "photo.jpg", state: "uploaded", sortOrder: 0, retryCount: 0 } as Record<string, unknown>,
+    saved: { photoId: id, key: "photo.webp", state: "uploaded", sortOrder: 0, retryCount: 0 } as Record<string, unknown>,
     photos: [] as Record<string, unknown>[],
     gate: { canPublish: true, blockers: [] as string[] },
   };

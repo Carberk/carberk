@@ -47,12 +47,12 @@ const seedMedia: ListingsSchemas.ListingMedia[] = [
   {
     id: "550e8400-e29b-41d4-a716-446655440001",
     kind: "image",
-    key: "listings/l1/m1/original.jpg",
+    key: "listings/l1/m1/original.webp",
     variants: {
-      thumbnail: "t.jpg",
-      list: "l.jpg",
-      detail: "d.jpg",
-      fullscreen: "f.jpg",
+      thumbnail: "t.webp",
+      list: "l.webp",
+      detail: "d.webp",
+      fullscreen: "f.webp",
     },
     sortOrder: 0,
     width: 1920,
@@ -61,12 +61,12 @@ const seedMedia: ListingsSchemas.ListingMedia[] = [
   {
     id: "550e8400-e29b-41d4-a716-446655440002",
     kind: "image",
-    key: "listings/l1/m2/original.jpg",
+    key: "listings/l1/m2/original.webp",
     variants: {
-      thumbnail: "t.jpg",
-      list: "l.jpg",
-      detail: "d.jpg",
-      fullscreen: "f.jpg",
+      thumbnail: "t.webp",
+      list: "l.webp",
+      detail: "d.webp",
+      fullscreen: "f.webp",
     },
     sortOrder: 1,
     width: 1920,
@@ -281,7 +281,7 @@ describe("useSaveListingEdit", () => {
           id: "550e8400-e29b-41d4-a716-446655440008",
           listingId: LISTING_ID,
           kind: "image",
-          key: "listings/l1/new1/original.jpg",
+          key: "listings/l1/new1/original.webp",
           sortOrder: 2,
           createdAt: "2026-05-21T12:00:00.000Z",
         });
@@ -363,7 +363,7 @@ describe("useSaveListingEdit", () => {
           id: "550e8400-e29b-41d4-a716-446655440008",
           listingId: LISTING_ID,
           kind: "image",
-          key: "listings/l1/new1/original.jpg",
+          key: "listings/l1/new1/original.webp",
           sortOrder: 2,
           createdAt: "2026-05-21T12:00:00.000Z",
         });
