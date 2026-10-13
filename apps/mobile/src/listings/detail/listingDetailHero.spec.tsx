@@ -53,6 +53,15 @@ vi.mock("../../api/catalog/useTransmissions", () => ({
 vi.mock("../../api/catalog/useEngineTypes", () => ({
   useEngineTypes: () => ({ data: { items: [{ id: "engine", name: "Petrol" }] } }),
 }));
+vi.mock("../../api/catalog/useDriveTypes", () => ({
+  useDriveTypes: () => ({ data: { items: [{ id: "drive", name: "Front wheel" }] } }),
+}));
+vi.mock("../../api/catalog/useBodyTypes", () => ({
+  useBodyTypes: () => ({ data: { items: [{ id: "body", name: "Sedan" }] } }),
+}));
+vi.mock("../../api/catalog/useColors", () => ({
+  useColors: () => ({ data: { items: [{ id: "color", name: "White" }] } }),
+}));
 
 type Screen = Awaited<ReturnType<typeof renderMobile>>;
 
@@ -243,5 +252,66 @@ describe("loading placeholders in the loaded detail's shape (#864)", () => {
     await loadDetail(screen, complete());
 
     expect(loading).toEqual(specLayout(screen));
+  });
+});
+
+describe("a card summary that carries the preview's fields (#867)", () => {
+  /** Every Specifications entry, as its layout and what it shows, or "loading". */
+  function specEntries(screen: Screen) {
+    return screen.container
+      .queryAll((node) => typeof node.type === "string"
+        && typeof node.props.testID === "string" && /^spec-(cell|row)/.test(node.props.testID))
+      .map((node) => {
+        const loading = node.props.testID.endsWith("-loading");
+        const texts = queryAllHosts(node, "Text").flatMap((text) => [text.props.children].flat()).join(" ");
+        return `${node.props.testID.replace(/-loading$/, "")} ${node.props.className} ${loading ? "loading" : texts}`;
+      });
+  }
+  /** The badges under the price and the contact buttons on screen. */
+  function chrome(screen: Screen) {
+    return {
+      badges: ["Exchange possible", "Installment possible"].filter((badge) => screen.queryByText(badge)),
+      contact: ["Call", "Message"].filter((name) => screen.queryAllByRole("button", { name }).length > 0),
+    };
+  }
+
+  it.each([
+    [
+      "a complete Listing",
+      { enginePower: 150, driveTypeId: "drive", bodyTypeId: "body", colorId: "color", hasVin: false,
+        acceptsExchange: true, installmentAvailable: false, allowCalls: false, allowChat: true },
+      { enginePower: 150, driveTypeId: "drive", bodyTypeId: "body", colorId: "color",
+        acceptsExchange: true, installmentAvailable: false, allowCalls: false, allowChat: true },
+    ],
+    [
+      "a sparse Listing",
+      { hasVin: false, acceptsExchange: false, installmentAvailable: true, allowCalls: true, allowChat: true },
+      { acceptsExchange: false, installmentAvailable: true, allowCalls: true, allowChat: true },
+    ],
+  ] as const)("keeps every Specifications entry, badge and contact button in place when detail loads: %s", async (_name, card, detail) => {
+    state.preview = summaryFixture(card);
+    const screen = await renderMobile(<ListingDetailScreen />);
+    const before = { specs: specEntries(screen), ...chrome(screen) };
+
+    await loadDetail(screen, fixture({
+      media: cardMedia(), mileageKm: 12000, transmissionId: "transmission", engineTypeId: "engine", condition: "used", ...detail,
+    }));
+
+    expect(before).toEqual({ specs: specEntries(screen), ...chrome(screen) });
+  });
+
+  it("holds a VIN row only for a Listing that has a VIN, and never shows the VIN before detail", async () => {
+    state.preview = summaryFixture({ hasVin: true, enginePower: 150, driveTypeId: "drive", bodyTypeId: "body", colorId: "color" });
+    const screen = await renderMobile(<ListingDetailScreen />);
+    const loading = specLayout(screen);
+    expect(screen.getAllByTestId("spec-row-loading")).toHaveLength(1);
+
+    await loadDetail(screen, fixture({
+      media: cardMedia(), mileageKm: 12000, transmissionId: "transmission", engineTypeId: "engine", condition: "used",
+      enginePower: 150, driveTypeId: "drive", bodyTypeId: "body", colorId: "color", vin: "JTDKB20U793456789",
+    }));
+
+    expect(specLayout(screen)).toEqual(loading);
+    expect(screen.getByText("JTDKB20U793456789")).toBeTruthy();
   });
 });

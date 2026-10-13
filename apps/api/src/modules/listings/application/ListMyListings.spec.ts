@@ -72,6 +72,37 @@ describe("ListMyListings", () => {
     expect(result.items[0]).toMatchObject({ photoThumbHashes: ["1fsDBYCIiIiHiIdweIeHh4d4cIgH", null] });
   });
 
+  it("returns what the detail preview places on the owner's summaries, but no VIN or contact phone", async () => {
+    seedSummary({
+      enginePower: 150,
+      driveTypeId: "drive-1",
+      bodyTypeId: "body-1",
+      colorId: "color-1",
+      hasVin: true,
+      acceptsExchange: true,
+      installmentAvailable: false,
+      contactPhone: "+99365000000",
+      allowCalls: false,
+    });
+
+    const uc = new ListMyListings(port);
+    const [item] = (await uc.execute({ userId: "user-1" })).items;
+
+    expect(item).toMatchObject({
+      enginePower: 150,
+      driveTypeId: "drive-1",
+      bodyTypeId: "body-1",
+      colorId: "color-1",
+      hasVin: true,
+      acceptsExchange: true,
+      installmentAvailable: false,
+      allowCalls: false,
+      allowChat: true,
+    });
+    expect(item).not.toHaveProperty("contactPhone");
+    expect(item).not.toHaveProperty("vin");
+  });
+
   it("returns owner's listings", async () => {
     seedSummary();
     const uc = makeUseCase(port);
