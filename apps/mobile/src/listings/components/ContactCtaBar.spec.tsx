@@ -147,9 +147,14 @@ describe("ContactCtaBar without calls", () => {
       await screen.unmount();
     }
   });
-  it("keeps a disabled Call while the Listing is still loading", async () => {
-    const screen = await renderMobile(<ContactCtaBar {...props} allowCalls={false} allowChat={false} contactPhone={undefined} pending />);
+  it("holds a disabled Call while the Listing is still loading when the card says the seller takes calls", async () => {
+    const screen = await renderMobile(<ContactCtaBar {...props} allowCalls allowChat={false} contactPhone={undefined} pending />);
     expect(screen.getByRole("button", { name: "Call", disabled: true })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Message", disabled: true })).toBeTruthy();
+  });
+  it("leaves Call out while loading when the card says the seller takes no calls, as the loaded bar will (#867)", async () => {
+    const screen = await renderMobile(<ContactCtaBar {...props} allowCalls={false} allowChat={false} contactPhone={undefined} pending />);
+    expect(screen.queryByRole("button", { name: "Call" })).toBeNull();
     expect(screen.getByRole("button", { name: "Message", disabled: true })).toBeTruthy();
   });
   it.each([Enums.ListingStatus.Sold, Enums.ListingStatus.Archived])("keeps a disabled Call on a %s Listing, with or without calls", async (status) => {

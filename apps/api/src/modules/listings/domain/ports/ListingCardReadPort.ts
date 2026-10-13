@@ -15,6 +15,15 @@ export interface ListingCard extends ListingSummary, CardPhotos {
   engineTypeId?: string;
   contactPhone?: string;
   allowCalls: boolean;
+  /** What Listing detail's preview places before detail loads (#867). */
+  enginePower?: number;
+  driveTypeId?: string;
+  bodyTypeId?: string;
+  colorId?: string;
+  /** Whether the Listing has a VIN; the VIN itself stays on detail. */
+  hasVin?: boolean;
+  acceptsExchange?: boolean;
+  installmentAvailable?: boolean;
 }
 
 export interface ListingCardReadPort {
