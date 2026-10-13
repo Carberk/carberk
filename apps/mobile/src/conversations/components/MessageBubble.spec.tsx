@@ -308,11 +308,11 @@ describe("Listing-reference bubble width", () => {
     expect(container(screen).props.className.split(/\s+/)).toContain("w-full");
     expect(container(screen).props.className).toContain("max-w-[80%]");
     expect(container(screen).props.className).not.toMatch(/(?:^|\s)h-/);
-    expect(screen.getByText("Toyota Camry with a long model name, 2018")).toBeTruthy();
+    expect(screen.getByText("2018 Toyota Camry with a long model name")).toBeTruthy();
     expect(screen.getByText("285,000 TMT")).toBeTruthy();
     expect(screen.getByText("Active")).toBeTruthy();
     expect(screen.getByText("02:05 PM")).toBeTruthy();
-    const card = screen.getByRole("button", { name: /Open listing: Toyota Camry/ });
+    const card = screen.getByRole("button", { name: /Open: 2018 Toyota Camry/ });
     await fireEvent.press(card);
     expect(onPostRefPress).toHaveBeenCalledWith(listing.listingId);
     await fireEvent(card, "longPress");
@@ -326,7 +326,7 @@ describe("Listing-reference bubble width", () => {
     }));
     expect(container(screen).props.className.split(/\s+/)).toContain("w-full");
     expect(screen.getByText("Sold")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /Open listing/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Open:/ })).toBeNull();
     expect(onPostRefPress).not.toHaveBeenCalled();
   });
 
