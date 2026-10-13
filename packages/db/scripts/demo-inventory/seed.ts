@@ -13,12 +13,18 @@ import {
 import { OBJECTS_PER_PHOTO, preparePhoto, type PhotoSource } from "./photos";
 import { refused, type DemoInventoryResult } from "./result";
 import type { ObjectStore } from "./storage";
+import { createUploadQueue } from "./upload-queue";
 
 const DAY_MS = 86_400_000;
 /** Listings are published over this many days before the first run. */
 const PUBLISH_WINDOW_DAYS = 30;
 /** The fixed seed behind every drawn value, so a run on any machine draws the same ones. */
 const RANDOM_SEED = 703;
+/**
+ * Stored objects uploaded at once. Photos are still loaded one at a time, as Commons asks, and
+ * prepared one at a time; only the uploads to the bucket overlap.
+ */
+export const DEMO_UPLOAD_CONCURRENCY = 8;
 
 /** mulberry32: a small seeded generator. `Math.random` would make two runs disagree. */
 function seededRandom(seed: number): () => number {
@@ -202,6 +208,7 @@ export async function seedDemoInventory(deps: {
 
   const drawn = drawListingValues(cars.length);
   const expectedKeys = new Set<string>();
+  const uploads = createUploadQueue(DEMO_UPLOAD_CONCURRENCY);
   let photoCount = 0;
 
   for (const [index, car] of cars.entries()) {
@@ -213,24 +220,32 @@ export async function seedDemoInventory(deps: {
     // The checks above cover all four; this narrows them for the compiler.
     if (!reference || !draw || !entry || !sellerId) throw new Error(`Demo car ${car.slug} is incomplete`);
 
-    // Upload first: a media row whose object is missing renders an empty frame.
+    // Upload first: a media row whose object is missing renders an empty frame. Every upload of
+    // this Listing has finished before its rows are written.
     const media: { id: string; key: string; sortOrder: number; width: number; height: number }[] = [];
-    for (const [order, photo] of entry.photos.entries()) {
-      const base = `${DEMO_OBJECT_PREFIX}${car.slug}/${String(order + 1).padStart(2, "0")}`;
-      const prepared = await preparePhoto(await photos.load(photo));
-      for (const file of prepared.files) {
-        const key = `${base}/${file.name}.jpg`;
-        await storage.put(key, file.body, "image/jpeg");
-        expectedKeys.add(key);
+    try {
+      for (const [order, photo] of entry.photos.entries()) {
+        const base = `${DEMO_OBJECT_PREFIX}${car.slug}/${String(order + 1).padStart(2, "0")}`;
+        const prepared = await preparePhoto(await photos.load(photo));
+        for (const file of prepared.files) {
+          const key = `${base}/${file.name}.jpg`;
+          await uploads.add(() => storage.put(key, file.body, "image/jpeg"));
+          expectedKeys.add(key);
+        }
+        media.push({
+          id: demoMediaId(index, order),
+          key: `${base}/original.jpg`,
+          sortOrder: order,
+          width: prepared.width,
+          height: prepared.height,
+        });
       }
-      media.push({
-        id: demoMediaId(index, order),
-        key: `${base}/original.jpg`,
-        sortOrder: order,
-        width: prepared.width,
-        height: prepared.height,
-      });
+    } catch (error) {
+      // A photo that failed to load or prepare: let the uploads in flight finish, then report it.
+      await uploads.drain().catch(() => undefined);
+      throw error;
     }
+    await uploads.drain();
     photoCount += media.length;
 
     const rate = car.priceCurrency === "TMT" ? 1 : catalog.ratesToTmt.get(car.priceCurrency);

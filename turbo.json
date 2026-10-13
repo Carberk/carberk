@@ -41,7 +41,7 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "outputs": ["coverage/**"]
+      "outputs": []
     },
     "test:unit": {
       "dependsOn": ["^build"],
@@ -57,7 +57,7 @@
     },
     "@auto-tm/db#test": {
       "dependsOn": ["^build", "build"],
-      "outputs": ["coverage/**"]
+      "outputs": []
     },
     "@auto-tm/db#test:unit": {
       "dependsOn": ["^build", "build"],
@@ -66,7 +66,7 @@
     "@auto-tm/api#test": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/admin/src/lib/**", "$TURBO_ROOT$/apps/admin/package.json"],
-      "outputs": ["coverage/**"]
+      "outputs": []
     },
     "@auto-tm/api#test:unit": {
       "dependsOn": ["^build"],
