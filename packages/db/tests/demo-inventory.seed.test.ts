@@ -98,16 +98,10 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
   beforeAll(async () => {
     // "An empty migrated database with the catalog seeded": the real migrations and catalog seed,
     // run while MinIO starts.
-    // TEMPORARY (#851): phase timings for the hosted run; removed before review.
-    const t0 = Date.now();
-    const mark = (label: string) => console.info(`[seed-test timing] ${label} at ${Date.now() - t0}ms`);
     const migrateAndSeedCatalog = async (started: StartedPostgreSqlContainer) => {
-      mark("postgres started");
       const env = { ...process.env, DATABASE_URL: started.getConnectionUri() };
       await run(`${packageDir}node_modules/.bin/prisma`, ["migrate", "deploy"], { cwd: packageDir, env });
-      mark("migrated");
       await run(`${packageDir}node_modules/.bin/tsx`, ["src/seed.ts"], { cwd: packageDir, env });
-      mark("catalog seeded");
       return started;
     };
     [postgres, minio] = await Promise.all([
@@ -125,11 +119,7 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
         .withCommand(["server", "/data"])
         .withExposedPorts(9000)
         .withWaitStrategy(Wait.forHttp("/minio/health/live", 9000))
-        .start()
-        .then((started) => {
-          mark("minio started");
-          return started;
-        }),
+        .start(),
     ]);
 
     pool = new Pool({ connectionString: postgres.getConnectionUri() });
@@ -181,7 +171,6 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
         return stub;
       },
     };
-    mark("beforeAll done");
   }, 300_000);
 
   afterAll(async () => {
