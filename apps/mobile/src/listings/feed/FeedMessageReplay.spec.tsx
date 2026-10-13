@@ -21,8 +21,8 @@ const results: AuthHref = { pathname: "/(tabs)/(search)/results", params: { sort
 function renderReplay() {
   return renderMobile(<ToastProvider><FeedMessageReplay returnTo={results} /></ToastProvider>);
 }
-function signInReturns(returnTo: AuthHref, listingId = "listing") {
-  act(() => useAuthIntentStore.setState({ intent: null, replayAction: { kind: "message", listingId }, replayReturnTo: returnTo }));
+async function signInReturns(returnTo: AuthHref, listingId = "listing") {
+  await act(() => useAuthIntentStore.setState({ intent: null, replayAction: { kind: "message", listingId }, replayReturnTo: returnTo }));
 }
 
 beforeEach(() => {
@@ -31,31 +31,31 @@ beforeEach(() => {
 });
 
 describe("Results Message after sign-in", () => {
-  it("opens the Conversation about the Listing once when sign-in returns to Results", () => {
-    const view = renderReplay();
-    signInReturns(results);
+  it("opens the Conversation about the Listing once when sign-in returns to Results", async () => {
+    const view = await renderReplay();
+    await signInReturns(results);
     expect(conversation.open).toHaveBeenCalledOnce();
     expect(conversation.open).toHaveBeenCalledWith("listing");
     expect(useAuthIntentStore.getState().replayAction).toBeNull();
-    view.rerender(<ToastProvider><FeedMessageReplay returnTo={results} /></ToastProvider>);
+    await view.rerender(<ToastProvider><FeedMessageReplay returnTo={results} /></ToastProvider>);
     expect(conversation.open).toHaveBeenCalledOnce();
   });
-  it("leaves a Message that another screen asked for", () => {
-    renderReplay();
-    signInReturns({ pathname: "/(public)/listings/[id]", params: { id: "listing" } });
+  it("leaves a Message that another screen asked for", async () => {
+    await renderReplay();
+    await signInReturns({ pathname: "/(public)/listings/[id]", params: { id: "listing" } });
     expect(conversation.open).not.toHaveBeenCalled();
     expect(useAuthIntentStore.getState().replayAction).not.toBeNull();
   });
-  it("waits while another screen is on top of Results", () => {
+  it("waits while another screen is on top of Results", async () => {
     screenFocus.focused = false;
-    renderReplay();
-    signInReturns(results);
+    await renderReplay();
+    await signInReturns(results);
     expect(conversation.open).not.toHaveBeenCalled();
   });
-  it("says so when the Conversation cannot open", () => {
+  it("says so when the Conversation cannot open", async () => {
     conversation.error = new Error("Network request failed");
-    const view = renderReplay();
-    signInReturns(results);
+    const view = await renderReplay();
+    await signInReturns(results);
     expect(view.getByText("Something went wrong")).toBeTruthy();
   });
 });

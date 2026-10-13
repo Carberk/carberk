@@ -26,25 +26,25 @@ beforeEach(() => {
 
 afterEach(() => vi.useRealTimers());
 
-function deleteButton(screen: ReturnType<typeof renderMobile>) {
+function deleteButton(screen: Awaited<ReturnType<typeof renderMobile>>) {
   return screen.getByRole("button", { name: screen.i18n.t("account:deleteAccount") });
 }
 
-function understand(screen: ReturnType<typeof renderMobile>, checked: boolean) {
+function understand(screen: Awaited<ReturnType<typeof renderMobile>>, checked: boolean) {
   return screen.getByRole("checkbox", { name: screen.i18n.t("account:deleteAccountUnderstand"), checked });
 }
 
-async function confirmDeletion(screen: ReturnType<typeof renderMobile>) {
-  fireEvent.press(understand(screen, false));
-  fireEvent.press(deleteButton(screen));
+async function confirmDeletion(screen: Awaited<ReturnType<typeof renderMobile>>) {
+  await fireEvent.press(understand(screen, false));
+  await fireEvent.press(deleteButton(screen));
   await act(async () => {
-    fireEvent.press(screen.getByText(screen.i18n.t("account:deleteAccountConfirmAction")));
+    void fireEvent.press(screen.getByText(screen.i18n.t("account:deleteAccountConfirmAction")));
   });
 }
 
 describe("Delete account screen", () => {
-  it.each(["en", "ru", "tk"] as const)("explains what happens with the date 30 days from today in %s", (locale) => {
-    const screen = renderMobile(<DeleteAccountScreen />, { locale });
+  it.each(["en", "ru", "tk"] as const)("explains what happens with the date 30 days from today in %s", async (locale) => {
+    const screen = await renderMobile(<DeleteAccountScreen />, { locale });
     const t = screen.i18n.t;
 
     expect(screen.getByText(t("account:deleteAccountDescription"))).toBeTruthy();
@@ -56,28 +56,28 @@ describe("Delete account screen", () => {
     expect(screen.getByText(t("account:deleteAccountRestoreBefore"))).toBeTruthy();
   });
 
-  it("keeps Delete account disabled, for screen readers too, until I understand is ticked", () => {
-    const screen = renderMobile(<DeleteAccountScreen />);
+  it("keeps Delete account disabled, for screen readers too, until I understand is ticked", async () => {
+    const screen = await renderMobile(<DeleteAccountScreen />);
 
     expect(deleteButton(screen).props.accessibilityState).toMatchObject({ disabled: true });
-    fireEvent.press(deleteButton(screen));
+    await fireEvent.press(deleteButton(screen));
     expect(screen.queryByText(screen.i18n.t("account:deleteAccountConfirmTitle"))).toBeNull();
 
-    fireEvent.press(understand(screen, false));
+    await fireEvent.press(understand(screen, false));
 
     expect(understand(screen, true)).toBeTruthy();
     expect(deleteButton(screen).props.accessibilityState).toMatchObject({ disabled: false });
   });
 
-  it("asks in a dialog with the date, and Cancel changes nothing", () => {
-    const screen = renderMobile(<DeleteAccountScreen />);
+  it("asks in a dialog with the date, and Cancel changes nothing", async () => {
+    const screen = await renderMobile(<DeleteAccountScreen />);
     const t = screen.i18n.t;
 
-    fireEvent.press(understand(screen, false));
-    fireEvent.press(deleteButton(screen));
+    await fireEvent.press(understand(screen, false));
+    await fireEvent.press(deleteButton(screen));
     expect(screen.getByText(t("account:deleteAccountConfirmDescription", { date: DATES.en }))).toBeTruthy();
 
-    fireEvent.press(screen.getByText(t("account:deleteAccountCancel")));
+    await fireEvent.press(screen.getByText(t("account:deleteAccountCancel")));
 
     expect(screen.queryByText(t("account:deleteAccountConfirmTitle"))).toBeNull();
     expect(api.delete).not.toHaveBeenCalled();
@@ -88,7 +88,7 @@ describe("Delete account screen", () => {
   });
 
   it("deletes with the session alone, clears the session and cache, and opens the scheduled screen over Cabinet", async () => {
-    const screen = renderMobile(<DeleteAccountScreen />);
+    const screen = await renderMobile(<DeleteAccountScreen />);
     screen.queryClient.setQueryData(["me"], { id: "user-1" });
 
     await confirmDeletion(screen);
@@ -107,7 +107,7 @@ describe("Delete account screen", () => {
 
   it("keeps the User signed in on the screen and shows the error when deletion fails", async () => {
     api.delete.mockRejectedValue(new Error("network"));
-    const screen = renderMobile(<DeleteAccountScreen />);
+    const screen = await renderMobile(<DeleteAccountScreen />);
 
     await confirmDeletion(screen);
 
@@ -121,40 +121,40 @@ describe("Delete account screen", () => {
 
   it("opens again with no old error and an unticked box", async () => {
     api.delete.mockRejectedValue(new Error("network"));
-    const first = renderMobile(<DeleteAccountScreen />);
+    const first = await renderMobile(<DeleteAccountScreen />);
     await confirmDeletion(first);
     expect(await first.findByRole("alert")).toBeTruthy();
-    first.unmount();
+    await first.unmount();
 
-    const again = renderMobile(<DeleteAccountScreen />);
+    const again = await renderMobile(<DeleteAccountScreen />);
 
     expect(again.queryByRole("alert")).toBeNull();
     expect(understand(again, false)).toBeTruthy();
   });
 
-  it("goes Back to Profile, or opens Profile when there is no previous screen", () => {
-    const screen = renderMobile(<DeleteAccountScreen />);
+  it("goes Back to Profile, or opens Profile when there is no previous screen", async () => {
+    const screen = await renderMobile(<DeleteAccountScreen />);
     const back = screen.getByRole("button", { name: screen.i18n.t("common:back") });
 
-    fireEvent.press(back);
+    await fireEvent.press(back);
     expect(routerMock.back).toHaveBeenCalledOnce();
 
     routerMock.canGoBack.mockImplementation(() => false);
-    fireEvent.press(back);
+    await fireEvent.press(back);
     expect(routerMock.replace).toHaveBeenCalledWith("/profile");
   });
 });
 
 describe("Account scheduled for deletion screen", () => {
-  it.each(["en", "ru", "tk"] as const)("shows the deletion date in %s and Done opens Cabinet", (locale) => {
-    const screen = renderMobile(<DeletionScheduledScreen />, { locale });
+  it.each(["en", "ru", "tk"] as const)("shows the deletion date in %s and Done opens Cabinet", async (locale) => {
+    const screen = await renderMobile(<DeletionScheduledScreen />, { locale });
     const t = screen.i18n.t;
 
     expect(screen.getByText(t("account:deleteAccountScheduledTitle"))).toBeTruthy();
     expect(screen.getByText(t("account:deleteAccountScheduledMessage", { date: DATES[locale] }))).toBeTruthy();
     expect(screen.queryByRole("button", { name: t("common:back") })).toBeNull();
 
-    fireEvent.press(screen.getByRole("button", { name: t("common:done") }));
+    await fireEvent.press(screen.getByRole("button", { name: t("common:done") }));
 
     expect(routerMock.dismissTo).toHaveBeenCalledWith("/(tabs)/services");
   });

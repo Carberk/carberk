@@ -1,16 +1,15 @@
-import { Image } from "expo-image";
 import { describe, expect, it } from "vitest";
 
-import { fireEvent, first, renderMobile } from "../../../test/render";
+import { fireEvent, first, renderMobile, getHost, queryHost, queryAllHosts } from "../../../test/render";
 import { fixture } from "../../../test/fixtures/listing";
 
 import { SellerBlock } from "./SellerBlock";
 
-type View = ReturnType<typeof renderMobile>;
+type View = Awaited<ReturnType<typeof renderMobile>>;
 type Host = { type: unknown; props: Record<string, unknown>; parent: Host | null };
 
 /** Rendered host nodes of one native type, such as the avatar's `Svg`. */
-const hosts = (view: View, type: string) => view.UNSAFE_queryAllByType(type as never) as unknown as Host[];
+const hosts = (view: View, type: string) => queryAllHosts(view.container, type) as unknown as Host[];
 const marks = (view: View) => hosts(view, "Path").map((path) => path.props.d);
 const personIcons = (view: View) => hosts(view, "Icon").filter((icon) => icon.props.name === "User");
 /** The native view that holds the car mark: the avatar's circle. */
@@ -30,8 +29,8 @@ const PHOTO_URL = "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.j
 /** Merdan, avatar index 7, name number 2057, no photo. */
 const seller = (updates: Partial<ReturnType<typeof fixture>["seller"]> = {}) => ({ ...fixture().seller, ...updates });
 
-it("shows real seller identity and city/place without contact-phone badges", () => {
-  const screen = renderMobile(
+it("shows real seller identity and city/place without contact-phone badges", async () => {
+  const screen = await renderMobile(
     <SellerBlock
       seller={fixture().seller}
       cityName="Ashgabat"
@@ -43,7 +42,7 @@ it("shows real seller identity and city/place without contact-phone badges", () 
   expect(screen.getByText("On Carberk since January 2024")).toBeTruthy();
   expect(screen.getByText("Ashgabat · Parahat 7")).toBeTruthy();
   expect(screen.queryByText(/verified|inspection|dealer/i)).toBeNull();
-  screen.rerender(
+  await screen.rerender(
     <SellerBlock seller={{ ...fixture().seller, displayName: " " }} />,
   );
   expect(screen.getByText("Driver 2057")).toBeTruthy();
@@ -52,8 +51,8 @@ it("shows real seller identity and city/place without contact-phone badges", () 
 });
 
 describe("SellerBlock name", () => {
-  it("puts the name first, Private seller under it, then the join month", () => {
-    const view = renderMobile(<SellerBlock seller={seller()} />);
+  it("puts the name first, Private seller under it, then the join month", async () => {
+    const view = await renderMobile(<SellerBlock seller={seller()} />);
     expect(position(view, "Merdan")).toBeGreaterThan(-1);
     expect(position(view, "Merdan")).toBeLessThan(position(view, "Private seller"));
     expect(position(view, "Private seller")).toBeLessThan(position(view, "On Carberk since January 2024"));
@@ -63,8 +62,8 @@ describe("SellerBlock name", () => {
     ["en", "Driver 2057", "Private seller"],
     ["ru", "Водитель 2057", "Частный продавец"],
     ["tk", "Sürüji 2057", "Şahsy satyjy"],
-  ])("titles a seller without a name of their own with the generated name in %s", (locale, name, role) => {
-    const view = renderMobile(<SellerBlock seller={seller({ displayName: null })} />, { locale });
+  ])("titles a seller without a name of their own with the generated name in %s", async (locale, name, role) => {
+    const view = await renderMobile(<SellerBlock seller={seller({ displayName: null })} />, { locale });
     expect(position(view, name)).toBeGreaterThan(-1);
     expect(position(view, name)).toBeLessThan(position(view, role));
     // The role is the second line only; it no longer stands in for the name.
@@ -75,39 +74,39 @@ describe("SellerBlock name", () => {
     ["en", "Abdyrahman Gurbanguly Atamyrad"],
     ["ru", "Абдырахман Гурбангулыев Атамыр"],
     ["tk", "Abdyrahman Gurbangulyýew Çaryý"],
-  ])("keeps a 30-character name on one line that ends in an ellipsis in %s", (locale, name) => {
+  ])("keeps a 30-character name on one line that ends in an ellipsis in %s", async (locale, name) => {
     expect(name).toHaveLength(30);
-    const view = renderMobile(<SellerBlock seller={seller({ displayName: name })} />, { locale });
+    const view = await renderMobile(<SellerBlock seller={seller({ displayName: name })} />, { locale });
     expect(view.getByText(name).props).toMatchObject({ numberOfLines: 1, ellipsizeMode: "tail" });
   });
 });
 
 describe("SellerBlock avatar", () => {
-  it("draws the seller's car mark at 44 points when they have no photo", () => {
-    const view = renderMobile(<SellerBlock seller={seller()} />);
+  it("draws the seller's car mark at 44 points when they have no photo", async () => {
+    const view = await renderMobile(<SellerBlock seller={seller()} />);
     expect(marks(view)[0]).toBe(KEY_MARK);
     expect(avatarCircle(view).style).toMatchObject({ width: 44, height: 44 });
     expect(personIcons(view)).toHaveLength(0);
-    expect(view.UNSAFE_queryByType(Image)).toBeNull();
+    expect(queryHost(view.container, "Image")).toBeNull();
   });
 
-  it("shows the seller's photo at 44 points instead of the car mark", () => {
-    const view = renderMobile(<SellerBlock seller={seller({ avatarKey: PHOTO_KEY })} />);
-    const photo = view.UNSAFE_getByType(Image);
+  it("shows the seller's photo at 44 points instead of the car mark", async () => {
+    const view = await renderMobile(<SellerBlock seller={seller({ avatarKey: PHOTO_KEY })} />);
+    const photo = getHost(view.container, "Image");
     expect(photo.props.source).toEqual({ uri: PHOTO_URL });
     expect(photo.props.style).toMatchObject({ width: 44, height: 44 });
     expect(hosts(view, "Svg")).toHaveLength(0);
   });
 
-  it("goes back to the car mark when the photo does not load", () => {
-    const view = renderMobile(<SellerBlock seller={seller({ avatarKey: PHOTO_KEY })} />);
-    fireEvent(view.UNSAFE_getByType(Image), "error");
-    expect(view.UNSAFE_queryByType(Image)).toBeNull();
+  it("goes back to the car mark when the photo does not load", async () => {
+    const view = await renderMobile(<SellerBlock seller={seller({ avatarKey: PHOTO_KEY })} />);
+    await fireEvent(getHost(view.container, "Image"), "error");
+    expect(queryHost(view.container, "Image")).toBeNull();
     expect(marks(view)[0]).toBe(KEY_MARK);
   });
 
-  it("is not read on its own: a screen reader hears the name once", () => {
-    const view = renderMobile(<SellerBlock seller={seller()} />);
+  it("is not read on its own: a screen reader hears the name once", async () => {
+    const view = await renderMobile(<SellerBlock seller={seller()} />);
     expect(view.getAllByText("Merdan")).toHaveLength(1);
     expect(view.queryByRole("image")).toBeNull();
     expect(view.queryByLabelText("Merdan")).toBeNull();
@@ -118,8 +117,8 @@ describe("SellerBlock avatar", () => {
 });
 
 describe("SellerBlock for a deleted seller", () => {
-  it("keeps Private seller as the only name and shows the person icon, not a car", () => {
-    const view = renderMobile(<SellerBlock seller={seller({ displayName: null, deleted: true })} />);
+  it("keeps Private seller as the only name and shows the person icon, not a car", async () => {
+    const view = await renderMobile(<SellerBlock seller={seller({ displayName: null, deleted: true })} />);
     expect(view.getAllByText("Private seller")).toHaveLength(1);
     expect(view.queryByText("Driver 2057")).toBeNull();
     expect(personIcons(view)).toHaveLength(1);

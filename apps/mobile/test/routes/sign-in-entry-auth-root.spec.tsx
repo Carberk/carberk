@@ -26,19 +26,19 @@ describe.each([
   ["phone", PhoneScreen],
   ["email", EmailScreen],
 ] as const)("The %s entry that started sign-in", (_method, Screen) => {
-  it("keeps the pending intent when a pop back to it drops the authRoot param", () => {
-    const screen = renderMobile(<Screen />);
+  it("keeps the pending intent when a pop back to it drops the authRoot param", async () => {
+    const screen = await renderMobile(<Screen />);
 
     Reflect.deleteProperty(routeParams, "authRoot");
-    screen.rerender(<Screen />);
+    await screen.rerender(<Screen />);
 
     expect(useAuthIntentStore.getState().intent).not.toBeNull();
   });
 
-  it("cancels the pending intent when it closes", () => {
-    const screen = renderMobile(<Screen />);
+  it("cancels the pending intent when it closes", async () => {
+    const screen = await renderMobile(<Screen />);
 
-    screen.unmount();
+    await screen.unmount();
 
     expect(useAuthIntentStore.getState().intent).toBeNull();
   });

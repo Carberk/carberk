@@ -26,9 +26,11 @@ Two TypeScript compilers are installed side by side, both from the pnpm default 
 
 Every package that type-checks must pass both. Check TypeScript 6 with `pnpm --filter <package> exec tsc6 --noEmit`. Do not set `ignoreDeprecations`: TypeScript 7 removed the options TypeScript 6 deprecated, such as `moduleResolution: node10` and `baseUrl`. TypeScript 6 changed two defaults, so each tsconfig states them where they matter: `rootDir` (now the tsconfig directory) where output paths depend on it, and `types` (now `[]`) where code uses `@types` globals such as `node`. Leave `typescript` on TypeScript 6 until typescript-eslint, the Nest CLI and Next.js support TypeScript 7's API.
 
+The shared compiler options live in `packages/tsconfig/base.json` itself. A config in `@auto-tm/tsconfig` must not `extends` a file outside that package: Vitest's transform (Vite 8's Oxc) resolves a relative `extends` from the package's `node_modules` symlink, not its real path, and fails to load the config.
+
 ## Why the API crashed
 
-Context7-confirmed rules:
+Rules confirmed against the TypeScript and Node documentation:
 
 - Node ESM requires fully specified relative imports. If source says `./prisma.service.js`, Node looks for exactly `prisma.service.js`; it does not fall back to `prisma.service.ts`.
 - TypeScript normally preserves import specifier strings during emit. It does not rewrite `./x` to `./x.js`, except when using `rewriteRelativeImportExtensions`.

@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { Test } from "@nestjs/testing";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
@@ -20,8 +22,10 @@ vi.mock("../../../../../admin/src/lib/cookies", () => ({
 }));
 
 // Loading the UI bridge as a test fixture must not pull its DOM/Next types
-// into the API's CommonJS production compilation.
-const adminClientPath = "../../../../../admin/src/lib/api-client";
+// into the API's CommonJS production compilation. The path is absolute
+// because Vitest resolves a computed import() against the module's
+// root-relative id, from which a relative path cannot leave apps/api.
+const adminClientPath = resolve(__dirname, "../../../../../admin/src/lib/api-client");
 type AdminClient = {
   apiFetch(path: string, options: { method: string; body: unknown }): Promise<unknown>;
   ApiError: typeof Error;

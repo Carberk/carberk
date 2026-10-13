@@ -35,15 +35,15 @@ function paddingInsideSafeArea(content: Node) {
   throw new Error("The content is not inside SafeScreen");
 }
 
-function render(screen: ReactElement) {
-  const view = renderMobile(screen);
-  const insetView = view.UNSAFE_root.findAll(isInsetView)[0] as Node;
+async function render(screen: ReactElement) {
+  const view = await renderMobile(screen);
+  const insetView = view.container.queryAll(isInsetView)[0] as Node;
   return { ...view, insetView };
 }
 
 describe("Onboarding screen padding", () => {
-  it("keeps the language wordmark, title, rows and Continue button off the screen edges", () => {
-    const screen = render(<LanguagePickerScreen />);
+  it("keeps the language wordmark, title, rows and Continue button off the screen edges", async () => {
+    const screen = await render(<LanguagePickerScreen />);
 
     const content = [
       screen.getByLabelText("Carberk"),
@@ -59,8 +59,8 @@ describe("Onboarding screen padding", () => {
     expect(paddingInsideSafeArea(screen.getByRole("button", { name: "Continue" }))).toContain("pb-4");
   });
 
-  it("keeps the page text, page dots and main button off the screen edges", () => {
-    const screen = render(<ValuePropScreen />);
+  it("keeps the page text, page dots and main button off the screen edges", async () => {
+    const screen = await render(<ValuePropScreen />);
 
     const content = [
       screen.getByText("Find a car by make and model"),
@@ -74,8 +74,8 @@ describe("Onboarding screen padding", () => {
     expect(paddingInsideSafeArea(screen.getByRole("button", { name: "Next" }))).toContain("pb-4");
   });
 
-  it("keeps Back and Skip off the screen edges in the top bar", () => {
-    const screen = render(<ValuePropScreen />);
+  it("keeps Back and Skip off the screen edges in the top bar", async () => {
+    const screen = await render(<ValuePropScreen />);
 
     for (const name of ["Back", "Skip"]) {
       expect(paddingInsideSafeArea(screen.getByRole("button", { name }))).toContain("px-4");
@@ -85,8 +85,8 @@ describe("Onboarding screen padding", () => {
   it.each([
     ["language", <LanguagePickerScreen key="language" />],
     ["value prop", <ValuePropScreen key="value-prop" />],
-  ])("adds the %s padding to the safe-area inset instead of replacing it", (_name, element) => {
-    const { insetView } = render(element);
+  ])("adds the %s padding to the safe-area inset instead of replacing it", async (_name, element) => {
+    const { insetView } = await render(element);
 
     expect(insetView.props.style).toMatchObject({ paddingTop: INSETS.top, paddingBottom: INSETS.bottom });
     expect(classes(insetView).filter((name) => PADDING_CLASS.test(name))).toEqual([]);

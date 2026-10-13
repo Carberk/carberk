@@ -58,9 +58,9 @@ describe("Profile photo uses the shared authentication lifecycle", () => {
       }),
     );
     const session = await capturePhotoSession();
-    const { result, client } = setupPhotoHook(useSetProfilePhoto);
+    const { result, client } = await setupPhotoHook(useSetProfilePhoto);
     let photoRequest!: Promise<unknown>;
-    act(() => { photoRequest = result.current.mutateAsync({ request: { key: "pending/new/original.jpg" }, session }).catch((error: unknown) => error); });
+    await act(() => { photoRequest = result.current.mutateAsync({ request: { key: "pending/new/original.jpg" }, session }).catch((error: unknown) => error); });
     await vi.waitFor(() => expect(refreshes).toBe(1));
     const unrelatedRequest = apiClient.get("/probe").catch((error: unknown) => error);
     // Let the unrelated request join the same pending refresh before disposal.
@@ -87,9 +87,9 @@ describe("Profile photo uses the shared authentication lifecycle", () => {
       http.post("*/uploads/presign", () => { presigns += 1; return HttpResponse.json({ code: "UNAUTHORIZED" }, { status: 401 }); }),
     );
     choosePhoto();
-    const { result, client } = setupPhotoHook(useProfilePhotoUpload);
+    const { result, client } = await setupPhotoHook(useProfilePhotoUpload);
     let picking!: Promise<void>;
-    act(() => { picking = result.current.pick("library"); });
+    await act(() => { picking = result.current.pick("library"); });
     await vi.waitFor(() => expect(started).toBe(true));
     await act(async () => { result.current.cancel(); });
     await act(async () => { complete(HttpResponse.json({ accessToken: "fresh", refreshToken: "fresh-refresh" })); await picking; });
@@ -113,7 +113,7 @@ describe("Profile photo uses the shared authentication lifecycle", () => {
     const publicRequest = apiClient.get("/probe");
     await vi.waitFor(() => expect(started).toBe(true));
     const session = await capturePhotoSession();
-    const { result } = setupPhotoHook(useSetProfilePhoto);
+    const { result } = await setupPhotoHook(useSetProfilePhoto);
     let photoRequest!: Promise<unknown>;
     await act(async () => {
       photoRequest = result.current.mutateAsync({ request: { key: "pending/new/original.jpg" }, session }).catch((error: unknown) => error);
@@ -159,15 +159,15 @@ describe("Profile photo uses the shared authentication lifecycle", () => {
     );
     if (operation === "presign") {
       choosePhoto();
-      const { result } = setupPhotoHook(useProfilePhotoUpload);
-      act(() => { void result.current.pick("library"); });
+      const { result } = await setupPhotoHook(useProfilePhotoUpload);
+      await act(() => { void result.current.pick("library"); });
       await vi.waitFor(() => expect(events).toContain("refresh"));
       await vi.waitFor(() => expect(photoDevice.sent).toHaveLength(1));
       await act(async () => { photoDevice.finish(); });
       await vi.waitFor(() => expect(result.current.state.status).toBe("idle"));
     } else {
       const session = await capturePhotoSession();
-      const { result } = setupPhotoHook(() => ({ set: useSetProfilePhoto(), remove: useRemoveProfilePhoto() }));
+      const { result } = await setupPhotoHook(() => ({ set: useSetProfilePhoto(), remove: useRemoveProfilePhoto() }));
       let error: unknown;
       await act(async () => { await (operation === "set" ? result.current.set.mutateAsync({ request: { key: "pending/new/original.jpg" }, session }) : result.current.remove.mutateAsync(session)).catch((e: unknown) => { error = e; }); });
       expect(error).toBeUndefined();
@@ -188,8 +188,8 @@ describe("Profile photo uses the shared authentication lifecycle", () => {
       http.post("*/uploads/presign", () => { presigns += 1; return HttpResponse.json({ code: "UNAUTHORIZED" }, { status: 401 }); }),
     );
     choosePhoto();
-    const { result } = setupPhotoHook(useProfilePhotoUpload);
-    act(() => { void result.current.pick("library"); });
+    const { result } = await setupPhotoHook(useProfilePhotoUpload);
+    await act(() => { void result.current.pick("library"); });
     await vi.waitFor(() => expect(started).toBe(true));
     await clearAuthSession();
     const next = { accessToken: "merdan", refreshToken: "merdan-refresh", user: { id: "00000000-0000-4000-8000-00000000000b", phone: PHOTO_ME.phone, email: null, displayName: "Merdan", role: "buyer" as const } };

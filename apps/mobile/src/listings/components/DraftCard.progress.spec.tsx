@@ -36,18 +36,18 @@ describe("DraftCard rendered progress", () => {
     { payload: {}, filled: 0, percent: 0 },
     { payload: { brandId: id }, filled: 0, percent: 0 },
     { payload: contact, filled: 1, percent: 14 },
-  ])("renders $filled of 7 and $percent% from saved fields", ({ payload, filled, percent }) => {
-    const screen = renderMobile(card(payload));
+  ])("renders $filled of 7 and $percent% from saved fields", async ({ payload, filled, percent }) => {
+    const screen = await renderMobile(card(payload));
     expect(screen.getByText(`${filled} of 7 steps filled`)).toBeTruthy();
     expect(screen.getByText(`${percent}%`)).toBeTruthy();
     expect(screen.getByRole("progressbar").props.accessibilityValue.now).toBe(percent);
   });
 
-  it("lowers both the label and bar when saved fields are invalidated", () => {
+  it("lowers both the label and bar when saved fields are invalidated", async () => {
     const payload = { ...savedFields, currentStep: 7, validatedSteps: ["vehicle", "price", "contact"] };
-    const screen = renderMobile(card(payload));
+    const screen = await renderMobile(card(payload));
     expect(screen.getByText("3 of 7 steps filled")).toBeTruthy();
-    screen.rerender(card({ ...payload, priceAmount: 0 }));
+    await screen.rerender(card({ ...payload, priceAmount: 0 }));
     expect(screen.getByText("2 of 7 steps filled")).toBeTruthy();
     expect(screen.getByText("29%")).toBeTruthy();
     expect(screen.getByRole("progressbar").props.accessibilityValue.now).toBe(29);

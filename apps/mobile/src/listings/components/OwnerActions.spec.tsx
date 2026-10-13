@@ -18,15 +18,15 @@ beforeEach(() => {
   api.delete.mockReset();
 });
 
-it("keeps Edit and Mark sold in the sticky bar and navigates Edit", () => {
-  const screen = renderMobile(
+it("keeps Edit and Mark sold in the sticky bar and navigates Edit", async () => {
+  const screen = await renderMobile(
     <OwnerActions listingId="listing-373" status="active" mode="bar" />,
   );
-  fireEvent.press(screen.getByRole("button", { name: "Edit" }));
+  await fireEvent.press(screen.getByRole("button", { name: "Edit" }));
   expect(routerMock.push).toHaveBeenCalledWith("/listings/listing-373/edit");
   expect(screen.getByRole("button", { name: "Mark as sold" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Archive listing" })).toBeNull();
-  screen.rerender(
+  await screen.rerender(
     <OwnerActions listingId="listing-373" status="sold" mode="bar" />,
   );
   expect(screen.queryByRole("button", { name: "Mark as sold" })).toBeNull();
@@ -37,12 +37,12 @@ it.each([
   ["sold", ["Delete"]],
 ] as const)(
   "puts the shared My listings action names, and no Share, in overflow for %s",
-  (status, expected) => {
-    const screen = renderMobile(
+  async (status, expected) => {
+    const screen = await renderMobile(
       <OwnerActions listingId="listing-373" status={status} mode="menu" />,
     );
     expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
-    fireEvent.press(screen.getByRole("button", { name: "More options" }));
+    await fireEvent.press(screen.getByRole("button", { name: "More options" }));
     for (const name of ["Remove from sale", "Relist", "Delete"]) {
       expect(screen.queryByRole("button", { name }) !== null).toBe((expected as readonly string[]).includes(name));
     }
@@ -51,41 +51,41 @@ it.each([
     }
   },
 );
-it("shows no overflow for a blocked Listing, which allows no owner action", () => {
-  const screen = renderMobile(
+it("shows no overflow for a blocked Listing, which allows no owner action", async () => {
+  const screen = await renderMobile(
     <OwnerActions listingId="listing-373" status="banned" mode="menu" />,
   );
   expect(screen.queryByRole("button", { name: "More options" })).toBeNull();
 });
-it("asks with the shared copy, without the buyer question", () => {
-  const screen = renderMobile(
+it("asks with the shared copy, without the buyer question", async () => {
+  const screen = await renderMobile(
     <OwnerActions listingId="listing-373" status="active" mode="bar" />,
   );
-  fireEvent.press(screen.getByRole("button", { name: "Mark as sold" }));
+  await fireEvent.press(screen.getByRole("button", { name: "Mark as sold" }));
   expect(screen.getByText("Mark as sold?")).toBeTruthy();
   expect(screen.getByText("Buyers will see it as Sold. A sold listing cannot be put back on sale.")).toBeTruthy();
   expect(screen.queryByText(/buyer from Carberk/)).toBeNull();
 });
-it("names the overflow actions in Russian", () => {
-  const screen = renderMobile(
+it("names the overflow actions in Russian", async () => {
+  const screen = await renderMobile(
     <OwnerActions listingId="listing-373" status="archived" mode="menu" />,
     { locale: "ru" },
   );
-  fireEvent.press(screen.getByRole("button", { name: "Другие действия" }));
+  await fireEvent.press(screen.getByRole("button", { name: "Другие действия" }));
   expect(screen.getByRole("button", { name: "Вернуть в продажу" })).toBeTruthy();
 });
 it("requires confirmation before Mark sold, supports cancel and exposes failure", async () => {
   api.post.mockRejectedValue(new Error("offline"));
-  const screen = renderMobile(
+  const screen = await renderMobile(
     <OwnerActions listingId="listing-373" status="active" mode="bar" />,
   );
-  fireEvent.press(screen.getByRole("button", { name: "Mark as sold" }));
+  await fireEvent.press(screen.getByRole("button", { name: "Mark as sold" }));
   expect(api.post).not.toHaveBeenCalled();
-  fireEvent.press(screen.getByText("Cancel"));
+  await fireEvent.press(screen.getByText("Cancel"));
   expect(screen.queryByText("Confirm")).toBeNull();
-  fireEvent.press(screen.getByRole("button", { name: "Mark as sold" }));
+  await fireEvent.press(screen.getByRole("button", { name: "Mark as sold" }));
   await act(async () => {
-    fireEvent.press(screen.getByText("Confirm"));
+    void fireEvent.press(screen.getByText("Confirm"));
   });
   expect(api.post).toHaveBeenCalledWith(
     "/listings/listing-373/sold",
@@ -110,13 +110,13 @@ it("opens the confirm sheet when a relist answer says the number needs a new cod
       : Promise.reject(new ApiError("CONTACT_PHONE_NOT_CONFIRMED", 409)),
   );
   api.get.mockResolvedValue({ contactPhone: "+99362000002" });
-  const screen = renderMobile(
+  const screen = await renderMobile(
     <OwnerActions listingId="listing-373" status="archived" mode="menu" />,
   );
-  fireEvent.press(screen.getByRole("button", { name: "More options" }));
-  fireEvent.press(screen.getByRole("button", { name: "Relist" }));
+  await fireEvent.press(screen.getByRole("button", { name: "More options" }));
+  await fireEvent.press(screen.getByRole("button", { name: "Relist" }));
   await act(async () => {
-    fireEvent.press(screen.getByText("Confirm"));
+    void fireEvent.press(screen.getByText("Confirm"));
   });
   expect(await screen.findByText("Confirm the contact phone")).toBeTruthy();
   expect(
@@ -126,7 +126,7 @@ it("opens the confirm sheet when a relist answer says the number needs a new cod
   ).toBeTruthy();
   // Send code asks for the code and goes straight to the code screen.
   await act(async () => {
-    fireEvent.press(screen.getByRole("button", { name: "Send code" }));
+    void fireEvent.press(screen.getByRole("button", { name: "Send code" }));
   });
   expect(api.post).toHaveBeenCalledWith(
     "/me/contact-phones/request",
@@ -147,13 +147,13 @@ it("opens the confirm sheet when a relist answer says the number needs a new cod
 });
 it("tells the seller to add a phone through Edit when a relist answer says one is required", async () => {
   api.post.mockRejectedValue(new ApiError("CONTACT_PHONE_REQUIRED", 409));
-  const screen = renderMobile(
+  const screen = await renderMobile(
     <OwnerActions listingId="listing-373" status="archived" mode="menu" />,
   );
-  fireEvent.press(screen.getByRole("button", { name: "More options" }));
-  fireEvent.press(screen.getByRole("button", { name: "Relist" }));
+  await fireEvent.press(screen.getByRole("button", { name: "More options" }));
+  await fireEvent.press(screen.getByRole("button", { name: "Relist" }));
   await act(async () => {
-    fireEvent.press(screen.getByText("Confirm"));
+    void fireEvent.press(screen.getByText("Confirm"));
   });
   expect(
     await screen.findByText(
@@ -164,13 +164,13 @@ it("tells the seller to add a phone through Edit when a relist answer says one i
 });
 it("clears the add-a-phone hint when the next action starts", async () => {
   api.post.mockRejectedValueOnce(new ApiError("CONTACT_PHONE_REQUIRED", 409));
-  const screen = renderMobile(
+  const screen = await renderMobile(
     <OwnerActions listingId="listing-373" status="archived" mode="menu" />,
   );
-  fireEvent.press(screen.getByRole("button", { name: "More options" }));
-  fireEvent.press(screen.getByRole("button", { name: "Relist" }));
+  await fireEvent.press(screen.getByRole("button", { name: "More options" }));
+  await fireEvent.press(screen.getByRole("button", { name: "Relist" }));
   await act(async () => {
-    fireEvent.press(screen.getByText("Confirm"));
+    void fireEvent.press(screen.getByText("Confirm"));
   });
   const hint = "This listing has no contact phone. Add one through Edit, then relist.";
   expect(await screen.findByText(hint)).toBeTruthy();
@@ -181,9 +181,9 @@ it("clears the add-a-phone hint when the next action starts", async () => {
     status: "active",
     publishedAt: "2026-10-05T12:00:00.000Z",
   });
-  fireEvent.press(screen.getByRole("button", { name: "Relist" }));
+  await fireEvent.press(screen.getByRole("button", { name: "Relist" }));
   await act(async () => {
-    fireEvent.press(screen.getByText("Confirm"));
+    void fireEvent.press(screen.getByText("Confirm"));
   });
 
   expect(screen.queryByText(hint)).toBeNull();

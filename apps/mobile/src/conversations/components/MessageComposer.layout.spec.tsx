@@ -25,7 +25,7 @@ vi.mock("../upload/chatImageUpload", () => ({
 interface Node {
   parent: Node | null;
   props: { className?: unknown; style?: unknown };
-  findAll: (match: (node: Node) => boolean) => Node[];
+  queryAll: (match: (node: Node) => boolean) => Node[];
 }
 
 const TOUCH_TARGET = 44;
@@ -48,22 +48,22 @@ function spacing(node: Node, prefix: string): number | undefined {
   return found ? Number(found[1]) * 4 : undefined;
 }
 
-function composer(text = "") {
-  const screen = renderMobile(<MessageComposer onSend={vi.fn()} conversationId="c1" />);
+async function composer(text = "") {
+  const screen = await renderMobile(<MessageComposer onSend={vi.fn()} conversationId="c1" />);
   const input = screen.getByPlaceholderText("Message") as unknown as Node;
-  if (text) fireEvent.changeText(screen.getByPlaceholderText("Message"), text);
+  if (text) await fireEvent.changeText(screen.getByPlaceholderText("Message"), text);
   const field = closest(input, "rounded-2xl");
   const row = closest(field, "border-t");
   const button = (name: string) => {
     const node = screen.getByRole("button", { name }) as unknown as Node;
-    return [node, ...node.findAll(() => true)].find((candidate) => classes(candidate).includes("h-11")) ?? closest(node, "h-11");
+    return [node, ...node.queryAll(() => true)].find((candidate) => classes(candidate).includes("h-11")) ?? closest(node, "h-11");
   };
   return { input, field, row, paperclip: button("Attach photo"), send: button("Send message") };
 }
 
 describe("Message composer row alignment (#775 F)", () => {
-  it("makes a one-line field exactly as tall as the two buttons, so the three share a centre", () => {
-    const { input, field, paperclip, send } = composer("Hello");
+  it("makes a one-line field exactly as tall as the two buttons, so the three share a centre", async () => {
+    const { input, field, paperclip, send } = await composer("Hello");
 
     // The field's own text adds no native padding of its own on either platform.
     expect(spacing(input, "py")).toBe(0);
@@ -77,13 +77,13 @@ describe("Message composer row alignment (#775 F)", () => {
     expect(spacing(send, "h")).toBe(TOUCH_TARGET);
   });
 
-  it("centres the text of the field on Android as well", () => {
-    const { input } = composer();
+  it("centres the text of the field on Android as well", async () => {
+    const { input } = await composer();
     expect(input.props.style).toMatchObject({ textAlignVertical: "center" });
   });
 
-  it("keeps both buttons at the bottom of a field that grew to several lines", () => {
-    const { row, field, paperclip, send } = composer("One\nTwo\nThree");
+  it("keeps both buttons at the bottom of a field that grew to several lines", async () => {
+    const { row, field, paperclip, send } = await composer("One\nTwo\nThree");
 
     expect(classes(row)).toContain("items-end");
     expect(closest(paperclip, "border-t")).toBe(row);
@@ -92,8 +92,8 @@ describe("Message composer row alignment (#775 F)", () => {
     expect(spacing(field, "h")).toBeUndefined();
   });
 
-  it("keeps a 44 dp touch target on both buttons", () => {
-    const { paperclip, send } = composer();
+  it("keeps a 44 dp touch target on both buttons", async () => {
+    const { paperclip, send } = await composer();
     for (const button of [paperclip, send]) {
       expect(spacing(button, "h")).toBe(TOUCH_TARGET);
       expect(spacing(button, "w")).toBe(TOUCH_TARGET);

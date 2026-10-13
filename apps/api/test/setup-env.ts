@@ -1,6 +1,10 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { inject } from "vitest";
+
+import { workerUrls } from "./helpers/testDatabases";
+
 const hadOtpTestMode = "OTP_TEST_MODE" in process.env;
 
 const envPath = resolve(__dirname, "../.env");
@@ -21,4 +25,14 @@ if (!hadOtpTestMode) {
 if (!process.env["TOTP_SECRET_ENCRYPTION_KEY"]) {
   process.env["TOTP_SECRET_ENCRYPTION_KEY"] =
     "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=";
+}
+
+// Spec files run in parallel, each worker on its own Postgres database and
+// Redis logical database (test/globalSetup.ts). PrismaService, BullMQ and the
+// Redis clients read these when constructed, after this file has run.
+const databases = inject("apiTestDatabases");
+if (databases) {
+  const urls = workerUrls(databases, Number(process.env["VITEST_POOL_ID"]));
+  process.env["DATABASE_URL"] = urls.databaseUrl;
+  process.env["REDIS_URL"] = urls.redisUrl;
 }

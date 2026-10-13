@@ -24,27 +24,27 @@ vi.mock("react-native-reanimated", () => ({ SlideInDown: { duration: () => ({}) 
 vi.mock("react-native-screens", async () => ({ FullWindowOverlay: (await import("react-native")).View }));
 vi.mock("@/components/ui/native-only-animated-view", async () => ({ NativeOnlyAnimatedView: (await import("react-native")).View }));
 
-function renderSheet() {
+async function renderSheet() {
   const onOpenChange = vi.fn();
   const onContinue = vi.fn();
-  const view = renderMobile(
+  const view = await renderMobile(
     <ChangeSignInMethodSheet method="email" open onOpenChange={onOpenChange} onContinue={onContinue} />,
   );
   return { view, onOpenChange, onContinue };
 }
 
 describe("ChangeSignInMethodSheet", () => {
-  it("closes on a tap outside without continuing", () => {
-    const { view, onOpenChange, onContinue } = renderSheet();
-    fireEvent.press(view.getByTestId("sheet-backdrop", { includeHiddenElements: true }));
+  it("closes on a tap outside without continuing", async () => {
+    const { view, onOpenChange, onContinue } = await renderSheet();
+    await fireEvent.press(view.getByTestId("sheet-backdrop", { includeHiddenElements: true }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(onContinue).not.toHaveBeenCalled();
   });
 
-  it("continues only from Continue", () => {
-    const { view, onContinue } = renderSheet();
+  it("continues only from Continue", async () => {
+    const { view, onContinue } = await renderSheet();
     expect(view.getByText("Change email?")).toBeTruthy();
-    fireEvent.press(view.getByRole("button", { name: "Continue" }));
+    await fireEvent.press(view.getByRole("button", { name: "Continue" }));
     expect(onContinue).toHaveBeenCalledOnce();
   });
 });

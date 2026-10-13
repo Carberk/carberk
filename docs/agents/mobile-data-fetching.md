@@ -1,6 +1,6 @@
 # Mobile data fetching
 
-Use this guide when changing mobile API calls, server-state caching, refresh, or realtime reconciliation. [ADR-0015](../adr/0015-mobile-data-fetching.md) records the architecture; [ADR-0063](../adr/0063-mobile-refreshes-an-expired-access-token-before-sending.md) extends its refresh to run before sending when the stored token has expired. [ADR-0077](../adr/0077-mobile-keeps-the-session-when-a-token-refresh-fails-without-a-rejection.md) clears the session only when `/auth/refresh` answers 401 or a 2xx JSON body that breaks the contract; any other failure keeps it. Query Context7 for the specific TanStack Query or native-library API involved; use [documentation lookups](documentation-lookups.md).
+Use this guide when changing mobile API calls, server-state caching, refresh, or realtime reconciliation. [ADR-0015](../adr/0015-mobile-data-fetching.md) records the architecture; [ADR-0063](../adr/0063-mobile-refreshes-an-expired-access-token-before-sending.md) extends its refresh to run before sending when the stored token has expired. [ADR-0077](../adr/0077-mobile-keeps-the-session-when-a-token-refresh-fails-without-a-rejection.md) clears the session only when `/auth/refresh` answers 401 or a 2xx JSON body that breaks the contract; any other failure keeps it. For the specific TanStack Query or native-library API involved, follow [documentation lookups](documentation-lookups.md).
 
 ## Ownership
 
@@ -12,7 +12,7 @@ Use this guide when changing mobile API calls, server-state caching, refresh, or
 | Shared query keys | [api/queryKeys.ts](../../apps/mobile/src/api/queryKeys.ts) and feature key factories |
 | Existing query/mutation patterns and tests | [src/api](../../apps/mobile/src/api) |
 | Error copy | [getErrorCopy.ts](../../apps/mobile/src/api/getErrorCopy.ts) |
-| Native test environment and aliases | [vitest.config.ts](../../apps/mobile/vitest.config.ts) |
+| Native test environment and aliases | [vitest.config.mts](../../apps/mobile/vitest.config.mts) |
 
 The wrapper already exists. Do not paste a new client or QueryClient provider from a setup tutorial. Preserve one owner for refresh, secure storage, connectivity, and session transitions.
 

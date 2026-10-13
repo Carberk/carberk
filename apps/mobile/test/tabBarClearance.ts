@@ -7,7 +7,7 @@ import { tabBarSpace } from "../components/navigation/tabBarHeight";
 interface Node {
   parent: Node | null;
   props: Record<string, unknown>;
-  findAll: (match: (node: Node) => boolean) => Node[];
+  queryAll: (match: (node: Node) => boolean, options?: { includeSelf?: boolean }) => Node[];
 }
 
 const paddingBottomOf = (node: Node) =>
@@ -18,7 +18,7 @@ export const TAB_BAR_SPACE = tabBarSpace(0);
 
 /** The TabScreen root: the safe-area view that keeps the top and side edges. */
 export function screenRoot(root: Node): Node {
-  const found = root.findAll((node) => Array.isArray(node.props.edges))[0];
+  const found = root.queryAll((node) => Array.isArray(node.props.edges), { includeSelf: true })[0];
   if (!found) throw new Error("No TabScreen root in the tree");
   return found;
 }

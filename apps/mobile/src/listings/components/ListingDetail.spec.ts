@@ -9,8 +9,8 @@ import { ListingDetailView } from "./ListingDetail";
 describe("decoded VIN", () => {
   it.each([undefined, { decoded: false }] as const)(
     "hides unavailable decoding while retaining the VIN specification",
-    (vinHistory) => {
-      const screen = renderMobile(
+    async (vinHistory) => {
+      const screen = await renderMobile(
         createElement(ListingDetailView, {
           listing: fixture({ vin: "VIN373", vinHistory }),
           maps,
@@ -20,8 +20,8 @@ describe("decoded VIN", () => {
       expect(screen.queryByText("VIN history")).toBeNull();
     },
   );
-  it("shows only actual decoded fields and confidence", () => {
-    const screen = renderMobile(
+  it("shows only actual decoded fields and confidence", async () => {
+    const screen = await renderMobile(
       createElement(ListingDetailView, {
         listing: fixture({
           vinHistory: {

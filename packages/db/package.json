@@ -47,8 +47,9 @@
     "@typescript/native": "catalog:",
     "prisma": "^7.6.0",
     "tsx": "catalog:",
+    "vite": "catalog:",
     "vitest": "catalog:",
-    "@testcontainers/postgresql": "^10.16.0",
+    "@testcontainers/postgresql": "catalog:",
     "@types/pg": "^8.11.10",
     "@types/node": "catalog:",
     "typescript": "catalog:",
@@ -57,6 +58,6 @@
     "@aws-sdk/client-s3": "catalog:",
     "sharp": "catalog:",
     "simple-icons": "16.33.0",
-    "testcontainers": "^10.28.0"
+    "testcontainers": "^12.2.0"
   }
 }

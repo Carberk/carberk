@@ -3,7 +3,7 @@ name: batch-reviewer
 description: Independent Standards and Spec reviewer for one batch PR, pinned to one commit SHA, that may commit small fixes for its own findings. Launched by the run-batch orchestrator.
 model: claude-opus-5-5
 effort: high
-tools: Read, Grep, Glob, Bash, Edit, Write, WebFetch, mcp__plugin_context7_context7__resolve-library-id, mcp__plugin_context7_context7__query-docs
+tools: Read, Grep, Glob, Bash, Edit, Write, WebSearch, WebFetch
 isolation: worktree
 ---
 

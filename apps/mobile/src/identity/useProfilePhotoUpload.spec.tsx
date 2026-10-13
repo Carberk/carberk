@@ -40,9 +40,9 @@ describe("useProfilePhotoUpload", () => {
       http.put("*/me/photo", () => HttpResponse.json({ ...PHOTO_ME, avatarKey: "pending/new/original.jpg" })));
     choosePhoto({ mimeType });
     try {
-      const { result } = setupPhotoHook(useProfilePhotoUpload);
+      const { result } = await setupPhotoHook(useProfilePhotoUpload);
       let picking!: Promise<void>;
-      act(() => { picking = result.current.pick("library"); });
+      await act(() => { picking = result.current.pick("library"); });
       await vi.waitFor(() => expect(photoDevice.sent).toHaveLength(1));
       expect(photoDevice.saves).toContainEqual({ format: "jpeg", compress: 0.8 });
       await act(async () => { photoDevice.finish(); await picking; });
@@ -58,7 +58,7 @@ describe("useProfilePhotoUpload", () => {
     Platform.OS = platform;
     photoDevice.cameraGranted = true;
     try {
-      const { result } = setupPhotoHook(useProfilePhotoUpload);
+      const { result } = await setupPhotoHook(useProfilePhotoUpload);
       await act(() => result.current.pick(source));
       expect(source === "library" ? photoDevice.library : photoDevice.camera).toHaveBeenCalledWith(expect.objectContaining({ allowsEditing }));
       expect(result.current.state.status).toBe("idle");
@@ -75,9 +75,9 @@ describe("useProfilePhotoUpload", () => {
       http.put("*/me/photo", () => HttpResponse.json({ ...PHOTO_ME, avatarKey: "pending/new/original.jpg" })));
     choosePhoto({ width: Number(pickedWidth), height: Number(pickedHeight) });
     photoDevice.dimensions = { width: Number(decodedWidth), height: Number(decodedHeight) };
-    const { result } = setupPhotoHook(useProfilePhotoUpload);
+    const { result } = await setupPhotoHook(useProfilePhotoUpload);
     let picking!: Promise<void>;
-    act(() => { picking = result.current.pick("library"); });
+    await act(() => { picking = result.current.pick("library"); });
     await vi.waitFor(() => expect(photoDevice.sent).toHaveLength(1));
     expect(photoDevice.savedImages.at(-1)).toMatchObject({ width: 512, height: 512 });
     expect(photoDevice.crops).toContainEqual({ originX, originY, width: 512, height: 512 });
@@ -94,7 +94,7 @@ describe("useProfilePhotoUpload", () => {
       return photoDevice.result;
     });
     try {
-      const { result } = setupPhotoHook(useProfilePhotoUpload);
+      const { result } = await setupPhotoHook(useProfilePhotoUpload);
       await act(() => result.current.pick("library"));
       expect(result.current.state.status).toBe("unsupported");
       expect(photoDevice.sent).toHaveLength(0);
@@ -103,7 +103,7 @@ describe("useProfilePhotoUpload", () => {
 
   it("offers another photo when native image reading rejects before returning an asset", async () => {
     photoDevice.library.mockRejectedValueOnce(Object.assign(new Error("Cannot read selected file"), { code: "ERR_FAILED_TO_READ_FILE" }));
-    const { result } = setupPhotoHook(useProfilePhotoUpload);
+    const { result } = await setupPhotoHook(useProfilePhotoUpload);
     await act(() => result.current.pick("library"));
     expect(result.current.state.status).toBe("unsupported");
   });
@@ -112,15 +112,15 @@ describe("useProfilePhotoUpload", () => {
     server.use(http.post("*/uploads/presign", () => HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: "pending/new/original.jpg", expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"' } })),
       http.put("*/me/photo", () => HttpResponse.json({ ...PHOTO_ME, avatarKey: "pending/new/original.jpg" })));
     choosePhoto();
-    const { result } = setupPhotoHook(useProfilePhotoUpload);
+    const { result } = await setupPhotoHook(useProfilePhotoUpload);
     let picking!: Promise<void>;
-    act(() => { picking = result.current.pick("library"); });
+    await act(() => { picking = result.current.pick("library"); });
     await vi.waitFor(() => expect(photoDevice.sent).toHaveLength(1));
     await act(async () => { photoDevice.fail(new Error("Connection reset")); await picking; });
     expect(result.current.state.status).toBe("failed");
     expect(photoDevice.cancelUpload).toHaveBeenCalledOnce();
     let retrying!: Promise<void>;
-    act(() => { retrying = result.current.retry(); });
+    await act(() => { retrying = result.current.retry(); });
     await vi.waitFor(() => expect(photoDevice.sent).toHaveLength(2));
     await act(async () => { photoDevice.finish(); await retrying; });
     expect(result.current.state.status).toBe("idle");
@@ -130,13 +130,13 @@ describe("useProfilePhotoUpload", () => {
     server.use(http.post("*/uploads/presign", () => HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: "pending/new/original.jpg", expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"' } })),
       http.put("*/me/photo", () => HttpResponse.json({ ...PHOTO_ME, avatarKey: "pending/new/original.jpg" })));
     choosePhoto();
-    const { result } = setupPhotoHook(useProfilePhotoUpload);
+    const { result } = await setupPhotoHook(useProfilePhotoUpload);
     let picking!: Promise<void>;
-    act(() => { picking = result.current.pick("library"); });
+    await act(() => { picking = result.current.pick("library"); });
     await vi.waitFor(() => expect(photoDevice.sent).toHaveLength(1));
     await act(async () => { photoDevice.finish(500); await picking; });
     let retries!: Promise<unknown>;
-    act(() => { retries = Promise.all([result.current.retry(), result.current.retry()]); });
+    await act(() => { retries = Promise.all([result.current.retry(), result.current.retry()]); });
     await vi.waitFor(() => expect(photoDevice.sent.length).toBeGreaterThanOrEqual(2));
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 25)); });
     expect(photoDevice.sent).toHaveLength(2);
@@ -154,20 +154,20 @@ describe("useProfilePhotoUpload", () => {
       }),
       http.delete("*/me/photo", () => { removals += 1; return HttpResponse.json({ code: "INTERNAL" }, { status: 500 }); }),
     );
-    const { result } = setupPhotoHook(useProfilePhotoUpload);
+    const { result } = await setupPhotoHook(useProfilePhotoUpload);
     if (operation === "picker") {
       photoDevice.permission.mockRejectedValueOnce(new Error("Camera unavailable"));
       await act(() => result.current.pick("camera"));
     } else if (operation === "upload") {
       choosePhoto();
-      act(() => { void result.current.pick("library"); });
+      await act(() => { void result.current.pick("library"); });
       await vi.waitFor(() => expect(photoDevice.sent).toHaveLength(1));
       await act(async () => { photoDevice.finish(500); });
     } else await act(() => result.current.remove());
     expect(result.current.state.status).toBe("failed");
     const previousCalls = { presigns, removals, picks: photoDevice.library.mock.calls.length, permissions: photoDevice.permission.mock.calls.length };
     await act(resetProfilePhotoUpload);
-    const next = setupPhotoHook(useProfilePhotoUpload);
+    const next = await setupPhotoHook(useProfilePhotoUpload);
     await act(() => next.result.current.retry());
     expect(next.result.current.state.status).toBe("idle");
     expect({ presigns, removals, picks: photoDevice.library.mock.calls.length, permissions: photoDevice.permission.mock.calls.length }).toEqual(previousCalls);
@@ -176,7 +176,7 @@ describe("useProfilePhotoUpload", () => {
 
   it("requests camera access and opens a square crop when permission is granted", async () => {
     photoDevice.cameraGranted = true;
-    const { result } = setupPhotoHook(useProfilePhotoUpload);
+    const { result } = await setupPhotoHook(useProfilePhotoUpload);
     await act(() => result.current.pick("camera"));
     expect(photoDevice.permission).toHaveBeenCalledOnce();
     expect(photoDevice.camera).toHaveBeenCalledWith(expect.objectContaining({ mediaTypes: ["images"], allowsEditing: true, aspect: [1, 1] }));
@@ -185,7 +185,7 @@ describe("useProfilePhotoUpload", () => {
 
   it("contains a native permission request failure instead of rejecting a press handler", async () => {
     photoDevice.permission.mockRejectedValueOnce(new Error("Camera unavailable"));
-    const { result } = setupPhotoHook(useProfilePhotoUpload);
+    const { result } = await setupPhotoHook(useProfilePhotoUpload);
     await act(async () => { await result.current.pick("camera"); });
     expect(result.current.state.status).toBe("failed");
   });

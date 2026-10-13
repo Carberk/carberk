@@ -80,7 +80,7 @@ vi.mock("expo-router", async () => {
 // The signed-in case is decided in `onboardingGate.spec.ts`; a session here
 // would start the signed-in root effects, which this spec does not model.
 async function launchApp() {
-  const screen = renderMobile(<RootLayout />);
+  const screen = await renderMobile(<RootLayout />);
   await act(async () => {});
   await act(async () => {});
   return screen;
@@ -116,7 +116,7 @@ describe("Root Back anchor", () => {
 
     expect(first.getByTestId("(tabs)")).toBeTruthy();
     expect(launch.push).not.toHaveBeenCalled();
-    first.unmount();
+    await first.unmount();
 
     await launchApp();
 
@@ -172,7 +172,7 @@ describe("Onboarding on launch", () => {
     vi.mocked(AsyncStorage.getItem).mockImplementation((key) =>
       key === FLAG ? new Promise(() => {}) : Promise.resolve(null),
     );
-    const screen = renderMobile(<RootLayout />);
+    const screen = await renderMobile(<RootLayout />);
     await act(async () => {});
     expect(screen.queryByTestId("(tabs)")).toBeNull();
 
@@ -194,45 +194,45 @@ describe("Back after onboarding", () => {
 });
 
 describe("OnboardingLaunch", () => {
-  it("pushes the Language screen above the tabs when the launch owes onboarding", () => {
-    renderMobile(<OnboardingLaunch decision="show" />);
+  it("pushes the Language screen above the tabs when the launch owes onboarding", async () => {
+    await renderMobile(<OnboardingLaunch decision="show" />);
 
     expect(launch.push).toHaveBeenCalledWith(LANGUAGE);
   });
 
-  it("lets the launch screen go at once, without pushing, when nothing is owed or a deep link won", () => {
-    const skip = renderMobile(<OnboardingLaunch decision="skip" />);
+  it("lets the launch screen go at once, without pushing, when nothing is owed or a deep link won", async () => {
+    const skip = await renderMobile(<OnboardingLaunch decision="skip" />);
     expect(SplashScreen.hide).toHaveBeenCalledTimes(1);
     expect(launch.push).not.toHaveBeenCalled();
-    skip.unmount();
+    await skip.unmount();
 
     launch.pathname = "/listings/550e8400-e29b-41d4-a716-446655440000";
-    renderMobile(<OnboardingLaunch decision="show" />);
+    await renderMobile(<OnboardingLaunch decision="show" />);
     expect(launch.push).not.toHaveBeenCalled();
     expect(SplashScreen.hide).toHaveBeenCalledTimes(2);
   });
 
-  it("still lets the launch screen go when the push itself throws", () => {
+  it("still lets the launch screen go when the push itself throws", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     launch.push.mockImplementation(() => {
       throw new Error("router is down");
     });
-    renderMobile(<OnboardingLaunch decision="show" />);
+    await renderMobile(<OnboardingLaunch decision="show" />);
 
     // The splash goes at once instead of waiting out the fallback timer.
     expect(SplashScreen.hide).toHaveBeenCalledTimes(1);
-    act(() => {
+    await act(() => {
       vi.advanceTimersByTime(1000);
     });
     expect(SplashScreen.hide).toHaveBeenCalledTimes(1);
   });
 
-  it("clears the fallback timer when the launch gate leaves the tree", () => {
+  it("clears the fallback timer when the launch gate leaves the tree", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    const screen = renderMobile(<OnboardingLaunch decision="show" />);
-    screen.unmount();
+    const screen = await renderMobile(<OnboardingLaunch decision="show" />);
+    await screen.unmount();
 
-    act(() => {
+    await act(() => {
       vi.advanceTimersByTime(1000);
     });
     expect(SplashScreen.hide).not.toHaveBeenCalled();

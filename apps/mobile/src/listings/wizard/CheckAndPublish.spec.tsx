@@ -54,8 +54,8 @@ function check(overrides: Partial<Parameters<typeof CheckAndPublish>[0]> = {}, l
 }
 
 describe("Check and publish, the card preview", () => {
-  it("shows the cover photo, price, Brand Model and year, spec line and city under the buyers' note", () => {
-    const screen = check();
+  it("shows the cover photo, price, Brand Model and year, spec line and city under the buyers' note", async () => {
+    const screen = await check();
     const card = within(screen.getByTestId("check-preview"));
 
     expect(screen.getByTestId("check-preview-cover").props.source).toEqual({ uri: "file:///staged/photo-0.jpg" });
@@ -69,8 +69,8 @@ describe("Check and publish, the card preview", () => {
     expect(json.indexOf("This is how buyers will see your listing")).toBeGreaterThan(json.indexOf("Toyota Camry, 2020"));
   });
 
-  it("shows the price in the draft's currency and New for a new car", () => {
-    const screen = check({
+  it("shows the price in the draft's currency and New for a new car", async () => {
+    const screen = await check({
       payload: { ...usedCar, condition: "new", mileageKm: undefined, priceAmount: 12500, priceCurrency: "USD" },
     });
 
@@ -80,15 +80,15 @@ describe("Check and publish, the card preview", () => {
     expect(card.getByText("New · Automatic · Petrol")).toBeTruthy();
   });
 
-  it("does not say No photos before the draft's photos are read from the device", () => {
-    const screen = check({ photos: [], photosReady: false });
+  it("does not say No photos before the draft's photos are read from the device", async () => {
+    const screen = await check({ photos: [], photosReady: false });
 
     expect(screen.queryByText("No photos")).toBeNull();
     expect(screen.queryByTestId("check-preview-cover")).toBeNull();
   });
 
-  it("says No photos when nothing is picked", () => {
-    const screen = check({ photos: [] });
+  it("says No photos when nothing is picked", async () => {
+    const screen = await check({ photos: [] });
 
     expect(screen.queryByTestId("check-preview-cover")).toBeNull();
     expect(screen.getByText("No photos")).toBeTruthy();
@@ -97,8 +97,8 @@ describe("Check and publish, the card preview", () => {
   it.each([
     ["ru", "Так покупатели увидят ваше объявление"],
     ["tk", "Alyjylar bildirişiňizi şu görnüşde görer"],
-  ])("has the buyers' note in %s", (locale, note) => {
-    expect(check({}, locale).getByText(note)).toBeTruthy();
+  ])("has the buyers' note in %s", async (locale, note) => {
+    expect((await check({}, locale)).getByText(note)).toBeTruthy();
   });
 });
 
@@ -113,29 +113,29 @@ describe("Check and publish, the Posting rules line", () => {
     ["en", "By publishing you accept the Posting rules.", "Posting rules"],
     ["ru", "Публикуя, вы принимаете Правила размещения.", "Правила размещения"],
     ["tk", "Neşir etmek bilen siz Ýerleşdirme düzgünlerini kabul edýärsiňiz.", "Ýerleşdirme düzgünlerini"],
-  ])("in %s reads as one sentence and opens the Posting rules page for that language", (locale, sentence, link) => {
-    const screen = check({}, locale);
+  ])("in %s reads as one sentence and opens the Posting rules page for that language", async (locale, sentence, link) => {
+    const screen = await check({}, locale);
 
     expect(screen.getByText(sentence)).toBeTruthy();
-    fireEvent.press(screen.getByRole("link", { name: link }));
+    await fireEvent.press(screen.getByRole("link", { name: link }));
 
     expect(Linking.openURL).toHaveBeenCalledTimes(1);
     expect(Linking.openURL).toHaveBeenCalledWith(`https://autotm.example/${locale}/legal/posting-rules`);
   });
 
-  it("sits under the sections", () => {
-    const json = JSON.stringify(check().toJSON());
+  it("sits under the sections", async () => {
+    const json = JSON.stringify((await check()).toJSON());
 
     expect(json.indexOf("By publishing you accept the ")).toBeGreaterThan(json.indexOf('"Contact"'));
   });
 });
 
 describe("Check and publish, the sections", () => {
-  const rowLabels = (screen: ReturnType<typeof check>) =>
+  const rowLabels = (screen: Awaited<ReturnType<typeof check>>) =>
     screen.getAllByTestId("check-section").map((row) => String(row.props.accessibilityLabel));
 
-  it("lists one row per step in the wizard's order, each with a summary and Change", () => {
-    const screen = check({
+  it("lists one row per step in the wizard's order, each with a summary and Change", async () => {
+    const screen = await check({
       payload: {
         ...usedCar, generationId: ID, vin: "WBA1234567890ABCD",
         acceptsExchange: true, locationText: "Near the bazaar",
@@ -152,18 +152,18 @@ describe("Check and publish, the sections", () => {
     ]);
   });
 
-  it("opens the step a row names", () => {
+  it("opens the step a row names", async () => {
     const onChangeStep = vi.fn();
-    const screen = check({ onChangeStep });
+    const screen = await check({ onChangeStep });
 
-    fireEvent.press(screen.getByRole("button", { name: /^Price, / }));
-    fireEvent.press(screen.getByRole("button", { name: /^Description and place, / }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Price, / }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Description and place, / }));
 
     expect(onChangeStep.mock.calls).toEqual([["price"], ["location"]]);
   });
 
-  it("offers Fill in for a step that is not complete", () => {
-    const screen = check({
+  it("offers Fill in for a step that is not complete", async () => {
+    const screen = await check({
       payload: { ...usedCar, priceAmount: undefined },
       validatedSteps: ["vehicle", "specs", "photos"],
     });
@@ -178,17 +178,17 @@ describe("Check and publish, the sections", () => {
     ]);
   });
 
-  it("offers Fill in on Photos while a photo has failed, since that is where it is fixed", () => {
-    const screen = check({ photos: [photo(0), photo(1, "failed")] });
+  it("offers Fill in on Photos while a photo has failed, since that is where it is fixed", async () => {
+    const screen = await check({ photos: [photo(0), photo(1, "failed")] });
 
     expect(rowLabels(screen)[2]).toBe("Photos, Photos: 2, Fill in");
   });
 
-  it("says whether the car is damaged for a Used car only", () => {
-    const used = check({ payload: { ...usedCar, conditionDisclosure: { damaged: true } } });
+  it("says whether the car is damaged for a Used car only", async () => {
+    const used = await check({ payload: { ...usedCar, conditionDisclosure: { damaged: true } } });
     expect(used.getByText(/Damaged \/ needs repair: Yes/)).toBeTruthy();
 
-    const fresh = check({
+    const fresh = await check({
       payload: { ...usedCar, condition: "new", mileageKm: undefined, conditionDisclosure: { damaged: false } },
     });
     expect(fresh.queryByText(/Damaged/)).toBeNull();
@@ -198,8 +198,8 @@ describe("Check and publish, the sections", () => {
   it.each([
     ["ru", "Изменить", "Заполнить"],
     ["tk", "Üýtget", "Doldur"],
-  ])("names the actions in %s", (locale, change, fillIn) => {
-    const screen = check({ validatedSteps: ["vehicle"] }, locale);
+  ])("names the actions in %s", async (locale, change, fillIn) => {
+    const screen = await check({ validatedSteps: ["vehicle"] }, locale);
 
     expect(screen.getAllByText(change)).toHaveLength(1);
     expect(screen.getAllByText(fillIn)).toHaveLength(5);

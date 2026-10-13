@@ -88,9 +88,9 @@ beforeEach(() => {
 });
 
 describe("Sell wizard", () => {
-  it("opens an empty draft on Car with no Skip action", () => {
+  it("opens an empty draft on Car with no Skip action", async () => {
     resume("empty");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
     expect(screen.getByRole("header", { name: "Car, Step 1 of 7" })).toBeTruthy();
     expect(screen.getByLabelText("VIN")).toBeTruthy();
@@ -98,26 +98,26 @@ describe("Sell wizard", () => {
     expect(screen.queryByText(/skip/i)).toBeNull();
   });
 
-  it("saves a cleared VIN as null so reopening the draft no longer restores it", () => {
+  it("saves a cleared VIN as null so reopening the draft no longer restores it", async () => {
     resume("withVin");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
-    fireEvent.changeText(screen.getByLabelText("VIN"), "");
+    await fireEvent.changeText(screen.getByLabelText("VIN"), "");
 
     // null survives JSON.stringify; an omitted key would leave the stored VIN in place.
     expect(fixture.save).toHaveBeenCalledWith(expect.objectContaining({ vin: null }));
   });
 
-  it("opens Description and place without errors and shows Description's once the seller leaves it empty", () => {
+  it("opens Description and place without errors and shows Description's once the seller leaves it empty", async () => {
     resume("atPlace");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
     expect(screen.getByRole("header", { name: "Description and place, Step 5 of 7" })).toBeTruthy();
     expect(screen.queryByText("Description is required")).toBeNull();
     expect(screen.queryByText("Region is required")).toBeNull();
     expect(screen.getByRole("button", { name: "Continue" }).props.accessibilityState).toMatchObject({ disabled: true });
 
-    fireEvent(screen.getByLabelText("Description"), "blur");
+    await fireEvent(screen.getByLabelText("Description"), "blur");
 
     expect(screen.getByText("Description is required")).toBeTruthy();
   });
@@ -133,9 +133,9 @@ describe("Sell wizard", () => {
     },
   } as const;
 
-  it.each(["ru", "tk"] as const)("titles the seven steps in %s", (locale) => {
+  it.each(["ru", "tk"] as const)("titles the seven steps in %s", async (locale) => {
     resume("complete");
-    const screen = renderMobile(<SellScreen />, { locale });
+    const screen = await renderMobile(<SellScreen />, { locale });
 
     expect(screen.getByRole("header", { name: titles[locale].header })).toBeTruthy();
     const json = JSON.stringify(screen.toJSON());

@@ -21,8 +21,8 @@ vi.mock("../../../lib/theme", () => ({
 const composer = { onSend: vi.fn(), conversationId: "conversation-1" };
 
 describe("ConversationFooter", () => {
-  it("shows the composer, with the draft, and no blocked banner", () => {
-    const screen = renderMobile(
+  it("shows the composer, with the draft, and no blocked banner", async () => {
+    const screen = await renderMobile(
       <ConversationFooter
         isBlocked={false}
         unblockPending={false}
@@ -37,9 +37,9 @@ describe("ConversationFooter", () => {
     expect(screen.queryByText("typing...")).toBeNull();
   });
 
-  it("replaces the composer with the blocked banner when the viewer blocked the other participant", () => {
+  it("replaces the composer with the blocked banner when the viewer blocked the other participant", async () => {
     const onUnblock = vi.fn();
-    const screen = renderMobile(
+    const screen = await renderMobile(
       <ConversationFooter
         isBlocked
         unblockPending={false}
@@ -53,7 +53,7 @@ describe("ConversationFooter", () => {
     expect(screen.getByText("You cannot send messages to this user.")).toBeTruthy();
     const unblock = screen.getByRole("button", { name: "Unblock" });
     expect(unblock.props.className).toContain("h-11");
-    fireEvent.press(unblock);
+    await fireEvent.press(unblock);
     expect(onUnblock).toHaveBeenCalledOnce();
 
     // No composer, attach button, quick replies or typing indicator.
@@ -64,15 +64,15 @@ describe("ConversationFooter", () => {
     expect(screen.queryByText("typing...")).toBeNull();
   });
 
-  it("disables Unblock while an unblock is in flight", () => {
-    const screen = renderMobile(
+  it("disables Unblock while an unblock is in flight", async () => {
+    const screen = await renderMobile(
       <ConversationFooter isBlocked unblockPending onUnblock={vi.fn()} peerTyping={false} composer={composer} />,
     );
     expect(screen.getByRole("button", { name: "Unblock", disabled: true })).toBeTruthy();
   });
 
-  it("shows the typing indicator while the other participant types", () => {
-    const screen = renderMobile(
+  it("shows the typing indicator while the other participant types", async () => {
+    const screen = await renderMobile(
       <ConversationFooter
         isBlocked={false}
         unblockPending={false}
@@ -84,8 +84,8 @@ describe("ConversationFooter", () => {
     expect(screen.getByText("typing...")).toBeTruthy();
   });
 
-  it("has no composer without a signed-in viewer", () => {
-    const screen = renderMobile(
+  it("has no composer without a signed-in viewer", async () => {
+    const screen = await renderMobile(
       <ConversationFooter isBlocked={false} unblockPending={false} onUnblock={vi.fn()} peerTyping={false} />,
     );
     expect(screen.queryByRole("button", { name: "Send message" })).toBeNull();
@@ -96,8 +96,8 @@ describe("ConversationFooter", () => {
       ["listing_unavailable", "This listing is no longer available"],
       ["chat_disabled", "The seller has turned off messages for this listing"],
       ["participant_unavailable", "You can't send messages in this Conversation"],
-    ] as const)("replaces the composer with one line for %s", (sendRestriction, line) => {
-      const screen = renderMobile(
+    ] as const)("replaces the composer with one line for %s", async (sendRestriction, line) => {
+      const screen = await renderMobile(
         <ConversationFooter
           isBlocked={false}
           sendRestriction={sendRestriction}
@@ -119,8 +119,8 @@ describe("ConversationFooter", () => {
       expect(screen.queryByText("Unblock")).toBeNull();
     });
 
-    it("does not say who blocked whom or who is restricted", () => {
-      const screen = renderMobile(
+    it("does not say who blocked whom or who is restricted", async () => {
+      const screen = await renderMobile(
         <ConversationFooter
           isBlocked={false}
           sendRestriction="participant_unavailable"
@@ -133,8 +133,8 @@ describe("ConversationFooter", () => {
       expect(screen.queryByText(/block|suspend|restrict/i)).toBeNull();
     });
 
-    it("lets the blocked banner win over a closed line", () => {
-      const screen = renderMobile(
+    it("lets the blocked banner win over a closed line", async () => {
+      const screen = await renderMobile(
         <ConversationFooter
           isBlocked
           sendRestriction="listing_unavailable"
@@ -148,8 +148,8 @@ describe("ConversationFooter", () => {
       expect(screen.queryByText("This listing is no longer available")).toBeNull();
     });
 
-    it("is localized", () => {
-      const screen = renderMobile(
+    it("is localized", async () => {
+      const screen = await renderMobile(
         <ConversationFooter
           isBlocked={false}
           sendRestriction="chat_disabled"

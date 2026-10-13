@@ -38,9 +38,9 @@ beforeEach(() => {
   removedFiles.mockClear();
 });
 
-async function attach(view: ReturnType<typeof renderMobile>, label = "Attach photo") {
+async function attach(view: Awaited<ReturnType<typeof renderMobile>>, label = "Attach photo") {
   await act(async () => {
-    fireEvent.press(view.getByRole("button", { name: label }));
+    void fireEvent.press(view.getByRole("button", { name: label }));
   });
 }
 
@@ -52,32 +52,32 @@ describe("Conversation attachment removal", () => {
   ] as const)("exposes localized Remove as a button and preserves held text in %s", async (locale, attachLabel, removeLabel, sendLabel) => {
     const onSend = vi.fn();
     const onSendImage = vi.fn();
-    const view = renderMobile(<MessageComposer conversationId="conversation" onSend={onSend} onSendImage={onSendImage} initialText="Held question" />, { locale });
+    const view = await renderMobile(<MessageComposer conversationId="conversation" onSend={onSend} onSendImage={onSendImage} initialText="Held question" />, { locale });
     await attach(view, attachLabel);
     const remove = view.getByRole("button", { name: removeLabel });
-    fireEvent.press(remove);
+    await fireEvent.press(remove);
     expect(view.queryByRole("button", { name: removeLabel })).toBeNull();
     expect(view.getByDisplayValue("Held question")).toBeTruthy();
     expect(removedFiles).toHaveBeenLastCalledWith(expect.stringMatching(/^file:\/\/\/doc\/chat-staging\/conversation\/picker-.*\.jpg$/), { idempotent: true });
-    fireEvent.press(view.getByRole("button", { name: sendLabel, disabled: false }));
+    await fireEvent.press(view.getByRole("button", { name: sendLabel, disabled: false }));
     expect(onSend).toHaveBeenCalledWith("Held question");
     expect(onSendImage).not.toHaveBeenCalled();
   });
 
   it("disables Send again after an image-only attachment is removed", async () => {
-    const view = renderMobile(<MessageComposer conversationId="conversation" onSend={vi.fn()} onSendImage={vi.fn()} />);
+    const view = await renderMobile(<MessageComposer conversationId="conversation" onSend={vi.fn()} onSendImage={vi.fn()} />);
     await attach(view);
     expect(view.getByRole("button", { name: "Send message", disabled: false })).toBeTruthy();
-    fireEvent.press(view.getByRole("button", { name: "Remove" }));
+    await fireEvent.press(view.getByRole("button", { name: "Remove" }));
     expect(view.getByRole("button", { name: "Send message", disabled: true })).toBeTruthy();
   });
 
   it("keeps image sending and held text after selecting an attachment", async () => {
     const onSend = vi.fn();
     const onSendImage = vi.fn();
-    const view = renderMobile(<MessageComposer conversationId="conversation" onSend={onSend} onSendImage={onSendImage} initialText="Held question" />);
+    const view = await renderMobile(<MessageComposer conversationId="conversation" onSend={onSend} onSendImage={onSendImage} initialText="Held question" />);
     await attach(view);
-    fireEvent.press(view.getByRole("button", { name: "Send message", disabled: false }));
+    await fireEvent.press(view.getByRole("button", { name: "Send message", disabled: false }));
     expect(onSendImage).toHaveBeenCalledWith({
       uri: expect.stringMatching(/^file:\/\/\/doc\/chat-staging\/conversation\/picker-.*\.jpg$/),
       width: 1200, height: 800, fileSize: 1024,
@@ -89,19 +89,19 @@ describe("Conversation attachment removal", () => {
 
   it("keeps removal available when the parent disables sending", async () => {
     const onSend = vi.fn();
-    const view = renderMobile(<MessageComposer conversationId="conversation" onSend={onSend} />);
+    const view = await renderMobile(<MessageComposer conversationId="conversation" onSend={onSend} />);
     await attach(view);
-    view.rerender(<MessageComposer conversationId="conversation" onSend={onSend} disabled />);
+    await view.rerender(<MessageComposer conversationId="conversation" onSend={onSend} disabled />);
     expect(view.getByRole("button", { name: "Send message", disabled: true })).toBeTruthy();
     expect(view.getByRole("button", { name: "Attach photo", disabled: true })).toBeTruthy();
-    fireEvent.press(view.getByRole("button", { name: "Remove" }));
+    await fireEvent.press(view.getByRole("button", { name: "Remove" }));
     expect(view.queryByRole("button", { name: "Remove" })).toBeNull();
     expect(onSend).not.toHaveBeenCalled();
   });
 
   it("leaves no attachment when the native picker is canceled", async () => {
     picker.canceled = true;
-    const view = renderMobile(<MessageComposer conversationId="conversation" onSend={vi.fn()} />);
+    const view = await renderMobile(<MessageComposer conversationId="conversation" onSend={vi.fn()} />);
     await attach(view);
     expect(view.queryByRole("button", { name: "Remove" })).toBeNull();
     expect(view.getByRole("button", { name: "Send message", disabled: true })).toBeTruthy();

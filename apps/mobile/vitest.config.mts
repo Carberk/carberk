@@ -1,13 +1,14 @@
-import { resolve } from "path";
+import { resolve } from "node:path";
 
 import { defineConfig } from "vitest/config";
 
+// `.mts` so Vite loads this config as ESM in a CommonJS package.
 export default defineConfig({
-  esbuild: { jsx: "automatic" },
+  oxc: { jsx: { runtime: "automatic" } },
   resolve: {
     alias: [
-      { find: "@/", replacement: resolve(__dirname, "./") + "/" },
-      { find: /^react-native$/, replacement: resolve(__dirname, "test/native-host.cjs") },
+      { find: "@/", replacement: resolve(import.meta.dirname, "./") + "/" },
+      { find: /^react-native$/, replacement: resolve(import.meta.dirname, "test/native-host.cjs") },
     ],
   },
   test: {

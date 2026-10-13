@@ -102,13 +102,13 @@ async function signInWith(session: typeof pendingSession | (Omit<typeof pendingS
   user: Omit<typeof pendingSession.user, "deletionScheduledAt"> & { deletionScheduledAt: null };
 })) {
   mocks.verify.mockResolvedValue(session);
-  const screen = renderMobile(
+  const screen = await renderMobile(
     <ToastProvider>
       <OtpScreen />
     </ToastProvider>,
   );
   await act(async () => {
-    fireEvent.press(screen.getByRole("button", { name: "Submit code" }));
+    void fireEvent.press(screen.getByRole("button", { name: "Submit code" }));
   });
   return screen;
 }
@@ -130,7 +130,7 @@ describe("Sign-in code screen for a User whose deletion is scheduled", () => {
     const screen = await signInWith(pendingSession);
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Restore" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Restore" }));
     });
 
     expect(mocks.restore).toHaveBeenCalledWith("pending-access");
@@ -151,7 +151,7 @@ describe("Sign-in code screen for a User whose deletion is scheduled", () => {
     const screen = await signInWith(pendingSession);
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Restore" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Restore" }));
     });
 
     expect(screen.getByText("Account restoration")).toBeTruthy();
@@ -165,7 +165,7 @@ describe("Sign-in code screen for a User whose deletion is scheduled", () => {
 
     mocks.restore.mockResolvedValueOnce({ ...pendingSession.user, deletionScheduledAt: null });
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Restore" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Restore" }));
     });
 
     expect(mocks.restore).toHaveBeenCalledTimes(2);
@@ -181,7 +181,7 @@ describe("Sign-in code screen for a User whose deletion is scheduled", () => {
     const screen = await signInWith(pendingSession);
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Restore" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Restore" }));
     });
 
     expect(
@@ -197,7 +197,7 @@ describe("Sign-in code screen for a User whose deletion is scheduled", () => {
     expect(screen.queryByRole("button", { name: "Restore" })).toBeNull();
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Sign in again" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Sign in again" }));
     });
 
     expect(mocks.restore).toHaveBeenCalledTimes(1);
@@ -212,7 +212,7 @@ describe("Sign-in code screen for a User whose deletion is scheduled", () => {
     const screen = await signInWith(pendingSession);
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Cancel" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Cancel" }));
     });
 
     expect(mocks.revoke).toHaveBeenCalledWith("pending-refresh");
@@ -238,12 +238,12 @@ describe("Leaving the prompt does not wait on the best-effort revoke", () => {
     const screen = await signInWith(pendingSession);
     if (label === "Sign in again") {
       await act(async () => {
-        fireEvent.press(screen.getByRole("button", { name: "Restore" }));
+        void fireEvent.press(screen.getByRole("button", { name: "Restore" }));
       });
     }
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: label }));
+      void fireEvent.press(screen.getByRole("button", { name: label }));
     });
 
     expect(mocks.navigation.changeMethod).toHaveBeenCalledTimes(1);
@@ -271,34 +271,34 @@ describe("Sign-in code screen for a User with no scheduled deletion", () => {
 });
 
 describe("Sign-in code screen actions", () => {
-  it("opens Help from Contact support", () => {
-    const screen = renderMobile(
+  it("opens Help from Contact support", async () => {
+    const screen = await renderMobile(
       <ToastProvider>
         <OtpScreen />
       </ToastProvider>,
     );
 
-    fireEvent.press(screen.getByRole("button", { name: "Contact support" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Contact support" }));
 
     expect(routerMock.push).toHaveBeenCalledWith("/help");
   });
 
-  it("offers Use phone instead on an email code and returns to the phone entry", () => {
+  it("offers Use phone instead on an email code and returns to the phone entry", async () => {
     routeParams.method = "email";
     routeParams.destination = "aman@example.com";
-    const screen = renderMobile(
+    const screen = await renderMobile(
       <ToastProvider>
         <OtpScreen />
       </ToastProvider>,
     );
 
-    fireEvent.press(screen.getByRole("button", { name: "Use phone instead" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Use phone instead" }));
 
     expect(mocks.navigation.usePhoneInstead).toHaveBeenCalledTimes(1);
   });
 
-  it("does not offer Use phone instead on a phone code", () => {
-    const screen = renderMobile(
+  it("does not offer Use phone instead on a phone code", async () => {
+    const screen = await renderMobile(
       <ToastProvider>
         <OtpScreen />
       </ToastProvider>,

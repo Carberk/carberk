@@ -1,9 +1,11 @@
 # Mobile component tests
 
 Use `renderMobile` from `apps/mobile/test/render.tsx` for component behavior in
-Vitest. It renders React through React Native Testing Library and
-`react-test-renderer`, with test-only native hosts. Existing happy-dom hook tests
-keep their file-level environment directive and DOM Testing Library imports.
+Vitest 5. It renders React through React Native Testing Library (RNTL) 14 and
+`test-renderer`, with test-only native hosts. `test-renderer`'s 1.x line follows
+the React minor: `~1.2.0` matches React 19.2 (react-reconciler 0.33); move it with
+React. Existing happy-dom hook tests keep their file-level environment directive
+and DOM Testing Library imports.
 Tests belong beside `src` components or in `test/screens` and `test/routes`, never
 inside Expo Router's `app` directory.
 
@@ -22,12 +24,12 @@ import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { renderMobile, fireEvent } from "@/test/render";
 
-it("saves on press", () => {
+it("saves on press", async () => {
   const onSave = vi.fn();
-  const screen = renderMobile(
+  const screen = await renderMobile(
     <Button accessibilityLabel="Save" onPress={onSave}><Text>Save</Text></Button>,
   );
-  fireEvent.press(screen.getByRole("button", { name: "Save" }));
+  await fireEvent.press(screen.getByRole("button", { name: "Save" }));
   expect(onSave).toHaveBeenCalledOnce();
   expect(screen.getByText("Save")).toBeTruthy();
 });
@@ -39,12 +41,34 @@ by default, and a fresh QueryClient with retries disabled. Pass
 survives `screen.rerender`. The result also exposes `i18n` and `queryClient`.
 Unmounts and cache cleanup run after each test.
 
+`renderMobile`, `fireEvent`, `act`, `rerender` and `unmount` are async in RNTL 14;
+await each. `render` settles every pending update before it returns, so a state
+that only exists between mount and the first data (a loading flash) is gone by
+the first assertion; hold such a state with a promise the spec controls, or
+observe renders with a `Profiler` mounted through `rerender`
+(`test/routes/listings-edit-sections.spec.tsx`). An awaited `fireEvent` also
+waits for the promise its handler returns. When a press must leave its handler
+running, such as two quick taps or a publish the spec finishes later, fire it
+inside `act` without awaiting it: `await act(async () => { void fireEvent.press(button); })`
+(`test/routes/sell-check.spec.tsx`).
+
 Use `getByRole`, `getByLabelText`, `getByText`, `getByDisplayValue` and their
 `queryBy`/`findBy` variants. For radios, query both options with `checked: true`
 or `checked: false`. Use `fireEvent.press` for actions and `fireEvent.changeText`
 for inputs. Await async work with `act` or a `findBy` query. Query visible outcomes
 and callbacks instead of reading component source. Style props can test a
-component's supplied dimensions, but cannot prove native layout.
+component's supplied dimensions, but cannot prove native layout. RNTL's matchers,
+such as `toHaveTextContent`, are typed for Vitest by `test/rntl-matchers.d.ts`.
+
+RNTL 14 removed the `UNSAFE_*ByType` and `UNSAFE_*ByProps` queries, and
+`test-renderer` keeps only host elements. When no role, label or text identifies
+an element, `queryAllHosts`, `getAllHosts`, `queryHost` and `getHost` from
+`test/render.tsx` find host elements below a root (usually `screen.container`) by
+the native name the adapter renders (`Image`, `Modal`, `RCTScrollView`, `Icon`,
+`View`) and optional props. A host instance offers `type`, `props`, `parent`,
+`children` and `queryAll(predicate)`; `findAll`, `findByType` and composite
+components are gone. `within(element)` searches only below the element, not the
+element itself.
 
 `routerMock` records `push`, `navigate`, `replace`, `back` and `setParams` calls.
 Set `routeParams.id` and other string parameters before rendering a screen.
@@ -60,15 +84,20 @@ similar navigation and inspection behavior.
 
 ## What the adapter does
 
-`vitest.config.ts` aliases the exact `react-native` import to
+`vitest.config.mts` aliases the exact `react-native` import to
 `test/native-host.cjs`. The setup registers the same adapter in this worker's
 Node require cache because RNTL's CommonJS imports bypass Vitest `vi.mock`.
 Nothing changes in node_modules, Metro, Babel or the application runtime.
 
 The adapter renders native-named host nodes. It keeps children, event handlers,
 accessibility props, disabled input behavior and Pressable's disabled responder
-decision. It uses a fixed 390 by 844 window. FlatList renders all supplied items with its header and empty components;
-Modal renders children only when visible. `RefreshControl` is an inert host
+decision. It uses a fixed 390 by 844 window. FlatList renders all supplied items with its header and empty components
+into an `RCTScrollView` host that keeps `data` and the list's other props;
+Modal renders children only when visible, on a `Modal` host that keeps `visible`.
+A ref to a `View`, `Text`, `TextInput`, `Image`, `ScrollView` or other adapter host
+receives React Native's imperative methods (`focus`, `blur`, `clear`, `scrollTo`,
+`scrollToEnd`, `measure` and so on) as no-ops, plus the host's `type` and latest
+`props`; nothing focuses or scrolls. `RefreshControl` is an inert host
 node: its `refreshing` and `onRefresh` stay props and nothing calls `onRefresh`,
 so a spec cannot simulate a pull and must call the handler itself. This is an intentionally small
 project adapter, not the upstream Jest React Native preset. Add an explicit
@@ -88,8 +117,9 @@ not copy these stubs into a spec.
   `getByRole("checkbox", { checked })` and press it with `fireEvent.press`. Where a
   component wraps it in a row that carries its own role and `onPress` (the Model
   picker's `ModelCheckRow`), the row and the shell both match the role, and
-  `within(row)` counts the row itself. See `test/native-shells.spec.tsx` and the
-  Model picker test in `SearchParametersForm.spec.tsx`.
+  `within(row)` finds only the box, so match the row itself by name. See
+  `test/native-shells.spec.tsx` and the Model picker test in
+  `SearchParametersForm.spec.tsx`.
 - **Navigation themes.** `@react-navigation/native` is stubbed to `DefaultTheme`
   and `DarkTheme` with only `dark` and empty `colors`; other theme fields such as
   `fonts` are undefined. That is enough for a spec to import `@/lib/theme`
@@ -134,7 +164,8 @@ empty `scrollRequests` at the start of a second scroll test.
 
 Real app Button, Text, Input, Icon and feature components execute. NativeWind
 `className` passes through and `cssInterop`/`remapProps` are no-ops. Lucide icons,
-Expo Image and safe-area values use native test substitutes. Slot clones its
+Expo Image and safe-area values use native test substitutes; each Lucide icon is
+an `Icon` host with its `name` and the props it was given, such as `className`. Slot clones its
 child because the installed primitive package retains JSX in its `.mjs` file.
 Sheet, dropdown and alert-dialog test shells model open/closed visibility and
 callbacks. They do not run portal or animation implementations. The detail spec
@@ -158,8 +189,7 @@ do not mount a navigation tree or prove a route exists. Use Expo Router's
 RNTL's Jest-dependent fake-timer and `userEvent` paths are not covered here;
 these specs use real timers and `fireEvent`. A spec that must pass a long wait
 fakes only `setTimeout` and `clearTimeout` with Vitest and advances them inside
-`act`, as the close-wait cases in `test/routes/sell-close.spec.tsx` do. React 19 prints the upstream
-react-test-renderer deprecation warning; it is retained in test output.
+`act`, as the close-wait cases in `test/routes/sell-close.spec.tsx` do.
 
 Run [mobile/Expo checks](mobile-expo.md) for dependency and bundle evidence.
 A development build and captured device evidence remain necessary for visible
@@ -167,11 +197,19 @@ or native runtime changes. No product UI changed when adding this test adapter.
 
 ## Documentation consulted
 
-Context7 results for `/callstack/react-native-testing-library/v13.3.3` verified
-render wrappers, query/event APIs, cleanup and exact React/renderer peer
-matching. `/vitest-dev/vitest` supplied setupFiles, aliases and mock guidance;
-the installed Vitest 2.1 configuration was checked by the suite.
-`/tanstack/query` supplied fresh clients, retry/GC configuration and clear.
+For the RNTL 14 and Vitest 5 move (#854): the
+[RNTL v14 migration guide](https://oss.callstack.com/react-native-testing-library/docs/start/migration-v14)
+verified async `render`/`fireEvent`/`act`, the removed `UNSAFE_*` queries,
+`createNodeMock` and `concurrentRoot`, and that the `test-renderer` line follows
+the React minor; the installed RNTL 14.1.0 and `test-renderer` 1.2.0 sources
+verified the host names, `within` and `fireEvent`'s returned handler promise.
+The Vitest [v3](https://v3.vitest.dev/guide/migration),
+[v4](https://v4.vitest.dev/guide/migration) and
+[v5](https://vitest.dev/guide/migration) migration guides and the
+[Vite 8 guide](https://vite.dev/guide/migration) supplied the config changes.
+Earlier, Context7 results for `/callstack/react-native-testing-library/v13.3.3`
+verified render wrappers, query/event APIs and cleanup, and `/vitest-dev/vitest`
+supplied setupFiles, aliases and mock guidance. `/tanstack/query` supplied fresh clients, retry/GC configuration and clear.
 `/websites/react_i18next` supplied real provider testing.
 `/nativewind/nativewind/nativewind_4.2.0` described class interop and build-time
 CSS processing. `/expo/expo/__branch__sdk-55` supplied router testing and

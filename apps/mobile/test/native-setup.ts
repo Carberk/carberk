@@ -21,10 +21,13 @@ const scrollRequests = (ReactNative as unknown as { scrollRequests: unknown[] })
 
 vi.mock("nativewind", () => ({ cssInterop: vi.fn(), remapProps: vi.fn(),
   useColorScheme: () => ({ colorScheme: "light", setColorScheme: vi.fn() }) }));
+// Each icon is an `Icon` host node with the props it was given, so a spec can
+// read its name and classes; test-renderer keeps only host nodes.
 vi.mock("lucide-react-native", async () => {
   const React = await import("react");
   return new Proxy({}, { has: () => true, get: (_, name) => name === "then" ? undefined
-    : name === "__esModule" ? true : () => React.createElement("Icon", { name }) });
+    : name === "__esModule" ? true
+    : (props: Record<string, unknown>) => React.createElement("Icon", { ...props, name }) });
 });
 // Expo haptics needs a native module; hardware feedback stays a runtime gate.
 vi.mock("expo-haptics", () => ({
