@@ -9,10 +9,10 @@
     "eslint": "catalog:"
   },
   "dependencies": {
-    "@eslint/js": "^9.18.0",
-    "typescript-eslint": "^8.20.0",
-    "eslint-plugin-import": "^2.31.0",
-    "eslint-config-prettier": "^9.1.0",
-    "globals": "^15.14.0"
+    "@eslint/js": "^9.39.5",
+    "typescript-eslint": "^8.71.2",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0"
   }
 }
