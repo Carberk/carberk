@@ -14,7 +14,6 @@ import { legalPageUrl } from "../../src/config/publicWebUrl";
 import { BrandLogo } from "../../src/auth/BrandLogo";
 import { LocaleSwitcher } from "../../src/auth/LocaleSwitcher";
 
-import { SignInMethodContent } from "./SignInMethodContent";
 import { type SignInMethod, SignInMethodTabs } from "./SignInMethodTabs";
 
 import { SafeScreen } from "@/components/navigation/SafeScreen";
@@ -23,12 +22,9 @@ import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useLargeText } from "@/lib/font-scale";
 import { THEME } from "@/lib/theme";
-import { cn } from "@/lib/utils";
 
 interface AuthEntryScreenProps {
   method: SignInMethod;
-  title: string;
-  helper: string;
   canSubmit: boolean;
   isSubmitting: boolean;
   onSubmit: () => Promise<void>;
@@ -39,8 +35,6 @@ interface AuthEntryScreenProps {
 
 export function AuthEntryScreen({
   method,
-  title,
-  helper,
   canSubmit,
   isSubmitting,
   onSubmit,
@@ -55,8 +49,8 @@ export function AuthEntryScreen({
   const largeText = useLargeText();
   const scroll = useRef<ScrollView>(null);
   // When the keyboard opens the form's frame gets shorter: bring the field and
-  // the submit button above the keyboard. The extra space under the legal
-  // line carries the method switch fully under the header, not half of it.
+  // the submit button above the keyboard. Scrolling remains available for
+  // large text and longer error messages.
   const tallestFrame = useRef(0);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const onFrameLayout = (event: LayoutChangeEvent) => {
@@ -103,18 +97,17 @@ export function AuthEntryScreen({
             showsVerticalScrollIndicator={false}
             bounces={false}
           >
-            <View className={largeText ? "mt-4 gap-5" : "mt-8 gap-8"}>
-              {largeText ? null : <BrandLogo />}
+            <View className="mt-3 gap-4">
+              {largeText ? null : <BrandLogo width={110} height={20} />}
 
               <SignInMethodTabs
                 value={method}
                 onChange={onMethodChange}
               />
 
-              <SignInMethodContent method={method}
-                phone={<View className="gap-2"><Text className="text-headline font-semibold leading-snug text-foreground">{method === "phone" ? title : t("phoneTitle")}</Text><Text className="text-body leading-normal text-muted-foreground">{method === "phone" ? helper : t("phoneHelper")}</Text></View>}
-                email={<View className="gap-2"><Text className="text-headline font-semibold leading-snug text-foreground">{method === "email" ? title : t("emailTitle")}</Text><Text className="text-body leading-normal text-muted-foreground">{method === "email" ? helper : t("emailHelper")}</Text></View>}
-              />
+              <Text className="text-headline font-semibold leading-snug text-foreground">
+                {t("entryTitle")}
+              </Text>
 
               {children}
 
@@ -134,7 +127,7 @@ export function AuthEntryScreen({
               </Button>
             </View>
 
-            <Text className={cn("mt-auto pt-6 text-caption leading-normal text-muted-foreground", keyboardOpen ? "pb-14" : "pb-6")}>
+            <Text className="mt-4 pb-6 text-caption leading-normal text-muted-foreground">
               {t("legalPrefix")} {" "}
               <Text
                 className="font-medium text-link underline"

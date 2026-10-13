@@ -39,7 +39,7 @@ describe.each(profiles)("%s public web links", (profile, baseUrl) => {
     expect(Linking.openURL).toHaveBeenLastCalledWith(`${baseUrl}/${locale}/legal/posting-rules`);
     cabinet.unmount();
 
-    const auth = renderMobile(<AuthEntryScreen method="email" title="Sign in" helper="Email" canSubmit={false} isSubmitting={false} onSubmit={async () => {}} onMethodChange={() => {}} onClose={() => {}}>{null}</AuthEntryScreen>, { locale });
+    const auth = renderMobile(<AuthEntryScreen method="email" canSubmit={false} isSubmitting={false} onSubmit={async () => {}} onMethodChange={() => {}} onClose={() => {}}>{null}</AuthEntryScreen>, { locale });
     fireEvent.press(auth.getByText(auth.i18n.t("auth:privacy")));
     expect(Linking.openURL).toHaveBeenLastCalledWith(`${baseUrl}/${locale}/legal/privacy`);
     fireEvent.press(auth.getByText(auth.i18n.t("auth:terms")));

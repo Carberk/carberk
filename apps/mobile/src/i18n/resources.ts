@@ -630,6 +630,7 @@ export const resources: Resource = {
     auth: {
       phone: "Телефон",
       email: "Эл. почта",
+      entryTitle: "Вход в Carberk",
       phoneTitle: "Введите номер телефона",
       phoneHelper: "Мы отправим код по SMS.",
       phoneLabel: "Номер телефона",
@@ -1462,6 +1463,7 @@ export const resources: Resource = {
     auth: {
       phone: "Telefon",
       email: "E-poçta",
+      entryTitle: "Carberk-e giriň",
       phoneTitle: "Telefon belgiňizi giriziň",
       phoneHelper: "Kody SMS bilen ibereris.",
       phoneLabel: "Telefon belgisi",
@@ -2292,6 +2294,7 @@ export const resources: Resource = {
     auth: {
       phone: "Phone",
       email: "Email",
+      entryTitle: "Sign in to Carberk",
       phoneTitle: "Enter your phone number",
       phoneHelper: "We'll send a code by SMS.",
       phoneLabel: "Phone number",

@@ -123,15 +123,15 @@ it("requests the selected method and opens the existing code route with its purp
 
 
 it.each([
-  ["en", "Phone", "Email", "Phone number", "Enter your email", "Close"],
-  ["ru", "Телефон", "Эл. почта", "Номер телефона", "Введите электронную почту", "Закрыть"],
-  ["tk", "Telefon", "E-poçta", "Telefon belgisi", "E-poçtaňyzy giriziň", "Ýap"],
-] as const)("keeps localized accessible method selection and held value in %s", (locale, phone, email, field, emailTitle, close) => {
+  ["en", "Phone", "Email", "Phone number", "Sign in to Carberk", "Close"],
+  ["ru", "Телефон", "Эл. почта", "Номер телефона", "Вход в Carberk", "Закрыть"],
+  ["tk", "Telefon", "E-poçta", "Telefon belgisi", "Carberk-e giriň", "Ýap"],
+] as const)("keeps localized accessible method selection and held value in %s", (locale, phone, email, field, entryTitle, close) => {
   const view = renderMobile(<PhoneScreen />, { locale });
   fireEvent.changeText(view.getByLabelText(field), "61234567");
   fireEvent.press(view.getByRole("tab", { name: email }));
   expect(view.getByRole("tab", { name: email, selected: true })).toBeTruthy();
-  expect(view.getByText(emailTitle)).toBeTruthy();
+  expect(view.getByText(entryTitle)).toBeTruthy();
   expect(view.getByRole("button", { name: close })).toBeTruthy();
   fireEvent.press(view.getByRole("tab", { name: phone }));
   expect(view.getByDisplayValue("61 23-45-67")).toBeTruthy();
