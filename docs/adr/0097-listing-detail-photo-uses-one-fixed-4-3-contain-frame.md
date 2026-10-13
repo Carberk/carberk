@@ -25,7 +25,9 @@ Every Listing detail photo state uses one full-width frame at 4:3, `height = wid
 - every photo in the gallery;
 - the No photos tile.
 
-The preview and the gallery draw each photo whole (`contentFit="contain"`) on the neutral muted surface, and never crop it. The frame never changes height while detail loads or as the buyer swipes. Before a photo's `detail` size loads, the preview may fill the frame with that photo's ThumbHash. The photo viewer, feed and Results cards keep their own framing.
+The preview and the gallery draw each photo whole (`contentFit="contain"`) on the neutral muted surface, and never crop it. A photo wider than 4:3 is pinned to the frame's bottom, so it rests on the title and its band sits at the top, behind the status bar and Back; a taller photo is centred between side bands. The frame never changes height while detail loads or as the buyer swipes.
+
+Before a photo's `detail` size loads, the frame shows only what will not move when it does. For a cover its ThumbHash reads as about 4:3, the card's cached 3:2 `list` crop shows at the frame's centre over the blurred hash filling the frame. Any other shape shows only its blurred hash at the hash's shape, pinned as the photo is, never the crop. The photo viewer, feed and Results cards keep their own framing.
 
 This supersedes only ADR-0096's sentence describing the Listing detail gallery exception against 3:2 framing. ADR-0096's whole-photo intent and its other decisions remain in force.
 
@@ -39,7 +41,8 @@ This supersedes only ADR-0096's sentence describing the Listing detail gallery e
 ### Negative / accepted costs
 
 - The hero is about 39 pt taller on a 390 pt screen, so the title and price start lower.
-- 3:2 and 16:9 photos show neutral bands top and bottom, and portrait photos at the sides.
+- 3:2 and 16:9 photos show a neutral band at the top, behind the status bar, and portrait photos at the sides.
+- A non-4:3 cover is blurred, not sharp, until its `detail` size loads. A 3:2 cover, which its ThumbHash cannot tell from 4:3, settles 16 pt lower when it does.
 
 ### Neutral
 

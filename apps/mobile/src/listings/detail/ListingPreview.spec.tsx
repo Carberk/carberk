@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthIntentStore } from "../../auth/intentStore";
-import { fireEvent, renderMobile, getHost } from "../../../test/render";
+import { fireEvent, renderMobile, getAllHosts } from "../../../test/render";
 import { summaryFixture } from "../../../test/fixtures/listing";
 
 import { ListingPreview } from "./ListingPreview";
@@ -53,15 +53,17 @@ describe("Listing detail preview, from the tapped card's cached data", () => {
       expect(screen.getByText(value)).toBeTruthy();
     expect(screen.getByText("20 Sep · Ashgabat")).toBeTruthy();
     expect(screen.getByText("1 / 12")).toBeTruthy();
-    // The card already decoded the `list` size, so it shows at once while the
-    // gallery's `detail` size loads behind it (#816).
-    const photo = getHost(screen.container, "Image").props;
-    expect(photo.placeholder).toEqual({ uri: "https://media.autotm.tm/listing-photos/listing-0/list.webp?v=webp-natural-1" });
-    // Drawn whole, in the gallery's own fit, so the gallery replaces it in place (#864).
-    expect(photo.placeholderContentFit).toBe("contain");
-    expect(photo.contentFit).toBe("contain");
-    expect(photo.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/listing-0/detail.webp?v=webp-natural-1" });
-    expect(photo.priority).toBe("high");
+    // The card already decoded the `list` size, so it shows at once under the
+    // gallery's `detail` size while that loads (#816).
+    const [list, photo] = getAllHosts(screen.container, "Image").map((image) => image.props);
+    expect(list).toEqual(expect.objectContaining({ source: { uri: "https://media.autotm.tm/listing-photos/listing-0/list.webp?v=webp-natural-1" } }));
+    // Drawn whole, in the gallery's own fit and position, so the gallery replaces it in place (#864).
+    expect(photo).toEqual(expect.objectContaining({
+      source: { uri: "https://media.autotm.tm/listing-photos/listing-0/detail.webp?v=webp-natural-1" },
+      contentFit: "contain",
+      contentPosition: "bottom",
+      priority: "high",
+    }));
   });
 
   it("loads the rest behind skeletons and offers nothing it does not have yet", async () => {

@@ -18,11 +18,11 @@ describe("Photo gallery and viewer", () => {
   it.each([[900, 1600], [1920, 1080]])("shows the complete %sx%s vehicle photo inside the fixed 4:3 gallery frame", async (width, height) => {
     const media = mediaFixture(1).map((photo) => ({ ...photo, width, height }));
     const screen = await renderMobile(<PhotoGallery media={media} />);
-    const image = first(getAllHosts(screen.container, "Image"));
-    expect(image.props.contentFit).toBe("contain");
-    expect(image.props.placeholderContentFit).toBe("contain");
-    expect(first(screen.getAllByTestId("listing-photo-frame")).props.style).toEqual({ width: 390, height: 292.5 });
+    const image = getHost(screen.container, "Image", { priority: "high" });
     expect(image.props.source.uri).toBe("https://media.test/0/detail.webp?v=webp-natural-1");
+    expect(image.props.contentFit).toBe("contain");
+    expect(image.props.contentPosition).toBe("bottom");
+    expect(first(screen.getAllByTestId("listing-photo-frame")).props.style).toEqual({ width: 390, height: 292.5 });
   });
 
   it("opens the viewer at the photo that was tapped", async () => {
@@ -85,10 +85,14 @@ describe("Photo gallery and viewer", () => {
   it("loads the first photo behind the card's cached size, then only its neighbour (#816)", async () => {
     const screen = await renderMobile(<PhotoGallery media={mediaFixture(20)} />);
     const sources = () => getAllHosts(screen.container, "Image").map((image) => image.props.source.uri);
-    // Nothing shares the first photo's bandwidth until it has loaded.
-    expect(sources()).toEqual(["https://media.test/0/detail.webp?v=webp-natural-1"]);
+    // Nothing shares the first photo's bandwidth until it has loaded; the
+    // card's cached size shows under it meanwhile.
+    expect(sources()).toEqual([
+      "https://media.test/0/list.webp?v=webp-natural-1",
+      "https://media.test/0/detail.webp?v=webp-natural-1",
+    ]);
 
-    await fireEvent(first(getAllHosts(screen.container, "Image")), "load", {
+    await fireEvent(getHost(screen.container, "Image", { priority: "high" }), "load", {
       source: { url: "https://media.test/0/detail.webp?v=webp-natural-1", width: 1200, height: 800 },
     });
 
@@ -97,24 +101,21 @@ describe("Photo gallery and viewer", () => {
       "https://media.test/0/detail.webp?v=webp-natural-1",
       "https://media.test/1/detail.webp?v=webp-natural-1",
     ]);
-    expect(photos[0]).toEqual(expect.objectContaining({
-      placeholder: { uri: "https://media.test/0/list.webp?v=webp-natural-1" },
-      placeholderContentFit: "contain",
-      priority: "high",
-    }));
+    expect(photos[0]).toEqual(expect.objectContaining({ priority: "high" }));
     expect(photos[1]).toEqual(expect.objectContaining({ placeholder: undefined, priority: "low" }));
   });
 
-  it("lays the first photo's cached list size over its ThumbHash, so the blur shows at once and the sharper size replaces it", async () => {
+  it("lays an about 4:3 first photo's cached list size over its ThumbHash, so the blur shows at once and the sharper size replaces it", async () => {
     const media = mediaFixture(2).map((photo, index) => ({ ...photo, thumbHash: index === 0 ? "1fsDBYCIiIiHiIdweIeHh4d4cIgH" : "2yMBBYCIh4iHiHeAiId4dXh3f4f4" }));
     const screen = await renderMobile(<PhotoGallery media={media} />);
 
-    const [blur, photo] = getAllHosts(screen.container, "Image").map((image) => image.props);
-    expect(blur).toEqual(expect.objectContaining({ source: { thumbhash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" }, contentFit: "contain" }));
+    const [blur, list, photo] = getAllHosts(screen.container, "Image").map((image) => image.props);
+    expect(blur).toEqual(expect.objectContaining({ source: { thumbhash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" }, contentFit: "cover" }));
+    expect(list).toEqual(expect.objectContaining({ source: { uri: "https://media.test/0/list.webp?v=webp-natural-1" }, contentFit: "contain" }));
     expect(photo).toEqual(expect.objectContaining({
       source: { uri: "https://media.test/0/detail.webp?v=webp-natural-1" },
-      placeholder: { uri: "https://media.test/0/list.webp?v=webp-natural-1" },
-      placeholderContentFit: "contain",
+      placeholder: undefined,
+      contentPosition: "bottom",
     }));
   });
 

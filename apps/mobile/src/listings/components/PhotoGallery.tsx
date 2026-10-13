@@ -80,6 +80,7 @@ export function PhotoGallery({
                 priority={index === 0 ? "high" : "low"}
                 style={{ width: "100%", height: "100%" }}
                 contentFit="contain"
+                inListingFrame
                 onAspectRatio={index === 0 ? () => setFirstLoaded(true) : undefined}
               />
             )}

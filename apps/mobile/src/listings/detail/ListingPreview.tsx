@@ -14,6 +14,7 @@ import { GalleryBanner, GalleryCounter } from "../components/GalleryImage";
 import { ContactCtaBar } from "../components/ContactCtaBar";
 import { keySpecs, PENDING, specRows } from "../components/ListingSpecs";
 import { NoPhotosFrame, useListingPhotoFrame } from "../components/ListingPhotoFrame";
+import { LISTING_PHOTO_POSITION, ListingPhotoUnderlay } from "../components/ListingPhotoUnderlay";
 import { PriceDisplay } from "../components/PriceDisplay";
 import { useFeedCatalogMaps } from "../feed/useFeedCatalogMaps";
 
@@ -61,19 +62,18 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
   const closed = !isOwner && isClosedForContact(summary.status);
   const bannerKey = closed ? closedListingBannerKey(summary.status) : null;
   const coverKey = summary.photoKeys[0] ?? summary.coverMediaKey;
-  // The card decoded the `list` size already, so it shows at once while the
-  // `detail` size the gallery opens on loads behind it. The gallery then finds
-  // that size cached, and the photo never blanks when the full detail arrives.
-  // Both are drawn whole in the gallery's frame and fit, so nothing moves.
+  // The `detail` size the gallery opens on loads here, so the gallery finds it
+  // cached and the photo never blanks when the full detail arrives. It is drawn
+  // whole in the gallery's frame, fit and position, so nothing moves.
   const imageUri = coverKey
     ? useOriginalImage
       ? buildOriginalUrl(coverKey)
       : buildVariantUrl(coverKey, "detail")
     : null;
   const placeholderUri = coverKey ? buildVariantUrl(coverKey, "list") : null;
-  // `list` is a 3:2 crop, so whole inside the frame it leaves bands where a 4:3
-  // photo will be. The cover's blurred colours fill the frame behind it until
-  // the `detail` size has loaded and shows the photo's own shape.
+  // Until `detail` loads, the frame shows what will not move when it does
+  // (`ListingPhotoUnderlay`): the card's `list` crop only on an about 4:3
+  // cover, and the cover's blurred colours.
   const thumbHash = summary.photoKeys[0] ? summary.photoThumbHashes?.[0] : undefined;
 
   const title = [
@@ -133,19 +133,14 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: bar.space }}>
         {imageUri ? (
           <View testID="listing-photo-frame" className="bg-muted" style={frame}>
-            {thumbHash && !photoLoaded && (
-              <Image
-                source={{ thumbhash: thumbHash }}
-                style={StyleSheet.absoluteFill}
-                contentFit="cover"
-              />
+            {!photoLoaded && (
+              <ListingPhotoUnderlay thumbHash={thumbHash} listUri={placeholderUri ?? undefined} />
             )}
             <Image
               source={{ uri: imageUri }}
-              placeholder={placeholderUri ? { uri: placeholderUri } : undefined}
-              placeholderContentFit="contain"
               style={StyleSheet.absoluteFill}
               contentFit="contain"
+              contentPosition={LISTING_PHOTO_POSITION}
               priority="high"
               cachePolicy="memory-disk"
               onLoad={() => setPhotoLoaded(true)}

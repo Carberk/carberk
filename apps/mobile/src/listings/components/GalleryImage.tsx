@@ -6,6 +6,8 @@ import type { ComponentProps } from "react";
 
 import { buildOriginalUrl, buildVariantUrl } from "../detail/buildVariantUrl";
 
+import { LISTING_PHOTO_POSITION, ListingPhotoUnderlay } from "./ListingPhotoUnderlay";
+
 import { GlassSurface } from "@/components/ui/glass-surface";
 import { Text } from "@/components/ui/text";
 import { tabularFigures } from "@/lib/font";
@@ -80,6 +82,9 @@ function variantUri(item: ListingMedia, variant: Variant): string {
  * fullscreen size changes only the photo's props and it sharpens in place.
  * The blur goes once the photo has loaded: a hash decodes at an approximate
  * aspect ratio, so beside a contain-fit photo it would show as bands.
+ *
+ * `inListingFrame` draws the photo in Listing detail's 4:3 frame: pinned as
+ * every photo there is, over `ListingPhotoUnderlay` until it loads.
  */
 export function GalleryImage({
   item,
@@ -88,6 +93,7 @@ export function GalleryImage({
   priority = "normal",
   contentFit,
   style,
+  inListingFrame = false,
   onAspectRatio,
 }: {
   item: ListingMedia;
@@ -97,6 +103,8 @@ export function GalleryImage({
   priority?: "low" | "normal" | "high";
   contentFit: "cover" | "contain";
   style: ExpoImageStyle;
+  /** Drawn in Listing detail's 4:3 frame. */
+  inListingFrame?: boolean;
   /** Reports the loaded photo's width / height. */
   onAspectRatio?: (aspectRatio: number) => void;
 }) {
@@ -109,10 +117,11 @@ export function GalleryImage({
   const photo = (
     <Image
       source={{ uri: sourceUri }}
-      placeholder={placeholderUri ? { uri: placeholderUri } : undefined}
+      placeholder={placeholderUri && !inListingFrame ? { uri: placeholderUri } : undefined}
       placeholderContentFit={contentFit}
-      style={thumbHash ? StyleSheet.absoluteFill : style}
+      style={thumbHash || inListingFrame ? StyleSheet.absoluteFill : style}
       contentFit={contentFit}
+      contentPosition={inListingFrame ? LISTING_PHOTO_POSITION : undefined}
       priority={priority}
       cachePolicy="memory-disk"
       onLoad={(event) => {
@@ -123,6 +132,19 @@ export function GalleryImage({
       onError={() => setUseOriginalImage(true)}
     />
   );
+  if (inListingFrame) {
+    return (
+      <View style={style as ComponentProps<typeof View>["style"]}>
+        {loaded ? null : (
+          <ListingPhotoUnderlay
+            thumbHash={thumbHash}
+            listUri={placeholderVariant === "list" ? placeholderUri : undefined}
+          />
+        )}
+        {photo}
+      </View>
+    );
+  }
   if (!thumbHash) return photo;
 
   return (
