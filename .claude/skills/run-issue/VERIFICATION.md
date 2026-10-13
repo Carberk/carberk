@@ -31,7 +31,7 @@ Missing render infrastructure or simulator/emulator access is missing evidence. 
 - For TypeScript package-boundary changes, follow `docs/agents/typescript-runtime.md` and run the runtime-import gate.
 - For mobile/Expo work, read `docs/agents/mobile-expo.md` before dependency/config changes and run its dependency, typecheck, export, and runtime/simulator gates as applicable.
 - For mobile UI, also read `docs/agents/nativewind-v4.md` and the current UI sources named by the design spec.
-- For external libraries, record the Context7 library ID and what was verified.
+- For external libraries, record the `Docs:` line from `docs/agents/documentation-lookups.md`: why no lookup was needed, or the official URLs read and what each verified. Dependency upgrades also record the `peerDependencies` and `engines` checked.
 
 Under [ADR-0075](../../../docs/adr/0075-railway-pr-backends-for-agent-native-sessions.md), the hosted required `pr` check supplies the full repository container-backed test gate. Run `pnpm test:unit`, focused non-container checks and repository typecheck locally; native sessions use the Railway PR backend. Do not start local Docker to repeat hosted container gates. Run all other relevant host-capable tests. If Testcontainers, CI, credentials, hardware, or a simulator is genuinely unavailable, name the skipped gate, why it is unavailable, and where it must run; never report it as passed.
 

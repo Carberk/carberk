@@ -30,7 +30,7 @@ Execute exactly one issue per invocation. Under [run-queue](../run-queue/SKILL.m
 - Build a scoped execution plan mapping every acceptance criterion to implementation and evidence.
 - For an issue with ordered slices, read [SLICED-ISSUES.md](SLICED-ISSUES.md) before planning and apply its eligibility, checkpoint and real-path evidence rules.
 - Record relevant canonical terms and avoided synonyms. Do not silently migrate unrelated names.
-- Before writing or debugging code that touches an external dependency, resolve and query it through Context7, following `docs/agents/documentation-lookups.md` and ADR-0017.
+- Before writing or debugging code that relies on an external dependency version published after your training cutoff, read its official documentation, following `docs/agents/documentation-lookups.md` and ADR-0096.
 - Never query an agent provider for remaining quota before starting.
 
 ## Decision boundaries

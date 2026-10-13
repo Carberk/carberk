@@ -1,5 +1,6 @@
-import { execSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
 import {
   CreateBucketCommand,
@@ -13,7 +14,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import sharp from "sharp";
 import { GenericContainer, Wait, type StartedTestContainer } from "testcontainers";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { PrismaClient } from "../generated/prisma/client/client";
 import { DEMO_CARS, DEMO_SELLERS } from "../scripts/demo-inventory/content";
@@ -25,10 +26,31 @@ import {
   demoSellerId,
   demoSellerPhone,
 } from "../scripts/demo-inventory/marker";
-import type { PhotoSource } from "../scripts/demo-inventory/photos";
+import type * as PhotosModule from "../scripts/demo-inventory/photos";
 import { removeDemoInventory } from "../scripts/demo-inventory/remove";
-import { seedDemoInventory } from "../scripts/demo-inventory/seed";
+import { DEMO_UPLOAD_CONCURRENCY, seedDemoInventory } from "../scripts/demo-inventory/seed";
 import { createS3ObjectStore, type ObjectStore } from "../scripts/demo-inventory/storage";
+
+// Every stub photo is the same buffer, so the real preparation runs once and each seed reuses its
+// files. Preparing about 300 photos per seed, four seeds a run, cost minutes of CPU on a CI runner
+// and tested nothing more: encoding the variants is the same work for each identical input.
+vi.mock("../scripts/demo-inventory/photos", async (importOriginal) => {
+  const actual = await importOriginal<typeof PhotosModule>();
+  const prepared = new WeakMap<Buffer, Promise<PhotosModule.PreparedPhoto>>();
+  return {
+    ...actual,
+    preparePhoto(source: Buffer): Promise<PhotosModule.PreparedPhoto> {
+      let result = prepared.get(source);
+      if (!result) {
+        result = actual.preparePhoto(source);
+        prepared.set(source, result);
+      }
+      return result;
+    },
+  };
+});
+
+const run = promisify(execFile);
 
 const BUCKET = "listing-photos";
 const CHAT_BUCKET = "chat-attachments";
@@ -37,7 +59,7 @@ const DAY = 86_400_000;
 const FIRST_RUN = new Date("2026-10-06T09:00:00.000Z");
 const SECOND_RUN = new Date("2026-10-09T15:30:00.000Z");
 /** Each seed uploads about 1,500 objects; a CI runner is several times slower than a laptop. */
-const SEED_TIMEOUT = 300_000;
+const SEED_TIMEOUT = 120_000;
 
 const REAL_SELLER = "0a000000-0000-4000-8000-000000000001";
 const REAL_BUYER = "0a000000-0000-4000-8000-000000000002";
@@ -65,17 +87,33 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
   let s3: S3Client;
   let storage: ObjectStore;
   let downloads: string[];
-  let photos: PhotoSource;
+  let loadsInFlight = 0;
+  let maxLoadsInFlight = 0;
+  let putsInFlight = 0;
+  let maxPutsInFlight = 0;
+  let photos: PhotosModule.PhotoSource;
   /** What the first seed drew per Listing, to compare with a seed after a removal. */
   let firstDraw: { id: string; publishedAt: Date | null; viewCount: number }[];
 
   beforeAll(async () => {
+    // "An empty migrated database with the catalog seeded": the real migrations and catalog seed,
+    // run while MinIO starts.
+    const migrateAndSeedCatalog = async (started: StartedPostgreSqlContainer) => {
+      const env = { ...process.env, DATABASE_URL: started.getConnectionUri() };
+      await run(`${packageDir}node_modules/.bin/prisma`, ["migrate", "deploy"], { cwd: packageDir, env });
+      await run(`${packageDir}node_modules/.bin/tsx`, ["src/seed.ts"], { cwd: packageDir, env });
+      return started;
+    };
     [postgres, minio] = await Promise.all([
       new PostgreSqlContainer("postgres:16-alpine")
         .withUsername("auto_tm")
         .withPassword("auto_tm_pass")
         .withDatabase("auto_tm_test")
-        .start(),
+        // A throwaway database: no commit waits for the disk. The catalog seed alone commits
+        // about 5,500 times, which took most of this setup on a CI runner.
+        .withCommand(["postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"])
+        .start()
+        .then(migrateAndSeedCatalog),
       new GenericContainer("cgr.dev/chainguard/minio@sha256:4692462f35d97d7e82c30371d82f057703c5d9489bcae726010594c812f2d285")
         .withEnvironment({ MINIO_ROOT_USER: "minioadmin", MINIO_ROOT_PASSWORD: "minioadmin" })
         .withCommand(["server", "/data"])
@@ -84,12 +122,7 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
         .start(),
     ]);
 
-    // "An empty migrated database with the catalog seeded": the real migrations and catalog seed.
-    const url = postgres.getConnectionUri();
-    const env = { ...process.env, DATABASE_URL: url };
-    execSync("pnpm prisma migrate deploy", { cwd: packageDir, env, stdio: "pipe" });
-    execSync("pnpm tsx src/seed.ts", { cwd: packageDir, env, stdio: "pipe" });
-    pool = new Pool({ connectionString: url });
+    pool = new Pool({ connectionString: postgres.getConnectionUri() });
     db = new PrismaClient({ adapter: new PrismaPg(pool) });
 
     const endpoint = `http://${minio.getHost()}:${minio.getMappedPort(9000)}`;
@@ -97,17 +130,30 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
     s3 = new S3Client({ endpoint, region: "us-east-1", credentials, forcePathStyle: true });
     await s3.send(new CreateBucketCommand({ Bucket: BUCKET }));
     await s3.send(new CreateBucketCommand({ Bucket: CHAT_BUCKET }));
-    storage = createS3ObjectStore({
+    const s3Store = createS3ObjectStore({
       endpoint,
       region: "us-east-1",
       accessKeyId: credentials.accessKeyId,
       secretAccessKey: credentials.secretAccessKey,
     });
+    // Counts the uploads in flight, so the test sees the seed's upload concurrency.
+    storage = {
+      ...s3Store,
+      async put(key, body, contentType) {
+        putsInFlight += 1;
+        maxPutsInFlight = Math.max(maxPutsInFlight, putsInFlight);
+        try {
+          await s3Store.put(key, body, contentType);
+        } finally {
+          putsInFlight -= 1;
+        }
+      },
+    };
 
     // The download is stubbed: no test reaches Commons. The stub photo carries EXIF and an
     // orientation tag, as a real camera file would, so the seed has metadata to remove.
-    // It is small on purpose: every seed resizes each of about 300 photos into five files, and a
-    // full-size frame makes that run for minutes on a CI runner without testing anything more.
+    // It is small on purpose: preparing it into five files is real work (see the `preparePhoto`
+    // mock above), and a full-size frame makes that slower without testing anything more.
     const stub = await sharp({ create: { width: 480, height: 320, channels: 3, background: "#7a8fa3" } })
       .jpeg()
       .withExif({ IFD0: { Artist: "A Real Photographer", Copyright: "CC BY-SA 4.0" } })
@@ -116,7 +162,12 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
     downloads = [];
     photos = {
       async load(photo) {
+        loadsInFlight += 1;
+        maxLoadsInFlight = Math.max(maxLoadsInFlight, loadsInFlight);
         downloads.push(photo.sourceFile);
+        // Yield, so an overlapping second load would be seen.
+        await new Promise((resolve) => setImmediate(resolve));
+        loadsInFlight -= 1;
         return stub;
       },
     };
@@ -147,12 +198,14 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
     const tables = await pool.query<{ tablename: string }>(
       `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations' ORDER BY tablename`,
     );
-    const snapshot: Record<string, unknown[]> = {};
-    for (const { tablename } of tables.rows) {
-      const rows = await pool.query(`SELECT to_jsonb(t) AS row FROM "${tablename}" AS t ORDER BY to_jsonb(t)::text`);
-      snapshot[tablename] = rows.rows.map((entry) => entry.row);
-    }
-    return snapshot;
+    // The tables are read concurrently, over the pool's connections; nothing writes meanwhile.
+    const entries = await Promise.all(
+      tables.rows.map(async ({ tablename }) => {
+        const rows = await pool.query(`SELECT to_jsonb(t) AS row FROM "${tablename}" AS t ORDER BY to_jsonb(t)::text`);
+        return [tablename, rows.rows.map((entry) => entry.row)] as const;
+      }),
+    );
+    return Object.fromEntries(entries);
   }
 
   /** The seeded rows without `updatedAt`, the one column a rerun is allowed to touch. */
@@ -358,6 +411,11 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
     expect({ width: meta.width, height: meta.height }).toEqual({ width: sample.width, height: sample.height });
 
     expect(new Set(downloads).size).toBe(photoCount);
+    // Commons asks automated clients to stay sequential: one photo is loaded at a time. Uploads
+    // to the bucket overlap.
+    expect(maxLoadsInFlight).toBe(1);
+    expect(maxPutsInFlight).toBeGreaterThan(1);
+    expect(maxPutsInFlight).toBeLessThanOrEqual(DEMO_UPLOAD_CONCURRENCY);
     firstDraw = listings.map(({ id, publishedAt, viewCount }) => ({ id, publishedAt, viewCount }));
   }, SEED_TIMEOUT);
 
@@ -445,7 +503,20 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
   });
 
   it("refuses to remove when a seeded seller has gained a Sign-in Method, and deletes nothing", async () => {
-    await seedDemoInventory({ prisma: db, storage, photos, now: FIRST_RUN });
+    // Every seller and two cars: the refusal turns on a seller, and the full inventory's seed and
+    // removal are covered above.
+    const cars = DEMO_CARS.slice(0, 2);
+    const listings = Object.fromEntries(cars.map((car) => [car.slug, must(DEMO_PHOTO_MANIFEST.listings[car.slug])]));
+    const seeded = await seedDemoInventory({
+      prisma: db,
+      storage,
+      photos,
+      now: FIRST_RUN,
+      cars,
+      manifest: { ...DEMO_PHOTO_MANIFEST, listings },
+    });
+    expect(seeded.exitCode, seeded.message).toBe(0);
+    expect(await db.user.count({ where: { id: { startsWith: DEMO_ID_PREFIX } } })).toBe(DEMO_SELLERS.length);
     await db.user.update({
       where: { id: demoSellerId(2) },
       data: { phone: "+99365550009", phoneVerifiedAt: FIRST_RUN },

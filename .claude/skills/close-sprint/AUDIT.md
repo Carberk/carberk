@@ -33,7 +33,7 @@ Use bounded evidence. A grep hit is a lead, not a verdict.
 
 ## Dependencies and verification
 
-- Review meaningful dependency/version changes and their Context7/Expo alignment evidence.
+- Review meaningful dependency/version changes and their compatibility, official-documentation and Expo alignment evidence.
 - Spot-check the repository-required typecheck, lint, test, migration, CI, Testcontainers, and host-only mobile gates.
 - Distinguish passed, failed, skipped with reason, and unavailable.
 - Scan for layer violations, direct cross-context imports, accidental scope, and unexplained complexity in touched areas.

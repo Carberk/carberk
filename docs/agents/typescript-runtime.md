@@ -28,7 +28,7 @@ Every package that type-checks must pass both. Check TypeScript 6 with `pnpm --f
 
 ## Why the API crashed
 
-Context7-confirmed rules:
+Rules confirmed against the TypeScript and Node documentation:
 
 - Node ESM requires fully specified relative imports. If source says `./prisma.service.js`, Node looks for exactly `prisma.service.js`; it does not fall back to `prisma.service.ts`.
 - TypeScript normally preserves import specifier strings during emit. It does not rewrite `./x` to `./x.js`, except when using `rewriteRelativeImportExtensions`.
