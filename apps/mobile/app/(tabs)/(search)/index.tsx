@@ -70,8 +70,9 @@ export default function HomeScreen() {
     [data],
   );
   const catalogMaps = useFeedCatalogMaps(items);
-  // A tapped card opens Listing detail with its own spec line (km · gearbox ·
-  // fuel); the names come from these catalogs, so warm them here.
+  // A tapped card opens Listing detail with its gearbox and engine already in
+  // their Specifications cells; the names come from these catalogs, so warm
+  // them here.
   useTransmissions();
   useEngineTypes();
   const cells = useMemo<GridCell[]>(

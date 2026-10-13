@@ -10,16 +10,16 @@ import {
   isClosedForContact,
 } from "../detail/closedListing";
 import { AskSellerChips } from "../detail/AskSellerChips";
+import { OwnerStatusCard } from "../detail/OwnerStatusCard";
 import { listingTitle, detailDate } from "../detail/presentation";
 import { ViewerFavorite } from "../detail/ViewerFavorite";
 
 import { ContactCtaBar } from "./ContactCtaBar";
+import { keySpecs, specRows, SpecificationsSection } from "./ListingSpecs";
 import { PhotoGallery } from "./PhotoGallery";
 import { PriceDisplay } from "./PriceDisplay";
 import { SellerBlock } from "./SellerBlock";
 
-import { localeTag } from "@/src/i18n/resources";
-import { useLargeText } from "@/lib/font-scale";
 import { cn } from "@/lib/utils";
 import { Text } from "@/components/ui/text";
 import { Separator } from "@/components/ui/separator";
@@ -37,31 +37,6 @@ interface ListingDetailProps {
   onPhotoHeight?: (height: number) => void;
   /** Room kept at the end of the scroll for a bar that floats over it. */
   bottomSpace?: number;
-}
-interface SpecItemProps {
-  label: string;
-  value: string | undefined;
-}
-function SpecItem({ label, value }: SpecItemProps) {
-  // Three columns break a value such as "120 000 km" across lines at a large
-  // font size; two columns keep it whole.
-  const largeText = useLargeText();
-  if (!value) return null;
-  return (
-    <View className={cn(largeText ? "w-1/2" : "w-1/3", "gap-1 py-3 pr-2")}>
-      <Text className="text-caption text-muted-foreground">{label}</Text>
-      <Text className="text-callout font-semibold text-foreground">{value}</Text>
-    </View>
-  );
-}
-function SpecRow({ label, value }: SpecItemProps) {
-  if (!value) return null;
-  return (
-    <View className="flex-row gap-3 py-1.5">
-      <Text className="w-2/5 text-callout text-muted-foreground">{label}</Text>
-      <Text className="flex-1 text-callout text-foreground">{value}</Text>
-    </View>
-  );
 }
 export function ListingDetailView({
   listing,
@@ -82,63 +57,35 @@ export function ListingDetailView({
   const showViewerActions = !isOwner && !closed;
   const brandName = maps.brandName(listing.brandId);
   const modelName = maps.modelName(listing.modelId);
-  const specs: SpecItemProps[] = [
+  const specs = keySpecs(
     {
-      label: t("year"),
-      value: listing.year ? String(listing.year) : undefined,
-    },
-    {
-      label: t("mileage"),
-      value:
-        listing.mileageKm != null
-          ? `${listing.mileageKm.toLocaleString(localeTag(i18n.language))} ${t("km")}`
-          : undefined,
-    },
-    {
-      label: t("transmission"),
-      value: listing.transmissionId
+      year: listing.year,
+      mileageKm: listing.mileageKm,
+      transmission: listing.transmissionId
         ? maps.transmissionName(listing.transmissionId)
         : undefined,
-    },
-    {
-      label: t("engineType"),
-      value: listing.engineTypeId
+      engineType: listing.engineTypeId
         ? maps.engineTypeName(listing.engineTypeId)
         : undefined,
-    },
-    {
-      label: t("enginePower"),
-      value:
-        listing.enginePower != null
-          ? `${listing.enginePower} ${t("hp")}`
-          : undefined,
-    },
-    {
-      label: t("driveType"),
-      value: listing.driveTypeId
+      enginePower: listing.enginePower,
+      driveType: listing.driveTypeId
         ? maps.driveTypeName(listing.driveTypeId)
         : undefined,
     },
-  ];
-  const rows: SpecItemProps[] = [
+    t,
+    i18n.language,
+  );
+  const rows = specRows(
     {
-      label: t("condition"),
-      value: listing.condition
-        ? t(listing.condition === "new" ? "new" : "used")
-        : undefined,
-    },
-    {
-      label: t("bodyType"),
-      value: listing.bodyTypeId
+      condition: listing.condition,
+      bodyType: listing.bodyTypeId
         ? maps.bodyTypeName(listing.bodyTypeId)
         : undefined,
+      color: listing.colorId ? maps.colorName(listing.colorId) : undefined,
+      vin: listing.vin,
     },
-    {
-      label: t("color"),
-      value: listing.colorId ? maps.colorName(listing.colorId) : undefined,
-    },
-    { label: t("vin"), value: listing.vin || undefined },
-  ];
+    t,
+  );
   return (
     <ScrollView
       className="flex-1"
@@ -183,15 +130,7 @@ export function ListingDetailView({
       </View>
       <View className="gap-4 px-5 py-5">
         {isOwner && (
-          <View className="gap-2 rounded-xl bg-muted p-4">
-            <Text className="text-body font-semibold">
-              {t("yourListing")} · {t(listing.status)}
-            </Text>
-            {/* Saves are counted by the API. Views are not counted yet, so no view figure is shown. */}
-            <Text className="text-callout text-muted-foreground">
-              {t("listingSaves", { count: listing.favoriteCount })}
-            </Text>
-          </View>
+          <OwnerStatusCard status={listing.status} favoriteCount={listing.favoriteCount} />
         )}
         <Text
           className="text-headline font-heading font-semibold text-foreground"
@@ -224,21 +163,7 @@ export function ListingDetailView({
             <Icon as={ChevronRight} className="size-4" />
           </Button>
         )}
-        {(specs.some((spec) => spec.value) ||
-          rows.some((row) => row.value)) && (
-          <View className="gap-1">
-            <Separator className="mb-3" />
-            <Text className="text-subhead font-semibold">{t("specifications")}</Text>
-            <View className="flex-row flex-wrap">
-              {specs.map((spec) => (
-                <SpecItem key={spec.label} {...spec} />
-              ))}
-            </View>
-            {rows.map((row) => (
-              <SpecRow key={row.label} {...row} />
-            ))}
-          </View>
-        )}
+        <SpecificationsSection specs={specs} rows={rows} />
         {listing.description && (
           <View className="gap-2">
             <Separator className="mb-3" />

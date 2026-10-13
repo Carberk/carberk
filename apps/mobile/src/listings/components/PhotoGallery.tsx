@@ -1,19 +1,12 @@
 import { useCallback, useRef, useState, type ReactNode } from "react";
-import {
-  FlatList,
-  Pressable,
-  View,
-  useWindowDimensions,
-  type ViewToken,
-} from "react-native";
+import { FlatList, Pressable, View, type ViewToken } from "react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
 import { GalleryBanner, GalleryCounter, GalleryImage } from "./GalleryImage";
+import { NoPhotosFrame, useListingPhotoFrame } from "./ListingPhotoFrame";
 import { isNearPhoto } from "./photoWindow";
 import { PhotoViewer } from "./PhotoViewer";
-
-import { Text } from "@/components/ui/text";
 
 type ListingMedia = ListingsSchemas.ListingMedia;
 
@@ -34,7 +27,8 @@ export function PhotoGallery({
   viewerFooter,
 }: PhotoGalleryProps) {
   const { t } = useTranslation();
-  const { width: screenWidth } = useWindowDimensions();
+  const frame = useListingPhotoFrame();
+  const screenWidth = frame.width;
   const [activeIndex, setActiveIndex] = useState(0);
   // Neighbours wait until the first photo has loaded, so on a slow connection
   // they never share its bandwidth; once the buyer swipes they load anyway.
@@ -74,7 +68,7 @@ export function PhotoGallery({
           onPress={() => setViewerIndex(index)}
           className="active:opacity-90"
         >
-          <View className="bg-muted" style={{ width: screenWidth, height: screenWidth * 0.65 }}>
+          <View testID="listing-photo-frame" className="bg-muted" style={frame}>
             {(index === activeIndex || (loadNeighbours && isNearPhoto(index, activeIndex))) && (
               <GalleryImage
                 item={item}
@@ -93,16 +87,11 @@ export function PhotoGallery({
         </Pressable>
       );
     },
-    [screenWidth, media.length, activeIndex, loadNeighbours, t],
+    [frame, media.length, activeIndex, loadNeighbours, t],
   );
 
   if (media.length === 0) {
-    return (
-      <View className="h-[240px] w-full items-center justify-center bg-muted">
-        <Text className="text-callout text-muted-foreground">{t("noPhotos")}</Text>
-        {banner && <GalleryBanner label={banner} />}
-      </View>
-    );
+    return <NoPhotosFrame banner={banner} />;
   }
 
   return (

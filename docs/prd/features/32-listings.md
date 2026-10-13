@@ -119,7 +119,7 @@ That is the whole screen. Video is added below the photos only when the video me
   - A "See other Brand Model" link opens Results filtered by that brand and model. It is a plain filter, not a recommendation.
   - An **existing** Conversation about the Listing stays open for Messages: the Conversation shows a Sold (or Removed from sale) badge and a banner linking to other cars of the same model, and the composer stays on ([34 — Conversations](34-conversations.md#closed-and-sold-listings)).
 - **Deleted / banned for a buyer (404):** "This listing is no longer available", with Go to Home and Back.
-- **Loading:** the photo, title, price, spec line, city and date come straight from the tapped card's cache. The rest loads behind skeletons, and the contact bar is disabled until it does. Deep links use a plain skeleton.
+- **Loading:** the photo (in the same full-width 4:3 frame and fit as the loaded gallery), title, price, city and date come straight from the tapped card's cache, and the specifications the card knows appear in their final Specifications cells. The rest loads behind placeholders in the loaded sections' shape, and the contact bar is disabled until it does. Deep links show the same frame and placeholders, with Back.
 
 **Removed from detail** by the approved design:
 

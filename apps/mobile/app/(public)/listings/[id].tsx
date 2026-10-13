@@ -104,7 +104,7 @@ export default function ListingDetailScreen() {
         onBack={goBack}
       />
     ) : (
-      <DetailSkeleton bottomInset={insets.bottom} />
+      <DetailSkeleton bottomInset={insets.bottom} onBack={goBack} />
     );
   }
 
