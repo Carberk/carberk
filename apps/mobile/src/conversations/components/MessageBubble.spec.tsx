@@ -2,7 +2,7 @@ import type { ComponentProps } from "react";
 import { Image } from "react-native";
 import { describe, expect, it, vi } from "vitest";
 
-import { fireEvent, renderMobile } from "../../../test/render";
+import { fireEvent, renderMobile, getHost } from "../../../test/render";
 
 import { MessageBubble } from "./MessageBubble";
 
@@ -23,8 +23,8 @@ function bubble(props: Partial<ComponentProps<typeof MessageBubble>> = {}) {
 }
 
 describe("MessageBubble time and ticks", () => {
-  it("shows the time and one tick on a sent own Message", () => {
-    const screen = renderMobile(bubble({ status: "sent" }));
+  it("shows the time and one tick on a sent own Message", async () => {
+    const screen = await renderMobile(bubble({ status: "sent" }));
 
     expect(screen.getByText("02:05 PM")).toBeTruthy();
     expect(screen.getByTestId("message-tick-sent", { includeHiddenElements: true })).toBeTruthy();
@@ -32,85 +32,85 @@ describe("MessageBubble time and ticks", () => {
     expect(screen.getByLabelText("Is the car still available?, 02:05 PM, Sent")).toBeTruthy();
   });
 
-  it("shows two ticks for delivered and read, the read ones in another colour", () => {
-    const tickClasses = (screen: ReturnType<typeof renderMobile>) =>
+  it("shows two ticks for delivered and read, the read ones in another colour", async () => {
+    const tickClasses = (screen: Awaited<ReturnType<typeof renderMobile>>) =>
       screen
         .getByTestId("message-tick-double", { includeHiddenElements: true })
         .children.map((child: { props: { className?: string } } | string) =>
           typeof child === "string" ? child : child.props.className,
         );
 
-    const delivered = renderMobile(bubble({ status: "delivered" }));
+    const delivered = await renderMobile(bubble({ status: "delivered" }));
     expect(delivered.getByLabelText("Is the car still available?, 02:05 PM, Delivered")).toBeTruthy();
     const deliveredClasses = tickClasses(delivered);
-    delivered.unmount();
+    await delivered.unmount();
 
-    const read = renderMobile(bubble({ status: "read" }));
+    const read = await renderMobile(bubble({ status: "read" }));
     expect(read.getByLabelText("Is the car still available?, 02:05 PM, Read")).toBeTruthy();
     expect(tickClasses(read)).not.toEqual(deliveredClasses);
     expect(tickClasses(read)[0]).toEqual(expect.stringContaining("size-3.5"));
     expect(deliveredClasses[0]).toEqual(expect.stringContaining("size-3.5"));
   });
 
-  it("shows the time without ticks on the other participant's Message", () => {
-    const screen = renderMobile(bubble({ isMine: false }));
+  it("shows the time without ticks on the other participant's Message", async () => {
+    const screen = await renderMobile(bubble({ isMine: false }));
 
     expect(screen.getByText("02:05 PM")).toBeTruthy();
     expect(screen.queryByTestId(/message-tick/, { includeHiddenElements: true })).toBeNull();
     expect(screen.getByLabelText("Is the car still available?, 02:05 PM")).toBeTruthy();
   });
 
-  it("formats the time in the app language", () => {
-    const screen = renderMobile(bubble(), { locale: "ru" });
+  it("formats the time in the app language", async () => {
+    const screen = await renderMobile(bubble(), { locale: "ru" });
     expect(screen.getByText("14:05")).toBeTruthy();
   });
 });
 
 describe("MessageBubble Read label", () => {
-  it("shows Read under the bubble when asked to", () => {
-    const screen = renderMobile(bubble({ status: "read", showReadLabel: true }));
+  it("shows Read under the bubble when asked to", async () => {
+    const screen = await renderMobile(bubble({ status: "read", showReadLabel: true }));
     expect(screen.getByText("Read")).toBeTruthy();
   });
 
-  it("has no Read label otherwise", () => {
-    const screen = renderMobile(bubble({ status: "read" }));
+  it("has no Read label otherwise", async () => {
+    const screen = await renderMobile(bubble({ status: "read" }));
     expect(screen.queryByText("Read")).toBeNull();
   });
 });
 
 describe("MessageBubble sending and failed", () => {
-  it("shows Sending... on a pending Message", () => {
-    const screen = renderMobile(bubble({ status: "pending" }));
+  it("shows Sending... on a pending Message", async () => {
+    const screen = await renderMobile(bubble({ status: "pending" }));
 
     expect(screen.getByText("Sending...")).toBeTruthy();
     expect(screen.queryByTestId(/message-tick/, { includeHiddenElements: true })).toBeNull();
     expect(screen.getByLabelText("Is the car still available?, 02:05 PM, Sending...")).toBeTruthy();
   });
 
-  it("shows Failed to send and a visible Retry with a 44 pt target", () => {
+  it("shows Failed to send and a visible Retry with a 44 pt target", async () => {
     const onRetry = vi.fn();
-    const screen = renderMobile(bubble({ status: "failed", onRetry }));
+    const screen = await renderMobile(bubble({ status: "failed", onRetry }));
 
     expect(screen.getByText("Failed to send")).toBeTruthy();
     const retry = screen.getByRole("button", { name: "Retry" });
     expect(screen.getByText("Retry")).toBeTruthy();
     expect(retry.props.style).toMatchObject({ minHeight: 44, minWidth: 44 });
-    fireEvent.press(retry);
+    await fireEvent.press(retry);
     expect(onRetry).toHaveBeenCalledOnce();
   });
 });
 
 describe("MessageBubble kinds keep their look and gain the time", () => {
-  it("shows the time on a deleted Message", () => {
-    const screen = renderMobile(bubble({ deletedAt: AT_1405 }));
+  it("shows the time on a deleted Message", async () => {
+    const screen = await renderMobile(bubble({ deletedAt: AT_1405 }));
 
     expect(screen.getByText("Message deleted")).toBeTruthy();
     expect(screen.getByText("02:05 PM")).toBeTruthy();
     expect(screen.getByLabelText("Message deleted, 02:05 PM")).toBeTruthy();
   });
 
-  it("shows the time on an image Message", () => {
-    const screen = renderMobile(
+  it("shows the time on an image Message", async () => {
+    const screen = await renderMobile(
       bubble({ kind: "image", text: "", localImageUri: "file:///photo.jpg", status: "delivered" }),
     );
 
@@ -118,39 +118,39 @@ describe("MessageBubble kinds keep their look and gain the time", () => {
     expect(screen.getByTestId("message-tick-double", { includeHiddenElements: true })).toBeTruthy();
   });
 
-  it("reads the time and state of an own image Message", () => {
-    const screen = renderMobile(
+  it("reads the time and state of an own image Message", async () => {
+    const screen = await renderMobile(
       bubble({ kind: "image", text: "", localImageUri: "file:///photo.jpg", status: "delivered" }),
     );
 
     expect(screen.getByLabelText("02:05 PM, Delivered").props.accessible).toBe(true);
   });
 
-  it("announces an image Message as a photo", () => {
+  it("announces an image Message as a photo", async () => {
     const onImagePress = vi.fn();
-    const screen = renderMobile(
+    const screen = await renderMobile(
       bubble({ kind: "image", text: "", localImageUri: "file:///photo.jpg", onImagePress }),
     );
 
-    fireEvent.press(screen.getByRole("imagebutton", { name: "Photo" }));
+    await fireEvent.press(screen.getByRole("imagebutton", { name: "Photo" }));
     expect(onImagePress).toHaveBeenCalledOnce();
   });
 
-  it("announces the photo in the app language", () => {
-    const ru = renderMobile(bubble({ kind: "image", text: "", localImageUri: "file:///photo.jpg" }), {
+  it("announces the photo in the app language", async () => {
+    const ru = await renderMobile(bubble({ kind: "image", text: "", localImageUri: "file:///photo.jpg" }), {
       locale: "ru",
     });
     expect(ru.getByRole("image", { name: "Фото" })).toBeTruthy();
-    ru.unmount();
+    await ru.unmount();
 
-    const tk = renderMobile(bubble({ kind: "image", text: "", localImageUri: "file:///photo.jpg" }), {
+    const tk = await renderMobile(bubble({ kind: "image", text: "", localImageUri: "file:///photo.jpg" }), {
       locale: "tk",
     });
     expect(tk.getByRole("image", { name: "Surat" })).toBeTruthy();
   });
 
-  it("shows the time on a Listing-reference Message", () => {
-    const screen = renderMobile(
+  it("shows the time on a Listing-reference Message", async () => {
+    const screen = await renderMobile(
       bubble({
         kind: "post_ref",
         isMine: false,
@@ -174,8 +174,8 @@ describe("MessageBubble kinds keep their look and gain the time", () => {
     expect(screen.getByText("02:05 PM")).toBeTruthy();
   });
 
-  it("reads the time and state of an own Listing-reference Message", () => {
-    const screen = renderMobile(
+  it("reads the time and state of an own Listing-reference Message", async () => {
+    const screen = await renderMobile(
       bubble({
         kind: "post_ref",
         text: "",
@@ -198,8 +198,8 @@ describe("MessageBubble kinds keep their look and gain the time", () => {
     expect(screen.getByLabelText("02:05 PM, Read").props.accessible).toBe(true);
   });
 
-  it("reads Reported on a reported text Message", () => {
-    const screen = renderMobile(bubble({ isMine: false, reported: true }));
+  it("reads Reported on a reported text Message", async () => {
+    const screen = await renderMobile(bubble({ isMine: false, reported: true }));
 
     expect(screen.getByLabelText("Is the car still available?, 02:05 PM, Reported")).toBeTruthy();
   });
@@ -236,38 +236,38 @@ describe("MessageBubble reported dimming", () => {
     throw new Error("No bubble container above the node");
   }
 
-  it("dims a reported text Message", () => {
-    const screen = renderMobile(bubble({ isMine: false, reported: true }));
+  it("dims a reported text Message", async () => {
+    const screen = await renderMobile(bubble({ isMine: false, reported: true }));
 
     expect(bubbleClassName(screen.getByText("Reported"))).toContain("opacity-60");
   });
 
-  it("dims a reported image Message", () => {
-    const screen = renderMobile(bubble({ ...IMAGE, isMine: false, reported: true }));
+  it("dims a reported image Message", async () => {
+    const screen = await renderMobile(bubble({ ...IMAGE, isMine: false, reported: true }));
 
     expect(bubbleClassName(screen.getByText("Reported"))).toContain("opacity-60");
   });
 
-  it("dims a reported Listing-reference Message", () => {
-    const screen = renderMobile(bubble({ ...POST_REF, isMine: false, reported: true }));
+  it("dims a reported Listing-reference Message", async () => {
+    const screen = await renderMobile(bubble({ ...POST_REF, isMine: false, reported: true }));
 
     expect(bubbleClassName(screen.getByText("Reported"))).toContain("opacity-60");
   });
 
-  it("does not dim a Message that is not reported", () => {
-    const screen = renderMobile(bubble({ isMine: false }));
+  it("does not dim a Message that is not reported", async () => {
+    const screen = await renderMobile(bubble({ isMine: false }));
 
     expect(bubbleClassName(screen.getByText("Is the car still available?"))).not.toMatch(/opacity-/);
   });
 
-  it("does not dim a deleted Message", () => {
-    const screen = renderMobile(bubble({ isMine: false, reported: true, deletedAt: AT_1405 }));
+  it("does not dim a deleted Message", async () => {
+    const screen = await renderMobile(bubble({ isMine: false, reported: true, deletedAt: AT_1405 }));
 
     expect(bubbleClassName(screen.getByText("Message deleted"))).not.toMatch(/opacity-/);
   });
 
-  it("keeps a pending Message at its own dimming", () => {
-    const screen = renderMobile(bubble({ status: "pending" }));
+  it("keeps a pending Message at its own dimming", async () => {
+    const screen = await renderMobile(bubble({ status: "pending" }));
 
     const className = bubbleClassName(screen.getByText("Sending..."));
     expect(className).toContain("opacity-70");
@@ -276,26 +276,26 @@ describe("MessageBubble reported dimming", () => {
 });
 
 describe("MessageBubble image preview", () => {
-  it("shows the photo's ThumbHash while a received image loads", () => {
-    const screen = renderMobile(
+  it("shows the photo's ThumbHash while a received image loads", async () => {
+    const screen = await renderMobile(
       bubble({ kind: "image", text: "", isMine: false, metadata: { key: "chat-attachments/c/m/original.webp", width: 800, height: 600, thumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" } }),
     );
 
-    expect(screen.UNSAFE_getByType(Image).props.placeholder).toEqual({ thumbhash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" });
+    expect(getHost(screen.container, "Image").props.placeholder).toEqual({ thumbhash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" });
   });
 
-  it("has no placeholder for an image Message from before ThumbHashes", () => {
-    const screen = renderMobile(
+  it("has no placeholder for an image Message from before ThumbHashes", async () => {
+    const screen = await renderMobile(
       bubble({ kind: "image", text: "", isMine: false, metadata: { key: "chat-attachments/c/m/original.webp" } }),
     );
 
-    expect(screen.UNSAFE_getByType(Image).props.placeholder).toBeUndefined();
+    expect(getHost(screen.container, "Image").props.placeholder).toBeUndefined();
   });
 });
 
 describe("MessageBubble Listing-reference preview", () => {
-  it("shows the cover's ThumbHash on the chat Listing card while the cover loads", () => {
-    const screen = renderMobile(
+  it("shows the cover's ThumbHash on the chat Listing card while the cover loads", async () => {
+    const screen = await renderMobile(
       bubble({
         kind: "post_ref",
         isMine: false,
@@ -314,7 +314,7 @@ describe("MessageBubble Listing-reference preview", () => {
       }),
     );
 
-    expect(screen.UNSAFE_getByType(Image).props.placeholder).toEqual({ thumbhash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" });
+    expect(getHost(screen.container, "Image").props.placeholder).toEqual({ thumbhash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" });
   });
 });
 

@@ -1,8 +1,8 @@
 import { createRef } from "react";
-import { View } from "react-native";
+import type { View } from "react-native";
 import { beforeEach, expect, it, vi } from "vitest";
 
-import { renderMobile } from "../render";
+import { renderMobile, getAllHosts } from "../render";
 import { Text } from "../../components/ui/text";
 import { GlassSurface } from "../../components/ui/glass-surface";
 
@@ -15,16 +15,16 @@ vi.mock("expo-glass-effect", async () => {
   return { GlassView: (props: object) => React.createElement(View, { ...props, testID: "system-glass" }), GlassContainer: View, isLiquidGlassAvailable: () => true, isGlassEffectAPIAvailable: () => true };
 });
 beforeEach(() => { settings.reduced = false; settings.dark = false; });
-it.each([false, true])("keeps iOS system glass in dark=%s", (dark) => {
+it.each([false, true])("keeps iOS system glass in dark=%s", async (dark) => {
   settings.dark = dark;
-  const view = renderMobile(<GlassSurface blurTarget={createRef<View>()}><Text>Search</Text></GlassSurface>);
+  const view = await renderMobile(<GlassSurface blurTarget={createRef<View>()}><Text>Search</Text></GlassSurface>);
   expect(view.getByTestId("system-glass").props).toMatchObject({ glassEffectStyle: "regular", colorScheme: dark ? "dark" : "light" });
   expect(view.getByText("Search")).toBeTruthy();
 });
-it("uses the opaque material when iOS Reduce Transparency is on", () => {
+it("uses the opaque material when iOS Reduce Transparency is on", async () => {
   settings.reduced = true;
-  const view = renderMobile(<GlassSurface><Text>Search</Text></GlassSurface>);
+  const view = await renderMobile(<GlassSurface><Text>Search</Text></GlassSurface>);
   expect(view.queryByTestId("system-glass")).toBeNull();
-  expect(view.UNSAFE_getAllByType(View).some((node) => node.props.className?.includes("bg-card"))).toBe(true);
+  expect(getAllHosts(view.container, "View").some((node) => node.props.className?.includes("bg-card"))).toBe(true);
   expect(view.getByText("Search")).toBeTruthy();
 });

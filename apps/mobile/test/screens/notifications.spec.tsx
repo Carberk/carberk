@@ -38,7 +38,7 @@ function devicePermission(permission: Permission) {
 }
 
 async function renderScreen(locale = "en") {
-  const view = renderMobile(<NotificationsScreen />, { locale });
+  const view = await renderMobile(<NotificationsScreen />, { locale });
   await act(async () => {});
   return view;
 }
@@ -111,7 +111,7 @@ describe("Notifications screen", () => {
     vi.mocked(Notifications.getPermissionsAsync)
       .mockImplementationOnce(() => new Promise<never>((resolve) => { resolveOlder = resolve as (value: unknown) => void; }))
       .mockImplementationOnce(async () => ({ granted: true, status: "granted" }) as never);
-    const view = renderMobile(<NotificationsScreen />);
+    const view = await renderMobile(<NotificationsScreen />);
     await act(async () => {
       appState.listeners.forEach((listener) => listener("active"));
     });
@@ -126,7 +126,7 @@ describe("Notifications screen", () => {
   it("opens the app's page in system settings", async () => {
     devicePermission("denied");
     const view = await renderScreen();
-    fireEvent.press(view.getByRole("button", { name: "Open system settings" }));
+    await fireEvent.press(view.getByRole("button", { name: "Open system settings" }));
     expect(Linking.openSettings).toHaveBeenCalledTimes(1);
   });
 
@@ -147,7 +147,7 @@ describe("Notifications screen", () => {
   it("goes back to Cabinet", async () => {
     devicePermission("granted");
     const view = await renderScreen();
-    fireEvent.press(view.getByRole("button", { name: "Back" }));
+    await fireEvent.press(view.getByRole("button", { name: "Back" }));
     expect(routerMock.back).toHaveBeenCalledTimes(1);
   });
 
@@ -155,7 +155,7 @@ describe("Notifications screen", () => {
     devicePermission("granted");
     routerMock.canGoBack.mockReturnValueOnce(false);
     const view = await renderScreen();
-    fireEvent.press(view.getByRole("button", { name: "Back" }));
+    await fireEvent.press(view.getByRole("button", { name: "Back" }));
     expect(routerMock.replace).toHaveBeenCalledWith("/(tabs)/services");
   });
 

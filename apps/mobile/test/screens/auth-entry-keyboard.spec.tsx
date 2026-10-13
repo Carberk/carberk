@@ -13,8 +13,8 @@ vi.mock("../../src/auth/useAuth", () => ({ useAuth: () => ({ isAuthenticated: fa
 
 describe("Sign-in entry keyboard (#843)", () => {
   it.each(KEYBOARD_PLATFORMS)("keeps the phone field and Get code above the %s keyboard", (os) =>
-    onPlatform(os, () => {
-      const view = renderMobile(
+    onPlatform(os, async () => {
+      const view = await renderMobile(
         <AuthEntryScreen method="phone" canSubmit isSubmitting={false}
           onSubmit={async () => {}} onMethodChange={() => {}} onClose={() => {}}>
           <TextInput accessibilityLabel="Phone number" value="65 12 34 56" />

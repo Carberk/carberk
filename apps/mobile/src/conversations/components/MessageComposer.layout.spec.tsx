@@ -1,8 +1,8 @@
 import { mobileType } from "@auto-tm/ui/tokens";
-import { KeyboardAvoidingView, Platform } from "react-native";
+import { Platform } from "react-native";
 import { describe, expect, it, vi } from "vitest";
 
-import { fireEvent, renderMobile } from "../../../test/render";
+import { fireEvent, renderMobile, queryAllHosts } from "../../../test/render";
 
 import { MessageComposer } from "./MessageComposer";
 
@@ -26,7 +26,7 @@ vi.mock("../upload/chatImageUpload", () => ({
 interface Node {
   parent: Node | null;
   props: { className?: unknown; style?: unknown };
-  findAll: (match: (node: Node) => boolean) => Node[];
+  queryAll: (match: (node: Node) => boolean) => Node[];
 }
 
 const TOUCH_TARGET = 44;
@@ -49,22 +49,22 @@ function spacing(node: Node, prefix: string): number | undefined {
   return found ? Number(found[1]) * 4 : undefined;
 }
 
-function composer(text = "") {
-  const screen = renderMobile(<MessageComposer onSend={vi.fn()} conversationId="c1" />);
+async function composer(text = "") {
+  const screen = await renderMobile(<MessageComposer onSend={vi.fn()} conversationId="c1" />);
   const input = screen.getByPlaceholderText("Message") as unknown as Node;
-  if (text) fireEvent.changeText(screen.getByPlaceholderText("Message"), text);
+  if (text) await fireEvent.changeText(screen.getByPlaceholderText("Message"), text);
   const field = closest(input, "rounded-2xl");
   const row = closest(field, "border-t");
   const button = (name: string) => {
     const node = screen.getByRole("button", { name }) as unknown as Node;
-    return [node, ...node.findAll(() => true)].find((candidate) => classes(candidate).includes("h-11")) ?? closest(node, "h-11");
+    return [node, ...node.queryAll(() => true)].find((candidate) => classes(candidate).includes("h-11")) ?? closest(node, "h-11");
   };
   return { input, field, row, paperclip: button("Attach photo"), send: button("Send message") };
 }
 
 describe("Message composer row alignment (#775 F)", () => {
-  it("makes a one-line field exactly as tall as the two buttons, so the three share a centre", () => {
-    const { input, field, paperclip, send } = composer("Hello");
+  it("makes a one-line field exactly as tall as the two buttons, so the three share a centre", async () => {
+    const { input, field, paperclip, send } = await composer("Hello");
 
     // The field's own text adds no native padding of its own on either platform.
     expect(spacing(input, "py")).toBe(0);
@@ -78,13 +78,13 @@ describe("Message composer row alignment (#775 F)", () => {
     expect(spacing(send, "h")).toBe(TOUCH_TARGET);
   });
 
-  it("centres the text of the field on Android as well", () => {
-    const { input } = composer();
+  it("centres the text of the field on Android as well", async () => {
+    const { input } = await composer();
     expect(input.props.style).toMatchObject({ textAlignVertical: "center" });
   });
 
-  it("keeps both buttons at the bottom of a field that grew to several lines", () => {
-    const { row, field, paperclip, send } = composer("One\nTwo\nThree");
+  it("keeps both buttons at the bottom of a field that grew to several lines", async () => {
+    const { row, field, paperclip, send } = await composer("One\nTwo\nThree");
 
     expect(classes(row)).toContain("items-end");
     expect(closest(paperclip, "border-t")).toBe(row);
@@ -93,8 +93,8 @@ describe("Message composer row alignment (#775 F)", () => {
     expect(spacing(field, "h")).toBeUndefined();
   });
 
-  it("keeps a 44 dp touch target on both buttons", () => {
-    const { paperclip, send } = composer();
+  it("keeps a 44 dp touch target on both buttons", async () => {
+    const { paperclip, send } = await composer();
     for (const button of [paperclip, send]) {
       expect(spacing(button, "h")).toBe(TOUCH_TARGET);
       expect(spacing(button, "w")).toBe(TOUCH_TARGET);
@@ -106,12 +106,12 @@ describe("Message composer keyboard avoidance (#843)", () => {
   // The composer sits at the bottom of the Conversation screen, which owns the one
   // avoidance region. A region of its own would measure its frame in the footer's
   // coordinates against the keyboard's screen position and leave it behind the keys.
-  it.each(["ios", "android"] as const)("adds no keyboard avoidance of its own on %s", (os) => {
+  it.each(["ios", "android"] as const)("adds no keyboard avoidance of its own on %s", async (os) => {
     const previousOS = Platform.OS;
     Platform.OS = os;
     try {
-      const screen = renderMobile(<MessageComposer onSend={vi.fn()} conversationId="c1" showQuickReplies />);
-      expect(screen.UNSAFE_queryAllByType(KeyboardAvoidingView)).toHaveLength(0);
+      const screen = await renderMobile(<MessageComposer onSend={vi.fn()} conversationId="c1" showQuickReplies />);
+      expect(queryAllHosts(screen.container, "KeyboardAvoidingView")).toHaveLength(0);
       expect(screen.getByRole("button", { name: "Attach photo" })).toBeTruthy();
       expect(screen.getByRole("button", { name: "Send message" })).toBeTruthy();
     } finally { Platform.OS = previousOS; }

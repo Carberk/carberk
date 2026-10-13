@@ -4,73 +4,73 @@ import { fireEvent, renderMobile } from "../../../test/render";
 
 import { MessageActionsSheet } from "./MessageActionsSheet";
 
-function renderSheet(props: Partial<React.ComponentProps<typeof MessageActionsSheet>> = {}) {
+async function renderSheet(props: Partial<React.ComponentProps<typeof MessageActionsSheet>> = {}) {
   const handlers = { onOpenChange: vi.fn(), onCopy: vi.fn(), onReport: vi.fn(), onDelete: vi.fn() };
-  const screen = renderMobile(
+  const screen = await renderMobile(
     <MessageActionsSheet open canCopy canReport canDelete {...handlers} {...props} />,
   );
   return { screen, ...handlers };
 }
 
 describe("MessageActionsSheet", () => {
-  it("renders nothing while closed", () => {
-    const { screen } = renderSheet({ open: false });
+  it("renders nothing while closed", async () => {
+    const { screen } = await renderSheet({ open: false });
     expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
   });
 
-  it("lists only the offered actions, with Cancel last", () => {
-    const { screen } = renderSheet({ canDelete: false });
+  it("lists only the offered actions, with Cancel last", async () => {
+    const { screen } = await renderSheet({ canDelete: false });
 
     const names = screen.getAllByRole("button").map((node) => node.props.accessibilityLabel);
     expect(names).toEqual(["Copy", "Report message", "Cancel"]);
   });
 
-  it("omits Copy and Report when they are not offered", () => {
-    const { screen } = renderSheet({ canCopy: false, canReport: false });
+  it("omits Copy and Report when they are not offered", async () => {
+    const { screen } = await renderSheet({ canCopy: false, canReport: false });
 
     const names = screen.getAllByRole("button").map((node) => node.props.accessibilityLabel);
     expect(names).toEqual(["Delete", "Cancel"]);
   });
 
-  it("gives every item a 44 pt touch target", () => {
-    const { screen } = renderSheet();
+  it("gives every item a 44 pt touch target", async () => {
+    const { screen } = await renderSheet();
 
     for (const node of screen.getAllByRole("button")) {
       expect(node.props.className.split(" ")).toContain("min-h-[44px]");
     }
   });
 
-  it("runs the chosen action and closes the sheet", () => {
-    const { screen, onCopy, onReport, onDelete, onOpenChange } = renderSheet();
+  it("runs the chosen action and closes the sheet", async () => {
+    const { screen, onCopy, onReport, onDelete, onOpenChange } = await renderSheet();
 
-    fireEvent.press(screen.getByRole("button", { name: "Copy" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Copy" }));
     expect(onCopy).toHaveBeenCalledOnce();
     expect(onOpenChange).toHaveBeenLastCalledWith(false);
 
-    fireEvent.press(screen.getByRole("button", { name: "Report message" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Report message" }));
     expect(onReport).toHaveBeenCalledOnce();
 
-    fireEvent.press(screen.getByRole("button", { name: "Delete" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Delete" }));
     expect(onDelete).toHaveBeenCalledOnce();
   });
 
-  it("closes on Cancel without acting", () => {
-    const { screen, onCopy, onOpenChange } = renderSheet();
+  it("closes on Cancel without acting", async () => {
+    const { screen, onCopy, onOpenChange } = await renderSheet();
 
-    fireEvent.press(screen.getByRole("button", { name: "Cancel" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Cancel" }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(onCopy).not.toHaveBeenCalled();
   });
 
-  it("reads in Russian and Turkmen", () => {
-    const ru = renderMobile(
+  it("reads in Russian and Turkmen", async () => {
+    const ru = await renderMobile(
       <MessageActionsSheet open canCopy canReport canDelete onOpenChange={vi.fn()} onCopy={vi.fn()} onReport={vi.fn()} onDelete={vi.fn()} />,
       { locale: "ru" },
     );
     expect(ru.getAllByRole("button").map((node) => node.props.accessibilityLabel))
       .toEqual(["Копировать", "Пожаловаться на сообщение", "Удалить", "Отмена"]);
-    ru.unmount();
-    const tk = renderMobile(
+    await ru.unmount();
+    const tk = await renderMobile(
       <MessageActionsSheet open canCopy canReport canDelete onOpenChange={vi.fn()} onCopy={vi.fn()} onReport={vi.fn()} onDelete={vi.fn()} />,
       { locale: "tk" },
     );

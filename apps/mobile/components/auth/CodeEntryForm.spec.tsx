@@ -49,7 +49,7 @@ function rateLimited(details?: unknown) {
   return new ApiError("RATE_LIMITED", 429, "Too many OTP requests", details);
 }
 
-function renderForm(
+async function renderForm(
   overrides: Partial<Parameters<typeof CodeEntryForm>[0]> = {},
   locale?: "en" | "ru" | "tk",
 ) {
@@ -63,13 +63,13 @@ function renderForm(
     onContactSupport: vi.fn(),
     ...overrides,
   };
-  const screen = renderMobile(<CodeEntryForm {...props} />, { locale });
+  const screen = await renderMobile(<CodeEntryForm {...props} />, { locale });
   return { screen, props };
 }
 
-async function pressResend(screen: ReturnType<typeof renderMobile>) {
+async function pressResend(screen: Awaited<ReturnType<typeof renderMobile>>) {
   await act(async () => {
-    fireEvent.press(screen.getByRole("button", { name: "Resend code" }));
+    void fireEvent.press(screen.getByRole("button", { name: "Resend code" }));
   });
 }
 
@@ -87,15 +87,15 @@ afterEach(() => {
 });
 
 describe("CodeEntryForm code lifetime", () => {
-  it("tells a phone User the code lasts 5 minutes", () => {
-    const { screen } = renderForm({ method: "phone" });
+  it("tells a phone User the code lasts 5 minutes", async () => {
+    const { screen } = await renderForm({ method: "phone" });
 
     expect(screen.getByText("The code expires in 5 minutes.")).toBeTruthy();
     expect(screen.queryByText("The code expires in 10 minutes.")).toBeNull();
   });
 
-  it("tells an email User the code lasts 10 minutes", () => {
-    const { screen } = renderForm({ method: "email" });
+  it("tells an email User the code lasts 10 minutes", async () => {
+    const { screen } = await renderForm({ method: "email" });
 
     expect(screen.getByText("The code expires in 10 minutes.")).toBeTruthy();
     expect(screen.queryByText("The code expires in 5 minutes.")).toBeNull();
@@ -107,7 +107,7 @@ describe("CodeEntryForm daily code limit", () => {
     "stops Resend and code entry on a %s and offers Contact support",
     async (method) => {
       const verify = vi.fn(async () => {});
-      const { screen, props } = renderForm({
+      const { screen, props } = await renderForm({
         method,
         verify,
         resend: vi.fn(async () => {
@@ -122,15 +122,15 @@ describe("CodeEntryForm daily code limit", () => {
       expect(screen.queryByText(/Resend code in/)).toBeNull();
 
       await act(async () => {
-        fireEvent.changeText(screen.getByLabelText("Code"), "123456");
+        void fireEvent.changeText(screen.getByLabelText("Code"), "123456");
       });
       expect(verify).not.toHaveBeenCalled();
       expect(screen.getByText(DAILY_LIMIT)).toBeTruthy();
 
-      fireEvent.press(screen.getByRole("button", { name: "Contact support" }));
+      await fireEvent.press(screen.getByRole("button", { name: "Contact support" }));
       expect(props.onContactSupport).toHaveBeenCalledTimes(1);
 
-      fireEvent.press(
+      await fireEvent.press(
         screen.getByRole("button", {
           name: method === "email" ? "Change email" : "Change number",
         }),
@@ -140,7 +140,7 @@ describe("CodeEntryForm daily code limit", () => {
   );
 
   it("leaves Contact support as the one way forward on an email sign-in", async () => {
-    const { screen } = renderForm({
+    const { screen } = await renderForm({
       method: "email",
       onUsePhoneInstead: vi.fn(),
       resend: vi.fn(async () => {
@@ -162,7 +162,7 @@ describe("CodeEntryForm daily code limit", () => {
     ["ip_limit", { reason: "ip_limit", retryInSeconds: 0 }],
     ["no details", undefined],
   ])("keeps Resend after a %s refusal and offers no support link", async (_label, details) => {
-    const { screen } = renderForm({
+    const { screen } = await renderForm({
       resend: vi.fn(async () => {
         throw rateLimited(details);
       }),
@@ -175,8 +175,8 @@ describe("CodeEntryForm daily code limit", () => {
     expect(screen.queryByRole("button", { name: "Contact support" })).toBeNull();
   });
 
-  it("never offers Contact support before the limit", () => {
-    const { screen } = renderForm({ method: "email" });
+  it("never offers Contact support before the limit", async () => {
+    const { screen } = await renderForm({ method: "email" });
 
     expect(screen.queryByText("Contact support")).toBeNull();
   });
@@ -185,7 +185,7 @@ describe("CodeEntryForm daily code limit", () => {
     ["ru", "За 24 часа запрошено слишком много кодов. Попробуйте позже.", "Связаться с поддержкой"],
     ["tk", "24 sagatda gaty köp kod soraldy. Soňrak synanyşyň.", "Goldaw bilen habarlaş"],
   ] as const)("shows the limit in %s", async (locale, message, link) => {
-    const { screen } = renderForm(
+    const { screen } = await renderForm(
       {
         resend: vi.fn(async () => {
           throw rateLimited({ reason: "destination_limit", retryInSeconds: 0 });
@@ -195,7 +195,7 @@ describe("CodeEntryForm daily code limit", () => {
     );
 
     await act(async () => {
-      fireEvent.press(
+      void fireEvent.press(
         screen.getByRole("button", {
           name: locale === "ru" ? "Отправить код снова" : "Kody täzeden iber",
         }),
@@ -208,9 +208,9 @@ describe("CodeEntryForm daily code limit", () => {
 });
 
 describe("CodeEntryForm email not arriving", () => {
-  it("waits for the first countdown to end before hinting", () => {
+  it("waits for the first countdown to end before hinting", async () => {
     const onUsePhoneInstead = vi.fn();
-    const { screen } = renderForm({
+    const { screen } = await renderForm({
       method: "email",
       initialResendSeconds: 3,
       onUsePhoneInstead,
@@ -219,17 +219,17 @@ describe("CodeEntryForm email not arriving", () => {
     expect(screen.queryByText(NOT_ARRIVING)).toBeNull();
     expect(screen.queryByRole("button", { name: "Use phone instead" })).toBeNull();
 
-    act(() => {
+    await act(() => {
       vi.advanceTimersByTime(3000);
     });
 
     expect(screen.getByText(NOT_ARRIVING)).toBeTruthy();
-    fireEvent.press(screen.getByRole("button", { name: "Use phone instead" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Use phone instead" }));
     expect(onUsePhoneInstead).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the hint after a resend restarts the countdown", async () => {
-    const { screen } = renderForm({ method: "email", initialResendSeconds: 0 });
+    const { screen } = await renderForm({ method: "email", initialResendSeconds: 0 });
 
     await pressResend(screen);
 
@@ -237,27 +237,27 @@ describe("CodeEntryForm email not arriving", () => {
     expect(screen.getByText(NOT_ARRIVING)).toBeTruthy();
   });
 
-  it("offers Use phone instead only when the screen passes it", () => {
-    const { screen } = renderForm({ method: "email", initialResendSeconds: 0 });
+  it("offers Use phone instead only when the screen passes it", async () => {
+    const { screen } = await renderForm({ method: "email", initialResendSeconds: 0 });
 
     expect(screen.getByText(NOT_ARRIVING)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Use phone instead" })).toBeNull();
   });
 
-  it("never hints on a phone code", () => {
-    const { screen } = renderForm({ method: "phone", initialResendSeconds: 0 });
+  it("never hints on a phone code", async () => {
+    const { screen } = await renderForm({ method: "phone", initialResendSeconds: 0 });
 
     expect(screen.queryByText(NOT_ARRIVING)).toBeNull();
   });
 });
 
 describe("CodeEntryForm countdown", () => {
-  it("shows seconds up to a minute and minutes with seconds above it", () => {
-    const { screen } = renderForm({ initialResendSeconds: 61 });
+  it("shows seconds up to a minute and minutes with seconds above it", async () => {
+    const { screen } = await renderForm({ initialResendSeconds: 61 });
 
     expect(screen.getByText("Resend code in 1:01")).toBeTruthy();
 
-    act(() => {
+    await act(() => {
       vi.advanceTimersByTime(1000);
     });
 
@@ -279,10 +279,10 @@ describe("CodeEntryForm wrong-code recovery", () => {
     const verify = vi.fn()
       .mockRejectedValueOnce(new ApiError("INVALID_OTP", 400, "Invalid OTP code"))
       .mockResolvedValueOnce(undefined);
-    const { screen, props } = renderForm({ method, verify });
+    const { screen, props } = await renderForm({ method, verify });
 
     await act(async () => {
-      fireEvent.changeText(screen.getByLabelText("Code"), "000000");
+      void fireEvent.changeText(screen.getByLabelText("Code"), "000000");
     });
     expect(screen.getByText("Wrong code. Try again.")).toBeTruthy();
     expect(screen.queryByText("Code expired. Request a new one.")).toBeNull();
@@ -290,7 +290,7 @@ describe("CodeEntryForm wrong-code recovery", () => {
     expect(screen.getByLabelText("Code").props.value).toBe("");
 
     await act(async () => {
-      fireEvent.changeText(screen.getByLabelText("Code"), "123456");
+      void fireEvent.changeText(screen.getByLabelText("Code"), "123456");
     });
     expect(verify).toHaveBeenNthCalledWith(1, "000000");
     expect(verify).toHaveBeenNthCalledWith(2, "123456");
@@ -300,10 +300,10 @@ describe("CodeEntryForm wrong-code recovery", () => {
 
   it("refocuses the cells only once they are editable again (#781)", async () => {
     const verify = vi.fn().mockRejectedValueOnce(new ApiError("INVALID_OTP", 400, "Invalid OTP code"));
-    const { screen } = renderForm({ verify });
+    const { screen } = await renderForm({ verify });
 
     await act(async () => {
-      fireEvent.changeText(screen.getByLabelText("Code"), "000000");
+      void fireEvent.changeText(screen.getByLabelText("Code"), "000000");
     });
 
     expect(screen.getByText("Wrong code. Try again.")).toBeTruthy();

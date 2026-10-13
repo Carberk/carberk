@@ -28,76 +28,76 @@ function ValidatedSpecs({ initial = { condition: "used", mileageKm: 1000 }, disa
 }
 
 describe("Step4Specs condition disclosure", () => {
-  it("keeps untouched required errors quiet, then shows only the touched field error", () => {
-    const screen = renderMobile(<ValidatedSpecs initial={{ condition: "used" }} />);
+  it("keeps untouched required errors quiet, then shows only the touched field error", async () => {
+    const screen = await renderMobile(<ValidatedSpecs initial={{ condition: "used" }} />);
     expect(screen.queryByText("Answer whether the car is damaged or needs repair")).toBeNull();
     expect(screen.queryByText("Mileage is required for used cars")).toBeNull();
-    fireEvent(screen.getByRole("radio", { name: "Damaged / needs repair: Yes" }), "blur");
+    await fireEvent(screen.getByRole("radio", { name: "Damaged / needs repair: Yes" }), "blur");
     expect(screen.getByText("Answer whether the car is damaged or needs repair")).toBeTruthy();
     expect(screen.queryByText("Mileage is required for used cars")).toBeNull();
-    fireEvent(screen.getByPlaceholderText("e.g. 50000"), "blur");
+    await fireEvent(screen.getByPlaceholderText("e.g. 50000"), "blur");
     expect(screen.getByText("Mileage is required for used cars")).toBeTruthy();
-    fireEvent.changeText(screen.getByPlaceholderText("e.g. 50000"), "1000");
+    await fireEvent.changeText(screen.getByPlaceholderText("e.g. 50000"), "1000");
     expect(screen.queryByText("Mileage is required for used cars")).toBeNull();
     expect(screen.getByRole("radio", { name: "Damaged / needs repair: Yes", checked: false })).toBeTruthy();
     expect(screen.getByRole("radio", { name: "Damaged / needs repair: No", checked: false })).toBeTruthy();
   });
 
-  it.each(["Yes", "No"])("selects %s, preserves Known issues, and removes the required error", (answer) => {
-    const screen = renderMobile(<ValidatedSpecs initial={{ condition: "used", mileageKm: 1000, conditionDisclosure: { knownIssuesText: "Rust on the sill" } }} />);
-    fireEvent.press(screen.getByRole("radio", { name: `Damaged / needs repair: ${answer}` }));
+  it.each(["Yes", "No"])("selects %s, preserves Known issues, and removes the required error", async (answer) => {
+    const screen = await renderMobile(<ValidatedSpecs initial={{ condition: "used", mileageKm: 1000, conditionDisclosure: { knownIssuesText: "Rust on the sill" } }} />);
+    await fireEvent.press(screen.getByRole("radio", { name: `Damaged / needs repair: ${answer}` }));
     expect(screen.getByRole("radio", { name: `Damaged / needs repair: ${answer}`, checked: true })).toBeTruthy();
     expect(screen.getByRole("radio", { name: `Damaged / needs repair: ${answer === "Yes" ? "No" : "Yes"}`, checked: false })).toBeTruthy();
     expect(screen.queryByText("Answer whether the car is damaged or needs repair")).toBeNull();
     expect(screen.getByDisplayValue("Rust on the sill")).toBeTruthy();
   });
 
-  it("shows Known issues validation after Damaged is answered", () => {
-    const screen = renderMobile(<ValidatedSpecs initial={{ condition: "used", mileageKm: 1000, conditionDisclosure: { damaged: true, knownIssuesText: "x".repeat(1001) } }} />);
+  it("shows Known issues validation after Damaged is answered", async () => {
+    const screen = await renderMobile(<ValidatedSpecs initial={{ condition: "used", mileageKm: 1000, conditionDisclosure: { damaged: true, knownIssuesText: "x".repeat(1001) } }} />);
     expect(screen.queryByText("Invalid value")).toBeNull();
-    fireEvent(screen.getByDisplayValue("x".repeat(1001)), "blur");
+    await fireEvent(screen.getByDisplayValue("x".repeat(1001)), "blur");
     expect(screen.getByText("Invalid value")).toBeTruthy();
     expect(screen.queryByText("Answer whether the car is damaged or needs repair")).toBeNull();
     const input = screen.getByDisplayValue("x".repeat(1001));
     expect(input.props.maxLength).toBe(1000);
-    fireEvent.changeText(input, "Rust");
+    await fireEvent.changeText(input, "Rust");
     expect(screen.queryByText("Invalid value")).toBeNull();
     expect(screen.getByRole("radio", { name: "Damaged / needs repair: Yes", checked: true })).toBeTruthy();
   });
 
-  it("shows both required errors only when this step is attempted", () => {
+  it("shows both required errors only when this step is attempted", async () => {
     const initial: WizardSchemas.WizardDraftPayload = { condition: "used" };
-    const screen = renderMobile(<ValidatedSpecs initial={initial} />);
+    const screen = await renderMobile(<ValidatedSpecs initial={initial} />);
     expect(screen.queryByText("Mileage is required for used cars")).toBeNull();
     expect(screen.queryByText("Answer whether the car is damaged or needs repair")).toBeNull();
-    screen.rerender(<ValidatedSpecs initial={initial} showErrors />);
+    await screen.rerender(<ValidatedSpecs initial={initial} showErrors />);
     expect(screen.getByText("Mileage is required for used cars")).toBeTruthy();
     expect(screen.getByText("Answer whether the car is damaged or needs repair")).toBeTruthy();
-    fireEvent.press(screen.getByRole("button", { name: "New" }));
+    await fireEvent.press(screen.getByRole("button", { name: "New" }));
     expect(screen.queryByText("Mileage is required for used cars")).toBeNull();
     expect(screen.queryByText("Answer whether the car is damaged or needs repair")).toBeNull();
-    fireEvent.press(screen.getByRole("button", { name: "Used" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Used" }));
     expect(screen.getByText("Mileage is required for used cars")).toBeTruthy();
     expect(screen.getByText("Answer whether the car is damaged or needs repair")).toBeTruthy();
     expect(screen.getByRole("radio", { name: "Damaged / needs repair: No", checked: false })).toBeTruthy();
   });
 
-  it("resets field touch when New hides the Used questions", () => {
-    const screen = renderMobile(<ValidatedSpecs initial={{ condition: "used" }} />);
-    fireEvent(screen.getByPlaceholderText("e.g. 50000"), "blur");
-    fireEvent(screen.getByRole("radio", { name: "Damaged / needs repair: Yes" }), "blur");
+  it("resets field touch when New hides the Used questions", async () => {
+    const screen = await renderMobile(<ValidatedSpecs initial={{ condition: "used" }} />);
+    await fireEvent(screen.getByPlaceholderText("e.g. 50000"), "blur");
+    await fireEvent(screen.getByRole("radio", { name: "Damaged / needs repair: Yes" }), "blur");
     expect(screen.getByText("Answer whether the car is damaged or needs repair")).toBeTruthy();
-    fireEvent.press(screen.getByRole("button", { name: "New" }));
-    fireEvent.press(screen.getByRole("button", { name: "Used" }));
+    await fireEvent.press(screen.getByRole("button", { name: "New" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Used" }));
     expect(screen.queryByText("Mileage is required for used cars")).toBeNull();
     expect(screen.queryByText("Answer whether the car is damaged or needs repair")).toBeNull();
     expect(screen.getByRole("radio", { name: "Damaged / needs repair: No", checked: false })).toBeTruthy();
   });
 
-  it("does not change a disabled answer", () => {
+  it("does not change a disabled answer", async () => {
     const onChange = vi.fn();
-    const screen = renderMobile(<Step4Specs payload={{ condition: "used" }} onChange={onChange} disabled />);
-    fireEvent.press(screen.getByRole("radio", { name: "Damaged / needs repair: Yes" }));
+    const screen = await renderMobile(<Step4Specs payload={{ condition: "used" }} onChange={onChange} disabled />);
+    await fireEvent.press(screen.getByRole("radio", { name: "Damaged / needs repair: Yes" }));
     expect(onChange).not.toHaveBeenCalled();
   });
 });
@@ -106,15 +106,15 @@ describe("Step4Specs condition disclosure", () => {
 describe("Step4Specs for a New car", () => {
   const damagedRadios = /Damaged \/ needs repair/;
 
-  function renderTracked(initial: WizardSchemas.WizardDraftPayload) {
+  async function renderTracked(initial: WizardSchemas.WizardDraftPayload) {
     let latest = initial;
-    const screen = renderMobile(<ValidatedSpecs initial={initial} onPayload={(p) => { latest = p; }} />);
+    const screen = await renderMobile(<ValidatedSpecs initial={initial} onPayload={(p) => { latest = p; }} />);
     return { screen, payload: () => latest };
   }
 
-  it("hides the Damaged question, stores not damaged, and keeps Known issues optional", () => {
-    const { screen, payload } = renderTracked({ condition: "used", mileageKm: 1000 });
-    fireEvent.press(screen.getByRole("button", { name: "New" }));
+  it("hides the Damaged question, stores not damaged, and keeps Known issues optional", async () => {
+    const { screen, payload } = await renderTracked({ condition: "used", mileageKm: 1000 });
+    await fireEvent.press(screen.getByRole("button", { name: "New" }));
 
     expect(screen.queryAllByRole("radio", { name: damagedRadios })).toHaveLength(0);
     expect(screen.queryByText("Damaged / needs repair")).toBeNull();
@@ -124,26 +124,26 @@ describe("Step4Specs for a New car", () => {
     expect(screen.getByText("Known issues")).toBeTruthy();
   });
 
-  it("keeps not damaged when the seller writes Known issues", () => {
-    const { screen, payload } = renderTracked({ condition: "new" });
-    fireEvent.changeText(screen.getByPlaceholderText("Describe known problems or damage..."), "Paint chip");
+  it("keeps not damaged when the seller writes Known issues", async () => {
+    const { screen, payload } = await renderTracked({ condition: "new" });
+    await fireEvent.changeText(screen.getByPlaceholderText("Describe known problems or damage..."), "Paint chip");
 
     expect(payload().conditionDisclosure).toEqual({ damaged: false, knownIssuesText: "Paint chip" });
     expect(WizardSchemas.validateStep("specs", payload()).valid).toBe(true);
   });
 
-  it("stores not damaged when a Used car answered Yes switches to New", () => {
-    const { screen, payload } = renderTracked({
+  it("stores not damaged when a Used car answered Yes switches to New", async () => {
+    const { screen, payload } = await renderTracked({
       condition: "used", mileageKm: 1000, conditionDisclosure: { damaged: true, knownIssuesText: "Dent" },
     });
-    fireEvent.press(screen.getByRole("button", { name: "New" }));
+    await fireEvent.press(screen.getByRole("button", { name: "New" }));
 
     expect(payload().conditionDisclosure).toEqual({ damaged: false, knownIssuesText: "Dent" });
   });
 
-  it("clears the answer on New to Used and asks the question again", () => {
-    const { screen, payload } = renderTracked({ condition: "new", conditionDisclosure: { damaged: false, knownIssuesText: "Dent" } });
-    fireEvent.press(screen.getByRole("button", { name: "Used" }));
+  it("clears the answer on New to Used and asks the question again", async () => {
+    const { screen, payload } = await renderTracked({ condition: "new", conditionDisclosure: { damaged: false, knownIssuesText: "Dent" } });
+    await fireEvent.press(screen.getByRole("button", { name: "Used" }));
 
     expect(payload().conditionDisclosure).toEqual({ knownIssuesText: "Dent" });
     expect(screen.getByRole("radio", { name: "Damaged / needs repair: Yes", checked: false })).toBeTruthy();
@@ -154,24 +154,24 @@ describe("Step4Specs for a New car", () => {
     expect(screen.getByDisplayValue("Dent")).toBeTruthy();
   });
 
-  it("keeps an existing Used answer when Used is tapped again", () => {
-    const { screen, payload } = renderTracked({ condition: "used", mileageKm: 1000, conditionDisclosure: { damaged: true } });
-    fireEvent.press(screen.getByRole("button", { name: "Used" }));
+  it("keeps an existing Used answer when Used is tapped again", async () => {
+    const { screen, payload } = await renderTracked({ condition: "used", mileageKm: 1000, conditionDisclosure: { damaged: true } });
+    await fireEvent.press(screen.getByRole("button", { name: "Used" }));
 
     expect(payload().conditionDisclosure).toEqual({ damaged: true });
   });
 
-  it("explains a damaged New draft under Condition and lets New clear it", () => {
-    const { screen, payload } = renderTracked({ condition: "new", conditionDisclosure: { damaged: true } });
+  it("explains a damaged New draft under Condition and lets New clear it", async () => {
+    const { screen, payload } = await renderTracked({ condition: "new", conditionDisclosure: { damaged: true } });
 
     expect(screen.getByText("A new car can't be damaged. Choose Used.")).toBeTruthy();
-    fireEvent.press(screen.getByRole("button", { name: "New" }));
+    await fireEvent.press(screen.getByRole("button", { name: "New" }));
     expect(payload().conditionDisclosure).toEqual({ damaged: false });
     expect(screen.queryByText("A new car can't be damaged. Choose Used.")).toBeNull();
   });
 
-  it("announces New as selected and has no Damaged control in the accessibility tree", () => {
-    const { screen } = renderTracked({ condition: "new", conditionDisclosure: { damaged: false } });
+  it("announces New as selected and has no Damaged control in the accessibility tree", async () => {
+    const { screen } = await renderTracked({ condition: "new", conditionDisclosure: { damaged: false } });
 
     expect(screen.getByRole("button", { name: "New", selected: true })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Used", selected: false })).toBeTruthy();
@@ -186,26 +186,26 @@ describe("Step4Specs Engine power feedback", () => {
     condition: "used", mileageKm: 1000, conditionDisclosure: { damaged: false }, enginePower: 0,
   };
 
-  it("keeps an untouched invalid value quiet, reveals it on blur, and clears it on correction", () => {
+  it("keeps an untouched invalid value quiet, reveals it on blur, and clears it on correction", async () => {
     let latest = initial;
-    const screen = renderMobile(<ValidatedSpecs initial={initial} onPayload={(p) => { latest = p; }} />);
+    const screen = await renderMobile(<ValidatedSpecs initial={initial} onPayload={(p) => { latest = p; }} />);
     expect(screen.getByText("Power")).toBeTruthy();
     expect(screen.queryByText(error)).toBeNull();
-    fireEvent(screen.getByPlaceholderText("e.g. 150"), "blur");
+    await fireEvent(screen.getByPlaceholderText("e.g. 150"), "blur");
     expect(screen.getByText(error)).toBeTruthy();
-    fireEvent.changeText(screen.getByPlaceholderText("e.g. 150"), "150.9");
+    await fireEvent.changeText(screen.getByPlaceholderText("e.g. 150"), "150.9");
     expect(latest.enginePower).toBe(150);
     expect(screen.queryByText(error)).toBeNull();
-    fireEvent.changeText(screen.getByPlaceholderText("e.g. 150"), "");
+    await fireEvent.changeText(screen.getByPlaceholderText("e.g. 150"), "");
     expect(latest.enginePower).toBeUndefined();
     expect(WizardSchemas.validateStep("specs", latest).valid).toBe(true);
     expect(screen.queryByText(error)).toBeNull();
   });
 
-  it("shows the error as soon as the seller enters zero", () => {
-    const screen = renderMobile(<ValidatedSpecs initial={{ ...initial, enginePower: undefined }} />);
+  it("shows the error as soon as the seller enters zero", async () => {
+    const screen = await renderMobile(<ValidatedSpecs initial={{ ...initial, enginePower: undefined }} />);
     expect(screen.queryByText(error)).toBeNull();
-    fireEvent.changeText(screen.getByPlaceholderText("e.g. 150"), "0");
+    await fireEvent.changeText(screen.getByPlaceholderText("e.g. 150"), "0");
     expect(screen.getByText(error)).toBeTruthy();
   });
 });

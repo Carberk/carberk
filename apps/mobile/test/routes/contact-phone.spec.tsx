@@ -42,21 +42,21 @@ beforeEach(() => {
   mocks.toast.mockClear();
 });
 
-function typePhone(screen: ReturnType<typeof renderMobile>, value: string) {
-  fireEvent.changeText(screen.getByLabelText("Phone number"), value);
-  fireEvent(screen.getByLabelText("Phone number"), "blur");
+async function typePhone(screen: Awaited<ReturnType<typeof renderMobile>>, value: string) {
+  await fireEvent.changeText(screen.getByLabelText("Phone number"), value);
+  await fireEvent(screen.getByLabelText("Phone number"), "blur");
 }
 
-async function pressSendCode(screen: ReturnType<typeof renderMobile>) {
+async function pressSendCode(screen: Awaited<ReturnType<typeof renderMobile>>) {
   await act(async () => {
-    fireEvent.press(screen.getByRole("button", { name: "Send code" }));
+    void fireEvent.press(screen.getByRole("button", { name: "Send code" }));
   });
 }
 
 describe("contact-phone screen", () => {
-  it("asks for another contact number with the +993 prefix", () => {
+  it("asks for another contact number with the +993 prefix", async () => {
     routeParams.returnPathname = "/(tabs)/sell";
-    const screen = renderMobile(<ContactPhoneScreen />);
+    const screen = await renderMobile(<ContactPhoneScreen />);
 
     expect(
       screen.getByRole("header", { name: "Another contact number" }),
@@ -67,10 +67,10 @@ describe("contact-phone screen", () => {
     expect(screen.getByText("+993")).toBeTruthy();
   });
 
-  it("titled reconfirm when a saved number expired", () => {
+  it("titled reconfirm when a saved number expired", async () => {
     routeParams.phone = "+99362999999";
     routeParams.reconfirm = "1";
-    const screen = renderMobile(<ContactPhoneScreen />);
+    const screen = await renderMobile(<ContactPhoneScreen />);
 
     expect(
       screen.getByRole("header", { name: "Confirm the number again" }),
@@ -79,8 +79,8 @@ describe("contact-phone screen", () => {
   });
 
   it("shows the format error without a request", async () => {
-    const screen = renderMobile(<ContactPhoneScreen />);
-    typePhone(screen, "11");
+    const screen = await renderMobile(<ContactPhoneScreen />);
+    await typePhone(screen, "11");
 
     await pressSendCode(screen);
 
@@ -93,8 +93,8 @@ describe("contact-phone screen", () => {
   it("opens the code screen when the code is sent", async () => {
     routeParams.returnPathname = "/(tabs)/sell";
     mocks.request.mockResolvedValue(CODE_SENT);
-    const screen = renderMobile(<ContactPhoneScreen />);
-    typePhone(screen, "61 00-00-01");
+    const screen = await renderMobile(<ContactPhoneScreen />);
+    await typePhone(screen, "61 00-00-01");
 
     await pressSendCode(screen);
 
@@ -121,8 +121,8 @@ describe("contact-phone screen", () => {
         reusableUntil: null,
       },
     });
-    const screen = renderMobile(<ContactPhoneScreen />);
-    typePhone(screen, "65 00-00-00");
+    const screen = await renderMobile(<ContactPhoneScreen />);
+    await typePhone(screen, "65 00-00-00");
 
     await pressSendCode(screen);
 
@@ -144,8 +144,8 @@ describe("contact-phone screen", () => {
         retryInSeconds: 0,
       }),
     );
-    const screen = renderMobile(<ContactPhoneScreen />);
-    typePhone(screen, "61 00-00-01");
+    const screen = await renderMobile(<ContactPhoneScreen />);
+    await typePhone(screen, "61 00-00-01");
 
     await pressSendCode(screen);
 
@@ -155,7 +155,7 @@ describe("contact-phone screen", () => {
       ),
     ).toBeTruthy();
 
-    fireEvent.press(screen.getByRole("link", { name: "Help" }));
+    await fireEvent.press(screen.getByRole("link", { name: "Help" }));
     expect(routerMock.push).toHaveBeenCalledWith("/help");
   });
 
@@ -166,8 +166,8 @@ describe("contact-phone screen", () => {
         retryInSeconds: 0,
       }),
     );
-    const screen = renderMobile(<ContactPhoneScreen />);
-    typePhone(screen, "61 00-00-01");
+    const screen = await renderMobile(<ContactPhoneScreen />);
+    await typePhone(screen, "61 00-00-01");
 
     await pressSendCode(screen);
 
@@ -184,8 +184,8 @@ describe("contact-phone screen", () => {
         retryInSeconds: 120,
       }),
     );
-    const screen = renderMobile(<ContactPhoneScreen />);
-    typePhone(screen, "61 00-00-01");
+    const screen = await renderMobile(<ContactPhoneScreen />);
+    await typePhone(screen, "61 00-00-01");
 
     await pressSendCode(screen);
 
@@ -196,8 +196,8 @@ describe("contact-phone screen", () => {
 
   it("shows the offline message", async () => {
     mocks.request.mockRejectedValue(new ApiError("NETWORK_ERROR", 0));
-    const screen = renderMobile(<ContactPhoneScreen />);
-    typePhone(screen, "61 00-00-01");
+    const screen = await renderMobile(<ContactPhoneScreen />);
+    await typePhone(screen, "61 00-00-01");
 
     await pressSendCode(screen);
 
@@ -220,7 +220,7 @@ describe("contact-phone screen", () => {
         reusableUntil: "2026-10-12T12:00:00.000Z",
       },
     });
-    const screen = renderMobile(<ContactPhoneScreen />);
+    const screen = await renderMobile(<ContactPhoneScreen />);
 
     await pressSendCode(screen);
 
@@ -232,12 +232,12 @@ describe("contact-phone screen", () => {
     expect(routerMock.dismissTo).toHaveBeenCalledWith("/listings/manage");
   });
 
-  it("keeps the Listing's own number read-only on a relist", () => {
+  it("keeps the Listing's own number read-only on a relist", async () => {
     routeParams.purpose = "relist";
     routeParams.listingId = "listing-1";
     routeParams.phone = "+99362000002";
     routeParams.returnPathname = "/listings/manage";
-    const screen = renderMobile(<ContactPhoneScreen />);
+    const screen = await renderMobile(<ContactPhoneScreen />);
 
     expect(screen.getByDisplayValue("62 00-00-02").props.editable).toBe(false);
   });
@@ -245,8 +245,8 @@ describe("contact-phone screen", () => {
 
 describe("contact-phone keyboard (#843)", () => {
   it.each(KEYBOARD_PLATFORMS)("keeps the number and Send code above the %s keyboard", (os) =>
-    onPlatform(os, () => {
-      const screen = renderMobile(<ContactPhoneScreen />);
+    onPlatform(os, async () => {
+      const screen = await renderMobile(<ContactPhoneScreen />);
       const region = activeKeyboardRegion(screen);
       expect(within(region).getByLabelText("Phone number")).toBeTruthy();
       expect(within(region).getByRole("button", { name: "Send code" })).toBeTruthy();

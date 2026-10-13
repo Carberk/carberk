@@ -61,7 +61,7 @@ vi.mock("react-native-safe-area-context", async () => ({
 
 const { id, coverId, secondId } = fixture;
 const variants = { thumbnail: "t.webp", list: "l.webp", detail: "d.webp", fullscreen: "f.webp" };
-type Screen = ReturnType<typeof renderMobile>;
+type Screen = Awaited<ReturnType<typeof renderMobile>>;
 
 /** The published Listing on the fake server, and what the app sent to change it. */
 function createListingApi(overrides: Record<string, unknown> = {}) {
@@ -114,7 +114,7 @@ function createListingApi(overrides: Record<string, unknown> = {}) {
 
 /** Opens the edit screen and waits for the Listing and its photos. */
 async function openEdit({ locale = "en", heading = "Edit listing" } = {}) {
-  const screen = renderMobile(<ToastProvider><EditListingScreen /></ToastProvider>, { locale });
+  const screen = await renderMobile(<ToastProvider><EditListingScreen /></ToastProvider>, { locale });
   await screen.findByRole("header", { name: heading });
   await screen.findByText(/^Photos: 4$|^Фото: 4$|^Suratlar: 4$/);
   return screen;
@@ -124,17 +124,17 @@ const saveButton = (screen: Screen) => screen.getByRole("button", { name: "Save 
 const isDisabled = (button: { props: { accessibilityState?: { disabled?: boolean } } }) =>
   button.props.accessibilityState?.disabled === true;
 
-function openStep(screen: Screen, row: RegExp, header: string) {
-  fireEvent.press(screen.getByRole("button", { name: row }));
+async function openStep(screen: Screen, row: RegExp, header: string) {
+  await fireEvent.press(screen.getByRole("button", { name: row }));
   expect(screen.getByRole("header", { name: header })).toBeTruthy();
 }
 
 /** Types a new amount on the Price step and returns to the list with Done. */
-function changePrice(screen: Screen, from: string, to: string) {
-  openStep(screen, /^Price, .*Change$/, "Price");
+async function changePrice(screen: Screen, from: string, to: string) {
+  await openStep(screen, /^Price, .*Change$/, "Price");
   // The price field shows grouped digits; the typed text and the saved value are plain.
-  fireEvent.changeText(screen.getByDisplayValue(Number(from).toLocaleString("en-US")), to);
-  fireEvent.press(screen.getByRole("button", { name: "Done" }));
+  await fireEvent.changeText(screen.getByDisplayValue(Number(from).toLocaleString("en-US")), to);
+  await fireEvent.press(screen.getByRole("button", { name: "Done" }));
   expect(screen.getByRole("header", { name: "Edit listing" })).toBeTruthy();
 }
 
@@ -145,11 +145,11 @@ const localized = {
 } as const;
 
 /** From the list: opens Details, answers Damaged "No" and returns with Done. */
-function answerNotDamaged(screen: Screen, locale: keyof typeof localized) {
+async function answerNotDamaged(screen: Screen, locale: keyof typeof localized) {
   const names = localized[locale];
-  fireEvent.press(screen.getByRole("button", { name: new RegExp(`^${names.details}, `) }));
-  fireEvent.press(screen.getByRole("radio", { name: names.notDamaged }));
-  fireEvent.press(screen.getByRole("button", { name: names.done }));
+  await fireEvent.press(screen.getByRole("button", { name: new RegExp(`^${names.details}, `) }));
+  await fireEvent.press(screen.getByRole("radio", { name: names.notDamaged }));
+  await fireEvent.press(screen.getByRole("button", { name: names.done }));
 }
 
 beforeEach(() => {
@@ -165,9 +165,9 @@ describe("the section list of a published Listing (#589)", () => {
   it("saves a price change while preserving a locked legacy VIN", async () => {
     const api = createListingApi({ vin: "Corolla" });
     const screen = await openEdit();
-    changePrice(screen, "100000", "120000");
+    await changePrice(screen, "100000", "120000");
     expect(isDisabled(saveButton(screen))).toBe(false);
-    await act(async () => { fireEvent.press(saveButton(screen)); });
+    await act(async () => { void fireEvent.press(saveButton(screen)); });
     await waitFor(() => expect(api.patches).toHaveLength(1));
     expect(api.patches[0]).toMatchObject({ priceAmount: 120000 });
     expect(api.patches[0]).not.toHaveProperty("vin");
@@ -187,7 +187,11 @@ describe("the section list of a published Listing (#589)", () => {
 
     const photoRows: string[] = [];
     const observedScreen: { current?: Screen } = {};
-    const screen = renderMobile(
+    // RNTL 14's render settles every update before it returns, so the screen
+    // mounts by rerender once the observer can query it, from its first render.
+    const screen = await renderMobile(<></>);
+    observedScreen.current = screen;
+    await screen.rerender(
       <Profiler id="edit-photos" onRender={() => {
         const row = observedScreen.current?.queryAllByTestId("check-section")
           .find((item) => String(item.props.accessibilityLabel).startsWith("Photos, "));
@@ -196,7 +200,6 @@ describe("the section list of a published Listing (#589)", () => {
         <ToastProvider><EditListingScreen /></ToastProvider>
       </Profiler>,
     );
-    observedScreen.current = screen;
     await screen.findByRole("header", { name: "Edit listing" });
     expect(photoRows.length).toBeGreaterThan(0);
     expect(screen.queryByText("Photos: 4")).toBeNull();
@@ -262,7 +265,7 @@ describe("the locked Car row (#589)", () => {
     expect(screen.queryByRole("button", { name: /^Car, / })).toBeNull();
 
     // A tap on it opens nothing.
-    fireEvent.press(row);
+    await fireEvent.press(row);
     expect(screen.getByRole("header", { name: "Edit listing" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Done" })).toBeNull();
   });
@@ -283,15 +286,15 @@ describe("changing a section (#589)", () => {
     createListingApi();
     const screen = await openEdit();
 
-    openStep(screen, /^Price, .*Change$/, "Price");
+    await openStep(screen, /^Price, .*Change$/, "Price");
     // Headed by the edit and the car, with no position in the wizard.
     expect(screen.getByText("Edit listing")).toBeTruthy();
     expect(screen.getByText("Toyota Camry, 2020")).toBeTruthy();
     expect(screen.queryByText(/Step \d of 7/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
-    fireEvent.changeText(screen.getByDisplayValue("100,000"), "179000");
-    fireEvent.press(screen.getByRole("button", { name: "Done" }));
+    await fireEvent.changeText(screen.getByDisplayValue("100,000"), "179000");
+    await fireEvent.press(screen.getByRole("button", { name: "Done" }));
 
     expect(screen.getByRole("header", { name: "Edit listing" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Price, 179,000 TMT, Change" })).toBeTruthy();
@@ -301,11 +304,11 @@ describe("changing a section (#589)", () => {
     createListingApi();
     const screen = await openEdit();
 
-    openStep(screen, /^Price, .*Change$/, "Price");
-    fireEvent.changeText(screen.getByDisplayValue("100,000"), "");
+    await openStep(screen, /^Price, .*Change$/, "Price");
+    await fireEvent.changeText(screen.getByDisplayValue("100,000"), "");
     const done = screen.getByRole("button", { name: "Done" });
     expect(isDisabled(done)).toBe(true);
-    fireEvent.press(done);
+    await fireEvent.press(done);
 
     expect(screen.getByRole("header", { name: "Price" })).toBeTruthy();
   });
@@ -314,17 +317,17 @@ describe("changing a section (#589)", () => {
     createListingApi();
     const screen = await openEdit();
 
-    openStep(screen, /^Price, .*Change$/, "Price");
-    fireEvent.changeText(screen.getByDisplayValue("100,000"), "179000");
-    fireEvent.press(screen.getByRole("button", { name: "Back" }));
+    await openStep(screen, /^Price, .*Change$/, "Price");
+    await fireEvent.changeText(screen.getByDisplayValue("100,000"), "179000");
+    await fireEvent.press(screen.getByRole("button", { name: "Back" }));
 
     expect(screen.getByRole("header", { name: "Edit listing" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Price, 179,000 TMT, Change" })).toBeTruthy();
 
     // Left invalid, the step is asked for again and nothing can be saved.
-    openStep(screen, /^Price, .*Change$/, "Price");
-    fireEvent.changeText(screen.getByDisplayValue("179,000"), "");
-    fireEvent.press(screen.getByRole("button", { name: "Back" }));
+    await openStep(screen, /^Price, .*Change$/, "Price");
+    await fireEvent.changeText(screen.getByDisplayValue("179,000"), "");
+    await fireEvent.press(screen.getByRole("button", { name: "Back" }));
 
     expect(screen.getByRole("header", { name: "Edit listing" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Price, .*Fill in$/ })).toBeTruthy();
@@ -343,9 +346,9 @@ describe("Save changes (#589)", () => {
     vi.mocked(FileSystem.getInfoAsync).mockImplementation(async (uri) =>
       uri === photoDir ? photoRead : { exists: false, uri, isDirectory: false },
     );
-    const screen = renderMobile(<ToastProvider><EditListingScreen /></ToastProvider>);
+    const screen = await renderMobile(<ToastProvider><EditListingScreen /></ToastProvider>);
     await screen.findByRole("header", { name: "Edit listing" });
-    changePrice(screen, "100000", "179000");
+    await changePrice(screen, "100000", "179000");
     expect(screen.queryByText("Photos: 4")).toBeNull();
     expect(isDisabled(saveButton(screen))).toBe(true);
 
@@ -362,7 +365,7 @@ describe("Save changes (#589)", () => {
 
     await screen.findByText("Photos: 4");
     expect(isDisabled(saveButton(screen))).toBe(false);
-    await act(async () => { fireEvent.press(saveButton(screen)); });
+    await act(async () => { void fireEvent.press(saveButton(screen)); });
     await waitFor(() => expect(api.patches).toEqual([expect.objectContaining({ priceAmount: 179000 })]));
     expect(api.removed).toEqual([]);
   });
@@ -370,10 +373,10 @@ describe("Save changes (#589)", () => {
   it("asks to fill in a ready photo set when fewer than three photos remain (#736)", async () => {
     createListingApi();
     const screen = await openEdit();
-    openStep(screen, /^Photos, .*Change$/, "Photos");
-    fireEvent.press(screen.getByRole("button", { name: "Remove: Photo 4 of 4" }));
-    fireEvent.press(screen.getByRole("button", { name: "Remove: Photo 3 of 3" }));
-    fireEvent.press(screen.getByRole("button", { name: "Back" }));
+    await openStep(screen, /^Photos, .*Change$/, "Photos");
+    await fireEvent.press(screen.getByRole("button", { name: "Remove: Photo 4 of 4" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Remove: Photo 3 of 3" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Back" }));
 
     expect(screen.getByRole("button", { name: "Photos, Photos: 2, Fill in" })).toBeTruthy();
     expect(isDisabled(saveButton(screen))).toBe(true);
@@ -384,10 +387,10 @@ describe("Save changes (#589)", () => {
     const screen = await openEdit();
     expect(isDisabled(saveButton(screen))).toBe(true);
 
-    changePrice(screen, "100000", "179000");
+    await changePrice(screen, "100000", "179000");
     expect(isDisabled(saveButton(screen))).toBe(false);
 
-    changePrice(screen, "179000", "100000");
+    await changePrice(screen, "179000", "100000");
     expect(isDisabled(saveButton(screen))).toBe(true);
   });
 
@@ -395,7 +398,7 @@ describe("Save changes (#589)", () => {
     const api = createListingApi();
     const screen = await openEdit();
 
-    await act(async () => { fireEvent.press(saveButton(screen)); });
+    await act(async () => { void fireEvent.press(saveButton(screen)); });
 
     expect(api.patches).toEqual([]);
     expect(routerMock.replace).not.toHaveBeenCalled();
@@ -405,9 +408,9 @@ describe("Save changes (#589)", () => {
     createListingApi();
     const screen = await openEdit();
 
-    openStep(screen, /^Photos, .*Change$/, "Photos");
-    fireEvent.press(screen.getByRole("button", { name: "Remove: Photo 2 of 4" }));
-    fireEvent.press(screen.getByRole("button", { name: "Done" }));
+    await openStep(screen, /^Photos, .*Change$/, "Photos");
+    await fireEvent.press(screen.getByRole("button", { name: "Remove: Photo 2 of 4" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Done" }));
 
     expect(screen.getByRole("button", { name: "Photos, Photos: 3, Change" })).toBeTruthy();
     expect(isDisabled(saveButton(screen))).toBe(false);
@@ -416,9 +419,9 @@ describe("Save changes (#589)", () => {
   it("returns to the Listing with a Changes saved toast after a successful save", async () => {
     const api = createListingApi();
     const screen = await openEdit();
-    changePrice(screen, "100000", "179000");
+    await changePrice(screen, "100000", "179000");
 
-    await act(async () => { fireEvent.press(saveButton(screen)); });
+    await act(async () => { void fireEvent.press(saveButton(screen)); });
 
     await waitFor(() => expect(routerMock.replace).toHaveBeenCalledWith(`/(public)/listings/${id}`));
     expect(api.patches).toEqual([expect.objectContaining({ priceAmount: 179000 })]);
@@ -429,9 +432,9 @@ describe("Save changes (#589)", () => {
     const api = createListingApi();
     api.failEdits = 1;
     const screen = await openEdit();
-    changePrice(screen, "100000", "179000");
+    await changePrice(screen, "100000", "179000");
 
-    await act(async () => { fireEvent.press(saveButton(screen)); });
+    await act(async () => { void fireEvent.press(saveButton(screen)); });
 
     await screen.findByText("Couldn't save all changes. Try again.");
     expect(screen.getByRole("header", { name: "Edit listing" })).toBeTruthy();
@@ -439,11 +442,11 @@ describe("Save changes (#589)", () => {
     expect(routerMock.replace).not.toHaveBeenCalled();
     expect(screen.queryByText("Changes saved")).toBeNull();
     // Still unsaved: leaving asks first.
-    fireEvent.press(screen.getByRole("button", { name: "Close" }));
-    fireEvent.press(screen.getByRole("button", { name: "Keep editing" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Close" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Keep editing" }));
     expect(routerMock.back).not.toHaveBeenCalled();
 
-    await act(async () => { fireEvent.press(screen.getByRole("button", { name: "Retry" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Retry" })); });
 
     await waitFor(() => expect(routerMock.replace).toHaveBeenCalledWith(`/(public)/listings/${id}`));
     expect(api.patches).toEqual([expect.objectContaining({ priceAmount: 179000 })]);
@@ -453,16 +456,16 @@ describe("Save changes (#589)", () => {
     const api = createListingApi();
     api.failEdits = 1;
     const screen = await openEdit();
-    changePrice(screen, "100000", "179000");
-    await act(async () => { fireEvent.press(saveButton(screen)); });
+    await changePrice(screen, "100000", "179000");
+    await act(async () => { void fireEvent.press(saveButton(screen)); });
     await screen.findByText("Couldn't save all changes. Try again.");
 
     // Part of the edit may have reached the server (ADR-0025), so the seller can
     // still save, and leaving still asks.
-    changePrice(screen, "179000", "100000");
+    await changePrice(screen, "179000", "100000");
 
     expect(isDisabled(saveButton(screen))).toBe(false);
-    fireEvent.press(screen.getByRole("button", { name: "Close" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Close" }));
     expect(screen.getByText("Leave edit mode?")).toBeTruthy();
     expect(routerMock.back).not.toHaveBeenCalled();
   });
@@ -475,9 +478,9 @@ describe("Save changes (#589)", () => {
     api.failEdits = 1;
     const screen = await openEdit({ locale, heading });
     // One tap changes the Listing: the seller answers Damaged the other way.
-    answerNotDamaged(screen, locale as keyof typeof localized);
+    await answerNotDamaged(screen, locale as keyof typeof localized);
 
-    await act(async () => { fireEvent.press(screen.getByRole("button", { name: save })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: save })); });
 
     expect(await screen.findByText(message)).toBeTruthy();
   });
@@ -495,9 +498,9 @@ describe("returning from the contact phone code flow (#589)", () => {
       }] })),
     );
     const screen = await openEdit();
-    changePrice(screen, "100000", "179000");
-    openStep(screen, /^Contact, .*Change$/, "Contact");
-    fireEvent.press(screen.getByLabelText("Another number"));
+    await changePrice(screen, "100000", "179000");
+    await openStep(screen, /^Contact, .*Change$/, "Contact");
+    await fireEvent.press(screen.getByLabelText("Another number"));
     expect(routerMock.push).toHaveBeenCalledWith({
       pathname: "/listings/contact-phone",
       params: { returnPathname: `/listings/${id}/edit` },
@@ -506,7 +509,7 @@ describe("returning from the contact phone code flow (#589)", () => {
     // The code screen confirms the number and returns with router.dismissTo: the
     // same edit screen comes back into focus with the number as a route param.
     routeParams.confirmedContactPhone = confirmed;
-    screen.rerender(<ToastProvider><EditListingScreen /></ToastProvider>);
+    await screen.rerender(<ToastProvider><EditListingScreen /></ToastProvider>);
 
     expect(routerMock.setParams).toHaveBeenCalledWith({ confirmedContactPhone: undefined });
     expect(screen.getByRole("header", { name: "Contact" })).toBeTruthy();
@@ -514,17 +517,17 @@ describe("returning from the contact phone code flow (#589)", () => {
       expect(screen.getByLabelText(confirmed, { exact: false }).props.accessibilityState)
         .toMatchObject({ checked: true }),
     );
-    fireEvent.press(screen.getByRole("button", { name: "Done" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Done" }));
 
     expect(screen.getByRole("header", { name: "Edit listing" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Price, 179,000 TMT, Change" })).toBeTruthy();
     expect(screen.getByRole("button", { name: new RegExp(`^Contact, \\${confirmed}`) })).toBeTruthy();
     // Still unsaved: leaving asks first.
-    fireEvent.press(screen.getByRole("button", { name: "Close" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Close" }));
     expect(screen.getByText("Leave edit mode?")).toBeTruthy();
-    fireEvent.press(screen.getByRole("button", { name: "Keep editing" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Keep editing" }));
 
-    await act(async () => { fireEvent.press(saveButton(screen)); });
+    await act(async () => { void fireEvent.press(saveButton(screen)); });
 
     await waitFor(() => expect(routerMock.replace).toHaveBeenCalledWith(`/(public)/listings/${id}`));
     expect(api.patches).toEqual([
@@ -538,7 +541,7 @@ describe("leaving the edit (#589)", () => {
     createListingApi();
     const screen = await openEdit();
 
-    fireEvent.press(screen.getByRole("button", { name: "Close" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Close" }));
 
     expect(routerMock.back).toHaveBeenCalledOnce();
     expect(screen.queryByText("Leave edit mode?")).toBeNull();
@@ -547,21 +550,21 @@ describe("leaving the edit (#589)", () => {
   it("✕ with changes asks first; Keep editing stays and Leave closes", async () => {
     createListingApi();
     const screen = await openEdit();
-    changePrice(screen, "100000", "179000");
+    await changePrice(screen, "100000", "179000");
 
-    fireEvent.press(screen.getByRole("button", { name: "Close" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Close" }));
 
     expect(screen.getByText("Leave edit mode?")).toBeTruthy();
     expect(screen.getByText("Any unsaved changes will be lost.")).toBeTruthy();
     expect(routerMock.back).not.toHaveBeenCalled();
 
-    fireEvent.press(screen.getByRole("button", { name: "Keep editing" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Keep editing" }));
     expect(screen.queryByText("Leave edit mode?")).toBeNull();
     expect(screen.getByRole("button", { name: "Price, 179,000 TMT, Change" })).toBeTruthy();
     expect(routerMock.back).not.toHaveBeenCalled();
 
-    fireEvent.press(screen.getByRole("button", { name: "Close" }));
-    fireEvent.press(screen.getByRole("button", { name: "Leave" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Close" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Leave" }));
     expect(routerMock.back).toHaveBeenCalledOnce();
   });
 
@@ -579,7 +582,7 @@ describe("leaving the edit (#589)", () => {
   it("system back with changes asks first, and a second back keeps editing", async () => {
     createListingApi();
     const screen = await openEdit();
-    changePrice(screen, "100000", "179000");
+    await changePrice(screen, "100000", "179000");
 
     await act(async () => { pressHardwareBack(); });
     expect(screen.getByText("Leave edit mode?")).toBeTruthy();
@@ -593,7 +596,7 @@ describe("leaving the edit (#589)", () => {
   it("system back on a step returns to the list, not out of the edit", async () => {
     createListingApi();
     const screen = await openEdit();
-    openStep(screen, /^Price, .*Change$/, "Price");
+    await openStep(screen, /^Price, .*Change$/, "Price");
 
     await act(async () => { pressHardwareBack(); });
 
@@ -606,10 +609,10 @@ describe("leaving the edit (#589)", () => {
     const screen = await openEdit();
     expect(screenOptions.current.gestureEnabled).toBe(true);
 
-    changePrice(screen, "100000", "179000");
+    await changePrice(screen, "100000", "179000");
     expect(screenOptions.current.gestureEnabled).toBe(false);
 
-    changePrice(screen, "179000", "100000");
+    await changePrice(screen, "179000", "100000");
     expect(screenOptions.current.gestureEnabled).toBe(true);
   });
 
@@ -633,9 +636,9 @@ describe("leaving the edit (#589)", () => {
   ])("asks in %s", async (locale, heading, close, copy) => {
     createListingApi({ conditionDisclosure: { damaged: true } });
     const screen = await openEdit({ locale, heading });
-    answerNotDamaged(screen, locale as keyof typeof localized);
+    await answerNotDamaged(screen, locale as keyof typeof localized);
 
-    fireEvent.press(screen.getByRole("button", { name: close }));
+    await fireEvent.press(screen.getByRole("button", { name: close }));
 
     for (const text of copy) expect(screen.getByText(text)).toBeTruthy();
   });

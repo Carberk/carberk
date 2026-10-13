@@ -56,7 +56,7 @@ async function settle() {
 
 async function renderBar(count: number | null, { index = 0, locale = "en" } = {}) {
   if (count !== null) api.get.mockResolvedValue({ count });
-  const view = renderMobile(<AutoTmTabBar {...barProps(index)} />, { locale });
+  const view = await renderMobile(<AutoTmTabBar {...barProps(index)} />, { locale });
   await settle();
   return view;
 }
@@ -128,14 +128,14 @@ describe("Messages tab unread badge", () => {
     expect(view.getByText("5")).toBeTruthy();
 
     auth.viewer = null;
-    view.rerender(<AutoTmTabBar {...barProps(0)} />);
+    await view.rerender(<AutoTmTabBar {...barProps(0)} />);
     await settle();
     expect(view.queryByTestId("messages-tab-badge")).toBeNull();
 
     let answer: (value: { count: number }) => void = () => {};
     api.get.mockReturnValue(new Promise((resolve) => { answer = resolve; }));
     auth.viewer = { userId: "user-b" };
-    view.rerender(<AutoTmTabBar {...barProps(0)} />);
+    await view.rerender(<AutoTmTabBar {...barProps(0)} />);
     await settle();
     expect(view.queryByTestId("messages-tab-badge")).toBeNull();
 
@@ -173,7 +173,7 @@ describe("Messages tab unread badge", () => {
       const view = await renderBar(1, { index: 0 });
       api.get.mockClear().mockResolvedValue({ count: 3 });
 
-      view.rerender(<AutoTmTabBar {...barProps(CHAT)} />);
+      await view.rerender(<AutoTmTabBar {...barProps(CHAT)} />);
       await settle();
 
       expect(api.get).toHaveBeenCalledTimes(1);
@@ -184,7 +184,7 @@ describe("Messages tab unread badge", () => {
       const view = await renderBar(1, { index: 0 });
       api.get.mockClear();
 
-      view.rerender(<AutoTmTabBar {...barProps(1)} />);
+      await view.rerender(<AutoTmTabBar {...barProps(1)} />);
       await settle();
 
       expect(api.get).not.toHaveBeenCalled();

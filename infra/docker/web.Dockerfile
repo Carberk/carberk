@@ -11,15 +11,21 @@ FROM node:22-bookworm-slim AS base
 # migrate pre-deploy) would fail with EACCES trying to re-download pnpm.
 # Pinning a shared, world-writable location makes the prepared pnpm reachable
 # from every user in every stage.
+# pnpm 12 is a native executable: corepack fetches only its launcher, which
+# downloads the binary next to itself on first run. `pnpm --version` fetches it
+# here, as root and before the permissions are fixed, so no later stage or user
+# has to download it.
 ENV COREPACK_HOME=/opt/corepack
 RUN mkdir -p /opt/corepack && chmod 777 /opt/corepack \
-    && corepack enable && corepack prepare pnpm@9.12.0 --activate \
+    && corepack enable && corepack prepare pnpm@12.11.2 --activate \
+    && pnpm --version \
     && chmod -R a+rX /opt/corepack
 WORKDIR /app
 
 FROM base AS deps
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ openssl && rm -rf /var/lib/apt/lists/*
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json ./
+COPY patches ./patches
 COPY apps/api/package.json apps/api/package.json
 COPY apps/worker/package.json apps/worker/package.json
 COPY apps/admin/package.json apps/admin/package.json

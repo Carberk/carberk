@@ -1,4 +1,3 @@
-import { Image } from "expo-image";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -8,7 +7,7 @@ import { ConversationHeader } from "../../src/conversations/components/Conversat
 import { ConversationList } from "../../src/conversations/components/ConversationList";
 import { SellerBlock } from "../../src/listings/components/SellerBlock";
 import { server } from "../msw";
-import { first, renderMobile } from "../render";
+import { first, renderMobile, getAllHosts, getHost, queryHost, queryAllHosts } from "../render";
 
 // The three places one User sees another, fed by the real API client and
 // query hooks from an in-memory API. Every answer below is the JSON the API
@@ -23,10 +22,10 @@ const SELLER_ID = "00000000-0000-4000-8000-0000000000b2";
 const KEY_MARK = "M11.5 12H21M17 12v3M20 12v2.4M6.5 12h.01";
 const SUV_MARK = "M3 15V9.4C3 8.6 3.6 8 4.4 8H15l3.2 3.6 2.8.6V15";
 
-type View = ReturnType<typeof renderMobile>;
+type View = Awaited<ReturnType<typeof renderMobile>>;
 type Host = { type: unknown; props: Record<string, unknown>; parent: Host | null };
 
-const hosts = (view: View, type: string) => view.UNSAFE_queryAllByType(type as never) as unknown as Host[];
+const hosts = (view: View, type: string) => queryAllHosts(view.container, type) as unknown as Host[];
 const marks = (view: View) => hosts(view, "Path").map((path) => path.props.d);
 const personIcons = (view: View) => hosts(view, "Icon").filter((icon) => icon.props.name === "User");
 
@@ -99,7 +98,7 @@ describe("Seller block from GET /listings/:id", () => {
     ["tk", "Sürüji 2057", "Şahsy satyjy"],
   ])("shows a seller without a name their generated name and car mark in %s", async (locale, name, role) => {
     serve(`/listings/${LISTING_ID}`, listingJson(identityJson()));
-    const view = renderMobile(<ListingSeller />, { locale });
+    const view = await renderMobile(<ListingSeller />, { locale });
 
     expect(await view.findByText(name)).toBeTruthy();
     expect(view.getAllByText(role)).toHaveLength(1);
@@ -108,27 +107,27 @@ describe("Seller block from GET /listings/:id", () => {
 
   it("shows a seller's own name and photo", async () => {
     serve(`/listings/${LISTING_ID}`, listingJson(identityJson({ displayName: "Aman", avatarKey: "avatars/u2/original.webp" })));
-    const view = renderMobile(<ListingSeller />);
+    const view = await renderMobile(<ListingSeller />);
 
     expect(await view.findByText("Aman")).toBeTruthy();
     expect(view.getByText("Private seller")).toBeTruthy();
-    expect(view.UNSAFE_getByType(Image).props.source).toEqual({
+    expect(getHost(view.container, "Image").props.source).toEqual({
       uri: "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.webp?v=webp-natural-1",
     });
   });
 
   it("shows a seller's own name with their car mark when they have no photo", async () => {
     serve(`/listings/${LISTING_ID}`, listingJson(identityJson({ displayName: "Aman", avatarIndex: 2 })));
-    const view = renderMobile(<ListingSeller />);
+    const view = await renderMobile(<ListingSeller />);
 
     expect(await view.findByText("Aman")).toBeTruthy();
     expect(marks(view)[0]).toBe(SUV_MARK);
-    expect(view.UNSAFE_queryByType(Image)).toBeNull();
+    expect(queryHost(view.container, "Image")).toBeNull();
   });
 
   it("shows nothing of what the contract does not carry, such as a phone", async () => {
     serve(`/listings/${LISTING_ID}`, listingJson(identityJson({ displayName: "Aman", phone: "+99365000000" })));
-    const view = renderMobile(<ListingSeller />);
+    const view = await renderMobile(<ListingSeller />);
 
     await view.findByText("Aman");
     expect(JSON.stringify(view.queryClient.getQueryCache().getAll().map((query) => query.state.data))).not.toContain("+99365000000");
@@ -142,7 +141,7 @@ describe("Conversation header from GET /conversations/:id", () => {
     ["tk", "Sürüji 2057"],
   ])("shows a participant without a name their generated name and car mark in %s", async (locale, name) => {
     serve(`/conversations/${CONVERSATION_ID}`, { ...conversationJson(CONVERSATION_ID, identityJson()), sendRestriction: null });
-    const view = renderMobile(<OpenConversationHeader />, { locale });
+    const view = await renderMobile(<OpenConversationHeader />, { locale });
 
     expect(await view.findByText(name)).toBeTruthy();
     expect(marks(view)[0]).toBe(KEY_MARK);
@@ -153,10 +152,10 @@ describe("Conversation header from GET /conversations/:id", () => {
       ...conversationJson(CONVERSATION_ID, identityJson({ displayName: "Aman", avatarKey: "avatars/u2/original.webp" })),
       sendRestriction: null,
     });
-    const view = renderMobile(<OpenConversationHeader />);
+    const view = await renderMobile(<OpenConversationHeader />);
 
     expect(await view.findByText("Aman")).toBeTruthy();
-    expect(view.UNSAFE_getByType(Image).props.source).toEqual({
+    expect(getHost(view.container, "Image").props.source).toEqual({
       uri: "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.webp?v=webp-natural-1",
     });
   });
@@ -166,7 +165,7 @@ describe("Conversation header from GET /conversations/:id", () => {
       ...conversationJson(CONVERSATION_ID, identityJson({ deleted: true })),
       sendRestriction: null,
     });
-    const view = renderMobile(<OpenConversationHeader />);
+    const view = await renderMobile(<OpenConversationHeader />);
 
     expect(await view.findByText("Deleted user")).toBeTruthy();
     expect(personIcons(view)).toHaveLength(1);
@@ -187,13 +186,13 @@ describe("Messages rows from GET /conversations", () => {
       ],
       nextCursor: null,
     });
-    const view = renderMobile(<ConversationList />);
+    const view = await renderMobile(<ConversationList />);
 
     expect(await view.findByText("Driver 2057")).toBeTruthy();
     expect(view.getByText("Aman")).toBeTruthy();
     expect(view.getByText("Deleted user")).toBeTruthy();
     expect(marks(view)[0]).toBe(KEY_MARK);
-    const photo = first(view.UNSAFE_getAllByType(Image));
+    const photo = first(getAllHosts(view.container, "Image"));
     expect(photo.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/avatars/u2/thumbnail.webp?v=webp-natural-1" });
     expect(photo.props.style).toMatchObject({ width: 24, height: 24 });
     expect(personIcons(view)).toHaveLength(1);

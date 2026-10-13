@@ -18,9 +18,9 @@ vi.mock("../../src/api/listings/useListingCount", () => ({ useListingCount: () =
 beforeEach(() => { routerMock.canGoBack.mockReturnValue(true); });
 
 describe("Search parameters route", () => {
-  it("opens pre-filled with the filters carried in the route", () => {
+  it("opens pre-filled with the filters carried in the route", async () => {
     Object.assign(routeParams, { brandId: "toyota", modelIds: "camry,corolla", condition: "new", yearMin: "2019", priceMax: "250000", sort: "year_desc", returnToResults: "1" });
-    const view = renderMobile(<SearchParametersScreen />);
+    const view = await renderMobile(<SearchParametersScreen />);
     expect(view.getByText("Search parameters")).toBeTruthy();
     expect(view.getByRole("button", { name: "New Condition", selected: true })).toBeTruthy();
     expect(view.getByLabelText("Brand: Toyota")).toBeTruthy();
@@ -29,19 +29,19 @@ describe("Search parameters route", () => {
     expect(view.getByDisplayValue("250,000")).toBeTruthy();
   });
 
-  it("Show N returns to the Results below with the form's filters and the carried sort", () => {
+  it("Show N returns to the Results below with the form's filters and the carried sort", async () => {
     Object.assign(routeParams, { condition: "used", sort: "year_desc", returnToResults: "1" });
-    const view = renderMobile(<SearchParametersScreen />);
-    fireEvent.press(view.getByRole("button", { name: "Show 12 listings" }));
+    const view = await renderMobile(<SearchParametersScreen />);
+    await fireEvent.press(view.getByRole("button", { name: "Show 12 listings" }));
     expect(routerMock.dismissTo).toHaveBeenCalledWith({ pathname: "/(tabs)/(search)/results", params: expect.objectContaining({ condition: "used", sort: "year_desc" }) });
     expect(routerMock.push).not.toHaveBeenCalled();
   });
 
-  it("Back leaves the form without applying anything", () => {
+  it("Back leaves the form without applying anything", async () => {
     Object.assign(routeParams, { condition: "used", returnToResults: "1" });
-    const view = renderMobile(<SearchParametersScreen />);
-    fireEvent.press(view.getByRole("button", { name: "New Condition" }));
-    fireEvent.press(view.getByRole("button", { name: "Back" }));
+    const view = await renderMobile(<SearchParametersScreen />);
+    await fireEvent.press(view.getByRole("button", { name: "New Condition" }));
+    await fireEvent.press(view.getByRole("button", { name: "Back" }));
     expect(routerMock.back).toHaveBeenCalledOnce();
     expect(routerMock.dismissTo).not.toHaveBeenCalled();
     expect(routerMock.setParams).not.toHaveBeenCalled();

@@ -91,8 +91,8 @@ function confirmedEntry(phone: string, daysLeft: number): ListingsSchemas.Verifi
   };
 }
 
-function openContactStep(screen: ReturnType<typeof renderMobile>) {
-  fireEvent.press(screen.getByRole("button", { name: /^Contact, / }));
+async function openContactStep(screen: Awaited<ReturnType<typeof renderMobile>>) {
+  await fireEvent.press(screen.getByRole("button", { name: /^Contact, / }));
   expect(screen.getByRole("header", { name: "Contact" })).toBeTruthy();
 }
 
@@ -107,9 +107,9 @@ beforeEach(() => {
 });
 
 describe("Listing edit Contact step", () => {
-  it("shows the Listing's current number selected without a code, and Done needs none", () => {
-    const screen = renderMobile(<EditListingScreen />);
-    openContactStep(screen);
+  it("shows the Listing's current number selected without a code, and Done needs none", async () => {
+    const screen = await renderMobile(<EditListingScreen />);
+    await openContactStep(screen);
 
     expect(
       screen.getByLabelText("+99361234567", { exact: false }).props.accessibilityState,
@@ -118,17 +118,17 @@ describe("Listing edit Contact step", () => {
     expect(screen.getByText("Your sign-in phone. No code needed.")).toBeTruthy();
     expect(screen.getByLabelText("Another number")).toBeTruthy();
 
-    fireEvent.press(screen.getByRole("button", { name: "Done" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Done" }));
 
     expect(screen.getByRole("button", { name: "Save changes" })).toBeTruthy();
     expect(routerMock.push).not.toHaveBeenCalled();
   });
 
-  it("opens the number screen from Another number, returning to this edit", () => {
-    const screen = renderMobile(<EditListingScreen />);
-    openContactStep(screen);
+  it("opens the number screen from Another number, returning to this edit", async () => {
+    const screen = await renderMobile(<EditListingScreen />);
+    await openContactStep(screen);
 
-    fireEvent.press(screen.getByLabelText("Another number"));
+    await fireEvent.press(screen.getByLabelText("Another number"));
 
     expect(routerMock.push).toHaveBeenCalledWith({
       pathname: "/listings/contact-phone",
@@ -136,11 +136,11 @@ describe("Listing edit Contact step", () => {
     });
   });
 
-  it("selects the number the code flow confirmed and clears the route param", () => {
+  it("selects the number the code flow confirmed and clears the route param", async () => {
     fixture.confirmedPhones = [confirmedEntry(CONFIRMED_PHONE, 7)];
     routeParams.confirmedContactPhone = CONFIRMED_PHONE;
-    const screen = renderMobile(<EditListingScreen />);
-    openContactStep(screen);
+    const screen = await renderMobile(<EditListingScreen />);
+    await openContactStep(screen);
 
     expect(
       screen.getByLabelText(CONFIRMED_PHONE, { exact: false }).props.accessibilityState,
@@ -153,34 +153,34 @@ describe("Listing edit Contact step", () => {
     });
   });
 
-  it("selects the sign-in phone without a code", () => {
-    const screen = renderMobile(<EditListingScreen />);
-    openContactStep(screen);
+  it("selects the sign-in phone without a code", async () => {
+    const screen = await renderMobile(<EditListingScreen />);
+    await openContactStep(screen);
 
-    fireEvent.press(screen.getByLabelText("+99365000000", { exact: false }));
+    await fireEvent.press(screen.getByLabelText("+99365000000", { exact: false }));
 
     expect(
       screen.getByLabelText("+99365000000", { exact: false }).props.accessibilityState,
     ).toMatchObject({ checked: true });
-    fireEvent.press(screen.getByRole("button", { name: "Done" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Done" }));
     expect(screen.getByRole("button", { name: "Save changes" })).toBeTruthy();
     expect(routerMock.push).not.toHaveBeenCalled();
   });
 
-  it("does not leave the Contact step with a new number that is not confirmed", () => {
+  it("does not leave the Contact step with a new number that is not confirmed", async () => {
     // The number came back from the code flow but is not in the confirmed list.
     routeParams.confirmedContactPhone = CONFIRMED_PHONE;
-    const screen = renderMobile(<EditListingScreen />);
-    openContactStep(screen);
+    const screen = await renderMobile(<EditListingScreen />);
+    await openContactStep(screen);
 
     expect(screen.getByText("Confirmation expired. Tap to confirm again.")).toBeTruthy();
-    fireEvent.press(screen.getByRole("button", { name: "Done" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Done" }));
 
     expect(screen.getByRole("header", { name: "Contact" })).toBeTruthy();
     expect(screen.getByText("Confirm this number again or choose another")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
 
-    fireEvent.press(screen.getByLabelText(CONFIRMED_PHONE, { exact: false }));
+    await fireEvent.press(screen.getByLabelText(CONFIRMED_PHONE, { exact: false }));
     expect(routerMock.push).toHaveBeenCalledWith({
       pathname: "/listings/contact-phone",
       params: {
@@ -194,23 +194,23 @@ describe("Listing edit Contact step", () => {
   it("Back with a new number that is not confirmed asks for Contact on the list and keeps Save disabled", async () => {
     // The number came back from the code flow but is not in the confirmed list.
     routeParams.confirmedContactPhone = CONFIRMED_PHONE;
-    const screen = renderMobile(<EditListingScreen />);
-    openContactStep(screen);
+    const screen = await renderMobile(<EditListingScreen />);
+    await openContactStep(screen);
 
-    fireEvent.press(screen.getByRole("button", { name: "Back" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Back" }));
 
     expect(screen.getByRole("button", { name: /^Contact, .*Fill in$/ })).toBeTruthy();
     const save = screen.getByRole("button", { name: "Save changes" });
     expect(save.props.accessibilityState).toMatchObject({ disabled: true });
-    await act(async () => { fireEvent.press(save); });
+    await act(async () => { void fireEvent.press(save); });
     expect(fixture.save).not.toHaveBeenCalled();
   });
 
-  it("does not call a new number expired while the confirmed list is not known, and Done goes on", () => {
+  it("does not call a new number expired while the confirmed list is not known, and Done goes on", async () => {
     fixture.confirmedPhones = undefined;
     routeParams.confirmedContactPhone = CONFIRMED_PHONE;
-    const screen = renderMobile(<EditListingScreen />);
-    openContactStep(screen);
+    const screen = await renderMobile(<EditListingScreen />);
+    await openContactStep(screen);
 
     expect(
       screen.queryByText("Confirmation expired. Tap to confirm again."),
@@ -219,7 +219,7 @@ describe("Listing edit Contact step", () => {
       screen.getByRole("radio", { name: CONFIRMED_PHONE }).props.accessibilityState,
     ).toMatchObject({ checked: true });
 
-    fireEvent.press(screen.getByRole("button", { name: "Done" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Done" }));
 
     expect(
       screen.queryByText("Confirm this number again or choose another"),
@@ -235,14 +235,14 @@ describe("Listing edit Contact step", () => {
         new ApiError(ListingsSchemas.ListingsErrorCode.ContactPhoneNotConfirmed, 400),
       ),
     );
-    const screen = renderMobile(<EditListingScreen />);
+    const screen = await renderMobile(<EditListingScreen />);
     // The seller changes the number: Save changes sends nothing for an unchanged Listing (#589).
-    openContactStep(screen);
-    fireEvent.press(screen.getByLabelText("+99365000000", { exact: false }));
-    fireEvent.press(screen.getByRole("button", { name: "Done" }));
+    await openContactStep(screen);
+    await fireEvent.press(screen.getByLabelText("+99365000000", { exact: false }));
+    await fireEvent.press(screen.getByRole("button", { name: "Done" }));
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Save changes" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Save changes" }));
     });
 
     expect(screen.getByRole("header", { name: "Contact" })).toBeTruthy();
@@ -255,14 +255,14 @@ describe("Listing edit Contact step", () => {
     fixture.save.mockRejectedValue(
       new EditSessionError({ fields: "failed" }, "fields", new ApiError("INTERNAL", 500)),
     );
-    const screen = renderMobile(<EditListingScreen />);
+    const screen = await renderMobile(<EditListingScreen />);
     // The seller changes the number: Save changes sends nothing for an unchanged Listing (#589).
-    openContactStep(screen);
-    fireEvent.press(screen.getByLabelText("+99365000000", { exact: false }));
-    fireEvent.press(screen.getByRole("button", { name: "Done" }));
+    await openContactStep(screen);
+    await fireEvent.press(screen.getByLabelText("+99365000000", { exact: false }));
+    await fireEvent.press(screen.getByRole("button", { name: "Done" }));
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Save changes" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Save changes" }));
     });
 
     expect(fixture.save).toHaveBeenCalledOnce();

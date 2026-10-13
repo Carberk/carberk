@@ -55,7 +55,7 @@ afterEach(() => {
 describe("Onboarding group guard", () => {
   it("stays on the screen while onboarding is still owed", async () => {
     stored.flag = "pending";
-    renderMobile(<OnboardingLayout />);
+    await renderMobile(<OnboardingLayout />);
     await act(async () => {});
 
     expect(router.replace).not.toHaveBeenCalled();
@@ -63,7 +63,7 @@ describe("Onboarding group guard", () => {
 
   it("redirects to the tabs when onboarding was already completed", async () => {
     stored.flag = "true";
-    renderMobile(<OnboardingLayout />);
+    await renderMobile(<OnboardingLayout />);
     await act(async () => {});
 
     expect(router.replace).toHaveBeenCalledTimes(1);
@@ -73,7 +73,7 @@ describe("Onboarding group guard", () => {
   it("redirects to the tabs when a session exists, even with the flag still pending", async () => {
     stored.flag = "pending";
     secureStore.session = JSON.stringify(SESSION);
-    renderMobile(<OnboardingLayout />);
+    await renderMobile(<OnboardingLayout />);
     await act(async () => {});
 
     expect(router.replace).toHaveBeenCalledTimes(1);
@@ -83,7 +83,7 @@ describe("Onboarding group guard", () => {
   it("stays when storage cannot be read; the launch gate owns that failure path", async () => {
     stored.flag = "true";
     vi.mocked(AsyncStorage.getItem).mockRejectedValue(new Error("storage unavailable"));
-    renderMobile(<OnboardingLayout />);
+    await renderMobile(<OnboardingLayout />);
     await act(async () => {});
 
     expect(router.replace).not.toHaveBeenCalled();

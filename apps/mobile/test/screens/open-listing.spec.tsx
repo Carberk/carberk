@@ -78,7 +78,7 @@ describe("OpenListingConversationScreen behaviour", () => {
     post.mockResolvedValue(summary);
     routeParams.listingId = "00000000-0000-4000-8000-0000000000a1";
 
-    const screen = renderMobile(<OpenListingRoute />);
+    const screen = await renderMobile(<OpenListingRoute />);
 
     // The mutation's success reaches the screen on a later timer tick, not within one act().
     await waitFor(() =>

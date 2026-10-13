@@ -22,104 +22,104 @@ function destination(ready: boolean) {
 }
 
 /** Overlay laid out and its C-dot painted: the point where native launch may be released. */
-function paint(screen: ReturnType<typeof renderMobile>) {
-  fireEvent(screen.getByTestId("launch-entrance"), "layout");
-  fireEvent(screen.getByTestId("launch-c-dot"), "load");
+async function paint(screen: Awaited<ReturnType<typeof renderMobile>>) {
+  await fireEvent(screen.getByTestId("launch-entrance"), "layout");
+  await fireEvent(screen.getByTestId("launch-c-dot"), "load");
 }
 
 describe("cold-launch identity", () => {
-  it("holds the completed wordmark and credit for 450 ms even when the destination is ready", () => {
-    const screen = renderMobile(destination(true));
-    paint(screen);
-    act(() => vi.advanceTimersByTime(620));
-    act(() => vi.advanceTimersByTime(30));
-    act(() => vi.advanceTimersByTime(180));
+  it("holds the completed wordmark and credit for 450 ms even when the destination is ready", async () => {
+    const screen = await renderMobile(destination(true));
+    await paint(screen);
+    await act(() => vi.advanceTimersByTime(620));
+    await act(() => vi.advanceTimersByTime(30));
+    await act(() => vi.advanceTimersByTime(180));
     expect(screen.getByText("By Alpha Motors")).toBeTruthy();
-    act(() => vi.advanceTimersByTime(239));
+    await act(() => vi.advanceTimersByTime(239));
     expect(screen.getByText("By Alpha Motors")).toBeTruthy();
-    act(() => vi.advanceTimersByTime(1));
-    act(() => vi.advanceTimersByTime(180));
+    await act(() => vi.advanceTimersByTime(1));
+    await act(() => vi.advanceTimersByTime(180));
     expect(screen.queryByText("By Alpha Motors")).toBeNull();
   });
 
-  it("shows the exact credit while startup is pending and mounts the destination independently", () => {
-    const screen = renderMobile(destination(false));
+  it("shows the exact credit while startup is pending and mounts the destination independently", async () => {
+    const screen = await renderMobile(destination(false));
     expect(screen.getByText("By Alpha Motors")).toBeTruthy();
     expect(screen.getByText("Destination route")).toBeTruthy();
-    paint(screen);
-    act(() => vi.advanceTimersByTime(2000));
+    await paint(screen);
+    await act(() => vi.advanceTimersByTime(2000));
     expect(screen.getByText("By Alpha Motors")).toBeTruthy();
-    screen.rerender(destination(true));
-    act(() => vi.advanceTimersByTime(180));
+    await screen.rerender(destination(true));
+    await act(() => vi.advanceTimersByTime(180));
     expect(screen.queryByText("By Alpha Motors")).toBeNull();
   });
 
-  it("keeps native launch up on layout alone and releases it once the matching C-dot has loaded", () => {
-    const screen = renderMobile(destination(false));
+  it("keeps native launch up on layout alone and releases it once the matching C-dot has loaded", async () => {
+    const screen = await renderMobile(destination(false));
     expect(SplashScreen.hide).not.toHaveBeenCalled();
-    fireEvent(screen.getByTestId("launch-entrance"), "layout");
+    await fireEvent(screen.getByTestId("launch-entrance"), "layout");
     expect(SplashScreen.hide).not.toHaveBeenCalled();
-    fireEvent(screen.getByTestId("launch-c-dot"), "load");
+    await fireEvent(screen.getByTestId("launch-c-dot"), "load");
     expect(SplashScreen.hide).toHaveBeenCalledOnce();
-    fireEvent(screen.getByTestId("launch-entrance"), "layout");
-    fireEvent(screen.getByTestId("launch-c-dot"), "load");
-    act(() => vi.advanceTimersByTime(2000));
+    await fireEvent(screen.getByTestId("launch-entrance"), "layout");
+    await fireEvent(screen.getByTestId("launch-c-dot"), "load");
+    await act(() => vi.advanceTimersByTime(2000));
     expect(SplashScreen.hide).toHaveBeenCalledOnce();
   });
 
-  it("does not start the entrance before native launch is released", () => {
-    const screen = renderMobile(destination(true));
-    fireEvent(screen.getByTestId("launch-entrance"), "layout");
-    act(() => vi.advanceTimersByTime(250));
+  it("does not start the entrance before native launch is released", async () => {
+    const screen = await renderMobile(destination(true));
+    await fireEvent(screen.getByTestId("launch-entrance"), "layout");
+    await act(() => vi.advanceTimersByTime(250));
     expect(SplashScreen.hide).not.toHaveBeenCalled();
     expect(screen.getByText("By Alpha Motors")).toBeTruthy();
-    fireEvent(screen.getByTestId("launch-c-dot"), "load");
-    act(() => vi.advanceTimersByTime(1069));
+    await fireEvent(screen.getByTestId("launch-c-dot"), "load");
+    await act(() => vi.advanceTimersByTime(1069));
     expect(screen.getByText("By Alpha Motors")).toBeTruthy();
-    act(() => vi.advanceTimersByTime(1));
-    act(() => vi.advanceTimersByTime(180));
+    await act(() => vi.advanceTimersByTime(1));
+    await act(() => vi.advanceTimersByTime(180));
     expect(screen.queryByText("By Alpha Motors")).toBeNull();
   });
 
-  it("releases native launch when the C-dot fails to load", () => {
-    const screen = renderMobile(destination(false));
-    fireEvent(screen.getByTestId("launch-entrance"), "layout");
-    fireEvent(screen.getByTestId("launch-c-dot"), "error");
+  it("releases native launch when the C-dot fails to load", async () => {
+    const screen = await renderMobile(destination(false));
+    await fireEvent(screen.getByTestId("launch-entrance"), "layout");
+    await fireEvent(screen.getByTestId("launch-c-dot"), "error");
     expect(SplashScreen.hide).toHaveBeenCalledOnce();
   });
 
-  it("never hangs on native launch when the C-dot reports nothing", () => {
-    const screen = renderMobile(destination(true));
-    fireEvent(screen.getByTestId("launch-entrance"), "layout");
+  it("never hangs on native launch when the C-dot reports nothing", async () => {
+    const screen = await renderMobile(destination(true));
+    await fireEvent(screen.getByTestId("launch-entrance"), "layout");
     expect(SplashScreen.hide).not.toHaveBeenCalled();
-    act(() => vi.advanceTimersByTime(400));
+    await act(() => vi.advanceTimersByTime(400));
     expect(SplashScreen.hide).toHaveBeenCalledOnce();
-    act(() => vi.advanceTimersByTime(1070));
-    act(() => vi.advanceTimersByTime(180));
+    await act(() => vi.advanceTimersByTime(1070));
+    await act(() => vi.advanceTimersByTime(180));
     expect(screen.queryByText("By Alpha Motors")).toBeNull();
   });
 
-  it("enters once, does not restart on readiness changes, and leaves a settled destination", () => {
-    const screen = renderMobile(destination(false));
+  it("enters once, does not restart on readiness changes, and leaves a settled destination", async () => {
+    const screen = await renderMobile(destination(false));
     expect(screen.getByText("By Alpha Motors")).toBeTruthy();
-    paint(screen);
-    act(() => vi.advanceTimersByTime(1070));
-    screen.rerender(destination(true));
-    act(() => vi.advanceTimersByTime(180));
+    await paint(screen);
+    await act(() => vi.advanceTimersByTime(1070));
+    await screen.rerender(destination(true));
+    await act(() => vi.advanceTimersByTime(180));
     expect(screen.queryByText("By Alpha Motors")).toBeNull();
-    screen.rerender(destination(false));
-    screen.rerender(destination(true));
+    await screen.rerender(destination(false));
+    await screen.rerender(destination(true));
     expect(screen.queryByText("By Alpha Motors")).toBeNull();
     expect(screen.getByText("Destination route")).toBeTruthy();
   });
 
-  it("uses static identity for reduced motion and lets ready or failed startup leave immediately", () => {
+  it("uses static identity for reduced motion and lets ready or failed startup leave immediately", async () => {
     vi.mocked(useReduceMotion).mockReturnValue(true);
-    const screen = renderMobile(destination(false));
+    const screen = await renderMobile(destination(false));
     expect(screen.getByText("By Alpha Motors")).toBeTruthy();
     expect(screen.getByLabelText("Carberk")).toBeTruthy();
-    paint(screen);
-    screen.rerender(destination(true));
+    await paint(screen);
+    await screen.rerender(destination(true));
     expect(screen.queryByText("By Alpha Motors")).toBeNull();
     expect(screen.getByText("Destination route")).toBeTruthy();
     expect(vi.getTimerCount()).toBe(0);

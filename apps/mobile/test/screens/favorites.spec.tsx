@@ -1,9 +1,8 @@
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useFocusEffect } from "expo-router";
-import { ActivityIndicator } from "react-native";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { renderMobile, act, fireEvent, routerMock, within } from "../render";
+import { renderMobile, act, fireEvent, routerMock, within, getHost } from "../render";
 import { TAB_BAR_SPACE, clearsTabBar, listContentPaddingBottom, rootPaddingBottom } from "../tabBarClearance";
 import FavoritesScreen from "../../app/(tabs)/favorites";
 import { useAuthIntentStore } from "../../src/auth/intentStore";
@@ -67,7 +66,7 @@ async function settle() {
   for (let i = 0; i < 5; i += 1) await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
 }
 async function renderFavorites({ locale = "en" } = {}) {
-  const view = renderMobile(<ToastProvider><FavoritesScreen /></ToastProvider>, { locale });
+  const view = await renderMobile(<ToastProvider><FavoritesScreen /></ToastProvider>, { locale });
   await settle();
   return view;
 }
@@ -156,10 +155,10 @@ describe("Favorites screen", () => {
     let release: () => void = () => {};
     api.get.mockClear();
     api.get.mockImplementation((url: string) => new Promise((resolve) => { release = () => resolve(serve(url)); }));
-    fireEvent.press(heart(view, 0));
+    await fireEvent.press(heart(view, 0));
     const effect = vi.mocked(useFocusEffect).mock.calls.at(-1)?.[0];
     const blur = effect?.();
-    act(() => { if (typeof blur === "function") blur(); });
+    await act(() => { if (typeof blur === "function") blur(); });
     await settle();
     expect(api.get).toHaveBeenCalledWith("/favorites?limit=20&activeOnly=true", expect.any(Object));
     expect(view.getByTestId("favorites-list").props.refreshControl.props.refreshing).toBe(false);
@@ -173,7 +172,7 @@ describe("Favorites screen", () => {
       finish = () => (fails ? reject(new Error("Network request failed")) : resolve(serve(url)));
     }));
     const refreshing = () => view.getByTestId("favorites-list").props.refreshControl.props.refreshing;
-    act(() => { view.getByTestId("favorites-list").props.refreshControl.props.onRefresh(); });
+    await act(() => { view.getByTestId("favorites-list").props.refreshControl.props.onRefresh(); });
     expect(refreshing()).toBe(true);
     await act(async () => { finish(); });
     await settle();
@@ -183,7 +182,7 @@ describe("Favorites screen", () => {
   it("keeps the switch and the count while the other position loads", async () => {
     const view = await renderFavorites();
     api.get.mockImplementation(() => new Promise(() => {}));
-    fireEvent.press(view.getByRole("switch", { name: "Hide sold" }));
+    await fireEvent.press(view.getByRole("switch", { name: "Hide sold" }));
     await settle();
     expect(view.getByRole("switch", { name: "Hide sold" }).props.accessibilityState).toEqual(expect.objectContaining({ checked: false }));
     expect(view.getByTestId("favorites-count").props.children).toBe(4);
@@ -193,11 +192,11 @@ describe("Favorites screen", () => {
   it("lets the User switch back after the other position fails to load", async () => {
     const view = await renderFavorites();
     api.get.mockRejectedValue(new Error("Network request failed"));
-    fireEvent.press(view.getByRole("switch", { name: "Hide sold" }));
+    await fireEvent.press(view.getByRole("switch", { name: "Hide sold" }));
     await settle();
     expect(view.getByText("Something went wrong")).toBeTruthy();
     expect(view.getByTestId("favorites-count").props.children).toBe(4);
-    fireEvent.press(view.getByRole("switch", { name: "Hide sold" }));
+    await fireEvent.press(view.getByRole("switch", { name: "Hide sold" }));
     await settle();
     expect(cardTitles(view)).toEqual(["Toyota Camry, 2018", "Toyota RAV4, 2018"]);
   });
@@ -210,7 +209,7 @@ describe("Favorites screen", () => {
 
   it("lists every visible Favorite newest first, sold and removed ones dimmed without contact buttons, when Hide sold is off", async () => {
     const view = await renderFavorites();
-    fireEvent.press(view.getByRole("switch", { name: "Hide sold" }));
+    await fireEvent.press(view.getByRole("switch", { name: "Hide sold" }));
     await settle();
     expect(lastUrl()).toBe("/favorites?limit=20&activeOnly=false");
     expect(view.getByRole("switch", { name: "Hide sold" }).props.accessibilityState).toEqual(expect.objectContaining({ checked: false }));
@@ -223,9 +222,9 @@ describe("Favorites screen", () => {
 
   it("keeps the Hide sold choice while the app runs", async () => {
     const first = await renderFavorites();
-    fireEvent.press(first.getByRole("switch", { name: "Hide sold" }));
+    await fireEvent.press(first.getByRole("switch", { name: "Hide sold" }));
     await settle();
-    first.unmount();
+    await first.unmount();
     const again = await renderFavorites();
     expect(again.getByRole("switch", { name: "Hide sold" }).props.accessibilityState).toEqual(expect.objectContaining({ checked: false }));
   });
@@ -236,7 +235,7 @@ describe("Favorites screen", () => {
     expect(view.getByText("No active listings")).toBeTruthy();
     expect(view.getByText("Sold listings are hidden. Turn off “Hide sold” to see them.")).toBeTruthy();
     expect(view.getByRole("switch", { name: "Hide sold" })).toBeTruthy();
-    fireEvent.press(view.getByRole("button", { name: "Browse listings" }));
+    await fireEvent.press(view.getByRole("button", { name: "Browse listings" }));
     expect(routerMock.navigate).toHaveBeenCalledWith(HOME_HREF);
   });
 
@@ -247,7 +246,7 @@ describe("Favorites screen", () => {
     expect(view.getByText("Save listings to find them later")).toBeTruthy();
     expect(view.queryByRole("switch")).toBeNull();
     expect(view.queryByTestId("favorites-count")).toBeNull();
-    fireEvent.press(view.getByRole("button", { name: "Browse listings" }));
+    await fireEvent.press(view.getByRole("button", { name: "Browse listings" }));
     expect(routerMock.navigate).toHaveBeenCalledWith(HOME_HREF);
   });
 
@@ -263,7 +262,7 @@ describe("Favorites screen", () => {
     api.get.mockRejectedValueOnce(new Error("Network request failed"));
     const view = await renderFavorites();
     expect(view.getByText("Something went wrong")).toBeTruthy();
-    fireEvent.press(view.getByRole("button", { name: "Retry" }));
+    await fireEvent.press(view.getByRole("button", { name: "Retry" }));
     await settle();
     expect(cardTitles(view)).toEqual(["Toyota Camry, 2018", "Toyota RAV4, 2018"]);
   });
@@ -273,19 +272,19 @@ describe("Favorites screen", () => {
     const view = await renderFavorites();
     expect(view.getByText("Sign in to see your Favorites")).toBeTruthy();
     expect(view.getByText("Tap ♡ on a listing to save it here.")).toBeTruthy();
-    fireEvent.press(view.getByRole("button", { name: "Sign in" }));
+    await fireEvent.press(view.getByRole("button", { name: "Sign in" }));
     expect(useAuthIntentStore.getState().intent).toEqual(expect.objectContaining({ returnTo: "/(tabs)/favorites" }));
     expect(api.get).not.toHaveBeenCalled();
   });
 
   it("removes the card at once and Undo puts it back in place without a request", async () => {
     const view = await renderFavorites();
-    fireEvent.press(heart(view, 0));
+    await fireEvent.press(heart(view, 0));
     expect(cardTitles(view)).toEqual(["Toyota RAV4, 2018"]);
     expect(view.getByTestId("favorites-count").props.children).toBe(3);
     const toast = view.getByTestId("toast-viewport-above-tab-bar");
     expect(within(toast).getByText("Removed from Favorites")).toBeTruthy();
-    fireEvent.press(within(toast).getByRole("button", { name: "Undo" }));
+    await fireEvent.press(within(toast).getByRole("button", { name: "Undo" }));
     expect(cardTitles(view)).toEqual(["Toyota Camry, 2018", "Toyota RAV4, 2018"]);
     expect(view.getByTestId("favorites-count").props.children).toBe(4);
     expect(view.queryByText("Removed from Favorites")).toBeNull();
@@ -294,11 +293,11 @@ describe("Favorites screen", () => {
 
   it("lowers the hidden count when a removed-from-sale card is removed with Hide sold off", async () => {
     const view = await renderFavorites();
-    fireEvent.press(view.getByRole("switch", { name: "Hide sold" }));
+    await fireEvent.press(view.getByRole("switch", { name: "Hide sold" }));
     await settle();
-    fireEvent.press(heart(view, 3));
+    await fireEvent.press(heart(view, 3));
     expect(cardTitles(view)).toEqual(["Toyota Camry, 2018", "Toyota Prado, 2018", "Toyota RAV4, 2018"]);
-    fireEvent.press(view.getByRole("switch", { name: "Hide sold" }));
+    await fireEvent.press(view.getByRole("switch", { name: "Hide sold" }));
     await settle();
     expect(view.getByText("1 sold or removed from sale hidden")).toBeTruthy();
   });
@@ -306,7 +305,7 @@ describe("Favorites screen", () => {
   it("deletes the Favorite on the server when the toast ends", async () => {
     const view = await renderFavorites();
     vi.useFakeTimers();
-    fireEvent.press(heart(view, 0));
+    await fireEvent.press(heart(view, 0));
     await act(async () => { await vi.advanceTimersByTimeAsync(2900); });
     expect(api.delete).not.toHaveBeenCalled();
     expect(view.getByText("Removed from Favorites")).toBeTruthy();
@@ -320,8 +319,8 @@ describe("Favorites screen", () => {
 
   it("deletes the earlier Favorite at once when another card is removed", async () => {
     const view = await renderFavorites();
-    fireEvent.press(heart(view, 0));
-    fireEvent.press(heart(view, 0));
+    await fireEvent.press(heart(view, 0));
+    await fireEvent.press(heart(view, 0));
     await settle();
     expect(api.delete).toHaveBeenCalledTimes(1);
     expect(api.delete).toHaveBeenCalledWith("/listings/camry-1/favorite", expect.any(Object));
@@ -330,10 +329,10 @@ describe("Favorites screen", () => {
 
   it("deletes a pending removal when the screen loses focus", async () => {
     const view = await renderFavorites();
-    fireEvent.press(heart(view, 0));
+    await fireEvent.press(heart(view, 0));
     const effect = vi.mocked(useFocusEffect).mock.calls.at(-1)?.[0];
     const blur = effect?.();
-    act(() => { if (typeof blur === "function") blur(); });
+    await act(() => { if (typeof blur === "function") blur(); });
     await settle();
     expect(api.delete).toHaveBeenCalledWith("/listings/camry-1/favorite", expect.any(Object));
     expect(view.queryByText("Removed from Favorites")).toBeNull();
@@ -342,10 +341,10 @@ describe("Favorites screen", () => {
   it("brings the card back and shows an error toast when the delete fails", async () => {
     api.delete.mockRejectedValue(new Error("Network request failed"));
     const view = await renderFavorites();
-    fireEvent.press(heart(view, 0));
+    await fireEvent.press(heart(view, 0));
     const effect = vi.mocked(useFocusEffect).mock.calls.at(-1)?.[0];
     const blur = effect?.();
-    act(() => { if (typeof blur === "function") blur(); });
+    await act(() => { if (typeof blur === "function") blur(); });
     await settle();
     expect(cardTitles(view)).toEqual(["Toyota Camry, 2018", "Toyota RAV4, 2018"]);
     expect(view.getByText("Could not remove from Favorites. Try again.")).toBeTruthy();
@@ -357,19 +356,19 @@ describe("Favorites screen", () => {
     server[key] = [page([camry], { total: 4, inactive: 2 }, "1"), page([rav4], { total: 4, inactive: 2 })];
     const view = await renderFavorites();
     const list = view.getByTestId("favorites-list");
-    act(() => { list.props.onEndReached(); });
+    await act(() => { list.props.onEndReached(); });
     await settle();
     expect(lastUrl()).toBe(`/favorites?limit=20&activeOnly=${hideSold}&cursor=1`);
     expect(cardTitles(view)).toEqual(["Toyota Camry, 2018", "Toyota RAV4, 2018"]);
     api.get.mockClear();
-    act(() => { view.getByTestId("favorites-list").props.refreshControl.props.onRefresh(); });
+    await act(() => { view.getByTestId("favorites-list").props.refreshControl.props.onRefresh(); });
     await settle();
     expect(api.get).toHaveBeenCalledWith(`/favorites?limit=20&activeOnly=${hideSold}`, expect.any(Object));
   });
 
   it("opens Listing detail from a card", async () => {
     const view = await renderFavorites();
-    fireEvent.press(view.getByRole("button", { name: /Toyota Camry, 2018/ }));
+    await fireEvent.press(view.getByRole("button", { name: /Toyota Camry, 2018/ }));
     expect(routerMock.push).toHaveBeenCalledWith("/(public)/listings/camry-1");
   });
 
@@ -391,7 +390,7 @@ describe("Favorites screen", () => {
 describe("Favorites under the glass tab bar", () => {
   it("runs the list under the bar and ends it with the bar's space, so the glass shows the cards", async () => {
     const view = await renderFavorites();
-    expect(rootPaddingBottom(view.UNSAFE_root as never)).toBe(0);
+    expect(rootPaddingBottom(view.container as never)).toBe(0);
     expect(listContentPaddingBottom(view.getByTestId("favorites-list") as never)).toBe(TAB_BAR_SPACE + 16);
   });
 
@@ -399,15 +398,15 @@ describe("Favorites under the glass tab bar", () => {
     server.active = [page([], { total: 0, inactive: 0 })];
     const empty = await renderFavorites();
     expect(clearsTabBar(empty.getByText("No favorites yet") as never)).toBe(true);
-    empty.unmount();
+    await empty.unmount();
 
     state.auth = false;
     const signedOut = await renderFavorites();
     expect(clearsTabBar(signedOut.getByRole("button", { name: "Sign in" }) as never)).toBe(true);
-    signedOut.unmount();
+    await signedOut.unmount();
 
     state.auth = null;
     const loading = await renderFavorites();
-    expect(clearsTabBar(loading.UNSAFE_getByType(ActivityIndicator) as never)).toBe(true);
+    expect(clearsTabBar(getHost(loading.container, "ActivityIndicator") as never)).toBe(true);
   });
 });

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WizardSchemas } from "@auto-tm/contracts";
 
-import { fireEvent, renderMobile, routeParams } from "../render";
+import { fireEvent, renderMobile, routeParams, first } from "../render";
 import SellScreen from "../../app/(tabs)/sell";
 
 const fixture = vi.hoisted(() => ({
@@ -57,10 +57,9 @@ beforeEach(() => {
 
 // A New draft with a complete Car counts Details as complete (ADR-0080) and
 // resumes past it, so the seller returns to Details with Back.
-function backToDetails(screen: ReturnType<typeof renderMobile>) {
+async function backToDetails(screen: Awaited<ReturnType<typeof renderMobile>>) {
   expect(screen.getByText("Photos")).toBeTruthy();
-  const [back] = screen.getAllByRole("button", { name: "Back" });
-  fireEvent.press(back);
+  await fireEvent.press(first(screen.getAllByRole("button", { name: "Back" })));
   fixture.forceSave.mockClear();
   expect(screen.getByText("Details and condition")).toBeTruthy();
 }
@@ -68,12 +67,12 @@ function backToDetails(screen: ReturnType<typeof renderMobile>) {
 const required = "Answer whether the car is damaged or needs repair";
 
 describe("Sell Details footer and resumed New persistence", () => {
-  it("pressing Continue after New to Used reveals errors and stays on Details", () => {
-    const screen = renderMobile(<SellScreen />);
-    backToDetails(screen);
-    fireEvent.press(screen.getByRole("button", { name: "Used" }));
+  it("pressing Continue after New to Used reveals errors and stays on Details", async () => {
+    const screen = await renderMobile(<SellScreen />);
+    await backToDetails(screen);
+    await fireEvent.press(screen.getByRole("button", { name: "Used" }));
     expect(screen.queryByText(required)).toBeNull();
-    fireEvent.press(screen.getByRole("button", { name: "Continue" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Continue" }));
     expect(screen.getByText(required)).toBeTruthy();
     expect(screen.getByText("Mileage is required for used cars")).toBeTruthy();
     expect(screen.getByText("Details and condition")).toBeTruthy();
@@ -81,15 +80,15 @@ describe("Sell Details footer and resumed New persistence", () => {
     expect(fixture.forceSave).not.toHaveBeenCalled();
   });
 
-  it.each([undefined, { knownIssuesText: "Paint chip" }])("autosaves and continues a resumed New draft with missing answer %j as false", (disclosure) => {
+  it.each([undefined, { knownIssuesText: "Paint chip" }])("autosaves and continues a resumed New draft with missing answer %j as false", async (disclosure) => {
     fixture.payload.conditionDisclosure = disclosure;
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
     expect(fixture.save).toHaveBeenLastCalledWith(expect.objectContaining({
       conditionDisclosure: { ...disclosure, damaged: false },
     }));
-    backToDetails(screen);
+    await backToDetails(screen);
     expect(screen.queryByRole("radio")).toBeNull();
-    fireEvent.press(screen.getByRole("button", { name: "Continue" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Continue" }));
     expect(fixture.forceSave).toHaveBeenLastCalledWith(expect.objectContaining({
       conditionDisclosure: { ...disclosure, damaged: false },
     }));
@@ -98,13 +97,13 @@ describe("Sell Details footer and resumed New persistence", () => {
     expect(screen.getByRole("button", { name: "Continue", disabled: true })).toBeTruthy();
   });
 
-  it("Continue explains untouched invalid Engine power and stays on Details", () => {
+  it("Continue explains untouched invalid Engine power and stays on Details", async () => {
     fixture.payload = { ...fixture.payload, condition: "used", mileageKm: 1000,
       conditionDisclosure: { damaged: false }, enginePower: 0 };
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
     expect(screen.getByText("Power")).toBeTruthy();
     expect(screen.queryByText("Engine power must be greater than zero")).toBeNull();
-    fireEvent.press(screen.getByRole("button", { name: "Continue", disabled: false }));
+    await fireEvent.press(screen.getByRole("button", { name: "Continue", disabled: false }));
     expect(screen.getByText("Engine power must be greater than zero")).toBeTruthy();
     expect(screen.getByText("Details and condition")).toBeTruthy();
     expect(screen.getByDisplayValue("0")).toBeTruthy();
@@ -113,21 +112,21 @@ describe("Sell Details footer and resumed New persistence", () => {
     expect(screen.queryByText("Mileage is required for used cars")).toBeNull();
   });
 
-  it("preserves and rejects a legacy explicit damaged New answer on Continue", () => {
+  it("preserves and rejects a legacy explicit damaged New answer on Continue", async () => {
     fixture.payload.conditionDisclosure = { damaged: true };
-    const screen = renderMobile(<SellScreen />);
-    fireEvent.press(screen.getByRole("button", { name: "Continue", disabled: false }));
+    const screen = await renderMobile(<SellScreen />);
+    await fireEvent.press(screen.getByRole("button", { name: "Continue", disabled: false }));
     expect(screen.getByText("A new car can't be damaged. Choose Used.")).toBeTruthy();
     expect(screen.getByText("Details and condition")).toBeTruthy();
     expect(fixture.forceSave).not.toHaveBeenCalled();
     expect(fixture.save).toHaveBeenLastCalledWith(expect.objectContaining({ conditionDisclosure: { damaged: true } }));
   });
 
-  it("keeps a pending discard from enabling the specs footer", () => {
+  it("keeps a pending discard from enabling the specs footer", async () => {
     fixture.pending = true;
     fixture.payload = { ...fixture.payload, condition: "used" };
-    const screen = renderMobile(<SellScreen />);
-    fireEvent.press(screen.getByRole("button", { name: "Continue", disabled: true }));
+    const screen = await renderMobile(<SellScreen />);
+    await fireEvent.press(screen.getByRole("button", { name: "Continue", disabled: true }));
     expect(fixture.forceSave).not.toHaveBeenCalled();
     expect(screen.getByText("Details and condition")).toBeTruthy();
   });

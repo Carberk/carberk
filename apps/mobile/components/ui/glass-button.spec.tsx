@@ -9,8 +9,8 @@ import { Text } from "./text";
 // Off iOS 26 (what a spec renders, see test/native-setup.ts) a glass button is
 // a solid capsule with the floating shadow.
 describe("GlassButton without the system glass", () => {
-  it("draws Call as a solid brand capsule and Message as a solid tonal capsule", () => {
-    const screen = renderMobile(<>
+  it("draws Call as a solid brand capsule and Message as a solid tonal capsule", async () => {
+    const screen = await renderMobile(<>
       <GlassButton tone="brand" onPress={vi.fn()} accessibilityLabel="Call"><Text>Call</Text></GlassButton>
       <GlassButton onPress={vi.fn()} accessibilityLabel="Message"><Text>Message</Text></GlassButton>
     </>);
@@ -26,23 +26,23 @@ describe("GlassButton without the system glass", () => {
     }
   });
 
-  it("passes layout classes and presses through", () => {
+  it("passes layout classes and presses through", async () => {
     const onPress = vi.fn();
-    const screen = renderMobile(<GlassButton className="flex-1" onPress={onPress} accessibilityLabel="Go"><Text>Go</Text></GlassButton>);
+    const screen = await renderMobile(<GlassButton className="flex-1" onPress={onPress} accessibilityLabel="Go"><Text>Go</Text></GlassButton>);
 
-    fireEvent.press(screen.getByRole("button", { name: "Go" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Go" }));
     expect(onPress).toHaveBeenCalledOnce();
     expect(screen.getByRole("button", { name: "Go" }).props.className).toMatch(/\bflex-1\b/);
   });
 });
 
 describe("StickyActionBar", () => {
-  it("floats its buttons with no material of its own behind them", () => {
-    const screen = renderMobile(<StickyActionBar testID="bar">
+  it("floats its buttons with no material of its own behind them", async () => {
+    const screen = await renderMobile(<StickyActionBar testID="bar">
       <GlassButton onPress={vi.fn()} accessibilityLabel="All filters"><Text>All filters</Text></GlassButton>
     </StickyActionBar>);
 
-    const materials = screen.UNSAFE_root.findAll((node: { props: { className?: unknown } }) =>
+    const materials = screen.container.queryAll((node: { props: { className?: unknown } }) =>
       typeof node.props.className === "string" && /\bbg-glass\b|\bbg-glass\/|rounded-3xl/.test(node.props.className));
     expect(materials).toHaveLength(0);
     expect(screen.getByRole("button", { name: "All filters" })).toBeTruthy();

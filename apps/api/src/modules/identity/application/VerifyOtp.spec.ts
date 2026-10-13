@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
 import { createHash, randomUUID } from "node:crypto";
 import { UserSuspendedError } from "../domain/UserSuspendedError";
 import { InMemoryReservedPhoneAttemptLedger } from "./testing/InMemoryReservedPhoneAttemptLedger";
@@ -362,7 +362,7 @@ interface MakeUseCaseOpts {
   sessionRepo?: SessionRepository;
   hasher?: PasswordHasherPort;
   clock?: ClockPort;
-  eventBus?: { emit: ReturnType<typeof vi.fn> };
+  eventBus?: { emit: Mock<(event: string, payload: unknown) => void> };
   reviewerBypassConfig?: ReviewerOtpBypassConfig;
   constantTimeComparator?: ConstantTimeComparatorPort;
   random?: RandomSourcePort;
@@ -407,7 +407,7 @@ describe("VerifyOtp", () => {
   let sessionRepo: FakeSessionRepository;
   let hasher: FakePasswordHasher;
   let clock: FakeClock;
-  let eventBus: { emit: ReturnType<typeof vi.fn> };
+  let eventBus: { emit: Mock<(event: string, payload: unknown) => void> };
   let constantTimeComparator: FakeConstantTimeComparator;
 
   beforeEach(() => {

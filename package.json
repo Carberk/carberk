@@ -5,10 +5,10 @@
   "description": "AutoTM \u2014 Turkmenistan car marketplace (rewrite). Monorepo for API, web, admin, mobile, SMS gateway, phone agent, worker.",
   "license": "UNLICENSED",
   "engines": {
-    "node": ">=22.11.0",
-    "pnpm": ">=9.0.0"
+    "node": ">=22.13.0",
+    "pnpm": "^12.11.2"
   },
-  "packageManager": "pnpm@9.12.0",
+  "packageManager": "pnpm@12.11.2",
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
@@ -49,17 +49,13 @@
     "test:native-session": "node --test scripts/native-session*.test.mjs"
   },
   "devDependencies": {
-    "tsx": "^4.19.2",
-    "turbo": "^2.3.3",
-    "typescript": "^5.7.3"
+    "@typescript/native": "catalog:",
+    "tsx": "catalog:",
+    "turbo": "^2.11.7",
+    "typescript": "catalog:"
   },
   "workspaces": [
     "apps/*",
     "packages/*"
-  ],
-  "pnpm": {
-    "overrides": {
-      "react-native-css-interop": "0.2.4"
-    }
-  }
+  ]
 }

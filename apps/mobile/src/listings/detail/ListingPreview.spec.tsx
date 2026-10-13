@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Image } from "react-native";
 
 import { useAuthIntentStore } from "../../auth/intentStore";
-import { fireEvent, renderMobile } from "../../../test/render";
+import { fireEvent, renderMobile, getHost } from "../../../test/render";
 import { summaryFixture } from "../../../test/fixtures/listing";
 
 import { ListingPreview } from "./ListingPreview";
@@ -45,8 +44,8 @@ function preview(
 }
 
 describe("Listing detail preview, from the tapped card's cached data", () => {
-  it("shows the card's photo, title, price, spec line, city and date at once", () => {
-    const screen = preview();
+  it("shows the card's photo, title, price, spec line, city and date at once", async () => {
+    const screen = await preview();
 
     expect(screen.getByText("Toyota Camry, 2020")).toBeTruthy();
     expect(screen.getByText("35,000 TMT")).toBeTruthy();
@@ -55,38 +54,38 @@ describe("Listing detail preview, from the tapped card's cached data", () => {
     expect(screen.getByText("1 / 12")).toBeTruthy();
     // The card already decoded the `list` size, so it shows at once while the
     // gallery's `detail` size loads behind it (#816).
-    const photo = screen.UNSAFE_getByType(Image).props;
+    const photo = getHost(screen.container, "Image").props;
     expect(photo.placeholder).toEqual({ uri: "https://media.autotm.tm/listing-photos/listing-0/list.webp?v=webp-natural-1" });
     expect(photo.placeholderContentFit).toBe("cover");
     expect(photo.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/listing-0/detail.webp?v=webp-natural-1" });
     expect(photo.priority).toBe("high");
   });
 
-  it("loads the rest behind skeletons and offers nothing it does not have yet", () => {
-    const screen = preview();
+  it("loads the rest behind skeletons and offers nothing it does not have yet", async () => {
+    const screen = await preview();
 
     expect(screen.getByTestId("detail-skeleton-body")).toBeTruthy();
     for (const heading of ["Specifications", "Description", "Seller", "Ask the seller"])
       expect(screen.queryByText(heading)).toBeNull();
   });
 
-  it("keeps Call and Message disabled until the full detail arrives", () => {
-    const screen = preview();
+  it("keeps Call and Message disabled until the full detail arrives", async () => {
+    const screen = await preview();
 
     expect(screen.getByRole("button", { name: "Call", disabled: true })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Message", disabled: true })).toBeTruthy();
   });
 
-  it("goes back from the preview", () => {
-    const screen = preview();
+  it("goes back from the preview", async () => {
+    const screen = await preview();
 
-    fireEvent.press(screen.getByRole("button", { name: "Back" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Back" }));
 
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
-  it("drops fields the card does not have, with no placeholder", () => {
-    const screen = preview({
+  it("drops fields the card does not have, with no placeholder", async () => {
+    const screen = await preview({
       mileageKm: undefined,
       transmissionId: undefined,
       engineTypeId: undefined,
@@ -98,29 +97,29 @@ describe("Listing detail preview, from the tapped card's cached data", () => {
     expect(screen.getByText("20 Sep · Ashgabat")).toBeTruthy();
   });
 
-  it("falls back to the No photos tile for a Listing without photos", () => {
-    const screen = preview({ photoKeys: [], coverMediaKey: undefined, photoCount: 0 });
+  it("falls back to the No photos tile for a Listing without photos", async () => {
+    const screen = await preview({ photoKeys: [], coverMediaKey: undefined, photoCount: 0 });
 
     expect(screen.getByText("No photos")).toBeTruthy();
     expect(screen.queryByText(/\d+ \/ \d+/)).toBeNull();
   });
 
-  it("shows no contact bar to the owner or on a closed Listing", () => {
+  it("shows no contact bar to the owner or on a closed Listing", async () => {
     for (const screen of [
-      preview({}, { isOwner: true }),
-      preview({ status: "sold" }),
-      preview({ status: "archived" }),
+      (await preview({}, { isOwner: true })),
+      (await preview({ status: "sold" })),
+      (await preview({ status: "archived" })),
     ]) {
       expect(screen.queryByRole("button", { name: "Call" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Message" })).toBeNull();
     }
   });
 
-  it("leaves a replayed Message to the detail bar that replaces it", () => {
+  it("leaves a replayed Message to the detail bar that replaces it", async () => {
     const summary = summaryFixture();
     useAuthIntentStore.setState({ replayAction: { kind: "message", listingId: summary.id } });
 
-    preview();
+    await preview();
 
     expect(useAuthIntentStore.getState().replayAction).not.toBeNull();
     useAuthIntentStore.setState({ replayAction: null });

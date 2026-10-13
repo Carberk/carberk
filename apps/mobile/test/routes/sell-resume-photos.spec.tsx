@@ -98,7 +98,7 @@ vi.mock("../../src/api/catalog/useModels", () => ({ useModels: () => ({ data: { 
 const { id, photoId, savedPhoto, savedPhotos } = fixture;
 const LATER_STEPS = ["photos", "price", "location", "contact"];
 
-const publishButton = (screen: ReturnType<typeof renderMobile>) => screen.getByRole("button", { name: "Publish" });
+const publishButton = (screen: Awaited<ReturnType<typeof renderMobile>>) => screen.getByRole("button", { name: "Publish" });
 const savedPayloads = () => fixture.patch.mock.calls.map(([request]) => request.payload);
 // Longer than the autosave debounce, so a save the screen asked for has gone out.
 const pause = (ms: number) => act(async () => { await new Promise((resolve) => setTimeout(resolve, ms)); });
@@ -107,9 +107,9 @@ const letAutosaveRun = () => pause(700);
 // The seller is on the Sell tab, where the queue has settled with no draft open,
 // and taps Continue on the latest draft.
 async function openDraftFromSellTab() {
-  const screen = renderMobile(<SellScreen />);
+  const screen = await renderMobile(<SellScreen />);
   await pause(20);
-  fireEvent.press(screen.getByRole("button", { name: "Continue" }));
+  await fireEvent.press(screen.getByRole("button", { name: "Continue" }));
   return screen;
 }
 
@@ -143,7 +143,7 @@ describe("Sell wizard, resuming a draft whose saved photo is still staged on the
       expect(payload.validatedSteps).toEqual(expect.arrayContaining(LATER_STEPS));
     }
 
-    fireEvent.press(publishButton(screen));
+    await fireEvent.press(publishButton(screen));
     await waitFor(() => expect(fixture.mutation.mutateAsync).toHaveBeenCalledWith(id));
     for (const payload of savedPayloads()) expect(payload.photos).toEqual(savedPhotos);
   });

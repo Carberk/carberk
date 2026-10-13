@@ -29,20 +29,20 @@ beforeEach(() => {
   Object.assign(routeParams, { brandId: "toyota", modelIds: "camry", returnToResults: "1", resultsState: JSON.stringify({ ...otherFilters, priceMin: "70000", priceMax: "120000", yearMin: "2018", yearMax: "2020", brandId: "toyota", modelIds: "camry", sort: "price_asc" }) });
 });
 describe("Results picker route count wiring", () => {
-  it("counts the same retained Results filters behind Show N and per-model rows", () => {
-    const view = renderMobile(<ModelPickerScreen />);
+  it("counts the same retained Results filters behind Show N and per-model rows", async () => {
+    const view = await renderMobile(<ModelPickerScreen />);
     expect(view.getByText("Show 2 listings")).toBeTruthy();
     expect(counts.total).toHaveBeenLastCalledWith({ filters: expect.objectContaining({ ...otherFilters, brandId: "toyota", modelIds: ["camry"] }) });
     expect(counts.models).toHaveBeenLastCalledWith({ filters: expect.objectContaining({ ...otherFilters, brandId: "toyota" }) });
   });
-  it("counts popular brands against the same retained non-model filters", () => {
-    renderMobile(<BrandPickerScreen />);
+  it("counts popular brands against the same retained non-model filters", async () => {
+    await renderMobile(<BrandPickerScreen />);
     expect(counts.brands).toHaveBeenLastCalledWith({ filters: expect.objectContaining(otherFilters) });
   });
-  it("never sends the Results sort order to the brand or model counts endpoints, which reject it", () => {
-    renderMobile(<ModelPickerScreen />);
+  it("never sends the Results sort order to the brand or model counts endpoints, which reject it", async () => {
+    await renderMobile(<ModelPickerScreen />);
     expect(counts.models.mock.lastCall?.[0].filters).not.toHaveProperty("sort");
-    renderMobile(<BrandPickerScreen />);
+    await renderMobile(<BrandPickerScreen />);
     expect(counts.brands.mock.lastCall?.[0].filters).not.toHaveProperty("sort");
   });
 });

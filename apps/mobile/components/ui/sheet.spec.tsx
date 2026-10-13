@@ -34,9 +34,9 @@ vi.mock("@/components/ui/native-only-animated-view", async () => ({ NativeOnlyAn
 // The backdrop is hidden from accessibility, so queries must include hidden elements.
 const hidden = { includeHiddenElements: true };
 
-function renderSheet(closeOnBackdropPress?: boolean) {
+async function renderSheet(closeOnBackdropPress?: boolean) {
   const onOpenChange = vi.fn();
-  const view = renderMobile(
+  const view = await renderMobile(
     <Sheet open onOpenChange={onOpenChange}>
       <SheetContent closeOnBackdropPress={closeOnBackdropPress}>
         <Text>Body</Text>
@@ -47,20 +47,20 @@ function renderSheet(closeOnBackdropPress?: boolean) {
 }
 
 describe("Sheet backdrop", () => {
-  it("closes on a tap outside when the sheet opts in", () => {
-    const { view, onOpenChange } = renderSheet(true);
-    fireEvent.press(view.getByTestId("sheet-backdrop", hidden));
+  it("closes on a tap outside when the sheet opts in", async () => {
+    const { view, onOpenChange } = await renderSheet(true);
+    await fireEvent.press(view.getByTestId("sheet-backdrop", hidden));
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it("has no backdrop by default, so a stray tap cannot discard a draft", () => {
-    const { view } = renderSheet();
+  it("has no backdrop by default, so a stray tap cannot discard a draft", async () => {
+    const { view } = await renderSheet();
     expect(view.queryByTestId("sheet-backdrop", hidden)).toBeNull();
   });
 
-  it("keeps the sheet open when the body is tapped", () => {
-    const { view, onOpenChange } = renderSheet(true);
-    fireEvent.press(view.getByText("Body"));
+  it("keeps the sheet open when the body is tapped", async () => {
+    const { view, onOpenChange } = await renderSheet(true);
+    await fireEvent.press(view.getByText("Body"));
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 });
@@ -71,53 +71,53 @@ afterEach(() => vi.useRealTimers());
 describe("Sheet dismissal", () => {
   const sheet = (open: boolean) => <Sheet open={open} onOpenChange={() => {}}><SheetContent><Text>Options</Text></SheetContent></Sheet>;
 
-  it("retains the whole sheet for its exit before removing it", () => {
-    const view = renderMobile(sheet(true));
-    view.rerender(sheet(false));
+  it("retains the whole sheet for its exit before removing it", async () => {
+    const view = await renderMobile(sheet(true));
+    await view.rerender(sheet(false));
     expect(view.getByText("Options", hidden)).toBeTruthy();
-    act(() => vi.advanceTimersByTime(220));
+    await act(() => vi.advanceTimersByTime(220));
     expect(view.queryByText("Options")).toBeNull();
   });
 
-  it("uses a brief fade dismissal when motion is reduced", () => {
+  it("uses a brief fade dismissal when motion is reduced", async () => {
     vi.mocked(useReduceMotion).mockReturnValue(true);
-    const view = renderMobile(sheet(true));
-    view.rerender(sheet(false));
+    const view = await renderMobile(sheet(true));
+    await view.rerender(sheet(false));
     expect(view.getByText("Options", hidden)).toBeTruthy();
-    act(() => vi.advanceTimersByTime(150));
+    await act(() => vi.advanceTimersByTime(150));
     expect(view.queryByText("Options", hidden)).toBeNull();
   });
 
-  it("cancels pending removal when reopened during the exit", () => {
-    const view = renderMobile(sheet(true));
-    view.rerender(sheet(false));
-    act(() => vi.advanceTimersByTime(100));
-    view.rerender(sheet(true));
-    act(() => vi.advanceTimersByTime(50));
-    view.rerender(sheet(false));
-    act(() => vi.advanceTimersByTime(70));
+  it("cancels pending removal when reopened during the exit", async () => {
+    const view = await renderMobile(sheet(true));
+    await view.rerender(sheet(false));
+    await act(() => vi.advanceTimersByTime(100));
+    await view.rerender(sheet(true));
+    await act(() => vi.advanceTimersByTime(50));
+    await view.rerender(sheet(false));
+    await act(() => vi.advanceTimersByTime(70));
     // First exit would finish now. The second exit still owes 150 ms.
     expect(view.getByText("Options", hidden)).toBeTruthy();
-    act(() => vi.advanceTimersByTime(149));
+    await act(() => vi.advanceTimersByTime(149));
     expect(view.getByText("Options", hidden)).toBeTruthy();
-    act(() => vi.advanceTimersByTime(1));
+    await act(() => vi.advanceTimersByTime(1));
     expect(view.queryByText("Options", hidden)).toBeNull();
   });
 });
 
 
 describe("Photo actions dismissal", () => {
-  it("retains the selected photo's title and actions after the parent clears selection", () => {
+  it("retains the selected photo's title and actions after the parent clears selection", async () => {
     const photo: StagedPhoto = { photoId: "photo-1", state: "uploaded", sortOrder: 1, retryCount: 0 };
     const actions = { onOpenChange: vi.fn(), onSetAsCover: vi.fn(), onMoveEarlier: vi.fn(), onMoveLater: vi.fn(), onRemove: vi.fn(), onRetry: vi.fn() };
     const sheet = (selected: StagedPhoto | null) => <PhotoActionSheet open={selected !== null} photo={selected} index={1} total={3} {...actions} />;
-    const view = renderMobile(sheet(photo));
+    const view = await renderMobile(sheet(photo));
     expect(view.getByText("Photo 2 of 3")).toBeTruthy();
     expect(view.getByText("Set as cover")).toBeTruthy();
-    view.rerender(sheet(null));
+    await view.rerender(sheet(null));
     expect(view.getByText("Photo 2 of 3", hidden)).toBeTruthy();
     expect(view.getByText("Set as cover", hidden)).toBeTruthy();
-    act(() => vi.advanceTimersByTime(220));
+    await act(() => vi.advanceTimersByTime(220));
     expect(view.queryByText("Photo 2 of 3", hidden)).toBeNull();
   });
 });

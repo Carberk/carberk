@@ -2,7 +2,7 @@ import { Image } from "react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { describe, expect, it, vi } from "vitest";
 
-import { renderMobile } from "../../../test/render";
+import { renderMobile, getAllHosts } from "../../../test/render";
 
 import { ListingCard } from "./ListingCard";
 import { ListingGridCard } from "./ListingGridCard";
@@ -24,49 +24,49 @@ const listing: ListingsSchemas.ListingSummary = {
   publishedAt: "2026-09-30T04:00:00.000Z",
 };
 
-const placeholders = (screen: ReturnType<typeof renderMobile>) =>
-  screen.UNSAFE_getAllByType(Image).map((image) => image.props.placeholder as unknown);
+const placeholders = (screen: Awaited<ReturnType<typeof renderMobile>>) =>
+  getAllHosts(screen.container, "Image").map((image) => image.props.placeholder as unknown);
 
 describe("Listing photo blurred preview", () => {
-  it("shows the photo's ThumbHash while the photo loads", () => {
-    const screen = renderMobile(<ListingPhoto mediaKey="one.webp" thumbHash={H1} emptyLabel="No photo" />);
+  it("shows the photo's ThumbHash while the photo loads", async () => {
+    const screen = await renderMobile(<ListingPhoto mediaKey="one.webp" thumbHash={H1} emptyLabel="No photo" />);
 
     expect(placeholders(screen)).toEqual([{ thumbhash: H1 }]);
   });
 
-  it("has no placeholder for a photo without a ThumbHash", () => {
-    const screen = renderMobile(<ListingPhoto mediaKey="one.webp" emptyLabel="No photo" />);
+  it("has no placeholder for a photo without a ThumbHash", async () => {
+    const screen = await renderMobile(<ListingPhoto mediaKey="one.webp" emptyLabel="No photo" />);
 
     expect(placeholders(screen)).toEqual([undefined]);
   });
 
-  it("previews every photo of the Results strip with its own ThumbHash, none where the feed sent null", () => {
+  it("previews every photo of the Results strip with its own ThumbHash, none where the feed sent null", async () => {
     const item: ListingsSchemas.FeedListingSummary = {
       ...listing, photoCount: 3, galleryKeys: ["one.webp", "two.webp", "three.webp"], galleryThumbHashes: [H1, null, H2],
     };
-    const screen = renderMobile(
+    const screen = await renderMobile(
       <ListingLargeCard listing={item} brandName="Toyota" modelName="Camry" isAuthenticated={false} returnTo="/(tabs)/(search)/results" onPress={vi.fn()} />,
     );
 
     expect(placeholders(screen)).toEqual([{ thumbhash: H1 }, undefined, { thumbhash: H2 }]);
   });
 
-  it("previews the grid card's first photo with its ThumbHash", () => {
-    const screen = renderMobile(
+  it("previews the grid card's first photo with its ThumbHash", async () => {
+    const screen = await renderMobile(
       <ListingGridCard listing={listing} brandName="Toyota" modelName="Camry" isAuthenticated={false} returnTo="/(tabs)/(search)/results" onPress={vi.fn()} />,
     );
 
     expect(placeholders(screen)).toEqual([{ thumbhash: H1 }]);
   });
 
-  it("previews an owner card's cover with the first photo's ThumbHash when the cover is that photo", () => {
-    const screen = renderMobile(<ListingCard listing={listing} onPress={vi.fn()} />);
+  it("previews an owner card's cover with the first photo's ThumbHash when the cover is that photo", async () => {
+    const screen = await renderMobile(<ListingCard listing={listing} onPress={vi.fn()} />);
 
     expect(placeholders(screen)).toEqual([{ thumbhash: H1 }]);
   });
 
-  it("gives an owner card's video cover no photo's ThumbHash", () => {
-    const screen = renderMobile(<ListingCard listing={{ ...listing, coverMediaKey: "clip.mp4" }} onPress={vi.fn()} />);
+  it("gives an owner card's video cover no photo's ThumbHash", async () => {
+    const screen = await renderMobile(<ListingCard listing={{ ...listing, coverMediaKey: "clip.mp4" }} onPress={vi.fn()} />);
 
     expect(placeholders(screen)).toEqual([undefined]);
   });

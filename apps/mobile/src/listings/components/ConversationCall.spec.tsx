@@ -24,14 +24,14 @@ function header() {
 
 describe("Conversation Android dialer", () => {
   it("dials despite a false package-visibility check", async () => {
-    const view = header();
-    await act(async () => { fireEvent.press(view.getByRole("button", { name: "Call the seller" })); });
+    const view = await header();
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Call the seller" })); });
     expect(Linking.openURL).toHaveBeenCalledWith("tel:+99365000000");
   });
   it("shows the number when the dialer fails", async () => {
     vi.mocked(Linking.openURL).mockRejectedValueOnce(new Error("No dialer"));
-    const view = header();
-    await act(async () => { fireEvent.press(view.getByRole("button", { name: "Call the seller" })); });
+    const view = await header();
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Call the seller" })); });
     expect(Alert.alert).toHaveBeenCalledWith("Call", "Could not open the dialer. Call +99365000000 manually.");
   });
 });

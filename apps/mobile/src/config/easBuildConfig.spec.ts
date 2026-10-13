@@ -118,7 +118,7 @@ describe("EAS build configuration", () => {
     // EAS runs `corepack enable` before honouring the `pnpm` pin. Corepack creates the
     // pnpm shim first, so the pin's `npm i -g pnpm@<version>` then fails with EEXIST.
     expect(easJson.build.base.corepack).toBeUndefined();
-    expect(easJson.build.base.pnpm).toBe("9.12.0");
+    expect(easJson.build.base.pnpm).toBe("12.11.2");
     expect(rootPackageJson.packageManager).toBe(`pnpm@${easJson.build.base.pnpm}`);
   });
 

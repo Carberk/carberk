@@ -3,7 +3,7 @@ import { StyleSheet } from "react-native";
 import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fireEvent, renderMobile } from "../../../test/render";
+import { fireEvent, renderMobile, getHost } from "../../../test/render";
 
 import { MessageList, type MessageItem } from "./MessageList";
 
@@ -23,7 +23,7 @@ interface RenderedNode {
 }
 
 /** Every text in render order. Rows are in data order, newest first; the inverted list draws each row above the previous one. */
-function texts(json: ReturnType<ReturnType<typeof renderMobile>["toJSON"]>): string[] {
+function texts(json: ReturnType<Awaited<ReturnType<typeof renderMobile>>["toJSON"]>): string[] {
   const out: string[] = [];
   const walk = (node: RenderedNode | string | null) => {
     if (node == null) return;
@@ -47,8 +47,8 @@ afterEach(() => {
 });
 
 describe("MessageList day separators", () => {
-  it("puts Today, Yesterday and a dated separator above the first Message of each day", () => {
-    const screen = renderMobile(
+  it("puts Today, Yesterday and a dated separator above the first Message of each day", async () => {
+    const screen = await renderMobile(
       <MessageList
         currentUserId={ME}
         messages={[
@@ -76,8 +76,8 @@ describe("MessageList day separators", () => {
     ]);
   });
 
-  it("renders each day separator as its own row directly above the day's oldest Message", () => {
-    const screen = renderMobile(
+  it("renders each day separator as its own row directly above the day's oldest Message", async () => {
+    const screen = await renderMobile(
       <MessageList
         currentUserId={ME}
         messages={[
@@ -92,7 +92,7 @@ describe("MessageList day separators", () => {
     // separator nested in the Message cell would land below the bubble. Each
     // separator must be a sibling row instead; the row after the oldest
     // Message of a day renders directly above it.
-    const list = screen.UNSAFE_getByProps({ inverted: true });
+    const list = getHost(screen.container, "RCTScrollView", { inverted: true });
     const keys = (list.props.data as Array<{ key: string }>).map((row) => row.key);
     expect(keys).toEqual([
       "today-2",
@@ -103,30 +103,30 @@ describe("MessageList day separators", () => {
     ]);
   });
 
-  it("writes the date in the app language", () => {
-    const screen = renderMobile(
+  it("writes the date in the app language", async () => {
+    const screen = await renderMobile(
       <MessageList currentUserId={ME} messages={[message("old", new Date(2026, 8, 28, 10).toISOString())]} />,
       { locale: "ru" },
     );
     expect(screen.getByText("28 сентября")).toBeTruthy();
   });
 
-  it("adds the year for a date in another year", () => {
-    const screen = renderMobile(
+  it("adds the year for a date in another year", async () => {
+    const screen = await renderMobile(
       <MessageList currentUserId={ME} messages={[message("old", new Date(2025, 11, 30, 10).toISOString())]} />,
     );
     expect(screen.getByText("December 30, 2025")).toBeTruthy();
   });
 
-  it("moves the separator up when an older page of the same day loads", () => {
+  it("moves the separator up when an older page of the same day loads", async () => {
     const firstPage = [message("today-1", at(2, 9)), message("yesterday-2", at(1, 21))];
-    const screen = renderMobile(<MessageList currentUserId={ME} messages={firstPage} />);
+    const screen = await renderMobile(<MessageList currentUserId={ME} messages={firstPage} />);
     expect(texts(screen.toJSON()).filter((s) => ["Yesterday", "yesterday-2"].includes(s))).toEqual([
       "yesterday-2",
       "Yesterday",
     ]);
 
-    screen.rerender(
+    await screen.rerender(
       <MessageList
         currentUserId={ME}
         messages={[...firstPage, message("yesterday-1", at(1, 8)), message("before", new Date(2026, 8, 29, 8).toISOString())]}
@@ -139,32 +139,32 @@ describe("MessageList day separators", () => {
     ).toEqual(["yesterday-2", "yesterday-1", "Yesterday", "September 29"]);
   });
 
-  it("asks for older Messages at the top of the history", () => {
+  it("asks for older Messages at the top of the history", async () => {
     const onLoadOlder = vi.fn();
-    const screen = renderMobile(
+    const screen = await renderMobile(
       <MessageList currentUserId={ME} messages={[message("today-1", at(2, 9))]} onLoadOlder={onLoadOlder} />,
     );
-    screen.UNSAFE_getByProps({ inverted: true }).props.onEndReached();
+    getHost(screen.container, "RCTScrollView", { inverted: true }).props.onEndReached();
     expect(onLoadOlder).toHaveBeenCalledOnce();
   });
 });
 
 describe("MessageList older pages", () => {
-  it("shows a loading row at the top of the history while an older page loads", () => {
-    const screen = renderMobile(
+  it("shows a loading row at the top of the history while an older page loads", async () => {
+    const screen = await renderMobile(
       <MessageList currentUserId={ME} messages={[message("today-1", at(2, 9))]} loadingOlder />,
     );
     expect(screen.getByLabelText("Loading earlier messages")).toBeTruthy();
   });
 
-  it("has no loading row otherwise", () => {
-    const screen = renderMobile(<MessageList currentUserId={ME} messages={[message("today-1", at(2, 9))]} />);
+  it("has no loading row otherwise", async () => {
+    const screen = await renderMobile(<MessageList currentUserId={ME} messages={[message("today-1", at(2, 9))]} />);
     expect(screen.queryByLabelText("Loading earlier messages")).toBeNull();
   });
 
-  it("keeps the Messages and offers Retry when an older page fails", () => {
+  it("keeps the Messages and offers Retry when an older page fails", async () => {
     const onRetryOlder = vi.fn();
-    const screen = renderMobile(
+    const screen = await renderMobile(
       <MessageList
         currentUserId={ME}
         messages={[message("today-1", at(2, 9))]}
@@ -177,78 +177,78 @@ describe("MessageList older pages", () => {
     expect(screen.getByText("Could not load earlier messages")).toBeTruthy();
     const retry = screen.getByRole("button", { name: "Retry" });
     expect(retry.props.style).toMatchObject({ minHeight: 44 });
-    fireEvent.press(retry);
+    await fireEvent.press(retry);
     expect(onRetryOlder).toHaveBeenCalledOnce();
   });
 });
 
 describe("MessageList Message actions", () => {
-  function renderList(messages: MessageItem[], props: Partial<ComponentProps<typeof MessageList>> = {}) {
+  async function renderList(messages: MessageItem[], props: Partial<ComponentProps<typeof MessageList>> = {}) {
     const handlers = { onCopy: vi.fn(), onDelete: vi.fn(), onReport: vi.fn() };
-    const screen = renderMobile(
+    const screen = await renderMobile(
       <MessageList currentUserId={ME} messages={messages} {...handlers} {...props} />,
     );
     return { screen, ...handlers };
   }
 
-  const longPressText = (screen: ReturnType<typeof renderMobile>, label: string) =>
+  const longPressText = (screen: Awaited<ReturnType<typeof renderMobile>>, label: string) =>
     fireEvent(screen.getByLabelText(label), "longPress");
-  const longPressPhoto = (screen: ReturnType<typeof renderMobile>) =>
+  const longPressPhoto = (screen: Awaited<ReturnType<typeof renderMobile>>) =>
     fireEvent(screen.getByRole("imagebutton", { name: "Photo" }), "longPress");
-  const sheetOpen = (screen: ReturnType<typeof renderMobile>) => screen.queryByText("Cancel") !== null;
+  const sheetOpen = (screen: Awaited<ReturnType<typeof renderMobile>>) => screen.queryByText("Cancel") !== null;
 
-  it("offers Copy, Report message and Cancel for the other participant's text Message", () => {
-    const { screen } = renderList([message("peer-1", at(2, 9), { senderId: PEER })]);
+  it("offers Copy, Report message and Cancel for the other participant's text Message", async () => {
+    const { screen } = await renderList([message("peer-1", at(2, 9), { senderId: PEER })]);
 
     expect(sheetOpen(screen)).toBe(false);
-    longPressText(screen, "peer-1, 09:00 AM");
+    await longPressText(screen, "peer-1, 09:00 AM");
     expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Report message" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
   });
 
-  it("opens the sheet through the TalkBack long-press accessibility action", () => {
-    const { screen } = renderList([message("peer-1", at(2, 9), { senderId: PEER })]);
+  it("opens the sheet through the TalkBack long-press accessibility action", async () => {
+    const { screen } = await renderList([message("peer-1", at(2, 9), { senderId: PEER })]);
 
     const target = screen.getByLabelText("peer-1, 09:00 AM");
     expect(target.props.accessibilityActions).toEqual([{ name: "longpress", label: "Message actions" }]);
-    fireEvent(target, "accessibilityAction", { nativeEvent: { actionName: "longpress" } });
+    await fireEvent(target, "accessibilityAction", { nativeEvent: { actionName: "longpress" } });
     expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
   });
 
-  it("copies the text, closes the sheet and reports the Message to the screen", () => {
-    const { screen, onCopy } = renderList([message("peer-1", at(2, 9), { senderId: PEER, text: "Call me" })]);
+  it("copies the text, closes the sheet and reports the Message to the screen", async () => {
+    const { screen, onCopy } = await renderList([message("peer-1", at(2, 9), { senderId: PEER, text: "Call me" })]);
 
-    longPressText(screen, "Call me, 09:00 AM");
-    fireEvent.press(screen.getByRole("button", { name: "Copy" }));
+    await longPressText(screen, "Call me, 09:00 AM");
+    await fireEvent.press(screen.getByRole("button", { name: "Copy" }));
     expect(onCopy).toHaveBeenCalledWith("Call me");
     expect(sheetOpen(screen)).toBe(false);
   });
 
-  it("hands the Message to the report reasons and closes the sheet", () => {
-    const { screen, onReport } = renderList([message("peer-1", at(2, 9), { senderId: PEER })]);
+  it("hands the Message to the report reasons and closes the sheet", async () => {
+    const { screen, onReport } = await renderList([message("peer-1", at(2, 9), { senderId: PEER })]);
 
-    longPressText(screen, "peer-1, 09:00 AM");
-    fireEvent.press(screen.getByRole("button", { name: "Report message" }));
+    await longPressText(screen, "peer-1, 09:00 AM");
+    await fireEvent.press(screen.getByRole("button", { name: "Report message" }));
     expect(onReport).toHaveBeenCalledWith("peer-1");
     expect(sheetOpen(screen)).toBe(false);
   });
 
-  it.each(["Copy", "Report message"])("removes %s when the open sheet's Message is deleted and redacted", (action) => {
+  it.each(["Copy", "Report message"])("removes %s when the open sheet's Message is deleted and redacted", async (action) => {
     const incoming = message("peer-recent", at(2, 17, 59), { senderId: PEER, text: "Private original text" });
     const handlers = { onCopy: vi.fn(), onReport: vi.fn() };
-    const screen = renderMobile(<MessageList currentUserId={ME} messages={[incoming]} {...handlers} />);
-    longPressText(screen, "Private original text, 05:59 PM");
+    const screen = await renderMobile(<MessageList currentUserId={ME} messages={[incoming]} {...handlers} />);
+    await longPressText(screen, "Private original text, 05:59 PM");
     expect(screen.getByRole("button", { name: action })).toBeTruthy();
 
     // The websocket deletion replaces the cached item and clears its text.
-    screen.rerender(
+    await screen.rerender(
       <MessageList currentUserId={ME} messages={[{ ...incoming, text: "", deletedAt: at(2, 18) }]} {...handlers} />,
     );
     expect(screen.getByText("Message deleted")).toBeTruthy();
     const staleAction = screen.queryByRole("button", { name: action });
-    if (staleAction) fireEvent.press(staleAction);
+    if (staleAction) await fireEvent.press(staleAction);
 
     expect(handlers.onCopy).not.toHaveBeenCalled();
     expect(handlers.onReport).not.toHaveBeenCalled();
@@ -256,13 +256,13 @@ describe("MessageList Message actions", () => {
     expect(screen.queryByRole("button", { name: "Report message" })).toBeNull();
   });
 
-  it.each(["pending", "failed", "absent"] as const)("closes an open sheet when its Message becomes %s", (status) => {
+  it.each(["pending", "failed", "absent"] as const)("closes an open sheet when its Message becomes %s", async (status) => {
     const incoming = message("peer-recent", at(2, 17, 59), { senderId: PEER });
-    const { screen, onCopy, onReport } = renderList([incoming]);
-    longPressText(screen, "peer-recent, 05:59 PM");
+    const { screen, onCopy, onReport } = await renderList([incoming]);
+    await longPressText(screen, "peer-recent, 05:59 PM");
     expect(sheetOpen(screen)).toBe(true);
 
-    screen.rerender(
+    await screen.rerender(
       <MessageList currentUserId={ME} messages={status === "absent" ? [] : [{ ...incoming, status }]} onCopy={onCopy} onReport={onReport} />,
     );
     expect(sheetOpen(screen)).toBe(false);
@@ -272,50 +272,50 @@ describe("MessageList Message actions", () => {
     expect(onReport).not.toHaveBeenCalled();
   });
 
-  it("closes on Cancel without acting", () => {
-    const { screen, onCopy, onReport } = renderList([message("peer-1", at(2, 9), { senderId: PEER })]);
+  it("closes on Cancel without acting", async () => {
+    const { screen, onCopy, onReport } = await renderList([message("peer-1", at(2, 9), { senderId: PEER })]);
 
-    longPressText(screen, "peer-1, 09:00 AM");
-    fireEvent.press(screen.getByRole("button", { name: "Cancel" }));
+    await longPressText(screen, "peer-1, 09:00 AM");
+    await fireEvent.press(screen.getByRole("button", { name: "Cancel" }));
     expect(sheetOpen(screen)).toBe(false);
     expect(onCopy).not.toHaveBeenCalled();
     expect(onReport).not.toHaveBeenCalled();
   });
 
-  it("hides Report message when reporting is switched off", () => {
-    const { screen } = renderList([message("peer-1", at(2, 9), { senderId: PEER })], { reportEnabled: false });
+  it("hides Report message when reporting is switched off", async () => {
+    const { screen } = await renderList([message("peer-1", at(2, 9), { senderId: PEER })], { reportEnabled: false });
 
-    longPressText(screen, "peer-1, 09:00 AM");
+    await longPressText(screen, "peer-1, 09:00 AM");
     expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Report message" })).toBeNull();
   });
 
-  it("offers Copy only for a Message already reported, which shows Reported", () => {
-    const { screen } = renderList([message("peer-1", at(2, 9), { senderId: PEER })], {
+  it("offers Copy only for a Message already reported, which shows Reported", async () => {
+    const { screen } = await renderList([message("peer-1", at(2, 9), { senderId: PEER })], {
       reportedMessageIds: new Set(["peer-1"]),
     });
 
     expect(screen.getByText("Reported")).toBeTruthy();
-    longPressText(screen, "peer-1, 09:00 AM, Reported");
+    await longPressText(screen, "peer-1, 09:00 AM, Reported");
     expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Report message" })).toBeNull();
   });
 
-  it("offers Copy and Delete for an own Message inside the delete window", () => {
-    const { screen, onDelete } = renderList([message("own-1", at(2, 9), { canDelete: true })]);
+  it("offers Copy and Delete for an own Message inside the delete window", async () => {
+    const { screen, onDelete } = await renderList([message("own-1", at(2, 9), { canDelete: true })]);
 
-    longPressText(screen, "own-1, 09:00 AM, Sent");
+    await longPressText(screen, "own-1, 09:00 AM, Sent");
     expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Report message" })).toBeNull();
-    fireEvent.press(screen.getByRole("button", { name: "Delete" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Delete" }));
     expect(onDelete).toHaveBeenCalledWith("own-1");
     expect(sheetOpen(screen)).toBe(false);
   });
 
-  it("offers Copy only for an own Message past the delete window", () => {
-    const { screen } = renderList([message("own-1", at(2, 9), { canDelete: false })]);
+  it("offers Copy only for an own Message past the delete window", async () => {
+    const { screen } = await renderList([message("own-1", at(2, 9), { canDelete: false })]);
 
-    longPressText(screen, "own-1, 09:00 AM, Sent");
+    await longPressText(screen, "own-1, 09:00 AM, Sent");
     expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
   });
@@ -324,45 +324,45 @@ describe("MessageList Message actions", () => {
     ["deleted", { deletedAt: at(2, 9, 5) }, "Message deleted, 09:00 AM"],
     ["pending", { status: "pending" as const }, "peer-1, 09:00 AM, Sending..."],
     ["failed", { status: "failed" as const }, "peer-1, 09:00 AM, Failed to send"],
-  ])("opens no sheet for a %s Message", (_name, updates, label) => {
-    const { screen } = renderList([message("peer-1", at(2, 9), { canDelete: true, ...updates })]);
+  ])("opens no sheet for a %s Message", async (_name, updates, label) => {
+    const { screen } = await renderList([message("peer-1", at(2, 9), { canDelete: true, ...updates })]);
 
-    longPressText(screen, label);
+    await longPressText(screen, label);
     expect(sheetOpen(screen)).toBe(false);
   });
 
-  it("offers Report message only for the other participant's image Message", () => {
-    const { screen } = renderList([
+  it("offers Report message only for the other participant's image Message", async () => {
+    const { screen } = await renderList([
       message("img-1", at(2, 9), { senderId: PEER, kind: "image", text: "", localImageUri: "file:///photo.webp" }),
     ]);
 
-    longPressPhoto(screen);
+    await longPressPhoto(screen);
     expect(screen.getByRole("button", { name: "Report message" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
   });
 
-  it("offers Delete only for an own image Message inside the delete window", () => {
-    const { screen } = renderList([
+  it("offers Delete only for an own image Message inside the delete window", async () => {
+    const { screen } = await renderList([
       message("img-1", at(2, 9), { kind: "image", text: "", localImageUri: "file:///photo.webp", canDelete: true }),
     ]);
 
-    longPressPhoto(screen);
+    await longPressPhoto(screen);
     expect(screen.getByRole("button", { name: "Delete" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
   });
 
-  it("opens no sheet for a reported image Message or an own one past the window", () => {
-    const { screen } = renderList(
+  it("opens no sheet for a reported image Message or an own one past the window", async () => {
+    const { screen } = await renderList(
       [message("img-1", at(2, 9), { senderId: PEER, kind: "image", text: "", localImageUri: "file:///photo.webp" })],
       { reportedMessageIds: new Set(["img-1"]) },
     );
 
-    longPressPhoto(screen);
+    await longPressPhoto(screen);
     expect(sheetOpen(screen)).toBe(false);
   });
 
-  it("offers Report message only for the other participant's Listing Message", () => {
-    const { screen } = renderList([
+  it("offers Report message only for the other participant's Listing Message", async () => {
+    const { screen } = await renderList([
       message("ref-1", at(2, 9), {
         senderId: PEER,
         kind: "post_ref",
@@ -380,12 +380,12 @@ describe("MessageList Message actions", () => {
       }),
     ]);
 
-    fireEvent(screen.getByRole("button", { name: /^Open/ }), "longPress");
+    await fireEvent(screen.getByRole("button", { name: /^Open/ }), "longPress");
     expect(screen.getByRole("button", { name: "Report message" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
   });
 
-  it.each([true, false])("own Listing-reference Message actions follow canDelete=%s", (canDelete) => {
+  it.each([true, false])("own Listing-reference Message actions follow canDelete=%s", async (canDelete) => {
     const ownListing = message("own-ref", at(2, canDelete ? 17 : 9, canDelete ? 59 : 0), {
       kind: "post_ref",
       text: "",
@@ -401,14 +401,14 @@ describe("MessageList Message actions", () => {
         available: true,
       },
     });
-    const { screen, onDelete, onCopy, onReport } = renderList([ownListing]);
-    fireEvent(screen.getByRole("button", { name: /^Open/ }), "longPress");
+    const { screen, onDelete, onCopy, onReport } = await renderList([ownListing]);
+    await fireEvent(screen.getByRole("button", { name: /^Open/ }), "longPress");
 
     if (canDelete) {
       expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy();
       expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Report message" })).toBeNull();
-      fireEvent.press(screen.getByRole("button", { name: "Delete" }));
+      await fireEvent.press(screen.getByRole("button", { name: "Delete" }));
       expect(onDelete.mock.calls).toEqual([["own-ref"]]);
       expect(sheetOpen(screen)).toBe(false);
     } else {
@@ -420,9 +420,9 @@ describe("MessageList Message actions", () => {
     expect(onReport).not.toHaveBeenCalled();
   });
 
-  it("opens the Listing of a Listing-reference Message on a press", () => {
+  it("opens the Listing of a Listing-reference Message on a press", async () => {
     const onPostRefPress = vi.fn();
-    const screen = renderMobile(
+    const screen = await renderMobile(
       <MessageList
         currentUserId={ME}
         messages={[
@@ -446,12 +446,12 @@ describe("MessageList Message actions", () => {
       />,
     );
 
-    fireEvent.press(screen.getByRole("button", { name: /^Open/ }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Open/ }));
     expect(onPostRefPress).toHaveBeenCalledWith("00000000-0000-4000-8000-0000000000a1");
   });
 
-  it("dims a reported Message in the list", () => {
-    const { screen } = renderList([message("peer-1", at(2, 9), { senderId: PEER })], {
+  it("dims a reported Message in the list", async () => {
+    const { screen } = await renderList([message("peer-1", at(2, 9), { senderId: PEER })], {
       reportedMessageIds: new Set(["peer-1"]),
     });
 
@@ -462,9 +462,9 @@ describe("MessageList Message actions", () => {
     expect(node?.props?.className).toContain("opacity-60");
   });
 
-  it("opens the photo of an image Message", () => {
+  it("opens the photo of an image Message", async () => {
     const onImagePress = vi.fn();
-    const screen = renderMobile(
+    const screen = await renderMobile(
       <MessageList
         currentUserId={ME}
         messages={[message("img-1", at(2, 9), { kind: "image", text: "", localImageUri: "file:///photo.webp" })]}
@@ -472,14 +472,14 @@ describe("MessageList Message actions", () => {
       />,
     );
 
-    fireEvent.press(screen.getByRole("imagebutton", { name: "Photo" }));
+    await fireEvent.press(screen.getByRole("imagebutton", { name: "Photo" }));
     expect(onImagePress).toHaveBeenCalledWith("file:///photo.webp");
   });
 });
 
 describe("MessageList Read label", () => {
-  it("labels only the last own Message once it is read", () => {
-    const screen = renderMobile(
+  it("labels only the last own Message once it is read", async () => {
+    const screen = await renderMobile(
       <MessageList
         currentUserId={ME}
         messages={[
@@ -495,8 +495,8 @@ describe("MessageList Read label", () => {
     expect(order).toEqual(["own-2", "Read", "own-1"]);
   });
 
-  it("has no Read label while the last own Message is not read yet", () => {
-    const screen = renderMobile(
+  it("has no Read label while the last own Message is not read yet", async () => {
+    const screen = await renderMobile(
       <MessageList
         currentUserId={ME}
         messages={[
@@ -508,14 +508,14 @@ describe("MessageList Read label", () => {
     expect(screen.queryByText("Read")).toBeNull();
   });
 
-  it("moves the label to a newer own Message once that one is read", () => {
+  it("moves the label to a newer own Message once that one is read", async () => {
     const older = message("own-1", at(2, 9), { status: "read" });
-    const screen = renderMobile(
+    const screen = await renderMobile(
       <MessageList currentUserId={ME} messages={[message("own-2", at(2, 9, 30), { status: "delivered" }), older]} />,
     );
     expect(screen.queryByText("Read")).toBeNull();
 
-    screen.rerender(
+    await screen.rerender(
       <MessageList currentUserId={ME} messages={[message("own-2", at(2, 9, 30), { status: "read" }), older]} />,
     );
 
@@ -529,15 +529,15 @@ describe("MessageList Read label", () => {
 });
 
 describe("MessageList empty", () => {
-  it("shows the empty state with no Messages", () => {
-    const screen = renderMobile(<MessageList currentUserId={ME} messages={[]} />);
+  it("shows the empty state with no Messages", async () => {
+    const screen = await renderMobile(<MessageList currentUserId={ME} messages={[]} />);
     expect(screen.getByText("No messages yet. Start the conversation.")).toBeTruthy();
   });
 });
 
 describe("MessageList empty layout and send scrolling", () => {
-  it("lets the native inverted list keep its empty label upright", () => {
-     const screen = renderMobile(<MessageList messages={[]} currentUserId={ME} />);
+  it("lets the native inverted list keep its empty label upright", async () => {
+     const screen = await renderMobile(<MessageList messages={[]} currentUserId={ME} />);
      const label = screen.getByText("No messages yet. Start the conversation.");
      // VirtualizedList already counter-inverts ListEmptyComponent. A second
      // transform overrides its correction and flips the label on the device.
@@ -547,11 +547,11 @@ describe("MessageList empty layout and send scrolling", () => {
      expect(StyleSheet.flatten(container.props.style)?.transform).toBeUndefined();
    });
   
-  it("returns to the newest Message after sending while reading older history", () => {
+  it("returns to the newest Message after sending while reading older history", async () => {
     const requests = (RN as unknown as { scrollRequests: unknown[] }).scrollRequests;
-    const screen = renderMobile(<MessageList currentUserId={ME} messages={[message("old", at(1, 10), { senderId: PEER })]} />);
+    const screen = await renderMobile(<MessageList currentUserId={ME} messages={[message("old", at(1, 10), { senderId: PEER })]} />);
     requests.length = 0;
-    screen.rerender(<MessageList currentUserId={ME} sendCount={1} messages={[
+    await screen.rerender(<MessageList currentUserId={ME} sendCount={1} messages={[
       message("new-send", at(2, 10), { status: "pending" }),
       message("old", at(1, 10), { senderId: PEER }),
     ]} />);
@@ -559,25 +559,25 @@ describe("MessageList empty layout and send scrolling", () => {
     expect(requests).toContainEqual({ method: "scrollToOffset", offset: 0, animated: false });
   });
   
-  it("leaves older history in place when an incoming Message arrives", () => {
+  it("leaves older history in place when an incoming Message arrives", async () => {
     const requests = (RN as unknown as { scrollRequests: unknown[] }).scrollRequests;
-    const screen = renderMobile(<MessageList currentUserId={ME} messages={[message("old", at(1, 10), { senderId: PEER })]} />);
+    const screen = await renderMobile(<MessageList currentUserId={ME} messages={[message("old", at(1, 10), { senderId: PEER })]} />);
     requests.length = 0;
-    screen.rerender(<MessageList currentUserId={ME} messages={[message("incoming", at(2, 10), { senderId: PEER }), message("old", at(1, 10), { senderId: PEER })]} />);
+    await screen.rerender(<MessageList currentUserId={ME} messages={[message("incoming", at(2, 10), { senderId: PEER }), message("old", at(1, 10), { senderId: PEER })]} />);
     expect(screen.getByText("incoming")).toBeTruthy();
     expect(requests).toHaveLength(0);
   });
 });
 
 describe("MessageList acknowledgement preserves reading position", () => {
-  it("scrolls for the send, but not its later acknowledgement after the User scrolls up", () => {
+  it("scrolls for the send, but not its later acknowledgement after the User scrolls up", async () => {
     const requests = (RN as unknown as { scrollRequests: unknown[] }).scrollRequests;
-    const screen = renderMobile(<MessageList currentUserId={ME} sendCount={1} messages={[message("pending-slow", at(2, 10), { status: "pending" })]} />);
+    const screen = await renderMobile(<MessageList currentUserId={ME} sendCount={1} messages={[message("pending-slow", at(2, 10), { status: "pending" })]} />);
     requests.length = 0; // The User has moved into older history during the send.
-    screen.rerender(<MessageList currentUserId={ME} sendCount={1} messages={[message("server-slow", at(2, 10))]} />);
+    await screen.rerender(<MessageList currentUserId={ME} sendCount={1} messages={[message("server-slow", at(2, 10))]} />);
     expect(screen.getByText("server-slow")).toBeTruthy();
     expect(requests).toHaveLength(0);
-    screen.rerender(<MessageList currentUserId={ME} sendCount={2} messages={[message("next-send", at(2, 11), { status: "pending" }), message("server-slow", at(2, 10))]} />);
+    await screen.rerender(<MessageList currentUserId={ME} sendCount={2} messages={[message("next-send", at(2, 11), { status: "pending" }), message("server-slow", at(2, 10))]} />);
     expect(requests).toEqual([{ method: "scrollToOffset", offset: 0, animated: false }]);
   });
 });

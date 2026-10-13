@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { Image, Pressable } from "react-native";
+import { Pressable } from "react-native";
 
-import { fireEvent, renderMobile, first } from "../../../test/render";
+import { fireEvent, renderMobile, first, getAllHosts } from "../../../test/render";
 import { mediaFixture } from "../../../test/fixtures/listing";
 
 import { PhotoViewer } from "./PhotoViewer";
@@ -49,50 +49,49 @@ function open(count = 3, initialIndex = 0) {
 }
 
 /** The photo at `uri` finishes loading, as expo-image reports it. */
-function load(screen: ReturnType<typeof open>, uri: string) {
-  const image = screen.UNSAFE_getAllByType(Image).find((node) => node.props.source.uri === uri);
+async function load(screen: Awaited<ReturnType<typeof open>>, uri: string) {
+  const image = getAllHosts(screen.container, "Image").find((node) => node.props.source.uri === uri);
   if (!image) throw new Error(`No image for ${uri}`);
-  fireEvent(image, "load", { source: { url: uri, width: 1200, height: 800 } });
+  await fireEvent(image, "load", { source: { url: uri, width: 1200, height: 800 } });
 }
 
 /** The photo URLs the pages ask for, leaving out the thumbnail strip. */
-function pageSources(screen: ReturnType<typeof open>) {
-  return screen
-    .UNSAFE_getAllByType(Image)
+function pageSources(screen: Awaited<ReturnType<typeof open>>) {
+  return getAllHosts(screen.container, "Image")
     .map((image) => image.props.source.uri as string)
     .filter((uri) => !uri.includes("thumbnail"));
 }
 
 describe("Photo viewer while a photo is zoomed", () => {
-  it("pages between photos only while the photo is fitted", () => {
-    const screen = open();
+  it("pages between photos only while the photo is fitted", async () => {
+    const screen = await open();
     const pager = () => screen.getByTestId("photo-viewer-pager");
 
     expect(pager().props.scrollEnabled).toBe(true);
 
-    fireEvent.press(screen.getByRole("button", { name: "Zoom in active photo" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Zoom in active photo" }));
     expect(pager().props.scrollEnabled).toBe(false);
 
-    fireEvent.press(first(screen.getAllByRole("button", { name: "Zoom out" })));
+    await fireEvent.press(first(screen.getAllByRole("button", { name: "Zoom out" })));
     expect(pager().props.scrollEnabled).toBe(true);
   });
 
-  it("tells only the photo being viewed that it is the active one", () => {
-    const screen = open();
+  it("tells only the photo being viewed that it is the active one", async () => {
+    const screen = await open();
 
     expect(screen.getAllByRole("button", { name: "Zoom in active photo" })).toHaveLength(1);
-    load(screen, "https://media.test/0/detail.webp?v=webp-natural-1");
+    await load(screen, "https://media.test/0/detail.webp?v=webp-natural-1");
     // Only the neighbour of the first photo is loaded, not the third (#816).
     expect(screen.getAllByRole("button", { name: "Zoom in other photo" })).toHaveLength(1);
   });
 });
 
 describe("Photo viewer on a slow connection (#816)", () => {
-  it("loads the photo on screen first, then its neighbours, at the gallery's size", () => {
-    const screen = open(20, 5);
+  it("loads the photo on screen first, then its neighbours, at the gallery's size", async () => {
+    const screen = await open(20, 5);
     expect(pageSources(screen)).toEqual(["https://media.test/5/detail.webp?v=webp-natural-1"]);
 
-    load(screen, "https://media.test/5/detail.webp?v=webp-natural-1");
+    await load(screen, "https://media.test/5/detail.webp?v=webp-natural-1");
 
     expect(pageSources(screen)).toEqual([
       "https://media.test/4/detail.webp?v=webp-natural-1",
@@ -101,32 +100,30 @@ describe("Photo viewer on a slow connection (#816)", () => {
     ]);
   });
 
-  it("keeps each photo's load priority when the viewer moves, so no download restarts", () => {
-    const screen = open(20, 5);
+  it("keeps each photo's load priority when the viewer moves, so no download restarts", async () => {
+    const screen = await open(20, 5);
     const priorityOf = (n: number) =>
-      screen
-        .UNSAFE_getAllByType(Image)
+      getAllHosts(screen.container, "Image")
         .find((image) => image.props.source.uri === `https://media.test/${n}/detail.webp?v=webp-natural-1`)?.props
         .priority;
-    load(screen, "https://media.test/5/detail.webp?v=webp-natural-1");
+    await load(screen, "https://media.test/5/detail.webp?v=webp-natural-1");
     expect([priorityOf(5), priorityOf(6)]).toEqual(["high", "low"]);
 
-    fireEvent(screen.getByTestId("photo-viewer-pager"), "momentumScrollEnd", {
+    await fireEvent(screen.getByTestId("photo-viewer-pager"), "momentumScrollEnd", {
       nativeEvent: { contentOffset: { x: 390 * 6, y: 0 } },
     });
 
     expect([priorityOf(5), priorityOf(6), priorityOf(7)]).toEqual(["high", "low", "low"]);
   });
 
-  it("asks for the 2400 px photo only once a zoom starts, over the cached detail size", () => {
-    const screen = open(3, 0);
-    load(screen, "https://media.test/0/detail.webp?v=webp-natural-1");
+  it("asks for the 2400 px photo only once a zoom starts, over the cached detail size", async () => {
+    const screen = await open(3, 0);
+    await load(screen, "https://media.test/0/detail.webp?v=webp-natural-1");
     expect(pageSources(screen).some((uri) => uri.includes("fullscreen"))).toBe(false);
 
-    fireEvent.press(screen.getByRole("button", { name: "Start zoom on active photo" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Start zoom on active photo" }));
 
-    const sharpened = screen
-      .UNSAFE_getAllByType(Image)
+    const sharpened = getAllHosts(screen.container, "Image")
       .find((image) => image.props.source.uri === "https://media.test/0/fullscreen.webp?v=webp-natural-1");
     expect(sharpened?.props.placeholder).toEqual({ uri: "https://media.test/0/detail.webp?v=webp-natural-1" });
     expect(sharpened?.props.placeholderContentFit).toBe("contain");

@@ -1,7 +1,7 @@
-import { KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import { Platform } from "react-native";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fireEvent, renderMobile, within } from "../../../test/render";
+import { fireEvent, renderMobile, within, getHost } from "../../../test/render";
 
 import { MessageReportSheet } from "./MessageReportSheet";
 import { ReportSheet } from "./ReportSheet";
@@ -33,10 +33,10 @@ beforeEach(() => {
 describe.each(["en", "ru", "tk"])("report success in %s", (locale) => {
   it.each(["listing", "user", "message"] as const)(
     "shows one confirmation after a %s report and keeps Done",
-    (targetType) => {
+    async (targetType) => {
       const onOpenChange = vi.fn();
       const onReported = vi.fn();
-      const view = renderMobile(
+      const view = await renderMobile(
         targetType === "message" ? (
           <MessageReportSheet
             conversationId="conversation-1"
@@ -58,8 +58,8 @@ describe.each(["en", "ru", "tk"])("report success in %s", (locale) => {
       const copy = (key: string) => view.i18n.t(key);
 
       expect(view.queryByText(copy("thanksWeReceived"))).toBeNull();
-      fireEvent.press(view.getByRole("radio", { name: copy("spam") }));
-      fireEvent.press(view.getByRole("button", { name: copy("submitReport") }));
+      await fireEvent.press(view.getByRole("radio", { name: copy("spam") }));
+      await fireEvent.press(view.getByRole("button", { name: copy("submitReport") }));
 
       expect(reports.mutate).toHaveBeenCalledTimes(1);
       expect(reports.mutate).toHaveBeenCalledWith(
@@ -76,7 +76,7 @@ describe.each(["en", "ru", "tk"])("report success in %s", (locale) => {
         expect(onReported).toHaveBeenCalledTimes(1);
         expect(onReported).toHaveBeenCalledWith("message-1");
       }
-      fireEvent.press(view.getByRole("button", { name: copy("done") }));
+      await fireEvent.press(view.getByRole("button", { name: copy("done") }));
       expect(onOpenChange).toHaveBeenCalledWith(false);
     },
   );
@@ -100,38 +100,38 @@ vi.mock("@rn-primitives/dialog", async () => {
 vi.mock("react-native-screens", async () => ({ FullWindowOverlay: (await import("react-native")).View }));
 
 describe.each(["android", "ios"] as const)("report keyboard layout on %s", (os) => {
-  it.each(["user", "message"] as const)("keeps %s details scrollable and Submit in the avoidance region", (targetType) => {
+  it.each(["user", "message"] as const)("keeps %s details scrollable and Submit in the avoidance region", async (targetType) => {
     const previousOS = Platform.OS;
     Platform.OS = os;
     try {
-      const view = renderMobile(targetType === "message" ?
+      const view = await renderMobile(targetType === "message" ?
         <MessageReportSheet conversationId="conversation-1" messageId="message-1" open onOpenChange={vi.fn()} /> :
         <ReportSheet targetType="user" targetId="target-1" open onOpenChange={vi.fn()} />);
-      fireEvent.press(view.getByRole("radio", { name: "Other" }));
-      fireEvent.changeText(view.getByPlaceholderText("Describe the issue..."), "Report while typing");
-      const avoidance = view.UNSAFE_getByType(KeyboardAvoidingView);
+      await fireEvent.press(view.getByRole("radio", { name: "Other" }));
+      await fireEvent.changeText(view.getByPlaceholderText("Describe the issue..."), "Report while typing");
+      const avoidance = getHost(view.container, "KeyboardAvoidingView");
       expect(avoidance.props.enabled).toBe(true);
       expect(avoidance.props.behavior).toBe("padding");
       expect(within(avoidance).getByDisplayValue("Report while typing")).toBeTruthy();
       expect(within(avoidance).getByRole("button", { name: "Submit report", disabled: false })).toBeTruthy();
-      const scroll = view.UNSAFE_getByType(ScrollView);
+      const scroll = getHost(view.container, "RCTScrollView");
       expect(scroll.props.keyboardShouldPersistTaps).toBe("handled");
       expect(within(scroll).getByDisplayValue("Report while typing")).toBeTruthy();
       expect(within(scroll).queryByRole("button", { name: "Submit report" })).toBeNull();
-      fireEvent.press(view.getByRole("button", { name: "Submit report" }));
+      await fireEvent.press(view.getByRole("button", { name: "Submit report" }));
       expect(view.getByText("Thanks, we received your report.")).toBeTruthy();
     } finally { Platform.OS = previousOS; }
   });
 });
 
 describe("Compact report uses the keyboard-free viewport", () => {
-  it.each(["user", "message"] as const)("keeps %s details and Submit separate from the pinned Close control", (targetType) => {
+  it.each(["user", "message"] as const)("keeps %s details and Submit separate from the pinned Close control", async (targetType) => {
     const onOpenChange = vi.fn();
-    const view = renderMobile(targetType === "message" ?
+    const view = await renderMobile(targetType === "message" ?
       <MessageReportSheet conversationId="conversation-1" messageId="message-1" open onOpenChange={onOpenChange} /> :
       <ReportSheet targetType="user" targetId="target-1" open onOpenChange={onOpenChange} />);
-    fireEvent.press(view.getByRole("radio", { name: "Other" }));
-    fireEvent.changeText(view.getByPlaceholderText("Describe the issue..."), "Small-screen report details");
+    await fireEvent.press(view.getByRole("radio", { name: "Other" }));
+    await fireEvent.changeText(view.getByPlaceholderText("Describe the issue..."), "Small-screen report details");
     const submit = view.getByRole("button", { name: "Submit report", disabled: false });
     let content = submit.parent;
     while (content && !content.props.className?.includes("z-50")) content = content.parent;
@@ -139,10 +139,10 @@ describe("Compact report uses the keyboard-free viewport", () => {
     expect(content.props.className).toContain("max-h-full");
     expect(content.props.className).toContain("min-h-0 shrink");
     expect(content.props.className).not.toContain("max-h-[70%]");
-    const scroll = view.UNSAFE_getByType(ScrollView);
+    const scroll = getHost(view.container, "RCTScrollView");
     expect(within(scroll).getByDisplayValue("Small-screen report details")).toBeTruthy();
     expect(within(scroll).queryByRole("button", { name: "Close" })).toBeNull();
-    fireEvent.press(view.getByRole("button", { name: "Close" }));
+    await fireEvent.press(view.getByRole("button", { name: "Close" }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });

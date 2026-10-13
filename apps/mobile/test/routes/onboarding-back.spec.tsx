@@ -108,7 +108,7 @@ vi.mock("expo-router", async () => {
 // The signed-in case is decided in `onboardingGate.spec.ts`; a session here
 // would start the signed-in root effects, which this spec does not model.
 async function launchApp() {
-  const screen = renderMobile(<RootLayout />);
+  const screen = await renderMobile(<RootLayout />);
   await act(async () => {});
   await act(async () => {});
   return screen;
@@ -144,7 +144,7 @@ describe("Startup resource failures", () => {
     launch.stored = { "@auto-tm/theme": "light", [LOCALE]: "en" };
     const screen = await launchApp();
     expect(screen.queryByTestId("(tabs)")).toBeNull();
-    act(() => {
+    await act(() => {
       appearance.current = "light";
       appearance.hold = false;
       for (const listener of appearance.listeners) listener();
@@ -159,7 +159,7 @@ describe("Startup resource failures", () => {
     const screen = await launchApp();
     expect(screen.getByTestId("(tabs)")).toBeTruthy();
     appearance.hold = true;
-    act(() => themeStore.getState().setTheme("dark"));
+    await act(() => themeStore.getState().setTheme("dark"));
     expect(screen.getByTestId("(tabs)")).toBeTruthy();
   });
 
@@ -209,7 +209,7 @@ describe("Root Back anchor", () => {
 
     expect(first.getByTestId("(tabs)")).toBeTruthy();
     expect(launch.push).not.toHaveBeenCalled();
-    first.unmount();
+    await first.unmount();
 
     await launchApp();
 
@@ -265,7 +265,7 @@ describe("Onboarding on launch", () => {
     vi.mocked(AsyncStorage.getItem).mockImplementation((key) =>
       key === FLAG ? new Promise(() => {}) : Promise.resolve(null),
     );
-    const screen = renderMobile(<RootLayout />);
+    const screen = await renderMobile(<RootLayout />);
     await act(async () => {});
     expect(screen.queryByTestId("(tabs)")).toBeNull();
 
@@ -287,45 +287,45 @@ describe("Back after onboarding", () => {
 });
 
 describe("OnboardingLaunch", () => {
-  it("pushes the Language screen above the tabs when the launch owes onboarding", () => {
-    renderMobile(<OnboardingLaunch decision="show" />);
+  it("pushes the Language screen above the tabs when the launch owes onboarding", async () => {
+    await renderMobile(<OnboardingLaunch decision="show" />);
 
     expect(launch.push).toHaveBeenCalledWith(LANGUAGE);
   });
 
-  it("leaves native handoff to the entrance when nothing is owed or a deep link won", () => {
-    const skip = renderMobile(<OnboardingLaunch decision="skip" />);
+  it("leaves native handoff to the entrance when nothing is owed or a deep link won", async () => {
+    const skip = await renderMobile(<OnboardingLaunch decision="skip" />);
     expect(SplashScreen.hide).not.toHaveBeenCalled();
     expect(launch.push).not.toHaveBeenCalled();
-    skip.unmount();
+    await skip.unmount();
 
     launch.pathname = "/listings/550e8400-e29b-41d4-a716-446655440000";
-    renderMobile(<OnboardingLaunch decision="show" />);
+    await renderMobile(<OnboardingLaunch decision="show" />);
     expect(launch.push).not.toHaveBeenCalled();
     expect(SplashScreen.hide).not.toHaveBeenCalled();
   });
 
-  it("leaves native handoff to the entrance when the push itself throws", () => {
+  it("leaves native handoff to the entrance when the push itself throws", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     launch.push.mockImplementation(() => {
       throw new Error("router is down");
     });
-    renderMobile(<OnboardingLaunch decision="show" />);
+    await renderMobile(<OnboardingLaunch decision="show" />);
 
     // Navigation failure cannot release native before the entrance has laid out.
     expect(SplashScreen.hide).not.toHaveBeenCalled();
-    act(() => {
+    await act(() => {
       vi.advanceTimersByTime(1000);
     });
     expect(SplashScreen.hide).not.toHaveBeenCalled();
   });
 
-  it("never releases native from a navigation fallback timer", () => {
+  it("never releases native from a navigation fallback timer", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    const screen = renderMobile(<OnboardingLaunch decision="show" />);
-    screen.unmount();
+    const screen = await renderMobile(<OnboardingLaunch decision="show" />);
+    await screen.unmount();
 
-    act(() => {
+    await act(() => {
       vi.advanceTimersByTime(1000);
     });
     expect(SplashScreen.hide).not.toHaveBeenCalled();

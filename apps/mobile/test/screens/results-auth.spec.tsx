@@ -56,33 +56,33 @@ beforeEach(() => {
 describe("Results favorite sign-in boundary", () => {
   it("returns to the same applied search and replays once only after focus, patching signed-in caches", async () => {
     Object.assign(routeParams, { brandId: "toyota", modelIds: "camry,corolla", cityId: "ashgabat", sort: "price_asc", yearMin: "2018" });
-    const view = renderMobile(<ResultsScreen />);
+    const view = await renderMobile(<ResultsScreen />);
     const signedIn = queryKeys.listings.list({ sort: "price_asc", limit: 20 }, "buyer");
     const anonymous = queryKeys.listings.list({ sort: "price_asc", limit: 20 }, null);
     for (const key of [signedIn, anonymous]) view.queryClient.setQueryData(key, { pages: [{ items: [{ ...listing, id: "page-1-listing", isFavorited: false }], nextCursor: "page-2" }, { items: [{ ...listing, isFavorited: false }], nextCursor: null }], pageParams: [null, "page-2"] });
-    fireEvent.press(view.getByRole("button", { name: "Favorite" }));
+    await fireEvent.press(view.getByRole("button", { name: "Favorite" }));
     const intent = useAuthIntentStore.getState().intent;
     expect(intent).toEqual(expect.objectContaining({ action: { kind: "favorite", listingId: listing.id }, returnTo: expect.objectContaining({ pathname: "/(tabs)/(search)/results", params: expect.objectContaining({ brandId: "toyota", modelIds: "camry,corolla", cityId: "ashgabat", sort: "price_asc", yearMin: "2018" }) }) }));
     expect(routerMock.push).toHaveBeenCalledWith(expect.objectContaining({ pathname: "/(auth)/phone" }));
     expect(state.post).not.toHaveBeenCalled();
-    state.focused = false; state.empty = true; view.rerender(<ResultsScreen />);
-    act(() => useAuthIntentStore.getState().completeSignIn({ push: routerMock.push, dismissTo: vi.fn() }));
+    state.focused = false; state.empty = true; await view.rerender(<ResultsScreen />);
+    await act(() => useAuthIntentStore.getState().completeSignIn({ push: routerMock.push, dismissTo: vi.fn() }));
     expect(state.post).not.toHaveBeenCalled();
     expect(view.queryByRole("button", { name: "Favorite" })).toBeNull();
-    state.viewer = { userId: "buyer" }; state.focused = true; view.rerender(<ResultsScreen />);
+    state.viewer = { userId: "buyer" }; state.focused = true; await view.rerender(<ResultsScreen />);
     await waitFor(() => expect(state.post).toHaveBeenCalledOnce());
     expect(state.post).toHaveBeenCalledWith(`/listings/${listing.id}/favorite`, {}, expect.anything());
     expect(state.feed).toHaveBeenLastCalledWith(expect.objectContaining({ viewerId: "buyer" }));
     expect(useAuthIntentStore.getState().replayAction).toBeNull();
     const saved = (key: typeof signedIn) => view.queryClient.getQueryData<{ pages: { items: { id: string; isFavorited: boolean }[] }[] }>(key)?.pages.flatMap((page) => page.items).find((item) => item.id === listing.id)?.isFavorited;
     expect(saved(signedIn)).toBe(true); expect(saved(anonymous)).toBe(false);
-    view.rerender(<ResultsScreen />); expect(state.post).toHaveBeenCalledOnce();
+    await view.rerender(<ResultsScreen />); expect(state.post).toHaveBeenCalledOnce();
   });
-  it("cancelling sign-in drops the waiting favorite", () => {
-    const view = renderMobile(<ResultsScreen />);
-    fireEvent.press(view.getByRole("button", { name: "Favorite" }));
-    act(() => useAuthIntentStore.getState().cancelSignIn());
-    state.viewer = { userId: "buyer" }; view.rerender(<ResultsScreen />);
+  it("cancelling sign-in drops the waiting favorite", async () => {
+    const view = await renderMobile(<ResultsScreen />);
+    await fireEvent.press(view.getByRole("button", { name: "Favorite" }));
+    await act(() => useAuthIntentStore.getState().cancelSignIn());
+    state.viewer = { userId: "buyer" }; await view.rerender(<ResultsScreen />);
     expect(state.post).not.toHaveBeenCalled(); expect(useAuthIntentStore.getState().intent).toBeNull();
   });
 });

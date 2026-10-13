@@ -21,15 +21,15 @@ vi.mock("@rn-primitives/dialog", async () => {
 });
 vi.mock("react-native-screens", async () => ({ FullWindowOverlay: (await import("react-native")).View }));
 
-function setup(hasPhoto = false, locale = "en") {
+async function setup(hasPhoto = false, locale = "en") {
   const callbacks = { onOpenChange: vi.fn(), onTakePhoto: vi.fn(), onChoosePhoto: vi.fn(), onRemovePhoto: vi.fn() };
-  return { ...renderMobile(<ProfilePhotoSheet open hasPhoto={hasPhoto} {...callbacks} />, { locale }), callbacks };
+  return { ...(await renderMobile(<ProfilePhotoSheet open hasPhoto={hasPhoto} {...callbacks} />, { locale })), callbacks };
 }
 
 describe("ProfilePhotoSheet", () => {
-  it.each(["close", "outside"])("dismisses with %s without choosing or removing a photo", (control) => {
-    const view = setup(true);
-    fireEvent.press(control === "close" ? view.getByRole("button", { name: "Close" }) : view.getByTestId("sheet-backdrop", { includeHiddenElements: true }));
+  it.each(["close", "outside"])("dismisses with %s without choosing or removing a photo", async (control) => {
+    const view = await setup(true);
+    await fireEvent.press(control === "close" ? view.getByRole("button", { name: "Close" }) : view.getByTestId("sheet-backdrop", { includeHiddenElements: true }));
     expect(view.callbacks.onOpenChange).toHaveBeenCalledWith(false);
     expect(view.callbacks.onChoosePhoto).not.toHaveBeenCalled();
     expect(view.callbacks.onTakePhoto).not.toHaveBeenCalled();
@@ -40,17 +40,17 @@ describe("ProfilePhotoSheet", () => {
     ["en", "Profile photo", "Take photo", "Choose from library", "Remove photo"],
     ["ru", "Фото профиля", "Сделать фото", "Выбрать из галереи", "Удалить фото"],
     ["tk", "Profil suraty", "Surata al", "Galereýadan saýla", "Suraty aýyr"],
-  ])("offers the photo actions and conditional removal in %s", (locale, title, camera, library, remove) => {
-    const empty = setup(false, locale);
+  ])("offers the photo actions and conditional removal in %s", async (locale, title, camera, library, remove) => {
+    const empty = await setup(false, locale);
     expect(empty.getByText(title)).toBeTruthy();
     expect(empty.getByRole("button", { name: camera })).toBeTruthy();
     expect(empty.queryByRole("button", { name: remove })).toBeNull();
-    fireEvent.press(empty.getByRole("button", { name: library }));
+    await fireEvent.press(empty.getByRole("button", { name: library }));
     expect(empty.callbacks.onChoosePhoto).toHaveBeenCalledOnce();
     expect(empty.callbacks.onOpenChange).toHaveBeenCalledWith(false);
-    empty.unmount();
-    const full = setup(true, locale);
-    fireEvent.press(full.getByRole("button", { name: remove }));
+    await empty.unmount();
+    const full = await setup(true, locale);
+    await fireEvent.press(full.getByRole("button", { name: remove }));
     expect(full.callbacks.onRemovePhoto).toHaveBeenCalledOnce();
     expect(full.callbacks.onOpenChange).toHaveBeenCalledWith(false);
   });

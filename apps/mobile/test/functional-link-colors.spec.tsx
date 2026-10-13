@@ -8,8 +8,8 @@ import { Text } from "@/components/ui/text";
 import { THEME } from "@/lib/theme";
 
 describe("functional blue", () => {
-  it("gives More the functional link role", () => {
-    const screen = renderMobile(<Button variant="link"><Text>More</Text></Button>);
+  it("gives More the functional link role", async () => {
+    const screen = await renderMobile(<Button variant="link"><Text>More</Text></Button>);
     expect(screen.getByText("More").props.className).toContain("text-link");
   });
 

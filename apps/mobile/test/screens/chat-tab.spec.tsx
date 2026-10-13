@@ -1,11 +1,10 @@
 import type { ConversationsSchemas } from "@auto-tm/contracts";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
-import { Image } from "expo-image";
 import * as Notifications from "expo-notifications";
 import { useFocusEffect } from "expo-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { act, fireEvent, renderMobile, routerMock } from "../render";
+import { act, fireEvent, renderMobile, routerMock, getAllHosts } from "../render";
 import { TAB_BAR_SPACE, clearsTabBar, listContentPaddingBottom, rootPaddingBottom } from "../tabBarClearance";
 import ChatScreen from "../../app/(tabs)/chat";
 import { AutoTmTabBar } from "../../components/navigation/AutoTmTabBar";
@@ -63,7 +62,7 @@ async function settle() {
   for (let i = 0; i < 5; i += 1) await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
 }
 async function renderScreen(locale = "en") {
-  const view = renderMobile(<ChatScreen />, { locale });
+  const view = await renderMobile(<ChatScreen />, { locale });
   await settle();
   return view;
 }
@@ -99,7 +98,7 @@ describe("Messages tab", () => {
     api.get.mockReset().mockRejectedValueOnce(new Error("offline")).mockResolvedValue(page([conversation(first, 0)]));
     const view = await renderScreen();
 
-    fireEvent.press(view.getByText("Retry"));
+    await fireEvent.press(view.getByText("Retry"));
     await settle();
 
     expect(view.getByText("Merdan")).toBeTruthy();
@@ -111,7 +110,7 @@ describe("Messages tab", () => {
 
     expect(view.getByText("No conversations yet")).toBeTruthy();
     expect(view.getByText("Open a listing and message the seller. The Conversation appears here.")).toBeTruthy();
-    fireEvent.press(view.getByText("Browse listings"));
+    await fireEvent.press(view.getByText("Browse listings"));
     expect(routerMock.navigate).toHaveBeenCalledWith(HOME_HREF);
   });
 
@@ -134,7 +133,7 @@ describe("Messages tab", () => {
     const view = await renderScreen();
 
     expect(view.getByText("Sign in to see your Messages")).toBeTruthy();
-    fireEvent.press(view.getByText("Sign in"));
+    await fireEvent.press(view.getByText("Sign in"));
     expect(requireSignIn).toHaveBeenCalledWith(routerMock, { returnTo: "/(tabs)/chat" });
     expect(api.get).not.toHaveBeenCalled();
   });
@@ -206,7 +205,7 @@ describe("Messages tab", () => {
     }))));
     const view = await renderScreen();
 
-    const badges = view.UNSAFE_getAllByType(Image).map((image) => image.props.source.uri);
+    const badges = getAllHosts(view.container, "Image").map((image) => image.props.source.uri);
     expect(badges).toEqual([
       "https://media.autotm.tm/listing-photos/avatars/u0/thumbnail.webp?v=webp-natural-1",
       "https://media.autotm.tm/listing-photos/avatars/u1/thumbnail.webp?v=webp-natural-1",
@@ -234,10 +233,10 @@ describe("Messages tab button", () => {
     return renderMobile(<AutoTmTabBar {...props} />, { locale });
   }
 
-  it("reads Messages / Сообщения / Çat", () => {
-    expect(renderTabBar("en").getByRole("tab", { name: "Messages" })).toBeTruthy();
-    expect(renderTabBar("ru").getByRole("tab", { name: "Сообщения" })).toBeTruthy();
-    expect(renderTabBar("tk").getByRole("tab", { name: "Çat" })).toBeTruthy();
+  it("reads Messages / Сообщения / Çat", async () => {
+    expect((await renderTabBar("en")).getByRole("tab", { name: "Messages" })).toBeTruthy();
+    expect((await renderTabBar("ru")).getByRole("tab", { name: "Сообщения" })).toBeTruthy();
+    expect((await renderTabBar("tk")).getByRole("tab", { name: "Çat" })).toBeTruthy();
   });
 });
 
@@ -246,17 +245,17 @@ describe("Messages tab permission timing", () => {
     state.auth = true;
     vi.mocked(Notifications.requestPermissionsAsync).mockClear();
     api.get.mockResolvedValue(page([]));
-    const view = renderMobile(<ChatScreen />);
+    const view = await renderMobile(<ChatScreen />);
     await act(async () => { await Promise.resolve(); });
     expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
-    view.unmount();
+    await view.unmount();
   });
 });
 
 describe("Messages under the glass tab bar", () => {
   it("runs the Conversation list under the bar and ends it with the bar's space", async () => {
     const view = await renderScreen();
-    expect(rootPaddingBottom(view.UNSAFE_root as never)).toBe(0);
+    expect(rootPaddingBottom(view.container as never)).toBe(0);
     expect(listContentPaddingBottom(view.getByTestId("conversation-list") as never)).toBe(TAB_BAR_SPACE + 16);
   });
 
@@ -264,7 +263,7 @@ describe("Messages under the glass tab bar", () => {
     api.get.mockReset().mockResolvedValue(page([]));
     const empty = await renderScreen();
     expect(clearsTabBar(empty.getByText("No conversations yet") as never)).toBe(true);
-    empty.unmount();
+    await empty.unmount();
 
     state.auth = false;
     const signedOut = await renderScreen();

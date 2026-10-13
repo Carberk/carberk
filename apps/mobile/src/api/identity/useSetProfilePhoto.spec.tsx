@@ -28,7 +28,7 @@ describe("useSetProfilePhoto", () => {
       return HttpResponse.json({ ...PHOTO_ME, avatarKey: request.key });
     }));
     const session = await capturePhotoSession();
-    const { client, result } = setupPhotoHook(useSetProfilePhoto);
+    const { client, result } = await setupPhotoHook(useSetProfilePhoto);
     await act(() => result.current.mutateAsync({ request, session }));
     expect(sent).toEqual({ body: { key: "pending/new/original.webp" }, auth: "Bearer aman" });
     expect(client.getQueryData(queryKeys.me())).toEqual({ ...PHOTO_ME, avatarKey: "pending/new/original.webp" });
@@ -41,7 +41,7 @@ describe("useSetProfilePhoto", () => {
   ])("rejects a %s answer and keeps the prior me", async (_kind, response) => {
     server.use(http.put("*/me/photo", () => HttpResponse.json(response)));
     const session = await capturePhotoSession();
-    const { client, result } = setupPhotoHook(useSetProfilePhoto);
+    const { client, result } = await setupPhotoHook(useSetProfilePhoto);
     const error = await act(() => result.current.mutateAsync({ request, session }).catch((e: unknown) => e));
     expect(error).toMatchObject({ code: "CONTRACT_VIOLATION" });
     expect(client.getQueryData(queryKeys.me())).toEqual(PHOTO_ME);
@@ -56,7 +56,7 @@ describe("useSetProfilePhoto", () => {
   ])("preserves the server refusal %s %s %s and the old photo", async (status, code, reason) => {
     server.use(http.put("*/me/photo", () => HttpResponse.json({ code, details: reason ? { reason } : undefined }, { status })));
     const session = await capturePhotoSession();
-    const { client, result } = setupPhotoHook(useSetProfilePhoto);
+    const { client, result } = await setupPhotoHook(useSetProfilePhoto);
     const error = await act(() => result.current.mutateAsync({ request, session }).catch((e: unknown) => e));
     expect(error).toMatchObject({ code, status });
     if (reason) expect(error).toMatchObject({ details: { reason } });

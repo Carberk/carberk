@@ -41,7 +41,7 @@ import { createRequire } from "node:module";
 
 // Resolved through apps/mobile's package rather than a root dependency, on
 // purpose: the harness should drive the flow with the exact Socket.IO client
-// the shipped app uses, and this survives `.npmrc`'s shamefully-hoist being
+// the shipped app uses, and this survives pnpm-workspace.yaml's shamefullyHoist being
 // turned off or Expo re-aligning the mobile dependency set.
 const { io } = createRequire(new URL("../apps/mobile/package.json", import.meta.url))(
   "socket.io-client",

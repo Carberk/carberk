@@ -99,7 +99,7 @@ function resume(payload: "atPhotos" | "complete") {
   routeParams.resumeDraftId = fixture.id;
 }
 
-const continueButton = (screen: ReturnType<typeof renderMobile>) => screen.getByRole("button", { name: "Continue" });
+const continueButton = (screen: Awaited<ReturnType<typeof renderMobile>>) => screen.getByRole("button", { name: "Continue" });
 
 beforeEach(() => {
   fixture.payload = {};
@@ -112,22 +112,22 @@ beforeEach(() => {
 });
 
 describe("Sell wizard, Photos step", () => {
-  it("requires three picked photos, explains the floor and nudges toward eight", () => {
+  it("requires three picked photos, explains the floor and nudges toward eight", async () => {
     fixture.queuePhotos = [keyed(ids.a, 0), keyed(ids.b, 1)];
     resume("atPhotos");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
     expect(continueButton(screen).props.accessibilityState).toMatchObject({ disabled: true });
     expect(screen.getByText("At least 3 photos are required")).toBeTruthy();
     expect(screen.getByText("Photos: 2")).toBeTruthy();
     fixture.queuePhotos = [...fixture.queuePhotos, keyed(ids.c, 2)];
-    screen.rerender(<SellScreen />);
+    await screen.rerender(<SellScreen />);
     expect(continueButton(screen).props.accessibilityState).toMatchObject({ disabled: false });
     expect(screen.getByText("Add 5 more for a better listing")).toBeTruthy();
   });
 
-  it("opens on Photos with the minimum helper and will not continue below three", () => {
+  it("opens on Photos with the minimum helper and will not continue below three", async () => {
     resume("atPhotos");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
     expect(screen.getByRole("header", { name: "Photos, Step 3 of 7" })).toBeTruthy();
     expect(screen.getByText("At least 3 photos are required")).toBeTruthy();
@@ -143,23 +143,23 @@ describe("Sell wizard, Photos step", () => {
     ["failed", staged(ids.a, 0, "failed", { retryCount: 1, error: { code: "NETWORK_ERROR", message: "Offline", retryable: true } })],
     ["lost", staged(ids.a, 0, "lost", { localUri: undefined })],
     ["uploaded", keyed(ids.a, 0)],
-  ])("Continue moves on with three picked photos including one that is %s", (_name, photo) => {
+  ])("Continue moves on with three picked photos including one that is %s", async (_name, photo) => {
     fixture.queuePhotos = [photo, keyed(ids.b, 1), keyed(ids.c, 2)];
     resume("atPhotos");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
     expect(screen.queryByText("At least 3 photos are required")).toBeNull();
     expect(continueButton(screen).props.accessibilityState).toMatchObject({ disabled: false });
-    fireEvent.press(continueButton(screen));
+    await fireEvent.press(continueButton(screen));
 
     expect(screen.getByRole("header", { name: "Price, Step 4 of 7" })).toBeTruthy();
   });
 
-  it("does not put a photo without a key into the saved draft", () => {
+  it("does not put a photo without a key into the saved draft", async () => {
     fixture.queuePhotos = [staged(ids.a, 0, "uploading"), keyed(ids.b, 1), staged(ids.c, 2, "compressed")];
     resume("atPhotos");
-    const screen = renderMobile(<SellScreen />);
-    fireEvent.press(continueButton(screen));
+    const screen = await renderMobile(<SellScreen />);
+    await fireEvent.press(continueButton(screen));
 
     expect(fixture.forceSave).toHaveBeenCalled();
     for (const [payload] of [...fixture.forceSave.mock.calls, ...fixture.save.mock.calls]) {
@@ -167,20 +167,20 @@ describe("Sell wizard, Photos step", () => {
     }
   });
 
-  it("saves nothing under photos when no picked photo has a key yet, and Publish would still need one", () => {
+  it("saves nothing under photos when no picked photo has a key yet, and Publish would still need one", async () => {
     fixture.queuePhotos = [staged(ids.a, 0, "uploading"), staged(ids.b, 1, "compressed"), staged(ids.c, 2, "presigned")];
     resume("atPhotos");
-    const screen = renderMobile(<SellScreen />);
-    fireEvent.press(continueButton(screen));
+    const screen = await renderMobile(<SellScreen />);
+    await fireEvent.press(continueButton(screen));
 
     expect(fixture.forceSave).toHaveBeenCalledWith(expect.objectContaining({ photos: [] }));
   });
 
-  it("saves the photos in the order the seller left them", () => {
+  it("saves the photos in the order the seller left them", async () => {
     fixture.queuePhotos = [keyed(ids.b, 0), keyed(ids.a, 1), keyed(ids.c, 2)];
     resume("atPhotos");
-    const screen = renderMobile(<SellScreen />);
-    fireEvent.press(continueButton(screen));
+    const screen = await renderMobile(<SellScreen />);
+    await fireEvent.press(continueButton(screen));
 
     expect(fixture.forceSave).toHaveBeenCalledWith(expect.objectContaining({
       photos: [
@@ -200,54 +200,54 @@ describe("Sell wizard, upload status on later steps", () => {
     })];
   };
 
-  it("shows the uploading and failed counts in the header, and the chip opens Photos", () => {
+  it("shows the uploading and failed counts in the header, and the chip opens Photos", async () => {
     withUploads();
     resume("complete");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
     expect(screen.getByRole("header", { name: "Check and publish, Step 7 of 7" })).toBeTruthy();
     expect(screen.getByText("1 uploading")).toBeTruthy();
     expect(screen.getByText("1 failed")).toBeTruthy();
-    fireEvent.press(screen.getByRole("button", { name: "1 uploading, 1 failed" }));
+    await fireEvent.press(screen.getByRole("button", { name: "1 uploading, 1 failed" }));
 
     expect(screen.getByRole("header", { name: "Photos, Step 3 of 7" })).toBeTruthy();
   });
 
-  it("names the failed photos above Publish and keeps Publish disabled", () => {
+  it("names the failed photos above Publish and keeps Publish disabled", async () => {
     withUploads();
     fixture.gate = { canPublish: false, blockers: ["wizardErrors.uploadsInProgress", "wizardErrors.uploadsFailed"] };
     resume("complete");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
     expect(screen.getByText("Photos failed: 1. Retry or remove them.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Publish" }).props.accessibilityState).toMatchObject({ disabled: true });
   });
 
-  it("names the uploading photos above Publish when none failed", () => {
+  it("names the uploading photos above Publish when none failed", async () => {
     fixture.queuePhotos = [keyed(ids.a, 0), staged(ids.b, 1, "uploading"), staged(ids.c, 2, "compressed")];
     fixture.gate = { canPublish: false, blockers: ["wizardErrors.uploadsInProgress"] };
     resume("complete");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
     expect(screen.getByText("Photos still uploading: 2")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Publish" }).props.accessibilityState).toMatchObject({ disabled: true });
   });
 
-  it("counts a photo waiting for the network as still uploading", () => {
+  it("counts a photo waiting for the network as still uploading", async () => {
     fixture.queuePhotos = [keyed(ids.a, 0), staged(ids.b, 1, "waiting_for_network")];
     fixture.gate = { canPublish: false, blockers: ["wizardErrors.uploadsInProgress"] };
     resume("complete");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
     expect(screen.getByText("Photos still uploading: 1")).toBeTruthy();
     expect(screen.getByText("1 uploading")).toBeTruthy();
   });
 
-  it("counts a lost photo as failed", () => {
+  it("counts a lost photo as failed", async () => {
     fixture.queuePhotos = [keyed(ids.a, 0), staged(ids.b, 1, "lost", { localUri: undefined })];
     fixture.gate = { canPublish: false, blockers: ["wizardErrors.uploadsFailed"] };
     resume("complete");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
     expect(screen.getByText("Photos failed: 1. Retry or remove them.")).toBeTruthy();
     expect(screen.getByText("1 failed")).toBeTruthy();
@@ -256,52 +256,52 @@ describe("Sell wizard, upload status on later steps", () => {
   it.each([
     ["ru", "Ещё загружается фото: 1", "Не загрузилось фото: 1. Повторите или удалите."],
     ["tk", "Entek ýüklenýän surat: 1", "Ýüklenmedik surat: 1. Täzeden synanyşyň ýa-da aýryň."],
-  ] as const)("words the Publish blockers in %s", (locale, uploading, failed) => {
+  ] as const)("words the Publish blockers in %s", async (locale, uploading, failed) => {
     fixture.queuePhotos = [keyed(ids.a, 0), staged(ids.b, 1, "uploading")];
     fixture.gate = { canPublish: false, blockers: ["wizardErrors.uploadsInProgress"] };
     resume("complete");
-    expect(renderMobile(<SellScreen />, { locale }).getByText(uploading)).toBeTruthy();
+    expect((await renderMobile(<SellScreen />, { locale })).getByText(uploading)).toBeTruthy();
 
     fixture.queuePhotos = [keyed(ids.a, 0), staged(ids.b, 1, "failed", { retryCount: 1 })];
     fixture.gate = { canPublish: false, blockers: ["wizardErrors.uploadsFailed"] };
-    expect(renderMobile(<SellScreen />, { locale }).getByText(failed)).toBeTruthy();
+    expect((await renderMobile(<SellScreen />, { locale })).getByText(failed)).toBeTruthy();
   });
 
-  it("keeps the earlier steps done while a photo's upload finishes, so Publish opens as soon as it does", () => {
+  it("keeps the earlier steps done while a photo's upload finishes, so Publish opens as soon as it does", async () => {
     // The draft holds the photo with its key; the queue still shows it uploading.
     fixture.queuePhotos = [staged(ids.a, 0, "uploading")];
     fixture.gate = { canPublish: false, blockers: ["wizardErrors.uploadsInProgress"] };
     resume("complete");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
     expect(screen.getByRole("button", { name: "Publish" }).props.accessibilityState).toMatchObject({ disabled: true });
 
     fixture.queuePhotos = [keyed(ids.a, 0), keyed(ids.b, 1), keyed(ids.c, 2)];
     fixture.gate = { canPublish: true, blockers: [] };
-    screen.rerender(<SellScreen />);
+    await screen.rerender(<SellScreen />);
 
     expect(screen.getByRole("button", { name: "Publish" }).props.accessibilityState).toMatchObject({ disabled: false });
   });
 
-  it("keeps the later steps done when a resumed draft brings back a photo it had not saved", () => {
+  it("keeps the later steps done when a resumed draft brings back a photo it had not saved", async () => {
     // The app closed while the second photo was uploading: only the first is in the draft.
     fixture.queuePhotos = [keyed(ids.a, 0), staged(ids.b, 1, "compressed")];
     fixture.queueReady = true;
     resume("complete");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
     expect(screen.getByRole("header", { name: "Check and publish, Step 7 of 7" })).toBeTruthy();
     expect(screen.queryByText(/^Fill in: /)).toBeNull();
 
     // A photo the seller adds afterwards is a change of theirs, and is checked again.
     fixture.queuePhotos = [...fixture.queuePhotos, staged("44444444-4444-4444-8444-444444444444", 3, "selected")];
-    screen.rerender(<SellScreen />);
+    await screen.rerender(<SellScreen />);
     expect(screen.getByText(/^Fill in: /)).toBeTruthy();
   });
 
-  it("can publish once every photo is attached", () => {
+  it("can publish once every photo is attached", async () => {
     fixture.queuePhotos = [keyed(ids.a, 0)];
     resume("complete");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
     expect(screen.queryByText(/Photos still uploading|Photos failed/)).toBeNull();
     expect(screen.getByRole("button", { name: "Publish" }).props.accessibilityState).toMatchObject({ disabled: false });

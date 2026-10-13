@@ -106,9 +106,9 @@ function renderSell() {
 }
 
 /** Taps New listing on an empty Sell tab; the create wizard opens on Car. */
-function openNewListing() {
-  const screen = renderSell();
-  fireEvent.press(screen.getByRole("button", { name: "List a car" }));
+async function openNewListing() {
+  const screen = await renderSell();
+  await fireEvent.press(screen.getByRole("button", { name: "List a car" }));
   expect(screen.getByRole("header", { name: "Car, Step 1 of 7" })).toBeTruthy();
   return screen;
 }
@@ -119,18 +119,18 @@ function resumeDraft(payload: Record<string, unknown>) {
   return renderSell();
 }
 
-async function pressClose(screen: ReturnType<typeof renderSell>) {
+async function pressClose(screen: Awaited<ReturnType<typeof renderSell>>) {
   await act(async () => {
-    fireEvent.press(screen.getByRole("button", { name: "Close" }));
+    void fireEvent.press(screen.getByRole("button", { name: "Close" }));
   });
 }
 
-const wizardIsOpen = (screen: ReturnType<typeof renderSell>) => screen.queryByRole("button", { name: "Close" }) !== null;
+const wizardIsOpen = (screen: Awaited<ReturnType<typeof renderSell>>) => screen.queryByRole("button", { name: "Close" }) !== null;
 
 describe("✕ saves the draft and closes the Sell wizard (#585)", () => {
   it("saves the pending change, closes to the Sell tab and shows Saved to Drafts", async () => {
-    const screen = openNewListing();
-    fireEvent.press(screen.getByRole("button", { name: "Change car" }));
+    const screen = await openNewListing();
+    await fireEvent.press(screen.getByRole("button", { name: "Change car" }));
 
     await pressClose(screen);
 
@@ -145,8 +145,8 @@ describe("✕ saves the draft and closes the Sell wizard (#585)", () => {
   });
 
   it("shows Saved to Drafts above the tab bar, clear of the Latest draft card at the top", async () => {
-    const screen = openNewListing();
-    fireEvent.press(screen.getByRole("button", { name: "Change car" }));
+    const screen = await openNewListing();
+    await fireEvent.press(screen.getByRole("button", { name: "Change car" }));
 
     await pressClose(screen);
 
@@ -162,17 +162,17 @@ describe("✕ saves the draft and closes the Sell wizard (#585)", () => {
   ] as const)("shows the toast in %s", async (locale, text) => {
     fixture.drafts = [{ id: fixture.id, payload: { ...car, currentStep: 2 } }];
     routeParams.resumeDraftId = fixture.id;
-    const screen = renderMobile(<ToastProvider><SellScreen /></ToastProvider>, { locale });
+    const screen = await renderMobile(<ToastProvider><SellScreen /></ToastProvider>, { locale });
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: locale === "ru" ? "Закрыть" : "Ýap" }));
+      void fireEvent.press(screen.getByRole("button", { name: locale === "ru" ? "Закрыть" : "Ýap" }));
     });
 
     expect(screen.getByText(text)).toBeTruthy();
   });
 
   it("leaves no draft behind for a new Listing the seller never touched, and shows no toast", async () => {
-    const screen = openNewListing();
+    const screen = await openNewListing();
 
     await pressClose(screen);
 
@@ -185,8 +185,8 @@ describe("✕ saves the draft and closes the Sell wizard (#585)", () => {
   });
 
   it("does not delete a new Listing once the seller has changed something", async () => {
-    const screen = openNewListing();
-    fireEvent.press(screen.getByRole("button", { name: "Change car" }));
+    const screen = await openNewListing();
+    await fireEvent.press(screen.getByRole("button", { name: "Change car" }));
 
     await pressClose(screen);
 
@@ -197,7 +197,7 @@ describe("✕ saves the draft and closes the Sell wizard (#585)", () => {
   it("does not delete a new Listing that has a picked photo still uploading", async () => {
     // The photo has no key yet, so the payload alone still looks untouched.
     fixture.queuePhotos = [{ photoId: fixture.id, state: "uploading", sortOrder: 0, retryCount: 0 }];
-    const screen = openNewListing();
+    const screen = await openNewListing();
 
     await pressClose(screen);
 
@@ -210,7 +210,7 @@ describe("✕ saves the draft and closes the Sell wizard (#585)", () => {
   it("waits for the delete before closing, so the five-draft count is right when New listing is tapped again", async () => {
     let finishDelete: () => void = () => {};
     fixture.discard.mockImplementation(() => new Promise<void>((resolve) => { finishDelete = resolve; }));
-    const screen = openNewListing();
+    const screen = await openNewListing();
 
     await pressClose(screen);
     expect(wizardIsOpen(screen)).toBe(true);
@@ -223,7 +223,7 @@ describe("✕ saves the draft and closes the Sell wizard (#585)", () => {
 
   it("still closes, without a toast, when deleting the untouched draft fails", async () => {
     fixture.discard.mockRejectedValue(new Error("offline"));
-    const screen = openNewListing();
+    const screen = await openNewListing();
 
     await pressClose(screen);
 
@@ -232,7 +232,7 @@ describe("✕ saves the draft and closes the Sell wizard (#585)", () => {
   });
 
   it("keeps an empty draft the seller reopened from the Sell tab instead of deleting it", async () => {
-    const screen = resumeDraft({ currentStep: 1, allowCalls: true, allowChat: true, priceCurrency: "TMT" });
+    const screen = await resumeDraft({ currentStep: 1, allowCalls: true, allowChat: true, priceCurrency: "TMT" });
 
     await pressClose(screen);
 
@@ -241,8 +241,8 @@ describe("✕ saves the draft and closes the Sell wizard (#585)", () => {
     expect(screen.getByText("Saved to Drafts")).toBeTruthy();
   });
 
-  it("has no delete or discard action in the create wizard", () => {
-    const screen = openNewListing();
+  it("has no delete or discard action in the create wizard", async () => {
+    const screen = await openNewListing();
 
     expect(screen.queryByText(/discard|delete/i)).toBeNull();
     expect(screen.queryByText("Cancel")).toBeNull();
@@ -252,10 +252,10 @@ describe("✕ saves the draft and closes the Sell wizard (#585)", () => {
 
 describe("✕ when the latest changes are not saved (#585)", () => {
   async function openAfterFailedSave() {
-    const screen = openNewListing();
-    fireEvent.press(screen.getByRole("button", { name: "Change car" }));
+    const screen = await openNewListing();
+    await fireEvent.press(screen.getByRole("button", { name: "Change car" }));
     Object.assign(fixture.autosave, { saveStatus: "error", saveError: "No internet" });
-    screen.rerender(<ToastProvider><SellScreen /></ToastProvider>);
+    await screen.rerender(<ToastProvider><SellScreen /></ToastProvider>);
     await pressClose(screen);
     return screen;
   }
@@ -278,17 +278,17 @@ describe("✕ when the latest changes are not saved (#585)", () => {
     routeParams.resumeDraftId = fixture.id;
     Object.assign(fixture.autosave, { saveStatus: "error", saveError: "No internet" });
 
-    const ru = renderMobile(<ToastProvider><SellScreen /></ToastProvider>, { locale: "ru" });
-    await act(async () => { fireEvent.press(ru.getByRole("button", { name: "Закрыть" })); });
+    const ru = await renderMobile(<ToastProvider><SellScreen /></ToastProvider>, { locale: "ru" });
+    await act(async () => { void fireEvent.press(ru.getByRole("button", { name: "Закрыть" })); });
     expect(ru.getByText("Последние изменения не сохранены")).toBeTruthy();
     expect(ru.getByText("Повторите, когда появится сеть, или выйдите: изменения на этом шаге пропадут.")).toBeTruthy();
     expect(ru.getByRole("button", { name: "Повторить" })).toBeTruthy();
     expect(ru.getByRole("button", { name: "Всё равно выйти" })).toBeTruthy();
     expect(ru.getByRole("button", { name: "Продолжить редактирование" })).toBeTruthy();
-    ru.unmount();
+    await ru.unmount();
 
-    const tk = renderMobile(<ToastProvider><SellScreen /></ToastProvider>, { locale: "tk" });
-    await act(async () => { fireEvent.press(tk.getByRole("button", { name: "Ýap" })); });
+    const tk = await renderMobile(<ToastProvider><SellScreen /></ToastProvider>, { locale: "tk" });
+    await act(async () => { void fireEvent.press(tk.getByRole("button", { name: "Ýap" })); });
     expect(tk.getByText("Soňky üýtgeşmeler ýatda saklanmady")).toBeTruthy();
     expect(tk.getByText("Tor bar wagty täzeden synanyşyň ýa-da çykyň: bu tapgyrdaky üýtgeşmeler ýitýär.")).toBeTruthy();
     expect(tk.getByRole("button", { name: "Täzeden synanyş" })).toBeTruthy();
@@ -299,7 +299,7 @@ describe("✕ when the latest changes are not saved (#585)", () => {
   it("Keep editing closes the dialog and keeps the wizard and the unsaved status", async () => {
     const screen = await openAfterFailedSave();
 
-    fireEvent.press(screen.getByRole("button", { name: "Keep editing" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Keep editing" }));
 
     expect(screen.queryByText("Latest changes are not saved")).toBeNull();
     expect(wizardIsOpen(screen)).toBe(true);
@@ -309,7 +309,7 @@ describe("✕ when the latest changes are not saved (#585)", () => {
   it("Leave anyway closes without a toast and leaves the draft as last saved", async () => {
     const screen = await openAfterFailedSave();
 
-    await act(async () => { fireEvent.press(screen.getByRole("button", { name: "Leave anyway" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Leave anyway" })); });
 
     expect(wizardIsOpen(screen)).toBe(false);
     expect(screen.queryByText("Saved to Drafts")).toBeNull();
@@ -321,7 +321,7 @@ describe("✕ when the latest changes are not saved (#585)", () => {
   it("Retry saves again and closes with the toast when it works", async () => {
     const screen = await openAfterFailedSave();
 
-    await act(async () => { fireEvent.press(screen.getByRole("button", { name: "Retry" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Retry" })); });
 
     expect(fixture.autosave.flush).toHaveBeenCalledTimes(1);
     expect(wizardIsOpen(screen)).toBe(false);
@@ -332,7 +332,7 @@ describe("✕ when the latest changes are not saved (#585)", () => {
     fixture.autosave.flush.mockResolvedValue(false);
     const screen = await openAfterFailedSave();
 
-    await act(async () => { fireEvent.press(screen.getByRole("button", { name: "Retry" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Retry" })); });
 
     expect(wizardIsOpen(screen)).toBe(true);
     expect(screen.getByText("Latest changes are not saved")).toBeTruthy();
@@ -341,8 +341,8 @@ describe("✕ when the latest changes are not saved (#585)", () => {
 
   it("asks when the save made by ✕ itself fails", async () => {
     fixture.autosave.flush.mockResolvedValue(false);
-    const screen = openNewListing();
-    fireEvent.press(screen.getByRole("button", { name: "Change car" }));
+    const screen = await openNewListing();
+    await fireEvent.press(screen.getByRole("button", { name: "Change car" }));
 
     await pressClose(screen);
 
@@ -362,8 +362,8 @@ describe("✕ when the latest changes are not saved (#585)", () => {
 
     it("stops waiting for the save after about ten seconds and asks, with ✕ usable again", async () => {
       fixture.autosave.flush.mockReturnValue(new Promise<boolean>(() => {}));
-      const screen = openNewListing();
-      fireEvent.press(screen.getByRole("button", { name: "Change car" }));
+      const screen = await openNewListing();
+      await fireEvent.press(screen.getByRole("button", { name: "Change car" }));
 
       await pressClose(screen);
       await act(async () => { await vi.advanceTimersByTimeAsync(9_000); });
@@ -380,7 +380,7 @@ describe("✕ when the latest changes are not saved (#585)", () => {
 
     it("stops waiting for the delete of an untouched new Listing and closes", async () => {
       fixture.discard.mockReturnValue(new Promise<void>(() => {}));
-      const screen = openNewListing();
+      const screen = await openNewListing();
 
       await pressClose(screen);
       await act(async () => { await vi.advanceTimersByTimeAsync(9_000); });
@@ -395,22 +395,22 @@ describe("✕ when the latest changes are not saved (#585)", () => {
 });
 
 describe("Sell wizard resume and system back (#585)", () => {
-  it("opens the step the seller left, and keeps saving that position", () => {
-    const screen = resumeDraft({ ...car, ...details, ...photos, currentStep: 4 });
+  it("opens the step the seller left, and keeps saving that position", async () => {
+    const screen = await resumeDraft({ ...car, ...details, ...photos, currentStep: 4 });
 
     expect(screen.getByRole("header", { name: "Price, Step 4 of 7" })).toBeTruthy();
     // The autosave effect sends the position with the payload.
     expect(fixture.autosave.save).toHaveBeenCalledWith(expect.objectContaining({ currentStep: 4 }));
   });
 
-  it("opens a draft saved before this change at its first incomplete step", () => {
-    const screen = resumeDraft({ ...car, ...details, ...photos, currentStep: 1 });
+  it("opens a draft saved before this change at its first incomplete step", async () => {
+    const screen = await resumeDraft({ ...car, ...details, ...photos, currentStep: 1 });
 
     expect(screen.getByRole("header", { name: "Price, Step 4 of 7" })).toBeTruthy();
   });
 
   it("system back on the first step behaves as ✕", async () => {
-    const screen = resumeDraft({ ...car, currentStep: 1 });
+    const screen = await resumeDraft({ ...car, currentStep: 1 });
     // Car is complete, so the first incomplete step is Details; system back goes to Car.
     expect(screen.getByRole("header", { name: "Details and condition, Step 2 of 7" })).toBeTruthy();
     await act(async () => { pressHardwareBack(); });
@@ -426,7 +426,7 @@ describe("Sell wizard resume and system back (#585)", () => {
   });
 
   it("system back on a later step goes back one step and does not close the wizard", async () => {
-    const screen = resumeDraft({ ...car, currentStep: 2 });
+    const screen = await resumeDraft({ ...car, currentStep: 2 });
     expect(screen.getByRole("header", { name: "Details and condition, Step 2 of 7" })).toBeTruthy();
 
     let handled = false;
@@ -439,7 +439,7 @@ describe("Sell wizard resume and system back (#585)", () => {
   });
 
   it("saves the step it moves to, not the one it left", async () => {
-    const screen = resumeDraft({ ...car, currentStep: 1 });
+    const screen = await resumeDraft({ ...car, currentStep: 1 });
     expect(screen.getByRole("header", { name: "Details and condition, Step 2 of 7" })).toBeTruthy();
     // The draft opened on Details, and that position is what the autosave sends.
     expect(fixture.autosave.save).toHaveBeenLastCalledWith(expect.objectContaining({ currentStep: 2 }));
@@ -452,7 +452,7 @@ describe("Sell wizard resume and system back (#585)", () => {
 
   it("system back with the unsaved dialog open closes the dialog and stays on the step", async () => {
     Object.assign(fixture.autosave, { saveStatus: "error", saveError: "No internet" });
-    const screen = resumeDraft({ ...car, currentStep: 2 });
+    const screen = await resumeDraft({ ...car, currentStep: 2 });
     await pressClose(screen);
     expect(screen.getByText("Latest changes are not saved")).toBeTruthy();
 
@@ -466,12 +466,12 @@ describe("Sell wizard resume and system back (#585)", () => {
   });
 
   it("leaves system back to the screen on top while another screen covers the wizard", async () => {
-    const screen = resumeDraft({ ...car, currentStep: 2 });
+    const screen = await resumeDraft({ ...car, currentStep: 2 });
     expect(screen.getByRole("header", { name: "Details and condition, Step 2 of 7" })).toBeTruthy();
 
     // A push notification opened a Conversation over the tabs.
     screenFocus.focused = false;
-    screen.rerender(<ToastProvider><SellScreen /></ToastProvider>);
+    await screen.rerender(<ToastProvider><SellScreen /></ToastProvider>);
     let handled = true;
     await act(async () => { handled = pressHardwareBack(); });
 
@@ -482,15 +482,15 @@ describe("Sell wizard resume and system back (#585)", () => {
 
     // Back on the Sell tab, system back belongs to the wizard again.
     screenFocus.focused = true;
-    screen.rerender(<ToastProvider><SellScreen /></ToastProvider>);
+    await screen.rerender(<ToastProvider><SellScreen /></ToastProvider>);
     await act(async () => { handled = pressHardwareBack(); });
 
     expect(handled).toBe(true);
     expect(screen.getByRole("header", { name: "Car, Step 1 of 7" })).toBeTruthy();
   });
 
-  it("leaves system back alone on the Sell tab", () => {
-    renderSell();
+  it("leaves system back alone on the Sell tab", async () => {
+    await renderSell();
 
     expect(pressHardwareBack()).toBe(false);
   });

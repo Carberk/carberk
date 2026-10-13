@@ -43,9 +43,9 @@ function check(overrides: LayoutProps = {}) {
   );
 }
 
-const publish = (screen: ReturnType<typeof renderMobile>) => screen.getByRole("button", { name: "Publish" });
+const publish = (screen: Awaited<ReturnType<typeof renderMobile>>) => screen.getByRole("button", { name: "Publish" });
 /** Position of a text in the rendered tree, which is the order a screen reader follows. */
-const position = (screen: ReturnType<typeof renderMobile>, text: string) => {
+const position = (screen: Awaited<ReturnType<typeof renderMobile>>, text: string) => {
   const index = JSON.stringify(screen.toJSON()).indexOf(text);
   expect(index).toBeGreaterThan(-1);
   return index;
@@ -56,21 +56,21 @@ describe("WizardLayout while publishing (#588)", () => {
     ["en", "Publishing..."],
     ["ru", "Публикация..."],
     ["tk", "Neşir edilýär..."],
-  ])("in %s the button reads %s and takes no further taps", (locale, label) => {
+  ])("in %s the button reads %s and takes no further taps", async (locale, label) => {
     const onPublish = vi.fn();
-    const screen = renderMobile(check({ isPublishing: true, onPublish }), { locale });
+    const screen = await renderMobile(check({ isPublishing: true, onPublish }), { locale });
 
     const button = screen.getByRole("button", { name: label });
     expect(button.props.accessibilityState).toMatchObject({ disabled: true, busy: true });
-    fireEvent.press(button);
+    await fireEvent.press(button);
     expect(onPublish).not.toHaveBeenCalled();
   });
 
-  it("reads Publish and is enabled otherwise", () => {
+  it("reads Publish and is enabled otherwise", async () => {
     const onPublish = vi.fn();
-    const screen = renderMobile(check({ onPublish }));
+    const screen = await renderMobile(check({ onPublish }));
 
-    fireEvent.press(publish(screen));
+    await fireEvent.press(publish(screen));
     expect(onPublish).toHaveBeenCalledOnce();
     expect(screen.queryByText("Publishing...")).toBeNull();
   });
@@ -83,8 +83,8 @@ describe("WizardLayout publish error (#588)", () => {
     announcements.length = 0;
   });
 
-  it("shows the error above Publish as an alert and announces it once", () => {
-    const screen = renderMobile(check({ publishError: error }));
+  it("shows the error above Publish as an alert and announces it once", async () => {
+    const screen = await renderMobile(check({ publishError: error }));
 
     const alert = screen.getByRole("alert");
     expect(alert.props.accessibilityLiveRegion).toBe("assertive");
@@ -92,15 +92,15 @@ describe("WizardLayout publish error (#588)", () => {
     expect(position(screen, error)).toBeLessThan(position(screen, '"Publish"'));
     expect(announcements.filter((message) => message === error)).toHaveLength(1);
 
-    screen.rerender(check({ publishError: error }));
+    await screen.rerender(check({ publishError: error }));
     expect(announcements.filter((message) => message === error)).toHaveLength(1);
   });
 
-  it("announces the error on Android too, where a new live region may not be read", () => {
+  it("announces the error on Android too, where a new live region may not be read", async () => {
     const os = Platform.OS;
     Platform.OS = "android";
     try {
-      renderMobile(check({ publishError: error }));
+      await renderMobile(check({ publishError: error }));
     } finally {
       Platform.OS = os;
     }
@@ -108,32 +108,32 @@ describe("WizardLayout publish error (#588)", () => {
     expect(announcements.filter((message) => message === error)).toHaveLength(1);
   });
 
-  it("leaves Publish enabled so the seller can try again", () => {
+  it("leaves Publish enabled so the seller can try again", async () => {
     const onPublish = vi.fn();
-    const screen = renderMobile(check({ publishError: error, onPublish }));
+    const screen = await renderMobile(check({ publishError: error, onPublish }));
 
-    fireEvent.press(publish(screen));
+    await fireEvent.press(publish(screen));
     expect(onPublish).toHaveBeenCalledOnce();
   });
 
-  it("announces a failure again when the same one follows another try", () => {
-    const screen = renderMobile(check({ publishError: error }));
-    screen.rerender(check({ publishError: null, isPublishing: true }));
-    screen.rerender(check({ publishError: error }));
+  it("announces a failure again when the same one follows another try", async () => {
+    const screen = await renderMobile(check({ publishError: error }));
+    await screen.rerender(check({ publishError: null, isPublishing: true }));
+    await screen.rerender(check({ publishError: error }));
 
     expect(announcements.filter((message) => message === error)).toHaveLength(2);
   });
 
-  it("shows no alert without an error", () => {
-    expect(renderMobile(check()).queryByRole("alert")).toBeNull();
+  it("shows no alert without an error", async () => {
+    expect((await renderMobile(check())).queryByRole("alert")).toBeNull();
   });
 });
 
 describe("WizardLayout publish blockers (#588)", () => {
   const blockers = ["Fill in: Car, Price", "Photos still uploading: 2", "Photos failed: 1. Retry or remove them."];
 
-  it("lists the blockers above a disabled Publish, in the order given", () => {
-    const screen = renderMobile(check({ canPublish: false, publishBlockers: blockers }));
+  it("lists the blockers above a disabled Publish, in the order given", async () => {
+    const screen = await renderMobile(check({ canPublish: false, publishBlockers: blockers }));
 
     expect(publish(screen).props.accessibilityState).toMatchObject({ disabled: true });
     const [missing, uploading, failed] = blockers.map((line) => position(screen, line));
@@ -142,8 +142,8 @@ describe("WizardLayout publish blockers (#588)", () => {
     expect(failed).toBeLessThan(position(screen, '"Publish"'));
   });
 
-  it("shows no blocker and an enabled Publish when nothing blocks", () => {
-    const screen = renderMobile(check({ publishBlockers: [] }));
+  it("shows no blocker and an enabled Publish when nothing blocks", async () => {
+    const screen = await renderMobile(check({ publishBlockers: [] }));
 
     expect(publish(screen).props.accessibilityState).toMatchObject({ disabled: false });
     expect(screen.queryByTestId("publish-blockers")).toBeNull();

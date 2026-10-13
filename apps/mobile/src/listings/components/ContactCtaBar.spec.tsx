@@ -61,16 +61,16 @@ beforeEach(() => {
 });
 
 describe("ContactCtaBar", () => {
-  it("puts a solid card under the floating bar's error, since the bar draws no material", () => {
+  it("puts a solid card under the floating bar's error, since the bar draws no material", async () => {
     state.error = new Error("boom");
-    const screen = renderMobile(<ContactCtaBar {...props} variant="floating" />);
+    const screen = await renderMobile(<ContactCtaBar {...props} variant="floating" />);
     let node = screen.getByText("Something went wrong").parent;
     while (node && !/\bbg-card\b/.test(String(node.props.className ?? ""))) node = node.parent;
     expect(node).toBeTruthy();
   });
   it("opens the seller phone directly for an anonymous buyer", async () => {
     state.authenticated = false;
-    const screen = renderMobile(<ContactCtaBar {...props} />);
+    const screen = await renderMobile(<ContactCtaBar {...props} />);
     await act(async () =>
       fireEvent.press(screen.getByRole("button", { name: "Call" })),
     );
@@ -79,55 +79,55 @@ describe("ContactCtaBar", () => {
   });
   it.each([Enums.ListingStatus.Sold, Enums.ListingStatus.Archived])(
     "disables contact for %s listings",
-    (status) => {
-      const screen = renderMobile(<ContactCtaBar {...props} status={status} />);
+    async (status) => {
+      const screen = await renderMobile(<ContactCtaBar {...props} status={status} />);
       expect(
         screen.getByRole("button", { name: "Message" }).props.accessibilityState
           .disabled,
       ).toBe(true);
-      fireEvent.press(screen.getByRole("button", { name: "Message" }));
+      await fireEvent.press(screen.getByRole("button", { name: "Message" }));
       expect(state.mutate).not.toHaveBeenCalled();
     },
   );
-  it("disables Message when chat is unavailable or a request is pending", () => {
-    const screen = renderMobile(<ContactCtaBar {...props} allowChat={false} />);
+  it("disables Message when chat is unavailable or a request is pending", async () => {
+    const screen = await renderMobile(<ContactCtaBar {...props} allowChat={false} />);
     expect(
       screen.getByRole("button", { name: "Message" }).props.accessibilityState
         .disabled,
     ).toBe(true);
     state.pending = true;
-    screen.rerender(<ContactCtaBar {...props} />);
+    await screen.rerender(<ContactCtaBar {...props} />);
     expect(
       screen.getByRole("button", { name: "Message" }).props.accessibilityState
         .disabled,
     ).toBe(true);
   });
-  it("parks the listing Message intent for an anonymous buyer", () => {
+  it("parks the listing Message intent for an anonymous buyer", async () => {
     state.authenticated = false;
-    const screen = renderMobile(<ContactCtaBar {...props} />);
-    fireEvent.press(screen.getByRole("button", { name: "Message" }));
+    const screen = await renderMobile(<ContactCtaBar {...props} />);
+    await fireEvent.press(screen.getByRole("button", { name: "Message" }));
     expect(state.requireSignIn).toHaveBeenCalledWith(routerMock, {
       returnTo: "/(public)/listings/listing-373",
       action: { kind: "message", listingId: "listing-373" },
     });
     expect(state.mutate).not.toHaveBeenCalled();
   });
-  it("opens the same conversation from a signed-in tap and post-sign-in replay", () => {
-    const screen = renderMobile(<ContactCtaBar {...props} />);
-    fireEvent.press(screen.getByRole("button", { name: "Message" }));
+  it("opens the same conversation from a signed-in tap and post-sign-in replay", async () => {
+    const screen = await renderMobile(<ContactCtaBar {...props} />);
+    await fireEvent.press(screen.getByRole("button", { name: "Message" }));
     expect(state.mutate).toHaveBeenCalledWith(
       { listingId: "listing-373" },
       expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
     state.authenticated = false;
-    screen.rerender(<ContactCtaBar {...props} />);
+    await screen.rerender(<ContactCtaBar {...props} />);
     state.replay?.();
     expect(state.mutate).toHaveBeenCalledTimes(2);
   });
-  it("does not silently open a conversation before the session check finishes", () => {
+  it("does not silently open a conversation before the session check finishes", async () => {
     state.authenticated = null;
-    const screen = renderMobile(<ContactCtaBar {...props} />);
-    fireEvent.press(screen.getByRole("button", { name: "Message" }));
+    const screen = await renderMobile(<ContactCtaBar {...props} />);
+    await fireEvent.press(screen.getByRole("button", { name: "Message" }));
     expect(state.mutate).not.toHaveBeenCalled();
     expect(state.requireSignIn).not.toHaveBeenCalled();
   });
@@ -137,27 +137,27 @@ describe("ContactCtaBar without calls", () => {
   it.each([
     ["the seller turned calls off", { allowCalls: false }],
     ["the Listing has no contact phone", { contactPhone: undefined }],
-  ])("drops Call and gives Message the full width when %s", (_reason, override) => {
+  ])("drops Call and gives Message the full width when %s", async (_reason, override) => {
     for (const variant of ["floating", "viewer"] as const) {
-      const screen = renderMobile(<ContactCtaBar {...props} {...override} variant={variant} />);
+      const screen = await renderMobile(<ContactCtaBar {...props} {...override} variant={variant} />);
       expect(screen.queryByRole("button", { name: "Call" })).toBeNull();
       expect(screen.getAllByRole("button")).toHaveLength(1);
       const message = screen.getByRole("button", { name: "Message", disabled: false });
       expect(message.props.className).toContain("flex-1");
-      screen.unmount();
+      await screen.unmount();
     }
   });
-  it("keeps a disabled Call while the Listing is still loading", () => {
-    const screen = renderMobile(<ContactCtaBar {...props} allowCalls={false} allowChat={false} contactPhone={undefined} pending />);
+  it("keeps a disabled Call while the Listing is still loading", async () => {
+    const screen = await renderMobile(<ContactCtaBar {...props} allowCalls={false} allowChat={false} contactPhone={undefined} pending />);
     expect(screen.getByRole("button", { name: "Call", disabled: true })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Message", disabled: true })).toBeTruthy();
   });
-  it.each([Enums.ListingStatus.Sold, Enums.ListingStatus.Archived])("keeps a disabled Call on a %s Listing, with or without calls", (status) => {
+  it.each([Enums.ListingStatus.Sold, Enums.ListingStatus.Archived])("keeps a disabled Call on a %s Listing, with or without calls", async (status) => {
     for (const allowCalls of [true, false]) {
-      const screen = renderMobile(<ContactCtaBar {...props} allowCalls={allowCalls} status={status} />);
+      const screen = await renderMobile(<ContactCtaBar {...props} allowCalls={allowCalls} status={status} />);
       expect(screen.getByRole("button", { name: "Call", disabled: true })).toBeTruthy();
       expect(screen.getByRole("button", { name: "Message", disabled: true })).toBeTruthy();
-      screen.unmount();
+      await screen.unmount();
     }
   });
 });
@@ -170,8 +170,8 @@ vi.mock("react-native", async (original) => ({
 describe("Android dialer", () => {
   it("dials despite a false package-visibility check", async () => {
     vi.mocked(Linking.canOpenURL).mockResolvedValueOnce(false);
-    const view = renderMobile(<ContactCtaBar {...props} />);
-    await act(async () => { fireEvent.press(view.getByRole("button", { name: "Call" })); });
+    const view = await renderMobile(<ContactCtaBar {...props} />);
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Call" })); });
     expect(Linking.openURL).toHaveBeenCalledWith("tel:+99361000001");
   });
   it.each([
@@ -180,14 +180,14 @@ describe("Android dialer", () => {
     ["+99361#000001;ext=2", "tel:+993610000012"],
     ["993+61/000001", "tel:99361000001"],
   ])("strips dial-control and formatting characters from %s", async (phone, uri) => {
-    const view = renderMobile(<ContactCtaBar {...props} contactPhone={phone} />);
-    await act(async () => { fireEvent.press(view.getByRole("button", { name: "Call" })); });
+    const view = await renderMobile(<ContactCtaBar {...props} contactPhone={phone} />);
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Call" })); });
     expect(Linking.openURL).toHaveBeenCalledWith(uri);
   });
   it("shows the number when the dialer fails", async () => {
     vi.mocked(Linking.openURL).mockRejectedValueOnce(new Error("No dialer"));
-    const view = renderMobile(<ContactCtaBar {...props} />);
-    await act(async () => { fireEvent.press(view.getByRole("button", { name: "Call" })); });
+    const view = await renderMobile(<ContactCtaBar {...props} />);
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Call" })); });
     expect(Alert.alert).toHaveBeenCalledWith("Call", "Could not open the dialer. Call +99361000001 manually.");
   });
 });

@@ -6,7 +6,7 @@ import CabinetScreen from "../../app/(tabs)/services";
 import ProfileScreen from "../../app/profile";
 import { clearAuthSession, storeAuthSession } from "../../src/auth/session";
 import { server } from "../msw";
-import { act, fireEvent, first, renderMobile, routerMock } from "../render";
+import { act, fireEvent, first, renderMobile, routerMock, queryAllHosts } from "../render";
 
 import { ToastProvider } from "@/components/ui/toast";
 
@@ -83,11 +83,11 @@ function render(screen: ReactElement, options?: { locale?: string }) {
   return renderMobile(<ToastProvider>{screen}</ToastProvider>, options);
 }
 
-type View = ReturnType<typeof renderMobile>;
+type View = Awaited<ReturnType<typeof renderMobile>>;
 type Host = { type: unknown; props: Record<string, unknown>; parent: Host | null };
 
 /** Rendered host nodes of one native type, such as the avatar's `Svg`. */
-const hosts = (view: View, type: string) => view.UNSAFE_queryAllByType(type as never) as unknown as Host[];
+const hosts = (view: View, type: string) => queryAllHosts(view.container, type) as unknown as Host[];
 /** The native view that holds the avatar's drawing: its circle. */
 function avatarCircle(view: View): Record<string, unknown> {
   let node = first(hosts(view, "Svg")).parent;
@@ -106,7 +106,7 @@ describe("Cabinet profile row", () => {
   ])("shows a User without a name their generated name in %s, over the masked method", async (locale, name) => {
     serve("aman", meOf());
     await signIn("aman");
-    const view = render(<CabinetScreen />, { locale });
+    const view = await render(<CabinetScreen />, { locale });
     expect(await view.findByRole("button", { name: `${name}, ${PHONE}` })).toBeTruthy();
     expect(view.getByText(name)).toBeTruthy();
     expect(view.getByText(PHONE)).toBeTruthy();
@@ -115,7 +115,7 @@ describe("Cabinet profile row", () => {
   it("changes the generated name with the app language, without a reload", async () => {
     serve("aman", meOf());
     await signIn("aman");
-    const view = render(<CabinetScreen />);
+    const view = await render(<CabinetScreen />);
     await view.findByRole("button", { name: `Driver 4821, ${PHONE}` });
     await act(async () => { await view.i18n.changeLanguage("ru"); });
     expect(view.getByRole("button", { name: `Водитель 4821, ${PHONE}` })).toBeTruthy();
@@ -126,7 +126,7 @@ describe("Cabinet profile row", () => {
   it("shows the name the User set, over the masked method", async () => {
     serve("aman", meOf({ displayName: "Aman" }));
     await signIn("aman");
-    const view = render(<CabinetScreen />);
+    const view = await render(<CabinetScreen />);
     expect(await view.findByRole("button", { name: `Aman, ${PHONE}` })).toBeTruthy();
     expect(view.queryByText(/4821/)).toBeNull();
   });
@@ -134,14 +134,14 @@ describe("Cabinet profile row", () => {
   it("shows an email-only User the generated name over the masked email", async () => {
     serve("aman", meOf({ phone: null, phoneVerified: false, email: "aman@example.com" }));
     await signIn("aman");
-    const view = render(<CabinetScreen />);
+    const view = await render(<CabinetScreen />);
     expect(await view.findByRole("button", { name: "Driver 4821, a•••@example.com" })).toBeTruthy();
   });
 
   it("draws the User's car mark at 48 points, with no letter and no person icon", async () => {
     serve("aman", meOf({ displayName: "Aman" }));
     await signIn("aman");
-    const view = render(<CabinetScreen />);
+    const view = await render(<CabinetScreen />);
     await view.findByRole("button", { name: `Aman, ${PHONE}` });
     expect(marks(view)).toEqual([KEY_MARK]);
     expect(avatarCircle(view).style).toMatchObject({ width: 48, height: 48 });
@@ -152,7 +152,7 @@ describe("Cabinet profile row", () => {
   it("still draws a mark for an avatar index this app does not have", async () => {
     serve("aman", meOf({ avatarIndex: 14 }));
     await signIn("aman");
-    const view = render(<CabinetScreen />);
+    const view = await render(<CabinetScreen />);
     await view.findByRole("button", { name: `Driver 4821, ${PHONE}` });
     expect(marks(view)[0]).toBe(SUV_MARK);
   });
@@ -160,7 +160,7 @@ describe("Cabinet profile row", () => {
   it("keeps a 30-character name on one line, with the masked method under it", async () => {
     serve("aman", meOf({ displayName: LONG_NAME }));
     await signIn("aman");
-    const view = render(<CabinetScreen />);
+    const view = await render(<CabinetScreen />);
     await view.findByRole("button", { name: `${LONG_NAME}, ${PHONE}` });
     expect(view.getByText(LONG_NAME).props.numberOfLines).toBe(1);
     expect(view.getByText(PHONE)).toBeTruthy();
@@ -169,18 +169,18 @@ describe("Cabinet profile row", () => {
   it("is read as one button with the name and the method; the avatar is not read on its own", async () => {
     serve("aman", meOf());
     await signIn("aman");
-    const view = render(<CabinetScreen />);
+    const view = await render(<CabinetScreen />);
     const row = await view.findByRole("button", { name: `Driver 4821, ${PHONE}` });
     expect(view.queryByRole("image")).toBeNull();
     expect(avatarCircle(view)).toMatchObject({
       accessible: false, accessibilityElementsHidden: true, importantForAccessibility: "no-hide-descendants",
     });
-    fireEvent.press(row);
+    await fireEvent.press(row);
     expect(routerMock.push).toHaveBeenLastCalledWith("/profile");
   });
 
   it("keeps the signed-out row: Sign in, the person icon, no car and no request", async () => {
-    const view = render(<CabinetScreen />);
+    const view = await render(<CabinetScreen />);
     expect(await view.findByRole("button", { name: "Sign in, By phone or email" })).toBeTruthy();
     expect(personIcons(view)).toHaveLength(1);
     expect(hosts(view, "Svg")).toHaveLength(0);
@@ -190,7 +190,7 @@ describe("Cabinet profile row", () => {
   it("keeps the skeleton row while /me loads", async () => {
     api.users.set("aman", async () => { await delay("infinite"); return HttpResponse.json(meOf()); });
     await signIn("aman");
-    const view = render(<CabinetScreen />);
+    const view = await render(<CabinetScreen />);
     expect(await view.findByRole("button", { name: "Notifications" })).toBeTruthy();
     expect(view.getByLabelText("Please wait...")).toBeTruthy();
     expect(hosts(view, "Svg")).toHaveLength(0);
@@ -200,13 +200,13 @@ describe("Cabinet profile row", () => {
   it("keeps the person icon and Retry when /me fails, then shows the name after Retry", async () => {
     api.users.set("aman", () => HttpResponse.json({ code: "INTERNAL" }, { status: 500 }));
     await signIn("aman");
-    const view = render(<CabinetScreen />);
+    const view = await render(<CabinetScreen />);
     const retry = await view.findByRole("button", { name: "Retry" });
     expect(view.getByText("Something went wrong")).toBeTruthy();
     expect(personIcons(view)).toHaveLength(1);
     expect(hosts(view, "Svg")).toHaveLength(0);
     serve("aman", meOf());
-    fireEvent.press(retry);
+    await fireEvent.press(retry);
     expect(await view.findByRole("button", { name: `Driver 4821, ${PHONE}` })).toBeTruthy();
   });
 });
@@ -219,14 +219,14 @@ describe("Profile header", () => {
   ])("shows a User without a name their generated name in %s", async (locale, name) => {
     serve("aman", meOf());
     await signIn("aman");
-    const view = render(<ProfileScreen />, { locale });
+    const view = await render(<ProfileScreen />, { locale });
     expect(await view.findByText(name)).toBeTruthy();
   });
 
   it("changes the generated name with the app language, without a reload", async () => {
     serve("aman", meOf());
     await signIn("aman");
-    const view = render(<ProfileScreen />);
+    const view = await render(<ProfileScreen />);
     await view.findByText("Driver 4821");
     await act(async () => { await view.i18n.changeLanguage("tk"); });
     expect(view.getByText("Sürüji 4821")).toBeTruthy();
@@ -236,7 +236,7 @@ describe("Profile header", () => {
   it("shows the name the User set", async () => {
     serve("aman", meOf({ displayName: "Aman" }));
     await signIn("aman");
-    const view = render(<ProfileScreen />);
+    const view = await render(<ProfileScreen />);
     expect(await view.findByText("Aman")).toBeTruthy();
     expect(view.queryByText(/4821/)).toBeNull();
   });
@@ -244,7 +244,7 @@ describe("Profile header", () => {
   it("draws the User's car mark at 72 points, with no letter and no person icon", async () => {
     serve("aman", meOf({ displayName: "Aman" }));
     await signIn("aman");
-    const view = render(<ProfileScreen />);
+    const view = await render(<ProfileScreen />);
     await view.findByText("Aman");
     expect(marks(view)).toEqual([KEY_MARK]);
     expect(avatarCircle(view).style).toMatchObject({ width: 72, height: 72 });
@@ -255,7 +255,7 @@ describe("Profile header", () => {
   it("still draws a mark for an avatar index this app does not have", async () => {
     serve("aman", meOf({ avatarIndex: 14 }));
     await signIn("aman");
-    const view = render(<ProfileScreen />);
+    const view = await render(<ProfileScreen />);
     await view.findByText("Driver 4821");
     expect(marks(view)[0]).toBe(SUV_MARK);
   });
@@ -263,7 +263,7 @@ describe("Profile header", () => {
   it("keeps a 30-character name on one line", async () => {
     serve("aman", meOf({ displayName: LONG_NAME }));
     await signIn("aman");
-    const view = render(<ProfileScreen />);
+    const view = await render(<ProfileScreen />);
     const name = await view.findByText(LONG_NAME);
     expect(name.props.numberOfLines).toBe(1);
   });
@@ -271,7 +271,7 @@ describe("Profile header", () => {
   it("reads the name as the Edit name button; the avatar is not read on its own", async () => {
     serve("aman", meOf());
     await signIn("aman");
-    const view = render(<ProfileScreen />);
+    const view = await render(<ProfileScreen />);
     await view.findByText("Driver 4821");
     expect(view.queryByRole("image")).toBeNull();
     expect(avatarCircle(view)).toMatchObject({
@@ -283,7 +283,7 @@ describe("Profile header", () => {
   it("keeps the error state when /me fails: Retry and Log out, no name and no avatar", async () => {
     api.users.set("aman", () => HttpResponse.json({ code: "INTERNAL" }, { status: 500 }));
     await signIn("aman");
-    const view = render(<ProfileScreen />);
+    const view = await render(<ProfileScreen />);
     expect(await view.findByRole("button", { name: "Retry" })).toBeTruthy();
     expect(view.getByRole("button", { name: "Log out" })).toBeTruthy();
     expect(hosts(view, "Svg")).toHaveLength(0);
@@ -293,7 +293,7 @@ describe("Profile header", () => {
   it("keeps the loading state while /me loads: no name, no avatar, no rows", async () => {
     api.users.set("aman", async () => { await delay("infinite"); return HttpResponse.json(meOf()); });
     await signIn("aman");
-    const view = render(<ProfileScreen />);
+    const view = await render(<ProfileScreen />);
     await act(async () => { await Promise.resolve(); });
     expect(view.getByText("Profile")).toBeTruthy();
     expect(hosts(view, "Svg")).toHaveLength(0);
@@ -306,16 +306,16 @@ describe("Signing out and signing in as someone else", () => {
   it("never shows the previous User's name or avatar", async () => {
     serve("aman", meOf({ displayName: "Aman" }));
     await signIn("aman");
-    const view = render(<CabinetScreen />);
+    const view = await render(<CabinetScreen />);
     await view.findByRole("button", { name: `Aman, ${PHONE}` });
 
     // Aman logs out from Profile and lands on Cabinet, signed out.
-    view.rerender(<ToastProvider><ProfileScreen /></ToastProvider>);
+    await view.rerender(<ToastProvider><ProfileScreen /></ToastProvider>);
     expect(await view.findByText("Aman")).toBeTruthy();
-    fireEvent.press(await view.findByRole("button", { name: "Log out" }));
-    fireEvent.press(first(view.getAllByText("Log out").reverse()));
+    await fireEvent.press(await view.findByRole("button", { name: "Log out" }));
+    await fireEvent.press(first(view.getAllByText("Log out").reverse()));
     await vi.waitFor(() => expect(routerMock.dismissTo).toHaveBeenCalledWith("/(tabs)/services"));
-    view.rerender(<ToastProvider><CabinetScreen /></ToastProvider>);
+    await view.rerender(<ToastProvider><CabinetScreen /></ToastProvider>);
     expect(await view.findByRole("button", { name: "Sign in, By phone or email" })).toBeTruthy();
     expect(view.queryByText("Aman")).toBeNull();
     expect(hosts(view, "Svg")).toHaveLength(0);
@@ -336,7 +336,7 @@ describe("Signing out and signing in as someone else", () => {
     expect(marks(view)[0]).toBe(SUV_MARK);
     expect(view.queryByText("Aman")).toBeNull();
 
-    view.rerender(<ToastProvider><ProfileScreen /></ToastProvider>);
+    await view.rerender(<ToastProvider><ProfileScreen /></ToastProvider>);
     expect(await view.findByText("Driver 2057")).toBeTruthy();
     expect(view.queryByText("Aman")).toBeNull();
     await act(async () => { await clearAuthSession(); });

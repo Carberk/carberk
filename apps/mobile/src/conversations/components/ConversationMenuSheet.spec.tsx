@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fireEvent, renderMobile } from "../../../test/render";
+import { fireEvent, renderMobile, getHost } from "../../../test/render";
 
 import { ConversationMenuSheet } from "./ConversationMenuSheet";
 
@@ -23,8 +23,8 @@ beforeEach(() => {
 });
 
 describe("ConversationMenuSheet", () => {
-  it("lists Mute, Report and Block, in that order, and nothing else", () => {
-    const screen = menu();
+  it("lists Mute, Report and Block, in that order, and nothing else", async () => {
+    const screen = await menu();
 
     expect(screen.getAllByRole("button").map((item) => item.props.accessibilityLabel)).toEqual([
       "Mute notifications",
@@ -35,8 +35,8 @@ describe("ConversationMenuSheet", () => {
     expect(screen.queryByText(/support/i)).toBeNull();
   });
 
-  it("offers Unmute and Unblock when muted and blocked", () => {
-    const screen = menu({ isMuted: true, isBlocked: true });
+  it("offers Unmute and Unblock when muted and blocked", async () => {
+    const screen = await menu({ isMuted: true, isBlocked: true });
 
     expect(screen.getAllByRole("button").map((item) => item.props.accessibilityLabel)).toEqual([
       "Unmute notifications",
@@ -45,8 +45,8 @@ describe("ConversationMenuSheet", () => {
     ]);
   });
 
-  it("gives every item a 44 pt target and draws Block in the destructive colour", () => {
-    const screen = menu();
+  it("gives every item a 44 pt target and draws Block in the destructive colour", async () => {
+    const screen = await menu();
 
     for (const item of screen.getAllByRole("button")) {
       expect(item.props.className).toContain("min-h-11");
@@ -55,12 +55,12 @@ describe("ConversationMenuSheet", () => {
     expect(screen.getByText("Mute notifications").props.className).not.toContain("text-destructive");
   });
 
-  it("closes, then runs the chosen action", () => {
-    const screen = menu();
+  it("closes, then runs the chosen action", async () => {
+    const screen = await menu();
 
-    fireEvent.press(screen.getByRole("button", { name: "Mute notifications" }));
-    fireEvent.press(screen.getByRole("button", { name: "Report" }));
-    fireEvent.press(screen.getByRole("button", { name: "Block user" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Mute notifications" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Report" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Block user" }));
 
     expect(handlers.onToggleMute).toHaveBeenCalledOnce();
     expect(handlers.onReport).toHaveBeenCalledOnce();
@@ -69,34 +69,34 @@ describe("ConversationMenuSheet", () => {
     expect(handlers.onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it("runs Unblock when blocked", () => {
-    const screen = menu({ isBlocked: true });
+  it("runs Unblock when blocked", async () => {
+    const screen = await menu({ isBlocked: true });
 
-    fireEvent.press(screen.getByRole("button", { name: "Unblock user" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Unblock user" }));
     expect(handlers.onUnblock).toHaveBeenCalledOnce();
     expect(handlers.onBlock).not.toHaveBeenCalled();
   });
 
-  it("hides Report when there is no report action", () => {
-    const screen = menu({ onReport: undefined });
+  it("hides Report when there is no report action", async () => {
+    const screen = await menu({ onReport: undefined });
 
     expect(screen.queryByRole("button", { name: "Report" })).toBeNull();
     expect(screen.getAllByRole("button")).toHaveLength(2);
   });
 
-  it("disables Mute while a mute change is in flight", () => {
-    const screen = menu({ muteDisabled: true });
+  it("disables Mute while a mute change is in flight", async () => {
+    const screen = await menu({ muteDisabled: true });
 
     expect(screen.getByRole("button", { name: "Mute notifications", disabled: true })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Block user", disabled: false })).toBeTruthy();
   });
 
-  it("closes on a tap outside (the shell mock passes the prop to a View)", () => {
-    expect(menu().UNSAFE_getByProps({ closeOnBackdropPress: true })).toBeTruthy();
+  it("closes on a tap outside (the shell mock passes the prop to a View)", async () => {
+    expect(getHost((await menu()).container, "View", { closeOnBackdropPress: true })).toBeTruthy();
   });
 
-  it("is localized", () => {
-    const screen = renderMobile(
+  it("is localized", async () => {
+    const screen = await renderMobile(
       <ConversationMenuSheet open isMuted={false} isBlocked={false} {...handlers} />,
       { locale: "ru" },
     );

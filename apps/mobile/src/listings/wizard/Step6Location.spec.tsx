@@ -75,18 +75,18 @@ function ValidatedPlace({
   );
 }
 
-const headerNames = (screen: ReturnType<typeof renderMobile>) =>
+const headerNames = (screen: Awaited<ReturnType<typeof renderMobile>>) =>
   screen.queryAllByRole("header").map((header) => String(header.props.children));
 
-async function openCitySheet(screen: ReturnType<typeof renderMobile>) {
-  fireEvent.press(screen.getByRole("button", { name: "City: Select city" }));
+async function openCitySheet(screen: Awaited<ReturnType<typeof renderMobile>>) {
+  await fireEvent.press(screen.getByRole("button", { name: "City: Select city" }));
   // The sheet lists cities once every region's cities have loaded.
   await screen.findByRole("header", { name: "Lebap" });
 }
 
 describe("Description and place step", () => {
-  it("holds Description, then the place section with City and Area, and no Region row", () => {
-    const screen = renderMobile(<ValidatedPlace />);
+  it("holds Description, then the place section with City and Area, and no Region row", async () => {
+    const screen = await renderMobile(<ValidatedPlace />);
 
     const json = JSON.stringify(screen.toJSON());
     const positions = ["Description", "Where the car can be seen", "City", "Area"].map((label) =>
@@ -106,25 +106,25 @@ describe("Description and place step", () => {
     ["ru", "Где можно посмотреть автомобиль", "Только район, где можно посмотреть автомобиль. Не указывайте домашний адрес."],
     ["tk", "Awtoulagy nirede görüp bolýar", "Diňe awtoulagy görüp boljak etrap. Öý salgysyny ýazmaň."],
     ["en", "Where the car can be seen", "Only the area where the car can be seen. Do not enter a home address."],
-  ])("names the place section and explains Area in %s", (locale, section, helper) => {
-    const screen = renderMobile(<ValidatedPlace />, { locale });
+  ])("names the place section and explains Area in %s", async (locale, section, helper) => {
+    const screen = await renderMobile(<ValidatedPlace />, { locale });
     expect(screen.getByText(section)).toBeTruthy();
     expect(screen.getByText(helper)).toBeTruthy();
   });
 
-  it("ends with Area, with no preview caption that has no preview under it", () => {
-    const screen = renderMobile(<ValidatedPlace />);
+  it("ends with Area, with no preview caption that has no preview under it", async () => {
+    const screen = await renderMobile(<ValidatedPlace />);
     // The caption belongs to the card on Check and publish, the only place with a preview.
     expect(screen.queryByText("This is how buyers will see your listing")).toBeNull();
   });
 
-  it("keeps Area to 200 characters", () => {
-    const screen = renderMobile(<ValidatedPlace />);
+  it("keeps Area to 200 characters", async () => {
+    const screen = await renderMobile(<ValidatedPlace />);
     expect(screen.getByLabelText("Area / landmark").props.maxLength).toBe(200);
   });
 
   it("lists every city under its region header in the City sheet", async () => {
-    const screen = renderMobile(<ValidatedPlace />);
+    const screen = await renderMobile(<ValidatedPlace />);
     await openCitySheet(screen);
 
     // The sheet title, besides the City row's placeholder.
@@ -148,11 +148,11 @@ describe("Description and place step", () => {
     ["ru", "Город", "Выберите город"],
     ["tk", "Şäher", "Şäher saýlaň"],
   ] as const)("titles the City sheet in %s", async (locale, city, title) => {
-    const screen = renderMobile(<ValidatedPlace />, { locale });
+    const screen = await renderMobile(<ValidatedPlace />, { locale });
     // Only the City row's placeholder before the sheet opens.
     expect(screen.getAllByText(title)).toHaveLength(1);
 
-    fireEvent.press(screen.getByRole("button", { name: `${city}: ${title}` }));
+    await fireEvent.press(screen.getByRole("button", { name: `${city}: ${title}` }));
     await screen.findByRole("header", { name: "Lebap" });
 
     expect(screen.getAllByText(title)).toHaveLength(2);
@@ -164,9 +164,9 @@ describe("Description and place step", () => {
         HttpResponse.json({ message: "Unavailable" }, { status: 503 }),
       ),
     );
-    const screen = renderMobile(<ValidatedPlace />);
+    const screen = await renderMobile(<ValidatedPlace />);
 
-    fireEvent.press(screen.getByRole("button", { name: "City: Select city" }));
+    await fireEvent.press(screen.getByRole("button", { name: "City: Select city" }));
 
     expect(
       await screen.findByText("Action failed. Pull down to refresh or try again."),
@@ -177,10 +177,10 @@ describe("Description and place step", () => {
   });
 
   it("filters cities across every region and keeps only the headers that still match", async () => {
-    const screen = renderMobile(<ValidatedPlace />);
+    const screen = await renderMobile(<ValidatedPlace />);
     await openCitySheet(screen);
 
-    fireEvent.changeText(screen.getByPlaceholderText("Search..."), "ba");
+    await fireEvent.changeText(screen.getByPlaceholderText("Search..."), "ba");
 
     expect(screen.getByRole("button", { name: "Bayramaly" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Turkmenabat" })).toBeTruthy();
@@ -188,22 +188,22 @@ describe("Description and place step", () => {
     expect(screen.queryByRole("button", { name: "Mary" })).toBeNull();
     expect(screen.getAllByRole("header").length).toBe(3);
 
-    fireEvent.changeText(screen.getByPlaceholderText("Search..."), "bayr");
+    await fireEvent.changeText(screen.getByPlaceholderText("Search..."), "bayr");
     expect(headerNames(screen)).toEqual([
       "Mary region",
     ]);
 
-    fireEvent.changeText(screen.getByPlaceholderText("Search..."), "zzz");
+    await fireEvent.changeText(screen.getByPlaceholderText("Search..."), "zzz");
     expect(screen.getByText("No cities match your search")).toBeTruthy();
     expect(screen.queryAllByRole("header")).toHaveLength(0);
   });
 
   it("saves the picked city with its region and shows the region muted when the names differ", async () => {
     const onChange = vi.fn();
-    const screen = renderMobile(<ValidatedPlace onChange={onChange} />);
+    const screen = await renderMobile(<ValidatedPlace onChange={onChange} />);
     await openCitySheet(screen);
 
-    fireEvent.press(screen.getByRole("button", { name: "Bayramaly" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Bayramaly" }));
 
     expect(onChange).toHaveBeenLastCalledWith({ cityId: BAYRAMALY, regionId: MARY_REGION });
     expect(screen.queryByText("Select city")).toBeNull();
@@ -212,7 +212,7 @@ describe("Description and place step", () => {
   });
 
   it("shows only the city when its name matches the region", async () => {
-    const screen = renderMobile(<ValidatedPlace initial={{ regionId: ASHGABAT_REGION, cityId: ASHGABAT }} />);
+    const screen = await renderMobile(<ValidatedPlace initial={{ regionId: ASHGABAT_REGION, cityId: ASHGABAT }} />);
 
     expect(await screen.findByRole("button", { name: "City: Ashgabat" })).toBeTruthy();
     expect(screen.getAllByText("Ashgabat")).toHaveLength(1);
@@ -220,7 +220,7 @@ describe("Description and place step", () => {
 
   it("shows a saved draft's city and region unchanged", async () => {
     const onChange = vi.fn();
-    const screen = renderMobile(
+    const screen = await renderMobile(
       <ValidatedPlace initial={{ regionId: LEBAP_REGION, cityId: TURKMENABAT }} onChange={onChange} />,
     );
 
@@ -229,10 +229,10 @@ describe("Description and place step", () => {
   });
 
   it("shows the City required error under the City row after Continue, and never a Region error", async () => {
-    const screen = renderMobile(<ValidatedPlace initial={{ description: "One owner" }} />);
+    const screen = await renderMobile(<ValidatedPlace initial={{ description: "One owner" }} />);
     expect(screen.queryByText("City is required")).toBeNull();
 
-    fireEvent.press(screen.getByRole("button", { name: "Continue" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Continue" }));
 
     expect(screen.getByText("City is required")).toBeTruthy();
     expect(screen.queryByText("Region is required")).toBeNull();
@@ -241,34 +241,34 @@ describe("Description and place step", () => {
     expect(json.indexOf('"City is required"')).toBeLessThan(json.indexOf('"Area / landmark"'));
 
     await openCitySheet(screen);
-    fireEvent.press(screen.getByRole("button", { name: "Mary" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Mary" }));
     expect(screen.queryByText("City is required")).toBeNull();
   });
 
-  it("shows the required Description error under the field after the first Continue tap and clears it once typed", () => {
-    const screen = renderMobile(<ValidatedPlace />);
+  it("shows the required Description error under the field after the first Continue tap and clears it once typed", async () => {
+    const screen = await renderMobile(<ValidatedPlace />);
     expect(screen.queryByText("Description is required")).toBeNull();
 
-    fireEvent.press(screen.getByRole("button", { name: "Continue" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Continue" }));
     expect(screen.getByText("Description is required")).toBeTruthy();
 
-    fireEvent.changeText(screen.getByLabelText("Description"), "One owner, garage kept");
+    await fireEvent.changeText(screen.getByLabelText("Description"), "One owner, garage kept");
 
     expect(screen.queryByText("Description is required")).toBeNull();
     expect(screen.getByText("22/2000")).toBeTruthy();
   });
 
-  it("shows the required Description error once the seller leaves it empty, before Continue", () => {
-    const screen = renderMobile(<ValidatedPlace />);
+  it("shows the required Description error once the seller leaves it empty, before Continue", async () => {
+    const screen = await renderMobile(<ValidatedPlace />);
 
-    fireEvent(screen.getByLabelText("Description"), "blur");
+    await fireEvent(screen.getByLabelText("Description"), "blur");
 
     expect(screen.getByText("Description is required")).toBeTruthy();
     expect(screen.queryByText("City is required")).toBeNull();
   });
 
-  it("keeps the Description, City and Area read-only when the step is disabled", () => {
-    const screen = renderMobile(
+  it("keeps the Description, City and Area read-only when the step is disabled", async () => {
+    const screen = await renderMobile(
       <Step6Location payload={{ description: "Kept" }} onChange={() => {}} disabled />,
     );
     expect(screen.getByLabelText("Description").props.editable).toBe(false);
