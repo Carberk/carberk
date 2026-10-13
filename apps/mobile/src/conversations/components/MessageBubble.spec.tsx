@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { fireEvent, renderMobile } from "../../../test/render";
+import { fireEvent, getAllHosts, renderMobile } from "../../../test/render";
 
 import { MessageBubble } from "./MessageBubble";
 
@@ -271,5 +271,74 @@ describe("MessageBubble reported dimming", () => {
     const className = bubbleClassName(screen.getByText("Sending..."));
     expect(className).toContain("opacity-70");
     expect(className).not.toContain("opacity-60");
+  });
+});
+
+
+describe("Listing-reference bubble width", () => {
+  const listing = {
+    listingId: "00000000-0000-4000-8000-0000000000a1",
+    brandId: "00000000-0000-4000-8000-0000000000d1",
+    modelId: "00000000-0000-4000-8000-0000000000d2",
+    year: 2018,
+    displayPriceTmt: 285000,
+    priceCurrency: "TMT" as const,
+    status: "active" as const,
+    available: true,
+  };
+  const postRef = {
+    kind: "post_ref" as const,
+    text: "",
+    metadata: listing,
+    postRefBrandName: "Toyota",
+    postRefModelName: "Camry with a long model name",
+  };
+  function container(screen: Awaited<ReturnType<typeof renderMobile>>) {
+    const node = getAllHosts(screen.container, "View").find((host) =>
+      host.props.className?.includes("max-w-[80%]"),
+    );
+    if (!node) throw new Error("No bubble container rendered");
+    return node;
+  }
+
+  it.each([true, false])("bounds a full-width reference and retains its actions, own=%s", async (isMine) => {
+    const onPostRefPress = vi.fn();
+    const onOpenActions = vi.fn();
+    const screen = await renderMobile(bubble({ ...postRef, isMine, onPostRefPress, onOpenActions }));
+
+    // The renderer pins the responsive policy; native screenshots prove Yoga layout.
+    expect(container(screen).props.className.split(/\s+/)).toContain("w-full");
+    expect(container(screen).props.className).toContain("max-w-[80%]");
+    expect(container(screen).props.className).not.toMatch(/(?:^|\s)h-/);
+    expect(screen.getByText("2018 Toyota Camry with a long model name")).toBeTruthy();
+    expect(screen.getByText("285,000 TMT")).toBeTruthy();
+    expect(screen.getByText("Active")).toBeTruthy();
+    expect(screen.getByText("02:05 PM")).toBeTruthy();
+    const card = screen.getByRole("button", { name: /Open: 2018 Toyota Camry/ });
+    await fireEvent.press(card);
+    expect(onPostRefPress).toHaveBeenCalledWith(listing.listingId);
+    await fireEvent(card, "longPress");
+    expect(onOpenActions).toHaveBeenCalledOnce();
+  });
+
+  it("keeps an unavailable reference bounded and non-tappable", async () => {
+    const onPostRefPress = vi.fn();
+    const screen = await renderMobile(bubble({
+      ...postRef, metadata: { ...listing, status: "sold" }, onPostRefPress,
+    }));
+    expect(container(screen).props.className.split(/\s+/)).toContain("w-full");
+    expect(screen.getByText("Sold")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Open:/ })).toBeNull();
+    expect(onPostRefPress).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { kind: "text" as const },
+    { kind: "image" as const, text: "", localImageUri: "file:///photo.jpg" },
+    { ...postRef, deletedAt: AT_1405 },
+  ])("preserves intrinsic sizing for ordinary and deleted Messages: $kind", async (props) => {
+    const screen = await renderMobile(bubble(props));
+    expect(container(screen).props.className.split(/\s+/)).not.toContain("w-full");
+    expect(container(screen).props.className).toContain("max-w-[80%]");
   });
 });
