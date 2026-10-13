@@ -1,3 +1,44 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# React Native/Expo needs flat node_modules: Metro expects npm/yarn-style
+# hoisting. pnpm 11+ reads this only from here, not from .npmrc.
+shamefullyHoist: true
+
+# ADR-0048. pnpm 11+ ignores the `pnpm` field of package.json.
+overrides:
+  react-native-css-interop: 0.2.4
+
+# Dependency install scripts. pnpm fails the install on any script not listed
+# here, so a new one has to be reviewed before it can run.
+allowBuilds:
+  # Downloads the Prisma schema engine that `prisma migrate` runs, including
+  # the API image's migrate pre-deploy as a user that cannot download it later.
+  "@prisma/engines": true
+  # Checks the Node.js and package manager versions Prisma 7 supports.
+  prisma: true
+  # Writes Firebase web defaults only when FIREBASE_WEBAPP_CONFIG is set; unused.
+  "@firebase/util": false
+  # Prints an Open Collective message.
+  "@nestjs/core": false
+  # Checks that the prebuilt native binding loads; the platform package
+  # (@swc/core-<platform>) already provides it.
+  "@swc/core": false
+  # Optional native speedups for ssh2 (via Testcontainers); ssh2 falls back to JS.
+  cpu-features: false
+  ssh2: false
+  # Validates the binary from the @esbuild/<platform> package, which the JS API
+  # and bin shim load directly.
+  esbuild: false
+  # Looks for the prebuilt @msgpackr-extract/<platform> binary, which loads at
+  # runtime without this step; msgpackr falls back to JS without it.
+  msgpackr-extract: false
+  # Copies the service worker into directories set by `msw.workerDirectory`;
+  # no workspace sets it.
+  msw: false
+  # Only warns when a dependent declares protobufjs with the wrong range prefix.
+  protobufjs: false
+  # Builds from source only when no prebuilt @img/sharp-<platform> binary
+  # matches; every supported target has one.
+  sharp: false
