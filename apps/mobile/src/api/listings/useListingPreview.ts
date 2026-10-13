@@ -1,8 +1,7 @@
 import { useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { ListingsSchemas } from "@auto-tm/contracts";
 
-import { findCachedListingSummary } from "./findCachedListingSummary";
+import { findCachedListingSummary, type CachedListingSummary } from "./findCachedListingSummary";
 
 /**
  * What Listing detail can show before its own request returns: the card the
@@ -16,7 +15,7 @@ import { findCachedListingSummary } from "./findCachedListingSummary";
  */
 export function useListingPreview(
   listingId: string,
-): ListingsSchemas.ListingSummary | undefined {
+): CachedListingSummary | undefined {
   const queryClient = useQueryClient();
   return useMemo(
     () => (listingId ? findCachedListingSummary(queryClient, listingId) : undefined),

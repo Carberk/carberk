@@ -66,7 +66,9 @@ export function ContactCtaBar({
   const canMessage = !pending && allowChat && !isSold && !isArchived;
   // A loaded, open Listing that takes no calls has no Call button at all, as on
   // the Results and Favorites cards. Loading, sold and archived keep it, disabled.
-  const showCall = pending || isSold || isArchived || (allowCalls && !!contactPhone);
+  // While detail loads the phone is not known yet: Call holds its place
+  // whenever the card says the seller takes calls.
+  const showCall = isSold || isArchived || (pending ? allowCalls : allowCalls && !!contactPhone);
   const onDark = variant === "viewer";
   // Inside the sticky action bar the bar supplies the padding.
   const floating = variant === "floating";

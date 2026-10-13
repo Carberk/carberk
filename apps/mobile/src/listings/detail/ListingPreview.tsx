@@ -1,12 +1,15 @@
 import { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
-import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useBodyTypes } from "../../api/catalog/useBodyTypes";
+import { useColors } from "../../api/catalog/useColors";
+import { useDriveTypes } from "../../api/catalog/useDriveTypes";
 import { useEngineTypes } from "../../api/catalog/useEngineTypes";
 import { useTransmissions } from "../../api/catalog/useTransmissions";
+import type { CachedListingSummary } from "../../api/listings/findCachedListingSummary";
 import { GalleryBanner, GalleryCounter } from "../components/GalleryImage";
 import { ContactCtaBar } from "../components/ContactCtaBar";
 import { keySpecs, PENDING, specRows } from "../components/ListingSpecs";
@@ -26,7 +29,7 @@ import { Text } from "@/components/ui/text";
 
 export interface ListingPreviewProps {
   /** The tapped card's cached data. */
-  summary: ListingsSchemas.ListingSummary;
+  summary: CachedListingSummary;
   isOwner: boolean;
   onBack: () => void;
 }
@@ -51,6 +54,9 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
   const names = useFeedCatalogMaps(listings);
   const transmissions = useTransmissions();
   const engineTypes = useEngineTypes();
+  const driveTypes = useDriveTypes();
+  const bodyTypes = useBodyTypes();
+  const colors = useColors();
 
   const closed = !isOwner && isClosedForContact(summary.status);
   const bannerKey = closed ? closedListingBannerKey(summary.status) : null;
@@ -79,27 +85,34 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
     .filter(Boolean)
     .join(", ");
 
-  // A name still loading keeps its cell; power, drive, body and colour are
-  // not on the card.
+  // A card from an API that sends `hasVin` also says which optional
+  // specifications the Listing has (#867), so every entry takes its final
+  // place; an older API's card holds them as placeholders. A name still
+  // loading keeps its cell.
+  const knowsAll = summary.hasVin !== undefined;
+  const named = (id: string | undefined, items: { id: string; name: string }[] | undefined) =>
+    id ? (items?.find((item) => item.id === id)?.name ?? PENDING) : undefined;
   const specs = keySpecs(
     {
       year: summary.year,
       mileageKm: summary.mileageKm,
-      transmission: summary.transmissionId
-        ? (transmissions.data?.items.find((item) => item.id === summary.transmissionId)?.name ??
-          PENDING)
-        : undefined,
-      engineType: summary.engineTypeId
-        ? (engineTypes.data?.items.find((item) => item.id === summary.engineTypeId)?.name ??
-          PENDING)
-        : undefined,
-      enginePower: PENDING,
-      driveType: PENDING,
+      transmission: named(summary.transmissionId, transmissions.data?.items),
+      engineType: named(summary.engineTypeId, engineTypes.data?.items),
+      enginePower: knowsAll ? summary.enginePower : PENDING,
+      driveType: knowsAll ? named(summary.driveTypeId, driveTypes.data?.items) : PENDING,
     },
     t,
     i18n.language,
   );
-  const rows = specRows({ condition: summary.condition, bodyType: PENDING, color: PENDING }, t);
+  const rows = specRows(
+    {
+      condition: summary.condition,
+      bodyType: knowsAll ? named(summary.bodyTypeId, bodyTypes.data?.items) : PENDING,
+      color: knowsAll ? named(summary.colorId, colors.data?.items) : PENDING,
+      vin: summary.hasVin ? PENDING : undefined,
+    },
+    t,
+  );
 
   const dateAndCity = [
     detailDate(summary.publishedAt, i18n.language),
@@ -160,8 +173,8 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
             displayPriceTmt={summary.displayPriceTmt}
             priceAmount={summary.priceAmount}
             priceCurrency={summary.priceCurrency}
-            acceptsExchange={false}
-            installmentAvailable={false}
+            acceptsExchange={summary.acceptsExchange ?? false}
+            installmentAvailable={summary.installmentAvailable ?? false}
             isOwner={isOwner}
             muted={closed}
           />
@@ -177,7 +190,9 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
           <ContactCtaBar
             variant="floating"
             listingId={summary.id}
-            allowCalls={false}
+            // Laid out as the loaded bar: Call only when the seller takes
+            // calls; an older API's card keeps the disabled Call.
+            allowCalls={summary.allowCalls ?? true}
             allowChat={false}
             status={summary.status}
             pending

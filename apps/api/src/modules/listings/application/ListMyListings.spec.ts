@@ -72,7 +72,7 @@ describe("ListMyListings", () => {
     expect(result.items[0]).toMatchObject({ photoThumbHashes: ["1fsDBYCIiIiHiIdweIeHh4d4cIgH", null] });
   });
 
-  it("returns what the detail preview places on the owner's summaries, but no VIN or contact phone", async () => {
+  it("returns what the detail preview places on the owner's summaries, but no VIN, contact phone or contact preferences", async () => {
     seedSummary({
       enginePower: 150,
       driveTypeId: "drive-1",
@@ -96,10 +96,9 @@ describe("ListMyListings", () => {
       hasVin: true,
       acceptsExchange: true,
       installmentAvailable: false,
-      allowCalls: false,
-      allowChat: true,
     });
     expect(item).not.toHaveProperty("contactPhone");
+    expect(item).not.toHaveProperty("allowCalls");
     expect(item).not.toHaveProperty("vin");
   });
 

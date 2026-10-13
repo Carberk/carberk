@@ -12,6 +12,8 @@ import {
   type ListingCardReadPort,
 } from "../domain/ports/ListingCardReadPort";
 
+import { cardPreviewFields } from "../domain/CardPreviewFields";
+
 import { decodeListingsCursor } from "./decodeListingsCursor";
 
 export interface ListMyFavoritesInput {
@@ -91,6 +93,7 @@ export class ListMyFavorites {
         contactPhone: item.contactPhone,
         allowCalls: item.allowCalls,
         allowChat: item.allowChat,
+        ...cardPreviewFields(item),
       })),
       nextCursor: favoriteResult.nextCursor
         ? ListingsSchemas.encodeCursor(favoriteResult.nextCursor)

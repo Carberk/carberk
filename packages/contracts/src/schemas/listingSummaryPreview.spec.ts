@@ -30,17 +30,24 @@ const previewFields = {
   hasVin: true,
   acceptsExchange: true,
   installmentAvailable: false,
-  allowCalls: false,
-  allowChat: true,
 };
+const contactPreferences = { allowCalls: false, allowChat: true };
 
 describe("Listing summary fields for the detail preview", () => {
   it.each([
-    ["ListingSummary", ListingSummarySchema, {}],
-    ["FeedListingSummary", FeedListingSummarySchema, {}],
-    ["FavoriteListingSummary", FavoriteListingSummarySchema, { allowCalls: false, allowChat: true }],
-  ] as const)("%s keeps power, drive, body, colour, VIN presence, exchange, installment and contact preferences", (_name, schema, required) => {
-    expect(schema.parse({ ...base, ...required, ...previewFields })).toMatchObject(previewFields);
+    ["ListingSummary (My listings)", ListingSummarySchema],
+    ["FeedListingSummary", FeedListingSummarySchema],
+    ["FavoriteListingSummary", FavoriteListingSummarySchema],
+  ] as const)("%s keeps power, drive, body, colour, VIN presence, exchange and installment", (_name, schema) => {
+    expect(schema.parse({ ...base, ...contactPreferences, ...previewFields })).toMatchObject(previewFields);
+  });
+
+  it("keeps contact preferences for the buyer's contact bar on feed and favorites items only", () => {
+    const item = { ...base, ...contactPreferences, ...previewFields };
+
+    expect(FeedListingSummarySchema.parse(item)).toMatchObject(contactPreferences);
+    expect(FavoriteListingSummarySchema.parse(item)).toMatchObject(contactPreferences);
+    expect(ListingSummarySchema.parse(item)).not.toHaveProperty("allowCalls");
   });
 
   it("still parses a summary from an older API without them", () => {
