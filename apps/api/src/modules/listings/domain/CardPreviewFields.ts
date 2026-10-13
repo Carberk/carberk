@@ -16,7 +16,10 @@ export interface CardPreviewFields {
   installmentAvailable?: boolean;
 }
 
-export function cardPreviewFields(source: CardPreviewFields): CardPreviewFields {
+/** A Listing or card read, whose unset fields may be `undefined`. */
+type CardPreviewSource = { [K in keyof CardPreviewFields]?: CardPreviewFields[K] | undefined };
+
+export function cardPreviewFields(source: CardPreviewSource): CardPreviewFields {
   return {
     ...(source.enginePower !== undefined ? { enginePower: source.enginePower } : {}),
     ...(source.driveTypeId !== undefined ? { driveTypeId: source.driveTypeId } : {}),
