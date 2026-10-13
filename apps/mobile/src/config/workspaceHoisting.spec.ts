@@ -17,7 +17,7 @@ function workspaceSettings() {
     const line = raw.replace(/\s+#.*$/, "").replace(/^#.*$/, "");
     const entry = /^(\s*)("?)([^":]+)\2:\s*(.*)$/.exec(line);
     if (!entry) continue;
-    const [, indent, , key, value] = entry;
+    const [, indent = "", , key = "", value = ""] = entry;
     if (indent === "") section = key;
     settings.set(indent === "" ? key : `${section}.${key}`, value.replace(/^"(.*)"$/, "$1"));
   }
