@@ -59,6 +59,10 @@
   "pnpm": {
     "overrides": {
       "react-native-css-interop": "0.2.4"
+    },
+    "patchedDependencies": {
+      "expo-modules-core@55.0.26": "patches/expo-modules-core@55.0.26.patch",
+      "react-native-reanimated@4.2.1": "patches/react-native-reanimated@4.2.1.patch"
     }
   }
 }
