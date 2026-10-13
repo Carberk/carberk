@@ -93,6 +93,7 @@ export class ListMyFavorites {
         contactPhone: item.contactPhone,
         allowCalls: item.allowCalls,
         allowChat: item.allowChat,
+        hasContactPhone: !!item.contactPhone,
         ...cardPreviewFields(item),
       })),
       nextCursor: favoriteResult.nextCursor

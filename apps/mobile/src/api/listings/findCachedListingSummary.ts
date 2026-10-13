@@ -6,7 +6,7 @@ import { queryKeys } from "../queryKeys";
 type ListingSummary = ListingsSchemas.ListingSummary;
 /** A cached card: Feed and Favorites items also carry the contact preferences. */
 export type CachedListingSummary = ListingSummary &
-  Partial<Pick<ListingsSchemas.FeedListingSummary, "allowCalls" | "allowChat">>;
+  Partial<Pick<ListingsSchemas.FeedListingSummary, "allowCalls" | "allowChat" | "hasContactPhone">>;
 type SummaryPages = InfiniteData<{ items: CachedListingSummary[] }>;
 
 /**

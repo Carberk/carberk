@@ -13,7 +13,9 @@ Feed, My listings and Favorites summaries also carry what Listing detail's card-
 - `hasVin`, whether a VIN row exists. The VIN itself stays on detail, so the lists cannot be scraped for VINs.
 - `acceptsExchange` and `installmentAvailable`.
 
-They are optional on the shared `ListingSummaryBaseSchema`, so an older client ignores them. My listings items still carry no contact preferences.
+They are optional on the shared `ListingSummaryBaseSchema`, so an older client ignores them.
+
+Feed and Favorites items add `hasContactPhone`, because Call needs a number besides `allowCalls` and some kept Listings have had theirs cleared. My listings items still carry no contact preferences.
 
 The seller condition disclosure is `{ damaged, knownIssuesText? }` ([ADR-0052](../../../../../docs/adr/0052-seller-condition-disclosure-is-damaged-plus-known-issues.md)). Only a Used Listing needs the answer ([ADR-0080](../../../../../docs/adr/0080-a-new-car-skips-the-damaged-question.md)); `domain/damagedAnswer.ts` holds the rule both publish and edit use. Publish rejects a Used draft without a `damaged` answer as `INVALID_DRAFT_PAYLOAD` with a `conditionDisclosure` field error, and edit rejects any change to a Used Listing that has no answer unless the patch supplies one (`DAMAGED_REQUIRED`). A New Listing stores `damaged: false` when the answer is missing, and publish or edit refuses a damaged New Listing, including an edit that only changes Condition to New, with `DAMAGED_NOT_ALLOWED_FOR_NEW`; a disclosure patch without `damaged` already fails the edit request schema (`VALIDATION_ERROR`). A Listing with no answer (only possible for rows from before the migration) returns no `conditionDisclosure`. A supplied disclosure replaces its optional Known issues text; omitting that text clears it, while omitting the entire disclosure preserves it.
 

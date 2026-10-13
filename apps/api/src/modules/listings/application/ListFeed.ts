@@ -142,6 +142,7 @@ export class ListFeed {
         }),
         allowCalls: listing.allowCalls,
         allowChat: listing.allowChat,
+        hasContactPhone: !!listing.contactPhone,
         ...(seller !== undefined
           ? {
               seller: {

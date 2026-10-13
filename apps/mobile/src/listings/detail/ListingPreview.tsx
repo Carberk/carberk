@@ -191,8 +191,9 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
             variant="floating"
             listingId={summary.id}
             // Laid out as the loaded bar: Call only when the seller takes
-            // calls; an older API's card keeps the disabled Call.
-            allowCalls={summary.allowCalls ?? true}
+            // calls and the Listing has a contact phone; an older API's card
+            // keeps the disabled Call.
+            allowCalls={(summary.allowCalls ?? true) && summary.hasContactPhone !== false}
             allowChat={false}
             status={summary.status}
             pending
