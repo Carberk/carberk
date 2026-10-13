@@ -1,4 +1,3 @@
-import { Image } from "react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { describe, expect, it, vi } from "vitest";
 

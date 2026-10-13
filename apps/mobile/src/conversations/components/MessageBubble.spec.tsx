@@ -1,5 +1,4 @@
 import type { ComponentProps } from "react";
-import { Image } from "react-native";
 import { describe, expect, it, vi } from "vitest";
 
 import { fireEvent, renderMobile, getHost } from "../../../test/render";
