@@ -44,19 +44,22 @@ function preview(
 }
 
 describe("Listing detail preview, from the tapped card's cached data", () => {
-  it("shows the card's photo, title, price, spec line, city and date at once", async () => {
+  it("shows the card's photo, title, price, city, date and known specifications at once", async () => {
     const screen = await preview();
 
     expect(screen.getByText("Toyota Camry, 2020")).toBeTruthy();
     expect(screen.getByText("35,000 TMT")).toBeTruthy();
-    expect(screen.getByText("12,000 km · Automatic · Petrol")).toBeTruthy();
+    for (const value of ["2020", "12,000 km", "Automatic", "Petrol", "Used"])
+      expect(screen.getByText(value)).toBeTruthy();
     expect(screen.getByText("20 Sep · Ashgabat")).toBeTruthy();
     expect(screen.getByText("1 / 12")).toBeTruthy();
     // The card already decoded the `list` size, so it shows at once while the
     // gallery's `detail` size loads behind it (#816).
     const photo = getHost(screen.container, "Image").props;
     expect(photo.placeholder).toEqual({ uri: "https://media.autotm.tm/listing-photos/listing-0/list.webp?v=webp-natural-1" });
-    expect(photo.placeholderContentFit).toBe("cover");
+    // Drawn whole, in the gallery's own fit, so the gallery replaces it in place (#864).
+    expect(photo.placeholderContentFit).toBe("contain");
+    expect(photo.contentFit).toBe("contain");
     expect(photo.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/listing-0/detail.webp?v=webp-natural-1" });
     expect(photo.priority).toBe("high");
   });
@@ -65,8 +68,18 @@ describe("Listing detail preview, from the tapped card's cached data", () => {
     const screen = await preview();
 
     expect(screen.getByTestId("detail-skeleton-body")).toBeTruthy();
-    for (const heading of ["Specifications", "Description", "Seller", "Ask the seller"])
+    expect(screen.getAllByTestId("spec-cell-loading")).toHaveLength(2);
+    expect(screen.getAllByTestId("spec-row-loading")).toHaveLength(2);
+    for (const heading of ["Description", "Seller", "Ask the seller", "Power", "Drive"])
       expect(screen.queryByText(heading)).toBeNull();
+  });
+
+  it("holds the owner's status card, with saves still loading, and no Seller placeholder", async () => {
+    const screen = await preview({}, { isOwner: true });
+
+    expect(screen.getByText("Your listing · Active")).toBeTruthy();
+    expect(screen.queryByText(/saves?/i)).toBeNull();
+    expect(screen.getByText("10,000 USD")).toBeTruthy();
   });
 
   it("keeps Call and Message disabled until the full detail arrives", async () => {

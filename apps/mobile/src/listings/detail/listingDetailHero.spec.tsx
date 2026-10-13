@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as Native from "react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 
-import { fireEvent, renderMobile, routeParams, routerMock, getAllHosts } from "../../../test/render";
+import { fireEvent, first, renderMobile, routeParams, routerMock, queryAllHosts } from "../../../test/render";
 import ListingDetailScreen from "../../../app/(public)/listings/[id]";
 import {
   fixture,
@@ -88,8 +88,8 @@ function cardMedia(dimensions?: { width: number; height: number }) {
 
 /** The first photo frame on screen, flattened to its size and fit. */
 function hero(screen: Screen) {
-  const frame = screen.getAllByTestId("listing-photo-frame")[0]!;
-  const image = getAllHosts(frame, "Image").find((node) => "uri" in (node.props.source ?? {}));
+  const frame = first(screen.getAllByTestId("listing-photo-frame"));
+  const image = queryAllHosts(frame, "Image").find((node) => "uri" in (node.props.source ?? {}));
   const { width, height } = [frame.props.style].flat().reduce((all, part) => ({ ...all, ...part }), {});
   return {
     frame: { width, height },
@@ -197,7 +197,7 @@ describe("loading placeholders in the loaded detail's shape (#864)", () => {
       ["Transmission", "Automatic"],
       ["Engine type", "Petrol"],
       ["Condition", "Used"],
-    ]) {
+    ] as const) {
       expect(screen.getByText(label)).toBeTruthy();
       expect(screen.getByText(value)).toBeTruthy();
     }

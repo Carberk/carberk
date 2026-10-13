@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ScrollView, View, useWindowDimensions } from "react-native";
+import { ScrollView, View } from "react-native";
 import { Image } from "expo-image";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
@@ -9,13 +9,15 @@ import { useEngineTypes } from "../../api/catalog/useEngineTypes";
 import { useTransmissions } from "../../api/catalog/useTransmissions";
 import { GalleryBanner, GalleryCounter } from "../components/GalleryImage";
 import { ContactCtaBar } from "../components/ContactCtaBar";
+import { keySpecs, PENDING, specRows } from "../components/ListingSpecs";
+import { NoPhotosFrame, useListingPhotoFrame } from "../components/ListingPhotoFrame";
 import { PriceDisplay } from "../components/PriceDisplay";
-import { listingSpecLine } from "../feed/listingSpecLine";
 import { useFeedCatalogMaps } from "../feed/useFeedCatalogMaps";
 
 import { buildOriginalUrl, buildVariantUrl } from "./buildVariantUrl";
 import { closedListingBannerKey, isClosedForContact } from "./closedListing";
 import { DetailSkeletonBody } from "./DetailSkeleton";
+import { OwnerStatusCard } from "./OwnerStatusCard";
 import { detailDate } from "./presentation";
 
 import { BackButton } from "@/components/navigation/StackHeader";
@@ -31,14 +33,16 @@ export interface ListingPreviewProps {
 
 /**
  * Listing detail before its own request returns, built only from the tapped
- * card: the photo, title, price, spec line, city and date. Specs, description
- * and seller load behind skeletons, and Call and Message stay disabled until
- * the full detail replaces this screen. Nothing here is written to the detail
- * cache.
+ * card and laid out as the loaded detail is: the photo in the same frame and
+ * fit, title, price, date and city, and the specifications the card knows in
+ * their final cells. The rest of the specifications, the description and the
+ * seller load behind placeholders of their own shape, and Call and Message
+ * stay disabled until the full detail replaces this screen. Nothing here is
+ * written to the detail cache.
  */
 export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps) {
   const { t, i18n } = useTranslation();
-  const { width } = useWindowDimensions();
+  const frame = useListingPhotoFrame();
   const insets = useSafeAreaInsets();
   const bar = useStickyActionBar("screen");
   const [useOriginalImage, setUseOriginalImage] = useState(false);
@@ -53,6 +57,7 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
   // The card decoded the `list` size already, so it shows at once while the
   // `detail` size the gallery opens on loads behind it. The gallery then finds
   // that size cached, and the photo never blanks when the full detail arrives.
+  // Both are drawn whole in the gallery's frame and fit, so nothing moves.
   const imageUri = coverKey
     ? useOriginalImage
       ? buildOriginalUrl(coverKey)
@@ -69,17 +74,27 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
     .filter(Boolean)
     .join(", ");
 
-  const specLine = listingSpecLine({
-    mileageKm: summary.mileageKm,
-    transmissionName: summary.transmissionId
-      ? transmissions.data?.items.find((item) => item.id === summary.transmissionId)?.name
-      : undefined,
-    engineTypeName: summary.engineTypeId
-      ? engineTypes.data?.items.find((item) => item.id === summary.engineTypeId)?.name
-      : undefined,
-    locale: i18n.language,
-    kmLabel: t("km"),
-  });
+  // A name still loading keeps its cell; power, drive, body and colour are
+  // not on the card.
+  const specs = keySpecs(
+    {
+      year: summary.year,
+      mileageKm: summary.mileageKm,
+      transmission: summary.transmissionId
+        ? (transmissions.data?.items.find((item) => item.id === summary.transmissionId)?.name ??
+          PENDING)
+        : undefined,
+      engineType: summary.engineTypeId
+        ? (engineTypes.data?.items.find((item) => item.id === summary.engineTypeId)?.name ??
+          PENDING)
+        : undefined,
+      enginePower: PENDING,
+      driveType: PENDING,
+    },
+    t,
+    i18n.language,
+  );
+  const rows = specRows({ condition: summary.condition, bodyType: PENDING, color: PENDING }, t);
 
   const dateAndCity = [
     detailDate(summary.publishedAt, i18n.language),
@@ -99,13 +114,13 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
 
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: bar.space }}>
         {imageUri ? (
-          <View style={{ width, height: width * 0.65 }}>
+          <View testID="listing-photo-frame" className="bg-muted" style={frame}>
             <Image
               source={{ uri: imageUri }}
               placeholder={placeholderUri ? { uri: placeholderUri } : undefined}
-              placeholderContentFit="cover"
+              placeholderContentFit="contain"
               style={{ width: "100%", height: "100%" }}
-              contentFit="cover"
+              contentFit="contain"
               priority="high"
               cachePolicy="memory-disk"
               onError={() => setUseOriginalImage(true)}
@@ -120,13 +135,11 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
             {bannerKey && <GalleryBanner label={t(bannerKey)} />}
           </View>
         ) : (
-          <View className="h-[240px] w-full items-center justify-center bg-muted">
-            <Text className="text-callout text-muted-foreground">{t("noPhotos")}</Text>
-            {bannerKey && <GalleryBanner label={t(bannerKey)} />}
-          </View>
+          <NoPhotosFrame banner={bannerKey ? t(bannerKey) : undefined} />
         )}
 
         <View className="gap-4 px-5 py-5">
+          {isOwner && <OwnerStatusCard status={summary.status} />}
           <Text className="text-headline font-heading font-semibold text-foreground" numberOfLines={2}>
             {title || t("listing")}
           </Text>
@@ -136,15 +149,13 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
             priceCurrency={summary.priceCurrency}
             acceptsExchange={false}
             installmentAvailable={false}
+            isOwner={isOwner}
             muted={closed}
           />
-          {specLine.length > 0 && (
-            <Text className="text-callout text-foreground">{specLine}</Text>
-          )}
           {dateAndCity.length > 0 && (
             <Text className="text-callout text-muted-foreground">{dateAndCity}</Text>
           )}
-          <DetailSkeletonBody />
+          <DetailSkeletonBody specs={specs} rows={rows} seller={!isOwner} />
         </View>
       </ScrollView>
 
