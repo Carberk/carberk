@@ -115,6 +115,9 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
         .withUsername("auto_tm")
         .withPassword("auto_tm_pass")
         .withDatabase("auto_tm_test")
+        // A throwaway database: no commit waits for the disk. The catalog seed alone commits
+        // about 5,500 times, which took most of this setup on a CI runner.
+        .withCommand(["postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"])
         .start()
         .then(migrateAndSeedCatalog),
       new GenericContainer("cgr.dev/chainguard/minio@sha256:4692462f35d97d7e82c30371d82f057703c5d9489bcae726010594c812f2d285")
