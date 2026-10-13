@@ -84,6 +84,13 @@ export default async function setup({ config, provide }: GlobalSetupContext) {
       for (const name of [...names, template]) {
         await admin.$executeRawUnsafe(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
       }
+      // The prefix is a plain identifier (testDatabasePrefix), so `_` is the only LIKE wildcard.
+      const left = await admin.$queryRawUnsafe<{ datname: string }[]>(
+        `SELECT datname FROM pg_database WHERE datname LIKE '${prefix.replaceAll("_", "\\_")}\\_%'`,
+      );
+      if (left.length > 0) {
+        throw new Error(`API test databases were not dropped: ${left.map((row) => row.datname).join(", ")}`);
+      }
     });
 
   try {
