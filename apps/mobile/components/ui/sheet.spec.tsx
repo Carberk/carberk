@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PhotoActionSheet } from "../../src/listings/wizard/PhotoActionSheet";
 import type { StagedPhoto } from "../../src/listings/uploadStaging/types";
-
 import { act, fireEvent, renderMobile } from "../../test/render";
 
 import { Sheet, SheetContent } from "@/components/ui/sheet";
