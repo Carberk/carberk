@@ -24,7 +24,7 @@ Both gate workflows avoid work that cannot change the result.
 
 ### Toolchain and caching
 
-Every workflow installs pnpm with `pnpm/action-setup` (version pinned to the `packageManager` field in `package.json`; keep the two equal) before Node with `actions/setup-node` and `cache: pnpm`. pnpm must come first so `setup-node` can find it. The standard GitHub cache holds the pnpm store, keyed on `pnpm-lock.yaml`, so the first run after a lockfile change is cold and later runs restore the store. Docker and Compose v2 are the runner's built-ins. There is no persistent runner state to prune or repair, and a failed run leaves nothing behind once the runner is discarded.
+Every workflow installs pnpm with `pnpm/action-setup` (version pinned to the `packageManager` field in `package.json`; keep the two equal) before Node. pnpm 12 needs `pnpm/action-setup` v6.1.0 or later, and the floating `v6` tag still points at 6.0.10, so the workflows pin `v6.1.0`. The same pnpm version is pinned in the Dockerfiles' `corepack prepare` and in `apps/mobile/eas.json`. pnpm reads its settings, the `allowBuilds` list and the dependency catalog from `pnpm-workspace.yaml`. Then Node is installed with `actions/setup-node` and `cache: pnpm`. pnpm must come first so `setup-node` can find it. The standard GitHub cache holds the pnpm store, keyed on `pnpm-lock.yaml`, so the first run after a lockfile change is cold and later runs restore the store. Docker and Compose v2 are the runner's built-ins. There is no persistent runner state to prune or repair, and a failed run leaves nothing behind once the runner is discarded.
 
 Compare timings of two runs, step by step, with:
 

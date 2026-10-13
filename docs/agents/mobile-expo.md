@@ -61,7 +61,10 @@ Stop Metro before handing back the task.
 
 ## Known SDK 55 pitfalls
 
-- Keep `.npmrc` with `shamefully-hoist=true`; Metro expects flat React Native dependencies under pnpm.
+- Keep `shamefullyHoist: true` in `pnpm-workspace.yaml`; Metro expects flat React Native dependencies under pnpm. pnpm 11 and later read only auth and registry settings from `.npmrc`, so the setting cannot live there.
+- Keep the `react-native-css-interop` override in `pnpm-workspace.yaml` ([ADR-0048](../adr/0048-pin-react-native-css-interop-with-a-pnpm-override.md)); pnpm 11 and later ignore the `pnpm` field of `package.json`.
+- pnpm fails the install when a dependency's install script is not listed in `allowBuilds` in `pnpm-workspace.yaml`. When a new native package needs its script, review it and add it with a comment saying why; deny a script the app does not need with `false`.
+- Shared dependency ranges live in the default `catalog` in `pnpm-workspace.yaml`, and package files say `catalog:`. Mobile declares its own `react`, `react-dom` and `tailwindcss` ranges because Expo SDK 55 and NativeWind 4 pin them.
 - Keep `react-native-reanimated` and `react-native-worklets` as explicit Expo-installed app dependencies. SDK 55's Expo docs install them together, and Reanimated 4 initializes through Worklets; relying on a transitive Worklets peer can compile but crash in Expo Go with vague `Exception in HostFunction` errors when RNR components import builders such as `FadeIn` / `FadeOut`.
 - Keep `react-native-screens` on its React Native/Fabric source path. Do not redirect it to `lib/commonjs`; that caused `RNSSafeAreaView` view-config crashes.
 - Do not patch `@react-native/codegen` for `react-native-screens` unless the package check is already clean and a fresh Codegen/parser repro proves the current aligned toolchain still fails.

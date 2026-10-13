@@ -31,7 +31,7 @@ Use the [glossary](docs/domain/GLOSSARY.md) when interpreting or changing domain
 - Keep domain code framework-free. Cross-context calls use injected ports or events. Prisma rows stay behind infrastructure boundaries. Use one use-case per file and test business behavior in domain/application tests.
 - Commit schema changes as migrations. `db push` is localhost-only. Store timestamps in UTC. Never commit secrets or plaintext refresh tokens; refresh state belongs to Session, not User.
 - External service egress needs an approved decision. Existing push and sign-in email delivery run in the worker. Hosting follows [ADR-0039](docs/adr/0039-phased-cloud-first-hosting.md); preserve the future TM deployment constraints.
-- Preserve `.npmrc` hoisting and mobile media limits. Follow the mobile gate before changing package resolution or compression.
+- Preserve `shamefullyHoist` in `pnpm-workspace.yaml` and mobile media limits. Follow the mobile gate before changing package resolution or compression.
 - Keep merged ADRs immutable, started sprint plans locked, and retros append-only. [ADR-0060](docs/adr/0060-source-first-agent-context-and-task-scoped-guidance.md) replaces exhaustive code mirrors with selective orientation. Update an overview when its documented boundary, constraint, ownership, or limitation changes.
 
 ## Finish with evidence
