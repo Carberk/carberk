@@ -1,0 +1,31 @@
+name: API image runtime
+
+on:
+  pull_request:
+    paths:
+      - "infra/docker/api.Dockerfile"
+      - "scripts/api-image-runtime-smoke.mjs"
+      - ".github/workflows/api-image-runtime.yml"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "patches/**"
+      - "packages/db/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Build final API image
+        run: docker build -f infra/docker/api.Dockerfile -t auto-tm/api:runtime .
+      - name: Check packaged commands and isolated migrations
+        run: node scripts/api-image-runtime-smoke.mjs auto-tm/api:runtime

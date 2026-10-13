@@ -55,6 +55,9 @@ RUN pnpm --filter @auto-tm/contracts build
 RUN pnpm --filter @auto-tm/api build
 
 FROM base AS runtime
+# This stage intentionally trims the installed workspace. Runtime commands
+# must use packaged dependencies, not reinstall to repair build-stage metadata.
+ENV pnpm_config_verify_deps_before_run=false
 # Deploy evidence: Railway injects RAILWAY_GIT_COMMIT_SHA as a build arg for
 # Dockerfile builds; baking it into ENV means /healthz and /readyz identify
 # the exact revision even when Railway rebuilds it. "unknown" off Railway.
@@ -64,6 +67,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl openssl po
 # Root workspace files so the migration pre-deploy command can run
 # `pnpm --filter @auto-tm/db migrate:deploy` inside this image.
 COPY --from=build /app/package.json /app/pnpm-workspace.yaml /app/pnpm-lock.yaml /app/
+COPY --from=build /app/patches /app/patches
 COPY --from=build /app/node_modules /app/node_modules
 COPY --from=build /app/apps/api/node_modules /app/apps/api/node_modules
 COPY --from=build /app/apps/api/dist /app/apps/api/dist
