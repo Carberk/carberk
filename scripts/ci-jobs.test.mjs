@@ -4,9 +4,11 @@ import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-// PR Checks and CI split the workspace tests between a backend job (with
-// services) and a frontend job (without). These checks keep every workspace's
-// tests in exactly one of them, and keep the required `pr` check meaningful.
+// PR Checks and CI split the workspace tests between an api job (api and
+// worker, with Compose services), a db job (Testcontainers only) and a frontend
+// job (no services). These checks keep every workspace's tests in exactly one
+// of them, give each job only the services it needs, and keep the required
+// `pr` check meaningful.
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const readJson = (path) => JSON.parse(readFileSync(join(root, path), "utf8"));
@@ -49,11 +51,18 @@ function jobs(source) {
   return result;
 }
 
+const testScripts = ["test:api", "test:db", "test:frontend"];
+
 test("every workspace with tests runs in exactly one CI test job", () => {
-  const backend = filters(rootScripts["test:backend"]);
-  const frontend = filters(rootScripts["test:frontend"]);
-  assert.deepEqual(backend.filter((name) => frontend.includes(name)), []);
-  assert.deepEqual([...backend, ...frontend].sort(), workspacesWithTests());
+  const all = testScripts.flatMap((script) => filters(rootScripts[script]));
+  assert.deepEqual(all.filter((name, index) => all.indexOf(name) !== index), [], "a workspace is in two CI test scripts");
+  assert.deepEqual(all.sort(), workspacesWithTests());
+});
+
+test("api and worker share the api job, apart from the db suite", () => {
+  assert.deepEqual(filters(rootScripts["test:api"]).sort(), ["@auto-tm/api", "@auto-tm/worker"]);
+  assert.deepEqual(filters(rootScripts["test:db"]), ["@auto-tm/db"]);
+  assert.equal(rootScripts["test:backend"], undefined, "test:backend would run api and db on one runner again");
 });
 
 test("the CI test scripts run every root node --test file", () => {
@@ -61,10 +70,11 @@ test("the CI test scripts run every root node --test file", () => {
 });
 
 for (const name of ["pr-checks.yml", "ci.yml"]) {
-  test(`${name} runs the backend, frontend and root tests, lint, typecheck and the admin runtime check`, () => {
+  test(`${name} runs the api, db, frontend and root tests, lint, typecheck and the admin runtime check`, () => {
     const source = workflow(name);
     for (const command of [
-      "pnpm test:backend",
+      "pnpm test:api",
+      "pnpm test:db",
       "pnpm test:frontend",
       "pnpm test:root",
       "pnpm lint",
@@ -85,5 +95,40 @@ test("the required pr job needs every other PR Checks job and runs even when one
   assert.match(pr, /\n {4}if: always\(\)\n/);
   for (const id of needs) {
     assert.ok(pr.includes(`needs.${id}.result`), `pr does not check the ${id} job's result`);
+  }
+});
+
+for (const name of ["pr-checks.yml", "ci.yml"]) {
+  test(`${name} runs api and db tests in separate jobs, with services only in api`, () => {
+    const graph = jobs(workflow(name));
+    assert.equal(graph.has("backend"), false, `${name} still has a backend job`);
+    const api = graph.get("api");
+    const db = graph.get("db");
+    assert.ok(api && db, `${name} needs both an api and a db job`);
+    assert.ok(api.includes("run: pnpm test:api") && !api.includes("pnpm test:db"));
+    assert.ok(db.includes("run: pnpm test:db") && !db.includes("pnpm test:api"));
+    for (const [id, text] of [["api", api], ["db", db]]) {
+      assert.match(text, /^ {4}needs: lane\n {4}if: needs\.lane\.outputs\.lane != 'docs'\n/m, `${name} ${id} is not skipped by the docs lane`);
+      assert.match(text, /TESTCONTAINERS_RYUK_DISABLED: "true"/, `${name} ${id} must disable Ryuk`);
+    }
+    assert.match(api, /scripts\/ci-services\.sh up/);
+    assert.match(api, /if: always\(\)\n {8}shell: bash\n {8}run: bash scripts\/ci-services\.sh down/);
+    assert.doesNotMatch(db, /ci-services\.sh|REDIS_URL|MINIO_/, `${name} db must not start or point at Compose services`);
+    for (const [id, text] of graph) {
+      if (id !== "api") assert.doesNotMatch(text, /ci-services\.sh/, `${name} ${id} starts Compose services`);
+    }
+  });
+}
+
+test("every variable the api and db jobs set reaches turbo tasks under strict env mode", () => {
+  const turbo = readJson("turbo.json");
+  const allowed = new Set([...turbo.globalEnv, ...turbo.globalPassThroughEnv]);
+  for (const name of ["pr-checks.yml", "ci.yml"]) {
+    const graph = jobs(workflow(name));
+    for (const id of ["api", "db"]) {
+      for (const [, variable] of graph.get(id).matchAll(/^ {6,10}([A-Z][A-Z0-9_]+):/gm)) {
+        assert.ok(allowed.has(variable), `${name} ${id} sets ${variable}, which turbo strips`);
+      }
+    }
   }
 });

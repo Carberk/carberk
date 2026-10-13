@@ -95,8 +95,8 @@ jobs:
       - name: Build admin and verify real session/runtime paths
         run: pnpm --filter @auto-tm/admin verify:runtime
 
-  # api, worker and db tests against disposable Postgres, Redis and MinIO.
-  backend:
+  # api and worker tests against disposable Postgres, Redis and MinIO.
+  api:
     needs: lane
     if: needs.lane.outputs.lane != 'docs'
     runs-on: ubuntu-latest
@@ -132,14 +132,14 @@ jobs:
       - name: Create disposable media buckets
         run: pnpm minio:bootstrap
 
-      - run: pnpm test:backend
+      - run: pnpm test:api
         env:
           NODE_ENV: test
           APP_ENV: test
-          # The runner is discarded after the job, so Ryuk adds no cleanup.
-          # Spec files run in fresh workers and reconnect to the previous
-          # file's Ryuk, which can stop between files: "Failed to connect
-          # to Reaper".
+          # Some api specs start Testcontainers too. The runner is discarded
+          # after the job, so Ryuk adds no cleanup. Spec files run in fresh
+          # workers and reconnect to the previous file's Ryuk, which can stop
+          # between files: "Failed to connect to Reaper".
           TESTCONTAINERS_RYUK_DISABLED: "true"
 
       - name: Show test service logs on failure
@@ -147,10 +147,43 @@ jobs:
         shell: bash
         run: bash scripts/ci-services.sh logs
 
+      # always() also runs this step when a newer push cancels the run.
       - name: Remove disposable test services
         if: always()
         shell: bash
         run: bash scripts/ci-services.sh down
+
+  # db tests. Each starts its own Postgres (and MinIO) with Testcontainers,
+  # so this job starts no Compose services.
+  db:
+    needs: lane
+    if: needs.lane.outputs.lane != 'docs'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Prisma loads prisma.config.ts during generate (the db build) and
+      # requires a DATABASE_URL, though generate never connects. Unreachable
+      # port 1; every test passes its own container's URL.
+      DATABASE_URL: postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:1/auto_tm_ci
+      NODE_ENV: test
+      APP_ENV: test
+      # The runner is discarded after the job, so Ryuk adds no cleanup.
+      # Spec files run in fresh workers and reconnect to the previous file's
+      # Ryuk, which can stop between files: "Failed to connect to Reaper".
+      TESTCONTAINERS_RYUK_DISABLED: "true"
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6.1.0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm test:db
 
   # mobile, web, admin, contracts and sms-gateway tests, then the root
   # scripts' node --test files. No services.
