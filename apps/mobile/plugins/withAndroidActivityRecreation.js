@@ -88,6 +88,8 @@ function withAndroidActivityRecreation(config) {
   });
 }
 
+// Expando properties, then one module.exports assignment: TypeScript 7 does not
+// type a module that mixes `module.exports =` with `module.exports.x =`.
+withAndroidActivityRecreation.addConfigChanges = addConfigChanges;
+withAndroidActivityRecreation.addHostDestroyOnRelaunch = addHostDestroyOnRelaunch;
 module.exports = withAndroidActivityRecreation;
-module.exports.addConfigChanges = addConfigChanges;
-module.exports.addHostDestroyOnRelaunch = addHostDestroyOnRelaunch;

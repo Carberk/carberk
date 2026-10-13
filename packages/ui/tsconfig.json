@@ -4,7 +4,8 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "module": "ESNext",
-    "moduleResolution": "Bundler"
+    "moduleResolution": "Bundler",
+    "types": []
   },
   "include": ["src", "tokens", "theme", "components"]
 }

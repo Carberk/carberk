@@ -6,7 +6,7 @@ This repo has more than one TypeScript runtime. Do not apply one import-extensio
 
 | Class | Workspaces | Runtime rule |
 |---|---|---|
-| Nest/CommonJS backend apps | `apps/api`, `apps/worker` | Compile app code to CommonJS. Do not execute workspace package `src/*.ts` directly from Node. |
+| Nest/CommonJS backend apps | `apps/api`, `apps/worker` | Compile app code to CommonJS (`module: CommonJS` with `moduleResolution: Bundler`). Do not execute workspace package `src/*.ts` directly from Node. |
 | Runtime-shared packages | `packages/db`, `packages/contracts` | Build to ignored `dist/` before consumers run. Package `exports` must point at `dist`, not `src`. |
 | True ESM service | `apps/sms-gateway` | `type: "module"` + NodeNext. Relative runtime imports in `.ts` source use `.js` specifiers because TypeScript preserves them for emitted JS. |
 | Bundler-only UI package | `packages/ui` | Source exports are allowed because Next/Metro consume them through bundlers, not raw Node. Do not import this package from API/worker. |
@@ -14,6 +14,17 @@ This repo has more than one TypeScript runtime. Do not apply one import-extensio
 `packages/db/generated/` is ignored. `pnpm --filter @auto-tm/db build` runs `prisma generate` before `tsc`, so do not hand-edit or commit generated Prisma client files. The Prisma generator uses `moduleFormat = "cjs"` to avoid emitting ESM-only generated code into the DB package's CommonJS build.
 
 `apps/api`, `apps/worker`, and `apps/mobile` run the needed package build before `dev`. For `build`, `test`, and `typecheck`, either use the root Turbo scripts or run the package builds listed below first.
+
+## Which compiler runs where
+
+Two TypeScript compilers are installed side by side, both from the pnpm default catalog. TypeScript 7 is the native compiler and ships no compiler API before 7.1, so tools that load the API keep TypeScript 6.
+
+| Package name in `package.json` | Version | Binary | Runs |
+|---|---|---|---|
+| `@typescript/native` (`npm:typescript@^7.0.2`) | 7.0 | `tsc` | Every `typecheck` script (`tsc --noEmit`), so `pnpm typecheck` is TypeScript 7. Also the `tsc` emit in the `packages/contracts` and `packages/db` builds and the `apps/sms-gateway` build. |
+| `typescript` (`npm:@typescript/typescript6@^6.0.2`) | 6.0 | `tsc6` | Whatever imports `typescript`: typescript-eslint during `pnpm lint` (it supports TypeScript <6.1), `nest build` for `apps/api` and `apps/worker`, `next build` type checking for `apps/admin` and `apps/web`, and Expo's TypeScript config loader. |
+
+Every package that type-checks must pass both. Check TypeScript 6 with `pnpm --filter <package> exec tsc6 --noEmit`. Do not set `ignoreDeprecations`: TypeScript 7 removed the options TypeScript 6 deprecated, such as `moduleResolution: node10` and `baseUrl`. TypeScript 6 changed two defaults, so each tsconfig states them where they matter: `rootDir` (now the tsconfig directory) where output paths depend on it, and `types` (now `[]`) where code uses `@types` globals such as `node`. Leave `typescript` on TypeScript 6 until typescript-eslint, the Nest CLI and Next.js support TypeScript 7's API.
 
 ## Why the API crashed
 

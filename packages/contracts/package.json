@@ -29,6 +29,8 @@
   "devDependencies": {
     "@auto-tm/tsconfig": "workspace:*",
     "@auto-tm/eslint-config": "workspace:*",
+    "@types/node": "catalog:",
+    "@typescript/native": "catalog:",
     "tsx": "catalog:",
     "vitest": "catalog:",
     "typescript": "catalog:",

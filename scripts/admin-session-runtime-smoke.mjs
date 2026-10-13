@@ -185,7 +185,9 @@ try {
   assert.equal(rotations, before + 1, "short handoff must not spend refresh again");
   await delay(5_100);
   const loser = await request(concurrent.old, true);
-  assert.equal(loser.status, 303);
+  // Next.js 16.3+ answers a client-handled action redirect with 200 plus
+  // x-action-redirect (vercel/next.js#96310); 16.2 sent 303 without Location.
+  assert.equal(loser.status, 200, "client-handled action redirect must not look like an HTTP redirect");
   assert.equal(mutations, 1, "losing action must never execute or replay");
   const redirect = loser.headers.get("x-action-redirect");
   assert(redirect?.startsWith("/login?reason=session-expired") && redirect.endsWith(";push"), "Next action redirect must navigate its JavaScript client to login");
@@ -196,7 +198,7 @@ try {
   // Login is statically prerendered with a client useSearchParams boundary.
   // Hydrated Russian copy is covered by the rendered login DOM tests.
   await login.text();
-  console.log("PASS cache expiry/loser: 303, both cookies cleared, no mutation, login GET without loop");
+  console.log("PASS cache expiry/loser: action redirect to login, both cookies cleared, no mutation, login GET without loop");
 
   const ordinaryPost = await fetch(`${origin}/reports`, { method: "POST", redirect: "manual", headers: { cookie: cookie(concurrent.old), origin }, body: "original form" });
   assert.equal(ordinaryPost.status, 303);
@@ -212,7 +214,7 @@ try {
       await delay(100);
     }
     const restartLoser = await request(first.old, true);
-    assert.equal(restartLoser.status, 303, "lost process-local handoff must fail closed after restart");
+    assert.equal(restartLoser.status, 200, "lost process-local handoff must fail closed after restart");
     assert(restartLoser.headers.get("x-action-redirect")?.startsWith("/login?reason=session-expired"), "restart loser must preserve native action navigation");
     assert.equal(mutations, 1);
     console.log("PASS restart loser: login; original action never runs");

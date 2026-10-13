@@ -1,6 +1,6 @@
 {
   "extends": "@auto-tm/tsconfig/nextjs.json",
-  "compilerOptions": { "baseUrl": ".", "paths": { "@/*": ["./src/*"] } },
+  "compilerOptions": { "types": ["node"], "paths": { "@/*": ["./src/*"] } },
   "include": ["next-env.d.ts", "src", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
 }

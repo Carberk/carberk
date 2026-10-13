@@ -44,6 +44,7 @@
   "devDependencies": {
     "@auto-tm/tsconfig": "workspace:*",
     "@auto-tm/eslint-config": "workspace:*",
+    "@typescript/native": "catalog:",
     "prisma": "^7.6.0",
     "tsx": "catalog:",
     "vitest": "catalog:",
@@ -54,7 +55,7 @@
     "eslint": "catalog:",
     "dotenv": "17.4.2",
     "@aws-sdk/client-s3": "catalog:",
-    "sharp": "^0.34.5",
+    "sharp": "catalog:",
     "simple-icons": "16.33.0",
     "testcontainers": "^10.28.0"
   }
