@@ -1,0 +1,42 @@
+10-13 20:19:23.573 20197 20757 I ReactNativeJS: '[post-ref-layout]', 'outer-row', { x: 0,
+10-13 20:19:23.573 20197 20757 I ReactNativeJS:   y: 0,
+10-13 20:19:23.573 20197 20757 I ReactNativeJS:   width: 411.4285583496094,
+10-13 20:19:23.573 20197 20757 I ReactNativeJS:   height: 132.19049072265625 }
+10-13 20:19:23.603 20197 20757 I ReactNativeJS: '[post-ref-layout]', 'bubble', { x: 91.80952453613281,
+10-13 20:19:23.603 20197 20757 I ReactNativeJS:   y: 4.190476417541504,
+10-13 20:19:23.603 20197 20757 I ReactNativeJS:   width: 303.6190185546875,
+10-13 20:19:23.603 20197 20757 I ReactNativeJS:   height: 124.57142639160156 }
+10-13 20:19:23.608 20197 20757 I ReactNativeJS: '[post-ref-layout]', 'content-pressable', { x: 16,
+10-13 20:19:23.608 20197 20757 I ReactNativeJS:   y: 9.904762268066406,
+10-13 20:19:23.608 20197 20757 I ReactNativeJS:   width: 271.6190185546875,
+10-13 20:19:23.608 20197 20757 I ReactNativeJS:   height: 104.38095092773438 }
+10-13 20:19:23.618 20197 20757 I ReactNativeJS: '[post-ref-layout]', 'card-pressable', { x: 0, y: 0, width: 271.6190185546875, height: 84.5714111328125 }
+10-13 20:19:23.627 20197 20757 I ReactNativeJS: '[post-ref-layout]', 'card-row', { x: 0, y: 0, width: 271.6190185546875, height: 84.5714111328125 }
+10-13 20:19:23.631 20197 20757 I ReactNativeJS: '[post-ref-layout]', 'text-column', { x: 84.95237731933594,
+10-13 20:19:23.631 20197 20757 I ReactNativeJS:   y: 9.142857551574707,
+10-13 20:19:23.631 20197 20757 I ReactNativeJS:   width: 177.5238037109375,
+10-13 20:19:23.631 20197 20757 I ReactNativeJS:   height: 66.28570556640625 }
+10-13 20:19:23.632 20197 20757 I ReactNativeJS: '[post-ref-layout]', 'outer-row', { x: 0,
+10-13 20:19:23.632 20197 20757 I ReactNativeJS:   y: 0,
+10-13 20:19:23.632 20197 20757 I ReactNativeJS:   width: 411.4285583496094,
+10-13 20:19:23.632 20197 20757 I ReactNativeJS:   height: 132.5714111328125 }
+10-13 20:19:23.632 20197 20757 I ReactNativeJS: '[post-ref-layout]', 'bubble', { x: 91.80952453613281,
+10-13 20:19:23.632 20197 20757 I ReactNativeJS:   y: 4.190476417541504,
+10-13 20:19:23.632 20197 20757 I ReactNativeJS:   width: 303.6190185546875,
+10-13 20:19:23.632 20197 20757 I ReactNativeJS:   height: 124.19049072265625 }
+10-13 20:19:23.632 20197 20757 I ReactNativeJS: '[post-ref-layout]', 'content-pressable', { x: 16,
+10-13 20:19:23.632 20197 20757 I ReactNativeJS:   y: 9.904762268066406,
+10-13 20:19:23.632 20197 20757 I ReactNativeJS:   width: 271.6190185546875,
+10-13 20:19:23.632 20197 20757 I ReactNativeJS:   height: 104.38095092773438 }
+10-13 20:19:23.632 20197 20757 I ReactNativeJS: '[post-ref-layout]', 'card-pressable', { x: 0,
+10-13 20:19:23.632 20197 20757 I ReactNativeJS:   y: 0,
+10-13 20:19:23.632 20197 20757 I ReactNativeJS:   width: 271.6190185546875,
+10-13 20:19:23.632 20197 20757 I ReactNativeJS:   height: 84.19049072265625 }
+10-13 20:19:23.633 20197 20757 I ReactNativeJS: '[post-ref-layout]', 'card-row', { x: 0,
+10-13 20:19:23.633 20197 20757 I ReactNativeJS:   y: 0,
+10-13 20:19:23.633 20197 20757 I ReactNativeJS:   width: 271.6190185546875,
+10-13 20:19:23.633 20197 20757 I ReactNativeJS:   height: 84.19049072265625 }
+10-13 20:19:23.633 20197 20757 I ReactNativeJS: '[post-ref-layout]', 'text-column', { x: 84.95237731933594,
+10-13 20:19:23.633 20197 20757 I ReactNativeJS:   y: 9.142857551574707,
+10-13 20:19:23.633 20197 20757 I ReactNativeJS:   width: 177.5238037109375,
+10-13 20:19:23.633 20197 20757 I ReactNativeJS:   height: 66.28570556640625 }
