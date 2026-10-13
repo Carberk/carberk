@@ -10,6 +10,11 @@ shamefullyHoist: true
 overrides:
   react-native-css-interop: 0.2.4
 
+# Official Android prefab backports, reviewed separately in PR #859.
+patchedDependencies:
+  "expo-modules-core@55.0.26": patches/expo-modules-core@55.0.26.patch
+  "react-native-reanimated@4.2.1": patches/react-native-reanimated@4.2.1.patch
+
 # pnpm 12.11+ links agent skills that dependencies ship into the workspace's
 # agent skill directories, such as .claude/skills. ADR-0040 reserves
 # .claude/skills for repository skills, so an empty list turns the feature off.
