@@ -6,25 +6,45 @@ GitHub Actions workflows. All of them run on GitHub-hosted `ubuntu-latest` runne
 
 | Workflow | Trigger | Runner | Purpose |
 |---|---|---|---|
-| `ci.yml` | Push to `main` | `ubuntu-latest` | lane choice → disposable test services → install → glossary check → lane tests → db generate and migrate → MinIO buckets → lint → typecheck → `pnpm test` → `pnpm build` → service cleanup. Docs-only pushes stop after the docs checks |
-| `pr-checks.yml` | Pull request to `main` | `ubuntu-latest` | lane choice → disposable test services → install → glossary check → lane tests → db generate and migrate → MinIO buckets → lint → typecheck → `pnpm test` → service cleanup. Docs-only pull requests stop after the docs checks; a new push cancels the older run |
+| `ci.yml` | Push to `main` | `ubuntu-latest` | The [job graph](#job-graph) below, plus a `build` job running `pnpm build`. Docs-only pushes run only the docs job. There is no aggregator: `main` has no required check |
+| `pr-checks.yml` | Pull request to `main` | `ubuntu-latest` | The [job graph](#job-graph) below, ending in the required `pr` job. Docs-only pull requests run only the docs job; a new push cancels the older run |
 | `bundle.yml` | Tag push `v*`, manual dispatch | `ubuntu-latest` | `make bundle TAG=<tag>` builds the service images and saves them to `images/auto-tm-<tag>.tar.gz`, uploaded as a workflow artifact (90-day retention). A manual dispatch takes an optional `tag` input, defaults to `dev-<sha>`, and publishes nothing but the artifact |
 
-Each job has a 30-minute timeout (the bundle job 60). Each workflow sets `permissions: contents: read`.
+Each work job has a 30-minute timeout (the bundle job 60; `lane` and `pr` 5). Each workflow sets `permissions: contents: read`.
+
+### Job graph
+
+PR Checks and CI run as parallel jobs, each on its own runner:
+
+```
+lane ─┬─ docs        (docs lane only)
+      ├─ static      lint, typecheck, admin verify:runtime; no services
+      ├─ backend     pnpm test:backend: api, worker, db; disposable services
+      ├─ frontend    pnpm test:frontend: mobile, web, admin, contracts, sms-gateway; then pnpm test:root
+      └─ build       (CI only) pnpm build
+                 └── pr (PR Checks only) needs every job above, if: always()
+```
+
+- **`lane`** checks out at depth 2 and runs `scripts/ci-lane.mjs`. Its `lane` output is `docs` or `full`. It installs nothing, so the work jobs start within seconds.
+- **`docs`** runs when the lane is `docs`: install, the glossary check, the lane tests, `pnpm test:agent-docs` and `pnpm test:glossary`.
+- **`static`**, **`backend`**, **`frontend`** and (on `main`) **`build`** run when the lane is not `docs`. `static` also runs the glossary check and the lane tests. Only `backend` starts the disposable services. `frontend` runs `pnpm test:root` after the workspace tests, because the reviewer-flow smoke imports the built `@auto-tm/contracts`; `test:root` runs every `scripts/*.test.mjs` file in one concurrent `node --test`. `scripts/ci-jobs.test.mjs` fails if a workspace with a `test` script is in neither `test:backend` nor `test:frontend`, or in both.
+- **`pr`** lists every other job in `needs` and runs with `if: always()`. It passes only when each needed job succeeded or was skipped by the lane: `docs` in the full lane, `static`, `backend` and `frontend` in the docs lane. Anything else fails it: a failed, cancelled or unexpectedly skipped job, or a failed `lane` job, which skips everything after it.
+
+`if: always()` on `pr` is load-bearing. Without it, a failed job makes GitHub skip `pr` too, because a job's default condition requires its needed jobs to succeed, and GitHub counts a skipped required check as passing. A broken pull request could then merge. `scripts/ci-jobs.test.mjs` checks that `pr` needs every other job, keeps `if: always()` and reads each needed job's result.
 
 ### Lanes and cancellation
 
 Both gate workflows avoid work that cannot change the result.
 
 - **Cancellation.** PR Checks uses one concurrency group per pull request with `cancel-in-progress`. A new push cancels that pull request's queued or running run; other pull requests are unaffected and run in parallel. `main` has no concurrency group: every push to `main` is checked, in order.
-- **Docs lane.** `scripts/ci-lane.mjs` selects docs when every changed path is Markdown (`*.md`, anywhere) or lives under `docs/`. PR Checks compares the synthetic merge commit with its base parent at `fetch-depth: 2`. It also takes the docs lane after a green previous head of the same PR when only documentation changed by hand since then, including documentation conflict resolutions in a merge from `main`; see [ADR-0091](../../docs/adr/0091-docs-lane-after-a-green-pull-request-head.md). CI compares the push with the previous `main` commit (`github.event.before`). The docs lane runs install, the glossary check, lane tests, `pnpm test:agent-docs`, and `pnpm test:glossary`, and skips test services, migrations, MinIO, lint, typecheck, workspace tests, and the build. Renames list both paths, so moving code into `docs/` takes the full lane.
-- **Fail-safe.** If neither docs rule can be proved, the lane is `full`. An unreadable diff takes full; the green-previous-head rule also requires readable, unambiguous event, history and check data. Full-pipeline steps use `lane != 'docs'`. The lane rule is tested by `pnpm test:ci-lane`, which both lanes run.
-- **Required check.** Branch protection requires the `pr` job. Keep that job id. Do not add a workflow-level `paths` or `paths-ignore` filter to PR Checks: a pull request whose workflow never starts leaves `pr` pending forever, and auto-merge never fires. Skip steps inside the job instead.
-- **Cleanup on cancel.** The service cleanup step uses `always()`, which also runs when a newer push cancels the run.
+- **Docs lane.** `scripts/ci-lane.mjs` selects docs when every changed path is Markdown (`*.md`, anywhere) or lives under `docs/`. PR Checks compares the synthetic merge commit with its base parent at `fetch-depth: 2`. It also takes the docs lane after a green previous head of the same PR when only documentation changed by hand since then, including documentation conflict resolutions in a merge from `main`; see [ADR-0091](../../docs/adr/0091-docs-lane-after-a-green-pull-request-head.md). CI compares the push with the previous `main` commit (`github.event.before`). The docs lane runs only the `docs` job, so it skips test services, migrations, MinIO, lint, typecheck, workspace tests, and the build. Renames list both paths, so moving code into `docs/` takes the full lane.
+- **Fail-safe.** If neither docs rule can be proved, the lane is `full`. An unreadable diff takes full; the green-previous-head rule also requires readable, unambiguous event, history and check data. Full-lane jobs use `needs.lane.outputs.lane != 'docs'`. The lane rule is tested by `pnpm test:ci-lane`, which both lanes run.
+- **Required check.** Branch protection requires the `pr` job. Keep that job id and its `if: always()` (see the [job graph](#job-graph)). Do not add a workflow-level `paths` or `paths-ignore` filter to PR Checks: a pull request whose workflow never starts leaves `pr` pending forever, and auto-merge never fires. Skip jobs through the lane instead.
+- **Cleanup on cancel.** The `backend` job's service cleanup step uses `always()`, which also runs when a newer push cancels the run. A cancelled run also runs `pr`, which fails on the cancelled jobs; the newer run reports the check for the new head.
 
 ### Toolchain and caching
 
-Every workflow installs pnpm with `pnpm/action-setup` (version pinned to the `packageManager` field in `package.json`; keep the two equal) before Node with `actions/setup-node` and `cache: pnpm`. pnpm must come first so `setup-node` can find it. The standard GitHub cache holds the pnpm store, keyed on `pnpm-lock.yaml`, so the first run after a lockfile change is cold and later runs restore the store. Docker and Compose v2 are the runner's built-ins. There is no persistent runner state to prune or repair, and a failed run leaves nothing behind once the runner is discarded.
+Every job that installs dependencies sets up pnpm with `pnpm/action-setup@v6` before Node with `actions/setup-node@v7` and `cache: pnpm`. pnpm must come first so `setup-node` can find it, and since `setup-node` v6 pnpm caching happens only when `cache: pnpm` is set. `pnpm/action-setup` has no `version:` input: it reads the version from the `packageManager` field in `package.json`, and fails if the two disagree. Checkout is `actions/checkout@v7` and the bundle upload `actions/upload-artifact@v7`; all four run on Node 24. The standard GitHub cache holds the pnpm store, keyed on `pnpm-lock.yaml`, so the first run after a lockfile change is cold and later runs restore the store. Docker and Compose v2 are the runner's built-ins. There is no persistent runner state to prune or repair, and a failed run leaves nothing behind once the runner is discarded.
 
 Compare timings of two runs, step by step, with:
 
@@ -33,15 +53,21 @@ gh api repos/bagtyyarkovusov/auto.tm-rewrite/actions/runs/<run-id>/jobs \
   --jq '.jobs[] | {name, runner_name, steps: [.steps[] | {name, conclusion, started_at, completed_at}]}'
 ```
 
-Subtract `started_at` from `completed_at` per step. The trial that led to the move measured a cold-cache hosted run at 3m33s against 2m42s self-hosted; see ADR-0073. The research that preceded it, including the retired self-hosted store layout, is in [the runner performance research](../../docs/research/github-actions-self-hosted-performance.md) and is historical.
+Subtract `started_at` from `completed_at` per step. The trial that led to the move measured a cold-cache hosted run at 3m33s against 2m42s self-hosted; see ADR-0073. Before the job split (#851) a full-lane PR Checks run took 8–10 minutes on one runner, of which `pnpm test` took 333–472 seconds.
+
+The turbo `test` tasks declare `outputs: []`: no workspace test writes coverage or another file worth caching. The research that preceded it, including the retired self-hosted store layout, is in [the runner performance research](../../docs/research/github-actions-self-hosted-performance.md) and is historical.
 
 ## Disposable CI services
 
-PR Checks and CI each start `infra/compose/docker-compose.ci.yml` through `scripts/ci-services.sh`. The Compose project name includes `GITHUB_RUN_ID` and `GITHUB_RUN_ATTEMPT`, so re-runs get separate containers, networks, and volumes. Docker assigns random host ports bound to `127.0.0.1`; the script reads them with `docker compose port` and writes `DATABASE_URL`, `REDIS_URL`, `MINIO_ENDPOINT`, and `MINIO_PUBLIC_URL` to `$GITHUB_ENV` for later steps. The job's initial endpoint values point to unreachable port 1, so no step can reach a service before the script starts it.
+The `backend` job of PR Checks and CI starts `infra/compose/docker-compose.ci.yml` through `scripts/ci-services.sh`. The Compose project name includes `GITHUB_RUN_ID` and `GITHUB_RUN_ATTEMPT`, so re-runs get separate containers, networks, and volumes. Docker assigns random host ports bound to `127.0.0.1`; the script reads them with `docker compose port` and writes `DATABASE_URL`, `REDIS_URL`, `MINIO_ENDPOINT`, and `MINIO_PUBLIC_URL` to `$GITHUB_ENV` for later steps. The job's initial endpoint values point to unreachable port 1, so no step can reach a service before the script starts it.
 
 `docker compose up --wait` waits for Postgres, Redis, and MinIO health checks. After `pnpm install` and Prisma client generation, `pnpm db:migrate:deploy` applies this checkout's committed migrations to the empty CI database. `pnpm minio:bootstrap` creates its media buckets before tests. The last step uses `if: always()` and `docker compose down --volumes --remove-orphans`, including when an earlier step fails. The CI Compose file uses disposable volumes, never the development Compose project's volumes or fixed ports.
 
-All test credentials and flags are public, nonproduction placeholders written by `scripts/ci-services.sh`: the MinIO keys and region, JWT secrets, TOTP key, and report/moderation flags. The `pnpm test` step sets `NODE_ENV` and `APP_ENV` to `test`, and sets `TESTCONTAINERS_RYUK_DISABLED` because the hosted runner is discarded after the job and a fresh test worker reconnecting to the previous worker's Ryuk reaper can fail with "Failed to connect to Reaper". It includes the reviewer-flow smoke's pure helper tests; the deployed smoke remains an operator command. The CI build keeps its normal production mode. Production values never belong in CI (ADR-0005).
+All test credentials and flags are public, nonproduction placeholders written by `scripts/ci-services.sh`: the MinIO keys and region, JWT secrets, TOTP key, and report/moderation flags. The `pnpm test:backend` step sets `NODE_ENV` and `APP_ENV` to `test`, and sets `TESTCONTAINERS_RYUK_DISABLED` because the hosted runner is discarded after the job and a fresh test worker reconnecting to the previous worker's Ryuk reaper can fail with "Failed to connect to Reaper". The `frontend` job sets `NODE_ENV` and `APP_ENV` to `test` and has no service variables. `pnpm test:root` includes the reviewer-flow smoke's pure helper tests; the deployed smoke remains an operator command. The CI build keeps its normal production mode. Production values never belong in CI (ADR-0005).
+
+### API spec files on per-worker databases
+
+`apps/api` runs its spec files in parallel. `apps/api/test/globalSetup.ts` creates `<database>_t<run id>_template`, applies this checkout's committed migrations to it with `prisma migrate deploy`, and clones `<database>_t<run id>_w1` … `_w<N>` from it with `CREATE DATABASE … TEMPLATE`, one per Vitest worker. In CI the base is the migrated disposable database; the template is migrated from the same migrations rather than cloned from it, because `CREATE DATABASE … TEMPLATE` fails while another session is connected to the source, and the worker and db tests use that database at the same time. `apps/api/test/setup-env.ts` points each worker at its database and at Redis logical database N (`VITEST_POOL_ID`) before any module loads, so a spec that TRUNCATEs or calls an unscoped `deleteMany()` reaches only its own worker's rows. Teardown drops the template and worker databases with `DROP DATABASE … WITH (FORCE)`. Locally the same harness runs against the dev Compose stack's Postgres and Redis, and Redis database 0 stays with the dev server. `pnpm --filter @auto-tm/api test:unit` sets `AUTO_TM_TEST_DATABASES=off` and creates nothing. MinIO stays shared: a spec that wipes objects must scope the wipe to keys only it writes, as `BrandLogoCleanupRaces.e2e.spec.ts` does with its `races-` brand slugs.
 
 ### MinIO image
 

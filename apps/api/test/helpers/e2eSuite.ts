@@ -2,15 +2,15 @@ import { createHash, randomUUID } from "node:crypto";
 import type { PrismaService } from "@auto-tm/db";
 
 /**
- * Per-suite fixture isolation for e2e specs that share one Postgres dev stack.
+ * Per-suite fixture isolation for e2e specs that share a database.
  *
- * Why this exists: vitest serializes spec files inside a single process
- * (`fileParallelism: false` in apps/api/vitest.config.ts), but whole spec
- * files also run concurrently in separate processes (parallel CI jobs,
- * local `pnpm vitest run <file> &`). Hardcoded fixture IDs (brand
- * 00000000-…-0001 / slug "test-brand") and global `deleteMany()` cleanup
- * collide under that concurrency: unique-constraint violations on shared
- * IDs, and one suite wiping another suite's rows mid-test.
+ * Why this exists: each Vitest worker has its own Postgres database
+ * (test/globalSetup.ts), but the spec files one worker runs share it, one
+ * after another, and every spec file shares the run's MinIO buckets.
+ * Hardcoded fixture IDs (brand 00000000-…-0001 / slug "test-brand") and
+ * global `deleteMany()` cleanup collide there: unique-constraint violations
+ * on rows an earlier file left, and object keys derived from a slug another
+ * suite also uses.
  *
  * Every spec file declares a unique suite slug. Entity IDs, slugs, and
  * phones derive deterministically from it (sha256), so:

@@ -7,8 +7,98 @@ on:
 permissions:
   contents: read
 
+# The PR Checks job graph (see README.md) plus `build`. `main` has no required
+# check, so there is no aggregator job: each job reports its own result.
 jobs:
-  build:
+  # "docs" only when every file changed since the previous push to main is
+  # Markdown or under docs/. A previous commit that cannot be fetched takes
+  # the full lane; a failed lane step fails the job and skips the others.
+  lane:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      lane: ${{ steps.lane.outputs.lane }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Choose the CI lane
+        id: lane
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BEFORE" || true
+          node scripts/ci-lane.mjs "$BEFORE"
+
+  docs:
+    needs: lane
+    if: needs.lane.outputs.lane == 'docs'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      # pnpm must be installed before setup-node so `cache: pnpm` can find it.
+      # It reads its version from packageManager in package.json.
+      - uses: pnpm/action-setup@v6
+
+      # Standard GitHub cache of the pnpm store, keyed on pnpm-lock.yaml.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm check:glossary
+
+      - run: pnpm test:ci-lane
+
+      - name: Docs checks
+        run: pnpm test:agent-docs && pnpm test:glossary
+
+  # Lint, typecheck and the admin build with its runtime smoke. No services.
+  static:
+    needs: lane
+    if: needs.lane.outputs.lane != 'docs'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Prisma loads prisma.config.ts during generate and requires a
+      # DATABASE_URL, though generate never connects. Unreachable port 1.
+      DATABASE_URL: postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:1/auto_tm_ci
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm check:glossary
+
+      - run: pnpm test:ci-lane
+
+      - run: pnpm --filter @auto-tm/db generate
+
+      - run: pnpm lint
+
+      - run: pnpm typecheck
+
+      - name: Build admin and verify real session/runtime paths
+        run: pnpm --filter @auto-tm/admin verify:runtime
+
+  # api, worker and db tests against disposable Postgres, Redis and MinIO.
+  backend:
+    needs: lane
+    if: needs.lane.outputs.lane != 'docs'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -18,66 +108,31 @@ jobs:
       REDIS_URL: redis://127.0.0.1:1
       MINIO_ENDPOINT: http://127.0.0.1:1
       MINIO_PUBLIC_URL: http://127.0.0.1:1
-
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      # pnpm must be installed before setup-node so `cache: pnpm` can find it.
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.12.0
+      - uses: pnpm/action-setup@v6
 
-      # Standard GitHub cache of the pnpm store, keyed on pnpm-lock.yaml.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
 
-      # "docs" only when every file changed since the previous push to main is
-      # Markdown or under docs/. A previous commit that cannot be fetched
-      # takes the full lane; a failed lane step fails the job.
-      - name: Choose the CI lane
-        id: lane
-        env:
-          BEFORE: ${{ github.event.before }}
-        run: |
-          git fetch --no-tags --depth=1 origin "$BEFORE" || true
-          node scripts/ci-lane.mjs "$BEFORE"
-
       - name: Start disposable test services
-        if: steps.lane.outputs.lane != 'docs'
         shell: bash
         run: bash scripts/ci-services.sh up
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm check:glossary
-
-      - run: pnpm test:ci-lane
-
-      - name: Docs checks
-        if: steps.lane.outputs.lane == 'docs'
-        run: pnpm test:agent-docs && pnpm test:glossary
-
-      - if: steps.lane.outputs.lane != 'docs'
-        run: pnpm --filter @auto-tm/db generate
+      - run: pnpm --filter @auto-tm/db generate
 
       - name: Deploy migrations to the disposable database
-        if: steps.lane.outputs.lane != 'docs'
         run: pnpm db:migrate:deploy
 
       - name: Create disposable media buckets
-        if: steps.lane.outputs.lane != 'docs'
         run: pnpm minio:bootstrap
 
-      - if: steps.lane.outputs.lane != 'docs'
-        run: pnpm lint
-
-      - if: steps.lane.outputs.lane != 'docs'
-        run: pnpm typecheck
-
-      - if: steps.lane.outputs.lane != 'docs'
-        run: pnpm test
+      - run: pnpm test:backend
         env:
           NODE_ENV: test
           APP_ENV: test
@@ -87,15 +142,64 @@ jobs:
           # to Reaper".
           TESTCONTAINERS_RYUK_DISABLED: "true"
 
-      - if: steps.lane.outputs.lane != 'docs'
-        run: pnpm build
-
       - name: Show test service logs on failure
-        if: ${{ failure() && steps.lane.outputs.lane != 'docs' }}
+        if: failure()
         shell: bash
         run: bash scripts/ci-services.sh logs
 
       - name: Remove disposable test services
-        if: ${{ always() && steps.lane.outputs.lane != 'docs' }}
+        if: always()
         shell: bash
         run: bash scripts/ci-services.sh down
+
+  # mobile, web, admin, contracts and sms-gateway tests, then the root
+  # scripts' node --test files. No services.
+  frontend:
+    needs: lane
+    if: needs.lane.outputs.lane != 'docs'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_ENV: test
+      APP_ENV: test
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm test:frontend
+
+      # After the workspace tests: the reviewer-flow smoke imports the built
+      # @auto-tm/contracts.
+      - run: pnpm test:root
+
+  # Every workspace's production build, in its normal production mode.
+  build:
+    needs: lane
+    if: needs.lane.outputs.lane != 'docs'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:1/auto_tm_ci
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @auto-tm/db generate
+
+      - run: pnpm build
