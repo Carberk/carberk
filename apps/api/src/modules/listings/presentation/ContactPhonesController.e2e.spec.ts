@@ -1,3 +1,4 @@
+import { EventEmitterModule } from "@nestjs/event-emitter";
 import "reflect-metadata";
 
 import { createHash } from "node:crypto";
@@ -41,6 +42,7 @@ describe("ContactPhonesController e2e (ADR-0081)", () => {
     process.env["OTP_TEST_MODE"] = "true";
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [
+        EventEmitterModule.forRoot(),
         bullTestRoot(),
         ConfigModule.forRoot({ isGlobal: true, validate: (cfg) => EnvSchema.parse(cfg) }),
         ListingsModule,
