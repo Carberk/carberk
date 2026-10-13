@@ -23,15 +23,15 @@
     "openapi:generate": "tsx scripts/generate-openapi.ts"
   },
   "dependencies": {
-    "zod": "^3.23.8",
+    "zod": "catalog:",
     "@asteasolutions/zod-to-openapi": "^7.3.0"
   },
   "devDependencies": {
     "@auto-tm/tsconfig": "workspace:*",
     "@auto-tm/eslint-config": "workspace:*",
-    "tsx": "^4.19.2",
-    "vitest": "^2.1.8",
-    "typescript": "^5.7.3",
-    "eslint": "^9.18.0"
+    "tsx": "catalog:",
+    "vitest": "catalog:",
+    "typescript": "catalog:",
+    "eslint": "catalog:"
   }
 }
