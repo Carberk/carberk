@@ -24,7 +24,7 @@ export function OwnerStatusCard({
       </Text>
       {/* Saves are counted by the API. Views are not counted yet, so no view figure is shown. */}
       {favoriteCount === undefined ? (
-        <SkeletonText className="text-callout" width="40%" />
+        <SkeletonText testID="owner-saves-loading" className="text-callout" width="40%" />
       ) : (
         <Text className="text-callout text-muted-foreground">
           {t("listingSaves", { count: favoriteCount })}

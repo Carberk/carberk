@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as Native from "react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 
-import { fireEvent, first, renderMobile, routeParams, routerMock, queryAllHosts } from "../../../test/render";
+import { fireEvent, first, getHost, renderMobile, routeParams, routerMock, queryAllHosts } from "../../../test/render";
 import ListingDetailScreen from "../../../app/(public)/listings/[id]";
 import {
   fixture,
@@ -38,19 +38,6 @@ vi.mock("../../api/listings/useListingPreview", () => ({
 vi.mock("../../auth/useViewer", () => ({ useViewer: () => null }));
 vi.mock("../../auth/useAuth", () => ({ useAuth: () => ({ isAuthenticated: true }) }));
 vi.mock("../../api/admin/useConfig", () => ({ useConfig: () => ({ data: {} }) }));
-vi.mock("expo-secure-store", () => ({
-  getItemAsync: vi.fn(async () => null),
-  setItemAsync: vi.fn(),
-  deleteItemAsync: vi.fn(),
-}));
-vi.mock("expo-linking", () => ({
-  canOpenURL: vi.fn(async () => true),
-  openURL: vi.fn(async () => {}),
-}));
-vi.mock("@/components/ui/skeleton", async () => ({
-  Skeleton: (await import("react-native")).View,
-}));
-vi.mock("../../admin/components/ReportSheet", () => ({ ReportSheet: () => null }));
 vi.mock("./useCatalogMaps", () => ({ useCatalogMaps: () => ({ maps }) }));
 vi.mock("../feed/useFeedCatalogMaps", () => ({
   useFeedCatalogMaps: () => ({
@@ -71,6 +58,7 @@ type Screen = Awaited<ReturnType<typeof renderMobile>>;
 
 /** A 390 dp wide screen holds a 4:3 photo frame 292.5 dp tall. */
 const FRAME = { width: 390, height: 292.5 };
+const HASH = "1fsDBYCIiIiHiIdweIeHh4d4cIgH";
 
 /** The tapped card's photos, as the loaded detail returns them. */
 function cardMedia(dimensions?: { width: number; height: number }) {
@@ -93,6 +81,7 @@ function hero(screen: Screen) {
   const { width, height } = [frame.props.style].flat().reduce((all, part) => ({ ...all, ...part }), {});
   return {
     frame: { width, height },
+    surface: frame.props.className,
     contentFit: image?.props.contentFit,
     placeholderContentFit: image?.props.placeholderContentFit,
     uri: image?.props.source.uri,
@@ -131,6 +120,7 @@ describe("the Listing detail photo frame from tap to loaded (#864)", () => {
 
     expect(before).toEqual({
       frame: FRAME,
+      surface: "bg-muted",
       contentFit: "contain",
       placeholderContentFit: "contain",
       uri: buildVariantUrl("listing-0/original.webp", "detail"),
@@ -142,11 +132,27 @@ describe("the Listing detail photo frame from tap to loaded (#864)", () => {
     ["16:9", 1920, 1080],
     ["square", 1200, 1200],
     ["portrait", 900, 1600],
-  ])("shows a %s photo whole inside the same frame", async (_shape, width, height) => {
+  ])("shows a %s photo whole, in the same frame and fit before and after detail loads", async (_shape, width, height) => {
     const screen = await renderMobile(<ListingDetailScreen />);
+    const before = hero(screen);
+
     await loadDetail(screen, fixture({ media: cardMedia({ width, height }) }));
 
-    expect(hero(screen)).toMatchObject({ frame: FRAME, contentFit: "contain" });
+    expect(before).toMatchObject({ frame: FRAME, surface: "bg-muted", contentFit: "contain" });
+    expect(hero(screen)).toEqual(before);
+  });
+
+  it("fills the preview frame with the cover's blurred colours until its photo loads, then shows the photo's own shape", async () => {
+    state.preview = summaryFixture({ photoThumbHashes: [HASH, null] });
+    const screen = await renderMobile(<ListingDetailScreen />);
+    const frame = first(screen.getAllByTestId("listing-photo-frame"));
+    const blur = () => queryAllHosts(frame, "Image").filter((node) => node.props.source?.thumbhash === HASH);
+    expect(blur().map((node) => node.props.contentFit)).toEqual(["cover"]);
+
+    const photo = getHost(frame, "Image", { priority: "high" });
+    await fireEvent(photo, "load", { source: { url: photo.props.source.uri, width: 1067, height: 800 } });
+
+    expect(blur()).toHaveLength(0);
   });
 
   it("gives a Listing without photos the same frame, before and after detail loads", async () => {
@@ -167,6 +173,8 @@ describe("the Listing detail photo frame from tap to loaded (#864)", () => {
 
     expect(screen.getByTestId("detail-skeleton")).toBeTruthy();
     expect(hero(screen).frame).toEqual(FRAME);
+    for (const placeholder of ["title-loading", "price-loading", "date-loading", "description-loading", "seller-loading"])
+      expect(screen.getByTestId(placeholder, { includeHiddenElements: true })).toBeTruthy();
 
     await fireEvent.press(screen.getByRole("button", { name: "Back" }));
     expect(routerMock.back).toHaveBeenCalledTimes(1);
@@ -207,10 +215,13 @@ describe("loading placeholders in the loaded detail's shape (#864)", () => {
   });
 
   it.each([
-    ["three columns", 1, "w-1/3"],
-    ["two columns at a large font size", 1.3, "w-1/2"],
-  ])("lays the placeholder grid out as the loaded grid: %s", async (_name, fontScale, column) => {
+    ["the card preview", "three columns", 1, "w-1/3"],
+    ["the card preview", "two columns at a large font size", 1.3, "w-1/2"],
+    ["a deep link", "three columns", 1, "w-1/3"],
+    ["a deep link", "two columns at a large font size", 1.3, "w-1/2"],
+  ])("lays %s's placeholder grid out as the loaded grid: %s", async (entry, _name, fontScale, column) => {
     device.fontScale = fontScale;
+    if (entry === "a deep link") state.preview = undefined;
     const screen = await renderMobile(<ListingDetailScreen />);
     const loading = specLayout(screen);
 

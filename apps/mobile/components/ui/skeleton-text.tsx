@@ -10,9 +10,18 @@ import { cn } from '@/lib/utils';
  * the current font size, and the text takes its place without moving what
  * follows. The bar sits inside the line's leading, as the glyphs do.
  */
-function SkeletonText({ className, width }: { className: string; width: DimensionValue }) {
+function SkeletonText({
+  className,
+  width,
+  testID,
+}: {
+  className: string;
+  width: DimensionValue;
+  testID?: string;
+}) {
   return (
     <View
+      testID={testID}
       style={{ width }}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"

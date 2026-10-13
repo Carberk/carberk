@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
@@ -46,6 +46,7 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
   const insets = useSafeAreaInsets();
   const bar = useStickyActionBar("screen");
   const [useOriginalImage, setUseOriginalImage] = useState(false);
+  const [photoLoaded, setPhotoLoaded] = useState(false);
   const listings = useMemo(() => [summary], [summary]);
   const names = useFeedCatalogMaps(listings);
   const transmissions = useTransmissions();
@@ -64,6 +65,10 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
       : buildVariantUrl(coverKey, "detail")
     : null;
   const placeholderUri = coverKey ? buildVariantUrl(coverKey, "list") : null;
+  // `list` is a 3:2 crop, so whole inside the frame it leaves bands where a 4:3
+  // photo will be. The cover's blurred colours fill the frame behind it until
+  // the `detail` size has loaded and shows the photo's own shape.
+  const thumbHash = summary.photoKeys[0] ? summary.photoThumbHashes?.[0] : undefined;
 
   const title = [
     [names.brandName(summary.brandId), names.modelName(summary.modelId)]
@@ -115,14 +120,22 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: bar.space }}>
         {imageUri ? (
           <View testID="listing-photo-frame" className="bg-muted" style={frame}>
+            {thumbHash && !photoLoaded && (
+              <Image
+                source={{ thumbhash: thumbHash }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+              />
+            )}
             <Image
               source={{ uri: imageUri }}
               placeholder={placeholderUri ? { uri: placeholderUri } : undefined}
               placeholderContentFit="contain"
-              style={{ width: "100%", height: "100%" }}
+              style={StyleSheet.absoluteFill}
               contentFit="contain"
               priority="high"
               cachePolicy="memory-disk"
+              onLoad={() => setPhotoLoaded(true)}
               onError={() => setUseOriginalImage(true)}
             />
             {summary.photoCount > 0 && (

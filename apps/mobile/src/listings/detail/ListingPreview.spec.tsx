@@ -75,11 +75,18 @@ describe("Listing detail preview, from the tapped card's cached data", () => {
   });
 
   it("holds the owner's status card, with saves still loading, and no Seller placeholder", async () => {
-    const screen = await preview({}, { isOwner: true });
+    const hidden = { includeHiddenElements: true };
+    const buyer = await preview();
+    expect(buyer.getByTestId("seller-loading", hidden)).toBeTruthy();
+    expect(buyer.queryByTestId("owner-saves-loading", hidden)).toBeNull();
 
-    expect(screen.getByText("Your listing · Active")).toBeTruthy();
-    expect(screen.queryByText(/saves?/i)).toBeNull();
-    expect(screen.getByText("10,000 USD")).toBeTruthy();
+    const owner = await preview({}, { isOwner: true });
+
+    expect(owner.getByText("Your listing · Active")).toBeTruthy();
+    expect(owner.getByTestId("owner-saves-loading", hidden)).toBeTruthy();
+    expect(owner.queryByText(/saves?/i)).toBeNull();
+    expect(owner.queryByTestId("seller-loading", hidden)).toBeNull();
+    expect(owner.getByText("10,000 USD")).toBeTruthy();
   });
 
   it("keeps Call and Message disabled until the full detail arrives", async () => {

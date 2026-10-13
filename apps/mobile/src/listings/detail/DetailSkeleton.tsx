@@ -41,7 +41,7 @@ export function DetailSkeletonBody({
         rows={rows ?? specRows(PENDING_SPEC_ROWS, t)}
       />
 
-      <View className="gap-2">
+      <View testID="description-loading" className="gap-2">
         <Separator className="mb-3" />
         <SkeletonText className="text-subhead font-semibold" width="35%" />
         <View>
@@ -52,7 +52,7 @@ export function DetailSkeletonBody({
       </View>
 
       {seller && (
-        <View className="gap-3">
+        <View testID="seller-loading" className="gap-3">
           <Separator />
           <View className="gap-3">
             <SkeletonText className="text-subhead font-semibold" width="30%" />
@@ -94,9 +94,13 @@ export function DetailSkeleton({
       <Skeleton testID="listing-photo-frame" className="rounded-none" style={frame} />
 
       <View className="gap-4 px-5 py-5">
-        <SkeletonText className="text-headline font-heading font-semibold" width="70%" />
-        <SkeletonText className="text-title font-heading" width="45%" />
-        <SkeletonText className="text-callout" width="40%" />
+        <SkeletonText
+          testID="title-loading"
+          className="text-headline font-heading font-semibold"
+          width="70%"
+        />
+        <SkeletonText testID="price-loading" className="text-title font-heading" width="45%" />
+        <SkeletonText testID="date-loading" className="text-callout" width="40%" />
         <DetailSkeletonBody />
       </View>
 
