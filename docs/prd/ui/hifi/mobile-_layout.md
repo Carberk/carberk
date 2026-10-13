@@ -97,7 +97,7 @@ Unhandled JS error crashes to Expo error boundary (red screen in dev). No custom
 
 ## Motion
 
-Issue #833 adds one cold-launch sequence, while local startup proceeds. Wordmark fade starts at 80 ms and lasts 460 ms; the credit starts at 260 ms and fades/rises 4 pt over 300 ms. At 650 ms the entrance has settled. Once the destination is ready, the overlay exits over 180 ms. Navigation, auth and deep links never wait on animation completion. Reduced Motion shows a stable wordmark and credit and removes the ready overlay immediately. No loop or launch network dependency is introduced.
+Issue #833 adds one cold-launch sequence, while local startup proceeds. The matching C-dot contracts from scale 1 to 0.92 and moves 6 pt upward while fading over 200 ms, before the wordmark starts at 200 ms and fades/rises 8 pt into place over 420 ms; the credit starts at 260 ms and fades/rises 4 pt over 300 ms. The completed wordmark and credit settle by 620 ms, then remain readable for 450 ms. The presentation is complete at 1070 ms. Once the destination is ready, the overlay exits over 180 ms. Navigation, auth and deep links never wait on animation completion. Reduced Motion shows a stable wordmark and credit and removes the ready overlay immediately, without spatial movement or the completed-brand hold. No loop or launch network dependency is introduced. The dark brand launch background is intentional in both themes. Before mounting navigation, startup waits for saved theme hydration and for NativeWind to report the resolved appearance, preventing a wrong-theme destination frame. This readiness is latched once, so later theme changes preserve navigation and local screen state.
 
 | Element | Animation | Duration | Easing |
 |---|---|---|---|
