@@ -1,5 +1,6 @@
-import { execSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
 import {
   CreateBucketCommand,
@@ -13,7 +14,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import sharp from "sharp";
 import { GenericContainer, Wait, type StartedTestContainer } from "testcontainers";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { PrismaClient } from "../generated/prisma/client/client";
 import { DEMO_CARS, DEMO_SELLERS } from "../scripts/demo-inventory/content";
@@ -25,10 +26,31 @@ import {
   demoSellerId,
   demoSellerPhone,
 } from "../scripts/demo-inventory/marker";
-import type { PhotoSource } from "../scripts/demo-inventory/photos";
+import type * as PhotosModule from "../scripts/demo-inventory/photos";
 import { removeDemoInventory } from "../scripts/demo-inventory/remove";
-import { seedDemoInventory } from "../scripts/demo-inventory/seed";
+import { DEMO_UPLOAD_CONCURRENCY, seedDemoInventory } from "../scripts/demo-inventory/seed";
 import { createS3ObjectStore, type ObjectStore } from "../scripts/demo-inventory/storage";
+
+// Every stub photo is the same buffer, so the real preparation runs once and each seed reuses its
+// files. Preparing about 300 photos per seed, four seeds a run, cost minutes of CPU on a CI runner
+// and tested nothing more: encoding the variants is the same work for each identical input.
+vi.mock("../scripts/demo-inventory/photos", async (importOriginal) => {
+  const actual = await importOriginal<typeof PhotosModule>();
+  const prepared = new WeakMap<Buffer, Promise<PhotosModule.PreparedPhoto>>();
+  return {
+    ...actual,
+    preparePhoto(source: Buffer): Promise<PhotosModule.PreparedPhoto> {
+      let result = prepared.get(source);
+      if (!result) {
+        result = actual.preparePhoto(source);
+        prepared.set(source, result);
+      }
+      return result;
+    },
+  };
+});
+
+const run = promisify(execFile);
 
 const BUCKET = "listing-photos";
 const CHAT_BUCKET = "chat-attachments";
@@ -37,7 +59,7 @@ const DAY = 86_400_000;
 const FIRST_RUN = new Date("2026-10-06T09:00:00.000Z");
 const SECOND_RUN = new Date("2026-10-09T15:30:00.000Z");
 /** Each seed uploads about 1,500 objects; a CI runner is several times slower than a laptop. */
-const SEED_TIMEOUT = 300_000;
+const SEED_TIMEOUT = 120_000;
 
 const REAL_SELLER = "0a000000-0000-4000-8000-000000000001";
 const REAL_BUYER = "0a000000-0000-4000-8000-000000000002";
@@ -69,17 +91,26 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
   let maxLoadsInFlight = 0;
   let putsInFlight = 0;
   let maxPutsInFlight = 0;
-  let photos: PhotoSource;
+  let photos: PhotosModule.PhotoSource;
   /** What the first seed drew per Listing, to compare with a seed after a removal. */
   let firstDraw: { id: string; publishedAt: Date | null; viewCount: number }[];
 
   beforeAll(async () => {
+    // "An empty migrated database with the catalog seeded": the real migrations and catalog seed,
+    // run while MinIO starts.
+    const migrateAndSeedCatalog = async (started: StartedPostgreSqlContainer) => {
+      const env = { ...process.env, DATABASE_URL: started.getConnectionUri() };
+      await run(`${packageDir}node_modules/.bin/prisma`, ["migrate", "deploy"], { cwd: packageDir, env });
+      await run(`${packageDir}node_modules/.bin/tsx`, ["src/seed.ts"], { cwd: packageDir, env });
+      return started;
+    };
     [postgres, minio] = await Promise.all([
       new PostgreSqlContainer("postgres:16-alpine")
         .withUsername("auto_tm")
         .withPassword("auto_tm_pass")
         .withDatabase("auto_tm_test")
-        .start(),
+        .start()
+        .then(migrateAndSeedCatalog),
       new GenericContainer("cgr.dev/chainguard/minio@sha256:4692462f35d97d7e82c30371d82f057703c5d9489bcae726010594c812f2d285")
         .withEnvironment({ MINIO_ROOT_USER: "minioadmin", MINIO_ROOT_PASSWORD: "minioadmin" })
         .withCommand(["server", "/data"])
@@ -88,12 +119,7 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
         .start(),
     ]);
 
-    // "An empty migrated database with the catalog seeded": the real migrations and catalog seed.
-    const url = postgres.getConnectionUri();
-    const env = { ...process.env, DATABASE_URL: url };
-    execSync("pnpm prisma migrate deploy", { cwd: packageDir, env, stdio: "pipe" });
-    execSync("pnpm tsx src/seed.ts", { cwd: packageDir, env, stdio: "pipe" });
-    pool = new Pool({ connectionString: url });
+    pool = new Pool({ connectionString: postgres.getConnectionUri() });
     db = new PrismaClient({ adapter: new PrismaPg(pool) });
 
     const endpoint = `http://${minio.getHost()}:${minio.getMappedPort(9000)}`;
@@ -384,6 +410,7 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
     // to the bucket overlap.
     expect(maxLoadsInFlight).toBe(1);
     expect(maxPutsInFlight).toBeGreaterThan(1);
+    expect(maxPutsInFlight).toBeLessThanOrEqual(DEMO_UPLOAD_CONCURRENCY);
     firstDraw = listings.map(({ id, publishedAt, viewCount }) => ({ id, publishedAt, viewCount }));
   }, SEED_TIMEOUT);
 
