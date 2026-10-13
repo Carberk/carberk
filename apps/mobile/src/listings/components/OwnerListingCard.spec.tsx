@@ -12,46 +12,46 @@ function listing(status: ListingsSchemas.ListingSummary["status"]): ListingsSche
     publishedAt: "2026-09-30T04:00:00.000Z",
   };
 }
-function renderCard(status: ListingsSchemas.ListingSummary["status"]) {
+async function renderCard(status: ListingsSchemas.ListingSummary["status"]) {
   const onOpen = vi.fn();
   const onMore = vi.fn();
-  const view = renderMobile(
+  const view = await renderMobile(
     <OwnerListingCard listing={listing(status)} brandName="Toyota" modelName="Camry" cityName="Ashgabat" onOpen={onOpen} onMore={onMore} />,
   );
   return { view, onOpen, onMore };
 }
 
 describe("OwnerListingCard", () => {
-  it("opens the Listing on tap and hands ⋯ its title", () => {
-    const { view, onOpen, onMore } = renderCard("active");
+  it("opens the Listing on tap and hands ⋯ its title", async () => {
+    const { view, onOpen, onMore } = await renderCard("active");
     expect(view.getByText("Ashgabat")).toBeTruthy();
-    fireEvent.press(view.getByRole("button", { name: "Toyota Camry, 2018" }));
+    await fireEvent.press(view.getByRole("button", { name: "Toyota Camry, 2018" }));
     expect(onOpen).toHaveBeenCalledWith("camry-1");
-    fireEvent.press(view.getByRole("button", { name: "Actions for Toyota Camry, 2018" }));
+    await fireEvent.press(view.getByRole("button", { name: "Actions for Toyota Camry, 2018" }));
     expect(onMore).toHaveBeenCalledWith(expect.objectContaining({ id: "camry-1" }), "Toyota Camry, 2018");
   });
 
   it.each([
     ["sold", "Sold"],
     ["archived", "Removed from sale"],
-  ] as const)("labels a %s Listing and keeps its actions", (status, label) => {
-    const { view } = renderCard(status);
+  ] as const)("labels a %s Listing and keeps its actions", async (status, label) => {
+    const { view } = await renderCard(status);
     expect(view.getByText(label)).toBeTruthy();
     expect(view.getByRole("button", { name: `Toyota Camry, 2018, ${label}` })).toBeTruthy();
     expect(view.getByRole("button", { name: "Actions for Toyota Camry, 2018" })).toBeTruthy();
   });
 
-  it("shows a blocked Listing with a neutral note, no ⋯ and no tap", () => {
-    const { view, onOpen } = renderCard("banned");
+  it("shows a blocked Listing with a neutral note, no ⋯ and no tap", async () => {
+    const { view, onOpen } = await renderCard("banned");
     expect(view.getByText("Blocked")).toBeTruthy();
     expect(view.getByText("Blocked by moderation. Buyers do not see it.")).toBeTruthy();
     expect(view.queryByRole("button")).toBeNull();
-    fireEvent.press(view.getByText("Toyota Camry, 2018"));
+    await fireEvent.press(view.getByText("Toyota Camry, 2018"));
     expect(onOpen).not.toHaveBeenCalled();
   });
 
-  it("draws an active Listing's price in the normal text colour, at the same size and weight (#775 F)", () => {
-    const { view } = renderCard("active");
+  it("draws an active Listing's price in the normal text colour, at the same size and weight (#775 F)", async () => {
+    const { view } = await renderCard("active");
     const className = String(view.getByText("100,000 TMT").props.className);
     expect(className).toContain("text-foreground");
     expect(className).not.toMatch(/text-primary(?!-)/);
@@ -59,8 +59,8 @@ describe("OwnerListingCard", () => {
     expect(className).toContain("font-heading");
   });
 
-  it.each(["sold", "archived"] as const)("keeps the muted price of a %s Listing (#775 F)", (status) => {
-    const { view } = renderCard(status);
+  it.each(["sold", "archived"] as const)("keeps the muted price of a %s Listing (#775 F)", async (status) => {
+    const { view } = await renderCard(status);
     expect(String(view.getByText("100,000 TMT").props.className)).toContain("text-muted-foreground");
   });
 });

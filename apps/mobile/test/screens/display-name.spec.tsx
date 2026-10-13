@@ -8,7 +8,7 @@ import ProfileScreen from "../../app/profile";
 import { clearAuthSession, storeAuthSession } from "../../src/auth/session";
 import { profileNoticeStore } from "../../src/identity/profileNotice";
 import { server } from "../msw";
-import { act, fireEvent, renderMobile, routerMock } from "../render";
+import { act, fireEvent, renderMobile, routerMock, queryAllHosts } from "../render";
 
 import { ToastProvider } from "@/components/ui/toast";
 
@@ -89,10 +89,10 @@ function render(screen: ReactElement, options?: { locale?: string }) {
   return renderMobile(<ToastProvider>{screen}</ToastProvider>, options);
 }
 
-type View = ReturnType<typeof renderMobile>;
+type View = Awaited<ReturnType<typeof renderMobile>>;
 
 async function openEditor(options?: { locale?: string }) {
-  const view = render(<DisplayNameScreen />, options);
+  const view = await render(<DisplayNameScreen />, options);
   const generated = { en: "Driver 4821", ru: "Водитель 4821", tk: "Sürüji 4821" };
   await view.findByDisplayValue(api.displayName ?? generated[(options?.locale ?? "en") as keyof typeof generated]);
   return view;
@@ -107,14 +107,14 @@ const classOf = (node: { props: Record<string, unknown> }) => String(node.props.
 
 describe("Opening the name editor from Profile", () => {
   it("shows the name on Profile as a button with a pencil that opens the editor", async () => {
-    const view = render(<ProfileScreen />);
+    const view = await render(<ProfileScreen />);
     const name = await view.findByRole("button", { name: "Edit name" });
     expect(view.getByText("Driver 4821")).toBeTruthy();
     // A value, not a hint: screen readers can switch hints off.
     expect(name.props.accessibilityValue).toEqual({ text: "Driver 4821" });
     expect(name.props.accessibilityHint).toBeUndefined();
     expect(classOf(name)).toContain("min-h-11");
-    fireEvent.press(name);
+    await fireEvent.press(name);
     expect(routerMock.push).toHaveBeenCalledWith("/account/display-name");
   });
 
@@ -134,11 +134,11 @@ describe("Opening the name editor from Profile", () => {
 
   it("shows no name in the field when opened signed out with the previous User's /me cached", async () => {
     api.displayName = "Aman";
-    const view = render(<ProfileScreen />);
+    const view = await render(<ProfileScreen />);
     expect(await view.findByText("Aman")).toBeTruthy();
     await act(async () => { await clearAuthSession(); });
 
-    view.rerender(<ToastProvider><DisplayNameScreen /></ToastProvider>);
+    await view.rerender(<ToastProvider><DisplayNameScreen /></ToastProvider>);
 
     expect(view.getByLabelText("Name").props.value).toBe("");
     expect(view.queryByDisplayValue("Aman")).toBeNull();
@@ -156,11 +156,11 @@ describe("Editing the name", () => {
     api.displayName = "Aman";
     const view = await openEditor();
     expect(isDisabled(save(view))).toBe(true);
-    type(view, "Aman ");
+    await type(view, "Aman ");
     expect(isDisabled(save(view))).toBe(true);
-    type(view, "A");
+    await type(view, "A");
     expect(isDisabled(save(view))).toBe(true);
-    type(view, "Merdan");
+    await type(view, "Merdan");
     expect(isDisabled(save(view))).toBe(false);
   });
 
@@ -177,7 +177,7 @@ describe("Editing the name", () => {
     ["a".repeat(31), "Use 30 characters or fewer."],
   ])("after an edit, replaces the rule line with the error for %j at once", async (text, error) => {
     const view = await openEditor();
-    type(view, text);
+    await type(view, text);
     const line = view.getByText(error);
     expect(line.props.accessibilityRole).toBe("alert");
     expect(line.props.accessibilityLiveRegion).toBe("polite");
@@ -188,9 +188,9 @@ describe("Editing the name", () => {
 
   it("counts characters after trimming and turns the counter red past 30", async () => {
     const view = await openEditor();
-    type(view, "  Aman   Durdy ");
+    await type(view, "  Aman   Durdy ");
     expect(view.getByText("10/30")).toBeTruthy();
-    type(view, "a".repeat(31));
+    await type(view, "a".repeat(31));
     expect(classOf(view.getByText("31/30"))).toContain("text-destructive");
   });
 
@@ -203,29 +203,29 @@ describe("Editing the name", () => {
 describe("Saving the name", () => {
   it("saves the normalized name, returns to Profile and Cabinet with it, and says Name saved", async () => {
     const view = await openEditor();
-    type(view, "  Aman   Durdy ");
-    await act(async () => { fireEvent.press(save(view)); });
+    await type(view, "  Aman   Durdy ");
+    await act(async () => { void fireEvent.press(save(view)); });
     await vi.waitFor(() => expect(routerMock.dismissTo).toHaveBeenCalledWith("/profile"));
     expect(api.patches).toEqual([{ displayName: "Aman Durdy" }]);
 
-    view.rerender(<ToastProvider><ProfileScreen /></ToastProvider>);
+    await view.rerender(<ToastProvider><ProfileScreen /></ToastProvider>);
     expect(await view.findByText("Aman Durdy")).toBeTruthy();
     const notice = view.getByText("Name saved");
     expect(notice.props.accessibilityRole).toBe("alert");
     expect(view.queryByRole("button", { name: "Name saved" })).toBeNull();
 
-    view.rerender(<ToastProvider><CabinetScreen /></ToastProvider>);
+    await view.rerender(<ToastProvider><CabinetScreen /></ToastProvider>);
     expect(await view.findByRole("button", { name: `Aman Durdy, ${PHONE}` })).toBeTruthy();
   });
 
   it("clears Name saved from Profile by itself", async () => {
-    const view = render(<ProfileScreen />);
+    const view = await render(<ProfileScreen />);
     await view.findByRole("button", { name: "Edit name" });
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     try {
-      act(() => profileNoticeStore.getState().show({ kind: "nameSaved" }));
+      await act(() => profileNoticeStore.getState().show({ kind: "nameSaved" }));
       expect(view.getByText("Name saved")).toBeTruthy();
-      act(() => { vi.advanceTimersByTime(4000); });
+      await act(() => { vi.advanceTimersByTime(4000); });
       expect(view.queryByText("Name saved")).toBeNull();
     } finally {
       vi.useRealTimers();
@@ -235,11 +235,11 @@ describe("Saving the name", () => {
   it("shows Saving... with a spinner, and locks the field and the button while saving", async () => {
     api.next = ["hold"];
     const view = await openEditor();
-    type(view, "Aman");
-    await act(async () => { fireEvent.press(save(view)); });
+    await type(view, "Aman");
+    await act(async () => { void fireEvent.press(save(view)); });
     const button = await view.findByRole("button", { name: "Saving..." });
     expect(isDisabled(button)).toBe(true);
-    expect(view.UNSAFE_queryAllByType("ActivityIndicator" as never)).toHaveLength(1);
+    expect(queryAllHosts(view.container, "ActivityIndicator")).toHaveLength(1);
     expect(field(view).props.editable).toBe(false);
     await act(async () => { api.release?.(); });
   });
@@ -247,13 +247,13 @@ describe("Saving the name", () => {
   it("keeps the text after a failed save and sends the same name again from Retry", async () => {
     api.next = ["fail"];
     const view = await openEditor();
-    type(view, "Aman");
-    await act(async () => { fireEvent.press(save(view)); });
+    await type(view, "Aman");
+    await act(async () => { void fireEvent.press(save(view)); });
     expect(await view.findByText("Couldn't save the name. Try again.")).toBeTruthy();
     expect(view.getByDisplayValue("Aman")).toBeTruthy();
     expect(routerMock.dismissTo).not.toHaveBeenCalled();
 
-    await act(async () => { fireEvent.press(view.getByRole("button", { name: "Retry" })); });
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Retry" })); });
     await vi.waitFor(() => expect(routerMock.dismissTo).toHaveBeenCalledWith("/profile"));
     expect(api.patches).toEqual([{ displayName: "Aman" }, { displayName: "Aman" }]);
   });
@@ -261,8 +261,8 @@ describe("Saving the name", () => {
   it("uses the app's offline sentence when there is no connection", async () => {
     api.next = ["offline"];
     const view = await openEditor();
-    type(view, "Aman");
-    await act(async () => { fireEvent.press(save(view)); });
+    await type(view, "Aman");
+    await act(async () => { void fireEvent.press(save(view)); });
     expect(await view.findByText("No internet connection. Try again when you are online.")).toBeTruthy();
     expect(view.getByRole("button", { name: "Retry" })).toBeTruthy();
     expect(view.getByDisplayValue("Aman")).toBeTruthy();
@@ -271,8 +271,8 @@ describe("Saving the name", () => {
   it("shows the matching rule error when the server refuses the name", async () => {
     api.next = [{ reason: "too_long" }];
     const view = await openEditor();
-    type(view, "Aman");
-    await act(async () => { fireEvent.press(save(view)); });
+    await type(view, "Aman");
+    await act(async () => { void fireEvent.press(save(view)); });
     expect(await view.findByText("Use 30 characters or fewer.")).toBeTruthy();
     expect(view.queryByText("Couldn't save the name. Try again.")).toBeNull();
   });
@@ -281,8 +281,8 @@ describe("Saving the name", () => {
 describe("Leaving the editor", () => {
   it("goes back without a question and changes nothing", async () => {
     const view = await openEditor();
-    type(view, "Aman");
-    fireEvent.press(view.getByRole("button", { name: "Back" }));
+    await type(view, "Aman");
+    await fireEvent.press(view.getByRole("button", { name: "Back" }));
     expect(routerMock.back).toHaveBeenCalled();
     expect(view.queryByRole("alertdialog")).toBeNull();
     expect(api.patches).toEqual([]);
@@ -291,11 +291,11 @@ describe("Leaving the editor", () => {
   it("lets a save in flight land after the User left, and Profile shows the new name", async () => {
     api.next = ["hold"];
     const view = await openEditor();
-    type(view, "Aman");
-    await act(async () => { fireEvent.press(save(view)); });
+    await type(view, "Aman");
+    await act(async () => { void fireEvent.press(save(view)); });
     await vi.waitFor(() => expect(api.release).not.toBeNull());
 
-    view.rerender(<ToastProvider><ProfileScreen /></ToastProvider>);
+    await view.rerender(<ToastProvider><ProfileScreen /></ToastProvider>);
     expect(await view.findByText("Driver 4821")).toBeTruthy();
     await act(async () => { api.release?.(); });
 

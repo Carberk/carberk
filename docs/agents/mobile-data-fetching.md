@@ -12,7 +12,7 @@ Use this guide when changing mobile API calls, server-state caching, refresh, or
 | Shared query keys | [api/queryKeys.ts](../../apps/mobile/src/api/queryKeys.ts) and feature key factories |
 | Existing query/mutation patterns and tests | [src/api](../../apps/mobile/src/api) |
 | Error copy | [getErrorCopy.ts](../../apps/mobile/src/api/getErrorCopy.ts) |
-| Native test environment and aliases | [vitest.config.ts](../../apps/mobile/vitest.config.ts) |
+| Native test environment and aliases | [vitest.config.mts](../../apps/mobile/vitest.config.mts) |
 
 The wrapper already exists. Do not paste a new client or QueryClient provider from a setup tutorial. Preserve one owner for refresh, secure storage, connectivity, and session transitions.
 

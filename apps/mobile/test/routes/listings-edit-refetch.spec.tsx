@@ -148,26 +148,26 @@ describe("Listing edit save across a background refetch", () => {
       { photoId: "550e8400-e29b-41d4-a716-000000000901", key: "pending/support/original.jpg", state: "uploaded", sortOrder: 2, retryCount: 0 },
     ];
 
-    const screen = renderMobile(<EditListingScreen />);
-    fireEvent.press(screen.getByRole("radio", { name: "Damaged / needs repair: Yes" }));
-    fireEvent.press(screen.getByRole("button", { name: "Done", disabled: false }));
+    const screen = await renderMobile(<EditListingScreen />);
+    await fireEvent.press(screen.getByRole("radio", { name: "Damaged / needs repair: Yes" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Done", disabled: false }));
     await act(async () => fireEvent.press(screen.getByRole("button", { name: "Save changes", disabled: false })));
     await waitFor(() => expect(screen.getByText("✗ Update photo order")).toBeTruthy());
     expect(screen.getAllByText("✓ Attach photo")).toHaveLength(2);
 
     // The save's invalidations refetch the Listing: a new object with the attached row.
     fixture.listing = { ...api.detail(), favoriteCount: 1 };
-    screen.rerender(<EditListingScreen />);
+    await screen.rerender(<EditListingScreen />);
     expect(screen.getByText("✗ Update photo order")).toBeTruthy();
     expect(screen.getByText("10,000 km · Damaged / needs repair: Yes")).toBeTruthy();
 
     // The seller changes their answer after the failure, then another refetch lands.
-    fireEvent.press(screen.getByRole("button", { name: /^Details and condition, .*Change$/ }));
-    fireEvent.press(screen.getByRole("radio", { name: "Damaged / needs repair: No" }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Details and condition, .*Change$/ }));
+    await fireEvent.press(screen.getByRole("radio", { name: "Damaged / needs repair: No" }));
     fixture.listing = { ...api.detail(), favoriteCount: 2 };
-    screen.rerender(<EditListingScreen />);
+    await screen.rerender(<EditListingScreen />);
     expect(screen.getByRole("radio", { name: "Damaged / needs repair: No", checked: true })).toBeTruthy();
-    fireEvent.press(screen.getByRole("button", { name: "Done", disabled: false }));
+    await fireEvent.press(screen.getByRole("button", { name: "Done", disabled: false }));
 
     const [retry] = screen.getAllByRole("button", { name: "Retry" }).slice(-1);
     if (!retry) throw new Error("No Retry button");

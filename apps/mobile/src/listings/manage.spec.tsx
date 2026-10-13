@@ -92,18 +92,18 @@ async function settle() {
   for (let i = 0; i < 6; i += 1) await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
 }
 async function renderScreen({ locale = "en" } = {}) {
-  const view = renderMobile(<ToastProvider><ManageListingsScreen /></ToastProvider>, { locale });
+  const view = await renderMobile(<ToastProvider><ManageListingsScreen /></ToastProvider>, { locale });
   await settle();
   return view;
 }
 type View = Awaited<ReturnType<typeof renderScreen>>;
 const tab = (view: View, name: RegExp) => view.getByRole("tab", { name });
 async function openTab(view: View, name: RegExp) {
-  fireEvent.press(tab(view, name));
+  await fireEvent.press(tab(view, name));
   await settle();
 }
 async function openActions(view: View, title: string) {
-  fireEvent.press(view.getByRole("button", { name: `Actions for ${title}` }));
+  await fireEvent.press(view.getByRole("button", { name: `Actions for ${title}` }));
   await settle();
 }
 const sheetActions = (view: View) =>
@@ -137,7 +137,7 @@ describe("My listings tabs", () => {
   it("reads the tab names in Russian and Turkmen", async () => {
     const ru = await renderScreen({ locale: "ru" });
     expect(ru.getAllByRole("tab").map((node) => node.props.accessibilityLabel)).toEqual(["Активные, 2", "Черновики, 1", "Архив, 2"]);
-    ru.unmount();
+    await ru.unmount();
     const tk = await renderScreen({ locale: "tk" });
     expect(tk.getAllByRole("tab").map((node) => node.props.accessibilityLabel)).toEqual(["Aktiw, 2", "Garalamalar, 1", "Arhiw, 2"]);
   });
@@ -146,7 +146,7 @@ describe("My listings tabs", () => {
     server.drafts = [];
     const view = await renderScreen();
     expect(tab(view, /^Drafts/).props.accessibilityLabel).toBe("Drafts");
-    view.unmount();
+    await view.unmount();
     failCounts = true;
     const failed = await renderScreen();
     expect(failed.getAllByRole("tab").map((node) => node.props.accessibilityLabel)).toEqual(["Active", "Drafts", "Archive"]);
@@ -182,7 +182,7 @@ describe("My listings rows", () => {
     expect(view.getByText("Blocked")).toBeTruthy();
     expect(view.getByText("Blocked by moderation. Buyers do not see it.")).toBeTruthy();
     expect(view.queryByRole("button", { name: "Actions for Toyota Altima, 2018" })).toBeNull();
-    fireEvent.press(view.getByText("Toyota Altima, 2018"));
+    await fireEvent.press(view.getByText("Toyota Altima, 2018"));
     expect(routerMock.push).not.toHaveBeenCalled();
   });
 
@@ -190,7 +190,7 @@ describe("My listings rows", () => {
     const ru = await renderScreen({ locale: "ru" });
     expect(ru.getByText("Заблокировано")).toBeTruthy();
     expect(ru.getByText("Заблокировано модерацией. Покупатели его не видят.")).toBeTruthy();
-    ru.unmount();
+    await ru.unmount();
     const tk = await renderScreen({ locale: "tk" });
     expect(tk.getByText("Petiklenen")).toBeTruthy();
     expect(tk.getByText("Moderasiýa tarapyndan petiklenen. Alyjylar ony görmeýär.")).toBeTruthy();
@@ -202,7 +202,7 @@ describe("My listings rows", () => {
     expect(view.getByText("Sold")).toBeTruthy();
     expect(view.getByText("Removed from sale")).toBeTruthy();
     expect(view.queryByText("Toyota Camry, 2018")).toBeNull();
-    fireEvent.press(view.getByText("Toyota Prado, 2018"));
+    await fireEvent.press(view.getByText("Toyota Prado, 2018"));
     expect(routerMock.push).toHaveBeenCalledWith("/(public)/listings/prado-1");
   });
 
@@ -211,7 +211,7 @@ describe("My listings rows", () => {
     const ru = await renderScreen({ locale: "ru" });
     expect(ru.getByText("Продано")).toBeTruthy();
     expect(ru.getByText("Снято с продажи")).toBeTruthy();
-    ru.unmount();
+    await ru.unmount();
     const tk = await renderScreen({ locale: "tk" });
     expect(tk.getByText("Satyldy")).toBeTruthy();
     expect(tk.getByText("Satuwdan aýryldy")).toBeTruthy();
@@ -234,7 +234,7 @@ describe("My listings rows", () => {
   it("resumes the wizard from a draft row", async () => {
     const view = await renderScreen();
     await openTab(view, /^Drafts/);
-    fireEvent.press(view.getByText("Lexus RX, 2012"));
+    await fireEvent.press(view.getByText("Lexus RX, 2012"));
     expect(routerMock.push).toHaveBeenCalledWith({ pathname: "/(tabs)/sell", params: { resumeDraftId: "draft-1" } });
   });
 
@@ -252,7 +252,7 @@ describe("My listings action sheet", () => {
     const view = await renderScreen();
     await openActions(view, "Toyota Camry, 2018");
     expect(sheetActions(view)).toEqual(["Edit", "Mark as sold", "Remove from sale", "Delete"]);
-    fireEvent.press(view.getByRole("button", { name: "Edit" }));
+    await fireEvent.press(view.getByRole("button", { name: "Edit" }));
     expect(routerMock.push).toHaveBeenCalledWith("/listings/camry-1/edit");
     expect(view.queryByTestId("listing-actions-sheet")).toBeNull();
   });
@@ -262,7 +262,7 @@ describe("My listings action sheet", () => {
     await openTab(view, /^Archive/);
     await openActions(view, "Toyota RAV4, 2018");
     expect(sheetActions(view)).toEqual(["Relist", "Edit", "Delete"]);
-    fireEvent.press(view.getByRole("button", { name: "Cancel" }));
+    await fireEvent.press(view.getByRole("button", { name: "Cancel" }));
     await openActions(view, "Toyota Prado, 2018");
     expect(sheetActions(view)).toEqual(["Delete"]);
   });
@@ -272,19 +272,19 @@ describe("My listings action sheet", () => {
     await openTab(view, /^Drafts/);
     await openActions(view, "Lexus RX, 2012");
     expect(sheetActions(view)).toEqual(["Continue", "Delete draft"]);
-    fireEvent.press(view.getByRole("button", { name: "Continue" }));
+    await fireEvent.press(view.getByRole("button", { name: "Continue" }));
     expect(routerMock.push).toHaveBeenCalledWith({ pathname: "/(tabs)/sell", params: { resumeDraftId: "draft-1" } });
   });
 
   it("names the actions in Russian and Turkmen", async () => {
     const ru = await renderScreen({ locale: "ru" });
-    fireEvent.press(ru.getByRole("button", { name: "Действия: Toyota Camry, 2018" }));
+    await fireEvent.press(ru.getByRole("button", { name: "Действия: Toyota Camry, 2018" }));
     await settle();
     expect(sheetActions(ru)).toEqual(["Изменить", "Отметить проданным", "Снять с продажи", "Удалить"]);
-    ru.unmount();
+    await ru.unmount();
     routeParams.tab = "drafts";
     const tk = await renderScreen({ locale: "tk" });
-    fireEvent.press(tk.getByRole("button", { name: "Hereketler: Lexus RX, 2012" }));
+    await fireEvent.press(tk.getByRole("button", { name: "Hereketler: Lexus RX, 2012" }));
     await settle();
     expect(sheetActions(tk)).toEqual(["Dowam et", "Garalamany poz"]);
   });
@@ -292,12 +292,12 @@ describe("My listings action sheet", () => {
   it("asks before Mark as sold, then moves the row to Archive, updates the counts and confirms", async () => {
     const view = await renderScreen();
     await openActions(view, "Toyota Camry, 2018");
-    fireEvent.press(view.getByRole("button", { name: "Mark as sold" }));
+    await fireEvent.press(view.getByRole("button", { name: "Mark as sold" }));
     await settle();
     expect(view.getByText("Mark as sold?")).toBeTruthy();
     expect(view.getByText("Buyers will see it as Sold. A sold listing cannot be put back on sale.")).toBeTruthy();
     expect(api.post).not.toHaveBeenCalled();
-    fireEvent.press(view.getByRole("button", { name: "Confirm" }));
+    await fireEvent.press(view.getByRole("button", { name: "Confirm" }));
     await settle();
     expect(api.post).toHaveBeenCalledWith("/listings/camry-1/sold", {}, expect.anything());
     expect(view.getByText("Marked as sold")).toBeTruthy();
@@ -311,11 +311,11 @@ describe("My listings action sheet", () => {
   ])("asks before %s on an active Listing and confirms it", async (action, title, body, toast, url) => {
     const view = await renderScreen();
     await openActions(view, "Toyota Camry, 2018");
-    fireEvent.press(view.getByRole("button", { name: action }));
+    await fireEvent.press(view.getByRole("button", { name: action }));
     await settle();
     expect(view.getByText(title)).toBeTruthy();
     expect(view.getByText(body)).toBeTruthy();
-    fireEvent.press(view.getByTestId("confirm-action"));
+    await fireEvent.press(view.getByTestId("confirm-action"));
     await settle();
     expect([...api.post.mock.calls, ...api.delete.mock.calls].map((call) => call[0])).toEqual([url]);
     expect(view.getByText(toast)).toBeTruthy();
@@ -326,10 +326,10 @@ describe("My listings action sheet", () => {
     const view = await renderScreen();
     await openTab(view, /^Archive/);
     await openActions(view, "Toyota RAV4, 2018");
-    fireEvent.press(view.getByRole("button", { name: "Relist" }));
+    await fireEvent.press(view.getByRole("button", { name: "Relist" }));
     await settle();
     expect(view.getByText("Relist?")).toBeTruthy();
-    fireEvent.press(view.getByRole("button", { name: "Confirm" }));
+    await fireEvent.press(view.getByRole("button", { name: "Confirm" }));
     await settle();
     expect(api.post).toHaveBeenCalledWith("/listings/rav4-1/republish", {}, expect.anything());
     expect(view.getByText("Back on sale")).toBeTruthy();
@@ -358,9 +358,9 @@ describe("My listings action sheet", () => {
     const view = await renderScreen();
     await openTab(view, /^Archive/);
     await openActions(view, "Toyota RAV4, 2018");
-    fireEvent.press(view.getByRole("button", { name: "Relist" }));
+    await fireEvent.press(view.getByRole("button", { name: "Relist" }));
     await settle();
-    fireEvent.press(view.getByRole("button", { name: "Confirm" }));
+    await fireEvent.press(view.getByRole("button", { name: "Confirm" }));
     await settle();
     expect(view.getByText("Confirm the contact phone")).toBeTruthy();
     expect(
@@ -368,7 +368,7 @@ describe("My listings action sheet", () => {
         "+99362000002 was confirmed more than 7 days ago. Confirm it again to relist.",
       ),
     ).toBeTruthy();
-    fireEvent.press(view.getByRole("button", { name: "Send code" }));
+    await fireEvent.press(view.getByRole("button", { name: "Send code" }));
     await settle();
     // Send code asks for the code and goes straight to the code screen.
     expect(api.post).toHaveBeenCalledWith(
@@ -399,9 +399,9 @@ describe("My listings action sheet", () => {
     const view = await renderScreen();
     await openTab(view, /^Archive/);
     await openActions(view, "Toyota RAV4, 2018");
-    fireEvent.press(view.getByRole("button", { name: "Relist" }));
+    await fireEvent.press(view.getByRole("button", { name: "Relist" }));
     await settle();
-    fireEvent.press(view.getByRole("button", { name: "Confirm" }));
+    await fireEvent.press(view.getByRole("button", { name: "Confirm" }));
     await settle();
     expect(
       view.getByText(
@@ -415,11 +415,11 @@ describe("My listings action sheet", () => {
     const view = await renderScreen();
     await openTab(view, /^Drafts/);
     await openActions(view, "Lexus RX, 2012");
-    fireEvent.press(view.getByRole("button", { name: "Delete draft" }));
+    await fireEvent.press(view.getByRole("button", { name: "Delete draft" }));
     await settle();
     expect(view.getByText("Delete draft?")).toBeTruthy();
     expect(view.getByText("Your draft and photos will be deleted. This cannot be undone.")).toBeTruthy();
-    fireEvent.press(view.getByTestId("confirm-action"));
+    await fireEvent.press(view.getByTestId("confirm-action"));
     await settle();
     expect(api.delete).toHaveBeenCalledWith("/listings/drafts/draft-1");
     expect(view.getByText("Draft deleted")).toBeTruthy();
@@ -430,9 +430,9 @@ describe("My listings action sheet", () => {
   it("does nothing when the confirmation is cancelled", async () => {
     const view = await renderScreen();
     await openActions(view, "Toyota Camry, 2018");
-    fireEvent.press(view.getByRole("button", { name: "Mark as sold" }));
+    await fireEvent.press(view.getByRole("button", { name: "Mark as sold" }));
     await settle();
-    fireEvent.press(view.getByRole("button", { name: "Cancel" }));
+    await fireEvent.press(view.getByRole("button", { name: "Cancel" }));
     await settle();
     expect(view.queryByText("Mark as sold?")).toBeNull();
     expect(api.post).not.toHaveBeenCalled();
@@ -443,9 +443,9 @@ describe("My listings action sheet", () => {
     api.post.mockRejectedValue(new Error("offline"));
     const view = await renderScreen();
     await openActions(view, "Toyota Camry, 2018");
-    fireEvent.press(view.getByRole("button", { name: "Mark as sold" }));
+    await fireEvent.press(view.getByRole("button", { name: "Mark as sold" }));
     await settle();
-    fireEvent.press(view.getByRole("button", { name: "Confirm" }));
+    await fireEvent.press(view.getByRole("button", { name: "Confirm" }));
     await settle();
     expect(view.getByText("Action failed. Try again.")).toBeTruthy();
     expect(view.getByText("Toyota Camry, 2018")).toBeTruthy();
@@ -459,14 +459,14 @@ describe("My listings action sheet", () => {
       ["tk", "Hereketler: Toyota Camry, 2018", "Poz", "Hereket başa barmady. Täzeden synanyşyň."],
     ] as const) {
       const view = await renderScreen({ locale });
-      fireEvent.press(view.getByRole("button", { name: title }));
+      await fireEvent.press(view.getByRole("button", { name: title }));
       await settle();
-      fireEvent.press(within(view.getByTestId("listing-actions-sheet")).getByRole("button", { name: button }));
+      await fireEvent.press(within(view.getByTestId("listing-actions-sheet")).getByRole("button", { name: button }));
       await settle();
-      fireEvent.press(view.getByTestId("confirm-action"));
+      await fireEvent.press(view.getByTestId("confirm-action"));
       await settle();
       expect(view.getByText(message)).toBeTruthy();
-      view.unmount();
+      await view.unmount();
     }
   });
 });
@@ -484,7 +484,7 @@ describe("My listings states", () => {
     const view = await renderScreen();
     expect(view.getByText("Something went wrong")).toBeTruthy();
     api.get.mockImplementation(serve);
-    fireEvent.press(view.getByRole("button", { name: "Retry" }));
+    await fireEvent.press(view.getByRole("button", { name: "Retry" }));
     await settle();
     expect(view.getByText("Toyota Camry, 2018")).toBeTruthy();
   });
@@ -494,7 +494,7 @@ describe("My listings states", () => {
     routeParams.tab = "drafts";
     const loading = await renderScreen();
     expect(loading.getByTestId("my-listings-skeleton")).toBeTruthy();
-    loading.unmount();
+    await loading.unmount();
     api.get.mockImplementation((url: string) => (url.startsWith("/me/drafts?") ? Promise.reject(new Error("offline")) : serve(url)));
     const failed = await renderScreen();
     expect(failed.getByText("Something went wrong")).toBeTruthy();
@@ -523,7 +523,7 @@ describe("My listings states", () => {
       const view = await renderScreen({ locale });
       expect(view.getByText(title)).toBeTruthy();
       expect(view.getByText(body)).toBeTruthy();
-      view.unmount();
+      await view.unmount();
     }
   });
 

@@ -6,8 +6,8 @@ import { fixture, maps } from "../../../test/fixtures/listing";
 
 import { ListingDetailView } from "./ListingDetail";
 
-it("does not render the deferred inspection entry or extra trust link", () => {
-  const screen = renderMobile(
+it("does not render the deferred inspection entry or extra trust link", async () => {
+  const screen = await renderMobile(
     createElement(ListingDetailView, { listing: fixture(), maps }),
   );
   expect(

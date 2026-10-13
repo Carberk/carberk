@@ -11,8 +11,8 @@ const email = "bagtyyarkowusow.dev@gmail.com";
 const shownPhone = "+993 63 98 94 04";
 
 describe("Help", () => {
-  it("shows Email us and Call us with the contacts and what to include", () => {
-    const screen = renderMobile(<HelpScreen />);
+  it("shows Email us and Call us with the contacts and what to include", async () => {
+    const screen = await renderMobile(<HelpScreen />);
 
     expect(screen.getByText("Help")).toBeTruthy();
     expect(screen.getByRole("button", { name: `Email us, ${email}` })).toBeTruthy();
@@ -22,12 +22,12 @@ describe("Help", () => {
     ).toBeTruthy();
   });
 
-  it("opens the mail app and the dialer", () => {
-    const screen = renderMobile(<HelpScreen />);
+  it("opens the mail app and the dialer", async () => {
+    const screen = await renderMobile(<HelpScreen />);
 
-    fireEvent.press(screen.getByRole("button", { name: `Email us, ${email}` }));
+    await fireEvent.press(screen.getByRole("button", { name: `Email us, ${email}` }));
     expect(Linking.openURL).toHaveBeenLastCalledWith(`mailto:${email}`);
-    fireEvent.press(screen.getByRole("button", { name: `Call us, ${shownPhone}` }));
+    await fireEvent.press(screen.getByRole("button", { name: `Call us, ${shownPhone}` }));
     expect(Linking.openURL).toHaveBeenLastCalledWith("tel:+99363989404");
   });
 
@@ -36,10 +36,10 @@ describe("Help", () => {
     ["Call us", shownPhone, "Couldn't open the dialer. Copy the number:"],
   ])("explains when %s cannot open and keeps the contact selectable", async (label, value, message) => {
     vi.mocked(Linking.openURL).mockRejectedValueOnce(new Error("No activity found"));
-    const screen = renderMobile(<HelpScreen />);
+    const screen = await renderMobile(<HelpScreen />);
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: `${label}, ${value}` }));
+      void fireEvent.press(screen.getByRole("button", { name: `${label}, ${value}` }));
     });
 
     expect(screen.getByRole("alert").props.children).toBe(message);
@@ -49,8 +49,8 @@ describe("Help", () => {
     expect(copies.filter((copy) => copy.props.selectable)).toHaveLength(1);
   });
 
-  it("offers nothing but Back, Email us and Call us", () => {
-    const screen = renderMobile(<HelpScreen />);
+  it("offers nothing but Back, Email us and Call us", async () => {
+    const screen = await renderMobile(<HelpScreen />);
 
     expect(screen.getAllByRole("button").map((b) => b.props.accessibilityLabel)).toEqual([
       "Back",
@@ -60,18 +60,18 @@ describe("Help", () => {
     expect(screen.queryByText(/chat|hours|respond|reply/i)).toBeNull();
   });
 
-  it("goes back to Cabinet", () => {
-    const screen = renderMobile(<HelpScreen />);
+  it("goes back to Cabinet", async () => {
+    const screen = await renderMobile(<HelpScreen />);
 
-    fireEvent.press(screen.getByRole("button", { name: "Back" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Back" }));
     expect(routerMock.back).toHaveBeenCalledOnce();
   });
 
   it.each([
     ["ru", "Помощь", "Написать на почту", "Позвонить нам", "Укажите номер объявления, например № 123456, и что произошло."],
     ["tk", "Kömek", "E-poçta ýaz", "Bize jaň et", "Bildiriş belgisini, mysal üçin № 123456, we näme bolandygyny ýazyň."],
-  ])("reads in %s", (locale, title, emailUs, callUs, include) => {
-    const screen = renderMobile(<HelpScreen />, { locale });
+  ])("reads in %s", async (locale, title, emailUs, callUs, include) => {
+    const screen = await renderMobile(<HelpScreen />, { locale });
 
     expect(screen.getByText(title)).toBeTruthy();
     expect(screen.getByText(emailUs)).toBeTruthy();

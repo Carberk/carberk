@@ -73,15 +73,15 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function typeCode(screen: ReturnType<typeof renderMobile>, code: string) {
+async function typeCode(screen: Awaited<ReturnType<typeof renderMobile>>, code: string) {
   await act(async () => {
-    fireEvent.changeText(screen.getByLabelText("Code"), code);
+    void fireEvent.changeText(screen.getByLabelText("Code"), code);
   });
 }
 
 describe("contact-phone-code screen", () => {
-  it("says where the code went, that it expires in 5 minutes, and what it allows", () => {
-    const screen = renderMobile(<ContactPhoneCodeScreen />);
+  it("says where the code went, that it expires in 5 minutes, and what it allows", async () => {
+    const screen = await renderMobile(<ContactPhoneCodeScreen />);
 
     expect(screen.getByRole("header", { name: "Enter the code" })).toBeTruthy();
     expect(screen.getByText("Code sent to +993 61 XX-XX-01")).toBeTruthy();
@@ -102,7 +102,7 @@ describe("contact-phone-code screen", () => {
         reusableUntil: "2026-10-12T12:00:00.000Z",
       },
     });
-    const screen = renderMobile(<ContactPhoneCodeScreen />);
+    const screen = await renderMobile(<ContactPhoneCodeScreen />);
 
     await typeCode(screen, "123456");
 
@@ -124,7 +124,7 @@ describe("contact-phone-code screen", () => {
     mocks.confirm.mockRejectedValue(
       new ApiError("INVALID_OTP", 400, undefined, { attemptsLeft: 3 }),
     );
-    const screen = renderMobile(<ContactPhoneCodeScreen />);
+    const screen = await renderMobile(<ContactPhoneCodeScreen />);
 
     await typeCode(screen, "123456");
 
@@ -133,7 +133,7 @@ describe("contact-phone-code screen", () => {
 
   it("locks entry after five wrong codes and offers a new code", async () => {
     mocks.confirm.mockRejectedValue(new ApiError("OTP_LOCKED", 400));
-    const screen = renderMobile(<ContactPhoneCodeScreen />);
+    const screen = await renderMobile(<ContactPhoneCodeScreen />);
 
     await typeCode(screen, "123456");
 
@@ -148,7 +148,7 @@ describe("contact-phone-code screen", () => {
       resendInSeconds: 60,
     });
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Send a new code" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Send a new code" }));
     });
 
     expect(mocks.request).toHaveBeenCalledWith({ phone: "+99361000001" });
@@ -157,7 +157,7 @@ describe("contact-phone-code screen", () => {
 
   it("treats an expired code the same way", async () => {
     mocks.confirm.mockRejectedValue(new ApiError("OTP_EXPIRED", 400));
-    const screen = renderMobile(<ContactPhoneCodeScreen />);
+    const screen = await renderMobile(<ContactPhoneCodeScreen />);
 
     await typeCode(screen, "123456");
 
@@ -167,9 +167,9 @@ describe("contact-phone-code screen", () => {
     expect(screen.getByRole("button", { name: "Send a new code" })).toBeTruthy();
   });
 
-  it("disables Resend with a countdown from resendInSeconds", () => {
+  it("disables Resend with a countdown from resendInSeconds", async () => {
     routeParams.resendInSeconds = "45";
-    const screen = renderMobile(<ContactPhoneCodeScreen />);
+    const screen = await renderMobile(<ContactPhoneCodeScreen />);
 
     const resend = screen.getByRole("button", { name: "Resend code in 45s" });
     expect(resend.props.accessibilityState).toMatchObject({ disabled: true });
@@ -182,10 +182,10 @@ describe("contact-phone-code screen", () => {
         retryInSeconds: 120,
       }),
     );
-    const screen = renderMobile(<ContactPhoneCodeScreen />);
+    const screen = await renderMobile(<ContactPhoneCodeScreen />);
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Resend code" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Resend code" }));
     });
 
     expect(
@@ -209,11 +209,11 @@ describe("contact-phone-code screen", () => {
           retryInSeconds: 120,
         }),
       );
-      const screen = renderMobile(<ContactPhoneCodeScreen />);
+      const screen = await renderMobile(<ContactPhoneCodeScreen />);
       await typeCode(screen, "123456");
 
       await act(async () => {
-        fireEvent.press(screen.getByRole("button", { name: "Send a new code" }));
+        void fireEvent.press(screen.getByRole("button", { name: "Send a new code" }));
       });
 
       expect(
@@ -237,7 +237,7 @@ describe("contact-phone-code screen", () => {
   it("offers Send a new code at once after a lock, whatever was left of the resend wait", async () => {
     routeParams.resendInSeconds = "45";
     mocks.confirm.mockRejectedValue(new ApiError("OTP_LOCKED", 400));
-    const screen = renderMobile(<ContactPhoneCodeScreen />);
+    const screen = await renderMobile(<ContactPhoneCodeScreen />);
 
     await typeCode(screen, "123456");
 
@@ -252,10 +252,10 @@ describe("contact-phone-code screen", () => {
         retryInSeconds: 0,
       }),
     );
-    const screen = renderMobile(<ContactPhoneCodeScreen />);
+    const screen = await renderMobile(<ContactPhoneCodeScreen />);
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Resend code" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Resend code" }));
     });
 
     expect(
@@ -265,13 +265,13 @@ describe("contact-phone-code screen", () => {
     ).toBeTruthy();
     expect(screen.getByLabelText("Code").props.editable).toBe(false);
 
-    fireEvent.press(screen.getByRole("link", { name: "Help" }));
+    await fireEvent.press(screen.getByRole("link", { name: "Help" }));
     expect(routerMock.push).toHaveBeenCalledWith("/help");
   });
 
   it("keeps the screen on offline", async () => {
     mocks.confirm.mockRejectedValue(new ApiError("NETWORK_ERROR", 0));
-    const screen = renderMobile(<ContactPhoneCodeScreen />);
+    const screen = await renderMobile(<ContactPhoneCodeScreen />);
 
     await typeCode(screen, "123456");
 
@@ -281,19 +281,19 @@ describe("contact-phone-code screen", () => {
     expect(screen.getByLabelText("Code").props.editable).toBe(true);
   });
 
-  it("goes back to the number screen from Change number", () => {
-    const screen = renderMobile(<ContactPhoneCodeScreen />);
+  it("goes back to the number screen from Change number", async () => {
+    const screen = await renderMobile(<ContactPhoneCodeScreen />);
 
-    fireEvent.press(screen.getByRole("button", { name: "Change number" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Change number" }));
 
     expect(routerMock.back).toHaveBeenCalled();
   });
 
-  it("offers no Change number on a relist, which confirms the Listing's own number only", () => {
+  it("offers no Change number on a relist, which confirms the Listing's own number only", async () => {
     routeParams.purpose = "relist";
     routeParams.listingId = "listing-1";
     routeParams.returnPathname = "/listings/manage";
-    const screen = renderMobile(<ContactPhoneCodeScreen />);
+    const screen = await renderMobile(<ContactPhoneCodeScreen />);
 
     expect(screen.getByRole("header", { name: "Enter the code" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Change number" })).toBeNull();
@@ -311,7 +311,7 @@ describe("contact-phone-code screen", () => {
         reusableUntil: "2026-10-12T12:00:00.000Z",
       },
     });
-    const screen = renderMobile(<ContactPhoneCodeScreen />);
+    const screen = await renderMobile(<ContactPhoneCodeScreen />);
 
     await typeCode(screen, "123456");
 

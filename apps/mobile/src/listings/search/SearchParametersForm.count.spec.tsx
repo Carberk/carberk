@@ -37,12 +37,12 @@ describe("Search parameters: count requests while the year range is edited", () 
   afterEach(() => vi.useRealTimers());
 
   it("requests no invalid year range when an inverted range is corrected, then shows the current count", async () => {
-    const view = open({ yearMin: 2020, yearMax: 2018, sort: "newest" });
+    const view = await open({ yearMin: 2020, yearMax: 2018, sort: "newest" });
     await settle(500);
     expect(api.get).not.toHaveBeenCalled();
     expect(view.getByText("Check filter values")).toBeTruthy();
 
-    fireEvent.changeText(view.getByLabelText("To"), "2021");
+    await fireEvent.changeText(view.getByLabelText("To"), "2021");
     await settle(300);
     await settle(10);
 
@@ -52,15 +52,15 @@ describe("Search parameters: count requests while the year range is edited", () 
   });
 
   it("requests no invalid year range when a valid range is broken and then corrected", async () => {
-    const view = open({ yearMin: 2018, yearMax: 2020, sort: "newest" });
+    const view = await open({ yearMin: 2018, yearMax: 2020, sort: "newest" });
     await settle(300);
     api.get.mockClear();
 
-    fireEvent.changeText(view.getByLabelText("To"), "2015");
+    await fireEvent.changeText(view.getByLabelText("To"), "2015");
     await settle(500);
     expect(api.get).not.toHaveBeenCalled();
 
-    fireEvent.changeText(view.getByLabelText("To"), "2022");
+    await fireEvent.changeText(view.getByLabelText("To"), "2022");
     await settle(300);
 
     expect(requestedUrls().filter((url) => url.includes("yearMax=2015"))).toEqual([]);

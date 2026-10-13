@@ -254,7 +254,7 @@ test('every bare import the seed steps load is declared by the db workspace', ()
 
 test('the db typecheck covers every TypeScript file the seed scripts directory holds', () => {
   const db = path.join(root, 'packages/db');
-  const tsc = path.join(db, 'node_modules/typescript/bin/tsc');
+  const tsc = path.join(db, 'node_modules/@typescript/native/bin/tsc');
   const result = spawnSync(process.execPath, [tsc, '--noEmit', '-p', 'tsconfig.json', '--listFilesOnly'], { cwd: db, encoding: 'utf8', timeout: 60_000 });
   assert.equal(result.status, 0, result.stderr);
   const checked = new Set(result.stdout.split('\n').map(line => path.resolve(db, line.trim())));

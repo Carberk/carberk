@@ -1,9 +1,9 @@
 import type * as Native from "react-native";
-import { KeyboardAvoidingView, Platform } from "react-native";
+import { Platform } from "react-native";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { renderMobile, act, fireEvent, routerMock, within } from "../../../test/render";
+import { renderMobile, act, fireEvent, routerMock, within, getHost } from "../../../test/render";
 
 import { SearchParametersForm } from "./SearchParametersForm";
 import type { ListingFilter } from "./useListingFilters";
@@ -53,8 +53,8 @@ const open = (initial: ListingFilter = { sort: "newest" }, returnToResults = tru
   renderMobile(<SearchParametersForm initial={initial} returnToResults={returnToResults} onBack={onBack} />);
 
 describe("Search parameters: opening", () => {
-  it("is a full-screen form titled Search parameters with the six approved fields", () => {
-    const view = open();
+  it("is a full-screen form titled Search parameters with the six approved fields", async () => {
+    const view = await open();
     expect(view.getByText("Search parameters")).toBeTruthy();
     expect(view.getByRole("button", { name: "Any Condition" })).toBeTruthy();
     expect(view.getAllByText("City").length).toBeGreaterThan(0);
@@ -66,8 +66,8 @@ describe("Search parameters: opening", () => {
     expect(view.getByRole("button", { name: "Show 100 listings" })).toBeTruthy();
   });
 
-  it("is pre-filled with the filters it was opened with", () => {
-    const view = open(filled);
+  it("is pre-filled with the filters it was opened with", async () => {
+    const view = await open(filled);
     expect(view.getByRole("button", { name: "Used Condition", selected: true })).toBeTruthy();
     expect(view.getByLabelText("Brand: Toyota")).toBeTruthy();
     expect(view.getByLabelText("Model: Camry")).toBeTruthy();
@@ -80,62 +80,62 @@ describe("Search parameters: opening", () => {
 });
 
 describe("Search parameters: the Show N count", () => {
-  it("updates as each field changes", () => {
-    const view = open();
+  it("updates as each field changes", async () => {
+    const view = await open();
     expect(view.getByRole("button", { name: "Show 100 listings" })).toBeTruthy();
-    fireEvent.press(view.getByRole("button", { name: "Used Condition" }));
+    await fireEvent.press(view.getByRole("button", { name: "Used Condition" }));
     expect(view.getByRole("button", { name: "Show 40 listings" })).toBeTruthy();
     expect(lastFilters().condition).toBe("used");
-    fireEvent.changeText(view.getByPlaceholderText("Max"), "150000");
+    await fireEvent.changeText(view.getByPlaceholderText("Max"), "150000");
     expect(view.getByRole("button", { name: "Show 20 listings" })).toBeTruthy();
     expect(lastFilters().priceMax).toBe(150000);
-    fireEvent.press(view.getByRole("button", { name: "New Condition" }));
+    await fireEvent.press(view.getByRole("button", { name: "New Condition" }));
     expect(view.getByRole("button", { name: "Show 30 listings" })).toBeTruthy();
   });
 
-  it("shows Loading while the count loads and still lets the buyer continue", () => {
+  it("shows Loading while the count loads and still lets the buyer continue", async () => {
     state.mode = "loading";
-    const view = open();
+    const view = await open();
     const button = view.getByRole("button", { name: "Loading..." });
-    fireEvent.press(button);
+    await fireEvent.press(button);
     expect(routerMock.dismissTo).toHaveBeenCalledOnce();
   });
 
-  it("falls back to Show results with a message when the count fails", () => {
+  it("falls back to Show results with a message when the count fails", async () => {
     state.mode = "error";
-    const view = open();
+    const view = await open();
     expect(view.getByText("Could not load listing count")).toBeTruthy();
-    fireEvent.press(view.getByRole("button", { name: "Show results" }));
+    await fireEvent.press(view.getByRole("button", { name: "Show results" }));
     expect(routerMock.dismissTo).toHaveBeenCalledOnce();
   });
 
-  it("disables Show N and says why when the year range is inverted", () => {
-    const view = open({ yearMin: 2020, yearMax: 2018, sort: "newest" });
+  it("disables Show N and says why when the year range is inverted", async () => {
+    const view = await open({ yearMin: 2020, yearMax: 2018, sort: "newest" });
     expect(view.getByText("Check filter values")).toBeTruthy();
-    fireEvent.press(view.getByRole("button", { name: /Show|Apply/ }));
+    await fireEvent.press(view.getByRole("button", { name: /Show|Apply/ }));
     expect(routerMock.dismissTo).not.toHaveBeenCalled();
     expect(routerMock.push).not.toHaveBeenCalled();
   });
 
-  it("disables Show N when the minimum price exceeds the maximum", () => {
-    const view = open({ priceMin: 200000, priceMax: 100000, sort: "newest" });
+  it("disables Show N when the minimum price exceeds the maximum", async () => {
+    const view = await open({ priceMin: 200000, priceMax: 100000, sort: "newest" });
     expect(view.getByText("Check filter values")).toBeTruthy();
-    fireEvent.press(view.getByRole("button", { name: /Show|Apply/ }));
+    await fireEvent.press(view.getByRole("button", { name: /Show|Apply/ }));
     expect(routerMock.dismissTo).not.toHaveBeenCalled();
   });
 });
 
 describe("Search parameters: Reset", () => {
-  it("clears a Region selected without a City and disables the City row", () => {
-    const view = open({ sort: "price_asc" });
-    fireEvent.press(view.getByLabelText("Region: Select region"));
-    fireEvent.press(view.getByRole("button", { name: "Ahal" }));
-    fireEvent.press(view.getByRole("button", { name: "Close" }));
+  it("clears a Region selected without a City and disables the City row", async () => {
+    const view = await open({ sort: "price_asc" });
+    await fireEvent.press(view.getByLabelText("Region: Select region"));
+    await fireEvent.press(view.getByRole("button", { name: "Ahal" }));
+    await fireEvent.press(view.getByRole("button", { name: "Close" }));
     expect(view.getByLabelText("Region: Ahal")).toBeTruthy();
     expect(view.getByRole("button", { name: "City: Select city", disabled: false })).toBeTruthy();
     expect(lastFilters()).toEqual({ sort: "price_asc" });
 
-    fireEvent.press(view.getByRole("button", { name: "Reset" }));
+    await fireEvent.press(view.getByRole("button", { name: "Reset" }));
 
     expect(view.getByLabelText("Region: Select region")).toBeTruthy();
     expect(view.getByRole("button", { name: "City: Select a region first", disabled: true })).toBeTruthy();
@@ -143,17 +143,17 @@ describe("Search parameters: Reset", () => {
     expect(view.getByRole("button", { name: "Show 100 listings" })).toBeTruthy();
   });
 
-  it("updates the count for a selected City, then clears City and Region on Reset", () => {
-    const view = open({ sort: "price_asc" });
-    fireEvent.press(view.getByLabelText("Region: Select region"));
-    fireEvent.press(view.getByRole("button", { name: "Ahal" }));
-    fireEvent.press(view.getByRole("button", { name: "Anau" }));
+  it("updates the count for a selected City, then clears City and Region on Reset", async () => {
+    const view = await open({ sort: "price_asc" });
+    await fireEvent.press(view.getByLabelText("Region: Select region"));
+    await fireEvent.press(view.getByRole("button", { name: "Ahal" }));
+    await fireEvent.press(view.getByRole("button", { name: "Anau" }));
     expect(view.getByLabelText("Region: Ahal")).toBeTruthy();
     expect(view.getByLabelText("City: Anau")).toBeTruthy();
     expect(lastFilters()).toEqual({ cityId: "anau", sort: "price_asc" });
     expect(view.getByRole("button", { name: "Show 20 listings" })).toBeTruthy();
 
-    fireEvent.press(view.getByRole("button", { name: "Reset" }));
+    await fireEvent.press(view.getByRole("button", { name: "Reset" }));
 
     expect(view.getByLabelText("Region: Select region")).toBeTruthy();
     expect(view.getByRole("button", { name: "City: Select a region first", disabled: true })).toBeTruthy();
@@ -161,9 +161,9 @@ describe("Search parameters: Reset", () => {
     expect(view.getByRole("button", { name: "Show 100 listings" })).toBeTruthy();
   });
 
-  it("clears every field, keeps the sort, and applies nothing yet", () => {
-    const view = open(filled);
-    fireEvent.press(view.getByRole("button", { name: "Reset" }));
+  it("clears every field, keeps the sort, and applies nothing yet", async () => {
+    const view = await open(filled);
+    await fireEvent.press(view.getByRole("button", { name: "Reset" }));
     expect(view.getByRole("button", { name: "Any Condition", selected: true })).toBeTruthy();
     expect(view.getByLabelText("Brand: Select brand")).toBeTruthy();
     expect(view.getByLabelText("Model: Select model")).toBeTruthy();
@@ -180,15 +180,15 @@ describe("Search parameters: Reset", () => {
 });
 
 describe("Search parameters: brand and model in Done mode", () => {
-  it("picks a brand and models in the pickers and returns to the form with the choice", () => {
-    const view = open();
-    fireEvent.press(view.getByLabelText("Brand: Select brand"));
+  it("picks a brand and models in the pickers and returns to the form with the choice", async () => {
+    const view = await open();
+    await fireEvent.press(view.getByLabelText("Brand: Select brand"));
     expect(view.getByText("Lexus")).toBeTruthy();
-    fireEvent.press(view.getByText("Lexus"));
+    await fireEvent.press(view.getByText("Lexus"));
     expect(view.getByText("Lexus models")).toBeTruthy();
     expect(view.queryByText("More filters")).toBeNull();
-    fireEvent.press(view.getByText("RX"));
-    fireEvent.press(view.getByRole("button", { name: /^Done/ }));
+    await fireEvent.press(view.getByText("RX"));
+    await fireEvent.press(view.getByRole("button", { name: /^Done/ }));
     expect(view.queryByText("Lexus models")).toBeNull();
     expect(view.getByLabelText("Brand: Lexus")).toBeTruthy();
     expect(view.getByLabelText("Model: RX")).toBeTruthy();
@@ -198,45 +198,49 @@ describe("Search parameters: brand and model in Done mode", () => {
     expect(routerMock.dismissTo).not.toHaveBeenCalled();
   });
 
-  it("opens the Model picker from the Model row with the current models ticked", () => {
-    const view = open(filled);
-    fireEvent.press(view.getByLabelText("Model: Camry"));
+  it("opens the Model picker from the Model row with the current models ticked", async () => {
+    const view = await open(filled);
+    await fireEvent.press(view.getByLabelText("Model: Camry"));
     expect(view.getByText("Toyota models")).toBeTruthy();
     expect(view.getByRole("checkbox", { name: "Camry", checked: true })).toBeTruthy();
     expect(view.getByRole("checkbox", { name: "Corolla", checked: false })).toBeTruthy();
   });
 
-  it("changes the model selection when a model checkbox is pressed, box and all", () => {
-    const view = open(filled);
-    fireEvent.press(view.getByLabelText("Model: Camry"));
+  it("changes the model selection when a model checkbox is pressed, box and all", async () => {
+    const view = await open(filled);
+    await fireEvent.press(view.getByLabelText("Model: Camry"));
     const row = (name: string) => view.getByRole("checkbox", { name });
-    // `within` includes the row itself, so two matches are the row plus the
-    // Checkbox box inside it; the box must mirror the row's selected state.
-    const boxesIn = (name: string, checked: boolean) => within(row(name)).getAllByRole("checkbox", { checked });
+    // Two matches are the row plus the Checkbox box inside it; the box must
+    // mirror the row's selected state. RNTL 14's `within` searches only below
+    // the row, so the row is matched by name.
+    const boxesIn = (name: string, checked: boolean) => [
+      ...view.queryAllByRole("checkbox", { name, checked }),
+      ...within(row(name)).queryAllByRole("checkbox", { checked }),
+    ];
     expect(boxesIn("Corolla", false)).toHaveLength(2);
     expect(boxesIn("Camry", true)).toHaveLength(2);
 
-    fireEvent.press(row("Corolla"));
+    await fireEvent.press(row("Corolla"));
 
     expect(boxesIn("Corolla", true)).toHaveLength(2);
-    fireEvent.press(view.getByRole("button", { name: /^Done/ }));
+    await fireEvent.press(view.getByRole("button", { name: /^Done/ }));
     expect(lastFilters().modelIds).toEqual(["camry", "corolla"]);
     expect(view.getByLabelText("Model: 2 selected")).toBeTruthy();
 
-    fireEvent.press(view.getByLabelText("Model: 2 selected"));
-    fireEvent.press(row("Camry"));
+    await fireEvent.press(view.getByLabelText("Model: 2 selected"));
+    await fireEvent.press(row("Camry"));
     expect(boxesIn("Camry", false)).toHaveLength(2);
-    fireEvent.press(view.getByRole("button", { name: /^Done/ }));
+    await fireEvent.press(view.getByRole("button", { name: /^Done/ }));
     expect(lastFilters().modelIds).toEqual(["corolla"]);
   });
 });
 
 describe("Search parameters: Show N", () => {
-  it("applies the form to the Results screen below it without stacking a second Results", () => {
-    const view = open(filled, true);
-    fireEvent.press(view.getByRole("button", { name: "Used Condition" }));
-    fireEvent.press(view.getByRole("button", { name: "New Condition" }));
-    fireEvent.press(view.getByRole("button", { name: /^Show \d+ listings$/ }));
+  it("applies the form to the Results screen below it without stacking a second Results", async () => {
+    const view = await open(filled, true);
+    await fireEvent.press(view.getByRole("button", { name: "Used Condition" }));
+    await fireEvent.press(view.getByRole("button", { name: "New Condition" }));
+    await fireEvent.press(view.getByRole("button", { name: /^Show \d+ listings$/ }));
     expect(routerMock.dismissTo).toHaveBeenCalledOnce();
     expect(routerMock.dismissTo).toHaveBeenCalledWith({
       pathname: "/(tabs)/(search)/results",
@@ -246,25 +250,25 @@ describe("Search parameters: Show N", () => {
     expect(routerMock.dismissAll).not.toHaveBeenCalled();
   });
 
-  it("clears a filter on Results that the form cleared", () => {
-    const view = open(filled, true);
-    fireEvent.press(view.getByRole("button", { name: "Reset" }));
-    fireEvent.press(view.getByRole("button", { name: /^Show \d+ listings$/ }));
+  it("clears a filter on Results that the form cleared", async () => {
+    const view = await open(filled, true);
+    await fireEvent.press(view.getByRole("button", { name: "Reset" }));
+    await fireEvent.press(view.getByRole("button", { name: /^Show \d+ listings$/ }));
     const call = routerMock.dismissTo.mock.calls[0]?.[0] as { params: Record<string, string | undefined> };
     expect(call.params).toEqual(expect.objectContaining({ brandId: undefined, modelIds: undefined, condition: undefined, priceMax: undefined, sort: "price_asc" }));
   });
 
-  it("opens Results over Home when the form came from the Model picker, with the pickers taken off the stack", () => {
-    const view = open({ brandId: "toyota", sort: "newest" }, false);
-    fireEvent.press(view.getByRole("button", { name: /^Show \d+ listings$/ }));
+  it("opens Results over Home when the form came from the Model picker, with the pickers taken off the stack", async () => {
+    const view = await open({ brandId: "toyota", sort: "newest" }, false);
+    await fireEvent.press(view.getByRole("button", { name: /^Show \d+ listings$/ }));
     expect(routerMock.dismissAll).toHaveBeenCalledOnce();
     expect(routerMock.push).toHaveBeenCalledWith({ pathname: "/(tabs)/(search)/results", params: expect.objectContaining({ brandId: "toyota", sort: "newest" }) });
     expect(routerMock.dismissTo).not.toHaveBeenCalled();
   });
 
-  it("saves the applied brand choice to Recent", () => {
-    const view = open(filled, true);
-    fireEvent.press(view.getByRole("button", { name: /^Show \d+ listings$/ }));
+  it("saves the applied brand choice to Recent", async () => {
+    const view = await open(filled, true);
+    await fireEvent.press(view.getByRole("button", { name: /^Show \d+ listings$/ }));
     expect(state.record).toHaveBeenCalledWith(expect.objectContaining({ brandId: "toyota", modelIds: ["camry"] }));
   });
 });
@@ -283,45 +287,45 @@ describe("Search parameters: price inputs keep every digit typed or pasted", () 
   ] as const;
 
   describe.each(fields)("$name price", ({ placeholder, key }) => {
-    it("keeps 7000000 when the digits arrive one at a time with a render between each", () => {
-      const view = open();
-      for (const text of prefixes("7000000")) fireEvent.changeText(view.getByPlaceholderText(placeholder), text);
+    it("keeps 7000000 when the digits arrive one at a time with a render between each", async () => {
+      const view = await open();
+      for (const text of prefixes("7000000")) await fireEvent.changeText(view.getByPlaceholderText(placeholder), text);
       expect(view.getByDisplayValue("7,000,000")).toBeTruthy();
       expect(lastFilters()[key]).toBe(7000000);
     });
 
-    it("keeps 7000000 when every digit arrives in one burst, before any render", () => {
-      const view = open();
+    it("keeps 7000000 when every digit arrives in one burst, before any render", async () => {
+      const view = await open();
       const field = view.getByPlaceholderText(placeholder);
-      act(() => {
+      await act(async () => {
         // One act batches the events, so React does not re-render between them, as in a native burst.
-        for (const text of prefixes("7000000")) fireEvent.changeText(field, text);
+        for (const text of prefixes("7000000")) void fireEvent.changeText(field, text);
       });
       expect(view.getByDisplayValue("7,000,000")).toBeTruthy();
       expect(lastFilters()[key]).toBe(7000000);
     });
 
-    it.each(["7000000", "7,000,000", "7 000 000", "7 000 000 TMT"])("keeps 7000000 when %j is pasted whole", (pasted) => {
-      const view = open();
-      fireEvent.changeText(view.getByPlaceholderText(placeholder), pasted);
+    it.each(["7000000", "7,000,000", "7 000 000", "7 000 000 TMT"])("keeps 7000000 when %j is pasted whole", async (pasted) => {
+      const view = await open();
+      await fireEvent.changeText(view.getByPlaceholderText(placeholder), pasted);
       expect(view.getByDisplayValue("7,000,000")).toBeTruthy();
       expect(lastFilters()[key]).toBe(7000000);
     });
 
-    it("replaces an existing value with a whole pasted value", () => {
-      const view = open({ [key]: 70000, sort: "newest" });
-      fireEvent.changeText(view.getByDisplayValue("70,000"), "7000000");
+    it("replaces an existing value with a whole pasted value", async () => {
+      const view = await open({ [key]: 70000, sort: "newest" });
+      await fireEvent.changeText(view.getByDisplayValue("70,000"), "7000000");
       expect(view.queryByDisplayValue("70,000")).toBeNull();
       expect(view.getByDisplayValue("7,000,000")).toBeTruthy();
       expect(lastFilters()[key]).toBe(7000000);
     });
 
-    it("keeps the digits typed after a delete in the same burst", () => {
+    it("keeps the digits typed after a delete in the same burst", async () => {
       // Opens at 7000000 and ends on a different value, so a handler that drops every event fails.
-      const view = open({ [key]: 7000000, sort: "newest" });
+      const view = await open({ [key]: 7000000, sort: "newest" });
       const field = view.getByDisplayValue("7,000,000");
-      act(() => {
-        for (const text of ["700000", "70000", "7000", "70005", "700055", "7000555"]) fireEvent.changeText(field, text);
+      await act(async () => {
+        for (const text of ["700000", "70000", "7000", "70005", "700055", "7000555"]) void fireEvent.changeText(field, text);
       });
       expect(view.queryByDisplayValue("7,000,000")).toBeNull();
       expect(view.getByDisplayValue("7,000,555")).toBeTruthy();
@@ -329,15 +333,15 @@ describe("Search parameters: price inputs keep every digit typed or pasted", () 
     });
   });
 
-  it("keeps both whole values when min and max are typed in alternating bursts", () => {
-    const view = open();
+  it("keeps both whole values when min and max are typed in alternating bursts", async () => {
+    const view = await open();
     const min = view.getByPlaceholderText("Min");
     const max = view.getByPlaceholderText("Max");
-    act(() => {
+    await act(async () => {
       const maxTexts = prefixes("7000000");
       for (const [index, text] of prefixes("1500000").entries()) {
-        fireEvent.changeText(min, text);
-        fireEvent.changeText(max, maxTexts[index] as string);
+        void fireEvent.changeText(min, text);
+        void fireEvent.changeText(max, maxTexts[index] as string);
       }
     });
     expect(view.getByDisplayValue("1,500,000")).toBeTruthy();
@@ -345,27 +349,27 @@ describe("Search parameters: price inputs keep every digit typed or pasted", () 
     expect(lastFilters()).toEqual(expect.objectContaining({ priceMin: 1500000, priceMax: 7000000 }));
   });
 
-  it("passes both whole values to Results when Show is pressed after a burst", () => {
-    const view = open({ sort: "newest" });
+  it("passes both whole values to Results when Show is pressed after a burst", async () => {
+    const view = await open({ sort: "newest" });
     const min = view.getByPlaceholderText("Min");
     const max = view.getByPlaceholderText("Max");
-    act(() => {
-      for (const text of prefixes("1500000")) fireEvent.changeText(min, text);
-      for (const text of prefixes("7000000")) fireEvent.changeText(max, text);
+    await act(async () => {
+      for (const text of prefixes("1500000")) void fireEvent.changeText(min, text);
+      for (const text of prefixes("7000000")) void fireEvent.changeText(max, text);
     });
-    fireEvent.press(view.getByRole("button", { name: /^Show \d+ listings$/ }));
+    await fireEvent.press(view.getByRole("button", { name: /^Show \d+ listings$/ }));
     expect(routerMock.dismissTo).toHaveBeenCalledWith({
       pathname: "/(tabs)/(search)/results",
       params: expect.objectContaining({ priceMin: "1500000", priceMax: "7000000" }),
     });
   });
 
-  it("lets a maximum typed digit by digit pass through values below the minimum and end whole", () => {
-    const view = open({ priceMin: 500000, sort: "newest" });
-    fireEvent.changeText(view.getByPlaceholderText("Max"), "7");
+  it("lets a maximum typed digit by digit pass through values below the minimum and end whole", async () => {
+    const view = await open({ priceMin: 500000, sort: "newest" });
+    await fireEvent.changeText(view.getByPlaceholderText("Max"), "7");
     expect(view.getByText("Minimum price cannot exceed maximum price")).toBeTruthy();
     expect(view.getByDisplayValue("7")).toBeTruthy();
-    for (const text of prefixes("7000000").slice(1)) fireEvent.changeText(view.getByPlaceholderText("Max"), text);
+    for (const text of prefixes("7000000").slice(1)) await fireEvent.changeText(view.getByPlaceholderText("Max"), text);
     expect(view.queryByText("Minimum price cannot exceed maximum price")).toBeNull();
     expect(view.getByDisplayValue("7,000,000")).toBeTruthy();
     expect(lastFilters()).toEqual(expect.objectContaining({ priceMin: 500000, priceMax: 7000000 }));
@@ -373,11 +377,11 @@ describe("Search parameters: price inputs keep every digit typed or pasted", () 
 });
 
 describe("Search parameters: Back", () => {
-  it("leaves without applying, so unapplied edits are discarded", () => {
+  it("leaves without applying, so unapplied edits are discarded", async () => {
     const onBack = vi.fn();
-    const view = open(filled, true, onBack);
-    fireEvent.press(view.getByRole("button", { name: "Used Condition" }));
-    fireEvent.press(view.getByRole("button", { name: "Back" }));
+    const view = await open(filled, true, onBack);
+    await fireEvent.press(view.getByRole("button", { name: "Used Condition" }));
+    await fireEvent.press(view.getByRole("button", { name: "Back" }));
     expect(onBack).toHaveBeenCalledOnce();
     expect(routerMock.dismissTo).not.toHaveBeenCalled();
     expect(routerMock.push).not.toHaveBeenCalled();
@@ -387,29 +391,29 @@ describe("Search parameters: Back", () => {
 });
 
 describe("Russian filter result count", () => {
-  it.each([[1, "Показать 1 объявление"], [2, "Показать 2 объявления"], [3, "Показать 3 объявления"], [4, "Показать 4 объявления"], [5, "Показать 5 объявлений"], [11, "Показать 11 объявлений"], [12, "Показать 12 объявлений"], [13, "Показать 13 объявлений"], [14, "Показать 14 объявлений"], [21, "Показать 21 объявление"], [22, "Показать 22 объявления"], [25, "Показать 25 объявлений"]])("shows the correct filter button for %i matches", (count, label) => {
+  it.each([[1, "Показать 1 объявление"], [2, "Показать 2 объявления"], [3, "Показать 3 объявления"], [4, "Показать 4 объявления"], [5, "Показать 5 объявлений"], [11, "Показать 11 объявлений"], [12, "Показать 12 объявлений"], [13, "Показать 13 объявлений"], [14, "Показать 14 объявлений"], [21, "Показать 21 объявление"], [22, "Показать 22 объявления"], [25, "Показать 25 объявлений"]])("shows the correct filter button for %i matches", async (count, label) => {
     state.total = count as number;
-    const screen = renderMobile(<SearchParametersForm initial={{}} returnToResults={false} onBack={vi.fn()} />, { locale: "ru" });
+    const screen = await renderMobile(<SearchParametersForm initial={{}} returnToResults={false} onBack={vi.fn()} />, { locale: "ru" });
     expect(screen.getByRole("button", { name: label })).toBeTruthy();
   });
 });
 
 describe("English filter result count", () => {
-  it("uses a singular Listing for one match", () => {
+  it("uses a singular Listing for one match", async () => {
     state.total = 1;
-    const screen = renderMobile(<SearchParametersForm initial={{}} returnToResults={false} onBack={vi.fn()} />);
+    const screen = await renderMobile(<SearchParametersForm initial={{}} returnToResults={false} onBack={vi.fn()} />);
     expect(screen.getByRole("button", { name: "Show 1 listing" })).toBeTruthy();
   });
 });
 
 
 describe("Filter count without Intl.PluralRules", () => {
-  it.each([[1, "Показать 1 объявление"], [2, "Показать 2 объявления"], [5, "Показать 5 объявлений"], [11, "Показать 11 объявлений"], [21, "Показать 21 объявление"], [22, "Показать 22 объявления"], [25, "Показать 25 объявлений"]])("shows %i Russian matches on Hermes without plural rules", (count, label) => {
+  it.each([[1, "Показать 1 объявление"], [2, "Показать 2 объявления"], [5, "Показать 5 объявлений"], [11, "Показать 11 объявлений"], [21, "Показать 21 объявление"], [22, "Показать 22 объявления"], [25, "Показать 25 объявлений"]])("shows %i Russian matches on Hermes without plural rules", async (count, label) => {
     const descriptor = Object.getOwnPropertyDescriptor(Intl, "PluralRules");
     Object.defineProperty(Intl, "PluralRules", { configurable: true, value: undefined });
     try {
       state.total = count as number;
-      const screen = renderMobile(<SearchParametersForm initial={{}} returnToResults={false} onBack={vi.fn()} />, { locale: "ru" });
+      const screen = await renderMobile(<SearchParametersForm initial={{}} returnToResults={false} onBack={vi.fn()} />, { locale: "ru" });
       expect(screen.getByRole("button", { name: label })).toBeTruthy();
     } finally {
       if (descriptor) Object.defineProperty(Intl, "PluralRules", descriptor);
@@ -418,12 +422,12 @@ describe("Filter count without Intl.PluralRules", () => {
 });
 
 describe("Search parameters: keyboard", () => {
-  it.each(["android", "ios"] as const)("keeps the year and price fields and Show N inside the padding avoidance region on %s", (os) => {
+  it.each(["android", "ios"] as const)("keeps the year and price fields and Show N inside the padding avoidance region on %s", async (os) => {
     const previousOS = Platform.OS;
     Platform.OS = os;
     try {
-      const view = open(filled);
-      const avoidance = view.UNSAFE_getByType(KeyboardAvoidingView);
+      const view = await open(filled);
+      const avoidance = getHost(view.container, "KeyboardAvoidingView");
       expect(avoidance.props.enabled).not.toBe(false);
       expect(avoidance.props.behavior).toBe("padding");
       expect(within(avoidance).getByDisplayValue("2018")).toBeTruthy();
@@ -434,24 +438,24 @@ describe("Search parameters: keyboard", () => {
 });
 
 describe("Search parameters: price entry", () => {
-  it("groups minimum and maximum price while typing and sends plain numbers", () => {
-    const view = open();
-    fireEvent.changeText(view.getByPlaceholderText("Min"), "420000");
-    fireEvent.changeText(view.getByPlaceholderText("Max"), "2329600");
+  it("groups minimum and maximum price while typing and sends plain numbers", async () => {
+    const view = await open();
+    await fireEvent.changeText(view.getByPlaceholderText("Min"), "420000");
+    await fireEvent.changeText(view.getByPlaceholderText("Max"), "2329600");
     expect(view.getByDisplayValue("420,000")).toBeTruthy();
     expect(view.getByDisplayValue("2,329,600")).toBeTruthy();
     expect(lastFilters()).toEqual(expect.objectContaining({ priceMin: 420000, priceMax: 2329600 }));
   });
 
-  it.each(["2 329 600", "2,329,600", "2\u00a0329\u00a0600 TMT"])("parses a pasted %j", (pasted) => {
-    const view = open();
-    fireEvent.changeText(view.getByPlaceholderText("Max"), pasted);
+  it.each(["2 329 600", "2,329,600", "2\u00a0329\u00a0600 TMT"])("parses a pasted %j", async (pasted) => {
+    const view = await open();
+    await fireEvent.changeText(view.getByPlaceholderText("Max"), pasted);
     expect(view.getByDisplayValue("2,329,600")).toBeTruthy();
     expect(lastFilters()).toEqual(expect.objectContaining({ priceMax: 2329600 }));
   });
 
-  it("leaves the year fields ungrouped", () => {
-    const view = open(filled);
+  it("leaves the year fields ungrouped", async () => {
+    const view = await open(filled);
     expect(view.getByDisplayValue("2018")).toBeTruthy();
     expect(view.getByDisplayValue("2020")).toBeTruthy();
     expect(view.queryByDisplayValue("2,018")).toBeNull();

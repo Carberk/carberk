@@ -23,19 +23,19 @@ function Example() {
 }
 
 describe("mobile renderer", () => {
-  it("does not dispatch a press to a disabled native button", () => {
+  it("does not dispatch a press to a disabled native button", async () => {
     const onPress = vi.fn();
-    const screen = renderMobile(<Button disabled onPress={onPress}><Text>Save</Text></Button>);
-    fireEvent.press(screen.getByRole("button", { name: "Save", disabled: true }));
+    const screen = await renderMobile(<Button disabled onPress={onPress}><Text>Save</Text></Button>);
+    await fireEvent.press(screen.getByRole("button", { name: "Save", disabled: true }));
     expect(onPress).not.toHaveBeenCalled();
   });
   it("queries native roles, labels and translated text and presses a real component", async () => {
-    const screen = renderMobile(<Example />);
+    const screen = await renderMobile(<Example />);
     expect(screen.getByLabelText("Name")).toBeTruthy();
-    fireEvent.press(screen.getByRole("button", { name: "Save" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Save" }));
     expect(screen.getByText("Saved")).toBeTruthy();
     expect(routerMock.push).toHaveBeenCalledWith("/profile");
-    screen.rerender(<Example />);
+    await screen.rerender(<Example />);
     expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
     expect(await screen.findByText("Loaded")).toBeTruthy();
   });

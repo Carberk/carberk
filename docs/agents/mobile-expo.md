@@ -26,6 +26,8 @@ CI=1 pnpm --filter @auto-tm/mobile exec expo install --check
 
 `pnpm install --force` is required after package alignment because stale pnpm symlinks in `apps/mobile/node_modules` can keep pointing at the previous store entry.
 
+`typescript` is the one deliberate exception. Expo SDK 55 expects `~5.9.2`, but the workspace catalog keeps TypeScript 6 under that name and type-checks with TypeScript 7 ([which compiler runs where](typescript-runtime.md#which-compiler-runs-where)). `apps/mobile/package.json` lists it in `expo.install.exclude`, so the check skips it. Metro compiles with Babel; Expo only uses `typescript` to load TypeScript config files, and this app's config is JavaScript. Do not run `expo install --fix` to "repair" it.
+
 ## Android Worklets prefab patches
 
 The workspace carries two native build patches for Expo Modules Core 55.0.26 and Reanimated 4.2.1. They backport [Expo #43863](https://github.com/expo/expo/pull/43863) and [Reanimated #8685](https://github.com/software-mansion/react-native-reanimated/pull/8685), linking Worklets through its published prefab target. The original consumers hardcode an obsolete AGP output path and fail on clean Debug and Release builds. Worklets 0.7.4 already includes the required prefab cache fix.
@@ -67,7 +69,10 @@ Stop Metro before handing back the task.
 
 ## Known SDK 55 pitfalls
 
-- Keep `.npmrc` with `shamefully-hoist=true`; Metro expects flat React Native dependencies under pnpm.
+- Keep `shamefullyHoist: true` in `pnpm-workspace.yaml`; Metro expects flat React Native dependencies under pnpm. pnpm 11 and later read only auth and registry settings from `.npmrc`, so the setting cannot live there.
+- Keep the `react-native-css-interop` override in `pnpm-workspace.yaml` ([ADR-0048](../adr/0048-pin-react-native-css-interop-with-a-pnpm-override.md)); pnpm 11 and later ignore the `pnpm` field of `package.json`.
+- pnpm fails the install when a dependency's install script is not listed in `allowBuilds` in `pnpm-workspace.yaml`. When a new native package needs its script, review it and add it with a comment saying why; deny a script the app does not need with `false`.
+- Shared dependency ranges live in the default `catalog` in `pnpm-workspace.yaml`, and package files say `catalog:`. Mobile declares its own `react`, `react-dom` and `tailwindcss` ranges because Expo SDK 55 and NativeWind 4 pin them.
 - Keep `react-native-reanimated` and `react-native-worklets` as explicit Expo-installed app dependencies. SDK 55's Expo docs install them together, and Reanimated 4 initializes through Worklets; relying on a transitive Worklets peer can compile but crash in Expo Go with vague `Exception in HostFunction` errors when RNR components import builders such as `FadeIn` / `FadeOut`.
 - Keep `react-native-screens` on its React Native/Fabric source path. Do not redirect it to `lib/commonjs`; that caused `RNSSafeAreaView` view-config crashes.
 - Do not patch `@react-native/codegen` for `react-native-screens` unless the package check is already clean and a fresh Codegen/parser repro proves the current aligned toolchain still fails.

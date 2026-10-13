@@ -16,22 +16,23 @@
     "lint": "eslint . --max-warnings 0"
   },
   "dependencies": {
-    "clsx": "^2.1.1",
-    "tailwind-merge": "^2.5.4",
-    "class-variance-authority": "^0.7.1"
+    "clsx": "catalog:",
+    "tailwind-merge": "catalog:",
+    "class-variance-authority": "catalog:"
   },
   "peerDependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "tailwindcss": "^4.1.0"
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "tailwindcss": "catalog:"
   },
   "devDependencies": {
     "@auto-tm/tsconfig": "workspace:*",
     "@auto-tm/eslint-config": "workspace:*",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "tailwindcss": "^4.1.0",
-    "typescript": "^5.7.3",
-    "eslint": "^9.18.0"
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@typescript/native": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "eslint": "catalog:"
   }
 }

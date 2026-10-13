@@ -13,20 +13,20 @@ function draft(payload: ListingsSchemas.ListingDraft["payload"]): ListingsSchema
 }
 
 describe("DraftCard", () => {
-  it("resumes on tap and hands ⋯ its title", () => {
+  it("resumes on tap and hands ⋯ its title", async () => {
     const onResume = vi.fn();
     const onMore = vi.fn();
     const item = draft({ brandId: "lexus", modelId: "rx", year: 2012, currentStep: 3, contactPhone: "+99361234567", allowCalls: true, allowChat: true });
-    const view = renderMobile(<DraftCard draft={item} brandName="Lexus" modelName="RX" onResume={onResume} onMore={onMore} />);
+    const view = await renderMobile(<DraftCard draft={item} brandName="Lexus" modelName="RX" onResume={onResume} onMore={onMore} />);
     expect(view.getByText("1 of 7 steps filled")).toBeTruthy();
-    fireEvent.press(view.getByRole("button", { name: "Continue listing Lexus RX, 2012" }));
+    await fireEvent.press(view.getByRole("button", { name: "Continue listing Lexus RX, 2012" }));
     expect(onResume).toHaveBeenCalledWith(item);
-    fireEvent.press(view.getByRole("button", { name: "Actions for Lexus RX, 2012" }));
+    await fireEvent.press(view.getByRole("button", { name: "Actions for Lexus RX, 2012" }));
     expect(onMore).toHaveBeenCalledWith(item, "Lexus RX, 2012");
   });
 
-  it("names a draft with no car yet", () => {
-    const view = renderMobile(<DraftCard draft={draft({})} onResume={vi.fn()} onMore={vi.fn()} />);
+  it("names a draft with no car yet", async () => {
+    const view = await renderMobile(<DraftCard draft={draft({})} onResume={vi.fn()} onMore={vi.fn()} />);
     expect(view.getByText("Untitled draft")).toBeTruthy();
     expect(view.getByRole("button", { name: "Actions for Untitled draft" })).toBeTruthy();
   });

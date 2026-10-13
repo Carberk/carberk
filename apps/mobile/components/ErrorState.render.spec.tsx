@@ -9,8 +9,8 @@ describe("ErrorState fallback copy", () => {
     ["en", "Something went wrong", "This didn't load. Try again in a moment.", "Retry"],
     ["ru", "Что-то пошло не так", "Не удалось загрузить. Попробуйте чуть позже.", "Повторить"],
     ["tk", "Bir zat ýalňyş boldy", "Ýükläp bolmady. Biraz soňrak synanyşyň.", "Täzeden synanyş"],
-  ])("in %s says what happened in its own words, apart from the retry button", (locale, title, description, retry) => {
-    const screen = renderMobile(<ErrorState error={new Error("boom")} onRetry={vi.fn()} />, { locale });
+  ])("in %s says what happened in its own words, apart from the retry button", async (locale, title, description, retry) => {
+    const screen = await renderMobile(<ErrorState error={new Error("boom")} onRetry={vi.fn()} />, { locale });
 
     expect(screen.getByText(title)).toBeTruthy();
     expect(screen.getByText(description)).toBeTruthy();

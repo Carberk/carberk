@@ -8,11 +8,11 @@ import { MessageBubble } from "./MessageBubble";
 
 import { THEME } from "@/lib/theme";
 
-type Screen = ReturnType<typeof renderMobile>;
+type Screen = Awaited<ReturnType<typeof renderMobile>>;
 interface Node {
   parent: Node | null;
   props: { className?: unknown };
-  findAll: (match: (node: Node) => boolean) => Node[];
+  queryAll: (match: (node: Node) => boolean, options?: { includeSelf?: boolean }) => Node[];
 }
 
 const AT_1405 = new Date(2026, 9, 2, 14, 5).toISOString();
@@ -65,60 +65,60 @@ function contrastOnBubble(node: Node, theme: ThemeName): number {
 }
 
 /** The icon inside a wrapper: the one node whose class sets an icon size. */
-const iconIn = (wrapper: Node) => wrapper.findAll((node) => classOf(node).includes("size-3.5"))[0] as Node;
+const iconIn = (wrapper: Node) => wrapper.queryAll((node) => classOf(node).includes("size-3.5"), { includeSelf: true })[0] as Node;
 const tick = (screen: Screen, id: string) =>
   iconIn(screen.getByTestId(id, { includeHiddenElements: true }) as unknown as Node);
 const text = (screen: Screen, value: string) => screen.getByText(value) as unknown as Node;
 
 describe("own Message bubble tint (#775 F)", () => {
-  it("fills an own Message with the tint token, not the solid brand colour", () => {
-    const className = classOf(bubbleOf(text(renderMobile(bubble()), TEXT)));
+  it("fills an own Message with the tint token, not the solid brand colour", async () => {
+    const className = classOf(bubbleOf(text((await renderMobile(bubble())), TEXT)));
     expect(className).toContain("bg-message-own");
     expect(className).not.toMatch(/bg-primary/);
     expect(className).toContain("rounded-br-md");
   });
 
-  it("puts a sent photo in the same tinted bubble", () => {
-    const screen = renderMobile(bubble({ ...IMAGE, status: "delivered" }));
+  it("puts a sent photo in the same tinted bubble", async () => {
+    const screen = await renderMobile(bubble({ ...IMAGE, status: "delivered" }));
     expect(classOf(bubbleOf(text(screen, "02:05 PM")))).toContain("bg-message-own");
   });
 
-  it("writes the Message in the normal text colour", () => {
-    expect(classOf(text(renderMobile(bubble()), TEXT)).split(/\s+/)).toContain("text-foreground");
+  it("writes the Message in the normal text colour", async () => {
+    expect(classOf(text((await renderMobile(bubble())), TEXT)).split(/\s+/)).toContain("text-foreground");
   });
 
-  it("draws the time, the sent and delivered ticks and the state labels in one quiet colour", () => {
-    const sent = renderMobile(bubble({ status: "sent" }));
+  it("draws the time, the sent and delivered ticks and the state labels in one quiet colour", async () => {
+    const sent = await renderMobile(bubble({ status: "sent" }));
     const quiet = colourClass(classOf(text(sent, "02:05 PM")), "text");
     expect(quiet.token).toBe("foreground");
     expect(quiet.alpha).toBeLessThan(1);
     expect(colourClass(classOf(tick(sent, "message-tick-sent")), "text")).toEqual(quiet);
-    sent.unmount();
+    await sent.unmount();
 
-    const delivered = renderMobile(bubble({ status: "delivered" }));
+    const delivered = await renderMobile(bubble({ status: "delivered" }));
     expect(colourClass(classOf(tick(delivered, "message-tick-double")), "text")).toEqual(quiet);
-    delivered.unmount();
+    await delivered.unmount();
 
-    const pending = renderMobile(bubble({ status: "pending" }));
+    const pending = await renderMobile(bubble({ status: "pending" }));
     expect(colourClass(classOf(text(pending, "Sending...")), "text")).toEqual(quiet);
-    pending.unmount();
+    await pending.unmount();
 
-    const reported = renderMobile(bubble({ reported: true }));
+    const reported = await renderMobile(bubble({ reported: true }));
     expect(colourClass(classOf(text(reported, "Reported")), "text")).toEqual(quiet);
   });
 
-  it("colours the read ✓✓ with the read token, so it differs from delivered (#821)", () => {
-    const read = renderMobile(bubble({ status: "read" }));
+  it("colours the read ✓✓ with the read token, so it differs from delivered (#821)", async () => {
+    const read = await renderMobile(bubble({ status: "read" }));
     expect(colourClass(classOf(tick(read, "message-tick-double")), "text")).toEqual({ token: "message-read", alpha: 1 });
   });
 
-  it.each(THEMES)("reads the read ✓✓ on the %s tint at 3:1 or better (#821)", (theme) => {
-    const read = renderMobile(bubble({ status: "read" }));
+  it.each(THEMES)("reads the read ✓✓ on the %s tint at 3:1 or better (#821)", async (theme) => {
+    const read = await renderMobile(bubble({ status: "read" }));
     expect(contrastOnBubble(tick(read, "message-tick-double"), theme)).toBeGreaterThanOrEqual(GRAPHIC);
   });
 
-  it("draws Failed to send and Retry on an own Message in the destructive colour", () => {
-    const screen = renderMobile(bubble({ status: "failed", onRetry: vi.fn() }));
+  it("draws Failed to send and Retry on an own Message in the destructive colour", async () => {
+    const screen = await renderMobile(bubble({ status: "failed", onRetry: vi.fn() }));
     const retry = screen.getByRole("button", { name: "Retry" }) as unknown as Node;
     for (const node of [text(screen, "Failed to send"), text(screen, "Retry"), iconIn(retry)]) {
       expect(colourClass(classOf(node), "text")).toEqual({ token: "destructive", alpha: 1 });
@@ -133,19 +133,19 @@ describe("own Message bubble tint (#775 F)", () => {
     });
   });
 
-  it.each(THEMES)("reads every text and icon on the %s tint at 4.5:1 or better", (theme) => {
-    const sent = renderMobile(bubble({ status: "sent" }));
+  it.each(THEMES)("reads every text and icon on the %s tint at 4.5:1 or better", async (theme) => {
+    const sent = await renderMobile(bubble({ status: "sent" }));
     expect(contrastOnBubble(text(sent, TEXT), theme)).toBeGreaterThanOrEqual(AA);
     expect(contrastOnBubble(text(sent, "02:05 PM"), theme)).toBeGreaterThanOrEqual(AA);
     expect(contrastOnBubble(tick(sent, "message-tick-sent"), theme)).toBeGreaterThanOrEqual(AA);
-    sent.unmount();
+    await sent.unmount();
 
-    const photo = renderMobile(bubble({ ...IMAGE, status: "delivered" }));
+    const photo = await renderMobile(bubble({ ...IMAGE, status: "delivered" }));
     expect(contrastOnBubble(text(photo, "02:05 PM"), theme)).toBeGreaterThanOrEqual(AA);
     expect(contrastOnBubble(tick(photo, "message-tick-double"), theme)).toBeGreaterThanOrEqual(AA);
-    photo.unmount();
+    await photo.unmount();
 
-    const failed = renderMobile(bubble({ status: "failed", onRetry: vi.fn() }));
+    const failed = await renderMobile(bubble({ status: "failed", onRetry: vi.fn() }));
     const retry = failed.getByRole("button", { name: "Retry" }) as unknown as Node;
     expect(contrastOnBubble(text(failed, TEXT), theme)).toBeGreaterThanOrEqual(AA);
     expect(contrastOnBubble(text(failed, "Failed to send"), theme)).toBeGreaterThanOrEqual(AA);
@@ -169,33 +169,33 @@ describe("own Message bubble tint (#775 F)", () => {
 });
 
 describe("what the tint leaves alone (#775 F)", () => {
-  it("keeps the other person's bubble", () => {
-    const screen = renderMobile(bubble({ isMine: false }));
+  it("keeps the other person's bubble", async () => {
+    const screen = await renderMobile(bubble({ isMine: false }));
     const className = classOf(bubbleOf(text(screen, TEXT)));
     expect(className.split(/\s+/)).toEqual(expect.arrayContaining(["bg-muted", "rounded-bl-md"]));
     expect(classOf(text(screen, TEXT)).split(/\s+/)).toContain("text-foreground");
     expect(classOf(text(screen, "02:05 PM")).split(/\s+/)).toContain("text-muted-foreground");
   });
 
-  it("keeps the other person's failed label destructive", () => {
-    const screen = renderMobile(bubble({ isMine: false, status: "failed" }));
+  it("keeps the other person's failed label destructive", async () => {
+    const screen = await renderMobile(bubble({ isMine: false, status: "failed" }));
     expect(classOf(text(screen, "Failed to send")).split(/\s+/)).toContain("text-destructive");
   });
 
-  it("keeps a deleted own Message grey", () => {
-    const screen = renderMobile(bubble({ deletedAt: AT_1405 }));
+  it("keeps a deleted own Message grey", async () => {
+    const screen = await renderMobile(bubble({ deletedAt: AT_1405 }));
     const className = classOf(bubbleOf(text(screen, "Message deleted")));
     expect(className.split(/\s+/)).toEqual(expect.arrayContaining(["bg-muted/60", "rounded-md"]));
     expect(className).not.toContain("bg-message-own");
     expect(classOf(text(screen, "02:05 PM")).split(/\s+/)).toContain("text-muted-foreground");
   });
 
-  it("keeps the dimming of a pending and of a reported own Message", () => {
-    const pending = renderMobile(bubble({ status: "pending" }));
+  it("keeps the dimming of a pending and of a reported own Message", async () => {
+    const pending = await renderMobile(bubble({ status: "pending" }));
     expect(classOf(bubbleOf(text(pending, "Sending...")))).toContain("opacity-70");
-    pending.unmount();
+    await pending.unmount();
 
-    const reported = renderMobile(bubble({ reported: true }));
+    const reported = await renderMobile(bubble({ reported: true }));
     expect(classOf(bubbleOf(text(reported, "Reported")))).toContain("opacity-60");
   });
 });

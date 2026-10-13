@@ -76,11 +76,11 @@ beforeEach(() => {
 
 describe("Favorites stays in step with a ♡ elsewhere", () => {
   it("shows a Listing favorited from a feed card while the tab is mounted", async () => {
-    const view = renderMobile(<ToastProvider><FavoritesScreen /><FeedHeart id="prado" /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><FavoritesScreen /><FeedHeart id="prado" /></ToastProvider>);
     await settle();
     expect(view.queryByText("Toyota prado, 2018")).toBeNull();
 
-    fireEvent.press(view.getByLabelText("feed-heart-prado"));
+    await fireEvent.press(view.getByLabelText("feed-heart-prado"));
     await settle();
 
     expect(api.post).toHaveBeenCalledWith("/listings/prado/favorite", {}, expect.anything());
@@ -88,14 +88,14 @@ describe("Favorites stays in step with a ♡ elsewhere", () => {
   });
 
   it("turns a feed card's ♥ back to ♡ when the Favorite is removed on the tab, and keeps it after a refetch", async () => {
-    const view = renderMobile(<ToastProvider><FavoritesScreen /><FeedHeart id="camry" /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><FavoritesScreen /><FeedHeart id="camry" /></ToastProvider>);
     const queryClient = view.queryClient;
     queryClient.setQueryData(FEED_KEY, { pages: [{ items: [{ id: "camry", isFavorited: true }], nextCursor: null }], pageParams: [null] });
     await settle();
     expect(view.getByLabelText("feed-heart-camry")).toHaveTextContent("♥");
 
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    fireEvent.press(view.getByRole("button", { name: "Remove from Favorites" }));
+    await fireEvent.press(view.getByRole("button", { name: "Remove from Favorites" }));
     await act(async () => { await vi.advanceTimersByTimeAsync(FAVORITE_REMOVAL_DELAY_MS + 50); });
     vi.useRealTimers();
     await settle();

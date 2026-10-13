@@ -3,13 +3,12 @@ import { useState, type PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Linking from "expo-linking";
-import { Image } from "expo-image";
-import { Modal, Platform, KeyboardAvoidingView } from "react-native";
+import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import type { ConversationsSchemas, ListingsSchemas } from "@auto-tm/contracts";
 import { waitFor } from "@testing-library/react-native";
 
-import { act, fireEvent, renderMobile, routeParams, routerMock, within } from "../render";
+import { act, fireEvent, renderMobile, routeParams, routerMock, within, getAllHosts, getHost, first } from "../render";
 import ConversationDetailScreen from "../../app/conversations/[id]";
 import { queryKeys } from "../../src/api/queryKeys";
 import { seedConversationDetail } from "../../src/api/conversations/useConversation";
@@ -219,7 +218,7 @@ describe("Conversation opened with only its ID", () => {
       [`/conversations/${CONVERSATION_ID}`]: () => conversation(),
       [`/listings/${LISTING_ID}`]: () => listingDetail(),
     });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText("Merdan")).toBeTruthy();
     expect(screen.queryByText("M", { includeHiddenElements: true })).toBeNull();
@@ -233,15 +232,15 @@ describe("Conversation opened with only its ID", () => {
 
   it("opens the Listing from the strip", async () => {
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
-    fireEvent.press(await screen.findByRole("button", { name: "Open: Toyota Camry, 2018, 285,000 TMT" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Open: Toyota Camry, 2018, 285,000 TMT" }));
     expect(routerMock.push).toHaveBeenCalledWith(`/(public)/listings/${LISTING_ID}`);
   });
 
-  it("shows header and strip skeletons while the Conversation loads", () => {
+  it("shows header and strip skeletons while the Conversation loads", async () => {
     routeGet({});
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(screen.getByTestId("conversation-header-skeleton")).toBeTruthy();
     expect(screen.getByTestId("conversation-listing-skeleton")).toBeTruthy();
@@ -251,14 +250,14 @@ describe("Conversation opened with only its ID", () => {
 
   it("shows ErrorState with Retry when the Conversation fails to load", async () => {
     state.get.mockRejectedValue(new Error("offline"));
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     const retry = await screen.findByRole("button", { name: /Retry|Try again/ });
     expect(screen.queryByTestId("conversation-header-skeleton")).toBeNull();
     expect(screen.queryByText("Is the car still available?")).toBeNull();
     state.get.mockClear();
     await act(async () => {
-      fireEvent.press(retry);
+      void fireEvent.press(retry);
     });
     expect(state.get).toHaveBeenCalledWith(`/conversations/${CONVERSATION_ID}`, expect.anything());
   });
@@ -269,10 +268,10 @@ describe("Conversation opened with only its ID", () => {
     state.messages.data = undefined;
     state.messages.isError = true;
     state.messages.error = new Error("offline");
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText("Merdan")).toBeTruthy();
-    fireEvent.press(screen.getByRole("button", { name: /Retry|Try again/ }));
+    await fireEvent.press(screen.getByRole("button", { name: /Retry|Try again/ }));
     expect(state.messages.refetch).toHaveBeenCalled();
   });
 });
@@ -293,7 +292,7 @@ describe("Conversation opened from cached data", () => {
       useState(() => seedConversationDetail(queryClient, summary));
       return children;
     }
-    const screen = renderMobile(<Seeded><ConversationDetailScreen /></Seeded>);
+    const screen = await renderMobile(<Seeded><ConversationDetailScreen /></Seeded>);
 
     expect(screen.getByText("Cached")).toBeTruthy();
     expect(screen.getByText("Toyota Camry, 2018")).toBeTruthy();
@@ -313,11 +312,11 @@ describe("Conversation header Call", () => {
       [`/conversations/${CONVERSATION_ID}`]: () => conversation(),
       [`/listings/${LISTING_ID}`]: () => listingDetail(),
     });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     const call = await screen.findByRole("button", { name: "Call the seller" });
     await act(async () => {
-      fireEvent.press(call);
+      void fireEvent.press(call);
     });
     expect(Linking.openURL).toHaveBeenCalledWith(`tel:${SELLER_PHONE}`);
   });
@@ -329,7 +328,7 @@ describe("Conversation header Call", () => {
         conversation({ myRole: "seller", peer: peer(BUYER_ID, { displayName: null }) }),
       [`/listings/${LISTING_ID}`]: () => listingDetail(),
     });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText("Driver 2057")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Call the seller" })).toBeNull();
@@ -345,7 +344,7 @@ describe("Conversation header Call", () => {
       [`/conversations/${CONVERSATION_ID}`]: () => conversation(),
       [`/listings/${LISTING_ID}`]: () => detail,
     });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText("Merdan")).toBeTruthy();
     // Let the Listing detail answer reach the screen before asserting Call stays hidden.
@@ -365,7 +364,7 @@ describe("Conversation header Call", () => {
       [`/conversations/${CONVERSATION_ID}`]: () =>
         conversation({ listing: null, peer: peer(SELLER_ID, { displayName: null }) }),
     });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText("Driver 2057")).toBeTruthy();
     expect(screen.getByText("Listing unavailable")).toBeTruthy();
@@ -384,16 +383,16 @@ describe("Conversation quick replies", () => {
   it("stay for the buyer after the buyer's own Messages", async () => {
     state.messages.data = { pages: [{ items: [serverMessage("hello", BUYER_ID)], nextCursor: null }] };
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText(QUICK_REPLY)).toBeTruthy();
   });
 
   it("fill the composer on tap and send nothing by themselves", async () => {
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
-    fireEvent.press(await screen.findByRole("button", { name: QUICK_REPLY }));
+    await fireEvent.press(await screen.findByRole("button", { name: QUICK_REPLY }));
     expect(screen.getByDisplayValue(QUICK_REPLY)).toBeTruthy();
     expect(state.socket.sendTextMessage).not.toHaveBeenCalled();
   });
@@ -403,7 +402,7 @@ describe("Conversation quick replies", () => {
       pages: [{ items: [serverMessage("reply", SELLER_ID), serverMessage("hello", BUYER_ID)], nextCursor: null }],
     };
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText("Merdan")).toBeTruthy();
     expect(screen.queryByText(QUICK_REPLY)).toBeNull();
@@ -415,7 +414,7 @@ describe("Conversation quick replies", () => {
       [`/conversations/${CONVERSATION_ID}`]: () =>
         conversation({ myRole: "seller", peer: peer(BUYER_ID, { displayName: null }) }),
     });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText("Driver 2057")).toBeTruthy();
     expect(screen.queryByText(QUICK_REPLY)).toBeNull();
@@ -425,7 +424,7 @@ describe("Conversation quick replies", () => {
     routeGet({
       [`/conversations/${CONVERSATION_ID}`]: () => conversation({ sendRestriction: "chat_disabled" }),
     });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText("Merdan")).toBeTruthy();
     expect(screen.queryByText(QUICK_REPLY)).toBeNull();
@@ -437,10 +436,10 @@ describe("Conversation history", () => {
     state.messages.data = { pages: [{ items: [serverMessage("hello", BUYER_ID)], nextCursor: "next" }] };
     state.messages.hasNextPage = true;
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText("hello")).toBeTruthy();
-    screen.UNSAFE_getByProps({ inverted: true }).props.onEndReached();
+    getHost(screen.container, "RCTScrollView", { inverted: true }).props.onEndReached();
     expect(state.messages.fetchNextPage).toHaveBeenCalledOnce();
   });
 
@@ -449,7 +448,7 @@ describe("Conversation history", () => {
     state.messages.hasNextPage = true;
     state.messages.isFetchingNextPage = true;
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText("hello")).toBeTruthy();
     expect(screen.getByLabelText("Loading earlier messages")).toBeTruthy();
@@ -463,11 +462,11 @@ describe("Conversation history", () => {
     state.messages.isFetchNextPageError = true;
     state.messages.error = new Error("offline");
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText("hello")).toBeTruthy();
     expect(screen.getByText("Could not load earlier messages")).toBeTruthy();
-    fireEvent.press(screen.getByRole("button", { name: "Retry" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Retry" }));
     expect(state.messages.fetchNextPage).toHaveBeenCalledOnce();
     expect(state.messages.refetch).not.toHaveBeenCalled();
   });
@@ -480,12 +479,12 @@ describe("Conversation history", () => {
     state.messages.isFetchNextPageError = true;
     state.messages.error = new Error("offline");
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText("hello")).toBeTruthy();
-    screen.UNSAFE_getByProps({ inverted: true }).props.onEndReached();
+    getHost(screen.container, "RCTScrollView", { inverted: true }).props.onEndReached();
     expect(state.messages.fetchNextPage).not.toHaveBeenCalled();
-    fireEvent.press(screen.getByRole("button", { name: "Retry" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Retry" }));
     expect(state.messages.fetchNextPage).toHaveBeenCalledOnce();
   });
 });
@@ -515,7 +514,7 @@ describe("Conversation persisted image addressing", () => {
       }
       throw new Error(`Unexpected image-history read: ${path}`);
     });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
     const photo = await screen.findByRole("imagebutton", { name: "Photo" });
     return { screen, photo };
   }
@@ -524,21 +523,21 @@ describe("Conversation persisted image addressing", () => {
     const { screen, photo } = await openStoredImage();
 
     expect(state.readMessages).toHaveBeenLastCalledWith({ conversationId: CONVERSATION_ID });
-    expect(within(photo).UNSAFE_getByType(Image).props.source).toEqual({ uri: expectedUri });
+    expect(getHost(photo, "Image").props.source).toEqual({ uri: expectedUri });
     expect(screen.queryByLabelText("Close")).toBeNull();
   });
 
   it("opens the same persisted object in the real fullscreen viewer and closes it", async () => {
     const { screen, photo } = await openStoredImage();
 
-    fireEvent.press(photo);
-    const viewer = screen.UNSAFE_getByType(Modal);
+    await fireEvent.press(photo);
+    const viewer = getHost(screen.container, "Modal");
     expect(viewer.props.visible).toBe(true);
-    expect(within(viewer).UNSAFE_getByType(Image).props.source).toEqual({ uri: expectedUri });
+    expect(getHost(viewer, "Image").props.source).toEqual({ uri: expectedUri });
 
-    fireEvent.press(within(viewer).getByLabelText("Close"));
+    await fireEvent.press(within(viewer).getByLabelText("Close"));
     expect(screen.queryByLabelText("Close")).toBeNull();
-    expect(within(screen.getByRole("imagebutton", { name: "Photo" })).UNSAFE_getByType(Image).props.source)
+    expect(getHost(screen.getByRole("imagebutton", { name: "Photo" }), "Image").props.source)
       .toEqual({ uri: expectedUri });
   });
 });
@@ -549,16 +548,16 @@ describe("Conversation Retry", () => {
       .mockResolvedValueOnce({ ok: false, code: "INTERNAL" })
       .mockResolvedValueOnce({ ok: true, message: { id: "server-1" } });
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
-    fireEvent.changeText(await screen.findByPlaceholderText("Message"), "Still there?");
+    await fireEvent.changeText(await screen.findByPlaceholderText("Message"), "Still there?");
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Send message" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Send message" }));
     });
     expect(await screen.findByText("Failed to send")).toBeTruthy();
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Retry" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Retry" }));
     });
 
     const [first, second] = state.socket.sendTextMessage.mock.calls.map(([args]) => args);
@@ -571,19 +570,19 @@ describe("Conversation Retry", () => {
       .mockResolvedValueOnce({ ok: false, code: "INTERNAL" })
       .mockResolvedValueOnce({ ok: true, message: { id: "server-2" } });
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     await act(async () => {
       // The attach button's label is matched loosely: it reads its key from another namespace today.
-      fireEvent.press(await screen.findByLabelText(/attach/i));
+      void fireEvent.press(await screen.findByLabelText(/attach/i));
     });
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Send message" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Send message" }));
     });
     expect(await screen.findByText("Failed to send")).toBeTruthy();
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Retry" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Retry" }));
     });
 
     const [first, second] = state.socket.sendImageMessage.mock.calls.map(([args]) => args);
@@ -600,10 +599,10 @@ describe("Conversation menu", () => {
       createdAt: "2026-10-02T10:00:00.000Z",
       reusedExisting: false,
     });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
-    fireEvent.press(await screen.findByRole("button", { name: "Conversation actions" }));
-    fireEvent.press(screen.getByRole("button", { name: "Report" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Conversation actions" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Report" }));
 
     // The reasons the API accepts for a User report.
     for (const reason of ["Spam", "Scam or fraud", "Misleading information", "Harassment", "Other"]) {
@@ -611,10 +610,10 @@ describe("Conversation menu", () => {
     }
     expect(screen.queryByRole("radio", { name: "Wrong category" })).toBeNull();
 
-    fireEvent.press(screen.getByRole("radio", { name: "Other" }));
-    fireEvent.changeText(screen.getByPlaceholderText("Describe the issue..."), "Asks for prepayment");
+    await fireEvent.press(screen.getByRole("radio", { name: "Other" }));
+    await fireEvent.changeText(screen.getByPlaceholderText("Describe the issue..."), "Asks for prepayment");
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Submit report" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Submit report" }));
     });
 
     expect(state.post).toHaveBeenCalledWith(
@@ -633,13 +632,13 @@ describe("Conversation menu", () => {
       createdAt: "2026-10-01T10:00:00.000Z",
       reusedExisting: true,
     });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
-    fireEvent.press(await screen.findByRole("button", { name: "Conversation actions" }));
-    fireEvent.press(screen.getByRole("button", { name: "Report" }));
-    fireEvent.press(screen.getByRole("radio", { name: "Spam" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Conversation actions" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Report" }));
+    await fireEvent.press(screen.getByRole("radio", { name: "Spam" }));
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Submit report" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Submit report" }));
     });
 
     expect(state.post).toHaveBeenCalledWith(`/users/${SELLER_ID}/report`, { reason: "spam" }, expect.anything());
@@ -655,11 +654,11 @@ describe("Conversation menu", () => {
         inspectionInterestEnabled: false,
       }),
     });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     await vi.waitFor(() => expect(state.get).toHaveBeenCalledWith("/config", expect.anything()));
     await act(async () => {});
-    fireEvent.press(await screen.findByRole("button", { name: "Conversation actions" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Conversation actions" }));
     expect(screen.getByRole("button", { name: "Block user" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Report" })).toBeNull();
   });
@@ -674,16 +673,16 @@ describe("Conversation menu", () => {
       refreshing = true;
       options?.onSuccess?.();
     });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
-    fireEvent.press(await screen.findByRole("button", { name: "Conversation actions" }));
-    fireEvent.press(screen.getByRole("button", { name: "Block user" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Conversation actions" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Block user" }));
     expect(screen.getByText("Block this user?")).toBeTruthy();
     expect(
       screen.getByText("You will stop receiving messages and notifications from this user. The history stays."),
     ).toBeTruthy();
     await act(async () => {
-      fireEvent.press(screen.getByText("Block"));
+      void fireEvent.press(screen.getByText("Block"));
     });
 
     expect(state.mutation.mutate).toHaveBeenCalledWith({ userId: SELLER_ID }, expect.anything());
@@ -713,7 +712,7 @@ describe("Conversation blocked by the viewer", () => {
         },
       ],
     };
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText("User blocked")).toBeTruthy();
     expect(screen.getByText("Yes, it is available")).toBeTruthy();
@@ -730,15 +729,16 @@ describe("Conversation blocked by the viewer", () => {
       refreshing = true;
       options?.onSuccess?.();
     });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
-    fireEvent.press(await screen.findByRole("button", { name: "Unblock" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Unblock" }));
     expect(screen.getByText("Unblock this user?")).toBeTruthy();
     expect(screen.getByText("After unblocking, the user can message you again.")).toBeTruthy();
     await act(async () => {
       // The banner's Unblock, then the dialog's.
-      const [, confirm] = screen.getAllByText("Unblock");
-      fireEvent.press(confirm);
+      const confirm = screen.getAllByText("Unblock")[1];
+      if (!confirm) throw new Error("The dialog's Unblock is missing");
+      void fireEvent.press(confirm);
     });
 
     expect(state.mutation.mutate).toHaveBeenCalledWith({ userId: SELLER_ID }, expect.anything());
@@ -761,7 +761,7 @@ describe("Conversation while signed out", () => {
   });
 
   it("asks to sign in and reads nothing", async () => {
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(screen.getByText("Sign in to view messages")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Sign in" })).toBeTruthy();
@@ -782,21 +782,21 @@ describe("Conversation while signed out", () => {
       useState(() => seedConversationDetail(queryClient, summary));
       return children;
     }
-    const screen = renderMobile(<Seeded><ConversationDetailScreen /></Seeded>);
+    const screen = await renderMobile(<Seeded><ConversationDetailScreen /></Seeded>);
     expect(screen.queryByText("Merdan")).toBeNull();
     expect(state.readMessages).toHaveBeenLastCalledWith({ conversationId: "" });
     expect(state.get).not.toHaveBeenCalledWith(`/conversations/${CONVERSATION_ID}`, expect.anything());
     state.viewerLoading = false;
     state.viewerId = BUYER_ID;
   state.cachedMessages = false;
-    screen.rerender(<Seeded><ConversationDetailScreen /></Seeded>);
+    await screen.rerender(<Seeded><ConversationDetailScreen /></Seeded>);
     expect(await screen.findByText("Merdan")).toBeTruthy();
   });
 
   it("signs in and returns to the same Conversation, which then loads", async () => {
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
-    fireEvent.press(screen.getByRole("button", { name: "Sign in" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Sign in" }));
     expect(routerMock.push).toHaveBeenCalledWith({
       pathname: "/(auth)/phone",
       params: { authRoot: "1" },
@@ -808,20 +808,20 @@ describe("Conversation while signed out", () => {
 
     state.viewerId = BUYER_ID;
   state.cachedMessages = false;
-    screen.rerender(<ConversationDetailScreen />);
+    await screen.rerender(<ConversationDetailScreen />);
     expect(await screen.findByText("Merdan")).toBeTruthy();
     expect(screen.queryByText("Sign in to view messages")).toBeNull();
   });
 
-  it("returns to the signed-out state when sign-in is cancelled", () => {
-    const screen = renderMobile(<ConversationDetailScreen />);
+  it("returns to the signed-out state when sign-in is cancelled", async () => {
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
-    fireEvent.press(screen.getByRole("button", { name: "Sign in" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Sign in" }));
     useAuthIntentStore.getState().cancelSignIn(routerMock);
 
     expect(routerMock.dismissTo).toHaveBeenCalledWith(conversationHref);
     expect(screen.getByText("Sign in to view messages")).toBeTruthy();
-    fireEvent.press(screen.getByRole("button", { name: "Go back" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Go back" }));
     expect(routerMock.back).toHaveBeenCalledOnce();
   });
 });
@@ -832,12 +832,12 @@ describe("Conversation not available", () => {
     ["is not the User's", new ApiError("FORBIDDEN", 403, "Not a participant", { reason: "NOT_A_PARTICIPANT" })],
   ])("shows Conversation not found when it %s", async (_case, error) => {
     state.get.mockRejectedValue(error);
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText("Conversation not found")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Retry|Try again/ })).toBeNull();
     expect(screen.queryByRole("textbox")).toBeNull();
-    fireEvent.press(screen.getByRole("button", { name: "Go to Messages" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Go to Messages" }));
     expect(routerMock.dismissTo).toHaveBeenCalledWith("/(tabs)/chat");
   });
 
@@ -850,7 +850,7 @@ describe("Conversation not available", () => {
       useState(() => seedConversationDetail(queryClient, summary));
       return children;
     }
-    const screen = renderMobile(<Seeded><ConversationDetailScreen /></Seeded>);
+    const screen = await renderMobile(<Seeded><ConversationDetailScreen /></Seeded>);
 
     expect(await screen.findByText("Conversation not found")).toBeTruthy();
     expect(screen.queryByText("Merdan")).toBeNull();
@@ -862,7 +862,7 @@ describe("Conversation not available", () => {
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
     state.messages.isError = true;
     state.messages.error = new ApiError("FORBIDDEN", 403, "Not a participant");
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText("Conversation not found")).toBeTruthy();
     expect(screen.queryByText("Merdan")).toBeNull();
@@ -875,8 +875,8 @@ describe("Conversation Message actions", () => {
   async function openPeerSheet(routes: Record<string, () => unknown> = {}) {
     state.messages.data = { pages: [{ items: [serverMessage("peer-1", SELLER_ID, undefined, PEER_TEXT)], nextCursor: null }] };
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation(), ...routes });
-    const screen = renderMobile(<ConversationDetailScreen />);
-    fireEvent(await screen.findByLabelText(new RegExp(`^${PEER_TEXT}`)), "longPress");
+    const screen = await renderMobile(<ConversationDetailScreen />);
+    await fireEvent(await screen.findByLabelText(new RegExp(`^${PEER_TEXT}`)), "longPress");
     return screen;
   }
 
@@ -884,7 +884,7 @@ describe("Conversation Message actions", () => {
     const screen = await openPeerSheet();
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Copy" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Copy" }));
     });
     expect(state.clipboard).toHaveBeenCalledWith(PEER_TEXT);
     expect(state.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Copied" }));
@@ -893,10 +893,10 @@ describe("Conversation Message actions", () => {
 
   it("shows Copied below the Conversation header at the height it is drawn", async () => {
     const screen = await openPeerSheet();
-    fireEvent(screen.getByRole("button", { name: "Go back" }), "layout", { nativeEvent: { layout: { height: 96 } } });
+    await fireEvent(screen.getByRole("button", { name: "Go back" }), "layout", { nativeEvent: { layout: { height: 96 } } });
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Copy" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Copy" }));
     });
     expect(state.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Copied", topClearance: 96 }));
   });
@@ -904,7 +904,7 @@ describe("Conversation Message actions", () => {
   it("opens the report reasons for the Message, then shows Reported and offers Copy only", async () => {
     const screen = await openPeerSheet();
 
-    fireEvent.press(screen.getByRole("button", { name: "Report message" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Report message" }));
     expect(state.reportSheet.current).toMatchObject({ messageId: "peer-1", open: true });
 
     await act(async () => {
@@ -912,7 +912,7 @@ describe("Conversation Message actions", () => {
     });
     expect(screen.getByText("Reported")).toBeTruthy();
 
-    fireEvent(screen.getByLabelText(new RegExp(`^${PEER_TEXT}.*Reported`)), "longPress");
+    await fireEvent(screen.getByLabelText(new RegExp(`^${PEER_TEXT}.*Reported`)), "longPress");
     expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Report message" })).toBeNull();
   });
@@ -927,10 +927,10 @@ describe("Conversation Message actions", () => {
   it("keeps the delete confirmation for an own Message", async () => {
     state.messages.data = { pages: [{ items: [serverMessage("own-1", BUYER_ID, new Date().toISOString(), "Hello")], nextCursor: null }] };
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
-    fireEvent(await screen.findByLabelText(/^Hello/), "longPress");
-    fireEvent.press(screen.getByRole("button", { name: "Delete" }));
+    await fireEvent(await screen.findByLabelText(/^Hello/), "longPress");
+    await fireEvent.press(screen.getByRole("button", { name: "Delete" }));
     expect(screen.getByText("Delete message?")).toBeTruthy();
   });
 });
@@ -952,14 +952,14 @@ describe("Conversation about a closed Listing", () => {
   it("shows the Sold badge, the banner and the link after the last Message, with the composer on", async () => {
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => withListing("sold") });
     state.messages.data = { pages: [{ items: [SELLER_MESSAGE] }] };
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText("Sold")).toBeTruthy();
     expect(screen.getByText("Thanks, already sold")).toBeTruthy();
     expect(
       screen.getByText("This car is sold. You can keep talking, but the listing is no longer available."),
     ).toBeTruthy();
-    fireEvent.press(screen.getByRole("button", { name: "See other Toyota Camry" }));
+    await fireEvent.press(screen.getByRole("button", { name: "See other Toyota Camry" }));
     expect(routerMock.navigate).toHaveBeenCalledWith({
       pathname: "/(tabs)/(search)/results",
       params: { brandId: "00000000-0000-4000-8000-0000000000d1", modelId: "00000000-0000-4000-8000-0000000000d2" },
@@ -970,7 +970,7 @@ describe("Conversation about a closed Listing", () => {
 
   it("shows no quick replies on a sold Listing, even with no Messages yet", async () => {
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => withListing("sold") });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText("Sold")).toBeTruthy();
     expect(screen.queryByText("Is the car still available?")).toBeNull();
@@ -980,19 +980,19 @@ describe("Conversation about a closed Listing", () => {
   it("sends a Message on a sold Listing", async () => {
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => withListing("sold") });
     state.socket.sendTextMessage.mockResolvedValue({ ok: true, message: { id: "server-1" } });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     await screen.findByText("Sold");
-    fireEvent.changeText(screen.getByPlaceholderText("Message"), "Is the price final?");
+    await fireEvent.changeText(screen.getByPlaceholderText("Message"), "Is the price final?");
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Send message" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Send message" }));
     });
     expect(state.socket.sendTextMessage).toHaveBeenCalledWith(expect.objectContaining({ text: "Is the price final?" }));
   });
 
   it("shows the Removed from sale badge and its banner for an archived Listing", async () => {
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => withListing("archived") });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText("Removed from sale")).toBeTruthy();
     expect(
@@ -1012,7 +1012,7 @@ describe("Conversation about a closed Listing", () => {
         conversation({ listing: restriction === "listing_unavailable" ? null : conversation().listing, sendRestriction: restriction }),
     });
     state.messages.data = { pages: [{ items: [SELLER_MESSAGE] }] };
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText(line)).toBeTruthy();
     expect(screen.getByText("Thanks, already sold")).toBeTruthy();
@@ -1028,7 +1028,7 @@ describe("Conversation about a closed Listing", () => {
     routeGet({
       [`/conversations/${CONVERSATION_ID}`]: () => conversation({ sendRestriction: "listing_unavailable" }),
     });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText("This listing is no longer available")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /^Open:/ })).toBeNull();
@@ -1039,7 +1039,7 @@ describe("Conversation about a closed Listing", () => {
       [`/conversations/${CONVERSATION_ID}`]: () =>
         conversation({ blockedByMe: true, sendRestriction: "blocked_by_me", listing: withListing("sold").listing }),
     });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByRole("button", { name: "Unblock" })).toBeTruthy();
     expect(screen.getByText("User blocked")).toBeTruthy();
@@ -1057,12 +1057,12 @@ describe("Conversation about a closed Listing", () => {
       restricted = true;
       return { ok: false, code: "FORBIDDEN", message: "Forbidden" };
     });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     await screen.findByText("Merdan");
-    fireEvent.changeText(screen.getByPlaceholderText("Message"), "Hello");
+    await fireEvent.changeText(screen.getByPlaceholderText("Message"), "Hello");
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Send message" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Send message" }));
     });
 
     expect(await screen.findByText("The seller has turned off messages for this listing")).toBeTruthy();
@@ -1080,12 +1080,12 @@ describe("Conversation about a closed Listing", () => {
       restricted = true;
       options?.onError?.(new ApiError("FORBIDDEN", 403, "Forbidden"));
     });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     await screen.findByText("Merdan");
-    fireEvent.changeText(screen.getByPlaceholderText("Message"), "Hello");
+    await fireEvent.changeText(screen.getByPlaceholderText("Message"), "Hello");
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Send message" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Send message" }));
     });
 
     expect(state.mutation.mutate).toHaveBeenCalledWith(
@@ -1106,14 +1106,14 @@ describe("Conversation about a closed Listing", () => {
       restricted = true;
       throw new ApiError("FORBIDDEN", 403, "Forbidden");
     });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     await screen.findByText("Merdan");
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Attach photo" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Attach photo" }));
     });
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Send message" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Send message" }));
     });
 
     expect(state.mutation.mutateAsync).toHaveBeenCalledWith({
@@ -1141,21 +1141,21 @@ describe("Conversation about a closed Listing", () => {
         throw new ApiError("FORBIDDEN", 403, "Forbidden");
       });
     state.socket.sendImageMessage.mockResolvedValueOnce({ ok: false, code: "INTERNAL" });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     await screen.findByText("Merdan");
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Attach photo" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Attach photo" }));
     });
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Send message" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Send message" }));
     });
     expect(await screen.findByText("Failed to send")).toBeTruthy();
     expect(readConversation).toHaveBeenCalledTimes(1);
     expect(screen.getByPlaceholderText("Message")).toBeTruthy();
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Retry" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Retry" }));
     });
 
     expect(state.mutation.mutateAsync).toHaveBeenCalledTimes(2);
@@ -1178,7 +1178,7 @@ describe("Conversation about a closed Listing", () => {
     routeGet({
       [`/conversations/${CONVERSATION_ID}`]: () => ({ ...withListing("sold"), ...change }),
     });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(await screen.findByText("Sold")).toBeTruthy();
     expect(screen.queryByText(/You can keep talking/)).toBeNull();
@@ -1191,12 +1191,12 @@ describe("Own Message acknowledgement", () => {
     state.messages.data = { pages: [{ items: existing ? [serverMessage("older", SELLER_ID)] : [] }] };
     state.socket.sendTextMessage.mockResolvedValue({ ok: true, message: { id: "server-new" } });
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
-    const screen = renderMobile(<ConversationDetailScreen />);
-    fireEvent.changeText(await screen.findByPlaceholderText("Message"), "Visible immediately");
+    const screen = await renderMobile(<ConversationDetailScreen />);
+    await fireEvent.changeText(await screen.findByPlaceholderText("Message"), "Visible immediately");
     const scrollRequests = (RN as unknown as { scrollRequests: unknown[] }).scrollRequests;
     scrollRequests.length = 0;
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Send message" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Send message" }));
     });
     expect(screen.getAllByText("Visible immediately")).toHaveLength(1);
     expect(scrollRequests).toContainEqual({ method: "scrollToOffset", offset: 0, animated: false });
@@ -1205,7 +1205,7 @@ describe("Own Message acknowledgement", () => {
     if (!firstSend) throw new Error("Message send missing");
     const clientMessageId = firstSend[0].clientMessageId;
     state.messages.data = { pages: [{ items: [{ ...serverMessage("server-new", BUYER_ID, new Date().toISOString(), "Visible immediately"), clientMessageId }] }] };
-    screen.rerender(<ConversationDetailScreen />);
+    await screen.rerender(<ConversationDetailScreen />);
     expect(screen.getAllByText("Visible immediately")).toHaveLength(1);
     expect(state.socket.sendTextMessage).toHaveBeenCalledTimes(1);
   });
@@ -1224,13 +1224,13 @@ describe("First chat action notifications", () => {
     state.mutation.mutateAsync.mockResolvedValue({ uploadUrl: "https://upload", key: "chat-attachments/first.jpg" });
     state.post.mockResolvedValue({});
     try {
-      const screen = renderMobile(<ConversationDetailScreen />);
+      const screen = await renderMobile(<ConversationDetailScreen />);
       const field = await screen.findByPlaceholderText("Message");
       expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
-      if (kind === "text") fireEvent.changeText(field, "First action");
-      else await act(async () => { fireEvent.press(screen.getByLabelText(/attach/i)); });
+      if (kind === "text") await fireEvent.changeText(field, "First action");
+      else await act(async () => { void fireEvent.press(screen.getByLabelText(/attach/i)); });
       expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
-      await act(async () => { fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
+      await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
       await waitFor(() => expect(state.post).toHaveBeenCalledWith("/notifications/tokens", { token: "first-chat-token", platform: "android" }, expect.anything()));
       expect(Notifications.requestPermissionsAsync).toHaveBeenCalledOnce();
     } finally {
@@ -1249,19 +1249,20 @@ describe("Conversation keyboard ownership", () => {
     state.messages.data = { pages: [{ items: [serverMessage("Read while typing", SELLER_ID)] }] };
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
     try {
-      const screen = renderMobile(<ConversationDetailScreen />);
+      const screen = await renderMobile(<ConversationDetailScreen />);
       const field = await screen.findByPlaceholderText("Message");
-      fireEvent.changeText(field, "Above the keyboard");
-      const active = screen.UNSAFE_getAllByType(KeyboardAvoidingView).filter((view) => view.props.enabled !== false);
+      await fireEvent.changeText(field, "Above the keyboard");
+      const active = getAllHosts(screen.container, "KeyboardAvoidingView").filter((view) => view.props.enabled !== false);
       expect(active).toHaveLength(1);
-      expect(within(active[0]).getByDisplayValue("Above the keyboard")).toBeTruthy();
-      expect(within(active[0]).getByRole("button", { name: "Send message", disabled: false })).toBeTruthy();
+      const avoiding = first(active);
+      expect(within(avoiding).getByDisplayValue("Above the keyboard")).toBeTruthy();
+      expect(within(avoiding).getByRole("button", { name: "Send message", disabled: false })).toBeTruthy();
       if (os === "android") {
-        expect(within(active[0]).getByText("Read while typing")).toBeTruthy();
-        expect(active[0].props.behavior).toBe("padding");
-        expect(active[0].props.className).toBe("flex-1");
+        expect(within(avoiding).getByText("Read while typing")).toBeTruthy();
+        expect(avoiding.props.behavior).toBe("padding");
+        expect(avoiding.props.className).toBe("flex-1");
       } else {
-        expect(active[0].props.behavior).toBe("padding");
+        expect(avoiding.props.behavior).toBe("padding");
       }
     } finally { Platform.OS = previousOS; }
   });
@@ -1273,12 +1274,12 @@ describe("Acknowledged Message transport coverage", () => {
     state.socket.sendTextMessage.mockResolvedValue({ ok: false, code: "NOT_CONNECTED" });
     state.mutation.mutate.mockImplementation((_input, options) => options?.onSuccess?.(serverMessage("http-message", BUYER_ID, new Date().toISOString(), "HTTP still visible")));
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
-    const screen = renderMobile(<ConversationDetailScreen />);
-    fireEvent.changeText(await screen.findByPlaceholderText("Message"), "HTTP still visible");
-    await act(async () => { fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
+    const screen = await renderMobile(<ConversationDetailScreen />);
+    await fireEvent.changeText(await screen.findByPlaceholderText("Message"), "HTTP still visible");
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
     expect(screen.getAllByText("HTTP still visible")).toHaveLength(1);
     state.messages.data = { pages: [{ items: [serverMessage("http-message", BUYER_ID, new Date().toISOString(), "HTTP still visible")] }] };
-    screen.rerender(<ConversationDetailScreen />);
+    await screen.rerender(<ConversationDetailScreen />);
     expect(screen.getAllByText("HTTP still visible")).toHaveLength(1);
   });
   it.each([false, true])("keeps an acknowledged image visible without an echo, HTTP=%s", async (http) => {
@@ -1286,12 +1287,12 @@ describe("Acknowledged Message transport coverage", () => {
     state.socket.sendImageMessage.mockResolvedValue(http ? { ok: false, code: "NOT_CONNECTED" } : { ok: true, message: { id: "image-ack" } });
     state.mutation.mutate.mockImplementation((_input, options) => options?.onSuccess?.({ ...serverMessage("image-ack", BUYER_ID, new Date().toISOString()), kind: "image", text: null, metadata: { key: "chat-attachments/ack.jpg" } }));
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
     await screen.findByPlaceholderText("Message");
-    await act(async () => { fireEvent.press(screen.getByLabelText(/attach/i)); });
-    await act(async () => { fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
+    await act(async () => { void fireEvent.press(screen.getByLabelText(/attach/i)); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
     expect(screen.getAllByRole("imagebutton", { name: "Photo" })).toHaveLength(1);
-    expect(within(screen.getByRole("imagebutton", { name: "Photo" })).UNSAFE_getByType(Image).props.source.uri).toContain("chat-attachments/ack.jpg");
+    expect(getHost(screen.getByRole("imagebutton", { name: "Photo" }), "Image").props.source.uri).toContain("chat-attachments/ack.jpg");
   });
 });
 
@@ -1302,14 +1303,14 @@ describe("Acknowledged own Message actions", () => {
     state.socket.deleteMessage.mockResolvedValue(http ? { ok: false, code: "NOT_CONNECTED" } : { ok: true, messageId: "ack-to-delete", conversationId: CONVERSATION_ID, deletedAt });
     state.mutation.mutate.mockImplementation((_input, options) => options?.onSuccess?.({ messageId: "ack-to-delete", conversationId: CONVERSATION_ID, deletedAt }));
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
-    const screen = renderMobile(<ConversationDetailScreen />);
-    fireEvent.changeText(await screen.findByPlaceholderText("Message"), "Acknowledged and deletable");
-    await act(async () => { fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
-    fireEvent(screen.getByText("Acknowledged and deletable"), "longPress");
+    const screen = await renderMobile(<ConversationDetailScreen />);
+    await fireEvent.changeText(await screen.findByPlaceholderText("Message"), "Acknowledged and deletable");
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
+    await fireEvent(screen.getByText("Acknowledged and deletable"), "longPress");
     expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
-    fireEvent.press(screen.getByRole("button", { name: "Delete" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Delete" }));
     expect(screen.getByText("Delete message?")).toBeTruthy();
-    await act(async () => { fireEvent.press(screen.getByText("Delete")); });
+    await act(async () => { void fireEvent.press(screen.getByText("Delete")); });
     expect(screen.queryByText("Acknowledged and deletable")).toBeNull();
     expect(screen.getByText("Message deleted")).toBeTruthy();
     expect(state.socket.deleteMessage).toHaveBeenCalledWith({ conversationId: CONVERSATION_ID, messageId: "ack-to-delete" });
@@ -1324,9 +1325,9 @@ describe("Authoritative acknowledgement cache", () => {
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
     let acknowledge: ((value: unknown) => void) | undefined;
     state.socket.sendTextMessage.mockImplementation(() => new Promise((resolve) => { acknowledge = resolve; }));
-    const screen = renderMobile(<ConversationDetailScreen />);
-    fireEvent.changeText(await screen.findByPlaceholderText("Message"), "Typed before server acknowledgement");
-    await act(async () => { fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
+    const screen = await renderMobile(<ConversationDetailScreen />);
+    await fireEvent.changeText(await screen.findByPlaceholderText("Message"), "Typed before server acknowledgement");
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
     const firstSend = state.socket.sendTextMessage.mock.calls[0];
     if (!firstSend) throw new Error("Send missing");
     const message = { ...serverMessage("canonical-id", BUYER_ID, "2026-10-08T12:34:56.000Z", "Canonical server text"), clientMessageId: firstSend[0].clientMessageId };
@@ -1336,7 +1337,7 @@ describe("Authoritative acknowledgement cache", () => {
       queryFn: () => new Promise((resolve) => { finishOldRead = resolve; }),
       staleTime: 0,
     }).catch(() => undefined) : undefined;
-    if (echoFirst) act(() => screen.queryClient.setQueryData(queryKeys.conversations.messages(CONVERSATION_ID), { pages: [{ items: [message, older], nextCursor: "older-page" }, { items: [], nextCursor: null }], pageParams: [null, "older-page"] }));
+    if (echoFirst) await act(() => screen.queryClient.setQueryData(queryKeys.conversations.messages(CONVERSATION_ID), { pages: [{ items: [message, older], nextCursor: "older-page" }, { items: [], nextCursor: null }], pageParams: [null, "older-page"] }));
     await act(async () => { acknowledge?.({ ok: true, message }); });
     await act(async () => { finishOldRead?.(state.messages.data); await oldRead; });
     const cached = screen.queryClient.getQueryData<{ pages: { items: ConversationsSchemas.MessageSummary[]; nextCursor: string | null }[]; pageParams: unknown[] }>(queryKeys.conversations.messages(CONVERSATION_ID));
@@ -1345,8 +1346,8 @@ describe("Authoritative acknowledgement cache", () => {
     expect(cached?.pages[0]?.nextCursor).toBe("older-page");
     expect(screen.getAllByText("Canonical server text")).toHaveLength(1);
     // Same provider/client, but the route and its local outbox are remounted.
-    screen.rerender(<RN.View />);
-    screen.rerender(<ConversationDetailScreen />);
+    await screen.rerender(<RN.View />);
+    await screen.rerender(<ConversationDetailScreen />);
     expect(await screen.findByText("Canonical server text")).toBeTruthy();
     expect(screen.getAllByText("Canonical server text")).toHaveLength(1);
   });
@@ -1359,13 +1360,13 @@ describe("Acknowledgement cannot undo a newer deletion", () => {
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
     let acknowledge: ((value: unknown) => void) | undefined;
     state.socket.sendTextMessage.mockImplementation(() => new Promise((resolve) => { acknowledge = resolve; }));
-    const screen = renderMobile(<ConversationDetailScreen />);
-    fireEvent.changeText(await screen.findByPlaceholderText("Message"), "Before deletion");
-    await act(async () => { fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
+    const screen = await renderMobile(<ConversationDetailScreen />);
+    await fireEvent.changeText(await screen.findByPlaceholderText("Message"), "Before deletion");
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
     const send = state.socket.sendTextMessage.mock.calls[0];
     if (!send) throw new Error("Send missing");
     const message = { ...serverMessage("deleted-before-ack", BUYER_ID, new Date().toISOString(), "Before deletion"), clientMessageId: send[0].clientMessageId };
-    act(() => screen.queryClient.setQueryData(queryKeys.conversations.messages(CONVERSATION_ID), { pages: [{ items: [{ ...message, text: null, deletedAt: "2026-10-08T14:00:00.000Z" }], nextCursor: null }], pageParams: [null] }));
+    await act(() => screen.queryClient.setQueryData(queryKeys.conversations.messages(CONVERSATION_ID), { pages: [{ items: [{ ...message, text: null, deletedAt: "2026-10-08T14:00:00.000Z" }], nextCursor: null }], pageParams: [null] }));
     await act(async () => { acknowledge?.({ ok: true, message }); });
     expect(screen.queryByText("Before deletion")).toBeNull();
     expect(screen.getByText("Message deleted")).toBeTruthy();

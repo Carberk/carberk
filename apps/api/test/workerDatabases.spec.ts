@@ -1,6 +1,6 @@
 import { describe, expect, inject, it } from "vitest";
 
-import config from "../vitest.config";
+import config from "../vitest.config.mjs";
 import "./helpers/testDatabases";
 
 // Spec files run in parallel. Each Vitest worker gets its own Postgres

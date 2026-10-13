@@ -1,5 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "./tsconfig.json",
-  "exclude": ["dist", "node_modules", "src/**/*.spec.ts", "src/**/testing/**", "src/**/*.e2e.spec.ts", "test"]
+  "compilerOptions": {
+    "rootDir": "."
+  },
+  "exclude": ["dist", "node_modules", "src/**/*.spec.ts", "src/**/testing/**", "src/**/*.e2e.spec.ts", "test", "vitest.config.mts"]
 }

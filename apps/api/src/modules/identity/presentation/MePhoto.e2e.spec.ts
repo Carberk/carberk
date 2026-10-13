@@ -1,3 +1,4 @@
+import { EventEmitterModule } from "@nestjs/event-emitter";
 import "reflect-metadata";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -97,6 +98,7 @@ describe("PUT and DELETE /api/v1/me/photo e2e (#642)", () => {
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [
+        EventEmitterModule.forRoot(),
         bullTestRoot(),
         ConfigModule.forRoot({ isGlobal: true, validate: (cfg) => EnvSchema.parse(cfg) }),
         IdentityModule,

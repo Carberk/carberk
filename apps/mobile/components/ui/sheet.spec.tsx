@@ -30,9 +30,9 @@ vi.mock("@/components/ui/native-only-animated-view", async () => ({ NativeOnlyAn
 // The backdrop is hidden from accessibility, so queries must include hidden elements.
 const hidden = { includeHiddenElements: true };
 
-function renderSheet(closeOnBackdropPress?: boolean) {
+async function renderSheet(closeOnBackdropPress?: boolean) {
   const onOpenChange = vi.fn();
-  const view = renderMobile(
+  const view = await renderMobile(
     <Sheet open onOpenChange={onOpenChange}>
       <SheetContent closeOnBackdropPress={closeOnBackdropPress}>
         <Text>Body</Text>
@@ -43,20 +43,20 @@ function renderSheet(closeOnBackdropPress?: boolean) {
 }
 
 describe("Sheet backdrop", () => {
-  it("closes on a tap outside when the sheet opts in", () => {
-    const { view, onOpenChange } = renderSheet(true);
-    fireEvent.press(view.getByTestId("sheet-backdrop", hidden));
+  it("closes on a tap outside when the sheet opts in", async () => {
+    const { view, onOpenChange } = await renderSheet(true);
+    await fireEvent.press(view.getByTestId("sheet-backdrop", hidden));
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it("has no backdrop by default, so a stray tap cannot discard a draft", () => {
-    const { view } = renderSheet();
+  it("has no backdrop by default, so a stray tap cannot discard a draft", async () => {
+    const { view } = await renderSheet();
     expect(view.queryByTestId("sheet-backdrop", hidden)).toBeNull();
   });
 
-  it("keeps the sheet open when the body is tapped", () => {
-    const { view, onOpenChange } = renderSheet(true);
-    fireEvent.press(view.getByText("Body"));
+  it("keeps the sheet open when the body is tapped", async () => {
+    const { view, onOpenChange } = await renderSheet(true);
+    await fireEvent.press(view.getByText("Body"));
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 });

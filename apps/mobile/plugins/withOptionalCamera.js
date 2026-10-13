@@ -45,5 +45,7 @@ function withOptionalCamera(config) {
   });
 }
 
+// Expando property, then one module.exports assignment: TypeScript 7 does not
+// type a module that mixes `module.exports =` with `module.exports.x =`.
+withOptionalCamera.addOptionalCameraFeatures = addOptionalCameraFeatures;
 module.exports = withOptionalCamera;
-module.exports.addOptionalCameraFeatures = addOptionalCameraFeatures;

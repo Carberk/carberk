@@ -26,12 +26,12 @@ export async function signInPhotoUser() {
 const clients = new Set<QueryClient>();
 afterEach(() => { clients.forEach((client) => client.clear()); clients.clear(); onlineManager.setOnline(true); });
 
-export function setupPhotoHook<T>(hook: () => T) {
+export async function setupPhotoHook<T>(hook: () => T) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   client.setQueryData(queryKeys.me(), PHOTO_ME);
   clients.add(client);
   function wrapper({ children }: PropsWithChildren) {
     return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
   }
-  return { client, ...renderHook(hook, { wrapper }) };
+  return { client, ...(await renderHook(hook, { wrapper })) };
 }

@@ -44,18 +44,20 @@
   "devDependencies": {
     "@auto-tm/tsconfig": "workspace:*",
     "@auto-tm/eslint-config": "workspace:*",
+    "@typescript/native": "catalog:",
     "prisma": "^7.6.0",
-    "tsx": "^4.19.2",
-    "vitest": "^2.1.8",
-    "@testcontainers/postgresql": "^10.16.0",
+    "tsx": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "@testcontainers/postgresql": "catalog:",
     "@types/pg": "^8.11.10",
-    "@types/node": "^22.10.0",
-    "typescript": "^5.7.3",
-    "eslint": "^9.18.0",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "eslint": "catalog:",
     "dotenv": "17.4.2",
-    "@aws-sdk/client-s3": "^3.1048.0",
-    "sharp": "^0.34.5",
+    "@aws-sdk/client-s3": "catalog:",
+    "sharp": "catalog:",
     "simple-icons": "16.33.0",
-    "testcontainers": "^10.28.0"
+    "testcontainers": "^12.2.0"
   }
 }

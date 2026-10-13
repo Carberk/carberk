@@ -77,8 +77,8 @@ beforeEach(() => {
 });
 
 describe("Ask the seller", () => {
-  it("offers the four QuickReplies questions as chips under a heading", () => {
-    const screen = chips();
+  it("offers the four QuickReplies questions as chips under a heading", async () => {
+    const screen = await chips();
 
     expect(screen.getByText("Ask the seller")).toBeTruthy();
     for (const question of QUESTIONS)
@@ -86,10 +86,10 @@ describe("Ask the seller", () => {
   });
 
   it("opens the Conversation with the question ready to send, and sends nothing", async () => {
-    const screen = chips();
+    const screen = await chips();
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Can I see the car?" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Can I see the car?" }));
     });
 
     expect(state.post).toHaveBeenCalledTimes(1);
@@ -110,9 +110,9 @@ describe("Ask the seller", () => {
 
   it("parks a signed-out question behind sign-in, then finishes it on return", async () => {
     state.authenticated = false;
-    const screen = chips();
+    const screen = await chips();
 
-    fireEvent.press(screen.getByRole("button", { name: "What is the final price?" }));
+    await fireEvent.press(screen.getByRole("button", { name: "What is the final price?" }));
 
     expect(routerMock.push).toHaveBeenCalledWith(
       expect.objectContaining({ pathname: "/(auth)/phone" }),
@@ -140,7 +140,7 @@ describe("Ask the seller", () => {
   });
 
   it("does not finish a question that was parked for another Listing", async () => {
-    chips();
+    await chips();
 
     await act(async () => {
       useAuthIntentStore.setState({
@@ -155,11 +155,11 @@ describe("Ask the seller", () => {
     expect(state.post).not.toHaveBeenCalled();
   });
 
-  it("ignores taps until the session is known", () => {
+  it("ignores taps until the session is known", async () => {
     state.authenticated = null;
-    const screen = chips();
+    const screen = await chips();
 
-    fireEvent.press(screen.getByRole("button", { name: "Can I see the car?" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Can I see the car?" }));
 
     expect(state.post).not.toHaveBeenCalled();
     expect(routerMock.push).not.toHaveBeenCalled();
@@ -168,9 +168,9 @@ describe("Ask the seller", () => {
   it("disables every chip while the Conversation opens", async () => {
     let open: (value: unknown) => void = () => {};
     state.post.mockReturnValue(new Promise((resolve) => { open = resolve; }));
-    const screen = chips();
+    const screen = await chips();
 
-    fireEvent.press(screen.getByRole("button", { name: "Can I see the car?" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Can I see the car?" }));
 
     for (const question of QUESTIONS)
       expect(
@@ -181,15 +181,15 @@ describe("Ask the seller", () => {
 
   it("retries a failed open with the same question", async () => {
     state.post.mockRejectedValueOnce(new Error("offline"));
-    const screen = chips();
+    const screen = await chips();
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Can I see the car?" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Can I see the car?" }));
     });
     expect(routerMock.push).not.toHaveBeenCalled();
 
     await act(async () => {
-      fireEvent.press(await screen.findByRole("button", { name: "Retry" }));
+      void fireEvent.press(await screen.findByRole("button", { name: "Retry" }));
     });
 
     expect(routerMock.push).toHaveBeenCalledWith({
@@ -198,22 +198,22 @@ describe("Ask the seller", () => {
     });
   });
 
-  it("is hidden from the owner", () => {
-    const screen = chips({ isOwner: true });
+  it("is hidden from the owner", async () => {
+    const screen = await chips({ isOwner: true });
 
     expect(screen.queryByText("Ask the seller")).toBeNull();
     expect(screen.queryByRole("button", { name: first(QUESTIONS) })).toBeNull();
   });
 
-  it.each(["sold", "archived"] as const)("is hidden on a %s Listing", (status) => {
-    const screen = chips({ status: status as Enums.ListingStatus });
+  it.each(["sold", "archived"] as const)("is hidden on a %s Listing", async (status) => {
+    const screen = await chips({ status: status as Enums.ListingStatus });
 
     expect(screen.queryByText("Ask the seller")).toBeNull();
     expect(screen.queryByRole("button", { name: first(QUESTIONS) })).toBeNull();
   });
 
-  it("is hidden when the seller turned chat off, as Message is", () => {
-    const screen = chips({ allowChat: false });
+  it("is hidden when the seller turned chat off, as Message is", async () => {
+    const screen = await chips({ allowChat: false });
 
     expect(screen.queryByText("Ask the seller")).toBeNull();
   });

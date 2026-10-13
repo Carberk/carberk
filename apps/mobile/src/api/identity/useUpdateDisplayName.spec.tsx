@@ -28,7 +28,7 @@ const ME = {
   createdAt: "2026-01-15T00:00:00.000Z", deletionScheduledAt: null,
 };
 
-function setup() {
+async function setup() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -36,7 +36,7 @@ function setup() {
   function wrapper({ children }: PropsWithChildren) {
     return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
   }
-  return { client, ...renderHook(() => useUpdateDisplayName(), { wrapper }) };
+  return { client, ...(await renderHook(() => useUpdateDisplayName(), { wrapper })) };
 }
 
 beforeEach(async () => {
@@ -59,7 +59,7 @@ describe("useUpdateDisplayName", () => {
         return HttpResponse.json({ ...ME, displayName: body.displayName });
       }),
     );
-    const { client, result } = setup();
+    const { client, result } = await setup();
 
     await act(() => result.current.mutateAsync("Aman Durdy"));
 
@@ -75,7 +75,7 @@ describe("useUpdateDisplayName", () => {
           { status: 400 },
         )),
     );
-    const { client, result } = setup();
+    const { client, result } = await setup();
 
     const error = await act(() => result.current.mutateAsync("a".repeat(31)).catch((e: unknown) => e));
 
@@ -90,10 +90,10 @@ describe("useUpdateDisplayName", () => {
   it("fails at once when the device is offline, instead of waiting for the network", async () => {
     server.use(http.patch("*/me", () => HttpResponse.error()));
     onlineManager.setOnline(false);
-    const { result } = setup();
+    const { result } = await setup();
 
     let outcome: unknown = "paused";
-    act(() => {
+    await act(() => {
       result.current.mutateAsync("Aman").then(
         () => { outcome = "saved"; },
         () => { outcome = "failed"; },

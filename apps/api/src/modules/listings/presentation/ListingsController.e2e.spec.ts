@@ -1,3 +1,4 @@
+import { EventEmitterModule } from "@nestjs/event-emitter";
 import "reflect-metadata";
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
@@ -44,6 +45,7 @@ describe("ListingsController e2e", () => {
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [
+        EventEmitterModule.forRoot(),
         bullTestRoot(),
         ConfigModule.forRoot({
           isGlobal: true,

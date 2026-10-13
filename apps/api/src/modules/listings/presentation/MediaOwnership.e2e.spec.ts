@@ -1,3 +1,4 @@
+import { EventEmitterModule } from "@nestjs/event-emitter";
 import "reflect-metadata";
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
@@ -72,6 +73,7 @@ describe("Listing media upload ownership e2e (#536)", () => {
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [
+        EventEmitterModule.forRoot(),
         bullTestRoot(),
         ConfigModule.forRoot({
           isGlobal: true,

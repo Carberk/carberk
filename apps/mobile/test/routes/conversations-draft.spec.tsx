@@ -104,9 +104,9 @@ beforeEach(() => {
 });
 
 describe("Conversation opened from Ask the seller", () => {
-  it("shows the chosen question in the composer without sending it", () => {
+  it("shows the chosen question in the composer without sending it", async () => {
     routeParams.draft = DRAFT;
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(screen.getByDisplayValue(DRAFT)).toBeTruthy();
     expect(mocks.sendTextMessage).not.toHaveBeenCalled();
@@ -115,10 +115,10 @@ describe("Conversation opened from Ask the seller", () => {
 
   it("sends the question only when the buyer presses Send", async () => {
     routeParams.draft = DRAFT;
-    const screen = renderMobile(<ConversationDetailScreen />);
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Send message", disabled: false }));
+      void fireEvent.press(screen.getByRole("button", { name: "Send message", disabled: false }));
     });
 
     expect(mocks.sendTextMessage).toHaveBeenCalledTimes(1);
@@ -127,8 +127,8 @@ describe("Conversation opened from Ask the seller", () => {
     );
   });
 
-  it("opens with an empty composer when there is no draft", () => {
-    const screen = renderMobile(<ConversationDetailScreen />);
+  it("opens with an empty composer when there is no draft", async () => {
+    const screen = await renderMobile(<ConversationDetailScreen />);
 
     expect(screen.queryByDisplayValue(DRAFT)).toBeNull();
     expect(screen.getByRole("button", { name: "Send message", disabled: true })).toBeTruthy();
