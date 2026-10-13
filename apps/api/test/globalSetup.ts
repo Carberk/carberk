@@ -1,13 +1,12 @@
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { availableParallelism } from "node:os";
 import { resolve } from "node:path";
 import { parseEnv, promisify } from "node:util";
 
 import { PrismaService } from "@auto-tm/db";
 import { Redis } from "ioredis";
-import type { GlobalSetupContext } from "vitest/node";
+import type { TestProject } from "vitest/node";
 
 import {
   MAX_TEST_WORKERS,
@@ -34,11 +33,14 @@ function runEnv(name: "DATABASE_URL" | "REDIS_URL"): string | undefined {
   return parseEnv(readFileSync(envPath, "utf8"))[name];
 }
 
-/** How many forks Vitest runs: every VITEST_POOL_ID is between 1 and this. */
-function workerCount(config: GlobalSetupContext["config"]): number {
-  const forks = config.poolOptions?.forks;
-  if (!config.fileParallelism || forks?.singleFork) return 1;
-  return forks?.maxForks ?? config.maxWorkers ?? Math.max(availableParallelism() - 1, 1);
+/**
+ * How many workers Vitest runs: every VITEST_POOL_ID is between 1 and this.
+ * Vitest 4 removed `poolOptions`, `singleFork` and `maxForks`. The resolved
+ * `maxWorkers` already applies `fileParallelism: false` (1), VITEST_MAX_WORKERS
+ * and a percentage given on the command line.
+ */
+function workerCount(config: TestProject["config"]): number {
+  return config.maxWorkers;
 }
 
 /** Runs one statement that cannot run in a transaction, such as CREATE DATABASE. */
@@ -80,7 +82,7 @@ async function flushWorkerRedis(baseRedisUrl: string, workers: number): Promise<
  * the run ends. `pnpm test:unit` sets AUTO_TM_TEST_DATABASES=off and needs no
  * services.
  */
-export default async function setup({ config, provide }: GlobalSetupContext) {
+export default async function setup({ config, provide }: TestProject) {
   const baseDatabaseUrl = runEnv("DATABASE_URL");
   const baseRedisUrl = runEnv("REDIS_URL");
   if (process.env["AUTO_TM_TEST_DATABASES"] === "off" || (!baseDatabaseUrl && !baseRedisUrl)) {
