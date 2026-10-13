@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import { parseEnv, promisify } from "node:util";
 
 import { PrismaService } from "@auto-tm/db";
+import { Redis } from "ioredis";
 import type { GlobalSetupContext } from "vitest/node";
 
 import {
@@ -13,6 +14,7 @@ import {
   templateDatabaseName,
   testDatabasePrefix,
   withDatabase,
+  withRedisDatabase,
   workerDatabaseName,
   type ApiTestDatabases,
 } from "./helpers/testDatabases";
@@ -52,6 +54,23 @@ async function withAdmin<T>(baseDatabaseUrl: string, work: (admin: PrismaService
     return await work(admin);
   } finally {
     await admin.onModuleDestroy();
+  }
+}
+
+/**
+ * Empties Redis logical databases 1 to `workers`, so keys a previous local run
+ * left, such as sign-in lockouts, cannot leak into this one. Database 0 stays
+ * with the development server.
+ */
+async function flushWorkerRedis(baseRedisUrl: string, workers: number): Promise<void> {
+  for (let worker = 1; worker <= workers; worker += 1) {
+    const redis = new Redis(withRedisDatabase(baseRedisUrl, worker), { lazyConnect: true, maxRetriesPerRequest: 1 });
+    try {
+      await redis.connect();
+      await redis.flushdb();
+    } finally {
+      redis.disconnect();
+    }
   }
 }
 
@@ -112,10 +131,11 @@ export default async function setup({ config, provide }: GlobalSetupContext) {
         await admin.$executeRawUnsafe(`CREATE DATABASE "${name}" TEMPLATE "${template}"`);
       }
     });
+    await flushWorkerRedis(baseRedisUrl, workers);
   } catch (error) {
     await dropAll().catch(() => undefined);
     throw new Error(
-      `Could not create the per-worker API test databases on ${new URL(baseDatabaseUrl).host}. ` +
+      `Could not prepare the per-worker API test databases on ${new URL(baseDatabaseUrl).host} and ${new URL(baseRedisUrl).host}. ` +
         "Start the dev stack (pnpm compose:up), or run unit specs with pnpm test:unit.",
       { cause: error },
     );
