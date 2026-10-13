@@ -34,7 +34,7 @@ describe("app auth error navigation", () => {
 
   it("clears an expired session on a Conversation without replacing its route", async () => {
     state.pathname = "/conversations/conv-a";
-    const screen = renderMobile(<AppNavigationEffects />);
+    const screen = await renderMobile(<AppNavigationEffects />);
     await act(async () => {
       await screen.queryClient.fetchQuery({ queryKey: ["expired"], queryFn: () => Promise.reject(new ApiError("UNAUTHENTICATED", 401, "Expired")) }).catch(() => {});
     });
@@ -44,9 +44,9 @@ describe("app auth error navigation", () => {
 
   it("uses the latest route and redirects an expired session outside a Conversation", async () => {
     state.pathname = "/conversations/conv-a";
-    const screen = renderMobile(<AppNavigationEffects />);
+    const screen = await renderMobile(<AppNavigationEffects />);
     state.pathname = "/favorites";
-    screen.rerender(<AppNavigationEffects />);
+    await screen.rerender(<AppNavigationEffects />);
     await act(async () => {
       await screen.queryClient.fetchQuery({ queryKey: ["expired"], queryFn: () => Promise.reject(new ApiError("UNAUTHENTICATED", 401, "Expired")) }).catch(() => {});
     });
@@ -56,7 +56,7 @@ describe("app auth error navigation", () => {
   it("redirects an expired session after a refused mutation, as after a refused query (#673)", async () => {
     state.pathname = "/account/display-name";
     state.clear.mockClear();
-    const screen = renderMobile(<AppNavigationEffects />);
+    const screen = await renderMobile(<AppNavigationEffects />);
     const mutation = screen.queryClient.getMutationCache().build(screen.queryClient, {
       mutationFn: () => Promise.reject(new ApiError("UNAUTHENTICATED", 401, "Expired")),
     });
@@ -70,7 +70,7 @@ describe("app auth error navigation", () => {
   it("keeps a Conversation's route after a refused mutation there", async () => {
     state.pathname = "/conversations/conv-a";
     state.clear.mockClear();
-    const screen = renderMobile(<AppNavigationEffects />);
+    const screen = await renderMobile(<AppNavigationEffects />);
     const mutation = screen.queryClient.getMutationCache().build(screen.queryClient, {
       mutationFn: () => Promise.reject(new ApiError("UNAUTHENTICATED", 401, "Expired")),
     });
@@ -83,7 +83,7 @@ describe("app auth error navigation", () => {
 
   it("redirects again when a later session expires after a new sign-in", async () => {
     state.pathname = "/favorites";
-    const screen = renderMobile(<AppNavigationEffects />);
+    const screen = await renderMobile(<AppNavigationEffects />);
     const expire = (key: string) =>
       act(async () => {
         await screen.queryClient.fetchQuery({ queryKey: [key], queryFn: () => Promise.reject(new ApiError("UNAUTHENTICATED", 401, "Expired")) }).catch(() => {});

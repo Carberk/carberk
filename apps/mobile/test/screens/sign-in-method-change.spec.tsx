@@ -55,9 +55,9 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function openVerify(params: Record<string, string>) {
+async function openVerify(params: Record<string, string>) {
   Object.assign(routeParams, { resendInSeconds: "60", ...params });
-  const view = renderMobile(<VerifySignInMethodScreen />);
+  const view = await renderMobile(<VerifySignInMethodScreen />);
   const verify = state.codeEntry?.verify;
   if (!verify) throw new Error("CodeEntryForm was not rendered");
   return { view, verify };
@@ -68,7 +68,7 @@ const TAKEN = new ApiError("SIGN_IN_METHOD_TAKEN", 409);
 describe("Confirming a new Sign-in Method", () => {
   it("returns to Profile and says the phone was changed", async () => {
     state.verify.mockResolvedValue({});
-    const { verify } = openVerify({ method: "phone", destination: "+99361000000", kind: "change" });
+    const { verify } = await openVerify({ method: "phone", destination: "+99361000000", kind: "change" });
     await act(() => verify("123456"));
     expect(routerMock.dismissTo).toHaveBeenCalledWith("/profile");
     expect(profileNoticeStore.getState().notice).toEqual({ kind: "changed", value: "+993 61 XX-XX-00" });
@@ -76,14 +76,14 @@ describe("Confirming a new Sign-in Method", () => {
 
   it("says an email was added", async () => {
     state.verify.mockResolvedValue({});
-    const { verify } = openVerify({ method: "email", destination: "new@example.com", kind: "add" });
+    const { verify } = await openVerify({ method: "email", destination: "new@example.com", kind: "add" });
     await act(() => verify("123456"));
     expect(profileNoticeStore.getState().notice).toEqual({ kind: "added", value: "n•••@example.com" });
   });
 
   it("opens the refused state on SIGN_IN_METHOD_TAKEN instead of an inline error", async () => {
     state.verify.mockRejectedValue(TAKEN);
-    const { verify } = openVerify({ method: "email", destination: "taken@example.com", kind: "add" });
+    const { verify } = await openVerify({ method: "email", destination: "taken@example.com", kind: "add" });
     // Resolving tells the shared form there is no error to print.
     await act(() => verify("123456"));
     expect(routerMock.dismissTo).toHaveBeenCalledWith("/profile");
@@ -93,7 +93,7 @@ describe("Confirming a new Sign-in Method", () => {
 
   it("leaves other errors to the code form", async () => {
     state.verify.mockRejectedValue(new ApiError("INVALID_OTP", 400));
-    const { verify } = openVerify({ method: "phone", destination: "+99361000000", kind: "change" });
+    const { verify } = await openVerify({ method: "phone", destination: "+99361000000", kind: "change" });
     await expect(verify("123456")).rejects.toMatchObject({ code: "INVALID_OTP" });
     expect(routerMock.push).not.toHaveBeenCalled();
   });
@@ -101,9 +101,9 @@ describe("Confirming a new Sign-in Method", () => {
   it("does not open the refused state after the User has left the code screen", async () => {
     const pending = deferred<unknown>();
     state.verify.mockReturnValue(pending.promise);
-    const { view, verify } = openVerify({ method: "phone", destination: "+99361000000", kind: "change" });
+    const { view, verify } = await openVerify({ method: "phone", destination: "+99361000000", kind: "change" });
     const result = verify("123456");
-    view.unmount();
+    await view.unmount();
     pending.reject(TAKEN);
     await act(() => result);
     expect(routerMock.dismissTo).not.toHaveBeenCalled();
@@ -113,9 +113,9 @@ describe("Confirming a new Sign-in Method", () => {
   it("keeps the User where they went when the change lands after they left", async () => {
     const pending = deferred<unknown>();
     state.verify.mockReturnValue(pending.promise);
-    const { view, verify } = openVerify({ method: "phone", destination: "+99361000000", kind: "change" });
+    const { view, verify } = await openVerify({ method: "phone", destination: "+99361000000", kind: "change" });
     const result = verify("123456");
-    view.unmount();
+    await view.unmount();
     pending.resolve({});
     await act(() => result);
     // Not pulled back to Profile; Profile says what changed when they reach it.
@@ -128,27 +128,27 @@ describe("Refused value", () => {
   it.each([
     ["phone", "This number is used by another account. Sign in with it instead, or use a different number.", "Use a different number", "/account/add-phone"],
     ["email", "This email is used by another account. Sign in with it instead, or use a different email.", "Use a different email", "/account/add-email"],
-  ])("explains a taken %s and offers one way forward", (method, sentence, action, href) => {
+  ])("explains a taken %s and offers one way forward", async (method, sentence, action, href) => {
     routeParams.method = method;
-    const view = renderMobile(<SignInMethodTakenScreen />);
+    const view = await renderMobile(<SignInMethodTakenScreen />);
     expect(view.getByText(sentence)).toBeTruthy();
     expect(view.getByText("Accounts are never merged.")).toBeTruthy();
     // Back and the one action; no switch-account control.
     expect(view.getAllByRole("button")).toHaveLength(2);
-    fireEvent.press(view.getByRole("button", { name: action }));
+    await fireEvent.press(view.getByRole("button", { name: action }));
     expect(routerMock.replace).toHaveBeenCalledWith(href);
   });
 
-  it("goes back to Profile", () => {
+  it("goes back to Profile", async () => {
     routeParams.method = "phone";
-    const view = renderMobile(<SignInMethodTakenScreen />);
-    fireEvent.press(view.getByRole("button", { name: "Back" }));
+    const view = await renderMobile(<SignInMethodTakenScreen />);
+    await fireEvent.press(view.getByRole("button", { name: "Back" }));
     expect(routerMock.back).toHaveBeenCalledOnce();
   });
 
-  it.each(["ru", "tk"])("reads in %s", (locale) => {
+  it.each(["ru", "tk"])("reads in %s", async (locale) => {
     routeParams.method = "email";
-    const view = renderMobile(<SignInMethodTakenScreen />, { locale });
+    const view = await renderMobile(<SignInMethodTakenScreen />, { locale });
     expect(view.getByText(view.i18n.t("auth:emailTaken"))).toBeTruthy();
     expect(view.getByText(view.i18n.t("account:accountsNeverMerged"))).toBeTruthy();
     expect(view.getByRole("button", { name: view.i18n.t("account:useDifferentEmail") })).toBeTruthy();
@@ -156,26 +156,26 @@ describe("Refused value", () => {
 });
 
 describe("Entering the value the User already has", () => {
-  it("refuses the same phone without sending a code", () => {
-    const view = renderMobile(<AddPhoneScreen />);
-    fireEvent.changeText(view.getByLabelText("Phone number"), "65123456");
-    fireEvent.press(view.getByRole("button", { name: "Get code" }));
+  it("refuses the same phone without sending a code", async () => {
+    const view = await renderMobile(<AddPhoneScreen />);
+    await fireEvent.changeText(view.getByLabelText("Phone number"), "65123456");
+    await fireEvent.press(view.getByRole("button", { name: "Get code" }));
     expect(view.getByText("This is already your number.")).toBeTruthy();
     expect(state.requestCode).not.toHaveBeenCalled();
   });
 
-  it("refuses the same email, whatever its case, without sending a code", () => {
-    const view = renderMobile(<AddEmailScreen />);
-    fireEvent.changeText(view.getByLabelText("Email"), " Aman@Example.com ");
-    fireEvent.press(view.getByRole("button", { name: "Get code" }));
+  it("refuses the same email, whatever its case, without sending a code", async () => {
+    const view = await renderMobile(<AddEmailScreen />);
+    await fireEvent.changeText(view.getByLabelText("Email"), " Aman@Example.com ");
+    await fireEvent.press(view.getByRole("button", { name: "Get code" }));
     expect(view.getByText("This is already your email.")).toBeTruthy();
     expect(state.requestCode).not.toHaveBeenCalled();
   });
 
   it("sends a code for a different phone and says whether it adds or changes", async () => {
-    const view = renderMobile(<AddPhoneScreen />);
-    fireEvent.changeText(view.getByLabelText("Phone number"), "61000000");
-    await act(async () => { fireEvent.press(view.getByRole("button", { name: "Get code" })); });
+    const view = await renderMobile(<AddPhoneScreen />);
+    await fireEvent.changeText(view.getByLabelText("Phone number"), "61000000");
+    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Get code" })); });
     expect(state.requestCode).toHaveBeenCalledWith({ phone: "+99361000000" });
     expect(routerMock.push).toHaveBeenCalledWith(expect.objectContaining({
       pathname: "/account/verify-sign-in-method",
@@ -185,9 +185,9 @@ describe("Entering the value the User already has", () => {
 
   it("marks a first email as an add", async () => {
     state.me = { phone: "+99365123456", email: null };
-    const view = renderMobile(<AddEmailScreen />);
-    fireEvent.changeText(view.getByLabelText("Email"), "new@example.com");
-    await act(async () => { fireEvent.press(view.getByRole("button", { name: "Get code" })); });
+    const view = await renderMobile(<AddEmailScreen />);
+    await fireEvent.changeText(view.getByLabelText("Email"), "new@example.com");
+    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Get code" })); });
     expect(routerMock.push).toHaveBeenCalledWith(expect.objectContaining({
       params: expect.objectContaining({ method: "email", kind: "add" }),
     }));
@@ -196,34 +196,34 @@ describe("Entering the value the User already has", () => {
   // The previous User's /me can outlive their session in the cache.
   it("offers a signed-out visitor Add, not Change, and does not compare with the cached phone", async () => {
     state.isAuthenticated = false;
-    const view = renderMobile(<AddPhoneScreen />);
+    const view = await renderMobile(<AddPhoneScreen />);
     expect(view.getByText(view.i18n.t("account:addPhoneTitle"))).toBeTruthy();
     expect(view.queryByText(view.i18n.t("account:changePhoneTitle"))).toBeNull();
-    fireEvent.changeText(view.getByLabelText("Phone number"), "65123456");
-    await act(async () => { fireEvent.press(view.getByRole("button", { name: "Get code" })); });
+    await fireEvent.changeText(view.getByLabelText("Phone number"), "65123456");
+    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Get code" })); });
     expect(view.queryByText("This is already your number.")).toBeNull();
   });
 
   it("offers a signed-out visitor Add, not Change, and does not compare with the cached email", async () => {
     state.isAuthenticated = false;
-    const view = renderMobile(<AddEmailScreen />);
+    const view = await renderMobile(<AddEmailScreen />);
     expect(view.getByText(view.i18n.t("account:addEmailTitle"))).toBeTruthy();
     expect(view.queryByText(view.i18n.t("account:changeEmailTitle"))).toBeNull();
-    fireEvent.changeText(view.getByLabelText("Email"), "aman@example.com");
-    await act(async () => { fireEvent.press(view.getByRole("button", { name: "Get code" })); });
+    await fireEvent.changeText(view.getByLabelText("Email"), "aman@example.com");
+    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Get code" })); });
     expect(view.queryByText("This is already your email.")).toBeNull();
   });
 
-  it.each([AddPhoneScreen, AddEmailScreen])("renders nothing until the session is known", (Screen) => {
+  it.each([AddPhoneScreen, AddEmailScreen])("renders nothing until the session is known", async (Screen) => {
     state.isAuthenticated = null;
-    const view = renderMobile(<Screen />);
+    const view = await renderMobile(<Screen />);
     expect(view.toJSON()).toBeNull();
   });
 
-  it.each(["ru", "tk"])("reads the refusal in %s", (locale) => {
-    const view = renderMobile(<AddPhoneScreen />, { locale });
-    fireEvent.changeText(view.getByLabelText(view.i18n.t("auth:phoneLabel")), "65123456");
-    fireEvent.press(view.getByRole("button", { name: view.i18n.t("auth:getCode") }));
+  it.each(["ru", "tk"])("reads the refusal in %s", async (locale) => {
+    const view = await renderMobile(<AddPhoneScreen />, { locale });
+    await fireEvent.changeText(view.getByLabelText(view.i18n.t("auth:phoneLabel")), "65123456");
+    await fireEvent.press(view.getByRole("button", { name: view.i18n.t("auth:getCode") }));
     expect(view.getByText(view.i18n.t("account:samePhoneError"))).toBeTruthy();
   });
 });
@@ -232,49 +232,49 @@ describe("Email field feedback", () => {
   const ERROR = "Enter a valid email address.";
   const HINT = "Enter your email address.";
 
-  it("keeps the hint under an empty field the User has not typed in, even after leaving it", () => {
+  it("keeps the hint under an empty field the User has not typed in, even after leaving it", async () => {
     state.me = { phone: "+99365123456", email: null };
-    const view = renderMobile(<AddEmailScreen />);
+    const view = await renderMobile(<AddEmailScreen />);
     const field = view.getByLabelText("Email");
     expect(view.getByText(HINT)).toBeTruthy();
     // The field opens focused; focus leaving it is not the User's input.
-    fireEvent(field, "blur");
+    await fireEvent(field, "blur");
     expect(view.queryByText(ERROR)).toBeNull();
     expect(view.getByText(HINT)).toBeTruthy();
     expect(field.props["aria-invalid"]).toBe(false);
   });
 
-  it("keeps the hint while the User is still typing", () => {
-    const view = renderMobile(<AddEmailScreen />);
-    fireEvent.changeText(view.getByLabelText("Email"), "aman@");
+  it("keeps the hint while the User is still typing", async () => {
+    const view = await renderMobile(<AddEmailScreen />);
+    await fireEvent.changeText(view.getByLabelText("Email"), "aman@");
     expect(view.queryByText(ERROR)).toBeNull();
     expect(view.getByText(HINT)).toBeTruthy();
   });
 
-  it("shows the error once the User leaves an invalid address", () => {
-    const view = renderMobile(<AddEmailScreen />);
+  it("shows the error once the User leaves an invalid address", async () => {
+    const view = await renderMobile(<AddEmailScreen />);
     const field = view.getByLabelText("Email");
-    fireEvent.changeText(field, "aman@");
-    fireEvent(field, "blur");
+    await fireEvent.changeText(field, "aman@");
+    await fireEvent(field, "blur");
     expect(view.getByText(ERROR)).toBeTruthy();
     expect(view.getByLabelText("Email").props["aria-invalid"]).toBe(true);
   });
 
-  it("shows the error when the User clears what they typed and leaves", () => {
-    const view = renderMobile(<AddEmailScreen />);
+  it("shows the error when the User clears what they typed and leaves", async () => {
+    const view = await renderMobile(<AddEmailScreen />);
     const field = view.getByLabelText("Email");
-    fireEvent.changeText(field, "a");
-    fireEvent.changeText(field, "");
-    fireEvent(field, "blur");
+    await fireEvent.changeText(field, "a");
+    await fireEvent.changeText(field, "");
+    await fireEvent(field, "blur");
     expect(view.getByText(ERROR)).toBeTruthy();
   });
 
-  it("returns to the hint once the address is valid", () => {
-    const view = renderMobile(<AddEmailScreen />);
+  it("returns to the hint once the address is valid", async () => {
+    const view = await renderMobile(<AddEmailScreen />);
     const field = view.getByLabelText("Email");
-    fireEvent.changeText(field, "aman@");
-    fireEvent(field, "blur");
-    fireEvent.changeText(field, "new@example.com");
+    await fireEvent.changeText(field, "aman@");
+    await fireEvent(field, "blur");
+    await fireEvent.changeText(field, "new@example.com");
     expect(view.queryByText(ERROR)).toBeNull();
     expect(view.getByText(HINT)).toBeTruthy();
   });

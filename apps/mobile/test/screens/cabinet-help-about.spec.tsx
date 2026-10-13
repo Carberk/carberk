@@ -32,9 +32,9 @@ describe.each([
   ["signed out", false],
   ["signed in", true],
 ])("Cabinet %s", (_, signedIn) => {
-  it("lists Help right after Theme and, last, About the app", () => {
+  it("lists Help right after Theme and, last, About the app", async () => {
     auth.isAuthenticated = signedIn;
-    const screen = renderMobile(<CabinetScreen />);
+    const screen = await renderMobile(<CabinetScreen />);
 
     const labels = screen.getAllByRole("button").map((b) => b.props.accessibilityLabel);
     const theme = labels.findIndex((l) => String(l).startsWith(screen.i18n.t("account:theme")));
@@ -43,13 +43,13 @@ describe.each([
     expect(labels.at(-1)).toBe(screen.i18n.t("support:about"));
   });
 
-  it("opens Help and About", () => {
+  it("opens Help and About", async () => {
     auth.isAuthenticated = signedIn;
-    const screen = renderMobile(<CabinetScreen />);
+    const screen = await renderMobile(<CabinetScreen />);
 
-    fireEvent.press(screen.getByRole("button", { name: "Help" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Help" }));
     expect(routerMock.push).toHaveBeenLastCalledWith("/help");
-    fireEvent.press(screen.getByRole("button", { name: "About the app" }));
+    await fireEvent.press(screen.getByRole("button", { name: "About the app" }));
     expect(routerMock.push).toHaveBeenLastCalledWith("/about");
   });
 });

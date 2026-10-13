@@ -2,12 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { Modal, Pressable } from "react-native";
 import * as RN from "react-native";
 
-import {
-  act,
-  fireEvent,
-  renderMobile,
-  within,
-} from "../../../test/render";
+import { act, fireEvent, renderMobile, within, getHost } from "../../../test/render";
 import { mediaFixture } from "../../../test/fixtures/listing";
 
 import { PhotoViewer } from "./PhotoViewer";
@@ -16,9 +11,9 @@ const WINDOW_WIDTH = 390;
 const scrollRequests = (RN as unknown as { scrollRequests: unknown[] })
   .scrollRequests;
 
-function open(props: Partial<React.ComponentProps<typeof PhotoViewer>> = {}) {
+async function open(props: Partial<React.ComponentProps<typeof PhotoViewer>> = {}) {
   const onClose = vi.fn();
-  const screen = renderMobile(
+  const screen = await renderMobile(
     <PhotoViewer
       visible
       media={mediaFixture(5)}
@@ -30,22 +25,22 @@ function open(props: Partial<React.ComponentProps<typeof PhotoViewer>> = {}) {
   return { screen, onClose };
 }
 
-function swipeTo(screen: ReturnType<typeof open>["screen"], index: number) {
-  fireEvent(screen.getByTestId("photo-viewer-pager"), "momentumScrollEnd", {
+async function swipeTo(screen: Awaited<ReturnType<typeof open>>["screen"], index: number) {
+  await fireEvent(screen.getByTestId("photo-viewer-pager"), "momentumScrollEnd", {
     nativeEvent: { contentOffset: { x: WINDOW_WIDTH * index, y: 0 } },
   });
 }
 
 describe("Photo viewer", () => {
-  it("opens at the requested photo with an n / N counter", () => {
-    const { screen } = open();
+  it("opens at the requested photo with an n / N counter", async () => {
+    const { screen } = await open();
 
     expect(screen.getByText("3 / 5")).toBeTruthy();
     expect(screen.getByTestId("photo-viewer-pager").props.initialScrollIndex).toBe(2);
   });
 
-  it("shows a thumbnail for every photo and marks the one being viewed", () => {
-    const { screen } = open();
+  it("shows a thumbnail for every photo and marks the one being viewed", async () => {
+    const { screen } = await open();
 
     expect(screen.getAllByRole("button", { name: /^Photo \d of 5$/ })).toHaveLength(5);
     expect(
@@ -56,10 +51,10 @@ describe("Photo viewer", () => {
     ).toBeTruthy();
   });
 
-  it("jumps to a photo when its thumbnail is tapped", () => {
-    const { screen } = open();
+  it("jumps to a photo when its thumbnail is tapped", async () => {
+    const { screen } = await open();
 
-    fireEvent.press(screen.getByRole("button", { name: "Photo 5 of 5" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Photo 5 of 5" }));
 
     expect(screen.getByText("5 / 5")).toBeTruthy();
     expect(
@@ -70,10 +65,10 @@ describe("Photo viewer", () => {
     );
   });
 
-  it("follows a swipe to the next photo", () => {
-    const { screen } = open();
+  it("follows a swipe to the next photo", async () => {
+    const { screen } = await open();
 
-    swipeTo(screen, 3);
+    await swipeTo(screen, 3);
 
     expect(screen.getByText("4 / 5")).toBeTruthy();
     expect(
@@ -81,35 +76,35 @@ describe("Photo viewer", () => {
     ).toBeTruthy();
   });
 
-  it("closes with the ✕ and hands back the photo it was left on", () => {
-    const { screen, onClose } = open();
-    swipeTo(screen, 3);
+  it("closes with the ✕ and hands back the photo it was left on", async () => {
+    const { screen, onClose } = await open();
+    await swipeTo(screen, 3);
 
-    fireEvent.press(screen.getByRole("button", { name: "Close" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Close" }));
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledWith(3);
   });
 
-  it("closes from the system back gesture with the photo it was left on", () => {
-    const { screen, onClose } = open();
-    fireEvent.press(screen.getByRole("button", { name: "Photo 1 of 5" }));
+  it("closes from the system back gesture with the photo it was left on", async () => {
+    const { screen, onClose } = await open();
+    await fireEvent.press(screen.getByRole("button", { name: "Photo 1 of 5" }));
 
-    act(() => screen.UNSAFE_getByType(Modal).props.onRequestClose());
+    await act(() => getHost(screen.container, "Modal").props.onRequestClose());
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledWith(0);
   });
 
-  it("draws nothing while closed", () => {
-    const { screen } = open({ visible: false });
+  it("draws nothing while closed", async () => {
+    const { screen } = await open({ visible: false });
 
     expect(screen.queryByText("3 / 5")).toBeNull();
     expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
   });
 
-  it("hosts the caller's ♡ and Call + Message, and lets them close the viewer", () => {
-    const { screen, onClose } = open({
+  it("hosts the caller's ♡ and Call + Message, and lets them close the viewer", async () => {
+    const { screen, onClose } = await open({
       headerAction: (close) => (
         <Pressable accessibilityRole="button" accessibilityLabel="Favorite" onPress={close} />
       ),
@@ -117,22 +112,22 @@ describe("Photo viewer", () => {
         <Pressable accessibilityRole="button" accessibilityLabel="Message" />
       ),
     });
-    swipeTo(screen, 1);
+    await swipeTo(screen, 1);
 
     expect(screen.getByRole("button", { name: "Message" })).toBeTruthy();
-    fireEvent.press(screen.getByRole("button", { name: "Favorite" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Favorite" }));
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledWith(1);
   });
 
-  it("leaves the top corner empty without a ♡ and shows no footer", () => {
-    const { screen } = open();
+  it("leaves the top corner empty without a ♡ and shows no footer", async () => {
+    const { screen } = await open();
 
     expect(screen.queryByRole("button", { name: "Favorite" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Call" })).toBeNull();
     expect(
-      within(screen.UNSAFE_getByType(Modal)).getByText("3 / 5"),
+      within(getHost(screen.container, "Modal")).getByText("3 / 5"),
     ).toBeTruthy();
   });
 });
@@ -143,19 +138,19 @@ describe("Photo viewer scroll requests", () => {
   const pagerRequests = () =>
     scrollRequests.filter((request) => (request as { method: string }).method === "scrollToIndex");
 
-  it("asks the pager to scroll when a thumbnail is tapped", () => {
-    const { screen } = open();
+  it("asks the pager to scroll when a thumbnail is tapped", async () => {
+    const { screen } = await open();
 
-    fireEvent.press(screen.getByRole("button", { name: "Photo 5 of 5" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Photo 5 of 5" }));
 
     expect(pagerRequests()).toEqual([{ method: "scrollToIndex", index: 4, animated: false }]);
   });
 
-  it("starts the next test with no scroll requests left by the one before", () => {
+  it("starts the next test with no scroll requests left by the one before", async () => {
     expect(scrollRequests).toHaveLength(0);
-    const { screen } = open();
+    const { screen } = await open();
 
-    fireEvent.press(screen.getByRole("button", { name: "Photo 2 of 5" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Photo 2 of 5" }));
 
     expect(pagerRequests()).toEqual([{ method: "scrollToIndex", index: 1, animated: false }]);
   });

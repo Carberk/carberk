@@ -6,7 +6,7 @@ import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { server } from "../../../test/msw";
-import { fireEvent, renderMobile, within } from "../../../test/render";
+import { fireEvent, renderMobile, within, getHost } from "../../../test/render";
 
 import Step5Price from "./Step5Price";
 
@@ -61,14 +61,14 @@ function PriceStep({
 }
 
 describe("Price step currency", () => {
-  it("offers TMT, USD and AED as three radio buttons with TMT selected by default", () => {
-    const screen = renderMobile(<PriceStep />);
+  it("offers TMT, USD and AED as three radio buttons with TMT selected by default", async () => {
+    const screen = await renderMobile(<PriceStep />);
 
     expect(screen.getByText("Currency")).toBeTruthy();
     // getByRole only matches accessibility elements, and the group is a plain
     // View: marking it `accessible` would make iOS read it as one element and
     // hide its three radios. So the role and name are read from its props.
-    const group = screen.UNSAFE_getByProps({
+    const group = getHost(screen.container, "View", {
       accessibilityRole: "radiogroup",
       accessibilityLabel: "Currency",
     });
@@ -81,14 +81,14 @@ describe("Price step currency", () => {
     expect(screen.queryByText("Select currency")).toBeNull();
   });
 
-  it("clears the amount and keeps focus on it when the seller picks another currency", () => {
+  it("clears the amount and keeps focus on it when the seller picks another currency", async () => {
     const onChange = vi.fn();
-    const screen = renderMobile(
+    const screen = await renderMobile(
       <PriceStep initial={{ priceAmount: 185000, priceCurrency: Enums.Currency.TMT }} onChange={onChange} />,
     );
     expect(screen.getByDisplayValue("185,000")).toBeTruthy();
 
-    fireEvent.press(screen.getByRole("radio", { name: "USD" }));
+    await fireEvent.press(screen.getByRole("radio", { name: "USD" }));
 
     expect(onChange).toHaveBeenLastCalledWith({ priceCurrency: Enums.Currency.USD, priceAmount: undefined });
     expect(screen.getByRole("radio", { name: "USD", checked: true })).toBeTruthy();
@@ -97,54 +97,54 @@ describe("Price step currency", () => {
     expect(focusRequests.count).toBe(1);
   });
 
-  it("groups the amount while the seller types and keeps the stored value a plain number", () => {
+  it("groups the amount while the seller types and keeps the stored value a plain number", async () => {
     const onChange = vi.fn();
-    const screen = renderMobile(<PriceStep onChange={onChange} />);
+    const screen = await renderMobile(<PriceStep onChange={onChange} />);
     const amount = screen.getByPlaceholderText("Enter amount");
 
-    fireEvent.changeText(amount, "185000");
+    await fireEvent.changeText(amount, "185000");
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ priceAmount: 185000 }));
     expect(screen.getByDisplayValue("185,000")).toBeTruthy();
 
     // The next keystroke arrives with the grouping already in the field.
-    fireEvent.changeText(amount, "185,0005");
+    await fireEvent.changeText(amount, "185,0005");
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ priceAmount: 1850005 }));
     expect(screen.getByDisplayValue("1,850,005")).toBeTruthy();
   });
 
-  it.each(["2 329 600", "2,329,600", "2\u00a0329\u00a0600 TMT"])("parses a pasted %j", (pasted) => {
+  it.each(["2 329 600", "2,329,600", "2\u00a0329\u00a0600 TMT"])("parses a pasted %j", async (pasted) => {
     const onChange = vi.fn();
-    const screen = renderMobile(<PriceStep onChange={onChange} />);
-    fireEvent.changeText(screen.getByPlaceholderText("Enter amount"), pasted);
+    const screen = await renderMobile(<PriceStep onChange={onChange} />);
+    await fireEvent.changeText(screen.getByPlaceholderText("Enter amount"), pasted);
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ priceAmount: 2329600 }));
     expect(screen.getByDisplayValue("2,329,600")).toBeTruthy();
   });
 
-  it("groups as a displayed price does in Russian", () => {
-    const screen = renderMobile(<PriceStep initial={{ priceAmount: 185000 }} />, { locale: "ru" });
+  it("groups as a displayed price does in Russian", async () => {
+    const screen = await renderMobile(<PriceStep initial={{ priceAmount: 185000 }} />, { locale: "ru" });
     expect(screen.getByDisplayValue((185000).toLocaleString("ru-RU"))).toBeTruthy();
   });
 
-  it("keeps the amount when the seller taps the currency already selected", () => {
+  it("keeps the amount when the seller taps the currency already selected", async () => {
     const onChange = vi.fn();
-    const screen = renderMobile(<PriceStep initial={{ priceAmount: 9000 }} onChange={onChange} />);
+    const screen = await renderMobile(<PriceStep initial={{ priceAmount: 9000 }} onChange={onChange} />);
 
-    fireEvent.press(screen.getByRole("radio", { name: "TMT" }));
+    await fireEvent.press(screen.getByRole("radio", { name: "TMT" }));
 
     expect(onChange).not.toHaveBeenCalled();
     expect(screen.getByDisplayValue("9,000")).toBeTruthy();
   });
 
   it("shows the TMT equivalent for a foreign currency when the rate is known", async () => {
-    const screen = renderMobile(<PriceStep initial={{ priceCurrency: Enums.Currency.USD }} />);
+    const screen = await renderMobile(<PriceStep initial={{ priceCurrency: Enums.Currency.USD }} />);
 
-    fireEvent.changeText(screen.getByPlaceholderText("Enter amount"), "10000");
+    await fireEvent.changeText(screen.getByPlaceholderText("Enter amount"), "10000");
 
     expect(await screen.findByText(`≈ ${(35000).toLocaleString()} TMT`)).toBeTruthy();
   });
 
   it("shows no missing-rate helper when AED has no rate", async () => {
-    const screen = renderMobile(<PriceStep initial={{ priceCurrency: Enums.Currency.AED, priceAmount: 5000 }} />);
+    const screen = await renderMobile(<PriceStep initial={{ priceCurrency: Enums.Currency.AED, priceAmount: 5000 }} />);
     await screen.findByRole("radio", { name: "AED", checked: true });
     await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -152,8 +152,8 @@ describe("Price step currency", () => {
     expect(screen.queryByText(/rate/i)).toBeNull();
   });
 
-  it("keeps each currency button's class shape the same whether or not it is selected", () => {
-    const screen = renderMobile(<PriceStep />);
+  it("keeps each currency button's class shape the same whether or not it is selected", async () => {
+    const screen = await renderMobile(<PriceStep />);
     // A class that sets a CSS variable (shadow-sm) and appears only when
     // selected crashes the dev app when it lands on a mounted Pressable.
     const shape = (name: string) =>
@@ -167,15 +167,15 @@ describe("Price step currency", () => {
     expect(shape("TMT")).toContain("border");
     expect(String(screen.getByRole("radio", { name: "TMT" }).props.className)).not.toMatch(/shadow/);
 
-    fireEvent.press(screen.getByRole("radio", { name: "USD" }));
+    await fireEvent.press(screen.getByRole("radio", { name: "USD" }));
 
     expect(shape("USD")).toEqual(shape("TMT"));
     expect(String(screen.getByRole("radio", { name: "USD" }).props.className)).toContain("bg-background");
     expect(String(screen.getByRole("radio", { name: "TMT" }).props.className)).toContain("bg-transparent");
   });
 
-  it("disables every currency when the step is read-only", () => {
-    const screen = renderMobile(<Step5Price payload={{}} onChange={() => {}} disabled />);
+  it("disables every currency when the step is read-only", async () => {
+    const screen = await renderMobile(<Step5Price payload={{}} onChange={() => {}} disabled />);
     for (const name of ["TMT", "USD", "AED"]) {
       expect(screen.getByRole("radio", { name }).props.accessibilityState.disabled).toBe(true);
     }
@@ -187,8 +187,8 @@ describe("Price step amount label", () => {
     ["en", "Amount *", "Price *"],
     ["ru", "Сумма *", "Цена *"],
     ["tk", "Mukdary *", "Bahasy *"],
-  ])("labels the amount field once in %s", (locale, kept, dropped) => {
-    const screen = renderMobile(<PriceStep />, { locale });
+  ])("labels the amount field once in %s", async (locale, kept, dropped) => {
+    const screen = await renderMobile(<PriceStep />, { locale });
 
     expect(screen.getAllByText(kept)).toHaveLength(1);
     expect(screen.queryByText(dropped)).toBeNull();
@@ -209,41 +209,41 @@ describe("Price step errors", () => {
     );
   }
 
-  it("says nothing about the empty amount when the seller arrives on the step", () => {
-    const screen = renderMobile(<ErrorsStep />);
+  it("says nothing about the empty amount when the seller arrives on the step", async () => {
+    const screen = await renderMobile(<ErrorsStep />);
 
     expect(screen.getByPlaceholderText("Enter amount")).toBeTruthy();
     expect(screen.queryByText("Price is required")).toBeNull();
   });
 
-  it("says nothing when a currency switch clears the amount", () => {
-    const screen = renderMobile(<ErrorsStep />);
+  it("says nothing when a currency switch clears the amount", async () => {
+    const screen = await renderMobile(<ErrorsStep />);
 
-    fireEvent.press(screen.getByRole("radio", { name: "USD" }));
+    await fireEvent.press(screen.getByRole("radio", { name: "USD" }));
 
     expect(screen.queryByText("Price is required")).toBeNull();
   });
 
-  it("says the amount is required once the seller clears it", () => {
-    const screen = renderMobile(<ErrorsStep />);
+  it("says the amount is required once the seller clears it", async () => {
+    const screen = await renderMobile(<ErrorsStep />);
     const amount = screen.getByPlaceholderText("Enter amount");
 
-    fireEvent.changeText(amount, "5");
-    fireEvent.changeText(amount, "");
+    await fireEvent.changeText(amount, "5");
+    await fireEvent.changeText(amount, "");
 
     expect(screen.getByText("Price is required")).toBeTruthy();
   });
 
-  it("says the amount is required once the seller leaves it empty", () => {
-    const screen = renderMobile(<ErrorsStep />);
+  it("says the amount is required once the seller leaves it empty", async () => {
+    const screen = await renderMobile(<ErrorsStep />);
 
-    fireEvent(screen.getByPlaceholderText("Enter amount"), "blur");
+    await fireEvent(screen.getByPlaceholderText("Enter amount"), "blur");
 
     expect(screen.getByText("Price is required")).toBeTruthy();
   });
 
-  it("says the amount is required when the wizard asks the step to show its errors", () => {
-    const screen = renderMobile(<ErrorsStep showErrors />);
+  it("says the amount is required when the wizard asks the step to show its errors", async () => {
+    const screen = await renderMobile(<ErrorsStep showErrors />);
 
     expect(screen.getByText("Price is required")).toBeTruthy();
   });

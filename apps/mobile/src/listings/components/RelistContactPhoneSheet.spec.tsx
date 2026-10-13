@@ -37,9 +37,9 @@ const CONFIRMED = {
   },
 };
 
-function renderSheet(open = true, onOpenChange = vi.fn()) {
+async function renderSheet(open = true, onOpenChange = vi.fn()) {
   const onRelisted = vi.fn();
-  const screen = renderMobile(
+  const screen = await renderMobile(
     <RelistContactPhoneSheet
       open={open}
       listingId="listing-1"
@@ -51,9 +51,9 @@ function renderSheet(open = true, onOpenChange = vi.fn()) {
   return { screen, onOpenChange, onRelisted };
 }
 
-async function pressSendCode(screen: ReturnType<typeof renderMobile>) {
+async function pressSendCode(screen: Awaited<ReturnType<typeof renderMobile>>) {
   await act(async () => {
-    fireEvent.press(screen.getByRole("button", { name: "Send code" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Send code" }));
   });
 }
 
@@ -65,8 +65,8 @@ describe("RelistContactPhoneSheet", () => {
     mocks.republish.mockReset().mockResolvedValue({});
   });
 
-  it("offers Send code and Cancel for the Listing's own number, and no other number", () => {
-    const { screen } = renderSheet();
+  it("offers Send code and Cancel for the Listing's own number, and no other number", async () => {
+    const { screen } = await renderSheet();
 
     expect(screen.getByText("Confirm the contact phone")).toBeTruthy();
     expect(
@@ -81,7 +81,7 @@ describe("RelistContactPhoneSheet", () => {
 
   it("sends the code to the Listing's number and opens the code screen for a relist", async () => {
     mocks.request.mockResolvedValue(CODE_SENT);
-    const { screen, onOpenChange } = renderSheet();
+    const { screen, onOpenChange } = await renderSheet();
 
     await pressSendCode(screen);
 
@@ -102,7 +102,7 @@ describe("RelistContactPhoneSheet", () => {
 
   it("relists without a code when the number is already confirmed", async () => {
     mocks.request.mockResolvedValue(CONFIRMED);
-    const { screen, onOpenChange, onRelisted } = renderSheet();
+    const { screen, onOpenChange, onRelisted } = await renderSheet();
 
     await pressSendCode(screen);
 
@@ -115,7 +115,7 @@ describe("RelistContactPhoneSheet", () => {
   it("says so in the sheet when the relist after an already confirmed number fails", async () => {
     mocks.request.mockResolvedValue(CONFIRMED);
     mocks.republish.mockRejectedValue(new ApiError("INTERNAL", 500));
-    const { screen, onOpenChange, onRelisted } = renderSheet();
+    const { screen, onOpenChange, onRelisted } = await renderSheet();
 
     await pressSendCode(screen);
 
@@ -133,7 +133,7 @@ describe("RelistContactPhoneSheet", () => {
         retryInSeconds: 0,
       }),
     );
-    const { screen, onOpenChange } = renderSheet();
+    const { screen, onOpenChange } = await renderSheet();
 
     await pressSendCode(screen);
 
@@ -145,7 +145,7 @@ describe("RelistContactPhoneSheet", () => {
     expect(onOpenChange).not.toHaveBeenCalled();
     expect(routerMock.push).not.toHaveBeenCalled();
 
-    fireEvent.press(screen.getByRole("link", { name: "Help" }));
+    await fireEvent.press(screen.getByRole("link", { name: "Help" }));
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(routerMock.push).toHaveBeenCalledWith("/help");
@@ -158,7 +158,7 @@ describe("RelistContactPhoneSheet", () => {
         retryInSeconds: 120,
       }),
     );
-    const { screen, onOpenChange } = renderSheet();
+    const { screen, onOpenChange } = await renderSheet();
 
     await pressSendCode(screen);
 
@@ -171,7 +171,7 @@ describe("RelistContactPhoneSheet", () => {
 
   it("shows the offline message and stays open", async () => {
     mocks.request.mockRejectedValue(new ApiError("NETWORK_ERROR", 0));
-    const { screen, onOpenChange } = renderSheet();
+    const { screen, onOpenChange } = await renderSheet();
 
     await pressSendCode(screen);
 
@@ -182,10 +182,10 @@ describe("RelistContactPhoneSheet", () => {
     expect(routerMock.push).not.toHaveBeenCalled();
   });
 
-  it("closes on Cancel without sending or navigating", () => {
-    const { screen, onOpenChange } = renderSheet();
+  it("closes on Cancel without sending or navigating", async () => {
+    const { screen, onOpenChange } = await renderSheet();
 
-    fireEvent.press(screen.getByRole("button", { name: "Cancel" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Cancel" }));
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(mocks.request).not.toHaveBeenCalled();
@@ -194,20 +194,20 @@ describe("RelistContactPhoneSheet", () => {
 
   it("keeps Send code shut until the Listing's number loads", async () => {
     detail.data = undefined;
-    const { screen } = renderSheet();
+    const { screen } = await renderSheet();
 
     const sendCode = screen.getByRole("button", { name: "Send code" });
     expect(sendCode.props.accessibilityState).toMatchObject({ disabled: true });
 
     await act(async () => {
-      fireEvent.press(sendCode);
+      await fireEvent.press(sendCode);
     });
     expect(mocks.request).not.toHaveBeenCalled();
     expect(routerMock.push).not.toHaveBeenCalled();
   });
 
-  it("stays closed when nothing was refused", () => {
-    const { screen } = renderSheet(false);
+  it("stays closed when nothing was refused", async () => {
+    const { screen } = await renderSheet(false);
 
     expect(screen.queryByText("Confirm the contact phone")).toBeNull();
   });

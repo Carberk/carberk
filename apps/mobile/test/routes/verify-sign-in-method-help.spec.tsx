@@ -41,16 +41,16 @@ beforeEach(() => {
 });
 
 describe("Add or change Sign-in Method code screen", () => {
-  it("opens Help from Contact support", () => {
-    const screen = renderMobile(<VerifySignInMethodScreen />);
+  it("opens Help from Contact support", async () => {
+    const screen = await renderMobile(<VerifySignInMethodScreen />);
 
-    fireEvent.press(screen.getByRole("button", { name: "Contact support" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Contact support" }));
 
     expect(routerMock.push).toHaveBeenCalledWith("/help");
   });
 
-  it("never offers Use phone instead outside sign-in", () => {
-    const screen = renderMobile(<VerifySignInMethodScreen />);
+  it("never offers Use phone instead outside sign-in", async () => {
+    const screen = await renderMobile(<VerifySignInMethodScreen />);
 
     expect(screen.queryByRole("button", { name: "Use phone instead" })).toBeNull();
   });

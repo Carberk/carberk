@@ -26,7 +26,7 @@ describe("useRemoveProfilePhoto", () => {
       return HttpResponse.json(PHOTO_ME);
     }));
     const session = await capturePhotoSession();
-    const { client, result } = setupPhotoHook(useRemoveProfilePhoto);
+    const { client, result } = await setupPhotoHook(useRemoveProfilePhoto);
     client.setQueryData(queryKeys.me(), { ...PHOTO_ME, avatarKey: "pending/old/original.jpg" });
     await act(() => result.current.mutateAsync(session));
     expect(sent).toEqual({ body: "", auth: "Bearer aman" });
@@ -37,11 +37,11 @@ describe("useRemoveProfilePhoto", () => {
   it("fails without pausing offline and preserves the existing photo", async () => {
     server.use(http.delete("*/me/photo", () => HttpResponse.error()));
     const session = await capturePhotoSession();
-    const { client, result } = setupPhotoHook(useRemoveProfilePhoto);
+    const { client, result } = await setupPhotoHook(useRemoveProfilePhoto);
     client.setQueryData(queryKeys.me(), { ...PHOTO_ME, avatarKey: "pending/old/original.jpg" });
     onlineManager.setOnline(false);
     let error: unknown;
-    act(() => { void result.current.mutateAsync(session).catch((e: unknown) => { error = e; }); });
+    await act(() => { void result.current.mutateAsync(session).catch((e: unknown) => { error = e; }); });
     await vi.waitFor(() => expect(error).toBeDefined(), { timeout: 500 });
     expect(result.current.isPaused).toBe(false);
     expect(client.getQueryData(queryKeys.me())).toEqual({ ...PHOTO_ME, avatarKey: "pending/old/original.jpg" });
@@ -51,7 +51,7 @@ describe("useRemoveProfilePhoto", () => {
   it("rejects another User's successful answer instead of reporting removal", async () => {
     server.use(http.delete("*/me/photo", () => HttpResponse.json({ ...PHOTO_ME, id: "00000000-0000-4000-8000-00000000000b" })));
     const session = await capturePhotoSession();
-    const { client, result } = setupPhotoHook(useRemoveProfilePhoto);
+    const { client, result } = await setupPhotoHook(useRemoveProfilePhoto);
     const error = await act(() => result.current.mutateAsync(session).catch((e: unknown) => e));
     expect(error).toMatchObject({ code: "CONTRACT_VIOLATION" });
     expect(client.getQueryData(queryKeys.me())).toEqual(PHOTO_ME);

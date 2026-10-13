@@ -24,9 +24,9 @@ it("provides the focused target after its first mount and removes it on unmount"
   function Screen({ mounted }: { mounted: boolean }) {
     return <TabBlurTargets><Bar />{mounted ? <TabBlurTarget routeKey="search"><View /></TabBlurTarget> : null}</TabBlurTargets>;
   }
-  const view = renderMobile(<Screen mounted />);
+  const view = await renderMobile(<Screen mounted />);
   expect(view.getByTestId("focused-blur").props.blurTarget).toBeDefined();
-  view.rerender(<Screen mounted={false} />);
+  await view.rerender(<Screen mounted={false} />);
   expect(view.queryByTestId("focused-blur")).toBeNull();
   expect(view.getByText("Search")).toBeTruthy();
 });
@@ -53,26 +53,26 @@ it("keeps the bar's blur and its children mounted while a lazily mounted tab reg
       </TabBlurTargets>
     );
   }
-  const view = renderMobile(<Screen focused="search" favoritesMounted={false} />);
+  const view = await renderMobile(<Screen focused="search" favoritesMounted={false} />);
   const searchTarget = view.getByTestId("focused-blur").props.blurTarget;
   expect(searchTarget).toBeDefined();
   const mountsWithBlur = mounts;
 
-  view.rerender(<Screen focused="favorites" favoritesMounted={false} />);
+  await view.rerender(<Screen focused="favorites" favoritesMounted={false} />);
   expect(view.getByTestId("focused-blur").props.blurTarget).toBe(searchTarget);
   expect(mounts).toBe(mountsWithBlur);
 
-  view.rerender(<Screen focused="favorites" favoritesMounted />);
+  await view.rerender(<Screen focused="favorites" favoritesMounted />);
   const favoritesTarget = view.getByTestId("focused-blur").props.blurTarget;
   expect(favoritesTarget).toBeDefined();
   expect(favoritesTarget).not.toBe(searchTarget);
   expect(mounts).toBe(mountsWithBlur);
-  view.unmount();
+  await view.unmount();
 
   // Focusing and mounting in one commit, as the navigator does, must not remount either.
-  const once = renderMobile(<Screen focused="search" favoritesMounted={false} />);
+  const once = await renderMobile(<Screen focused="search" favoritesMounted={false} />);
   const mountsBefore = mounts;
-  once.rerender(<Screen focused="favorites" favoritesMounted />);
+  await once.rerender(<Screen focused="favorites" favoritesMounted />);
   expect(once.getByTestId("focused-blur").props.blurTarget).toBeDefined();
   expect(mounts).toBe(mountsBefore);
 });
@@ -84,7 +84,7 @@ it.each([30, 29])("keeps Android API%s screen content without a blur target", as
   function Bar() {
     return <GlassSurface blurTarget={useTabBlurTarget("search")}><Text>Search</Text></GlassSurface>;
   }
-  const view = renderMobile(<TabBlurTargets><TabBlurTarget routeKey="search"><Text>Photos</Text></TabBlurTarget><Bar /></TabBlurTargets>);
+  const view = await renderMobile(<TabBlurTargets><TabBlurTarget routeKey="search"><Text>Photos</Text></TabBlurTarget><Bar /></TabBlurTargets>);
   expect(view.queryByTestId("focused-blur")).toBeNull();
   expect(view.getByText("Photos")).toBeTruthy();
   expect(view.getByText("Search")).toBeTruthy();

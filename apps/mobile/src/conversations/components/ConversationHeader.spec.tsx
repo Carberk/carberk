@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as Linking from "expo-linking";
 import { Image } from "expo-image";
 
-import { act, fireEvent, first, renderMobile } from "../../../test/render";
+import { act, fireEvent, first, renderMobile, getHost, queryHost, queryAllHosts } from "../../../test/render";
 import type { ConversationDetail } from "../../api/conversations/useConversation";
 
 import { ConversationHeader } from "./ConversationHeader";
@@ -15,11 +15,11 @@ vi.mock("expo-linking", () => ({
 const SELLER = "00000000-0000-4000-8000-0000000000b2";
 const BUYER = "00000000-0000-4000-8000-0000000000b1";
 
-type View = ReturnType<typeof renderMobile>;
+type View = Awaited<ReturnType<typeof renderMobile>>;
 type Host = { type: unknown; props: Record<string, unknown>; parent: Host | null };
 
 /** Rendered host nodes of one native type, such as the avatar's `Svg`. */
-const hosts = (view: View, type: string) => view.UNSAFE_queryAllByType(type as never) as unknown as Host[];
+const hosts = (view: View, type: string) => queryAllHosts(view.container, type) as unknown as Host[];
 const marks = (view: View) => hosts(view, "Path").map((path) => path.props.d);
 const personIcons = (view: View) => hosts(view, "Icon").filter((icon) => icon.props.name === "User");
 /** The native view that holds the car mark: the avatar's circle. */
@@ -82,8 +82,8 @@ beforeEach(() => {
 });
 
 describe("ConversationHeader", () => {
-  it("shows the other participant's car mark at 36 points left of the one-line name, and last seen", () => {
-    const screen = header();
+  it("shows the other participant's car mark at 36 points left of the one-line name, and last seen", async () => {
+    const screen = await header();
 
     expect(marks(screen)[0]).toBe(KEY_MARK);
     expect(avatarCircle(screen).style).toMatchObject({ width: 36, height: 36 });
@@ -96,25 +96,25 @@ describe("ConversationHeader", () => {
     expect(screen.getByText("last seen 5 min ago")).toBeTruthy();
   });
 
-  it("shows the other participant's photo at 36 points instead of the car mark", () => {
-    const screen = header({ conversation: conversation({ peer: peer(SELLER, { avatarKey: PHOTO_KEY }) }) });
+  it("shows the other participant's photo at 36 points instead of the car mark", async () => {
+    const screen = await header({ conversation: conversation({ peer: peer(SELLER, { avatarKey: PHOTO_KEY }) }) });
 
-    const photo = screen.UNSAFE_getByType(Image);
+    const photo = getHost(screen.container, "Image");
     expect(photo.props.source).toEqual({ uri: PHOTO_URL });
     expect(photo.props.style).toMatchObject({ width: 36, height: 36 });
     expect(hosts(screen, "Svg")).toHaveLength(0);
   });
 
-  it("goes back to the car mark when the photo does not load", () => {
-    const screen = header({ conversation: conversation({ peer: peer(SELLER, { avatarKey: PHOTO_KEY }) }) });
+  it("goes back to the car mark when the photo does not load", async () => {
+    const screen = await header({ conversation: conversation({ peer: peer(SELLER, { avatarKey: PHOTO_KEY }) }) });
 
-    fireEvent(screen.UNSAFE_getByType(Image), "error");
-    expect(screen.UNSAFE_queryByType(Image)).toBeNull();
+    await fireEvent(getHost(screen.container, "Image"), "error");
+    expect(queryHost(screen.container, "Image")).toBeNull();
     expect(marks(screen)[0]).toBe(KEY_MARK);
   });
 
-  it("is heard as the name once: the avatar is not read on its own", () => {
-    const screen = header();
+  it("is heard as the name once: the avatar is not read on its own", async () => {
+    const screen = await header();
 
     expect(screen.getAllByText("Merdan Ataýew")).toHaveLength(1);
     expect(screen.queryByRole("image")).toBeNull();
@@ -128,9 +128,9 @@ describe("ConversationHeader", () => {
     ["en", "Abdyrahman Gurbanguly Atamyrad"],
     ["ru", "Абдырахман Гурбангулыев Атамыр"],
     ["tk", "Abdyrahman Gurbangulyýew Çaryý"],
-  ])("keeps a 30-character name on one line that ends in an ellipsis in %s", (locale, name) => {
+  ])("keeps a 30-character name on one line that ends in an ellipsis in %s", async (locale, name) => {
     expect(name).toHaveLength(30);
-    const screen = renderMobile(
+    const screen = await renderMobile(
       <ConversationHeader
         conversation={conversation({ peer: peer(SELLER, { displayName: name }) })}
         loading={false}
@@ -144,45 +144,45 @@ describe("ConversationHeader", () => {
     expect(screen.getByText(name).props).toMatchObject({ numberOfLines: 1, ellipsizeMode: "tail" });
   });
 
-  it("labels Back, Call and the menu, each on a 44 pt target", () => {
-    const screen = header({ callPhone: "+99361000000" });
+  it("labels Back, Call and the menu, each on a 44 pt target", async () => {
+    const screen = await header({ callPhone: "+99361000000" });
 
     for (const name of ["Go back", "Call the seller", "Conversation actions"]) {
       expect(screen.getByRole("button", { name }).props.className).toContain("h-11 w-11");
     }
-    fireEvent.press(screen.getByRole("button", { name: "Go back" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Go back" }));
     expect(handlers.onBack).toHaveBeenCalledOnce();
   });
 
   it("dials the given Listing contact phone", async () => {
-    const screen = header({ callPhone: "+99361000000" });
+    const screen = await header({ callPhone: "+99361000000" });
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Call the seller" }));
+      await fireEvent.press(screen.getByRole("button", { name: "Call the seller" }));
     });
     expect(Linking.openURL).toHaveBeenCalledWith("tel:+99361000000");
   });
 
-  it("has no Call without a phone", () => {
-    expect(header().queryByRole("button", { name: "Call the seller" })).toBeNull();
+  it("has no Call without a phone", async () => {
+    expect((await header()).queryByRole("button", { name: "Call the seller" })).toBeNull();
   });
 
-  it("names a seller without a name of their own by their generated name, not Private seller", () => {
-    const screen = header({ conversation: conversation({ peer: peer(SELLER, { displayName: null }) }) });
+  it("names a seller without a name of their own by their generated name, not Private seller", async () => {
+    const screen = await header({ conversation: conversation({ peer: peer(SELLER, { displayName: null }) }) });
     expect(screen.getByText("Driver 2057")).toBeTruthy();
     expect(screen.queryByText("Private seller")).toBeNull();
   });
 
-  it("names a buyer without a name of their own by their generated name, not Buyer", () => {
-    const screen = header({
+  it("names a buyer without a name of their own by their generated name, not Buyer", async () => {
+    const screen = await header({
       conversation: conversation({ myRole: "seller", peer: peer(BUYER, { displayName: "  ", nameNumber: 4821 }) }),
     });
     expect(screen.getByText("Driver 4821")).toBeTruthy();
     expect(screen.queryByText("Buyer")).toBeNull();
   });
 
-  it("names a deleted seller Deleted user, with the person icon and no car", () => {
-    const screen = header({ conversation: conversation({ peer: peer(SELLER, { displayName: null, deleted: true }) }) });
+  it("names a deleted seller Deleted user, with the person icon and no car", async () => {
+    const screen = await header({ conversation: conversation({ peer: peer(SELLER, { displayName: null, deleted: true }) }) });
     expect(screen.getByText("Deleted user")).toBeTruthy();
     expect(screen.queryByText("Private seller")).toBeNull();
     expect(screen.queryByText("Driver 2057")).toBeNull();
@@ -190,8 +190,8 @@ describe("ConversationHeader", () => {
     expect(hosts(screen, "Svg")).toHaveLength(0);
   });
 
-  it("names a deleted buyer Deleted user, with the person icon and no car", () => {
-    const screen = header({
+  it("names a deleted buyer Deleted user, with the person icon and no car", async () => {
+    const screen = await header({
       conversation: conversation({ myRole: "seller", peer: peer(BUYER, { displayName: null, deleted: true }) }),
     });
     expect(screen.getByText("Deleted user")).toBeTruthy();
@@ -200,56 +200,56 @@ describe("ConversationHeader", () => {
     expect(hosts(screen, "Svg")).toHaveLength(0);
   });
 
-  it("shows the muted bell when muted", () => {
-    expect(header({ isMuted: true }).getByLabelText("Notifications muted")).toBeTruthy();
-    expect(header().queryByLabelText("Notifications muted")).toBeNull();
+  it("shows the muted bell when muted", async () => {
+    expect((await header({ isMuted: true })).getByLabelText("Notifications muted")).toBeTruthy();
+    expect((await header()).queryByLabelText("Notifications muted")).toBeNull();
   });
 
-  it("opens the menu sheet with Mute, Report and Block from the ⋯ button", () => {
+  it("opens the menu sheet with Mute, Report and Block from the ⋯ button", async () => {
     const onReport = vi.fn();
-    const screen = header({ onReport });
+    const screen = await header({ onReport });
     expect(screen.queryByRole("button", { name: "Report" })).toBeNull();
 
-    fireEvent.press(screen.getByRole("button", { name: "Conversation actions" }));
-    fireEvent.press(screen.getByRole("button", { name: "Report" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Conversation actions" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Report" }));
     expect(onReport).toHaveBeenCalledOnce();
     // Each item closes the sheet before its action runs.
     expect(screen.queryByRole("button", { name: "Block user" })).toBeNull();
 
-    fireEvent.press(screen.getByRole("button", { name: "Conversation actions" }));
-    fireEvent.press(screen.getByRole("button", { name: "Mute notifications" }));
-    fireEvent.press(screen.getByRole("button", { name: "Conversation actions" }));
-    fireEvent.press(screen.getByRole("button", { name: "Block user" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Conversation actions" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Mute notifications" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Conversation actions" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Block user" }));
     expect(handlers.onToggleMute).toHaveBeenCalledOnce();
     expect(handlers.onBlock).toHaveBeenCalledOnce();
   });
 
-  it("leaves Report out of the menu without a report action", () => {
-    const screen = header();
-    fireEvent.press(screen.getByRole("button", { name: "Conversation actions" }));
+  it("leaves Report out of the menu without a report action", async () => {
+    const screen = await header();
+    await fireEvent.press(screen.getByRole("button", { name: "Conversation actions" }));
 
     expect(screen.getByRole("button", { name: "Block user" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Report" })).toBeNull();
   });
 
-  it("offers Unmute and Unblock when muted and blocked", () => {
-    const screen = header({ isMuted: true, isBlocked: true });
-    fireEvent.press(screen.getByRole("button", { name: "Conversation actions" }));
+  it("offers Unmute and Unblock when muted and blocked", async () => {
+    const screen = await header({ isMuted: true, isBlocked: true });
+    await fireEvent.press(screen.getByRole("button", { name: "Conversation actions" }));
     expect(screen.getByRole("button", { name: "Unmute notifications" })).toBeTruthy();
-    fireEvent.press(screen.getByRole("button", { name: "Unblock user" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Unblock user" }));
     expect(handlers.onUnblock).toHaveBeenCalledOnce();
   });
 
-  it("shows skeletons and only Back while loading", () => {
-    const screen = header({ conversation: undefined, loading: true });
+  it("shows skeletons and only Back while loading", async () => {
+    const screen = await header({ conversation: undefined, loading: true });
 
     expect(screen.getByTestId("conversation-header-skeleton")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Go back" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Conversation actions" })).toBeNull();
   });
 
-  it("shows only Back when the Conversation failed to load", () => {
-    const screen = header({ conversation: undefined, loading: false });
+  it("shows only Back when the Conversation failed to load", async () => {
+    const screen = await header({ conversation: undefined, loading: false });
 
     expect(screen.queryByTestId("conversation-header-skeleton")).toBeNull();
     expect(screen.getByRole("button", { name: "Go back" })).toBeTruthy();
@@ -258,8 +258,8 @@ describe("ConversationHeader", () => {
   it.each([
     ["ru", "Водитель 2057", "Позвонить продавцу"],
     ["tk", "Sürüji 2057", null],
-  ])("is localized in %s, generated name included", (locale, name, call) => {
-    const screen = renderMobile(
+  ])("is localized in %s, generated name included", async (locale, name, call) => {
+    const screen = await renderMobile(
       <ConversationHeader
         conversation={conversation({ peer: peer(SELLER, { displayName: null }) })}
         loading={false}
@@ -275,8 +275,8 @@ describe("ConversationHeader", () => {
     if (call) expect(screen.getByRole("button", { name: call })).toBeTruthy();
   });
 
-  it("names a deleted User in Russian as the account deletion screen does", () => {
-    const screen = renderMobile(
+  it("names a deleted User in Russian as the account deletion screen does", async () => {
+    const screen = await renderMobile(
       <ConversationHeader
         conversation={conversation({ peer: peer(SELLER, { displayName: null, deleted: true }) })}
         loading={false}

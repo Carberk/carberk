@@ -84,20 +84,20 @@ beforeEach(() => {
 
 describe("legacy Listing edit", () => {
   it.each(["Yes", "No"])("asks for Damaged before saving and accepts %s", async (answer) => {
-    const screen = renderMobile(<EditListingScreen />);
+    const screen = await renderMobile(<EditListingScreen />);
     expect(screen.queryByText("Answer whether the car is damaged or needs repair")).toBeNull();
     expect(screen.getByRole("radio", { name: "Damaged / needs repair: Yes", checked: false })).toBeTruthy();
     expect(screen.getByRole("radio", { name: "Damaged / needs repair: No", checked: false })).toBeTruthy();
     const done = screen.getByRole("button", { name: "Done", disabled: false });
     expect.soft(done.props.className.split(" ")).toContain("w-full");
     expect.soft(done.props.className.split(" ")).not.toContain("flex-1");
-    fireEvent.press(done);
+    await fireEvent.press(done);
     expect(screen.getByText("Answer whether the car is damaged or needs repair")).toBeTruthy();
     expect(fixture.save).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
-    fireEvent.press(screen.getByRole("radio", { name: `Damaged / needs repair: ${answer}` }));
+    await fireEvent.press(screen.getByRole("radio", { name: `Damaged / needs repair: ${answer}` }));
     expect(screen.queryByText("Answer whether the car is damaged or needs repair")).toBeNull();
-    fireEvent.press(screen.getByRole("button", { name: "Done", disabled: false }));
+    await fireEvent.press(screen.getByRole("button", { name: "Done", disabled: false }));
     expect(screen.getByText(`10,000 km · Damaged / needs repair: ${answer}`)).toBeTruthy();
     const save = screen.getByRole("button", { name: "Save changes", disabled: false });
     expect.soft(save.props.className.split(" ")).toContain("w-full");
@@ -109,22 +109,22 @@ describe("legacy Listing edit", () => {
     expect(fixture.deleteDraftDir).toHaveBeenCalledWith(`edit-${fixture.id}`);
   });
 
-  it("keeps missing Mileage and Damaged quiet until Done, and stays on Details while invalid", () => {
+  it("keeps missing Mileage and Damaged quiet until Done, and stays on Details while invalid", async () => {
     fixture.listing = { ...fixture.baseline, mileageKm: undefined };
-    const screen = renderMobile(<EditListingScreen />);
+    const screen = await renderMobile(<EditListingScreen />);
     expect(screen.queryByText("Mileage is required for used cars")).toBeNull();
     expect(screen.queryByText("Answer whether the car is damaged or needs repair")).toBeNull();
     expect(screen.getByRole("button", { name: "Done", disabled: false })).toBeTruthy();
-    fireEvent(screen.getByPlaceholderText("e.g. 50000"), "blur");
+    await fireEvent(screen.getByPlaceholderText("e.g. 50000"), "blur");
     expect(screen.getByText("Mileage is required for used cars")).toBeTruthy();
     expect(screen.queryByText("Answer whether the car is damaged or needs repair")).toBeNull();
-    fireEvent.press(screen.getByRole("button", { name: "New" }));
+    await fireEvent.press(screen.getByRole("button", { name: "New" }));
     expect(screen.queryByRole("radio")).toBeNull();
     expect(screen.getByRole("button", { name: "Done", disabled: false })).toBeTruthy();
-    fireEvent.press(screen.getByRole("button", { name: "Used" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Used" }));
     expect(screen.queryByText("Mileage is required for used cars")).toBeNull();
     expect(screen.queryByText("Answer whether the car is damaged or needs repair")).toBeNull();
-    fireEvent.press(screen.getByRole("button", { name: "Done" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Done" }));
     expect(screen.getByText("Answer whether the car is damaged or needs repair")).toBeTruthy();
     expect(screen.getByText("Mileage is required for used cars")).toBeTruthy();
     expect(screen.getByText("Details and condition")).toBeTruthy();
@@ -133,21 +133,21 @@ describe("legacy Listing edit", () => {
     expect(screen.getByRole("radio", { name: "Damaged / needs repair: No", checked: false })).toBeTruthy();
   });
 
-  it("keeps Done disabled during a pending save even on invalid Details", () => {
+  it("keeps Done disabled during a pending save even on invalid Details", async () => {
     fixture.pending = true;
-    const screen = renderMobile(<EditListingScreen />);
-    fireEvent.press(screen.getByRole("button", { name: "Done", disabled: true }));
+    const screen = await renderMobile(<EditListingScreen />);
+    await fireEvent.press(screen.getByRole("button", { name: "Done", disabled: true }));
     expect(screen.queryByText("Answer whether the car is damaged or needs repair")).toBeNull();
     expect(fixture.save).not.toHaveBeenCalled();
   });
 
-  it("Done explains untouched invalid Engine power and stays on Details", () => {
+  it("Done explains untouched invalid Engine power and stays on Details", async () => {
     fixture.listing = { ...fixture.baseline, enginePower: 0 };
-    const screen = renderMobile(<EditListingScreen />);
-    fireEvent.press(screen.getByRole("radio", { name: "Damaged / needs repair: No" }));
+    const screen = await renderMobile(<EditListingScreen />);
+    await fireEvent.press(screen.getByRole("radio", { name: "Damaged / needs repair: No" }));
     expect(screen.getByText("Power")).toBeTruthy();
     expect(screen.queryByText("Engine power must be greater than zero")).toBeNull();
-    fireEvent.press(screen.getByRole("button", { name: "Done", disabled: false }));
+    await fireEvent.press(screen.getByRole("button", { name: "Done", disabled: false }));
     expect(screen.getByText("Engine power must be greater than zero")).toBeTruthy();
     expect(screen.getByText("Details and condition")).toBeTruthy();
     expect(screen.getByDisplayValue("0")).toBeTruthy();
@@ -157,9 +157,9 @@ describe("legacy Listing edit", () => {
     expect(screen.queryByText("Mileage is required for used cars")).toBeNull();
   });
 
-  it("opens a New Listing without disclosure directly at the section list with Save changes", () => {
+  it("opens a New Listing without disclosure directly at the section list with Save changes", async () => {
     fixture.listing = { ...fixture.baseline, condition: "new", conditionDisclosure: undefined };
-    const screen = renderMobile(<EditListingScreen />);
+    const screen = await renderMobile(<EditListingScreen />);
     expect(screen.getByRole("header", { name: "Edit listing" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Save changes" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Done" })).toBeNull();
@@ -168,65 +168,65 @@ describe("legacy Listing edit", () => {
     expect(fixture.save).not.toHaveBeenCalled();
   });
 
-  it("clears this Listing's staged photos when the seller leaves the edit with changes", () => {
-    const screen = renderMobile(<EditListingScreen />);
-    fireEvent.press(screen.getByRole("radio", { name: "Damaged / needs repair: Yes" }));
-    fireEvent.press(screen.getByRole("button", { name: "Done", disabled: false }));
-    fireEvent.press(screen.getByRole("button", { name: "Close" }));
+  it("clears this Listing's staged photos when the seller leaves the edit with changes", async () => {
+    const screen = await renderMobile(<EditListingScreen />);
+    await fireEvent.press(screen.getByRole("radio", { name: "Damaged / needs repair: Yes" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Done", disabled: false }));
+    await fireEvent.press(screen.getByRole("button", { name: "Close" }));
     expect(fixture.deleteDraftDir).not.toHaveBeenCalled();
-    fireEvent.press(screen.getByRole("button", { name: "Leave" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Leave" }));
     expect(fixture.deleteDraftDir).toHaveBeenCalledWith(`edit-${fixture.id}`);
   });
 
   describe("with a photo that keeps Save changes disabled", () => {
-    function renderReview(photo: Record<string, unknown>, blocker: string) {
+    async function renderReview(photo: Record<string, unknown>, blocker: string) {
       fixture.listing = { ...fixture.baseline, conditionDisclosure: { damaged: false } };
       fixture.photos = [fixture.saved, { photoId: "new-photo", sortOrder: 1, retryCount: 0, ...photo }];
       fixture.gate = { canPublish: false, blockers: [blocker] };
-      const screen = renderMobile(<EditListingScreen />);
+      const screen = await renderMobile(<EditListingScreen />);
       expect(screen.getByRole("button", { name: "Save changes", disabled: true })).toBeTruthy();
       return screen;
     }
 
-    it("counts a photo waiting for the network as uploading, in the chip and the reason", () => {
-      const screen = renderReview({ state: "waiting_for_network" }, "wizardErrors.uploadsInProgress");
+    it("counts a photo waiting for the network as uploading, in the chip and the reason", async () => {
+      const screen = await renderReview({ state: "waiting_for_network" }, "wizardErrors.uploadsInProgress");
       expect(screen.getByText("1 uploading")).toBeTruthy();
       expect(screen.getByText("Wait for 1 photos to finish uploading")).toBeTruthy();
     });
 
-    it("counts a lost photo as failed, in the chip and the reason", () => {
-      const screen = renderReview({ state: "lost" }, "wizardErrors.uploadsFailed");
+    it("counts a lost photo as failed, in the chip and the reason", async () => {
+      const screen = await renderReview({ state: "lost" }, "wizardErrors.uploadsFailed");
       expect(screen.getByText("1 failed")).toBeTruthy();
       expect(screen.getByText("1 failed — retry or remove")).toBeTruthy();
     });
   });
 
   describe("after a partial save failure", () => {
-    function renderFailedReview() {
+    async function renderFailedReview() {
       fixture.saveState = {
         status: "failed",
         error: new Error("Edit session failed at operation reorder"),
         opStates: { fields: "succeeded", [`attach:local`]: "succeeded", reorder: "failed" },
       };
-      const screen = renderMobile(<EditListingScreen />);
-      fireEvent.press(screen.getByRole("radio", { name: "Damaged / needs repair: No" }));
-      fireEvent.press(screen.getByRole("button", { name: "Done", disabled: false }));
+      const screen = await renderMobile(<EditListingScreen />);
+      await fireEvent.press(screen.getByRole("radio", { name: "Damaged / needs repair: No" }));
+      await fireEvent.press(screen.getByRole("button", { name: "Done", disabled: false }));
       return screen;
     }
 
     // Retry 0 is the status line under the progress bar, Retry 1 the failure banner on Review.
-    function retryButton(screen: ReturnType<typeof renderMobile>, index: number) {
+    function retryButton(screen: Awaited<ReturnType<typeof renderMobile>>, index: number) {
       return screen.getByRole("button", { name: index === 0 ? "Not saved. Retry" : "Retry" });
     }
 
-    it("shows which operations succeeded and failed", () => {
-      const screen = renderFailedReview();
+    it("shows which operations succeeded and failed", async () => {
+      const screen = await renderFailedReview();
       expect(screen.getByText("✓ attach:local")).toBeTruthy();
       expect(screen.getByText("✗ reorder")).toBeTruthy();
     });
 
     it.each([0, 1])("leaves the edit screen once Retry %i completes the remaining operations", async (entry) => {
-      const screen = renderFailedReview();
+      const screen = await renderFailedReview();
       await act(async () => fireEvent.press(retryButton(screen, entry)));
       expect(fixture.retry).toHaveBeenCalledOnce();
       expect(fixture.save).not.toHaveBeenCalled();
@@ -236,7 +236,7 @@ describe("legacy Listing edit", () => {
 
     it.each([0, 1])("does not report success when Retry %i did not run", async (entry) => {
       fixture.retry.mockResolvedValue(false);
-      const screen = renderFailedReview();
+      const screen = await renderFailedReview();
       await act(async () => fireEvent.press(retryButton(screen, entry)));
       expect(fixture.retry).toHaveBeenCalledOnce();
       expect(fixture.show).not.toHaveBeenCalled();
@@ -245,9 +245,9 @@ describe("legacy Listing edit", () => {
 
     it("does not report success when Save did not run", async () => {
       fixture.save.mockResolvedValue(false);
-      const screen = renderMobile(<EditListingScreen />);
-      fireEvent.press(screen.getByRole("radio", { name: "Damaged / needs repair: No" }));
-      fireEvent.press(screen.getByRole("button", { name: "Done", disabled: false }));
+      const screen = await renderMobile(<EditListingScreen />);
+      await fireEvent.press(screen.getByRole("radio", { name: "Damaged / needs repair: No" }));
+      await fireEvent.press(screen.getByRole("button", { name: "Done", disabled: false }));
       await act(async () =>
         fireEvent.press(screen.getByRole("button", { name: "Save changes", disabled: false })),
       );
@@ -258,7 +258,7 @@ describe("legacy Listing edit", () => {
 
     it.each([0, 1])("stays on the edit screen when Retry %i fails again", async (entry) => {
       fixture.retry.mockRejectedValue(new Error("still failing"));
-      const screen = renderFailedReview();
+      const screen = await renderFailedReview();
       await act(async () => fireEvent.press(retryButton(screen, entry)));
       expect(fixture.retry).toHaveBeenCalledOnce();
       expect(fixture.show).not.toHaveBeenCalled();
@@ -276,29 +276,29 @@ describe("legacy Listing edit", () => {
       fixture.listing = { ...fixture.listing, ...changes };
     }
 
-    it("retains an unsaved Damaged choice when refetch returns a new Listing object", () => {
-      const screen = renderMobile(<EditListingScreen />);
-      fireEvent.press(screen.getByRole("radio", damagedYes));
+    it("retains an unsaved Damaged choice when refetch returns a new Listing object", async () => {
+      const screen = await renderMobile(<EditListingScreen />);
+      await fireEvent.press(screen.getByRole("radio", damagedYes));
       expect(screen.getByRole("radio", { ...damagedYes, checked: true })).toBeTruthy();
       refetch();
-      screen.rerender(<EditListingScreen />);
+      await screen.rerender(<EditListingScreen />);
       expect(screen.getByRole("radio", { ...damagedYes, checked: true })).toBeTruthy();
     });
 
-    it("stays on the step the seller reached", () => {
-      const screen = renderMobile(<EditListingScreen />);
-      fireEvent.press(screen.getByRole("radio", damagedYes));
-      fireEvent.press(screen.getByRole("button", { name: "Done", disabled: false }));
+    it("stays on the step the seller reached", async () => {
+      const screen = await renderMobile(<EditListingScreen />);
+      await fireEvent.press(screen.getByRole("radio", damagedYes));
+      await fireEvent.press(screen.getByRole("button", { name: "Done", disabled: false }));
       expect(screen.getByRole("button", { name: "Save changes" })).toBeTruthy();
       refetch({ favoriteCount: 2, updatedAt: "2026-10-02T12:00:00.000Z" });
-      screen.rerender(<EditListingScreen />);
+      await screen.rerender(<EditListingScreen />);
       expect(screen.getByRole("button", { name: "Save changes" })).toBeTruthy();
       expect(screen.getByText("10,000 km · Damaged / needs repair: Yes")).toBeTruthy();
     });
 
-    it("starts a different Listing from its own server baseline", () => {
-      const screen = renderMobile(<EditListingScreen />);
-      fireEvent.press(screen.getByRole("radio", damagedYes));
+    it("starts a different Listing from its own server baseline", async () => {
+      const screen = await renderMobile(<EditListingScreen />);
+      await fireEvent.press(screen.getByRole("radio", damagedYes));
       const otherId = "550e8400-e29b-41d4-a716-4466554400ff";
       routeParams.id = otherId;
       fixture.listing = {
@@ -306,7 +306,7 @@ describe("legacy Listing edit", () => {
         id: otherId,
         conditionDisclosure: { damaged: false },
       };
-      screen.rerender(<EditListingScreen />);
+      await screen.rerender(<EditListingScreen />);
       expect(screen.getByText("10,000 km · Damaged / needs repair: No")).toBeTruthy();
       expect(screen.getByRole("button", { name: "Save changes" })).toBeTruthy();
     });

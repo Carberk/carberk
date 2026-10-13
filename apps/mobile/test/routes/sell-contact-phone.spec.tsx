@@ -125,10 +125,10 @@ beforeEach(() => {
 });
 
 describe("Sell wizard Contact step", () => {
-  it("preselects the sign-in phone and lists confirmed numbers with the days left", () => {
+  it("preselects the sign-in phone and lists confirmed numbers with the days left", async () => {
     fixture.confirmedPhones = [confirmedEntry(CONFIRMED_PHONE, 3)];
     resume("atContact");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
     expect(screen.getByRole("header", { name: "Contact, Step 6 of 7" })).toBeTruthy();
     expect(screen.getByText("Contact phone")).toBeTruthy();
@@ -146,11 +146,11 @@ describe("Sell wizard Contact step", () => {
     expect(screen.getByText("In-app chat")).toBeTruthy();
   });
 
-  it("opens the number screen from Another number", () => {
+  it("opens the number screen from Another number", async () => {
     resume("atContact");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
-    fireEvent.press(screen.getByLabelText("Another number"));
+    await fireEvent.press(screen.getByLabelText("Another number"));
 
     expect(routerMock.push).toHaveBeenCalledWith({
       pathname: "/listings/contact-phone",
@@ -158,11 +158,11 @@ describe("Sell wizard Contact step", () => {
     });
   });
 
-  it("selects the number the code flow confirmed and clears the route param", () => {
+  it("selects the number the code flow confirmed and clears the route param", async () => {
     fixture.confirmedPhones = [confirmedEntry(CONFIRMED_PHONE, 7)];
     resume("atContact");
     routeParams.confirmedContactPhone = CONFIRMED_PHONE;
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
     expect(
       screen.getByLabelText(CONFIRMED_PHONE, { exact: false }).props.accessibilityState,
@@ -175,26 +175,26 @@ describe("Sell wizard Contact step", () => {
     });
   });
 
-  it("marks a stale saved number, blocks Continue and offers reconfirmation", () => {
+  it("marks a stale saved number, blocks Continue and offers reconfirmation", async () => {
     resume("stale");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
     // Opened from Check and publish (#588), so the step ends with Done.
-    fireEvent.press(screen.getByRole("button", { name: /^Contact, .*Change$/ }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Contact, .*Change$/ }));
 
     expect(screen.getByRole("header", { name: "Contact, Step 6 of 7" })).toBeTruthy();
     expect(
       screen.getByText("Confirmation expired. Tap to confirm again."),
     ).toBeTruthy();
 
-    fireEvent.press(screen.getByRole("button", { name: "Done" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Done" }));
 
     expect(
       screen.getByText("Confirm this number again or choose another"),
     ).toBeTruthy();
     expect(screen.getByRole("header", { name: "Contact, Step 6 of 7" })).toBeTruthy();
 
-    fireEvent.press(screen.getByLabelText(STALE_PHONE, { exact: false }));
+    await fireEvent.press(screen.getByLabelText(STALE_PHONE, { exact: false }));
 
     expect(routerMock.push).toHaveBeenCalledWith({
       pathname: "/listings/contact-phone",
@@ -209,9 +209,9 @@ describe("Sell wizard Contact step", () => {
   it("does not call a saved number expired while the confirmed list is not known, and Done goes on", async () => {
     fixture.confirmedPhones = undefined;
     resume("stale");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
-    fireEvent.press(screen.getByRole("button", { name: /^Contact, .*Change$/ }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Contact, .*Change$/ }));
 
     expect(screen.getByRole("header", { name: "Contact, Step 6 of 7" })).toBeTruthy();
     expect(
@@ -222,7 +222,7 @@ describe("Sell wizard Contact step", () => {
     ).toMatchObject({ checked: true });
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Done" }));
+      await fireEvent.press(screen.getByRole("button", { name: "Done" }));
     });
 
     // The app cannot judge the number yet, so it does not hold the seller
@@ -235,10 +235,10 @@ describe("Sell wizard Contact step", () => {
     ).toBeTruthy();
   });
 
-  it("asks an email-only User to choose or confirm a contact phone", () => {
+  it("asks an email-only User to choose or confirm a contact phone", async () => {
     fixture.auth = { isAuthenticated: true, phone: null };
     resume("atContact");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
     expect(
       screen.getByText(
@@ -247,7 +247,7 @@ describe("Sell wizard Contact step", () => {
     ).toBeTruthy();
     expect(screen.queryByLabelText("+99365000000")).toBeNull();
 
-    fireEvent.press(screen.getByRole("button", { name: "Continue" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Continue" }));
 
     expect(
       screen.getByText("Choose or confirm a contact phone"),
@@ -263,10 +263,10 @@ describe("Sell wizard Contact step", () => {
     async (_label, code) => {
       fixture.publish.mutateAsync.mockRejectedValue(new ApiError(code, 409));
       resume("stale");
-      const screen = renderMobile(<SellScreen />);
+      const screen = await renderMobile(<SellScreen />);
 
       await act(async () => {
-        fireEvent.press(screen.getByRole("button", { name: "Publish" }));
+        await fireEvent.press(screen.getByRole("button", { name: "Publish" }));
       });
 
       expect(
@@ -282,12 +282,12 @@ describe("Sell wizard Contact step", () => {
 
       // Picking a number that needs no code and Done returns to Check, where
       // Publish is ready again and no publish failure is worded (#588).
-      fireEvent.press(screen.getByLabelText("+99365000000", { exact: false }));
+      await fireEvent.press(screen.getByLabelText("+99365000000", { exact: false }));
       expect(
         screen.queryByText("Confirm the contact phone again to publish."),
       ).toBeNull();
       await act(async () => {
-        fireEvent.press(screen.getByRole("button", { name: "Done" }));
+        await fireEvent.press(screen.getByRole("button", { name: "Done" }));
       });
       expect(
         screen.getByRole("button", { name: "Publish" }).props.accessibilityState,
@@ -304,10 +304,10 @@ describe("Sell wizard Contact step", () => {
       new ApiError(ListingsSchemas.ListingsErrorCode.ContactPhoneNotConfirmed, 409),
     );
     resume("stale");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Publish" }));
+      await fireEvent.press(screen.getByRole("button", { name: "Publish" }));
     });
 
     // The refusal settles what the app could not judge: the row is expired.
@@ -319,7 +319,7 @@ describe("Sell wizard Contact step", () => {
     ).toBeTruthy();
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Done" }));
+      await fireEvent.press(screen.getByRole("button", { name: "Done" }));
     });
 
     expect(
@@ -328,15 +328,15 @@ describe("Sell wizard Contact step", () => {
     expect(screen.getByRole("header", { name: "Contact, Step 6 of 7" })).toBeTruthy();
   });
 
-  it("still requires a contact phone when calls are off, and shows no calls-off line (D7)", () => {
+  it("still requires a contact phone when calls are off, and shows no calls-off line (D7)", async () => {
     fixture.auth = { isAuthenticated: true, phone: null };
     resume("callsOff");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
     expect(screen.getByText("Contact phone")).toBeTruthy();
     expect(screen.queryByText(/calls are off/i)).toBeNull();
 
-    fireEvent.press(screen.getByRole("button", { name: "Continue" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Continue" }));
 
     expect(screen.getByText("Choose or confirm a contact phone")).toBeTruthy();
     expect(screen.getByRole("header", { name: "Contact, Step 6 of 7" })).toBeTruthy();
@@ -344,11 +344,11 @@ describe("Sell wizard Contact step", () => {
 
   it("Continue is enabled with the preselected sign-in phone and moves to Check and publish", async () => {
     resume("atContact");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
     const next = screen.getByRole("button", { name: "Continue" });
     expect(next.props.accessibilityState).toMatchObject({ disabled: false });
-    await act(async () => { fireEvent.press(next); });
+    await act(async () => { await fireEvent.press(next); });
 
     expect(screen.queryByText("Choose or confirm a contact phone")).toBeNull();
     expect(
@@ -359,12 +359,12 @@ describe("Sell wizard Contact step", () => {
   it("Continue is enabled with a confirmed number selected and moves to Check and publish", async () => {
     fixture.confirmedPhones = [confirmedEntry(CONFIRMED_PHONE, 3)];
     resume("atContact");
-    const screen = renderMobile(<SellScreen />);
+    const screen = await renderMobile(<SellScreen />);
 
-    fireEvent.press(screen.getByLabelText(CONFIRMED_PHONE, { exact: false }));
+    await fireEvent.press(screen.getByLabelText(CONFIRMED_PHONE, { exact: false }));
     const next = screen.getByRole("button", { name: "Continue" });
     expect(next.props.accessibilityState).toMatchObject({ disabled: false });
-    await act(async () => { fireEvent.press(next); });
+    await act(async () => { await fireEvent.press(next); });
 
     expect(
       screen.getByRole("header", { name: "Check and publish, Step 7 of 7" }),

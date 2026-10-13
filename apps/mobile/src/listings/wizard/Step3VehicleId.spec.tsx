@@ -1,10 +1,9 @@
 import { Profiler, useState, type ReactElement } from "react";
-import { FlatList } from "react-native";
 import { WizardSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fireEvent, first, renderMobile, within } from "../../../test/render";
+import { fireEvent, first, getHost, renderMobile, within } from "../../../test/render";
 
 import Step3VehicleId from "./Step3VehicleId";
 import { translateWizardFieldErrors } from "./wizardErrors";
@@ -86,8 +85,8 @@ const vinHelper = {
 } as const;
 
 describe("Car step", () => {
-  it("shows Brand, Model, Year and Generation, then an optional VIN field at the bottom", () => {
-    const screen = renderMobile(<Step3VehicleId payload={filled} onChange={() => {}} />);
+  it("shows Brand, Model, Year and Generation, then an optional VIN field at the bottom", async () => {
+    const screen = await renderMobile(<Step3VehicleId payload={filled} onChange={() => {}} />);
 
     const labels = ["Brand", "Model", "Year", "Generation", "VIN"].map(
       (label) => screen.getAllByText(new RegExp(`^${label}( \\*)?$`))[0],
@@ -107,37 +106,37 @@ describe("Car step", () => {
     expect(screen.queryByRole("button", { name: "Skip" })).toBeNull();
   });
 
-  it.each(["ru", "tk"] as const)("shows the VIN helper in %s", (locale) => {
-    const screen = renderMobile(<Step3VehicleId payload={{}} onChange={() => {}} />, { locale });
+  it.each(["ru", "tk"] as const)("shows the VIN helper in %s", async (locale) => {
+    const screen = await renderMobile(<Step3VehicleId payload={{}} onChange={() => {}} />, { locale });
     expect(screen.getByText(vinHelper[locale])).toBeTruthy();
     expect(screen.getByHintText(vinHelper[locale])).toBeTruthy();
   });
 
-  it("saves the typed VIN and clears it when emptied", () => {
+  it("saves the typed VIN and clears it when emptied", async () => {
     const onChange = vi.fn();
-    const screen = renderMobile(<Step3VehicleId payload={{}} onChange={onChange} />);
+    const screen = await renderMobile(<Step3VehicleId payload={{}} onChange={onChange} />);
 
-    fireEvent.changeText(screen.getByLabelText("VIN"), "WBA1234567890ABCD");
-    fireEvent.changeText(screen.getByLabelText("VIN"), "  ");
+    await fireEvent.changeText(screen.getByLabelText("VIN"), "WBA1234567890ABCD");
+    await fireEvent.changeText(screen.getByLabelText("VIN"), "  ");
 
     expect(onChange).toHaveBeenNthCalledWith(1, { vin: "WBA1234567890ABCD" });
     expect(onChange).toHaveBeenNthCalledWith(2, { vin: null });
   });
 
-  it("shows a VIN error under the field after the first Continue tap", () => {
+  it("shows a VIN error under the field after the first Continue tap", async () => {
     const fieldErrors = { vin: "Use 17 characters or fewer" };
-    const screen = renderMobile(
+    const screen = await renderMobile(
       <Step3VehicleId payload={{ vin: "A".repeat(18) }} onChange={() => {}} fieldErrors={fieldErrors} />,
     );
     expect(screen.queryByText("Use 17 characters or fewer")).toBeNull();
 
-    screen.rerender(
+    await screen.rerender(
       <Step3VehicleId payload={{ vin: "A".repeat(18) }} onChange={() => {}} fieldErrors={fieldErrors} showErrors />,
     );
     expect(screen.getByText("Use 17 characters or fewer")).toBeTruthy();
   });
 
-  it("shows the VIN error while typing, without waiting for Continue (#780)", () => {
+  it("shows the VIN error while typing, without waiting for Continue (#780)", async () => {
     function LiveVin() {
       const [payload, setPayload] = useState<Payload>({});
       const { t } = useTranslation();
@@ -154,33 +153,33 @@ describe("Car step", () => {
       );
     }
     const message = "Enter a 17-character VIN using letters and digits, without I, O or Q.";
-    const screen = renderMobile(<LiveVin />);
+    const screen = await renderMobile(<LiveVin />);
     expect(screen.queryByText(message)).toBeNull();
 
-    fireEvent.changeText(screen.getByLabelText("VIN"), "Corolla");
+    await fireEvent.changeText(screen.getByLabelText("VIN"), "Corolla");
     expect(screen.getByText(message)).toBeTruthy();
 
-    fireEvent.changeText(screen.getByLabelText("VIN"), "WBA1234567890ABCD");
+    await fireEvent.changeText(screen.getByLabelText("VIN"), "WBA1234567890ABCD");
     expect(screen.queryByText(message)).toBeNull();
 
-    fireEvent.changeText(screen.getByLabelText("VIN"), "");
+    await fireEvent.changeText(screen.getByLabelText("VIN"), "");
     expect(screen.queryByText(message)).toBeNull();
   });
 
-  it("locks the VIN with the rest of Car when editing a published Listing", () => {
-    const screen = renderMobile(
+  it("locks the VIN with the rest of Car when editing a published Listing", async () => {
+    const screen = await renderMobile(
       <Step3VehicleId payload={{ vin: "WBA1234567890ABCD" }} onChange={() => {}} disabled />,
     );
     expect(screen.getByLabelText("VIN").props.editable).toBe(false);
   });
 });
 
-const row = (screen: ReturnType<typeof renderMobile>, name: string | RegExp) =>
+const row = (screen: Awaited<ReturnType<typeof renderMobile>>, name: string | RegExp) =>
   screen.getByRole("button", { name });
 /** A sheet row; sheets render after the Car rows, whose value text can share its name. */
-const option = (screen: ReturnType<typeof renderMobile>, name: string) =>
+const option = (screen: Awaited<ReturnType<typeof renderMobile>>, name: string) =>
   first(screen.getAllByRole("button", { name }).reverse());
-const sheetOpen = (screen: ReturnType<typeof renderMobile>) =>
+const sheetOpen = (screen: Awaited<ReturnType<typeof renderMobile>>) =>
   screen.queryByRole("button", { name: "Close" }) !== null;
 
 /**
@@ -188,11 +187,11 @@ const sheetOpen = (screen: ReturnType<typeof renderMobile>) =>
  * Generation sheet was on screen. A sheet that opens and closes inside one
  * press leaves no trace in the final tree, so the commits are the evidence.
  */
-function renderWatchingCommits(ui: ReactElement) {
+async function renderWatchingCommits(ui: ReactElement) {
   const emptySheetCommits: boolean[] = [];
   // Empty during the first render, which happens before renderMobile returns.
-  const mounted: { screen?: ReturnType<typeof renderMobile> } = {};
-  const screen = renderMobile(
+  const mounted: { screen?: Awaited<ReturnType<typeof renderMobile>> } = {};
+  const screen = await renderMobile(
     <Profiler
       id="car"
       onRender={() => {
@@ -211,16 +210,16 @@ function renderWatchingCommits(ui: ReactElement) {
 }
 
 describe("Car step pickers chain", () => {
-  it("opens Model after a Brand, Year after a Model and Generation after a Year", () => {
-    const screen = renderMobile(<CarStep />);
+  it("opens Model after a Brand, Year after a Model and Generation after a Year", async () => {
+    const screen = await renderMobile(<CarStep />);
 
-    fireEvent.press(row(screen, "Brand: Select brand"));
-    fireEvent.press(option(screen, "Toyota"));
+    await fireEvent.press(row(screen, "Brand: Select brand"));
+    await fireEvent.press(option(screen, "Toyota"));
     expect(screen.queryByRole("button", { name: "BMW" })).toBeNull();
-    fireEvent.press(option(screen, "Camry"));
+    await fireEvent.press(option(screen, "Camry"));
     expect(screen.queryByRole("button", { name: "Corolla" })).toBeNull();
-    fireEvent.press(option(screen, "2018"));
-    fireEvent.press(option(screen, "XV70 (2017–2024)"));
+    await fireEvent.press(option(screen, "2018"));
+    await fireEvent.press(option(screen, "XV70 (2017–2024)"));
 
     expect(sheetOpen(screen)).toBe(false);
     expect(row(screen, "Brand: Toyota")).toBeTruthy();
@@ -229,57 +228,57 @@ describe("Car step pickers chain", () => {
     expect(row(screen, "Generation: XV70 (2017–2024)")).toBeTruthy();
   });
 
-  it("goes from Model straight to Generation when the year is already set", () => {
-    const screen = renderMobile(<CarStep initial={{ brandId: "toyota", year: 2018 }} />);
+  it("goes from Model straight to Generation when the year is already set", async () => {
+    const screen = await renderMobile(<CarStep initial={{ brandId: "toyota", year: 2018 }} />);
 
-    fireEvent.press(row(screen, "Model: Select model"));
-    fireEvent.press(option(screen, "Camry"));
+    await fireEvent.press(row(screen, "Model: Select model"));
+    await fireEvent.press(option(screen, "Camry"));
 
     expect(screen.queryByRole("button", { name: "1999" })).toBeNull();
     expect(screen.getByRole("button", { name: "XV70 (2017–2024)" })).toBeTruthy();
   });
 
-  it("stops after Model when the year is set and the model has no generations", () => {
-    const screen = renderMobile(<CarStep initial={{ brandId: "toyota", year: 2018 }} />);
+  it("stops after Model when the year is set and the model has no generations", async () => {
+    const screen = await renderMobile(<CarStep initial={{ brandId: "toyota", year: 2018 }} />);
 
-    fireEvent.press(row(screen, "Model: Select model"));
-    fireEvent.press(option(screen, "Corolla"));
+    await fireEvent.press(row(screen, "Model: Select model"));
+    await fireEvent.press(option(screen, "Corolla"));
 
     expect(sheetOpen(screen)).toBe(false);
     expect(row(screen, "Model: Corolla")).toBeTruthy();
   });
 
-  it("stops after Year when a generation is already chosen", () => {
-    const screen = renderMobile(<CarStep initial={filled} />);
+  it("stops after Year when a generation is already chosen", async () => {
+    const screen = await renderMobile(<CarStep initial={filled} />);
 
-    fireEvent.press(row(screen, "Year: 2018"));
-    fireEvent.press(option(screen, "2019"));
+    await fireEvent.press(row(screen, "Year: 2018"));
+    await fireEvent.press(option(screen, "2019"));
 
     expect(sheetOpen(screen)).toBe(false);
     expect(row(screen, "Year: 2019")).toBeTruthy();
   });
 
-  it("closes a Generation sheet it opened once the model turns out to have no generations", () => {
+  it("closes a Generation sheet it opened once the model turns out to have no generations", async () => {
     catalog.generationsPending = true;
-    const screen = renderMobile(<CarStep initial={{ brandId: "toyota", year: 2018 }} />);
+    const screen = await renderMobile(<CarStep initial={{ brandId: "toyota", year: 2018 }} />);
 
-    fireEvent.press(row(screen, "Model: Select model"));
-    fireEvent.press(option(screen, "Corolla"));
+    await fireEvent.press(row(screen, "Model: Select model"));
+    await fireEvent.press(option(screen, "Corolla"));
     expect(sheetOpen(screen)).toBe(true);
 
     catalog.generationsPending = false;
-    screen.rerender(<CarStep initial={{ brandId: "toyota", year: 2018 }} />);
+    await screen.rerender(<CarStep initial={{ brandId: "toyota", year: 2018 }} />);
 
     expect(sheetOpen(screen)).toBe(false);
   });
 
-  it("never shows the Generation sheet after a Year when the model is known to have none", () => {
-    const { screen, emptySheetCommits } = renderWatchingCommits(
+  it("never shows the Generation sheet after a Year when the model is known to have none", async () => {
+    const { screen, emptySheetCommits } = await renderWatchingCommits(
       <CarStep initial={{ brandId: "toyota", modelId: "corolla" }} />,
     );
 
-    fireEvent.press(row(screen, "Year: Select year"));
-    fireEvent.press(option(screen, "2018"));
+    await fireEvent.press(row(screen, "Year: Select year"));
+    await fireEvent.press(option(screen, "2018"));
 
     expect(emptySheetCommits).not.toContain(true);
     expect(emptySheetCommits.length).toBeGreaterThan(0);
@@ -287,42 +286,43 @@ describe("Car step pickers chain", () => {
     expect(row(screen, "Year: 2018")).toBeTruthy();
   });
 
-  it("never shows the Generation sheet when a model known to have none is picked again", () => {
-    const { screen, emptySheetCommits } = renderWatchingCommits(
+  it("never shows the Generation sheet when a model known to have none is picked again", async () => {
+    const { screen, emptySheetCommits } = await renderWatchingCommits(
       <CarStep initial={{ brandId: "toyota", modelId: "corolla", year: 2018 }} />,
     );
 
-    fireEvent.press(row(screen, "Model: Corolla"));
-    fireEvent.press(option(screen, "Corolla"));
+    await fireEvent.press(row(screen, "Model: Corolla"));
+    await fireEvent.press(option(screen, "Corolla"));
 
     expect(emptySheetCommits).not.toContain(true);
     expect(emptySheetCommits.length).toBeGreaterThan(0);
     expect(sheetOpen(screen)).toBe(false);
   });
 
-  it("starts each picker's list from the top instead of keeping the last list's scroll", () => {
-    const screen = renderMobile(<CarStep />);
+  it("starts each picker's list from the top instead of keeping the last list's scroll", async () => {
+    const screen = await renderMobile(<CarStep />);
 
-    fireEvent.press(row(screen, "Brand: Select brand"));
-    const brandList = screen.UNSAFE_getByType(FlatList);
-    fireEvent.press(option(screen, "Toyota"));
-    const modelList = screen.UNSAFE_getByType(FlatList);
-    fireEvent.press(option(screen, "Camry"));
-    const yearList = screen.UNSAFE_getByType(FlatList);
+    await fireEvent.press(row(screen, "Brand: Select brand"));
+    const brandList = getHost(screen.container, "RCTScrollView");
+    await fireEvent.press(option(screen, "Toyota"));
+    const modelList = getHost(screen.container, "RCTScrollView");
+    await fireEvent.press(option(screen, "Camry"));
+    const yearList = getHost(screen.container, "RCTScrollView");
 
-    // A list that is mounted anew has no scroll offset to carry over. Compared
-    // as booleans: printing two test instances on failure exhausts the heap.
+    // A list that is mounted anew has no scroll offset to carry over; each
+    // FlatList renders the sheet's only scroll host. Compared as booleans:
+    // printing two test instances on failure exhausts the heap.
     expect(modelList === brandList).toBe(false);
     expect(yearList === modelList).toBe(false);
   });
 
-  it("keeps what was picked and opens nothing more when a sheet is closed", () => {
+  it("keeps what was picked and opens nothing more when a sheet is closed", async () => {
     const onChange = vi.fn();
-    const screen = renderMobile(<CarStep onChange={onChange} />);
+    const screen = await renderMobile(<CarStep onChange={onChange} />);
 
-    fireEvent.press(row(screen, "Brand: Select brand"));
-    fireEvent.press(option(screen, "Toyota"));
-    fireEvent.press(option(screen, "Close"));
+    await fireEvent.press(row(screen, "Brand: Select brand"));
+    await fireEvent.press(option(screen, "Toyota"));
+    await fireEvent.press(option(screen, "Close"));
 
     expect(sheetOpen(screen)).toBe(false);
     expect(row(screen, "Brand: Toyota")).toBeTruthy();
@@ -332,12 +332,12 @@ describe("Car step pickers chain", () => {
 });
 
 describe("Car step clearing", () => {
-  it("clears Model and Generation but keeps Year when the Brand changes", () => {
+  it("clears Model and Generation but keeps Year when the Brand changes", async () => {
     const onChange = vi.fn();
-    const screen = renderMobile(<CarStep initial={filled} onChange={onChange} />);
+    const screen = await renderMobile(<CarStep initial={filled} onChange={onChange} />);
 
-    fireEvent.press(row(screen, "Brand: Toyota"));
-    fireEvent.press(option(screen, "BMW"));
+    await fireEvent.press(row(screen, "Brand: Toyota"));
+    await fireEvent.press(option(screen, "BMW"));
 
     expect(onChange).toHaveBeenLastCalledWith({
       brandId: "bmw",
@@ -348,24 +348,24 @@ describe("Car step clearing", () => {
     expect(row(screen, "Year: 2018")).toBeTruthy();
   });
 
-  it("clears Generation but keeps Year when the Model changes", () => {
+  it("clears Generation but keeps Year when the Model changes", async () => {
     const onChange = vi.fn();
-    const screen = renderMobile(<CarStep initial={filled} onChange={onChange} />);
+    const screen = await renderMobile(<CarStep initial={filled} onChange={onChange} />);
 
-    fireEvent.press(row(screen, "Model: Camry"));
-    fireEvent.press(option(screen, "Corolla"));
+    await fireEvent.press(row(screen, "Model: Camry"));
+    await fireEvent.press(option(screen, "Corolla"));
 
     expect(onChange).toHaveBeenLastCalledWith({ modelId: "corolla", generationId: undefined });
     expect(row(screen, "Year: 2018")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /^Generation:/ })).toBeNull();
   });
 
-  it("keeps Model and Generation when the same Brand is picked again", () => {
+  it("keeps Model and Generation when the same Brand is picked again", async () => {
     const onChange = vi.fn();
-    const screen = renderMobile(<CarStep initial={filled} onChange={onChange} />);
+    const screen = await renderMobile(<CarStep initial={filled} onChange={onChange} />);
 
-    fireEvent.press(row(screen, "Brand: Toyota"));
-    fireEvent.press(option(screen, "Toyota"));
+    await fireEvent.press(row(screen, "Brand: Toyota"));
+    await fireEvent.press(option(screen, "Toyota"));
 
     expect(onChange).not.toHaveBeenCalled();
     expect(row(screen, "Model: Camry")).toBeTruthy();
@@ -374,10 +374,10 @@ describe("Car step clearing", () => {
 });
 
 describe("Car step Year list", () => {
-  it("lists every year from next year down to 1900 with no search field or keyboard", () => {
-    const screen = renderMobile(<CarStep />);
+  it("lists every year from next year down to 1900 with no search field or keyboard", async () => {
+    const screen = await renderMobile(<CarStep />);
 
-    fireEvent.press(row(screen, "Year: Select year"));
+    await fireEvent.press(row(screen, "Year: Select year"));
 
     const years = screen
       .getAllByRole("button", { name: /^\d{4}$/ })
@@ -394,19 +394,19 @@ describe("Car step Year list", () => {
     ["en", "Select year"],
     ["ru", "Выберите год"],
     ["tk", "Ýyl saýlaň"],
-  ] as const)("titles the Year sheet in %s", (locale, title) => {
-    const screen = renderMobile(<CarStep initial={{ year: 2018 }} />, { locale });
+  ] as const)("titles the Year sheet in %s", async (locale, title) => {
+    const screen = await renderMobile(<CarStep initial={{ year: 2018 }} />, { locale });
 
     expect(screen.queryByText(title)).toBeNull();
-    fireEvent.press(screen.getByRole("button", { name: /2018$/ }));
+    await fireEvent.press(screen.getByRole("button", { name: /2018$/ }));
 
     expect(screen.getByText(title)).toBeTruthy();
   });
 
-  it("announces the chosen year as selected", () => {
-    const screen = renderMobile(<CarStep initial={{ year: 2018 }} />);
+  it("announces the chosen year as selected", async () => {
+    const screen = await renderMobile(<CarStep initial={{ year: 2018 }} />);
 
-    fireEvent.press(row(screen, "Year: 2018"));
+    await fireEvent.press(row(screen, "Year: 2018"));
 
     expect(screen.getByRole("button", { name: "2018", selected: true })).toBeTruthy();
     expect(screen.getByRole("button", { name: "2017", selected: false })).toBeTruthy();
@@ -418,64 +418,64 @@ describe("Car step Generation", () => {
     ["en", "I don't know, skip"],
     ["ru", "Не знаю, пропустить"],
     ["tk", "Bilemok, geç"],
-  ] as const)("ends the Generation sheet with a skip row in %s", (locale, skip) => {
-    const screen = renderMobile(
+  ] as const)("ends the Generation sheet with a skip row in %s", async (locale, skip) => {
+    const screen = await renderMobile(
       <CarStep initial={{ brandId: "toyota", modelId: "camry", year: 2018 }} />,
       { locale },
     );
 
     const generation = { en: "Generation", ru: "Поколение", tk: "Nesil" }[locale];
-    fireEvent.press(screen.getByRole("button", { name: new RegExp(`^${generation}:`) }));
+    await fireEvent.press(screen.getByRole("button", { name: new RegExp(`^${generation}:`) }));
 
     const labels = JSON.stringify(screen.toJSON());
     expect(labels.indexOf(skip)).toBeGreaterThan(labels.indexOf("XV50 (2011–2017)"));
     expect(screen.getByRole("button", { name: skip })).toBeTruthy();
   });
 
-  it("closes with no generation when the seller skips", () => {
+  it("closes with no generation when the seller skips", async () => {
     const onChange = vi.fn();
-    const screen = renderMobile(<CarStep initial={filled} onChange={onChange} />);
+    const screen = await renderMobile(<CarStep initial={filled} onChange={onChange} />);
 
-    fireEvent.press(row(screen, "Generation: XV70 (2017–2024)"));
-    fireEvent.press(option(screen, "I don't know, skip"));
+    await fireEvent.press(row(screen, "Generation: XV70 (2017–2024)"));
+    await fireEvent.press(option(screen, "I don't know, skip"));
 
     expect(onChange).toHaveBeenLastCalledWith({ generationId: undefined });
     expect(sheetOpen(screen)).toBe(false);
     expect(row(screen, "Generation: Select generation")).toBeTruthy();
   });
 
-  it("hides the Generation row until a model with generations is chosen", () => {
-    const empty = renderMobile(<CarStep />);
+  it("hides the Generation row until a model with generations is chosen", async () => {
+    const empty = await renderMobile(<CarStep />);
     expect(empty.queryByRole("button", { name: /^Generation:/ })).toBeNull();
-    empty.unmount();
+    await empty.unmount();
 
-    const none = renderMobile(<CarStep initial={{ brandId: "toyota", modelId: "corolla" }} />);
+    const none = await renderMobile(<CarStep initial={{ brandId: "toyota", modelId: "corolla" }} />);
     expect(none.queryByRole("button", { name: /^Generation:/ })).toBeNull();
-    none.unmount();
+    await none.unmount();
 
-    const some = renderMobile(<CarStep initial={{ brandId: "toyota", modelId: "camry" }} />);
+    const some = await renderMobile(<CarStep initial={{ brandId: "toyota", modelId: "camry" }} />);
     expect(some.getByRole("button", { name: "Generation: Select generation" })).toBeTruthy();
   });
 
-  it("keeps showing a generation that is already set", () => {
-    const screen = renderMobile(
+  it("keeps showing a generation that is already set", async () => {
+    const screen = await renderMobile(
       <CarStep initial={{ brandId: "toyota", modelId: "corolla", generationId: "xv70" }} />,
     );
     expect(screen.getByRole("button", { name: /^Generation:/ })).toBeTruthy();
   });
 
-  it("lets the seller clear a generation the model no longer has", () => {
+  it("lets the seller clear a generation the model no longer has", async () => {
     const onChange = vi.fn();
-    const screen = renderMobile(
+    const screen = await renderMobile(
       <CarStep
         initial={{ brandId: "toyota", modelId: "corolla", generationId: "xv70" }}
         onChange={onChange}
       />,
     );
 
-    fireEvent.press(screen.getByRole("button", { name: /^Generation:/ }));
+    await fireEvent.press(screen.getByRole("button", { name: /^Generation:/ }));
     expect(screen.getByText("No generations available")).toBeTruthy();
-    fireEvent.press(option(screen, "I don't know, skip"));
+    await fireEvent.press(option(screen, "I don't know, skip"));
 
     expect(onChange).toHaveBeenLastCalledWith({ generationId: undefined });
     expect(sheetOpen(screen)).toBe(false);
@@ -490,11 +490,11 @@ describe("Car step errors, rows and edit mode", () => {
     year: "Year is required",
   };
 
-  it("shows the required errors under Brand, Model and Year after the first Continue", () => {
-    const screen = renderMobile(<CarStep fieldErrors={fieldErrors} />);
+  it("shows the required errors under Brand, Model and Year after the first Continue", async () => {
+    const screen = await renderMobile(<CarStep fieldErrors={fieldErrors} />);
     expect(screen.queryByText("Year is required")).toBeNull();
 
-    screen.rerender(<CarStep fieldErrors={fieldErrors} showErrors />);
+    await screen.rerender(<CarStep fieldErrors={fieldErrors} showErrors />);
 
     const json = JSON.stringify(screen.toJSON());
     const order = ["Brand: Select brand", "Brand is required", "Model: Select model",
@@ -503,27 +503,27 @@ describe("Car step errors, rows and edit mode", () => {
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
-  it("announces each row as a button with its label and current value", () => {
-    const screen = renderMobile(<CarStep initial={filled} />);
+  it("announces each row as a button with its label and current value", async () => {
+    const screen = await renderMobile(<CarStep initial={filled} />);
 
     for (const name of ["Brand: Toyota", "Model: Camry", "Year: 2018", "Generation: XV70 (2017–2024)"]) {
       expect(row(screen, name)).toBeTruthy();
     }
   });
 
-  it("keeps the Car rows locked and opens no sheet in edit mode", () => {
-    const screen = renderMobile(<CarStep initial={filled} disabled />);
+  it("keeps the Car rows locked and opens no sheet in edit mode", async () => {
+    const screen = await renderMobile(<CarStep initial={filled} disabled />);
 
     for (const name of ["Brand: Toyota", "Model: Camry", "Year: 2018", "Generation: XV70 (2017–2024)"]) {
       const button = row(screen, name);
       expect(button.props.accessibilityState).toMatchObject({ disabled: true });
-      fireEvent.press(button);
+      await fireEvent.press(button);
       expect(sheetOpen(screen)).toBe(false);
     }
   });
 
-  it("shows the locked note in the seller's language", () => {
-    const screen = renderMobile(<CarStep initial={filled} disabled />, { locale: "ru" });
+  it("shows the locked note in the seller's language", async () => {
+    const screen = await renderMobile(<CarStep initial={filled} disabled />, { locale: "ru" });
     expect(screen.getAllByText("Это поле нельзя изменить после публикации.").length).toBeGreaterThanOrEqual(4);
   });
 });

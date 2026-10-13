@@ -94,7 +94,7 @@ describe("reopening the Listing editor", () => {
     // A save that later left the screen by back gesture, or an app kill, kept this file.
     fixture.files.add(`${stagingDir}7c9e6679-7425-40de-944b-e07fc1f90ae7.jpg`);
 
-    const screen = renderMobile(<EditListingScreen />);
+    const screen = await renderMobile(<EditListingScreen />);
     await waitFor(() => expect([...fixture.files]).toEqual([]));
 
     expect(screen.queryByText(/uploading/i)).toBeNull();

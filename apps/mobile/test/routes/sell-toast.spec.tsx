@@ -63,8 +63,8 @@ beforeEach(() => {
   fixture.flush.mockReset().mockResolvedValue(true);
 });
 
-function renderWizard() {
-  const screen = renderMobile(<ToastProvider><SellScreen /></ToastProvider>);
+async function renderWizard() {
+  const screen = await renderMobile(<ToastProvider><SellScreen /></ToastProvider>);
   const top = () => StyleSheet.flatten(screen.getByTestId("toast-viewport-top").props.style).top;
   return { screen, top };
 }
@@ -78,9 +78,9 @@ describe("Sell publish toasts", () => {
     ["tk", "Iň azyndan 3 surat gerek"],
   ])("shows the same minimum helper after the server refuses publication in %s", async (locale, message) => {
     fixture.publish.mockRejectedValue(new ApiError("INVALID_DRAFT_PAYLOAD", 400, "Draft is missing required fields", { formErrors: ["AT_LEAST_THREE_PHOTOS_REQUIRED"] }));
-    const screen = renderMobile(<ToastProvider><SellScreen /></ToastProvider>, { locale });
+    const screen = await renderMobile(<ToastProvider><SellScreen /></ToastProvider>, { locale });
     const publishName = locale === "ru" ? "Опубликовать" : locale === "tk" ? "Neşir et" : "Publish";
-    await act(async () => { fireEvent.press(screen.getByRole("button", { name: publishName })); });
+    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: publishName })); });
     expect(within(screen.getByRole("alert")).getByText(message)).toBeTruthy();
     expect(routerMock.replace).not.toHaveBeenCalled();
   });
@@ -94,9 +94,9 @@ describe("Sell publish toasts", () => {
     ["tk", "Suratlaryňyzdan biri indi elýeterli däl. Ony «Surat» ädiminde täzeden goşuň we täzeden synanyşyň."],
   ])("names the re-add step when the server answers UPLOAD_NOT_AVAILABLE for a photo (%s)", async (locale, message) => {
     fixture.publish.mockRejectedValue(new ApiError(code, 400, "A photo upload is no longer available"));
-    const screen = renderMobile(<ToastProvider><SellScreen /></ToastProvider>, { locale });
+    const screen = await renderMobile(<ToastProvider><SellScreen /></ToastProvider>, { locale });
     const publishName = locale === "ru" ? "Опубликовать" : locale === "tk" ? "Neşir et" : "Publish";
-    await act(async () => { fireEvent.press(screen.getByRole("button", { name: publishName })); });
+    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: publishName })); });
     expect(within(screen.getByRole("alert")).getByText(message)).toBeTruthy();
     expect(routerMock.replace).not.toHaveBeenCalled();
   });
@@ -104,8 +104,8 @@ describe("Sell publish toasts", () => {
   });
 
   it("shows a publish failure above Publish, not as a toast, and keeps the wizard open", async () => {
-    const { screen } = renderWizard();
-    await act(async () => { fireEvent.press(screen.getByRole("button", { name: "Publish" })); });
+    const { screen } = await renderWizard();
+    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Publish" })); });
 
     const message = "Could not publish. Your draft is saved. Try again.";
     expect(within(screen.getByRole("alert")).getByText(message)).toBeTruthy();
@@ -117,8 +117,8 @@ describe("Sell publish toasts", () => {
 
   it("uses ordinary clearance for the success toast on the destination screen", async () => {
     fixture.publish.mockResolvedValue({ id: fixture.id });
-    const { screen, top } = renderWizard();
-    await act(async () => { fireEvent.press(screen.getByRole("button", { name: "Publish" })); });
+    const { screen, top } = await renderWizard();
+    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Publish" })); });
     expect(routerMock.push).toHaveBeenCalledWith(`/(public)/listings/${fixture.id}`);
     expect(screen.getByText("Listing published")).toBeTruthy();
     expect(top()).toBe(59 + 64 + 8);
@@ -149,7 +149,7 @@ it("Back after publish and opening/closing Edit returns to tabs, then can leave 
   routerMock.replace.mockImplementation((name) => navigation.dispatch(StackActions.replace(String(name))));
   routerMock.push.mockImplementation((name) => navigation.dispatch(StackActions.push(String(name))));
   fixture.publish.mockResolvedValue({ id: fixture.id });
-  const screen = renderMobile(<ToastProvider><BaseNavigationContainer ref={navigation}>
+  const screen = await renderMobile(<ToastProvider><BaseNavigationContainer ref={navigation}>
     <Navigator.Navigator>
       <Navigator.Screen name="(tabs)" component={SellScreen} />
       <Navigator.Screen name={detail}>{() => <Text>Published detail</Text>}</Navigator.Screen>
@@ -158,14 +158,14 @@ it("Back after publish and opening/closing Edit returns to tabs, then can leave 
     </Navigator.Navigator>
   </BaseNavigationContainer></ToastProvider>);
   try {
-    await act(async () => { fireEvent.press(screen.getByRole("button", { name: "Publish" })); });
+    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Publish" })); });
     expect(navigation.getCurrentRoute()?.name).toBe(detail);
-    act(() => navigation.dispatch(StackActions.push(edit)));
+    await act(() => navigation.dispatch(StackActions.push(edit)));
     expect(navigation.getCurrentRoute()?.name).toBe(edit);
-    act(() => navigation.goBack());
+    await act(() => navigation.goBack());
     expect(navigation.getCurrentRoute()?.name).toBe(detail);
     expect(navigation.canGoBack()).toBe(true);
-    act(() => navigation.goBack());
+    await act(() => navigation.goBack());
     expect(navigation.getCurrentRoute()?.name).toBe("(tabs)");
     expect(screen.getByText("New listing")).toBeTruthy();
     expect(navigation.canGoBack()).toBe(false);

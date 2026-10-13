@@ -80,6 +80,7 @@
     "@tanstack/react-query-devtools": "^5.100.10",
     "@testing-library/react": "catalog:",
     "@testing-library/react-native": "^14.1.0",
+    "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@typescript/native": "catalog:",
     "babel-preset-expo": "~55.0.21",

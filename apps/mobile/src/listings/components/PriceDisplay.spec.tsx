@@ -50,8 +50,8 @@ describe("PriceDisplay owner mode", () => {
 });
 
 describe("PriceDisplay price colour (#775 F)", () => {
-  function priceClass(muted: boolean): string {
-    const screen = renderMobile(
+  async function priceClass(muted: boolean): Promise<string> {
+    const screen = await renderMobile(
       <PriceDisplay
         displayPriceTmt={100000}
         priceAmount={100000}

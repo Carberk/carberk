@@ -52,7 +52,9 @@ const FlatList = React.forwardRef(({
     scrollToIndex: (args) => scrollRequests.push({ method: "scrollToIndex", ...args }),
     scrollToOffset: (args) => scrollRequests.push({ method: "scrollToOffset", ...args }),
   }));
-  return React.createElement("RCTScrollView", props, slot(ListHeaderComponent),
+  // The host keeps `data`: test-renderer exposes only host elements, so specs
+  // read the list's rows and handlers (onEndReached) from this node.
+  return React.createElement("RCTScrollView", { ...props, data }, slot(ListHeaderComponent),
     data.map((item, index) => React.createElement(React.Fragment,
       { key: keyExtractor?.(item, index) ?? index }, renderItem({ item, index }))),
     data.length ? null : slot(ListEmptyComponent), slot(ListFooterComponent));

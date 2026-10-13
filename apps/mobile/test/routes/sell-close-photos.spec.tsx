@@ -106,7 +106,7 @@ vi.mock("../../src/api/catalog/useModels", () => ({ useModels: () => ({ data: { 
 
 const { a, b } = fixture;
 const LATER_STEPS = ["photos", "price", "location", "contact"];
-type Screen = ReturnType<typeof renderMobile>;
+type Screen = Awaited<ReturnType<typeof renderMobile>>;
 
 const publishButton = (screen: Screen) => screen.getByRole("button", { name: "Publish" });
 const photoLine = (draft: typeof a) => `photo ${draft.photoId} attached ${draft.savedPhoto.key}`;
@@ -120,14 +120,14 @@ const letAutosaveRun = () => pause(700);
 // The seller is on the Sell tab, where the queue has settled with no draft open,
 // and taps Continue on the latest draft.
 async function openSellTab() {
-  const screen = renderMobile(<SellScreen />);
+  const screen = await renderMobile(<SellScreen />);
   await pause(20);
   return screen;
 }
 const pressContinue = (screen: Screen) => fireEvent.press(screen.getByRole("button", { name: "Continue" }));
 
 async function closeWithX(screen: Screen) {
-  await act(async () => { fireEvent.press(screen.getByRole("button", { name: "Close" })); });
+  await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Close" })); });
   await waitFor(() => expect(screen.queryByRole("button", { name: "Close" })).toBeNull());
   expect(screen.getByRole("button", { name: "Continue" })).toBeTruthy();
 }
@@ -161,29 +161,29 @@ beforeEach(() => {
 describe("Sell wizard, closing a draft with ✕ and opening one again in the same session (#585)", () => {
   it("reopens the same draft ready to publish, with the photo as it was saved", async () => {
     const screen = await openSellTab();
-    pressContinue(screen);
+    await pressContinue(screen);
     await screen.findByText(photoLine(a));
     await letAutosaveRun();
 
     await closeWithX(screen);
     await pause(20);
-    pressContinue(screen);
+    await pressContinue(screen);
     await screen.findByText(photoLine(a));
     await letAutosaveRun();
 
     expectDraftAsSaved(screen, a);
-    fireEvent.press(publishButton(screen));
+    await fireEvent.press(publishButton(screen));
     await waitFor(() => expect(fixture.mutation.mutateAsync).toHaveBeenCalledWith(a.id));
     for (const payload of savedPayloads(a.id)) expect(payload.photos).toEqual(a.savedPhotos);
   });
 
   it("reopens it the same way when the seller taps Continue straight after ✕", async () => {
     const screen = await openSellTab();
-    pressContinue(screen);
+    await pressContinue(screen);
     await screen.findByText(photoLine(a));
 
     await closeWithX(screen);
-    pressContinue(screen);
+    await pressContinue(screen);
     await screen.findByText(photoLine(a));
     await letAutosaveRun();
 
@@ -192,15 +192,15 @@ describe("Sell wizard, closing a draft with ✕ and opening one again in the sam
 
   it("shows another draft none of the photos of the one just closed", async () => {
     const screen = await openSellTab();
-    pressContinue(screen);
+    await pressContinue(screen);
     await screen.findByText(photoLine(a));
     await letAutosaveRun();
     await closeWithX(screen);
 
     // A newer draft now heads the Sell tab.
     fixture.drafts = [b, a];
-    screen.rerender(<SellScreen />);
-    pressContinue(screen);
+    await screen.rerender(<SellScreen />);
+    await pressContinue(screen);
     await screen.findByText(photoLine(b));
     await letAutosaveRun();
 
@@ -216,7 +216,7 @@ describe("Sell wizard, closing a draft with ✕ and opening one again in the sam
     let release = () => {};
     fixture.listing = new Promise<void>((resolve) => { release = resolve; });
     const screen = await openSellTab();
-    pressContinue(screen);
+    await pressContinue(screen);
     await pause(20);
 
     await closeWithX(screen);

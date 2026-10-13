@@ -10,7 +10,7 @@ import { useVerifySignInMethodChange } from "../../src/api/identity/useVerifySig
 import { clearAuthSession, loadAuthSession, storeAuthSession } from "../../src/auth/session";
 import { AppNavigationEffects } from "../../src/navigation/AppNavigationEffects";
 import { server } from "../msw";
-import { act, fireEvent, first, renderMobile, routerMock } from "../render";
+import { act, fireEvent, first, renderMobile, routerMock, queryAllHosts } from "../render";
 
 import { ToastProvider } from "@/components/ui/toast";
 
@@ -88,16 +88,16 @@ beforeEach(() => {
   );
 });
 
-type View = ReturnType<typeof renderMobile>;
+type View = Awaited<ReturnType<typeof renderMobile>>;
 type Host = { props: Record<string, unknown> };
 /** Rendered host nodes of one native type, such as the avatar's `Svg`. */
-const hosts = (view: View, type: string) => view.UNSAFE_queryAllByType(type as never) as unknown as Host[];
+const hosts = (view: View, type: string) => queryAllHosts(view.container, type) as unknown as Host[];
 
 describe("Signing in as someone else after the API ended the session", () => {
   it("shows Cabinet's skeleton until the new User's /me arrives, never the previous User's name or avatar", async () => {
     accepted.set("aman", () => HttpResponse.json(meOf({ displayName: "Aman" })));
     await signIn("aman", AMAN_ID);
-    const view = renderMobile(<><AppNavigationEffects /><CabinetScreen /></>);
+    const view = await renderMobile(<><AppNavigationEffects /><CabinetScreen /></>);
     await view.findByRole("button", { name: `Aman, ${PHONE}` });
 
     // The API no longer accepts Aman's tokens. He comes back to Cabinet, its
@@ -132,7 +132,7 @@ describe("Signing in as someone else after the API ended the session", () => {
     accepted.set("aman", () => HttpResponse.json(meOf({ displayName: "Aman" })));
     await signIn("aman", AMAN_ID);
     // Profile is stacked above Cabinet, which stays mounted under it.
-    const view = renderMobile(
+    const view = await renderMobile(
       <ToastProvider><AppNavigationEffects /><CabinetScreen /><ProfileScreen /></ToastProvider>,
     );
     await view.findByRole("button", { name: "Edit name" });
@@ -204,9 +204,9 @@ describe("Saving an account edit after the API ended the session (#673)", () => 
   ])("signs the User out and offers sign-in when $edit is refused", async ({ route, useSave }) => {
     server.use(route);
     await signIn("aman", AMAN_ID);
-    const view = renderMobile(<><AppNavigationEffects /><Save useSave={useSave} /></>);
+    const view = await renderMobile(<><AppNavigationEffects /><Save useSave={useSave} /></>);
 
-    fireEvent.press(view.getByRole("button", { name: "Save" }));
+    await fireEvent.press(view.getByRole("button", { name: "Save" }));
 
     await act(async () => {
       await vi.waitFor(() => expect(routerMock.replace).toHaveBeenCalledWith("/(auth)/phone"));

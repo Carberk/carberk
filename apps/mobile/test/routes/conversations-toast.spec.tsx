@@ -117,16 +117,16 @@ beforeEach(() => {
 });
 
 describe("Conversation toast and header boundary", () => {
-  it("places a top toast below the measured header, whatever the text size", () => {
-    const screen = renderMobile(<ToastProvider><ConversationDetailScreen /></ToastProvider>);
+  it("places a top toast below the measured header, whatever the text size", async () => {
+    const screen = await renderMobile(<ToastProvider><ConversationDetailScreen /></ToastProvider>);
     let header = screen.getByRole("button", { name: "Go back" }).parent;
     while (header && !header.props.className?.includes("border-b")) header = header.parent;
     if (!header) throw new Error("Conversation header missing");
     // A native layout event reports the larger header that a bigger text size produces.
-    fireEvent(header, "layout", { nativeEvent: { layout: { height: 132, width: 390, x: 0, y: 0 } } });
+    await fireEvent(header, "layout", { nativeEvent: { layout: { height: 132, width: 390, x: 0, y: 0 } } });
 
-    fireEvent.press(screen.getByRole("button", { name: "Conversation actions" }));
-    fireEvent.press(screen.getByRole("button", { name: "Mute notifications" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Conversation actions" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Mute notifications" }));
 
     expect(screen.getByText("Couldn't update the notification setting")).toBeTruthy();
     expect(StyleSheet.flatten(screen.getByTestId("toast-viewport-top").props.style).top).toBe(59 + 132 + 8);

@@ -48,8 +48,8 @@ function controlsInOrder(tree: unknown): string[] {
 const noop = () => undefined;
 
 describe("Step4Specs order (prototype bSpecs)", () => {
-  it("reads Condition, Mileage, Damaged, Known issues, then the optional specs, for a Used car", () => {
-    const screen = renderMobile(
+  it("reads Condition, Mileage, Damaged, Known issues, then the optional specs, for a Used car", async () => {
+    const screen = await renderMobile(
       <Step4Specs payload={{ condition: "used", mileageKm: 1000 }} onChange={noop} />,
     );
 
@@ -69,8 +69,8 @@ describe("Step4Specs order (prototype bSpecs)", () => {
     ]);
   });
 
-  it("reaches Known issues right after Condition for a New car", () => {
-    const screen = renderMobile(
+  it("reaches Known issues right after Condition for a New car", async () => {
+    const screen = await renderMobile(
       <Step4Specs
         payload={{ condition: "new", conditionDisclosure: { damaged: false } }}
         onChange={noop}
@@ -90,8 +90,8 @@ describe("Step4Specs order (prototype bSpecs)", () => {
     ]);
   });
 
-  it("shows the field labels in the same order as the controls", () => {
-    const screen = renderMobile(
+  it("shows the field labels in the same order as the controls", async () => {
+    const screen = await renderMobile(
       <Step4Specs payload={{ condition: "used", mileageKm: 1000 }} onChange={noop} />,
     );
     const text = JSON.stringify(screen.toJSON());
@@ -113,8 +113,8 @@ describe("Step4Specs order (prototype bSpecs)", () => {
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
   });
 
-  it("drops the Drivetrain and Engine boxes in favour of one More details group", () => {
-    const screen = renderMobile(
+  it("drops the Drivetrain and Engine boxes in favour of one More details group", async () => {
+    const screen = await renderMobile(
       <Step4Specs payload={{ condition: "new", conditionDisclosure: { damaged: false } }} onChange={noop} />,
     );
 
@@ -127,8 +127,8 @@ describe("Step4Specs order (prototype bSpecs)", () => {
     ["en", "More details (optional)"],
     ["ru", "Дополнительно (необязательно)"],
     ["tk", "Goşmaça (hökman däl)"],
-  ])("labels the optional group in %s", (locale, label) => {
-    const screen = renderMobile(
+  ])("labels the optional group in %s", async (locale, label) => {
+    const screen = await renderMobile(
       <Step4Specs payload={{ condition: "new", conditionDisclosure: { damaged: false } }} onChange={noop} />,
       { locale },
     );

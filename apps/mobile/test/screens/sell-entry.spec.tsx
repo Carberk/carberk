@@ -96,7 +96,7 @@ async function settle() {
   for (let i = 0; i < 5; i += 1) await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
 }
 async function renderSell(locale = "en") {
-  const view = renderMobile(<SellScreen />, { locale });
+  const view = await renderMobile(<SellScreen />, { locale });
   await settle();
   return view;
 }
@@ -121,7 +121,7 @@ describe("Sell tab with no drafts", () => {
     expect(screen.getByRole("button", { name: "List a car" })).toBeTruthy();
     expect(screen.queryByText("Latest draft")).toBeNull();
 
-    fireEvent.press(screen.getByRole("button", { name: "My listings" }));
+    await fireEvent.press(screen.getByRole("button", { name: "My listings" }));
     expect(routerMock.push).toHaveBeenCalledWith("/listings/manage");
   });
 
@@ -141,7 +141,7 @@ describe("Sell tab with no drafts", () => {
     fx.post.mockResolvedValue(draft("new", {}));
     const screen = await renderSell();
 
-    fireEvent.press(screen.getByRole("button", { name: "List a car" }));
+    await fireEvent.press(screen.getByRole("button", { name: "List a car" }));
     await settle();
 
     expect(fx.post).toHaveBeenCalledWith("/listings/drafts", {}, expect.anything());
@@ -186,7 +186,7 @@ describe("Sell tab with drafts", () => {
     const ru = await renderSell("ru");
     expect(ru.getByLabelText(new RegExp(`^Черновик без автомобиля, Заполнено шагов: 1 из ${DATA_STEPS} · Обновлено `))).toBeTruthy();
     expect(ru.getByRole("button", { name: /^Все черновики/ })).toBeTruthy();
-    ru.unmount();
+    await ru.unmount();
 
     const tk = await renderSell("tk");
     expect(tk.getByLabelText(new RegExp(`^Awtoulagsyz garalama, ${DATA_STEPS} tapgyrdan 1 sanysy doldurylan · Täzelendi: `))).toBeTruthy();
@@ -197,7 +197,7 @@ describe("Sell tab with drafts", () => {
     serverDrafts = [draft("d1")];
     const screen = await renderSell();
 
-    fireEvent.press(screen.getByRole("button", { name: "Continue" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Continue" }));
 
     expect(screen.getByText(/^wizard:/)).toBeTruthy();
   });
@@ -207,10 +207,10 @@ describe("Sell tab with drafts", () => {
     const screen = await renderSell();
 
     const allDrafts = screen.getByRole("button", { name: "All drafts, 3" });
-    fireEvent.press(allDrafts);
+    await fireEvent.press(allDrafts);
     expect(routerMock.push).toHaveBeenCalledWith({ pathname: "/listings/manage", params: { tab: "drafts" } });
 
-    fireEvent.press(screen.getByRole("button", { name: "My listings" }));
+    await fireEvent.press(screen.getByRole("button", { name: "My listings" }));
     expect(routerMock.push).toHaveBeenLastCalledWith("/listings/manage");
   });
 
@@ -219,7 +219,7 @@ describe("Sell tab with drafts", () => {
     fx.post.mockResolvedValue(draft("new", {}));
     const screen = await renderSell();
 
-    fireEvent.press(screen.getByRole("button", { name: "New listing" }));
+    await fireEvent.press(screen.getByRole("button", { name: "New listing" }));
     await settle();
 
     expect(fx.post).toHaveBeenCalledTimes(1);
@@ -233,7 +233,7 @@ describe("five-draft limit", () => {
     const screen = await renderSell();
     expect(screen.queryByText("You have 5 drafts")).toBeNull();
 
-    fireEvent.press(screen.getByRole("button", { name: "New listing" }));
+    await fireEvent.press(screen.getByRole("button", { name: "New listing" }));
 
     expect(fx.post).not.toHaveBeenCalled();
     expect(screen.getByText("You have 5 drafts")).toBeTruthy();
@@ -243,7 +243,7 @@ describe("five-draft limit", () => {
   it("reads the sheet title before its buttons", async () => {
     serverDrafts = drafts(5);
     const screen = await renderSell();
-    fireEvent.press(screen.getByRole("button", { name: "New listing" }));
+    await fireEvent.press(screen.getByRole("button", { name: "New listing" }));
 
     const order = screen.getAllByText(/You have 5 drafts|Open drafts|^Cancel$/).map((node) => node.props.children);
     expect(order).toEqual(["You have 5 drafts", "Open drafts", "Cancel"]);
@@ -253,12 +253,12 @@ describe("five-draft limit", () => {
     serverDrafts = drafts(5);
     const screen = await renderSell();
 
-    fireEvent.press(screen.getByRole("button", { name: "New listing" }));
-    fireEvent.press(screen.getByRole("button", { name: "Cancel" }));
+    await fireEvent.press(screen.getByRole("button", { name: "New listing" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByText("You have 5 drafts")).toBeNull();
 
-    fireEvent.press(screen.getByRole("button", { name: "New listing" }));
-    fireEvent.press(screen.getByRole("button", { name: "Open drafts" }));
+    await fireEvent.press(screen.getByRole("button", { name: "New listing" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Open drafts" }));
     expect(routerMock.push).toHaveBeenCalledWith({ pathname: "/listings/manage", params: { tab: "drafts" } });
     expect(screen.queryByText("You have 5 drafts")).toBeNull();
   });
@@ -268,7 +268,7 @@ describe("five-draft limit", () => {
     fx.post.mockRejectedValue(new fx.ApiError("DRAFT_LIMIT_REACHED", 409, "A User can keep at most 5 drafts"));
     const screen = await renderSell();
 
-    fireEvent.press(screen.getByRole("button", { name: "New listing" }));
+    await fireEvent.press(screen.getByRole("button", { name: "New listing" }));
     await settle();
 
     expect(screen.getByText("You have 5 drafts")).toBeTruthy();
@@ -281,7 +281,7 @@ describe("five-draft limit", () => {
   ])("is localized in %s", async (locale, title, body, open, cancel) => {
     serverDrafts = drafts(5);
     const screen = await renderSell(locale);
-    fireEvent.press(screen.getByRole("button", { name: locale === "ru" ? "Новое объявление" : "Täze bildiriş" }));
+    await fireEvent.press(screen.getByRole("button", { name: locale === "ru" ? "Новое объявление" : "Täze bildiriş" }));
 
     expect(screen.getByText(title)).toBeTruthy();
     expect(screen.getByText(body)).toBeTruthy();
@@ -307,7 +307,7 @@ describe("loading and errors", () => {
     expect(screen.getByText("No internet connection. Try again when you are online.")).toBeTruthy();
     expect(screen.queryByText("Sell your car")).toBeNull();
     serverDrafts = [draft("d1")];
-    fireEvent.press(screen.getByRole("button", { name: "Retry" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Retry" }));
     await settle();
 
     expect(screen.getByText("Latest draft")).toBeTruthy();

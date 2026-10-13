@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Image } from "expo-image";
 
-import { fireEvent, first, renderMobile, routerMock, within } from "../../../test/render";
+import { fireEvent, first, renderMobile, routerMock, within, queryAllHosts, getHost } from "../../../test/render";
 import { contrast, cssTokens, rgb, type ThemeName } from "../../../test/tokens";
 import { queryKeys } from "../../api/queryKeys";
 import type { ConversationSummaryData } from "../../api/conversations/useConversation";
@@ -35,11 +35,11 @@ function message(senderId: string, overrides: Partial<NonNullable<ConversationSu
   };
 }
 
-type Row = ReturnType<typeof renderMobile>;
+type Row = Awaited<ReturnType<typeof renderMobile>>;
 type Host = { type: unknown; props: Record<string, unknown>; parent: Host | null };
 
 /** Rendered host nodes of one native type, such as the avatar's `Svg`. */
-const hosts = (row: Row, type: string) => row.UNSAFE_queryAllByType(type as never) as unknown as Host[];
+const hosts = (row: Row, type: string) => queryAllHosts(row.container, type) as unknown as Host[];
 const marks = (row: Row) => hosts(row, "Path").map((path) => path.props.d);
 const personIcons = (row: Row) => hosts(row, "Icon").filter((icon) => icon.props.name === "User");
 /** The native view that holds the car mark: the avatar's circle. */
@@ -49,7 +49,7 @@ function avatarCircle(row: Row): Record<string, unknown> {
   return node?.props ?? {};
 }
 /** The photos drawn inside the badge on the thumbnail's corner. */
-const badgePhotos = (row: Row) => within(row.getByTestId("conversation-row-peer-avatar")).UNSAFE_queryAllByType(Image);
+const badgePhotos = (row: Row) => queryAllHosts(row.getByTestId("conversation-row-peer-avatar"), "Image");
 
 // The first stroke of the key, the mark for avatar index 7.
 const KEY_MARK = "M11.5 12H21M17 12v3M20 12v2.4M6.5 12h.01";
@@ -86,8 +86,8 @@ function renderRow(conversation: ConversationSummaryData, locale = "en") {
 }
 
 describe("ConversationListItem", () => {
-  it("shows the other participant, the Listing line and the last Message", () => {
-    const row = renderRow(summary());
+  it("shows the other participant, the Listing line and the last Message", async () => {
+    const row = await renderRow(summary());
 
     expect(row.getByText("Merdan")).toBeTruthy();
     expect(row.getByText(/^Toyota Camry, 2018 · 285,000 TMT$/)).toBeTruthy();
@@ -97,57 +97,57 @@ describe("ConversationListItem", () => {
     expect(row.queryByText("You are seller")).toBeNull();
   });
 
-  it("keeps the Listing line to one line", () => {
-    const row = renderRow(summary());
+  it("keeps the Listing line to one line", async () => {
+    const row = await renderRow(summary());
     expect(row.getByText(/^Toyota Camry, 2018/).props.numberOfLines).toBe(1);
   });
 
-  it("shows a bold preview and the unread count when there are unread Messages", () => {
-    const row = renderRow(summary({ unreadCount: 2 }));
+  it("shows a bold preview and the unread count when there are unread Messages", async () => {
+    const row = await renderRow(summary({ unreadCount: 2 }));
 
     expect(row.getByText("2")).toBeTruthy();
     expect(row.getByText("Yes, it is still for sale").props.className).toContain("font-semibold");
   });
 
-  it("caps the unread badge at 99+", () => {
-    const row = renderRow(summary({ unreadCount: 150 }));
+  it("caps the unread badge at 99+", async () => {
+    const row = await renderRow(summary({ unreadCount: 150 }));
     expect(row.getByText("99+")).toBeTruthy();
   });
 
-  it("shows a regular preview with no badge when everything is read", () => {
-    const row = renderRow(summary());
+  it("shows a regular preview with no badge when everything is read", async () => {
+    const row = await renderRow(summary());
     expect(row.getByText("Yes, it is still for sale").props.className).not.toContain("font-semibold");
     expect(row.queryByTestId("conversation-row-unread")).toBeNull();
   });
 
-  it("shows the muted bell for a muted Conversation only", () => {
-    expect(renderRow(summary({ mutedAt: "2026-09-30T10:00:00.000Z" })).getByTestId("conversation-row-muted")).toBeTruthy();
-    expect(renderRow(summary({ mutedAt: null })).queryByTestId("conversation-row-muted")).toBeNull();
+  it("shows the muted bell for a muted Conversation only", async () => {
+    expect((await renderRow(summary({ mutedAt: "2026-09-30T10:00:00.000Z" }))).getByTestId("conversation-row-muted")).toBeTruthy();
+    expect((await renderRow(summary({ mutedAt: null }))).queryByTestId("conversation-row-muted")).toBeNull();
   });
 
-  it("shows one tick for the viewer's own sent last Message", () => {
-    const row = renderRow(summary({ lastMessage: message(BUYER) }));
+  it("shows one tick for the viewer's own sent last Message", async () => {
+    const row = await renderRow(summary({ lastMessage: message(BUYER) }));
     expect(row.getByTestId("conversation-row-tick-sent")).toBeTruthy();
   });
 
-  it("shows two ticks once the other participant received or read the viewer's last Message", () => {
-    const delivered = renderRow(summary({ lastMessage: message(BUYER), peerLastDeliveredAt: "2026-10-01T10:00:05.000Z" }));
+  it("shows two ticks once the other participant received or read the viewer's last Message", async () => {
+    const delivered = await renderRow(summary({ lastMessage: message(BUYER), peerLastDeliveredAt: "2026-10-01T10:00:05.000Z" }));
     expect(delivered.getByTestId("conversation-row-tick-delivered")).toBeTruthy();
 
-    const read = renderRow(summary({ lastMessage: message(BUYER), peerLastReadAt: "2026-10-01T10:00:05.000Z" }));
+    const read = await renderRow(summary({ lastMessage: message(BUYER), peerLastReadAt: "2026-10-01T10:00:05.000Z" }));
     expect(read.getByTestId("conversation-row-tick-read")).toBeTruthy();
   });
 
-  it("colours the read ✓✓ blue and leaves sent and delivered grey (#821)", () => {
+  it("colours the read ✓✓ blue and leaves sent and delivered grey (#821)", async () => {
     const iconClass = (row: Row, id: string) => {
-      const icon = row.getByTestId(id).findAll((node: { props: { className?: unknown } }) => String(node.props.className ?? "").includes("size-3.5"))[0];
+      const icon = row.getByTestId(id).queryAll((node) => String(node.props.className ?? "").includes("size-3.5"), { includeSelf: true })[0];
       return String(icon?.props.className ?? "");
     };
-    const sent = renderRow(summary({ lastMessage: message(BUYER) }));
+    const sent = await renderRow(summary({ lastMessage: message(BUYER) }));
     expect(iconClass(sent, "conversation-row-tick-sent")).toContain("text-muted-foreground");
-    const delivered = renderRow(summary({ lastMessage: message(BUYER), peerLastDeliveredAt: "2026-10-01T10:00:05.000Z" }));
+    const delivered = await renderRow(summary({ lastMessage: message(BUYER), peerLastDeliveredAt: "2026-10-01T10:00:05.000Z" }));
     expect(iconClass(delivered, "conversation-row-tick-delivered")).toContain("text-muted-foreground");
-    const read = renderRow(summary({ lastMessage: message(BUYER), peerLastReadAt: "2026-10-01T10:00:05.000Z" }));
+    const read = await renderRow(summary({ lastMessage: message(BUYER), peerLastReadAt: "2026-10-01T10:00:05.000Z" }));
     expect(iconClass(read, "conversation-row-tick-read")).toContain("text-message-read");
   });
 
@@ -156,59 +156,59 @@ describe("ConversationListItem", () => {
     expect(contrast(rgb(tokens["message-read"] ?? ""), rgb(tokens.background ?? ""))).toBeGreaterThanOrEqual(3);
   });
 
-  it("shows no tick when the last Message is the other participant's", () => {
-    const row = renderRow(summary({ peerLastReadAt: "2026-10-01T10:00:05.000Z" }));
+  it("shows no tick when the last Message is the other participant's", async () => {
+    const row = await renderRow(summary({ peerLastReadAt: "2026-10-01T10:00:05.000Z" }));
     expect(row.queryByTestId(/^conversation-row-tick/)).toBeNull();
   });
 
-  it("works out the viewer's own Messages from the seller side too", () => {
-    const row = renderRow(summary({ myRole: "seller", peer: peer(BUYER, { displayName: "Aman" }), lastMessage: message(SELLER) }));
+  it("works out the viewer's own Messages from the seller side too", async () => {
+    const row = await renderRow(summary({ myRole: "seller", peer: peer(BUYER, { displayName: "Aman" }), lastMessage: message(SELLER) }));
     expect(row.getByTestId("conversation-row-tick-sent")).toBeTruthy();
   });
 
-  it("dims the thumbnail and shows a Sold badge for a sold Listing", () => {
-    const row = renderRow(summary({ listing: { ...listing, status: "sold" } }));
+  it("dims the thumbnail and shows a Sold badge for a sold Listing", async () => {
+    const row = await renderRow(summary({ listing: { ...listing, status: "sold" } }));
     expect(row.getByText("Sold")).toBeTruthy();
     expect(row.getByTestId("conversation-row-thumbnail").props.className).toContain("opacity-60");
   });
 
-  it("dims the thumbnail and shows Removed from sale for an archived Listing", () => {
-    const row = renderRow(summary({ listing: { ...listing, status: "archived" } }));
+  it("dims the thumbnail and shows Removed from sale for an archived Listing", async () => {
+    const row = await renderRow(summary({ listing: { ...listing, status: "archived" } }));
     expect(row.getByText("Removed from sale")).toBeTruthy();
     expect(row.getByTestId("conversation-row-thumbnail").props.className).toContain("opacity-60");
   });
 
-  it("dims the thumbnail and reads Unavailable for any other closed Listing", () => {
+  it("dims the thumbnail and reads Unavailable for any other closed Listing", async () => {
     for (const status of ["pending_review", "rejected", "banned"] as const) {
-      const row = renderRow(summary({ listing: { ...listing, status } }));
+      const row = await renderRow(summary({ listing: { ...listing, status } }));
       expect(row.getByText("Unavailable")).toBeTruthy();
       expect(row.getByTestId("conversation-row-thumbnail").props.className).toContain("opacity-60");
     }
   });
 
-  it("replaces the preview with User blocked when the viewer blocked the other participant", () => {
-    const row = renderRow(summary({ blockedByMe: true }));
+  it("replaces the preview with User blocked when the viewer blocked the other participant", async () => {
+    const row = await renderRow(summary({ blockedByMe: true }));
     expect(row.getByText("User blocked")).toBeTruthy();
     expect(row.queryByText("Yes, it is still for sale")).toBeNull();
   });
 
-  it("shows the unavailable label and a placeholder with no Listing", () => {
-    const row = renderRow(summary({ listing: null }));
+  it("shows the unavailable label and a placeholder with no Listing", async () => {
+    const row = await renderRow(summary({ listing: null }));
     expect(row.getByText("Listing unavailable")).toBeTruthy();
     expect(row.getByTestId("conversation-row-placeholder")).toBeTruthy();
   });
 
-  it("shows a placeholder when the Listing has no photo", () => {
-    const row = renderRow(summary({ listing: { ...listing, coverMediaKey: undefined } }));
+  it("shows a placeholder when the Listing has no photo", async () => {
+    const row = await renderRow(summary({ listing: { ...listing, coverMediaKey: undefined } }));
     expect(row.getByTestId("conversation-row-placeholder")).toBeTruthy();
   });
 
-  it("names a seller or a buyer without a name of their own by their generated name", () => {
-    const seller = renderRow(summary({ peer: peer(SELLER, { displayName: null }) }));
+  it("names a seller or a buyer without a name of their own by their generated name", async () => {
+    const seller = await renderRow(summary({ peer: peer(SELLER, { displayName: null }) }));
     expect(seller.getByText("Driver 2057")).toBeTruthy();
     expect(seller.queryByText("Private seller")).toBeNull();
 
-    const buyer = renderRow(summary({ myRole: "seller", peer: peer(BUYER, { displayName: "  ", nameNumber: 4821 }) }));
+    const buyer = await renderRow(summary({ myRole: "seller", peer: peer(BUYER, { displayName: "  ", nameNumber: 4821 }) }));
     expect(buyer.getByText("Driver 4821")).toBeTruthy();
     expect(buyer.queryByText("Buyer")).toBeNull();
   });
@@ -217,18 +217,18 @@ describe("ConversationListItem", () => {
     ["en", "Driver 2057"],
     ["ru", "Водитель 2057"],
     ["tk", "Sürüji 2057"],
-  ])("writes the generated name in %s", (locale, name) => {
-    expect(renderRow(summary({ peer: peer(SELLER, { displayName: null }) }), locale).getByText(name)).toBeTruthy();
+  ])("writes the generated name in %s", async (locale, name) => {
+    expect((await renderRow(summary({ peer: peer(SELLER, { displayName: null }) }), locale)).getByText(name)).toBeTruthy();
   });
 
-  it("names a deleted seller or buyer Deleted user, with the person icon and no car", () => {
-    const seller = renderRow(summary({ peer: peer(SELLER, { displayName: null, deleted: true }) }));
+  it("names a deleted seller or buyer Deleted user, with the person icon and no car", async () => {
+    const seller = await renderRow(summary({ peer: peer(SELLER, { displayName: null, deleted: true }) }));
     expect(seller.getByText("Deleted user")).toBeTruthy();
     expect(seller.queryByText("Driver 2057")).toBeNull();
     expect(personIcons(seller)).toHaveLength(1);
     expect(hosts(seller, "Svg")).toHaveLength(0);
 
-    const buyer = renderRow(summary({ myRole: "seller", peer: peer(BUYER, { displayName: null, deleted: true }) }));
+    const buyer = await renderRow(summary({ myRole: "seller", peer: peer(BUYER, { displayName: null, deleted: true }) }));
     expect(buyer.getByText("Deleted user")).toBeTruthy();
     expect(buyer.queryByText("Buyer")).toBeNull();
     expect(personIcons(buyer)).toHaveLength(1);
@@ -239,48 +239,48 @@ describe("ConversationListItem", () => {
     ["en", "Abdyrahman Gurbanguly Atamyrad"],
     ["ru", "Абдырахман Гурбангулыев Атамыр"],
     ["tk", "Abdyrahman Gurbangulyýew Çaryý"],
-  ])("keeps a 30-character name on one line that ends in an ellipsis in %s", (locale, name) => {
+  ])("keeps a 30-character name on one line that ends in an ellipsis in %s", async (locale, name) => {
     expect(name).toHaveLength(30);
-    const row = renderRow(summary({ peer: peer(SELLER, { displayName: name }) }), locale);
+    const row = await renderRow(summary({ peer: peer(SELLER, { displayName: name }) }), locale);
     expect(row.getByText(name).props).toMatchObject({ numberOfLines: 1, ellipsizeMode: "tail" });
   });
 
-  it("keeps the photo, Listing and deleted previews", () => {
-    expect(renderRow(summary({ lastMessage: message(SELLER, { kind: "image", text: null }) })).getByText("Photo")).toBeTruthy();
-    expect(renderRow(summary({ lastMessage: message(SELLER, { kind: "post_ref", text: null }) })).getByText("Listing")).toBeTruthy();
+  it("keeps the photo, Listing and deleted previews", async () => {
+    expect((await renderRow(summary({ lastMessage: message(SELLER, { kind: "image", text: null }) }))).getByText("Photo")).toBeTruthy();
+    expect((await renderRow(summary({ lastMessage: message(SELLER, { kind: "post_ref", text: null }) }))).getByText("Listing")).toBeTruthy();
     expect(
-      renderRow(summary({ lastMessage: message(SELLER, { deletedAt: "2026-10-01T10:01:00.000Z" }) })).getByText("Message deleted"),
+      (await renderRow(summary({ lastMessage: message(SELLER, { deletedAt: "2026-10-01T10:01:00.000Z" }) }))).getByText("Message deleted"),
     ).toBeTruthy();
   });
 
-  it("reads the name, the Listing, the preview and the unread count as one label", () => {
-    const row = renderRow(summary({ unreadCount: 3 }));
+  it("reads the name, the Listing, the preview and the unread count as one label", async () => {
+    const row = await renderRow(summary({ unreadCount: 3 }));
     expect(row.getByRole("button").props.accessibilityLabel).toBe(
       "Merdan, Toyota Camry, 2018 · 285,000 TMT, Yes, it is still for sale, Unread: 3",
     );
   });
 
-  it("leaves the unread count out of the label when everything is read", () => {
-    const row = renderRow(summary({ blockedByMe: true }));
+  it("leaves the unread count out of the label when everything is read", async () => {
+    const row = await renderRow(summary({ blockedByMe: true }));
     expect(row.getByRole("button").props.accessibilityLabel).toBe(
       "Merdan, Toyota Camry, 2018 · 285,000 TMT, User blocked",
     );
   });
 
-  it("shows Russian and Turkmen copy", () => {
-    const ru = renderRow(summary({ listing: { ...listing, status: "sold" }, blockedByMe: true }), "ru");
+  it("shows Russian and Turkmen copy", async () => {
+    const ru = await renderRow(summary({ listing: { ...listing, status: "sold" }, blockedByMe: true }), "ru");
     expect(ru.getByText("Продано")).toBeTruthy();
     expect(ru.getByText("Пользователь заблокирован")).toBeTruthy();
 
-    const tk = renderRow(summary({ listing: null, peer: peer(SELLER, { displayName: null, deleted: true }) }), "tk");
+    const tk = await renderRow(summary({ listing: null, peer: peer(SELLER, { displayName: null, deleted: true }) }), "tk");
     expect(tk.getByText("Pozulan ulanyjy")).toBeTruthy();
     expect(tk.getByText("Bildiriş elýeterli däl")).toBeTruthy();
   });
 });
 
 describe("ConversationListItem avatar badge", () => {
-  it("puts the other participant's car mark on the thumbnail's lower corner as a 24-point badge", () => {
-    const row = renderRow(summary());
+  it("puts the other participant's car mark on the thumbnail's lower corner as a 24-point badge", async () => {
+    const row = await renderRow(summary());
     const badge = row.getByTestId("conversation-row-peer-avatar");
 
     expect(marks(row)[0]).toBe(KEY_MARK);
@@ -291,23 +291,23 @@ describe("ConversationListItem avatar badge", () => {
     expect(personIcons(row)).toHaveLength(0);
   });
 
-  it("rings the badge in the background colour so it reads on any photo", () => {
-    const badge = renderRow(summary()).getByTestId("conversation-row-peer-avatar");
+  it("rings the badge in the background colour so it reads on any photo", async () => {
+    const badge = (await renderRow(summary())).getByTestId("conversation-row-peer-avatar");
     expect(badge.props.className).toContain("rounded-full");
     expect(badge.props.className).toContain("bg-background");
     expect(badge.props.className).toContain("p-0.5");
   });
 
-  it("still leads the row with the Listing thumbnail, whose photo the badge does not replace", () => {
-    const row = renderRow(summary({ peer: peer(SELLER, { avatarKey: PHOTO_KEY }) }));
-    const thumbnail = within(row.getByTestId("conversation-row-thumbnail")).UNSAFE_getByType(Image);
+  it("still leads the row with the Listing thumbnail, whose photo the badge does not replace", async () => {
+    const row = await renderRow(summary({ peer: peer(SELLER, { avatarKey: PHOTO_KEY }) }));
+    const thumbnail = getHost(row.getByTestId("conversation-row-thumbnail"), "Image");
     expect(thumbnail.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/listings/a1/cover.jpg/thumbnail.jpg" });
     // The badge sits beside the clipped thumbnail, not inside it, so it is not clipped or dimmed.
     expect(within(row.getByTestId("conversation-row-thumbnail")).queryByTestId("conversation-row-peer-avatar")).toBeNull();
   });
 
-  it("shows the other participant's photo in the badge, sized for 24 points", () => {
-    const row = renderRow(summary({ peer: peer(SELLER, { avatarKey: PHOTO_KEY }) }));
+  it("shows the other participant's photo in the badge, sized for 24 points", async () => {
+    const row = await renderRow(summary({ peer: peer(SELLER, { avatarKey: PHOTO_KEY }) }));
     const photos = badgePhotos(row);
 
     expect(photos).toHaveLength(1);
@@ -316,16 +316,16 @@ describe("ConversationListItem avatar badge", () => {
     expect(hosts(row, "Svg")).toHaveLength(0);
   });
 
-  it("goes back to the car mark when the photo does not load", () => {
-    const row = renderRow(summary({ peer: peer(SELLER, { avatarKey: PHOTO_KEY }) }));
-    fireEvent(first(badgePhotos(row)), "error");
+  it("goes back to the car mark when the photo does not load", async () => {
+    const row = await renderRow(summary({ peer: peer(SELLER, { avatarKey: PHOTO_KEY }) }));
+    await fireEvent(first(badgePhotos(row)), "error");
 
     expect(badgePhotos(row)).toHaveLength(0);
     expect(marks(row)[0]).toBe(KEY_MARK);
   });
 
-  it("is not read on its own: the row stays one button whose label carries the name", () => {
-    const row = renderRow(summary());
+  it("is not read on its own: the row stays one button whose label carries the name", async () => {
+    const row = await renderRow(summary());
 
     expect(row.getAllByRole("button")).toHaveLength(1);
     expect(row.queryByRole("image")).toBeNull();
@@ -339,11 +339,11 @@ describe("ConversationListItem avatar badge", () => {
 });
 
 describe("ConversationListItem press", () => {
-  it("opens the Conversation by ID and seeds the by-ID cache with the row's summary", () => {
+  it("opens the Conversation by ID and seeds the by-ID cache with the row's summary", async () => {
     const conversation = summary();
-    const row = renderRow(conversation);
+    const row = await renderRow(conversation);
 
-    fireEvent.press(row.getByRole("button"));
+    await fireEvent.press(row.getByRole("button"));
 
     expect(routerMock.push).toHaveBeenCalledWith({
       pathname: "/conversations/[id]",

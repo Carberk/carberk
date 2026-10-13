@@ -17,8 +17,8 @@ vi.mock("expo-glass-effect", async () => {
 });
 
 describe("GlassButton on the system glass", () => {
-  it("tints Call with the brand red and leaves Message clear glass", () => {
-    const screen = renderMobile(<>
+  it("tints Call with the brand red and leaves Message clear glass", async () => {
+    const screen = await renderMobile(<>
       <GlassButton tone="brand" className="flex-1" accessibilityLabel="Call"><Text>Call</Text></GlassButton>
       <GlassButton accessibilityLabel="Message"><Text>Message</Text></GlassButton>
     </>);
@@ -35,8 +35,8 @@ describe("GlassButton on the system glass", () => {
     expect(screen.getByText("Message").props.className).toMatch(/\btext-foreground\b/);
   });
 
-  it("drops the tint and quiets the label while disabled", () => {
-    const screen = renderMobile(<GlassButton tone="brand" disabled accessibilityLabel="Call"><Text>Call</Text></GlassButton>);
+  it("drops the tint and quiets the label while disabled", async () => {
+    const screen = await renderMobile(<GlassButton tone="brand" disabled accessibilityLabel="Call"><Text>Call</Text></GlassButton>);
 
     expect(screen.getByTestId("glass").props.tintColor).toBeUndefined();
     expect(screen.getByText("Call").props.className).toMatch(/\btext-muted-foreground\b/);

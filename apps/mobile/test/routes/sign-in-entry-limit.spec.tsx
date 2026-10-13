@@ -33,10 +33,10 @@ describe("Sign-in entry at the daily code limit", () => {
   it("says the phone hit its 24-hour limit", async () => {
     refuse({ reason: "destination_limit", retryInSeconds: 0 });
     routeParams.phone = "+99361234567";
-    const screen = renderMobile(<PhoneScreen />);
+    const screen = await renderMobile(<PhoneScreen />);
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Get code" }));
+      await fireEvent.press(screen.getByRole("button", { name: "Get code" }));
     });
 
     expect(screen.getByText(DAILY_LIMIT)).toBeTruthy();
@@ -46,10 +46,10 @@ describe("Sign-in entry at the daily code limit", () => {
   it("says the email hit its 24-hour limit", async () => {
     refuse({ reason: "destination_limit", retryInSeconds: 0 });
     routeParams.email = "aman@example.com";
-    const screen = renderMobile(<EmailScreen />);
+    const screen = await renderMobile(<EmailScreen />);
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Get code" }));
+      await fireEvent.press(screen.getByRole("button", { name: "Get code" }));
     });
 
     expect(screen.getByText(DAILY_LIMIT)).toBeTruthy();
@@ -58,10 +58,10 @@ describe("Sign-in entry at the daily code limit", () => {
   it("keeps the wait-a-moment copy for a backoff refusal", async () => {
     refuse({ reason: "backoff", retryInSeconds: 120 });
     routeParams.email = "aman@example.com";
-    const screen = renderMobile(<EmailScreen />);
+    const screen = await renderMobile(<EmailScreen />);
 
     await act(async () => {
-      fireEvent.press(screen.getByRole("button", { name: "Get code" }));
+      await fireEvent.press(screen.getByRole("button", { name: "Get code" }));
     });
 
     expect(screen.getByText("Too many requests. Please wait a moment.")).toBeTruthy();

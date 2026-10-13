@@ -13,7 +13,7 @@ import { server } from "../msw";
 import { profilePhotoCopy } from "../profile-photo-copy";
 import { choosePhoto, photoDevice as picker, resetPhotoDevice } from "../profile-photo-device";
 import CabinetScreen from "../../app/(tabs)/services";
-import { act, fireEvent, renderMobile } from "../render";
+import { act, fireEvent, renderMobile, getHost, queryAllHosts } from "../render";
 
 import { ToastProvider } from "@/components/ui/toast";
 
@@ -93,14 +93,14 @@ describe("Profile photo", () => {
   ])("uses photo-specific indeterminate text and measured percentages in %s", async (locale, indeterminate, measured) => {
     const announce = vi.spyOn(AccessibilityInfo, "announceForAccessibility");
     choosePhoto();
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>, { locale });
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>, { locale });
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: profilePhotoCopy[locale as keyof typeof profilePhotoCopy].changePhoto }));
-    fireEvent.press(view.getByRole("button", { name: profilePhotoCopy[locale as keyof typeof profilePhotoCopy].chooseLib }));
+    await fireEvent.press(view.getByRole("button", { name: profilePhotoCopy[locale as keyof typeof profilePhotoCopy].changePhoto }));
+    await fireEvent.press(view.getByRole("button", { name: profilePhotoCopy[locale as keyof typeof profilePhotoCopy].chooseLib }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(1));
     expect(view.getByRole("progressbar").props.children).toBe(indeterminate);
     expect(announce.mock.calls.map(([message]) => message)).toEqual([indeterminate]);
-    act(() => { picker.progress({ totalBytesSent: 512, totalBytesExpectedToSend: 2048 }); });
+    await act(() => { picker.progress({ totalBytesSent: 512, totalBytesExpectedToSend: 2048 }); });
     expect(view.getByText(measured)).toBeTruthy();
     expect(announce.mock.calls.map(([message]) => message)).toEqual([indeterminate]);
     await act(async () => { picker.finish(); });
@@ -108,14 +108,14 @@ describe("Profile photo", () => {
 
   it.each(["no events", "unknown total"])("shows an indeterminate ring when upload byte progress has %s", async (progress) => {
     choosePhoto();
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(1));
-    if (progress === "unknown total") act(() => { picker.progress({ totalBytesSent: 512, totalBytesExpectedToSend: 0 }); });
+    if (progress === "unknown total") await act(() => { picker.progress({ totalBytesSent: 512, totalBytesExpectedToSend: 0 }); });
     expect(view.getByRole("progressbar").props.accessibilityValue?.now).toBeUndefined();
-    expect(view.UNSAFE_queryAllByType("ActivityIndicator" as never)).toHaveLength(1);
+    expect(queryAllHosts(view.container, "ActivityIndicator")).toHaveLength(1);
     expect(view.queryByText("Uploading photo... 0%")).toBeNull();
     await act(async () => { picker.finish(); });
     expect(await view.findByText("Photo updated")).toBeTruthy();
@@ -123,21 +123,21 @@ describe("Profile photo", () => {
 
   it.each(["retry", "new photo"])("recovers through %s after a native transfer failure and cancelling the Log out dialog", async (recovery) => {
     choosePhoto();
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(1));
-    fireEvent.press(view.getByRole("button", { name: "Log out" }));
-    fireEvent.press(view.getByText("Cancel"));
+    await fireEvent.press(view.getByRole("button", { name: "Log out" }));
+    await fireEvent.press(view.getByText("Cancel"));
     await act(async () => { picker.fail(new Error("Connection reset")); });
     await view.findByText("Couldn't upload the photo.");
     expect(picker.cancelUpload).toHaveBeenCalledOnce();
-    if (recovery === "retry") fireEvent.press(view.getByRole("button", { name: "Retry" }));
+    if (recovery === "retry") await fireEvent.press(view.getByRole("button", { name: "Retry" }));
     else {
-      fireEvent.press(view.getByRole("button", { name: "Cancel" }));
-      fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-      fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+      await fireEvent.press(view.getByRole("button", { name: "Cancel" }));
+      await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+      await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     }
     await vi.waitFor(() => expect(picker.sent).toHaveLength(2));
     await act(async () => { picker.finish(); });
@@ -161,17 +161,17 @@ describe("Profile photo", () => {
       refreshes += 1;
       return HttpResponse.json({ accessToken: "fresh", refreshToken: "fresh-refresh" });
     }), operation === "remove" ? http.delete("*/me/photo", respond) : http.put("*/me/photo", respond));
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: operation === "remove" ? "Remove photo" : "Choose from library" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: operation === "remove" ? "Remove photo" : "Choose from library" }));
     if (operation === "upload") {
       await vi.waitFor(() => expect(picker.sent).toHaveLength(1));
       await act(async () => { picker.finish(); });
     }
     expect(await view.findByText(operation === "remove" ? "Couldn't remove the photo." : "Couldn't upload the photo.")).toBeTruthy();
     expect(refreshes).toBe(1);
-    fireEvent.press(view.getByRole("button", { name: "Retry" }));
+    await fireEvent.press(view.getByRole("button", { name: "Retry" }));
     if (operation === "upload") {
       await vi.waitFor(() => expect(picker.sent).toHaveLength(2));
       expect(picker.sent[0]?.uri).toBe(picker.sent[1]?.uri);
@@ -183,22 +183,22 @@ describe("Profile photo", () => {
   });
 
   it("opens the photo sheet from the labelled avatar and can close without a change", async () => {
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
     expect(view.getByText("Profile photo")).toBeTruthy();
     expect(view.getByRole("button", { name: "Take photo" })).toBeTruthy();
     expect(view.getByRole("button", { name: "Choose from library" })).toBeTruthy();
     expect(view.queryByRole("button", { name: "Remove photo" })).toBeNull();
-    fireEvent.press(view.getByRole("button", { name: "Close" }));
+    await fireEvent.press(view.getByRole("button", { name: "Close" }));
     expect(view.queryByText("Profile photo")).toBeNull();
     expect(view.getByText("Aman")).toBeTruthy();
   });
   it("opens the library with square crop, no permission prompt, and cancellation changes nothing", async () => {
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    await act(async () => { fireEvent.press(view.getByRole("button", { name: "Choose from library" })); });
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Choose from library" })); });
     expect(picker.library).toHaveBeenCalledWith(expect.objectContaining({ allowsEditing: true, aspect: [1, 1], mediaTypes: ["images"] }));
     expect(picker.libraryPermission).not.toHaveBeenCalled();
     expect(view.queryByText("Profile photo")).toBeNull();
@@ -208,14 +208,14 @@ describe("Profile photo", () => {
 
   it("explains denied camera permission and opens system settings", async () => {
     const settings = vi.spyOn(Linking, "openSettings");
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    await act(async () => { fireEvent.press(view.getByRole("button", { name: "Take photo" })); });
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Take photo" })); });
     expect(view.getByText("Camera access is off")).toBeTruthy();
     expect(view.getByText("To take a photo, allow camera access for Carberk in system settings.")).toBeTruthy();
     expect(picker.camera).not.toHaveBeenCalled();
-    await act(async () => { fireEvent.press(view.getByRole("button", { name: "Open settings" })); });
+    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Open settings" })); });
     expect(settings).toHaveBeenCalledOnce();
     expect(view.queryByText("Camera access is off")).toBeNull();
   });
@@ -236,45 +236,45 @@ describe("Profile photo", () => {
       }),
       http.get("*/me/listings/counts", () => HttpResponse.json({ active: 0, sold: 0, archived: 0, banned: 0, drafts: 0, total: 0 })),
     );
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     expect(await view.findByText("Uploading photo")).toBeTruthy();
     await vi.waitFor(() => expect(picker.sent).toHaveLength(1));
     expect(presign).toEqual({ kind: "image", writeProtocol: "conditional-v1", contentType: "image/jpeg", sizeBytes: 2048 });
     expect(picker.sent[0]).toMatchObject({ url: "https://storage.example/photo", options: { httpMethod: "PUT", uploadType: 0, headers: { "if-match": '"etag"', "content-type": "image/jpeg" } } });
     expect(picker.saves).toContainEqual({ format: "jpeg", compress: 0.8 });
-    act(() => { picker.progress({ totalBytesSent: 512, totalBytesExpectedToSend: 2048 }); });
+    await act(() => { picker.progress({ totalBytesSent: 512, totalBytesExpectedToSend: 2048 }); });
     expect(view.getByRole("progressbar").props.accessibilityValue).toEqual({ min: 0, max: 100, now: 25 });
     expect(view.getByText("Uploading photo... 25%").props.accessibilityLiveRegion).toBe("polite");
     const button = view.getByRole("button", { name: "Change profile photo" });
     expect(button.props.accessibilityState.disabled).toBe(true);
-    fireEvent.press(button);
+    await fireEvent.press(button);
     expect(view.queryByText("Profile photo")).toBeNull();
-    act(() => { picker.progress({ totalBytesSent: 1536, totalBytesExpectedToSend: 2048 }); });
+    await act(() => { picker.progress({ totalBytesSent: 1536, totalBytesExpectedToSend: 2048 }); });
     expect(view.getByText("Uploading photo... 75%")).toBeTruthy();
     await act(async () => { picker.finish(); });
     expect(await view.findByText("Photo updated")).toBeTruthy();
     expect(attached).toEqual({ key: "pending/new/original.jpg" });
-    const photos = view.UNSAFE_queryAllByType("Image" as never);
+    const photos = queryAllHosts(view.container, "Image");
     expect(photos[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/new/thumbnail.jpg" });
-    view.rerender(<ToastProvider><CabinetScreen /></ToastProvider>);
+    await view.rerender(<ToastProvider><CabinetScreen /></ToastProvider>);
     await view.findByRole("button", { name: "Aman, +993 65 XX-XX-56" });
-    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/new/thumbnail.jpg" });
+    expect(queryAllHosts(view.container, "Image")[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/new/thumbnail.jpg" });
   });
 
   it("falls back to the assigned car mark when the local preview fails while preserving upload progress", async () => {
     choosePhoto();
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(1));
-    act(() => { picker.progress({ totalBytesSent: 512, totalBytesExpectedToSend: 2048 }); });
-    fireEvent(view.UNSAFE_getByType("Image" as never), "error");
-    expect(view.UNSAFE_queryAllByType("Image" as never)).toHaveLength(0);
-    expect(view.UNSAFE_queryAllByType("Path" as never)[0]?.props.d).toBe("M11.5 12H21M17 12v3M20 12v2.4M6.5 12h.01");
+    await act(() => { picker.progress({ totalBytesSent: 512, totalBytesExpectedToSend: 2048 }); });
+    await fireEvent(getHost(view.container, "Image"), "error");
+    expect(queryAllHosts(view.container, "Image")).toHaveLength(0);
+    expect(queryAllHosts(view.container, "Path")[0]?.props.d).toBe("M11.5 12H21M17 12v3M20 12v2.4M6.5 12h.01");
     expect(view.getByRole("progressbar").props.accessibilityValue.now).toBe(25);
     await act(async () => { picker.finish(); });
     expect(await view.findByText("Photo updated")).toBeTruthy();
@@ -284,38 +284,38 @@ describe("Profile photo", () => {
     currentMe = { ...me, avatarKey: "pending/old/original.jpg" };
     choosePhoto();
     if (phase === "attachment") server.use(http.put("*/me/photo", () => HttpResponse.json({ code: "INTERNAL" }, { status: 500 })));
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(1));
     await act(async () => { picker.finish(phase === "storage" ? 500 : 200); });
     const error = await view.findByText("Couldn't upload the photo.");
     expect(error.props.accessibilityLiveRegion).toBe("assertive");
-    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/old/thumbnail.jpg" });
-    fireEvent.press(view.getByRole("button", { name: "Retry" }));
+    expect(queryAllHosts(view.container, "Image")[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/old/thumbnail.jpg" });
+    await fireEvent.press(view.getByRole("button", { name: "Retry" }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(2));
     expect(picker.library).toHaveBeenCalledOnce();
     expect(picker.sent[1]?.uri).toBe(picker.sent[0]?.uri);
     await act(async () => { picker.finish(500); });
     await view.findByText("Couldn't upload the photo.");
-    fireEvent.press(view.getByRole("button", { name: "Cancel" }));
+    await fireEvent.press(view.getByRole("button", { name: "Cancel" }));
     expect(view.queryByText("Couldn't upload the photo.")).toBeNull();
     expect(view.getByRole("button", { name: "Change profile photo" }).props.accessibilityState.disabled).toBe(false);
   });
 
   it("shows the offline sentence without a request and retries when online", async () => {
     choosePhoto();
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
     onlineManager.setOnline(false);
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     expect(await view.findByText("No internet connection. Try again when you are online.")).toBeTruthy();
     expect(requests.presigns).toEqual([]);
     expect(picker.sent).toEqual([]);
     onlineManager.setOnline(true);
-    fireEvent.press(view.getByRole("button", { name: "Retry" }));
+    await fireEvent.press(view.getByRole("button", { name: "Retry" }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(1));
     await act(async () => { picker.finish(); });
     expect(await view.findByText("Photo updated")).toBeTruthy();
@@ -330,17 +330,17 @@ describe("Profile photo", () => {
     choosePhoto(problem === "unreadable alternate format" ? { mimeType: "image/gif" } : {});
     if (problem === "oversize") picker.size = 5242881;
     if (problem === "unreadable" || problem === "unreadable alternate format") picker.readable = false;
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     expect(await view.findByText(message)).toBeTruthy();
     expect(requests.presigns).toEqual([]);
     expect(requests.sets).toEqual([]);
     expect(view.queryByRole("button", { name: "Retry" })).toBeNull();
-    fireEvent.press(view.getByRole("button", { name: "Choose another photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Choose another photo" }));
     expect(view.getByText("Profile photo")).toBeTruthy();
-    fireEvent.press(view.getByRole("button", { name: "Close" }));
+    await fireEvent.press(view.getByRole("button", { name: "Close" }));
     expect(view.queryByText(message)).toBeNull();
   });
 
@@ -352,15 +352,15 @@ describe("Profile photo", () => {
       currentMe = { ...me };
       return HttpResponse.json(currentMe);
     }));
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: "Remove photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Remove photo" }));
     expect(await view.findByText("Photo removed")).toBeTruthy();
     expect(deleted).toBe(true);
-    expect(view.UNSAFE_queryAllByType("Image" as never)).toHaveLength(0);
-    expect(view.UNSAFE_queryAllByType("Path" as never)[0]?.props.d).toBe("M11.5 12H21M17 12v3M20 12v2.4M6.5 12h.01");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    expect(queryAllHosts(view.container, "Image")).toHaveLength(0);
+    expect(queryAllHosts(view.container, "Path")[0]?.props.d).toBe("M11.5 12H21M17 12v3M20 12v2.4M6.5 12h.01");
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
     expect(view.queryByRole("button", { name: "Remove photo" })).toBeNull();
   });
 
@@ -373,13 +373,13 @@ describe("Profile photo", () => {
       currentMe = { ...me };
       return HttpResponse.json(currentMe);
     }));
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: "Remove photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Remove photo" }));
     expect(await view.findByText("Couldn't remove the photo.")).toBeTruthy();
-    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/old/thumbnail.jpg" });
-    fireEvent.press(view.getByRole("button", { name: "Retry" }));
+    expect(queryAllHosts(view.container, "Image")[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/old/thumbnail.jpg" });
+    await fireEvent.press(view.getByRole("button", { name: "Retry" }));
     expect(await view.findByText("Photo removed")).toBeTruthy();
     expect(removes).toBe(2);
     expect(picker.library).not.toHaveBeenCalled();
@@ -394,11 +394,11 @@ describe("Profile photo", () => {
       currentMe = { ...me, avatarKey: "pending/new1/original.jpg" };
       return HttpResponse.json(currentMe);
     }));
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+    await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(1));
     await act(async () => { picker.finish(); });
     await vi.waitFor(() => expect(view.getByText("Preparing photo...")).toBeTruthy());
@@ -424,15 +424,15 @@ describe("Profile photo", () => {
       currentMe = { ...me, avatarKey: body.key };
       return HttpResponse.json(currentMe);
     }));
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(1));
     await act(async () => { picker.finish(); });
     expect(await view.findByText(message)).toBeTruthy();
     expect(view.queryByText("Photo updated")).toBeNull();
-    fireEvent.press(view.getByRole("button", { name: "Retry" }));
+    await fireEvent.press(view.getByRole("button", { name: "Retry" }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(2));
     await act(async () => { picker.finish(); });
     expect(await view.findByText("Photo updated")).toBeTruthy();
@@ -445,33 +445,33 @@ describe("Profile photo", () => {
     choosePhoto();
     currentMe = { ...me, avatarKey: "pending/old/original.jpg" };
     server.use(http.put("*/me/photo", () => HttpResponse.json({ code, details: { reason: "USER_SUSPENDED" } }, { status: 403 })));
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(1));
     await act(async () => { picker.finish(); });
     expect(await view.findByText("Your account is restricted. Contact support if you think this is a mistake.")).toBeTruthy();
     expect(view.queryByRole("button", { name: "Retry" })).toBeNull();
     expect(view.getByRole("button", { name: "Cancel" })).toBeTruthy();
-    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/old/thumbnail.jpg" });
+    expect(queryAllHosts(view.container, "Image")[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/old/thumbnail.jpg" });
   });
 
   it("finishes after leaving Profile and shows the result on return", async () => {
     choosePhoto();
     server.use(http.get("*/me/listings/counts", () => HttpResponse.json({ active: 0, sold: 0, archived: 0, banned: 0, drafts: 0, total: 0 })));
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(1));
-    view.rerender(<ToastProvider><CabinetScreen /></ToastProvider>);
+    await view.rerender(<ToastProvider><CabinetScreen /></ToastProvider>);
     await view.findByText("Account");
     await act(async () => { picker.finish(); });
     await vi.waitFor(() => expect(requests.sets).toHaveLength(1));
-    view.rerender(<ToastProvider><ProfileScreen /></ToastProvider>);
+    await view.rerender(<ToastProvider><ProfileScreen /></ToastProvider>);
     expect(await view.findByText("Photo updated")).toBeTruthy();
-    expect(view.UNSAFE_queryAllByType("Image" as never)[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/new1/thumbnail.jpg" });
+    expect(queryAllHosts(view.container, "Image")[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/new1/thumbnail.jpg" });
   });
 
   it.each(["storage", "attachment"])("never attaches or caches the previous User's photo when signing out during %s", async (phase) => {
@@ -484,10 +484,10 @@ describe("Profile photo", () => {
       return HttpResponse.json({ ...me, avatarKey: "pending/new1/original.jpg" });
     }));
     const content = <ToastProvider><ProfileScreen /></ToastProvider>;
-    const view = renderMobile(content);
+    const view = await renderMobile(content);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(1));
     if (phase === "attachment") {
       await act(async () => { picker.finish(); });
@@ -499,7 +499,7 @@ describe("Profile photo", () => {
     await act(async () => { await storeAuthSession({ accessToken: "merdan", refreshToken: "refresh-merdan", user: { id: currentMe.id, phone: me.phone, email: null, displayName: "Merdan", role: "buyer" } }); });
     await view.findByText("Merdan");
     expect(view.queryByText("Uploading photo")).toBeNull();
-    expect(view.UNSAFE_queryAllByType("Image" as never)).toHaveLength(0);
+    expect(queryAllHosts(view.container, "Image")).toHaveLength(0);
     await act(async () => {
       if (phase === "attachment") complete?.(HttpResponse.json({ ...me, avatarKey: "pending/new1/original.jpg" }));
       else picker.finish();
@@ -508,7 +508,7 @@ describe("Profile photo", () => {
     expect(sentTo).toEqual(phase === "attachment" ? ["Bearer aman"] : []);
     expect(view.getByText("Merdan")).toBeTruthy();
     expect(view.queryByText("Photo updated")).toBeNull();
-    expect(view.UNSAFE_queryAllByType("Image" as never)).toHaveLength(0);
+    expect(queryAllHosts(view.container, "Image")).toHaveLength(0);
   });
 
   it("discards compression after sign-out without leaking validation errors to the next User", async () => {
@@ -516,10 +516,10 @@ describe("Profile photo", () => {
     let complete!: () => void;
     picker.renderWait = new Promise<void>((resolve) => { complete = resolve; });
     picker.size = 6 * 1024 * 1024;
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     await vi.waitFor(() => expect(picker.renderStarted).toHaveBeenCalledOnce());
     await act(async () => { await clearAuthSession(); view.queryClient.clear(); });
     currentMe = { ...me, id: "00000000-0000-4000-8000-00000000000b", displayName: "Merdan" };
@@ -543,10 +543,10 @@ describe("Profile photo", () => {
       started = true;
       return new Promise<Response>((resolve) => { complete = resolve; });
     }));
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(1));
     await act(async () => { picker.finish(); });
     await vi.waitFor(() => expect(started).toBe(true));
@@ -569,16 +569,16 @@ describe("Profile photo", () => {
       attempts += 1;
       return HttpResponse.json({ code: "UPLOAD_ALREADY_ATTACHED", details: { reason: "UPLOAD_PREPARING" } }, { status: 409 });
     }));
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+    await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(1));
     await act(async () => { picker.finish(); });
     await vi.waitFor(() => expect(view.getByText("Preparing photo...")).toBeTruthy());
     if (ending === "cancel") {
-      fireEvent.press(view.getByRole("button", { name: "Cancel" }));
+      await fireEvent.press(view.getByRole("button", { name: "Cancel" }));
       await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
       expect(attempts).toBe(1);
       expect(view.queryByRole("progressbar")).toBeNull();
@@ -590,7 +590,7 @@ describe("Profile photo", () => {
       expect(view.getByText("Couldn't upload the photo.")).toBeTruthy();
       expect(attempts).toBe(30);
       expect(view.getByRole("button", { name: "Retry" })).toBeTruthy();
-      fireEvent.press(view.getByRole("button", { name: "Retry" }));
+      await fireEvent.press(view.getByRole("button", { name: "Retry" }));
       await vi.waitFor(() => expect(picker.sent).toHaveLength(2));
       expect(picker.sent[0]?.uri).toBe(picker.sent[1]?.uri);
       expect(picker.library).toHaveBeenCalledOnce();
@@ -606,10 +606,10 @@ describe("Profile photo", () => {
     let reject!: (error: Error) => void;
     const nativeCall = boundary === "library" ? picker.library : boundary === "camera" ? picker.camera : picker.permission;
     nativeCall.mockImplementationOnce(() => new Promise<never>((_resolve, fail) => { reject = fail; }));
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: boundary === "library" ? "Choose from library" : "Take photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: boundary === "library" ? "Choose from library" : "Take photo" }));
     await vi.waitFor(() => expect(reject).toBeDefined());
     await act(async () => { await clearAuthSession(); view.queryClient.clear(); });
     currentMe = { ...me, id: "00000000-0000-4000-8000-00000000000b", displayName: "Merdan" };
@@ -624,11 +624,11 @@ describe("Profile photo", () => {
 
   it("times out a stalled storage PUT, ignores late events and retries the same photo", async () => {
     choosePhoto();
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+    await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(1));
     const lateProgress = picker.progress;
     const lateFinish = picker.finish;
@@ -641,7 +641,7 @@ describe("Profile photo", () => {
     });
     expect(view.queryByRole("progressbar")).toBeNull();
     expect(requests.sets).toHaveLength(0);
-    fireEvent.press(view.getByRole("button", { name: "Retry" }));
+    await fireEvent.press(view.getByRole("button", { name: "Retry" }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(2));
     expect(picker.sent[0]?.uri).toBe(picker.sent[1]?.uri);
     await act(async () => { picker.finish(); });
@@ -661,13 +661,13 @@ describe("Profile photo", () => {
       if (attempts === 1) return HttpResponse.json({ code: "UPLOAD_ALREADY_ATTACHED", details: { reason: "UPLOAD_PREPARING" } }, { status: 409 });
       return HttpResponse.json({ ...me, avatarKey: "pending/new1/original.jpg" });
     }));
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+    await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(1));
-    for (const bytes of [512, 1024, 1536, 2048]) act(() => { picker.progress({ totalBytesSent: bytes, totalBytesExpectedToSend: 2048 }); });
+    for (const bytes of [512, 1024, 1536, 2048]) await act(() => { picker.progress({ totalBytesSent: bytes, totalBytesExpectedToSend: 2048 }); });
     expect(announce.mock.calls.map(([message]) => message)).toEqual(["Uploading photo"]);
     await act(async () => { picker.finish(ending === "failed" ? 500 : 200); });
     if (ending === "preparing") {
@@ -683,10 +683,10 @@ describe("Profile photo", () => {
     const announce = vi.spyOn(AccessibilityInfo, "announceForAccessibility");
     currentMe = { ...me, avatarKey: "pending/old/original.jpg" };
     server.use(http.delete("*/me/photo", () => HttpResponse.json(me)));
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: "Remove photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Remove photo" }));
     await view.findByText("Photo removed");
     expect(announce.mock.calls.map(([message]) => message)).toEqual(["Removing photo...", "Photo removed"]);
   });
@@ -695,10 +695,10 @@ describe("Profile photo", () => {
     currentMe = { ...me, avatarKey: "pending/old/original.jpg" };
     let complete: ((response: Response) => void) | undefined;
     server.use(http.delete("*/me/photo", () => new Promise<Response>((resolve) => { complete = resolve; })));
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: "Remove photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Remove photo" }));
     await vi.waitFor(() => expect(complete).toBeDefined());
     await act(async () => { await clearAuthSession(); view.queryClient.clear(); });
     currentMe = { ...me, id: "00000000-0000-4000-8000-00000000000b", displayName: "Merdan" };
@@ -712,16 +712,16 @@ describe("Profile photo", () => {
 
   it("never moves progress backwards when native byte events arrive out of order", async () => {
     choosePhoto();
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     await vi.waitFor(() => expect(picker.sent).toHaveLength(1));
-    act(() => { picker.progress({ totalBytesSent: 1536, totalBytesExpectedToSend: 2048 }); });
-    act(() => { picker.progress({ totalBytesSent: 1536, totalBytesExpectedToSend: 0 }); });
+    await act(() => { picker.progress({ totalBytesSent: 1536, totalBytesExpectedToSend: 2048 }); });
+    await act(() => { picker.progress({ totalBytesSent: 1536, totalBytesExpectedToSend: 0 }); });
     expect(view.getByRole("progressbar").props.accessibilityValue?.now).toBe(75);
     expect(view.getByText("Uploading photo... 75%")).toBeTruthy();
-    act(() => { picker.progress({ totalBytesSent: 512, totalBytesExpectedToSend: 2048 }); });
+    await act(() => { picker.progress({ totalBytesSent: 512, totalBytesExpectedToSend: 2048 }); });
     expect(view.getByRole("progressbar").props.accessibilityValue.now).toBe(75);
     await act(async () => { picker.finish(); });
     await view.findByText("Photo updated");
@@ -730,10 +730,10 @@ describe("Profile photo", () => {
   it("does not upload if a legacy server omits the conditional write headers", async () => {
     choosePhoto();
     server.use(http.post("*/uploads/presign", () => HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: "pending/new/original.jpg", expiresIn: 600, maxSizeBytes: 5242880 })));
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+    await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
+    await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
     expect(await view.findByText("Couldn't upload the photo.")).toBeTruthy();
     expect(picker.sent).toEqual([]);
     expect(requests.sets).toEqual([]);
@@ -761,9 +761,9 @@ describe("Profile photo", () => {
       if (attachAttempts > 1) return HttpResponse.json({ ...me, avatarKey: "pending/new1/original.jpg" });
       return HttpResponse.json({ code: "UPLOAD_ALREADY_ATTACHED", details: { reason: state === "preparing" ? "UPLOAD_PREPARING" : "UPLOAD_ATTACHED_TO_LISTING" } }, { status: 409 });
     }));
-    const view = renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>, { locale });
+    const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>, { locale });
     await view.findByText("Aman");
-    fireEvent.press(view.getByRole("button", { name: copy.changePhoto }));
+    await fireEvent.press(view.getByRole("button", { name: copy.changePhoto }));
     if (state === "idle") {
       expect(view.getByText(copy.photoT)).toBeTruthy();
       expect(view.getByRole("button", { name: copy.takePhoto })).toBeTruthy();
@@ -772,32 +772,32 @@ describe("Profile photo", () => {
       return;
     }
     if (state === "camera denied") {
-      fireEvent.press(view.getByRole("button", { name: copy.takePhoto }));
+      await fireEvent.press(view.getByRole("button", { name: copy.takePhoto }));
       expect(await view.findByText(copy.permT)).toBeTruthy();
       expect(view.getByText(copy.permD)).toBeTruthy();
       expect(view.getByRole("button", { name: copy.openSettings })).toBeTruthy();
-      fireEvent.press(view.getByRole("button", { name: copy.cancel }));
+      await fireEvent.press(view.getByRole("button", { name: copy.cancel }));
       expect(view.queryByText(copy.permT)).toBeNull();
       return;
     }
     if (removing) {
-      fireEvent.press(view.getByRole("button", { name: copy.removePhoto }));
+      await fireEvent.press(view.getByRole("button", { name: copy.removePhoto }));
       expect(await view.findByText(state === "removed" ? copy.photoRemoved : copy.photoRmFail)).toBeTruthy();
       if (state === "remove failed") expect(view.getByRole("button", { name: copy.retry })).toBeTruthy();
       return;
     }
     if (state === "offline") onlineManager.setOnline(false);
     if (state === "preparing") vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    fireEvent.press(view.getByRole("button", { name: copy.chooseLib }));
+    await fireEvent.press(view.getByRole("button", { name: copy.chooseLib }));
     if (state === "too large" || state === "unsupported" || state === "offline") {
       expect(await view.findByText(state === "too large" ? copy.photoBig : state === "unsupported" ? copy.photoType : copy.offline)).toBeTruthy();
       expect(view.getByRole("button", { name: state === "offline" ? copy.retry : copy.chooseOther })).toBeTruthy();
-      fireEvent.press(view.getByRole("button", { name: copy.cancel }));
+      await fireEvent.press(view.getByRole("button", { name: copy.cancel }));
       return;
     }
     await vi.waitFor(() => expect(picker.sent).toHaveLength(1));
     if (state === "uploading") {
-      act(() => { picker.progress({ totalBytesSent: 512, totalBytesExpectedToSend: 2048 }); });
+      await act(() => { picker.progress({ totalBytesSent: 512, totalBytesExpectedToSend: 2048 }); });
       expect(view.getByText(copy.uploading)).toBeTruthy();
       expect(view.getByRole("button", { name: copy.changePhoto }).props.accessibilityState.disabled).toBe(true);
     }
@@ -805,7 +805,7 @@ describe("Profile photo", () => {
     if (state === "failed" || state === "attached to listing") {
       expect(await view.findByText(state === "failed" ? copy.photoFail : copy.attached)).toBeTruthy();
       expect(view.getByRole("button", { name: copy.retry })).toBeTruthy();
-      fireEvent.press(view.getByRole("button", { name: copy.cancel }));
+      await fireEvent.press(view.getByRole("button", { name: copy.cancel }));
     } else {
       if (state === "preparing") {
         await vi.waitFor(() => expect(view.getByText(copy.preparing)).toBeTruthy());

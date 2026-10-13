@@ -28,21 +28,21 @@ describe.each(profiles)("%s public web links", (profile, baseUrl) => {
     expect(eas.build[profile].env.EXPO_PUBLIC_WEB_URL).toBe(baseUrl);
   });
 
-  it.each(["en", "ru", "tk"])("opens localized privacy, terms and posting rules from Cabinet and sign-in in %s", (locale) => {
+  it.each(["en", "ru", "tk"])("opens localized privacy, terms and posting rules from Cabinet and sign-in in %s", async (locale) => {
     vi.stubEnv("EXPO_PUBLIC_WEB_URL", baseUrl);
-    const cabinet = renderMobile(<CabinetScreen />, { locale });
-    fireEvent.press(cabinet.getByRole("button", { name: cabinet.i18n.t("account:privacyPolicy") }));
+    const cabinet = await renderMobile(<CabinetScreen />, { locale });
+    await fireEvent.press(cabinet.getByRole("button", { name: cabinet.i18n.t("account:privacyPolicy") }));
     expect(Linking.openURL).toHaveBeenLastCalledWith(`${baseUrl}/${locale}/legal/privacy`);
-    fireEvent.press(cabinet.getByRole("button", { name: cabinet.i18n.t("account:termsOfService") }));
+    await fireEvent.press(cabinet.getByRole("button", { name: cabinet.i18n.t("account:termsOfService") }));
     expect(Linking.openURL).toHaveBeenLastCalledWith(`${baseUrl}/${locale}/legal/terms`);
-    fireEvent.press(cabinet.getByRole("button", { name: cabinet.i18n.t("account:postingRules") }));
+    await fireEvent.press(cabinet.getByRole("button", { name: cabinet.i18n.t("account:postingRules") }));
     expect(Linking.openURL).toHaveBeenLastCalledWith(`${baseUrl}/${locale}/legal/posting-rules`);
-    cabinet.unmount();
+    await cabinet.unmount();
 
-    const auth = renderMobile(<AuthEntryScreen method="email" title="Sign in" helper="Email" canSubmit={false} isSubmitting={false} onSubmit={async () => {}} onMethodChange={() => {}} onClose={() => {}}>{null}</AuthEntryScreen>, { locale });
-    fireEvent.press(auth.getByText(auth.i18n.t("auth:privacy")));
+    const auth = await renderMobile(<AuthEntryScreen method="email" title="Sign in" helper="Email" canSubmit={false} isSubmitting={false} onSubmit={async () => {}} onMethodChange={() => {}} onClose={() => {}}>{null}</AuthEntryScreen>, { locale });
+    await fireEvent.press(auth.getByText(auth.i18n.t("auth:privacy")));
     expect(Linking.openURL).toHaveBeenLastCalledWith(`${baseUrl}/${locale}/legal/privacy`);
-    fireEvent.press(auth.getByText(auth.i18n.t("auth:terms")));
+    await fireEvent.press(auth.getByText(auth.i18n.t("auth:terms")));
     expect(Linking.openURL).toHaveBeenLastCalledWith(`${baseUrl}/${locale}/legal/terms`);
   });
 });
