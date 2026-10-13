@@ -180,6 +180,12 @@ export const FeedListingSummarySchema = ListingSummaryBaseSchema.extend({
   allowCalls: z.boolean().optional(),
   allowChat: z.boolean().optional(),
   /**
+   * Whether the Listing has a contact phone. Call needs one besides
+   * `allowCalls`, and some Listings have none (#867). The number itself
+   * stays on Listing detail.
+   */
+  hasContactPhone: z.boolean().optional(),
+  /**
    * What the card needs to name the seller: compose it with
    * `formatDisplayName`; a `deleted` seller has no name. No avatar fields.
    */
@@ -201,6 +207,8 @@ export const FavoriteListingSummarySchema = ListingSummaryBaseSchema.extend({
   contactPhone: z.string().optional(),
   allowCalls: z.boolean(),
   allowChat: z.boolean(),
+  /** As on a feed item (#867). */
+  hasContactPhone: z.boolean().optional(),
 }).superRefine(checkSummaryHashes);
 export type FavoriteListingSummary = z.infer<typeof FavoriteListingSummarySchema>;
 

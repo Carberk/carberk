@@ -288,6 +288,11 @@ describe("a card summary that carries the preview's fields (#867)", () => {
       { hasVin: false, acceptsExchange: false, installmentAvailable: true, allowCalls: true, allowChat: true },
       { acceptsExchange: false, installmentAvailable: true, allowCalls: true, allowChat: true },
     ],
+    [
+      "a Listing that takes calls but has no contact phone",
+      { hasVin: false, allowCalls: true, allowChat: true, hasContactPhone: false },
+      { allowCalls: true, allowChat: true, contactPhone: undefined },
+    ],
   ] as const)("keeps every Specifications entry, badge and contact button in place when detail loads: %s", async (_name, card, detail) => {
     state.preview = summaryFixture(card);
     const screen = await renderMobile(<ListingDetailScreen />);

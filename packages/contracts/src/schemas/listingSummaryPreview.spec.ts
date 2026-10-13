@@ -31,7 +31,7 @@ const previewFields = {
   acceptsExchange: true,
   installmentAvailable: false,
 };
-const contactPreferences = { allowCalls: false, allowChat: true };
+const contactPreferences = { allowCalls: true, allowChat: true, hasContactPhone: false };
 
 describe("Listing summary fields for the detail preview", () => {
   it.each([

@@ -349,6 +349,7 @@ describe("ListMyFavorites", () => {
       hasVin: false,
       acceptsExchange: false,
       installmentAvailable: true,
+      hasContactPhone: true,
     });
   });
   describe("activeOnly", () => {

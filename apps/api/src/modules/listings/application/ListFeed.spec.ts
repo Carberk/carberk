@@ -439,7 +439,7 @@ describe("ListFeed", () => {
         installmentAvailable: true,
         allowCalls: false,
       }),
-      seedListing({ id: "l2" }),
+      seedListing({ id: "l2", contactPhone: "+99365000000" }),
     ];
 
     const uc = makeUseCase(ranking, exchangeRates);
@@ -455,9 +455,13 @@ describe("ListFeed", () => {
       installmentAvailable: true,
       allowCalls: false,
       allowChat: true,
+      hasContactPhone: false,
     });
     expect(full).not.toHaveProperty("vin");
-    expect(sparse).toMatchObject({ hasVin: false, acceptsExchange: false, installmentAvailable: false });
+    expect(sparse).toMatchObject({
+      hasVin: false, acceptsExchange: false, installmentAvailable: false, hasContactPhone: true,
+    });
+    expect(sparse).not.toHaveProperty("contactPhone");
     for (const field of ["enginePower", "driveTypeId", "bodyTypeId", "colorId"])
       expect(sparse).not.toHaveProperty(field);
   });
