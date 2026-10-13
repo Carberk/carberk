@@ -65,6 +65,10 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
   let s3: S3Client;
   let storage: ObjectStore;
   let downloads: string[];
+  let loadsInFlight = 0;
+  let maxLoadsInFlight = 0;
+  let putsInFlight = 0;
+  let maxPutsInFlight = 0;
   let photos: PhotoSource;
   /** What the first seed drew per Listing, to compare with a seed after a removal. */
   let firstDraw: { id: string; publishedAt: Date | null; viewCount: number }[];
@@ -97,12 +101,25 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
     s3 = new S3Client({ endpoint, region: "us-east-1", credentials, forcePathStyle: true });
     await s3.send(new CreateBucketCommand({ Bucket: BUCKET }));
     await s3.send(new CreateBucketCommand({ Bucket: CHAT_BUCKET }));
-    storage = createS3ObjectStore({
+    const s3Store = createS3ObjectStore({
       endpoint,
       region: "us-east-1",
       accessKeyId: credentials.accessKeyId,
       secretAccessKey: credentials.secretAccessKey,
     });
+    // Counts the uploads in flight, so the test sees the seed's upload concurrency.
+    storage = {
+      ...s3Store,
+      async put(key, body, contentType) {
+        putsInFlight += 1;
+        maxPutsInFlight = Math.max(maxPutsInFlight, putsInFlight);
+        try {
+          await s3Store.put(key, body, contentType);
+        } finally {
+          putsInFlight -= 1;
+        }
+      },
+    };
 
     // The download is stubbed: no test reaches Commons. The stub photo carries EXIF and an
     // orientation tag, as a real camera file would, so the seed has metadata to remove.
@@ -116,7 +133,12 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
     downloads = [];
     photos = {
       async load(photo) {
+        loadsInFlight += 1;
+        maxLoadsInFlight = Math.max(maxLoadsInFlight, loadsInFlight);
         downloads.push(photo.sourceFile);
+        // Yield, so an overlapping second load would be seen.
+        await new Promise((resolve) => setImmediate(resolve));
+        loadsInFlight -= 1;
         return stub;
       },
     };
@@ -358,6 +380,10 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
     expect({ width: meta.width, height: meta.height }).toEqual({ width: sample.width, height: sample.height });
 
     expect(new Set(downloads).size).toBe(photoCount);
+    // Commons asks automated clients to stay sequential: one photo is loaded at a time. Uploads
+    // to the bucket overlap.
+    expect(maxLoadsInFlight).toBe(1);
+    expect(maxPutsInFlight).toBeGreaterThan(1);
     firstDraw = listings.map(({ id, publishedAt, viewCount }) => ({ id, publishedAt, viewCount }));
   }, SEED_TIMEOUT);
 
