@@ -11,6 +11,7 @@ function docker(args) {
   const result = spawnSync("docker", args, { encoding: "utf8", timeout: 120_000 });
   assert.ifError(result.error);
   assert.equal(result.status, 0, `${args[0]} failed: ${result.stdout}${result.stderr}`);
+  assert.doesNotMatch(result.stdout + result.stderr, /ERR_PNPM|out of sync|installing dependencies/);
   return result.stdout.trim();
 }
 const patches = Object.fromEntries(await Promise.all([
@@ -37,7 +38,7 @@ const probe = `
   for (const [name, expected] of Object.entries(${JSON.stringify(patches)}))
     assert.equal(digest('/app/patches/' + name), expected, 'retain exact tracked patch inputs');
   const resolved = spawnSync('pnpm', ['--filter', '@auto-tm/db', 'exec', 'node', '-e',
-    'require.resolve("tsx/cli"); require.resolve("@prisma/client"); console.log("packaged DB tools resolved")'],
+    'require.resolve("tsx/cli"); require("@auto-tm/db"); console.log("packaged DB tools resolved")'],
     {cwd:'/app', encoding:'utf8', timeout:30000});
   assert.ifError(resolved.error);
   assert.equal(resolved.status, 0, resolved.stdout + resolved.stderr);

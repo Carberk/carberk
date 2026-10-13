@@ -6,6 +6,11 @@ on:
       - "infra/docker/api.Dockerfile"
       - "scripts/api-image-runtime-smoke.mjs"
       - ".github/workflows/api-image-runtime.yml"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "patches/**"
+      - "packages/db/**"
   workflow_dispatch:
 
 permissions:
