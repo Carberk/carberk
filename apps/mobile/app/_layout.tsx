@@ -193,7 +193,7 @@ function PushTokenSyncOnBoot() {
 
 export default function RootLayout() {
   const osColorScheme = useOsColorScheme();
-  const { setColorScheme } = useNativeWindColorScheme();
+  const { colorScheme: appliedScheme, setColorScheme } = useNativeWindColorScheme();
   const theme = themeStore((state) => state.theme);
   const hydrateTheme = themeStore((state) => state.hydrate);
   const resolvedScheme =
@@ -218,7 +218,7 @@ export default function RootLayout() {
     "GeistMono-Medium": require("../assets/fonts/GeistMono-Medium.ttf"),
   });
   const [onboarding, setOnboarding] = useState<OnboardingDecision | null>(null);
-  const appReady = (fontsLoaded || !!fontError) && i18nReady && themeReady && onboarding !== null;
+  const appReady = (fontsLoaded || !!fontError) && i18nReady && themeReady && appliedScheme === scheme && onboarding !== null;
 
   useEffect(() => {
     // Started first: the gate reads storage before anything in this launch

@@ -61,7 +61,8 @@ export function LaunchEntrance({ ready, children }: PropsWithChildren<{ ready: b
       return;
     }
     icon.value = withTiming(0, { duration: 200 });
-    wordmark.value = withDelay(80, withTiming(1, { duration: 460 }));
+    // Finish the matching native identity before introducing the wordmark.
+    wordmark.value = withDelay(200, withTiming(1, { duration: 420 }));
     credit.value = withDelay(260, withTiming(1, { duration: 300 }));
     // This timer controls the overlay only. It never decides app readiness.
     const timer = setTimeout(() => setEntered(true), ENTRANCE_MS);
