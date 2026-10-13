@@ -18,7 +18,7 @@ Create root ADRs under `docs/adr/`. Never edit a merged ADR or invent the decisi
    `node ${CLAUDE_SKILL_DIR}/scripts/prepare.mjs "$ARGUMENTS"`
 
 4. Inspect semantic collisions. Present `supersede`, `complement`, `new decision`, or `cancel`; never overwrite or reuse a number.
-5. Use Context7 when the decision depends on an external library/API behavior.
+5. When the decision depends on external library/API behavior released after your training cutoff, read its official documentation following `docs/agents/documentation-lookups.md`.
 
 ## Establish the decision
 
