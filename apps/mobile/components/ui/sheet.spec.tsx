@@ -1,7 +1,7 @@
 import { Text } from "react-native";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fireEvent, renderMobile } from "../../test/render";
+import { act, fireEvent, renderMobile } from "../../test/render";
 
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 
@@ -13,17 +13,18 @@ vi.unmock("@/components/ui/sheet");
 vi.mock("@rn-primitives/dialog", async () => {
   const React = await import("react");
   const { View } = await import("react-native");
-  const Open = React.createContext<(open: boolean) => void>(() => {});
+  const Open = React.createContext({ open: false, onOpenChange: (_open: boolean) => {} });
   const Box = ({ children }: React.PropsWithChildren) => <View>{children}</View>;
   const Close = ({ children }: { children: React.ReactNode }) => {
-    const onOpenChange = React.useContext(Open);
+    const { onOpenChange } = React.useContext(Open);
     return React.cloneElement(children as React.ReactElement<{ onPress: () => void }>, { onPress: () => onOpenChange(false) });
   };
-  const Root = ({ onOpenChange, children }: React.PropsWithChildren<{ onOpenChange: (open: boolean) => void }>) =>
-    <Open.Provider value={onOpenChange}>{children}</Open.Provider>;
-  return { Root, Close, Portal: Box, Overlay: Box, Content: Box, Trigger: Box, Title: Box, Description: Box };
+  const Root = ({ open, onOpenChange, children }: React.PropsWithChildren<{ open: boolean; onOpenChange: (open: boolean) => void }>) =>
+    <Open.Provider value={{ open, onOpenChange }}>{children}</Open.Provider>;
+  const Present = ({ forceMount, children }: React.PropsWithChildren<{ forceMount?: boolean }>) =>
+    React.useContext(Open).open || forceMount ? <View>{children}</View> : null;
+  return { Root, Close, useRootContext: () => React.useContext(Open), Portal: Present, Overlay: Present, Content: Present, Trigger: Box, Title: Box, Description: Box };
 });
-vi.mock("react-native-reanimated", () => ({ SlideInDown: { duration: () => ({}) }, SlideOutDown: { duration: () => ({}) } }));
 vi.mock("react-native-screens", async () => ({ FullWindowOverlay: (await import("react-native")).View }));
 vi.mock("@/components/ui/native-only-animated-view", async () => ({ NativeOnlyAnimatedView: (await import("react-native")).View }));
 
@@ -58,5 +59,29 @@ describe("Sheet backdrop", () => {
     const { view, onOpenChange } = renderSheet(true);
     fireEvent.press(view.getByText("Body"));
     expect(onOpenChange).not.toHaveBeenCalled();
+  });
+});
+
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => vi.useRealTimers());
+
+describe("Sheet dismissal", () => {
+  const sheet = (open: boolean) => <Sheet open={open} onOpenChange={() => {}}><SheetContent><Text>Options</Text></SheetContent></Sheet>;
+
+  it("retains the whole sheet for its exit before removing it", () => {
+    const view = renderMobile(sheet(true));
+    view.rerender(sheet(false));
+    expect(view.getByText("Options")).toBeTruthy();
+    act(() => vi.advanceTimersByTime(220));
+    expect(view.queryByText("Options")).toBeNull();
+  });
+
+  it("cancels pending removal when reopened during the exit", () => {
+    const view = renderMobile(sheet(true));
+    view.rerender(sheet(false));
+    act(() => vi.advanceTimersByTime(100));
+    view.rerender(sheet(true));
+    act(() => vi.advanceTimersByTime(1000));
+    expect(view.getByText("Options")).toBeTruthy();
   });
 });

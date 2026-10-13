@@ -15,6 +15,28 @@ const FLAG = "@auto-tm/onboarding-completed";
 const LOCALE = "@auto-tm/locale";
 const LANGUAGE = "/(onboarding)/language";
 
+const appearance = vi.hoisted(() => ({
+  current: "light", hold: false, destinations: [] as string[],
+  listeners: new Set<() => void>(),
+}));
+vi.mock("nativewind", async () => {
+  const React = await import("react");
+  return {
+    cssInterop: vi.fn(), remapProps: vi.fn(),
+    useColorScheme: () => ({
+      colorScheme: React.useSyncExternalStore(
+        (listener) => { appearance.listeners.add(listener); return () => { appearance.listeners.delete(listener); }; },
+        () => appearance.current,
+      ),
+      setColorScheme: (scheme: string) => {
+        if (appearance.hold) return;
+        appearance.current = scheme === "system" ? "light" : scheme;
+        for (const listener of appearance.listeners) listener();
+      },
+    }),
+  };
+});
+
 const fontState = vi.hoisted(() => ({ loaded: true, error: null as Error | null }));
 
 const launch = vi.hoisted(() => ({
@@ -69,7 +91,10 @@ vi.mock("expo-router", async () => {
   // to do; the dismissal path runs on the production screens in onboarding-flow.spec.
   const native = await import("react-native");
   const Stack = Object.assign(({ children }: React.PropsWithChildren) => <native.View>{children}</native.View>, {
-    Screen: ({ name }: { name: string }) => <native.View testID={name} />,
+    Screen: ({ name }: { name: string }) => {
+      if (name === "(tabs)") appearance.destinations.push(appearance.current);
+      return <native.View testID={name} />;
+    },
   });
   return {
     Stack,
@@ -90,6 +115,9 @@ async function launchApp() {
 
 beforeEach(() => {
   createRequire(import.meta.url).extensions[".ttf"] = (module) => { module.exports = {}; };
+  appearance.current = "light";
+  appearance.hold = false;
+  appearance.destinations = [];
   fontState.loaded = true;
   fontState.error = null;
   launch.pathname = "/";
@@ -109,6 +137,22 @@ afterEach(() => {
 });
 
 describe("Startup resource failures", () => {
+  it("mounts the first destination with the saved Light appearance already applied", async () => {
+    appearance.current = "dark";
+    appearance.hold = true;
+    launch.stored = { "@auto-tm/theme": "light", [LOCALE]: "en" };
+    const screen = await launchApp();
+    expect(screen.queryByTestId("(tabs)")).toBeNull();
+    act(() => {
+      appearance.current = "light";
+      appearance.hold = false;
+      for (const listener of appearance.listeners) listener();
+    });
+    expect(screen.getByTestId("(tabs)")).toBeTruthy();
+    expect(appearance.destinations.length).toBeGreaterThan(0);
+    expect(appearance.destinations.every((scheme) => scheme === "light")).toBe(true);
+  });
+
   it("keeps the launch cover until the saved theme has settled", async () => {
     let resolveTheme!: (theme: string) => void;
     const pendingTheme = new Promise<string>((resolve) => { resolveTheme = resolve; });
