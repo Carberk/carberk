@@ -24,7 +24,7 @@ const RANDOM_SEED = 703;
  * Stored objects uploaded at once. Photos are still loaded one at a time, as Commons asks, and
  * prepared one at a time; only the uploads to the bucket overlap.
  */
-export const DEMO_UPLOAD_CONCURRENCY = 8;
+export const DEMO_UPLOAD_CONCURRENCY = 16;
 
 /** mulberry32: a small seeded generator. `Math.random` would make two runs disagree. */
 function seededRandom(seed: number): () => number {
