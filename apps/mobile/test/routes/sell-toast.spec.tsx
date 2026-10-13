@@ -80,7 +80,7 @@ describe("Sell publish toasts", () => {
     fixture.publish.mockRejectedValue(new ApiError("INVALID_DRAFT_PAYLOAD", 400, "Draft is missing required fields", { formErrors: ["AT_LEAST_THREE_PHOTOS_REQUIRED"] }));
     const screen = await renderMobile(<ToastProvider><SellScreen /></ToastProvider>, { locale });
     const publishName = locale === "ru" ? "Опубликовать" : locale === "tk" ? "Neşir et" : "Publish";
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: publishName })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: publishName })); });
     expect(within(screen.getByRole("alert")).getByText(message)).toBeTruthy();
     expect(routerMock.replace).not.toHaveBeenCalled();
   });
@@ -96,7 +96,7 @@ describe("Sell publish toasts", () => {
     fixture.publish.mockRejectedValue(new ApiError(code, 400, "A photo upload is no longer available"));
     const screen = await renderMobile(<ToastProvider><SellScreen /></ToastProvider>, { locale });
     const publishName = locale === "ru" ? "Опубликовать" : locale === "tk" ? "Neşir et" : "Publish";
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: publishName })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: publishName })); });
     expect(within(screen.getByRole("alert")).getByText(message)).toBeTruthy();
     expect(routerMock.replace).not.toHaveBeenCalled();
   });
@@ -105,7 +105,7 @@ describe("Sell publish toasts", () => {
 
   it("shows a publish failure above Publish, not as a toast, and keeps the wizard open", async () => {
     const { screen } = await renderWizard();
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Publish" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Publish" })); });
 
     const message = "Could not publish. Your draft is saved. Try again.";
     expect(within(screen.getByRole("alert")).getByText(message)).toBeTruthy();
@@ -118,7 +118,7 @@ describe("Sell publish toasts", () => {
   it("uses ordinary clearance for the success toast on the destination screen", async () => {
     fixture.publish.mockResolvedValue({ id: fixture.id });
     const { screen, top } = await renderWizard();
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Publish" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Publish" })); });
     expect(routerMock.push).toHaveBeenCalledWith(`/(public)/listings/${fixture.id}`);
     expect(screen.getByText("Listing published")).toBeTruthy();
     expect(top()).toBe(59 + 64 + 8);
@@ -158,7 +158,7 @@ it("Back after publish and opening/closing Edit returns to tabs, then can leave 
     </Navigator.Navigator>
   </BaseNavigationContainer></ToastProvider>);
   try {
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Publish" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Publish" })); });
     expect(navigation.getCurrentRoute()?.name).toBe(detail);
     await act(() => navigation.dispatch(StackActions.push(edit)));
     expect(navigation.getCurrentRoute()?.name).toBe(edit);

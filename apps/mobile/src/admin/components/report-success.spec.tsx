@@ -1,4 +1,4 @@
-import { KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import { Platform } from "react-native";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fireEvent, renderMobile, within, getHost } from "../../../test/render";

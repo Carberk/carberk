@@ -1,5 +1,5 @@
 import { createRef } from "react";
-import { View } from "react-native";
+import type { View } from "react-native";
 import { beforeEach, expect, it, vi } from "vitest";
 
 import { renderMobile, getAllHosts } from "../render";

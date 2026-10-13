@@ -1,6 +1,5 @@
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useFocusEffect } from "expo-router";
-import { ActivityIndicator } from "react-native";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderMobile, act, fireEvent, routerMock, within, getHost } from "../render";

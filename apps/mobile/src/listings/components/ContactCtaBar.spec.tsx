@@ -171,7 +171,7 @@ describe("Android dialer", () => {
   it("dials despite a false package-visibility check", async () => {
     vi.mocked(Linking.canOpenURL).mockResolvedValueOnce(false);
     const view = await renderMobile(<ContactCtaBar {...props} />);
-    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Call" })); });
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Call" })); });
     expect(Linking.openURL).toHaveBeenCalledWith("tel:+99361000001");
   });
   it.each([
@@ -181,13 +181,13 @@ describe("Android dialer", () => {
     ["993+61/000001", "tel:99361000001"],
   ])("strips dial-control and formatting characters from %s", async (phone, uri) => {
     const view = await renderMobile(<ContactCtaBar {...props} contactPhone={phone} />);
-    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Call" })); });
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Call" })); });
     expect(Linking.openURL).toHaveBeenCalledWith(uri);
   });
   it("shows the number when the dialer fails", async () => {
     vi.mocked(Linking.openURL).mockRejectedValueOnce(new Error("No dialer"));
     const view = await renderMobile(<ContactCtaBar {...props} />);
-    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Call" })); });
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Call" })); });
     expect(Alert.alert).toHaveBeenCalledWith("Call", "Could not open the dialer. Call +99361000001 manually.");
   });
 });

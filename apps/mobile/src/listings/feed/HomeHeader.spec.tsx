@@ -18,7 +18,7 @@ describe("Home See all press feedback", () => {
     await fireEvent(button, "pressOut");
     expect(style()).toMatchObject({ backgroundColor: "transparent", opacity: 1 });
     await fireEvent(button, "pressIn");
-    await act(async () => { await fireEvent.press(button); });
+    await act(async () => { void fireEvent.press(button); });
     expect(routerMock.push).toHaveBeenCalledWith("/(tabs)/(search)/results");
     expect(style()).toMatchObject({ backgroundColor: "transparent", opacity: 1 });
     expect(screen.getByText("See all")).toBeTruthy();

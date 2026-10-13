@@ -1,6 +1,6 @@
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import * as Haptics from "expo-haptics";
-import { Platform, View } from "react-native";
+import { Platform } from "react-native";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { act, fireEvent, renderMobile, getAllHosts } from "../render";

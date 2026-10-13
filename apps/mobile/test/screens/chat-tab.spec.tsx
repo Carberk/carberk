@@ -1,6 +1,5 @@
 import type { ConversationsSchemas } from "@auto-tm/contracts";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
-import { Image } from "expo-image";
 import * as Notifications from "expo-notifications";
 import { useFocusEffect } from "expo-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";

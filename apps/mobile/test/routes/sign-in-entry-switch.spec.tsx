@@ -115,7 +115,7 @@ it("requests the selected method and opens the existing code route with its purp
   const view = await renderMobile(<PhoneScreen />);
   await fireEvent.press(view.getByText("Email"));
   await fireEvent.changeText(view.getByPlaceholderText("name@example.com"), "held@example.com");
-  await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Get code" })); });
+  await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Get code" })); });
   await vi.waitFor(() => expect(routerMock.push).toHaveBeenCalled());
   expect(body).toEqual({ email: "held@example.com" });
   expect(routerMock.push).toHaveBeenCalledWith({ pathname: "/(auth)/otp", params: { method: "email", destination: "held@example.com", requestId: "00000000-0000-4000-8000-000000000001", resendInSeconds: "60" } });

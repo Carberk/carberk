@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { AccessibilityInfo, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput } from "react-native";
+import { AccessibilityInfo, Platform, Pressable, Text, TextInput } from "react-native";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fireEvent, renderMobile, within, getHost } from "../../../test/render";

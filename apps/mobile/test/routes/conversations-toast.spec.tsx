@@ -119,8 +119,9 @@ beforeEach(() => {
 describe("Conversation toast and header boundary", () => {
   it("places a top toast below the measured header, whatever the text size", async () => {
     const screen = await renderMobile(<ToastProvider><ConversationDetailScreen /></ToastProvider>);
+    // The header is the Back button's nearest ancestor that reports its own height.
     let header = screen.getByRole("button", { name: "Go back" }).parent;
-    while (header && !header.props.className?.includes("border-b")) header = header.parent;
+    while (header && typeof header.props.onLayout !== "function") header = header.parent;
     if (!header) throw new Error("Conversation header missing");
     // A native layout event reports the larger header that a bigger text size produces.
     await fireEvent(header, "layout", { nativeEvent: { layout: { height: 132, width: 390, x: 0, y: 0 } } });

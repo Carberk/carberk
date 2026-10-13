@@ -222,7 +222,7 @@ describe("Sell wizard Contact step", () => {
     ).toMatchObject({ checked: true });
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Done" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Done" }));
     });
 
     // The app cannot judge the number yet, so it does not hold the seller
@@ -266,7 +266,7 @@ describe("Sell wizard Contact step", () => {
       const screen = await renderMobile(<SellScreen />);
 
       await act(async () => {
-        await fireEvent.press(screen.getByRole("button", { name: "Publish" }));
+        void fireEvent.press(screen.getByRole("button", { name: "Publish" }));
       });
 
       expect(
@@ -287,7 +287,7 @@ describe("Sell wizard Contact step", () => {
         screen.queryByText("Confirm the contact phone again to publish."),
       ).toBeNull();
       await act(async () => {
-        await fireEvent.press(screen.getByRole("button", { name: "Done" }));
+        void fireEvent.press(screen.getByRole("button", { name: "Done" }));
       });
       expect(
         screen.getByRole("button", { name: "Publish" }).props.accessibilityState,
@@ -307,7 +307,7 @@ describe("Sell wizard Contact step", () => {
     const screen = await renderMobile(<SellScreen />);
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Publish" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Publish" }));
     });
 
     // The refusal settles what the app could not judge: the row is expired.
@@ -319,7 +319,7 @@ describe("Sell wizard Contact step", () => {
     ).toBeTruthy();
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Done" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Done" }));
     });
 
     expect(
@@ -348,7 +348,7 @@ describe("Sell wizard Contact step", () => {
 
     const next = screen.getByRole("button", { name: "Continue" });
     expect(next.props.accessibilityState).toMatchObject({ disabled: false });
-    await act(async () => { await fireEvent.press(next); });
+    await act(async () => { void fireEvent.press(next); });
 
     expect(screen.queryByText("Choose or confirm a contact phone")).toBeNull();
     expect(
@@ -364,7 +364,7 @@ describe("Sell wizard Contact step", () => {
     await fireEvent.press(screen.getByLabelText(CONFIRMED_PHONE, { exact: false }));
     const next = screen.getByRole("button", { name: "Continue" });
     expect(next.props.accessibilityState).toMatchObject({ disabled: false });
-    await act(async () => { await fireEvent.press(next); });
+    await act(async () => { void fireEvent.press(next); });
 
     expect(
       screen.getByRole("header", { name: "Check and publish, Step 7 of 7" }),

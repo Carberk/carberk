@@ -121,7 +121,7 @@ function resumeDraft(payload: Record<string, unknown>) {
 
 async function pressClose(screen: Awaited<ReturnType<typeof renderSell>>) {
   await act(async () => {
-    await fireEvent.press(screen.getByRole("button", { name: "Close" }));
+    void fireEvent.press(screen.getByRole("button", { name: "Close" }));
   });
 }
 
@@ -165,7 +165,7 @@ describe("✕ saves the draft and closes the Sell wizard (#585)", () => {
     const screen = await renderMobile(<ToastProvider><SellScreen /></ToastProvider>, { locale });
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: locale === "ru" ? "Закрыть" : "Ýap" }));
+      void fireEvent.press(screen.getByRole("button", { name: locale === "ru" ? "Закрыть" : "Ýap" }));
     });
 
     expect(screen.getByText(text)).toBeTruthy();
@@ -279,7 +279,7 @@ describe("✕ when the latest changes are not saved (#585)", () => {
     Object.assign(fixture.autosave, { saveStatus: "error", saveError: "No internet" });
 
     const ru = await renderMobile(<ToastProvider><SellScreen /></ToastProvider>, { locale: "ru" });
-    await act(async () => { await fireEvent.press(ru.getByRole("button", { name: "Закрыть" })); });
+    await act(async () => { void fireEvent.press(ru.getByRole("button", { name: "Закрыть" })); });
     expect(ru.getByText("Последние изменения не сохранены")).toBeTruthy();
     expect(ru.getByText("Повторите, когда появится сеть, или выйдите: изменения на этом шаге пропадут.")).toBeTruthy();
     expect(ru.getByRole("button", { name: "Повторить" })).toBeTruthy();
@@ -288,7 +288,7 @@ describe("✕ when the latest changes are not saved (#585)", () => {
     await ru.unmount();
 
     const tk = await renderMobile(<ToastProvider><SellScreen /></ToastProvider>, { locale: "tk" });
-    await act(async () => { await fireEvent.press(tk.getByRole("button", { name: "Ýap" })); });
+    await act(async () => { void fireEvent.press(tk.getByRole("button", { name: "Ýap" })); });
     expect(tk.getByText("Soňky üýtgeşmeler ýatda saklanmady")).toBeTruthy();
     expect(tk.getByText("Tor bar wagty täzeden synanyşyň ýa-da çykyň: bu tapgyrdaky üýtgeşmeler ýitýär.")).toBeTruthy();
     expect(tk.getByRole("button", { name: "Täzeden synanyş" })).toBeTruthy();
@@ -309,7 +309,7 @@ describe("✕ when the latest changes are not saved (#585)", () => {
   it("Leave anyway closes without a toast and leaves the draft as last saved", async () => {
     const screen = await openAfterFailedSave();
 
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Leave anyway" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Leave anyway" })); });
 
     expect(wizardIsOpen(screen)).toBe(false);
     expect(screen.queryByText("Saved to Drafts")).toBeNull();
@@ -321,7 +321,7 @@ describe("✕ when the latest changes are not saved (#585)", () => {
   it("Retry saves again and closes with the toast when it works", async () => {
     const screen = await openAfterFailedSave();
 
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Retry" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Retry" })); });
 
     expect(fixture.autosave.flush).toHaveBeenCalledTimes(1);
     expect(wizardIsOpen(screen)).toBe(false);
@@ -332,7 +332,7 @@ describe("✕ when the latest changes are not saved (#585)", () => {
     fixture.autosave.flush.mockResolvedValue(false);
     const screen = await openAfterFailedSave();
 
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Retry" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Retry" })); });
 
     expect(wizardIsOpen(screen)).toBe(true);
     expect(screen.getByText("Latest changes are not saved")).toBeTruthy();

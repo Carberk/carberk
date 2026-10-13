@@ -127,7 +127,7 @@ async function openSellTab() {
 const pressContinue = (screen: Screen) => fireEvent.press(screen.getByRole("button", { name: "Continue" }));
 
 async function closeWithX(screen: Screen) {
-  await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Close" })); });
+  await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Close" })); });
   await waitFor(() => expect(screen.queryByRole("button", { name: "Close" })).toBeNull());
   expect(screen.getByRole("button", { name: "Continue" })).toBeTruthy();
 }

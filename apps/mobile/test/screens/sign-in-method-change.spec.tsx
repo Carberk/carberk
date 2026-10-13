@@ -175,7 +175,7 @@ describe("Entering the value the User already has", () => {
   it("sends a code for a different phone and says whether it adds or changes", async () => {
     const view = await renderMobile(<AddPhoneScreen />);
     await fireEvent.changeText(view.getByLabelText("Phone number"), "61000000");
-    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Get code" })); });
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Get code" })); });
     expect(state.requestCode).toHaveBeenCalledWith({ phone: "+99361000000" });
     expect(routerMock.push).toHaveBeenCalledWith(expect.objectContaining({
       pathname: "/account/verify-sign-in-method",
@@ -187,7 +187,7 @@ describe("Entering the value the User already has", () => {
     state.me = { phone: "+99365123456", email: null };
     const view = await renderMobile(<AddEmailScreen />);
     await fireEvent.changeText(view.getByLabelText("Email"), "new@example.com");
-    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Get code" })); });
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Get code" })); });
     expect(routerMock.push).toHaveBeenCalledWith(expect.objectContaining({
       params: expect.objectContaining({ method: "email", kind: "add" }),
     }));
@@ -200,7 +200,7 @@ describe("Entering the value the User already has", () => {
     expect(view.getByText(view.i18n.t("account:addPhoneTitle"))).toBeTruthy();
     expect(view.queryByText(view.i18n.t("account:changePhoneTitle"))).toBeNull();
     await fireEvent.changeText(view.getByLabelText("Phone number"), "65123456");
-    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Get code" })); });
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Get code" })); });
     expect(view.queryByText("This is already your number.")).toBeNull();
   });
 
@@ -210,7 +210,7 @@ describe("Entering the value the User already has", () => {
     expect(view.getByText(view.i18n.t("account:addEmailTitle"))).toBeTruthy();
     expect(view.queryByText(view.i18n.t("account:changeEmailTitle"))).toBeNull();
     await fireEvent.changeText(view.getByLabelText("Email"), "aman@example.com");
-    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Get code" })); });
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Get code" })); });
     expect(view.queryByText("This is already your email.")).toBeNull();
   });
 

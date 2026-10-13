@@ -38,7 +38,7 @@ async function confirmDeletion(screen: Awaited<ReturnType<typeof renderMobile>>)
   await fireEvent.press(understand(screen, false));
   await fireEvent.press(deleteButton(screen));
   await act(async () => {
-    await fireEvent.press(screen.getByText(screen.i18n.t("account:deleteAccountConfirmAction")));
+    void fireEvent.press(screen.getByText(screen.i18n.t("account:deleteAccountConfirmAction")));
   });
 }
 

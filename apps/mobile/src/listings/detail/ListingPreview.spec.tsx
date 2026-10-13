@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Image } from "react-native";
 
 import { useAuthIntentStore } from "../../auth/intentStore";
 import { fireEvent, renderMobile, getHost } from "../../../test/render";

@@ -161,7 +161,7 @@ describe("Check and publish: changing a step (#588)", () => {
     expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Publish" })).toBeNull();
 
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Done" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Done" })); });
 
     header(screen, "Check and publish, Step 7 of 7");
     expect(screen.getByRole("button", { name: "Publish" }).props.accessibilityState).toMatchObject({ disabled: false });
@@ -178,7 +178,7 @@ describe("Check and publish: changing a step (#588)", () => {
     await fireEvent.press(screen.getByRole("button", { name: /^Contact, .*Change$/ }));
     header(screen, "Contact, Step 6 of 7");
 
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Back" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Back" })); });
 
     header(screen, "Check and publish, Step 7 of 7");
   });
@@ -192,12 +192,14 @@ describe("Check and publish: publishing (#588)", () => {
     fixture.mutation.mutateAsync.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
     const screen = await openCheck();
 
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Publish" })); });
+    // Not awaited: RNTL 14's press resolves with the handler's promise, and
+    // this publish stays pending until `finish` below.
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Publish" })); });
 
     const busy = screen.getByRole("button", { name: "Publishing..." });
     expect(busy.props.accessibilityState).toMatchObject({ disabled: true });
     expect(screen.queryByRole("button", { name: "Publish" })).toBeNull();
-    await act(async () => { await fireEvent.press(busy); });
+    await act(async () => { void fireEvent.press(busy); });
     expect(publishCalls()).toEqual([[id]]);
     // Neither ✕ nor a section leaves a publish that is under way.
     await fireEvent.press(screen.getByRole("button", { name: /^Price, / }));
@@ -212,8 +214,8 @@ describe("Check and publish: publishing (#588)", () => {
     const button = screen.getByRole("button", { name: "Publish" });
 
     await act(async () => {
-      await fireEvent.press(button);
-      await fireEvent.press(button);
+      void fireEvent.press(button);
+      void fireEvent.press(button);
     });
 
     expect(publishCalls()).toEqual([[id]]);
@@ -223,7 +225,7 @@ describe("Check and publish: publishing (#588)", () => {
     const screen = await openCheck();
     fixture.patch.mockClear();
 
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Publish" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Publish" })); });
 
     expect(savedPayloads().at(-1)).toMatchObject({ photos: fixture.savedPhotos, priceAmount: 100000 });
     expect(publishCalls()).toEqual([[id]]);
@@ -246,7 +248,7 @@ describe("Check and publish: a publish that fails (#588)", () => {
     const screen = await openCheck();
     fixture.patch.mockClear();
     announcements.length = 0;
-    await act(async () => { await fireEvent.press(publish(screen)); });
+    await act(async () => { void fireEvent.press(publish(screen)); });
     return screen;
   }
 
@@ -290,7 +292,7 @@ describe("Check and publish: a publish that fails (#588)", () => {
     let finish = (_listing: { id: string }) => {};
     fixture.mutation.mutateAsync.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
 
-    await act(async () => { await fireEvent.press(publish(screen)); });
+    await act(async () => { void fireEvent.press(publish(screen)); });
 
     expect(screen.getByRole("button", { name: "Publishing..." })).toBeTruthy();
     expect(screen.queryByRole("alert")).toBeNull();
@@ -310,7 +312,7 @@ describe("Check and publish: a publish that fails (#588)", () => {
     await fireEvent.press(screen.getByRole("button", { name: /^Price, / }));
 
     header(screen, "Price, Step 4 of 7");
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Done" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Done" })); });
     header(screen, "Check and publish, Step 7 of 7");
     expect(screen.queryByRole("alert")).toBeNull();
   });
@@ -329,7 +331,7 @@ describe("Check and publish: a save before publishing that fails (#588)", () => 
     fixture.patch.mockRejectedValue(error);
     const screen = await openCheck();
 
-    await act(async () => { await fireEvent.press(publish(screen)); });
+    await act(async () => { void fireEvent.press(publish(screen)); });
 
     expect(fixture.patch).toHaveBeenCalled();
     expect(fixture.mutation.mutateAsync).not.toHaveBeenCalled();
@@ -345,10 +347,10 @@ describe("Check and publish: a save before publishing that fails (#588)", () => 
   it("publishes on the next tap once the save goes through", async () => {
     fixture.patch.mockRejectedValue(new ApiError("NETWORK_ERROR", 0, "Network request failed"));
     const screen = await openCheck();
-    await act(async () => { await fireEvent.press(publish(screen)); });
+    await act(async () => { void fireEvent.press(publish(screen)); });
 
     fixture.patch.mockReset().mockResolvedValue({});
-    await act(async () => { await fireEvent.press(publish(screen)); });
+    await act(async () => { void fireEvent.press(publish(screen)); });
 
     expect(fixture.mutation.mutateAsync.mock.calls).toEqual([[id]]);
     expect(routerMock.push).toHaveBeenCalledWith(`/(public)/listings/${id}`);
@@ -366,7 +368,7 @@ describe("Check and publish: what blocks publishing (#588)", () => {
   async function leavePriceEmpty(screen: Screen) {
     await fireEvent.press(screen.getByRole("button", { name: /^Price, / }));
     await fireEvent.press(screen.getByRole("button", { name: "Clear price" }));
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Back" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Back" })); });
     header(screen, "Check and publish, Step 7 of 7");
   }
 

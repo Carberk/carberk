@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ScrollView, Text } from "react-native";
 import * as Linking from "expo-linking";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 
@@ -375,7 +374,7 @@ describe("issue 373 screen controls", () => {
       await fireEvent.press(screen.getByRole("button", { name: "More options" }));
       await fireEvent.press(screen.getByRole("button", { name: started }));
       await act(async () => {
-        await fireEvent.press(screen.getByText("Confirm"));
+        void fireEvent.press(screen.getByText("Confirm"));
       });
       expect(state.post).toHaveBeenCalledTimes(1);
       // React Query publishes pending state on a timer, so wait for it on a
@@ -450,7 +449,7 @@ describe("issue 373 screen controls", () => {
     expect(screen.queryByRole("button", { name: "Favorite" })).toBeNull();
     expect(screen.queryByText(/by SMS/)).toBeNull();
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Call" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Call" }));
     });
     expect(Linking.openURL).toHaveBeenCalledWith("tel:+99361000000");
     await fireEvent.press(screen.getByRole("button", { name: "Message" }));

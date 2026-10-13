@@ -64,16 +64,16 @@ describe("PriceDisplay price colour (#775 F)", () => {
     return String(screen.getByText("100,000 TMT").props.className);
   }
 
-  it("draws an active Listing's price in the normal text colour, at the same size and weight", () => {
-    const className = priceClass(false);
+  it("draws an active Listing's price in the normal text colour, at the same size and weight", async () => {
+    const className = await priceClass(false);
     expect(className).toContain("text-foreground");
     expect(className).not.toMatch(/text-primary(?!-)/);
     expect(className).toContain("text-title");
     expect(className).toContain("font-heading");
   });
 
-  it("keeps the muted price of a sold or removed Listing", () => {
-    const className = priceClass(true);
+  it("keeps the muted price of a sold or removed Listing", async () => {
+    const className = await priceClass(true);
     expect(className).toContain("text-muted-foreground");
     expect(className).not.toMatch(/text-foreground/);
   });

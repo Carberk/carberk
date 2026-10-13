@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { Image, Modal } from "react-native";
 import * as RN from "react-native";
 
 import { fireEvent, renderMobile, within, first, getAllHosts, getHost } from "../../../test/render";

@@ -85,7 +85,7 @@ it("requires confirmation before Mark sold, supports cancel and exposes failure"
   expect(screen.queryByText("Confirm")).toBeNull();
   await fireEvent.press(screen.getByRole("button", { name: "Mark as sold" }));
   await act(async () => {
-    await fireEvent.press(screen.getByText("Confirm"));
+    void fireEvent.press(screen.getByText("Confirm"));
   });
   expect(api.post).toHaveBeenCalledWith(
     "/listings/listing-373/sold",
@@ -116,7 +116,7 @@ it("opens the confirm sheet when a relist answer says the number needs a new cod
   await fireEvent.press(screen.getByRole("button", { name: "More options" }));
   await fireEvent.press(screen.getByRole("button", { name: "Relist" }));
   await act(async () => {
-    await fireEvent.press(screen.getByText("Confirm"));
+    void fireEvent.press(screen.getByText("Confirm"));
   });
   expect(await screen.findByText("Confirm the contact phone")).toBeTruthy();
   expect(
@@ -126,7 +126,7 @@ it("opens the confirm sheet when a relist answer says the number needs a new cod
   ).toBeTruthy();
   // Send code asks for the code and goes straight to the code screen.
   await act(async () => {
-    await fireEvent.press(screen.getByRole("button", { name: "Send code" }));
+    void fireEvent.press(screen.getByRole("button", { name: "Send code" }));
   });
   expect(api.post).toHaveBeenCalledWith(
     "/me/contact-phones/request",
@@ -153,7 +153,7 @@ it("tells the seller to add a phone through Edit when a relist answer says one i
   await fireEvent.press(screen.getByRole("button", { name: "More options" }));
   await fireEvent.press(screen.getByRole("button", { name: "Relist" }));
   await act(async () => {
-    await fireEvent.press(screen.getByText("Confirm"));
+    void fireEvent.press(screen.getByText("Confirm"));
   });
   expect(
     await screen.findByText(
@@ -170,7 +170,7 @@ it("clears the add-a-phone hint when the next action starts", async () => {
   await fireEvent.press(screen.getByRole("button", { name: "More options" }));
   await fireEvent.press(screen.getByRole("button", { name: "Relist" }));
   await act(async () => {
-    await fireEvent.press(screen.getByText("Confirm"));
+    void fireEvent.press(screen.getByText("Confirm"));
   });
   const hint = "This listing has no contact phone. Add one through Edit, then relist.";
   expect(await screen.findByText(hint)).toBeTruthy();
@@ -183,7 +183,7 @@ it("clears the add-a-phone hint when the next action starts", async () => {
   });
   await fireEvent.press(screen.getByRole("button", { name: "Relist" }));
   await act(async () => {
-    await fireEvent.press(screen.getByText("Confirm"));
+    void fireEvent.press(screen.getByText("Confirm"));
   });
 
   expect(screen.queryByText(hint)).toBeNull();

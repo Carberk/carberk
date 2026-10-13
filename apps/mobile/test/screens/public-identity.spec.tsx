@@ -1,4 +1,3 @@
-import { Image } from "expo-image";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it } from "vitest";
 

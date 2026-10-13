@@ -204,7 +204,7 @@ describe("Saving the name", () => {
   it("saves the normalized name, returns to Profile and Cabinet with it, and says Name saved", async () => {
     const view = await openEditor();
     await type(view, "  Aman   Durdy ");
-    await act(async () => { await fireEvent.press(save(view)); });
+    await act(async () => { void fireEvent.press(save(view)); });
     await vi.waitFor(() => expect(routerMock.dismissTo).toHaveBeenCalledWith("/profile"));
     expect(api.patches).toEqual([{ displayName: "Aman Durdy" }]);
 
@@ -236,7 +236,7 @@ describe("Saving the name", () => {
     api.next = ["hold"];
     const view = await openEditor();
     await type(view, "Aman");
-    await act(async () => { await fireEvent.press(save(view)); });
+    await act(async () => { void fireEvent.press(save(view)); });
     const button = await view.findByRole("button", { name: "Saving..." });
     expect(isDisabled(button)).toBe(true);
     expect(queryAllHosts(view.container, "ActivityIndicator")).toHaveLength(1);
@@ -248,12 +248,12 @@ describe("Saving the name", () => {
     api.next = ["fail"];
     const view = await openEditor();
     await type(view, "Aman");
-    await act(async () => { await fireEvent.press(save(view)); });
+    await act(async () => { void fireEvent.press(save(view)); });
     expect(await view.findByText("Couldn't save the name. Try again.")).toBeTruthy();
     expect(view.getByDisplayValue("Aman")).toBeTruthy();
     expect(routerMock.dismissTo).not.toHaveBeenCalled();
 
-    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Retry" })); });
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Retry" })); });
     await vi.waitFor(() => expect(routerMock.dismissTo).toHaveBeenCalledWith("/profile"));
     expect(api.patches).toEqual([{ displayName: "Aman" }, { displayName: "Aman" }]);
   });
@@ -262,7 +262,7 @@ describe("Saving the name", () => {
     api.next = ["offline"];
     const view = await openEditor();
     await type(view, "Aman");
-    await act(async () => { await fireEvent.press(save(view)); });
+    await act(async () => { void fireEvent.press(save(view)); });
     expect(await view.findByText("No internet connection. Try again when you are online.")).toBeTruthy();
     expect(view.getByRole("button", { name: "Retry" })).toBeTruthy();
     expect(view.getByDisplayValue("Aman")).toBeTruthy();
@@ -272,7 +272,7 @@ describe("Saving the name", () => {
     api.next = [{ reason: "too_long" }];
     const view = await openEditor();
     await type(view, "Aman");
-    await act(async () => { await fireEvent.press(save(view)); });
+    await act(async () => { void fireEvent.press(save(view)); });
     expect(await view.findByText("Use 30 characters or fewer.")).toBeTruthy();
     expect(view.queryByText("Couldn't save the name. Try again.")).toBeNull();
   });
@@ -292,7 +292,7 @@ describe("Leaving the editor", () => {
     api.next = ["hold"];
     const view = await openEditor();
     await type(view, "Aman");
-    await act(async () => { await fireEvent.press(save(view)); });
+    await act(async () => { void fireEvent.press(save(view)); });
     await vi.waitFor(() => expect(api.release).not.toBeNull());
 
     await view.rerender(<ToastProvider><ProfileScreen /></ToastProvider>);

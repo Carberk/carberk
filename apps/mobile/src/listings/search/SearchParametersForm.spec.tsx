@@ -1,5 +1,5 @@
 import type * as Native from "react-native";
-import { KeyboardAvoidingView, Platform } from "react-native";
+import { Platform } from "react-native";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -210,9 +210,13 @@ describe("Search parameters: brand and model in Done mode", () => {
     const view = await open(filled);
     await fireEvent.press(view.getByLabelText("Model: Camry"));
     const row = (name: string) => view.getByRole("checkbox", { name });
-    // `within` includes the row itself, so two matches are the row plus the
-    // Checkbox box inside it; the box must mirror the row's selected state.
-    const boxesIn = (name: string, checked: boolean) => within(row(name)).getAllByRole("checkbox", { checked });
+    // Two matches are the row plus the Checkbox box inside it; the box must
+    // mirror the row's selected state. RNTL 14's `within` searches only below
+    // the row, so the row is matched by name.
+    const boxesIn = (name: string, checked: boolean) => [
+      ...view.queryAllByRole("checkbox", { name, checked }),
+      ...within(row(name)).queryAllByRole("checkbox", { checked }),
+    ];
     expect(boxesIn("Corolla", false)).toHaveLength(2);
     expect(boxesIn("Camry", true)).toHaveLength(2);
 
@@ -295,7 +299,7 @@ describe("Search parameters: price inputs keep every digit typed or pasted", () 
       const field = view.getByPlaceholderText(placeholder);
       await act(async () => {
         // One act batches the events, so React does not re-render between them, as in a native burst.
-        for (const text of prefixes("7000000")) await fireEvent.changeText(field, text);
+        for (const text of prefixes("7000000")) void fireEvent.changeText(field, text);
       });
       expect(view.getByDisplayValue("7,000,000")).toBeTruthy();
       expect(lastFilters()[key]).toBe(7000000);
@@ -321,7 +325,7 @@ describe("Search parameters: price inputs keep every digit typed or pasted", () 
       const view = await open({ [key]: 7000000, sort: "newest" });
       const field = view.getByDisplayValue("7,000,000");
       await act(async () => {
-        for (const text of ["700000", "70000", "7000", "70005", "700055", "7000555"]) await fireEvent.changeText(field, text);
+        for (const text of ["700000", "70000", "7000", "70005", "700055", "7000555"]) void fireEvent.changeText(field, text);
       });
       expect(view.queryByDisplayValue("7,000,000")).toBeNull();
       expect(view.getByDisplayValue("7,000,555")).toBeTruthy();
@@ -336,8 +340,8 @@ describe("Search parameters: price inputs keep every digit typed or pasted", () 
     await act(async () => {
       const maxTexts = prefixes("7000000");
       for (const [index, text] of prefixes("1500000").entries()) {
-        await fireEvent.changeText(min, text);
-        await fireEvent.changeText(max, maxTexts[index] as string);
+        void fireEvent.changeText(min, text);
+        void fireEvent.changeText(max, maxTexts[index] as string);
       }
     });
     expect(view.getByDisplayValue("1,500,000")).toBeTruthy();
@@ -350,8 +354,8 @@ describe("Search parameters: price inputs keep every digit typed or pasted", () 
     const min = view.getByPlaceholderText("Min");
     const max = view.getByPlaceholderText("Max");
     await act(async () => {
-      for (const text of prefixes("1500000")) await fireEvent.changeText(min, text);
-      for (const text of prefixes("7000000")) await fireEvent.changeText(max, text);
+      for (const text of prefixes("1500000")) void fireEvent.changeText(min, text);
+      for (const text of prefixes("7000000")) void fireEvent.changeText(max, text);
     });
     await fireEvent.press(view.getByRole("button", { name: /^Show \d+ listings$/ }));
     expect(routerMock.dismissTo).toHaveBeenCalledWith({

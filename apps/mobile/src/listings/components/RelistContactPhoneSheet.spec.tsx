@@ -53,7 +53,7 @@ async function renderSheet(open = true, onOpenChange = vi.fn()) {
 
 async function pressSendCode(screen: Awaited<ReturnType<typeof renderMobile>>) {
   await act(async () => {
-    await fireEvent.press(screen.getByRole("button", { name: "Send code" }));
+    void fireEvent.press(screen.getByRole("button", { name: "Send code" }));
   });
 }
 
@@ -200,7 +200,7 @@ describe("RelistContactPhoneSheet", () => {
     expect(sendCode.props.accessibilityState).toMatchObject({ disabled: true });
 
     await act(async () => {
-      await fireEvent.press(sendCode);
+      void fireEvent.press(sendCode);
     });
     expect(mocks.request).not.toHaveBeenCalled();
     expect(routerMock.push).not.toHaveBeenCalled();

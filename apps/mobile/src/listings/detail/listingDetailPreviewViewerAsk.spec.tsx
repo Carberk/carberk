@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Modal, Text } from "react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 
 import type * as ClientModule from "../../api/client";

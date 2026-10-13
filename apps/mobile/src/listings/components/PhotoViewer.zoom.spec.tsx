@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { Image, Pressable } from "react-native";
+import { Pressable } from "react-native";
 
 import { fireEvent, renderMobile, first, getAllHosts } from "../../../test/render";
 import { mediaFixture } from "../../../test/fixtures/listing";

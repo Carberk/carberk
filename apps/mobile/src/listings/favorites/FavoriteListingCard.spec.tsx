@@ -99,7 +99,7 @@ describe("Favorites large card", () => {
 
   it("opens the dialer directly with the Listing contact phone", async () => {
     const { view } = await renderCard();
-    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Call" })); });
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Call" })); });
     expect(Linking.openURL).toHaveBeenCalledWith("tel:+99365000000");
   });
 
@@ -194,13 +194,13 @@ describe("Android dialer", () => {
   it("dials despite a false package-visibility check", async () => {
     vi.mocked(Linking.canOpenURL).mockResolvedValueOnce(false);
     const { view } = await renderCard();
-    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Call" })); });
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Call" })); });
     expect(Linking.openURL).toHaveBeenCalledWith("tel:+99365000000");
   });
   it("shows the number when the dialer fails", async () => {
     vi.mocked(Linking.openURL).mockRejectedValueOnce(new Error("No dialer"));
     const { view } = await renderCard();
-    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Call" })); });
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Call" })); });
     expect(Alert.alert).toHaveBeenCalledWith("Call", "Could not open the dialer. Call +99365000000 manually.");
   });
 });

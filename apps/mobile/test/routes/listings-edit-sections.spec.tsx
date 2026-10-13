@@ -167,7 +167,7 @@ describe("the section list of a published Listing (#589)", () => {
     const screen = await openEdit();
     await changePrice(screen, "100000", "120000");
     expect(isDisabled(saveButton(screen))).toBe(false);
-    await act(async () => { await fireEvent.press(saveButton(screen)); });
+    await act(async () => { void fireEvent.press(saveButton(screen)); });
     await waitFor(() => expect(api.patches).toHaveLength(1));
     expect(api.patches[0]).toMatchObject({ priceAmount: 120000 });
     expect(api.patches[0]).not.toHaveProperty("vin");
@@ -187,7 +187,11 @@ describe("the section list of a published Listing (#589)", () => {
 
     const photoRows: string[] = [];
     const observedScreen: { current?: Screen } = {};
-    const screen = await renderMobile(
+    // RNTL 14's render settles every update before it returns, so the screen
+    // mounts by rerender once the observer can query it, from its first render.
+    const screen = await renderMobile(<></>);
+    observedScreen.current = screen;
+    await screen.rerender(
       <Profiler id="edit-photos" onRender={() => {
         const row = observedScreen.current?.queryAllByTestId("check-section")
           .find((item) => String(item.props.accessibilityLabel).startsWith("Photos, "));
@@ -196,7 +200,6 @@ describe("the section list of a published Listing (#589)", () => {
         <ToastProvider><EditListingScreen /></ToastProvider>
       </Profiler>,
     );
-    observedScreen.current = screen;
     await screen.findByRole("header", { name: "Edit listing" });
     expect(photoRows.length).toBeGreaterThan(0);
     expect(screen.queryByText("Photos: 4")).toBeNull();
@@ -362,7 +365,7 @@ describe("Save changes (#589)", () => {
 
     await screen.findByText("Photos: 4");
     expect(isDisabled(saveButton(screen))).toBe(false);
-    await act(async () => { await fireEvent.press(saveButton(screen)); });
+    await act(async () => { void fireEvent.press(saveButton(screen)); });
     await waitFor(() => expect(api.patches).toEqual([expect.objectContaining({ priceAmount: 179000 })]));
     expect(api.removed).toEqual([]);
   });
@@ -395,7 +398,7 @@ describe("Save changes (#589)", () => {
     const api = createListingApi();
     const screen = await openEdit();
 
-    await act(async () => { await fireEvent.press(saveButton(screen)); });
+    await act(async () => { void fireEvent.press(saveButton(screen)); });
 
     expect(api.patches).toEqual([]);
     expect(routerMock.replace).not.toHaveBeenCalled();
@@ -418,7 +421,7 @@ describe("Save changes (#589)", () => {
     const screen = await openEdit();
     await changePrice(screen, "100000", "179000");
 
-    await act(async () => { await fireEvent.press(saveButton(screen)); });
+    await act(async () => { void fireEvent.press(saveButton(screen)); });
 
     await waitFor(() => expect(routerMock.replace).toHaveBeenCalledWith(`/(public)/listings/${id}`));
     expect(api.patches).toEqual([expect.objectContaining({ priceAmount: 179000 })]);
@@ -431,7 +434,7 @@ describe("Save changes (#589)", () => {
     const screen = await openEdit();
     await changePrice(screen, "100000", "179000");
 
-    await act(async () => { await fireEvent.press(saveButton(screen)); });
+    await act(async () => { void fireEvent.press(saveButton(screen)); });
 
     await screen.findByText("Couldn't save all changes. Try again.");
     expect(screen.getByRole("header", { name: "Edit listing" })).toBeTruthy();
@@ -443,7 +446,7 @@ describe("Save changes (#589)", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Keep editing" }));
     expect(routerMock.back).not.toHaveBeenCalled();
 
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Retry" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Retry" })); });
 
     await waitFor(() => expect(routerMock.replace).toHaveBeenCalledWith(`/(public)/listings/${id}`));
     expect(api.patches).toEqual([expect.objectContaining({ priceAmount: 179000 })]);
@@ -454,7 +457,7 @@ describe("Save changes (#589)", () => {
     api.failEdits = 1;
     const screen = await openEdit();
     await changePrice(screen, "100000", "179000");
-    await act(async () => { await fireEvent.press(saveButton(screen)); });
+    await act(async () => { void fireEvent.press(saveButton(screen)); });
     await screen.findByText("Couldn't save all changes. Try again.");
 
     // Part of the edit may have reached the server (ADR-0025), so the seller can
@@ -477,7 +480,7 @@ describe("Save changes (#589)", () => {
     // One tap changes the Listing: the seller answers Damaged the other way.
     await answerNotDamaged(screen, locale as keyof typeof localized);
 
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: save })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: save })); });
 
     expect(await screen.findByText(message)).toBeTruthy();
   });
@@ -524,7 +527,7 @@ describe("returning from the contact phone code flow (#589)", () => {
     expect(screen.getByText("Leave edit mode?")).toBeTruthy();
     await fireEvent.press(screen.getByRole("button", { name: "Keep editing" }));
 
-    await act(async () => { await fireEvent.press(saveButton(screen)); });
+    await act(async () => { void fireEvent.press(saveButton(screen)); });
 
     await waitFor(() => expect(routerMock.replace).toHaveBeenCalledWith(`/(public)/listings/${id}`));
     expect(api.patches).toEqual([

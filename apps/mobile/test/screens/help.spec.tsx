@@ -39,7 +39,7 @@ describe("Help", () => {
     const screen = await renderMobile(<HelpScreen />);
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: `${label}, ${value}` }));
+      void fireEvent.press(screen.getByRole("button", { name: `${label}, ${value}` }));
     });
 
     expect(screen.getByRole("alert").props.children).toBe(message);

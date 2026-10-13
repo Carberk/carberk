@@ -69,7 +69,7 @@ async function renderForm(
 
 async function pressResend(screen: Awaited<ReturnType<typeof renderMobile>>) {
   await act(async () => {
-    await fireEvent.press(screen.getByRole("button", { name: "Resend code" }));
+    void fireEvent.press(screen.getByRole("button", { name: "Resend code" }));
   });
 }
 
@@ -122,7 +122,7 @@ describe("CodeEntryForm daily code limit", () => {
       expect(screen.queryByText(/Resend code in/)).toBeNull();
 
       await act(async () => {
-        await fireEvent.changeText(screen.getByLabelText("Code"), "123456");
+        void fireEvent.changeText(screen.getByLabelText("Code"), "123456");
       });
       expect(verify).not.toHaveBeenCalled();
       expect(screen.getByText(DAILY_LIMIT)).toBeTruthy();
@@ -195,7 +195,7 @@ describe("CodeEntryForm daily code limit", () => {
     );
 
     await act(async () => {
-      await fireEvent.press(
+      void fireEvent.press(
         screen.getByRole("button", {
           name: locale === "ru" ? "Отправить код снова" : "Kody täzeden iber",
         }),
@@ -282,7 +282,7 @@ describe("CodeEntryForm wrong-code recovery", () => {
     const { screen, props } = await renderForm({ method, verify });
 
     await act(async () => {
-      await fireEvent.changeText(screen.getByLabelText("Code"), "000000");
+      void fireEvent.changeText(screen.getByLabelText("Code"), "000000");
     });
     expect(screen.getByText("Wrong code. Try again.")).toBeTruthy();
     expect(screen.queryByText("Code expired. Request a new one.")).toBeNull();
@@ -290,7 +290,7 @@ describe("CodeEntryForm wrong-code recovery", () => {
     expect(screen.getByLabelText("Code").props.value).toBe("");
 
     await act(async () => {
-      await fireEvent.changeText(screen.getByLabelText("Code"), "123456");
+      void fireEvent.changeText(screen.getByLabelText("Code"), "123456");
     });
     expect(verify).toHaveBeenNthCalledWith(1, "000000");
     expect(verify).toHaveBeenNthCalledWith(2, "123456");
@@ -303,7 +303,7 @@ describe("CodeEntryForm wrong-code recovery", () => {
     const { screen } = await renderForm({ verify });
 
     await act(async () => {
-      await fireEvent.changeText(screen.getByLabelText("Code"), "000000");
+      void fireEvent.changeText(screen.getByLabelText("Code"), "000000");
     });
 
     expect(screen.getByText("Wrong code. Try again.")).toBeTruthy();

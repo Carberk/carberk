@@ -441,9 +441,9 @@ describe("Sell camera permission", () => {
     vi.mocked(ImagePicker.getCameraPermissionsAsync).mockResolvedValue(permission(false, false));
     vi.mocked(ImagePicker.launchCameraAsync).mockResolvedValue({ canceled: true, assets: null });
     const screen = await renderMobile(<Step2Photos {...defaults()} />, { locale });
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: camera })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: camera })); });
     expect(screen.getByText(title)).toBeTruthy();
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: settings })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: settings })); });
     expect(Linking.openSettings).toHaveBeenCalled();
     expect(screen.queryByText(title)).toBeNull();
   });
@@ -453,7 +453,7 @@ describe("Sell camera permission", () => {
     vi.mocked(ImagePicker.launchCameraAsync).mockClear();
     vi.mocked(ImagePicker.launchCameraAsync).mockResolvedValue({ canceled: true, assets: null });
     const screen = await renderMobile(<Step2Photos {...defaults()} />);
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Camera" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Camera" })); });
     expect(ImagePicker.launchCameraAsync).not.toHaveBeenCalled();
     expect(screen.queryByText("Camera access is off")).toBeNull();
   });
@@ -461,7 +461,7 @@ describe("Sell camera permission", () => {
     vi.mocked(ImagePicker.getCameraPermissionsAsync).mockResolvedValue(permission(false, true));
     vi.mocked(ImagePicker.requestCameraPermissionsAsync).mockResolvedValue(permission(false, false));
     const screen = await renderMobile(<Step2Photos {...defaults()} />);
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Camera" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Camera" })); });
     expect(screen.getByText("Camera access is off")).toBeTruthy();
   });
   it("adds a camera photo once permission is granted", async () => {
@@ -470,7 +470,7 @@ describe("Sell camera permission", () => {
     vi.mocked(ImagePicker.launchCameraAsync).mockResolvedValue({ canceled: false, assets: [{ uri: "file:///camera/a.jpg", width: 100, height: 100 }] });
     const props = defaults();
     const screen = await renderMobile(<Step2Photos {...props} />);
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Camera" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Camera" })); });
     expect(props.onAddPhoto).toHaveBeenCalledWith(expect.stringContaining("picker-temp/"));
   });
   it("explains when the device has no camera instead of failing silently (#793)", async () => {
@@ -478,11 +478,11 @@ describe("Sell camera permission", () => {
     vi.mocked(ImagePicker.launchCameraAsync).mockRejectedValue(new Error("No camera available"));
     const props = defaults();
     const screen = await renderMobile(<Step2Photos {...props} />);
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Camera" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Camera" })); });
     expect(screen.getByText("No camera on this device")).toBeTruthy();
     expect(screen.getByText("You can still add photos from the gallery.")).toBeTruthy();
     expect(props.onAddPhoto).not.toHaveBeenCalled();
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Done" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Done" })); });
     expect(screen.queryByText("No camera on this device")).toBeNull();
   });
 });

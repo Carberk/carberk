@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { Image } from "expo-image";
 
 import { fireEvent, first, renderMobile, routerMock, within, queryAllHosts, getHost } from "../../../test/render";
 import { contrast, cssTokens, rgb, type ThemeName } from "../../../test/tokens";

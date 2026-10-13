@@ -198,7 +198,7 @@ describe("Profile photo", () => {
     const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
     await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Choose from library" })); });
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Choose from library" })); });
     expect(picker.library).toHaveBeenCalledWith(expect.objectContaining({ allowsEditing: true, aspect: [1, 1], mediaTypes: ["images"] }));
     expect(picker.libraryPermission).not.toHaveBeenCalled();
     expect(view.queryByText("Profile photo")).toBeNull();
@@ -211,11 +211,11 @@ describe("Profile photo", () => {
     const view = await renderMobile(<ToastProvider><ProfileScreen /></ToastProvider>);
     await view.findByText("Aman");
     await fireEvent.press(view.getByRole("button", { name: "Change profile photo" }));
-    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Take photo" })); });
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Take photo" })); });
     expect(view.getByText("Camera access is off")).toBeTruthy();
     expect(view.getByText("To take a photo, allow camera access for Carberk in system settings.")).toBeTruthy();
     expect(picker.camera).not.toHaveBeenCalled();
-    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Open settings" })); });
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Open settings" })); });
     expect(settings).toHaveBeenCalledOnce();
     expect(view.queryByText("Camera access is off")).toBeNull();
   });

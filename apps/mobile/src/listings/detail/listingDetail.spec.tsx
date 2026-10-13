@@ -1,7 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { ListingsSchemas } from "@auto-tm/contracts";
-import { Pressable, View } from "react-native";
-import { Image } from "expo-image";
 import * as Linking from "expo-linking";
 
 import { renderMobile, fireEvent, act, routeParams, routerMock, getAllHosts, getHost } from "../../../test/render";
@@ -70,7 +68,7 @@ describe("ContactCtaBar", () => {
   const props = { listingId: "listing-1", status: "active" as const, allowCalls: true, allowChat: true, contactPhone: "+99361000000" };
   it("calls through tel without a warning sheet", async () => {
     const screen = await renderMobile(<ContactCtaBar {...props} />);
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Call" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Call" })); });
     expect(Linking.openURL).toHaveBeenCalledWith("tel:+99361000000");
   });
   it("disables closed contact and a favorite while identity is unknown", async () => {
@@ -196,7 +194,7 @@ describe("InspectionInterestCta", () => {
   it("shows a submit error and allows another attempt", async () => {
     state.post.mockRejectedValueOnce(new Error("Request failed"));
     const screen = await renderMobile(<InspectionInterestCta listingId="listing-1" open onOpenChange={vi.fn()} />);
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Register interest" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Register interest" })); });
     expect(await screen.findByText("Something went wrong")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Register interest", disabled: false })).toBeTruthy();
     expect(screen.queryByText("Done")).toBeNull();
@@ -216,7 +214,7 @@ describe("InspectionInterestCta", () => {
   it("submits interest and shows a success state", async () => {
     state.post.mockResolvedValue({ id: "interest-1" });
     const screen = await renderMobile(<InspectionInterestCta listingId="listing-1" open onOpenChange={vi.fn()} />);
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: /register interest|submit/i })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: /register interest|submit/i })); });
     expect((await screen.findAllByText("Thanks, we received your interest. We'll contact you when inspections launch.")).length).toBeGreaterThan(0);
     expect(state.post).toHaveBeenCalledWith("/listings/listing-1/inspection-interest", {}, expect.anything());
   });

@@ -75,7 +75,7 @@ afterEach(() => {
 
 async function typeCode(screen: Awaited<ReturnType<typeof renderMobile>>, code: string) {
   await act(async () => {
-    await fireEvent.changeText(screen.getByLabelText("Code"), code);
+    void fireEvent.changeText(screen.getByLabelText("Code"), code);
   });
 }
 
@@ -148,7 +148,7 @@ describe("contact-phone-code screen", () => {
       resendInSeconds: 60,
     });
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Send a new code" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Send a new code" }));
     });
 
     expect(mocks.request).toHaveBeenCalledWith({ phone: "+99361000001" });
@@ -185,7 +185,7 @@ describe("contact-phone-code screen", () => {
     const screen = await renderMobile(<ContactPhoneCodeScreen />);
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Resend code" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Resend code" }));
     });
 
     expect(
@@ -213,7 +213,7 @@ describe("contact-phone-code screen", () => {
       await typeCode(screen, "123456");
 
       await act(async () => {
-        await fireEvent.press(screen.getByRole("button", { name: "Send a new code" }));
+        void fireEvent.press(screen.getByRole("button", { name: "Send a new code" }));
       });
 
       expect(
@@ -255,7 +255,7 @@ describe("contact-phone-code screen", () => {
     const screen = await renderMobile(<ContactPhoneCodeScreen />);
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Resend code" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Resend code" }));
     });
 
     expect(

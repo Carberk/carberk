@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { Modal, Pressable } from "react-native";
+import { Pressable } from "react-native";
 import * as RN from "react-native";
 
 import { act, fireEvent, renderMobile, within, getHost } from "../../../test/render";

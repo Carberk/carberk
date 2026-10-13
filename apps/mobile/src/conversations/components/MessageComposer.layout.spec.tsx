@@ -25,7 +25,7 @@ vi.mock("../upload/chatImageUpload", () => ({
 interface Node {
   parent: Node | null;
   props: { className?: unknown; style?: unknown };
-  findAll: (match: (node: Node) => boolean) => Node[];
+  queryAll: (match: (node: Node) => boolean) => Node[];
 }
 
 const TOUCH_TARGET = 44;
@@ -56,7 +56,7 @@ async function composer(text = "") {
   const row = closest(field, "border-t");
   const button = (name: string) => {
     const node = screen.getByRole("button", { name }) as unknown as Node;
-    return [node, ...node.findAll(() => true)].find((candidate) => classes(candidate).includes("h-11")) ?? closest(node, "h-11");
+    return [node, ...node.queryAll(() => true)].find((candidate) => classes(candidate).includes("h-11")) ?? closest(node, "h-11");
   };
   return { input, field, row, paperclip: button("Attach photo"), send: button("Send message") };
 }

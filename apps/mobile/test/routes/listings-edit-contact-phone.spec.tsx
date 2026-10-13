@@ -202,7 +202,7 @@ describe("Listing edit Contact step", () => {
     expect(screen.getByRole("button", { name: /^Contact, .*Fill in$/ })).toBeTruthy();
     const save = screen.getByRole("button", { name: "Save changes" });
     expect(save.props.accessibilityState).toMatchObject({ disabled: true });
-    await act(async () => { await fireEvent.press(save); });
+    await act(async () => { void fireEvent.press(save); });
     expect(fixture.save).not.toHaveBeenCalled();
   });
 
@@ -242,7 +242,7 @@ describe("Listing edit Contact step", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Done" }));
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Save changes" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Save changes" }));
     });
 
     expect(screen.getByRole("header", { name: "Contact" })).toBeTruthy();
@@ -262,7 +262,7 @@ describe("Listing edit Contact step", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Done" }));
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Save changes" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Save changes" }));
     });
 
     expect(fixture.save).toHaveBeenCalledOnce();

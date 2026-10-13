@@ -40,7 +40,7 @@ beforeEach(() => {
 
 async function attach(view: Awaited<ReturnType<typeof renderMobile>>, label = "Attach photo") {
   await act(async () => {
-    await fireEvent.press(view.getByRole("button", { name: label }));
+    void fireEvent.press(view.getByRole("button", { name: label }));
   });
 }
 

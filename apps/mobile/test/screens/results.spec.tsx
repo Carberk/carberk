@@ -1,5 +1,4 @@
 import { onlineManager, useQuery } from "@tanstack/react-query";
-import { Image } from "react-native";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderMobile, act, fireEvent, routeParams, routerMock, getAllHosts } from "../render";
@@ -138,7 +137,7 @@ describe("Results approved behavior", () => {
     await view.queryClient.fetchQuery({ queryKey: ["loaded-before-the-outage"], queryFn: healthy });
     await act(async () => { await Promise.resolve(); });
     expect(active).toHaveBeenCalledTimes(1);
-    await act(async () => { await fireEvent.press(view.getByText("Retry")); });
+    await act(async () => { void fireEvent.press(view.getByText("Retry")); });
     expect(active).toHaveBeenCalledTimes(2);
     expect(inactive).toHaveBeenCalledTimes(1);
     expect(healthy).toHaveBeenCalledTimes(1);
@@ -154,7 +153,7 @@ describe("Results approved behavior", () => {
       await act(async () => { void view.queryClient.refetchQueries({ queryKey: ["paused-behind-the-screen"] }); await new Promise((resolve) => setTimeout(resolve, 20)); });
       expect(view.queryClient.getQueryState(["paused-behind-the-screen"])?.fetchStatus).toBe("paused");
       const calls = values.mock.calls.length;
-      await act(async () => { await fireEvent.press(view.getByText("Retry")); });
+      await act(async () => { void fireEvent.press(view.getByText("Retry")); });
       expect(values.mock.calls.length).toBeGreaterThan(calls);
     } finally { onlineManager.setOnline(true); }
   });

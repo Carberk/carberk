@@ -1,5 +1,6 @@
 import { createRef, type ComponentProps } from "react";
-import { Platform, View } from "react-native";
+import type { View } from "react-native";
+import { Platform } from "react-native";
 import { beforeEach, expect, it, vi } from "vitest";
 
 import { renderMobile, getAllHosts } from "../render";

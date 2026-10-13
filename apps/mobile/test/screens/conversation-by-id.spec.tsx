@@ -3,8 +3,7 @@ import { useState, type PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Linking from "expo-linking";
-import { Image } from "expo-image";
-import { Modal, Platform, KeyboardAvoidingView } from "react-native";
+import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import type { ConversationsSchemas, ListingsSchemas } from "@auto-tm/contracts";
 import { waitFor } from "@testing-library/react-native";
@@ -258,7 +257,7 @@ describe("Conversation opened with only its ID", () => {
     expect(screen.queryByText("Is the car still available?")).toBeNull();
     state.get.mockClear();
     await act(async () => {
-      await fireEvent.press(retry);
+      void fireEvent.press(retry);
     });
     expect(state.get).toHaveBeenCalledWith(`/conversations/${CONVERSATION_ID}`, expect.anything());
   });
@@ -317,7 +316,7 @@ describe("Conversation header Call", () => {
 
     const call = await screen.findByRole("button", { name: "Call the seller" });
     await act(async () => {
-      await fireEvent.press(call);
+      void fireEvent.press(call);
     });
     expect(Linking.openURL).toHaveBeenCalledWith(`tel:${SELLER_PHONE}`);
   });
@@ -553,12 +552,12 @@ describe("Conversation Retry", () => {
 
     await fireEvent.changeText(await screen.findByPlaceholderText("Message"), "Still there?");
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Send message" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Send message" }));
     });
     expect(await screen.findByText("Failed to send")).toBeTruthy();
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Retry" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Retry" }));
     });
 
     const [first, second] = state.socket.sendTextMessage.mock.calls.map(([args]) => args);
@@ -575,15 +574,15 @@ describe("Conversation Retry", () => {
 
     await act(async () => {
       // The attach button's label is matched loosely: it reads its key from another namespace today.
-      await fireEvent.press(await screen.findByLabelText(/attach/i));
+      void fireEvent.press(await screen.findByLabelText(/attach/i));
     });
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Send message" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Send message" }));
     });
     expect(await screen.findByText("Failed to send")).toBeTruthy();
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Retry" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Retry" }));
     });
 
     const [first, second] = state.socket.sendImageMessage.mock.calls.map(([args]) => args);
@@ -614,7 +613,7 @@ describe("Conversation menu", () => {
     await fireEvent.press(screen.getByRole("radio", { name: "Other" }));
     await fireEvent.changeText(screen.getByPlaceholderText("Describe the issue..."), "Asks for prepayment");
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Submit report" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Submit report" }));
     });
 
     expect(state.post).toHaveBeenCalledWith(
@@ -639,7 +638,7 @@ describe("Conversation menu", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Report" }));
     await fireEvent.press(screen.getByRole("radio", { name: "Spam" }));
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Submit report" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Submit report" }));
     });
 
     expect(state.post).toHaveBeenCalledWith(`/users/${SELLER_ID}/report`, { reason: "spam" }, expect.anything());
@@ -683,7 +682,7 @@ describe("Conversation menu", () => {
       screen.getByText("You will stop receiving messages and notifications from this user. The history stays."),
     ).toBeTruthy();
     await act(async () => {
-      await fireEvent.press(screen.getByText("Block"));
+      void fireEvent.press(screen.getByText("Block"));
     });
 
     expect(state.mutation.mutate).toHaveBeenCalledWith({ userId: SELLER_ID }, expect.anything());
@@ -739,7 +738,7 @@ describe("Conversation blocked by the viewer", () => {
       // The banner's Unblock, then the dialog's.
       const confirm = screen.getAllByText("Unblock")[1];
       if (!confirm) throw new Error("The dialog's Unblock is missing");
-      await fireEvent.press(confirm);
+      void fireEvent.press(confirm);
     });
 
     expect(state.mutation.mutate).toHaveBeenCalledWith({ userId: SELLER_ID }, expect.anything());
@@ -885,7 +884,7 @@ describe("Conversation Message actions", () => {
     const screen = await openPeerSheet();
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Copy" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Copy" }));
     });
     expect(state.clipboard).toHaveBeenCalledWith(PEER_TEXT);
     expect(state.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Copied" }));
@@ -897,7 +896,7 @@ describe("Conversation Message actions", () => {
     await fireEvent(screen.getByRole("button", { name: "Go back" }), "layout", { nativeEvent: { layout: { height: 96 } } });
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Copy" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Copy" }));
     });
     expect(state.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Copied", topClearance: 96 }));
   });
@@ -986,7 +985,7 @@ describe("Conversation about a closed Listing", () => {
     await screen.findByText("Sold");
     await fireEvent.changeText(screen.getByPlaceholderText("Message"), "Is the price final?");
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Send message" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Send message" }));
     });
     expect(state.socket.sendTextMessage).toHaveBeenCalledWith(expect.objectContaining({ text: "Is the price final?" }));
   });
@@ -1063,7 +1062,7 @@ describe("Conversation about a closed Listing", () => {
     await screen.findByText("Merdan");
     await fireEvent.changeText(screen.getByPlaceholderText("Message"), "Hello");
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Send message" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Send message" }));
     });
 
     expect(await screen.findByText("The seller has turned off messages for this listing")).toBeTruthy();
@@ -1086,7 +1085,7 @@ describe("Conversation about a closed Listing", () => {
     await screen.findByText("Merdan");
     await fireEvent.changeText(screen.getByPlaceholderText("Message"), "Hello");
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Send message" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Send message" }));
     });
 
     expect(state.mutation.mutate).toHaveBeenCalledWith(
@@ -1111,10 +1110,10 @@ describe("Conversation about a closed Listing", () => {
 
     await screen.findByText("Merdan");
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Attach photo" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Attach photo" }));
     });
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Send message" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Send message" }));
     });
 
     expect(state.mutation.mutateAsync).toHaveBeenCalledWith({
@@ -1146,17 +1145,17 @@ describe("Conversation about a closed Listing", () => {
 
     await screen.findByText("Merdan");
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Attach photo" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Attach photo" }));
     });
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Send message" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Send message" }));
     });
     expect(await screen.findByText("Failed to send")).toBeTruthy();
     expect(readConversation).toHaveBeenCalledTimes(1);
     expect(screen.getByPlaceholderText("Message")).toBeTruthy();
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Retry" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Retry" }));
     });
 
     expect(state.mutation.mutateAsync).toHaveBeenCalledTimes(2);
@@ -1197,7 +1196,7 @@ describe("Own Message acknowledgement", () => {
     const scrollRequests = (RN as unknown as { scrollRequests: unknown[] }).scrollRequests;
     scrollRequests.length = 0;
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Send message" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Send message" }));
     });
     expect(screen.getAllByText("Visible immediately")).toHaveLength(1);
     expect(scrollRequests).toContainEqual({ method: "scrollToOffset", offset: 0, animated: false });
@@ -1229,9 +1228,9 @@ describe("First chat action notifications", () => {
       const field = await screen.findByPlaceholderText("Message");
       expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
       if (kind === "text") await fireEvent.changeText(field, "First action");
-      else await act(async () => { await fireEvent.press(screen.getByLabelText(/attach/i)); });
+      else await act(async () => { void fireEvent.press(screen.getByLabelText(/attach/i)); });
       expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
-      await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
+      await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
       await waitFor(() => expect(state.post).toHaveBeenCalledWith("/notifications/tokens", { token: "first-chat-token", platform: "android" }, expect.anything()));
       expect(Notifications.requestPermissionsAsync).toHaveBeenCalledOnce();
     } finally {
@@ -1277,7 +1276,7 @@ describe("Acknowledged Message transport coverage", () => {
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
     const screen = await renderMobile(<ConversationDetailScreen />);
     await fireEvent.changeText(await screen.findByPlaceholderText("Message"), "HTTP still visible");
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
     expect(screen.getAllByText("HTTP still visible")).toHaveLength(1);
     state.messages.data = { pages: [{ items: [serverMessage("http-message", BUYER_ID, new Date().toISOString(), "HTTP still visible")] }] };
     await screen.rerender(<ConversationDetailScreen />);
@@ -1290,8 +1289,8 @@ describe("Acknowledged Message transport coverage", () => {
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
     const screen = await renderMobile(<ConversationDetailScreen />);
     await screen.findByPlaceholderText("Message");
-    await act(async () => { await fireEvent.press(screen.getByLabelText(/attach/i)); });
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
+    await act(async () => { void fireEvent.press(screen.getByLabelText(/attach/i)); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
     expect(screen.getAllByRole("imagebutton", { name: "Photo" })).toHaveLength(1);
     expect(getHost(screen.getByRole("imagebutton", { name: "Photo" }), "Image").props.source.uri).toContain("chat-attachments/ack.jpg");
   });
@@ -1306,12 +1305,12 @@ describe("Acknowledged own Message actions", () => {
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
     const screen = await renderMobile(<ConversationDetailScreen />);
     await fireEvent.changeText(await screen.findByPlaceholderText("Message"), "Acknowledged and deletable");
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
     await fireEvent(screen.getByText("Acknowledged and deletable"), "longPress");
     expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
     await fireEvent.press(screen.getByRole("button", { name: "Delete" }));
     expect(screen.getByText("Delete message?")).toBeTruthy();
-    await act(async () => { await fireEvent.press(screen.getByText("Delete")); });
+    await act(async () => { void fireEvent.press(screen.getByText("Delete")); });
     expect(screen.queryByText("Acknowledged and deletable")).toBeNull();
     expect(screen.getByText("Message deleted")).toBeTruthy();
     expect(state.socket.deleteMessage).toHaveBeenCalledWith({ conversationId: CONVERSATION_ID, messageId: "ack-to-delete" });
@@ -1328,7 +1327,7 @@ describe("Authoritative acknowledgement cache", () => {
     state.socket.sendTextMessage.mockImplementation(() => new Promise((resolve) => { acknowledge = resolve; }));
     const screen = await renderMobile(<ConversationDetailScreen />);
     await fireEvent.changeText(await screen.findByPlaceholderText("Message"), "Typed before server acknowledgement");
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
     const firstSend = state.socket.sendTextMessage.mock.calls[0];
     if (!firstSend) throw new Error("Send missing");
     const message = { ...serverMessage("canonical-id", BUYER_ID, "2026-10-08T12:34:56.000Z", "Canonical server text"), clientMessageId: firstSend[0].clientMessageId };
@@ -1363,7 +1362,7 @@ describe("Acknowledgement cannot undo a newer deletion", () => {
     state.socket.sendTextMessage.mockImplementation(() => new Promise((resolve) => { acknowledge = resolve; }));
     const screen = await renderMobile(<ConversationDetailScreen />);
     await fireEvent.changeText(await screen.findByPlaceholderText("Message"), "Before deletion");
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Send message" })); });
     const send = state.socket.sendTextMessage.mock.calls[0];
     if (!send) throw new Error("Send missing");
     const message = { ...serverMessage("deleted-before-ack", BUYER_ID, new Date().toISOString(), "Before deletion"), clientMessageId: send[0].clientMessageId };

@@ -89,7 +89,7 @@ describe("Ask the seller", () => {
     const screen = await chips();
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Can I see the car?" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Can I see the car?" }));
     });
 
     expect(state.post).toHaveBeenCalledTimes(1);
@@ -184,12 +184,12 @@ describe("Ask the seller", () => {
     const screen = await chips();
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Can I see the car?" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Can I see the car?" }));
     });
     expect(routerMock.push).not.toHaveBeenCalled();
 
     await act(async () => {
-      await fireEvent.press(await screen.findByRole("button", { name: "Retry" }));
+      void fireEvent.press(await screen.findByRole("button", { name: "Retry" }));
     });
 
     expect(routerMock.push).toHaveBeenCalledWith({

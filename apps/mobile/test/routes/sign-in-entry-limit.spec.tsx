@@ -36,7 +36,7 @@ describe("Sign-in entry at the daily code limit", () => {
     const screen = await renderMobile(<PhoneScreen />);
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Get code" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Get code" }));
     });
 
     expect(screen.getByText(DAILY_LIMIT)).toBeTruthy();
@@ -49,7 +49,7 @@ describe("Sign-in entry at the daily code limit", () => {
     const screen = await renderMobile(<EmailScreen />);
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Get code" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Get code" }));
     });
 
     expect(screen.getByText(DAILY_LIMIT)).toBeTruthy();
@@ -61,7 +61,7 @@ describe("Sign-in entry at the daily code limit", () => {
     const screen = await renderMobile(<EmailScreen />);
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Get code" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Get code" }));
     });
 
     expect(screen.getByText("Too many requests. Please wait a moment.")).toBeTruthy();

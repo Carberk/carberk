@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { Image } from "expo-image";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { StyleSheet } from "react-native";
 
 import { renderMobile, fireEvent, getHost, getAllHosts } from "../../../test/render";
 import type { StagedPhoto } from "../uploadStaging/types";

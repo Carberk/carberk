@@ -1,4 +1,3 @@
-import { Image } from "expo-image";
 import { describe, expect, it } from "vitest";
 
 import { fireEvent, first, renderMobile, getHost, queryHost, queryAllHosts } from "../../../test/render";

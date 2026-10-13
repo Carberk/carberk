@@ -77,7 +77,7 @@ async function renderWrongCode(locale: "en" | "ru" | "tk" = "en", method: "phone
 
 async function enterWrongCode(view: Awaited<ReturnType<typeof renderMobile>>) {
   await act(async () => {
-    await fireEvent.changeText(view.getByDisplayValue(""), "123456");
+    void fireEvent.changeText(view.getByDisplayValue(""), "123456");
   });
 }
 
@@ -102,7 +102,7 @@ describe("wrong code through the real form and cells", () => {
     // The instant error does not prevent correcting the code on the same form.
     verify.mockResolvedValueOnce(undefined);
     await act(async () => {
-      await fireEvent.changeText(view.getByDisplayValue(""), "654321");
+      void fireEvent.changeText(view.getByDisplayValue(""), "654321");
     });
     expect(verify).toHaveBeenLastCalledWith("654321");
     expect(view.queryByText(error)).toBeNull();

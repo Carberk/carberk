@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { onlineManager } from "@tanstack/react-query";
-import { Keyboard, KeyboardAvoidingView, Platform } from "react-native";
+import { Keyboard, Platform } from "react-native";
 import type * as Native from "react-native";
 import { waitFor } from "@testing-library/react-native";
 

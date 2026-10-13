@@ -118,7 +118,7 @@ describe("Conversation opened from Ask the seller", () => {
     const screen = await renderMobile(<ConversationDetailScreen />);
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Send message", disabled: false }));
+      void fireEvent.press(screen.getByRole("button", { name: "Send message", disabled: false }));
     });
 
     expect(mocks.sendTextMessage).toHaveBeenCalledTimes(1);

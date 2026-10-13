@@ -221,7 +221,7 @@ describe("Leaving onboarding", () => {
     vi.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error("disk full"));
     const screen = await renderMobile(<ValuePropScreen />);
 
-    await act(async () => { await fireEvent.press(screen.getByRole("button", { name: "Skip" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Skip" })); });
 
     expect(routerMock.dismissTo).toHaveBeenCalledWith(HOME_HREF);
   });
@@ -319,11 +319,11 @@ describe("Language choice", () => {
     });
     expect(screen.getByText(COPY.ru.choose)).toBeTruthy();
 
-    await act(async () => { await fireEvent.press(screen.getByRole("radio", { name: "English" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("radio", { name: "English" })); });
     expect(screen.getByText(COPY.en.choose)).toBeTruthy();
     expect(screen.getByRole("button", { name: COPY.en.continue })).toBeTruthy();
 
-    await act(async () => { await fireEvent.press(screen.getByRole("radio", { name: "Türkmençe" })); });
+    await act(async () => { void fireEvent.press(screen.getByRole("radio", { name: "Türkmençe" })); });
     expect(screen.getByText(COPY.tk.choose)).toBeTruthy();
     expect(screen.getByRole("button", { name: COPY.tk.continue })).toBeTruthy();
     unsubscribe();

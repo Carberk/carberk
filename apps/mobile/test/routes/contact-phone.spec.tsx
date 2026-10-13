@@ -48,7 +48,7 @@ async function typePhone(screen: Awaited<ReturnType<typeof renderMobile>>, value
 
 async function pressSendCode(screen: Awaited<ReturnType<typeof renderMobile>>) {
   await act(async () => {
-    await fireEvent.press(screen.getByRole("button", { name: "Send code" }));
+    void fireEvent.press(screen.getByRole("button", { name: "Send code" }));
   });
 }
 

@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as Linking from "expo-linking";
-import { Image } from "expo-image";
 
 import { act, fireEvent, first, renderMobile, getHost, queryHost, queryAllHosts } from "../../../test/render";
 import type { ConversationDetail } from "../../api/conversations/useConversation";
@@ -158,7 +157,7 @@ describe("ConversationHeader", () => {
     const screen = await header({ callPhone: "+99361000000" });
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Call the seller" }));
+      void fireEvent.press(screen.getByRole("button", { name: "Call the seller" }));
     });
     expect(Linking.openURL).toHaveBeenCalledWith("tel:+99361000000");
   });

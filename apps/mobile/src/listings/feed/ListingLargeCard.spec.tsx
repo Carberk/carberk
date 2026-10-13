@@ -1,5 +1,5 @@
 import type * as Native from "react-native";
-import { Alert , Image, StyleSheet } from "react-native";
+import { Alert, StyleSheet } from "react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import * as Linking from "expo-linking";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -207,7 +207,7 @@ describe("Results card contact actions", () => {
     api.get.mockResolvedValue({ ...feedItem, status: "active", allowCalls: true, contactPhone: "+99365000000" });
     const { view } = await renderCard(feedItem);
     expect(view.queryByText(/\+99365000000/)).toBeNull();
-    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Call" })); });
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Call" })); });
     expect(api.get).toHaveBeenCalledWith("/listings/listing", expect.anything());
     expect(view.queryClient.getQueryData(queryKeys.listings.detail("listing"))).toEqual(expect.objectContaining({ contactPhone: "+99365000000" }));
     expect(Linking.openURL).toHaveBeenCalledWith("tel:+99365000000");
@@ -220,13 +220,13 @@ describe("Results card contact actions", () => {
   ])("dials nothing when detail says %s", async (_, detail) => {
     api.get.mockResolvedValue({ ...feedItem, status: "active", ...detail });
     const { view } = await renderCard(feedItem);
-    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Call" })); });
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Call" })); });
     expect(Linking.openURL).not.toHaveBeenCalled();
   });
   it("shows an error with Retry when the phone cannot be read", async () => {
     api.get.mockRejectedValue(new Error("Network request failed"));
     const { view } = await renderCard(feedItem);
-    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Call" })); });
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Call" })); });
     expect(await view.findByText("Something went wrong")).toBeTruthy();
     expect(view.getByRole("button", { name: "Retry" })).toBeTruthy();
     expect(Linking.openURL).not.toHaveBeenCalled();
@@ -282,14 +282,14 @@ describe("Android dialer", () => {
     vi.mocked(Linking.canOpenURL).mockResolvedValueOnce(false);
     api.get.mockResolvedValue({ ...feedItem, contactPhone: "+99365000000" });
     const { view } = await renderCard(feedItem);
-    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Call" })); });
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Call" })); });
     expect(Linking.openURL).toHaveBeenCalledWith("tel:+99365000000");
   });
   it("shows the number when the dialer fails", async () => {
     vi.mocked(Linking.openURL).mockRejectedValueOnce(new Error("No dialer"));
     api.get.mockResolvedValue({ ...feedItem, contactPhone: "+99365000000" });
     const { view } = await renderCard(feedItem);
-    await act(async () => { await fireEvent.press(view.getByRole("button", { name: "Call" })); });
+    await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Call" })); });
     expect(Alert.alert).toHaveBeenCalledWith("Call", "Could not open the dialer. Call +99365000000 manually.");
   });
 });

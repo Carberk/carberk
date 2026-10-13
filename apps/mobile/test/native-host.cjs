@@ -4,9 +4,24 @@
 // CommonJS is required here because RNTL loads React Native with require.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const React = require("react");
+// React Native's imperative methods on a host ref. Nothing focuses, scrolls or
+// measures in Node, so each does nothing, as the null refs of the old renderer did.
+const NATIVE_METHODS = ["focus", "blur", "clear", "measure", "measureInWindow", "measureLayout",
+  "setNativeProps", "scrollTo", "scrollToEnd"];
 const host = (name, defaults = {}) => {
-  const Component = React.forwardRef(({ children, ...props }, ref) =>
-    React.createElement(name, { ...defaults, ...props, ref }, children));
+  const Component = React.forwardRef(({ children, ...props }, ref) => {
+    // test-renderer would give a host ref its test instance, which has none of
+    // the methods above. The ref gets them instead, with the host's type and
+    // latest props. No ref reaches the host: React 19 keeps `ref` in its props.
+    const latest = React.useRef(null);
+    latest.current = { ...defaults, ...props, children };
+    React.useImperativeHandle(ref, () => {
+      const handle = { type: name, isFocused: () => false, get props() { return latest.current; } };
+      for (const method of NATIVE_METHODS) handle[method] = () => {};
+      return handle;
+    }, []);
+    return React.createElement(name, { ...defaults, ...props }, children);
+  });
   Component.displayName = name;
   return Component;
 };
@@ -69,8 +84,9 @@ module.exports = {
   KeyboardAvoidingView: host("KeyboardAvoidingView"),
   // No keyboard opens in a host test; listeners are accepted and never called.
   Keyboard: { addListener: () => ({ remove() {} }), dismiss() {} },
+  // The host keeps `visible`, which a spec reads from this node.
   Modal: ({ visible = true, children, ...props }) => visible
-    ? React.createElement("Modal", props, children) : null,
+    ? React.createElement("Modal", { ...props, visible }, children) : null,
   RefreshControl: host("RefreshControl"),
   FlatList,
   // Scroll requests the list received, newest last. Specs read this to prove a

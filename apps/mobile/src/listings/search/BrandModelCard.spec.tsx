@@ -1,4 +1,3 @@
-import { Image } from "react-native";
 import { describe, expect, it, vi } from "vitest";
 
 import { renderMobile, fireEvent, getAllHosts, queryAllHosts } from "../../../test/render";
