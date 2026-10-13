@@ -294,9 +294,11 @@ describe("Listing-reference bubble width", () => {
     postRefModelName: "Camry with a long model name",
   };
   function container(screen: Awaited<ReturnType<typeof renderMobile>>) {
-    return getAllHosts(screen.container, "View").find((node) =>
-      node.props.className?.includes("max-w-[80%]"),
-    )!;
+    const node = getAllHosts(screen.container, "View").find((host) =>
+      host.props.className?.includes("max-w-[80%]"),
+    );
+    if (!node) throw new Error("No bubble container rendered");
+    return node;
   }
 
   it.each([true, false])("bounds a full-width reference and retains its actions, own=%s", async (isMine) => {
