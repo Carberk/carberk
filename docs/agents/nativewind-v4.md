@@ -1,6 +1,6 @@
 # Mobile styling
 
-Use this guide for mobile components, tokens, and visual changes. [ADR-0014](../adr/0014-mobile-component-library.md) establishes React Native Reusables. Consult Context7 for the specific NativeWind/RNR API being changed using [documentation lookups](documentation-lookups.md). Inspect existing configuration before following an installation recipe.
+Use this guide for mobile components, tokens, and visual changes. [ADR-0014](../adr/0014-mobile-component-library.md) establishes React Native Reusables. For the specific NativeWind/RNR API being changed, follow [documentation lookups](documentation-lookups.md). Inspect existing configuration before following an installation recipe.
 
 ## Start with the affected component
 
@@ -37,7 +37,7 @@ For a new visual variant, inspect both container and text variant maps and chang
 - Theme mismatch: check the root color-scheme setup and semantic variables together.
 - Native crash after adding a component: run Expo's package-alignment check first. Preserve explicit Reanimated/Worklets dependencies and the mobile hoisting configuration.
 
-Context7's versioned NativeWind results can still include examples from a newer main branch. Check examples against the installed v4 configuration; a docs result is not permission for a framework migration.
+NativeWind documentation and search results can show examples from a newer major. Check examples against the installed v4 configuration; a docs result is not permission for a framework migration.
 
 ## Verification
 

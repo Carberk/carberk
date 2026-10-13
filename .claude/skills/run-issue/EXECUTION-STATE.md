@@ -23,7 +23,7 @@ Use this shape:
 - **Current failure:** `<root cause or none>`
 - **Interrupted commands:** `<command and last known state or none>`
 - **Documentation:** `<CONTEXT/ADR/PRD status>`
-- **Context7:** `<library IDs consulted or not applicable>`
+- **Docs:** `<one entry per external dependency: not needed — <package>@<version> published <YYYY-MM-DD>, before cutoff <YYYY-MM>; or <official URL> — <what it verified>; upgrades add the peerDependencies/engines checked; or not applicable>`
 - **Reviews:** `Standards <verdict/SHA>; Spec <verdict/SHA>; each finding fixed in <sha>, deferred to <issue>, or rejected: <reason>; or none`
 - **Next action:** `<one concrete action>`
 ```
