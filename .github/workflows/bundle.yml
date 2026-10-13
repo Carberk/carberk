@@ -31,7 +31,7 @@ jobs:
 
       # pnpm must be installed before setup-node so `cache: pnpm` can find it.
       # It reads its version from packageManager in package.json.
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v6.1.0
 
       # Standard GitHub cache of the pnpm store, keyed on pnpm-lock.yaml.
       - uses: actions/setup-node@v7
