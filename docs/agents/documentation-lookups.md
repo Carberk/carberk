@@ -5,7 +5,7 @@
 ## When a lookup is required
 
 1. Find the version: the lockfile gives the installed version; an upgrade gives the target version.
-2. Find its publish date: `npm view <package> time --json`, the entry for that version.
+2. Find its publish date: `npm view <package> time --json`, the entry for that version. A CLI, hosted service or platform without an npm publish date, such as GitHub Actions runners, Railway, EAS, FCM/APNs or the `gh` CLI, uses the date of its official changelog or release entry. When no dated entry is found, treat it as published after your cutoff.
 3. Compare it with your training cutoff as your host's model information states it. If you cannot state your cutoff, treat every version as published after it.
 4. Published after your cutoff, or an upgrade to such a version: look it up. Published before: no lookup is required. When an API's exact shape matters, read the installed package's type definitions, README or CHANGELOG under `node_modules`, and let typecheck and tests verify the use.
 
