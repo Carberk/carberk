@@ -1,5 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "agentGuidance": false,
   "globalDependencies": ["**/.env.*local", "tsconfig.base.json"],
   "globalEnv": ["NODE_ENV", "APP_ENV", "LOG_LEVEL"],
   "globalPassThroughEnv": [
