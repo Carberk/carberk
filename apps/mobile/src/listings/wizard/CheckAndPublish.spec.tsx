@@ -131,6 +131,14 @@ describe("Check and publish, the Posting rules line", () => {
 });
 
 describe("Check and publish, the sections", () => {
+  it("uses the shared functional blue for Change and Posting rules", async () => {
+    const screen = await check();
+    for (const label of screen.getAllByText("Change")) {
+      expect(label.props.className).toContain("text-link");
+    }
+    expect(screen.getByRole("link").props.className).toContain("text-link");
+  });
+
   const rowLabels = (screen: Awaited<ReturnType<typeof check>>) =>
     screen.getAllByTestId("check-section").map((row) => String(row.props.accessibilityLabel));
 
