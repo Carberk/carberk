@@ -25,7 +25,7 @@ lane ─┬─ docs        (docs lane only)
                  └── pr (PR Checks only) needs every job above, if: always()
 ```
 
-- **`lane`** checks out at depth 2 and runs `scripts/ci-lane.mjs`. Its `lane` output is `docs` or `full`. It installs nothing, so the work jobs start within seconds.
+- **`lane`** runs `scripts/ci-lane.mjs`: PR Checks checks out at depth 2, CI fetches the previous `main` commit. Its `lane` output is `docs` or `full`. It installs nothing, so the work jobs start within seconds.
 - **`docs`** runs when the lane is `docs`: install, the glossary check, the lane tests, `pnpm test:agent-docs` and `pnpm test:glossary`.
 - **`static`**, **`backend`**, **`frontend`** and (on `main`) **`build`** run when the lane is not `docs`. `static` also runs the glossary check and the lane tests. Only `backend` starts the disposable services. `frontend` runs `pnpm test:root` after the workspace tests, because the reviewer-flow smoke imports the built `@auto-tm/contracts`; `test:root` runs every `scripts/*.test.mjs` file in one concurrent `node --test`. `scripts/ci-jobs.test.mjs` fails if a workspace with a `test` script is in neither `test:backend` nor `test:frontend`, or in both.
 - **`pr`** lists every other job in `needs` and runs with `if: always()`. It passes only when each needed job succeeded or was skipped by the lane: `docs` in the full lane, `static`, `backend` and `frontend` in the docs lane. Anything else fails it: a failed, cancelled or unexpectedly skipped job, or a failed `lane` job, which skips everything after it.
