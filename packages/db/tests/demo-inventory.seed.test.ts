@@ -206,12 +206,14 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
     const tables = await pool.query<{ tablename: string }>(
       `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations' ORDER BY tablename`,
     );
-    const snapshot: Record<string, unknown[]> = {};
-    for (const { tablename } of tables.rows) {
-      const rows = await pool.query(`SELECT to_jsonb(t) AS row FROM "${tablename}" AS t ORDER BY to_jsonb(t)::text`);
-      snapshot[tablename] = rows.rows.map((entry) => entry.row);
-    }
-    return snapshot;
+    // The tables are read concurrently, over the pool's connections; nothing writes meanwhile.
+    const entries = await Promise.all(
+      tables.rows.map(async ({ tablename }) => {
+        const rows = await pool.query(`SELECT to_jsonb(t) AS row FROM "${tablename}" AS t ORDER BY to_jsonb(t)::text`);
+        return [tablename, rows.rows.map((entry) => entry.row)] as const;
+      }),
+    );
+    return Object.fromEntries(entries);
   }
 
   /** The seeded rows without `updatedAt`, the one column a rerun is allowed to touch. */
