@@ -96,6 +96,12 @@ function SheetContent({
   const { height } = useWindowDimensions();
   const [present, setPresent] = React.useState(open);
   const progress = useSharedValue(0);
+  // Parents may clear a picker step or selected photo as soon as they close.
+  // Preserve its committed contents and measured layout until the exit finishes.
+  const exitingContent = React.useRef({ children, style: props.style });
+  React.useLayoutEffect(() => {
+    if (open) exitingContent.current = { children, style: props.style };
+  }, [open, children, props.style]);
   const panelStyle = useAnimatedStyle(() => reducedMotion
     ? { opacity: progress.value }
     : { transform: [{ translateY: (1 - progress.value) * height }] });
@@ -137,6 +143,7 @@ function SheetContent({
           )}
           onStartShouldSetResponder={() => false}
           {...props}
+          style={native && !open ? exitingContent.current.style : props.style}
           forceMount={native ? true : props.forceMount}
           asChild={native}>
           <NativeOnlyAnimatedView
@@ -144,7 +151,7 @@ function SheetContent({
             style={panelStyle}>
             <View className={cn("min-h-0 w-full flex-col gap-4", compact ? "" : "flex-1", avoidKeyboard && "shrink")}>
               <View className="mx-auto h-1 w-9 rounded-full bg-accent" />
-              <>{children}</>
+              <>{native && !open ? exitingContent.current.children : children}</>
             </View>
           </NativeOnlyAnimatedView>
         </DialogPrimitive.Content>

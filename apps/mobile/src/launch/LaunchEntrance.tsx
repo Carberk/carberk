@@ -8,9 +8,12 @@ import splashIcon from "../../assets/images/splash-icon.png";
 import { BrandLogo } from "../auth/BrandLogo";
 
 import { Text } from "@/components/ui/text";
-import { useReduceMotion } from "@/lib/motion";
+import { easing, useReduceMotion } from "@/lib/motion";
 
-const ENTRANCE_MS = 650;
+const C_DOT_EXIT_MS = 200;
+const WORDMARK_ENTER_MS = 420;
+const COMPLETED_BRAND_HOLD_MS = 450;
+const ENTRANCE_MS = C_DOT_EXIT_MS + WORDMARK_ENTER_MS + COMPLETED_BRAND_HOLD_MS;
 const EXIT_MS = 180;
 /** Upper bound on holding native launch when the C-dot never reports load or error. */
 const RELEASE_FALLBACK_MS = 400;
@@ -28,8 +31,14 @@ export function LaunchEntrance({ ready, children }: PropsWithChildren<{ ready: b
   const wordmark = useSharedValue(reducedMotion ? 1 : 0);
   const credit = useSharedValue(reducedMotion ? 1 : 0);
   const opacity = useSharedValue(1);
-  const iconStyle = useAnimatedStyle(() => ({ opacity: icon.value }));
-  const wordmarkStyle = useAnimatedStyle(() => ({ opacity: wordmark.value }));
+  const iconStyle = useAnimatedStyle(() => ({
+    opacity: icon.value,
+    transform: [{ scale: 0.92 + icon.value * 0.08 }, { translateY: (1 - icon.value) * -6 }],
+  }));
+  const wordmarkStyle = useAnimatedStyle(() => ({
+    opacity: wordmark.value,
+    transform: [{ translateY: (1 - wordmark.value) * 8 }],
+  }));
   const creditStyle = useAnimatedStyle(() => ({ opacity: credit.value, transform: [{ translateY: (1 - credit.value) * 4 }] }));
   const overlayStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
@@ -60,10 +69,10 @@ export function LaunchEntrance({ ready, children }: PropsWithChildren<{ ready: b
       setEntered(true);
       return;
     }
-    icon.value = withTiming(0, { duration: 200 });
+    icon.value = withTiming(0, { duration: C_DOT_EXIT_MS, easing: easing.exit });
     // Finish the matching native identity before introducing the wordmark.
-    wordmark.value = withDelay(200, withTiming(1, { duration: 420 }));
-    credit.value = withDelay(260, withTiming(1, { duration: 300 }));
+    wordmark.value = withDelay(C_DOT_EXIT_MS, withTiming(1, { duration: WORDMARK_ENTER_MS, easing: easing.enter }));
+    credit.value = withDelay(260, withTiming(1, { duration: 300, easing: easing.enter }));
     // This timer controls the overlay only. It never decides app readiness.
     const timer = setTimeout(() => setEntered(true), ENTRANCE_MS);
     return () => clearTimeout(timer);
