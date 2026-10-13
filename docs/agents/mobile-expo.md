@@ -26,6 +26,8 @@ CI=1 pnpm --filter @auto-tm/mobile exec expo install --check
 
 `pnpm install --force` is required after package alignment because stale pnpm symlinks in `apps/mobile/node_modules` can keep pointing at the previous store entry.
 
+`typescript` is the one deliberate exception. Expo SDK 55 expects `~5.9.2`, but the workspace catalog keeps TypeScript 6 under that name and type-checks with TypeScript 7 ([which compiler runs where](typescript-runtime.md#which-compiler-runs-where)). `apps/mobile/package.json` lists it in `expo.install.exclude`, so the check skips it. Metro compiles with Babel; Expo only uses `typescript` to load TypeScript config files, and this app's config is JavaScript. Do not run `expo install --fix` to "repair" it.
+
 ## Required verification gate
 
 For any mobile change, run:

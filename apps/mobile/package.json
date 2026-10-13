@@ -91,5 +91,12 @@
     "tailwindcss": "^3.4.17",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "expo": {
+    "install": {
+      "exclude": [
+        "typescript"
+      ]
+    }
   }
 }
