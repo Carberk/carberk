@@ -95,7 +95,7 @@ vi.mock("@rn-primitives/dialog", async () => {
     const onPress = () => onOpenChange?.(false);
     return asChild ? React.cloneElement(children, { onPress }) : <Pressable onPress={onPress}>{children}</Pressable>;
   };
-  return { Root, Portal: View, Overlay: View, Content: View, Trigger: Pressable, Close, Title: Text, Description: Text };
+  return { Root, useRootContext: () => ({ open: true, onOpenChange: React.useContext(context) }), Portal: View, Overlay: View, Content: View, Trigger: Pressable, Close, Title: Text, Description: Text };
 });
 vi.mock("react-native-screens", async () => ({ FullWindowOverlay: (await import("react-native")).View }));
 

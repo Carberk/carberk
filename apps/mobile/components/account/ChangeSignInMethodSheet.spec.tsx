@@ -18,9 +18,8 @@ vi.mock("@rn-primitives/dialog", async () => {
   };
   const Root = ({ open, onOpenChange, children }: React.PropsWithChildren<{ open: boolean; onOpenChange: (open: boolean) => void }>) =>
     open ? <Open.Provider value={onOpenChange}>{children}</Open.Provider> : null;
-  return { Root, Close, Portal: Box, Overlay: Box, Content: Box, Trigger: Box, Title: Text, Description: Text };
+  return { Root, Close, useRootContext: () => ({ open: true, onOpenChange: React.useContext(Open) }), Portal: Box, Overlay: Box, Content: Box, Trigger: Box, Title: Text, Description: Text };
 });
-vi.mock("react-native-reanimated", () => ({ SlideInDown: { duration: () => ({}) }, SlideOutDown: { duration: () => ({}) } }));
 vi.mock("react-native-screens", async () => ({ FullWindowOverlay: (await import("react-native")).View }));
 vi.mock("@/components/ui/native-only-animated-view", async () => ({ NativeOnlyAnimatedView: (await import("react-native")).View }));
 

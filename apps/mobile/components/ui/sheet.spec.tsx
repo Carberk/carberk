@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, renderMobile } from "../../test/render";
 
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { useReduceMotion } from "@/lib/motion";
 
 // The shared native shell replaces the Sheet in every other spec, so this one loads the real file.
 vi.unmock("@/components/ui/sheet");
@@ -62,7 +63,7 @@ describe("Sheet backdrop", () => {
   });
 });
 
-beforeEach(() => vi.useFakeTimers());
+beforeEach(() => { vi.useFakeTimers(); vi.mocked(useReduceMotion).mockReturnValue(false); });
 afterEach(() => vi.useRealTimers());
 
 describe("Sheet dismissal", () => {
@@ -71,9 +72,18 @@ describe("Sheet dismissal", () => {
   it("retains the whole sheet for its exit before removing it", () => {
     const view = renderMobile(sheet(true));
     view.rerender(sheet(false));
-    expect(view.getByText("Options")).toBeTruthy();
+    expect(view.getByText("Options", hidden)).toBeTruthy();
     act(() => vi.advanceTimersByTime(220));
     expect(view.queryByText("Options")).toBeNull();
+  });
+
+  it("uses a brief fade dismissal when motion is reduced", () => {
+    vi.mocked(useReduceMotion).mockReturnValue(true);
+    const view = renderMobile(sheet(true));
+    view.rerender(sheet(false));
+    expect(view.getByText("Options", hidden)).toBeTruthy();
+    act(() => vi.advanceTimersByTime(150));
+    expect(view.queryByText("Options", hidden)).toBeNull();
   });
 
   it("cancels pending removal when reopened during the exit", () => {
@@ -82,6 +92,6 @@ describe("Sheet dismissal", () => {
     act(() => vi.advanceTimersByTime(100));
     view.rerender(sheet(true));
     act(() => vi.advanceTimersByTime(1000));
-    expect(view.getByText("Options")).toBeTruthy();
+    expect(view.getByText("Options", hidden)).toBeTruthy();
   });
 });

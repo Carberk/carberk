@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { act, renderMobile } from "../render";
 import RootLayout, { unstable_settings } from "../../app/_layout";
+import { themeStore } from "../../src/theme/themeStore";
 import { OnboardingLaunch } from "../../src/onboarding/OnboardingLaunch";
 
 const FLAG = "@auto-tm/onboarding-completed";
@@ -151,6 +152,15 @@ describe("Startup resource failures", () => {
     expect(screen.getByTestId("(tabs)")).toBeTruthy();
     expect(appearance.destinations.length).toBeGreaterThan(0);
     expect(appearance.destinations.every((scheme) => scheme === "light")).toBe(true);
+  });
+
+  it("keeps navigation mounted when the person changes theme after startup", async () => {
+    launch.stored = { "@auto-tm/theme": "light", [LOCALE]: "en" };
+    const screen = await launchApp();
+    expect(screen.getByTestId("(tabs)")).toBeTruthy();
+    appearance.hold = true;
+    act(() => themeStore.getState().setTheme("dark"));
+    expect(screen.getByTestId("(tabs)")).toBeTruthy();
   });
 
   it("keeps the launch cover until the saved theme has settled", async () => {
