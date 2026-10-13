@@ -27,15 +27,14 @@ jobs:
       BUNDLE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag || format('dev-{0}', github.sha) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # pnpm must be installed before setup-node so `cache: pnpm` can find it.
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.12.0
+      # It reads its version from packageManager in package.json.
+      - uses: pnpm/action-setup@v6.1.0
 
       # Standard GitHub cache of the pnpm store, keyed on pnpm-lock.yaml.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -54,7 +53,7 @@ jobs:
       # `docker save` into images/auto-tm-<tag>.tar.gz.
       - run: make bundle TAG="$BUNDLE_TAG"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: auto-tm-${{ env.BUNDLE_TAG }}
           path: images/auto-tm-${{ env.BUNDLE_TAG }}.tar.gz
