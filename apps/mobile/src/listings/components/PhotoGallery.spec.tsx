@@ -136,7 +136,7 @@ it("keeps the source hidden until the contain page has displayed the cached imag
   measured.set("listing-photo-tile", [16, 88, 358, 268.5]);
   measured.set("photo-viewer-root", [0, 24, 390, 820]);
   measured.set("photo-viewer-page", [0, 80, 390, 640]);
-  const screen = await renderMobile(<PhotoGallery media={mediaFixture(1)} />);
+  const screen = await renderMobile(<PhotoGallery media={mediaFixture(1).map((photo) => ({ ...photo, width: 1920, height: 1080 }))} />);
   await fireEvent.press(screen.getByRole("button", { name: "Photo 1 of 1" }));
   await act(() => getHost(screen.container, "Modal").props.onShow());
   const overlay = screen.getByTestId("photo-transition-overlay", { includeHiddenElements: true });
