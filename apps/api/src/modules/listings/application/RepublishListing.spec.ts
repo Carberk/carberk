@@ -236,6 +236,36 @@ describe("RepublishListing", () => {
     });
   });
 
+  it("keeps the original publish date, so relisting is no bump to the top of Newest (#871)", async () => {
+    const firstPublishedAt = new Date("2026-05-01T00:00:00Z");
+    const archivedAt = new Date("2026-05-10T00:00:00Z");
+    const relistedAt = new Date("2026-05-20T09:30:00Z");
+    seedListing(repo, "archived", {
+      publishedAt: firstPublishedAt,
+      soldAt: new Date("2026-05-08T00:00:00Z"),
+      updatedAt: archivedAt,
+    });
+    clock = { now: () => relistedAt };
+
+    const { listing } = await makeUseCase(repo, prisma).execute({
+      listingId: "listing-1",
+      userId: "user-1",
+    });
+
+    expect(listing.status).toBe("active");
+    expect(listing.soldAt).toBeUndefined();
+    expect(listing.publishedAt).toEqual(firstPublishedAt);
+    expect(listing.updatedAt).toEqual(relistedAt);
+    expect(repo.listings[0]?.publishedAt).toEqual(firstPublishedAt);
+    expect(prisma.auditLogs).toEqual([
+      expect.objectContaining({
+        action: "listing.republished",
+        targetId: "listing-1",
+        details: { previousArchivedAt: archivedAt.toISOString() },
+      }),
+    ]);
+  });
+
   it("writes priceTmt at today's rate when a foreign-currency Listing returns", async () => {
     seedListing(repo, "archived", { priceAmount: 10000, priceCurrency: "USD" });
     const rates = new FakeExchangeRatePort();
