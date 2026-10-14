@@ -64,7 +64,7 @@ beforeEach(() => {
 });
 
 describe("issue 373 approved detail content", () => {
-  it("shows the numeric photo counter even for one photo", async () => {
+  it("names even one photo by its position, with the counter left to the viewer (#864)", async () => {
     const screen = await renderMobile(
       <PhotoGallery
         media={[
@@ -78,7 +78,8 @@ describe("issue 373 approved detail content", () => {
         ]}
       />,
     );
-    expect(screen.getByText("1 / 1")).toBeTruthy();
+    expect(screen.queryByText("1 / 1")).toBeNull();
+    expect(screen.getByRole("button", { name: "Photo 1 of 1" })).toBeTruthy();
   });
   it("renders title, price, date/city, specs, description, condition, seller, report and footer in order", async () => {
     const screen = await renderMobile(

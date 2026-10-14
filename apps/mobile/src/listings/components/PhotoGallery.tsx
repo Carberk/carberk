@@ -1,25 +1,16 @@
 import { useCallback, useRef, useState, type ReactNode } from "react";
-import {
-  FlatList,
-  Pressable,
-  View,
-  useWindowDimensions,
-  type ViewToken,
-} from "react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
-import { useTranslation } from "react-i18next";
 
-import { GalleryBanner, GalleryCounter, GalleryImage } from "./GalleryImage";
-import { isNearPhoto } from "./photoWindow";
+import { DetailPhotoStrip, type DetailPhotoStripHandle } from "./DetailPhotoStrip";
+import type { PhotoGeometry } from "./photoTransitionMath";
 import { PhotoViewer } from "./PhotoViewer";
-
-import { Text } from "@/components/ui/text";
 
 type ListingMedia = ListingsSchemas.ListingMedia;
 
 interface PhotoGalleryProps {
   media: ListingMedia[];
-  /** Status strip across the bottom of the photo, e.g. "Sold" on a closed Listing. */
+  visibleTop?: number;
+  /** Status strip across the bottom of each photo, e.g. "Sold" on a closed Listing. */
   banner?: string;
   /** The photo viewer's top-right action (♡); omit it where the viewer has none. */
   viewerHeaderAction?: (close: () => void) => ReactNode;
@@ -27,117 +18,79 @@ interface PhotoGalleryProps {
   viewerFooter?: (close: () => void) => ReactNode;
 }
 
+/**
+ * Loaded Listing detail's photos: the inset strip (`DetailPhotoStrip`), and
+ * the full-screen viewer a tapped photo opens on. Closing the viewer lands
+ * the strip on the photo the viewer was left on.
+ */
 export function PhotoGallery({
   media,
+  visibleTop,
   banner,
   viewerHeaderAction,
   viewerFooter,
 }: PhotoGalleryProps) {
-  const { t } = useTranslation();
-  const { width: screenWidth } = useWindowDimensions();
-  const [activeIndex, setActiveIndex] = useState(0);
-  // Neighbours wait until the first photo has loaded, so on a slow connection
-  // they never share its bandwidth; once the buyer swipes they load anyway.
-  const [firstLoaded, setFirstLoaded] = useState(false);
-  const loadNeighbours = firstLoaded || activeIndex !== 0;
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
-  const listRef = useRef<FlatList<ListingMedia>>(null);
+  const [origin, setOrigin] = useState<PhotoGeometry | null>(null);
+  const [hiddenIndex, setHiddenIndex] = useState<number | null>(null);
+  const returns = useRef(new Map<number, PhotoGeometry>());
+  const openingRequest = useRef(0);
+  const stripRef = useRef<DetailPhotoStripHandle>(null);
 
-  const onViewableItemsChanged = useCallback(
-    (info: { viewableItems: ViewToken[] }) => {
-      const first = info.viewableItems[0];
-      if (first?.index != null) {
-        setActiveIndex(first.index);
-      }
-    },
-    [],
-  );
-
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
-
-  // Closing the viewer lands the gallery on the photo the viewer was left on.
-  const closeViewer = useCallback(
-    (index: number) => {
-      setViewerIndex(null);
-      setActiveIndex(index);
-      listRef.current?.scrollToOffset({ offset: index * screenWidth, animated: false });
-    },
-    [screenWidth],
-  );
-
-  const renderItem = useCallback(
-    ({ item, index }: { item: ListingMedia; index: number }) => {
-      return (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("photoOf", { n: index + 1, total: media.length })}
-          onPress={() => setViewerIndex(index)}
-          className="active:opacity-90"
-        >
-          <View className="bg-muted" style={{ width: screenWidth, height: screenWidth * 0.65 }}>
-            {(index === activeIndex || (loadNeighbours && isNearPhoto(index, activeIndex))) && (
-              <GalleryImage
-                item={item}
-                variant="detail"
-                // The first photo is the card's: its `list` size is cached and shows at once.
-                placeholderVariant={index === 0 ? "list" : undefined}
-                // Fixed per photo: expo-image restarts a download whose priority
-                // changes, so a neighbour keeps `low` once it is on screen.
-                priority={index === 0 ? "high" : "low"}
-                style={{ width: "100%", height: "100%" }}
-                contentFit="contain"
-                onAspectRatio={index === 0 ? () => setFirstLoaded(true) : undefined}
-              />
-            )}
-          </View>
-        </Pressable>
-      );
-    },
-    [screenWidth, media.length, activeIndex, loadNeighbours, t],
-  );
-
-  if (media.length === 0) {
-    return (
-      <View className="h-[240px] w-full items-center justify-center bg-muted">
-        <Text className="text-callout text-muted-foreground">{t("noPhotos")}</Text>
-        {banner && <GalleryBanner label={banner} />}
-      </View>
-    );
-  }
+  const prepareReturn = useCallback((index: number) => {
+    stripRef.current?.scrollToPhoto(index);
+    // The strip scroll crosses native frames before the tile lands; measuring
+    // after one frame can still read the pre-scroll position and make the
+    // close fade instead of flying into the current tile.
+    requestAnimationFrame(() => requestAnimationFrame(() => stripRef.current?.measurePhoto(index, (geometry) => {
+      if (geometry) returns.current.set(index, geometry);
+      else returns.current.delete(index);
+    })));
+  }, []);
+  const openViewer = useCallback((index: number) => {
+    setOrigin(null);
+    returns.current.clear();
+    const request = ++openingRequest.current;
+    let presented = false;
+    const present = () => {
+      if (presented || request !== openingRequest.current) return;
+      presented = true;
+      setViewerIndex(index);
+    };
+    stripRef.current?.measurePhoto(index, (geometry) => {
+      if (presented || request !== openingRequest.current) return;
+      if (geometry) returns.current.set(index, geometry);
+      setOrigin(geometry?.ratioKnown === false ? null : geometry);
+      present();
+    });
+    // Fabric measurements may cross native frames. Give both nested reads a
+    // frame before presenting; a missing/virtualized ref still opens by fade.
+    requestAnimationFrame(() => requestAnimationFrame(present));
+  }, []);
+  const closeViewer = useCallback((index: number) => {
+    setViewerIndex(null);
+    setHiddenIndex(null);
+    stripRef.current?.scrollToPhoto(index);
+  }, []);
 
   return (
-    <View>
-      <FlatList
-        ref={listRef}
-        data={media}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        extraData={{ activeIndex, loadNeighbours }}
-        initialNumToRender={1}
-        windowSize={3}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-      />
-
-      <GalleryCounter
-        position={activeIndex + 1}
-        total={media.length}
-        aboveBanner={Boolean(banner)}
-      />
-
-      {banner && <GalleryBanner label={banner} />}
-
-      <PhotoViewer
-        visible={viewerIndex !== null}
-        media={media}
-        initialIndex={viewerIndex ?? 0}
-        onClose={closeViewer}
-        headerAction={viewerHeaderAction}
-        footer={viewerFooter}
-      />
-    </View>
+    <>
+      <DetailPhotoStrip visibleTop={visibleTop} hiddenIndex={hiddenIndex} ref={stripRef} photos={media} banner={banner} onPressPhoto={openViewer} />
+      {media.length > 0 && (
+        <PhotoViewer
+          key={viewerIndex === null ? "closed" : `open-${viewerIndex}`}
+          origin={origin}
+          getReturnGeometry={(index) => returns.current.get(index) ?? null}
+          onIndexChange={prepareReturn}
+          onTileHidden={setHiddenIndex}
+          visible={viewerIndex !== null}
+          media={media}
+          initialIndex={viewerIndex ?? 0}
+          onClose={closeViewer}
+          headerAction={viewerHeaderAction}
+          footer={viewerFooter}
+        />
+      )}
+    </>
   );
 }

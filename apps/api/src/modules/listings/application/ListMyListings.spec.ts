@@ -72,6 +72,48 @@ describe("ListMyListings", () => {
     expect(result.items[0]).toMatchObject({ photoThumbHashes: ["1fsDBYCIiIiHiIdweIeHh4d4cIgH", null] });
   });
 
+  it("returns what the detail preview places on the owner's summaries, including contact preferences, but no VIN or contact phone", async () => {
+    seedSummary({
+      enginePower: 150,
+      driveTypeId: "drive-1",
+      bodyTypeId: "body-1",
+      colorId: "color-1",
+      hasVin: true,
+      acceptsExchange: true,
+      installmentAvailable: false,
+      contactPhone: "+99365000000",
+      allowCalls: false,
+    });
+
+    const uc = new ListMyListings(port);
+    const [item] = (await uc.execute({ userId: "user-1" })).items;
+
+    expect(item).toMatchObject({
+      enginePower: 150,
+      driveTypeId: "drive-1",
+      bodyTypeId: "body-1",
+      colorId: "color-1",
+      hasVin: true,
+      acceptsExchange: true,
+      installmentAvailable: false,
+    });
+    expect(item).not.toHaveProperty("contactPhone");
+    expect(item).toMatchObject({ allowCalls: false, allowChat: true });
+    expect(item).not.toHaveProperty("vin");
+  });
+
+  it("returns the owner's actual call and chat preferences independently", async () => {
+    seedSummary({ allowCalls: true, allowChat: false });
+    seedSummary({ id: "listing-2", allowCalls: false, allowChat: true });
+
+    const result = await makeUseCase(port).execute({ userId: "user-1" });
+
+    expect(result.items.map(({ allowCalls, allowChat }) => ({ allowCalls, allowChat }))).toEqual([
+      { allowCalls: true, allowChat: false },
+      { allowCalls: false, allowChat: true },
+    ]);
+  });
+
   it("returns owner's listings", async () => {
     seedSummary();
     const uc = makeUseCase(port);

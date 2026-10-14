@@ -8,6 +8,8 @@ import {
   type ListingCardReadPort,
 } from "../domain/ports/ListingCardReadPort";
 
+import { cardPreviewFields } from "../domain/CardPreviewFields";
+
 import { decodeListingsCursor } from "./decodeListingsCursor";
 
 export interface ListMyListingsInput {
@@ -58,6 +60,9 @@ export class ListMyListings {
         engineTypeId: item.engineTypeId,
         cityId: item.cityId,
         publishedAt: item.publishedAt.toISOString(),
+        ...cardPreviewFields(item),
+        allowCalls: item.allowCalls,
+        allowChat: item.allowChat,
       })),
       nextCursor: result.nextCursor
         ? ListingsSchemas.encodeCursor(result.nextCursor)

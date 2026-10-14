@@ -1,5 +1,4 @@
 import { Enums } from "@auto-tm/contracts";
-import { Camera } from "lucide-react-native";
 import { useCallback, useMemo } from "react";
 import { FlatList, Pressable, View, useWindowDimensions, type ListRenderItem } from "react-native";
 import { useTranslation } from "react-i18next";
@@ -67,8 +66,10 @@ interface ListingPhotoStripProps {
  * Android; `nestedScrollEnabled` keeps Android from handing the gesture to
  * the outer list once the strip has taken it.
  *
- * The photo count and a seller-stated "New" sit on the photos' bottom edge,
- * fixed while the photos move under them; they take no touches.
+ * A seller-stated "New" sits on the photos' bottom edge, fixed while the
+ * photos move under them; it takes no touches. The strip shows no photo
+ * count: the "+N photos" tile says there are more, and the full-screen viewer
+ * counts.
  */
 export function ListingPhotoStrip({ photoKeys, thumbHashes, photoCount, condition, onOpen, onPressIn, onPressOut }: ListingPhotoStripProps) {
   const { t } = useTranslation();
@@ -94,10 +95,8 @@ export function ListingPhotoStrip({ photoKeys, thumbHashes, photoCount, conditio
     </View>}</Pressable>;
   }, [height, photoWidth, tiles.length, t, onOpen, onPressIn, onPressOut]);
 
-  // 8 dp inside the first photo's corner at rest, which also lines the chips up with the text below.
+  // 8 dp inside the first photo's corner at rest, which also lines the chip up with the text below.
   const chips = <View pointerEvents="none" className="absolute bottom-2 left-4 flex-row gap-1.5">
-    {photoCount > 1 ? <PhotoChip icon={Camera} label={String(photoCount)} className="relative"
-      accessibilityLabel={t("resultsPhotoCount", { count: photoCount })} /> : null}
     {condition === Enums.ListingCondition.New ? <PhotoChip label={t("new")} className="relative" /> : null}
   </View>;
 

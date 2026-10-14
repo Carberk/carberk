@@ -131,6 +131,19 @@ export const ListingSummaryBaseSchema = z.object({
   publishedAt: z.string().datetime(),
   /** Present only when the request carries a signed-in viewer. */
   isFavorited: z.boolean().optional(),
+  // What Listing detail's card-seeded preview needs to place every field
+  // before detail loads (#867). Absent from older APIs. The VIN itself and
+  // the contact phone stay out: `hasVin` says only that a VIN row exists.
+  enginePower: z.number().int().positive().optional(),
+  driveTypeId: z.string().uuid().optional(),
+  bodyTypeId: z.string().uuid().optional(),
+  colorId: z.string().uuid().optional(),
+  hasVin: z.boolean().optional(),
+  acceptsExchange: z.boolean().optional(),
+  installmentAvailable: z.boolean().optional(),
+  /** Whether the seller takes calls and chat messages; absent from older APIs. */
+  allowCalls: z.boolean().optional(),
+  allowChat: z.boolean().optional(),
 });
 
 function checkSummaryHashes(
@@ -166,9 +179,12 @@ export const FeedListingSummarySchema = ListingSummaryBaseSchema.extend({
   galleryKeys: z.array(z.string()).max(8).optional(),
   /** ThumbHashes parallel to `galleryKeys`; never sent without them. */
   galleryThumbHashes: ThumbHashSlotsSchema(8).optional(),
-  /** Whether the seller takes calls and chat messages. */
-  allowCalls: z.boolean().optional(),
-  allowChat: z.boolean().optional(),
+  /**
+   * Whether the Listing has a contact phone. Call needs one besides
+   * `allowCalls`, and some Listings have none (#867). The number itself
+   * stays on Listing detail.
+   */
+  hasContactPhone: z.boolean().optional(),
   /**
    * What the card needs to name the seller: compose it with
    * `formatDisplayName`; a `deleted` seller has no name. No avatar fields.
@@ -191,6 +207,8 @@ export const FavoriteListingSummarySchema = ListingSummaryBaseSchema.extend({
   contactPhone: z.string().optional(),
   allowCalls: z.boolean(),
   allowChat: z.boolean(),
+  /** As on a feed item (#867). */
+  hasContactPhone: z.boolean().optional(),
 }).superRefine(checkSummaryHashes);
 export type FavoriteListingSummary = z.infer<typeof FavoriteListingSummarySchema>;
 

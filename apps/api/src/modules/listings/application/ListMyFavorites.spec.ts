@@ -318,6 +318,13 @@ describe("ListMyFavorites", () => {
       contactPhone: "+99365000000",
       allowCalls: false,
       allowChat: true,
+      enginePower: 150,
+      driveTypeId: "drive-1",
+      bodyTypeId: "body-1",
+      colorId: "color-1",
+      hasVin: false,
+      acceptsExchange: false,
+      installmentAvailable: true,
     });
     await favorites.add("user-1", "listing-1");
 
@@ -335,6 +342,14 @@ describe("ListMyFavorites", () => {
       contactPhone: "+99365000000",
       allowCalls: false,
       allowChat: true,
+      enginePower: 150,
+      driveTypeId: "drive-1",
+      bodyTypeId: "body-1",
+      colorId: "color-1",
+      hasVin: false,
+      acceptsExchange: false,
+      installmentAvailable: true,
+      hasContactPhone: true,
     });
   });
   describe("activeOnly", () => {

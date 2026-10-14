@@ -1,64 +1,76 @@
-import { useMemo, useState } from "react";
-import { ScrollView, View, useWindowDimensions } from "react-native";
-import { Image } from "expo-image";
-import type { ListingsSchemas } from "@auto-tm/contracts";
+import { useMemo } from "react";
+import { ScrollView, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useBodyTypes } from "../../api/catalog/useBodyTypes";
+import { useColors } from "../../api/catalog/useColors";
+import { useDriveTypes } from "../../api/catalog/useDriveTypes";
 import { useEngineTypes } from "../../api/catalog/useEngineTypes";
 import { useTransmissions } from "../../api/catalog/useTransmissions";
-import { GalleryBanner, GalleryCounter } from "../components/GalleryImage";
+import type { CachedListingSummary } from "../../api/listings/findCachedListingSummary";
 import { ContactCtaBar } from "../components/ContactCtaBar";
+import { DetailPhotoStrip, type StripPhoto } from "../components/DetailPhotoStrip";
+import { keySpecs, PENDING, specRows } from "../components/ListingSpecs";
 import { PriceDisplay } from "../components/PriceDisplay";
-import { listingSpecLine } from "../feed/listingSpecLine";
+import { feedCardPhotoKeys, feedCardPhotoThumbHashes } from "../feed/feedCardFields";
 import { useFeedCatalogMaps } from "../feed/useFeedCatalogMaps";
+import { ownerListingActions } from "../ownerListingActions";
 
-import { buildOriginalUrl, buildVariantUrl } from "./buildVariantUrl";
 import { closedListingBannerKey, isClosedForContact } from "./closedListing";
+import { DetailHeader, PendingDetailActions } from "./DetailHeader";
 import { DetailSkeletonBody } from "./DetailSkeleton";
+import { OwnerStatusCard } from "./OwnerStatusCard";
 import { detailDate } from "./presentation";
 
-import { BackButton } from "@/components/navigation/StackHeader";
 import { StickyActionBar, useStickyActionBar } from "@/components/navigation/StickyActionBar";
 import { Text } from "@/components/ui/text";
 
 export interface ListingPreviewProps {
   /** The tapped card's cached data. */
-  summary: ListingsSchemas.ListingSummary;
+  summary: CachedListingSummary;
   isOwner: boolean;
+  /** Reporting is on, so a buyer's loaded header will hold ⋯. */
+  reportEnabled?: boolean;
   onBack: () => void;
 }
 
 /**
  * Listing detail before its own request returns, built only from the tapped
- * card: the photo, title, price, spec line, city and date. Specs, description
- * and seller load behind skeletons, and Call and Message stay disabled until
- * the full detail replaces this screen. Nothing here is written to the detail
- * cache.
+ * card and laid out as the loaded detail is: the same header row, the photos
+ * the card knows in the same strip (the rest of the Listing's photos as grey
+ * tiles), title, price, date and city, and the specifications the card knows
+ * in their final cells. The rest of the specifications, the description and the
+ * seller load behind placeholders of their own shape, and Call and Message
+ * stay disabled until the full detail replaces this screen. Nothing here is
+ * written to the detail cache.
  */
-export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps) {
+export function ListingPreview({ summary, isOwner, reportEnabled = true, onBack }: ListingPreviewProps) {
   const { t, i18n } = useTranslation();
-  const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const bar = useStickyActionBar("screen");
-  const [useOriginalImage, setUseOriginalImage] = useState(false);
   const listings = useMemo(() => [summary], [summary]);
   const names = useFeedCatalogMaps(listings);
   const transmissions = useTransmissions();
   const engineTypes = useEngineTypes();
+  const driveTypes = useDriveTypes();
+  const bodyTypes = useBodyTypes();
+  const colors = useColors();
 
   const closed = !isOwner && isClosedForContact(summary.status);
   const bannerKey = closed ? closedListingBannerKey(summary.status) : null;
-  const coverKey = summary.photoKeys[0] ?? summary.coverMediaKey;
-  // The card decoded the `list` size already, so it shows at once while the
-  // `detail` size the gallery opens on loads behind it. The gallery then finds
-  // that size cached, and the photo never blanks when the full detail arrives.
-  const imageUri = coverKey
-    ? useOriginalImage
-      ? buildOriginalUrl(coverKey)
-      : buildVariantUrl(coverKey, "detail")
-    : null;
-  const placeholderUri = coverKey ? buildVariantUrl(coverKey, "list") : null;
+  // Every photo the card knows, at the `detail` size the Results strip
+  // already decoded, so each paints from memory; the Listing's other photos
+  // hold their tiles until detail names them.
+  const photos = useMemo<StripPhoto[]>(() => {
+    const hashes = feedCardPhotoThumbHashes(summary);
+    const known = feedCardPhotoKeys(summary).map((key, index) => ({ key, thumbHash: hashes[index] }));
+    const pending = Array.from({ length: Math.max(0, summary.photoCount - known.length) }, (_, index) => ({
+      key: `pending-${index}`,
+      pending: true as const,
+    }));
+    return [...known, ...pending];
+  }, [summary]);
 
   const title = [
     [names.brandName(summary.brandId), names.modelName(summary.modelId)]
@@ -69,17 +81,34 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
     .filter(Boolean)
     .join(", ");
 
-  const specLine = listingSpecLine({
-    mileageKm: summary.mileageKm,
-    transmissionName: summary.transmissionId
-      ? transmissions.data?.items.find((item) => item.id === summary.transmissionId)?.name
-      : undefined,
-    engineTypeName: summary.engineTypeId
-      ? engineTypes.data?.items.find((item) => item.id === summary.engineTypeId)?.name
-      : undefined,
-    locale: i18n.language,
-    kmLabel: t("km"),
-  });
+  // A card from an API that sends `hasVin` also says which optional
+  // specifications the Listing has (#867), so every entry takes its final
+  // place; an older API's card holds them as placeholders. A name still
+  // loading keeps its cell.
+  const knowsAll = summary.hasVin !== undefined;
+  const named = (id: string | undefined, items: { id: string; name: string }[] | undefined) =>
+    id ? (items?.find((item) => item.id === id)?.name ?? PENDING) : undefined;
+  const specs = keySpecs(
+    {
+      year: summary.year,
+      mileageKm: summary.mileageKm,
+      transmission: named(summary.transmissionId, transmissions.data?.items),
+      engineType: named(summary.engineTypeId, engineTypes.data?.items),
+      enginePower: knowsAll ? summary.enginePower : PENDING,
+      driveType: knowsAll ? named(summary.driveTypeId, driveTypes.data?.items) : PENDING,
+    },
+    t,
+    i18n.language,
+  );
+  const rows = specRows(
+    {
+      condition: summary.condition,
+      bodyType: knowsAll ? named(summary.bodyTypeId, bodyTypes.data?.items) : PENDING,
+      color: knowsAll ? named(summary.colorId, colors.data?.items) : PENDING,
+      vin: summary.hasVin ? PENDING : undefined,
+    },
+    t,
+  );
 
   const dateAndCity = [
     detailDate(summary.publishedAt, i18n.language),
@@ -90,43 +119,23 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
 
   return (
     <View className="flex-1 bg-background">
-      <View
-        className="absolute left-0 right-0 top-0 z-20 px-3 py-2"
-        style={{ paddingTop: insets.top + 8 }}
-      >
-        <BackButton tone="glass" accessibilityLabel={t("back")} onPress={onBack} />
-      </View>
+      <DetailHeader
+        topInset={insets.top}
+        onBack={onBack}
+        trailing={
+          <PendingDetailActions
+            favorite={!isOwner && !closed}
+            favorited={summary.isFavorited ?? false}
+            more={isOwner ? ownerListingActions(summary.status).length > 0 : !closed && reportEnabled}
+          />
+        }
+      />
 
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: bar.space }}>
-        {imageUri ? (
-          <View style={{ width, height: width * 0.65 }}>
-            <Image
-              source={{ uri: imageUri }}
-              placeholder={placeholderUri ? { uri: placeholderUri } : undefined}
-              placeholderContentFit="cover"
-              style={{ width: "100%", height: "100%" }}
-              contentFit="cover"
-              priority="high"
-              cachePolicy="memory-disk"
-              onError={() => setUseOriginalImage(true)}
-            />
-            {summary.photoCount > 0 && (
-              <GalleryCounter
-                position={1}
-                total={summary.photoCount}
-                aboveBanner={Boolean(bannerKey)}
-              />
-            )}
-            {bannerKey && <GalleryBanner label={t(bannerKey)} />}
-          </View>
-        ) : (
-          <View className="h-[240px] w-full items-center justify-center bg-muted">
-            <Text className="text-callout text-muted-foreground">{t("noPhotos")}</Text>
-            {bannerKey && <GalleryBanner label={t(bannerKey)} />}
-          </View>
-        )}
+        <DetailPhotoStrip photos={photos} banner={bannerKey ? t(bannerKey) : undefined} />
 
-        <View className="gap-4 px-5 py-5">
+        <View testID="detail-body" className="gap-4 px-4 py-5">
+          {isOwner && <OwnerStatusCard status={summary.status} />}
           <Text className="text-headline font-heading font-semibold text-foreground" numberOfLines={2}>
             {title || t("listing")}
           </Text>
@@ -134,17 +143,15 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
             displayPriceTmt={summary.displayPriceTmt}
             priceAmount={summary.priceAmount}
             priceCurrency={summary.priceCurrency}
-            acceptsExchange={false}
-            installmentAvailable={false}
+            acceptsExchange={summary.acceptsExchange ?? false}
+            installmentAvailable={summary.installmentAvailable ?? false}
+            isOwner={isOwner}
             muted={closed}
           />
-          {specLine.length > 0 && (
-            <Text className="text-callout text-foreground">{specLine}</Text>
-          )}
           {dateAndCity.length > 0 && (
             <Text className="text-callout text-muted-foreground">{dateAndCity}</Text>
           )}
-          <DetailSkeletonBody />
+          <DetailSkeletonBody specs={specs} rows={rows} seller={!isOwner} />
         </View>
       </ScrollView>
 
@@ -153,7 +160,10 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
           <ContactCtaBar
             variant="floating"
             listingId={summary.id}
-            allowCalls={false}
+            // Laid out as the loaded bar: Call only when the seller takes
+            // calls and the Listing has a contact phone; an older API's card
+            // keeps the disabled Call.
+            allowCalls={(summary.allowCalls ?? true) && summary.hasContactPhone !== false}
             allowChat={false}
             status={summary.status}
             pending

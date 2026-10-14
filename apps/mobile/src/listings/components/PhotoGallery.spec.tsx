@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import * as RN from "react-native";
 
-import { fireEvent, renderMobile, within, first, getAllHosts, getHost } from "../../../test/render";
+import { act, fireEvent, renderMobile, within, first, getAllHosts, getHost } from "../../../test/render";
 import { mediaFixture } from "../../../test/fixtures/listing";
 
 import { PhotoGallery } from "./PhotoGallery";
 
-const WINDOW_WIDTH = 390;
+/** A 390 dp screen less 16 dp margins each side; one swipe moves a tile and its 2 dp seam. */
+const TILE_WIDTH = 390 - 32;
 const scrollRequests = (RN as unknown as { scrollRequests: unknown[] })
   .scrollRequests;
 
@@ -15,15 +16,14 @@ function viewer(screen: Awaited<ReturnType<typeof renderMobile>>) {
 }
 
 describe("Photo gallery and viewer", () => {
-  it.each([[900, 1600], [1920, 1080]])("shows the complete %sx%s vehicle photo inside the existing fixed gallery frame", async (width, height) => {
+  it.each([[900, 1600], [1920, 1080]])("cover-fits the %sx%s vehicle photo into its inset 4:3 tile", async (width, height) => {
     const media = mediaFixture(1).map((photo) => ({ ...photo, width, height }));
     const screen = await renderMobile(<PhotoGallery media={media} />);
-    const image = first(getAllHosts(screen.container, "Image"));
-    expect(image.props.contentFit).toBe("contain");
-    expect(image.props.placeholderContentFit).toBe("contain");
-    const frame = getAllHosts(screen.container, "View").find((view) => view.props.className === "bg-muted");
-    expect(frame?.props.style).toEqual({ width: 390, height: 253.5 });
+    const image = getHost(screen.container, "Image", { priority: "high" });
     expect(image.props.source.uri).toBe("https://media.test/0/detail.webp?v=webp-natural-1");
+    expect(image.props.contentFit).toBe("cover");
+    expect(image.props.contentPosition).toBeUndefined();
+    expect(first(screen.getAllByTestId("listing-photo-tile")).props.style).toEqual({ width: TILE_WIDTH, height: TILE_WIDTH * 3 / 4 });
   });
 
   it("opens the viewer at the photo that was tapped", async () => {
@@ -46,11 +46,10 @@ describe("Photo gallery and viewer", () => {
     await fireEvent.press(viewer(screen).getByRole("button", { name: "Close" }));
 
     expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
-    expect(screen.getByText("3 / 3")).toBeTruthy();
     expect(scrollRequests).toContainEqual(
       expect.objectContaining({
         method: "scrollToOffset",
-        offset: WINDOW_WIDTH * 2,
+        offset: (TILE_WIDTH + 2) * 2,
         animated: false,
       }),
     );
@@ -83,13 +82,13 @@ describe("Photo gallery and viewer", () => {
     expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
   });
 
-  it("loads the first photo behind the card's cached size, then only its neighbour (#816)", async () => {
+  it("loads the first photo on its own, then only its neighbour (#816)", async () => {
     const screen = await renderMobile(<PhotoGallery media={mediaFixture(20)} />);
     const sources = () => getAllHosts(screen.container, "Image").map((image) => image.props.source.uri);
     // Nothing shares the first photo's bandwidth until it has loaded.
     expect(sources()).toEqual(["https://media.test/0/detail.webp?v=webp-natural-1"]);
 
-    await fireEvent(first(getAllHosts(screen.container, "Image")), "load", {
+    await fireEvent(getHost(screen.container, "Image", { priority: "high" }), "load", {
       source: { url: "https://media.test/0/detail.webp?v=webp-natural-1", width: 1200, height: 800 },
     });
 
@@ -98,24 +97,21 @@ describe("Photo gallery and viewer", () => {
       "https://media.test/0/detail.webp?v=webp-natural-1",
       "https://media.test/1/detail.webp?v=webp-natural-1",
     ]);
-    expect(photos[0]).toEqual(expect.objectContaining({
-      placeholder: { uri: "https://media.test/0/list.webp?v=webp-natural-1" },
-      placeholderContentFit: "contain",
-      priority: "high",
-    }));
+    expect(photos[0]).toEqual(expect.objectContaining({ priority: "high" }));
     expect(photos[1]).toEqual(expect.objectContaining({ placeholder: undefined, priority: "low" }));
   });
 
-  it("lays the first photo's cached list size over its ThumbHash, so the blur shows at once and the sharper size replaces it", async () => {
+  it("shows each photo's ThumbHash under it, cover-fit like the photo, until the photo loads", async () => {
     const media = mediaFixture(2).map((photo, index) => ({ ...photo, thumbHash: index === 0 ? "1fsDBYCIiIiHiIdweIeHh4d4cIgH" : "2yMBBYCIh4iHiHeAiId4dXh3f4f4" }));
     const screen = await renderMobile(<PhotoGallery media={media} />);
 
-    const [blur, photo] = getAllHosts(screen.container, "Image").map((image) => image.props);
-    expect(blur).toEqual(expect.objectContaining({ source: { thumbhash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" }, contentFit: "contain" }));
+    const [blur, photo, ...rest] = getAllHosts(screen.container, "Image").map((image) => image.props);
+    expect(rest).toEqual([]);
+    expect(blur).toEqual(expect.objectContaining({ source: { thumbhash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" }, contentFit: "cover" }));
     expect(photo).toEqual(expect.objectContaining({
       source: { uri: "https://media.test/0/detail.webp?v=webp-natural-1" },
-      placeholder: { uri: "https://media.test/0/list.webp?v=webp-natural-1" },
-      placeholderContentFit: "contain",
+      placeholder: undefined,
+      contentFit: "cover",
     }));
   });
 
@@ -132,4 +128,78 @@ describe("Photo gallery and viewer", () => {
     // Every photo in the viewer, page or thumbnail, has its blur under it until it loads.
     expect(blurs).toHaveLength(sources.length - blurs.length);
   });
+});
+
+it("keeps the source hidden until the contain page has displayed the cached image", async () => {
+  const measured = (RN as unknown as { measureRects: Map<string, number[]> }).measureRects;
+  measured.set("detail-photos", [0, 80, 390, 280]);
+  measured.set("listing-photo-tile", [16, 88, 358, 268.5]);
+  measured.set("photo-viewer-root", [0, 24, 390, 820]);
+  measured.set("photo-viewer-page", [0, 80, 390, 640]);
+  const screen = await renderMobile(<PhotoGallery media={mediaFixture(1).map((photo) => ({ ...photo, width: 1920, height: 1080 }))} />);
+  await fireEvent.press(screen.getByRole("button", { name: "Photo 1 of 1" }));
+  await act(() => getHost(screen.container, "Modal").props.onShow());
+  const overlay = screen.getByTestId("photo-transition-overlay", { includeHiddenElements: true });
+  await fireEvent(getHost(overlay, "Image"), "display");
+  expect(screen.getByTestId("listing-photo-tile").props.style.opacity).toBe(0);
+  const page = screen.getByTestId("photo-viewer-page");
+  await fireEvent(getHost(page, "Image"), "display");
+  expect(screen.getByTestId("listing-photo-tile").props.style.opacity).toBeUndefined();
+  expect(screen.queryByTestId("photo-transition-overlay", { includeHiddenElements: true })).toBeNull();
+});
+
+it("fades instead of guessing a flight shape before any photo size is known", async () => {
+  const measured = (RN as unknown as { measureRects: Map<string, number[]> }).measureRects;
+  measured.set("detail-photos", [0, 80, 390, 280]);
+  measured.set("listing-photo-tile", [16, 88, 358, 268.5]);
+  measured.set("photo-viewer-root", [0, 24, 390, 820]);
+  measured.set("photo-viewer-page", [0, 80, 390, 640]);
+  const media = mediaFixture(1).map((photo) => ({ ...photo, width: undefined, height: undefined }));
+  const screen = await renderMobile(<PhotoGallery media={media} />);
+  await fireEvent.press(screen.getByRole("button", { name: "Photo 1 of 1" }));
+  await act(() => getHost(screen.container, "Modal").props.onShow());
+  expect(screen.queryByTestId("photo-transition-overlay", { includeHiddenElements: true })).toBeNull();
+  expect(screen.getByTestId("listing-photo-tile").props.style.opacity).toBeUndefined();
+});
+
+it("measures the paged tile only after two frames, once the strip scroll has landed", async () => {
+  const native = RN as unknown as { measureRects: Map<string, number[]>; deferredMeasurements: Set<string>; measurementCallbacks: (() => void)[] };
+  native.measureRects.set("detail-photos", [0, 80, 390, 280]);
+  native.measureRects.set("listing-photo-tile", [16, 88, 358, 268.5]);
+  const screen = await renderMobile(<PhotoGallery media={mediaFixture(3)} />);
+  await fireEvent.press(first(screen.getAllByRole("button", { name: "Photo 1 of 3" })));
+  await act(() => getHost(screen.container, "Modal").props.onShow());
+
+  const queue: (() => void)[] = [];
+  const raf = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = ((cb: () => void) => { queue.push(cb); return queue.length; }) as typeof requestAnimationFrame;
+  try {
+    native.deferredMeasurements.add("detail-photos");
+    await fireEvent.press(viewer(screen).getByRole("button", { name: "Photo 2 of 3" }));
+    // One frame is the pre-fix behaviour: the strip has not landed yet, so
+    // the return measurement must not have started.
+    await act(() => queue.shift()?.());
+    expect(native.measurementCallbacks).toHaveLength(0);
+    await act(() => queue.shift()?.());
+    expect(native.measurementCallbacks).toHaveLength(1);
+  } finally { globalThis.requestAnimationFrame = raf; }
+});
+
+it("waits for the tapped tile measurement before presenting the Modal", async () => {
+  const native = RN as unknown as { measureRects: Map<string, number[]>; deferredMeasurements: Set<string>; measurementCallbacks: (() => void)[] };
+  native.measureRects.set("detail-photos", [0, 80, 390, 280]);
+  native.measureRects.set("listing-photo-tile", [16, 88, 358, 268.5]);
+  native.measureRects.set("photo-viewer-root", [0, 24, 390, 820]);
+  native.measureRects.set("photo-viewer-page", [0, 80, 390, 640]);
+  native.deferredMeasurements.add("detail-photos");
+  const raf = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = () => 0;
+  try {
+    const screen = await renderMobile(<PhotoGallery media={mediaFixture(1).map((photo) => ({ ...photo, width: 1920, height: 1080 }))} />);
+    await fireEvent.press(screen.getByRole("button", { name: "Photo 1 of 1" }));
+    expect(screen.queryByTestId("photo-viewer-pager")).toBeNull();
+    await act(() => native.measurementCallbacks.shift()?.());
+    await act(() => getHost(screen.container, "Modal").props.onShow());
+    expect(screen.getByTestId("photo-transition-overlay", { includeHiddenElements: true })).toBeTruthy();
+  } finally { globalThis.requestAnimationFrame = raf; }
 });

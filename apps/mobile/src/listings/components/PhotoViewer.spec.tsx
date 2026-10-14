@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Pressable } from "react-native";
 import * as RN from "react-native";
 
@@ -6,6 +6,10 @@ import { act, fireEvent, renderMobile, within, getHost } from "../../../test/ren
 import { mediaFixture } from "../../../test/fixtures/listing";
 
 import { PhotoViewer } from "./PhotoViewer";
+
+import { useReduceMotion } from "@/lib/motion";
+
+beforeEach(() => vi.mocked(useReduceMotion).mockReturnValue(false));
 
 const WINDOW_WIDTH = 390;
 const scrollRequests = (RN as unknown as { scrollRequests: unknown[] })
@@ -154,4 +158,38 @@ describe("Photo viewer scroll requests", () => {
 
     expect(pagerRequests()).toEqual([{ method: "scrollToIndex", index: 1, animated: false }]);
   });
+});
+
+// #869: the underlying strip follows the current photo before close starts.
+it("reports the current photo after paging so its return tile is ready", async () => {
+  const onIndexChange = vi.fn();
+  const { screen } = await open({ onIndexChange });
+  await swipeTo(screen, 4);
+  expect(onIndexChange).toHaveBeenCalledWith(4);
+});
+
+const measured = (RN as unknown as { measureRects: Map<string, number[]> }).measureRects;
+const origin = { tile: { x: 16, y: 90, width: 358, height: 268.5 }, visible: { x: 16, y: 90, width: 358, height: 268.5 }, radii: [12, 0, 0, 12] as const, uri: "https://cache.test/displayed-detail.webp", ratio: 16 / 9 };
+it("uses the displayed detail URI in the moving image before handing off to its page", async () => {
+  measured.set("photo-viewer-root", [0, 24, 390, 820]);
+  measured.set("photo-viewer-page", [0, 80, 390, 640]);
+  const { screen } = await open({ origin });
+  await act(() => getHost(screen.container, "Modal").props.onShow());
+  const overlay = screen.getByTestId("photo-transition-overlay", { includeHiddenElements: true });
+  expect(getHost(overlay, "Image").props.source.uri).toBe(origin.uri);
+  expect(getHost(overlay, "Image").props.contentFit).toBe("contain");
+});
+it("uses fade-only presentation under Reduce Motion and still returns the current photo", async () => {
+  measured.set("photo-viewer-root", [0, 24, 390, 820]);
+  measured.set("photo-viewer-page", [0, 80, 390, 640]);
+  vi.mocked(useReduceMotion).mockReturnValue(true);
+  const getReturnGeometry = vi.fn(() => origin);
+  const { screen, onClose } = await open({ origin, getReturnGeometry });
+  await act(() => getHost(screen.container, "Modal").props.onShow());
+  expect(screen.queryByTestId("photo-transition-overlay", { includeHiddenElements: true })).toBeNull();
+  await swipeTo(screen, 4);
+  await fireEvent.press(screen.getByRole("button", { name: "Close" }));
+  expect(getReturnGeometry).toHaveBeenCalledWith(4);
+  expect(screen.queryByTestId("photo-transition-overlay", { includeHiddenElements: true })).toBeNull();
+  expect(onClose).toHaveBeenCalledWith(4);
 });

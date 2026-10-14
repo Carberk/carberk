@@ -4,7 +4,7 @@ import { useState } from "react";
 import { View, type PressableProps, type ViewProps } from "react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 
-import { buildOriginalUrl, buildVariantUrl } from "../detail/buildVariantUrl";
+import { buildOriginalUrl, listingPhotoUrl } from "../detail/buildVariantUrl";
 
 import { GlassSurface } from "@/components/ui/glass-surface";
 import { Icon } from "@/components/ui/icon";
@@ -65,7 +65,7 @@ export function ListingPhoto({ mediaKey, emptyLabel, compact = false, variant = 
 
   return (
     <Image
-      source={{ uri: original ? buildOriginalUrl(mediaKey) : buildVariantUrl(mediaKey, variant) }}
+      source={{ uri: original ? buildOriginalUrl(mediaKey) : listingPhotoUrl({ key: mediaKey }, variant) }}
       placeholder={thumbHash ? { thumbhash: thumbHash } : undefined}
       placeholderContentFit="cover"
       className="h-full w-full"
@@ -160,8 +160,8 @@ type PhotoChipProps = ViewProps & {
 };
 
 /**
- * A small chip on a Listing photo: the photo count, or the state of a closed
- * Listing. It sizes to its text and keeps 8 dp of padding at each end.
+ * A small chip on a Listing photo: a seller-stated New, or the state of a
+ * closed Listing. It sizes to its text and keeps 8 dp of padding at each end.
  */
 export function PhotoChip({ label, icon, tone = "scrim", className, ...props }: PhotoChipProps) {
   const foreground =

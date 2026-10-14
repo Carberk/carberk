@@ -167,9 +167,9 @@ export function OwnerActions({ listingId, status, mode }: OwnerActionsProps) {
       {mode === "menu" && menuActions.length > 0 && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            {/* The menu sits in Listing detail's header, over the photo. */}
+            {/* The menu sits in Listing detail's plain header row (#864). */}
             <HeaderButton
-              tone="glass"
+              tone="plain"
               icon={MoreHorizontal}
               accessibilityLabel={t("detailOptions")}
             />

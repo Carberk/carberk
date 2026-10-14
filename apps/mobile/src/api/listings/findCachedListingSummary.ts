@@ -4,7 +4,10 @@ import type { ListingsSchemas } from "@auto-tm/contracts";
 import { queryKeys } from "../queryKeys";
 
 type ListingSummary = ListingsSchemas.ListingSummary;
-type SummaryPages = InfiniteData<{ items: ListingSummary[] }>;
+/** A cached card: Feed and Favorites items also carry the contact preferences and up to eight photo keys. */
+export type CachedListingSummary = ListingSummary &
+  Partial<Pick<ListingsSchemas.FeedListingSummary, "allowCalls" | "allowChat" | "hasContactPhone" | "galleryKeys" | "galleryThumbHashes">>;
+type SummaryPages = InfiniteData<{ items: CachedListingSummary[] }>;
 
 /**
  * Every infinite list whose cards open Listing detail: the Home feed and
@@ -26,7 +29,7 @@ const CARD_LIST_KEYS: QueryKey[] = [
 export function findCachedListingSummary(
   queryClient: QueryClient,
   listingId: string,
-): ListingSummary | undefined {
+): CachedListingSummary | undefined {
   for (const queryKey of CARD_LIST_KEYS) {
     for (const [, data] of queryClient.getQueriesData<SummaryPages>({ queryKey })) {
       for (const page of data?.pages ?? []) {

@@ -49,7 +49,7 @@ describe("Favorites large card", () => {
     expect(heart.props.accessibilityState).toEqual(expect.objectContaining({ selected: true }));
     expect(view.getByText("70,000 TMT")).toBeTruthy();
     expect(view.getByText("Toyota Camry, 2018")).toBeTruthy();
-    expect(view.getByLabelText("Photos: 7")).toBeTruthy();
+    expect(view.queryByLabelText(/Photos: /)).toBeNull();
   });
 
   it("looks like the Results card: full width, 28 dp radius, the swipeable inset photo strip", async () => {

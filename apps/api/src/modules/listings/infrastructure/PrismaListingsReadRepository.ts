@@ -56,6 +56,13 @@ type CardRow = {
   contactPhone: string | null;
   allowCalls: boolean;
   allowChat: boolean;
+  enginePower: number | null;
+  driveTypeId: string | null;
+  bodyTypeId: string | null;
+  colorId: string | null;
+  vin: string | null;
+  acceptsExchange: boolean;
+  installmentAvailable: boolean;
   media: Array<{ key: string; kind: MediaKind; thumbHash: string | null }>;
 };
 
@@ -272,6 +279,9 @@ export class PrismaListingsReadRepository
       publishedAt: row.publishedAt ?? new Date(),
       allowCalls: row.allowCalls,
       allowChat: row.allowChat,
+      hasVin: !!row.vin,
+      acceptsExchange: row.acceptsExchange,
+      installmentAvailable: row.installmentAvailable,
       ...toCardPhotos(row.media),
     };
 
@@ -281,6 +291,10 @@ export class PrismaListingsReadRepository
     if (row.transmissionId !== null) card.transmissionId = row.transmissionId;
     if (row.engineTypeId !== null) card.engineTypeId = row.engineTypeId;
     if (row.contactPhone !== null) card.contactPhone = row.contactPhone;
+    if (row.enginePower !== null) card.enginePower = row.enginePower;
+    if (row.driveTypeId !== null) card.driveTypeId = row.driveTypeId;
+    if (row.bodyTypeId !== null) card.bodyTypeId = row.bodyTypeId;
+    if (row.colorId !== null) card.colorId = row.colorId;
 
     return card;
   }

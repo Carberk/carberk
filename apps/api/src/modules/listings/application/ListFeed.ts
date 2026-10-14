@@ -36,6 +36,7 @@ import {
   type SellerProfilePort,
 } from "../domain/ports/SellerProfilePort";
 import { toCardPhotos } from "../domain/CardPhotos";
+import { cardPreviewFields } from "../domain/CardPreviewFields";
 
 export interface ListFeedInput {
   /** Signed-in viewer, when the request carries one; drives `isFavorited`. */
@@ -130,8 +131,18 @@ export class ListFeed {
         publishedAt: listing.publishedAt.toISOString(),
         ...(favorited !== undefined ? { isFavorited: favorited.has(listing.id) } : {}),
         // The contact phone stays out: a caller reads it from Listing detail.
+        ...cardPreviewFields({
+          enginePower: listing.enginePower,
+          driveTypeId: listing.driveTypeId,
+          bodyTypeId: listing.bodyTypeId,
+          colorId: listing.colorId,
+          hasVin: !!listing.vin,
+          acceptsExchange: listing.acceptsExchange,
+          installmentAvailable: listing.installmentAvailable,
+        }),
         allowCalls: listing.allowCalls,
         allowChat: listing.allowChat,
+        hasContactPhone: !!listing.contactPhone,
         ...(seller !== undefined
           ? {
               seller: {

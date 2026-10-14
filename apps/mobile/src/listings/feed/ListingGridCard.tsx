@@ -1,5 +1,4 @@
 import type { ListingsSchemas } from "@auto-tm/contracts";
-import { Camera } from "lucide-react-native";
 import { memo } from "react";
 import { Pressable, View } from "react-native";
 import { useTranslation } from "react-i18next";
@@ -8,7 +7,7 @@ import type { AuthHref } from "../../auth/intentStore";
 import { useListingFavorite } from "../useListingFavorite";
 
 import { listingGridCardText } from "./listingGridCardText";
-import { ListingPhoto, PhotoChip, PhotoFavoriteButton, cardPhotoThumbHash } from "./ListingPhoto";
+import { ListingPhoto, PhotoFavoriteButton, cardPhotoThumbHash } from "./ListingPhoto";
 
 import { EnterOnce, MotionView, usePressScale } from "@/components/ui/motion";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,8 +33,8 @@ interface ListingGridCardProps {
 /**
  * Home "New listings" card (32 — Listings, Cards; Auto.ru AR-01-002). The
  * photo is the card: a 3:2 picture rounded on all four corners, with ♡ on it
- * and the photo count when there is more than one, and no raised box around
- * it. The text sits on the page under it: the price loudest in bold tabular
+ * and no photo count (only the full-screen viewer counts), and no raised box
+ * around it. The text sits on the page under it: the price loudest in bold tabular
  * figures, "Brand Model" regular, and "year, km" or "year, New" quietest.
  * Two sit side by side. The whole card gives under a finger; the heart is a
  * control of its own beside the pressable area.
@@ -85,13 +84,6 @@ export const ListingGridCard = memo(function ListingGridCard({
         >
           <View className="aspect-photo w-full overflow-hidden rounded-2xl bg-secondary">
             <ListingPhoto mediaKey={coverKey} thumbHash={cardPhotoThumbHash(listing, coverKey)} emptyLabel={t("noPhoto")} />
-            {listing.photoCount > 1 ? (
-              <PhotoChip
-                icon={Camera}
-                label={String(listing.photoCount)}
-                className="bottom-2 left-2"
-              />
-            ) : null}
           </View>
 
           <View className="px-1 pb-2 pt-2">

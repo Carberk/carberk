@@ -221,8 +221,7 @@ describe("FeedListingSummarySchema for the Results card", () => {
 
     for (const parsed of [favorite, own]) expect(parsed).not.toHaveProperty("seller");
     expect(own).not.toHaveProperty("galleryKeys");
-    expect(own).not.toHaveProperty("allowCalls");
-    expect(own).not.toHaveProperty("allowChat");
+    expect(own).toMatchObject({ allowCalls: true, allowChat: false });
   });
 
   it("sends the gallery on favorites items for the Favorites card's strip, and tolerates an older API without it", () => {

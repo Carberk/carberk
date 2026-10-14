@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as RN from "react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 
 import type * as ClientModule from "../../api/client";
@@ -71,6 +72,7 @@ vi.mock("../../api/catalog/useEngineTypes", () => ({
 }));
 
 const SELLER = fixture().sellerId;
+const scrollRequests = (RN as unknown as { scrollRequests: Record<string, unknown>[] }).scrollRequests;
 
 beforeEach(() => {
   state.data = fixture({ media: mediaFixture(3) });
@@ -98,12 +100,13 @@ describe("instant loading from a tapped card", () => {
     state.preview = summaryFixture();
   });
 
-  it("shows the card's photo, title, price, spec line, city and date before the detail arrives", async () => {
+  it("shows the card's photo, title, price, known specifications, city and date before the detail arrives", async () => {
     const screen = await renderMobile(<ListingDetailScreen />);
 
     expect(screen.getByText("Toyota Camry, 2020")).toBeTruthy();
     expect(screen.getByText("35,000 TMT")).toBeTruthy();
-    expect(screen.getByText("12,000 km · Automatic · Petrol")).toBeTruthy();
+    expect(screen.getByText("12,000 km")).toBeTruthy();
+    expect(screen.getByText("Automatic")).toBeTruthy();
     expect(screen.getByText("20 Sep · Ashgabat")).toBeTruthy();
     expect(screen.getByTestId("detail-skeleton-body")).toBeTruthy();
   });
@@ -178,7 +181,8 @@ describe("photo viewer from Listing detail", () => {
     await fireEvent.press(viewer(screen).getByRole("button", { name: "Close" }));
 
     expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
-    expect(screen.getByText("3 / 3")).toBeTruthy();
+    // The strip scrolls to the third tile: two tiles of 390 - 32 dp and their 2 dp seams.
+    expect(scrollRequests.at(-1)).toMatchObject({ method: "scrollToOffset", offset: 720, animated: false });
   });
 
   it("closes before sending a signed-out Message to sign-in, so sign-in is not hidden behind it", async () => {

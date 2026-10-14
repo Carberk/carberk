@@ -5,9 +5,11 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
+  type SharedValue,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
+import { dismissDecision } from "./photoTransitionMath";
 import {
   clampScale,
   clampTranslation,
@@ -27,6 +29,9 @@ export interface ZoomableImageProps {
   /** Called as a zoom begins, so the viewer can start loading the sharper photo. */
   onZoomStart?: () => void;
   children: ReactNode;
+  drag?: SharedValue<{ x: number; y: number }>;
+  onDismiss?: (velocity: number) => void;
+  onDismissCancel?: () => void;
 }
 
 /** Below this a pinch counts as back at fitted size. */
@@ -53,6 +58,9 @@ export function ZoomableImage({
   onZoomChange,
   onZoomStart = noop,
   children,
+  drag,
+  onDismiss,
+  onDismissCancel,
 }: ZoomableImageProps) {
   const [zoomed, setZoomed] = useState(false);
   const scale = useSharedValue(1);
@@ -207,9 +215,30 @@ export function ZoomableImage({
         scheduleOnRN(reportZoom, next > 1);
       });
 
-    return Gesture.Race(doubleTap, Gesture.Simultaneous(pinch, pan));
+    const dismiss = Gesture.Pan()
+      .enabled(active && !zoomed && !!drag && !!onDismiss)
+      .activeOffsetY([-12, 12])
+      .failOffsetX([-12, 12])
+      .maxPointers(1)
+      .onChange((event) => {
+        if (pinching.value || scale.value >= FITTED || !drag) return;
+        drag.value = { x: drag.value.x + event.changeX, y: drag.value.y + event.changeY };
+      })
+      .onEnd((event) => {
+        if (!drag || !onDismiss || pinching.value || scale.value >= FITTED) return;
+        if (dismissDecision(drag.value.y, event.velocityY, height)) scheduleOnRN(onDismiss, event.velocityY);
+        else if (onDismissCancel) scheduleOnRN(onDismissCancel);
+      })
+      .onFinalize((_event, success) => {
+        if (!success && onDismissCancel) scheduleOnRN(onDismissCancel);
+      });
+    return Gesture.Race(doubleTap, Gesture.Simultaneous(pinch, pan, dismiss));
   }, [
     zoomed,
+    active,
+    drag,
+    onDismiss,
+    onDismissCancel,
     width,
     height,
     aspectRatio,

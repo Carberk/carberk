@@ -23,6 +23,7 @@ import { useAuth } from "../../../src/auth/useAuth";
 import { CollapsingHeader } from "../../../src/listings/detail/CollapsingHeader";
 import { DetailSkeleton } from "../../../src/listings/detail/DetailSkeleton";
 import { ListingPreview } from "../../../src/listings/detail/ListingPreview";
+import { useDetailPhotosBottom } from "../../../src/listings/components/DetailPhotoStrip";
 import { OwnerActions } from "../../../src/listings/components/OwnerActions";
 import { HOME_HREF } from "../../../src/navigation/homeHref";
 import { useConfig } from "../../../src/api/admin/useConfig";
@@ -68,8 +69,11 @@ export default function ListingDetailScreen() {
   const { data: config } = useConfig();
   const [reportOpen, setReportOpen] = useState(false);
   const { isAuthenticated } = useAuth();
+  // Two flags, not the offset, so a scroll re-renders the screen only when one flips.
+  const [scrolled, setScrolled] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [photoHeight, setPhotoHeight] = useState(260);
+  // The header shows the price and title once the photos have scrolled away.
+  const photosBottom = useDetailPhotosBottom();
   // The screen reaches the bottom edge, so the bar clears the system inset itself.
   const bar = useStickyActionBar("screen");
 
@@ -101,10 +105,11 @@ export default function ListingDetailScreen() {
       <ListingPreview
         summary={preview}
         isOwner={viewer != null && viewer.userId === preview.sellerId}
+        reportEnabled={config?.reportEntryEnabled !== false}
         onBack={goBack}
       />
     ) : (
-      <DetailSkeleton bottomInset={insets.bottom} />
+      <DetailSkeleton bottomInset={insets.bottom} onBack={goBack} />
     );
   }
 
@@ -138,6 +143,7 @@ export default function ListingDetailScreen() {
         listing={data}
         maps={maps}
         collapsed={collapsed}
+        scrolled={scrolled}
         topInset={insets.top}
         onBack={goBack}
         onReport={
@@ -154,8 +160,8 @@ export default function ListingDetailScreen() {
         }
       />
 
-      {/* Main content: the photo goes full-bleed to the top, and the page runs
-          under the floating action bar and ends clear of it. */}
+      {/* Main content: the page scrolls below the header row, runs under the
+          floating action bar and ends clear of it. */}
       <View className="flex-1" style={hasBar ? undefined : { paddingBottom: insets.bottom }}>
         <ListingDetailView
           bottomSpace={hasBar ? bar.space : 0}
@@ -165,10 +171,11 @@ export default function ListingDetailScreen() {
           onReport={
             config?.reportEntryEnabled !== false ? handleReport : undefined
           }
-          onPhotoHeight={setPhotoHeight}
-          onScroll={(event) =>
-            setCollapsed(event.nativeEvent.contentOffset.y >= photoHeight)
-          }
+          onScroll={(event) => {
+            const y = event.nativeEvent.contentOffset.y;
+            setScrolled(y > 0);
+            setCollapsed(y >= photosBottom);
+          }}
           onSeeSimilar={() => router.navigate(similarListingsHref(data))}
         />
       </View>

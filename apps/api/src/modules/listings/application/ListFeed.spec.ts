@@ -426,6 +426,46 @@ describe("ListFeed", () => {
     expect(item).not.toHaveProperty("engineTypeId");
   });
 
+  it("returns what the detail preview places: power, drive, body, colour, VIN presence, exchange and installment", async () => {
+    ranking.items = [
+      seedListing({
+        id: "l1",
+        enginePower: 150,
+        driveTypeId: "drive-1",
+        bodyTypeId: "body-1",
+        colorId: "color-1",
+        vin: "JTDKB20U793456789",
+        acceptsExchange: true,
+        installmentAvailable: true,
+        allowCalls: false,
+      }),
+      seedListing({ id: "l2", contactPhone: "+99365000000" }),
+    ];
+
+    const uc = makeUseCase(ranking, exchangeRates);
+    const [full, sparse] = (await uc.execute({})).items;
+
+    expect(full).toMatchObject({
+      enginePower: 150,
+      driveTypeId: "drive-1",
+      bodyTypeId: "body-1",
+      colorId: "color-1",
+      hasVin: true,
+      acceptsExchange: true,
+      installmentAvailable: true,
+      allowCalls: false,
+      allowChat: true,
+      hasContactPhone: false,
+    });
+    expect(full).not.toHaveProperty("vin");
+    expect(sparse).toMatchObject({
+      hasVin: false, acceptsExchange: false, installmentAvailable: false, hasContactPhone: true,
+    });
+    expect(sparse).not.toHaveProperty("contactPhone");
+    for (const field of ["enginePower", "driveTypeId", "bodyTypeId", "colorId"])
+      expect(sparse).not.toHaveProperty(field);
+  });
+
   it("marks isFavorited for a signed-in viewer with one favorites lookup per page", async () => {
     ranking.items = [seedListing({ id: "l1" }), seedListing({ id: "l2" })];
     const favorites = new FakeFavoriteRepository();

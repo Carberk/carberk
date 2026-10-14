@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthIntentStore } from "../../auth/intentStore";
-import { fireEvent, renderMobile, getHost } from "../../../test/render";
+import { fireEvent, renderMobile, getAllHosts } from "../../../test/render";
 import { summaryFixture } from "../../../test/fixtures/listing";
 
 import { ListingPreview } from "./ListingPreview";
@@ -44,29 +44,51 @@ function preview(
 }
 
 describe("Listing detail preview, from the tapped card's cached data", () => {
-  it("shows the card's photo, title, price, spec line, city and date at once", async () => {
+  it("shows the card's photo, title, price, city, date and known specifications at once", async () => {
     const screen = await preview();
 
     expect(screen.getByText("Toyota Camry, 2020")).toBeTruthy();
     expect(screen.getByText("35,000 TMT")).toBeTruthy();
-    expect(screen.getByText("12,000 km · Automatic · Petrol")).toBeTruthy();
+    for (const value of ["2020", "12,000 km", "Automatic", "Petrol", "Used"])
+      expect(screen.getByText(value)).toBeTruthy();
     expect(screen.getByText("20 Sep · Ashgabat")).toBeTruthy();
-    expect(screen.getByText("1 / 12")).toBeTruthy();
-    // The card already decoded the `list` size, so it shows at once while the
-    // gallery's `detail` size loads behind it (#816).
-    const photo = getHost(screen.container, "Image").props;
-    expect(photo.placeholder).toEqual({ uri: "https://media.autotm.tm/listing-photos/listing-0/list.webp?v=webp-natural-1" });
-    expect(photo.placeholderContentFit).toBe("cover");
-    expect(photo.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/listing-0/detail.webp?v=webp-natural-1" });
-    expect(photo.priority).toBe("high");
+    // No counter on detail: the photo says where it is to a screen reader only.
+    expect(screen.queryByText("1 / 12")).toBeNull();
+    expect(screen.getByLabelText("Photo 1 of 12")).toBeTruthy();
+    // The `detail` size the Results card strip already loaded, cover-fit as
+    // there, so it paints from memory with no smaller size under it (#816, #864).
+    const [photo, ...rest] = getAllHosts(screen.container, "Image").map((image) => image.props);
+    expect(rest).toEqual([]);
+    expect(photo).toEqual(expect.objectContaining({
+      source: { uri: "https://media.autotm.tm/listing-photos/listing-0/detail.webp?v=webp-natural-1" },
+      contentFit: "cover",
+      priority: "high",
+    }));
   });
 
   it("loads the rest behind skeletons and offers nothing it does not have yet", async () => {
     const screen = await preview();
 
     expect(screen.getByTestId("detail-skeleton-body")).toBeTruthy();
-    for (const heading of ["Specifications", "Description", "Seller", "Ask the seller"])
+    expect(screen.getAllByTestId("spec-cell-loading")).toHaveLength(2);
+    expect(screen.getAllByTestId("spec-row-loading")).toHaveLength(2);
+    for (const heading of ["Description", "Seller", "Ask the seller", "Power", "Drive"])
       expect(screen.queryByText(heading)).toBeNull();
+  });
+
+  it("holds the owner's status card, with saves still loading, and no Seller placeholder", async () => {
+    const hidden = { includeHiddenElements: true };
+    const buyer = await preview();
+    expect(buyer.getByTestId("seller-loading", hidden)).toBeTruthy();
+    expect(buyer.queryByTestId("owner-saves-loading", hidden)).toBeNull();
+
+    const owner = await preview({}, { isOwner: true });
+
+    expect(owner.getByText("Your listing · Active")).toBeTruthy();
+    expect(owner.getByTestId("owner-saves-loading", hidden)).toBeTruthy();
+    expect(owner.queryByText(/saves?/i)).toBeNull();
+    expect(owner.queryByTestId("seller-loading", hidden)).toBeNull();
+    expect(owner.getByText("10,000 USD")).toBeTruthy();
   });
 
   it("keeps Call and Message disabled until the full detail arrives", async () => {

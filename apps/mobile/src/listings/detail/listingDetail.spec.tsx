@@ -93,7 +93,7 @@ describe("PhotoGallery", () => {
     const media: ListingsSchemas.ListingMedia[] = [{ id: "image-1", kind: "image", key: "listings/a.webp", sortOrder: 0,
       variants: { thumbnail: "https://media/thumbnail.webp?v=webp-natural-1", list: "https://media/list.webp?v=webp-natural-1", detail: "https://media/detail.webp?v=webp-natural-1", fullscreen: "https://media/fullscreen.webp?v=webp-natural-1" } }];
     const screen = await renderMobile(<PhotoGallery media={media} />);
-    expect(getHost(screen.container, "Image").props.source.uri).toBe("https://media/detail.webp?v=webp-natural-1");
+    expect(getHost(screen.container, "Image", { priority: "high" }).props.source.uri).toBe("https://media/detail.webp?v=webp-natural-1");
     await fireEvent.press(screen.getByRole("button", { name: "Photo 1 of 1" }));
     const images = getAllHosts(screen.container, "Image");
     // The 2400 px size waits for a zoom (#816); the viewer's page is the last detail image.
