@@ -1,6 +1,7 @@
 import type { ListingsSchemas } from "@auto-tm/contracts";
 
 import { localeTag } from "../../i18n/resources";
+import { ashgabatWallClock } from "../ashgabatTime";
 
 import type { CatalogMaps } from "./useCatalogMaps";
 
@@ -21,15 +22,17 @@ export function listingTitle(
   return [name, listing.year].filter(Boolean).join(", ");
 }
 
+/** A Listing date on detail, "12 Sep" or "3 Mar 2025" for another year, on the Ashgabat calendar. */
 export function detailDate(iso: string | undefined, locale: string) {
   if (!iso) return undefined;
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return undefined;
+  const instant = new Date(iso);
+  if (Number.isNaN(instant.getTime())) return undefined;
+  const date = ashgabatWallClock(instant);
   const parts = new Intl.DateTimeFormat(localeTag(locale), {
     day: "numeric",
     month: "short",
     timeZone: "UTC",
-    ...(date.getUTCFullYear() !== new Date().getUTCFullYear()
+    ...(date.getUTCFullYear() !== ashgabatWallClock(new Date()).getUTCFullYear()
       ? ({ year: "numeric" } as const)
       : {}),
   }).formatToParts(date);

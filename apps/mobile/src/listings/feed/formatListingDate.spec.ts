@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { formatListingDate } from "./formatListingDate";
 
@@ -7,13 +7,11 @@ const t = (key: string) => ({ resultsToday: "Today", resultsYesterday: "Yesterda
 // Ashgabat is UTC+5 with no DST, so its midnight is 19:00 UTC. The device's
 // own time zone must not move a Listing across that day boundary.
 describe.each(["UTC", "America/Chicago", "Asia/Tokyo"])("formatListingDate on a device in %s", (zone) => {
-  const deviceZone = process.env["TZ"];
   beforeEach(() => {
-    process.env["TZ"] = zone;
+    vi.stubEnv("TZ", zone);
   });
   afterEach(() => {
-    if (deviceZone === undefined) delete process.env["TZ"];
-    else process.env["TZ"] = deviceZone;
+    vi.unstubAllEnvs();
   });
 
   const ashgabatMidnight = new Date("2026-10-14T19:00:00Z");

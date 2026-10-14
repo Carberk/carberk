@@ -5,16 +5,14 @@ import { detailDate } from "./presentation";
 // Ashgabat is UTC+5 with no DST, so its midnight is 19:00 UTC. Listing detail
 // dates the Listing by its Ashgabat calendar day, whatever the device's zone.
 describe.each(["UTC", "America/Chicago", "Asia/Tokyo"])("detailDate on a device in %s", (zone) => {
-  const deviceZone = process.env["TZ"];
   beforeEach(() => {
-    process.env["TZ"] = zone;
+    vi.stubEnv("TZ", zone);
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-14T19:00:00Z"));
   });
   afterEach(() => {
     vi.useRealTimers();
-    if (deviceZone === undefined) delete process.env["TZ"];
-    else process.env["TZ"] = deviceZone;
+    vi.unstubAllEnvs();
   });
 
   it("moves to the next day at Ashgabat midnight, 19:00 UTC", () => {
