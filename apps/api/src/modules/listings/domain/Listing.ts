@@ -230,6 +230,11 @@ export class Listing {
     );
   }
 
+  /**
+   * Puts a removed Listing back on sale. It keeps its first `publishedAt`, so
+   * relisting returns it to where that date places it in Newest instead of
+   * bumping it to the top (#871); `at` becomes its `updatedAt`.
+   */
   republish(at: Date): Listing {
     if (!canTransition(this.status, "active")) {
       throw new DomainError(
@@ -253,7 +258,7 @@ export class Listing {
       this.contactPhone,
       this.allowCalls,
       this.allowChat,
-      at,
+      this.publishedAt,
       undefined,
       this.deletedAt,
       this.condition,
@@ -273,7 +278,7 @@ export class Listing {
       this.coverMediaKey,
       this.conditionDisclosure,
       this.createdAt,
-      new Date(),
+      at,
       this.publicNumber,
     );
   }

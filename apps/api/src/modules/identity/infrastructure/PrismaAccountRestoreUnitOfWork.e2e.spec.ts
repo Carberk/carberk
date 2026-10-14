@@ -133,7 +133,12 @@ describe("PrismaAccountRestoreUnitOfWork e2e", () => {
 
     const state = await readState();
     expect(state.deletionScheduledAt).toBeNull();
-    expect(state.listing).toMatchObject({ status: "active", archivedByDeletion: false });
+    // Restore is no bump: the Listing keeps its first publish date (#871).
+    expect(state.listing).toEqual({
+      status: "active",
+      archivedByDeletion: false,
+      publishedAt: ARCHIVED_PUBLISHED_AT,
+    });
     const selfArchived = await prisma.listing.findUniqueOrThrow({
       where: { id: selfArchivedId },
     });
@@ -157,7 +162,11 @@ describe("PrismaAccountRestoreUnitOfWork e2e", () => {
 
       const state = await readState();
       expect(state.deletionScheduledAt).toBeNull();
-      expect(state.listing).toMatchObject({ status: "active", archivedByDeletion: false });
+      expect(state.listing).toEqual({
+        status: "active",
+        archivedByDeletion: false,
+        publishedAt: ARCHIVED_PUBLISHED_AT,
+      });
     },
   );
 

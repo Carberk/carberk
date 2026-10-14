@@ -194,6 +194,33 @@ describe("SortedFeedRankingAdapter — Testcontainers", () => {
     expect(result.nextCursor).toBeUndefined();
   });
 
+  it("leaves a relisted Listing at its original place in Newest, not at the top (#871)", async () => {
+    const { cityA, brandX, modelX, seller } = await seedBaseCatalog();
+    const now = new Date();
+    const base = {
+      sellerId: seller,
+      brandId: brandX,
+      modelId: modelX,
+      cityId: cityA,
+      priceAmount: 100_000,
+      priceCurrency: "TMT" as const,
+    };
+    const firstPublishedAt = new Date(now.getTime() - 10 * 24 * 3_600_000);
+    await seedListing({ ...base, id: "relisted", status: "archived", publishedAt: firstPublishedAt });
+    await seedListing({ ...base, id: "newer", publishedAt: new Date(now.getTime() - 24 * 3_600_000) });
+    await seedListing({ ...base, id: "older", publishedAt: new Date(now.getTime() - 20 * 24 * 3_600_000) });
+
+    const repository = new PrismaListingRepository(prisma);
+    const archived = await repository.findById("relisted");
+    await repository.update(archived!.republish(now), { priceTmt: 100_000 });
+
+    const stored = await prisma.listing.findUniqueOrThrow({ where: { id: "relisted" } });
+    expect(stored.status).toBe("active");
+    expect(stored.publishedAt).toEqual(firstPublishedAt);
+    const result = await adapter.rank({ sort: "newest", limit: 10 });
+    expect(result.items.map((i) => i.id)).toEqual(["newer", "relisted", "older"]);
+  });
+
   it("keeps a mileageKm of 0 on ranked Listings", async () => {
     const { cityA, brandX, modelX, seller } = await seedBaseCatalog();
     await seedListing({

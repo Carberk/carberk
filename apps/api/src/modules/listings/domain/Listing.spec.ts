@@ -145,13 +145,15 @@ describe("Listing", () => {
   });
 
   describe("republish", () => {
-    it("transitions archived → active and sets new publishedAt", () => {
-      const listing = makeListing({ status: "archived" });
-      const newPublishedAt = new Date("2026-05-20T08:00:00Z");
-      const republished = listing.republish(newPublishedAt);
+    it("transitions archived → active and keeps the original publishedAt (#871)", () => {
+      const firstPublishedAt = new Date("2026-05-01T08:00:00Z");
+      const listing = makeListing({ status: "archived", publishedAt: firstPublishedAt });
+      const relistedAt = new Date("2026-05-20T08:00:00Z");
+      const republished = listing.republish(relistedAt);
 
       expect(republished.status).toBe("active");
-      expect(republished.publishedAt).toEqual(newPublishedAt);
+      expect(republished.publishedAt).toEqual(firstPublishedAt);
+      expect(republished.updatedAt).toEqual(relistedAt);
       expect(republished.soldAt).toBeUndefined();
     });
 

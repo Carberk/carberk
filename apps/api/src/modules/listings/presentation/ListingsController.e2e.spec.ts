@@ -207,6 +207,12 @@ describe("ListingsController e2e", () => {
         knownIssuesText: validPayload.conditionDisclosure.knownIssuesText,
       });
 
+      // Publishing creates the Listing row, and takes its publish date before
+      // the insert, so createdAt is never earlier than the first publish. The
+      // #871 repair relies on this to recover a relisted Listing's first date.
+      expect(listing?.publishedAt?.toISOString()).toBe(res.body.publishedAt);
+      expect(listing!.publishedAt!.getTime()).toBeLessThanOrEqual(listing!.createdAt.getTime());
+
       // Audit log should be written
       const audit = await prisma.auditLog.findFirst({
         where: { action: "listing.published", targetId: res.body.id },
@@ -399,7 +405,12 @@ describe("ListingsController e2e", () => {
         .send({})
         .expect(201);
       expect(republishRes.body.status).toBe("active");
-      expect(republishRes.body.publishedAt).toBeTruthy();
+      // Relisting is no bump: the first publish date stays (#871).
+      expect(republishRes.body.publishedAt).toBe(publishRes.body.publishedAt);
+      const relisted = await prisma.listing.findUniqueOrThrow({ where: { id: listingId } });
+      expect(relisted.publishedAt?.toISOString()).toBe(publishRes.body.publishedAt);
+      expect(relisted.soldAt).toBeNull();
+      expect(relisted.updatedAt.getTime()).toBeGreaterThan(relisted.publishedAt!.getTime());
 
       const republishAudit = await prisma.auditLog.findFirst({
         where: { action: "listing.republished", targetId: listingId },
