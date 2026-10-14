@@ -161,3 +161,22 @@ it("fades instead of guessing a flight shape before any photo size is known", as
   expect(screen.queryByTestId("photo-transition-overlay", { includeHiddenElements: true })).toBeNull();
   expect(screen.getByTestId("listing-photo-tile").props.style.opacity).toBeUndefined();
 });
+
+it("waits for the tapped tile measurement before presenting the Modal", async () => {
+  const native = RN as unknown as { measureRects: Map<string, number[]>; deferredMeasurements: Set<string>; measurementCallbacks: (() => void)[] };
+  native.measureRects.set("detail-photos", [0, 80, 390, 280]);
+  native.measureRects.set("listing-photo-tile", [16, 88, 358, 268.5]);
+  native.measureRects.set("photo-viewer-root", [0, 24, 390, 820]);
+  native.measureRects.set("photo-viewer-page", [0, 80, 390, 640]);
+  native.deferredMeasurements.add("detail-photos");
+  const raf = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = () => 0;
+  try {
+    const screen = await renderMobile(<PhotoGallery media={mediaFixture(1).map((photo) => ({ ...photo, width: 1920, height: 1080 }))} />);
+    await fireEvent.press(screen.getByRole("button", { name: "Photo 1 of 1" }));
+    expect(screen.queryByTestId("photo-viewer-pager")).toBeNull();
+    await act(() => native.measurementCallbacks.shift()?.());
+    await act(() => getHost(screen.container, "Modal").props.onShow());
+    expect(screen.getByTestId("photo-transition-overlay", { includeHiddenElements: true })).toBeTruthy();
+  } finally { globalThis.requestAnimationFrame = raf; }
+});

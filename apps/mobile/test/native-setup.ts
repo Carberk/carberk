@@ -68,7 +68,9 @@ vi.mock("expo-router", () => ({
 }));
 beforeEach(() => {
   scrollRequests.length = 0;
-  (ReactNative as unknown as { measureRects: Map<string, unknown> }).measureRects.clear();
+  (ReactNative as unknown as { measureRects: Map<string, unknown>; deferredMeasurements: Set<string>; measurementCallbacks: unknown[] }).measureRects.clear();
+  (ReactNative as unknown as { deferredMeasurements: Set<string> }).deferredMeasurements.clear();
+  (ReactNative as unknown as { measurementCallbacks: unknown[] }).measurementCallbacks.length = 0;
   screenFocus.focused = true;
   screenOptions.current = {};
   Object.values(routerMock).forEach((mock) => mock.mockClear());
