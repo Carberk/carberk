@@ -17,6 +17,8 @@ requireNative.cache[nativePath] = nativeModule;
 // The `react-native` import here goes through the Vite alias, like every spec and
 // component import, so this is the array specs read. A setup file shares the
 // module graph with its test file.
+vi.stubGlobal("requestAnimationFrame", (callback: (time: number) => void) => { callback(0); return 0; });
+
 const scrollRequests = (ReactNative as unknown as { scrollRequests: unknown[] }).scrollRequests;
 
 vi.mock("nativewind", () => ({ cssInterop: vi.fn(), remapProps: vi.fn(),
@@ -66,6 +68,7 @@ vi.mock("expo-router", () => ({
 }));
 beforeEach(() => {
   scrollRequests.length = 0;
+  (ReactNative as unknown as { measureRects: Map<string, unknown> }).measureRects.clear();
   screenFocus.focused = true;
   screenOptions.current = {};
   Object.values(routerMock).forEach((mock) => mock.mockClear());
@@ -187,8 +190,8 @@ vi.mock("react-native-reanimated", async () => {
     useAnimatedProps: () => ({}),
     useAnimatedScrollHandler: () => () => undefined,
     useReducedMotion: () => false,
-    withTiming: <T,>(value: T) => value,
-    withSpring: <T,>(value: T) => value,
+    withTiming: <T,>(value: T, _config?: unknown, callback?: (finished: boolean) => void) => { callback?.(true); return value; },
+    withSpring: <T,>(value: T, _config?: unknown, callback?: (finished: boolean) => void) => { callback?.(true); return value; },
     withDelay: <T,>(_delay: number, value: T) => value,
     withSequence: <T,>(...values: T[]) => values[values.length - 1],
     withRepeat: <T,>(value: T) => value,

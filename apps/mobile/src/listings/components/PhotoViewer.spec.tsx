@@ -5,6 +5,7 @@ import * as RN from "react-native";
 import { act, fireEvent, renderMobile, within, getHost } from "../../../test/render";
 import { mediaFixture } from "../../../test/fixtures/listing";
 
+import { useReduceMotion } from "@/lib/motion";
 import { PhotoViewer } from "./PhotoViewer";
 
 const WINDOW_WIDTH = 390;
@@ -162,4 +163,25 @@ it("reports the current photo after paging so its return tile is ready", async (
   const { screen } = await open({ onIndexChange });
   await swipeTo(screen, 4);
   expect(onIndexChange).toHaveBeenCalledWith(4);
+});
+
+const measured = (RN as unknown as { measureRects: Map<string, number[]> }).measureRects;
+const origin = { tile: { x: 16, y: 90, width: 358, height: 268.5 }, visible: { x: 16, y: 90, width: 358, height: 268.5 }, radii: [12, 0, 0, 12] as const, uri: "https://cache.test/displayed-detail.webp", ratio: 16 / 9 };
+it("uses the displayed detail URI in the moving image before handing off to its page", async () => {
+  measured.set("photo-viewer-root", [0, 24, 390, 820]);
+  measured.set("photo-viewer-page", [0, 80, 390, 640]);
+  const { screen } = await open({ origin });
+  await act(() => getHost(screen.container, "Modal").props.onShow());
+  const overlay = screen.getByTestId("photo-transition-overlay");
+  expect(getHost(overlay, "Image").props.source.uri).toBe(origin.uri);
+  expect(getHost(overlay, "Image").props.contentFit).toBe("contain");
+});
+it("uses fade-only presentation under Reduce Motion and still returns the current photo", async () => {
+  vi.mocked(useReduceMotion).mockReturnValueOnce(true);
+  const { screen, onClose } = await open({ origin });
+  await act(() => getHost(screen.container, "Modal").props.onShow());
+  expect(screen.queryByTestId("photo-transition-overlay")).toBeNull();
+  await swipeTo(screen, 4);
+  await fireEvent.press(screen.getByRole("button", { name: "Close" }));
+  expect(onClose).toHaveBeenCalledWith(4);
 });

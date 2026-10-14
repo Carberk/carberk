@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ScrollView, View, type ScrollViewProps } from "react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { ChevronRight, Flag } from "lucide-react-native";
@@ -47,6 +47,8 @@ export function ListingDetailView({
   bottomSpace = 0,
 }: ListingDetailProps) {
   const { t, i18n } = useTranslation();
+  const scrollRef = useRef<View>(null);
+  const [visibleTop, setVisibleTop] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const closed = !isOwner && isClosedForContact(listing.status);
   const banner = closed ? closedListingBannerKey(listing.status) : null;
@@ -85,6 +87,7 @@ export function ListingDetailView({
     t,
   );
   return (
+    <View ref={scrollRef} collapsable={false} className="flex-1" onLayout={() => scrollRef.current?.measureInWindow((_x, y) => setVisibleTop(y))}>
     <ScrollView
       className="flex-1"
       contentContainerStyle={{ paddingBottom: bottomSpace }}
@@ -92,6 +95,7 @@ export function ListingDetailView({
       scrollEventThrottle={16}
     >
       <PhotoGallery
+        visibleTop={visibleTop}
         media={listing.media}
         banner={banner ? t(banner) : undefined}
         viewerHeaderAction={
@@ -250,6 +254,7 @@ export function ListingDetailView({
         </View>
       </View>
     </ScrollView>
+    </View>
   );
 }
 function VinHistorySection({

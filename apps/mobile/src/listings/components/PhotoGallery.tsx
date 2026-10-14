@@ -2,12 +2,14 @@ import { useCallback, useRef, useState, type ReactNode } from "react";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 
 import { DetailPhotoStrip, type DetailPhotoStripHandle } from "./DetailPhotoStrip";
+import type { PhotoGeometry } from "./photoTransitionMath";
 import { PhotoViewer } from "./PhotoViewer";
 
 type ListingMedia = ListingsSchemas.ListingMedia;
 
 interface PhotoGalleryProps {
   media: ListingMedia[];
+  visibleTop?: number;
   /** Status strip across the bottom of each photo, e.g. "Sold" on a closed Listing. */
   banner?: string;
   /** The photo viewer's top-right action (♡); omit it where the viewer has none. */
@@ -23,24 +25,48 @@ interface PhotoGalleryProps {
  */
 export function PhotoGallery({
   media,
+  visibleTop,
   banner,
   viewerHeaderAction,
   viewerFooter,
 }: PhotoGalleryProps) {
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [origin, setOrigin] = useState<PhotoGeometry | null>(null);
+  const [hiddenIndex, setHiddenIndex] = useState<number | null>(null);
+  const returns = useRef(new Map<number, PhotoGeometry>());
   const stripRef = useRef<DetailPhotoStripHandle>(null);
 
-  const openViewer = useCallback((index: number) => setViewerIndex(index), []);
+  const prepareReturn = useCallback((index: number) => {
+    stripRef.current?.scrollToPhoto(index);
+    requestAnimationFrame(() => stripRef.current?.measurePhoto(index, (geometry) => {
+      if (geometry) returns.current.set(index, geometry);
+      else returns.current.delete(index);
+    }));
+  }, []);
+  const openViewer = useCallback((index: number) => {
+    setOrigin(null);
+    stripRef.current?.measurePhoto(index, (geometry) => {
+      if (geometry) returns.current.set(index, geometry);
+      setOrigin(geometry);
+    });
+    setViewerIndex(index);
+  }, []);
   const closeViewer = useCallback((index: number) => {
     setViewerIndex(null);
+    setHiddenIndex(null);
     stripRef.current?.scrollToPhoto(index);
   }, []);
 
   return (
     <>
-      <DetailPhotoStrip ref={stripRef} photos={media} banner={banner} onPressPhoto={openViewer} />
+      <DetailPhotoStrip visibleTop={visibleTop} hiddenIndex={hiddenIndex} ref={stripRef} photos={media} banner={banner} onPressPhoto={openViewer} />
       {media.length > 0 && (
         <PhotoViewer
+          key={viewerIndex === null ? "closed" : `open-${viewerIndex}`}
+          origin={origin}
+          getReturnGeometry={(index) => returns.current.get(index) ?? null}
+          onIndexChange={prepareReturn}
+          onTileHidden={setHiddenIndex}
           visible={viewerIndex !== null}
           media={media}
           initialIndex={viewerIndex ?? 0}

@@ -8,6 +8,7 @@ const React = require("react");
 // measures in Node, so each does nothing, as the null refs of the old renderer did.
 const NATIVE_METHODS = ["focus", "blur", "clear", "measure", "measureInWindow", "measureLayout",
   "setNativeProps", "scrollTo", "scrollToEnd"];
+const measureRects = new Map();
 const host = (name, defaults = {}) => {
   const Component = React.forwardRef(({ children, ...props }, ref) => {
     // test-renderer would give a host ref its test instance, which has none of
@@ -18,6 +19,10 @@ const host = (name, defaults = {}) => {
     React.useImperativeHandle(ref, () => {
       const handle = { type: name, isFocused: () => false, get props() { return latest.current; } };
       for (const method of NATIVE_METHODS) handle[method] = () => {};
+      handle.measureInWindow = (callback) => {
+        const rect = measureRects.get(latest.current.testID);
+        if (rect) callback(...rect);
+      };
       return handle;
     }, []);
     return React.createElement(name, { ...defaults, ...props }, children);
@@ -91,7 +96,7 @@ module.exports = {
   FlatList,
   // Scroll requests the list received, newest last. Specs read this to prove a
   // component moved a list; the adapter never scrolls anything itself.
-  scrollRequests,
+  scrollRequests, measureRects,
   BackHandler, pressHardwareBack,
   Platform: { OS: "ios", select: (options) => options.ios ?? options.native ?? options.default },
   StyleSheet: { create: (styles) => styles, flatten, hairlineWidth: 1,
