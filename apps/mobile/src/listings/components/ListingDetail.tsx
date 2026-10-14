@@ -34,7 +34,6 @@ interface ListingDetailProps {
   onReport?: () => void;
   onSeeSimilar?: () => void;
   onScroll?: ScrollViewProps["onScroll"];
-  onPhotoHeight?: (height: number) => void;
   /** Room kept at the end of the scroll for a bar that floats over it. */
   bottomSpace?: number;
 }
@@ -45,7 +44,6 @@ export function ListingDetailView({
   onReport,
   onSeeSimilar,
   onScroll,
-  onPhotoHeight,
   bottomSpace = 0,
 }: ListingDetailProps) {
   const { t, i18n } = useTranslation();
@@ -93,42 +91,38 @@ export function ListingDetailView({
       onScroll={onScroll}
       scrollEventThrottle={16}
     >
-      <View
-        onLayout={(event) => onPhotoHeight?.(event.nativeEvent.layout.height)}
-      >
-        <PhotoGallery
-          media={listing.media}
-          banner={banner ? t(banner) : undefined}
-          viewerHeaderAction={
-            showViewerActions
-              ? (close) => (
-                  <ViewerFavorite
-                    listingId={listing.id}
-                    isFavorited={listing.isFavorited ?? false}
-                    onBeforeSignIn={close}
-                  />
-                )
-              : undefined
-          }
-          viewerFooter={
-            showViewerActions
-              ? (close) => (
-                  <ContactCtaBar
-                    variant="viewer"
-                    replayAuth={false}
-                    onBeforeMessage={close}
-                    listingId={listing.id}
-                    contactPhone={listing.contactPhone}
-                    allowCalls={listing.allowCalls}
-                    allowChat={listing.allowChat}
-                    status={listing.status}
-                  />
-                )
-              : undefined
-          }
-        />
-      </View>
-      <View className="gap-4 px-5 py-5">
+      <PhotoGallery
+        media={listing.media}
+        banner={banner ? t(banner) : undefined}
+        viewerHeaderAction={
+          showViewerActions
+            ? (close) => (
+                <ViewerFavorite
+                  listingId={listing.id}
+                  isFavorited={listing.isFavorited ?? false}
+                  onBeforeSignIn={close}
+                />
+              )
+            : undefined
+        }
+        viewerFooter={
+          showViewerActions
+            ? (close) => (
+                <ContactCtaBar
+                  variant="viewer"
+                  replayAuth={false}
+                  onBeforeMessage={close}
+                  listingId={listing.id}
+                  contactPhone={listing.contactPhone}
+                  allowCalls={listing.allowCalls}
+                  allowChat={listing.allowChat}
+                  status={listing.status}
+                />
+              )
+            : undefined
+        }
+      />
+      <View testID="detail-body" className="gap-4 px-4 py-5">
         {isOwner && (
           <OwnerStatusCard status={listing.status} favoriteCount={listing.favoriteCount} />
         )}

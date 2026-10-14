@@ -4,7 +4,7 @@ import { useState } from "react";
 import { View, type PressableProps, type ViewProps } from "react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 
-import { buildOriginalUrl, buildVariantUrl } from "../detail/buildVariantUrl";
+import { buildOriginalUrl, listingPhotoUrl } from "../detail/buildVariantUrl";
 
 import { GlassSurface } from "@/components/ui/glass-surface";
 import { Icon } from "@/components/ui/icon";
@@ -65,7 +65,7 @@ export function ListingPhoto({ mediaKey, emptyLabel, compact = false, variant = 
 
   return (
     <Image
-      source={{ uri: original ? buildOriginalUrl(mediaKey) : buildVariantUrl(mediaKey, variant) }}
+      source={{ uri: original ? buildOriginalUrl(mediaKey) : listingPhotoUrl({ key: mediaKey }, variant) }}
       placeholder={thumbHash ? { thumbhash: thumbHash } : undefined}
       placeholderContentFit="cover"
       className="h-full w-full"

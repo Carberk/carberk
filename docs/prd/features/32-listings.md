@@ -87,7 +87,7 @@ Approved in the [listing content resolution](https://github.com/bagtyyarkovusov/
 
 Top to bottom, in Auto.ru's order:
 
-1. **Photos**, full width, with an "n / N" counter.
+1. **Photos** in a strip of 4:3 tiles set in by the 16 pt page margin, with a sliver of the next photo and no counter ([ADR-0097](../../adr/0097-listing-detail-photos-use-an-inset-4-3-cover-strip.md)). Each photo is still read as "Photo n of N" by a screen reader.
 2. **"Brand Model Generation, year".** Derived; there is no manual title field.
 3. **Price**, plus Exchange possible / Installment possible when set. These terms are informational: AutoTM does not finance, broker, match exchange vehicles, or verify payment terms.
 4. **"date · city".**
@@ -102,7 +102,7 @@ Top to bottom, in Auto.ru's order:
 That is the whole screen. Video is added below the photos only when the video media UX ships.
 
 - **Contact bar:** Call (opens the phone dialer directly, with no warning sheet) and Message stick to the bottom of the screen, with no caption under them ([ADR-0095](../../adr/0095-listing-detail-drops-the-sms-verification-caption.md)). Phone verification is explained on the public trust page, not as a per-Listing badge, caption or extra detail link.
-- **Collapsing header:** once the photos scroll away, it turns solid and shows the price plus "Brand Model, year". Back, ♡ and ⋯ (which holds Report listing) stay put on active Listings. ⋯ is hidden whenever it would be empty: on sold and removed Listings, and on active Listings when report entry is disabled. A buyer then sees only Back on sold and removed Listings; the freed width goes to the title. There is no Share or Copy link action: both stay hidden until a public web Listing page and App Links exist ([#495](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/495), decided in [#322](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/322)).
+- **Collapsing header:** a plain row on the page background above the photos. A hairline appears under it once the page scrolls, and once the photos scroll away it shows the price plus "Brand Model, year". Back, ♡ and ⋯ (which holds Report listing) stay put on active Listings. ⋯ is hidden whenever it would be empty: on sold and removed Listings, and on active Listings when report entry is disabled. A buyer then sees only Back on sold and removed Listings; the freed width goes to the title. There is no Share or Copy link action: both stay hidden until a public web Listing page and App Links exist ([#495](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/495), decided in [#322](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/322)).
 - **Photo viewer:** black, full screen, with "n / N", ✕, ♡, swipe, pinch zoom, a thumbnail strip, and Call + Message. Closing it returns the gallery to the same photo.
 - **Sign-in on action:** ♡, Message, Ask the seller and Report listing need sign-in, then return to this Listing and finish the action. Call needs nothing. See [33 — Search & discovery](33-search-discovery.md#sign-in-on-action).
 - **VIN decoding:** a decoded-VIN section appears only when the VIN is actually decoded. With no real decoder bound, it never appears; there is no "not provided" or "not decoded" state ([ADR-0053](../../adr/0053-defer-vin-decoding-until-a-real-decoder-exists.md)).
@@ -119,7 +119,7 @@ That is the whole screen. Video is added below the photos only when the video me
   - A "See other Brand Model" link opens Results filtered by that brand and model. It is a plain filter, not a recommendation.
   - An **existing** Conversation about the Listing stays open for Messages: the Conversation shows a Sold (or Removed from sale) badge and a banner linking to other cars of the same model, and the composer stays on ([34 — Conversations](34-conversations.md#closed-and-sold-listings)).
 - **Deleted / banned for a buyer (404):** "This listing is no longer available", with Go to Home and Back.
-- **Loading:** the photo (in the same full-width 4:3 frame and fit as the loaded gallery), title, price, city and date come straight from the tapped card's cache, and the specifications the card knows appear in their final Specifications cells. The rest loads behind placeholders in the loaded sections' shape, and the contact bar is disabled until it does. Deep links show the same frame and placeholders, with Back.
+- **Loading:** the photos the card knows (in the same strip as the loaded detail), title, price, city and date come straight from the tapped card's cache, and the specifications the card knows appear in their final Specifications cells. The rest loads behind placeholders in the loaded sections' shape, and the contact bar is disabled until it does. Deep links show the same header row, a grey photo tile and placeholders, with Back.
 
 **Removed from detail** by the approved design:
 

@@ -10,9 +10,10 @@ import {
   SpecificationsSection,
   type ListingSpec,
 } from "../components/ListingSpecs";
-import { useListingPhotoFrame } from "../components/ListingPhotoFrame";
+import { DetailPhotoStripSkeleton } from "../components/DetailPhotoStrip";
 
-import { BackButton } from "@/components/navigation/StackHeader";
+import { DetailHeader } from "./DetailHeader";
+
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonText } from "@/components/ui/skeleton-text";
@@ -72,8 +73,9 @@ export function DetailSkeletonBody({
 }
 
 /**
- * A deep link has no card to borrow from: the loaded detail's shape with
- * nothing filled in, under the same photo frame and Back button.
+ * A deep link has no card to borrow from: the loaded detail's top with
+ * nothing filled in (the header row with Back, one grey photo tile, then
+ * title, price and date lines), then the same placeholder body.
  */
 export function DetailSkeleton({
   bottomInset,
@@ -82,18 +84,17 @@ export function DetailSkeleton({
   bottomInset: number;
   onBack: () => void;
 }) {
-  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const frame = useListingPhotoFrame();
   return (
     <View
       testID="detail-skeleton"
       className="flex-1 bg-background"
       style={{ paddingBottom: bottomInset }}
     >
-      <Skeleton testID="listing-photo-frame" className="rounded-none" style={frame} />
+      <DetailHeader topInset={insets.top} onBack={onBack} />
+      <DetailPhotoStripSkeleton />
 
-      <View className="gap-4 px-5 py-5">
+      <View testID="detail-body" className="gap-4 px-4 py-5">
         <SkeletonText
           testID="title-loading"
           className="text-headline font-heading font-semibold"
@@ -102,13 +103,6 @@ export function DetailSkeleton({
         <SkeletonText testID="price-loading" className="text-title font-heading" width="45%" />
         <SkeletonText testID="date-loading" className="text-callout" width="40%" />
         <DetailSkeletonBody />
-      </View>
-
-      <View
-        className="absolute left-0 right-0 top-0 z-20 px-3 py-2"
-        style={{ paddingTop: insets.top + 8 }}
-      >
-        <BackButton tone="glass" accessibilityLabel={t("back")} onPress={onBack} />
       </View>
     </View>
   );

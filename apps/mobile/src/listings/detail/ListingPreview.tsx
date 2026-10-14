@@ -1,6 +1,5 @@
-import { useMemo, useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
-import { Image } from "expo-image";
+import { useMemo } from "react";
+import { ScrollView, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -10,21 +9,20 @@ import { useDriveTypes } from "../../api/catalog/useDriveTypes";
 import { useEngineTypes } from "../../api/catalog/useEngineTypes";
 import { useTransmissions } from "../../api/catalog/useTransmissions";
 import type { CachedListingSummary } from "../../api/listings/findCachedListingSummary";
-import { GalleryBanner, GalleryCounter } from "../components/GalleryImage";
 import { ContactCtaBar } from "../components/ContactCtaBar";
+import { DetailPhotoStrip, type StripPhoto } from "../components/DetailPhotoStrip";
 import { keySpecs, PENDING, specRows } from "../components/ListingSpecs";
-import { NoPhotosFrame, useListingPhotoFrame } from "../components/ListingPhotoFrame";
-import { LISTING_PHOTO_POSITION, ListingPhotoUnderlay } from "../components/ListingPhotoUnderlay";
 import { PriceDisplay } from "../components/PriceDisplay";
+import { feedCardPhotoKeys, feedCardPhotoThumbHashes } from "../feed/feedCardFields";
 import { useFeedCatalogMaps } from "../feed/useFeedCatalogMaps";
+import { ownerListingActions } from "../ownerListingActions";
 
-import { buildOriginalUrl, buildVariantUrl } from "./buildVariantUrl";
 import { closedListingBannerKey, isClosedForContact } from "./closedListing";
+import { DetailHeader, PendingDetailActions } from "./DetailHeader";
 import { DetailSkeletonBody } from "./DetailSkeleton";
 import { OwnerStatusCard } from "./OwnerStatusCard";
 import { detailDate } from "./presentation";
 
-import { BackButton } from "@/components/navigation/StackHeader";
 import { StickyActionBar, useStickyActionBar } from "@/components/navigation/StickyActionBar";
 import { Text } from "@/components/ui/text";
 
@@ -32,25 +30,25 @@ export interface ListingPreviewProps {
   /** The tapped card's cached data. */
   summary: CachedListingSummary;
   isOwner: boolean;
+  /** Reporting is on, so a buyer's loaded header will hold ⋯. */
+  reportEnabled?: boolean;
   onBack: () => void;
 }
 
 /**
  * Listing detail before its own request returns, built only from the tapped
- * card and laid out as the loaded detail is: the photo in the same frame and
- * fit, title, price, date and city, and the specifications the card knows in
- * their final cells. The rest of the specifications, the description and the
+ * card and laid out as the loaded detail is: the same header row, the photos
+ * the card knows in the same strip (the rest of the Listing's photos as grey
+ * tiles), title, price, date and city, and the specifications the card knows
+ * in their final cells. The rest of the specifications, the description and the
  * seller load behind placeholders of their own shape, and Call and Message
  * stay disabled until the full detail replaces this screen. Nothing here is
  * written to the detail cache.
  */
-export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps) {
+export function ListingPreview({ summary, isOwner, reportEnabled = true, onBack }: ListingPreviewProps) {
   const { t, i18n } = useTranslation();
-  const frame = useListingPhotoFrame();
   const insets = useSafeAreaInsets();
   const bar = useStickyActionBar("screen");
-  const [useOriginalImage, setUseOriginalImage] = useState(false);
-  const [photoLoaded, setPhotoLoaded] = useState(false);
   const listings = useMemo(() => [summary], [summary]);
   const names = useFeedCatalogMaps(listings);
   const transmissions = useTransmissions();
@@ -61,20 +59,18 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
 
   const closed = !isOwner && isClosedForContact(summary.status);
   const bannerKey = closed ? closedListingBannerKey(summary.status) : null;
-  const coverKey = summary.photoKeys[0] ?? summary.coverMediaKey;
-  // The `detail` size the gallery opens on loads here, so the gallery finds it
-  // cached and the photo never blanks when the full detail arrives. It is drawn
-  // whole in the gallery's frame, fit and position, so nothing moves.
-  const imageUri = coverKey
-    ? useOriginalImage
-      ? buildOriginalUrl(coverKey)
-      : buildVariantUrl(coverKey, "detail")
-    : null;
-  const placeholderUri = coverKey ? buildVariantUrl(coverKey, "list") : null;
-  // Until `detail` loads, the frame shows what will not move when it does
-  // (`ListingPhotoUnderlay`): the card's `list` crop only on an about 4:3
-  // cover, and the cover's blurred colours.
-  const thumbHash = summary.photoKeys[0] ? summary.photoThumbHashes?.[0] : undefined;
+  // Every photo the card knows, at the `detail` size the Results strip
+  // already decoded, so each paints from memory; the Listing's other photos
+  // hold their tiles until detail names them.
+  const photos = useMemo<StripPhoto[]>(() => {
+    const hashes = feedCardPhotoThumbHashes(summary);
+    const known = feedCardPhotoKeys(summary).map((key, index) => ({ key, thumbHash: hashes[index] }));
+    const pending = Array.from({ length: Math.max(0, summary.photoCount - known.length) }, (_, index) => ({
+      key: `pending-${index}`,
+      pending: true as const,
+    }));
+    return [...known, ...pending];
+  }, [summary]);
 
   const title = [
     [names.brandName(summary.brandId), names.modelName(summary.modelId)]
@@ -123,43 +119,22 @@ export function ListingPreview({ summary, isOwner, onBack }: ListingPreviewProps
 
   return (
     <View className="flex-1 bg-background">
-      <View
-        className="absolute left-0 right-0 top-0 z-20 px-3 py-2"
-        style={{ paddingTop: insets.top + 8 }}
-      >
-        <BackButton tone="glass" accessibilityLabel={t("back")} onPress={onBack} />
-      </View>
+      <DetailHeader
+        topInset={insets.top}
+        onBack={onBack}
+        trailing={
+          <PendingDetailActions
+            favorite={!isOwner && !closed}
+            favorited={summary.isFavorited ?? false}
+            more={isOwner ? ownerListingActions(summary.status).length > 0 : !closed && reportEnabled}
+          />
+        }
+      />
 
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: bar.space }}>
-        {imageUri ? (
-          <View testID="listing-photo-frame" className="bg-muted" style={frame}>
-            {!photoLoaded && (
-              <ListingPhotoUnderlay thumbHash={thumbHash} listUri={placeholderUri ?? undefined} />
-            )}
-            <Image
-              source={{ uri: imageUri }}
-              style={StyleSheet.absoluteFill}
-              contentFit="contain"
-              contentPosition={LISTING_PHOTO_POSITION}
-              priority="high"
-              cachePolicy="memory-disk"
-              onLoad={() => setPhotoLoaded(true)}
-              onError={() => setUseOriginalImage(true)}
-            />
-            {summary.photoCount > 0 && (
-              <GalleryCounter
-                position={1}
-                total={summary.photoCount}
-                aboveBanner={Boolean(bannerKey)}
-              />
-            )}
-            {bannerKey && <GalleryBanner label={t(bannerKey)} />}
-          </View>
-        ) : (
-          <NoPhotosFrame banner={bannerKey ? t(bannerKey) : undefined} />
-        )}
+        <DetailPhotoStrip photos={photos} banner={bannerKey ? t(bannerKey) : undefined} />
 
-        <View className="gap-4 px-5 py-5">
+        <View testID="detail-body" className="gap-4 px-4 py-5">
           {isOwner && <OwnerStatusCard status={summary.status} />}
           <Text className="text-headline font-heading font-semibold text-foreground" numberOfLines={2}>
             {title || t("listing")}

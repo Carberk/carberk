@@ -4,23 +4,29 @@ import { Image } from "expo-image";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import type { ComponentProps } from "react";
 
-import { buildOriginalUrl, buildVariantUrl } from "../detail/buildVariantUrl";
+import { buildOriginalUrl, listingPhotoUrl } from "../detail/buildVariantUrl";
 
-import { LISTING_PHOTO_POSITION, ListingPhotoUnderlay } from "./ListingPhotoUnderlay";
-
-import { GlassSurface } from "@/components/ui/glass-surface";
 import { Text } from "@/components/ui/text";
-import { tabularFigures } from "@/lib/font";
-import { MEDIA_CHIP_MAX_FONT_SCALE } from "@/lib/font-scale";
-import { cn } from "@/lib/utils";
 
-type ListingMedia = ListingsSchemas.ListingMedia;
+/** What `GalleryImage` needs of a photo: a Listing's media, or a card's photo key and ThumbHash. */
+export type GalleryPhoto = Pick<ListingsSchemas.ListingMedia, "key"> & {
+  variants?: Partial<ListingsSchemas.ListingMedia["variants"]> | undefined;
+  thumbHash?: string | null | undefined;
+};
 type ExpoImageStyle = ComponentProps<typeof Image>["style"];
 
-/** Status strip across the bottom of a photo, e.g. "Sold" on a closed Listing. */
-export function GalleryBanner({ label }: { label: string }) {
+/**
+ * Status strip across the bottom of a photo tile, e.g. "Sold" on a closed
+ * Listing; the tile's rounded corners clip it. `hidden` keeps it from a
+ * screen reader where the tile itself says the status.
+ */
+export function GalleryBanner({ label, hidden = false }: { label: string; hidden?: boolean }) {
   return (
-    <View className="absolute bottom-0 left-0 right-0 bg-black/70 px-4 py-2">
+    <View
+      className="absolute bottom-0 left-0 right-0 bg-black/70 px-4 py-2"
+      accessibilityElementsHidden={hidden}
+      importantForAccessibility={hidden ? "no-hide-descendants" : "auto"}
+    >
       <Text className="text-body font-bold text-white" numberOfLines={1}>
         {label}
       </Text>
@@ -28,51 +34,14 @@ export function GalleryBanner({ label }: { label: string }) {
   );
 }
 
-/**
- * The `n / N` photo position at the bottom-right of the Listing detail photo:
- * a small glass chip, so it floats over the car without a dark box on it.
- * It sits above the status strip when there is one.
- */
-export function GalleryCounter({
-  position,
-  total,
-  aboveBanner,
-}: {
-  position: number;
-  total: number;
-  aboveBanner: boolean;
-}) {
-  return (
-    <GlassSurface
-      className={cn(
-        "absolute right-4 min-h-7 justify-center rounded-full px-3",
-        aboveBanner ? "bottom-12" : "bottom-3",
-      )}
-    >
-      <Text
-        className="text-footnote font-medium text-foreground"
-        style={tabularFigures}
-        maxFontSizeMultiplier={MEDIA_CHIP_MAX_FONT_SCALE}
-      >
-        {`${position} / ${total}`}
-      </Text>
-    </GlassSurface>
-  );
-}
-
 type Variant = "thumbnail" | "list" | "detail" | "fullscreen";
-
-function variantUri(item: ListingMedia, variant: Variant): string {
-  return item.variants[variant] || buildVariantUrl(item.key, variant);
-}
 
 /**
  * One Listing photo at a given size variant. Falls back to the original upload
  * when the variant is missing or fails to load. `placeholderVariant` names a
- * smaller size that is usually cached already (the card's `list`, or the
- * gallery's `detail` under the viewer's `fullscreen`): it shows at once, drawn
- * with the same fit so the sharper photo replaces it in place without a jump
- * or a blank frame.
+ * smaller size that is usually cached already (the strip's `detail` under the
+ * viewer's `fullscreen`): it shows at once, drawn with the same fit so the
+ * sharper photo replaces it in place without a jump or a blank frame.
  *
  * A photo with a ThumbHash shows its blurred colours before anything loads,
  * drawn in an Image underneath with the same fit. expo-image takes a single
@@ -82,9 +51,6 @@ function variantUri(item: ListingMedia, variant: Variant): string {
  * fullscreen size changes only the photo's props and it sharpens in place.
  * The blur goes once the photo has loaded: a hash decodes at an approximate
  * aspect ratio, so beside a contain-fit photo it would show as bands.
- *
- * `inListingFrame` draws the photo in Listing detail's 4:3 frame: pinned as
- * every photo there is, over `ListingPhotoUnderlay` until it loads.
  */
 export function GalleryImage({
   item,
@@ -93,35 +59,31 @@ export function GalleryImage({
   priority = "normal",
   contentFit,
   style,
-  inListingFrame = false,
   onAspectRatio,
 }: {
-  item: ListingMedia;
+  item: GalleryPhoto;
   variant: Variant;
   placeholderVariant?: Exclude<Variant, "fullscreen">;
   /** `high` for the photo on screen, `low` for a neighbour loading ahead. */
   priority?: "low" | "normal" | "high";
   contentFit: "cover" | "contain";
   style: ExpoImageStyle;
-  /** Drawn in Listing detail's 4:3 frame. */
-  inListingFrame?: boolean;
   /** Reports the loaded photo's width / height. */
   onAspectRatio?: (aspectRatio: number) => void;
 }) {
   const [useOriginalImage, setUseOriginalImage] = useState(false);
-  const sourceUri = useOriginalImage ? buildOriginalUrl(item.key) : variantUri(item, variant);
-  const placeholderUri = placeholderVariant ? variantUri(item, placeholderVariant) : undefined;
+  const sourceUri = useOriginalImage ? buildOriginalUrl(item.key) : listingPhotoUrl(item, variant);
+  const placeholderUri = placeholderVariant ? listingPhotoUrl(item, placeholderVariant) : undefined;
   const thumbHash = item.thumbHash;
   const [loaded, setLoaded] = useState(false);
 
   const photo = (
     <Image
       source={{ uri: sourceUri }}
-      placeholder={placeholderUri && !inListingFrame ? { uri: placeholderUri } : undefined}
+      placeholder={placeholderUri ? { uri: placeholderUri } : undefined}
       placeholderContentFit={contentFit}
-      style={thumbHash || inListingFrame ? StyleSheet.absoluteFill : style}
+      style={thumbHash ? StyleSheet.absoluteFill : style}
       contentFit={contentFit}
-      contentPosition={inListingFrame ? LISTING_PHOTO_POSITION : undefined}
       priority={priority}
       cachePolicy="memory-disk"
       onLoad={(event) => {
@@ -132,19 +94,6 @@ export function GalleryImage({
       onError={() => setUseOriginalImage(true)}
     />
   );
-  if (inListingFrame) {
-    return (
-      <View style={style as ComponentProps<typeof View>["style"]}>
-        {loaded ? null : (
-          <ListingPhotoUnderlay
-            thumbHash={thumbHash}
-            listUri={placeholderVariant === "list" ? placeholderUri : undefined}
-          />
-        )}
-        {photo}
-      </View>
-    );
-  }
   if (!thumbHash) return photo;
 
   return (

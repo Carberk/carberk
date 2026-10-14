@@ -27,3 +27,19 @@ export function buildOriginalUrl(key: string): string {
   if (!MEDIA_URL) return "";
   return `${MEDIA_URL}/${inferBucket(key)}/${key}`;
 }
+
+type PhotoVariant = "thumbnail" | "list" | "detail" | "fullscreen";
+
+/**
+ * The one address of a Listing photo at a size: the URL the API sent for it,
+ * or else the one built from its key. Results cards, Listing detail's strip,
+ * its preview and the photo viewer all load a photo through this, so a size
+ * one of them decoded is the same image cache entry for the others (#816,
+ * #864) and a tile can hand its photo to the viewer without a reload (#869).
+ */
+export function listingPhotoUrl(
+  photo: { key: string; variants?: Partial<Record<PhotoVariant, string>> | undefined },
+  variant: PhotoVariant,
+): string {
+  return photo.variants?.[variant] || buildVariantUrl(photo.key, variant);
+}

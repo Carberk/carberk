@@ -4,9 +4,9 @@ import type { ListingsSchemas } from "@auto-tm/contracts";
 import { queryKeys } from "../queryKeys";
 
 type ListingSummary = ListingsSchemas.ListingSummary;
-/** A cached card: Feed and Favorites items also carry the contact preferences. */
+/** A cached card: Feed and Favorites items also carry the contact preferences and up to eight photo keys. */
 export type CachedListingSummary = ListingSummary &
-  Partial<Pick<ListingsSchemas.FeedListingSummary, "allowCalls" | "allowChat" | "hasContactPhone">>;
+  Partial<Pick<ListingsSchemas.FeedListingSummary, "allowCalls" | "allowChat" | "hasContactPhone" | "galleryKeys" | "galleryThumbHashes">>;
 type SummaryPages = InfiniteData<{ items: CachedListingSummary[] }>;
 
 /**
