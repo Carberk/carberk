@@ -155,3 +155,11 @@ describe("Photo viewer scroll requests", () => {
     expect(pagerRequests()).toEqual([{ method: "scrollToIndex", index: 1, animated: false }]);
   });
 });
+
+// #869: the underlying strip follows the current photo before close starts.
+it("reports the current photo after paging so its return tile is ready", async () => {
+  const onIndexChange = vi.fn();
+  const { screen } = await open({ onIndexChange });
+  await swipeTo(screen, 4);
+  expect(onIndexChange).toHaveBeenCalledWith(4);
+});
