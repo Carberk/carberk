@@ -147,3 +147,17 @@ it("keeps the source hidden until the contain page has displayed the cached imag
   expect(screen.getByTestId("listing-photo-tile").props.style.opacity).toBeUndefined();
   expect(screen.queryByTestId("photo-transition-overlay", { includeHiddenElements: true })).toBeNull();
 });
+
+it("fades instead of guessing a flight shape before any photo size is known", async () => {
+  const measured = (RN as unknown as { measureRects: Map<string, number[]> }).measureRects;
+  measured.set("detail-photos", [0, 80, 390, 280]);
+  measured.set("listing-photo-tile", [16, 88, 358, 268.5]);
+  measured.set("photo-viewer-root", [0, 24, 390, 820]);
+  measured.set("photo-viewer-page", [0, 80, 390, 640]);
+  const media = mediaFixture(1).map((photo) => ({ ...photo, width: undefined, height: undefined }));
+  const screen = await renderMobile(<PhotoGallery media={media} />);
+  await fireEvent.press(screen.getByRole("button", { name: "Photo 1 of 1" }));
+  await act(() => getHost(screen.container, "Modal").props.onShow());
+  expect(screen.queryByTestId("photo-transition-overlay", { includeHiddenElements: true })).toBeNull();
+  expect(screen.getByTestId("listing-photo-tile").props.style.opacity).toBeUndefined();
+});
