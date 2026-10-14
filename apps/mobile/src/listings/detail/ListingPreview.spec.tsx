@@ -52,16 +52,16 @@ describe("Listing detail preview, from the tapped card's cached data", () => {
     for (const value of ["2020", "12,000 km", "Automatic", "Petrol", "Used"])
       expect(screen.getByText(value)).toBeTruthy();
     expect(screen.getByText("20 Sep · Ashgabat")).toBeTruthy();
-    expect(screen.getByText("1 / 12")).toBeTruthy();
-    // The card already decoded the `list` size, so it shows at once under the
-    // gallery's `detail` size while that loads (#816).
-    const [list, photo] = getAllHosts(screen.container, "Image").map((image) => image.props);
-    expect(list).toEqual(expect.objectContaining({ source: { uri: "https://media.autotm.tm/listing-photos/listing-0/list.webp?v=webp-natural-1" } }));
-    // Drawn whole, in the gallery's own fit and position, so the gallery replaces it in place (#864).
+    // No counter on detail: the photo says where it is to a screen reader only.
+    expect(screen.queryByText("1 / 12")).toBeNull();
+    expect(screen.getByLabelText("Photo 1 of 12")).toBeTruthy();
+    // The `detail` size the Results card strip already loaded, cover-fit as
+    // there, so it paints from memory with no smaller size under it (#816, #864).
+    const [photo, ...rest] = getAllHosts(screen.container, "Image").map((image) => image.props);
+    expect(rest).toEqual([]);
     expect(photo).toEqual(expect.objectContaining({
       source: { uri: "https://media.autotm.tm/listing-photos/listing-0/detail.webp?v=webp-natural-1" },
-      contentFit: "contain",
-      contentPosition: "bottom",
+      contentFit: "cover",
       priority: "high",
     }));
   });

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as Native from "react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 
-import { fireEvent, first, getHost, renderMobile, routeParams, routerMock, queryAllHosts } from "../../../test/render";
+import { fireEvent, first, getHost, renderMobile, routeParams, routerMock, queryAllHosts, within } from "../../../test/render";
 import ListingDetailScreen from "../../../app/(public)/listings/[id]";
 import {
   fixture,
@@ -16,7 +16,7 @@ import { buildVariantUrl } from "./buildVariantUrl";
 const device = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1 }));
 const state = vi.hoisted(() => ({
   data: undefined as ListingsSchemas.ListingDetail | undefined,
-  preview: undefined as ListingsSchemas.ListingSummary | undefined,
+  preview: undefined as (ListingsSchemas.ListingSummary & { galleryKeys?: string[] }) | undefined,
   isPending: true,
 }));
 
@@ -64,20 +64,18 @@ vi.mock("../../api/catalog/useColors", () => ({
 }));
 
 type Screen = Awaited<ReturnType<typeof renderMobile>>;
+type Node = ReturnType<Screen["getByTestId"]>;
 
-/** A 390 dp wide screen holds a 4:3 photo frame 292.5 dp tall. */
-const FRAME = { width: 390, height: 292.5 };
+/**
+ * On a 390 dp wide screen every tile is 390 - 16 - 16 = 358 dp wide and
+ * 358 x 3/4 = 268.5 dp tall; one swipe moves one tile and its 2 dp seam.
+ */
+const TILE = { width: 358, height: 268.5 };
 const HASH = "1fsDBYCIiIiHiIdweIeHh4d4cIgH";
-/** ThumbHashes of covers that are not about 4:3, made with `thumbhash` 0.1.1. */
-const OTHER_SHAPES = [
-  ["16:9", "HggKNJpwd4dweHiIiIdwcAf3eA=="],
-  ["square", "HwgKNxpwd4dwiHiHiHiIeIiHCAiIgI8I"],
-  ["portrait", "H/gJNRpwd4CIiId4h3h4d3BwCPd3"],
-] as const;
 
 /** The tapped card's photos, as the loaded detail returns them. */
-function cardMedia(dimensions?: { width: number; height: number }) {
-  return mediaFixture(3).map((photo) => ({
+function cardMedia(dimensions?: { width: number; height: number }, count = 3) {
+  return mediaFixture(count).map((photo) => ({
     ...photo,
     ...dimensions,
     variants: {
@@ -89,39 +87,66 @@ function cardMedia(dimensions?: { width: number; height: number }) {
   }));
 }
 
+/** The `detail` size the Results card strip loads for the cover (`ListingPhotoStrip`). */
 const COVER_DETAIL = buildVariantUrl("listing-0/original.webp", "detail");
 const COVER_LIST = buildVariantUrl("listing-0/original.webp", "list");
 
-/** The first photo frame on screen, flattened to its size and its photo's fit. */
-function hero(screen: Screen) {
-  const frame = first(screen.getAllByTestId("listing-photo-frame"));
-  const image = queryAllHosts(frame, "Image").find((node) => node.props.source?.uri === COVER_DETAIL);
-  const { width, height } = [frame.props.style].flat().reduce((all, part) => ({ ...all, ...part }), {});
+const styleOf = (node: Node): Record<string, unknown> =>
+  [node.props.style].flat(Infinity).reduce((all, part) => ({ ...all, ...part }), {});
+
+/** The rounded ends a tile's classes give it. */
+const endsOf = (node: Node) => String(node.props.className).split(" ").filter((name) => /^rounded-(l-|r-)?xl$/.test(name));
+
+/** The photo tiles of the strip, photo or still loading. */
+const tilesOf = (screen: Screen) => screen.getAllByTestId(/^listing-photo-tile/, { includeHiddenElements: true });
+
+/**
+ * The top of Listing detail, flattened: whether the header row floats over
+ * the page, the strip's offset, snapping and padding, every tile's size and
+ * rounded ends, and how the cover photo is drawn.
+ */
+function top(screen: Screen) {
+  const header = screen.getByTestId("detail-header");
+  const photos = screen.getByTestId("detail-photos");
+  const strip = queryAllHosts(photos, "RCTScrollView")[0];
+  const cover = queryAllHosts(photos, "Image").find((node) => node.props.source?.uri === COVER_DETAIL);
   return {
-    frame: { width, height },
-    surface: frame.props.className,
-    contentFit: image?.props.contentFit,
-    contentPosition: image?.props.contentPosition,
-    placeholder: image?.props.placeholder,
-    uri: image?.props.source.uri,
+    header: {
+      floating: String(header.props.className).split(" ").includes("absolute"),
+      surface: String(header.props.className).split(" ").includes("bg-background"),
+    },
+    photos: styleOf(photos),
+    strip: strip && {
+      snapToInterval: strip.props.snapToInterval,
+      content: strip.props.contentContainerStyle,
+      scrollEnabled: strip.props.scrollEnabled,
+    },
+    tiles: tilesOf(screen).map((tile) => {
+      const { width, height } = styleOf(tile);
+      return { width, height, ends: endsOf(tile) };
+    }),
+    cover: cover && {
+      contentFit: cover.props.contentFit,
+      contentPosition: cover.props.contentPosition,
+      placeholder: cover.props.placeholder,
+      priority: cover.props.priority,
+      cachePolicy: cover.props.cachePolicy,
+    },
   };
 }
 
-/** What the first photo frame shows under its photo until the photo loads. */
+/** What the first tile shows under its photo until the photo loads. */
 function underlay(screen: Screen) {
-  const frame = first(screen.getAllByTestId("listing-photo-frame"));
-  return queryAllHosts(frame, "Image")
+  return queryAllHosts(first(tilesOf(screen)), "Image")
     .filter((node) => node.props.source?.uri !== COVER_DETAIL)
     .map((node) => ({
       source: node.props.source?.thumbhash ? "blur" : node.props.source?.uri === COVER_LIST ? "list" : node.props.source?.uri,
       contentFit: node.props.contentFit,
-      contentPosition: node.props.contentPosition,
     }));
 }
 
-async function loadPhoto(screen: Screen) {
-  const frame = first(screen.getAllByTestId("listing-photo-frame"));
-  const photo = queryAllHosts(frame, "Image").find((node) => node.props.source?.uri === COVER_DETAIL);
+async function loadCover(screen: Screen) {
+  const photo = queryAllHosts(first(tilesOf(screen)), "Image").find((node) => node.props.source?.uri === COVER_DETAIL);
   if (!photo) throw new Error("no cover photo");
   await fireEvent(photo, "load", { source: { url: COVER_DETAIL, width: 1200, height: 900 } });
 }
@@ -153,103 +178,176 @@ beforeEach(() => {
   routeParams.id = fixture().id;
 });
 
-describe("the Listing detail photo frame from tap to loaded (#864)", () => {
-  it("keeps one full-width 4:3 frame, the same contain fit and the same photo when detail replaces the preview", async () => {
+describe("the Listing detail photo strip from tap to loaded (#864)", () => {
+  it("keeps the plain header row and the inset 4:3 strip, cover-fit on the card's photo, when detail replaces the preview", async () => {
+    state.preview = summaryFixture({ photoCount: 3 });
     const screen = await renderMobile(<ListingDetailScreen />);
-    const before = hero(screen);
+    const before = top(screen);
 
     await loadDetail(screen, fixture({ media: cardMedia({ width: 1600, height: 1200 }) }));
-    const after = hero(screen);
 
     expect(before).toEqual({
-      frame: FRAME,
-      surface: "bg-muted",
-      contentFit: "contain",
-      contentPosition: "bottom",
-      placeholder: undefined,
-      uri: COVER_DETAIL,
+      header: { floating: false, surface: true },
+      photos: { paddingTop: 8 },
+      strip: { snapToInterval: TILE.width + 2, content: { paddingHorizontal: 16 }, scrollEnabled: true },
+      tiles: [
+        { ...TILE, ends: ["rounded-l-xl"] },
+        { ...TILE, ends: [] },
+        { ...TILE, ends: ["rounded-r-xl"] },
+      ],
+      // The card loaded this size at cover 4:3, so it paints from memory at once (#816).
+      cover: { contentFit: "cover", contentPosition: undefined, placeholder: undefined, priority: "high", cachePolicy: "memory-disk" },
     });
-    expect(after).toEqual(before);
+    expect(top(screen)).toEqual(before);
   });
 
   it.each([
     ["16:9", 1920, 1080],
     ["square", 1200, 1200],
     ["portrait", 900, 1600],
-  ])("shows a %s photo whole, in the same frame and fit before and after detail loads", async (_shape, width, height) => {
+  ])("cover-fits a %s photo into its 4:3 tile before and after detail loads, and the viewer still shows it whole", async (_shape, width, height) => {
     const screen = await renderMobile(<ListingDetailScreen />);
-    const before = hero(screen);
+    const before = top(screen).cover;
 
     await loadDetail(screen, fixture({ media: cardMedia({ width, height }) }));
 
-    expect(before).toMatchObject({ frame: FRAME, surface: "bg-muted", contentFit: "contain" });
-    expect(hero(screen)).toEqual(before);
+    expect(before).toMatchObject({ contentFit: "cover" });
+    expect(top(screen).cover).toEqual(before);
+    await fireEvent.press(screen.getByRole("button", { name: "Photo 1 of 3" }));
+    const viewer = getHost(screen.container, "Modal");
+    const page = queryAllHosts(viewer, "Image").find((node) => node.props.source?.uri === COVER_DETAIL);
+    expect(page?.props.contentFit).toBe("contain");
   });
 
-  it("fills the preview frame with the cover's blurred colours until its photo loads, then shows the photo's own shape", async () => {
+  it("shows a cover's blurred colours under its tile, cover-fit, until the photo loads, and never the card's 3:2 crop", async () => {
     state.preview = summaryFixture({ photoThumbHashes: [HASH, null] });
     const screen = await renderMobile(<ListingDetailScreen />);
-    const frame = first(screen.getAllByTestId("listing-photo-frame"));
-    const blur = () => queryAllHosts(frame, "Image").filter((node) => node.props.source?.thumbhash === HASH);
-    expect(blur().map((node) => node.props.contentFit)).toEqual(["cover"]);
-
-    const photo = getHost(frame, "Image", { priority: "high" });
-    await fireEvent(photo, "load", { source: { url: photo.props.source.uri, width: 1067, height: 800 } });
-
-    expect(blur()).toHaveLength(0);
-  });
-
-  it("shows an about 4:3 cover's blurred colours across the frame and the card's 3:2 crop at the centre, where that part of the photo lands", async () => {
-    state.preview = summaryFixture({ photoThumbHashes: [HASH, null] });
-    const screen = await renderMobile(<ListingDetailScreen />);
-    const expected = [
-      { source: "blur", contentFit: "cover", contentPosition: undefined },
-      { source: "list", contentFit: "contain", contentPosition: undefined },
-    ];
-    expect(underlay(screen)).toEqual(expected);
-    await loadPhoto(screen);
+    expect(underlay(screen)).toEqual([{ source: "blur", contentFit: "cover" }]);
+    await loadCover(screen);
     expect(underlay(screen)).toEqual([]);
 
     await loadDetail(screen, fixture({ media: mediaWithCoverHash(HASH) }));
-    expect(underlay(screen)).toEqual(expected);
-    await loadPhoto(screen);
+    expect(underlay(screen)).toEqual([{ source: "blur", contentFit: "cover" }]);
+    await loadCover(screen);
     expect(underlay(screen)).toEqual([]);
   });
 
-  it.each(OTHER_SHAPES)("never shows the card's 3:2 crop of a %s cover: its blurred colours take its own shape, pinned as the photo is", async (_shape, hash) => {
-    state.preview = summaryFixture({ photoThumbHashes: [hash, null] });
+  it("shows every photo the card knows, and holds the rest of the Listing's photos as grey tiles", async () => {
+    state.preview = {
+      ...summaryFixture({ photoCount: 4 }),
+      galleryKeys: ["listing-0/original.webp", "listing-1/original.webp", "listing-2/original.webp"],
+    };
     const screen = await renderMobile(<ListingDetailScreen />);
-    const expected = [{ source: "blur", contentFit: "contain", contentPosition: "bottom" }];
-    expect(underlay(screen)).toEqual(expected);
 
-    await loadDetail(screen, fixture({ media: mediaWithCoverHash(hash) }));
-    expect(underlay(screen)).toEqual(expected);
-    expect(hero(screen)).toMatchObject({ contentFit: "contain", contentPosition: "bottom", placeholder: undefined });
+    expect(tilesOf(screen).map((tile) => tile.props.testID)).toEqual([
+      "listing-photo-tile", "listing-photo-tile", "listing-photo-tile", "listing-photo-tile-pending",
+    ]);
   });
 
-  it("gives a Listing without photos the same frame, before and after detail loads", async () => {
+  it("shows no photo counter on detail, while each photo is still read as Photo n of N", async () => {
+    const screen = await renderMobile(<ListingDetailScreen />);
+    expect(screen.queryByText(/^\d+ \/ \d+$/)).toBeNull();
+    expect(screen.getByLabelText("Photo 1 of 12")).toBeTruthy();
+
+    await loadDetail(screen, fixture({ media: cardMedia() }));
+
+    expect(screen.queryByText(/^\d+ \/ \d+$/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Photo 1 of 3" })).toBeTruthy();
+  });
+
+  it("gives one photo one tile from margin to margin that does not scroll, before and after detail loads", async () => {
+    state.preview = summaryFixture({ photoKeys: ["listing-0/original.webp"], photoCount: 1 });
+    const screen = await renderMobile(<ListingDetailScreen />);
+    const before = top(screen);
+
+    await loadDetail(screen, fixture({ media: cardMedia(undefined, 1) }));
+
+    expect(before.tiles).toEqual([{ ...TILE, ends: ["rounded-xl"] }]);
+    expect(before.strip?.scrollEnabled).toBe(false);
+    expect(top(screen)).toEqual(before);
+  });
+
+  it("gives a Listing without photos the same grey tile saying No photos, before and after detail loads", async () => {
     state.preview = summaryFixture({ photoKeys: [], coverMediaKey: undefined, photoCount: 0 });
     const screen = await renderMobile(<ListingDetailScreen />);
-    expect(hero(screen).frame).toEqual(FRAME);
-    expect(screen.getByText("No photos")).toBeTruthy();
+    const before = top(screen);
+    expect(before.tiles).toEqual([{ ...TILE, ends: ["rounded-xl"] }]);
+    expect(first(tilesOf(screen)).props.className).toContain("bg-muted");
+    expect(within(first(tilesOf(screen))).getByText("No photos")).toBeTruthy();
 
     await loadDetail(screen, fixture({ media: [] }));
 
-    expect(hero(screen).frame).toEqual(FRAME);
-    expect(screen.getByText("No photos")).toBeTruthy();
+    expect(top(screen)).toEqual(before);
+    expect(within(first(tilesOf(screen))).getByText("No photos")).toBeTruthy();
   });
 
-  it("opens a deep link on the same frame, with a Back button while it loads", async () => {
+  it.each([
+    ["sold", "Sold"],
+    ["archived", "Removed from sale"],
+  ] as const)("runs the %s banner across the bottom of each tile, inside its rounded corners", async (status, label) => {
+    state.preview = summaryFixture({ status, photoCount: 3 });
+    const screen = await renderMobile(<ListingDetailScreen />);
+    const banners = () => tilesOf(screen).map((tile) => within(tile).queryAllByText(label, { includeHiddenElements: true }).length);
+    expect(banners()).toEqual([1, 1, 1]);
+
+    await loadDetail(screen, fixture({ status, media: cardMedia() }));
+
+    expect(banners()).toEqual([1, 1, 1]);
+    // A screen reader hears the status with the photo, after "Photo n of N".
+    expect(screen.getByRole("button", { name: "Photo 1 of 3" }).props.accessibilityValue).toEqual({ text: label });
+  });
+
+  it("sets every section 16 dp from the screen edges, as the photos are", async () => {
+    const screen = await renderMobile(<ListingDetailScreen />);
+    expect(screen.getByTestId("detail-body").props.className.split(" ")).toContain("px-4");
+
+    await loadDetail(screen, fixture({ media: cardMedia() }));
+    expect(screen.getByTestId("detail-body").props.className.split(" ")).toContain("px-4");
+
+    state.preview = undefined;
+    state.isPending = true;
+    state.data = undefined;
+    await screen.rerender(<ListingDetailScreen />);
+    expect(screen.getByTestId("detail-body").props.className.split(" ")).toContain("px-4");
+  });
+
+  it("draws the header's hairline only once scrolled, and its price and title once the photos have scrolled away", async () => {
+    const screen = await renderMobile(<ListingDetailScreen />);
+    await loadDetail(screen, fixture({ media: cardMedia() }));
+    const header = () => screen.getByTestId("detail-header");
+    // The page's own scroll view holds the strip's, so it comes first.
+    const page = first(queryAllHosts(screen.container, "RCTScrollView"));
+    const hairline = () => String(header().props.className).split(" ").includes("border-border");
+    expect(hairline()).toBe(false);
+
+    await fireEvent.scroll(page, { nativeEvent: { contentOffset: { x: 0, y: 1 } } });
+    expect(hairline()).toBe(true);
+    expect(within(header()).queryByText("35,000 TMT")).toBeNull();
+
+    // The photos end 8 + 268.5 dp down the page.
+    await fireEvent.scroll(page, { nativeEvent: { contentOffset: { x: 0, y: 277 } } });
+    expect(within(header()).getByText("35,000 TMT")).toBeTruthy();
+  });
+
+  it("opens a deep link on the loaded top: the header row with a working Back, one grey tile, then title, price and date", async () => {
     state.preview = undefined;
     const screen = await renderMobile(<ListingDetailScreen />);
 
     expect(screen.getByTestId("detail-skeleton")).toBeTruthy();
-    expect(hero(screen).frame).toEqual(FRAME);
+    const skeleton = top(screen);
+    expect(skeleton).toMatchObject({
+      header: { floating: false, surface: true },
+      photos: { paddingTop: 8 },
+      tiles: [{ ...TILE, ends: ["rounded-xl"] }],
+    });
     for (const placeholder of ["title-loading", "price-loading", "date-loading", "description-loading", "seller-loading"])
       expect(screen.getByTestId(placeholder, { includeHiddenElements: true })).toBeTruthy();
 
     await fireEvent.press(screen.getByRole("button", { name: "Back" }));
     expect(routerMock.back).toHaveBeenCalledTimes(1);
+
+    await loadDetail(screen, fixture({ media: cardMedia(undefined, 1) }));
+    expect(top(screen)).toMatchObject({ header: skeleton.header, photos: skeleton.photos, tiles: skeleton.tiles });
   });
 });
 

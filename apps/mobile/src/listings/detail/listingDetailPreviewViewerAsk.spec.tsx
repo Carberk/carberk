@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as RN from "react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 
 import type * as ClientModule from "../../api/client";
@@ -71,6 +72,7 @@ vi.mock("../../api/catalog/useEngineTypes", () => ({
 }));
 
 const SELLER = fixture().sellerId;
+const scrollRequests = (RN as unknown as { scrollRequests: Record<string, unknown>[] }).scrollRequests;
 
 beforeEach(() => {
   state.data = fixture({ media: mediaFixture(3) });
@@ -179,7 +181,8 @@ describe("photo viewer from Listing detail", () => {
     await fireEvent.press(viewer(screen).getByRole("button", { name: "Close" }));
 
     expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
-    expect(screen.getByText("3 / 3")).toBeTruthy();
+    // The strip scrolls to the third tile: two tiles of 390 - 32 dp and their 2 dp seams.
+    expect(scrollRequests.at(-1)).toMatchObject({ method: "scrollToOffset", offset: 720, animated: false });
   });
 
   it("closes before sending a signed-out Message to sign-in, so sign-in is not hidden behind it", async () => {
