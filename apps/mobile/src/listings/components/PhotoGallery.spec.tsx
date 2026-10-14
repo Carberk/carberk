@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as RN from "react-native";
 
-import { fireEvent, renderMobile, within, first, getAllHosts, getHost } from "../../../test/render";
+import { act, fireEvent, renderMobile, within, first, getAllHosts, getHost } from "../../../test/render";
 import { mediaFixture } from "../../../test/fixtures/listing";
 
 import { PhotoGallery } from "./PhotoGallery";
@@ -128,4 +128,22 @@ describe("Photo gallery and viewer", () => {
     // Every photo in the viewer, page or thumbnail, has its blur under it until it loads.
     expect(blurs).toHaveLength(sources.length - blurs.length);
   });
+});
+
+it("keeps the source hidden until the contain page has displayed the cached image", async () => {
+  const measured = (RN as unknown as { measureRects: Map<string, number[]> }).measureRects;
+  measured.set("detail-photos", [0, 80, 390, 280]);
+  measured.set("listing-photo-tile", [16, 88, 358, 268.5]);
+  measured.set("photo-viewer-root", [0, 24, 390, 820]);
+  measured.set("photo-viewer-page", [0, 80, 390, 640]);
+  const screen = await renderMobile(<PhotoGallery media={mediaFixture(1)} />);
+  await fireEvent.press(screen.getByRole("button", { name: "Photo 1 of 1" }));
+  await act(() => getHost(screen.container, "Modal").props.onShow());
+  const overlay = screen.getByTestId("photo-transition-overlay", { includeHiddenElements: true });
+  await fireEvent(getHost(overlay, "Image"), "display");
+  expect(screen.getByTestId("listing-photo-tile").props.style.opacity).toBe(0);
+  const page = screen.getByTestId("photo-viewer-page");
+  await fireEvent(getHost(page, "Image"), "display");
+  expect(screen.getByTestId("listing-photo-tile").props.style.opacity).toBeUndefined();
+  expect(screen.queryByTestId("photo-transition-overlay", { includeHiddenElements: true })).toBeNull();
 });

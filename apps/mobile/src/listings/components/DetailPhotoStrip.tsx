@@ -2,9 +2,10 @@ import { useCallback, useImperativeHandle, useMemo, useRef, useState, type React
 import { FlatList, Pressable, View, useWindowDimensions, type ListRenderItem, type ViewToken } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { listingPhotoUrl } from "../detail/buildVariantUrl";
+
 import { GalleryBanner, GalleryImage, type GalleryPhoto } from "./GalleryImage";
 import { clippedRadii, intersectRect, minimalStripOffset, type PhotoGeometry } from "./photoTransitionMath";
-import { listingPhotoUrl } from "../detail/buildVariantUrl";
 import { isNearPhoto } from "./photoWindow";
 
 import { Skeleton } from "@/components/ui/skeleton";

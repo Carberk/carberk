@@ -14,8 +14,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { X } from "lucide-react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
-
 import Animated from "react-native-reanimated";
+
 import { PhotoTransitionOverlay } from "./PhotoTransitionOverlay";
 import { usePhotoTransition } from "./usePhotoTransition";
 import type { PhotoGeometry } from "./photoTransitionMath";
@@ -184,7 +184,7 @@ function ViewerContent({
   };
 
   return (
-    <View ref={transition.root} collapsable={false} className="flex-1" onLayout={transition.measure}>
+    <View testID="photo-viewer-root" ref={transition.root} collapsable={false} className="flex-1" onLayout={transition.measure}>
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: "black" }, transition.backdropStyle]} />
       <Animated.View className="flex-1" style={[{ paddingTop: insets.top }, transition.contentStyle]}>
       <Animated.View className="flex-row items-center px-3 py-2" style={transition.chromeStyle}>
@@ -206,6 +206,7 @@ function ViewerContent({
       </Animated.View>
 
       <Animated.View
+        testID="photo-viewer-page"
         ref={transition.pager}
         collapsable={false}
         style={transition.pagerStyle}
@@ -310,7 +311,7 @@ function ViewerContent({
       <View style={{ paddingBottom: insets.bottom }}>{footer?.(close)}</View>
       </Animated.View>
       </Animated.View>
-      {transition.overlay && transition.geometry && transition.page && <PhotoTransitionOverlay geometry={transition.geometry} page={transition.page} progress={transition.progress} drag={transition.drag} onDisplay={transition.onDisplay} />}
+      {transition.overlay && transition.geometry && transition.page && <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, transition.contentStyle]}><PhotoTransitionOverlay geometry={transition.geometry} page={transition.page} progress={transition.progress} drag={transition.drag} onDisplay={transition.onDisplay} /></Animated.View>}
     </View>
   );
 }

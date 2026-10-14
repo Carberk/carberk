@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { View } from "react-native";
+import type { View } from "react-native";
 import { ReduceMotion, useAnimatedStyle, useSharedValue, withTiming, withSpring } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
-import { duration, spring, timing, useReduceMotion } from "@/lib/motion";
+
 import { returnMode, toModalRect, type PhotoGeometry, type PhotoRect } from "./photoTransitionMath";
+
+import { duration, spring, timing, useReduceMotion } from "@/lib/motion";
 
 export function usePhotoTransition({ origin, getReturnGeometry, onTileHidden, onClose, indexRef, showRef, closeRef }: {
   origin?: PhotoGeometry | null;
@@ -17,6 +19,7 @@ export function usePhotoTransition({ origin, getReturnGeometry, onTileHidden, on
   const pager = useRef<View>(null);
   const rootOrigin = useRef({ x: 0, y: 0 });
   const [page, setPage] = useState<PhotoRect | null>(null);
+  const initialOrigin = useRef(origin);
   const [shown, setShown] = useState(false);
   const [displayed, setDisplayed] = useState(false);
   const [geometry, setGeometry] = useState<PhotoGeometry | null>(null);
@@ -36,12 +39,13 @@ export function usePhotoTransition({ origin, getReturnGeometry, onTileHidden, on
       });
     });
   }, []);
-  useEffect(() => { showRef.current = () => { setShown(true); measure(); }; }, [showRef, measure]);
+  useEffect(() => { showRef.current = () => { initialOrigin.current = origin; setShown(true); measure(); }; }, [showRef, measure, origin]);
   useEffect(() => {
-    if (!shown || !page || reduced || !origin) return;
-    setGeometry(convert(origin));
+    if (!shown || !page || reduced || !initialOrigin.current) return;
+    setGeometry(convert(initialOrigin.current));
     setOverlay(true);
-  }, [shown, page, reduced, origin, convert]);
+    opacity.value = 1;
+  }, [shown, page, reduced, origin, convert, opacity]);
   const finishOpen = useCallback(() => {
     setLanded(true);
     setOverlay(false);
@@ -50,7 +54,7 @@ export function usePhotoTransition({ origin, getReturnGeometry, onTileHidden, on
   }, [onTileHidden, chrome]);
   useEffect(() => {
     if (!shown || closing.current) return;
-    if (reduced || !origin) {
+    if (reduced || !initialOrigin.current) {
       opacity.value = withTiming(1, { duration: duration.fast, reduceMotion: ReduceMotion.Never });
       chrome.value = opacity.value;
       setLanded(true);
@@ -88,11 +92,11 @@ export function usePhotoTransition({ origin, getReturnGeometry, onTileHidden, on
     }
   }, [chrome, getReturnGeometry, indexRef, reduced, page, convert, onTileHidden, landed, progress, done, opacity]);
   useEffect(() => { closeRef.current = () => close(); }, [closeRef, close]);
-  const backdropStyle = useAnimatedStyle(() => ({ opacity: opacity.value * Math.min(progress.value / 0.6 + (reduced || !origin ? 1 : 0), 1) * (1 - 0.7 * Math.min(Math.abs(drag.value.y) / ((page?.height ?? 1) * 0.5), 1)) }));
+  const backdropStyle = useAnimatedStyle(() => ({ opacity: opacity.value * Math.min(progress.value / 0.6 + (reduced || !initialOrigin.current ? 1 : 0), 1) * (1 - 0.7 * Math.min(Math.abs(drag.value.y) / ((page?.height ?? 1) * 0.5), 1)) }));
   const contentStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
   const chromeStyle = useAnimatedStyle(() => ({ opacity: chrome.value * (drag.value.y === 0 ? 1 : 0) }));
   const pagerStyle = useAnimatedStyle(() => ({
-    opacity: overlay || (!landed && !!origin && !reduced) ? 0 : 1,
+    opacity: overlay || (!landed && !!initialOrigin.current && !reduced) ? 0 : 1,
     transform: [{ translateX: drag.value.x }, { translateY: drag.value.y }, { scale: 1 - 0.25 * Math.min(Math.abs(drag.value.y) / (page?.height ?? 1), 1) }],
   }));
   const cancelDrag = useCallback(() => { drag.value = reduced ? { x: 0, y: 0 } : withSpring({ x: 0, y: 0 }, spring.snappy); }, [drag, reduced]);

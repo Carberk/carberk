@@ -10,7 +10,6 @@ import Animated, {
 import { scheduleOnRN } from "react-native-worklets";
 
 import { dismissDecision } from "./photoTransitionMath";
-
 import {
   clampScale,
   clampTranslation,

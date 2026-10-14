@@ -1,6 +1,7 @@
 import { StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import Animated, { useAnimatedStyle, type SharedValue } from "react-native-reanimated";
+
 import { containRect, coverRect, dragRect, lerpRect, type PhotoGeometry, type PhotoRect } from "./photoTransitionMath";
 
 /** One absolute clip is the documented layout-animation exception in 76-motion. */

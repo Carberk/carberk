@@ -184,7 +184,7 @@ vi.mock("react-native-reanimated", async () => {
   return {
     default: { View, ScrollView, createAnimatedComponent },
     createAnimatedComponent,
-    useSharedValue: <T,>(value: T) => ({ value }),
+    useSharedValue: <T,>(value: T) => React.useRef({ value }).current,
     useDerivedValue: <T,>(derive: () => T) => ({ value: derive() }),
     useAnimatedStyle: () => ({}),
     useAnimatedProps: () => ({}),
