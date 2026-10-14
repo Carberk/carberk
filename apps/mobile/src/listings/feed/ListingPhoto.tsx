@@ -160,8 +160,8 @@ type PhotoChipProps = ViewProps & {
 };
 
 /**
- * A small chip on a Listing photo: the photo count, or the state of a closed
- * Listing. It sizes to its text and keeps 8 dp of padding at each end.
+ * A small chip on a Listing photo: a seller-stated New, or the state of a
+ * closed Listing. It sizes to its text and keeps 8 dp of padding at each end.
  */
 export function PhotoChip({ label, icon, tone = "scrim", className, ...props }: PhotoChipProps) {
   const foreground =
