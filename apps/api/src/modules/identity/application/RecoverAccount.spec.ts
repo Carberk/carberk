@@ -107,7 +107,6 @@ class FakeAccountRestoreUnitOfWork implements AccountRestoreUnitOfWork {
             ) {
               listing.status = "active";
               listing.archivedByDeletion = false;
-              listing.publishedAt = new Date();
             }
           }
           this.failIfAsked("republishListingsArchivedByDeletion");
@@ -177,6 +176,7 @@ describe("RecoverAccount", () => {
     expect(store.listing("deletion-archived")).toMatchObject({
       status: "active",
       archivedByDeletion: false,
+      publishedAt: ARCHIVED_AT,
     });
     expect(store.listing("self-archived").status).toBe("archived");
   });

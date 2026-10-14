@@ -146,6 +146,11 @@ That is the whole screen. Video is added below the photos only when the video me
 - The Listing transitions to `sold` and stays there; nothing archives it automatically. Buyers see it labelled Sold on detail and in Favorites; it never appears in Home or Results. The owner can only delete it.
 - Garage entry (if linked) auto-updates to `status=sold`
 
+### Relist
+
+- Relist in My listings' ⋯ sheet puts a removed Listing back on sale with the same ID and public number. An account restore relists the Listings its deletion removed in the same way.
+- A relisted Listing keeps its original publish date and returns to where that date places it in Newest; relisting never moves it up (founder decision on [#871](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/871)). Cards and the detail footer's Published show the original date; Updated shows the relist.
+
 ### Listing states
 
 | State | Visible to | Action available |
@@ -214,7 +219,7 @@ Chat switched off on a Listing (`allowChat` off) also leaves an existing Convers
 
 ## Out of scope
 
-- Listing auto-renewal / bumping (Phase 1.5 if needed)
+- Listing auto-renewal / bumping (Phase 1.5 if needed); relisting is not a bump (see [Relist](#relist))
 - Featured / promoted listings (paid placement) — explicitly against vision
 - Listing expiry (never automatic in MVP; sellers mark sold/archived themselves)
 - Exact listing GPS coordinates, first-open GPS prompt, and map/radius search in Phase 1
