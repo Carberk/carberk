@@ -172,7 +172,7 @@ describe("Results approved behavior", () => {
     expect(view.getByText("Toyota Camry, 2018")).toBeTruthy();
     expect(view.getByText("80,000 km · Automatic · Petrol")).toBeTruthy();
     expect(view.getByText("Ashgabat · Today")).toBeTruthy();
-    expect(view.getByLabelText("Photos: 7")).toBeTruthy();
+    expect(view.queryByLabelText(/Photos: /)).toBeNull();
     expect(view.getAllByTestId("listing-photo")).toHaveLength(2);
     await fireEvent.press(view.getByRole("button", { name: /Toyota Camry, 2018/ }));
     expect(routerMock.push).toHaveBeenCalledWith("/(public)/listings/listing-1");
@@ -256,10 +256,10 @@ describe("Results large card replacement", () => {
     expect(view.getByText("Toyota Camry, 2018")).toBeTruthy();
     expect(view.getByText("80,000 km · Automatic · Petrol")).toBeTruthy();
   });
-  it("shows the two-photo grid and total photo count for a Listing with photos", async () => {
+  it("shows the two-photo grid and no photo count for a Listing with photos", async () => {
     const view = await renderMobile(<ResultsScreen />);
     expect(view.getAllByTestId("listing-photo")).toHaveLength(2);
-    expect(view.getByLabelText("Photos: 7")).toBeTruthy();
+    expect(view.queryByLabelText(/Photos: /)).toBeNull();
   });
   it("shows city and a relative publication date", async () => {
     const view = await renderMobile(<ResultsScreen />);

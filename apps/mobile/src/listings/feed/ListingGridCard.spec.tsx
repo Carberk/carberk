@@ -1,7 +1,14 @@
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
-import { describe, expect, it } from "vitest";
+import type { ListingsSchemas } from "@auto-tm/contracts";
+import { describe, expect, it, vi } from "vitest";
+
+import { renderMobile } from "../../../test/render";
+
+import { ListingGridCard } from "./ListingGridCard";
+
+vi.mock("../../api/client", () => ({ apiClient: { get: vi.fn(), post: vi.fn(), delete: vi.fn() }, ApiError: class ApiError extends Error {} }));
 
 const source = readFileSync(resolve(__dirname, "./ListingGridCard.tsx"), "utf-8");
 // The heart on the photo is shared by every Listing card.
@@ -79,5 +86,22 @@ describe("ListingGridCard", () => {
   it("exports a skeleton with the same photo shape", () => {
     expect(source).toContain("export function ListingGridCardSkeleton");
     expect(source.match(/aspect-photo w-full/g)?.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+const summary: ListingsSchemas.ListingSummary = { id: "listing", sellerId: "seller", status: "active", brandId: "brand", modelId: "model", year: 2018, priceAmount: 2, priceCurrency: "USD", displayPriceTmt: 70000, photoKeys: ["one.webp", "two.webp"], photoCount: 7, cityId: "city", publishedAt: "2026-09-30T04:00:00.000Z" };
+
+describe("ListingGridCard photo count", () => {
+  it.each([0, 1, 2, 7])("renders no photo count for a Listing with %i photos", async (photoCount) => {
+    const photoKeys = ["one.webp", "two.webp"].slice(0, photoCount);
+    for (const locale of ["en", "ru", "tk"]) {
+      const view = await renderMobile(
+        <ListingGridCard listing={{ ...summary, photoKeys, photoCount }} onPress={vi.fn()} brandName="Toyota" modelName="Camry" isAuthenticated={false} returnTo="/(tabs)/(search)" />,
+        { locale },
+      );
+      expect(view.queryByLabelText(/(Photos|Фото|Suratlar): \d/)).toBeNull();
+      expect(view.queryByText(String(photoCount))).toBeNull();
+      expect(view.getByText("Toyota Camry")).toBeTruthy();
+    }
   });
 });
