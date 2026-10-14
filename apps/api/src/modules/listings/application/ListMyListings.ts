@@ -61,6 +61,8 @@ export class ListMyListings {
         cityId: item.cityId,
         publishedAt: item.publishedAt.toISOString(),
         ...cardPreviewFields(item),
+        allowCalls: item.allowCalls,
+        allowChat: item.allowChat,
       })),
       nextCursor: result.nextCursor
         ? ListingsSchemas.encodeCursor(result.nextCursor)

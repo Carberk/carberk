@@ -141,6 +141,9 @@ export const ListingSummaryBaseSchema = z.object({
   hasVin: z.boolean().optional(),
   acceptsExchange: z.boolean().optional(),
   installmentAvailable: z.boolean().optional(),
+  /** Whether the seller takes calls and chat messages; absent from older APIs. */
+  allowCalls: z.boolean().optional(),
+  allowChat: z.boolean().optional(),
 });
 
 function checkSummaryHashes(
@@ -176,9 +179,6 @@ export const FeedListingSummarySchema = ListingSummaryBaseSchema.extend({
   galleryKeys: z.array(z.string()).max(8).optional(),
   /** ThumbHashes parallel to `galleryKeys`; never sent without them. */
   galleryThumbHashes: ThumbHashSlotsSchema(8).optional(),
-  /** Whether the seller takes calls and chat messages. */
-  allowCalls: z.boolean().optional(),
-  allowChat: z.boolean().optional(),
   /**
    * Whether the Listing has a contact phone. Call needs one besides
    * `allowCalls`, and some Listings have none (#867). The number itself
