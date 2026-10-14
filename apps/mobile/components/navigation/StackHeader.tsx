@@ -63,7 +63,8 @@ export function HeaderCircleButton({
     <Button
       variant={tone === "tonal" ? "secondary" : "ghost"}
       size="icon"
-      className={className}
+      // A plain action has no fill, disabled too: only its glyph quietens.
+      className={cn(tone === "plain" && "disabled:border-0 disabled:bg-transparent", className)}
       {...props}
     >
       {children}
