@@ -12,6 +12,8 @@ import { Text } from "@/components/ui/text";
 export type GalleryPhoto = Pick<ListingsSchemas.ListingMedia, "key"> & {
   variants?: Partial<ListingsSchemas.ListingMedia["variants"]> | undefined;
   thumbHash?: string | null | undefined;
+  width?: number | null | undefined;
+  height?: number | null | undefined;
 };
 type ExpoImageStyle = ComponentProps<typeof Image>["style"];
 
@@ -60,6 +62,8 @@ export function GalleryImage({
   contentFit,
   style,
   onAspectRatio,
+  onDisplayedUri,
+  sourceOverride,
 }: {
   item: GalleryPhoto;
   variant: Variant;
@@ -70,9 +74,11 @@ export function GalleryImage({
   style: ExpoImageStyle;
   /** Reports the loaded photo's width / height. */
   onAspectRatio?: (aspectRatio: number) => void;
+  onDisplayedUri?: (uri: string) => void;
+  sourceOverride?: string;
 }) {
   const [useOriginalImage, setUseOriginalImage] = useState(false);
-  const sourceUri = useOriginalImage ? buildOriginalUrl(item.key) : listingPhotoUrl(item, variant);
+  const sourceUri = useOriginalImage ? buildOriginalUrl(item.key) : (sourceOverride ?? listingPhotoUrl(item, variant));
   const placeholderUri = placeholderVariant ? listingPhotoUrl(item, placeholderVariant) : undefined;
   const thumbHash = item.thumbHash;
   const [loaded, setLoaded] = useState(false);
@@ -86,6 +92,7 @@ export function GalleryImage({
       contentFit={contentFit}
       priority={priority}
       cachePolicy="memory-disk"
+      onDisplay={() => onDisplayedUri?.(sourceUri)}
       onLoad={(event) => {
         setLoaded(true);
         const { width, height } = event.source;

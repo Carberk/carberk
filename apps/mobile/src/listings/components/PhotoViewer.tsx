@@ -4,6 +4,7 @@ import {
   Modal,
   Pressable,
   View,
+  StyleSheet,
   useWindowDimensions,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -13,7 +14,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { X } from "lucide-react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
+import Animated from "react-native-reanimated";
 
+import { PhotoTransitionOverlay } from "./PhotoTransitionOverlay";
+import { usePhotoTransition } from "./usePhotoTransition";
+import type { PhotoGeometry } from "./photoTransitionMath";
 import { GalleryImage } from "./GalleryImage";
 import { isNearPhoto } from "./photoWindow";
 import { ZoomableImage } from "./ZoomableImage";
@@ -31,6 +36,10 @@ const STRIP_PADDING = 12;
 
 export interface PhotoViewerProps {
   visible: boolean;
+  origin?: PhotoGeometry | null;
+  getReturnGeometry?: (index: number) => PhotoGeometry | null;
+  onTileHidden?: (index: number | null) => void;
+  onIndexChange?: (index: number) => void;
   media: ListingMedia[];
   /** The photo to open on. */
   initialIndex: number;
@@ -60,22 +69,30 @@ export function PhotoViewer({
   onClose,
   headerAction,
   footer,
+  ...transitionProps
 }: PhotoViewerProps) {
   // The photo the viewer is on lives in the content, which mounts fresh on
   // every open. The system back gesture closes from the Modal itself, so the
   // content mirrors its photo here.
   const indexRef = useRef(initialIndex);
+  const showRef = useRef(() => {});
+  const closeRef = useRef(() => onClose(indexRef.current));
 
   return (
     <Modal
       visible={visible}
-      transparent={false}
-      animationType="fade"
+      transparent
+      animationType="none"
+      navigationBarTranslucent
+      onShow={() => showRef.current()}
       statusBarTranslucent
-      onRequestClose={() => onClose(indexRef.current)}
+      onRequestClose={() => closeRef.current()}
     >
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ViewerContent
+          {...transitionProps}
+          showRef={showRef}
+          closeRef={closeRef}
           media={media}
           initialIndex={initialIndex}
           indexRef={indexRef}
@@ -95,7 +112,13 @@ function ViewerContent({
   onClose,
   headerAction,
   footer,
-}: Pick<PhotoViewerProps, "media" | "initialIndex" | "onClose" | "headerAction" | "footer"> & {
+  onIndexChange,
+  showRef,
+  closeRef,
+  ...transitionProps
+}: Omit<PhotoViewerProps, "visible"> & {
+  showRef: { current: () => void };
+  closeRef: { current: () => void };
   indexRef: { current: number };
 }) {
   const { t } = useTranslation();
@@ -115,7 +138,8 @@ function ViewerContent({
   const pagerRef = useRef<FlatList<ListingMedia>>(null);
   const stripRef = useRef<FlatList<ListingMedia>>(null);
 
-  const close = useCallback(() => onClose(indexRef.current), [onClose, indexRef]);
+  const transition = usePhotoTransition({ ...transitionProps, onClose, indexRef, showRef, closeRef });
+  const close = useCallback(() => transition.close(), [transition.close]);
 
   const sharpen = useCallback((id: string) => {
     setSharp((current) => (current.has(id) ? current : new Set(current).add(id)));
@@ -129,9 +153,10 @@ function ViewerContent({
     (next: number) => {
       indexRef.current = next;
       setIndex(next);
+      onIndexChange?.(next);
       setZoomed(false);
     },
-    [indexRef],
+    [indexRef, onIndexChange],
   );
 
   useEffect(() => {
@@ -159,8 +184,10 @@ function ViewerContent({
   };
 
   return (
-    <View className="flex-1 bg-black" style={{ paddingTop: insets.top }}>
-      <View className="flex-row items-center px-3 py-2">
+    <View testID="photo-viewer-root" ref={transition.root} collapsable={false} className="flex-1" onLayout={transition.measure}>
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: "black" }, transition.backdropStyle]} />
+      <Animated.View className="flex-1" style={[{ paddingTop: insets.top }, transition.contentStyle]}>
+      <Animated.View className="flex-row items-center px-3 py-2" style={transition.chromeStyle}>
         <Button
           variant="ghost"
           size="icon"
@@ -176,11 +203,15 @@ function ViewerContent({
         <View className="h-11 w-11 items-center justify-center">
           {headerAction?.(close)}
         </View>
-      </View>
+      </Animated.View>
 
-      <View
+      <Animated.View
+        testID="photo-viewer-page"
+        ref={transition.pager}
+        collapsable={false}
+        style={transition.pagerStyle}
         className="flex-1"
-        onLayout={(event) => setPagerHeight(event.nativeEvent.layout.height)}
+        onLayout={(event) => { setPagerHeight(event.nativeEvent.layout.height); transition.measure(); }}
       >
         <FlatList
           ref={pagerRef}
@@ -211,28 +242,34 @@ function ViewerContent({
                 width={width}
                 height={pagerHeight}
                 aspectRatio={
-                  item.width && item.height ? item.width / item.height : loadedRatios[item.id]
+                  item.width && item.height ? item.width / item.height : loadedRatios[item.id] ?? (position === initialIndex ? transitionProps.origin?.ratio : undefined)
                 }
                 active={position === index}
+                drag={transition.drag}
+                onDismiss={transition.close}
+                onDismissCancel={transition.cancelDrag}
                 onZoomChange={setZoomed}
                 onZoomStart={() => sharpen(item.id)}
               >
                 <GalleryImage
                   item={item}
+                  sourceOverride={!isSharp ? transitionProps.getReturnGeometry?.(position)?.uri ?? (position === initialIndex ? transitionProps.origin?.uri : undefined) : undefined}
                   variant={isSharp ? "fullscreen" : "detail"}
                   placeholderVariant={isSharp ? "detail" : undefined}
                   // Fixed per photo, as a changed priority restarts the download.
                   priority={position === initialIndex ? "high" : "low"}
                   contentFit="contain"
                   style={{ width: "100%", height: "100%" }}
+                  onDisplayedUri={position === initialIndex ? transition.onPageDisplay : undefined}
                   onAspectRatio={(ratio) => rememberRatio(item.id, ratio)}
                 />
               </ZoomableImage>
             );
           }}
         />
-      </View>
+      </Animated.View>
 
+      <Animated.View style={transition.chromeStyle}>
       <FlatList
         ref={stripRef}
         data={media}
@@ -273,6 +310,9 @@ function ViewerContent({
       />
 
       <View style={{ paddingBottom: insets.bottom }}>{footer?.(close)}</View>
+      </Animated.View>
+      </Animated.View>
+      {transition.overlay && transition.geometry && transition.page && <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, transition.contentStyle]}><PhotoTransitionOverlay geometry={transition.geometry} page={transition.page} progress={transition.progress} drag={transition.drag} onDisplay={transition.onDisplay} onError={transition.onError} /></Animated.View>}
     </View>
   );
 }

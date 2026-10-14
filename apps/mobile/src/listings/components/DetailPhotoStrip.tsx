@@ -2,7 +2,10 @@ import { useCallback, useImperativeHandle, useMemo, useRef, useState, type React
 import { FlatList, Pressable, View, useWindowDimensions, type ListRenderItem, type ViewToken } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { listingPhotoUrl } from "../detail/buildVariantUrl";
+
 import { GalleryBanner, GalleryImage, type GalleryPhoto } from "./GalleryImage";
+import { clippedRadii, intersectRect, minimalStripOffset, type PhotoGeometry } from "./photoTransitionMath";
 import { isNearPhoto } from "./photoWindow";
 
 import { Skeleton } from "@/components/ui/skeleton";
@@ -40,6 +43,7 @@ export type StripPhoto = (GalleryPhoto & { pending?: false }) | { key: string; p
 /** What a parent can ask of the strip: land on a photo, as when the viewer closes on it. */
 export interface DetailPhotoStripHandle {
   scrollToPhoto: (index: number) => void;
+  measurePhoto: (index: number, callback: (geometry: PhotoGeometry | null) => void) => void;
 }
 
 interface DetailPhotoStripProps {
@@ -52,6 +56,8 @@ interface DetailPhotoStripProps {
    */
   onPressPhoto?: (index: number, tile: View | null) => void;
   ref?: Ref<DetailPhotoStripHandle>;
+  hiddenIndex?: number | null;
+  visibleTop?: number;
 }
 
 /**
@@ -77,9 +83,10 @@ interface DetailPhotoStripProps {
  * There is no counter here: each photo reads "Photo n of N" to a screen
  * reader, and the viewer shows `n / N`.
  */
-export function DetailPhotoStrip({ photos, banner, onPressPhoto, ref }: DetailPhotoStripProps) {
+export function DetailPhotoStrip({ photos, banner, onPressPhoto, ref, hiddenIndex, visibleTop = 0 }: DetailPhotoStripProps) {
   const { t } = useTranslation();
   const tile = useDetailPhotoTile();
+  const { width: viewport, height: windowHeight } = useWindowDimensions();
   const interval = tile.width + DETAIL_STRIP_SEAM;
   const [activeIndex, setActiveIndex] = useState(0);
   // Neighbours wait until the first photo has loaded, so on a slow connection
@@ -88,13 +95,34 @@ export function DetailPhotoStrip({ photos, banner, onPressPhoto, ref }: DetailPh
   const loadNeighbours = firstLoaded || activeIndex !== 0;
   const listRef = useRef<FlatList<StripPhoto>>(null);
   const tiles = useRef(new Map<number, View>());
+  const container = useRef<View>(null);
+  const offset = useRef(0);
+  const ratios = useRef(new Map<number, number>());
+  const uris = useRef(new Map<number, string>());
+  const measurePhoto = useCallback((index: number, callback: (geometry: PhotoGeometry | null) => void) => {
+    const photo = photos[index];
+    const node = tiles.current.get(index);
+    if (!photo || photo.pending || !node || !container.current) { callback(null); return; }
+    container.current.measureInWindow((sx, sy, sw, sh) => {
+      node.measureInWindow((x, y, width, height) => {
+        if (width <= 0 || height <= 0) { callback(null); return; }
+        const full = { x, y, width, height };
+        const visible = intersectRect(full, intersectRect({ x: sx, y: sy, width: sw, height: sh }, { x: 0, y: visibleTop, width: viewport, height: Math.max(0, windowHeight - visibleTop) }));
+        const ends: PhotoGeometry["radii"] = [index === 0 ? 12 : 0, index === photos.length - 1 ? 12 : 0, index === photos.length - 1 ? 12 : 0, index === 0 ? 12 : 0];
+        callback({ tile: full, visible, radii: clippedRadii(full, visible, ends), ratioKnown: !!(photo.width && photo.height) || ratios.current.has(index), uri: uris.current.get(index) ?? listingPhotoUrl(photo, "detail"), ratio: photo.width && photo.height ? photo.width / photo.height : ratios.current.get(index) ?? 4 / 3 });
+      });
+    });
+  }, [photos, visibleTop, viewport, windowHeight]);
 
   useImperativeHandle(ref, () => ({
     scrollToPhoto: (index) => {
       setActiveIndex(index);
-      listRef.current?.scrollToOffset({ offset: index * interval, animated: false });
+      const next = minimalStripOffset(index, offset.current, tile.width, DETAIL_STRIP_SEAM, DETAIL_MARGIN, viewport, DETAIL_MARGIN * 2 + photos.length * interval - DETAIL_STRIP_SEAM);
+      offset.current = next;
+      listRef.current?.scrollToOffset({ offset: next, animated: false });
     },
-  }), [interval]);
+    measurePhoto,
+  }), [interval, tile.width, viewport, photos.length, measurePhoto]);
 
   const onViewableItemsChanged = useCallback((info: { viewableItems: ViewToken[] }) => {
     const shown = info.viewableItems[0];
@@ -114,7 +142,7 @@ export function DetailPhotoStrip({ photos, banner, onPressPhoto, ref }: DetailPh
         }}
         collapsable={false}
         testID={item.pending ? "listing-photo-tile-pending" : "listing-photo-tile"}
-        style={{ width: tile.width, height: tile.height }}
+        style={{ width: tile.width, height: tile.height, ...(index === hiddenIndex ? { opacity: 0 } : {}) }}
         className={cn("overflow-hidden bg-muted", tileEnds(index, count))}
       >
         {!item.pending && (index === activeIndex || (loadNeighbours && isNearPhoto(index, activeIndex))) && (
@@ -126,7 +154,8 @@ export function DetailPhotoStrip({ photos, banner, onPressPhoto, ref }: DetailPh
             priority={index === 0 ? "high" : "low"}
             style={{ width: "100%", height: "100%" }}
             contentFit="cover"
-            onAspectRatio={index === 0 ? () => setFirstLoaded(true) : undefined}
+            onAspectRatio={(ratio) => { ratios.current.set(index, ratio); if (index === 0) setFirstLoaded(true); }}
+            onDisplayedUri={(uri) => uris.current.set(index, uri)}
           />
         )}
         {banner && <GalleryBanner label={banner} hidden />}
@@ -146,7 +175,7 @@ export function DetailPhotoStrip({ photos, banner, onPressPhoto, ref }: DetailPh
         {frame}
       </Pressable>
     );
-  }, [t, count, banner, tile, activeIndex, loadNeighbours, onPressPhoto]);
+  }, [t, count, banner, tile, activeIndex, loadNeighbours, onPressPhoto, hiddenIndex]);
 
   if (count === 0) {
     return (
@@ -164,7 +193,7 @@ export function DetailPhotoStrip({ photos, banner, onPressPhoto, ref }: DetailPh
   }
 
   return (
-    <DetailPhotos>
+    <View ref={container} collapsable={false} testID="detail-photos" style={PHOTOS}>
       <FlatList
         ref={listRef}
         testID="detail-photo-strip"
@@ -172,7 +201,9 @@ export function DetailPhotoStrip({ photos, banner, onPressPhoto, ref }: DetailPh
         data={photos}
         keyExtractor={(item, index) => (item.pending ? `pending-${index}` : item.key)}
         renderItem={renderItem}
-        extraData={{ activeIndex, loadNeighbours }}
+        extraData={{ activeIndex, loadNeighbours, hiddenIndex }}
+        onScroll={(event) => { offset.current = event.nativeEvent.contentOffset.x; }}
+        scrollEventThrottle={16}
         ItemSeparatorComponent={StripSeam}
         contentContainerStyle={STRIP_CONTENT}
         getItemLayout={(_, index) => ({ length: tile.width, offset: DETAIL_MARGIN + interval * index, index })}
@@ -188,7 +219,7 @@ export function DetailPhotoStrip({ photos, banner, onPressPhoto, ref }: DetailPh
         initialNumToRender={2}
         windowSize={3}
       />
-    </DetailPhotos>
+    </View>
   );
 }
 

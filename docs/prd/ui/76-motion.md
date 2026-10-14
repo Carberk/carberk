@@ -48,7 +48,7 @@
 
 ## Mobile motion tokens
 
-Mobile reads its motion from `packages/ui/tokens/mobile.ts` through `apps/mobile/lib/motion.ts`. Everything runs on the UI thread with Reanimated and animates transform and opacity only.
+Mobile reads its motion from `packages/ui/tokens/mobile.ts` through `apps/mobile/lib/motion.ts`. Everything runs on the UI thread with Reanimated. Most surfaces animate transform and opacity only. The photo viewer animates the geometry of one absolute clip view, as documented below.
 
 | Duration | ms | Use |
 |---|---|---|
@@ -85,6 +85,7 @@ Press scale: 0.96 for buttons, chips and icon buttons; 0.985 for cards and rows;
 | List and card entrance | A screen's content: a short fade and 8 dp rise on first mount. The first cards of a list replacing their skeletons: a fade with a 4 dp settle, 24 ms apart. Never per card on scroll |
 | Skeleton to content | The skeleton pulses in opacity (`pulse`); content fades in (`base`) |
 | Sheet | Complete panel slides as one with coordinated scrim fade, 300 ms / `enter`; leaves in 220 ms / `exit`. Rapid reopen reverses the current transition. Closing retains the committed contents and panel layout even when a parent clears its selected step or photo. |
+| Photo viewer open/close | Measured cover-to-contain reveal from the strip tile (`slow` / `standard`, 380 ms); close to the current visible tile (`base` / `standard`, 250 ms), or fade when less than 30% is visible. Chrome fades after landing (`fast`, 150 ms). Unzoomed vertical drag follows the finger; dismiss settles without overshoot (320 ms, damping ratio 1), cancellation uses `snappy`. Reduce Motion uses 150 ms fades. |
 | Dialog | Scales in with scrim fading (`slow`, `enter`); leaves faster (`base`, `exit`) |
 | Sticky header and bottom bar | Background and title fade with scroll position, driven by the scroll offset |
 | Toast | Fades and rises from the edge it sits on (`base`) |
@@ -117,7 +118,7 @@ Sign-in method selection (#717) uses Expo Haptics ~55.0.18: Android system Clock
 
 - 60fps target on TM mobile data with mid-range Android hardware
 - Avoid simultaneous animations (one at a time per surface)
-- Don't animate properties that trigger reflow (height, width — use transform + scale)
+- Don't animate properties that trigger reflow (height, width — use transform + scale), except the photo viewer's single absolute clip leaf: its width, height and corner radii reveal the cover crop while the image scales uniformly. Nothing reflows around it; clip and image share one progress value. Verify smoothness on Android.
 - Worth testing on a real low-end phone (Redmi Note 9, etc.)
 
 ## Implementation libraries
