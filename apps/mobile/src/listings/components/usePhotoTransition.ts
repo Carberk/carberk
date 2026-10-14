@@ -26,6 +26,8 @@ export function usePhotoTransition({ origin, getReturnGeometry, onTileHidden, on
   const [overlay, setOverlay] = useState(false);
   const [landed, setLanded] = useState(false);
   const closing = useRef(false);
+  const flightEnded = useRef(false);
+  const pageDisplayed = useRef(false);
   const progress = useSharedValue(0);
   const opacity = useSharedValue(0);
   const chrome = useSharedValue(0);
@@ -47,6 +49,8 @@ export function usePhotoTransition({ origin, getReturnGeometry, onTileHidden, on
     opacity.value = 1;
   }, [shown, page, reduced, origin, convert, opacity]);
   const finishOpen = useCallback(() => {
+    flightEnded.current = true;
+    if (!pageDisplayed.current || closing.current) return;
     setLanded(true);
     setOverlay(false);
     onTileHidden?.(null);
@@ -56,7 +60,7 @@ export function usePhotoTransition({ origin, getReturnGeometry, onTileHidden, on
     if (!shown || closing.current) return;
     if (reduced || !initialOrigin.current) {
       opacity.value = withTiming(1, { duration: duration.fast, reduceMotion: ReduceMotion.Never });
-      chrome.value = opacity.value;
+      chrome.value = withTiming(1, { duration: duration.fast, reduceMotion: ReduceMotion.Never });
       setLanded(true);
       return;
     }
@@ -85,20 +89,24 @@ export function usePhotoTransition({ origin, getReturnGeometry, onTileHidden, on
         const callback = (finished?: boolean) => { "worklet"; if (finished) scheduleOnRN(done); };
         progress.value = velocity === undefined
           ? withTiming(0, timing("base"), callback)
-          : withSpring(0, { duration: 320, dampingRatio: 1, velocity: 0, reduceMotion: ReduceMotion.System }, callback);
+          : withSpring(0, { duration: 320, dampingRatio: 1, velocity: -Math.abs(velocity) / Math.max(page.height, 1), reduceMotion: ReduceMotion.System }, callback);
       });
     } else {
       opacity.value = withTiming(0, { ...timing("base", "exit"), duration: reduced ? duration.fast : duration.base, reduceMotion: ReduceMotion.Never }, (finished) => { if (finished) scheduleOnRN(done); });
     }
   }, [chrome, getReturnGeometry, indexRef, reduced, page, convert, onTileHidden, landed, progress, done, opacity]);
   useEffect(() => { closeRef.current = () => close(); }, [closeRef, close]);
-  const backdropStyle = useAnimatedStyle(() => ({ opacity: opacity.value * Math.min(progress.value / 0.6 + (reduced || !initialOrigin.current ? 1 : 0), 1) * (1 - 0.7 * Math.min(Math.abs(drag.value.y) / ((page?.height ?? 1) * 0.5), 1)) }));
+  const hasOrigin = !!initialOrigin.current;
+  const flightBackdrop = hasOrigin || overlay;
+  const backdropStyle = useAnimatedStyle(() => ({ opacity: opacity.value * Math.min(progress.value / 0.6 + (reduced || !flightBackdrop ? 1 : 0), 1) * (1 - 0.7 * Math.min(Math.abs(drag.value.y) / ((page?.height ?? 1) * 0.5), 1)) }));
   const contentStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
   const chromeStyle = useAnimatedStyle(() => ({ opacity: chrome.value * (drag.value.y === 0 ? 1 : 0) }));
   const pagerStyle = useAnimatedStyle(() => ({
-    opacity: overlay || (!landed && !!initialOrigin.current && !reduced) ? 0 : 1,
+    opacity: overlay || (!landed && hasOrigin && !reduced) ? 0 : 1,
     transform: [{ translateX: drag.value.x }, { translateY: drag.value.y }, { scale: 1 - 0.25 * Math.min(Math.abs(drag.value.y) / (page?.height ?? 1), 1) }],
   }));
   const cancelDrag = useCallback(() => { drag.value = reduced ? { x: 0, y: 0 } : withSpring({ x: 0, y: 0 }, spring.snappy); }, [drag, reduced]);
-  return { root, pager, measure, page, geometry, overlay, progress, drag, close, cancelDrag, backdropStyle, contentStyle, chromeStyle, pagerStyle, onDisplay: useCallback(() => setDisplayed(true), []) };
+  const onPageDisplay = useCallback(() => { pageDisplayed.current = true; if (flightEnded.current) finishOpen(); }, [finishOpen]);
+  const onError = useCallback(() => { if (closing.current) return; opacity.value = 1; pageDisplayed.current = true; finishOpen(); }, [opacity, finishOpen]);
+  return { onPageDisplay, onError, root, pager, measure, page, geometry, overlay, progress, drag, close, cancelDrag, backdropStyle, contentStyle, chromeStyle, pagerStyle, onDisplay: useCallback(() => setDisplayed(true), []) };
 }

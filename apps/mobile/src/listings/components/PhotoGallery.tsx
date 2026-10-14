@@ -45,6 +45,7 @@ export function PhotoGallery({
   }, []);
   const openViewer = useCallback((index: number) => {
     setOrigin(null);
+    returns.current.clear();
     stripRef.current?.measurePhoto(index, (geometry) => {
       if (geometry) returns.current.set(index, geometry);
       setOrigin(geometry);

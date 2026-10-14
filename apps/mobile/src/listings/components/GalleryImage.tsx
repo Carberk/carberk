@@ -12,6 +12,8 @@ import { Text } from "@/components/ui/text";
 export type GalleryPhoto = Pick<ListingsSchemas.ListingMedia, "key"> & {
   variants?: Partial<ListingsSchemas.ListingMedia["variants"]> | undefined;
   thumbHash?: string | null | undefined;
+  width?: number | null | undefined;
+  height?: number | null | undefined;
 };
 type ExpoImageStyle = ComponentProps<typeof Image>["style"];
 

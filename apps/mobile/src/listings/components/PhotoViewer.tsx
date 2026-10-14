@@ -242,7 +242,7 @@ function ViewerContent({
                 width={width}
                 height={pagerHeight}
                 aspectRatio={
-                  item.width && item.height ? item.width / item.height : loadedRatios[item.id]
+                  item.width && item.height ? item.width / item.height : loadedRatios[item.id] ?? (position === initialIndex ? transitionProps.origin?.ratio : undefined)
                 }
                 active={position === index}
                 drag={transition.drag}
@@ -260,6 +260,7 @@ function ViewerContent({
                   priority={position === initialIndex ? "high" : "low"}
                   contentFit="contain"
                   style={{ width: "100%", height: "100%" }}
+                  onDisplayedUri={position === initialIndex ? transition.onPageDisplay : undefined}
                   onAspectRatio={(ratio) => rememberRatio(item.id, ratio)}
                 />
               </ZoomableImage>
@@ -311,7 +312,7 @@ function ViewerContent({
       <View style={{ paddingBottom: insets.bottom }}>{footer?.(close)}</View>
       </Animated.View>
       </Animated.View>
-      {transition.overlay && transition.geometry && transition.page && <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, transition.contentStyle]}><PhotoTransitionOverlay geometry={transition.geometry} page={transition.page} progress={transition.progress} drag={transition.drag} onDisplay={transition.onDisplay} /></Animated.View>}
+      {transition.overlay && transition.geometry && transition.page && <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, transition.contentStyle]}><PhotoTransitionOverlay geometry={transition.geometry} page={transition.page} progress={transition.progress} drag={transition.drag} onDisplay={transition.onDisplay} onError={transition.onError} /></Animated.View>}
     </View>
   );
 }

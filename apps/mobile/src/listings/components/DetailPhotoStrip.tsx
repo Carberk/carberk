@@ -109,7 +109,7 @@ export function DetailPhotoStrip({ photos, banner, onPressPhoto, ref, hiddenInde
         const full = { x, y, width, height };
         const visible = intersectRect(full, intersectRect({ x: sx, y: sy, width: sw, height: sh }, { x: 0, y: visibleTop, width: viewport, height: Math.max(0, windowHeight - visibleTop) }));
         const ends: PhotoGeometry["radii"] = [index === 0 ? 12 : 0, index === photos.length - 1 ? 12 : 0, index === photos.length - 1 ? 12 : 0, index === 0 ? 12 : 0];
-        callback({ tile: full, visible, radii: clippedRadii(full, visible, ends), uri: uris.current.get(index) ?? listingPhotoUrl(photo, "detail"), ratio: ratios.current.get(index) ?? 4 / 3 });
+        callback({ tile: full, visible, radii: clippedRadii(full, visible, ends), uri: uris.current.get(index) ?? listingPhotoUrl(photo, "detail"), ratio: photo.width && photo.height ? photo.width / photo.height : ratios.current.get(index) ?? 4 / 3 });
       });
     });
   }, [photos, visibleTop, viewport, windowHeight]);

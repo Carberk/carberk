@@ -5,9 +5,9 @@ import Animated, { useAnimatedStyle, type SharedValue } from "react-native-reani
 import { containRect, coverRect, dragRect, lerpRect, type PhotoGeometry, type PhotoRect } from "./photoTransitionMath";
 
 /** One absolute clip is the documented layout-animation exception in 76-motion. */
-export function PhotoTransitionOverlay({ geometry, page, progress, drag, onDisplay }: {
+export function PhotoTransitionOverlay({ geometry, page, progress, drag, onDisplay, onError }: {
   geometry: PhotoGeometry; page: PhotoRect; progress: SharedValue<number>;
-  drag: SharedValue<{ x: number; y: number }>; onDisplay: () => void;
+  drag: SharedValue<{ x: number; y: number }>; onDisplay: () => void; onError: () => void;
 }) {
   const target = containRect(page, geometry.ratio);
   const clipStyle = useAnimatedStyle(() => {
@@ -37,7 +37,7 @@ export function PhotoTransitionOverlay({ geometry, page, progress, drag, onDispl
   return (
     <Animated.View testID="photo-transition-overlay" pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.clip, clipStyle]}>
       <Animated.View style={[{ position: "absolute", width: page.width, height: page.height }, imageStyle]}>
-        <Image source={{ uri: geometry.uri }} contentFit="contain" style={StyleSheet.absoluteFill} cachePolicy="memory-disk" transition={0} onDisplay={onDisplay} />
+        <Image source={{ uri: geometry.uri }} contentFit="contain" style={StyleSheet.absoluteFill} cachePolicy="memory-disk" transition={0} onDisplay={onDisplay} onError={onError} />
       </Animated.View>
     </Animated.View>
   );
