@@ -48,7 +48,7 @@ export function PhotoGallery({
     returns.current.clear();
     stripRef.current?.measurePhoto(index, (geometry) => {
       if (geometry) returns.current.set(index, geometry);
-      setOrigin(geometry);
+      setOrigin(geometry?.ratioKnown === false ? null : geometry);
     });
     setViewerIndex(index);
   }, []);

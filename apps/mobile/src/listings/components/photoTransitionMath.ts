@@ -1,6 +1,6 @@
 /** Rectangles use window coordinates until converted into the Modal root. */
 export interface PhotoRect { x: number; y: number; width: number; height: number }
-export interface PhotoGeometry { tile: PhotoRect; visible: PhotoRect; radii: readonly [number, number, number, number]; uri: string; ratio: number }
+export interface PhotoGeometry { tile: PhotoRect; visible: PhotoRect; radii: readonly [number, number, number, number]; uri: string; ratio: number; ratioKnown?: boolean }
 export function coverRect(frame: PhotoRect, ratio: number): PhotoRect {
   "worklet";
   const width = Math.max(frame.width, frame.height * ratio);
@@ -32,7 +32,7 @@ export function visibleFraction(geometry: PhotoGeometry): number {
 }
 export function returnMode(geometry?: PhotoGeometry | null): "fly" | "fade" {
   "worklet";
-  return geometry && visibleFraction(geometry) >= 0.3 ? "fly" : "fade";
+  return geometry && geometry.ratioKnown !== false && visibleFraction(geometry) >= 0.3 ? "fly" : "fade";
 }
 export function clippedRadii(tile: PhotoRect, visible: PhotoRect, radii: PhotoGeometry["radii"]): PhotoGeometry["radii"] {
   "worklet";
