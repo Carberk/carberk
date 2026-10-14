@@ -34,6 +34,7 @@ export function PhotoGallery({
   const [origin, setOrigin] = useState<PhotoGeometry | null>(null);
   const [hiddenIndex, setHiddenIndex] = useState<number | null>(null);
   const returns = useRef(new Map<number, PhotoGeometry>());
+  const openingRequest = useRef(0);
   const stripRef = useRef<DetailPhotoStripHandle>(null);
 
   const prepareReturn = useCallback((index: number) => {
@@ -46,11 +47,22 @@ export function PhotoGallery({
   const openViewer = useCallback((index: number) => {
     setOrigin(null);
     returns.current.clear();
+    const request = ++openingRequest.current;
+    let presented = false;
+    const present = () => {
+      if (presented || request !== openingRequest.current) return;
+      presented = true;
+      setViewerIndex(index);
+    };
     stripRef.current?.measurePhoto(index, (geometry) => {
+      if (presented || request !== openingRequest.current) return;
       if (geometry) returns.current.set(index, geometry);
       setOrigin(geometry?.ratioKnown === false ? null : geometry);
+      present();
     });
-    setViewerIndex(index);
+    // Fabric measurements may cross native frames. Give both nested reads a
+    // frame before presenting; a missing/virtualized ref still opens by fade.
+    requestAnimationFrame(() => requestAnimationFrame(present));
   }, []);
   const closeViewer = useCallback((index: number) => {
     setViewerIndex(null);
