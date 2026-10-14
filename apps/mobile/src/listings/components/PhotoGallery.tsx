@@ -39,10 +39,13 @@ export function PhotoGallery({
 
   const prepareReturn = useCallback((index: number) => {
     stripRef.current?.scrollToPhoto(index);
-    requestAnimationFrame(() => stripRef.current?.measurePhoto(index, (geometry) => {
+    // The strip scroll crosses native frames before the tile lands; measuring
+    // after one frame can still read the pre-scroll position and make the
+    // close fade instead of flying into the current tile.
+    requestAnimationFrame(() => requestAnimationFrame(() => stripRef.current?.measurePhoto(index, (geometry) => {
       if (geometry) returns.current.set(index, geometry);
       else returns.current.delete(index);
-    }));
+    })));
   }, []);
   const openViewer = useCallback((index: number) => {
     setOrigin(null);
