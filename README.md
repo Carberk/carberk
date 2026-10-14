@@ -1,4 +1,4 @@
-# AutoTM
+# Carberk
 
 A mobile-first vehicle marketplace for Turkmenistan, with Russian, Turkmen, and English interfaces. Staging and production use the cloud-first Railway topology in [ADR-0039](docs/adr/0039-phased-cloud-first-hosting.md). The fully in-TM deployment remains a later phase.
 
@@ -34,7 +34,7 @@ Run `pnpm lint`, `pnpm typecheck`, and `pnpm test`. Migration and some integrati
 
 Use the [deployment runbook](docs/prd/ops/80-deployment-runbook.md) and the effective hosting decision. The API pre-deploy command owns deployed schema migrations. Do not infer current hosting from the original air-gap charter.
 
-Use the [portable coding workflow](docs/agents/coding-workflow.md) for issue execution, queues of issues, and resume.
+Use the [portable coding workflow](docs/agents/coding-workflow.md) for bounded integration delivery and recovery.
 
 ## License
 

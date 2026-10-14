@@ -27,7 +27,7 @@ Two kinds of issues coexist in this repo, **one parent per sprint** plus **one c
 | Type | Used for | Body shape |
 |---|---|---|
 | **Sprint PRD (parent)** | One per sprint (S1, S2, ...). Tracks child sub-issues. | Dashboard + tasklist — no agent prompt. |
-| **Sprint child** | One independently mergeable vertical slice. Executed by `/run-issue`, alone or as part of a `/run-queue` queue. | Self-contained implementation contract (see below). |
+| **Sprint child** | One testable vertical slice. An isolated `/run-issue` writer supplies the parent integration candidate. | Self-contained implementation contract (see below). |
 
 ## Sprint PRD body template (parent)
 
@@ -55,7 +55,7 @@ The unblocked queue is:
 \`gh issue list --label "ready-for-agent" --search "-label:blocked" --json number,title,labels\`
 
 - Interactive: the user selects an issue and invokes `run-issue <N>` in Codex desktop, Claude Code desktop, or the `claude-kimi` CLI.
-- Queue: the user gives one long-running session an ordered list of issues through [`run-queue`](../../.claude/skills/run-queue/SKILL.md). Each issue still goes through `run-issue`.
+- Queue: the user gives one long-running session an ordered list of issues through [`run-queue`](../../.claude/skills/run-queue/SKILL.md). Chief of Staff dispatches isolated `run-issue` writers into one bounded integration delivery.
 
 Both paths treat the issue body as the slice contract. The parent remains a dashboard, never an executable prompt.
 ```
@@ -125,7 +125,7 @@ Each child issue body has a `## Depends on` section listing zero or more issue n
 
 ## `/run-issue` integration
 
-Use [run-issue](../../.claude/skills/run-issue/SKILL.md) for one ready issue, [resume-issue](../../.claude/skills/resume-issue/SKILL.md) when its execution state exists, and [run-queue](../../.claude/skills/run-queue/SKILL.md) for a founder-ordered set. The [coding workflow](coding-workflow.md) routes their shared gates. The issue body stays a task contract; its branch and PR Execution state record implementation progress. The successful integration owner reconciles affected dependency labels through [sprint-transitions](sprint-transitions.md).
+Use [run-issue](../../.claude/skills/run-issue/SKILL.md) for one ready issue, [resume-issue](../../.claude/skills/resume-issue/SKILL.md) when its execution state exists, and [run-queue](../../.claude/skills/run-queue/SKILL.md) for a founder-ordered set. The [coding workflow](coding-workflow.md) routes their shared gates. The issue body stays a task contract; its branch/comment and parent integration PR Execution state record implementation progress. The successful integration owner reconciles affected dependency labels through [sprint-transitions](sprint-transitions.md).
 
 ## Body template (general / non-sprint issues)
 

@@ -1,50 +1,40 @@
-# AutoTM coding workflow
+# Integration delivery
 
-Choose the route for the task, then read its linked skill. [AGENTS.md](../../AGENTS.md) owns common constraints. The task's issue and specification own the intended outcome; source and tests establish current behavior. [CONTEXT-MAP.md](../../CONTEXT-MAP.md) locates the relevant overview. Read the [canonical domain glossary](../domain/GLOSSARY.md) when terminology matters.
+Active delivery policy under [ADR-0098](../adr/0098-integration-delivery-with-shared-staging-and-concise-agent-guidance.md). The [transition gates](../prd/ops/89-integration-delivery-transition.md) must precede activation of new operational capabilities. Existing executable safeguards remain effective; a written procedure does not enable staging fixtures or direct pushes.
 
-| Task | Route |
-|---|---|
-| Shape a capability or material decision | [shape-with-docs](../../.claude/skills/shape-with-docs/SKILL.md) and, when needed, [new-adr](../../.claude/skills/new-adr/SKILL.md) |
-| Create sprint issues after the shaping PR merges | [create-sprint-issues](../../.claude/skills/create-sprint-issues/SKILL.md), [issue-tracker](issue-tracker.md), and [sprint-transitions](sprint-transitions.md) |
-| Execute one ready issue | [run-issue](../../.claude/skills/run-issue/SKILL.md); use [resume-issue](../../.claude/skills/resume-issue/SKILL.md) when its branch, worktree, or PR exists |
-| Execute a founder-ordered queue or explicitly delegated outcome | [run-queue](../../.claude/skills/run-queue/SKILL.md); each item follows run-issue |
-| Implement several issues in this cache-warm session (trial) | [run-batch](../../.claude/skills/run-batch/SKILL.md), under [ADR-0094](../adr/0094-one-orchestrator-implements-batched-pull-requests-trial.md) |
-| Make a small fix or resolve a PR finding | [Small changes](#small-changes-adr-0065) |
-| Check progress or close a sprint | [sprint-status](../../.claude/skills/sprint-status/SKILL.md) or [close-sprint](../../.claude/skills/close-sprint/SKILL.md) |
+This file owns delivery roles, phases and gates. [AGENTS.md](../../AGENTS.md) routes task constraints. Specifications own intended behavior; source and runtime evidence own current behavior. Use the [glossary](../domain/GLOSSARY.md) when terminology matters.
 
-For UI work, read [UI-MODE.md](../../.claude/skills/run-issue/UI-MODE.md) after the issue and approved design. It routes nontrivial missing design to [design-grill](../../.claude/skills/design-grill/SKILL.md). All phases follow the [worktree lifecycle](worktree-lifecycle.md).
+## Prepare
 
-## Issue execution
+Shape unresolved intent with [shape-with-docs](../../.claude/skills/shape-with-docs/SKILL.md); material decisions use [new-adr](../../.claude/skills/new-adr/SKILL.md). After approved shaping merges, [create-sprint-issues](../../.claude/skills/create-sprint-issues/SKILL.md) prepares sprint tasks. [Issue tracker](issue-tracker.md) owns issue shape and [sprint transitions](sprint-transitions.md) owns scheduling bookkeeping.
 
-[Run-issue](../../.claude/skills/run-issue/SKILL.md) owns the action sequence. Load its references at the relevant phase:
+Chief of Staff uses [run-queue](../../.claude/skills/run-queue/SKILL.md) for one bounded parent specification, including a single-task delivery. Record founder authority, exclusions, selected issues, dependencies and completion evidence in the parent. Select within explicit delegation; product ambiguity, architecture decisions and material scope expansion return to the founder.
 
-- [Execution state](../../.claude/skills/run-issue/EXECUTION-STATE.md): reservation, checkpoints and durable recovery.
-- [Verification](../../.claude/skills/run-issue/VERIFICATION.md): acceptance evidence, applicable gates and failure handling.
-- [Finalization](../../.claude/skills/run-issue/FINALIZATION.md): independent review, the fix round and protected merge.
-- [Bail and recovery](../../.claude/skills/run-issue/BAIL-AND-RECOVERY.md): interruptions and missing authority or evidence.
+## Implement and assemble
 
-[Run-queue](../../.claude/skills/run-queue/SKILL.md) owns orchestration, stacking and founder-grouped integration branches. [Resume-issue](../../.claude/skills/resume-issue/SKILL.md) inspects an existing attempt before another writer starts. These contracts retain the required review and CI gates; this router does not duplicate them.
+1. Inspect existing branches, worktrees, PRs and durable state before assigning a writer. Resume existing attempts with [resume-issue](../../.claude/skills/resume-issue/SKILL.md).
+2. Reserve `agent/spec-<parent>-<slug>` from current `origin/main`. Open its one draft PR early, after the first checkpoint. Keep the parent and each issue's [Execution state](../../.claude/skills/run-issue/EXECUTION-STATE.md) current.
+3. Dispatch one isolated [run-issue](../../.claude/skills/run-issue/SKILL.md) writer per ready issue from a supplied integration SHA. Each owns `agent/issue-<N>`, pushes a reservation before edits and stops after verification. Writers open no issue PRs. Dependency work may proceed from a verified prerequisite incorporated into the integration candidate; dependencies close only through the final PR.
+4. One assembly writer merges verified issue checkpoints in dependency order, reconciles current `main`, inspects the combined diff and runs full candidate checks. Mechanical conflicts are implementation work; conflicts with multiple valid semantic resolutions need direction. Only one writer changes the integration branch at a time.
 
-## Push documentation separately
+Use the [worktree lifecycle](worktree-lifecycle.md) and host [model profile](queue-models.md). Chief of Staff owns dispatch and handoffs, never another writer's checkout. Stacking, unrelated per-issue PRs and the batch trial are retired delivery modes. Recover old attempts into the bounded parent without losing refs or evidence.
 
-Push documentation, evidence and Execution-state commits separately from code, after the code head's required `pr` check is green. Wait for each docs run to finish successfully before pushing the next docs commit. A cancelled previous run makes the next run take the full lane. The next synchronize run takes the short docs lane when it can prove that only documentation changed by hand since that green head. A merge from `main` may also take that lane when its only hand changes and conflict resolutions are documentation. Missing or ambiguous checks or history take the full lane. [ADR-0091](../adr/0091-docs-lane-after-a-green-pull-request-head.md) records the decision and its accepted cost. A `run-batch` batch pushes its docs with its code instead ([ADR-0094](../adr/0094-one-orchestrator-implements-batched-pull-requests-trial.md)).
+## Review and accept
 
-## Sliced issues (ADR-0082)
-
-When an issue has ordered slices, read [Sliced issues](../../.claude/skills/run-issue/SLICED-ISSUES.md) for its eligibility, size, checkpoint and evidence rules. The governing decision is [ADR-0082](../adr/0082-an-issue-may-carry-up-to-three-ordered-slices.md).
+1. Run [verification](../../.claude/skills/run-issue/VERIFICATION.md) before pinning the assembled SHA. Missing required evidence blocks completion.
+2. Obtain one independent, read-only Standards and Spec review round on that SHA, then one fix round under [finalization](../../.claude/skills/run-issue/FINALIZATION.md). Reviewers did not implement the candidate. Fixes receive affected verification; material scope or architecture changes require another independent review.
+3. Reserve [shared staging](shared-staging.md) for final deployed acceptance after review/fixes. Earlier reservations support investigations and device evidence needed by review. A staging-found bug is fixed on the integration branch and affected checks and deployed evidence rerun; a material scope or architecture change returns to independent review.
+4. Require green applicable CI on the resulting candidate, complete acceptance evidence and staging restoration. Merge the integration PR by protected squash merge. Production promotion and store submission are separate release actions.
+5. Verify merge and issue closure, reconcile dependent labels, report missing evidence and run the safe cleanup phase. Checkpoint commits preserve work; they do not establish final verification.
 
 ## Small changes (ADR-0065)
 
-[ADR-0065](../adr/0065-small-changes-skip-the-issue-ceremony.md) governs these exceptions.
+A focused, low-risk docs or code change may omit issue ceremony. Default delivery remains an integration PR. Direct push requires founder approval of the concrete diff and SHA, applicable independent review and hosted checks on that exact candidate before `main`. A changed candidate needs renewed approval and affected verification.
 
-- An accepted review finding is fixed in that PR, in its one fix round, and is not re-reviewed ([ADR-0085](../adr/0085-one-review-round-one-fix-round-no-re-review.md), [FINALIZATION](../../.claude/skills/run-issue/FINALIZATION.md#independent-review)).
-- A no-issue PR may cover about 50 lines or fewer excluding tests when it makes no migration, API contract, auth, deployment or production-configuration, ADR, agent-workflow policy, product, or architecture change. Use `fix/<slug>` or `chore/<slug>`, one fresh `Standards + Spec` review, and a green required `pr` check.
-- Batch non-blocking follow-ups by area as ADR-0065 specifies. Blocking findings are fixed before merge.
+Migrations, authentication/permissions, API contracts, cross-context restructuring, deployment and CI policy changes always use integration PRs. Workflow policy cutover uses a PR. The direct-push path remains unavailable until exact-commit CI and an actor-specific PR-requirement exception are implemented and verified. Keep required checks and other protection intact; never disable protection globally.
 
-## Document and client boundaries
+## Stop and recover
 
-[Domain guidance](domain.md#document-authority) owns document roles and mutability. [AGENTS.md](../../AGENTS.md) owns shared client constraints. Clients without automatic skill discovery open the linked repository skill manually; keep one canonical copy in `.claude/skills`.
+Preserve refs, local diffs and [durable state](../../.claude/skills/run-issue/BAIL-AND-RECOVERY.md) on interruption, unavailable authority/evidence or host refusal. Cap repairs of the same root failure at three focused attempts. Waiting is not an attempt. Resume from evidence rather than chat history; destructive recovery and ambiguous semantic conflicts need direction.
 
-Codex queue dispatch follows the [queue model profile](queue-models.md) and [host-specific worktree lifecycle](worktree-lifecycle.md#queue-implementer-worktrees). Claude role defaults remain host-specific.
-
-For bounded GitHub reads, issue creation and comments, use [GitHub operations](github-operations.md).
+Shared rules have one owner: [domain/document authority](domain.md), [module/test standards](coding-standards.md), [acceptance verification](../../.claude/skills/run-issue/VERIFICATION.md), [staging operations](shared-staging.md), and workspace/CI configuration for commands. For GitHub reads and writes use [bounded operations](github-operations.md); for sprint status/closeout use [sprint-status](../../.claude/skills/sprint-status/SKILL.md) or [close-sprint](../../.claude/skills/close-sprint/SKILL.md).

@@ -20,6 +20,7 @@ function createFixture(glossary) {
   mkdirSync(join(root, ".claude", "skills", "new-adr"), { recursive: true });
   mkdirSync(join(root, ".claude", "skills", "create-sprint-issues"), { recursive: true });
   mkdirSync(join(root, ".claude", "skills", "run-issue"), { recursive: true });
+  mkdirSync(join(root, ".claude", "skills", "run-queue"), { recursive: true });
   mkdirSync(join(root, ".claude", "skills", "resume-issue"), { recursive: true });
   mkdirSync(join(root, ".claude", "skills", "design-grill"), { recursive: true });
   mkdirSync(join(root, ".claude", "skills", "wireframe"), { recursive: true });
@@ -53,6 +54,7 @@ function createFixture(glossary) {
     "[Run issue](../run-issue/SKILL.md)",
   ].join("\n"));
   writeFileSync(join(root, ".claude", "skills", "new-adr", "SKILL.md"), "fixture\n");
+  writeFileSync(join(root, ".claude", "skills", "run-queue", "SKILL.md"), "[Workflow](../../../docs/agents/coding-workflow.md)\n");
   for (const name of ["create-sprint-issues", "run-issue", "design-grill", "wireframe", "hifi-design"]) {
     writeFileSync(join(root, ".claude", "skills", name, "SKILL.md"), "[Glossary](../../../docs/domain/GLOSSARY.md)\n");
   }
@@ -63,6 +65,7 @@ function createFixture(glossary) {
     "[Shape](../../.claude/skills/shape-with-docs/SKILL.md)",
     "[Specify and create tickets](../../.claude/skills/create-sprint-issues/SKILL.md)",
     "[Implement and review](../../.claude/skills/run-issue/SKILL.md)",
+    "[Chief of Staff](../../.claude/skills/run-queue/SKILL.md)",
   ].join("\n"));
   writeFileSync(join(root, "docs", "agents", "domain.md"), "[Glossary](../domain/GLOSSARY.md)\n");
   writeFileSync(join(root, "docs", "agents", "issue-tracker.md"), "[Glossary](../domain/GLOSSARY.md)\n");
@@ -169,6 +172,7 @@ test("rejects a broken workflow-router glossary link", () => withFixture(valid, 
     "[Shape](../../.claude/skills/shape-with-docs/SKILL.md)",
     "[Specify and create tickets](../../.claude/skills/create-sprint-issues/SKILL.md)",
     "[Implement and review](../../.claude/skills/run-issue/SKILL.md)",
+    "[Chief of Staff](../../.claude/skills/run-queue/SKILL.md)",
   ].join("\n"));
   assert.match(failure(root), /coding workflow is missing its glossary link/);
 }));
@@ -185,6 +189,8 @@ for (const [label, target, diagnostic] of [
   }));
 }
 for (const [label, source, target, diagnostic] of [
+  ["Chief of Staff workflow authority", ".claude/skills/run-queue/SKILL.md", "../../../docs/agents/coding-workflow.md", /Chief of Staff is missing its authoritative workflow link/],
+  ["workflow orchestration", "docs/agents/coding-workflow.md", "../../.claude/skills/run-queue/SKILL.md", /coding workflow is missing its Chief of Staff link/],
   ["sprint issue creation", ".claude/skills/create-sprint-issues/SKILL.md", "../../../docs/domain/GLOSSARY.md", /create-sprint-issues is missing its glossary link/],
   ["child issue contract", "docs/agents/issue-tracker.md", "../domain/GLOSSARY.md", /issue tracker guidance is missing its glossary link/],
   ["issue execution", ".claude/skills/run-issue/SKILL.md", "../../../docs/domain/GLOSSARY.md", /run-issue is missing its glossary link/],
