@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Pressable } from "react-native";
 import * as RN from "react-native";
 
@@ -8,6 +8,8 @@ import { mediaFixture } from "../../../test/fixtures/listing";
 import { PhotoViewer } from "./PhotoViewer";
 
 import { useReduceMotion } from "@/lib/motion";
+
+beforeEach(() => vi.mocked(useReduceMotion).mockReturnValue(false));
 
 const WINDOW_WIDTH = 390;
 const scrollRequests = (RN as unknown as { scrollRequests: unknown[] })
@@ -178,7 +180,9 @@ it("uses the displayed detail URI in the moving image before handing off to its 
   expect(getHost(overlay, "Image").props.contentFit).toBe("contain");
 });
 it("uses fade-only presentation under Reduce Motion and still returns the current photo", async () => {
-  vi.mocked(useReduceMotion).mockReturnValueOnce(true);
+  measured.set("photo-viewer-root", [0, 24, 390, 820]);
+  measured.set("photo-viewer-page", [0, 80, 390, 640]);
+  vi.mocked(useReduceMotion).mockReturnValue(true);
   const { screen, onClose } = await open({ origin });
   await act(() => getHost(screen.container, "Modal").props.onShow());
   expect(screen.queryByTestId("photo-transition-overlay")).toBeNull();
