@@ -183,10 +183,13 @@ it("uses fade-only presentation under Reduce Motion and still returns the curren
   measured.set("photo-viewer-root", [0, 24, 390, 820]);
   measured.set("photo-viewer-page", [0, 80, 390, 640]);
   vi.mocked(useReduceMotion).mockReturnValue(true);
-  const { screen, onClose } = await open({ origin });
+  const getReturnGeometry = vi.fn(() => origin);
+  const { screen, onClose } = await open({ origin, getReturnGeometry });
   await act(() => getHost(screen.container, "Modal").props.onShow());
-  expect(screen.queryByTestId("photo-transition-overlay")).toBeNull();
+  expect(screen.queryByTestId("photo-transition-overlay", { includeHiddenElements: true })).toBeNull();
   await swipeTo(screen, 4);
   await fireEvent.press(screen.getByRole("button", { name: "Close" }));
+  expect(getReturnGeometry).toHaveBeenCalledWith(4);
+  expect(screen.queryByTestId("photo-transition-overlay", { includeHiddenElements: true })).toBeNull();
   expect(onClose).toHaveBeenCalledWith(4);
 });

@@ -42,21 +42,23 @@ describe("Listing summary fields for the detail preview", () => {
     expect(schema.parse({ ...base, ...contactPreferences, ...previewFields })).toMatchObject(previewFields);
   });
 
-  it("keeps contact preferences for the buyer's contact bar on feed and favorites items only", () => {
+  it("keeps contact preferences on owner, feed and favorites summaries", () => {
     const item = { ...base, ...contactPreferences, ...previewFields };
 
     expect(FeedListingSummarySchema.parse(item)).toMatchObject(contactPreferences);
     expect(FavoriteListingSummarySchema.parse(item)).toMatchObject(contactPreferences);
-    expect(ListingSummarySchema.parse(item)).not.toHaveProperty("allowCalls");
+    expect(ListingSummarySchema.parse(item)).toMatchObject({ allowCalls: true, allowChat: true });
   });
 
   it("still parses a summary from an older API without them", () => {
     const parsed = ListingSummarySchema.parse(base);
 
-    for (const field of Object.keys(previewFields)) expect(parsed).not.toHaveProperty(field);
+    for (const field of [...Object.keys(previewFields), "allowCalls", "allowChat"]) expect(parsed).not.toHaveProperty(field);
   });
 
-  it("never carries the VIN itself", () => {
-    expect(ListingSummarySchema.parse({ ...base, vin: "JTDKB20U793456789" })).not.toHaveProperty("vin");
+  it("never carries the VIN itself or contact phone on owner summaries", () => {
+    const parsed = ListingSummarySchema.parse({ ...base, vin: "JTDKB20U793456789", contactPhone: "+99365000000" });
+    expect(parsed).not.toHaveProperty("vin");
+    expect(parsed).not.toHaveProperty("contactPhone");
   });
 });
