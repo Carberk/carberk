@@ -41,16 +41,19 @@ describe("Large Listing card", () => {
   it("shows the photo strip, TMT price, spec line, one-line title and city/date", async () => {
     const onPress = vi.fn();
     const view = await renderMobile(<ListingLargeCard listing={{ ...listing, mileageKm: 0 }} brandName="Toyota" modelName="Camry" cityName="Ashgabat" transmissionName="Automatic" engineTypeName="Petrol" isAuthenticated={false} returnTo={returnTo} onPress={onPress} />);
-    expect(view.getAllByTestId("listing-photo")).toHaveLength(2); expect(view.getByLabelText("Photos: 7")).toBeTruthy();
+    expect(view.getAllByTestId("listing-photo")).toHaveLength(2); expect(view.queryByLabelText(/Photos: /)).toBeNull();
     expect(view.getByText("70,000 TMT")).toBeTruthy(); expect(view.queryByText(/USD/)).toBeNull();
     expect(view.getByText("Toyota Camry, 2018").props.numberOfLines).toBe(1);
     expect(view.getByText("0 km · Automatic · Petrol")).toBeTruthy();
     await fireEvent.press(view.getByRole("button", { name: /Toyota Camry, 2018/ })); expect(onPress).toHaveBeenCalledWith("listing");
     await fireEvent.press(view.getByRole("button", { name: "Favorite" })); expect(useAuthIntentStore.getState().intent).toEqual({ returnTo, action: { kind: "favorite", listingId: "listing" } });
   });
-  it.each([["en", "Photos: 2"], ["ru", "Фото: 2"], ["tk", "Suratlar: 2"]])("names the photo count without plural-dependent words in %s", async (locale, label) => {
-    const view = await renderMobile(<ListingLargeCard listing={{ ...listing, photoCount: 2 }} isAuthenticated={false} returnTo={returnTo} onPress={vi.fn()} />, { locale });
-    expect(view.getByLabelText(label)).toBeTruthy();
+  it.each([[0, []], [1, ["one.webp"]], [2, ["one.webp", "two.webp"]], [7, ["one.webp", "two.webp"]]])("renders no photo count for a Listing with %i photos", async (photoCount, photoKeys) => {
+    for (const locale of ["en", "ru", "tk"]) {
+      const view = await renderMobile(<ListingLargeCard listing={{ ...listing, photoKeys, photoCount }} isAuthenticated={false} returnTo={returnTo} onPress={vi.fn()} />, { locale });
+      expect(view.queryByLabelText(/(Photos|Фото|Suratlar): \d/)).toBeNull();
+      expect(view.queryByText(String(photoCount))).toBeNull();
+    }
   });
   it("drops absent spec parts without separators or UUID placeholders", async () => {
     const view = await renderMobile(<ListingLargeCard listing={listing} brandName="Toyota" modelName="Camry" engineTypeName="Petrol" isAuthenticated={null} returnTo={returnTo} onPress={vi.fn()} />);
@@ -77,7 +80,8 @@ describe("Large Listing card", () => {
     expect(formatListingDate(date, "en", (key) => ({ resultsToday: "Today", resultsYesterday: "Yesterday" })[key] ?? key, new Date("2026-09-30T12:00:00Z"))).toBe(expected);
   });
   it("says New on the photos only when the seller stated a new car", async () => {
-    expect((await renderCard({ ...listing, condition: "new" })).view.getByText("New")).toBeTruthy();
+    const stated = (await renderCard({ ...listing, condition: "new" })).view;
+    expect(stated.getByText("New")).toBeTruthy(); expect(stated.queryByLabelText(/Photos: /)).toBeNull(); expect(stated.getByTestId("listing-photos")).toBeTruthy();
     expect((await renderCard({ ...listing, condition: "used" })).view.queryByText("New")).toBeNull();
   });
 });
