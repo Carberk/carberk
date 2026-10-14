@@ -1,60 +1,32 @@
 # Durable execution state
 
-Git and GitHub are the recovery record for every implementation issue. Chat history may provide context, but another supported coding agent must be able to continue without it.
-
 ## Reservation and first checkpoint
 
-1. Create `agent/issue-<N>` from updated `main` and push it before editing. The remote branch is the issue reservation. A stacked issue under [run-queue](../run-queue/SKILL.md#stacking) branches from its parent's branch head instead.
-2. Commit and push after the first meaningful checkpoint, then open a draft pull request. The body starts with `Closes #<N>` and contains exactly one mutable `Execution state` section.
-3. Update that section after every checkpoint, verification result, review verdict, failure, or handoff. Do not append competing state summaries.
-4. Never query Codex, Claude, or another provider for remaining quota before starting. Checkpoints make an unexpected stop recoverable.
+Chief of Staff owns one parent integration record and draft PR. Each issue writer reserves its branch from the supplied integration SHA and maintains one execution comment until assembly. After assembly, copy criterion evidence into the integration PR and link the issue record; update the PR rather than appending competing summaries.
 
-Use this shape:
+Record after every checkpoint, verification phase, failure, review finding and handoff:
 
-```markdown
-## Execution state
+- Owner, role, parent/issue, branch, supplied base and last pushed checkpoint SHA.
+- Status: reserved, implementing, verifying, assembling, reviewing, fixing, accepting, ready, blocked or merged.
+- Criteria completed and evidence below; commands/results marked pass, fail or unknown.
+- Current root failure, interrupted commands/processes and missing authority or environment.
+- Documentation changes and external dependency `Docs:` receipts from the lookup guide.
+- Review target/verdicts and finding dispositions: fixed SHA, deferred issue or rejection reason.
+- Staging reservation/evidence/restoration link when applicable.
+- One concrete next action and the responsible owner.
 
-- **Status:** implementing | verifying | reviewing | ready-to-merge | blocked
-- **Stacked on:** `<parent PR and parent head SHA, or none>`
-- **Last checkpoint:** `<commit SHA>`
-- **Completed acceptance criteria:** `<issue checkbox references or concise list>`
-- **Acceptance evidence:** `<criterion, red checkpoint/run, green run, or exemption; UI state/spec/screenshot links>`
-- **Verification:** `<command and pass/fail/unknown result>`
-- **Current failure:** `<root cause or none>`
-- **Interrupted commands:** `<command and last known state or none>`
-- **Documentation:** `<CONTEXT/ADR/PRD status>`
-- **Docs:** `<one entry per external dependency: not needed — <package>@<version> published <YYYY-MM-DD>, before cutoff <YYYY-MM>; or <official URL> — <what it verified>; upgrades add the peerDependencies/engines checked; or not applicable>`
-- **Reviews:** `Standards <verdict/SHA>; Spec <verdict/SHA>; each finding fixed in <sha>, deferred to <issue>, or rejected: <reason>; or none`
-- **Next action:** `<one concrete action>`
-```
-
-Silence, a stopped process, and missing output are `unknown`, never `pass`.
-
-## Checkpoint boundaries
-
-Create a checkpoint when any of these becomes true:
-
-- one acceptance criterion is implemented with its test or inspection evidence;
-- a migration, generated contract, or current-state document changes;
-- a verification phase finishes;
-- a review finding is resolved;
-- work is about to cross a tool, machine, or session boundary; or
-- a long-running command can be safely interrupted after preserving the current result.
-
-Checkpoint commits may be small. The final squash keeps `main` history focused.
-
-Run focused checks for each changed behavior before its checkpoint. Record the exact result in Execution state. A checkpoint is recoverable progress, not a verified final commit. [Verification](VERIFICATION.md) owns the complete gates before final review; a later change invalidates evidence for inputs it affects.
+Silence or interrupted output is unknown. A checkpoint preserves work; [verification](VERIFICATION.md) establishes evidence. Never query provider quota before starting work.
 
 ## Acceptance evidence record
 
-For the [acceptance-evidence procedure](VERIFICATION.md#acceptance-evidence), keep one row per criterion in the mutable PR state:
+Keep a row for every criterion and preserve red output after green:
 
-| Criterion | Red checkpoint and run | Green run | Exemption or visual evidence |
+| Criterion | Red checkpoint/run | Green SHA/run | Exemption or device proof |
 |---|---|---|---|
-| `<criterion>` | `<pushed SHA, exact command, assertion/failure output>` | `<SHA, same command, result>` | `<reason and inspection proof, or state/spec/screenshot links>` |
+| Required behavior | SHA, exact command and relevant failure | SHA, same test and result | Reason and alternative proof; state/spec/artifact links |
 
-Record the actual failure reason and preserve the red checkpoint SHA and output after the test passes. Mark unavailable or interrupted evidence `unknown`, with its next action. For docs-only work record the exemption and documentation checks; no artificial failing test is needed.
+Docs-only and visual claims use explicit exemptions from artificial red tests under [acceptance evidence](VERIFICATION.md#acceptance-evidence). A missing required gate stays blocked with its owner and next action.
 
 ## Handoff inspection
 
-An incoming Codex desktop, Claude Code desktop, `claude-kimi` CLI, or other supported client inspects the issue, local and remote branch heads, worktree status, draft PR body and comments, checks, running processes, and the complete diff before changing anything. It resumes the existing record instead of creating another branch, PR, or summary document. It reuses the worktree only when no other session or agent owns it; otherwise it works in its own new worktree from the pushed branch under the [host-specific lifecycle](../../../docs/agents/worktree-lifecycle.md#queue-implementer-worktrees).
+An incoming writer inspects issue/spec, branch heads, worktree diff, PR/comments/checks, review SHAs and processes. A legacy per-issue or batch PR is preserved and reconciled by Chief of Staff into the integration attempt. Resume in an owned checkout; use [resume-issue](../resume-issue/SKILL.md).

@@ -8,6 +8,8 @@ For component behavior tests, use the [mobile testing guide](mobile-testing.md).
 
 Do not patch `node_modules`, Codegen, Metro resolution, or native-package entrypoints until Expo's dependency check has run. Expo Go ships native modules at SDK-specific versions; mismatched JavaScript packages can compile and still crash at runtime.
 
+Preserve the current mobile media limits. Before changing compression or upload resolution, inspect their source/contracts and run the applicable mobile gate; package resolution preserves `shamefullyHoist`.
+
 ## Required package check
 
 Run this before changing versions or debugging native-module crashes:
@@ -69,7 +71,7 @@ Stop Metro before handing back the task.
 
 ## Guarded native development sessions
 
-Use `native:metro` for a staging or PR backend. Pass an unused port explicitly. The helper reads the selected Railway api service's public API/socket domain and `MINIO_PUBLIC_URL`, refuses production, and checks API readiness, the media host and all three origins in the served bundle. Missing media configuration causes grey card Photos; a missing API configuration falls back to localhost. Railway variable output stays captured. Only public origins are printed.
+Use `native:metro` for a reserved staging backend. The executable helper also recognizes legacy PR environments during recovery. Pass an unused port explicitly. The helper reads the selected Railway api service's public API/socket domain and `MINIO_PUBLIC_URL`, refuses production, and checks API readiness, the media host and all three origins in the served bundle. Missing media configuration causes grey card Photos; a missing API configuration falls back to localhost. Railway variable output stays captured. Only public origins are printed.
 
 ```bash
 pnpm --filter @auto-tm/mobile native:metro -- --env pr-842 --port 8842
@@ -133,7 +135,7 @@ Local release builds fail in ways EAS never sees, because EAS starts from a clea
 pnpm --filter @auto-tm/mobile build:android:local
 ```
 
-`apps/mobile/scripts/local-android-release.mjs` rebuilds contracts, regenerates `android/` when branding assets changed, forces the JS bundle task to re-run, and verifies the APK embeds a Hermes bundle before it prints the `adb install -r` command. It defaults to the production backend; override `EXPO_PUBLIC_API_URL` / `EXPO_PUBLIC_WS_URL` / `EXPO_PUBLIC_MEDIA_URL` to point at a PR backend. The failure modes it guards, for when you must build by hand:
+`apps/mobile/scripts/local-android-release.mjs` rebuilds contracts, regenerates `android/` when branding assets changed, forces the JS bundle task to re-run, and verifies the APK embeds a Hermes bundle before it prints the `adb install -r` command. It defaults to the production backend; override `EXPO_PUBLIC_API_URL` / `EXPO_PUBLIC_WS_URL` / `EXPO_PUBLIC_MEDIA_URL` to point at reserved staging. The failure modes it guards, for when you must build by hand:
 
 - **Stale `@auto-tm/contracts` dist crashes the app after sign-in.** Metro resolves the package to its gitignored `dist/` via package exports. If `dist/` is older than a source change, the bundle silently lacks the new exports and the app throws `TypeError: undefined is not a function` at the first caller (logcat's componentStack names the calling screen, not the missing function — a profile row crash can be a contracts miss, not a screen bug). Fix: `pnpm --filter @auto-tm/contracts build`, then re-bundle. EAS is immune; this is local-only and never a store bug.
 
@@ -183,40 +185,15 @@ adb logcat -d | grep -c "finishDrawing of relaunch.*tm.auto.app"
 
 After each, the app must stay on the same screen, signed in, and Profile > Choose from library must open the picker. Module state survives a recreation and component state does not, so a screen that must not flash a loading state reads what the app already knows (`src/auth/sessionSnapshot.ts`).
 
-## Railway PR backend sessions
+## Shared staging native sessions
 
-[ADR-0075](../adr/0075-railway-pr-backends-for-agent-native-sessions.md) uses staging-based Railway PR environments with demo data and mock SMS. The hosted required `pr` check runs container-backed tests. Locally run `pnpm test:unit`, typecheck, affected lint and applicable exports. Keep Docker stopped for native proof. The coordinator assigns explicit simulator UUIDs and distinct Metro ports, with up to two sessions when capacity permits (simultaneous two-app capacity is unproven), and one heavy local phase at a time.
+Follow [staging reservation](shared-staging.md) for ownership, identity, deployed SHA, fixtures and restoration. Final acceptance uses the reviewed/fixed integration candidate; earlier reservations may provide investigation or reviewer device proof. Hosted disposable services remain the container-backed repository test gate. Locally run unit tests, repository typecheck, affected lint and applicable exports; keep Docker stopped for native proof.
 
-1. Open the issue's draft PR and wait for Railway's `auto.tm-rewrite-pr-<PR>` environment. PR environments are enabled from staging with Bot and Focused modes off. Read the environment ID and API service domain through the Railway dashboard or CLI. Use explicit environment and service IDs on every command. Existing PR clones can retain an old MinIO image; verify the ADR-0074 pinned image and a successful deployment.
-2. Prefer one environment-scoped project token shared by agents on this PR, stored outside the repo in an owner-only file and loaded as `RAILWAY_TOKEN`. Verify its `projectToken { projectId environmentId }` scope using `railway api`. A reusable workspace token includes production permissions. When token creation is unavailable, the coordinator's existing CLI session may perform setup, seed, log and redeploy operations on verified PR environment IDs under the [founder-delegated disposition](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/477#issuecomment-5926410525). Native agents receive only the public backend URL. The seed guard restricts this command, not the broad credential itself.
-3. Check the API's `/readyz` response for this environment and the PR backend commit. For a tooling or mobile-only PR whose watched paths skipped its initial application builds, the coordinator deploys API and then worker explicitly at the verified PR commit. After backend commits, wait for the corresponding deployment's `SUCCESS` and read the new `commitSha`; a successful prior deployment is insufficient. Confirm worker boot and MinIO readiness. Migrations belong to the API pre-deploy command.
-4. Set `MINIO_PUBLIC_URL` to `https://${{MinIO.RAILWAY_PUBLIC_DOMAIN}}` in the PR API and worker services, and `NEXT_PUBLIC_MINIO_PUBLIC_URL` to the same reference in PR admin/web. Staging may contain literal URLs that duplication preserves, so read back hostnames and confirm they belong to this PR. Keep deployed `DATABASE_URL` and `MINIO_ENDPOINT` on private Railway service origins. Confirm `SMS_DRIVER=mock` and `APP_ENV=staging`. After the API image is ready, run one command from the coordinator:
+The coordinator assigns explicit simulator UUIDs and distinct Metro ports, serializes heavy local phases and shares only public backend origins with native agents. Use guarded `native:metro` and `native:ios` entrypoints above. Confirm API/socket/media origins in the served bundle, `/readyz`, loaded feed and detail/gallery before claiming API/media evidence. Login secrets and tokens never belong in screenshots or PR evidence. Read mock OTPs only from the verified staging API's logs, matching request ID and time.
 
-   ```bash
-   railway ssh --project "$PR_PROJECT_ID" --environment "$PR_ENVIRONMENT_ID" --service "$PR_API_SERVICE_ID" node /app/scripts/native-pr-seed.mjs --remote
-   ```
+The existing `native-pr-seed` entrypoint and shared database guard require a PR environment and reject staging before constructing clients or launching steps. Its fixture reset deletes/recreates users/listings and cascades to sessions and related records. Do not rename or relax the guard to seed staging. The transition must implement reservation-bound staging identity and fixture/reset safety first; fixture-dependent evidence is blocked until that operational path is verified. A local/public database proxy is not a substitute.
 
-   The guarded command executes inside the PR API container with its private Postgres and MinIO connections. The image includes the entry point, bucket bootstrap, db seed scripts, generated client, fixture manifest and their runtime dependencies. It bootstraps all four MinIO buckets, reference catalog, fixture users and listings with 0, 1 and 2 photos, then licensed brand logos. Reruns converge without duplicates but are not a no-op: fixture users and listings are deleted and recreated with the same IDs, cascading to their sessions, drafts, favourites, conversations, saved searches and listings created as a fixture seller; sessions end and `publicNumber` advances. Do not reseed during another agent's live session. It rejects production, staging, missing or malformed names, nonmock SMS, wrong project, nonprivate data origins and inherited staging/other-PR media hosts before launching any step or constructing a client. The entry point and the fixture step run the same guard, `packages/db/scripts/native-pr-seed-guard.cjs`, and a malformed connection URL is refused by variable name without printing its value. Do not print variable values or credentials in evidence. Fixture phones include buyer `+99361000009` and seller `+99361000001`.
-
-   `--remote` is the only mode. There is no local mode: `node scripts/native-pr-seed.mjs` without `--remote`, and `pnpm native:seed`, refuse and print this command, because a local run could not be bound to the PR environment's database. `railway run` executes locally and cannot reach the private hostnames this guard requires. Do not enable a public Postgres proxy for a native session; remove an owned unused proxy without touching database data.
-5. Point Metro at the PR API URL including `/api/v1`:
-
-   ```bash
-   EXPO_PUBLIC_API_URL="$PR_API_URL/api/v1" \
-   EXPO_PUBLIC_WS_URL="wss://$PR_API_HOST/ws/chat" \
-   EXPO_PUBLIC_MEDIA_URL="https://$PR_MINIO_HOST" \
-   pnpm --filter @auto-tm/mobile exec expo start --dev-client --port "$METRO_PORT"
-   ```
-
-   `$PR_API_HOST` and `$PR_MINIO_HOST` are the PR API and MinIO public hosts. Without `EXPO_PUBLIC_MEDIA_URL` the app builds no photo URLs and renders no photos. For an installed iOS development client, launch the assigned simulator UUID with the Metro host and port as a launch argument:
-
-   ```bash
-   xcrun simctl launch "$SIMULATOR_UUID" tm.auto.app -RCT_jsLocation 127.0.0.1:"$METRO_PORT"
-   ```
-
-   `RCT_jsLocation` chooses Metro; the `EXPO_PUBLIC_*` variables choose the backend. Restart Metro with `--clear` if an old API origin remains in the bundle. Expo Go cannot run this app.
-6. Log in with a fixture phone. Read the mock OTP from this PR API service's logs with `railway logs --project "$PR_PROJECT_ID" --environment "$PR_ENVIRONMENT_ID" --service "$PR_API_SERVICE_ID" --lines 200`, looking for the last four digits of the request's phone and its time (the line reads `[mock] OTP for ***0009 (req 1a2b3c4d): <code>`; the tag is the first eight characters of the `requestId` the code request returned). Do not put OTPs or access tokens in PR evidence. Capture the loaded feed and a fixture detail/gallery to prove media and API traffic. Record environment ID, successful deployment ID/backend SHA, screenshot paths and the process check showing Docker absent.
-7. Stop only this session's Metro process. Revoke an environment-scoped disposable token when finished. Keep reusable coordinator credentials outside the repo. Railway automatically deletes the environment on PR merge/close; verify that its exact environment ID disappears. Close disposable proof PRs promptly and record deletion evidence. Do not close an active implementation PR just to collect cleanup evidence.
+Stop owned Metro/device sessions before restoration, retain exact deployment/device/artifact evidence and hand back to Chief of Staff. Failed restoration retains the reservation. Production binaries and promotion follow their separate release gates.
 
 ## Android package per build profile
 

@@ -65,6 +65,6 @@ Never edit an accepted ADR, a locked in-progress sprint plan, or an append-only 
 
 ## Hand off
 
-After the shaping PR merges, follow [the worktree lifecycle](../../../docs/agents/worktree-lifecycle.md), then follow the [coding workflow router](../../../docs/agents/coding-workflow.md): use [`create-sprint-issues`](../create-sprint-issues/SKILL.md) for an approved pending sprint, then execute one accepted issue at a time with [`run-issue`](../run-issue/SKILL.md). Each implementation must pass independent Standards and Spec review before merge.
+After the shaping PR merges, follow [the worktree lifecycle](../../../docs/agents/worktree-lifecycle.md), then follow the [coding workflow router](../../../docs/agents/coding-workflow.md): use [`create-sprint-issues`](../create-sprint-issues/SKILL.md) for an approved pending sprint, then hand the bounded parent to [Chief of Staff](../run-queue/SKILL.md) for isolated [`run-issue`](../run-issue/SKILL.md) writers and one integration PR. Each implementation must pass independent Standards and Spec review before merge.
 
 Report the merged shaping PR, changed canonical artifacts, accepted vocabulary, superseding ADRs, unresolved risks, and the exact next workflow. Stop before creating or running tickets.

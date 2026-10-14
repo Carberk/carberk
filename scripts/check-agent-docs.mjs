@@ -37,6 +37,7 @@ export function checkAgentDocs(root, files) {
   const current = files.filter((file) => entryPoints.includes(file) || file === "README.md" ||
     file.startsWith("docs/agents/") && file.endsWith(".md") ||
     file.startsWith(".claude/skills/") && file.endsWith(".md") ||
+    file.startsWith(".claude/agents/") && file.endsWith(".md") ||
     /^(apps|packages)\/.+\/CONTEXT\.md$/.test(file));
   for (const file of entryPoints) if (!existsSync(resolve(root, file))) errors.push(`missing entry point: ${file}`);
   for (const file of current) {

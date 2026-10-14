@@ -158,6 +158,8 @@ for (const [source, target, diagnostic] of [
   ["docs/agents/coding-workflow.md", "../../.claude/skills/shape-with-docs/SKILL.md", "coding workflow is missing its shaping-skill link"],
   ["docs/agents/coding-workflow.md", "../../.claude/skills/create-sprint-issues/SKILL.md", "coding workflow is missing its sprint-issue-creation link"],
   ["docs/agents/coding-workflow.md", "../../.claude/skills/run-issue/SKILL.md", "coding workflow is missing its issue-execution link"],
+  ["docs/agents/coding-workflow.md", "../../.claude/skills/run-queue/SKILL.md", "coding workflow is missing its Chief of Staff link"],
+  [".claude/skills/run-queue/SKILL.md", "../../../docs/agents/coding-workflow.md", "Chief of Staff is missing its authoritative workflow link"],
   ["docs/agents/domain.md", "../domain/GLOSSARY.md", "domain documentation is missing its glossary link"],
   ["AGENTS.md", "docs/domain/GLOSSARY.md", "AGENTS.md is missing its glossary link"],
   ["AGENTS.md", "docs/agents/coding-workflow.md", "AGENTS.md is missing its workflow-router link"],

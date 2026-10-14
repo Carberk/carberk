@@ -1,11 +1,15 @@
 # 80 — Deployment runbook
 
-The end-to-end procedure for shipping a new version of AutoTM. There are two operating eras:
+The end-to-end procedure for shipping a new version of Carberk. There are two operating eras:
 
 1. **Railway era (ADR-0039):** staging + reviewer-only production until both stores approve and the TM cutover gates are met. GitHub Actions owns CI; Railway builds/deploys after CI.
 2. **TM era (ADR-0005):** permanent TM-serving production uses the air-gapped bundle procedure later in this document. Railway remains non-TM staging.
 
-Sprint 11 is in flight. Railway **staging** is live and its data plane, application deploys, and backup/restore path have been exercised — see the evidence files under [`evidence/`](evidence/). Railway **production** now exists, but is not ready for promotion. The duplication cleanup completed on 2026-09-13 — production Postgres and Redis are verified empty and reviewer flags read back correct — while production push credentials, migrations, the reviewer seed, and runtime readiness remain open and are deferred to #282. Application revisions did run in production during the duplication incident; that breach is recorded, not erased. See [production foundation evidence](evidence/issue-281-production-foundation.md) for the current gates; the release procedure below is not proof that they passed.
+The following foundation paragraph records the 2026-09-13 evidence, not current sprint or runtime status. Railway **staging** is live and its data plane, application deploys, and backup/restore path have been exercised — see the evidence files under [`evidence/`](evidence/). Railway **production** now exists, but is not ready for promotion. The duplication cleanup completed on 2026-09-13 — production Postgres and Redis are verified empty and reviewer flags read back correct — while production push credentials, migrations, the reviewer seed, and runtime readiness remain open and are deferred to #282. Application revisions did run in production during the duplication incident; that breach is recorded, not erased. See [production foundation evidence](evidence/issue-281-production-foundation.md) for the current gates; the release procedure below is not proof that they passed.
+
+## Integration acceptance transition
+
+The [accepted ADR-0098](../../adr/0098-integration-delivery-with-shared-staging-and-concise-agent-guidance.md) prepares one shared staging acceptance lane. [Reservation operations](../../agents/shared-staging.md) own candidate identity, exclusive mutations, disposable data and restoration to latest `main`. Activation awaits guarded fixtures/resets and transition evidence. Repository tests retain hosted disposable services; production promotion stays a separate release action. Historical evidence below establishes only its dated claims; inspect current deployment IDs, SHAs and readiness for a new release.
 
 ## Pre-flight checklist
 

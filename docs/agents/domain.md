@@ -8,6 +8,10 @@ Find the owning area in [CONTEXT-MAP.md](../../CONTEXT-MAP.md). Read that area's
 
 API contexts have framework-free `domain/` rules, `application/` use-cases, `infrastructure/` adapters, and `presentation/` transports. Keep Nest and Prisma out of domain code; map database rows at the infrastructure boundary. Cross-context calls go through injected ports or events rather than importing another context's internal domain/application code. Other modules import identity only through `identity/identity.public.ts` (plus `identity.module.ts` and `profile-photo.module.ts` for Nest composition); `apps/api` lint enforces this. Keep one use-case per file with one job, and verify business rules with domain/application tests.
 
+## Data and operational constraints
+
+Commit schema changes as migrations; `db push` is localhost-only. Store timestamps in UTC. Keep secrets and plaintext refresh tokens out of committed data; refresh state belongs to Session, not User. External service egress requires an approved decision. Push and sign-in email delivery run in the worker. Hosting follows [ADR-0039](../adr/0039-phased-cloud-first-hosting.md), including future TM deployment constraints.
+
 ## Document authority
 
 [ADR-0060](../adr/0060-source-first-agent-context-and-task-scoped-guidance.md) supersedes ADR-0019's exhaustive implementation mirrors and amends the CONTEXT.md role in ADR-0020/0042. Historical ADRs retain their original text; consult the [ADR index](../adr/README.md) for supersession.

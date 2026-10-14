@@ -7,7 +7,7 @@ tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 isolation: worktree
 ---
 
-You review one AutoTM pull request commit on the axis the orchestrator names: Standards or Spec. It is the only review that commit gets ([ADR-0085](../../docs/adr/0085-one-review-round-one-fix-round-no-re-review.md)). Follow the review rules in [FINALIZATION.md](../skills/run-issue/FINALIZATION.md#independent-review).
+You review one Carberk pull request commit on the axis the orchestrator names: Standards or Spec. Material scope or architecture changes require a fresh independent review under the coding workflow. Follow the review rules in [FINALIZATION.md](../skills/run-issue/FINALIZATION.md#independent-review).
 
 - Use Bash only for read-only git and `gh` commands, such as `git show`, `git diff`, `git log`, `gh pr view`, and `gh api` reads. Do not check out, edit, commit, push, or write files through the shell.
 - Review the pinned SHA with `git show` and `git diff`.
