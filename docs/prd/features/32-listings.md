@@ -2,7 +2,7 @@
 
 ## Summary
 
-The core economic object: car ads. Sellers create listings via a 7-step wizard, with photos, brand/model/generation specs, price, and location. Buyers browse anonymously, inspect listing detail, and contact the seller. Video media is deferred out of the MLP beta and should not appear in the Sprint 4 mobile create wizard.
+The core economic object: car ads. Sellers create listings via a 7-step wizard, with photos, brand/model/generation specs, price, and location. Buyers browse anonymously, inspect listing detail, and contact the seller. The tester-only Listing video target is specified below under issue #886. This target does not claim current implementation or change historical Sprint 4 delivery.
 
 ## Why it exists
 
@@ -54,10 +54,10 @@ Per [ADR-0056](../../adr/0056-listing-contact-phones-are-verified.md), every Lis
 - Background upload is best-effort only. If the app is backgrounded, killed, or the network drops, uploads may pause/fail; on reopen/reconnect the app retries from the staged compressed file as a whole-file retry.
 - Publish is blocked until at least three photos are attached successfully and there are no required pending or failed uploads.
 - The server records each presigned upload for the User who requested it. Only that User can publish or attach it, and each upload backs one photo; a known or copied storage key authorizes nothing ([ADR-0079](../../adr/0079-server-recorded-upload-provenance-for-listing-media.md)). Retrying the same attach returns the existing photo.
-- Phase 1 does not promise byte-level resumable/multipart uploads, full offline listing creation, or guaranteed OS-level background upload.
+- Existing photo uploads do not promise byte-level resumable/multipart transfer. The tester-only video exception below requires resumable transfer. Neither flow promises full offline listing creation or guaranteed OS-level background upload.
 - Listing/feed screens use last-seen data while reconnecting, then refresh on app foreground/reconnect. This is not an offline browsing mode promise.
 - Remote listing images are displayed through a native image cache (`expo-image` in mobile) using immutable media URLs. TanStack Query caches listing JSON, not image/video bytes.
-- Listing video playback is deferred with the video media UX. We do not promise offline video playback or persistent video caching.
+- Listing video follows the tester-only scope below. Offline playback and persistent offline video downloads are excluded.
 
 ### Cards
 
@@ -99,7 +99,7 @@ Top to bottom, in Auto.ru's order:
 10. **Report listing.**
 11. **Footer:** ID · Published · Updated.
 
-That is the whole screen. Video is added below the photos only when the video media UX ships.
+The tester-only video scope places a ready video second among media, after the cover photo, using the existing photo-tile geometry. This supersedes the earlier below-photos placement for that scope only.
 
 - **Contact bar:** Call (opens the phone dialer directly, with no warning sheet) and Message stick to the bottom of the screen, with no caption under them ([ADR-0095](../../adr/0095-listing-detail-drops-the-sms-verification-caption.md)). Phone verification is explained on the public trust page, not as a per-Listing badge, caption or extra detail link.
 - **Collapsing header:** a plain row on the page background above the photos. A hairline appears under it once the page scrolls, and once the photos scroll away it shows the price plus "Brand Model, year". Back, ♡ and ⋯ (which holds Report listing) stay put on active Listings. ⋯ is hidden whenever it would be empty: on sold and removed Listings, and on active Listings when report entry is disabled. A buyer then sees only Back on sold and removed Listings; the freed width goes to the title. There is no Share or Copy link action: both stay hidden until a public web Listing page and App Links exist ([#495](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/495), decided in [#322](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/322)).
@@ -244,3 +244,92 @@ These are future product capabilities — most map to Phase 2 trust-layer work a
 - **Inappropriate / non-car photo screening** — MLP beta auto-publishes everything; reactive moderation ships in S7. A later trust bet should add self-hosted ML screening: NudeNet for NSFW, YOLO or CLIP for car-detection, pHash for stolen-photo detection (all offline-compatible per air-gap constraint). Implementation: `MediaContentClassifierPort` ships in S4 with `NullContentClassifier` adapter; trust bet swaps in `MlContentClassifier`. Failed classifications transition listing to `pending_review` status (enum value already in schema).
 - **Stolen photo detection** — Auto.ru fingerprints photos via perceptual hashing (pHash) to catch reuse across listings. Self-hostable. Phase 2 candidate; companion to NSFW classifier.
 - **Reporting flow** — "Report this listing" button on listing detail page + authenticated `POST /listings/:id/report` endpoint + admin queue. Ships in S7 alongside `banned` status activation. The route stays resource-shaped for client ergonomics, but report creation is implemented in `admin/` as a generic `ContentReport`; `listings/` only validates the listing target through a port. Listing reports are accepted only for currently `active` listings. Draft, archived, banned, soft-deleted, and other non-public listings return `NOT_FOUND`; visible but non-reportable states such as `sold` return `VALIDATION_FAILED` / `REPORT_TARGET_NOT_REPORTABLE`. Sellers cannot report their own listings; the API rejects own-listing reports with `VALIDATION_FAILED` / `SELF_REPORT_NOT_ALLOWED`, and owner-facing UI should hide the report action where ownership is known. If an event is needed, `admin/` emits `ContentReportCreated`, not a listing-owned `ListingReported` event. Report submission does not change `Listing.status` or public visibility; pending reports do not block owner archive/delete flows while the listing remains owner-actionable; only explicit admin ban hides a listing. S7 bans only active listings and unbans them back to active; there is no `previousStatus` restoration model. Banned listings are omitted from public feed/search/favorites and non-owner detail, while owner surfaces show only a generic banned notice. Owner routes cannot edit, change media, mark sold, archive, republish, or delete a banned listing until admin unban. Unban does not clean up favorites, emit saved-search events, or resolve/dismiss pending reports. Banning blocks new contact/new messages for that listing but does not auto-close existing conversations. Listing owners see no report metadata, and admin free-text reasons stay internal. The status mutation remains owned by `listings/` behind `ListingsAdminPort`; `admin/` does not write listing rows directly. Successful ban/unban may emit internal `ListingBanned` / `ListingUnbanned` events after commit, but S7 ships no user-facing consumers, notifications, conversation system messages, or worker jobs from those events.
+
+## Tester-only Listing video target
+
+Founder-agreed specification: [#886](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/886). [ADR-0099](../../adr/0099-tester-only-listing-video-with-a-90-second-limit.md) records the approved scoped supersession. Activate only after technical readiness is demonstrated and server-side rollout rules are settled. [Video UI](../ui/hifi/mobile-listing-video.md) owns interaction states and evidence. This section owns target capability; source and runtime evidence establish shipped behavior. Issue #886 retains the original decision record and acceptance criteria.
+
+### Problem and outcome
+
+Sellers need to show a short car walkaround, interior and engine sound. Buyers need intentional, usable video playback on slow downloads. Sellers often use modern iPhones, Samsung, Xiaomi, Redmi and Poco phones, and may select large 4K/60 fps recordings. A small playback stream does not solve uploading a huge original: prepare the selected interval on the phone before uploading, then generate adaptive playback on the server.
+
+Founder reports typical TM upload speeds of approximately 2–3 Mbps, often better than downloads. Treat this as a planning assumption, not measured population coverage. At 15 MiB, ideal upload time at those rates is approximately 42–63 seconds before overhead or interruptions.
+
+Public product copy uses Carberk. Technical identifiers retain existing AutoTM names.
+
+### Scope and non-goals
+
+- One optional active video per Listing. Photos remain required under existing publication rules.
+- Maximum published duration: 90 seconds.
+- Select an existing video from the phone library. In-app recording is excluded initially.
+- Preview, simple trimming and selecting a cover frame. No filters, music, multi-clip editing or general-purpose video editor.
+- Mobile iOS and Android upload and playback, including Results, Listing detail and the fullscreen media gallery.
+- Tester accounts first. Wider rollout and production promotion require a later explicit decision.
+- No chat video, video feed, feed autoplay, looping, automatic next-video playback, offline video promise or persistent offline video downloads.
+- No external video provider. Preserve the self-hosted future TM deployment constraints.
+
+### Seller journey
+
+1. In create/edit media flow, choose a library video. Request permissions with existing application conventions and retain the rest of the Listing if permission is denied.
+2. Validate selectable-source limits and local storage before preparation. Proposed initial source limits are 10 minutes and 2 GiB; these remain subject to technical proof and the founder samples.
+3. Preview the source. For clips within 90 seconds, Trim is optional. Longer clips require selecting an interval of at most 90 seconds. Initially select the first 90 seconds; the seller can move both boundaries. Display selected duration accurately.
+4. Provide start/end handles on a thumbnail timeline and preview of the selected interval. Do not silently round a selection beyond the 90-second maximum.
+5. Automatically suggest a poster frame from the selected interval. Allow the seller to choose another frame from that interval. Preview the photo-tile crop.
+6. On Use video, trim and compress only the selected interval. Show Preparing, then Uploading, then Processing as distinct states. Prepared byte size is visible during the upload stage.
+7. Upload on Wi-Fi or mobile data. Show progress and Pause/Cancel. Automatically continue after reconnect unless the seller paused. Uploaded portions must survive reconnect and reopening.
+8. Allow continuing the Listing wizard while work proceeds. Required photos permit publication while optional video uploads/processes. Buyers see video only when ready. A failed optional video never blocks photo-based publication.
+9. Seller sees failures and Retry/Remove. Keep selection and trim boundaries after preparation failure. If the app closes during preparation, recover those choices and resume where supported or restart preparation. Never upload an incomplete output.
+
+The app owns a durable staged compressed file for upload recovery. Source access after reopening and permissions/provider changes must be handled explicitly in the technical proof. Do not promise guaranteed OS background preparation or transfer. Background transfer is best effort; reopen/reconnect recovery is required.
+
+### Preparation and phone compatibility
+
+- Accept common iPhone/Samsung/Xiaomi/Redmi/Poco recordings where native decoding supports them, including MP4/MOV, H.264/HEVC, Full HD/60 fps and 4K/60 fps. Inspect actual tracks rather than infer format from filename or brand.
+- Normalize the selected interval to compatible H.264 video and AAC audio, at most 30 fps, with correct audio synchronization. Silent inputs remain valid.
+- Maximum resolution fits a 720p envelope: 1280×720 landscape or 720×1280 portrait. Preserve other aspect ratios proportionally inside the applicable envelope. Do not upscale smaller inputs.
+- Preserve orientation and complete visible frame in exported video. No stretching or cropping of playback content.
+- Convert HDR to SDR with correct tone mapping where supported. Native HDR/HEVC capability and colour fidelity require a proof before claiming support. Never silently export washed-out or incorrectly rotated video.
+- Proposed compressed-upload cap: 15 MiB. Tune quality against real walkarounds and samples; this is a maximum, not a target minimum. Avoid needless conversion when input already satisfies all validated requirements.
+- Process one local video at a time. Use native hardware acceleration when supported. Do not load the entire recording into JavaScript memory. Check storage, clean temporary outputs and preserve recoverable state on cancellation/failure.
+- Adapt to actual codec capabilities and resource limits, not a phone-brand table. Do not silently fall back to uploading the large original if preparation fails. Offer retry/another video; preserve Listing and photos.
+- The phone's full original is never sent to storage. Only the selected, prepared clip is uploaded.
+
+### Buyer journey and media presentation
+
+Auto.ru is the structural reference; retain Carberk tokens and approved photo geometry. Founder-supplied screenshots show Results poster → Listing detail poster → dedicated player, loading/poster state, quality settings and full-frame playback.
+
+- Keep the cover photo first; place ready video second among media. Video poster fills the same photo-tile shape and sizing on each surface. Results retains its existing large-card geometry; detail retains the inset 4:3 strip. Do not impose the video source ratio on these tile layouts.
+- Poster shows Play and duration and has accessible video/duration labeling.
+- Tapping the Results video poster opens Listing detail with that video selected. It does not play from Results.
+- Play on the detail poster opens the dedicated player. Closing returns to detail with media position preserved; Back to Results retains filters and scroll position.
+- The fullscreen photo/media gallery includes a video poster among photos and in its thumbnail navigation. Swiping onto it does not start playback. Play opens the dedicated player; closing returns to the same gallery item. Entry from detail returns to detail.
+- Playback preserves the original aspect ratio and complete frame with letterboxing where required. Poster crop does not crop the encoded video.
+- Download poster images only before Play. No video stream prefetch in Results, detail or gallery.
+- Play starts with sound, respecting native audio/volume behavior. Include pause/resume, seek, mute, quality selection and fullscreen. Controls remain accessible. Leaving/closing pauses/releases playback and stops further fetching, including background transitions.
+- Generate adaptive 240p, 360p and 720p tiers, preserving aspect ratio and never upscaling. Define labels and dimensions consistently for portrait and square content. Auto begins conservatively and adapts; Data saver caps at 360p. Manual choices show only available renditions.
+- Provide visible loading/buffering and recoverable playback failure states. Do not copy diagnostic overlays or external branding from Auto.ru into the public player.
+
+### Backend and lifecycle invariants
+
+- Listings owns its video association. Domain/application code remains framework-free; storage, codec probing, queues and native processing sit behind appropriate boundaries.
+- Upload bytes go directly to owned S3-compatible storage. The API authorizes uploads, adoption and lifecycle operations; keys alone authorize nothing.
+- Add durable resumable-upload sessions with confirmed-part recovery, pause/cancel, expiring credential renewal and idempotent completion. Select the concrete protocol during technical design. Persist association to the authenticated owner and intended Listing/draft.
+- Existing photo provenance, exclusive adoption and retirement guarantees must extend to video. A session/key copied from another User cannot be attached or published.
+- Validate actual uploaded content server-side, including duration ≤90 seconds, permitted codec/container, dimensions, file size and decodability. Do not trust client metadata or poster keys. Prevent malformed files from causing unbounded resource use.
+- After complete upload and validation, enqueue asynchronous self-hosted FFmpeg processing. Initially one conversion at a time with a bounded queue; size deployment budgets before activation.
+- Generate adaptive streams and authoritative poster assets. Publish readiness only after the entire required asset set is accessible. Client metadata, API rows or queue completion alone are not readiness evidence.
+- Use durable, idempotent processing state, bounded automatic retries, failure records and an operator reprocessing path. Processing failures do not require uploading again while a usable compressed source remains.
+- Replacement keeps the old playable video public until the replacement is ready, then atomically switches the association. Enforce one active video while allowing a pending replacement. Out-of-order jobs must not restore removed/replaced media.
+- Explicit removal immediately hides video and schedules cleanup. Retain the compressed uploaded source while attached for reprocessing. Removal/replacement cleanup includes source, poster, manifests and every playback segment/rendition, with durable retries.
+- Unfinished upload sessions can be resumed for seven days. After abandonment expiry, clean their parts/assets. Explicit cancellation schedules cleanup immediately. Cleanup must never remove attached media or a committed replacement.
+- Sold/removed-from-sale Listings follow existing photo visibility rules. Deleted/banned Listings prevent new video access; account purge also covers video. Cached/downloaded bytes cannot be recalled. Choose serving authorization/cache behavior that makes the new-access requirement enforceable; public immutable object URLs alone cannot satisfy it.
+- Existing Listing reporting identifies the affected video and allows moderator inspection. Automated content classification is not part of this agreement; do not present existing null classification as screening.
+- Preserve existing clients and photo contracts. Add migrations, contracts and client compatibility handling for readiness, video poster/card identity, renditions and lifecycle. Old clients must continue browsing/publishing photos safely.
+
+### Rollout and operations
+
+- Explicit tester account allowlist and one active video per Listing. Decide how upload and viewing eligibility interact before enabling; unauthorized clients must not bypass API rollout controls.
+- Configurable upload/processing limits and a switch to stop new video uploads while preserving existing playback.
+- Capture preparation time, prepared size, upload interruptions, processing failures, playback startup and buffering. Exclude media content, signed URLs, credentials and sensitive identifiers from diagnostics.
+- Quantify storage for compressed sources, posters and all renditions; conversion CPU/memory and playback egress before enabling testers. No paid resources are approved by this issue.
+- Use the accepted staging reservation and disposable-fixture rules in force at implementation time. Restore shared staging afterward. Production promotion is separate.

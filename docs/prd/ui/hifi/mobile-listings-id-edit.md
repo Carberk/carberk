@@ -1,5 +1,7 @@
 # Hi-Fi — Mobile Edit Listing (Wizard Edit Mode)
 
+> **Listing video target, 2026-10-14.** [Listing video UI](mobile-listing-video.md) defines the approved tester-only addition to this screen under #886. It changes optional video only; historical photo behavior below is not evidence of shipped video support.
+
 > Issue: #124 — apply wizard design handoff to app shell, auth, and listing wizard  
 > Maps to: `apps/mobile/app/listings/[id]/edit.tsx`  
 > Derived from wireframe: `docs/prd/ui/wireframes/mobile-listings-id-edit.md`  
