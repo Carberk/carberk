@@ -274,6 +274,7 @@ async function rawRequest<TResponse>(
 }
 
 export const apiClient = {
+  postBinary(_path: string, _bytes: Uint8Array): Promise<unknown> { return Promise.reject(new Error("not implemented")); },
   get<T>(path: string, schema?: ZodSchema<T>, opts: ClientOptions = {}) {
     return rawRequest<T>(path, { method: "GET", schema, ...opts }, false);
   },
