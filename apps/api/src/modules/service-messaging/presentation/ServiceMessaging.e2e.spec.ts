@@ -10,7 +10,7 @@ import { JwtModule, JwtService } from "@nestjs/jwt";
 import { Reflector } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import { PrismaService } from "@auto-tm/db";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import supertest from "supertest";
 
 import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
@@ -103,6 +103,11 @@ it("keeps staged bytes unusable until exact adoption and checks current audience
  expect(staged.body).not.toHaveProperty("objectKey"); expect(staged.body).not.toHaveProperty("url");
  await request.get(`/api/v1/services/conversations/${id}/attachments/${file}`).set("Authorization", auth(stranger)).expect(403);
  await request.post(`/api/v1/services/conversations/${other.body.id}/attachments/${file}/bytes`).set("Authorization", auth(customer)).set("Content-Type", "application/octet-stream").send(original).expect(400);
+ const privateStore = app.get<ServicePrivateStore>(SERVICE_PRIVATE_STORE), put = privateStore.putImmutable.bind(privateStore);
+ const lostResponse = vi.spyOn(privateStore, "putImmutable").mockImplementationOnce(async (...args) => { await put(...args); throw new Error("Synthetic lost storage response"); });
+ await request.post(`/api/v1/services/conversations/${id}/attachments/${file}/bytes`).set("Authorization", auth(stranger)).set("Content-Type", "application/octet-stream").send(original).expect(500);
+ const pending = await db.serviceAttachment.findUniqueOrThrow({ where: { id: file } }); expect(pending.objectKey).not.toBeNull(); expect(pending.sizeBytes).toBeNull();
+ lostResponse.mockRestore();
  await request.post(`/api/v1/services/conversations/${id}/attachments/${file}/bytes`).set("Authorization", auth(stranger)).set("Content-Type", "application/octet-stream").send(original).expect(201);
  await request.post(`/api/v1/services/conversations/${id}/attachments/${file}/bytes`).set("Authorization", auth(stranger)).set("Content-Type", "application/octet-stream").send(original).expect(201);
  await request.get(`/api/v1/services/conversations/${id}/attachments/${file}`).set("Authorization", auth(stranger)).expect(403);

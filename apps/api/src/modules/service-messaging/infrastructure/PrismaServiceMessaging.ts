@@ -136,15 +136,24 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
   });
  }
  async upload(subject: ServiceSubject, id: string, attachmentId: string, bytes: Uint8Array) {
-  await this.locked(subject, id, "send", async (tx, _row, scope) => {
+  // Commit the immutable locator before attempting an external write. Cleanup
+  // can then find bytes even if storage commits but its response/DB commit is lost.
+  const prepared = await this.locked(subject, id, "send", async (tx, _row, scope) => {
    const file = await tx.serviceAttachment.findUnique({ where: { id: attachmentId } });
    if (!file || file.conversationId !== id || file.uploaderId !== subject.userId || file.lifecycleEpoch !== scope.lifecycleEpoch || file.state !== "staged" || file.removedAt || file.expiresAt <= this.runtime.now() || bytes.length !== file.expectedBytes) throw new ServiceDenied("INVALID_ATTACHMENT");
    const cleaned = await cleanServiceBytes(bytes, file.contentType, scope.purpose);
    const sha256 = digest(cleaned);
-   if (file.objectKey) { if (file.sha256 !== sha256) throw new ServiceDenied("IDEMPOTENCY_CONFLICT"); return; }
-   const key = `service-private/${id}/${attachmentId}/${sha256}`;
-   await this.store.putImmutable(key, cleaned, file.contentType);
-   await tx.serviceAttachment.update({ where: { id: attachmentId }, data: { objectKey: key, sha256, sizeBytes: cleaned.length } });
+   if (file.sha256 && file.sha256 !== sha256) throw new ServiceDenied("IDEMPOTENCY_CONFLICT");
+   const key = file.objectKey ?? `service-private/${id}/${attachmentId}/${sha256}`;
+   if (!file.objectKey) await tx.serviceAttachment.update({ where: { id: attachmentId }, data: { objectKey: key, sha256 } });
+   return { cleaned, key, sha256, contentType: file.contentType, epoch: scope.lifecycleEpoch };
+  });
+  await this.locked(subject, id, "send", async (tx, _row, scope) => {
+   const file = await tx.serviceAttachment.findUnique({ where: { id: attachmentId } });
+   if (!file || file.conversationId !== id || file.uploaderId !== subject.userId || file.lifecycleEpoch !== scope.lifecycleEpoch || prepared.epoch !== scope.lifecycleEpoch || file.state !== "staged" || file.removedAt || file.expiresAt <= this.runtime.now() || file.objectKey !== prepared.key || file.sha256 !== prepared.sha256) throw new ServiceDenied("INVALID_ATTACHMENT");
+   if (file.sizeBytes !== null) return;
+   await this.store.putImmutable(prepared.key, prepared.cleaned, prepared.contentType);
+   await tx.serviceAttachment.update({ where: { id: attachmentId }, data: { sizeBytes: prepared.cleaned.length } });
   });
  }
  async file(subject: ServiceSubject, id: string, attachmentId: string) {

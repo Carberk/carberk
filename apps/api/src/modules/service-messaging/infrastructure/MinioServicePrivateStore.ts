@@ -15,7 +15,7 @@ export class MinioServicePrivateStore implements ServicePrivateStore {
  }
  async putImmutable(key: string, bytes: Uint8Array, contentType: string): Promise<void> {
   try {
-   await this.client.send(new PutObjectCommand({ Bucket: "service-private", Key: key, Body: bytes, ContentType: contentType, ContentLength: bytes.byteLength, IfNoneMatch: "*", CacheControl: "no-store, private", ContentDisposition: "attachment" }));
+   await this.client.send(new PutObjectCommand({ Bucket: "service-private", Key: key, Body: bytes, ContentType: contentType, ContentLength: bytes.byteLength, IfNoneMatch: "*", CacheControl: "no-store, private", ContentDisposition: "attachment" }), { abortSignal: AbortSignal.timeout(10000) });
   } catch (error) {
    if ((error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode !== 412) throw error;
    const existing = await this.get(key, bytes.byteLength);
@@ -24,7 +24,7 @@ export class MinioServicePrivateStore implements ServicePrivateStore {
  }
  async get(key: string, maxBytes: number): Promise<Uint8Array> {
   if (maxBytes <= 0 || maxBytes > 20 * 1024 * 1024) throw new ServiceDenied("INVALID_ATTACHMENT");
-  const object = await this.client.send(new GetObjectCommand({ Bucket: "service-private", Key: key }));
+  const object = await this.client.send(new GetObjectCommand({ Bucket: "service-private", Key: key }), { abortSignal: AbortSignal.timeout(10000) });
   if (!object.Body || object.ContentLength !== maxBytes) { if (object.Body instanceof Readable) if (object.Body instanceof Readable) object.Body.destroy(); throw new ServiceDenied("INVALID_ATTACHMENT"); }
   const chunks: Uint8Array[] = []; let length = 0;
   for await (const chunk of object.Body as AsyncIterable<Uint8Array>) {
@@ -36,6 +36,6 @@ export class MinioServicePrivateStore implements ServicePrivateStore {
   return Buffer.concat(chunks);
  }
  async remove(key: string): Promise<void> {
-  await this.client.send(new DeleteObjectCommand({ Bucket: "service-private", Key: key }));
+  await this.client.send(new DeleteObjectCommand({ Bucket: "service-private", Key: key }), { abortSignal: AbortSignal.timeout(10000) });
  }
 }
