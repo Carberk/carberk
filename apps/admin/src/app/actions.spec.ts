@@ -186,3 +186,18 @@ describe("admin auth server actions", () => {
     });
   });
 });
+
+describe('current scoped staff sign-in',()=>{
+  it('admits a non-admin only after current server capability eligibility, without exposing credentials',async()=>{
+    mockFetchQueue([
+      {status:200,body:{accessToken:'scoped-access',refreshToken:'scoped-refresh',user:{role:'buyer'}}},
+      {status:200,body:{capabilities:['founder.admission'],elevated:false}},
+      {status:200,body:{enrolled:true,elevated:false}},
+    ]);
+    const form=new FormData();form.set('phone','+99365000001');form.set('code','123456');
+    const result=await verifyOtp(null,form);
+    expect(result).toEqual({ok:true,next:'totp',totpEnrolled:true});
+    expect(JSON.stringify(result)).not.toContain('scoped-access');
+    expect(mockState.cookies.get('auto_tm_admin_access')).toBe('scoped-access');
+  });
+});
