@@ -37,6 +37,28 @@ export class GitLedger {
     catch { throw new Error('Coordination record is invalid; retain reservation for recovery'); }
     return { revision, state };
   }
+  async latestMain() {
+    await this.initialize();
+    const found = await this.git(['ls-remote', '--refs', this.remote, 'refs/heads/main']);
+    const revision = found.split(/\s/)[0];
+    if (!/^[a-f0-9]{40}$/.test(revision ?? '')) throw new Error('Latest main unavailable');
+    await this.git(['fetch', '--no-tags', this.remote, revision]);
+    return revision;
+  }
+  async assertNoSchemaChange(candidate, main) {
+    for (const revision of [candidate, main]) {
+      if (!/^[a-f0-9]{40}$/.test(revision)) throw new Error('Invalid schema revision');
+      await this.git(['fetch', '--no-tags', this.remote, revision]);
+    }
+    const changed = await this.git(['diff', '--name-only', main, candidate, '--', 'packages/db/prisma/migrations', 'packages/db/prisma/schema.prisma']);
+    if (changed) throw new Error('Persistent schema disposition unresolved; guarded deploy refused');
+  }
+  async migrationsAt(revision) {
+    if (!/^[a-f0-9]{40}$/.test(revision)) throw new Error('Invalid migration revision');
+    await this.git(['fetch', '--no-tags', this.remote, revision]);
+    return (await this.git(['ls-tree', '--name-only', `${revision}:packages/db/prisma/migrations`]))
+      .split('\n').filter(x => /^\d+_/.test(x)).sort();
+  }
   async compareAndSwap(expected, state) {
     await this.initialize();
     if (expected && !/^[a-f0-9]{40}$/.test(expected)) throw new Error('Invalid coordination revision');

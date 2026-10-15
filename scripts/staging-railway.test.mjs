@@ -28,3 +28,19 @@ test('production, scope mismatch and database host overrides are refused by the 
     await assert.rejects(platform.attest(policy),e=> !e.message.includes('SECRET'));
   }
 });
+
+test('mutations require explicit reservation authorization before any deployment request',async()=>{
+  const platform=new RailwayPlatform({token:'SECRET',fetch:boundary()});
+  await assert.rejects(platform.authorize({id:'1'.repeat(32),candidate:'a'.repeat(40)}),/authorization/);
+});
+test('remote fixture commands reject public namespace and credential-bearing media before touching SQL',async()=>{
+  const {remoteProgram}=await import('./staging-remote.mjs');
+  const {runInNewContext}=await import('node:vm');
+  const env={RAILWAY_PROJECT_ID:'project',RAILWAY_ENVIRONMENT_ID:'stage',RAILWAY_SERVICE_ID:'api',RAILWAY_ENVIRONMENT_NAME:'staging',APP_ENV:'staging',SMS_DRIVER:'mock',AUTOTM_COMMIT_SHA:'a'.repeat(40),DATABASE_URL:'postgresql://u:SECRET@postgres.railway.internal:5432/railway',MINIO_ENDPOINT:'http://SECRET@minio.railway.internal:9000',MINIO_PUBLIC_URL:policy.origins.publicMedia};
+  const payload={kind:'fixture',id:'1'.repeat(32),namespace:`cf_${'1'.repeat(32)}`,target:'a'.repeat(40),identity:policy};
+  for(const input of [{...payload,namespace:'public'},payload]){
+    let calls=0;const process={env,exitCode:0};let message='';
+    runInNewContext(remoteProgram(input),{process,URL,require:()=>({spawnSync:()=>{calls++;return {status:0,stdout:'0'};}}),console:{log:()=>{},error:(value)=>{message=value;}}});
+    assert.equal(process.exitCode,1);assert.equal(calls,0,'refused identity must not reach SQL');assert.equal(message.includes('SECRET'),false);
+  }
+});

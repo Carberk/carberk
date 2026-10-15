@@ -14,7 +14,7 @@ async function setup(t) {
   const root = await mkdtemp(join(tmpdir(), 'staging-control-')); t.after(() => rm(root, { recursive: true, force: true }));
   const remote = join(root, 'shared.git'); execFileSync('git', ['init', '--bare', remote], { stdio: 'ignore' });
   const ledger = new GitLedger({ directory: join(root, 'objects'), remote });
-  ledger.latestMain = async () => 'c'.repeat(40); ledger.assertNoSchemaChange = async () => {};
+  ledger.latestMain = async () => 'c'.repeat(40); ledger.migrationsAt = async () => ['20260101_initial']; ledger.assertNoSchemaChange = async () => {};
   const platform = new FakeStagingPlatform(policy);
   let sequence = 0;
   const control = new StagingControl({ ledger, platform, policy, actor: 'alice', now: () => '2026-10-15T01:00:00.000Z', id: () => (++sequence).toString(16).padStart(32, '0') });

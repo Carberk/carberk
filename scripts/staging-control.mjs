@@ -67,6 +67,7 @@ export class StagingControl {
   }
   async perform(claim, kind, restoring = false) {
     let snapshot = await this.owned(claim);
+    await this.platform.authorize(claim);
     await this.attest();
     const target = restoring ? await this.ledger.latestMain() : claim.candidate;
     if (!sha(target)) throw new Error('Exact latest main SHA required');
@@ -74,7 +75,7 @@ export class StagingControl {
     // Re-read after external lookups. A previously read owner never grants a new operation.
     snapshot = await this.owned(claim);
     const lease = snapshot.state.reservation;
-    const operation = { id: this.id(), kind: restoring ? 'restore' : kind, target, startedAt: this.now() };
+    const operation = { id: this.id(), kind: restoring ? 'restore' : kind, target, startedAt: this.now(), expectedMigrations: await this.ledger.migrationsAt(target) };
     lease.operation = operation; lease.lifecycle = restoring ? 'restoring' : 'active';
     lease.restoration = null;
     await this.write(snapshot, snapshot.state);

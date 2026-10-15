@@ -1,5 +1,6 @@
 export class FakeStagingPlatform {
   constructor(policy) { this.policy = structuredClone(policy); this.operations = []; this.fail = false; this.main = 'c'.repeat(40); }
+  async authorize() {}
   async attest() { return structuredClone(this.policy); }
   async execute(kind, lease, target) {
     this.operations.push({ kind, target, namespace: lease.namespace });
