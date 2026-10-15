@@ -25,6 +25,7 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
   @Inject(SERVICE_RUNTIME) private readonly runtime: ServiceRuntime) {}
 
  private async actor(tx: Tx, subject: ServiceSubject, purpose: ServiceMessagingSchemas.ServicePurpose): Promise<ServiceActor> {
+  if (!this.runtime.syntheticSubjectAllowed(subject)) throw new ServiceDenied("COLLECTION_DISABLED");
   await tx.$queryRaw`SELECT id FROM users WHERE id = ${subject.userId} FOR UPDATE`;
   await tx.$queryRaw`SELECT id FROM sessions WHERE id = ${subject.sessionId} FOR UPDATE`;
   const [user, session] = await Promise.all([tx.user.findUnique({ where: { id: subject.userId } }), tx.session.findUnique({ where: { id: subject.sessionId } })]);

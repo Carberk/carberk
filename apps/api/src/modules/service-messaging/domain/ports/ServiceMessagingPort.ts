@@ -20,5 +20,5 @@ export interface ServicePrivateStore {
   remove(key: string): Promise<void>;
 }
 export const SERVICE_PRIVATE_STORE = Symbol("ServicePrivateStore");
-export interface ServiceRuntime { now(): Date; id(): string; syntheticEnabled(): boolean }
+export interface ServiceRuntime { now(): Date; id(): string; syntheticEnabled(): boolean; syntheticSubjectAllowed(subject: ServiceSubject): boolean }
 export const SERVICE_RUNTIME = Symbol("ServiceRuntime");
