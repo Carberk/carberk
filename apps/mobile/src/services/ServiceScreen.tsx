@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../auth/useAuth";
 import { useAuthIntentStore } from "../auth/intentStore";
-import { ApiError } from "../api/client";
+import { apiClient, ApiError } from "../api/client";
 import { localeTag } from "../i18n/resources";
 
 import { pickServiceImage, uploadServiceImage, type ServiceImage } from "./serviceImage";
@@ -31,6 +31,13 @@ export function ServiceScreen() {
  const onDenied = useCallback(() => { setError("permission"); setImage(null); setAttachmentId(null); }, []);
  useServiceRealtime(selected, onDenied);
  const detail = isAuthenticated === true && !conversation.isError && error !== "permission" && error !== "conflict" ? conversation.data?.pages[0] ? { ...conversation.data.pages[0], messages: conversation.data.pages.flatMap(page => page.messages) } : undefined : undefined;
+ const readFence = useRef("");
+ const renderedThrough = detail?.messages.at(-1)?.sequence ?? 0;
+ useEffect(() => {
+  if (!detail || !userId || isAuthenticated !== true || renderedThrough <= detail.readThrough) return;
+  const fence = `${userId}:${detail.id}:${renderedThrough}`; if (readFence.current === fence) return; readFence.current = fence;
+  void apiClient.post(`/services/conversations/${detail.id}/read`, { throughSequence: renderedThrough }).catch(() => { if (readFence.current === fence) readFence.current = ""; });
+ }, [userId, isAuthenticated, detail?.id, detail?.readThrough, renderedThrough]);
  async function submit() {
   if (!detail || (!body.trim() && !attachmentId) || send.isPending) return;
   const fingerprint = JSON.stringify([detail.id, body.trim(), attachmentId]);
@@ -49,9 +56,10 @@ export function ServiceScreen() {
  async function create() { setError(null); try { const value = await open.mutateAsync("history"); setSelected(value.id); } catch (value) { failure(value); } }
  const button = (title: string, action: () => void, disabled = false) => <Button accessibilityLabel={title} disabled={disabled} onPress={action}><Text>{title}</Text></Button>;
  return <><Stack.Screen options={{ title: c.customerTitle }}/><ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 48 }} keyboardShouldPersistTaps="handled"><Text className="font-heading text-title-2 font-semibold">{c.customerTitle}</Text>
+  {!selected ? <><Text className="font-heading text-title-3 font-semibold">{c.history}</Text><Text>{c.historyIntro}</Text><Text>{c.price}</Text></> : null}
   {isAuthenticated !== true ? <>{button(c.signedOut, () => useAuthIntentStore.getState().requireSignIn(router, { returnTo: "/services" }))}</> : <>
    {error ? <Text accessibilityRole="alert">{c[error]}</Text> : null}
-   {!selected ? <><Text className="font-heading text-title-3 font-semibold">{c.history}</Text><Text>{c.historyIntro}</Text><Text>{c.price}</Text>{button(c.newRequest, () => { void create(); }, open.isPending)}
+   {!selected ? <>{button(c.newRequest, () => { void create(); }, open.isPending)}
     {list.isPending ? <Text accessibilityRole="progressbar">{c.loading}</Text> : list.isError ? <><Text accessibilityRole="alert">{c.error}</Text>{button(c.refresh, () => { void list.refetch(); })}</> : list.data?.length === 0 ? <Text>{c.empty}</Text> : list.data?.map(item => <View key={item.id} className="gap-2 rounded-xl border border-border p-4">{button(c[item.purpose], () => { setError(null); setBody(""); setImage(null); setAttachmentId(null); setUploadFailed(false); setSelected(item.id); })}<Text className="text-muted-foreground">{new Date(item.createdAt).toLocaleString(localeTag(i18n.language))}</Text></View>)}</> : <>
     {button(c.back, () => { setSelected(null); setBody(""); setError(null); setImage(null); setAttachmentId(null); })}
     {conversation.isPending ? <Text accessibilityRole="progressbar">{c.loading}</Text> : conversation.isError ? <><Text accessibilityRole="alert">{conversation.error instanceof ApiError && conversation.error.status === 403 ? c.permission : c.error}</Text>{button(c.refresh, () => { setError(null); void conversation.refetch(); })}</> : detail ? <>
