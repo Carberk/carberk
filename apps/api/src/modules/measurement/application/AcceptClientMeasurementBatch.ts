@@ -21,7 +21,13 @@ export class AcceptClientMeasurementBatch {
   if (!batch.success || Buffer.byteLength(JSON.stringify(body), "utf8") > MeasurementSchemas.MEASUREMENT_LIMITS.batchBytes
    || batch.data.events.some((item) => !item.visitId || item.context.platform === "server" || MeasurementSchemas.EVENT_DICTIONARY[item.eventName].origin !== "client")) return "invalid";
   let authority: MeasurementAuthority | null;
-  try { authority = await this.identities.resolve(credential); } catch { return "unavailable"; }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+   authority = await Promise.race([this.identities.resolve(credential), new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("Identity resolution unavailable")), 250);
+   })]);
+  } catch { return "unavailable"; }
+  finally { clearTimeout(timer); }
   if (!authority || authority.origin !== "client") return "unauthorized";
   const window = Math.floor(this.now() / 60000);
   if (window !== this.window) { this.window = window; this.total = 0; this.subjects.clear(); }
