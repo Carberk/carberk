@@ -19,8 +19,8 @@ export const privacyPolicy: Record<Locale, LegalDocument> = {
     title: "Privacy Policy",
     effectiveDate: "September 23, 2026",
     effectiveDateISO: "2026-09-23",
-    lastRevised: "October 7, 2026",
-    lastRevisedISO: "2026-10-07",
+    lastRevised: "October 14, 2026",
+    lastRevisedISO: "2026-10-14",
     sections: [
       {
         title: "1. What we collect",
@@ -38,6 +38,7 @@ export const privacyPolicy: Record<Locale, LegalDocument> = {
 - **Push notification token** — if you allow notifications, the token your device's push service gives the app, used to tell you about new messages.
 - **Photo uploads** — images you attach to listings.
 - **VIN** — if you voluntarily enter it.
+- **Listing views.** When you open a listing, the app sends an anonymous app identifier so we can count each viewer once per day. We keep only a scrambled form of it, delete it after 2 days, and never use it to identify you or for advertising.
 
 Future collections (if features ship): video uploads, garage vehicle data, blog content, inspection report data.`,
       },
@@ -108,8 +109,8 @@ When you request account deletion:
     title: "Политика конфиденциальности",
     effectiveDate: "23 сентября 2026 г.",
     effectiveDateISO: "2026-09-23",
-    lastRevised: "7 октября 2026 г.",
-    lastRevisedISO: "2026-10-07",
+    lastRevised: "14 октября 2026 г.",
+    lastRevisedISO: "2026-10-14",
     sections: [
       {
         title: "1. Какие данные мы собираем",
@@ -124,7 +125,8 @@ When you request account deletion:
 - **IP-адрес** — для ограничения частоты запросов и безопасности.
 - **Токен push-уведомлений** — если вы разрешите уведомления: токен, который push-сервис устройства выдаёт приложению, чтобы сообщать о новых сообщениях.
 - **Загруженные фото** — изображения к объявлениям.
-- **VIN** — если вы его введёте добровольно.`,
+- **VIN** — если вы его введёте добровольно.
+- **Просмотры объявлений.** Когда вы открываете объявление, приложение отправляет анонимный идентификатор приложения, чтобы мы могли учитывать каждого посетителя один раз в день. Мы храним только его преобразованную форму, удаляем её через 2 дня и никогда не используем для установления вашей личности или для рекламы.`,
       },
       {
         title: "2. Что мы НЕ собираем",
@@ -193,8 +195,8 @@ When you request account deletion:
     title: "Gizlinlik syýasaty",
     effectiveDate: "23-nji sentýabr 2026",
     effectiveDateISO: "2026-09-23",
-    lastRevised: "7-nji oktýabr 2026",
-    lastRevisedISO: "2026-10-07",
+    lastRevised: "14-nji oktýabr 2026",
+    lastRevisedISO: "2026-10-14",
     sections: [
       {
         title: "1. Haýsy maglumatlary ýygnaýarys",
@@ -209,7 +211,8 @@ When you request account deletion:
 - **IP salgysy** — howpsuzlyk we çäklendirme.
 - **Push habarnamalarynyň tokeni** — habarnamalara rugsat berseňiz: täze habarlar barada habar bermek üçin enjamyň push hyzmatynyň programma berýän tokeni.
 - **Ýüklenen suratlar** — bildirişlere goşulan.
-- **VIN** — öziňiz girizen bolsaňyz.`,
+- **VIN** — öziňiz girizen bolsaňyz.
+- **Bildirişleriň görülmegi.** Bildirişi açanyňyzda, her tomaşaçyny günde bir gezek hasaplamak üçin programma anonim programma kesgitleýjisini iberýär. Biz diňe onuň kodlanan görnüşini saklaýarys, 2 günden soň pozýarys we sizi tanamak ýa-da mahabat üçin hiç haçan ulanmaýarys.`,
       },
       {
         title: "2. Haýsy maglumatlary ÝIGNAMAýARYS",

@@ -29,6 +29,7 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 const REFRESH_TIMEOUT_MS = 15_000;
 
 interface RequestOptions<TResponse> {
+  headers?: Record<string, string>;
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   schema?: ZodSchema<TResponse>;
@@ -44,7 +45,7 @@ interface RequestOptions<TResponse> {
   assertSession?: () => Promise<unknown>;
 }
 
-type ClientOptions = Pick<RequestOptions<unknown>, "auth" | "accessToken" | "timeout" | "assertSession">;
+type ClientOptions = Pick<RequestOptions<unknown>, "auth" | "accessToken" | "timeout" | "assertSession" | "headers">;
 
 let refreshInFlight: Promise<void> | null = null;
 
@@ -171,6 +172,7 @@ async function rawRequest<TResponse>(
   };
 
   const locale = localeStore.getState().locale ?? "ru";
+  Object.assign(headers, opts.headers);
   headers["Accept-Language"] = locale;
 
   if (opts.body !== undefined) {
