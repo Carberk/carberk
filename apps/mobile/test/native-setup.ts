@@ -132,6 +132,8 @@ vi.mock("expo-image-picker", () => ({
 
 // Expo modules that load `expo-modules-core`, which needs the native runtime.
 // A spec that exercises one of them mocks it itself and wins over these stubs.
+vi.mock("expo-constants", () => ({ default: { expoConfig: { version: "1.0" }, nativeBuildVersion: "1" } }));
+vi.mock("expo-crypto", async () => ({ randomUUID: (await import("node:crypto")).randomUUID }));
 vi.mock("expo-linking", () => ({ canOpenURL: vi.fn(async () => false), openURL: vi.fn(async () => {}) }));
 vi.mock("expo-clipboard", () => ({ setStringAsync: vi.fn(async () => true) }));
 vi.mock("expo-splash-screen", () => ({ preventAutoHideAsync: vi.fn(async () => true), hide: vi.fn() }));

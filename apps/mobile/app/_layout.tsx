@@ -47,6 +47,7 @@ import {
 } from "../src/onboarding/onboardingGate";
 import { LaunchEntrance } from "../src/launch/LaunchEntrance";
 import { listingViewInstallId, listingViewsEnabled } from "../src/listings/detail/listingViewIdentity";
+import { startNativeMeasurement } from "../src/measurement/nativeMeasurement";
 import { themeStore } from "../src/theme/themeStore";
 
 import { ToastProvider } from "@/components/ui/toast";
@@ -193,6 +194,7 @@ function PushTokenSyncOnBoot() {
 }
 
 export default function RootLayout() {
+  useEffect(startNativeMeasurement, []);
   const osColorScheme = useOsColorScheme();
   const { colorScheme: appliedScheme, setColorScheme } = useNativeWindColorScheme();
   const theme = themeStore((state) => state.theme);

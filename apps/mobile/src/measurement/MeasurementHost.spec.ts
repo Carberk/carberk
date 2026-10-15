@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import type { MeasurementSchemas } from "@auto-tm/contracts";
+
 import { server } from "../../test/msw";
+
 import { MeasurementHost, type MeasurementHostPorts } from "./MeasurementHost";
 const visitId = "00000000-0000-4000-8000-000000000002";
 const event: MeasurementSchemas.MeasurementEvent = { version: 1, eventId: "00000000-0000-4000-8000-000000000001", visitId, occurredAt: "2026-10-15T00:00:00Z", purpose: "product_improvement", eventName: "listing_detail_opened", context: { platform: "android", release: "1.0", build: "1", locale: "ru" }, payload: { listingId: "00000000-0000-4000-8000-000000000003" } };
 function setup() {
  let identity: string | null = null; let queue: unknown = null; let actorKey = "guest";
- const ports: MeasurementHostPorts = { now: () => Date.parse("2026-10-15T00:00:00Z"), random: () => 0.5,
+ const ports: MeasurementHostPorts = { newId: () => "local-queue-generation", now: () => Date.parse("2026-10-15T00:00:00Z"), random: () => 0.5,
   identity: async () => ({ actorKey, authorization: actorKey === "guest" ? null : "Bearer account" }), readIdentity: async () => identity,
   writeIdentity: async (value) => { identity = value; }, readQueue: async () => queue, writeQueue: async (value) => { queue = value; }, syntheticProof: async () => `ms_${"s".repeat(43)}` };
  return { ports, actor: (value: string) => { actorKey = value; }, storedQueue: () => queue, storedIdentity: () => identity };
