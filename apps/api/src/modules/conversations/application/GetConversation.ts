@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException, Optional } from "@nestjs/common";
 
 import type {
   ListingsReadPort,
@@ -17,6 +17,8 @@ import {
 } from "../domain/ports/ConversationRepository";
 
 import { ConversationAccessPolicy } from "./ConversationAccessPolicy";
+import { BusinessEnquiryAccess } from "./BusinessEnquiryAccess";
+import type { ConversationActor } from "../domain/ports/BusinessEnquiryRepository";
 import { toConversationPeer, type ConversationPeer } from "./ConversationPeers";
 import {
   ConversationSendPolicy,
@@ -26,6 +28,7 @@ import {
 export interface GetConversationInput {
   userId: string;
   conversationId: string;
+  actor?: ConversationActor | undefined;
 }
 
 /** A list item plus whether the viewer's next Message would be accepted. */
@@ -55,6 +58,7 @@ export class GetConversation {
     private readonly accessPolicy: ConversationAccessPolicy,
     @Inject(ConversationSendPolicy)
     private readonly sendPolicy: ConversationSendPolicy,
+    @Inject(BusinessEnquiryAccess) @Optional() private readonly businessAccess?: BusinessEnquiryAccess,
   ) {}
 
   async execute(input: GetConversationInput): Promise<GetConversationResult> {
@@ -67,10 +71,14 @@ export class GetConversation {
         message: "Conversation not found",
       });
     }
-    const peerId = this.accessPolicy.assertParticipant(
-      conversation,
-      input.userId,
-    );
+    let peerId: string;
+    if (conversation.businessId) {
+      if (!input.actor || !this.businessAccess) throw new NotFoundException({ code: "NOT_FOUND", message: "Conversation not found" });
+      await this.businessAccess.authorize(conversation, input.actor, {});
+      peerId = conversation.buyerId;
+    } else {
+      peerId = this.accessPolicy.assertParticipant(conversation, input.userId);
+    }
 
     // History stays readable in every restricted case, so a refused send
     // never refuses the read: the restriction is reported, not thrown.

@@ -20,6 +20,9 @@ import { MyListingsController } from "./presentation/MyListingsController";
 import { ExchangeRatesController } from "./presentation/ExchangeRatesController";
 import { FavoritesController } from "./presentation/FavoritesController";
 import { ContactPhonesController } from "./presentation/ContactPhonesController";
+import { VideoUploadController } from "./presentation/VideoUploadController";
+import { VideoUploadSessionService } from "./application/VideoUploadSession";
+import { PrismaVideoUploadSessionRepository } from "./infrastructure/PrismaVideoUploadSessionRepository";
 import { NullVinDecoder } from "./infrastructure/NullVinDecoder";
 import { NullContentClassifier } from "./infrastructure/NullContentClassifier";
 import { SortedFeedRankingAdapter } from "./infrastructure/SortedFeedRankingAdapter";
@@ -104,7 +107,7 @@ import { LISTING_VIEWS_PORT } from "./domain/ports/ListingViewsPort";
 
 @Module({
   imports: [PrismaModule, EventEmitterModule, IdentityModule, MeasurementModule],
-  controllers: [BusinessInventoryController,ListingViewsController, ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController],
+  controllers: [BusinessInventoryController,ListingViewsController, ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController, VideoUploadController],
   providers: [
     { provide: BUSINESS_INVENTORY_REPOSITORY, useClass: PrismaBusinessInventoryRepository },
     { provide: BUSINESS_CONTACT_PHONE_REPOSITORY, useClass: PrismaBusinessContactPhoneRepository },
@@ -268,6 +271,8 @@ import { LISTING_VIEWS_PORT } from "./domain/ports/ListingViewsPort";
     RequestContactPhoneCode,
     ConfirmContactPhone,
     ListMyContactPhones,
+    VideoUploadSessionService,
+    PrismaVideoUploadSessionRepository,
   ],
   exports: [
     VIN_DECODER_PORT,

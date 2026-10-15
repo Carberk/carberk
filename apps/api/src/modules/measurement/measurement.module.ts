@@ -11,6 +11,7 @@ import { syntheticMeasurementAdmission } from "./application/SyntheticMeasuremen
 import { BootstrapMeasurement } from "./application/BootstrapMeasurement";
 import { PrismaMeasurementStore } from "./infrastructure/PrismaMeasurementStore";
 import { MeasurementController } from "./presentation/MeasurementController";
+import { MEASUREMENT_RATE_LIMITER, RedisMeasurementRateLimiter } from "./infrastructure/RedisMeasurementRateLimiter";
 
 const ACTIVATION = Symbol("MeasurementActivation");
 @Module({
@@ -31,7 +32,9 @@ const ACTIVATION = Symbol("MeasurementActivation");
    epoch: config.get("MEASUREMENT_COLLECTOR_EPOCH", { infer: true }) ?? "unprovisioned", environment: activation.environment, population: "synthetic",
   }) },
   { provide: AcceptMeasurement, inject: [PrismaMeasurementStore, ACTIVATION], useFactory: (store: PrismaMeasurementStore, activation: MeasurementActivation) => new AcceptMeasurement(store, () => new Date(), activation) },
-  { provide: AcceptClientMeasurementBatch, inject: [PrismaMeasurementStore, AcceptMeasurement], useFactory: (store: PrismaMeasurementStore, accept: AcceptMeasurement) => new AcceptClientMeasurementBatch(store, accept, () => Date.now()) },
+  RedisMeasurementRateLimiter,
+  { provide: MEASUREMENT_RATE_LIMITER, useExisting: RedisMeasurementRateLimiter },
+  { provide: AcceptClientMeasurementBatch, inject: [PrismaMeasurementStore, AcceptMeasurement, MEASUREMENT_RATE_LIMITER], useFactory: (store: PrismaMeasurementStore, accept: AcceptMeasurement, limiter: RedisMeasurementRateLimiter) => new AcceptClientMeasurementBatch(store, accept, () => Date.now(), limiter) },
   { provide: BootstrapMeasurement, inject: [PrismaMeasurementStore, ACTIVATION, ConfigService], useFactory: (store: PrismaMeasurementStore, activation: MeasurementActivation, config: ConfigService<Env, true>) => new BootstrapMeasurement(store, "synthetic", activation, (proof) => syntheticMeasurementAdmission({
    environment: config.get("APP_ENV", { infer: true }),
    ...(config.get("MEASUREMENT_SYNTHETIC_CAPABILITY_HASH", { infer: true }) ? { hash: config.get("MEASUREMENT_SYNTHETIC_CAPABILITY_HASH", { infer: true }) as string } : {}),
