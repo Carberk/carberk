@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { InMemoryListingViews } from "./testing/InMemoryListingViews";
 import { GetListingDetail } from "./GetListingDetail";
 import { Listing } from "../domain/Listing";
 import { ListingMedia } from "../domain/ListingMedia";
@@ -156,6 +157,7 @@ function makeUseCase(
   favorites?: FakeFavoriteRepository,
   vinDecoder?: FakeVinDecoder,
   sellerProfiles?: InMemorySellerProfiles,
+  views = new InMemoryListingViews(),
 ) {
   return new GetListingDetail(
     repo ?? new FakeListingRepository(),
@@ -165,6 +167,8 @@ function makeUseCase(
     favorites ?? new FakeFavoriteRepository(),
     vinDecoder ?? new FakeVinDecoder(),
     sellerProfiles ?? seededSellerProfiles(),
+    views,
+    { now: () => new Date("2026-10-14T19:00:00Z") },
   );
 }
 
@@ -210,6 +214,25 @@ describe("GetListingDetail", () => {
     const result = await makeUseCase(repo).execute({ listingId: "listing-1" });
     expect(result).not.toHaveProperty("viewCount");
     expect(result).not.toHaveProperty("viewsToday");
+  });
+
+  it.each(["active", "sold", "archived"] as const)("retains totals and today for the owner of an %s Listing without recording a view", async (status) => {
+    seedListing({ status });
+    const views = new InMemoryListingViews();
+    views.totals.set("listing-1", { viewCount: 17, viewsToday: 3 });
+    const uc = makeUseCase(repo, mediaRepo, exchangeRates, storage, favorites, undefined, undefined, views);
+    const result = await uc.execute({ listingId: "listing-1", requestingUserId: "user-1" });
+    expect(result).toMatchObject({ viewCount: 17, viewsToday: 3 });
+    expect(views.records).toEqual([]);
+  });
+
+  it("returns the active public totals without counting detail reads", async () => {
+    seedListing();
+    const views = new InMemoryListingViews();
+    views.totals.set("listing-1", { viewCount: 17, viewsToday: 3 });
+    const uc = makeUseCase(repo, mediaRepo, exchangeRates, storage, favorites, undefined, undefined, views);
+    expect(await uc.execute({ listingId: "listing-1" })).toMatchObject({ viewCount: 17, viewsToday: 3 });
+    expect(views.records).toEqual([]);
   });
 
   it("returns detail for an active listing", async () => {

@@ -273,7 +273,9 @@ export const ListingDetailSchema = z.object({
   acceptsExchange: z.boolean(),
   installmentAvailable: z.boolean(),
   media: z.array(ListingMediaSchema),
-  viewCount: z.number().int().nonnegative(),
+  // Absent for closed non-owner detail; numeric on older payloads remains valid.
+  viewCount: z.number().int().nonnegative().optional(),
+  viewsToday: z.number().int().nonnegative().optional(),
   favoriteCount: z.number().int().nonnegative(),
   isFavorited: z.boolean().optional(),
   conditionDisclosure: ConditionDisclosureSchema.optional(),
@@ -807,3 +809,6 @@ export const ListingsErrorCode = {
 } as const;
 export type ListingsErrorCode =
   (typeof ListingsErrorCode)[keyof typeof ListingsErrorCode];
+
+/** Dedicated app-only view signal header. No raw identifier in URLs, bodies or events. */
+export const ListingViewInstallIdSchema = z.string().uuid().toLowerCase();

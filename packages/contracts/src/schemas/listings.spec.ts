@@ -7,6 +7,7 @@ import {
   FeedListingSummarySchema,
   FeedResponseSchema,
   ListingDetailSchema,
+  ListingViewInstallIdSchema,
   ListingDraftPayloadSchema,
   MyListingsResponseSchema,
 } from "./listings";
@@ -254,4 +255,9 @@ describe("Listing view visibility compatibility", () => {
     expect(ListingDetailSchema.shape.viewCount.safeParse(17).success).toBe(true);
     expect(ListingDetailSchema.shape.viewCount.safeParse(-1).success).toBe(false);
   });
+});
+
+it("canonicalizes the app UUID before dedupe and rejects malformed identifiers", () => {
+  expect(ListingViewInstallIdSchema.parse("550E8400-E29B-41D4-A716-446655440000")).toBe("550e8400-e29b-41d4-a716-446655440000");
+  expect(ListingViewInstallIdSchema.safeParse("invalid").success).toBe(false);
 });

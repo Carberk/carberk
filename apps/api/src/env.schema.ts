@@ -81,6 +81,8 @@ const BaseSchema = z.object({
     .default("true"),
 
   INSPECTION_INTEREST_ENABLED: booleanFlag,
+  LISTING_VIEWS_ENABLED: booleanFlag,
+  LISTING_VIEW_SALT_SECRET: z.string().min(32).optional(),
 });
 
 type BaseEnv = z.infer<typeof BaseSchema>;
@@ -426,6 +428,9 @@ export const EnvSchema = BaseSchema.superRefine((env, ctx) => {
   const add = (path: string, message: string) =>
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
 
+  if (env.LISTING_VIEWS_ENABLED && !env.LISTING_VIEW_SALT_SECRET) {
+    add("LISTING_VIEW_SALT_SECRET", "Listing views require a dedicated stable salt secret");
+  }
   validateEndpoints(env, add);
   validateSecrets(env, add);
   validateReviewerSafety(env, add);

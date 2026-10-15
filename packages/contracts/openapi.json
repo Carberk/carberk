@@ -1036,6 +1036,38 @@
           },
           "isFavorited": {
             "type": "boolean"
+          },
+          "enginePower": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true
+          },
+          "driveTypeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bodyTypeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "colorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hasVin": {
+            "type": "boolean"
+          },
+          "acceptsExchange": {
+            "type": "boolean"
+          },
+          "installmentAvailable": {
+            "type": "boolean"
+          },
+          "allowCalls": {
+            "type": "boolean"
+          },
+          "allowChat": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -1158,6 +1190,38 @@
           "isFavorited": {
             "type": "boolean"
           },
+          "enginePower": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true
+          },
+          "driveTypeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bodyTypeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "colorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hasVin": {
+            "type": "boolean"
+          },
+          "acceptsExchange": {
+            "type": "boolean"
+          },
+          "installmentAvailable": {
+            "type": "boolean"
+          },
+          "allowCalls": {
+            "type": "boolean"
+          },
+          "allowChat": {
+            "type": "boolean"
+          },
           "galleryKeys": {
             "type": "array",
             "items": {
@@ -1174,10 +1238,7 @@
             },
             "maxItems": 8
           },
-          "allowCalls": {
-            "type": "boolean"
-          },
-          "allowChat": {
+          "hasContactPhone": {
             "type": "boolean"
           },
           "seller": {
@@ -1469,6 +1530,10 @@
             "type": "integer",
             "minimum": 0
           },
+          "viewsToday": {
+            "type": "integer",
+            "minimum": 0
+          },
           "favoriteCount": {
             "type": "integer",
             "minimum": 0
@@ -1581,7 +1646,6 @@
           "acceptsExchange",
           "installmentAvailable",
           "media",
-          "viewCount",
           "favoriteCount",
           "publishedAt",
           "createdAt",
@@ -2585,6 +2649,38 @@
                 "isFavorited": {
                   "type": "boolean"
                 },
+                "enginePower": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": true
+                },
+                "driveTypeId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "bodyTypeId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "colorId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "hasVin": {
+                  "type": "boolean"
+                },
+                "acceptsExchange": {
+                  "type": "boolean"
+                },
+                "installmentAvailable": {
+                  "type": "boolean"
+                },
+                "allowCalls": {
+                  "type": "boolean"
+                },
+                "allowChat": {
+                  "type": "boolean"
+                },
                 "galleryKeys": {
                   "type": "array",
                   "items": {
@@ -2601,10 +2697,7 @@
                   },
                   "maxItems": 8
                 },
-                "allowCalls": {
-                  "type": "boolean"
-                },
-                "allowChat": {
+                "hasContactPhone": {
                   "type": "boolean"
                 },
                 "seller": {
@@ -3000,6 +3093,38 @@
                 },
                 "isFavorited": {
                   "type": "boolean"
+                },
+                "enginePower": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": true
+                },
+                "driveTypeId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "bodyTypeId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "colorId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "hasVin": {
+                  "type": "boolean"
+                },
+                "acceptsExchange": {
+                  "type": "boolean"
+                },
+                "installmentAvailable": {
+                  "type": "boolean"
+                },
+                "allowCalls": {
+                  "type": "boolean"
+                },
+                "allowChat": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -3365,6 +3490,38 @@
           "isFavorited": {
             "type": "boolean"
           },
+          "enginePower": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true
+          },
+          "driveTypeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bodyTypeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "colorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hasVin": {
+            "type": "boolean"
+          },
+          "acceptsExchange": {
+            "type": "boolean"
+          },
+          "installmentAvailable": {
+            "type": "boolean"
+          },
+          "allowCalls": {
+            "type": "boolean"
+          },
+          "allowChat": {
+            "type": "boolean"
+          },
           "galleryKeys": {
             "type": "array",
             "items": {
@@ -3384,10 +3541,7 @@
           "contactPhone": {
             "type": "string"
           },
-          "allowCalls": {
-            "type": "boolean"
-          },
-          "allowChat": {
+          "hasContactPhone": {
             "type": "boolean"
           }
         },
@@ -3518,6 +3672,38 @@
                 "isFavorited": {
                   "type": "boolean"
                 },
+                "enginePower": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": true
+                },
+                "driveTypeId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "bodyTypeId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "colorId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "hasVin": {
+                  "type": "boolean"
+                },
+                "acceptsExchange": {
+                  "type": "boolean"
+                },
+                "installmentAvailable": {
+                  "type": "boolean"
+                },
+                "allowCalls": {
+                  "type": "boolean"
+                },
+                "allowChat": {
+                  "type": "boolean"
+                },
                 "galleryKeys": {
                   "type": "array",
                   "items": {
@@ -3537,10 +3723,7 @@
                 "contactPhone": {
                   "type": "string"
                 },
-                "allowCalls": {
-                  "type": "boolean"
-                },
-                "allowChat": {
+                "hasContactPhone": {
                   "type": "boolean"
                 }
               },
@@ -13375,6 +13558,96 @@
         "responses": {
           "200": {
             "description": "Logged out"
+          }
+        }
+      }
+    },
+    "/api/v1/listings/{id}/views": {
+      "post": {
+        "summary": "Signal an explicitly viewed Listing detail",
+        "description": "Public. Send only after a loaded, focused, foreground detail remains visible for two seconds. Installation identity takes precedence over optional authentication. No identity, owner/admin, inactive, deleted or duplicate daily signals do not increment. Collection is disabled until retention and disclosure gates pass.",
+        "tags": [
+          "Listings"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "x-app-install-id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Signal accepted without revealing whether it counted"
+          },
+          "400": {
+            "description": "Malformed app identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "UNAUTHORIZED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "USER_NOT_FOUND",
+                        "CONFLICT",
+                        "RATE_LIMITED",
+                        "OTP_EXPIRED",
+                        "OTP_ALREADY_USED",
+                        "INVALID_OTP",
+                        "OTP_LOCKED",
+                        "OTP_NOT_FOUND",
+                        "SIGN_IN_METHOD_TAKEN",
+                        "INVALID_DISPLAY_NAME",
+                        "INTERNAL"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "nullable": true
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message",
+                    "timestamp",
+                    "requestId"
+                  ]
+                }
+              }
+            }
           }
         }
       }

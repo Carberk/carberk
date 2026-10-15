@@ -124,8 +124,6 @@ export class PrismaListingRepository implements ListingRepository {
         description: n(listing.description),
         acceptsExchange: listing.acceptsExchange,
         installmentAvailable: listing.installmentAvailable,
-        viewCount: listing.viewCount,
-        favoriteCount: listing.favoriteCount,
         damaged: n(listing.conditionDisclosure?.damaged),
         knownIssuesText: n(listing.conditionDisclosure?.knownIssuesText),
       },

@@ -510,3 +510,9 @@ describe("Listing-view collection activation", () => {
     expect(EnvSchema.safeParse({ ...baseEnv, LISTING_VIEWS_ENABLED: "true" }).success).toBe(false);
   });
 });
+
+it("requires a long dedicated view salt only for enabled collection", () => {
+  expect(EnvSchema.parse(baseEnv).LISTING_VIEWS_ENABLED).toBe(false);
+  expect(EnvSchema.safeParse({ ...baseEnv, LISTING_VIEWS_ENABLED: "true", LISTING_VIEW_SALT_SECRET: "short" }).success).toBe(false);
+  expect(EnvSchema.parse({ ...baseEnv, LISTING_VIEWS_ENABLED: "true", LISTING_VIEW_SALT_SECRET: "synthetic-listing-view-secret-long-enough" }).LISTING_VIEWS_ENABLED).toBe(true);
+});
