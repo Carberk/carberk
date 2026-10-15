@@ -65,3 +65,23 @@ test('safe identity can reserve before mock preparation while all application mu
   assert.deepEqual(await platform.attest(policy,{requireMock:false}),policy);
   await assert.rejects(platform.attest(policy),/mock delivery/);
 });
+
+test('actual deployment proof rejects stale active deployment, wrong SHA and a non-successful active instance',async()=>{
+  const target='a'.repeat(40);const lease={id:'1'.repeat(32),candidate:target,namespace:`cf_${'1'.repeat(32)}`,identity:policy,expectedMigrations:[]};
+  for(const fault of ['none','stale-active','wrong-sha','active-building']){
+    const base=boundary();
+    const fetch=async(url,options)=>{
+      if(url===`${policy.origins.api}/readyz`)return{ok:true,json:async()=>({status:'ready',environment:'staging',commitSha:target,checks:{postgres:'ok',redis:'ok',minio:'ok'}})};
+      const {query,variables}=JSON.parse(options.body);let data;
+      if(query.includes('deployment(id:'))data={deployment:{id:variables.id,status:'SUCCESS',meta:{commitHash:fault==='wrong-sha'?'b'.repeat(40):target}}};
+      else if(query.includes('latestDeployment'))data={serviceInstance:{latestDeployment:{id:fault==='stale-active'?'old-deployment':`deployment-${variables.serviceId}`,status:fault==='active-building'?'BUILDING':'SUCCESS'}}};
+      else if(query.includes('deploymentLogs'))data={deploymentLogs:[{message:'Worker started (BullMQ consumer)'}]};
+      else return base(url,options);
+      return{ok:true,json:async()=>({data})};
+    };
+    const platform=new RailwayPlatform({token:'SECRET',fetch,command:async()=>JSON.stringify({sha:target,fixtures:'absent',schema:'unchanged'})});
+    const verify=()=>platform.verify(lease,target,{deployments:{api:'deployment-api',worker:'deployment-worker'}});
+    if(fault==='none')assert.equal((await verify()).sha,target);
+    else await assert.rejects(verify(),/deployed candidate mismatch/);
+  }
+});
