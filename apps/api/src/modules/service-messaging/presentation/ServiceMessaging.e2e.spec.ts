@@ -1,4 +1,6 @@
 import "reflect-metadata";
+import sharp from "sharp";
+import { S3Client, CreateBucketCommand } from "@aws-sdk/client-s3";
 import { randomUUID } from "node:crypto";
 
 import { EventEmitterModule } from "@nestjs/event-emitter";
@@ -16,7 +18,7 @@ import { GlobalErrorFilter } from "../../../common/error.filter";
 import { defineE2eSuite } from "../../../../test/helpers/e2eSuite";
 import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
 import { ServiceMessagingModule } from "../service-messaging.module";
-import { SERVICE_RUNTIME } from "../domain/ports/ServiceMessagingPort";
+import { SERVICE_PRIVATE_STORE, SERVICE_RUNTIME, type ServicePrivateStore } from "../domain/ports/ServiceMessagingPort";
 
 const suite = defineE2eSuite("service-messaging-boundaries");
 let app: NestFastifyApplication; let db: PrismaService; let request: ReturnType<typeof supertest>; let jwt: JwtService;
@@ -29,6 +31,8 @@ beforeAll(async () => {
  jwt = app.get(JwtService); db = app.get(PrismaService);
  app.useGlobalGuards(new JwtAuthGuard(app.get(Reflector), jwt)); app.useGlobalFilters(new GlobalErrorFilter());
  await app.listen(0, "127.0.0.1"); request = supertest(app.getHttpServer());
+ const storage = new S3Client({ endpoint: process.env["MINIO_ENDPOINT"] ?? "http://localhost:9000", region: "us-east-1", forcePathStyle: true, credentials: { accessKeyId: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin", secretAccessKey: process.env["MINIO_SECRET_KEY"] ?? "minioadmin" } });
+ try { await storage.send(new CreateBucketCommand({ Bucket: "service-private" })); } catch (error) { if (!(error instanceof Error) || !["BucketAlreadyExists", "BucketAlreadyOwnedByYou"].includes(error.name)) throw error; } finally { storage.destroy(); }
  for (const id of ids) {
   await db.user.create({ data: { id, phone: suite.phone(id), phoneVerifiedAt: new Date(), role: id === stranger ? "admin" : "buyer", ...(id === customer ? { suspendedAt: new Date() } : {}) } });
   const session = await db.session.create({ data: { userId: id, refreshTokenHash: randomUUID(), expiresAt: new Date(Date.now() + 3600000), adminTotpExpiresAt: new Date(Date.now() + 3600000) } });
@@ -38,8 +42,11 @@ beforeAll(async () => {
 });
 afterAll(async () => {
  if (db) {
+  const histories = await db.vehicleHistoryRequest.findMany({ where: { customerId: { in: ids } }, select: { conversation: { select: { id: true } } } });
   const scopes = await db.supportCase.findMany({ where: { customerId: { in: ids } }, select: { conversation: { select: { id: true } } } });
-  const conversations = scopes.flatMap(scope => scope.conversation ? [scope.conversation.id] : []);
+  const conversations = [...scopes, ...histories].flatMap(scope => scope.conversation ? [scope.conversation.id] : []);
+  const ownedFiles = await db.serviceAttachment.findMany({ where: { conversationId: { in: conversations } }, select: { objectKey: true } });
+  for (const file of ownedFiles) if (file.objectKey) await app.get<ServicePrivateStore>(SERVICE_PRIVATE_STORE).remove(file.objectKey);
   await db.serviceOutbox.deleteMany({ where: { conversationId: { in: conversations } } });
   await db.serviceMessage.deleteMany({ where: { conversationId: { in: conversations } } });
   await db.serviceAttachment.deleteMany({ where: { conversationId: { in: conversations } } });
@@ -48,6 +55,7 @@ afterAll(async () => {
   await db.serviceConversation.deleteMany({ where: { id: { in: conversations } } });
   await db.serviceAudit.deleteMany({ where: { actorId: { in: ids } } });
   await db.supportCase.deleteMany({ where: { customerId: { in: ids } } });
+  await db.vehicleHistoryRequest.deleteMany({ where: { customerId: { in: ids } } });
   await db.user.deleteMany({ where: { id: { in: ids } } });
  }
  await app?.close();
@@ -83,4 +91,32 @@ it("preserves restricted-user appeals, separate identities, exact assignment and
  await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(nextStaff)).expect(403);
  const audits = await db.serviceAudit.findMany({ where: { resourceId: opened.body.resourceId } });
  expect(audits.length).toBeGreaterThan(0); expect(JSON.stringify(audits)).not.toContain("Internal note");
+});
+it("keeps staged bytes unusable until exact adoption and checks current audience on every private download", async () => {
+ const opened = await request.post("/api/v1/services/conversations").set("Authorization", auth(stranger)).send({ purpose: "support", synthetic: true }).expect(201);
+ const id = opened.body.id as string;
+ const other = await request.post("/api/v1/services/conversations").set("Authorization", auth(customer)).send({ purpose: "history", synthetic: true }).expect(201);
+ const original = await sharp({ create: { width: 20, height: 10, channels: 3, background: "red" } }).jpeg().withExif({ IFD0: { Artist: "Synthetic private metadata" } }).toBuffer();
+ const rights = { category: "support_communication", purpose: "Synthetic fixture", basis: "Owned test data", provenance: "Generated red pixels", identifiability: "personal", use: ["service"], schedule: { kind: "support_case", closedDays: 90, eraseOnAccountDeletion: true }, supplierRestrictions: "", hold: null };
+ const staged = await request.post(`/api/v1/services/conversations/${id}/attachments`).set("Authorization", auth(stranger)).send({ category: "support_communication", contentType: "image/jpeg", sizeBytes: original.length, filename: "synthetic.jpg", rights }).expect(201);
+ const file = staged.body.id as string;
+ expect(staged.body).not.toHaveProperty("objectKey"); expect(staged.body).not.toHaveProperty("url");
+ await request.get(`/api/v1/services/conversations/${id}/attachments/${file}`).set("Authorization", auth(stranger)).expect(403);
+ await request.post(`/api/v1/services/conversations/${other.body.id}/attachments/${file}/bytes`).set("Authorization", auth(customer)).set("Content-Type", "application/octet-stream").send(original).expect(400);
+ await request.post(`/api/v1/services/conversations/${id}/attachments/${file}/bytes`).set("Authorization", auth(stranger)).set("Content-Type", "application/octet-stream").send(original).expect(201);
+ await request.post(`/api/v1/services/conversations/${id}/attachments/${file}/bytes`).set("Authorization", auth(stranger)).set("Content-Type", "application/octet-stream").send(original).expect(201);
+ await request.get(`/api/v1/services/conversations/${id}/attachments/${file}`).set("Authorization", auth(stranger)).expect(403);
+ const message = { clientMessageId: randomUUID(), attachmentId: file, visibility: "customer" };
+ const first = await request.post(`/api/v1/services/conversations/${id}/messages`).set("Authorization", auth(stranger)).send(message).expect(201);
+ const retry = await request.post(`/api/v1/services/conversations/${id}/messages`).set("Authorization", auth(stranger)).send(message).expect(201);
+ expect(first.body.id).toBe(retry.body.id);
+ await request.post(`/api/v1/services/conversations/${id}/messages`).set("Authorization", auth(stranger)).send({ ...message, body: "Different content" }).expect(409);
+ const downloaded = await request.get(`/api/v1/services/conversations/${id}/attachments/${file}`).set("Authorization", auth(stranger)).expect(200);
+ expect(downloaded.headers["cache-control"]).toContain("no-store");
+ expect((await sharp(downloaded.body as Buffer).metadata()).exif).toBeUndefined();
+ await request.get(`/api/v1/services/conversations/${id}/attachments/${file}`).set("Authorization", auth(customer)).expect(403);
+ const row = await db.serviceAttachment.findUniqueOrThrow({ where: { id: file } });
+ const anonymous = await fetch(`${process.env["MINIO_ENDPOINT"]}/service-private/${row.objectKey}`); expect([401, 403]).toContain(anonymous.status);
+ await db.session.deleteMany({ where: { userId: stranger } });
+ await request.get(`/api/v1/services/conversations/${id}/attachments/${file}`).set("Authorization", auth(stranger)).expect(403);
 });
