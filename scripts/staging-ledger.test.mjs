@@ -43,3 +43,23 @@ test('separate operator processes cannot both acquire the shared remote ref', as
   const durable=await new GitLedger({directory:join(root,'inspector'),remote}).read();
   assert.ok(['alice','bob'].includes(durable.state.owner));
 });
+
+test('reviewed additive schema is retained with exact checksums on current-main restoration', async () => {
+  const { evaluateSchemaPlan } = await import('./staging-schema.mjs');
+  const baseline = [{ name: '20260101_base', checksum: '1'.repeat(64) }];
+  const addition = { name: '20261015_views', checksum: '2'.repeat(64) };
+  const profile = { schemaHashes: ['old', 'new'], additions: [addition] };
+  const plan = evaluateSchemaPlan({ baseline, candidate: [...baseline, addition], main: baseline,
+    candidateSchema: 'new', mainSchema: 'old', profile });
+  assert.equal(plan.disposition, 'retained-additive');
+  assert.deepEqual(plan.migrations, [...baseline, addition]);
+  assert.deepEqual(evaluateSchemaPlan({ baseline, candidate: baseline, main: baseline,
+    candidateSchema: 'old', mainSchema: 'old', retained: plan.migrations, profile }).migrations, plan.migrations);
+  for (const change of [
+    { candidate: [...baseline, { ...addition, checksum: '3'.repeat(64) }] },
+    { candidate: [...baseline, { name: '20261016_drop_users', checksum: '3'.repeat(64) }] },
+    { candidate: [{ ...baseline[0], checksum: '4'.repeat(64) }, addition] },
+    { candidateSchema: 'unknown' },
+  ]) assert.throws(() => evaluateSchemaPlan({ baseline, candidate: [...baseline, addition], main: baseline,
+    candidateSchema: 'new', mainSchema: 'old', profile, ...change }), /schema|migration/i);
+});

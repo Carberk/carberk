@@ -131,3 +131,22 @@ test('interruption after a provider creates a deployment preserves its actual ID
   assert.equal(state.reservation.operation.deployments.api,'actual-api-deployment');
   assert.equal(state.reservation.lifecycle,'blocked');
 });
+
+test('only proven complete interrupted deployments can recover; unknown or partial states retain ownership', async(t) => {
+  const {control,platform,claim,ledger}=await setup(t);const lease=await claim();
+  platform.execute=async(_kind,_active,_target,record)=>{
+    await record('api','actual-api');await record('worker','actual-worker');throw new Error('Transport lost');
+  };
+  await assert.rejects(control.operate(lease,'deploy'),/blocked/);
+  const unknown=await ledger.read();unknown.state.reservation.operation.deployments={api:'actual-api'};
+  await ledger.compareAndSwap(unknown.revision,unknown.state);
+  await assert.rejects(control.recover(lease),/deployment|recovery/i);
+  assert.ok((await control.inspect()).reservation.operation);
+  const complete=await ledger.read();complete.state.reservation.operation.deployments.worker='actual-worker';
+  await ledger.compareAndSwap(complete.revision,complete.state);
+  await control.recover(lease);
+  const state=await control.inspect();assert.equal(state.reservation.operation,null);
+  assert.equal(state.reservation.evidence.at(-1).kind,'recovery');
+  assert.deepEqual(state.reservation.deployments,{api:'actual-api',worker:'actual-worker'});
+  await assert.rejects(control.release(lease),/restoration/);
+});
