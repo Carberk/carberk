@@ -248,8 +248,8 @@ describe("ListingDraftPayloadSchema", () => {
 
 
 describe("Listing view visibility compatibility", () => {
-  it("accepts omitted totals when closed-buyer counters are hidden", () => {
-    expect(ListingDetailSchema.shape.viewCount.safeParse(undefined).success).toBe(true);
+  it("keeps the released-client lifetime counter required", () => {
+    expect(ListingDetailSchema.shape.viewCount.safeParse(undefined).success).toBe(false);
   });
   it("retains old clients' numeric totals and rejects negative totals", () => {
     expect(ListingDetailSchema.shape.viewCount.safeParse(17).success).toBe(true);

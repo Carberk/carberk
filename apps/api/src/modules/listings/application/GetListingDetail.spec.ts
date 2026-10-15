@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { z } from "zod";
 import { InMemoryListingViews } from "./testing/InMemoryListingViews";
 import { GetListingDetail } from "./GetListingDetail";
 import { Listing } from "../domain/Listing";
@@ -209,10 +210,13 @@ describe("GetListingDetail", () => {
     return listing;
   }
 
-  it("hides retained view totals from a buyer of a sold Listing", async () => {
+  it("keeps closed-buyer detail parseable by released clients without exposing retained totals", async () => {
     seedListing({ status: "sold", viewCount: 17 });
     const result = await makeUseCase(repo).execute({ listingId: "listing-1" });
-    expect(result).not.toHaveProperty("viewCount");
+    // Released ListingDetailSchema required this numeric field. A new optional schema
+    // cannot repair a response that an installed client's old schema rejects.
+    expect(z.object({ viewCount: z.number().int().nonnegative() }).safeParse(result).success).toBe(true);
+    expect(result.viewCount).toBe(0);
     expect(result).not.toHaveProperty("viewsToday");
   });
 
