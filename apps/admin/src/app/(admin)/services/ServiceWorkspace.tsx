@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ServiceMessagingSchemas as S } from "@auto-tm/contracts";
 
-import { serviceAssign, serviceQueue, serviceRead, serviceSend, serviceStage, type ServiceQueue } from "./actions";
+import { serviceAssign, serviceMarkRead, serviceQueue, serviceRead, serviceSend, serviceStage, type ServiceQueue } from "./actions";
 import { serviceCopy } from "./copy";
 
 import { useAdminLocale } from "@/lib/i18n";
@@ -12,6 +12,17 @@ export function ServiceWorkspace() {
  const [purpose, setPurpose] = useState<S.ServicePurpose>("support"), [queue, setQueue] = useState<ServiceQueue>([]), [conversation, setConversation] = useState<S.ServiceConversation | null>(null), [error, setError] = useState(""), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [body, setBody] = useState(""), [visibility, setVisibility] = useState<"customer" | "staff">("customer"), [target, setTarget] = useState("");
  const [image, setImage] = useState<{ file: File; id?: string } | null>(null), [attachmentId, setAttachmentId] = useState<string | null>(null), [uploading, setUploading] = useState(false), [uploadFailed, setUploadFailed] = useState(false);
  const retry = useRef<{ fingerprint: string; id: string } | null>(null); const generation = useRef(0);
+ const readFence = useRef("");
+ const renderedThrough = conversation?.messages.at(-1)?.sequence ?? 0;
+ useEffect(() => {
+  if (!conversation || renderedThrough <= conversation.readThrough) return;
+  const fence = `${conversation.id}:${renderedThrough}`; if (readFence.current === fence) return; readFence.current = fence;
+  const epoch = generation.current;
+  void serviceMarkRead(conversation.id, renderedThrough).then(result => {
+   if (epoch !== generation.current) return;
+   if (!result.ok) { readFence.current = ""; if (result.error === "permission" || result.error === "conflict") { setConversation(null); setError(result.error); } }
+  });
+ }, [conversation?.id, conversation?.readThrough, renderedThrough]);
  async function refresh(next = purpose) {
   const epoch = ++generation.current; setLoading(true); setError(""); setConversation(null);
   const result = await serviceQueue(next); if (epoch !== generation.current) return;
