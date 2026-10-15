@@ -5,7 +5,7 @@ import { MinioServicePrivateStore } from "./MinioServicePrivateStore";
 const send = vi.hoisted(() => vi.fn());
 vi.mock("@aws-sdk/client-s3", async (original) => ({ ...await original<typeof import("@aws-sdk/client-s3")>(), S3Client: class { send = send; } }));
 const config = () => new ConfigService({ MINIO_ENDPOINT: "http://127.0.0.1:9000", MINIO_REGION: "us-east-1", MINIO_ACCESS_KEY: "synthetic", MINIO_SECRET_KEY: "synthetic-secret" });
-beforeEach(() => send.mockReset());
+beforeEach(() => { send.mockReset(); });
 it("writes immutable private bytes with browser caching disabled", async () => {
  send.mockResolvedValue({});
  await new MinioServicePrivateStore(config()).putImmutable("service-private/c/f/hash", new Uint8Array([1, 2]), "image/jpeg");
