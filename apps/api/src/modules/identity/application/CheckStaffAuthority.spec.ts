@@ -9,6 +9,13 @@ function fixture() {
  return { repo, authority: new CheckStaffAuthority(repo, { now: () => now }) };
 }
 describe("current purpose-scoped staff authority", () => {
+ it("refuses a grant revoked in the owning transaction before a protected write", async () => {
+  const { repo, authority } = fixture();
+  const transaction = {};
+  repo.transactionSnapshots.set(transaction, { ...repo.snapshot!, capabilities: [] });
+  await expect(authority.authorize({ ...subject, capability: "support.operations" }, transaction))
+   .rejects.toMatchObject({ reason: "CAPABILITY_REQUIRED" });
+ });
  it("admits an explicitly granted non-admin without adding moderation or another purpose", async () => {
   const { authority } = fixture();
   await expect(authority.authorize({ ...subject, capability: "support.operations" })).resolves.toBeUndefined();
