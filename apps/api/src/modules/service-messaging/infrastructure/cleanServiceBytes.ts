@@ -1,6 +1,5 @@
 import sharp from "sharp";
 
-import { stripImageMetadata } from "../../../common/stripImageMetadata";
 import { ServiceDenied } from "../domain/serviceAccess";
 
 const IMAGE_LIMIT = 5 * 1024 * 1024;
@@ -29,7 +28,14 @@ export async function cleanServiceBytes(
   try {
     const metadata = await sharp(input, { limitInputPixels: PIXEL_LIMIT }).metadata();
     if (metadata.format !== format) throw new ServiceDenied("INVALID_ATTACHMENT");
-    return await stripImageMetadata(input, format, IMAGE_LIMIT, PIXEL_LIMIT) ?? input;
+    const animated = format === "webp" && (metadata.pages ?? 1) > 1;
+    for (const quality of [80, 70, 60, 50]) {
+      const decoded = sharp(input, { limitInputPixels: PIXEL_LIMIT, failOn: "warning", ...(animated ? { animated: true } : {}) });
+      const upright = animated ? decoded : decoded.autoOrient();
+      const cleaned = await (format === "jpeg" ? upright.jpeg({ quality }) : upright.webp({ quality })).toBuffer();
+      if (cleaned.length <= IMAGE_LIMIT) return cleaned;
+    }
+    throw new ServiceDenied("INVALID_ATTACHMENT");
   } catch {
     throw new ServiceDenied("INVALID_ATTACHMENT");
   }
