@@ -34,7 +34,7 @@ it("keeps a failed draft and retries with the same idempotency identity through 
  await waitFor(() => expect(screen.getByRole("button", { name: "Retry sending" })).toBeTruthy());
  expect((screen.getByLabelText("Message") as HTMLTextAreaElement).value).toBe("Retry this synthetic reply");
  fireEvent.submit(form);
- await waitFor(() => expect(sends).toHaveLength(2)); expect(sends[0]?.clientMessageId).toBe(sends[1]?.clientMessageId);
+ await waitFor(() => expect(sends).toHaveLength(2)); expect(sends[0]?.["clientMessageId"]).toBe(sends[1]?.["clientMessageId"]);
 });
 it("removes protected content after denial and preserves draft while switching locale", async () => {
  const screen = render(<AdminLocaleProvider initialLocale="en"><AdminLanguageSwitch/><ServiceWorkspace/></AdminLocaleProvider>);
