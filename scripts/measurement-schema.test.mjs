@@ -1,0 +1,21 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { retainedSchemaProfile, evaluateSchemaPlan } from './staging-schema.mjs';
+test('measurement restore admits only exact epoch/erasable-ledger migration bytes', () => {
+  const name = '20261015040000_first_party_measurement';
+  const entry = retainedSchemaProfile.additions.find(item => item.name === name);
+  assert.ok(entry);
+  const fixture = readFileSync(new URL(`./testing/retained-schema/${name}.sql`, import.meta.url));
+  assert.deepEqual(fixture, readFileSync(new URL(`../packages/db/prisma/migrations/${name}/migration.sql`, import.meta.url)));
+  assert.equal(createHash('sha256').update(fixture).digest('hex'), entry.checksum);
+  const schema = createHash('sha256').update(readFileSync(new URL('../packages/db/prisma/schema.prisma', import.meta.url))).digest('hex');
+  const baseline = [{ name: 'baseline', checksum: '1'.repeat(64) }];
+  const candidate = [...baseline, ...retainedSchemaProfile.additions];
+  const main = candidate.filter(item => item.name !== name);
+  const input = { baseline, candidate, main, candidateSchema: schema, mainSchema: '7f12fa5b73b7d975d821cbf6eb2dadb16ac9ca674826afa0875e0c5f24751abc' };
+  assert.equal(evaluateSchemaPlan(input).disposition, 'retained-additive');
+  assert.throws(() => evaluateSchemaPlan({ ...input, candidate: main }), /inventory mismatch/);
+  assert.throws(() => evaluateSchemaPlan({ ...input, retained: [{ ...entry, checksum: '0'.repeat(64) }] }), /checksum drift/);
+});

@@ -87,6 +87,7 @@ model User {
   verifiedContactPhones        VerifiedContactPhone[]
   mediaUploads                 MediaUpload[]
   businessInvitations          DealershipInvitation[]
+  measurementPrincipals        MeasurementPrincipal[]
   staffGrants                  StaffGrant[]
   totpEnrollment               TotpEnrollment?
   reportsSubmitted             ContentReport[]           @relation("Reporter")
@@ -916,4 +917,79 @@ model StaffGrant {
   revokedAt DateTime?
   @@id([userId, capability])
   @@map("staff_grants")
+}
+
+/// First-party collection identity is erasable and never part of core account recovery.
+model MeasurementState {
+  key   String @id
+  epoch String
+  @@map("measurement_state")
+}
+
+model MeasurementPrincipal {
+  id             String @id
+  pseudonym      String @unique
+  generation     String @unique
+  epoch          String
+  kind           String
+  userId         String? @unique
+  user           User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  capabilityHash String? @unique
+  expiresAt      DateTime?
+  createdAt      DateTime @default(now())
+  visits         MeasurementVisit[] @relation("VisitPrincipal")
+  associatedVisits MeasurementVisit[] @relation("CurrentVisitAccount")
+  events         MeasurementRecord[]
+  outbox         MeasurementOutbox[]
+  @@index([expiresAt])
+  @@map("measurement_principals")
+}
+
+model MeasurementVisit {
+  id              String @id
+  principalId     String
+  principal       MeasurementPrincipal @relation("VisitPrincipal", fields: [principalId], references: [id], onDelete: Cascade)
+  linkedAccountId String?
+  linkedAccount   MeasurementPrincipal? @relation("CurrentVisitAccount", fields: [linkedAccountId], references: [id], onDelete: Cascade)
+  startedAt       DateTime
+  foregroundAt    DateTime
+  endedAt         DateTime?
+  events          MeasurementRecord[]
+  @@index([principalId])
+  @@index([linkedAccountId])
+  @@map("measurement_visits")
+}
+
+model MeasurementRecord {
+  id          String @id
+  principalId String
+  principal   MeasurementPrincipal @relation(fields: [principalId], references: [id], onDelete: Cascade)
+  visitId     String?
+  visit       MeasurementVisit? @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  event       Json
+  origin      String
+  environment String
+  population  String
+  occurredAt  DateTime
+  receivedAt  DateTime
+  expiresAt   DateTime
+  @@index([expiresAt])
+  @@index([principalId, occurredAt])
+  @@map("measurement_records")
+}
+
+/// Captures an already-authorized generation at the source commit, never at delivery.
+model MeasurementOutbox {
+  id          String @id
+  principalId String
+  principal   MeasurementPrincipal @relation(fields: [principalId], references: [id], onDelete: Cascade)
+  generation  String
+  epoch       String
+  environment String
+  population  String
+  event       Json
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+  @@index([expiresAt])
+  @@map("measurement_outbox")
 }
