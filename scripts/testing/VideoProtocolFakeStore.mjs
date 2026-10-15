@@ -2,10 +2,12 @@ export class VideoProtocolFakeStore {
   parts = [];
   object = null;
   holdCompletion;
+  onComplete;
   abortLeavesLatePart = false;
   deleted = false;
   async listParts() { return structuredClone(this.parts); }
   async complete(parts) {
+    this.onComplete?.();
     if (this.holdCompletion) await this.holdCompletion;
     this.object = { size: parts.reduce((total, part) => total + part.size, 0), sha256: "a".repeat(64) };
     this.parts = [];
