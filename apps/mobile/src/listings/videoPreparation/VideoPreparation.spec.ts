@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { VideoPreparation, type VideoSelection } from "./VideoPreparation";
 import { FakeVideoPreparation } from "./application/testing/FakeVideoPreparation";
 
@@ -43,6 +44,14 @@ describe("Listing video preparation handoff", () => {
     native.complete();
     await refused;
     expect(native.files.size).toBe(0);
+  });
+
+  it("preserves an existing completed generation when native refuses the duplicate", async () => {
+    const native = new FakeVideoPreparation();
+    native.files.add(selection.jobId);
+    native.prepare = async () => { throw new Error("JOB_COMPLETED"); };
+    await expect(new VideoPreparation(native).prepare(selection)).rejects.toThrow("JOB_COMPLETED");
+    expect(native.files.has(selection.jobId)).toBe(true);
   });
 
   it("allows only one local preparation at a time", async () => {
