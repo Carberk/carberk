@@ -148,6 +148,7 @@ model Session {
   createdAt          DateTime  @default(now())
   lastSeenAt         DateTime  @default(now())
   adminTotpExpiresAt DateTime?
+  servicePushSubscriptions ServicePushSubscription[]
 
   @@index([userId])
   @@map("sessions")
@@ -792,6 +793,7 @@ model FcmDevice {
   registeredAt  DateTime     @default(now())
   lastUsedAt    DateTime     @default(now())
   invalidatedAt DateTime?
+  servicePushSubscriptions ServicePushSubscription[]
 
   @@index([userId])
   @@index([userId, invalidatedAt])
@@ -1089,8 +1091,25 @@ model ServiceConversation {
   attachments ServiceAttachment[]
   readStates ServiceReadState[]
   outbox ServiceOutbox[]
+  pushSubscriptions ServicePushSubscription[]
   erasureFence ServiceErasureFence?
   @@map("service_conversations")
+}
+model ServicePushSubscription {
+  id String @id @default(uuid())
+  sessionId String
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  deviceId String
+  device FcmDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  conversationId String
+  conversation ServiceConversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  lifecycleEpoch Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([sessionId, deviceId, conversationId])
+  @@index([conversationId, lifecycleEpoch])
+  @@index([sessionId, deviceId])
+  @@map("service_push_subscriptions")
 }
 model ServiceMessage {
   id String @id @default(uuid())
