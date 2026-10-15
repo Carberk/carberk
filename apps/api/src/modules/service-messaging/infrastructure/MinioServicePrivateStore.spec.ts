@@ -1,3 +1,4 @@
+import { Readable } from "node:stream";
 import { ConfigService } from "@nestjs/config";
 import { beforeEach, expect, it, vi } from "vitest";
 import { MinioServicePrivateStore } from "./MinioServicePrivateStore";
@@ -20,4 +21,10 @@ it("refuses files larger than the authorized size without returning bytes", asyn
 it("does not treat an existing immutable object as a successful replacement", async () => {
  send.mockRejectedValue(Object.assign(new Error("Precondition failed"), { $metadata: { httpStatusCode: 412 } }));
  await expect(new MinioServicePrivateStore(config()).putImmutable("service-private/c/f/hash", new Uint8Array([1, 2]), "image/jpeg")).rejects.toBeDefined();
+});
+
+it("reconciles identical bytes after a conditional-write response or database commit was lost", async () => {
+ const bytes = new Uint8Array([1, 2, 3]);
+ send.mockRejectedValueOnce(Object.assign(new Error("Already present"), { $metadata: { httpStatusCode: 412 } })).mockResolvedValueOnce({ ContentLength: 3, Body: Readable.from([bytes]) });
+ await expect(new MinioServicePrivateStore(config()).putImmutable("service-private/c/f/hash", bytes, "image/jpeg")).resolves.toBeUndefined();
 });
