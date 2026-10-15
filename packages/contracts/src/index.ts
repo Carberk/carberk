@@ -43,3 +43,4 @@ export { generateOpenApiDocument } from "./openapi";
 
 export * as StaffSchemas from "./schemas/staff";
 export * as BusinessSchemas from "./schemas/business";
+export * as AdminContextSchemas from "./schemas/adminContext";

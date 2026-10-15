@@ -152,6 +152,27 @@ describe("AdminModerationController e2e smoke", () => {
     await request.get("/api/v1/admin/authority").set("Authorization", `Bearer ${elevatedAgain}`).expect(403);
   });
 
+  it("reads bounded marketplace context without sign-in/contact or private report artifacts", async () => {
+    await createUser("admin-one", "admin");
+    await createUser("seller-one");
+    const token = await createAdminSession(adminOneId);
+    const listing = await createActiveListing(sellerOneId);
+    await prisma.listing.update({ where: { id: listing.id }, data: { contactPhone: "+99365123456", vin: "TESTVIN", description: "Read-only listing" } });
+    const detail = await request.get(`/api/v1/admin/context/listings/${listing.id}`).set("Authorization", `Bearer ${token}`).expect(200);
+    expect(detail.body).toMatchObject({ id: listing.id, vin: "TESTVIN", description: "Read-only listing", seller: { id: sellerOneId } });
+    expect(JSON.stringify(detail.body)).not.toMatch(/contactPhone|refreshToken|phoneVerified|messageContext|reporterUserId/);
+    const users = await request.get(`/api/v1/admin/context/users?q=${sellerOneId}`).set("Authorization", `Bearer ${token}`).expect(200);
+    expect(users.body.items).toHaveLength(1);
+    expect(Object.keys(users.body.items[0]).sort()).toEqual(["createdAt", "deletionScheduled", "displayName", "id", "nameNumber", "suspended"]);
+    await request.get(`/api/v1/admin/context/listings?pageSize=500`).set("Authorization", `Bearer ${token}`).expect(400);
+    await request.get(`/api/v1/admin/context/users/${sellerOneId}`).set("Authorization", `Bearer ${mintUserJwt(sellerOneId)}`).expect(403);
+    await prisma.listing.update({ where: { id: listing.id }, data: { deletedAt: new Date() } });
+    const deleted = await request.get(`/api/v1/admin/context/listings/${listing.id}`).set("Authorization", `Bearer ${token}`).expect(200);
+    expect(deleted.body.deletedAt).not.toBeNull();
+    await prisma.session.updateMany({ where: { userId: adminOneId }, data: { adminTotpExpiresAt: new Date(0) } });
+    await request.get(`/api/v1/admin/context/users/${sellerOneId}`).set("Authorization", `Bearer ${token}`).expect(403);
+  });
+
   async function createActiveListing(sellerId: string) {
     const catalog = await seedCatalog();
     const listing = await prisma.listing.create({
