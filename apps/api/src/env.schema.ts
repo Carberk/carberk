@@ -81,6 +81,10 @@ const BaseSchema = z.object({
     .default("true"),
 
   INSPECTION_INTEREST_ENABLED: booleanFlag,
+  MEASUREMENT_ENABLED: booleanFlag,
+  MEASUREMENT_COLLECTOR_EPOCH: z.string().uuid().optional(),
+  MEASUREMENT_EVIDENCE_REF: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),
+  // Only synthetic population is currently composable. Real activation needs its independent evidence gate.
   LISTING_VIEWS_ENABLED: booleanFlag,
   LISTING_VIEW_SALT_SECRET: z.string().min(32).optional(),
 });
@@ -430,6 +434,9 @@ export const EnvSchema = BaseSchema.superRefine((env, ctx) => {
 
   if (env.LISTING_VIEWS_ENABLED && !env.LISTING_VIEW_SALT_SECRET) {
     add("LISTING_VIEW_SALT_SECRET", "Listing views require a dedicated stable salt secret");
+  }
+  if (env.MEASUREMENT_ENABLED && (!env.MEASUREMENT_COLLECTOR_EPOCH || !env.MEASUREMENT_EVIDENCE_REF)) {
+    add("MEASUREMENT_ENABLED", "Measurement requires externally provisioned collector epoch and admitted evidence");
   }
   validateEndpoints(env, add);
   validateSecrets(env, add);

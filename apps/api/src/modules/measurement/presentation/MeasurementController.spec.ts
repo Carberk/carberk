@@ -7,6 +7,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import supertest from "supertest";
 
 import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
+import { BootstrapMeasurement } from "../application/BootstrapMeasurement";
+import { FakeMeasurementSessions } from "../application/testing/FakeMeasurementSessions";
 import { MeasurementController } from "./MeasurementController";
 import { AcceptClientMeasurementBatch } from "../application/AcceptClientMeasurementBatch";
 import { AcceptMeasurement } from "../application/AcceptMeasurement";
@@ -16,6 +18,7 @@ import type { MeasurementSubjectPort } from "../application/AcceptClientMeasurem
 const event = { version: 1, eventId: "00000000-0000-4000-8000-000000000001", occurredAt: "2026-10-15T00:00:00.000Z", visitId: "00000000-0000-4000-8000-000000000002",
  purpose: "product_improvement", eventName: "listing_detail_opened", context: { platform: "android", release: "1.0", build: "1", locale: "ru" }, payload: { listingId: "00000000-0000-4000-8000-000000000003" } };
 const ledger = new FakeMeasurementLedger();
+const sessions = new FakeMeasurementSessions();
 const subjects: MeasurementSubjectPort = { resolve: async (input) => input.authenticatedUserId === "buyer" || input.guestCapability === `mg_${"a".repeat(43)}` ? {
  origin: "client", environment: "staging", population: "synthetic", subject: { kind: input.authenticatedUserId ? "account" : "guest", pseudonym: "b".repeat(64), generation: "generation-http" },
 } : null };
@@ -25,7 +28,7 @@ describe("first-party measurement HTTP", () => {
  beforeAll(async () => {
   const accept = new AcceptMeasurement(ledger, () => new Date("2026-10-15T00:00:00Z"), { enabled: true, environment: "staging", purposes: ["product_improvement"], evidenceRef: "synthetic-http", realCollectionApproved: false });
   const module = await Test.createTestingModule({ imports: [JwtModule.register({ secret: "synthetic-measurement-http-905" })], controllers: [MeasurementController],
-   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }, { provide: AcceptClientMeasurementBatch, useValue: new AcceptClientMeasurementBatch(subjects, accept, () => Date.parse("2026-10-15T00:00:00Z")) }],
+   providers: [{ provide: BootstrapMeasurement, useValue: new BootstrapMeasurement(sessions, "synthetic", { enabled: true, environment: "staging", purposes: ["product_improvement"], evidenceRef: "synthetic-http", realCollectionApproved: false }) }, { provide: APP_GUARD, useClass: JwtAuthGuard }, { provide: AcceptClientMeasurementBatch, useValue: new AcceptClientMeasurementBatch(subjects, accept, () => Date.parse("2026-10-15T00:00:00Z")) }],
   }).compile();
   jwt = module.get(JwtService); app = module.createNestApplication<NestFastifyApplication>(new FastifyAdapter()); await app.listen(0, "127.0.0.1"); request = supertest(app.getHttpServer());
  });
@@ -35,6 +38,14 @@ describe("first-party measurement HTTP", () => {
   expect(response.headers["cache-control"]).toBe("no-store");
   expect(response.body).toMatchObject({ visitId: "00000000-0000-4000-8000-000000000002", generation: "generation-http", purposes: ["product_improvement"] });
   await request.post("/api/v1/measurement/bootstrap").send({ userId: "buyer", token: "SENSITIVE_SENTINEL" }).expect(400);
+ });
+ it("takes account and current guest proof only from verified credentials and erases guests without revealing existence", async () => {
+  await request.post("/api/v1/measurement/bootstrap").set("authorization", `Bearer ${jwt.sign({ sub: "buyer" })}`)
+   .set("x-measurement-guest", `mg_${"a".repeat(43)}`).send({ visitId: event.visitId }).expect(201);
+  expect(sessions.bootstraps.at(-1)).toEqual({ authenticatedUserId: "buyer", guestCapability: `mg_${"a".repeat(43)}`, visitId: event.visitId });
+  await request.post("/api/v1/measurement/erase-guest").set("authorization", `Bearer mg_${"a".repeat(43)}`).expect(204);
+  expect(sessions.erased.has(`mg_${"a".repeat(43)}`)).toBe(true);
+  await request.post("/api/v1/measurement/erase-guest").expect(401);
  });
  it("uses verified JWT or scoped guest capability, never body actor metadata", async () => {
   const response = await request.post("/api/v1/measurement/events").set("authorization", `Bearer ${jwt.sign({ sub: "buyer" })}`).send({ events: [event] }).expect(204);

@@ -18,3 +18,12 @@ Restore protection requires a newly supplied external epoch before serving and c
 Actual PostgreSQL scenarios and their behavioral red checkpoint have not run locally. PostgreSQL binaries are unavailable and local Docker was intentionally not started. These are missing evidence, assigned to hosted integration CI, not passes inferred from types, fake ports or SQL inspection. Prisma generation and migration/profile checks validate shape and reviewed bytes only.
 
 Remaining #905 work includes installed bootstrap/HTTP composition, actual persisted mobile host and rendered core-action outage proof, authoritative source transaction/outbox integration, distributed caps, retention and complete trilingual actual-field disclosures/rights/activation evidence. Raw diagnostics are separately owned. Collection, external telemetry and real populations remain disabled. No native session, staging mutation or external service activation occurred.
+
+
+## Bootstrap composition continuation
+
+Actual Fastify bootstrap404red ef134f20 became six green HTTP cases after implementation. Strict request schema accepts only the existing visit ID; JWT and separately redacted scoped guest proof supply identity. Responses use no-store, invalid body metadata fails generically, and guest erase returns no existence counts. Disabled collection still permits guest erasure. The purpose-gated application has independent defaultclosed/realpopulation refusal evidence.
+
+Activation prerequisites and actual logger credential redaction red1fb3a967 produced two behavior failures and47 existing passes, followed by green. The new module is installed in AppModule with collection defaultfalse. Enabled test fixtures require an external collector epoch and evidence reference. Its composition additionally restricts issuance to APP_ENV=test until trusted population admission exists. Hardcoding every public guest as synthetic in a deployed environment would be unsafe and is explicitly prevented. This restriction is an implementation gate, not a new product scope decision.
+
+Full bootstrap checks: contracts553 tests, API2153 passes with2 existing skips, API/contracts TS7/lint, mobile TypeScript and runtime-import gate pass. Focused bootstrap/application/logger/environment57 tests pass. No dependencies or live environment settings changed. Actual PostgreSQL results remain assigned to hosted integration evidence.
