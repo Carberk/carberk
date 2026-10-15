@@ -22,7 +22,7 @@ export const retainedSchemaProfile = {
     'c02cefa47ade5650ea02f79dd07ba7c42fbb4524e938a6fd08bbbfca161a7735': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities'],
   },
   additions: [
-    { name: '20261015060000_business_enquiries', checksum: 'c7795f03693f2dc862233b2149ed18e65f934765d3a567b654e9b7293847ac1e' },
+    { name: '20261015060000_business_enquiries', checksum: '4d491f64ae7601fce337591a4fed5e14fc717fe5c1234aa83e4b3b2f1e5c36d8' },
     { name: '20261015050000_service_foundations', checksum: '66c9eec07c4c715624d42c30a00202a0727cb36b05f5ca850fed38a9901f9c9a' },
     { name: '20261015040000_first_party_measurement', checksum: '5da46ac7211e658eb1b1e96374c8be796ffad03c5ecb789a7692c4fc0dca384c' },
     { name: '20261015030000_business_inventory', checksum: '49143ea7a21fe5c6031a966794aedba44d69e3a3f9d6b6195dfbe57915ee93e8' },
