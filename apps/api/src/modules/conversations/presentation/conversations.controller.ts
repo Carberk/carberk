@@ -420,7 +420,7 @@ export class ConversationsController {
 
   private actor(req: FastifyRequest) {
     const auth = req as AuthenticatedRequest;
-    const businessId = req.headers?.["x-business-id"];
+    const businessId = req.headers["x-business-id"];
     return { userId: auth.user?.sub as string, sessionId: auth.user?.sid, ...(typeof businessId === "string" ? { businessId } : {}) };
   }
 

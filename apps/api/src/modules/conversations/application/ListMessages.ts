@@ -1,6 +1,7 @@
 import {
   Inject,
   Injectable,
+  Optional,
   NotFoundException,
   ForbiddenException,
 } from "@nestjs/common";
@@ -9,6 +10,8 @@ import type { Message } from "../domain/Message";
 import {
   CONVERSATION_ERROR_CODES,
 } from "../domain/types";
+import type { ConversationActor } from "../domain/ports/BusinessEnquiryRepository";
+import { BusinessEnquiryAccess } from "./BusinessEnquiryAccess";
 import {
   CONVERSATION_REPOSITORY,
   type ConversationRepository,
@@ -19,6 +22,7 @@ export interface ListMessagesInput {
   conversationId: string;
   cursor?: string;
   limit?: number;
+  actor?: ConversationActor;
 }
 
 export interface ListMessagesResult {
@@ -31,6 +35,7 @@ export class ListMessages {
   constructor(
     @Inject(CONVERSATION_REPOSITORY)
     private readonly conversations: ConversationRepository,
+    @Inject(BusinessEnquiryAccess) @Optional() private readonly businessAccess?: BusinessEnquiryAccess,
   ) {}
 
   async execute(input: ListMessagesInput): Promise<ListMessagesResult> {
@@ -45,7 +50,10 @@ export class ListMessages {
       });
     }
 
-    if (!conversation.isParticipant(input.userId)) {
+    if (conversation.businessId) {
+      if (!input.actor || !this.businessAccess) throw new ForbiddenException({ code: "FORBIDDEN", message: "Business context required" });
+      await this.businessAccess.authorize(conversation, input.actor, {});
+    } else if (!conversation.isParticipant(input.userId)) {
       throw new ForbiddenException({
         code: "FORBIDDEN",
         message: "You are not a participant in this conversation",

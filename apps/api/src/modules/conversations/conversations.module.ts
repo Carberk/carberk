@@ -34,12 +34,18 @@ import { MESSAGE_EVENT_PUBLISHER } from "./domain/ports/MessageEventPublisher";
 import { CONVERSATION_STATE_PORT } from "./domain/ports/ConversationStatePort";
 import { MESSAGE_MODERATION_READ_PORT } from "./domain/ports/MessageModerationReadPort";
 import { CONVERSATION_REPORT_CONTEXT_PORT } from "./domain/ports/ConversationReportContextPort";
+import { BusinessEnquiryAccess } from "./application/BusinessEnquiryAccess";
+import { PrismaBusinessEnquiryRepository } from "./infrastructure/PrismaBusinessEnquiryRepository";
+import { BUSINESS_ENQUIRY_REPOSITORY } from "./domain/ports/BusinessEnquiryRepository";
 
 @Module({
   imports: [EventEmitterModule, ListingsModule, IdentityModule, RealtimeModule],
   controllers: [ConversationsController],
   providers: [
     PrismaConversationRepository,
+    BusinessEnquiryAccess,
+    PrismaBusinessEnquiryRepository,
+    { provide: BUSINESS_ENQUIRY_REPOSITORY, useExisting: PrismaBusinessEnquiryRepository },
     {
       provide: CONVERSATION_REPOSITORY,
       useClass: PrismaConversationRepository,
