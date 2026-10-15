@@ -20,3 +20,10 @@ it("rejects forged image type and oversized input before adoption", async () => 
  await expect(cleanServiceBytes(Buffer.from("not an image"), "image/jpeg", "support")).rejects.toBeDefined();
  await expect(cleanServiceBytes(new Uint8Array(5 * 1024 * 1024 + 1), "image/jpeg", "support")).rejects.toMatchObject({ code: "INVALID_ATTACHMENT" });
 });
+it("requires decodable image pixels even when the header claims a valid metadata-free JPEG", async () => {
+ const original = await sharp({ create: { width: 100, height: 100, channels: 3, background: "red" } }).jpeg().toBuffer();
+ // Keep enough header for dimensions, remove most of the compressed pixels.
+ const scan = original.indexOf(Buffer.from([0xff, 0xda]));
+ const truncated = original.subarray(0, scan + 12);
+ await expect(cleanServiceBytes(truncated, "image/jpeg", "support")).rejects.toMatchObject({ code: "INVALID_ATTACHMENT" });
+});
