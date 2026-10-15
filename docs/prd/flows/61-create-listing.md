@@ -40,7 +40,7 @@ flowchart LR
     U -->|Success| O[Listing detail]
 ```
 
-Back/Continue and corrections preserve entered data through the existing reducer, autosave and staged-media recovery. Draft discard remains a confirmed destructive action in the wizard menu. Do not add arbitrary step jumps or change saved payload compatibility as a side effect of dealer work.
+Back/Continue and corrections preserve entered data through the existing reducer, autosave and staged-media recovery. Closing the create wizard saves pending changes and returns to Sell. A newly created untouched draft is automatically deleted on close; if that deletion fails, it remains available in My listings. A failed save asks whether to retry, leave with the last saved draft, or keep editing. The wizard has no discard menu; confirmed Delete draft is available in My listings. Do not add arbitrary step jumps or change saved payload compatibility as a side effect of dealer work.
 
 ## Recovery and publication
 
