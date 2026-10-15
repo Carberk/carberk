@@ -45,6 +45,12 @@ describe("ConfirmContactPhoneCode", () => {
     expect((await otp.findById(record.id))?.verifiedAt).toEqual(now);
   });
 
+  it("never consumes personal proof as business proof", async () => {
+    const personal = seedContactCode();
+    await expect(useCase.execute({ userId: "seller-1", phone: PHONE, code: CODE, businessId: "business-1" } as Parameters<typeof useCase.execute>[0])).rejects.toThrow("No Sign-in Code request found");
+    expect((await otp.findById(personal.id))?.verifiedAt).toBeNull();
+  });
+
   it("refuses a code used once already", async () => {
     seedContactCode();
     await useCase.execute({ userId: "seller-1", phone: PHONE, code: CODE });
