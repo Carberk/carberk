@@ -30,10 +30,10 @@ it("keeps a failed draft and retries with the same idempotency identity through 
  fireEvent.click(screen.getByRole("button", { name: "General Support" }));
  await waitFor(() => expect(screen.getByText("Synthetic service reply")).toBeTruthy());
  fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Retry this synthetic reply" } });
- fireEvent.submit(screen.getByRole("button", { name: "Send message" }).closest("form")!);
+ const form = screen.getByRole("button", { name: "Send message" }).closest("form"); if (!form) throw new Error("Missing message form"); fireEvent.submit(form);
  await waitFor(() => expect(screen.getByRole("button", { name: "Retry sending" })).toBeTruthy());
  expect((screen.getByLabelText("Message") as HTMLTextAreaElement).value).toBe("Retry this synthetic reply");
- fireEvent.submit(screen.getByRole("button", { name: "Retry sending" }).closest("form")!);
+ fireEvent.submit(form);
  await waitFor(() => expect(sends).toHaveLength(2)); expect(sends[0]?.clientMessageId).toBe(sends[1]?.clientMessageId);
 });
 it("removes protected content after denial and preserves draft while switching locale", async () => {
