@@ -10,6 +10,7 @@ import {
   isClosedForContact,
 } from "../detail/closedListing";
 import { AskSellerChips } from "../detail/AskSellerChips";
+import { ListingViewCount } from "../detail/ListingViewCount";
 import { OwnerStatusCard } from "../detail/OwnerStatusCard";
 import { listingTitle, detailDate } from "../detail/presentation";
 import { ViewerFavorite } from "../detail/ViewerFavorite";
@@ -128,7 +129,7 @@ export function ListingDetailView({
       />
       <View testID="detail-body" className="gap-4 px-4 py-5">
         {isOwner && (
-          <OwnerStatusCard status={listing.status} favoriteCount={listing.favoriteCount} />
+          <OwnerStatusCard status={listing.status} favoriteCount={listing.favoriteCount} viewCount={listing.viewCount} viewsToday={listing.viewsToday} />
         )}
         <Text
           className="text-headline font-heading font-semibold text-foreground"
@@ -232,6 +233,7 @@ export function ListingDetailView({
         )}
         <Separator />
         <View className="gap-1 pb-5">
+          {(isOwner || !closed) && <ListingViewCount total={listing.viewCount} today={listing.viewsToday} />}
           <Text className="text-caption text-muted-foreground">
             {t("publicListingId", { id: listing.publicNumber })}
           </Text>

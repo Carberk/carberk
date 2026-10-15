@@ -4,6 +4,7 @@ import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 
+import { useListingViewSignal } from "../../../src/listings/detail/useListingViewSignal";
 import { useListingDetail } from "../../../src/api/listings/useListingDetail";
 import { useListingPreview } from "../../../src/api/listings/useListingPreview";
 import { useCatalogMaps } from "../../../src/listings/detail/useCatalogMaps";
@@ -81,6 +82,8 @@ export default function ListingDetailScreen() {
 
   const isOwner =
     viewer != null && data != null && viewer.userId === data.sellerId;
+
+  useListingViewSignal(data?.id, !isPending && !error && data?.status === "active" && !isOwner && viewer !== undefined);
 
   // Reporting while signed out parks a pending action; returning from
   // authentication reopens the report sheet on this same screen.
