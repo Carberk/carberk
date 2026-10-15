@@ -1,0 +1,1285 @@
+{
+  "observedAt": "2026-10-15T00:28:09Z",
+  "method": "T3 browser UI clicks and state inspection; no automated assertion suite",
+  "guides": [
+    {
+      "guide": "Older payment first",
+      "steps": [
+        {
+          "feedback": "deniedFifo",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R0",
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "paid",
+          "step": 1
+        },
+        {
+          "feedback": "deniedFifo",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R0",
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "paid",
+          "step": 2
+        },
+        {
+          "feedback": "okPrepared",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R0",
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "ready",
+          "step": 3
+        },
+        {
+          "feedback": "okDelivered",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "delivered",
+          "step": 4
+        },
+        {
+          "feedback": "okDelivered",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "paid",
+          "step": 5
+        },
+        {
+          "feedback": "okPrepared",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "ready",
+          "step": 6
+        },
+        {
+          "feedback": "okDelivered",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "delivered",
+          "step": 7
+        }
+      ]
+    },
+    {
+      "guide": "Two hours and late funds",
+      "steps": [
+        {
+          "feedback": "okQuote",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "quote",
+          "step": 1
+        },
+        {
+          "feedback": "okAccept",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 1,
+            "15": 2,
+            "16": 2
+          },
+          "status": "awaiting",
+          "step": 2
+        },
+        {
+          "feedback": "okReceipt",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 1,
+            "15": 2,
+            "16": 2
+          },
+          "status": "review",
+          "step": 3
+        },
+        {
+          "feedback": "okClock",
+          "historicalOpen": false,
+          "now": 20880,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "late",
+          "step": 4
+        },
+        {
+          "feedback": "deniedExpired",
+          "historicalOpen": false,
+          "now": 20880,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "late",
+          "step": 5
+        },
+        {
+          "feedback": "okLate",
+          "historicalOpen": false,
+          "now": 20880,
+          "privateOpen": false,
+          "promise": 20940,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 1,
+            "15": 2,
+            "16": 2
+          },
+          "status": "review",
+          "step": 6
+        },
+        {
+          "feedback": "okPaid",
+          "historicalOpen": false,
+          "now": 20880,
+          "privateOpen": false,
+          "promise": 20940,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 1,
+            "15": 2,
+            "16": 2
+          },
+          "status": "paid",
+          "step": 7
+        },
+        {
+          "feedback": "okPrepared",
+          "historicalOpen": false,
+          "now": 20880,
+          "privateOpen": false,
+          "promise": 20940,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 1,
+            "15": 2,
+            "16": 2
+          },
+          "status": "ready",
+          "step": 8
+        },
+        {
+          "feedback": "okDelivered",
+          "historicalOpen": false,
+          "now": 20880,
+          "privateOpen": false,
+          "promise": 20940,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 1,
+            "15": 2,
+            "16": 2
+          },
+          "status": "delivered",
+          "step": 9
+        }
+      ]
+    },
+    {
+      "guide": "Delay refused",
+      "steps": [
+        {
+          "feedback": "okClock",
+          "historicalOpen": false,
+          "now": 20820,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "escalated",
+          "step": 1
+        },
+        {
+          "feedback": "okRefund",
+          "historicalOpen": false,
+          "now": 20820,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "refund",
+          "step": 2
+        },
+        {
+          "feedback": "initial",
+          "historicalOpen": false,
+          "now": 20820,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "refund",
+          "step": 3
+        },
+        {
+          "feedback": "okApproved",
+          "historicalOpen": false,
+          "now": 20820,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "approved",
+          "step": 4
+        },
+        {
+          "feedback": "okReturned",
+          "historicalOpen": false,
+          "now": 20820,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "refunded",
+          "step": 5
+        }
+      ]
+    },
+    {
+      "guide": "Agree then miss again",
+      "steps": [
+        {
+          "feedback": "okClock",
+          "historicalOpen": false,
+          "now": 20820,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "escalated",
+          "step": 1
+        },
+        {
+          "feedback": "okRecovery",
+          "historicalOpen": false,
+          "now": 20820,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": 20880,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "recovering",
+          "step": 2
+        },
+        {
+          "feedback": "okClock",
+          "historicalOpen": false,
+          "now": 20880,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [],
+          "recovery": 20880,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "refund",
+          "step": 3
+        },
+        {
+          "feedback": "initial",
+          "historicalOpen": false,
+          "now": 20880,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [],
+          "recovery": 20880,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "refund",
+          "step": 4
+        },
+        {
+          "feedback": "okApproved",
+          "historicalOpen": false,
+          "now": 20880,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [],
+          "recovery": 20880,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "approved",
+          "step": 5
+        },
+        {
+          "feedback": "okReturned",
+          "historicalOpen": false,
+          "now": 20880,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [],
+          "recovery": 20880,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "refunded",
+          "step": 6
+        }
+      ]
+    },
+    {
+      "guide": "Closing and morning cap",
+      "steps": [
+        {
+          "feedback": "okQuote",
+          "historicalOpen": false,
+          "now": 21330,
+          "privateOpen": false,
+          "promise": 22200,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "quote",
+          "step": 1
+        },
+        {
+          "feedback": "okAccept",
+          "historicalOpen": false,
+          "now": 21330,
+          "privateOpen": false,
+          "promise": 22200,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 1,
+            "16": 2
+          },
+          "status": "awaiting",
+          "step": 2
+        },
+        {
+          "feedback": "okClock",
+          "historicalOpen": false,
+          "now": 21390,
+          "privateOpen": false,
+          "promise": 22200,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 1,
+            "16": 2
+          },
+          "status": "awaiting",
+          "step": 3
+        },
+        {
+          "feedback": "okReceipt",
+          "historicalOpen": false,
+          "now": 21390,
+          "privateOpen": false,
+          "promise": 22200,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 1,
+            "16": 2
+          },
+          "status": "review",
+          "step": 4
+        },
+        {
+          "feedback": "deniedHours",
+          "historicalOpen": false,
+          "now": 21390,
+          "privateOpen": false,
+          "promise": 22200,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 1,
+            "16": 2
+          },
+          "status": "review",
+          "step": 5
+        },
+        {
+          "feedback": "okClock",
+          "historicalOpen": false,
+          "now": 22140,
+          "privateOpen": false,
+          "promise": 22200,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "late",
+          "step": 6
+        },
+        {
+          "feedback": "okLate",
+          "historicalOpen": false,
+          "now": 22140,
+          "privateOpen": false,
+          "promise": 22200,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 1,
+            "16": 2
+          },
+          "status": "review",
+          "step": 7
+        },
+        {
+          "feedback": "okPaid",
+          "historicalOpen": false,
+          "now": 22140,
+          "privateOpen": false,
+          "promise": 22200,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 1,
+            "16": 2
+          },
+          "status": "paid",
+          "step": 8
+        },
+        {
+          "feedback": "okClock",
+          "historicalOpen": false,
+          "now": 22200,
+          "privateOpen": false,
+          "promise": 22200,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 1,
+            "16": 2
+          },
+          "status": "escalated",
+          "step": 9
+        }
+      ]
+    },
+    {
+      "guide": "Two morning slots",
+      "steps": [
+        {
+          "feedback": "okQuote",
+          "historicalOpen": false,
+          "now": 21330,
+          "privateOpen": false,
+          "promise": 22200,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 0,
+            "15": 2,
+            "16": 2
+          },
+          "status": "quote",
+          "step": 1
+        },
+        {
+          "feedback": "okAccept",
+          "historicalOpen": false,
+          "now": 21330,
+          "privateOpen": false,
+          "promise": 22200,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 0,
+            "15": 1,
+            "16": 2
+          },
+          "status": "awaiting",
+          "step": 2
+        },
+        {
+          "feedback": "okAccept",
+          "historicalOpen": false,
+          "now": 21330,
+          "privateOpen": false,
+          "promise": null,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 0,
+            "15": 1,
+            "16": 2
+          },
+          "status": "enquiry",
+          "step": 3
+        },
+        {
+          "feedback": "okQuote",
+          "historicalOpen": false,
+          "now": 21330,
+          "privateOpen": false,
+          "promise": 22200,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 0,
+            "15": 1,
+            "16": 2
+          },
+          "status": "quote",
+          "step": 4
+        },
+        {
+          "feedback": "okAccept",
+          "historicalOpen": false,
+          "now": 21330,
+          "privateOpen": false,
+          "promise": 22200,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 0,
+            "15": 0,
+            "16": 2
+          },
+          "status": "awaiting",
+          "step": 5
+        },
+        {
+          "feedback": "okAccept",
+          "historicalOpen": false,
+          "now": 21330,
+          "privateOpen": false,
+          "promise": null,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 0,
+            "15": 0,
+            "16": 2
+          },
+          "status": "enquiry",
+          "step": 6
+        },
+        {
+          "feedback": "deniedFull",
+          "historicalOpen": false,
+          "now": 21330,
+          "privateOpen": false,
+          "promise": null,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 0,
+            "15": 0,
+            "16": 2
+          },
+          "status": "enquiry",
+          "step": 7
+        }
+      ]
+    },
+    {
+      "guide": "19:30 still achievable",
+      "steps": [
+        {
+          "feedback": "okQuote",
+          "historicalOpen": false,
+          "now": 21330,
+          "privateOpen": false,
+          "promise": 21360,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "quote",
+          "step": 1
+        },
+        {
+          "feedback": "okAccept",
+          "historicalOpen": false,
+          "now": 21330,
+          "privateOpen": false,
+          "promise": 21360,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 1,
+            "15": 2,
+            "16": 2
+          },
+          "status": "awaiting",
+          "step": 2
+        },
+        {
+          "feedback": "okReceipt",
+          "historicalOpen": false,
+          "now": 21330,
+          "privateOpen": false,
+          "promise": 21360,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 1,
+            "15": 2,
+            "16": 2
+          },
+          "status": "review",
+          "step": 3
+        },
+        {
+          "feedback": "okPaid",
+          "historicalOpen": false,
+          "now": 21330,
+          "privateOpen": false,
+          "promise": 21360,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 1,
+            "15": 2,
+            "16": 2
+          },
+          "status": "paid",
+          "step": 4
+        },
+        {
+          "feedback": "okClock",
+          "historicalOpen": false,
+          "now": 21360,
+          "privateOpen": false,
+          "promise": 21360,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 1,
+            "15": 2,
+            "16": 2
+          },
+          "status": "escalated",
+          "step": 5
+        },
+        {
+          "feedback": "okRecovery",
+          "historicalOpen": false,
+          "now": 21360,
+          "privateOpen": false,
+          "promise": 21360,
+          "queue": [
+            "R1"
+          ],
+          "recovery": 22200,
+          "slots": {
+            "14": 1,
+            "15": 2,
+            "16": 2
+          },
+          "status": "recovering",
+          "step": 6
+        }
+      ]
+    },
+    {
+      "guide": "Today and tomorrow full",
+      "steps": [
+        {
+          "feedback": "deniedFull",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": null,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 0,
+            "15": 0,
+            "16": 2
+          },
+          "status": "enquiry",
+          "step": 1
+        },
+        {
+          "feedback": "deniedStatus",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": null,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 0,
+            "15": 0,
+            "16": 2
+          },
+          "status": "enquiry",
+          "step": 2
+        }
+      ]
+    },
+    {
+      "guide": "Handover and privacy",
+      "steps": [
+        {
+          "feedback": "okRead",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": true,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "paid",
+          "step": 1
+        },
+        {
+          "feedback": "okHandover",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "paid",
+          "step": 2
+        },
+        {
+          "feedback": "deniedStaff",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "paid",
+          "step": 3
+        },
+        {
+          "feedback": "denied",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "paid",
+          "step": 4
+        },
+        {
+          "feedback": "initial",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "paid",
+          "step": 5
+        },
+        {
+          "feedback": "okRead",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": true,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "paid",
+          "step": 6
+        },
+        {
+          "feedback": "initial",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "paid",
+          "step": 7
+        },
+        {
+          "feedback": "denied",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "paid",
+          "step": 8
+        },
+        {
+          "feedback": "initial",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "paid",
+          "step": 9
+        },
+        {
+          "feedback": "okRead",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": true,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "paid",
+          "step": 10
+        },
+        {
+          "feedback": "initial",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "paid",
+          "step": 11
+        },
+        {
+          "feedback": "denied",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "paid",
+          "step": 12
+        }
+      ]
+    },
+    {
+      "guide": "Archive and restricted evidence",
+      "steps": [
+        {
+          "feedback": "okArchive",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "ready",
+          "step": 1
+        },
+        {
+          "feedback": "deniedFounder",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "ready",
+          "step": 2
+        },
+        {
+          "feedback": "initial",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "ready",
+          "step": 3
+        },
+        {
+          "feedback": "okRead",
+          "historicalOpen": true,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "ready",
+          "step": 4
+        },
+        {
+          "feedback": "initial",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [
+            "R1"
+          ],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "ready",
+          "step": 5
+        },
+        {
+          "feedback": "okDelivered",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "delivered",
+          "step": 6
+        },
+        {
+          "feedback": "initial",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "delivered",
+          "step": 7
+        },
+        {
+          "feedback": "denied",
+          "historicalOpen": false,
+          "now": 20760,
+          "privateOpen": false,
+          "promise": 20820,
+          "queue": [],
+          "recovery": null,
+          "slots": {
+            "14": 2,
+            "15": 2,
+            "16": 2
+          },
+          "status": "delivered",
+          "step": 8
+        }
+      ]
+    }
+  ],
+  "recoveryReadyExpiry": [
+    {
+      "feedback": "okClock",
+      "now": 20850,
+      "promise": 20820,
+      "recovery": 20880,
+      "status": "ready"
+    },
+    {
+      "feedback": "okClock",
+      "now": 20880,
+      "promise": 20820,
+      "recovery": 20880,
+      "status": "refund"
+    }
+  ],
+  "recoveryReadyDelivered": {
+    "feedback": "okDelivered",
+    "now": 20850,
+    "overflow": false,
+    "promise": 20820,
+    "recovery": 20880,
+    "status": "delivered"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "branch": "prototype/campaign-services-897",
+  "purpose": "Throwaway service commitment model; no production acceptance",
+  "sha256": {
+    "PRODUCT.md": "47c2cb182d1ed1359d55b9ff3bb8aa42d51e704346a30e8e763a238cda3c8bc0",
+    "README.md": "7646787272569e98ec8c92d30a095b0c89b5c386b720fdfe3491f972d97455ec",
+    "commitments.prototype.html": "71b406ca444bb9cf32747fa1e7713baeb6f9e20243d8c71c0a7fa2a30abb5cbe",
+    "evidence/README.md": "d465135c8a7c7ade0b33aba0cf8690744876fa56b046093a089b18f5c3c4e456",
+    "evidence/ru-late-payment-1024.png": "67c3725b818ccf3dd742b2762037537fbee3c805a110c53896b0c421cc06e7ed",
+    "evidence/tk-recovery-1024.png": "b6a83c9ff54d606de32f0ccb1305608363d867a6ac87d5241ef52807560e2757",
+    "evidence/walkthrough-receipts.json": "14b74d07e99f24637153e7fff9bb151701ed90bad343f5666fdae3b850c81a17",
+    "index.html": "2f3673baa856c47d0d6e6d855eb960415379c7702ccd1abf43cf53b74788be4c"
+  }
+}
