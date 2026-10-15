@@ -18,6 +18,10 @@ describe("explicit staff grant transitions", () => {
  ])("rejects unsupported/self-directed/no-reason transition %j", (patch) => {
   expect(() => assertStaffGrantChange(actor, { ...change, ...patch }, now)).toThrow();
  });
+ it("allows a different elevated founder to revoke founder control without permitting HTTP root grants", () => {
+  expect(() => assertStaffGrantChange(actor, { ...change, capability: "founder.control", grant: false }, now)).not.toThrow();
+  expect(() => assertStaffGrantChange({ ...actor, capabilities: ["staff.manage"] }, { ...change, capability: "founder.control", grant: false }, now)).toThrow();
+ });
  it("never derives staff management from marketplace admin role", () => {
   expect(() => assertStaffGrantChange({ ...actor, role: "admin", capabilities: [] }, change, now)).toThrow();
  });
