@@ -14,10 +14,12 @@ import { CONVERSATION_ERROR_CODES } from "../domain/types";
 import { buildPostRefSnapshot } from "../infrastructure/PostRefSnapshotMapper";
 
 import { SendConversationMessage } from "./SendConversationMessage";
+import type { ConversationActor } from "../domain/ports/BusinessEnquiryRepository";
 
 export interface SendPostRefMessageInput {
   senderId: string;
   conversationId: string;
+  actor?: ConversationActor;
   metadata: { listingId: string };
   clientMessageId?: string | undefined;
 }
@@ -42,6 +44,7 @@ export class SendPostRefMessage {
     const result = await this.sendConversationMessage.execute({
       senderId: input.senderId,
       conversationId: input.conversationId,
+      ...(input.actor ? { actor: input.actor } : {}),
       clientMessageId: input.clientMessageId,
       createMessage: async ({
         id,

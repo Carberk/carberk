@@ -20,6 +20,7 @@ import {
   type IdentityReadPort,
 } from "../../identity/identity.public";
 import { Conversation } from "../domain/Conversation";
+import type { ConversationActor } from "../domain/ports/BusinessEnquiryRepository";
 import { CONVERSATION_ERROR_CODES } from "../domain/types";
 import {
   missingPeer,
@@ -35,6 +36,7 @@ import {
 export interface OpenConversationInput {
   buyerId: string;
   listingId: string;
+  actor?: ConversationActor;
 }
 
 export interface OpenConversationResult {
@@ -149,9 +151,10 @@ export class OpenConversation {
       listingId: input.listingId,
       buyerId: input.buyerId,
       sellerId: listing.sellerId,
+      ...(input.actor?.businessId ? { businessId: input.actor.businessId } : {}),
     });
 
-    await this.conversations.save(conversation);
+    await this.conversations.save(conversation, input.actor);
 
     return this.withPeer(conversation, listing, input.buyerId);
   }

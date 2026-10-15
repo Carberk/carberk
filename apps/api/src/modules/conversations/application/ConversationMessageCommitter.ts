@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 
 import type { Message } from "../domain/Message";
+import type { ConversationActor } from "../domain/ports/BusinessEnquiryRepository";
 import {
   CONVERSATION_REPOSITORY,
   MessageAlreadySavedError,
@@ -21,9 +22,10 @@ export class ConversationMessageCommitter {
   async commit(
     message: Message,
     recipientId: string,
+    actor?: ConversationActor,
   ): Promise<{ message: Message; created: boolean }> {
     try {
-      await this.conversations.saveMessage(message);
+      await this.conversations.saveMessage(message, actor);
     } catch (error) {
       if (error instanceof MessageAlreadySavedError) {
         return { message: error.existingMessage, created: false };

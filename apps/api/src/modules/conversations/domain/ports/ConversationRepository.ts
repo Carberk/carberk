@@ -1,3 +1,4 @@
+import type { ConversationActor } from "./BusinessEnquiryRepository";
 import type { Conversation } from "../Conversation";
 import type { Message } from "../Message";
 
@@ -20,7 +21,7 @@ export interface ConversationRepository {
     listingId: string,
     buyerId: string,
   ): Promise<Conversation | null>;
-  save(conversation: Conversation): Promise<void>;
+  save(conversation: Conversation, actor?: ConversationActor): Promise<void>;
 
   listForUser(
     userId: string,
@@ -51,7 +52,7 @@ export interface ConversationRepository {
     clientMessageId: string,
   ): Promise<Message | null>;
 
-  saveMessage(message: Message): Promise<void>;
+  saveMessage(message: Message, actor?: ConversationActor): Promise<void>;
 
   updateWatermark(
     userId: string,
