@@ -23,12 +23,27 @@ export class DiagnosticRuleError extends Error {
 
 /** Appointment state and authorizations travel together, independently of Listing publication. */
 export class InspectionOrder {
-  constructor(readonly state: InspectionOrderState) {}
+  private readonly data: InspectionOrderState;
+  constructor(state: InspectionOrderState) { this.data = structuredClone(state); }
+  get state(): InspectionOrderState { return structuredClone(this.data); }
   transition(next: AppointmentState, actorId: string, now: Date): InspectionOrder {
-    return new InspectionOrder({ ...this.state, status: next,
-      events: [...this.state.events, { state: next, actorId, occurredAt: now.toISOString() }] });
+    if (next === this.data.status) return this;
+    const permitted: Record<AppointmentState, readonly AppointmentState[]> = {
+      requested: ["confirmed", "cancelled"], confirmed: ["arrived", "no_show", "cancelled"],
+      arrived: [], no_show: [], cancelled: [],
+    };
+    if (!permitted[this.data.status].includes(next)) throw new DiagnosticRuleError("APPOINTMENT_TRANSITION_DENIED");
+    if (next === "arrived") {
+      if (!this.data.physicalAuthorization) throw new DiagnosticRuleError("PHYSICAL_AUTHORIZATION_REQUIRED");
+      if (this.data.audience === "listing_public" && !this.data.publicationAuthorization) throw new DiagnosticRuleError("PUBLICATION_AUTHORIZATION_REQUIRED");
+    }
+    return new InspectionOrder({ ...this.data, status: next,
+      events: [...this.data.events, { state: next, actorId, occurredAt: now.toISOString() }] });
   }
   authorize(kind: "physical" | "publication", authorization: RecordedAuthorization): InspectionOrder {
-    return new InspectionOrder({ ...this.state, [kind === "physical" ? "physicalAuthorization" : "publicationAuthorization"]: authorization });
+    if (kind === "publication" && this.data.audience !== "listing_public") throw new DiagnosticRuleError("PRIVATE_AUDIENCE_IMMUTABLE");
+    if (!["requested", "confirmed"].includes(this.data.status)) throw new DiagnosticRuleError("AUTHORIZATION_LOCKED");
+    if (!authorization.authorityReference.trim() || !authorization.recordedBy || !Number.isFinite(Date.parse(authorization.recordedAt))) throw new DiagnosticRuleError("AUTHORIZATION_REQUIRED");
+    return new InspectionOrder({ ...this.data, [kind === "physical" ? "physicalAuthorization" : "publicationAuthorization"]: authorization });
   }
 }
