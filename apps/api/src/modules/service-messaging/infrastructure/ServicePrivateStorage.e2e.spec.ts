@@ -16,6 +16,7 @@ it("keeps known locators private, immutable and bounded on actual disposable obj
  try {
   await store.putImmutable(key, bytes, "image/jpeg");
   expect(Buffer.from(await store.get(key, bytes.length))).toEqual(bytes);
+  await expect(store.putImmutable(key, bytes, "image/jpeg")).resolves.toBeUndefined();
   await expect(store.putImmutable(key, Buffer.from("replacement"), "image/jpeg")).rejects.toBeDefined();
   expect(Buffer.from(await store.get(key, bytes.length))).toEqual(bytes);
   await expect(store.get(key, bytes.length - 1)).rejects.toBeDefined();
