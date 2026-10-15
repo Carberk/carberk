@@ -32,6 +32,7 @@ interface RequestOptions<TResponse> {
   headers?: Record<string, string>;
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
+  binaryBody?: Uint8Array;
   schema?: ZodSchema<TResponse>;
   // If false, do not attach Authorization header (used for OTP request/verify pre-login)
   auth?: boolean;
@@ -210,7 +211,7 @@ async function rawRequest<TResponse>(
     {
       method: opts.method ?? "GET",
       headers,
-      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      body: opts.binaryBody !== undefined ? opts.binaryBody as BodyInit : opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
     },
     opts.timeout ?? DEFAULT_TIMEOUT_MS,
   );
@@ -274,7 +275,10 @@ async function rawRequest<TResponse>(
 }
 
 export const apiClient = {
-  postBinary(_path: string, _bytes: Uint8Array): Promise<unknown> { return Promise.reject(new Error("not implemented")); },
+  postBinary(path: string, bytes: Uint8Array, opts: ClientOptions = {}): Promise<unknown> {
+    if (bytes.byteLength > 20 * 1024 * 1024) return Promise.reject(new ApiError("INVALID_ATTACHMENT", 400));
+    return rawRequest(path, { method: "POST", binaryBody: bytes, ...opts, headers: { ...opts.headers, "Content-Type": "application/octet-stream" } }, false);
+  },
   get<T>(path: string, schema?: ZodSchema<T>, opts: ClientOptions = {}) {
     return rawRequest<T>(path, { method: "GET", schema, ...opts }, false);
   },

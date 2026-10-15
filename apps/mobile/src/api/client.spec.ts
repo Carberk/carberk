@@ -715,7 +715,7 @@ describe("apiClient", () => {
 });
 
 it("posts bounded binary bodies through the current refresh and locale transport", async () => {
- mockedLoadAuthSession.mockResolvedValue({ accessToken: "binary-fixture", refreshToken: "refresh", user: { id: "fixture", phone: null, email: null, displayName: null, role: "buyer" } });
+ mockedLoadAuthSession.mockResolvedValue({ storedAt: new Date().toISOString(), accessToken: "binary-fixture", refreshToken: "refresh", user: { id: "fixture", phone: null, email: null, displayName: null, role: "buyer" } });
  const bytes = new Uint8Array([1, 2, 3]);
  const send = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ ok: true }));
  await apiClient.postBinary("/services/conversations/fixture/attachments/fixture/bytes", bytes);

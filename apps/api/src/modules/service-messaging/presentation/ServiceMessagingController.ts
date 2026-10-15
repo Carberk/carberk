@@ -46,16 +46,16 @@ export class ServiceMessagingController {
  @Post("conversations/:id/assignment") @Header("Cache-Control", "no-store, private")
  assign(@Req() req: ServiceRequest, @Param("id") id: string, @Body() body: unknown) {
   const data = parse(ServiceMessagingSchemas.ServiceAssignSchema, body);
-  return this.run(() => this.services.assign(this.subject(req), parse(uuid, id), data.expectedVersion, data.targetUserId));
+  return this.run(async () => { await this.services.assign(this.subject(req), parse(uuid, id), data.expectedVersion, data.targetUserId); return { ok: true }; });
  }
  @Post("conversations/:id/read") @Header("Cache-Control", "no-store, private")
- markRead(@Req() req: ServiceRequest, @Param("id") id: string, @Body() body: unknown) { return this.run(() => this.services.markRead(this.subject(req), parse(uuid, id), parse(ServiceMessagingSchemas.ServiceReadSchema, body).throughSequence)); }
+ markRead(@Req() req: ServiceRequest, @Param("id") id: string, @Body() body: unknown) { return this.run(async () => { await this.services.markRead(this.subject(req), parse(uuid, id), parse(ServiceMessagingSchemas.ServiceReadSchema, body).throughSequence); return { ok: true }; }); }
  @Post("conversations/:id/attachments") @Header("Cache-Control", "no-store, private")
  stage(@Req() req: ServiceRequest, @Param("id") id: string, @Body() body: unknown) { return this.run(() => this.services.stage(this.subject(req), parse(uuid, id), parse(ServiceMessagingSchemas.ServiceStageAttachmentSchema, body))); }
  @Post("conversations/:id/attachments/:attachmentId/bytes") @Header("Cache-Control", "no-store, private")
  upload(@Req() req: ServiceRequest, @Param("id") id: string, @Param("attachmentId") attachmentId: string, @Body() body: unknown) {
   if (!(body instanceof Uint8Array)) throw new BadRequestException({ code: "INVALID_ATTACHMENT", message: "Binary upload required" });
-  return this.run(() => this.services.upload(this.subject(req), parse(uuid, id), parse(uuid, attachmentId), body));
+  return this.run(async () => { await this.services.upload(this.subject(req), parse(uuid, id), parse(uuid, attachmentId), body); return { ok: true }; });
  }
  @Get("conversations/:id/attachments/:attachmentId")
  async file(@Req() req: ServiceRequest, @Param("id") id: string, @Param("attachmentId") attachmentId: string, @Res() reply: FastifyReply) {
