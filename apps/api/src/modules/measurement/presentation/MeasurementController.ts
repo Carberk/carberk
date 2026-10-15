@@ -11,7 +11,7 @@ export class MeasurementController {
   const user = (request as FastifyRequest & { user?: { sub?: unknown } }).user;
   const authorization = request.headers.authorization;
   const guest = authorization?.startsWith("Bearer mg_") ? authorization.slice(7) : undefined;
-  const result = await this.accept.execute(body, { authenticatedUserId: typeof user?.sub === "string" ? user.sub : undefined, guestCapability: guest });
+  const result = await this.accept.execute(body, { ...(typeof user?.sub === "string" ? { authenticatedUserId: user.sub } : {}), ...(guest ? { guestCapability: guest } : {}) });
   if (result === "invalid") throw new BadRequestException({ code: "INVALID_MEASUREMENT", message: "Invalid measurement batch" });
   if (result === "unauthorized") throw new UnauthorizedException({ code: "UNAUTHORIZED", message: "Measurement authorization required" });
   if (result === "unavailable") throw new ServiceUnavailableException({ code: "MEASUREMENT_UNAVAILABLE", message: "Measurement unavailable" });
