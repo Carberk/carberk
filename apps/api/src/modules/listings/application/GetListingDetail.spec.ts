@@ -205,6 +205,13 @@ describe("GetListingDetail", () => {
     return listing;
   }
 
+  it("hides retained view totals from a buyer of a sold Listing", async () => {
+    seedListing({ status: "sold", viewCount: 17 });
+    const result = await makeUseCase(repo).execute({ listingId: "listing-1" });
+    expect(result).not.toHaveProperty("viewCount");
+    expect(result).not.toHaveProperty("viewsToday");
+  });
+
   it("returns detail for an active listing", async () => {
     seedListing();
     const uc = makeUseCase(repo, mediaRepo, exchangeRates, storage, favorites);

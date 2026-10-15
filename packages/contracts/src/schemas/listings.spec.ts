@@ -244,3 +244,14 @@ describe("ListingDraftPayloadSchema", () => {
     expect(ListingDraftPayloadSchema.parse({ vin: null }).vin).toBeNull();
   });
 });
+
+
+describe("Listing view visibility compatibility", () => {
+  it("accepts omitted totals when closed-buyer counters are hidden", () => {
+    expect(ListingDetailSchema.shape.viewCount.safeParse(undefined).success).toBe(true);
+  });
+  it("retains old clients' numeric totals and rejects negative totals", () => {
+    expect(ListingDetailSchema.shape.viewCount.safeParse(17).success).toBe(true);
+    expect(ListingDetailSchema.shape.viewCount.safeParse(-1).success).toBe(false);
+  });
+});

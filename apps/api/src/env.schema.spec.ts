@@ -503,3 +503,10 @@ describe("photo conversion maintenance setting", () => {
     expect(EnvSchema.safeParse({ ...baseEnv, PHOTO_CONVERSION_MAINTENANCE: "yes" }).success).toBe(false);
   });
 });
+
+
+describe("Listing-view collection activation", () => {
+  it("rejects activation without a dedicated stable salt secret", () => {
+    expect(EnvSchema.safeParse({ ...baseEnv, LISTING_VIEWS_ENABLED: "true" }).success).toBe(false);
+  });
+});

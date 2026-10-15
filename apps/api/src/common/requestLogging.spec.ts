@@ -96,6 +96,11 @@ describe("API request logging", () => {
     expect(log).not.toContain('"query"');
   });
 
+  it("never retains the raw app-install identifier in request logs", async () => {
+    const log = await logOneRequest({ "x-app-install-id": "raw-install-sentinel" });
+    expect(log).not.toContain("raw-install-sentinel");
+  });
+
   it("never writes a bearer token, a cookie or a set-cookie to the log", async () => {
     const log = await logOneRequest({
       authorization: `Bearer ${TOKEN}`,
