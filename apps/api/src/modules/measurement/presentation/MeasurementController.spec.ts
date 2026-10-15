@@ -3,7 +3,7 @@ import { APP_GUARD } from "@nestjs/core";
 import { JwtModule, JwtService } from "@nestjs/jwt";
 import { Test } from "@nestjs/testing";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import supertest from "supertest";
 
 import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
@@ -43,6 +43,16 @@ describe("first-party measurement HTTP", () => {
   expect(JSON.stringify(response.body)).not.toContain("SENSITIVE_SENTINEL");
   await request.post("/api/v1/measurement/events").set("authorization", auth).send({ events: Array.from({ length: 51 }, () => event) }).expect(400);
   await request.post("/api/v1/measurement/events").set("authorization", auth).send({ events: [event], content: "x".repeat(131072) }).expect(400);
+ });
+ it("bounds identity resolution so collector outage cannot hold an HTTP request", async () => {
+  const accept = new AcceptMeasurement(ledger, () => new Date("2026-10-15T00:00:00Z"));
+  const batch = new AcceptClientMeasurementBatch({ resolve: () => new Promise(() => undefined) }, accept, () => 0);
+  vi.useFakeTimers();
+  try {
+   const receipt = batch.execute({ events: [event] }, { authenticatedUserId: "buyer" });
+   await vi.advanceTimersByTimeAsync(251);
+   expect(await Promise.race([receipt, Promise.resolve("still_waiting")])).toBe("unavailable");
+  } finally { vi.useRealTimers(); }
  });
  it("does not expose revoked identity or event counts, and isolates ledger outage", async () => {
   const auth = `Bearer ${jwt.sign({ sub: "buyer" })}`; ledger.revoked.add("generation-http");
