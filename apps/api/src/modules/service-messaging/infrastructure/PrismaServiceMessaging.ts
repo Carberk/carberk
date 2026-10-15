@@ -128,6 +128,7 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
  async stage(subject: ServiceSubject, id: string, upload: ServiceMessagingSchemas.ServiceStageAttachment) {
   return this.locked(subject, id, upload.visibility === "staff" ? "note" : "send", async (tx, _row, scope, _actor, audience) => {
    if (audience === "customer" && upload.category !== (scope.purpose === "support" ? "support_communication" : "history_communication") && upload.category !== "payment_evidence") throw new ServiceDenied("INVALID_ATTACHMENT");
+   if (audience === "customer" && (upload.rights.hold !== null || upload.rights.use.some(use => use !== "service"))) throw new ServiceDenied("INVALID_ATTACHMENT");
    assertServiceRights(scope.purpose, upload, this.runtime.now());
    const attachmentId = this.runtime.id();
    await tx.serviceAttachment.create({ data: { id: attachmentId, conversationId: id, uploaderId: subject.userId, lifecycleEpoch: scope.lifecycleEpoch, category: upload.category, visibility: upload.visibility, stagingKey: `service-staging/${attachmentId}`, contentType: upload.contentType, expectedBytes: upload.sizeBytes, filename: upload.filename, rights: upload.rights as unknown as Prisma.InputJsonValue, expiresAt: new Date(this.runtime.now().getTime() + 3600000) } });

@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+
 import { serviceAttachmentDue, supportCaseDue } from "./serviceRetention";
 const now = new Date("2026-10-15T12:00:00Z");
 it("uses the current closure boundary and never purges a reopened Support case", () => {
