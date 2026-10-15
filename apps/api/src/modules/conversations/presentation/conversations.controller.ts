@@ -189,6 +189,7 @@ export class ConversationsController {
     const result = await this.getConversationUC.execute({
       userId,
       conversationId: id,
+      ...(this.actor(req).businessId ? { actor: this.actor(req) } : {}),
     });
 
     const availabilityMap = await this.buildPostRefAvailabilityMap(
