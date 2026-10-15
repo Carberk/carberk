@@ -1,0 +1,218 @@
+[
+  {
+    "id": "check-1",
+    "section": "Awtoulagyň şahsyýeti, kuzow we aýnalar",
+    "title": "VIN belgisini deňeşdirmek",
+    "instruction": "Awtoulagdaky görünýän VIN belgisi bilen resminamadaky belgini deňeşdirmek. Gabat gelmezligi ýa-da okap bolmaýan ýerleri ýazmak."
+  },
+  {
+    "id": "check-2",
+    "section": "Awtoulagyň şahsyýeti, kuzow we aýnalar",
+    "title": "Ýörişi we esasy maglumatlary ýazmak",
+    "instruction": "Marka, model, ýyl we odometr görkezijisini ýazmak; odometri we awtoulagy suratlandyrmak. Bu hakyky ýörişi kepillendirmeýär."
+  },
+  {
+    "id": "check-3",
+    "section": "Awtoulagyň şahsyýeti, kuzow we aýnalar",
+    "title": "Kuzow bölekleriniň aralyklary",
+    "instruction": "Gapylaryň, kapotyň, ganatlaryň we ýük bölüminiň aralyklaryny deňeşdirmek; görünýän urgy ýa-da nädogry abatlaýyş alamatlaryny bellemek."
+  },
+  {
+    "id": "check-4",
+    "section": "Awtoulagyň şahsyýeti, kuzow we aýnalar",
+    "title": "Boýag we abatlaýyş alamatlary",
+    "instruction": "Reňk tapawudyny, gaýtadan boýalan ýerleri we şpaklýowka alamatlaryny ýazmak. Boýag galyňlygyny ölçemek mümkinçiligini anyklamak."
+  },
+  {
+    "id": "check-5",
+    "section": "Awtoulagyň şahsyýeti, kuzow we aýnalar",
+    "title": "Daýanç bölekleri we görünýän kebşirler",
+    "instruction": "Görünýän sütünlerde, aşaky gapdal böleklerde we birleşmelerde deformasiýa ýa-da abatlaýyş alamatlaryny barlamak. Görünmeýän ýerleri kadaly diýip bellemeli däl."
+  },
+  {
+    "id": "check-6",
+    "section": "Awtoulagyň şahsyýeti, kuzow we aýnalar",
+    "title": "Pos we kuzowyň aşaky bölegi",
+    "instruction": "Görünýän posy, deşikleri we aşaky bölekleriň ýagdaýyny barlamak. Göterijide barlagyň mümkinçiligini aýratyn bellemek."
+  },
+  {
+    "id": "check-7",
+    "section": "Awtoulagyň şahsyýeti, kuzow we aýnalar",
+    "title": "Gapylar, kapot we ýük bölümi",
+    "instruction": "Açylmagyny, ýapylmagyny, gulplaryny we rezin dykyzlaýjylaryny barlamak; suw girme alamatlaryny bellemek."
+  },
+  {
+    "id": "check-8",
+    "section": "Awtoulagyň şahsyýeti, kuzow we aýnalar",
+    "title": "Aýnalar we aýna arassalaýjylar",
+    "instruction": "Öň aýnany, beýleki aýnalary, gapdal aýnalary, arassalaýjylary we suw pürküjini barlamak."
+  },
+  {
+    "id": "check-9",
+    "section": "Awtoulagyň şahsyýeti, kuzow we aýnalar",
+    "title": "Ýagtylyk enjamlary",
+    "instruction": "Faralary, öwrüm görkezijilerini, tormoz we yzky çyralary barlamak; döwükleri ýa-da nädogry işleýän ýerleri bellemek."
+  },
+  {
+    "id": "check-10",
+    "section": "Hereketlendiriji, suwuklyklar we transmissiýa",
+    "title": "Hereketlendirijini işe girizmek",
+    "instruction": "Sowuk ýa-da gyzgyn ýagdaýda işe girişini, boş aýlawyny, adaty däl sesleri we titremäni barlamak. Sowuk işe giriş barlanmasa sebäbini ýazmak."
+  },
+  {
+    "id": "check-11",
+    "section": "Hereketlendiriji, suwuklyklar we transmissiýa",
+    "title": "Hereketlendirijiniň ýagy",
+    "instruction": "Elýeterli bolsa ýag derejesini we görünýän ýagdaýyny barlamak; önüm öndürijiniň barlag şertlerini berjaý etmek."
+  },
+  {
+    "id": "check-12",
+    "section": "Hereketlendiriji, suwuklyklar we transmissiýa",
+    "title": "Sowadyş ulgamy",
+    "instruction": "Howpsuz ýagdaýda sowadyjy suwuklygyň derejesini, şlangalary we görünýän syzmalary barlamak. Gyzgyn ulgamyň gapagyny açmaly däl."
+  },
+  {
+    "id": "check-13",
+    "section": "Hereketlendiriji, suwuklyklar we transmissiýa",
+    "title": "Görünýän syzmalar",
+    "instruction": "Ýagyň, ýangyjyň, sowadyjy ýa-da beýleki suwuklyklaryň görünýän syzmalaryny ýerleri bilen ýazmak we suratlandyrmak."
+  },
+  {
+    "id": "check-14",
+    "section": "Hereketlendiriji, suwuklyklar we transmissiýa",
+    "title": "Guşaklar, şlangalar we simler",
+    "instruction": "Elýeterli guşaklarda, şlangalarda, birikmelerde we simlerde çatlama, gowşaklyk ýa-da nädogry abatlaýyş alamatlaryny barlamak."
+  },
+  {
+    "id": "check-15",
+    "section": "Hereketlendiriji, suwuklyklar we transmissiýa",
+    "title": "Tüsse we çykaryş ulgamy",
+    "instruction": "Görünýän tüssäni, adaty däl ysy we çykaryş ulgamynyň sesini bellemek. Bu ölçegsiz barlag resmi zyňyndy synagy däldir."
+  },
+  {
+    "id": "check-16",
+    "section": "Hereketlendiriji, suwuklyklar we transmissiýa",
+    "title": "Geçirijiniň statiki işleýşi",
+    "instruction": "Awtomatik geçirijide D/R goşulmagyny ýa-da mehaniki geçirijide muftanyň we geçirijileriň işleýşini howpsuz barlamak."
+  },
+  {
+    "id": "check-17",
+    "section": "Hereketlendiriji, suwuklyklar we transmissiýa",
+    "title": "Transmissiýa we hereket geçiriji bölekler",
+    "instruction": "Elýeterli korpuslarda, ýarym oklarda we gorag rezinlerinde zeper, ýag syzmasy ýa-da boşluk alamatlaryny barlamak."
+  },
+  {
+    "id": "check-18",
+    "section": "Hereketlendiriji, suwuklyklar we transmissiýa",
+    "title": "Goşmaça hereketlendiriji synaglary",
+    "instruction": "Kompressiýa, silindr içini kamera bilen görmek ýa-da başga çuň barlag gerekmi? Başlangyç meýilnama girýändigini ýa-da aýratyn işdigini belläň."
+  },
+  {
+    "id": "check-19",
+    "section": "Tormoz, rul, asma ulgamy we tekerler",
+    "title": "Tormoz pedaly we duýduryşlar",
+    "instruction": "Pedalyň işleýşini we duýduryş çyralaryny barlamak; adaty däl ýumşaklygy ýa-da çökmegi bellemek."
+  },
+  {
+    "id": "check-20",
+    "section": "Tormoz, rul, asma ulgamy we tekerler",
+    "title": "Tormoz suwuklygy we syzmalar",
+    "instruction": "Elýeterli derejesini, görünýän turbalary we şlangalary barlamak; suwuklyk synagy üçin enjamyň bardygyny bellemek."
+  },
+  {
+    "id": "check-21",
+    "section": "Tormoz, rul, asma ulgamy we tekerler",
+    "title": "Tormoz diskleri we kolodkalar",
+    "instruction": "Görünýän könelişi, zeperi we mümkin bolsa galyňlygy barlamak. Tigri aýyrmak zerurlygyny we meýilnama girýändigini belläň."
+  },
+  {
+    "id": "check-22",
+    "section": "Tormoz, rul, asma ulgamy we tekerler",
+    "title": "Duralga tormozy",
+    "instruction": "Duralga tormozynyň işleýşini howpsuz şertlerde barlamak; elektrik görnüşinde skaneriň zerurlygyny anyklamak."
+  },
+  {
+    "id": "check-23",
+    "section": "Tormoz, rul, asma ulgamy we tekerler",
+    "title": "Rul dolandyryşy",
+    "instruction": "Ruluň boşlugyny, adaty däl sesleri we elýeterli birikmeleri barlamak. Ýörite stend zerur bolsa ýazmak."
+  },
+  {
+    "id": "check-24",
+    "section": "Tormoz, rul, asma ulgamy we tekerler",
+    "title": "Öňki we yzky asma ulgamy",
+    "instruction": "Şarnirleriň, rezin bölekleriň, pružinalaryň we görünýän berkidijileriň ýagdaýyny barlamak. Göterijisiz barlagyň çägini ýazmak."
+  },
+  {
+    "id": "check-25",
+    "section": "Tormoz, rul, asma ulgamy we tekerler",
+    "title": "Amortizatorlar",
+    "instruction": "Görünýän syzmalary, zeperi we berkidijileri barlamak; ýörite stend synagynyň bardygyny ýa-da ýokdugyny bellemek."
+  },
+  {
+    "id": "check-26",
+    "section": "Tormoz, rul, asma ulgamy we tekerler",
+    "title": "Tekerler we diskler",
+    "instruction": "Protektoryň çuňlugyny, basyşyny, könelişiň deňligini, kesikleri we çişmeleri barlamak; ölçegleri we önümçilik belgisini ýazmak."
+  },
+  {
+    "id": "check-27",
+    "section": "Tormoz, rul, asma ulgamy we tekerler",
+    "title": "Tigir berkidijileri we ätiýaç tigir",
+    "instruction": "Elýeterli berkidijileriň, ätiýaç tigriň we esasy gurallaryň bardygyny barlamak. Diňe degişli tertip bilen berkidiş güýjüni ölçemek."
+  },
+  {
+    "id": "check-28",
+    "section": "Elektrik ulgamy, kompýuter we synag sürüşi",
+    "title": "Akkumulýator we zarýad beriş",
+    "instruction": "Akkumulýatoryň görünýän ýagdaýyny, birikmelerini we degişli enjam bilen zarýad beriş ulgamyny barlamak; ölçegleri ýazmak."
+  },
+  {
+    "id": "check-29",
+    "section": "Elektrik ulgamy, kompýuter we synag sürüşi",
+    "title": "Panel we howpsuzlyk çyralary",
+    "instruction": "Ot açylanda we işe girizilenden soň hereketlendiriji, ABS we howa ýassygy çyralarynyň ýagdaýyny ýazmak."
+  },
+  {
+    "id": "check-30",
+    "section": "Elektrik ulgamy, kompýuter we synag sürüşi",
+    "title": "Elektrik enjamlary we salon",
+    "instruction": "Aýna göterijileri, merkezi gulpy, oturgyç sazlamalaryny we degişli elektrik enjamlaryny barlamak; suw ýa-da zeper alamatlaryny bellemek."
+  },
+  {
+    "id": "check-31",
+    "section": "Elektrik ulgamy, kompýuter we synag sürüşi",
+    "title": "Kondisioner we ýyladyş",
+    "instruction": "Sowadyş, ýyladyş we wentilýasiýanyň işleýşini barlamak; gaz basyşyny ölçemegiň meýilnama girýändigini anyklamak."
+  },
+  {
+    "id": "check-32",
+    "section": "Elektrik ulgamy, kompýuter we synag sürüşi",
+    "title": "OBD arkaly elektron bloklary okamak",
+    "instruction": "Skaneriň elýeterli bloklaryny sanamak: hereketlendiriji, geçiriji, ABS, SRS we beýlekiler. Okalmadyk bloklary sebäbi bilen görkezmek."
+  },
+  {
+    "id": "check-33",
+    "section": "Elektrik ulgamy, kompýuter we synag sürüşi",
+    "title": "Ýalňyşlyk kodlaryny saklamak",
+    "instruction": "Häzirki, garaşylýan we saklanan kodlary enjamyň mümkinçiliklerine görä ýazmak; başlangyç skan netijesini saklamak. Barlag wagtynda kodlary pozmazlyk."
+  },
+  {
+    "id": "check-34",
+    "section": "Elektrik ulgamy, kompýuter we synag sürüşi",
+    "title": "Taýýarlyk ýagdaýy we janly maglumatlar",
+    "instruction": "Enjam goldaýan bolsa taýýarlaýyş monitorlaryny we degişli janly maglumatlary ýazmak. Kodlar golaýda pozulan bolsa mümkin alamatlaryny bellemek."
+  },
+  {
+    "id": "check-35",
+    "section": "Elektrik ulgamy, kompýuter we synag sürüşi",
+    "title": "Howpsuzlyk kemerleri we howa ýassyklary",
+    "instruction": "Kemerleriň, gulplaryň we görünýän bölekleriň ýagdaýyny barlamak. Bu sökmezden howa ýassyklarynyň doly işleýşini kepillendirmeýär."
+  },
+  {
+    "id": "check-36",
+    "section": "Elektrik ulgamy, kompýuter we synag sürüşi",
+    "title": "Synag sürüşi",
+    "instruction": "Eýesiniň razylygy we howpsuz şertler bilen sürmek: tormoz, rul, geçiriji, ses we titreme. Geçirilmese sebäbini ýazmak; öňünden howply ýagdaý ýüze çyksa sürüşi geçirmezlik."
+  }
+]
