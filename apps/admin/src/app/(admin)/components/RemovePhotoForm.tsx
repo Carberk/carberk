@@ -6,12 +6,15 @@ import { Button, Input } from "@auto-tm/ui/components";
 
 import { removeUserPhoto } from "../actions";
 
+import { useAdminTranslation, AdminText } from "@/lib/i18n";
+
 interface RemovePhotoFormProps {
   reportId: string;
   targetId: string;
 }
 
 export function RemovePhotoForm({ reportId, targetId }: RemovePhotoFormProps) {
+  const t=useAdminTranslation();
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [reason, setReason] = useState("");
@@ -55,40 +58,38 @@ export function RemovePhotoForm({ reportId, targetId }: RemovePhotoFormProps) {
   }
 
   if (success) {
-    return <p role="status" className="text-sm text-green-700">Фото удалено.</p>;
+    return <p role="status" className="text-sm text-green-700"><AdminText>Фото удалено.</AdminText></p>;
   }
 
   if (!confirming) {
-    return <Button variant="destructive" onClick={() => setConfirming(true)}>Удалить фото</Button>;
+    return <Button variant="destructive" onClick={() => setConfirming(true)}><AdminText>Удалить фото</AdminText></Button>;
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      <p className="text-sm">Удалить фото профиля и обработать жалобу?</p>
+      <p className="text-sm"><AdminText>Удалить фото профиля и обработать жалобу?</AdminText></p>
       <div>
-        <label htmlFor="reason-remove-photo" className="text-xs font-medium text-neutral-600">
-          Причина действия
-        </label>
+        <label htmlFor="reason-remove-photo" className="text-xs font-medium text-neutral-600"><AdminText>Причина действия</AdminText></label>
         <Input
           id="reason-remove-photo"
           value={reason}
           onChange={(event) => setReason(event.target.value)}
-          placeholder="Обязательно: укажите причину..."
+          placeholder={t("Обязательно: укажите причину...")}
           disabled={isPending}
           maxLength={1000}
           className="mt-1"
         />
       </div>
-      {error && <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      {error && <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700"><AdminText>{error}</AdminText></p>}
       <div className="flex gap-2">
         <Button type="submit" variant="destructive" disabled={isPending}>
-          {isPending ? "Обработка..." : "Подтвердить удаление"}
+          <AdminText>{isPending ? "Обработка..." : "Подтвердить удаление"}</AdminText>
         </Button>
         <Button type="button" variant="secondary" disabled={isPending} onClick={() => {
           setConfirming(false);
           setReason("");
           setError(null);
-        }}>Отмена</Button>
+        }}><AdminText>Отмена</AdminText></Button>
       </div>
     </form>
   );

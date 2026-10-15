@@ -4,6 +4,8 @@ import type { ReportsSchemas } from "@auto-tm/contracts";
 
 import { listInspectionInterestStats } from "../../actions";
 
+import { AdminText } from "@/lib/i18n";
+
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 100;
 
@@ -44,9 +46,7 @@ export default async function InspectionInterestsPage({
   if (!result.ok && result.code === ErrorCode.ValidationFailed) {
     return (
       <div className="p-6 md:p-8">
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          Некорректные параметры пагинации.
-        </div>
+        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AdminText>Некорректные параметры пагинации.</AdminText></div>
       </div>
     );
   }
@@ -73,23 +73,21 @@ export default async function InspectionInterestsPage({
     <div className="p-6 md:p-8">
       <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Интерес к проверкам Carberk</h1>
+          <h1 className="text-2xl font-bold"><AdminText>Интерес к проверкам Carberk</AdminText></h1>
           <p className="text-sm text-neutral-500">
-            {total} {interestPlural(total)}
+            {total} <AdminText>{interestPlural(total)}</AdminText>
           </p>
         </div>
       </div>
 
       {!result.ok ? (
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {result.error}
+          <AdminText>{result.error}</AdminText>
         </div>
       ) : items.length === 0 ? (
         <div className="rounded-md border bg-surface p-8 text-center text-neutral-500">
-          <p className="text-lg font-medium">Пока нет заявок</p>
-          <p className="mt-1 text-sm">
-            Когда покупатели или продавцы оставят интерес к проверке, он появится здесь.
-          </p>
+          <p className="text-lg font-medium"><AdminText>Пока нет заявок</AdminText></p>
+          <p className="mt-1 text-sm"><AdminText>Когда покупатели или продавцы оставят интерес к проверке, он появится здесь.</AdminText></p>
         </div>
       ) : (
         <>
@@ -97,12 +95,12 @@ export default async function InspectionInterestsPage({
             <table className="w-full text-left text-sm">
               <thead className="bg-neutral-50 text-neutral-600">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Объявление</th>
-                  <th className="px-4 py-3 font-medium">Всего заявок</th>
-                  <th className="px-4 py-3 font-medium">Покупатели</th>
-                  <th className="px-4 py-3 font-medium">Продавцы</th>
-                  <th className="px-4 py-3 font-medium">Средняя готовность платить</th>
-                  <th className="px-4 py-3 font-medium">Ответов о цене</th>
+                  <th className="px-4 py-3 font-medium"><AdminText>Объявление</AdminText></th>
+                  <th className="px-4 py-3 font-medium"><AdminText>Всего заявок</AdminText></th>
+                  <th className="px-4 py-3 font-medium"><AdminText>Покупатели</AdminText></th>
+                  <th className="px-4 py-3 font-medium"><AdminText>Продавцы</AdminText></th>
+                  <th className="px-4 py-3 font-medium"><AdminText>Средняя готовность платить</AdminText></th>
+                  <th className="px-4 py-3 font-medium"><AdminText>Ответов о цене</AdminText></th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -129,25 +127,20 @@ export default async function InspectionInterestsPage({
 
           {totalPages > 1 && (
             <div className="mt-4 flex items-center justify-between">
-              <div className="text-sm text-neutral-500">
-                Страница {currentPage} из {totalPages}
+              <div className="text-sm text-neutral-500"><AdminText>Страница</AdminText>{currentPage}<AdminText>из</AdminText>{totalPages}
               </div>
               <div className="flex gap-2">
                 {currentPage > 1 && (
                   <Link
                     href={buildHref({ page: currentPage - 1 })}
                     className="rounded-md border bg-surface px-3 py-1.5 text-sm hover:bg-neutral-50"
-                  >
-                    Назад
-                  </Link>
+                  ><AdminText>Назад</AdminText></Link>
                 )}
                 {currentPage < totalPages && (
                   <Link
                     href={buildHref({ page: currentPage + 1 })}
                     className="rounded-md border bg-surface px-3 py-1.5 text-sm hover:bg-neutral-50"
-                  >
-                    Вперёд
-                  </Link>
+                  ><AdminText>Вперёд</AdminText></Link>
                 )}
               </div>
             </div>

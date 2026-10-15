@@ -5,19 +5,12 @@ import type { AdminSchemas } from "@auto-tm/contracts";
 
 import { listReports } from "../actions";
 
+import { AdminText, AdminDate } from "@/lib/i18n";
+
 const VALID_STATUSES = ["pending", "actioned", "dismissed"];
 const VALID_TARGET_TYPES = ["listing", "user", "message"];
 const DEFAULT_STATUS = "pending";
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 function reasonLabel(reason: string): string {
   const map: Record<string, string> = {
@@ -121,9 +114,9 @@ export default async function ReportsPage({
     <div className="p-6 md:p-8">
       <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Очередь жалоб</h1>
+          <h1 className="text-2xl font-bold"><AdminText>Очередь жалоб</AdminText></h1>
           <p className="text-sm text-neutral-500">
-            {total} {reportPlural(total)}
+            {total} <AdminText>{reportPlural(total)}</AdminText>
           </p>
         </div>
         <form
@@ -132,60 +125,54 @@ export default async function ReportsPage({
           className="flex flex-wrap items-end gap-3"
         >
           <div className="flex flex-col gap-1">
-            <label htmlFor="status" className="text-xs font-medium text-neutral-600">
-              Статус
-            </label>
+            <label htmlFor="status" className="text-xs font-medium text-neutral-600"><AdminText>Статус</AdminText></label>
             <select
               id="status"
               name="status"
               defaultValue={status}
               className="h-9 rounded-md border bg-surface px-2 text-sm"
             >
-              <option value="pending">В ожидании</option>
-              <option value="actioned">Обработаны</option>
-              <option value="dismissed">Отклонены</option>
+              <option value="pending"><AdminText>В ожидании</AdminText></option>
+              <option value="actioned"><AdminText>Обработаны</AdminText></option>
+              <option value="dismissed"><AdminText>Отклонены</AdminText></option>
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="targetType" className="text-xs font-medium text-neutral-600">
-              Тип
-            </label>
+            <label htmlFor="targetType" className="text-xs font-medium text-neutral-600"><AdminText>Тип</AdminText></label>
             <select
               id="targetType"
               name="targetType"
               defaultValue={targetType ?? ""}
               className="h-9 rounded-md border bg-surface px-2 text-sm"
             >
-              <option value="">Все</option>
-              <option value="listing">Объявление</option>
-              <option value="user">Пользователь</option>
-              <option value="message">Сообщение</option>
+              <option value=""><AdminText>Все</AdminText></option>
+              <option value="listing"><AdminText>Объявление</AdminText></option>
+              <option value="user"><AdminText>Пользователь</AdminText></option>
+              <option value="message"><AdminText>Сообщение</AdminText></option>
             </select>
           </div>
           <button
             type="submit"
             className="h-9 rounded-md bg-brand-500 px-3 text-sm font-medium text-white hover:bg-brand-600"
-          >
-            Применить
-          </button>
+          ><AdminText>Применить</AdminText></button>
         </form>
       </div>
 
       {!result.ok ? (
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {result.error}
+          <AdminText>{result.error}</AdminText>
         </div>
       ) : items.length === 0 ? (
         <div className="rounded-md border bg-surface p-8 text-center text-neutral-500">
           {status === "pending" ? (
             <>
-              <p className="text-lg font-medium">Очередь пуста 🎉</p>
-              <p className="mt-1 text-sm">Нет жалоб в ожидании обработки.</p>
+              <p className="text-lg font-medium"><AdminText>Очередь пуста 🎉</AdminText></p>
+              <p className="mt-1 text-sm"><AdminText>Нет жалоб в ожидании обработки.</AdminText></p>
             </>
           ) : (
             <>
-              <p className="text-lg font-medium">Ничего не найдено</p>
-              <p className="mt-1 text-sm">По выбранным фильтрам нет жалоб.</p>
+              <p className="text-lg font-medium"><AdminText>Ничего не найдено</AdminText></p>
+              <p className="mt-1 text-sm"><AdminText>По выбранным фильтрам нет жалоб.</AdminText></p>
             </>
           )}
         </div>
@@ -196,11 +183,11 @@ export default async function ReportsPage({
               <thead className="bg-neutral-50 text-neutral-600">
                 <tr>
                   <th className="px-4 py-3 font-medium">ID</th>
-                  <th className="px-4 py-3 font-medium">Статус</th>
-                  <th className="px-4 py-3 font-medium">Причина</th>
-                  <th className="px-4 py-3 font-medium">Тип</th>
-                  <th className="px-4 py-3 font-medium">Цель</th>
-                  <th className="px-4 py-3 font-medium">Дата</th>
+                  <th className="px-4 py-3 font-medium"><AdminText>Статус</AdminText></th>
+                  <th className="px-4 py-3 font-medium"><AdminText>Причина</AdminText></th>
+                  <th className="px-4 py-3 font-medium"><AdminText>Тип</AdminText></th>
+                  <th className="px-4 py-3 font-medium"><AdminText>Цель</AdminText></th>
+                  <th className="px-4 py-3 font-medium"><AdminText>Дата</AdminText></th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -218,12 +205,12 @@ export default async function ReportsPage({
                       <span
                         className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(item.status)}`}
                       >
-                        {statusLabel(item.status)}
+                        <AdminText>{statusLabel(item.status)}</AdminText>
                       </span>
                     </td>
-                    <td className="px-4 py-3">{reasonLabel(item.reason)}</td>
+                    <td className="px-4 py-3"><AdminText>{reasonLabel(item.reason)}</AdminText></td>
                     <td className="px-4 py-3">
-                      {item.targetType === "listing" ? "Объявление" : item.targetType === "message" ? "Сообщение" : "Пользователь"}
+                      <AdminText>{item.targetType === "listing" ? "Объявление" : item.targetType === "message" ? "Сообщение" : "Пользователь"}</AdminText>
                     </td>
                     <td className="px-4 py-3">
                       {item.targetSummary.available ? (
@@ -232,7 +219,7 @@ export default async function ReportsPage({
                         <span className="text-neutral-400 italic">{item.targetSummary.label}</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-neutral-500">{formatDate(item.createdAt)}</td>
+                    <td className="px-4 py-3 text-neutral-500"><AdminDate value={item.createdAt} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -241,25 +228,20 @@ export default async function ReportsPage({
 
           {totalPages > 1 && (
             <div className="mt-4 flex items-center justify-between">
-              <div className="text-sm text-neutral-500">
-                Страница {currentPage} из {totalPages}
+              <div className="text-sm text-neutral-500"><AdminText>Страница</AdminText>{currentPage}<AdminText>из</AdminText>{totalPages}
               </div>
               <div className="flex gap-2">
                 {currentPage > 1 && (
                   <Link
                     href={buildHref({ page: currentPage - 1 })}
                     className="rounded-md border bg-surface px-3 py-1.5 text-sm hover:bg-neutral-50"
-                  >
-                    Назад
-                  </Link>
+                  ><AdminText>Назад</AdminText></Link>
                 )}
                 {currentPage < totalPages && (
                   <Link
                     href={buildHref({ page: currentPage + 1 })}
                     className="rounded-md border bg-surface px-3 py-1.5 text-sm hover:bg-neutral-50"
-                  >
-                    Вперёд
-                  </Link>
+                  ><AdminText>Вперёд</AdminText></Link>
                 )}
               </div>
             </div>

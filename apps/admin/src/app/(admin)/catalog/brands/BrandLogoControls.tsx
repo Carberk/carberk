@@ -7,6 +7,8 @@ import { AlertCircle, Loader2 } from "lucide-react";
 
 import { removeBrandLogo, uploadBrandLogo } from "./actions";
 
+import { AdminText } from "@/lib/i18n";
+
 interface BrandLogoControlsProps {
   brandId: string;
   brandName: string;
@@ -67,18 +69,16 @@ export function BrandLogoControls({ brandId, brandName, hasLogo }: BrandLogoCont
           disabled={isPending}
           onClick={() => inputRef.current?.click()}
         >
-          {hasLogo ? "Заменить" : "Загрузить"}
+          <AdminText>{hasLogo ? "Заменить" : "Загрузить"}</AdminText>
         </Button>
         {hasLogo && (
-          <Button type="button" variant="destructive" disabled={isPending} onClick={onRemove}>
-            Удалить
-          </Button>
+          <Button type="button" variant="destructive" disabled={isPending} onClick={onRemove}><AdminText>Удалить</AdminText></Button>
         )}
       </div>
       {error && (
         <div className="flex items-start gap-2 rounded-md bg-red-50 p-2 text-xs text-red-700">
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          {error}
+          <AdminText>{error}</AdminText>
         </div>
       )}
     </div>

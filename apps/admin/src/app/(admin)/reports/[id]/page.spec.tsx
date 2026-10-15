@@ -268,7 +268,7 @@ describe("Reported Message detail", () => {
     expect(document.querySelector("script")).toBeNull();
     expect(screen.getByText("Есть вложение")).toBeDefined();
     expect(screen.getByText("Тип:").parentElement?.textContent).toBe("Тип: Сообщение");
-    expect(screen.getByText("Отправлено:").parentElement?.textContent).toBe("Отправлено: 01.01.2026, 12:00");
+    expect(screen.getByText("Отправлено:").parentElement?.textContent).toBe("Отправлено: 1 янв. 2026 г., 12:00 UTC");
     vi.unstubAllEnvs();
     expect(screen.getByRole("link", { name: "Борис" }).getAttribute("href")).toBe("/users/sender-1");
     expect(document.querySelector('a[href="/users/m1"]')).toBeNull();

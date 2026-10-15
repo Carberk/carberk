@@ -12,6 +12,7 @@ import {
   verifyTotp,
 } from "../actions";
 
+import { useAdminTranslation, AdminText } from "@/lib/i18n";
 import { SESSION_EXPIRED_MESSAGE } from "@/lib/auth-cookie-options";
 import { validateReturnTo } from "@/lib/validators";
 
@@ -52,9 +53,10 @@ function getDescription(step: Step): string {
 }
 
 function LoginPageContent() {
+  const t=useAdminTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const returnTo = validateReturnTo(searchParams.get("returnTo")) ?? "/reports";
+  const returnTo = validateReturnTo(searchParams.get("returnTo")) ?? "/workspace";
   const expiredSession = searchParams.get("reason") === "session-expired";
   const forcedMode = expiredSession ? null : searchParams.get("mode"); // "totp" forces TOTP re-verify
 
@@ -188,8 +190,8 @@ function LoginPageContent() {
     <div className="flex min-h-screen items-center justify-center bg-neutral-50 p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <h1 className="text-xl font-bold text-neutral-900">{getTitle(step)}</h1>
-          <p className="text-sm text-neutral-600">{getDescription(step)}</p>
+          <h1 className="text-xl font-bold text-neutral-900"><AdminText>{getTitle(step)}</AdminText></h1>
+          <p className="text-sm text-neutral-600"><AdminText>{getDescription(step)}</AdminText></p>
         </CardHeader>
         <CardBody>
           {step.kind === "phone" && (
@@ -203,9 +205,7 @@ function LoginPageContent() {
               }}
             >
               <div className="flex flex-col gap-2">
-                <label htmlFor="phone" className="text-sm font-medium text-neutral-700">
-                  Телефон
-                </label>
+                <label htmlFor="phone" className="text-sm font-medium text-neutral-700"><AdminText>Телефон</AdminText></label>
                 <Input
                   id="phone"
                   name="phone"
@@ -219,14 +219,13 @@ function LoginPageContent() {
               </div>
               {step.error && (
                 <p className="flex items-center gap-1 text-sm text-red-600">
-                  <AlertCircle className="h-4 w-4" /> {step.error}
+                  <AlertCircle className="h-4 w-4" /> <AdminText>{step.error}</AdminText>
                 </p>
               )}
               <Button type="submit" disabled={isPending} className="w-full">
                 {isPending ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Отправка...
-                  </>
+                    <Loader2 className="h-4 w-4 animate-spin" /><AdminText>Отправка...</AdminText></>
                 ) : (
                   "Отправить код"
                 )}
@@ -246,9 +245,7 @@ function LoginPageContent() {
             >
               <input type="hidden" name="phone" value={step.phone} />
               <div className="flex flex-col gap-2">
-                <label htmlFor="code" className="text-sm font-medium text-neutral-700">
-                  Код подтверждения
-                </label>
+                <label htmlFor="code" className="text-sm font-medium text-neutral-700"><AdminText>Код подтверждения</AdminText></label>
                 <Input
                   id="code"
                   name="code"
@@ -263,20 +260,18 @@ function LoginPageContent() {
                 />
               </div>
               {step.testCode && (
-                <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                  Dev mode — код: <span className="font-mono font-bold">{step.testCode}</span>
+                <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800"><AdminText>Dev mode — код:</AdminText><span className="font-mono font-bold">{step.testCode}</span>
                 </p>
               )}
               {step.error && (
                 <p className="flex items-center gap-1 text-sm text-red-600">
-                  <AlertCircle className="h-4 w-4" /> {step.error}
+                  <AlertCircle className="h-4 w-4" /> <AdminText>{step.error}</AdminText>
                 </p>
               )}
               <Button type="submit" disabled={isPending} className="w-full">
                 {isPending ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Проверка...
-                  </>
+                    <Loader2 className="h-4 w-4 animate-spin" /><AdminText>Проверка...</AdminText></>
                 ) : (
                   "Подтвердить"
                 )}
@@ -286,9 +281,7 @@ function LoginPageContent() {
                 variant="ghost"
                 disabled={isPending}
                 onClick={() => setStep({ kind: "phone", phone: step.phone })}
-              >
-                Изменить номер
-              </Button>
+              ><AdminText>Изменить номер</AdminText></Button>
             </form>
           )}
 
@@ -305,17 +298,13 @@ function LoginPageContent() {
               <div className="flex flex-col items-center gap-4">
                 <img
                   src={step.qrCodeDataUrl}
-                  alt="QR-код для настройки 2FA"
+                  alt={t("QR-код для настройки 2FA")}
                   className="h-48 w-48 rounded border"
                 />
-                <p className="text-xs text-neutral-500">
-                  Используйте приложение Google Authenticator, 1Password или аналогичное.
-                </p>
+                <p className="text-xs text-neutral-500"><AdminText>Используйте приложение Google Authenticator, 1Password или аналогичное.</AdminText></p>
               </div>
               <div className="flex flex-col gap-2">
-                <label htmlFor="code" className="text-sm font-medium text-neutral-700">
-                  Код из приложения
-                </label>
+                <label htmlFor="code" className="text-sm font-medium text-neutral-700"><AdminText>Код из приложения</AdminText></label>
                 <Input
                   id="code"
                   name="code"
@@ -330,14 +319,13 @@ function LoginPageContent() {
               </div>
               {step.error && (
                 <p className="flex items-center gap-1 text-sm text-red-600">
-                  <AlertCircle className="h-4 w-4" /> {step.error}
+                  <AlertCircle className="h-4 w-4" /> <AdminText>{step.error}</AdminText>
                 </p>
               )}
               <Button type="submit" disabled={isPending} className="w-full">
                 {isPending ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Проверка...
-                  </>
+                    <Loader2 className="h-4 w-4 animate-spin" /><AdminText>Проверка...</AdminText></>
                 ) : (
                   "Подтвердить"
                 )}
@@ -356,9 +344,7 @@ function LoginPageContent() {
               }}
             >
               <div className="flex flex-col gap-2">
-                <label htmlFor="code" className="text-sm font-medium text-neutral-700">
-                  Код из приложения-аутентификатора
-                </label>
+                <label htmlFor="code" className="text-sm font-medium text-neutral-700"><AdminText>Код из приложения-аутентификатора</AdminText></label>
                 <Input
                   id="code"
                   name="code"
@@ -373,14 +359,13 @@ function LoginPageContent() {
               </div>
               {step.error && (
                 <p className="flex items-center gap-1 text-sm text-red-600">
-                  <AlertCircle className="h-4 w-4" /> {step.error}
+                  <AlertCircle className="h-4 w-4" /> <AdminText>{step.error}</AdminText>
                 </p>
               )}
               <Button type="submit" disabled={isPending} className="w-full">
                 {isPending ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Проверка...
-                  </>
+                    <Loader2 className="h-4 w-4 animate-spin" /><AdminText>Проверка...</AdminText></>
                 ) : (
                   "Подтвердить"
                 )}
@@ -391,9 +376,7 @@ function LoginPageContent() {
           {step.kind === "backup-codes" && (
             <div className="flex flex-col gap-4">
               <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
-                <p className="text-sm font-medium text-amber-800">
-                  Сохраните эти коды сейчас — они не будут показаны снова.
-                </p>
+                <p className="text-sm font-medium text-amber-800"><AdminText>Сохраните эти коды сейчас — они не будут показаны снова.</AdminText></p>
               </div>
               <div className="grid grid-cols-2 gap-2 rounded-md border bg-neutral-50 p-4">
                 {step.codes.map((code, i) => (
@@ -414,21 +397,17 @@ function LoginPageContent() {
                 >
                   {copied ? (
                     <>
-                      <CheckCircle2 className="h-4 w-4" /> Скопировано
-                    </>
+                      <CheckCircle2 className="h-4 w-4" /><AdminText>Скопировано</AdminText></>
                   ) : (
                     <>
-                      <Copy className="h-4 w-4" /> Копировать
-                    </>
+                      <Copy className="h-4 w-4" /><AdminText>Копировать</AdminText></>
                   )}
                 </Button>
                 <Button
                   type="button"
                   onClick={() => router.push(returnTo)}
                   className="flex-1"
-                >
-                  Продолжить
-                </Button>
+                ><AdminText>Продолжить</AdminText></Button>
               </div>
             </div>
           )}

@@ -3,6 +3,8 @@ import { CatalogSchemas } from "@auto-tm/contracts";
 import { listAllBrands } from "./actions";
 import { BrandLogoControls } from "./BrandLogoControls";
 
+import { AdminText } from "@/lib/i18n";
+
 export default async function BrandsPage() {
   const result = await listAllBrands();
   const brands = result.ok ? result.data : [];
@@ -11,22 +13,17 @@ export default async function BrandsPage() {
   return (
     <div className="p-6 md:p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Бренды</h1>
-        <p className="text-sm text-neutral-500">
-          Логотипы: {withLogo} из {brands.length}. SVG, PNG или WebP, до{" "}
-          {CatalogSchemas.BRAND_LOGO_MAX_BYTES / 1024} КБ, почти
-          квадратные. Без логотипа приложение показывает первую букву.
-        </p>
+        <h1 className="text-2xl font-bold"><AdminText>Бренды</AdminText></h1>
+        <p className="text-sm text-neutral-500"><AdminText>Логотипы:</AdminText>{withLogo}<AdminText>из</AdminText>{brands.length}<AdminText>. SVG, PNG или WebP, до</AdminText>{" "}
+          {CatalogSchemas.BRAND_LOGO_MAX_BYTES / 1024}<AdminText>КБ, почти квадратные. Без логотипа приложение показывает первую букву.</AdminText></p>
       </div>
 
       {!result.ok ? (
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {result.error}
+          <AdminText>{result.error}</AdminText>
         </div>
       ) : brands.length === 0 ? (
-        <div className="rounded-md border bg-surface p-8 text-center text-neutral-500">
-          Брендов пока нет.
-        </div>
+        <div className="rounded-md border bg-surface p-8 text-center text-neutral-500"><AdminText>Брендов пока нет.</AdminText></div>
       ) : (
         <ul className="divide-y rounded-md border">
           {brands.map((brand) => (

@@ -4,17 +4,10 @@ import { AdminSchemas, ErrorCode } from "@auto-tm/contracts";
 
 import { listAuditEntries } from "../actions";
 
+import { AdminText, AdminDate } from "@/lib/i18n";
+
 const VALID_ACTIONS = Object.values(AdminSchemas.AdminAuditAction);
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 function actionLabel(action: string): string {
   const map: Record<string, string> = {
@@ -112,9 +105,9 @@ export default async function AuditPage({
     <div className="p-6 md:p-8">
       <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Аудит действий</h1>
+          <h1 className="text-2xl font-bold"><AdminText>Аудит действий</AdminText></h1>
           <p className="text-sm text-neutral-500">
-            {total} {recordPlural(total)}
+            {total} <AdminText>{recordPlural(total)}</AdminText>
           </p>
         </div>
         <form
@@ -123,43 +116,37 @@ export default async function AuditPage({
           className="flex flex-wrap items-end gap-3"
         >
           <div className="flex flex-col gap-1">
-            <label htmlFor="action" className="text-xs font-medium text-neutral-600">
-              Действие
-            </label>
+            <label htmlFor="action" className="text-xs font-medium text-neutral-600"><AdminText>Действие</AdminText></label>
             <select
               id="action"
               name="action"
               defaultValue={action ?? ""}
               className="h-9 rounded-md border bg-surface px-2 text-sm"
             >
-              <option value="">Все</option>
+              <option value=""><AdminText>Все</AdminText></option>
               {VALID_ACTIONS.map((a) => (
                 <option key={a} value={a}>
-                  {actionLabel(a)}
+                  <AdminText>{actionLabel(a)}</AdminText>
                 </option>
               ))}
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="targetType" className="text-xs font-medium text-neutral-600">
-              Тип цели
-            </label>
+            <label htmlFor="targetType" className="text-xs font-medium text-neutral-600"><AdminText>Тип цели</AdminText></label>
             <select
               id="targetType"
               name="targetType"
               defaultValue={targetType ?? ""}
               className="h-9 rounded-md border bg-surface px-2 text-sm"
             >
-              <option value="">Все</option>
-              <option value="listing">Объявление</option>
-              <option value="user">Пользователь</option>
-              <option value="content_report">Жалоба</option>
+              <option value=""><AdminText>Все</AdminText></option>
+              <option value="listing"><AdminText>Объявление</AdminText></option>
+              <option value="user"><AdminText>Пользователь</AdminText></option>
+              <option value="content_report"><AdminText>Жалоба</AdminText></option>
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="targetId" className="text-xs font-medium text-neutral-600">
-              ID цели
-            </label>
+            <label htmlFor="targetId" className="text-xs font-medium text-neutral-600"><AdminText>ID цели</AdminText></label>
             <input
               id="targetId"
               name="targetId"
@@ -172,20 +159,18 @@ export default async function AuditPage({
           <button
             type="submit"
             className="h-9 rounded-md bg-brand-500 px-3 text-sm font-medium text-white hover:bg-brand-600"
-          >
-            Применить
-          </button>
+          ><AdminText>Применить</AdminText></button>
         </form>
       </div>
 
       {!result.ok ? (
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {result.error}
+          <AdminText>{result.error}</AdminText>
         </div>
       ) : items.length === 0 ? (
         <div className="rounded-md border bg-surface p-8 text-center text-neutral-500">
-          <p className="text-lg font-medium">Нет записей</p>
-          <p className="mt-1 text-sm">По выбранным фильтрам аудит пуст.</p>
+          <p className="text-lg font-medium"><AdminText>Нет записей</AdminText></p>
+          <p className="mt-1 text-sm"><AdminText>По выбранным фильтрам аудит пуст.</AdminText></p>
         </div>
       ) : (
         <>
@@ -193,25 +178,25 @@ export default async function AuditPage({
             <table className="w-full text-left text-sm">
               <thead className="bg-neutral-50 text-neutral-600">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Дата</th>
-                  <th className="px-4 py-3 font-medium">Действие</th>
-                  <th className="px-4 py-3 font-medium">Администратор</th>
-                  <th className="px-4 py-3 font-medium">Тип цели</th>
-                  <th className="px-4 py-3 font-medium">Цель</th>
-                  <th className="px-4 py-3 font-medium">Причина</th>
+                  <th className="px-4 py-3 font-medium"><AdminText>Дата</AdminText></th>
+                  <th className="px-4 py-3 font-medium"><AdminText>Действие</AdminText></th>
+                  <th className="px-4 py-3 font-medium"><AdminText>Администратор</AdminText></th>
+                  <th className="px-4 py-3 font-medium"><AdminText>Тип цели</AdminText></th>
+                  <th className="px-4 py-3 font-medium"><AdminText>Цель</AdminText></th>
+                  <th className="px-4 py-3 font-medium"><AdminText>Причина</AdminText></th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {items.map((item) => (
                   <tr key={item.id} className="hover:bg-neutral-50">
                     <td className="px-4 py-3 text-neutral-500 whitespace-nowrap">
-                      {formatDate(item.createdAt)}
+                      <AdminDate value={item.createdAt} />
                     </td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${actionBadgeClass(item.action)}`}
                       >
-                        {actionLabel(item.action)}
+                        <AdminText>{actionLabel(item.action)}</AdminText>
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -222,13 +207,13 @@ export default async function AuditPage({
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {item.targetType === "listing"
+                      <AdminText>{item.targetType === "listing"
                         ? "Объявление"
                         : item.targetType === "user"
                         ? "Пользователь"
                         : item.targetType === "content_report"
                         ? "Жалоба"
-                        : item.targetType}
+                        : item.targetType}</AdminText>
                     </td>
                     <td className="px-4 py-3">
                       <Link
@@ -255,25 +240,20 @@ export default async function AuditPage({
 
           {totalPages > 1 && (
             <div className="mt-4 flex items-center justify-between">
-              <div className="text-sm text-neutral-500">
-                Страница {currentPage} из {totalPages}
+              <div className="text-sm text-neutral-500"><AdminText>Страница</AdminText>{currentPage}<AdminText>из</AdminText>{totalPages}
               </div>
               <div className="flex gap-2">
                 {currentPage > 1 && (
                   <Link
                     href={buildHref({ page: currentPage - 1 })}
                     className="rounded-md border bg-surface px-3 py-1.5 text-sm hover:bg-neutral-50"
-                  >
-                    Назад
-                  </Link>
+                  ><AdminText>Назад</AdminText></Link>
                 )}
                 {currentPage < totalPages && (
                   <Link
                     href={buildHref({ page: currentPage + 1 })}
                     className="rounded-md border bg-surface px-3 py-1.5 text-sm hover:bg-neutral-50"
-                  >
-                    Вперёд
-                  </Link>
+                  ><AdminText>Вперёд</AdminText></Link>
                 )}
               </div>
             </div>

@@ -7,15 +7,8 @@ import { UserReportPhoto } from "../../components/UserReportPhoto";
 import { RemovePhotoForm } from "../../components/RemovePhotoForm";
 import { ReportActionForm } from "../../components/ReportActionForm";
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+import { AdminText, AdminDate } from "@/lib/i18n";
+
 
 function reasonLabel(reason: string): string {
   const map: Record<string, string> = {
@@ -68,12 +61,10 @@ export default async function ReportDetailPage({ params }: PageProps) {
     return (
       <div className="p-6 md:p-8">
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {result.error}
+          <AdminText>{result.error}</AdminText>
         </div>
         <div className="mt-4">
-          <Link href="/reports" className="text-brand-600 hover:underline text-sm">
-            ← Назад к очереди
-          </Link>
+          <Link href="/reports" className="text-brand-600 hover:underline text-sm"><AdminText>← Назад к очереди</AdminText></Link>
         </div>
       </div>
     );
@@ -116,19 +107,17 @@ export default async function ReportDetailPage({ params }: PageProps) {
   return (
     <div className="p-6 md:p-8 max-w-4xl">
       <div className="mb-6">
-        <Link href="/reports" className="text-brand-600 hover:underline text-sm">
-          ← Назад к очереди
-        </Link>
+        <Link href="/reports" className="text-brand-600 hover:underline text-sm"><AdminText>← Назад к очереди</AdminText></Link>
       </div>
 
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Жалоба {id.slice(0, 8)}</h1>
+          <h1 className="text-2xl font-bold"><AdminText>Жалоба</AdminText>{id.slice(0, 8)}</h1>
           <div className="mt-2">
             <span
               className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${statusBadgeClass(report.status)}`}
             >
-              {statusLabel(report.status)}
+              <AdminText>{statusLabel(report.status)}</AdminText>
             </span>
           </div>
         </div>
@@ -137,12 +126,10 @@ export default async function ReportDetailPage({ params }: PageProps) {
       <div className="grid gap-6 md:grid-cols-2">
         {/* Reporter info */}
         <div className="rounded-md border bg-surface p-4">
-          <h2 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3">
-            Жалоба подана
-          </h2>
+          <h2 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3"><AdminText>Жалоба подана</AdminText></h2>
           <div className="space-y-2 text-sm">
             <div>
-              <span className="text-neutral-500">Автор жалобы:</span>{" "}
+              <span className="text-neutral-500"><AdminText>Автор жалобы:</AdminText></span>{" "}
               {report.reporter.available ? (
                 <span>{report.reporter.label}</span>
               ) : (
@@ -150,8 +137,8 @@ export default async function ReportDetailPage({ params }: PageProps) {
               )}
             </div>
             <div>
-              <span className="text-neutral-500">Причина:</span>{" "}
-              {reasonLabel(report.reason)}
+              <span className="text-neutral-500"><AdminText>Причина:</AdminText></span>{" "}
+              <AdminText>{reasonLabel(report.reason)}</AdminText>
             </div>
             {report.details && (
               <div className="mt-2 rounded-md bg-neutral-50 p-3 whitespace-pre-wrap text-neutral-700">
@@ -159,12 +146,12 @@ export default async function ReportDetailPage({ params }: PageProps) {
               </div>
             )}
             <div>
-              <span className="text-neutral-500">Дата:</span>{" "}
-              {formatDate(report.createdAt)}
+              <span className="text-neutral-500"><AdminText>Дата:</AdminText></span>{" "}
+              <AdminDate value={report.createdAt} />
             </div>
             {report.reportsSubmittedByReporterCount !== undefined && (
               <div>
-                <span className="text-neutral-500">Всего жалоб от отправителя:</span>{" "}
+                <span className="text-neutral-500"><AdminText>Всего жалоб от отправителя:</AdminText></span>{" "}
                 {report.reportsSubmittedByReporterCount}
               </div>
             )}
@@ -173,16 +160,14 @@ export default async function ReportDetailPage({ params }: PageProps) {
 
         {/* Target info */}
         <div className="rounded-md border bg-surface p-4">
-          <h2 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3">
-            Цель жалобы
-          </h2>
+          <h2 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3"><AdminText>Цель жалобы</AdminText></h2>
           <div className="space-y-2 text-sm">
             <div>
-              <span className="text-neutral-500">Тип:</span>{" "}
-              {isListing ? "Объявление" : isMessage ? "Сообщение" : "Пользователь"}
+              <span className="text-neutral-500"><AdminText>Тип:</AdminText></span>{" "}
+              <AdminText>{isListing ? "Объявление" : isMessage ? "Сообщение" : "Пользователь"}</AdminText>
             </div>
             <div>
-              <span className="text-neutral-500">Название:</span>{" "}
+              <span className="text-neutral-500"><AdminText>Название:</AdminText></span>{" "}
               {report.target.available ? (
                 <span>{report.target.label}</span>
               ) : (
@@ -196,19 +181,19 @@ export default async function ReportDetailPage({ params }: PageProps) {
                     {report.target.messageBody}
                   </div>
                 )}
-                {report.target.messageHasAttachment && <p>Есть вложение</p>}
-                {report.target.messageCreatedAt && <div><span className="text-neutral-500">Отправлено:</span>{" "}{formatDate(report.target.messageCreatedAt)}</div>}
+                {report.target.messageHasAttachment && <p><AdminText>Есть вложение</AdminText></p>}
+                {report.target.messageCreatedAt && <div><span className="text-neutral-500"><AdminText>Отправлено:</AdminText></span>{" "}<AdminDate value={report.target.messageCreatedAt} /></div>}
                 <div>
-                  <span className="text-neutral-500">Автор сообщения:</span>{" "}
+                  <span className="text-neutral-500"><AdminText>Автор сообщения:</AdminText></span>{" "}
                   {report.target.sender?.available && report.target.sender.userId ? (
                     <Link href={`/users/${report.target.sender.userId}`} className="text-brand-600 hover:underline">{report.target.sender.label}</Link>
-                  ) : <span className="italic text-neutral-400">Пользователь удалён</span>}
+                  ) : <span className="italic text-neutral-400"><AdminText>Пользователь удалён</AdminText></span>}
                 </div>
               </>
             )}
             {isListing && report.target.status && (
               <div>
-                <span className="text-neutral-500">Статус объявления:</span>{" "}
+                <span className="text-neutral-500"><AdminText>Статус объявления:</AdminText></span>{" "}
                 {report.target.status}
               </div>
             )}
@@ -222,26 +207,22 @@ export default async function ReportDetailPage({ params }: PageProps) {
             )}
             {isUser && report.target.role && (
               <div>
-                <span className="text-neutral-500">Роль:</span>{" "}
+                <span className="text-neutral-500"><AdminText>Роль:</AdminText></span>{" "}
                 {report.target.role}
               </div>
             )}
             {report.targetModerationState?.suspendedAt && (
-              <div className="text-error-500">
-                Пользователь заблокирован
-              </div>
+              <div className="text-error-500"><AdminText>Пользователь заблокирован</AdminText></div>
             )}
             <div>
-              <span className="text-neutral-500">Жалоб на цель в ожидании:</span>{" "}
+              <span className="text-neutral-500"><AdminText>Жалоб на цель в ожидании:</AdminText></span>{" "}
               {report.pendingReportsOnTargetCount}
             </div>
             {!isMessage && <div className="pt-2">
               <Link
                 href={isListing ? `/listings/${report.target.targetId}` : `/users/${report.target.targetId}`}
                 className="text-brand-600 hover:underline text-sm"
-              >
-                Перейти к действиям →
-              </Link>
+              ><AdminText>Перейти к действиям →</AdminText></Link>
             </div>}
           </div>
         </div>
@@ -250,20 +231,18 @@ export default async function ReportDetailPage({ params }: PageProps) {
       {/* Reviewer info */}
       {report.reviewer && (
         <div className="mt-6 rounded-md border bg-surface p-4">
-          <h2 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3">
-            Обработка
-          </h2>
+          <h2 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3"><AdminText>Обработка</AdminText></h2>
           <div className="space-y-2 text-sm">
             <div>
-              <span className="text-neutral-500">Обработал:</span>{" "}
+              <span className="text-neutral-500"><AdminText>Обработал:</AdminText></span>{" "}
               {report.reviewer.available ? report.reviewer.label : (
                 <span className="italic text-neutral-400">{report.reviewer.label}</span>
               )}
             </div>
             {report.reviewedAt && (
               <div>
-                <span className="text-neutral-500">Дата обработки:</span>{" "}
-                {formatDate(report.reviewedAt)}
+                <span className="text-neutral-500"><AdminText>Дата обработки:</AdminText></span>{" "}
+                <AdminDate value={report.reviewedAt} />
               </div>
             )}
           </div>
@@ -273,14 +252,12 @@ export default async function ReportDetailPage({ params }: PageProps) {
       {/* Action forms */}
       {isPending && moderationEnabled && (
         <div className="mt-6 space-y-4">
-          <h2 className="text-lg font-semibold">Действия</h2>
+          <h2 className="text-lg font-semibold"><AdminText>Действия</AdminText></h2>
 
           {/* Dismiss */}
           <div className="rounded-md border bg-surface p-4">
-            <h3 className="text-sm font-medium mb-2">Отклонить жалобу</h3>
-            <p className="text-xs text-neutral-500 mb-3">
-              Жалоба будет закрыта без изменения состояния цели.
-            </p>
+            <h3 className="text-sm font-medium mb-2"><AdminText>Отклонить жалобу</AdminText></h3>
+            <p className="text-xs text-neutral-500 mb-3"><AdminText>Жалоба будет закрыта без изменения состояния цели.</AdminText></p>
             <ReportActionForm
               actionType="dismiss"
               reportId={id}
@@ -292,10 +269,8 @@ export default async function ReportDetailPage({ params }: PageProps) {
           {/* Ban (listing only) */}
           {isListing && (
             <div className="rounded-md border bg-surface p-4">
-              <h3 className="text-sm font-medium mb-2">Заблокировать объявление</h3>
-              <p className="text-xs text-neutral-500 mb-3">
-                Объявление будет скрыто из публичного доступа. Новые сообщения и контакты будут заблокированы.
-              </p>
+              <h3 className="text-sm font-medium mb-2"><AdminText>Заблокировать объявление</AdminText></h3>
+              <p className="text-xs text-neutral-500 mb-3"><AdminText>Объявление будет скрыто из публичного доступа. Новые сообщения и контакты будут заблокированы.</AdminText></p>
               {canBan ? (
                 <ReportActionForm
                   actionType="ban"
@@ -304,19 +279,15 @@ export default async function ReportDetailPage({ params }: PageProps) {
                   targetId={report.target.targetId}
                 />
               ) : (
-                <p className="text-sm text-neutral-400 italic">
-                  Объявление уже неактивно или недоступно для блокировки.
-                </p>
+                <p className="text-sm text-neutral-400 italic"><AdminText>Объявление уже неактивно или недоступно для блокировки.</AdminText></p>
               )}
             </div>
           )}
 
           {isUser && report.target.avatarKey && canRemovePhoto && (
             <div className="rounded-md border bg-surface p-4">
-              <h3 className="text-sm font-medium mb-2">Удалить фото профиля</h3>
-              <p className="text-xs text-neutral-500 mb-3">
-                Фото будет удалено, и снова появится назначенный аватар. Жалоба будет обработана.
-              </p>
+              <h3 className="text-sm font-medium mb-2"><AdminText>Удалить фото профиля</AdminText></h3>
+              <p className="text-xs text-neutral-500 mb-3"><AdminText>Фото будет удалено, и снова появится назначенный аватар. Жалоба будет обработана.</AdminText></p>
               <RemovePhotoForm reportId={id} targetId={report.target.targetId} />
             </div>
           )}
@@ -324,10 +295,8 @@ export default async function ReportDetailPage({ params }: PageProps) {
           {/* Suspend a User or reported Message sender */}
           {(isUser || isMessage) && (
             <div className="rounded-md border bg-surface p-4">
-              <h3 className="text-sm font-medium mb-2">{isMessage ? "Заблокировать автора сообщения" : "Заблокировать пользователя"}</h3>
-              <p className="text-xs text-neutral-500 mb-3">
-                Пользователь не сможет создавать объявления, отправлять сообщения или совершать другие действия.
-              </p>
+              <h3 className="text-sm font-medium mb-2"><AdminText>{isMessage ? "Заблокировать автора сообщения" : "Заблокировать пользователя"}</AdminText></h3>
+              <p className="text-xs text-neutral-500 mb-3"><AdminText>Пользователь не сможет создавать объявления, отправлять сообщения или совершать другие действия.</AdminText></p>
               {canSuspend && suspensionTarget ? (
                 <ReportActionForm
                   actionType="suspend"
@@ -336,13 +305,9 @@ export default async function ReportDetailPage({ params }: PageProps) {
                   targetId={suspensionTarget}
                 />
               ) : suspensionRole === Enums.UserRole.Admin ? (
-                <p className="text-sm text-neutral-400 italic">
-                  Администраторов нельзя заблокировать через очередь жалоб.
-                </p>
+                <p className="text-sm text-neutral-400 italic"><AdminText>Администраторов нельзя заблокировать через очередь жалоб.</AdminText></p>
               ) : (
-                <p className="text-sm text-neutral-400 italic">
-                  Пользователь уже заблокирован или недоступен для блокировки.
-                </p>
+                <p className="text-sm text-neutral-400 italic"><AdminText>Пользователь уже заблокирован или недоступен для блокировки.</AdminText></p>
               )}
             </div>
           )}
@@ -351,9 +316,7 @@ export default async function ReportDetailPage({ params }: PageProps) {
 
       {isPending && !moderationEnabled && (
         <div className="mt-6 rounded-md border bg-surface p-4">
-          <p className="text-sm text-neutral-500">
-            Действия модерации временно недоступны.
-          </p>
+          <p className="text-sm text-neutral-500"><AdminText>Действия модерации временно недоступны.</AdminText></p>
         </div>
       )}
     </div>
