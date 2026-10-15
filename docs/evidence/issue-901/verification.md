@@ -9,3 +9,7 @@ Base `7af49d4c1474b2c3d841b14736c4ef59ce155a4e`. Scope is reserved staging contr
 The public seams under test are durable compare-and-swap, reservation commands and the Railway network/process boundary. The coordinator authorized these bounded executable controls and actual concurrent Git ref contention, without a separate architecture approval round.
 
 Docs: https://git-scm.com/docs/git-push verified explicit expected-value force-with-lease and concurrent ref protection. https://docs.railway.com/api/llms-docs.md verified project-token scope, variables, service identity and specific-commit deployment API. https://docs.railway.com/cli/ssh.md verified explicit project/environment/service SSH selection. Installed Railway 4.57.1 lacks the newer documented `railway api` command, so the adapter uses the documented GraphQL endpoint directly. No dependency upgrades.
+
+## Narrow ownership checkpoint
+
+`node --test scripts/staging-control.test.mjs scripts/staging-ledger.test.mjs` passed 3 tests after implementing the durable Git compare-and-swap transport, queued founder-priority/ready ordering, owner/candidate/identity records and initial authoritative-attestation comparison. Two independent object repositories contend on one bare remote. A fresh object repository reads the winning record. This checkpoint has no mutation/release commands and cannot activate staging. Further operation/recovery red tests were committed in `de3dfb37` and remain pending implementation outside this narrow checkpoint.
