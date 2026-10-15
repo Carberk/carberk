@@ -1,5 +1,3 @@
-export const LISTING_VIEW_RETENTION_LEDGER = Symbol("ListingViewRetentionLedger");
-
 /** No identifier or row data crosses this storage boundary. */
 export interface ListingViewRetentionLedger {
   deleteExpired(now: Date, limit: number): Promise<number>;

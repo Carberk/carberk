@@ -25,6 +25,10 @@ import { OrphanCleanupProcessor } from "./queues/orphan-cleanup.processor";
 import { AccountPurgeProcessor } from "./queues/account-purge.processor";
 import { AccountPurgeScheduler } from "./queues/account-purge.scheduler";
 import { PurgeExpiredAccounts } from "./jobs/PurgeExpiredAccounts";
+import { ExpireListingViewFingerprints } from "./jobs/ExpireListingViewFingerprints";
+import { PrismaListingViewRetentionLedger } from "./jobs/PrismaListingViewRetentionLedger";
+import { ListingViewRetentionProcessor } from "./queues/listing-view-retention.processor";
+import { LISTING_VIEW_RETENTION_QUEUE, ListingViewRetentionScheduler } from "./queues/listing-view-retention.scheduler";
 
 @Module({
   imports: [
@@ -51,10 +55,16 @@ import { PurgeExpiredAccounts } from "./jobs/PurgeExpiredAccounts";
       { name: "orphan-cleanup" },
       { name: "account-purge" },
       { name: RETIRED_UPLOAD_CLEANUP_QUEUE },
+      { name: LISTING_VIEW_RETENTION_QUEUE },
       { name: AuthSchemas.EMAIL_CODE_QUEUE },
     ),
   ],
   providers: [
+    PrismaListingViewRetentionLedger,
+    { provide: ExpireListingViewFingerprints, inject: [PrismaListingViewRetentionLedger],
+      useFactory: (ledger: PrismaListingViewRetentionLedger) => new ExpireListingViewFingerprints(ledger) },
+    ListingViewRetentionProcessor,
+    ListingViewRetentionScheduler,
     CleanRetiredUploads,
     RetiredUploadCleanupProcessor,
     RetiredUploadCleanupScheduler,

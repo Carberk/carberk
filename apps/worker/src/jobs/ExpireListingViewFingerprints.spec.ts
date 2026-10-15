@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ExpireListingViewFingerprints } from "./ExpireListingViewFingerprints";
 import { FakeListingViewRetentionLedger } from "./application/testing/FakeListingViewRetentionLedger";
@@ -22,6 +22,17 @@ describe("Listing view fingerprint retention", () => {
     expect(result.deleted).toBe(4);
     expect(ledger.expiresAt).toHaveLength(3);
     expect(result.health).toEqual({ lastSuccessAt: NOW, oldestOverdueAt: new Date("2026-10-14T18:49:59.000Z"), overdueMs: 301_000, healthy: false });
+  });
+
+  it("stops starting batches when its execution budget is spent", async () => {
+    const clock = vi.spyOn(performance, "now").mockReturnValueOnce(0).mockReturnValueOnce(0).mockReturnValue(31_000);
+    try {
+      const ledger = new FakeListingViewRetentionLedger();
+      ledger.expiresAt.push(...Array.from({ length: 7 }, () => NOW));
+      const result = await new ExpireListingViewFingerprints(ledger).execute(NOW, { batchSize: 2 });
+      expect(result.deleted).toBe(2);
+      expect(ledger.expiresAt).toHaveLength(5);
+    } finally { clock.mockRestore(); }
   });
 
   it("never reports a database outage as successful deletion or leaks its error", async () => {
