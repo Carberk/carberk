@@ -18,6 +18,8 @@ import {
 import { RetiredUploadCleanupScheduler } from "./queues/retired-upload-cleanup.scheduler";
 import { PushModule } from "./push/push.module";
 import { EmailModule } from "./email/email.module";
+import { MeasurementRetentionModule } from "./measurement-retention.module";
+import { ServiceLifecycleModule } from "./service-lifecycle.module";
 import { VideoTranscodeProcessor } from "./queues/video-transcode.processor";
 import { NotificationFanoutProcessor } from "./queues/notification-fanout.processor";
 import { EmailCodeProcessor } from "./queues/email-code.processor";
@@ -58,6 +60,8 @@ import { LISTING_VIEW_RETENTION_QUEUE, ListingViewRetentionScheduler } from "./q
       { name: LISTING_VIEW_RETENTION_QUEUE },
       { name: AuthSchemas.EMAIL_CODE_QUEUE },
     ),
+    MeasurementRetentionModule,
+    ServiceLifecycleModule,
   ],
   providers: [
     PrismaListingViewRetentionLedger,
