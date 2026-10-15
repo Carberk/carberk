@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import type { MeasurementSchemas } from "@auto-tm/contracts";
+
 import { server } from "../../test/msw";
+
 import { MeasurementHttpSender } from "./MeasurementHttpSender";
 import { MeasurementQueue } from "./MeasurementQueue";
 import { FakeMeasurementPorts } from "./application/testing/FakeMeasurementPorts";
