@@ -42,7 +42,7 @@ export class PrismaAccountDeletionUnitOfWork implements AccountDeletionUnitOfWor
         },
         archiveActiveListings: async (sellerId) => {
           await tx.listing.updateMany({
-            where: { sellerId, status: "active" },
+            where: { sellerId, businessId: null, status: "active" },
             data: { status: "archived", archivedByDeletion: true },
           });
         },
