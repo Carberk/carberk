@@ -11,8 +11,8 @@ function remoteMain(input) {
     if (e.RAILWAY_PROJECT_ID !== p.projectId || e.RAILWAY_ENVIRONMENT_ID !== p.environmentId || e.RAILWAY_SERVICE_ID !== p.services.api ||
         e.RAILWAY_ENVIRONMENT_NAME !== 'staging' || e.APP_ENV !== 'staging' || e.SMS_DRIVER !== 'mock' || e.AUTOTM_COMMIT_SHA !== input.target) throw new Error();
     const db = new URL(e.DATABASE_URL); const media = new URL(e.MINIO_ENDPOINT); const publicMedia = new URL(e.MINIO_PUBLIC_URL);
-    if (!['postgres:', 'postgresql:'].includes(db.protocol) || db.hostname !== 'postgres.railway.internal' || db.search || db.hash || media.search || media.hash ||
-        publicMedia.search || publicMedia.hash) throw new Error();
+    if (!['postgres:', 'postgresql:'].includes(db.protocol) || db.hostname !== 'postgres.railway.internal' || db.search || db.hash || media.username || media.password || media.search || media.hash ||
+        publicMedia.username || publicMedia.password || publicMedia.search || publicMedia.hash) throw new Error();
     db.username = ''; db.password = '';
     if (db.toString().replace(/\/$/, '') !== p.origins.database || media.origin !== p.origins.media || publicMedia.origin !== p.origins.publicMedia) throw new Error();
     const sql = (query) => {

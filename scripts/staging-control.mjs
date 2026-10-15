@@ -32,10 +32,12 @@ export class StagingControl {
   async enqueue(request) {
     if (!sha(request.candidate) || !Number.isSafeInteger(request.parent) || request.parent < 1 ||
         !Number.isSafeInteger(request.pr) || request.pr < 1 || !Number.isSafeInteger(request.priority) || request.priority < 0 ||
-        !/^https:\/\/github\.com\/bagtyyarkovusov\/auto\.tm-rewrite\/(issues|pull)\/[1-9]\d*(#.*)?$/.test(request.priorityEvidence ?? '')) throw new Error('Invalid reservation request');
+        !/^https:\/\/github\.com\/bagtyyarkovusov\/auto\.tm-rewrite\/(issues|pull)\/[1-9]\d*(#issuecomment-[1-9]\d*)?$/.test(request.priorityEvidence ?? '')) throw new Error('Invalid reservation request');
     const id = this.id(); if (!/^[a-f0-9]{32}$/.test(id)) throw new Error('Invalid reservation ID');
     const snapshot = await this.ledger.read(); const state = snapshot.state ?? empty();
-    state.queue.push({ ...request, id, owner: this.actor, readyAt: this.now(), identity: this.policy });
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9-]{0,38}$/.test(this.actor)) throw new Error('Authenticated GitHub actor required');
+    const { parent, pr, candidate, priority, priorityEvidence } = request;
+    state.queue.push({ parent, pr, candidate, priority, priorityEvidence, id, owner: this.actor, readyAt: this.now(), identity: structuredClone(this.policy) });
     await this.write(snapshot, state); return id;
   }
   async acquire(id) {
@@ -93,6 +95,7 @@ export class StagingControl {
       const owned = done.state.reservation;
       if (receipt) {
         owned.deployments = result.deployments;
+        owned.expectedMigrations = operation.expectedMigrations;
         owned.evidence.push({ ...receipt, observedAt: this.now(), deployments: result.deployments });
       }
       if (restoring) owned.restoration = { ...receipt, restoredSha: target };
