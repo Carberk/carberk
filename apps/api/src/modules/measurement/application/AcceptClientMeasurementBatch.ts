@@ -8,13 +8,14 @@ export interface MeasurementSubjectPort {
  resolve(input: { authenticatedUserId?: string; guestCapability?: string }): Promise<MeasurementAuthority | null>;
 }
 export type BatchReceipt = "accepted" | "invalid" | "unauthorized" | "unavailable" | "limited";
+export interface MeasurementRateLimitPort { consume(input: { subject: string; units: number; window: number }): Promise<boolean>; }
 
 /** Per-process caps supplement core ingress throttling; no raw credential becomes a rate key. */
 export class AcceptClientMeasurementBatch {
  private window = 0;
  private total = 0;
  private readonly subjects = new Map<string, number>();
- constructor(private readonly identities: MeasurementSubjectPort, private readonly accept: AcceptMeasurement, private readonly now: () => number) {}
+ constructor(private readonly identities: MeasurementSubjectPort, private readonly accept: AcceptMeasurement, private readonly now: () => number, private readonly distributedLimit?: MeasurementRateLimitPort) {}
  async execute(body: unknown, credential: { authenticatedUserId?: string; guestCapability?: string }): Promise<BatchReceipt> {
   if (!credential.authenticatedUserId && (!credential.guestCapability || !/^mg_[A-Za-z0-9_-]{43}$/.test(credential.guestCapability))) return "unauthorized";
   const batch = MeasurementSchemas.MeasurementBatchSchema.safeParse(body);
@@ -32,6 +33,10 @@ export class AcceptClientMeasurementBatch {
   const window = Math.floor(this.now() / 60000);
   if (window !== this.window) { this.window = window; this.total = 0; this.subjects.clear(); }
   const key = authority.subject.pseudonym;
+  if (this.distributedLimit) {
+   try { if (!(await this.distributedLimit.consume({ subject: key, units: batch.data.events.length, window }))) return "limited"; }
+   catch { return "unavailable"; }
+  }
   const received = this.subjects.get(key) ?? 0;
   // Initial pilot caps. Multi-replica/distributed load proof remains an acceptance gate.
   if (this.total + batch.data.events.length > 1000 || received + batch.data.events.length > 120 || (!this.subjects.has(key) && this.subjects.size >= 1000)) return "limited";
