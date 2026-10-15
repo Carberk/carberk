@@ -53,6 +53,16 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
    return work(tx, row, scope, actor, audience);
   }, { timeout: 20000 });
  }
+ async subscribePush(subject: ServiceSubject, id: string, deviceToken: string): Promise<void> {
+  await this.locked(subject, id, "read", async (tx, row) => {
+   const device = await tx.fcmDevice.findUnique({ where: { token: deviceToken } });
+   if (!device || device.userId !== subject.userId || device.invalidatedAt) throw new ServiceDenied("NO_ACCESS");
+   await tx.$queryRaw`SELECT id FROM fcm_devices WHERE id = ${device.id} FOR UPDATE`;
+   const current = await tx.fcmDevice.findUnique({ where: { id: device.id } });
+   if (!current || current.userId !== subject.userId || current.token !== deviceToken || current.invalidatedAt) throw new ServiceDenied("NO_ACCESS");
+   await tx.servicePushSubscription.upsert({ where: { sessionId_deviceId_conversationId: { sessionId: subject.sessionId, deviceId: device.id, conversationId: id } }, create: { sessionId: subject.sessionId, deviceId: device.id, conversationId: id, lifecycleEpoch: row.lifecycleEpoch }, update: { lifecycleEpoch: row.lifecycleEpoch } });
+  });
+ }
  async open(subject: ServiceSubject, purpose: ServiceMessagingSchemas.ServicePurpose, sourceListingId?: string) {
   if (!this.runtime.syntheticEnabled()) throw new ServiceDenied("COLLECTION_DISABLED");
   return this.db.$transaction(async tx => {

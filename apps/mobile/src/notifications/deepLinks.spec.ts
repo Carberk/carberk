@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { parseDirectMessageConversationId } from "./deepLinks";
+import { parseDirectMessageConversationId, parseServiceConversationId } from "./deepLinks";
 
 describe("parseDirectMessageConversationId", () => {
   it("returns the conversation id from a data.conversationId payload", () => {
@@ -72,4 +72,10 @@ describe("parseDirectMessageConversationId", () => {
 
 it("keeps service updates out of the marketplace conversation route", () => {
  expect(parseDirectMessageConversationId({ kind: "service_update", conversationId: "11111111-1111-4111-8111-111111111111" })).toBeNull();
+});
+
+it("requires an exact service payload and UUID conversation for service routing", () => {
+ const id = "11111111-1111-4111-8111-111111111111";
+ expect(parseServiceConversationId({ kind: "service_update", conversationId: id })).toBe(id);
+ for (const input of [{ conversationId: id }, { kind: "service_update", conversationId: "../private" }, { kind: "service_update", deepLink: "https://other.invalid" }]) expect(parseServiceConversationId(input)).toBeNull();
 });

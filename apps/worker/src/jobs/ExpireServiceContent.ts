@@ -29,6 +29,7 @@ export class ExpireServiceContent {
    const epoch = current.conversation.lifecycleEpoch + 1;
    await tx.serviceConversation.update({ where: { id }, data: { lifecycleEpoch: epoch, erasedAt: now } });
    await this.cleanup(tx, id, epoch, files.flatMap(file => file.objectKey ? [file.objectKey] : []), now);
+   await tx.servicePushSubscription.deleteMany({ where: { conversationId: id } });
    await tx.serviceOutbox.deleteMany({ where: { conversationId: id } });
    await tx.serviceReadState.deleteMany({ where: { conversationId: id } });
    await tx.serviceMessage.deleteMany({ where: { conversationId: id } });

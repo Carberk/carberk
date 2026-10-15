@@ -47,6 +47,7 @@ afterAll(async () => {
   const conversations = [...scopes, ...histories].flatMap(scope => scope.conversation ? [scope.conversation.id] : []);
   const ownedFiles = await db.serviceAttachment.findMany({ where: { conversationId: { in: conversations } }, select: { objectKey: true } });
   for (const file of ownedFiles) if (file.objectKey) await app.get<ServicePrivateStore>(SERVICE_PRIVATE_STORE).remove(file.objectKey);
+  await db.servicePushSubscription.deleteMany({ where: { conversationId: { in: conversations } } });
   await db.serviceOutbox.deleteMany({ where: { conversationId: { in: conversations } } });
   await db.serviceMessage.deleteMany({ where: { conversationId: { in: conversations } } });
   await db.serviceAttachment.deleteMany({ where: { conversationId: { in: conversations } } });
@@ -124,4 +125,17 @@ it("keeps staged bytes unusable until exact adoption and checks current audience
  const anonymous = await fetch(`${process.env["MINIO_ENDPOINT"]}/service-private/${row.objectKey}`); expect([401, 403]).toContain(anonymous.status);
  await db.session.deleteMany({ where: { userId: stranger } });
  await request.get(`/api/v1/services/conversations/${id}/attachments/${file}`).set("Authorization", auth(stranger)).expect(403);
+});
+
+it("binds push only to the current admitted Session and exact owned registered device", async () => {
+ const opened = await request.post("/api/v1/services/conversations").set("Authorization", auth(customer)).send({ purpose: "support", synthetic: true }).expect(201);
+ const id = opened.body.id as string;
+ const mine = await db.fcmDevice.create({ data: { userId: customer, token: `synthetic-service-${randomUUID()}`, platform: "android" } });
+ const other = await db.fcmDevice.create({ data: { userId: stranger, token: `synthetic-service-${randomUUID()}`, platform: "android" } });
+ await request.post(`/api/v1/services/conversations/${id}/push`).set("Authorization", auth(customer)).send({ deviceToken: other.token }).expect(403);
+ await request.post(`/api/v1/services/conversations/${id}/push`).set("Authorization", auth(customer)).send({ deviceToken: mine.token }).expect(201);
+ const session = jwt.decode(tokens.get(customer)!) as { sid: string };
+ expect(await db.servicePushSubscription.findMany({ where: { conversationId: id } })).toEqual([expect.objectContaining({ deviceId: mine.id, sessionId: session.sid, lifecycleEpoch: 0 })]);
+ await db.fcmDevice.update({ where: { id: mine.id }, data: { invalidatedAt: new Date() } });
+ await request.post(`/api/v1/services/conversations/${id}/push`).set("Authorization", auth(customer)).send({ deviceToken: mine.token }).expect(403);
 });
