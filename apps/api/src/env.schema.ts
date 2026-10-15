@@ -82,6 +82,9 @@ const BaseSchema = z.object({
 
   INSPECTION_INTEREST_ENABLED: booleanFlag,
   SERVICE_SYNTHETIC_ENABLED: booleanFlag,
+  SERVICE_SYNTHETIC_USER_IDS: z.string().default("[]").transform((value, ctx) => {
+    try { return z.array(z.string().uuid()).max(50).parse(JSON.parse(value)); } catch { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Expected at most 50 fixture User UUIDs" }); return z.NEVER; }
+  }),
   MEASUREMENT_ENABLED: booleanFlag,
   MEASUREMENT_SYNTHETIC_CAPABILITY_HASH: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   MEASUREMENT_SYNTHETIC_CAPABILITY_EXPIRES_AT: z.string().datetime().optional(),
@@ -441,6 +444,7 @@ export const EnvSchema = BaseSchema.superRefine((env, ctx) => {
   if (env.MEASUREMENT_ENABLED && (!env.MEASUREMENT_COLLECTOR_EPOCH || !env.MEASUREMENT_EVIDENCE_REF)) {
     add("MEASUREMENT_ENABLED", "Measurement requires externally provisioned collector epoch and admitted evidence");
   }
+  if (env.APP_ENV === "production" && env.SERVICE_SYNTHETIC_ENABLED) add("SERVICE_SYNTHETIC_ENABLED", "Synthetic service collection is forbidden in production");
   validateEndpoints(env, add);
   validateSecrets(env, add);
   validateReviewerSafety(env, add);

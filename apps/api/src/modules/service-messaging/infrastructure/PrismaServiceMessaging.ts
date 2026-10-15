@@ -30,7 +30,7 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
   await tx.$queryRaw`SELECT id FROM sessions WHERE id = ${subject.sessionId} FOR UPDATE`;
   const [user, session] = await Promise.all([tx.user.findUnique({ where: { id: subject.userId } }), tx.session.findUnique({ where: { id: subject.sessionId } })]);
   let staffAuthorized = false;
-  try { await this.staff.authorize({ ...subject, capability: serviceCapability(purpose) }); staffAuthorized = true; }
+  try { await this.staff.authorize({ ...subject, capability: serviceCapability(purpose) }, tx); staffAuthorized = true; }
   catch (error) { if (!(error instanceof StaffAuthorityDenied)) throw error; }
   return { ...subject, sessionValid: !!user && !!session && session.userId === subject.userId && session.expiresAt > this.runtime.now(), deleting: !!user?.deletionScheduledAt, suspended: !!user?.suspendedAt, staffAuthorized };
  }
