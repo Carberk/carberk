@@ -4,6 +4,7 @@ import { BUSINESS_INVENTORY_REPOSITORY } from "./domain/ports/BusinessInventoryR
 import { PrismaBusinessContactPhoneRepository } from "./infrastructure/PrismaBusinessContactPhoneRepository";
 import { BUSINESS_CONTACT_PHONE_REPOSITORY, type BusinessContactPhoneRepository } from "./domain/ports/BusinessContactPhoneRepository";
 import { ListingOwnership } from "./application/ListingOwnership";
+import { MeasurementModule } from "../measurement/measurement.module";
 import { Module } from "@nestjs/common";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 
@@ -102,7 +103,7 @@ import { PrismaListingViews } from "./infrastructure/PrismaListingViews";
 import { LISTING_VIEWS_PORT } from "./domain/ports/ListingViewsPort";
 
 @Module({
-  imports: [PrismaModule, EventEmitterModule, IdentityModule],
+  imports: [PrismaModule, EventEmitterModule, IdentityModule, MeasurementModule],
   controllers: [BusinessInventoryController,ListingViewsController, ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController],
   providers: [
     { provide: BUSINESS_INVENTORY_REPOSITORY, useClass: PrismaBusinessInventoryRepository },

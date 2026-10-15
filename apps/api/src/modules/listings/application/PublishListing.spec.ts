@@ -505,8 +505,10 @@ describe("PublishListing", () => {
     expect(measurement.facts[0]?.event).toMatchObject({ eventName: "listing_published", context: { platform: "server" }, payload: { listingId: result.listing.id, cityId: validPayload.cityId } });
     expect(JSON.stringify(measurement.facts)).not.toContain(validPayload.description);
     expect(JSON.stringify(measurement.facts)).not.toContain(validPayload.contactPhone);
-    measurement.unavailable = true;
+  });
+  it("keeps publication usable when measurement capture is unavailable", async () => {
     seedDraft(draftRepo, validPayload);
+    const measurement = new FakeMeasurementCommit(); measurement.unavailable = true;
     expect((await makeUseCase(draftRepo, prisma, exchangeRates, events, variantGenerator, measurement).execute({ draftId: "draft-1", userId: "user-1" })).listing.status).toBe("active");
   });
   it("publishes a valid draft", async () => {

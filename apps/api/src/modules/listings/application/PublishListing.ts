@@ -1,3 +1,4 @@
+import { MEASUREMENT_COMMIT_PORT, type MeasurementCommitPort } from "../../measurement/measurement.public";
 import { Optional ,
   Inject,
   Injectable,
@@ -159,6 +160,7 @@ export class PublishListing {
     @Inject(UPLOAD_CLAIM_PORT)
     private readonly claims: UploadClaimPort,
     @Optional() @Inject(ListingOwnership) private readonly ownership?: ListingOwnership,
+    @Optional() @Inject(MEASUREMENT_COMMIT_PORT) private readonly measurement?: MeasurementCommitPort,
   ) {}
 
   async execute(input: PublishListingInput): Promise<PublishListingResult> {
@@ -396,6 +398,11 @@ export class PublishListing {
             },
           },
         });
+        try {
+          await this.measurement?.capture(tx, input.userId, { version: 1, eventId: randomUUID(), occurredAt: now.toISOString(), purpose: "product_improvement",
+            eventName: "listing_published", context: { platform: "server", release: "server", build: "server", locale: "ru" }, payload: { listingId, cityId: payload.cityId },
+          });
+        } catch { /* Measurement outage never rolls back the core publication. */ }
         return created;
       });
 
