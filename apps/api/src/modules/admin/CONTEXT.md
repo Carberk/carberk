@@ -21,3 +21,5 @@ Audit and report history intentionally survives account deletion with nullable a
 - [Admin browser boundary](../../../../admin/CONTEXT.md)
 - [Inspection demand](../reports/CONTEXT.md)
 - [Schema](../../../../../packages/db/prisma/schema.prisma)
+
+The marketplace audit feed restricts its query and count to released `AdminAuditAction` actions. Purpose-private staff grant/revoke/bootstrap audit remains durable in the same table and requires a future explicitly scoped reader; marketplace role alone does not expose it or extend the legacy closed-enum response contract.

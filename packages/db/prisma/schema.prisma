@@ -86,6 +86,7 @@ model User {
   listingDrafts                ListingDraft[]
   verifiedContactPhones        VerifiedContactPhone[]
   mediaUploads                 MediaUpload[]
+  staffGrants                  StaffGrant[]
   totpEnrollment               TotpEnrollment?
   reportsSubmitted             ContentReport[]           @relation("Reporter")
   reportsReviewed              ContentReport[]           @relation("Reviewer")
@@ -863,4 +864,15 @@ model ListingViewFingerprint {
   @@id([listingId, day, fingerprint])
   @@index([expiresAt])
   @@map("listing_view_fingerprints")
+}
+
+/// Explicit purpose capability. Revocations retain transition history in AuditLog.
+model StaffGrant {
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  capability String
+  grantedAt DateTime @default(now())
+  revokedAt DateTime?
+  @@id([userId, capability])
+  @@map("staff_grants")
 }

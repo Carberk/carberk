@@ -5,7 +5,6 @@ import {
   Post,
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Req,
   Inject,
 } from "@nestjs/common";
@@ -14,14 +13,14 @@ import type { FastifyRequest } from "fastify";
 import { GetAdminTotpStatus } from "../application/GetAdminTotpStatus";
 import { EnrollAdminTotp } from "../application/EnrollAdminTotp";
 import { VerifyAdminTotp } from "../application/VerifyAdminTotp";
-import type { SessionRepository } from "../domain/ports/SessionRepository";
-import { PrismaSessionRepository } from "../infrastructure/PrismaSessionRepository";
+import { STAFF_AUTHORITY_PORT, StaffAuthorityDenied, type StaffAuthorityPort } from "../domain/ports/StaffAuthorityPort";
+import { staffAuthorityException } from "./staffAuthorityException";
 
 type AuthenticatedRequest = FastifyRequest & {
   user?: { sub?: string; sid?: string; role?: string };
 };
 
-@Controller("api/v1/auth/admin/totp")
+@Controller(["api/v1/auth/admin/totp", "api/v1/auth/staff/totp"])
 export class AdminAuthController {
   constructor(
     @Inject(GetAdminTotpStatus)
@@ -30,8 +29,8 @@ export class AdminAuthController {
     private readonly enrollUC: EnrollAdminTotp,
     @Inject(VerifyAdminTotp)
     private readonly verifyUC: VerifyAdminTotp,
-    @Inject(PrismaSessionRepository)
-    private readonly sessionRepo: SessionRepository,
+    @Inject(STAFF_AUTHORITY_PORT)
+    private readonly authority: StaffAuthorityPort,
   ) {}
 
   @Get("status")
@@ -55,7 +54,7 @@ export class AdminAuthController {
           details: { reason: "TOTP_ALREADY_ENROLLED" },
         });
       }
-      throw err;
+      staffAuthorityException(err);
     }
   }
 
@@ -91,7 +90,7 @@ export class AdminAuthController {
           message: "Invalid TOTP code. Please try again.",
         });
       }
-      throw err;
+      staffAuthorityException(err);
     }
   }
 
@@ -99,27 +98,9 @@ export class AdminAuthController {
     req: AuthenticatedRequest,
   ): Promise<{ userId: string; sessionId: string }> {
     const user = req.user;
-    if (!user?.sub || !user.sid) {
-      throw new ForbiddenException({
-        code: "FORBIDDEN",
-        message: "Admin session required",
-      });
-    }
-    if (user.role !== "admin") {
-      throw new ForbiddenException({
-        code: "FORBIDDEN",
-        message: "Admin role required",
-      });
-    }
-
-    const session = await this.sessionRepo.findById(user.sid);
-    if (!session || session.userId !== user.sub) {
-      throw new ForbiddenException({
-        code: "FORBIDDEN",
-        message: "Session ownership mismatch",
-      });
-    }
-
+    if (!user?.sub || !user.sid) return staffAuthorityException(new StaffAuthorityDenied("SESSION_REQUIRED"));
+    try { await this.authority.summary({ userId: user.sub, sessionId: user.sid }); }
+    catch (error) { staffAuthorityException(error); }
     return { userId: user.sub, sessionId: user.sid };
   }
 }

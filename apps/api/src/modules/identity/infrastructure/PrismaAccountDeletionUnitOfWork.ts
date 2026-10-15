@@ -22,6 +22,15 @@ export class PrismaAccountDeletionUnitOfWork implements AccountDeletionUnitOfWor
             where: { id: userId },
             data: { deletionScheduledAt },
           });
+          // Restoration creates a fresh ordinary identity session, never silently
+          // reactivates staff grants that existed before the deletion request.
+          const revoked = await tx.$queryRaw<{ capability: string }[]>`
+            UPDATE "staff_grants" SET "revokedAt" = CURRENT_TIMESTAMP
+            WHERE "userId" = ${userId} AND "revokedAt" IS NULL RETURNING "capability"`;
+          if (revoked.length) await tx.auditLog.create({ data: {
+            actorId: userId, action: "STAFF_AUTHORITY_REVOKED_FOR_DELETION", targetType: "User", targetId: userId,
+            details: { reason: "Account deletion scheduled", capabilities: revoked.map((grant) => grant.capability).sort() },
+          } });
         },
         archiveActiveListings: async (sellerId) => {
           await tx.listing.updateMany({

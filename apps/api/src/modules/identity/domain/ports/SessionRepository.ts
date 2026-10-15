@@ -53,6 +53,7 @@ export interface SessionRepository {
   updateAdminTotpExpiresAt(
     id: string,
     adminTotpExpiresAt: Date | null,
+    currentStaff?: { userId: string; now: Date },
   ): Promise<void>;
 
   /** Deletes a single session by ID. */

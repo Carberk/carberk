@@ -112,7 +112,11 @@ export class PrismaTotpEnrollmentRepository implements TotpEnrollmentRepository 
       });
 
       const elevated = await tx.session.updateMany({
-        where: { id: input.sessionId, userId: input.userId },
+        where: { id: input.sessionId, userId: input.userId,
+          expiresAt: { gt: input.verifiedAt },
+          user: { suspendedAt: null, deletionScheduledAt: null,
+            OR: [{ role: "admin" }, { staffGrants: { some: { revokedAt: null } } }] },
+        },
         data: { adminTotpExpiresAt: input.adminTotpExpiresAt },
       });
       if (elevated.count !== 1) {
@@ -141,7 +145,11 @@ export class PrismaTotpEnrollmentRepository implements TotpEnrollmentRepository 
       if (consumed.count !== 1) return false;
 
       const elevated = await tx.session.updateMany({
-        where: { id: input.sessionId, userId: input.userId },
+        where: { id: input.sessionId, userId: input.userId,
+          expiresAt: { gt: input.usedAt },
+          user: { suspendedAt: null, deletionScheduledAt: null,
+            OR: [{ role: "admin" }, { staffGrants: { some: { revokedAt: null } } }] },
+        },
         data: { adminTotpExpiresAt: input.adminTotpExpiresAt },
       });
       if (elevated.count !== 1) {

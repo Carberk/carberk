@@ -10,6 +10,7 @@ export interface AuditLogRow {
 
 export interface AuditLogRepository {
   findMany(params: {
+    allowedActions?: readonly string[];
     action?: string | undefined;
     targetType?: string | undefined;
     targetId?: string | undefined;
