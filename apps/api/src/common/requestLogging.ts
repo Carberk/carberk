@@ -10,6 +10,7 @@ import { readClientIpPolicy } from "./client-ip";
 const SECRET_HEADER_PATHS = [
   "req.headers.authorization",
   'req.headers["x-measurement-guest"]',
+  'req.headers["x-measurement-synthetic"]',
   "req.headers.cookie",
   'req.headers["x-app-install-id"]',
   'req.headers["proxy-authorization"]',

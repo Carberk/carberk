@@ -81,7 +81,10 @@ const BaseSchema = z.object({
     .default("true"),
 
   INSPECTION_INTEREST_ENABLED: booleanFlag,
+  SERVICE_SYNTHETIC_ENABLED: booleanFlag,
   MEASUREMENT_ENABLED: booleanFlag,
+  MEASUREMENT_SYNTHETIC_CAPABILITY_HASH: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  MEASUREMENT_SYNTHETIC_CAPABILITY_EXPIRES_AT: z.string().datetime().optional(),
   MEASUREMENT_COLLECTOR_EPOCH: z.string().uuid().optional(),
   MEASUREMENT_EVIDENCE_REF: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),
   // Only synthetic population is currently composable. Real activation needs its independent evidence gate.
