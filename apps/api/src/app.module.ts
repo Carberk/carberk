@@ -26,6 +26,7 @@ import { RealtimeModule } from "./modules/realtime/realtime.module";
 import { MeasurementModule } from "./modules/measurement/measurement.module";
 import { ServiceMessagingModule } from "./modules/service-messaging/service-messaging.module";
 import { requestLoggingOptions } from "./common/requestLogging";
+import { DiagnosticsModule } from "./modules/diagnostics/diagnostics.module";
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { requestLoggingOptions } from "./common/requestLogging";
     RealtimeModule,
     MeasurementModule,
     ServiceMessagingModule,
+    DiagnosticsModule,
   ],
   controllers: [HealthController],
   providers: [

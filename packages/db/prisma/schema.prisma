@@ -34,6 +34,11 @@ enum CodePurpose {
 }
 
 model User {
+  diagnosticCenterAssignments DiagnosticCenterAssignment[]
+  diagnosticCommissions InspectionOrder[] @relation("DiagnosticCommissioner")
+  diagnosticOrderAssignments DiagnosticOrderAssignment[]
+  publishedDiagnosticTemplates DiagnosticTemplateVersion[] @relation("DiagnosticTemplatePublisher")
+  diagnosticAuditEntries DiagnosticAudit[] @relation("DiagnosticAuditActor")
   id              String    @id @default(uuid())
   /// Sign-in Methods (ADR-0054). Each value is stored only with its verified-at
   /// time; the migration adds `users_phone_verified_check` / `users_email_verified_check`.
@@ -436,6 +441,7 @@ enum Currency {
 }
 
 model Listing {
+  diagnosticOrders InspectionOrder[]
   availabilityConfirmedAt DateTime?
   lastEditedById String?
   businessId String?
@@ -1179,4 +1185,115 @@ model ServiceErasureFence {
   erasedAt DateTime @default(now())
   cleanupCompletedAt DateTime?
   @@map("service_erasure_fences")
+}
+
+
+/// One center and one plan. Operational approval is separate from software preparation.
+model DiagnosticCenter {
+  id String @id @default(uuid())
+  code String @unique @default("ashgabat")
+  planCode String @default("standard")
+  names Json
+  operationalApproval Json?
+  createdAt DateTime @default(now())
+  assignments DiagnosticCenterAssignment[]
+  templates DiagnosticTemplateVersion[]
+  orders InspectionOrder[]
+  audits DiagnosticAudit[]
+  @@map("diagnostic_centers")
+}
+
+model DiagnosticCenterAssignment {
+  id String @id @default(uuid())
+  centerId String
+  center DiagnosticCenter @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  capability String
+  qualifiedUntil DateTime?
+  assignedAt DateTime @default(now())
+  revokedAt DateTime?
+  @@unique([centerId, userId, capability])
+  @@index([userId, revokedAt])
+  @@map("diagnostic_center_assignments")
+}
+
+/// Published content never changes. Attribution can be erased independently.
+model DiagnosticTemplateVersion {
+  id String @id @default(uuid())
+  centerId String
+  center DiagnosticCenter @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  version Int
+  definition Json
+  synthetic Boolean @default(true)
+  publishedById String?
+  publishedBy User? @relation("DiagnosticTemplatePublisher", fields: [publishedById], references: [id], onDelete: SetNull)
+  publishedAt DateTime @default(now())
+  orders InspectionOrder[]
+  @@unique([centerId, version])
+  @@map("diagnostic_template_versions")
+}
+
+model InspectionOrder {
+  id String @id @default(uuid())
+  centerId String
+  center DiagnosticCenter @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  templateVersionId String
+  templateVersion DiagnosticTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  commissionerId String?
+  commissioner User? @relation("DiagnosticCommissioner", fields: [commissionerId], references: [id], onDelete: SetNull)
+  requestKey String
+  audience String
+  listingId String?
+  listing Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  status String @default("requested")
+  version Int @default(0)
+  epoch String @default(uuid())
+  physicalAuthorization Json?
+  publicationAuthorization Json?
+  observedVehicle Json?
+  listingIdentityDigest String?
+  associationValidatedAt DateTime?
+  synthetic Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  erasedAt DateTime?
+  assignments DiagnosticOrderAssignment[]
+  audits DiagnosticAudit[]
+  @@unique([commissionerId, requestKey])
+  @@index([commissionerId, createdAt(sort: Desc)])
+  @@index([centerId, status, createdAt])
+  @@index([listingId, audience])
+  @@map("inspection_orders")
+}
+
+/// Center capability alone grants no access to a buyer-private commission.
+model DiagnosticOrderAssignment {
+  id String @id @default(uuid())
+  orderId String
+  order InspectionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  capability String
+  assignedAt DateTime @default(now())
+  revokedAt DateTime?
+  @@unique([orderId, userId, capability])
+  @@index([userId, revokedAt])
+  @@map("diagnostic_order_assignments")
+}
+
+/// Content-free state transitions. Consent, identifiers and observations stay private.
+model DiagnosticAudit {
+  id String @id @default(uuid())
+  centerId String
+  center DiagnosticCenter @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  orderId String?
+  order InspectionOrder? @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  actorId String?
+  actor User? @relation("DiagnosticAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  action String
+  details Json
+  createdAt DateTime @default(now())
+  @@index([orderId, createdAt])
+  @@map("diagnostic_audits")
 }
