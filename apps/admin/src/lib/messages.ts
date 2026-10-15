@@ -5,6 +5,60 @@ export function normalizeAdminLocale(value: unknown): AdminLocale {
 export const adminLocaleNames = { tk: "Türkmençe", ru: "Русский", en: "English" };
 export const adminLocaleTags = { tk: "tk-TM", ru: "ru-RU", en: "en-GB" };
 const messages: Record<string, [string, string]> = {
+  "Заблокирован": ["Bloklanan", "Suspended"],
+  "Далее": ["Indiki", "Next"],
+  "pending_review": ["Barlaga garaşylýar", "Pending review"],
+  "rejected": ["Ret edildi", "Rejected"],
+  "Загрузка...": ["Ýüklenýär...", "Loading..."],
+  "Поиск по номеру, VIN, марке или модели": ["Belgi, VIN, marka ýa-da model boýunça gözleg", "Search by number, VIN, brand or model"],
+  "Поиск по имени или номеру пользователя": ["Ulanyjynyň ady ýa-da belgisi boýunça gözleg", "Search by name or user number"],
+  "Марка": ["Marka", "Brand"],
+  "Регион": ["Sebit", "Region"],
+  "Создано с": ["Döredilen senesi, başy", "Created from"],
+  "Создано по": ["Döredilen senesi, soňy", "Created through"],
+  "Найти": ["Gözle", "Search"],
+  "Найдено": ["Tapylan", "Results"],
+  "Проверьте параметры поиска.": ["Gözleg maglumatlaryny barlaň.", "Check the search parameters."],
+
+  "Запись удалена или недоступна.": ["Ýazgy pozulan ýa-da elýeterli däl.", "The record was deleted or is unavailable."],
+  "Нет записей по выбранным фильтрам.": ["Saýlanan süzgüçlere laýyk ýazgy ýok.", "No records match these filters."],
+  "Видео недоступно до подключения разрешённого тестерам просмотра.": ["Synagçylar üçin rugsatly wideo görkezilişi birikdirilýänçä wideo elýeterli däl.", "Video is unavailable until tester-authorized playback is connected."],
+  "Дата регистрации": ["Hasaba alnan senesi", "Member since"],
+  "Без блокировки": ["Bloklanmadyk", "Not suspended"],
+  "Удаление запланировано": ["Pozmak meýilleşdirildi", "Deletion scheduled"],
+  "Удаление не запланировано": ["Pozmak meýilleşdirilmedi", "No deletion scheduled"],
+  "Удалено": ["Pozulan", "Deleted"],
+  "Поколение": ["Nesil", "Generation"],
+  "Цвет": ["Reňk", "Color"],
+  "Кузов": ["Kuzow", "Body type"],
+  "Двигатель": ["Hereketlendiriji", "Engine"],
+  "Коробка передач": ["Geçirijiler gutusy", "Transmission"],
+  "Привод": ["Ýörediji", "Drive type"],
+  "Пробег, км": ["Geçen ýoly, km", "Mileage, km"],
+  "Состояние": ["Ýagdaýy", "Condition"],
+  "Мощность": ["Kuwwaty", "Power"],
+  "Повреждения": ["Zeperler", "Damage"],
+  "Да": ["Hawa", "Yes"],
+  "Нет": ["Ýok", "No"],
+  "Известные проблемы": ["Belli meseleler", "Known issues"],
+  "Местоположение": ["Ýerleşýän ýeri", "Location"],
+  "Создано": ["Döredildi", "Created"],
+  "Обновлено": ["Täzelendi", "Updated"],
+  "Опубликовано": ["Ýerleşdirildi", "Published"],
+  "Продано": ["Satyldy", "Sold"],
+  "Продавец": ["Satyjy", "Seller"],
+  "Жалобы на объявление": ["Bildiriş barada şikaýatlar", "Listing complaints"],
+  "Жалобы на пользователя": ["Ulanyjy barada şikaýatlar", "User complaints"],
+  "Объявления пользователя": ["Ulanyjynyň bildirişleri", "User listings"],
+  "Показаны последние 25 объявлений.": ["Soňky 25 bildiriş görkezilýär.", "Showing the latest 25 listings."],
+  "draft": ["Garalama", "Draft"],
+  "active": ["Işjeň", "Active"],
+  "sold": ["Satyldy", "Sold"],
+  "archived": ["Arhiwde", "Archived"],
+  "banned": ["Bloklanan", "Banned"],
+  "used": ["Ulanylan", "Used"],
+  "new": ["Täze", "New"],
+
   "Язык": [
     "Dil",
     "Language"
@@ -847,7 +901,7 @@ const messages: Record<string, [string, string]> = {
   ]
 };
 export function translateAdmin(text: string, locale: AdminLocale): string {
-  if (locale === "ru") return text;
+  if (locale === "ru") return ({pending_review:"На проверке",rejected:"Отклонено",draft:"Черновик",active:"Активно",sold:"Продано",archived:"В архиве",banned:"Заблокировано",used:"С пробегом",new:"Новое"} as Record<string,string>)[text] ?? text;
   const size = text.match(/^Файл больше (\d+) КБ\.$/);
   if (size) return locale === "tk" ? `Faýl ${size[1]} KB-dan uly.` : `The file exceeds ${size[1]} KB.`;
   const otp = text.match(/^Введите 6-значный код, отправленный на (.+)$/);

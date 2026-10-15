@@ -37,3 +37,48 @@ it("shows a safe current-authority denial rather than backend diagnostics", asyn
   expect(document.body.textContent).toContain("Insufficient permission.");
   expect(document.body.textContent).not.toContain("private-chat-body");
 });
+
+it.each(["tk", "ru", "en"] as const)("keeps listing filters and pagination when switching real rendered directory locale %s", async (locale) => {
+  const { fireEvent } = await import("@testing-library/react");
+  const { default: ListingsPage } = await import("./(admin)/listings/page");
+  const { AdminLanguageSwitch } = await import("@/lib/i18n");
+  vi.mocked(fetch).mockResolvedValue(Response.json({ items: [detail], total: 60, page: 2, pageSize: 25, brands: [{ id, name: names }], regions: [{ id, name: names }] }));
+  const view = await ListingsPage({ searchParams: Promise.resolve({ q: "Toyota", status: "active", brandId: id, from: "2026-10-01", page: "2" }) });
+  const { container } = render(<AdminLocaleProvider initialLocale="ru"><AdminLanguageSwitch/>{view}</AdminLocaleProvider>);
+  const input = container.querySelector<HTMLInputElement>('input[name="q"]');
+  if (!input) throw new Error("Search missing");
+  fireEvent.change(input, { target: { value: "Unsubmitted search" } });
+  const select = container.querySelector<HTMLSelectElement>('select[aria-label="Язык"]');
+  if (!select) throw new Error("Language switch missing");
+  fireEvent.change(select, { target: { value: locale } });
+  expect(input.value).toBe("Unsubmitted search");
+  expect(container.querySelector<HTMLSelectElement>('select[name="status"]')?.value).toBe("active");
+  expect(container.querySelector<HTMLInputElement>('input[name="from"]')?.value).toBe("2026-10-01");
+  expect(container.querySelector('form')?.getAttribute("action")).toBe("/listings");
+  const next = [...container.querySelectorAll("a")].find(link => link.href.includes("page=3"));
+  expect(next?.href).toContain("status=active");
+  expect(next?.href).toContain("q=Toyota");
+  expect(screen.getByRole("heading", { name: locale === "tk" ? "Bildirişler" : locale === "en" ? "Listings" : "Объявления" })).toBeDefined();
+});
+it.each([404, 503])("renders missing and unavailable user context safely for HTTP %s", async (status) => {
+  const { default: UserPage } = await import("./(admin)/users/[id]/page");
+  vi.mocked(fetch).mockResolvedValue(Response.json({ message: "private-payment-data" }, { status }));
+  render(<AdminLocaleProvider initialLocale="en">{await UserPage({ params: Promise.resolve({ id }) })}</AdminLocaleProvider>);
+  expect(screen.getByRole("alert").textContent).toBe(status === 404 ? "The record was deleted or is unavailable." : "Temporarily unavailable. Try again.");
+  expect(document.body.textContent).not.toContain("private-payment-data");
+  expect(document.querySelector("form")).toBeNull();
+});
+it("shows the user projection and bounded listings without contact or private artifacts", async () => {
+  const { default: UserPage } = await import("./(admin)/users/[id]/page");
+  vi.mocked(fetch).mockImplementation(async input => String(input).includes("/admin/context/users/") ? Response.json({ ...seller, listings: [detail], listingCount: 26, complaintCount: 2, phone: "private-contact" }) : Response.json({ adminModerationActionsEnabled: false }));
+  render(<AdminLocaleProvider initialLocale="en">{await UserPage({ params: Promise.resolve({ id }) })}</AdminLocaleProvider>);
+  expect(screen.getByText("Seller name")).toBeDefined();
+  expect(screen.getByText("Showing the latest 25 listings.")).toBeDefined();
+  expect(document.body.textContent).not.toContain("private-contact");
+});
+it("treats a failed transport as unavailable without leaking diagnostics", async () => {
+  vi.mocked(fetch).mockRejectedValue(new TypeError("private-backend-host"));
+  render(<AdminLocaleProvider initialLocale="en">{await ListingPage({ params: Promise.resolve({ id }) })}</AdminLocaleProvider>);
+  expect(screen.getByRole("alert").textContent).toBe("Temporarily unavailable. Try again.");
+  expect(document.body.textContent).not.toContain("private-backend-host");
+});

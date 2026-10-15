@@ -2,7 +2,9 @@ import Link from "next/link";
 
 import { getConfig } from "../../actions";
 import { DirectActionForm } from "../../components/DirectActionForm";
+import { AdminContextUserDetail } from "../../components/AdminContextViews";
 
+import { readAdminContext, AdminContextSchemas } from "@/lib/admin-context";
 import { AdminText } from "@/lib/i18n";
 
 interface PageProps {
@@ -11,10 +13,12 @@ interface PageProps {
 
 export default async function UserActionPage({ params }: PageProps) {
   const { id } = await params;
+  const context = await readAdminContext(`users/${encodeURIComponent(id)}`, AdminContextSchemas.AdminContextUserDetailSchema);
+  if (!context.ok) return <div className="p-6 md:p-8"><p role="alert"><AdminText>{context.error}</AdminText></p></div>;
   const configResult = await getConfig();
   const moderationEnabled = configResult.ok
     ? configResult.data.adminModerationActionsEnabled
-    : true;
+    : false;
 
   return (
     <div className="p-6 md:p-8 max-w-2xl">
@@ -25,6 +29,7 @@ export default async function UserActionPage({ params }: PageProps) {
       <h1 className="text-2xl font-bold mb-2"><AdminText>Действия с пользователем</AdminText></h1>
       <p className="text-sm text-neutral-500 mb-6">ID: {id}</p>
 
+      <AdminContextUserDetail user={context.data}/>
       {moderationEnabled ? (
         <div className="space-y-6">
           <div className="rounded-md border bg-surface p-4">

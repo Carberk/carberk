@@ -1,12 +1,14 @@
 import { z } from "zod";
 
+import { ListingStatus } from "../enums";
+
 export const AdminContextQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
   page: z.coerce.number().int().min(1).max(10000).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(25),
 });
 export const AdminContextListingQuerySchema = AdminContextQuerySchema.extend({
-  status: z.enum(["draft", "active", "sold", "archived", "banned"]).optional(),
+  status: z.nativeEnum(ListingStatus).optional(),
   brandId: z.string().uuid().optional(),
   regionId: z.string().uuid().optional(),
   from: z.string().datetime().optional(),
@@ -37,7 +39,8 @@ export const AdminContextUserDetailSchema = AdminContextUserSummarySchema.extend
   listings: z.array(AdminContextListingSummarySchema), listingCount: z.number().int().nonnegative(),
   complaintCount: z.number().int().nonnegative(),
 });
-export const AdminContextListingPageSchema = z.object({ items: z.array(AdminContextListingSummarySchema), total: z.number().int(), page: z.number().int(), pageSize: z.number().int() });
+const option = z.object({ id: z.string().uuid(), name: names });
+export const AdminContextListingPageSchema = z.object({ brands: z.array(option).default([]), regions: z.array(option).default([]), items: z.array(AdminContextListingSummarySchema), total: z.number().int(), page: z.number().int(), pageSize: z.number().int() });
 export const AdminContextUserPageSchema = z.object({ items: z.array(AdminContextUserSummarySchema), total: z.number().int(), page: z.number().int(), pageSize: z.number().int() });
 export type AdminContextQuery = z.infer<typeof AdminContextQuerySchema>;
 export type AdminContextListingQuery = z.infer<typeof AdminContextListingQuerySchema>;

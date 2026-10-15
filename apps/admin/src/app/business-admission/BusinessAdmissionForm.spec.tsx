@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, fireEvent, waitFor, cleanup } from "@testing-library/react";
 
 import { BusinessAdmissionForm } from "./BusinessAdmissionForm";
+
+import { AdminLocaleProvider } from "@/lib/i18n";
+
 const framework = vi.hoisted(() => ({ expired: false }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: (name: string) => name === "auto_tm_admin_access" ? { value: "synthetic-access" } : undefined }), headers: async () => new Headers(framework.expired ? { "x-auto-tm-session-expired": "1" } : {}) }));
 vi.mock("next/navigation", () => ({ redirect: (url: string) => { throw new Error(`redirect:${url}`); }, unstable_rethrow: () => {} }));
@@ -20,11 +23,11 @@ beforeEach(() => {
 });
 describe("actual business admission form and server action", () => {
  it.each([["en", "Admit a business", "Prepare owner invitation"], ["ru", "Одобрить бизнес", "Подготовить приглашение владельца"], ["tk", "Işewürligi kabul et", "Eýesi üçin çakylyk taýýarla"]] as const)("renders admission and empty state in %s", (locale, title, button) => {
-  const screen = render(<BusinessAdmissionForm locale={locale} canAdmit canRecover={false} />);
+  const screen = render(<AdminLocaleProvider initialLocale={locale}><BusinessAdmissionForm canAdmit canRecover={false}/></AdminLocaleProvider>);
   expect(screen.getByText(title)).toBeTruthy(); expect(screen.getByRole("button", { name: button })).toBeTruthy();
  });
  it("submits validated synthetic admission through the real action and displays the one-time receipt", async () => {
-  const screen = render(<BusinessAdmissionForm locale="en" canAdmit canRecover={false} />);
+  const screen = render(<AdminLocaleProvider initialLocale="en"><BusinessAdmissionForm canAdmit canRecover={false}/></AdminLocaleProvider>);
   fireEvent.change(screen.getByLabelText("Business name"), { target: { value: "Ahal Motors" } });
   fireEvent.change(screen.getByLabelText("Public identifier"), { target: { value: "ahal-motors" } });
   fireEvent.change(screen.getByLabelText("Intended owner's account ID"), { target: { value: owner } });
@@ -42,4 +45,15 @@ describe("actual business admission form and server action", () => {
   const form = new FormData(); Object.entries({ operation: "admission", name: "Ahal", slug: "ahal", mode: "synthetic", ownerUserId: owner, evidence: "Synthetic fixture", reason: "Contract proof" }).forEach(([key, value]) => form.set(key, value));
   expect(await prepareBusinessInvitation(form)).toEqual({ ok: false, error: "permission" }); expect(sent).toBeNull();
  });
+});
+it("uses the shared locale switch without losing the founder's unfinished evidence", async () => {
+ const { AdminLocaleProvider, AdminLanguageSwitch } = await import("@/lib/i18n");
+ const { BusinessAdmissionPanel } = await import("./BusinessAdmissionForm");
+ const screen = render(<AdminLocaleProvider initialLocale="ru"><AdminLanguageSwitch/><BusinessAdmissionPanel canAdmit canRecover={false}/></AdminLocaleProvider>);
+ const evidence = screen.container.querySelector<HTMLTextAreaElement>('textarea[name="evidence"]');
+ if (!evidence) throw new Error("Evidence input missing");
+ fireEvent.change(evidence, { target: { value: "Unfinished checked evidence" } });
+ fireEvent.change(screen.getByRole("combobox", { name: "Язык" }), { target: { value: "en" } });
+ expect(screen.getByLabelText("Checked identity evidence")).toBe(evidence);
+ expect(evidence.value).toBe("Unfinished checked evidence");
 });
