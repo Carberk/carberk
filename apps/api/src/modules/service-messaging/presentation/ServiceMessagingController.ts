@@ -1,4 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Header, HttpException, Inject, Param, Post, Query, Req, Res } from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import { ServiceMessagingSchemas } from "@auto-tm/contracts";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -14,7 +15,7 @@ function parse<S extends z.ZodType>(schema: S, value: unknown): z.output<S> {
 }
 @Controller("api/v1/services")
 export class ServiceMessagingController {
- constructor(@Inject(SERVICE_MESSAGING_PORT) private readonly services: ServiceMessagingPort) {}
+ constructor(@Inject(SERVICE_MESSAGING_PORT) private readonly services: ServiceMessagingPort, @Inject(EventEmitter2) private readonly events: EventEmitter2) {}
  private subject(req: ServiceRequest): ServiceSubject {
   if (!req.user?.sub || !req.user.sid) throw new HttpException({ code: "NO_ACCESS", message: "Service access unavailable" }, 403);
   return { userId: req.user.sub, sessionId: req.user.sid };
@@ -42,11 +43,11 @@ export class ServiceMessagingController {
   return this.run(() => this.services.read(this.subject(req), parse(uuid, id), page.after, page.limit));
  }
  @Post("conversations/:id/messages") @Header("Cache-Control", "no-store, private")
- send(@Req() req: ServiceRequest, @Param("id") id: string, @Body() body: unknown) { return this.run(() => this.services.send(this.subject(req), parse(uuid, id), parse(ServiceMessagingSchemas.ServiceSendSchema, body))); }
+ send(@Req() req: ServiceRequest, @Param("id") id: string, @Body() body: unknown) { return this.run(async () => { const message = await this.services.send(this.subject(req), parse(uuid, id), parse(ServiceMessagingSchemas.ServiceSendSchema, body)); if (message.visibility === "customer") this.events.emit("service.changed", id); return message; }); }
  @Post("conversations/:id/assignment") @Header("Cache-Control", "no-store, private")
  assign(@Req() req: ServiceRequest, @Param("id") id: string, @Body() body: unknown) {
   const data = parse(ServiceMessagingSchemas.ServiceAssignSchema, body);
-  return this.run(async () => { await this.services.assign(this.subject(req), parse(uuid, id), data.expectedVersion, data.targetUserId); return { ok: true }; });
+  return this.run(async () => { await this.services.assign(this.subject(req), parse(uuid, id), data.expectedVersion, data.targetUserId); this.events.emit("service.changed", id); return { ok: true }; });
  }
  @Post("conversations/:id/read") @Header("Cache-Control", "no-store, private")
  markRead(@Req() req: ServiceRequest, @Param("id") id: string, @Body() body: unknown) { return this.run(async () => { await this.services.markRead(this.subject(req), parse(uuid, id), parse(ServiceMessagingSchemas.ServiceReadSchema, body).throughSequence); return { ok: true }; }); }

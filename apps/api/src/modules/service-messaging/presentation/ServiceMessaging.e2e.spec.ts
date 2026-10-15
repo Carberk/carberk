@@ -1,6 +1,8 @@
 import "reflect-metadata";
 import { randomUUID } from "node:crypto";
 
+import { EventEmitterModule } from "@nestjs/event-emitter";
+import { io, type Socket } from "socket.io-client";
 import { Test } from "@nestjs/testing";
 import { JwtModule, JwtService } from "@nestjs/jwt";
 import { Reflector } from "@nestjs/core";
@@ -22,7 +24,7 @@ const customer = suite.id("customer"), oldStaff = suite.id("operator"), nextStaf
 const ids = [customer, oldStaff, nextStaff, stranger];
 const tokens = new Map<string, string>();
 beforeAll(async () => {
- const module = await Test.createTestingModule({ imports: [bullTestRoot(), ServiceMessagingModule, JwtModule.register({ global: true, secret: "service-test-secret" })] }).overrideProvider(SERVICE_RUNTIME).useValue({ now: () => new Date(), id: randomUUID, syntheticEnabled: () => true, syntheticSubjectAllowed: (subject: { userId: string }) => ids.includes(subject.userId) }).compile();
+ const module = await Test.createTestingModule({ imports: [EventEmitterModule.forRoot(), bullTestRoot(), ServiceMessagingModule, JwtModule.register({ global: true, secret: "service-test-secret" })] }).overrideProvider(SERVICE_RUNTIME).useValue({ now: () => new Date(), id: randomUUID, syntheticEnabled: () => true, syntheticSubjectAllowed: (subject: { userId: string }) => ids.includes(subject.userId) }).compile();
  app = module.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
  jwt = app.get(JwtService); db = app.get(PrismaService);
  app.useGlobalGuards(new JwtAuthGuard(app.get(Reflector), jwt)); app.useGlobalFilters(new GlobalErrorFilter());
@@ -50,6 +52,12 @@ afterAll(async () => {
  }
  await app?.close();
 });
+async function watchSocket(userId: string, conversationId: string): Promise<Socket> {
+ const socket = io(`${await app.getUrl()}/ws/services`, { auth: { token: tokens.get(userId) }, transports: ["websocket"], reconnection: false });
+ await new Promise<void>((resolve, reject) => { socket.once("connect", () => resolve()); socket.once("connect_error", reject); });
+ const ack = await socket.timeout(3000).emitWithAck("service:watch", { conversationId });
+ expect(ack.ok).toBe(true); return socket;
+}
 const auth = (id: string) => `Bearer ${tokens.get(id)}`;
 it("preserves restricted-user appeals, separate identities, exact assignment and idempotent sends", async () => {
  const opened = await request.post("/api/v1/services/conversations").set("Authorization", auth(customer)).send({ purpose: "support", synthetic: true }).expect(201);
@@ -64,7 +72,10 @@ it("preserves restricted-user appeals, separate identities, exact assignment and
  const customerView = await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(customer)).expect(200);
  expect(JSON.stringify(customerView.body)).not.toContain("Internal note");
  expect(customerView.body.messages).toHaveLength(1);
+ const oldSocket = await watchSocket(oldStaff, id);
+ const denied = new Promise<void>(resolve => oldSocket.once("service:denied", () => resolve()));
  await request.post(`/api/v1/services/conversations/${id}/assignment`).set("Authorization", auth(oldStaff)).send({ expectedVersion: 1, targetUserId: nextStaff }).expect(201);
+ await denied; oldSocket.disconnect();
  await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(oldStaff)).expect(403);
  await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(nextStaff)).expect(200);
  await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(customer)).expect(200);
