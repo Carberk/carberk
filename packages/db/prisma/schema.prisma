@@ -599,6 +599,50 @@ model MediaUploadCleanup {
   @@map("media_upload_cleanups")
 }
 
+model VideoUploadSession {
+  id String @id @default(uuid())
+  uploadId String @unique
+  userId String
+  listingId String?
+  state String @default("UPLOADING")
+  sourceKey String
+  sizeBytes Int?
+  sha256 String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([state, expiresAt])
+  @@map("video_upload_sessions")
+}
+
+model VideoGeneration {
+  id String @id @default(uuid())
+  listingId String
+  uploadId String
+  state String @default("PROCESSING")
+  manifest Json?
+  durationMs Int?
+  posterKey String?
+  createdAt DateTime @default(now())
+  readyAt DateTime?
+  retiredAt DateTime?
+  @@index([listingId, state])
+  @@map("video_generations")
+}
+
+model VideoGrant {
+  id String @id @default(uuid())
+  secretHash String @unique
+  listingId String
+  generationId String
+  purpose String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([listingId, generationId, expiresAt])
+  @@map("video_grants")
+}
+
 /// A number a seller confirmed by SMS code for their Listings (ADR-0081). Owned
 /// by Listings; never a Sign-in Method and never touches `User.phone`. Reusable
 /// while now < confirmedAt + 7 days. Several sellers may confirm one number.
