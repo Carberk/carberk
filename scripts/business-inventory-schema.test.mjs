@@ -14,7 +14,7 @@ test('business membership and inventory restoration admit only exact reviewed SQ
   }
   const membership = 'fcccfb5425820267e806a9ff96688b67c36c65a1bf2ae1192c10ec404b91589f';
   const inventory = '7f12fa5b73b7d975d821cbf6eb2dadb16ac9ca674826afa0875e0c5f24751abc';
-  assert.equal(createHash('sha256').update(readFileSync(new URL('../packages/db/prisma/schema.prisma', import.meta.url))).digest('hex'), inventory);
+  assert.equal(createHash('sha256').update(readFileSync(new URL('../packages/db/prisma/schema.prisma', import.meta.url))).digest('hex'), 'afc0aceaa8ddbb9cd42bbbb8a9e84d270965a7aefe47917e464ff934ab0f4a05');
   const baseline = [{ name: 'baseline', checksum: '1'.repeat(64) }];
   const input = { baseline, candidate: [...baseline, ...additions], main: [...baseline, ...additions.slice(0, 3)], candidateSchema: inventory, mainSchema: membership };
   assert.equal(evaluateSchemaPlan(input).disposition, 'retained-additive');

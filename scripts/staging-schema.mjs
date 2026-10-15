@@ -2,6 +2,7 @@
 export const retainedSchemaProfile = {
   baseline: '7af49d4c1474b2c3d841b14736c4ef59ce155a4e',
   schemaHashes: [
+    'afc0aceaa8ddbb9cd42bbbb8a9e84d270965a7aefe47917e464ff934ab0f4a05',
     'fcccfb5425820267e806a9ff96688b67c36c65a1bf2ae1192c10ec404b91589f',
     '7f12fa5b73b7d975d821cbf6eb2dadb16ac9ca674826afa0875e0c5f24751abc',
     '3cf9a92dc50367112d7e41cfadaf9e3199e0000ef75a7181861c09ebe9d7e51d',
@@ -9,6 +10,7 @@ export const retainedSchemaProfile = {
     'c02cefa47ade5650ea02f79dd07ba7c42fbb4524e938a6fd08bbbfca161a7735',
   ],
   schemaMigrations: {
+    'afc0aceaa8ddbb9cd42bbbb8a9e84d270965a7aefe47917e464ff934ab0f4a05': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities', '20261015020000_business_membership', '20261015030000_business_inventory', '20261015040000_first_party_measurement'],
     'fcccfb5425820267e806a9ff96688b67c36c65a1bf2ae1192c10ec404b91589f': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities', '20261015020000_business_membership'],
     '7f12fa5b73b7d975d821cbf6eb2dadb16ac9ca674826afa0875e0c5f24751abc': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities', '20261015020000_business_membership', '20261015030000_business_inventory'],
     '3cf9a92dc50367112d7e41cfadaf9e3199e0000ef75a7181861c09ebe9d7e51d': [],
@@ -16,6 +18,7 @@ export const retainedSchemaProfile = {
     'c02cefa47ade5650ea02f79dd07ba7c42fbb4524e938a6fd08bbbfca161a7735': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities'],
   },
   additions: [
+    { name: '20261015040000_first_party_measurement', checksum: '5da46ac7211e658eb1b1e96374c8be796ffad03c5ecb789a7692c4fc0dca384c' },
     { name: '20261015030000_business_inventory', checksum: '49143ea7a21fe5c6031a966794aedba44d69e3a3f9d6b6195dfbe57915ee93e8' },
     { name: '20261015020000_business_membership', checksum: '7a60b7b21b212c9bf38a14522eb937eb9762044039d05e6e16b7e76d1093c00a' },
     { name: '20261015003500_listing_view_counts', checksum: 'bdb25bde750cd12de85ca3a4bf4201ac927681539f1b1b70105a633f4dc26d5d' },
