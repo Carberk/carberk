@@ -145,7 +145,7 @@ export class GetListingDetail {
         ...(m.thumbHash !== undefined ? { thumbHash: m.thumbHash } : {}),
       })),
       ...((listing.status === "active" || input.requestingUserId === listing.sellerId)
-        ? await this.views.counts(listing.id, this.clock.now()) : {}),
+        ? await this.views.counts(listing.id, this.clock.now()) : { viewCount: 0 }),
       favoriteCount: listing.favoriteCount,
       isFavorited,
       conditionDisclosure: listing.conditionDisclosure,

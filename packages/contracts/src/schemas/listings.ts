@@ -273,8 +273,8 @@ export const ListingDetailSchema = z.object({
   acceptsExchange: z.boolean(),
   installmentAvailable: z.boolean(),
   media: z.array(ListingMediaSchema),
-  // Absent for closed non-owner detail; numeric on older payloads remains valid.
-  viewCount: z.number().int().nonnegative().optional(),
+  // Required for released clients; closed non-owner detail sends zero.
+  viewCount: z.number().int().nonnegative(),
   viewsToday: z.number().int().nonnegative().optional(),
   favoriteCount: z.number().int().nonnegative(),
   isFavorited: z.boolean().optional(),
