@@ -112,6 +112,7 @@ model OtpRequest {
   attempts    Int               @default(0)
   userId      String?
   user        User?             @relation(fields: [userId], references: [id])
+  businessId String?
   ip          String
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
@@ -149,6 +150,11 @@ model Dealership {
   admissionMode String @default("synthetic")
   admittedAt DateTime?
   checkedEvidence String?
+  listings Listing[]
+  drafts ListingDraft[]
+  uploads MediaUpload[]
+  contactPhone String?
+  contactConfirmedAt DateTime?
   invitations DealershipInvitation[]
   id        String   @id @default(uuid())
   slug      String   @unique
@@ -420,6 +426,10 @@ enum Currency {
 }
 
 model Listing {
+  availabilityConfirmedAt DateTime?
+  lastEditedById String?
+  businessId String?
+  business Dealership? @relation(fields: [businessId], references: [id], onDelete: Restrict)
   id            String        @id @default(uuid())
   publicNumber  Int           @unique @default(autoincrement())
   sellerId      String
@@ -487,6 +497,7 @@ model Listing {
   @@index([status, mileageKm, id])
   @@index([brandId, modelId, status])
   @@index([cityId, status])
+  @@index([businessId, status, updatedAt(sort: Desc)], map: "listings_business_inventory")
   @@map("listings")
 }
 
@@ -524,6 +535,8 @@ model ListingMedia {
 /// calling User; a ListingMedia row adopts it at most once. A key without a row
 /// authorizes nothing, and deletion authority follows the adopting row.
 model MediaUpload {
+  businessId String?
+  business Dealership? @relation(fields: [businessId], references: [id], onDelete: Restrict)
   id          String        @id @default(uuid())
   userId      String
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -552,6 +565,7 @@ model MediaUpload {
   @@index([claimToken])
 
   @@index([userId, createdAt])
+  @@index([businessId, createdAt], map: "media_uploads_business_owner")
   @@map("media_uploads")
 }
 
@@ -603,6 +617,8 @@ model Favorite {
 }
 
 model ListingDraft {
+  businessId String?
+  business Dealership? @relation(fields: [businessId], references: [id], onDelete: Restrict)
   id        String   @id @default(uuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -611,6 +627,7 @@ model ListingDraft {
   updatedAt DateTime @updatedAt
 
   @@index([userId, updatedAt(sort: Desc)])
+  @@index([businessId, updatedAt(sort: Desc)], map: "listing_drafts_business_inventory")
   @@map("listing_drafts")
 }
 
