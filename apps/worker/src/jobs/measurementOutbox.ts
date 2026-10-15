@@ -3,7 +3,7 @@ import { PrismaService } from "@auto-tm/db";
 import { MeasurementSchemas } from "@auto-tm/contracts";
 
 export interface MeasurementCollector {
-  appendIfEligible(input: { event: MeasurementSchemas.MeasurementEvent; principalId: string; generation: string; epoch: string; environment: string; population: string }): Promise<"accepted" | "duplicate" | "revoked">;
+  appendIfEligible(input: { event: MeasurementSchemas.MeasurementEvent; principalId: string; generation: string; epoch: string; environment: string; population: string }): Promise<"accepted" | "duplicate" | "revoked" | "unavailable">;
 }
 export const MEASUREMENT_COLLECTOR = Symbol("MeasurementCollector");
 
