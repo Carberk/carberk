@@ -62,10 +62,18 @@ Post-MLP profile additions: public Garage entries, blog posts, richer trust stat
 
 ### Dealership (post-MLP bet)
 
-- A user can apply to create a Dealership (form: name, city, logo upload, description, working hours)
-- Admin reviews and verifies → sets `verifiedAt` → PRO badge appears
-- Dealership owner can invite other users as members (role: `sales`)
-- A dealership has a public showroom page (see Feature 38)
+Approved campaign target, 2026-10-14, formalized by [ADR-0103](../../adr/0103-free-dealer-business-ownership-and-enquiries.md). [38 — Dealer workspace and showroom](38-showroom.md) owns the approved bounded policy; [flow 67](../flows/67-dealer-workspace-and-sharing.md) owns the journeys.
+
+- A person keeps their personal sign-in and enters a business workspace from Cabinet. There is one Carberk app; no shared business login or separate dealer app.
+- Application/invitation requires manual approval before business access. It is not self-activation. Owner-controlled recipient-bound invitation and audited founder recovery apply under feature 38; actual checked evidence is a live admission input.
+- Dealership Member owner/sales permissions stay separate from Marketplace Role. Owner manages membership/settings; sales members can manage business cars and claim enquiries.
+- Business inventory and shared enquiries belong to the business, with actual staff attribution. Joining never transfers personal inventory; leaving must not delete business inventory.
+- Dealer access is free. A checked business identity does not certify vehicle condition or buy a ranking advantage. Exact public verification wording remains to approve.
+- Current membership schema allows one Dealership per User. Keep one membership; preserve business-owned stock/history on creator removal, protect sole owner with audited recovery, and scope business contact proof to owner authority under ADR-0103. Corresponding additive migrations are implementation work.
+
+Inspection staff permissions are a separate capability defined in [50](50-reports-tier.md). Dealership ownership never grants access to private buyer reports or the internal inspection portal. Existing admin TOTP guards are not a substitute for scoped technician/reviewer authorization.
+
+Sole-business-owner protection never prevents User account deletion under ADR-0032. An ownerless business enters protected suspended recovery, retaining business assets while personal data follows its own deletion rules. Only audited founder recovery appoints a replacement.
 
 ### Account deletion (App Store hard requirement)
 
@@ -168,3 +176,9 @@ MLP beta decision: keep the 30-day grace period. The S2 hard-delete endpoint is 
 ## Open questions
 
 - (none for MLP identity scope)
+
+## Final campaign dealer membership and diagnostic authority
+
+ADR-0103 retains at most one business/account and one protected owner with audited founder recovery. Admission is manual for identifiable car-selling businesses; brokers initially excluded. Owner controls recipient-bound single-use invitation/revocation, business contact proof and settings. Owner/Sales memberships never change Marketplace Role. Removal immediately revokes server/realtime/notification/private-file authority and requeues assigned business enquiries while preserving business assets. Account deletion cannot orphan the protected owner or archive/delete creator-attributed business stock. Personal inventory/drafts remain personal; no automatic transfer.
+
+ADR-0104 diagnostic technician/reviewer/template capabilities are independently scoped, assigned and current. Public finalization needs a different qualified reviewer; private self-review requires authority and audit. Privileged release/withdrawal uses current scoped elevation. Neither dealer membership nor mechanic role grants marketplace admin/analytics access. TK/RU/EN applies to all staff/admin interfaces.

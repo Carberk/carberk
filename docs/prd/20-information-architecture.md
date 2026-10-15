@@ -171,3 +171,11 @@ Each major surface has an explicit empty state — see [`ui/75-illustration-styl
 - My listings: "List your first car" + Sell CTA
 - Garage: "Add a car to your garage" + benefits explainer (post-MLP)
 - Notifications feed: "All caught up" (post-MLP)
+
+## Approved business-service campaign navigation
+
+The original route map above describes the reviewer-release surface; concrete file routes remain an implementation choice. The post-review campaign adds a compact Vehicle History entry above Home brand/model selection, Listing-detail entry and distinct request history in Messages. Public information/price/sample are available before sign-in, while operator contact requires sign-in. Returning actions are Open previous reports and New request, not a promise of updated/fresh provider history.
+
+General Support remains a separate service. Once ready, one Messages Support row and Cabinet Help open the same Support case/history. No extra Support links are added in Favorites or Listing Conversation menus. Before activation, Help retains its existing email/phone behavior. Paid provider/payment activation is independent of Support readiness.
+
+All admin, service, analytics and inspection areas support TK/RU/EN, including generated user-facing exports, without changing original provider documents. Console routes/readers are capability- and audience-scoped; menu visibility does not grant private case/order/report access. See [Vehicle History](features/53-vehicle-history.md), [Support](features/54-support.md), [bounded admin](features/40-admin.md) and [service workspace](ui/service-workspace.md).

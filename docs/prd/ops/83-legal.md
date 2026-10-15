@@ -49,6 +49,21 @@ If explicit recorded acceptance is required later, record the accepted terms ver
 | **Changes to policy** | Users notified in-app or through the documented beta support channel when policy changes materially; effective date displayed |
 | **Jurisdiction** | Turkmenistan law applies |
 
+
+## Analytics and diagnostics campaign collection gate
+
+Draft reconciliation for #602/#605, 2026-10-14. The founder prefers broad useful collection, default-on wherever its applicable basis permits, with clear Terms and privacy disclosures and no unnecessary optional controls. Terms alone do not establish a legal basis or waive required rights. First-party product measurement and operational diagnostics have separate purposes and field inventories under [85](85-launch-analytics-plan.md) and [81](81-monitoring-alarms.md).
+
+The [dated primary-source matrix](../../research/2026-10-14-carberk-collection-requirements.md) identifies specific requirements and applicability gaps for TM, China, Russia, Turkey, UAE, Uzbekistan, Georgia, Germany and South Korea. It is research, not a legal certification. TM parliamentary Articles 7-9, 12, 17 and 18 raise collection basis/consent, domestic storage, foreign transfer and statistical anonymization questions for the initial Ashgabat pilot itself. Pseudonymous timelines are not established as anonymous. Require responsible applicability review of the actual operator, data, consent format, storage/backups/remote access and destinations before that real collection. Do not invent identity-document collection to satisfy consent.
+
+For each admitted phase record operator/controller and responsible reviewer, applicable jurisdiction and purposes, legal basis, required notices/rights, guest/account mechanism, actual fields/SDK additions, recipients/processors, location/transfer basis, retention/deletion/restore, release/store declarations and signed-off evidence. Default-on is selected only where this record supports it. If prior consent is required, enforce it before identifiers, queue writes or event emission for that purpose; disable unvalidated longitudinal analytics as the accepted fallback. Operational/security processing needs its own validated basis. Core-service availability has independent obligations.
+
+Provide only required purpose-specific consent/withdrawal/deletion/access controls, not a universal optional analytics toggle by assumption. Guests need a safe rights path independent of account creation wherever required. Neither Listing city, language nor citizenship establishes a physical region. Unresolved regional enforcement cannot be solved by prohibited precise-location/fingerprinting. The applicable minimal eligibility mechanism must be reviewed before real-user collection.
+
+Disclosures must match the instrumented build and actual destinations. Preserve the first reviewer monitoring deferral; do not submit future telemetry as already collected or omit SDK metadata that is collected. Update RU/TK/EN public privacy/Terms and Google Play Data Safety for the appropriate release; relevant Apple declarations follow the iOS phase. Google Play form declarations and lawful regional basis are separate gates.
+
+No raw Message/media/contact values, credentials/OTP/tokens, precise location, advertising IDs, replay/autocapture, contact-book or keystrokes. Maximum raw product retention 90 days, individual diagnostics 30 days and routine non-identifying product/error aggregates 24 months, subject to shorter applicable limits. Genuinely anonymized permitted vehicle/market business datasets may be retained indefinitely under the explicit qualified-class exception in 85; this never extends raw personal or private/provider data by default. Stop linked collection and erase linked raw analytics at deletion request independently of core account recovery. Old queues, late submissions, diagnostic stores and backups must obey it. No year-long core archive of short-lived telemetry. No new paid resources, contracts or legal services are authorized by this specification.
+
 ## Terms of Service — required sections
 
 | Section | Content |
@@ -121,3 +136,13 @@ The Google Play answers, store copy, reviewer access template and Console steps 
 - [ADR-0022 — City-first listing location](../../adr/0022-city-first-listing-location.md) — city-level listing/search location policy
 - [ADR-0023 — First-party product analytics](../../adr/0023-first-party-product-analytics.md) — no third-party analytics SDKs in the MLP beta
 - [GRILL-OUTCOME §19](../../../GRILL-OUTCOME.md) — outstanding action item #7
+
+## Commercial anonymous insights and optional demographics
+
+The final founder direction is anonymized vehicle/market insight, not identifiable customer/contact resale. Apply 85's registered qualified-class retention exception and provenance/rights controls. Optional age bands and coarse self-reported residence require separate purpose, basis, minimal fields, notices, rights and youth/applicability review before live collection; an omitted name does not make source demographics anonymous. Keep account deletion, personal data, buyer-private report audiences and provider redistribution rights enforceable. Actual commercial disclosure remains a separate reviewed action.
+
+## Campaign Listing-view disclosure and classified service records
+
+#874/ADR-0105 adds the founder-approved English policy sentence: "Listing views. When you open a listing, the app sends an anonymous app identifier so we can count each viewer once per day. We keep only a scrambled form of it, delete it after 2 days, and never use it to identify you or for advertising." RU/TK policy must faithfully match before collection ships. The term anonymous app identifier describes the random install value, not an assertion that retained pseudonyms or service vehicle IDs are universally anonymous. Both App interactions and Device or other IDs are collected/not shared for app functionality. Raw header identifiers never enter request/error/hosting logs. Retention cleanup and translated disclosure are collection prerequisites. This is separate from longitudinal first-party analytics and its rights/retention contract.
+
+For dealer/diagnostic data under ADR-0103/0104, separate durable permitted vehicle/market observations and genuinely anonymized insights from personal/customer linkage, private reports, chat/payment evidence, provider documents and justified holds. No blanket service/inspection purge is approved. Retain useful data indefinitely only where rights and applicable obligations permit, otherwise for longest justified permitted period; document provenance, purpose, audience, lawful reuse, deletion and exports before real collection/disclosure. No raw customer sale, private-report resale/disclosure or actual commercial sale is authorized. VINs and reversible pseudonyms are not automatically anonymous. Account deletion and mandatory restrictions still apply.

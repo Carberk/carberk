@@ -1,6 +1,37 @@
 # 84 — Launch plan (cutover from build to live)
 
-> This is the **store-verification → TM cutover → public soft-launch** runbook. [ADR-0039](../../adr/0039-phased-cloud-first-hosting.md) re-sequences the path: reviewer-only Railway production comes first, both stores approve, and only then does production cut over to the ADR-0005 TM topology before real TM users are invited. Railway production never serves the public marketplace.
+> This is the store-verification, TM cutover and public soft-launch runbook. The proposed [Google Play-first cutover decision](../../adr/0100-google-play-first-tm-cutover-readiness.md) supersedes ADR-0039's both-store cutover trigger and owned/racked application-host requirement when accepted. Reviewer-only Railway production comes first; Google Play approval plus proven readiness then permits TM production cutover before TM real users. Railway production does not serve the public marketplace. Until the new decision is accepted and merged, ADR-0039 remains governing.
+
+
+## Android-first app pilot and monitoring campaign
+
+This section is the proposed 2026-10-14 scoped reconciliation for #602. It becomes governing with its approved shaping delivery. The wider public/iOS checklist below does not silently become a gate for the Android-first invited pilot. No existing safety, core service or actual platform requirement is waived.
+
+- First Google Play reviewer submission remains Railway-only without GlitchTip, admin analytics or TM VPS. Existing logs/readiness and reviewer-flow checks provide temporary limited visibility.
+- Monitoring and product measurement follow on Railway using synthetic/reviewer/test data. Instrumentation added later requires a new verified native candidate.
+- Actual TM cutover needs Google Play approval and core, hosting/storage/network, handler, data/disclosure, diagnostic/alert and backup/restore evidence under the scoped hosting decision. Preparation is not cutover; paid provisioning and promotion remain separately authorized.
+- Before real users, prove the core metric fixtures and scorecard in [85](85-launch-analytics-plan.md), diagnostics/alerts/incident drill in [81](81-monitoring-alarms.md), and the collection/rights and storage/transfer gate in [83](83-legal.md). Core-service regional readiness is separate from telemetry readiness.
+- Founder is sole responder, Monday-Friday 08:00-20:00 Asia/Shanghai, weekends best effort. No backup is assigned. The broader two-admin/on-call checklist below is a wider-launch objective, not a claim that a backup exists or an extra approved pilot staffing requirement.
+- [ADR-0101](../../adr/0101-app-pilot-separate-from-manual-inspections.md), when accepted, allows the 20-user Ashgabat app pilot independently of the manually operated inspection experiment. ADR-0057 inspection-demand deferral remains. No inspection service or vehicle-verification claim follows from this pilot.
+- Invitations and public communications remain human-authorized release actions. Expansion is human-authorized under the exact gate record below; the passage of time or a green dashboard never authorizes invitations.
+
+## Invited pilot checklist and expansion
+
+These gates own the accepted 20-user Ashgabat pilot and its expansion, separately from the wider public/iOS checklist. Record dated proof and owner for each before invitations.
+
+- Actual TM hosting/cutover, domestic API/media/legal reachability, storage/backup consistency, trusted-handler access and approved egress readiness.
+- Real phone/email sign-in delivery and Listing contact verification as applicable, session/deletion safety and instrumented native core browse/publish/contact/Message flows. No reviewer credential bypass for real users.
+- Technical publish/upload/contact requirements and public visibility eligibility verified; no unresolved critical security/account/core-flow defects.
+- Existing terms acceptance, reporting/blocking and applicable moderation enforcement/audit smoke pass. No new broad moderation/correction system is silently required by analytics.
+- Founder can handle support/moderation within accepted staffed coverage; actual support channel/contact, ownership and essential handling ready. Support chat and its independent discovery stay separate.
+- Core scorecard/diagnostics/alert receipt, retention/deletion/rights, region applicability and payload/delivery checks in 81/83/85 pass for the admitted phase.
+- Recovery target demonstrated and existing human-controlled rollback/feature-pause/moderation drills pass for admitted features. Flag changes do not gain automatic authority. Restore data respects telemetry deletion.
+
+Begin with 20 invited users in Ashgabat, approximately ten sellers and ten buyers. Review expansion after at least two weeks of real activity. Before expansion require ten real publicly active Listings from at least five sellers and five Listings receiving qualifying buyer contacts during the review period. Reviewer/demo/test and known own-Listing conversion are excluded. Listing/contact units follow 85; these thresholds are not completed sales or product-market fit. Successful publication and contacts, working measurement, no unresolved critical defects and manageable support are required alongside those minimums. If activity is insufficient, continue recruitment in Ashgabat rather than expanding because time elapsed.
+
+After the review passes, permit up to 50 invited Ashgabat users total, adding at most 30. After that stage require two weekly reviews showing stable core behavior and manageable support, plus at least five committed Mary sellers with ten real Listings ready. Then begin Mary with 20 invited users, not a large campaign. Founder makes each expansion decision after reviewing evidence.
+
+Recruit through personal networks and voluntary seller referrals. Founder commits to five seller conversations each week in the first month and two short buyer conversations each week. No paid campaigns in the initial 20/50 stages. These are founder commitments, not permission for an agent to send messages, invite users, import contacts or build a referral system.
 
 ## Pre-launch milestones
 

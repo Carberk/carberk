@@ -83,21 +83,21 @@ Five personas. Each one's primary jobs-to-be-done shape feature priorities.
 - 36, works at "BAH Awto" in Aşgabat
 - Lists 20-50 cars at any time; cars rotate weekly
 - Communicates with dozens of potential buyers daily
-- Wants the PRO badge for credibility
+- Wants a truthful business identity and accurate public inventory
 - Russian primary
 
 **Jobs-to-be-done**
 1. Post many listings efficiently (bulk-friendly UX)
-2. Respond to chats fast — his SLA reputation depends on it
-3. Project credibility (PRO badge, verified status, response time stat)
+2. Claim and respond to shared business enquiries with visible staff responsibility
+3. Show checked business identity without implying vehicle quality
 4. Share his showroom URL externally
 
 **Critical features for Ilýa**
-- Dealership account with multi-user (him + the other sales reps)
+- Personal staff sign-in with authorized access to business-owned inventory and enquiries
 - Listing creation that's fast on repeat (catalog autocomplete, copy-from-similar)
 - Chat with multiple conversations triage-able (mute, archive, "important" pinning)
 - Public showroom page with hours, logo, listings, contact
-- Response-time stat shown publicly (rewards fast responders)
+- Explicit personal/business context and durable handover when staff leave
 
 ---
 
@@ -110,36 +110,36 @@ Five personas. Each one's primary jobs-to-be-done shape feature priorities.
 
 **Jobs-to-be-done**
 1. Triage incoming reports and act on them within hours
-2. Verify dealerships (so PRO badge means something)
+2. Review business identity and membership without certifying vehicle condition
 3. Monitor SMS gateway health (5 phones humming = OTPs flowing)
-4. Send announcements to users (new feature, planned maintenance)
+4. Handle authorized service notices, operational failures and founder decisions
 5. Audit who did what (the buck stops at the audit log)
 
 **Critical features for Bagtyýar**
 - Admin dashboard with priority queues (reports, pending verifications)
 - Phone OTP + TOTP 2FA for security
 - Per-phone SMS gateway health view
-- Notification broadcast with target picker (all / segment / topic)
-- Audit log searchable + exportable
-- (Phase 2) Inspection report workflow
+- Purpose-scoped service/moderation queues and explicit staff grants
+- Searchable audit with separately authorized sensitive investigation/export
+- Scoped inspection operations and TK/RU/EN analytics/admin interfaces
 
 ---
 
-## Edna — Inspector (Phase 2)
+## Edna — Center technician
 
 **Profile**
 - AutoTM-employed mechanic
-- Drives to seller locations, performs ~3 inspections/day
-- Uses tablet on-site; types in details, attaches photos
+- Inspects vehicles brought to the center; actual throughput depends on validated scope and equipment
+- Uses a scoped tablet/desktop workspace, records observations and attaches evidence
 - Russian primary
 
 **Jobs-to-be-done**
 1. Receive inspection assignments
-2. Fill in the rubric on-site with photos
-3. Submit a complete report quickly
+2. Complete a pinned checklist with photos, measurements and explicit unchecked items
+3. Submit complete findings for the audience-appropriate authorized review
 4. Re-inspect if seller fixes something
 
-**Phase 2 — not in MVP**. Listed here so the inspection workflow design is grounded in a real persona.
+The approved center-service campaign follows [feature 50](features/50-reports-tier.md). Public reports need a different qualified reviewer; technician status never grants full marketplace-admin or private analytics access. Actual service opening waits for center/staff/equipment readiness. No traveling-inspector operation is included.
 
 ---
 

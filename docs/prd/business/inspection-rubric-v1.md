@@ -1,5 +1,7 @@
 # Inspection rubric v1 and pilot report template
 
+> 2026-10-14 scope note: this is the historical S9b concierge-pilot input, not the approved checklist for the center service. The new proposal is center-based at every stage, initially one own center in Aşgabat. Neither this 54-item pilot rubric, the separate 36-item mechanic capability PDF nor the body-map worksheet establishes final mechanical scope. Center staff must validate checks, equipment and wording. [Feature 50](../features/50-reports-tier.md) owns the software target and [inspection strategy](inspection-program.md) separates first launch from scaling. Historical pilot instructions below do not authorize traveling inspectors, live bookings or published claims for the new service.
+
 > **Status:** S9a pilot artifact for S9b free concierge inspections.
 > **Scope:** Manual, hand-filled inspections only. No paid product, no warranty, no insurance promise, no legal title verification, no software implementation.
 > **Owner:** Founder or trusted helper plus one pilot mechanic.

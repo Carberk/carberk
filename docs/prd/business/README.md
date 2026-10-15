@@ -6,9 +6,9 @@ This directory holds **revenue-model + go-to-market strategy documents** — dis
 
 | Document | Revenue stream | Phase first matters | TL;DR |
 |---|---|---|---|
-| [`inspection-program.md`](inspection-program.md) | AutoTM-staffed inspection fees | **Trust bet after MLP** | Largest discretionary revenue stream; unique trust-layer moat; 8-15 inspectors at maturity |
+| [`inspection-program.md`](inspection-program.md) | Center-based diagnostic service | **Readiness-gated launch, later scaling** | One own Aşgabat center/one plan first; preserve future center/staff/capacity strategy separately |
 | [`ad-sales-strategy.md`](ad-sales-strategy.md) | Third-party display + native advertising | **Post-MLP marketplace bet** | Banks, insurance, parts, service centers; direct-sales motion; modest but compounding |
-| [`dealer-subscriptions.md`](dealer-subscriptions.md) | Recurring SaaS-style dealer PRO accounts | **Post-MLP dealer bet** | 200-500 dealers at maturity; tiered pricing; major recurring revenue |
+| [`dealer-subscriptions.md`](dealer-subscriptions.md) | Free dealer access | **Proposed dealer scope** | No dealer subscription, trial expiry or paid ranking; track useful inventory and operating cost |
 
 ## How these documents relate to the rest of the repo
 
@@ -18,7 +18,7 @@ This directory holds **revenue-model + go-to-market strategy documents** — dis
 
 ## Honest framing
 
-These documents are **forward-looking strategy**, not commitments. They reflect best understanding as of 2026-05-18. Three things worth knowing:
+These documents are **forward-looking strategy**, not commitments. The dealer and inspection documents have a 2026-10-14 proposed revision; older market analysis below remains dated historical evidence and needs fresh validation. It is not approval of an operational promise. Other documents retain their own dates. Three things worth knowing:
 
 1. **TM-specific data is limited.** Some numbers are extrapolated from comparable markets (KZ, UA, RU) adjusted downward for TM specifics. Where I'm guessing, I say so.
 2. **Bias checks are explicit.** Each document has a "Biases to question" section. I'm pattern-matching against Western marketplaces; TM may behave differently.

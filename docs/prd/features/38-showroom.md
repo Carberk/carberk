@@ -1,99 +1,55 @@
-# 38 — Dealership Showroom
+# 38 — Free dealer workspace and public showroom
 
-## Summary
+> Approved campaign target, 2026-10-14. Founder approved product direction and final policy defaults. [ADR-0103](../../adr/0103-free-dealer-business-ownership-and-enquiries.md) formalizes the material decision. This specifies delivery, not current implementation or live-business activation.
 
-The public-facing page for a Dealership — logo, name, city, hours, contact, response-time stat, and all their active listings. Accessible via `auto.tm/dealers/<slug>` (web) and `app://dealers/<slug>` (mobile deep link).
+## Outcome and boundaries
 
-**MLP status:** deferred by [ADR-0027](../../adr/0027-mlp-beta-scope.md). Build after dealers actively post enough inventory to need a shareable storefront.
+Identifiable car-selling businesses manually approved by founder use free tools inside Carberk. Brokers, paid tiers, ranking boosts, multi-location, bulk import and automatic lead routing are excluded initially. Personal staff logins, one business per account and one protected owner retain ADR-0013. Business verification records checked evidence and never certifies vehicle condition.
 
-## Why it exists
+Keep Search, Favorites, Sell, Messages and Cabinet. Cabinet opens the business workspace. Existing Sell offers Personal/Showroom for eligible members before drafting; Inventory fixes the business context. Same seven-step wizard, validation, contact proof, minimum photos, media recovery and review. Display owning business before drafting and on Review; switching workspace never silently moves drafts/media.
 
-Dealerships rely on credibility. Ilýa (the dealer rep persona) needs:
-- A "card" he can share externally ("here's my showroom")
-- A place where buyers can see all his inventory at a glance
-- Public trust signals (PRO badge, response time, tenure, verified status)
+## Admission, membership and contact
 
-Without a showroom page, dealerships look identical to private sellers in the feed — a disservice to verified shops.
+Founder approves admission with auditable business identity evidence and truthful description of what was checked. Owner invites staff to redeem through personal sign-in. Tokens are single-use, recipient-bound, expiring/revocable and cannot grant access to the wrong account, duplicate membership or a second business. Delivery transport and expiry are bounded engineering choices; synthetic invitation checks never send to real recipients.
 
-## What it does (user-visible behavior)
+Protect the last/only owner against removal or account deletion until an audited founder recovery establishes a replacement. Recovery cannot expose personal sign-in secrets. Platform admission/recovery is a scoped platform privilege, separate from business Owner/Sales and general analytics investigation.
 
-### Showroom page (public, mobile + web)
+This protection must not block account deletion under ADR-0032. If deletion leaves no active owner, revoke the person's access, preserve business assets and suspend business operation for audited founder recovery. Do not automatically promote another member or preserve unnecessary personal data.
 
-Header section:
-- Logo (square, 80×80 mobile / 120×120 web)
-- Name + PRO badge (if `verifiedAt` is set)
-- City
-- Tenure: "3 года на auto.tm"
-- Response time: "Отвечает в течение часа" (computed from past conversations)
-- Action buttons: **Call** + **Message a sales rep** + **Get directions** (if map address set)
+Owner controls business details and contact proof. Confirmed business contact belongs to the business, with authorized-actor attribution and existing purpose-bound SMS security. Seven-day reuse governs new uses; changing number requires new proof. Sales can publish with current business proof but cannot alter it. Personal proof/sign-in rules retain their existing behavior. Membership alone cannot verify a number.
 
-About section:
-- Description (Markdown, optional)
-- Hours of operation (Mon-Sun, hours per day)
-- Address text (optional map pin in Phase 2)
+## Ownership and inventory
 
-Listings section:
-- All `active` listings of the dealership
-- Same card style as feed
-- Filter / sort within this dealer (mini-filter)
-- Pagination
+Business owns drafts, Listings, adopted media and enquiries; creator/editor remains attributable. Owner/Sales create/edit/publish/mark sold business cars. Current members read business enquiries. Owner alone changes settings/membership/reassignment. Personal inventory and conversations remain separate; joining does not transfer them. Personal-to-business transfer is deferred.
 
-Stats (visible only to dealer members + admin):
-- Active listings count
-- Total sold (lifetime)
-- Average response time
-- New chats this week
+Draft, Active, Sold and Archived UI states preserve moderation/lifecycle rules. Weekly availability review records confirmation without changing publishedAt or ranking. No automatic stale hiding. Staff removal/revocation requeues assigned enquiries, preserves stock/history and denies further API, realtime, push and private-file access, including stale sessions. Account deletion of a creator must not archive/delete/restore business-owned stock. Business suspension hides public showroom/inventory and blocks new publication/contact; individual member suspension does not erase business assets. Restoration cannot revive independently moderated content.
 
-### How a user reaches the showroom
+## Shared enquiries
 
-- From a listing detail: tap dealer name → showroom
-- From the feed: dealer-flagged listings have "From <dealer>" subtitle, tap to open showroom
-- From shared link: WhatsApp recipient taps URL → Universal Link / App Link opens showroom in app or browser
-- Direct URL: `https://auto.tm/dealers/<slug>` (SEO-friendly, OG-friendly)
+Business enquiries remain Listing-scoped. Showroom Message guides buyers to a car; no generic listing-less conversation is introduced. New enquiries enter Unassigned; atomic claim has one winner. All current members may read responsibility and response history. Owner reassigns/reopens/closes; assignment and Open/Closed are separate. Staff attribution survives departure. Existing conversation continuation after sold follows current contact lifecycle, without enabling new enquiry from a sold shared page. Personal and service/support conversations retain their own authorization policy.
 
-### Mobile vs. web
+## Public discovery, showroom and sharing
 
-Identical content. Web is server-rendered with OG meta:
-- `og:title` = "<Dealer name> — Verified Dealership in <City>"
-- `og:image` = dealer logo or hero photo
-- `og:description` = "<N active listings> · <response time> · <tenure>"
+Mixed results reuse current card design with truthful dealer identity and seller-type filter; business name opens showroom. No dealer/inspection ranking advantage. Compact name/logo/checked identity/city/contact/address appear before active inventory, then description/hours/services. Empty inventory is explicit; sold stock is not available inventory. Initial workspace counts cover active cars, drafts, review due and unanswered enquiries; do not invent response-time, transaction or completed-call statistics.
 
-## Screens / states
+External sharing includes BOTH Listing and showroom, system share sheet and Copy link, anonymous mobile web reader, optional opening in app and genuine HTTPS associations. Use configured canonical public web origin, safe stable target/locales/slug redirects. Sign-in only for actions that need it. Sold stays sold and blocks new enquiry; removed/moderated/suspended hides suppressed content. First-party cache metadata must follow current state; external cached previews cannot be guaranteed fresh. Private inspection existence/content never enters public tags/counts/cards.
 
-| Screen | State | Notes |
-|---|---|---|
-| Showroom | Default | Full layout |
-| Showroom | No active listings | "No listings right now — check back soon" |
-| Showroom | Not verified | No PRO badge; "Verification pending" if user is the dealer themselves |
-| Showroom | Anonymous viewer | Action buttons visible; tapping triggers login |
-| Showroom | Listing-card-from-share-link unfurl | OG card with logo + active listing count |
+Available public diagnostic reports use the neutral localized action "Inspection report available" on Results cards AND detail, opening complete findings/date/mileage. No checkmark/pass/quality guarantee or boost. No buyer-private indicator. Withdrawn/unavailable report association removes the action. Feature 50 owns eligibility.
 
-## Data references
+## Design and languages
 
-- `apps/api/src/modules/identity/CONTEXT.md` — Dealership entity
-- `apps/api/src/modules/listings/CONTEXT.md` — Dealer's listings
-- Public web route: `apps/web/CONTEXT.md` → `/[lang]/dealers/[slug]`
+Preserve current mobile tokens, navigation and wizard. All dealer/staff/admin screens support TK/RU/EN including navigation, validation, loading/empty/error/denied states and generated user-facing exports. Keep original source/provider documents in their supplied language. Phone-sized browser prototypes establish review intent, not native security/runtime evidence.
 
-## Decisions
+## Executable acceptance
 
-- Showroom is a **page**, not a separate bounded context — built on top of existing Dealership entity
-- Verification is admin-only in MVP (no self-serve dealership signup to prevent spam)
-- Free PRO badge in MVP (no payment integration yet)
+- D1: wrong-account/expired/revoked/duplicate invitation cannot activate membership; one-business and last-owner invariants survive concurrency and deletion/recovery.
+- D2: personal/business draft context stays explicit; current membership and valid business contact proof authorize publish; revoked context preserves saved work without allowing publication.
+- D3: business stock/media/history survive creator deletion/removal; personal paths retain existing behavior.
+- D4: current members read; concurrent claim has one winner; owner reassigns; removal requeues and revokes HTTP/socket/push/file access.
+- D5: suspension/public lifecycle, search seller filter, detail identity, inventory counts and cache metadata agree; independently moderated content stays hidden on restore.
+- D6: Listing/showroom links handle installed/uninstalled, signed-in/out, sold/unknown/removed/suspended and safe locale/redirect failure.
+- D7: actual rendered TK/RU/EN interfaces preserve accessibility/theme/text scale; final native/browser acceptance covers only changed critical paths.
 
-## Phase
+## Owners and references
 
-**Post-MLP marketplace bet.**
-
-## Out of scope
-
-- Map embed (Phase 2 — depends on offline map tile licensing or external maps SDK)
-- Reviews / ratings for dealerships (Phase ∞)
-- Multi-location dealerships (one dealership = one city in MVP)
-- Custom URL slug pattern beyond auto-generated (we generate slugs from name)
-- Self-serve dealership creation (admin-only for MVP — KYC concern)
-
-## Open questions
-
-- Hours of operation editor UX — admin-edit or dealer-self-edit? (Likely dealer-self-edit, admin verifies)
-- Response time calculation — over last 7 days? 30 days? (Likely 30 days, rolling)
-- Should we show "X people viewed this dealer today"? (Probably not — feels stalkerish)
+ADR-0103; Identity 30, Listings 32, Conversations 34, diagnostic reports 50, flow 67. Cross-context access uses injected ports, not internal application imports. Additive migrations and current source/tests govern compatibility. Live admission needs checked business facts and named operator; passing synthetic fixtures does not establish verification.

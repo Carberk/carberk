@@ -111,6 +111,15 @@ This directory contains architecture decisions for AutoTM. ADRs are **immutable 
 | [0098](0098-integration-delivery-with-shared-staging-and-concise-agent-guidance.md) | Integration delivery with shared staging and concise agent guidance; replacement of PR environments and alternative batch delivery | Accepted | 2026-10-14 |
 | [0099](0099-tester-only-listing-video-with-a-90-second-limit.md) | Tester-only Listing video with a 90-second limit (scoped supersession of ADR-0008 and ADR-0027) | Accepted | 2026-10-14 |
 
+| [0100](0100-google-play-first-tm-cutover-readiness.md) | Google Play approval and readiness gate the TM production cutover | Accepted | 2026-10-14 |
+| [0101](0101-app-pilot-separate-from-manual-inspections.md) | The Ashgabat app pilot can precede manual inspections | Accepted | 2026-10-14 |
+| [0102](0102-pilot-first-party-scorecard-and-investigation.md) | Pilot first-party scorecard and scoped diagnostic investigation | Accepted | 2026-10-14 |
+| [0103](0103-free-dealer-business-ownership-and-enquiries.md) | Free dealer workspaces own inventory and enquiries | Accepted | 2026-10-14 |
+| [0104](0104-center-diagnostics-with-private-and-public-reports.md) | Center diagnostics preserve report audience and observation history | Accepted | 2026-10-14 |
+| [0105](0105-listing-views-once-per-ashgabat-day.md) | Listing views count each viewer once per Ashgabat day, using an anonymous install id | Accepted | 2026-10-14 |
+| [0106](0106-service-owned-support-and-vehicle-history.md) | Service-owned Support and Vehicle History preserve separate policies | Accepted | 2026-10-14 |
+| [0107](0107-durable-permitted-vehicle-market-knowledge.md) | Durable permitted vehicle and market knowledge | Accepted | 2026-10-14 |
+
 ## Per-app ADRs
 
 | Location | Scope |
