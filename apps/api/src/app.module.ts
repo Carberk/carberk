@@ -24,6 +24,7 @@ import { ReportsModule } from "./modules/reports/reports.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { RealtimeModule } from "./modules/realtime/realtime.module";
 import { requestLoggingOptions } from "./common/requestLogging";
+import { DiagnosticsModule } from "./modules/diagnostics/diagnostics.module";
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { requestLoggingOptions } from "./common/requestLogging";
     ReportsModule,
     AdminModule,
     RealtimeModule,
+    DiagnosticsModule,
   ],
   controllers: [HealthController],
   providers: [
