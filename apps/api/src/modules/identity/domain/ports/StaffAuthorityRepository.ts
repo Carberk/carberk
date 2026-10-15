@@ -9,7 +9,7 @@ export interface StaffGrantChange extends StaffSubject {
   targetUserId: string; capability: string; reason: string; grant: boolean;
 }
 export interface StaffAuthorityRepository {
-  current(input: StaffSubject): Promise<StaffAuthoritySnapshot | null>;
+  current(input: StaffSubject, transaction?: unknown): Promise<StaffAuthoritySnapshot | null>;
   /** Rechecks authority and writes grant + durable actor/target audit atomically. */
   change(input: StaffGrantChange, now: Date): Promise<void>;
 }

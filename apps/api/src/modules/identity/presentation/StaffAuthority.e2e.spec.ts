@@ -17,6 +17,7 @@ import { StaffCapability, StaffGuard } from "../../../common/staff.guard";
 import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
 import { cleanSuiteFixtures, defineE2eSuite } from "../../../../test/helpers/e2eSuite";
 import { PrismaAccountDeletionUnitOfWork } from "../infrastructure/PrismaAccountDeletionUnitOfWork";
+import { STAFF_AUTHORITY_PORT, type StaffAuthorityPort } from "../identity.public";
 const suite = defineE2eSuite("staff-authority-900");
 @Controller("test/current-staff")
 class StaffConsumer {
@@ -81,6 +82,18 @@ describe("current staff authority on real HTTP and disposable PostgreSQL", () =>
   expect(audit.map((row) => row.action)).toEqual(["STAFF_CAPABILITY_GRANTED", "STAFF_CAPABILITY_REVOKED", "STAFF_CAPABILITY_GRANTED"]);
   expect(audit.every((row) => row.actorId === suite.id("founder"))).toBe(true);
   expect(audit[0]?.details).toMatchObject({ capability: "support.operations", reason: "Named test coverage" });
+ });
+ it("refuses revoked purpose access inside the owning PostgreSQL transaction", async () => {
+  await change("founder", "support.operations").expect(204);
+  await prisma.session.update({ where: { id: sessionId("staff") }, data: { adminTotpExpiresAt: new Date(Date.now() + 3600000) } });
+  const authority = app.get<StaffAuthorityPort>(STAFF_AUTHORITY_PORT);
+  const subject = { userId: suite.id("staff"), sessionId: sessionId("staff"), capability: "support.operations" };
+  await prisma.$transaction(async (tx) => {
+   await authority.authorize(subject, tx);
+   await tx.staffGrant.update({ where: { userId_capability: { userId: subject.userId, capability: subject.capability } }, data: { revokedAt: new Date() } });
+   await expect(authority.authorize(subject, tx)).rejects.toMatchObject({ reason: "CAPABILITY_REQUIRED" });
+  });
+  await get("/test/current-staff", "staff").expect(403);
  });
  it("rejects unsupported, self-escalating and ungranted admin transitions without an audit or grant", async () => {
   await change("admin", "support.operations").expect(403);
