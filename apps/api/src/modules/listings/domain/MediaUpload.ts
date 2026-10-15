@@ -6,6 +6,7 @@ import type { MediaKind } from "./types";
  * key with no MediaUpload authorizes nothing.
  */
 export interface MediaUpload {
+  businessId?: string | undefined;
   id: string;
   userId: string;
   key: string;

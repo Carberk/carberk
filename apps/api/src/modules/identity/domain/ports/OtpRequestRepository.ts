@@ -12,6 +12,7 @@ export interface OtpRequestRepository {
     codeHash: string;
     expiresAt: Date;
     userId: string | null;
+    businessId?: string | undefined;
     ip: string;
   }): Promise<OtpRequest>;
 
@@ -32,6 +33,7 @@ export interface OtpRequestRepository {
     channel: SignInCodeChannel;
     destination: string;
     userId?: string;
+    businessId?: string | undefined;
   }): Promise<OtpRequest | null>;
 
   /** Counts codes of every purpose: the per-destination limit is shared. */

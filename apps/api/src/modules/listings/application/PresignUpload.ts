@@ -1,4 +1,5 @@
-import { Inject, Injectable, BadRequestException } from "@nestjs/common";
+import { Optional , Inject, Injectable, BadRequestException } from "@nestjs/common";
+import { ListingOwnership, assertListingOwnership } from "./ListingOwnership";
 import { randomUUID } from "node:crypto";
 
 import { UPLOAD_CAPS } from "../domain/MediaUpload";
@@ -14,6 +15,8 @@ import {
 
 export interface PresignUploadInput {
   userId: string;
+  sessionId?: string | undefined;
+  businessId?: string | undefined;
   kind: "image" | "video";
   contentType: string;
   sizeBytes: number;
@@ -35,9 +38,11 @@ export class PresignUpload {
     private readonly storage: MediaStoragePort,
     @Inject(MEDIA_UPLOAD_REPOSITORY)
     private readonly uploads: MediaUploadRepository,
+    @Optional() @Inject(ListingOwnership) private readonly ownership?: ListingOwnership,
   ) {}
 
   async execute(input: PresignUploadInput): Promise<PresignUploadResult> {
+    if (input.businessId) await assertListingOwnership(this.ownership, input, { businessId: input.businessId });
     const cap = UPLOAD_CAPS[input.kind];
     if (!cap) {
       throw new BadRequestException("Invalid kind");
@@ -80,6 +85,7 @@ export class PresignUpload {
     await this.uploads.record({
       id: randomUUID(),
       userId: input.userId,
+      ...(input.businessId ? { businessId: input.businessId } : {}),
       key,
       kind: input.kind,
       contentType: input.contentType,
@@ -87,7 +93,7 @@ export class PresignUpload {
       createdAt: new Date(),
       writeProtocol: input.writeProtocol ?? "legacy",
       objectKeys: signed.objectKeys ?? [],
-    });
+    }, input);
 
     return {
       uploadUrl: signed.url,

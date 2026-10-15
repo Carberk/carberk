@@ -32,6 +32,7 @@ export class InMemoryOtpRequests implements OtpRequestRepository {
     codeHash: string;
     expiresAt: Date;
     userId: string | null;
+    businessId?: string | undefined;
     ip: string;
   }): Promise<OtpRequest> {
     const record: OtpRequest = {
@@ -61,6 +62,7 @@ export class InMemoryOtpRequests implements OtpRequestRepository {
     channel: SignInCodeChannel;
     destination: string;
     userId?: string;
+    businessId?: string | undefined;
   }): Promise<OtpRequest | null> {
     return (
       this.records.findLast(
@@ -68,6 +70,7 @@ export class InMemoryOtpRequests implements OtpRequestRepository {
           r.purpose === input.purpose &&
           r.channel === input.channel &&
           r.destination === input.destination &&
+          (r.businessId ?? null) === (input.businessId ?? null) &&
           (input.userId === undefined || r.userId === input.userId),
       ) ?? null
     );

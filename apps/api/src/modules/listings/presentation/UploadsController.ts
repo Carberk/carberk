@@ -1,3 +1,4 @@
+import { inventoryActor } from "./inventoryActor";
 import { Controller, Inject, Post, Body, Req, ForbiddenException } from "@nestjs/common";
 import { SkipThrottle } from "@nestjs/throttler";
 import type { FastifyRequest } from "fastify";
@@ -35,6 +36,7 @@ export class UploadsController {
     const parsed = UploadsSchemas.PresignRequestSchema.parse(body);
 
     const result = await this.presignUploadUC.execute({
+      ...inventoryActor(req, parsed.businessId),
       userId,
       kind: parsed.kind,
       contentType: parsed.contentType,

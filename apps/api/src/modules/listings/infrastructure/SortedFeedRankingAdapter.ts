@@ -209,6 +209,7 @@ export class SortedFeedRankingAdapter implements FeedRankingPort {
     const conditions: Prisma.ListingWhereInput[] = [
       { deletedAt: null },
       { status: "active" },
+      { OR: [{ businessId: null }, { business: { status: "active" } }] },
     ];
 
     if (filters?.brandId) {

@@ -20,6 +20,7 @@ export class PrismaOtpRequestRepository implements OtpRequestRepository {
     codeHash: string;
     expiresAt: Date;
     userId: string | null;
+    businessId?: string | undefined;
     ip: string;
   }): Promise<OtpRequest> {
     const row = await this.prisma.otpRequest.create({
@@ -31,6 +32,7 @@ export class PrismaOtpRequestRepository implements OtpRequestRepository {
         codeHash: input.codeHash,
         expiresAt: input.expiresAt,
         userId: input.userId,
+        businessId: input.businessId ?? null,
         ip: input.ip,
       },
     });
@@ -74,12 +76,14 @@ export class PrismaOtpRequestRepository implements OtpRequestRepository {
     channel: SignInCodeChannel;
     destination: string;
     userId?: string;
+    businessId?: string | undefined;
   }): Promise<OtpRequest | null> {
     const row = await this.prisma.otpRequest.findFirst({
       where: {
         purpose: toCodePurpose(input.purpose),
         channel: input.channel,
         destination: input.destination,
+        businessId: input.businessId ?? null,
         ...(input.userId === undefined ? {} : { userId: input.userId }),
       },
       orderBy: { createdAt: "desc" },
@@ -124,6 +128,7 @@ export class PrismaOtpRequestRepository implements OtpRequestRepository {
       verifiedAt: row.verifiedAt,
       attempts: row.attempts,
       userId: row.userId,
+      businessId: row.businessId ?? undefined,
       ip: row.ip,
       createdAt: row.createdAt,
     };

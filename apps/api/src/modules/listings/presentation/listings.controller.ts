@@ -1,3 +1,4 @@
+import { inventoryActor } from "./inventoryActor";
 import {
   Controller,
   Delete,
@@ -136,7 +137,8 @@ export class ListingsController {
     const viewerId = (req as { user?: { sub: string } }).user?.sub;
 
     return this.listFeedUC.execute({
-      ...(viewerId !== undefined ? { viewerId } : {}),
+
+       ...(viewerId !== undefined ? { viewerId } : {}),
       sort,
       ...(cursor !== undefined ? { cursor } : {}),
       limit,
@@ -153,7 +155,8 @@ export class ListingsController {
     const filters = this.parseAndValidateFilters(parsed);
 
     return this.countListingsUC.execute({
-      ...(filters !== undefined ? { filters } : {}),
+
+       ...(filters !== undefined ? { filters } : {}),
     });
   }
 
@@ -169,6 +172,7 @@ export class ListingsController {
     } as ListingsSchemas.ListingFilter);
 
     return this.countListingModelsUC.execute({
+
       brandId,
       ...(filters !== undefined ? { filters } : {}),
     });
@@ -181,7 +185,8 @@ export class ListingsController {
     const filters = this.parseAndValidateFilters(parsed);
 
     return this.countListingBrandsUC.execute({
-      ...(filters !== undefined ? { filters } : {}),
+
+       ...(filters !== undefined ? { filters } : {}),
     });
   }
 
@@ -189,7 +194,8 @@ export class ListingsController {
   @Get(":id")
   async getDetail(@Param("id") listingId: string, @Req() req: FastifyRequest) {
     const requestingUserId = (req as { user?: { sub: string } }).user?.sub;
-    return this.getListingDetailUC.execute({ listingId, requestingUserId });
+    return this.getListingDetailUC.execute({ ...inventoryActor(req),
+      listingId, requestingUserId });
   }
 
 
@@ -202,7 +208,8 @@ export class ListingsController {
     const userId = (req as { user?: { sub: string } }).user?.sub as string;
     await this.assertNotSuspended(userId);
 
-    const result = await this.publishListingUC.execute({ draftId, userId });
+    const result = await this.publishListingUC.execute({ ...inventoryActor(req),
+      draftId, userId });
 
     return {
       id: result.listing.id,
@@ -224,7 +231,8 @@ export class ListingsController {
     const userId = (req as { user?: { sub: string } }).user?.sub as string;
     await this.assertNotSuspended(userId);
 
-    const result = await this.markSoldUC.execute({ listingId, userId });
+    const result = await this.markSoldUC.execute({ ...inventoryActor(req),
+      listingId, userId });
 
     return {
       id: result.listing.id,
@@ -241,7 +249,8 @@ export class ListingsController {
     const userId = (req as { user?: { sub: string } }).user?.sub as string;
     await this.assertNotSuspended(userId);
 
-    const result = await this.archiveListingUC.execute({ listingId, userId });
+    const result = await this.archiveListingUC.execute({ ...inventoryActor(req),
+      listingId, userId });
 
     return {
       id: result.listing.id,
@@ -257,7 +266,8 @@ export class ListingsController {
     const userId = (req as { user?: { sub: string } }).user?.sub as string;
     await this.assertNotSuspended(userId);
 
-    const result = await this.republishListingUC.execute({ listingId, userId });
+    const result = await this.republishListingUC.execute({ ...inventoryActor(req),
+      listingId, userId });
 
     return {
       id: result.listing.id,
@@ -289,9 +299,11 @@ export class ListingsController {
       throw err;
     }
 
-    await this.editListingUC.execute({ listingId, userId, patch: parsed });
+    await this.editListingUC.execute({ ...inventoryActor(req),
+      listingId, userId, patch: parsed });
 
-    return this.getListingDetailUC.execute({ listingId, requestingUserId: userId });
+    return this.getListingDetailUC.execute({ ...inventoryActor(req),
+      listingId, requestingUserId: userId });
   }
 
   @Delete(":id")
@@ -302,7 +314,8 @@ export class ListingsController {
     const userId = (req as { user?: { sub: string } }).user?.sub as string;
     await this.assertNotSuspended(userId);
 
-    await this.deleteListingUC.execute({ listingId, userId });
+    await this.deleteListingUC.execute({ ...inventoryActor(req),
+      listingId, userId });
 
     return { success: true };
   }
@@ -331,6 +344,7 @@ export class ListingsController {
     }
 
     const result = await this.attachMediaUC.execute({
+      ...inventoryActor(req),
       listingId,
       userId,
       ...parsed,
@@ -360,7 +374,8 @@ export class ListingsController {
     const userId = (req as { user?: { sub: string } }).user?.sub as string;
     await this.assertNotSuspended(userId);
 
-    await this.removeMediaUC.execute({ listingId, mediaId, userId });
+    await this.removeMediaUC.execute({ ...inventoryActor(req),
+      listingId, mediaId, userId });
 
     return { success: true };
   }
@@ -389,6 +404,7 @@ export class ListingsController {
     }
 
     await this.reorderMediaUC.execute({
+      ...inventoryActor(req),
       listingId,
       userId,
       ordering: parsed.ordering,

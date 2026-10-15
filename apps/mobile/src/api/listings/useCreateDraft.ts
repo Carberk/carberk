@@ -1,11 +1,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ListingsSchemas } from "@auto-tm/contracts";
 
+import { useInventoryRequestOptions } from "../../business/useInventoryRequestOptions";
 import { apiClient } from "../client";
 import { queryKeys } from "../queryKeys";
 
-export function useCreateDraft() {
+export function useCreateDraft(businessId?: string) {
   const queryClient = useQueryClient();
+  const requestOptions = useInventoryRequestOptions(businessId);
 
   return useMutation({
     mutationFn: (payload?: ListingsSchemas.ListingDraftPayload) =>
@@ -13,6 +15,7 @@ export function useCreateDraft() {
         "/listings/drafts",
         payload ? { initialPayload: payload } : {},
         ListingsSchemas.ListingDraftSchema,
+        ...(businessId ? [requestOptions] : []),
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.listings.myDrafts() });

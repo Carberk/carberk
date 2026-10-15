@@ -7,13 +7,15 @@ export interface ContactPhoneCodePort {
   /** Applies the shared budgets, stores a code bound to the User and sends the SMS. */
   requestCode(input: {
     userId: string;
+  businessId?: string | undefined;
     phone: string;
     ip: string;
     locale: "ru" | "tk" | "en";
   }): Promise<ContactPhoneCodeSent>;
 
   /** Checks and consumes the newest contact-phone code this User requested for the number. */
-  confirmCode(input: { userId: string; phone: string; code: string }): Promise<void>;
+  confirmCode(input: { userId: string;
+  businessId?: string | undefined; phone: string; code: string }): Promise<void>;
 }
 
 export interface ContactPhoneCodeSent {

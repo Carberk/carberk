@@ -1,4 +1,6 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { BUSINESS_CONTACT_PHONE_REPOSITORY, type BusinessContactPhoneRepository } from "../domain/ports/BusinessContactPhoneRepository";
+import { Optional , Inject, Injectable } from "@nestjs/common";
+import { ListingOwnership } from "./ListingOwnership";
 
 import {
   CONTACT_PHONE_CODE_PORT,
@@ -15,6 +17,8 @@ import { confirmedContactPhone, type UsableContactPhone } from "./UsableContactP
 
 export interface ConfirmContactPhoneInput {
   userId: string;
+  sessionId?: string | undefined;
+  businessId?: string | undefined;
   phone: string;
   code: string;
 }
@@ -33,11 +37,19 @@ export class ConfirmContactPhone {
     private readonly confirmations: VerifiedContactPhoneRepository,
     @Inject(IDENTITY_CLOCK_PORT)
     private readonly clock: ClockPort,
+    @Optional() @Inject(BUSINESS_CONTACT_PHONE_REPOSITORY) private readonly businessPhones?: BusinessContactPhoneRepository,
+    @Optional() @Inject(ListingOwnership) private readonly ownership?: ListingOwnership,
   ) {}
 
   async execute(
     input: ConfirmContactPhoneInput,
   ): Promise<UsableContactPhone & { source: "confirmed" }> {
+    if (input.businessId) {
+      if (!this.ownership || !this.businessPhones) throw new Error("Business contact is unavailable");
+      await this.ownership.authorizeOwner(input);
+      await this.codes.confirmCode(input);
+      return confirmedContactPhone(await this.businessPhones.record(VerifiedContactPhone.create({ sellerId: input.businessId, phone: input.phone, confirmedAt: this.clock.now() }), input));
+    }
     await this.codes.confirmCode(input);
     const saved = await this.confirmations.record(
       VerifiedContactPhone.create({

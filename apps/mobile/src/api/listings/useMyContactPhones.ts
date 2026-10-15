@@ -8,13 +8,15 @@ import { queryKeys } from "../queryKeys";
 export function useMyContactPhones(opts: {
   userId: string | null;
   enabled?: boolean;
+  businessId?: string | undefined;
 }) {
   return useQuery({
-    queryKey: queryKeys.listings.myContactPhones(opts.userId),
+    queryKey: [...queryKeys.listings.myContactPhones(opts.userId), opts.businessId ?? "personal"],
     queryFn: () =>
       apiClient.get(
         "/me/contact-phones",
         ListingsSchemas.MyContactPhonesResponseSchema,
+        { headers: opts.businessId ? { "x-business-id": opts.businessId } : {} },
       ),
     enabled: (opts.enabled ?? true) && opts.userId != null,
   });

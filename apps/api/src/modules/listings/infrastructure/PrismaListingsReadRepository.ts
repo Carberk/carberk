@@ -86,7 +86,7 @@ export class PrismaListingsReadRepository
 
   async getListingSummary(id: string): Promise<ListingSummary | null> {
     const row = await this.prisma.listing.findUnique({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, OR: [{ businessId: null }, { business: { status: "active" } }] },
       include: CARD_INCLUDE,
     });
 
@@ -171,6 +171,7 @@ export class PrismaListingsReadRepository
         id: { in: ids },
         deletedAt: null,
         status: { in: [...VISIBLE_LISTING_STATUSES] },
+        OR: [{ businessId: null }, { business: { status: "active" } }],
       },
       include: CARD_INCLUDE,
     });
@@ -216,6 +217,7 @@ export class PrismaListingsReadRepository
     const rows = await this.prisma.listing.findMany({
       where: {
         sellerId: ownerId,
+        businessId: null,
         deletedAt: null,
       },
       take,

@@ -31,6 +31,7 @@ interface ContactPhonePickerProps {
   /** A publish answered CONTACT_PHONE_*; the seller must confirm the phone. */
   publishPhoneError?: boolean;
   disabled?: boolean;
+  canChangeNumber?: boolean | undefined;
 }
 
 function RadioMark({ selected }: { selected: boolean }) {
@@ -122,6 +123,7 @@ export function ContactPhonePicker({
   onConfirmExpired,
   selectionError,
   publishPhoneError = false,
+  canChangeNumber = true,
   disabled = false,
 }: ContactPhonePickerProps) {
   const { t } = useTranslation();
@@ -215,7 +217,7 @@ export function ContactPhonePicker({
             sub={t("confirmationExpiredTap")}
             selected={false}
             expired
-            disabled={disabled}
+            disabled={disabled || !canChangeNumber}
             onPress={() => onConfirmExpired(selectedPhone)}
           />
         ) : null}
@@ -229,7 +231,7 @@ export function ContactPhonePicker({
           />
         ) : null}
 
-        <Pressable
+        {canChangeNumber ? <Pressable
           accessibilityRole="button"
           accessibilityLabel={t("anotherNumber")}
           disabled={disabled}
@@ -240,7 +242,7 @@ export function ContactPhonePicker({
             {t("anotherNumber")}
           </Text>
           <Icon as={ChevronRight} className="size-4 text-muted-foreground" />
-        </Pressable>
+        </Pressable> : null}
       </View>
 
       {selectionError ? (
