@@ -12,6 +12,7 @@ import * as Linking from "expo-linking";
 import { ScrollView, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { businessCopy } from "../../src/business/copy";
 import { LargeTitle } from "../../components/navigation/ScreenHeader";
 import { TabScreen } from "../../components/navigation/TabScreen";
 import { useTabBarSpace } from "../../components/navigation/tabBarHeight";
@@ -182,6 +183,8 @@ export default function CabinetScreen() {
               onPress={() => router.push("/notifications")}
             />
             <MenuDivider />
+          <MenuRow label={businessCopy(i18n.language).title} chevron onPress={() => router.push("/business")} />
+
             <MyListingsRow />
           </MenuGroup>
         ) : null}
