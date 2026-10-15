@@ -5,11 +5,29 @@ import { MeasurementSchemas } from "@auto-tm/contracts";
 export interface MeasurementCollector {
   appendIfEligible(input: { event: MeasurementSchemas.MeasurementEvent; principalId: string; generation: string; epoch: string; environment: string; population: string }): Promise<"accepted" | "duplicate" | "revoked">;
 }
+export const MEASUREMENT_COLLECTOR = Symbol("MeasurementCollector");
+
+/** Adapter that applies the same generation/epoch fence as ingress, without importing API code. */
+@Injectable()
+export class PrismaMeasurementCollector implements MeasurementCollector {
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  async appendIfEligible(input: Parameters<MeasurementCollector["appendIfEligible"]>[0]): Promise<"accepted" | "duplicate" | "revoked"> {
+    return this.prisma.$transaction(async (tx) => {
+      const state = await tx.$queryRaw<{ epoch: string }[]>`SELECT "epoch" FROM "measurement_state" WHERE "key" = 'collector' FOR SHARE`;
+      if (state[0]?.epoch !== input.epoch) return "revoked";
+      const principals = await tx.$queryRaw<{ id: string; generation: string; epoch: string; kind: string; expiresAt: Date | null }[]>`SELECT "id", "generation", "epoch", "kind", "expiresAt" FROM "measurement_principals" WHERE "id" = ${input.principalId} FOR UPDATE`;
+      const principal = principals[0];
+      if (!principal || principal.epoch !== input.epoch || principal.generation !== input.generation || (principal.expiresAt && principal.expiresAt <= new Date())) return "revoked";
+      const inserted = await tx.measurementRecord.createMany({ data: [{ id: input.event.eventId, principalId: principal.id, visitId: null, event: JSON.parse(JSON.stringify(input.event)), origin: "server", environment: input.environment, population: input.population, occurredAt: new Date(input.event.occurredAt), receivedAt: new Date(), expiresAt: new Date(Date.parse(input.event.occurredAt) + 90 * 86400000) }], skipDuplicates: true });
+      return inserted.count ? "accepted" : "duplicate";
+    }, { maxWait: 250, timeout: 1000 });
+  }
+}
 
 /** Bounded, idempotent source-outbox delivery. Core writes never wait for this worker. */
 @Injectable()
 export class MeasurementOutboxDelivery {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService, private readonly collector: MeasurementCollector) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService, @Inject(MEASUREMENT_COLLECTOR) private readonly collector: MeasurementCollector) {}
 
   async deliver(limit = 50): Promise<{ delivered: number; retried: number }> {
     const rows = await this.prisma.$transaction(async (tx) => {
