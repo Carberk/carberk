@@ -1,3 +1,5 @@
+import { MEASUREMENT_COMMIT_PORT } from "./measurement.public";
+import { PrismaMeasurementCommit } from "./infrastructure/PrismaMeasurementCommit";
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "@auto-tm/db";
@@ -14,6 +16,10 @@ const ACTIVATION = Symbol("MeasurementActivation");
 @Module({
  imports: [PrismaModule], controllers: [MeasurementController],
  providers: [
+  { provide: MEASUREMENT_COMMIT_PORT, inject: [ACTIVATION, ConfigService], useFactory: (activation: MeasurementActivation, config: ConfigService<Env, true>) => new PrismaMeasurementCommit(activation,
+   config.get("MEASUREMENT_COLLECTOR_EPOCH", { infer: true }) ?? "", () => new Date(),
+   config.get("APP_ENV", { infer: true }) === "staging" ? config.get("MEASUREMENT_SYNTHETIC_CAPABILITY_EXPIRES_AT", { infer: true }) ?? "invalid" : undefined,
+  ) },
   { provide: ACTIVATION, inject: [ConfigService], useFactory: (config: ConfigService<Env, true>): MeasurementActivation => ({
    enabled: config.get("MEASUREMENT_ENABLED", { infer: true }) && ["test", "staging"].includes(config.get("APP_ENV", { infer: true })),
    environment: config.get("APP_ENV", { infer: true }) === "production" ? "production" : config.get("APP_ENV", { infer: true }) === "staging" ? "staging" : "test",
@@ -32,6 +38,6 @@ const ACTIVATION = Symbol("MeasurementActivation");
    ...(config.get("MEASUREMENT_SYNTHETIC_CAPABILITY_EXPIRES_AT", { infer: true }) ? { expiresAt: config.get("MEASUREMENT_SYNTHETIC_CAPABILITY_EXPIRES_AT", { infer: true }) as string } : {}),
   }, proof, new Date())) },
  ],
- exports: [AcceptMeasurement],
+ exports: [AcceptMeasurement, MEASUREMENT_COMMIT_PORT],
 })
 export class MeasurementModule {}
