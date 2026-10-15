@@ -1,1 +1,52 @@
-export function ServiceScreen() { return null; }
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ScrollView, View } from "react-native";
+import { Stack, router, useFocusEffect } from "expo-router";
+import { randomUUID } from "expo-crypto";
+import { useTranslation } from "react-i18next";
+
+import { useAuth } from "../auth/useAuth";
+import { useAuthIntentStore } from "../auth/intentStore";
+import { ApiError } from "../api/client";
+import { localeTag } from "../i18n/resources";
+
+import { serviceCopy } from "./copy";
+import { useServiceConversation, useServiceList, useServiceOpen, useServiceSend } from "./api";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Text } from "@/components/ui/text";
+
+export function ServiceScreen() {
+ const { i18n } = useTranslation(), c = serviceCopy(i18n.language); const { userId, isAuthenticated } = useAuth();
+ const list = useServiceList(), [selected, setSelected] = useState<string | null>(null), conversation = useServiceConversation(selected), send = useServiceSend(selected), open = useServiceOpen();
+ const [body, setBody] = useState(""), [error, setError] = useState<"permission" | "conflict" | "disabled" | "error" | null>(null);
+ const retry = useRef<{ fingerprint: string; id: string } | null>(null);
+ useEffect(() => { setSelected(null); setBody(""); setError(null); retry.current = null; }, [userId]);
+ useFocusEffect(useCallback(() => { if (isAuthenticated === true) { void list.refetch(); if (selected) void conversation.refetch(); } }, [isAuthenticated, selected, list.refetch, conversation.refetch]));
+ const failure = (value: unknown) => setError(value instanceof ApiError ? value.status === 403 ? "permission" : value.status === 409 ? "conflict" : value.status === 503 ? "disabled" : "error" : "error");
+ const detail = isAuthenticated === true && !conversation.isError && error !== "permission" && error !== "conflict" ? conversation.data : undefined;
+ async function submit() {
+  if (!detail || !body.trim() || send.isPending) return;
+  const fingerprint = JSON.stringify([detail.id, body.trim()]);
+  if (retry.current?.fingerprint !== fingerprint) retry.current = { fingerprint, id: randomUUID() };
+  setError(null);
+  try { await send.mutateAsync({ clientMessageId: retry.current.id, body: body.trim(), visibility: "customer" }); setBody(""); retry.current = null; }
+  catch (value) { failure(value); }
+ }
+ async function create() { setError(null); try { const value = await open.mutateAsync("history"); setSelected(value.id); } catch (value) { failure(value); } }
+ const button = (title: string, action: () => void, disabled = false) => <Button accessibilityLabel={title} disabled={disabled} onPress={action}><Text>{title}</Text></Button>;
+ return <><Stack.Screen options={{ title: c.customerTitle }}/><ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 48 }} keyboardShouldPersistTaps="handled"><Text className="font-heading text-title-2 font-semibold">{c.customerTitle}</Text>
+  {isAuthenticated !== true ? <>{button(c.signedOut, () => useAuthIntentStore.getState().requireSignIn(router, { returnTo: "/services" }))}</> : <>
+   {error ? <Text accessibilityRole="alert">{c[error]}</Text> : null}
+   {!selected ? <><Text className="font-heading text-title-3 font-semibold">{c.history}</Text><Text>{c.historyIntro}</Text><Text>{c.price}</Text>{button(c.newRequest, () => { void create(); }, open.isPending)}
+    {list.isPending ? <Text accessibilityRole="progressbar">{c.loading}</Text> : list.isError ? <><Text accessibilityRole="alert">{c.error}</Text>{button(c.refresh, () => { void list.refetch(); })}</> : list.data?.length === 0 ? <Text>{c.empty}</Text> : list.data?.map(item => <View key={item.id} className="gap-2 rounded-xl border border-border p-4">{button(c[item.purpose], () => { setError(null); setBody(""); setSelected(item.id); })}<Text className="text-muted-foreground">{new Date(item.createdAt).toLocaleString(localeTag(i18n.language))}</Text></View>)}</> : <>
+    {button(c.back, () => { setSelected(null); setBody(""); setError(null); })}
+    {conversation.isPending ? <Text accessibilityRole="progressbar">{c.loading}</Text> : conversation.isError ? <><Text accessibilityRole="alert">{conversation.error instanceof ApiError && conversation.error.status === 403 ? c.permission : c.error}</Text>{button(c.refresh, () => { setError(null); void conversation.refetch(); })}</> : detail ? <>
+     <Text className="font-heading text-title-3 font-semibold">{c[detail.purpose]}</Text>{detail.purpose === "support" ? <Text className="text-muted-foreground">{c.schedule}</Text> : null}<Text>{detail.operatorName ?? c.carberk}</Text>
+     {detail.messages.length === 0 ? <Text>{c.emptyMessages}</Text> : detail.messages.filter(message => message.visibility === "customer").map(message => <View key={message.id} className="gap-2 rounded-xl border border-border p-4"><Text className="font-semibold">{message.operatorName ?? c[message.sender]}</Text><Text>{message.body}</Text>{message.attachment ? <Text>{c.attachment}: {message.attachment.filename}</Text> : null}<Text className="text-muted-foreground text-caption">{new Date(message.createdAt).toLocaleString(localeTag(i18n.language))}</Text></View>)}
+     <Text>{c.body}</Text><Input accessibilityLabel={c.body} value={body} onChangeText={setBody} maxLength={4000} multiline/>{button(send.isPending ? c.sending : error ? c.retrySend : c.send, () => { void submit(); }, send.isPending || !body.trim())}
+    </> : button(c.refresh, () => { setError(null); void conversation.refetch(); })}
+   </>}
+  </>}
+ </ScrollView></>;
+}
