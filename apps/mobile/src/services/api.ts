@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { ServiceMessagingSchemas as S } from "@auto-tm/contracts";
 import { z } from "zod";
 
@@ -13,7 +13,7 @@ export function useServiceList() {
 }
 export function useServiceConversation(id: string | null) {
  const { userId, isAuthenticated } = useAuth();
- return useQuery({ queryKey: serviceKeys.detail(userId, id), queryFn: () => apiClient.get(`/services/conversations/${id}?limit=50`, S.ServiceConversationSchema), enabled: isAuthenticated === true && !!userId && !!id, staleTime: 0, gcTime: 0, retry: false });
+ return useInfiniteQuery({ queryKey: serviceKeys.detail(userId, id), initialPageParam: 0, queryFn: ({ pageParam }) => apiClient.get(`/services/conversations/${id}?limit=50&after=${pageParam}`, S.ServiceConversationSchema), getNextPageParam: page => page.hasMore ? page.messages.at(-1)?.sequence : undefined, enabled: isAuthenticated === true && !!userId && !!id, staleTime: 0, gcTime: 0, retry: false });
 }
 export function useServiceSend(id: string | null) {
  const { userId } = useAuth(); const client = useQueryClient();

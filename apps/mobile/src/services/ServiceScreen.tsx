@@ -10,6 +10,7 @@ import { ApiError } from "../api/client";
 import { localeTag } from "../i18n/resources";
 
 import { pickServiceImage, uploadServiceImage, type ServiceImage } from "./serviceImage";
+import { useServiceRealtime } from "./useServiceRealtime";
 import { serviceCopy } from "./copy";
 import { useServiceConversation, useServiceList, useServiceOpen, useServiceSend } from "./api";
 
@@ -27,7 +28,9 @@ export function ServiceScreen() {
  useEffect(() => { setSelected(null); setBody(""); setError(null); setImage(null); setAttachmentId(null); retry.current = null; }, [userId]);
  useFocusEffect(useCallback(() => { if (isAuthenticated === true) { void list.refetch(); if (selected) void conversation.refetch(); } }, [isAuthenticated, selected, list.refetch, conversation.refetch]));
  const failure = (value: unknown) => setError(value instanceof ApiError ? value.status === 403 ? "permission" : value.status === 409 ? "conflict" : value.status === 503 ? "disabled" : "error" : "error");
- const detail = isAuthenticated === true && !conversation.isError && error !== "permission" && error !== "conflict" ? conversation.data : undefined;
+ const onDenied = useCallback(() => { setError("permission"); setImage(null); setAttachmentId(null); }, []);
+ useServiceRealtime(selected, onDenied);
+ const detail = isAuthenticated === true && !conversation.isError && error !== "permission" && error !== "conflict" ? conversation.data?.pages[0] ? { ...conversation.data.pages[0], messages: conversation.data.pages.flatMap(page => page.messages) } : undefined : undefined;
  async function submit() {
   if (!detail || (!body.trim() && !attachmentId) || send.isPending) return;
   const fingerprint = JSON.stringify([detail.id, body.trim(), attachmentId]);
@@ -58,6 +61,7 @@ export function ServiceScreen() {
      {attachmentId ? <Text>{c.attachmentReady}</Text> : null}
      {button(uploadFailed ? c.uploadRetry : c.upload, () => { void upload(image ?? undefined); }, uploading || !!attachmentId)}
      {image ? button(c.remove, () => { setImage(null); setAttachmentId(null); setUploadFailed(false); }) : null}
+     {conversation.hasNextPage ? button(c.more, () => { void conversation.fetchNextPage(); }, conversation.isFetchingNextPage) : null}
      <Text>{c.body}</Text><Input accessibilityLabel={c.body} value={body} onChangeText={setBody} maxLength={4000} multiline/>{button(send.isPending ? c.sending : error ? c.retrySend : c.send, () => { void submit(); }, send.isPending || uploading || (image !== null && !attachmentId) || (!body.trim() && !attachmentId))}
     </> : button(c.refresh, () => { setError(null); void conversation.refetch(); })}
    </>}
