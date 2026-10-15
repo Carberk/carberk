@@ -1,8 +1,11 @@
 // @vitest-environment happy-dom
+import type * as NextNavigation from "next/navigation";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 vi.mock("next/headers", () => ({ headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) }));
+
+vi.mock("next/navigation", async (importOriginal) => ({ ...await importOriginal<typeof NextNavigation>(), useRouter: () => ({ refresh() {} }) }));
 
 import ListingPage from "./(admin)/listings/[id]/page";
 
