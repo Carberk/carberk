@@ -201,3 +201,12 @@ describe('current scoped staff sign-in',()=>{
     expect(mockState.cookies.get('auto_tm_admin_access')).toBe('scoped-access');
   });
 });
+
+it('retains the newly created session when current scoped eligibility is temporarily unavailable',async()=>{
+  mockFetchQueue([{status:200,body:{accessToken:'new-scoped-access',refreshToken:'new-scoped-refresh',user:{role:'buyer'}}},
+    {status:503,body:{code:'UNAVAILABLE',message:'private provider failure'}}]);
+  const form=new FormData();form.set('phone','+99365000001');form.set('code','123456');
+  const result=await verifyOtp(null,form);
+  expect(mockState.cookies.get('auto_tm_admin_access')).toBe('new-scoped-access');
+  expect(result).toEqual({ok:false,error:'Временно недоступно. Попробуйте ещё раз.'});
+});
