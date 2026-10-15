@@ -52,8 +52,8 @@ const api = createServer(async (req, res) => {
     res.end(JSON.stringify({ enrolled: true, elevated: true }));
   } else if (req.url === "/api/v1/staff/capabilities") {
     res.end(JSON.stringify({ capabilities: [], elevated: true }));
-  } else if (req.url === "/api/v1/admin/config") {
-    res.end(JSON.stringify({ adminModerationActionsEnabled: true }));
+  } else if (req.url === "/api/v1/admin/authority") {
+    res.end(JSON.stringify({ marketplaceAdmin: true }));
   } else if (req.url === "/api/v1/admin/reports/r1/dismiss" && req.method === "POST") {
     assert(JSON.parse(body).reason === "Runtime renewal proof", "original action arguments must reach mutation");
     mutations++;

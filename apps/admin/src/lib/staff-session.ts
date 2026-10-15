@@ -20,7 +20,7 @@ export async function requireStaffCapability(capability: StaffSchemas.StaffCapab
 }
 export async function currentMarketplaceAdmin() {
   try {
-    const config = await apiFetchOptional<unknown>("/admin/config", {cache:"no-store"});
-    return config !== null;
+    const authority = await apiFetchOptional<{marketplaceAdmin?:boolean}>("/admin/authority", {cache:"no-store"});
+    return authority?.marketplaceAdmin === true;
   } catch (error) { if (error instanceof ApiError && error.status===403) return false; throw error; }
 }
