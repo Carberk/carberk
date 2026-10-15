@@ -12,12 +12,15 @@ import {
   unsuspendUser,
 } from "../actions";
 
+import { useAdminTranslation, AdminText } from "@/lib/i18n";
+
 interface DirectActionFormProps {
   actionType: "ban" | "unban" | "suspend" | "unsuspend";
   targetId: string;
 }
 
 export function DirectActionForm({ actionType, targetId }: DirectActionFormProps) {
+  const t=useAdminTranslation();
   const router = useRouter();
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -95,14 +98,12 @@ export function DirectActionForm({ actionType, targetId }: DirectActionFormProps
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <div>
-        <label htmlFor={`reason-${actionType}-${targetId}`} className="text-xs font-medium text-neutral-600">
-          Причина действия
-        </label>
+        <label htmlFor={`reason-${actionType}-${targetId}`} className="text-xs font-medium text-neutral-600"><AdminText>Причина действия</AdminText></label>
         <Input
           id={`reason-${actionType}-${targetId}`}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="Обязательно: укажите причину..."
+          placeholder={t("Обязательно: укажите причину...")}
           disabled={isPending}
           maxLength={1000}
           className="mt-1"
@@ -112,25 +113,21 @@ export function DirectActionForm({ actionType, targetId }: DirectActionFormProps
       {error && (
         <div className="flex items-start gap-2 rounded-md bg-red-50 p-3 text-sm text-red-700">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          {error}
+          <AdminText>{error}</AdminText>
         </div>
       )}
 
       {success && (
         <div className="flex items-center gap-2 rounded-md bg-green-50 p-3 text-sm text-green-700">
-          <CheckCircle2 className="h-4 w-4" />
-          Действие выполнено успешно.
-        </div>
+          <CheckCircle2 className="h-4 w-4" /><AdminText>Действие выполнено успешно.</AdminText></div>
       )}
 
       <Button type="submit" disabled={isPending} variant={variant}>
         {isPending ? (
           <>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Обработка...
-          </>
+            <Loader2 className="h-4 w-4 animate-spin" /><AdminText>Обработка...</AdminText></>
         ) : (
-          label
+          <AdminText>{label}</AdminText>
         )}
       </Button>
     </form>
