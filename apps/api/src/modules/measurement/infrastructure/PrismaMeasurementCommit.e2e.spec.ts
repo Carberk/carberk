@@ -10,7 +10,7 @@ const EPOCH = suite.id("epoch");
 const activation = { enabled: true, environment: "test" as const, purposes: ["product_improvement" as const], evidenceRef: "publication-e2e", realCollectionApproved: false };
 
 const event = (id = randomUUID()) => ({ version: 1 as const, eventId: id, occurredAt: new Date("2026-10-15T00:00:00Z").toISOString(), purpose: "product_improvement" as const,
-  eventName: "listing_published" as const, context: { platform: "server" as const, release: "server", build: "e2e", locale: "en" }, payload: { listingId: suite.id("listing"), cityId: suite.id("city") } });
+  eventName: "listing_published" as const, context: { platform: "server" as const, release: "server", build: "e2e", locale: "en" as const }, payload: { listingId: suite.id("listing"), cityId: suite.id("city") } });
 
 describe("PrismaMeasurementCommit — PostgreSQL source transaction", () => {
   let prisma: PrismaService;
