@@ -723,3 +723,9 @@ it("posts bounded binary bodies through the current refresh and locale transport
  expect(init?.body).toBe(bytes);
  expect(init?.headers).toMatchObject({ "Content-Type": "application/octet-stream", Authorization: "Bearer binary-fixture" });
 });
+it("retrieves private bytes with the current credential rather than a reusable URL", async () => {
+ mockedLoadAuthSession.mockResolvedValue({ storedAt: new Date().toISOString(), accessToken: "binary-read", refreshToken: "refresh", user: { id: "fixture", phone: null, email: null, displayName: null, role: "buyer" } });
+ const fetcher = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(new Uint8Array([4, 5, 6]), { headers: { "Content-Type": "image/jpeg" } }));
+ expect(await apiClient.getBytes("/services/conversations/fixture/attachments/fixture", 10)).toEqual(new Uint8Array([4, 5, 6]));
+ expect(fetcher.mock.calls[0]?.[1]?.headers).toMatchObject({ Authorization: "Bearer binary-read" });
+});
