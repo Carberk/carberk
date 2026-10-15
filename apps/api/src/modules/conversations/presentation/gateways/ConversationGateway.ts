@@ -31,6 +31,7 @@ import { DeleteMessage } from "../../application/DeleteMessage";
 import type { Message } from "../../domain/Message";
 import type { MessageSentEvent } from "../../domain/ports/MessageEventPublisher";
 import type { Conversation } from "../../domain/Conversation";
+import type { ConversationActor } from "../../domain/ports/BusinessEnquiryRepository";
 
 type JoinPayload = {
   conversationId: string;
@@ -172,6 +173,7 @@ export class ConversationGateway implements OnGatewayDisconnect {
       conversation = await this.validateAccess.execute({
         userId: user.sub,
         conversationId: payload.conversationId,
+        ...(this.socketActor(client) ? { actor: this.socketActor(client) } : {}),
       });
     } catch (err) {
       return this.toSocketError(err);
@@ -313,6 +315,7 @@ export class ConversationGateway implements OnGatewayDisconnect {
       await this.validateAccess.execute({
         userId: user.sub,
         conversationId: payload.conversationId,
+        ...(this.socketActor(client) ? { actor: this.socketActor(client) } : {}),
       });
     } catch (err) {
       return this.toSocketError(err);
@@ -413,6 +416,7 @@ export class ConversationGateway implements OnGatewayDisconnect {
       await this.validateAccess.execute({
         userId: user.sub,
         conversationId: payload.conversationId,
+        ...(this.socketActor(client) ? { actor: this.socketActor(client) } : {}),
       });
     } catch (err) {
       return this.toSocketError(err);
@@ -537,6 +541,14 @@ export class ConversationGateway implements OnGatewayDisconnect {
       conversationId: payload.conversationId,
       deletedAt: result.deletedAt.toISOString(),
     };
+  }
+
+  private socketActor(client: Socket): ConversationActor | undefined {
+    const user = this.authenticatedUser(client);
+    if (!user) return undefined;
+    const raw = client.handshake.headers["x-business-id"];
+    const businessId = Array.isArray(raw) ? raw[0] : raw;
+    return { userId: user.sub, sessionId: user.sid, ...(businessId ? { businessId } : {}) };
   }
 
   private authenticatedUser(client: Socket): AuthenticatedSocketUser | null {
