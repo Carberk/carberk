@@ -14,9 +14,9 @@ test('business membership and inventory restoration admit only exact reviewed SQ
   }
   const membership = 'fcccfb5425820267e806a9ff96688b67c36c65a1bf2ae1192c10ec404b91589f';
   const inventory = '7f12fa5b73b7d975d821cbf6eb2dadb16ac9ca674826afa0875e0c5f24751abc';
-  assert.equal(createHash('sha256').update(readFileSync(new URL('../packages/db/prisma/schema.prisma', import.meta.url))).digest('hex'), '699490ac60c0eb724acd04af5d1f88853ef9d79ca5448f01b6b0236e662fcff4');
+  assert.equal(createHash('sha256').update(readFileSync(new URL('../packages/db/prisma/schema.prisma', import.meta.url))).digest('hex'), 'f3de8e84330abf0bbec854a2929ca2d2f7a4f00fa2eab6e95b6be14defda747a');
   const baseline = [{ name: 'baseline', checksum: '1'.repeat(64) }];
-  const input = { baseline, candidate: [...baseline, ...additions], main: [...baseline, ...additions.slice(0, 3)], candidateSchema: inventory, mainSchema: membership };
+  const input = { baseline, candidate: [...baseline, ...retainedSchemaProfile.additions], main: [...baseline, ...additions.slice(0, 3)], candidateSchema: 'f3de8e84330abf0bbec854a2929ca2d2f7a4f00fa2eab6e95b6be14defda747a', mainSchema: membership };
   assert.equal(evaluateSchemaPlan(input).disposition, 'retained-additive');
   assert.throws(() => evaluateSchemaPlan({ ...input, candidate: input.candidate.slice(0, -1) }), /inventory mismatch/);
   assert.throws(() => evaluateSchemaPlan({ ...input, candidateSchema: 'unreviewed' }), /Unreviewed schema/);

@@ -1,13 +1,14 @@
-import { randomUUID } from "node:crypto";
-
-import {
+import { MEASUREMENT_COMMIT_PORT, type MeasurementCommitPort } from "../../measurement/measurement.public";
+import { Optional ,
   Inject,
   Injectable,
   NotFoundException,
-  ForbiddenException,
   BadRequestException,
   ConflictException,
 } from "@nestjs/common";
+import { ListingOwnership, assertListingOwnership } from "./ListingOwnership";
+import { randomUUID } from "node:crypto";
+
 import { PrismaService } from "@auto-tm/db";
 import { AuthSchemas, ListingsSchemas, WizardSchemas } from "@auto-tm/contracts";
 import type { z } from "zod";
@@ -129,6 +130,8 @@ class UnusablePhotoError {
 export interface PublishListingInput {
   draftId: string;
   userId: string;
+  sessionId?: string | undefined;
+  businessId?: string | undefined;
 }
 
 export interface PublishListingResult {
@@ -156,6 +159,8 @@ export class PublishListing {
     private readonly clock: ClockPort,
     @Inject(UPLOAD_CLAIM_PORT)
     private readonly claims: UploadClaimPort,
+    @Optional() @Inject(ListingOwnership) private readonly ownership?: ListingOwnership,
+    @Optional() @Inject(MEASUREMENT_COMMIT_PORT) private readonly measurement?: MeasurementCommitPort,
   ) {}
 
   async execute(input: PublishListingInput): Promise<PublishListingResult> {
@@ -163,9 +168,7 @@ export class PublishListing {
     if (!draft) {
       throw new NotFoundException("Draft not found");
     }
-    if (draft.userId !== input.userId) {
-      throw new ForbiddenException("Not the owner of this draft");
-    }
+    await assertListingOwnership(this.ownership, input, draft);
     const now = this.clock.now();
 
     let payload: z.infer<typeof PublishablePayloadSchema>;
@@ -204,6 +207,7 @@ export class PublishListing {
             input.userId,
             typeof raw === "string" ? raw : null,
             now,
+            draft.businessId,
           );
           throw contactPhoneRejection(standing) ?? contactPhoneRejection({ kind: "not_confirmed" });
         }
@@ -220,7 +224,7 @@ export class PublishListing {
     const damagedAnswer = resolveDamagedAnswer(payload.condition, payload.conditionDisclosure?.damaged);
     const damaged = damagedAnswer.ok ? damagedAnswer.damaged : null;
     const rejection = contactPhoneRejection(
-      await this.contactPhones.standing(input.userId, payload.contactPhone, now),
+      await this.contactPhones.standing(input.userId, payload.contactPhone, now, draft.businessId),
     );
     if (rejection) throw rejection;
 
@@ -254,8 +258,9 @@ export class PublishListing {
     }
     const uploads = await this.uploadGuard
       .authorize(
-        draft.userId,
+        input.userId,
         photoKeys.map((key) => ({ key, kind: "image" as const })),
+        draft.businessId,
       )
       .catch(async (err: unknown) => {
         if (err instanceof UploadObjectInvalidError) {
@@ -283,7 +288,7 @@ export class PublishListing {
       target: { type: "listing" as const, id: listingId },
     };
     const reservation = await this.claims
-      .reserve({ userId: input.userId, ...claim })
+      .reserve({ userId: input.userId, ...(input.businessId ? { businessId: input.businessId, sessionId: input.sessionId } : {}), ...claim })
       .catch((err: unknown) => {
         throw claimRejection(err);
       });
@@ -322,11 +327,17 @@ export class PublishListing {
       // The Listing, its media, the draft removal, the audit entry and the
       // adoption of every upload commit together or not at all.
       const listingRow = await this.prisma.$transaction(async (tx) => {
+        await assertListingOwnership(this.ownership, input, draft, tx);
+        if (draft.businessId) {
+          const rejection = contactPhoneRejection(await this.contactPhones.standing(input.userId, payload.contactPhone, this.clock.now(), draft.businessId, tx));
+          if (rejection) throw rejection;
+        }
         await this.claims.finalize(tx, { token: reservation.token, ...claim });
         const created = await tx.listing.create({
           data: {
             id: listingId,
             sellerId: input.userId,
+            ...(draft.businessId ? { businessId: draft.businessId, lastEditedById: input.userId, availabilityConfirmedAt: now } : {}),
             status: "active",
             brandId: payload.brandId,
             modelId: payload.modelId,
@@ -387,6 +398,11 @@ export class PublishListing {
             },
           },
         });
+        try {
+          await this.measurement?.capture(tx, input.userId, { version: 1, eventId: randomUUID(), occurredAt: now.toISOString(), purpose: "product_improvement",
+            eventName: "listing_published", context: { platform: "server", release: "server", build: "server", locale: "ru" }, payload: { listingId, cityId: payload.cityId },
+          });
+        } catch { /* Measurement outage never rolls back the core publication. */ }
         return created;
       });
 
@@ -394,6 +410,7 @@ export class PublishListing {
         id: listingRow.id,
         publicNumber: listingRow.publicNumber,
         sellerId: listingRow.sellerId,
+        ...(listingRow.businessId ? { businessId: listingRow.businessId } : {}),
         status: listingRow.status as "active" | "sold" | "archived",
         brandId: listingRow.brandId,
         modelId: listingRow.modelId,

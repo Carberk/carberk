@@ -5,9 +5,11 @@ export class ListingDraft {
     readonly payload: Record<string, unknown>,
     readonly createdAt: Date,
     readonly updatedAt: Date,
+    readonly businessId?: string,
   ) {}
 
   static create(data: {
+    businessId?: string | undefined;
     id: string;
     userId: string;
     payload?: Record<string, unknown>;
@@ -20,6 +22,7 @@ export class ListingDraft {
       data.payload ?? {},
       data.createdAt ?? new Date(),
       data.updatedAt ?? new Date(),
+      data.businessId,
     );
   }
 
@@ -33,6 +36,7 @@ export class ListingDraft {
       payload,
       this.createdAt,
       updatedAt,
+      this.businessId,
     );
   }
 }

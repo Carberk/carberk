@@ -28,7 +28,7 @@ export function contactPhoneReturnHref(
     };
   }
   const pathname =
-    returnPathname === "/listings/manage" || returnPathname === "/(tabs)/sell"
+    returnPathname === "/listings/manage" || returnPathname === "/(tabs)/sell" || returnPathname === "/business"
       ? returnPathname
       : purpose === "relist"
         ? "/listings/manage"

@@ -87,3 +87,11 @@ export const MEASUREMENT_LIMITS = {
   queueAgeMs: 7 * 86400000, futureSkewMs: 5 * 60000, visitIdleMs: 30 * 60000,
   guestContinuityMs: 90 * 86400000, rawRetentionDays: 90, diagnosticRetentionDays: 30, aggregateRetentionMonths: 24,
 } as const;
+
+export const MeasurementBootstrapRequestSchema = z.object({ visitId: id.optional() }).strict();
+export const MeasurementBootstrapResponseSchema = z.object({
+ visitId: id, generation: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
+ purposes: z.array(z.enum(["product_improvement", "product_reliability"])).min(1).max(2),
+ guestCapability: z.string().regex(/^mg_[A-Za-z0-9_-]{43}$/).optional(),
+}).strict();
+export type MeasurementBootstrapResponse = z.infer<typeof MeasurementBootstrapResponseSchema>;

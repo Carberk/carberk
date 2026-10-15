@@ -1,10 +1,11 @@
-import {
+import { Optional ,
   BadRequestException,
   Inject,
   Injectable,
   NotFoundException,
   ForbiddenException,
 } from "@nestjs/common";
+import { ListingOwnership, assertListingOwnership } from "./ListingOwnership";
 import { PrismaService } from "@auto-tm/db";
 import { ListingsSchemas } from "@auto-tm/contracts";
 
@@ -30,6 +31,8 @@ import { contactPhoneRejection } from "./contactPhoneRejection";
 export interface RepublishListingInput {
   listingId: string;
   userId: string;
+  sessionId?: string | undefined;
+  businessId?: string | undefined;
 }
 
 export interface RepublishListingResult {
@@ -49,6 +52,7 @@ export class RepublishListing {
     private readonly contactPhones: ContactPhonePolicy,
     @Inject(IDENTITY_CLOCK_PORT)
     private readonly clock: ClockPort,
+    @Optional() @Inject(ListingOwnership) private readonly ownership?: ListingOwnership,
   ) {}
 
   async execute(input: RepublishListingInput): Promise<RepublishListingResult> {
@@ -56,9 +60,7 @@ export class RepublishListing {
     if (!existing) {
       throw new NotFoundException("Listing not found");
     }
-    if (existing.sellerId !== input.userId) {
-      throw new ForbiddenException("Not the owner of this listing");
-    }
+    await assertListingOwnership(this.ownership, input, existing);
     if (existing.deletedAt) {
       throw new NotFoundException("Listing not found");
     }
@@ -87,7 +89,7 @@ export class RepublishListing {
     // The stored number must still be usable; to relist with another number
     // the seller edits first (ADR-0081).
     const rejection = contactPhoneRejection(
-      await this.contactPhones.standing(existing.sellerId, existing.contactPhone, now),
+      await this.contactPhones.standing(existing.sellerId, existing.contactPhone, now, existing.businessId),
     );
     if (rejection) throw rejection;
 

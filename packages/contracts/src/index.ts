@@ -46,3 +46,4 @@ export * as BusinessSchemas from "./schemas/business";
 export * as MeasurementSchemas from "./schemas/measurement";
 export * as AdminContextSchemas from "./schemas/adminContext";
 export * as ServiceMessagingSchemas from "./schemas/serviceMessaging";
+export * as DiagnosticSchemas from "./schemas/diagnostics";

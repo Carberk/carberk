@@ -41,6 +41,7 @@ export class Listing {
     readonly createdAt: Date,
     readonly updatedAt: Date,
     readonly publicNumber: number,
+    readonly businessId?: string,
   ) {
     if (!allowCalls && !allowChat) {
       throw new DomainError(
@@ -51,6 +52,7 @@ export class Listing {
   }
 
   static create(data: {
+    businessId?: string | undefined;
     id: string;
     publicNumber: number;
     sellerId: string;
@@ -127,6 +129,7 @@ export class Listing {
       data.createdAt ?? new Date(),
       data.updatedAt ?? new Date(),
       data.publicNumber,
+      data.businessId,
     );
   }
 
@@ -179,6 +182,7 @@ export class Listing {
       this.createdAt,
       new Date(),
       this.publicNumber,
+      this.businessId,
     );
   }
 
@@ -227,6 +231,7 @@ export class Listing {
       this.createdAt,
       new Date(),
       this.publicNumber,
+      this.businessId,
     );
   }
 
@@ -280,6 +285,7 @@ export class Listing {
       this.createdAt,
       at,
       this.publicNumber,
+      this.businessId,
     );
   }
 
@@ -322,6 +328,7 @@ export class Listing {
       this.createdAt,
       new Date(),
       this.publicNumber,
+      this.businessId,
     );
   }
 }

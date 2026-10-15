@@ -14,16 +14,21 @@ export interface MeasurementStoreConfig {
  epoch: string;
  environment: MeasurementAuthority["environment"];
  population: MeasurementAuthority["population"];
+ expiresAt?: string;
 }
 
 /** Atomic principal/visit eligibility and event-ID dedupe share the deletion lock. */
 export class PrismaMeasurementStore implements MeasurementLedgerPort, MeasurementSubjectPort {
  constructor(private readonly prisma: PrismaService, private readonly config: MeasurementStoreConfig, private readonly now: () => Date = () => new Date()) {}
+ private admitted(): boolean {
+  return !this.config.expiresAt || Date.parse(this.config.expiresAt) > this.now().getTime();
+ }
  private authority(row: Principal): MeasurementAuthority {
   return { origin: "client", environment: this.config.environment, population: this.config.population,
    subject: { kind: row.kind as "account" | "guest", pseudonym: row.pseudonym, generation: row.generation } };
  }
  async resolve(input: { authenticatedUserId?: string; guestCapability?: string }): Promise<MeasurementAuthority | null> {
+  if (!this.admitted()) return null;
   if (!input.authenticatedUserId && (!input.guestCapability || !/^mg_[A-Za-z0-9_-]{43}$/.test(input.guestCapability))) return null;
   const state = await this.prisma.measurementState.findUnique({ where: { key: "collector" } });
   if (state?.epoch !== this.config.epoch) return null;
@@ -34,6 +39,7 @@ export class PrismaMeasurementStore implements MeasurementLedgerPort, Measuremen
   return this.authority(row);
  }
  async bootstrap(input: { authenticatedUserId?: string; guestCapability?: string; visitId?: string }): Promise<MeasurementBootstrap | null> {
+  if (!this.admitted()) return null;
   const now = this.now();
   return this.prisma.$transaction(async (tx) => {
    const states = await tx.$queryRaw<{ epoch: string }[]>`SELECT "epoch" FROM "measurement_state" WHERE "key" = 'collector' FOR SHARE`;
@@ -73,6 +79,7 @@ export class PrismaMeasurementStore implements MeasurementLedgerPort, Measuremen
   }, { maxWait: 250, timeout: 1000 });
  }
  async appendIfEligible(record: Parameters<MeasurementLedgerPort["appendIfEligible"]>[0]): Promise<"accepted" | "duplicate" | "revoked"> {
+  if (!this.admitted()) return "revoked";
   return this.prisma.$transaction(async (tx) => {
    const states = await tx.$queryRaw<{ epoch: string }[]>`SELECT "epoch" FROM "measurement_state" WHERE "key" = 'collector' FOR SHARE`;
    if (states[0]?.epoch !== this.config.epoch) return "revoked";

@@ -37,10 +37,10 @@ function makeFakePrisma() {
     ownedVehicles: [] as Array<{ id: string; userId: string }>,
     blockedUsers: [] as Array<{ id: string; blockerId: string; blockedId: string }>,
     dealershipMembers: [] as Array<{ id: string; userId: string }>,
-    listingDrafts: [] as Array<{ id: string; userId: string }>,
+    listingDrafts: [] as Array<{ id: string; userId: string; businessId?: string | null }>,
     verifiedContactPhones: [] as Array<{ id: string; sellerId: string }>,
     otpRequests: [] as Array<{ id: string; userId: string | null; destination: string; phone: string | null; createdAt: Date }>,
-    listings: [] as Array<{ id: string; sellerId: string; contactPhone: string | null }>,
+    listings: [] as Array<{ id: string; sellerId: string; contactPhone: string | null; businessId?: string | null }>,
     /** Operations passed to each `$transaction`, by the label their delegate gave them. */
     transactions: [] as string[][],
   };
@@ -190,9 +190,9 @@ function makeFakePrisma() {
     },
 
     listingDraft: {
-      deleteMany: async (args: { where: { userId: string } }) => {
+      deleteMany: async (args: { where: { userId: string; businessId?: null } }) => {
         const before = state.listingDrafts.length;
-        const kept = state.listingDrafts.filter((d) => d.userId !== args.where.userId);
+        const kept = state.listingDrafts.filter((d) => !(d.userId === args.where.userId && (args.where.businessId === undefined || (d.businessId ?? null) === args.where.businessId)));
         state.listingDrafts.splice(0, state.listingDrafts.length, ...kept);
         return { count: before - state.listingDrafts.length };
       },
@@ -222,11 +222,11 @@ function makeFakePrisma() {
     },
 
     listing: {
-      updateMany: (args: { where: { sellerId: string }; data: { contactPhone: null } }) =>
+      updateMany: (args: { where: { sellerId: string; businessId?: null }; data: { contactPhone: null } }) =>
         labelled("listing.updateMany", (async () => {
           let count = 0;
           for (const l of state.listings) {
-            if (l.sellerId === args.where.sellerId) {
+            if (l.sellerId === args.where.sellerId && (args.where.businessId === undefined || (l.businessId ?? null) === args.where.businessId)) {
               l.contactPhone = args.data.contactPhone;
               count += 1;
             }
@@ -261,6 +261,16 @@ describe("PurgeExpiredAccounts", () => {
   beforeEach(() => {
     fake = makeFakePrisma();
     job = new PurgeExpiredAccounts(fake.prisma);
+  });
+
+  it("preserves business-owned drafts and contact while purging the creator's personal inventory data", async () => {
+    fake.users.push({ id: "departed", phone: "+99365123456", displayName: "Former staff", avatarUrl: null, deletionScheduledAt: new Date(NOW.getTime() - 1) });
+    fake.listingDrafts.push({ id: "personal-draft", userId: "departed", businessId: null }, { id: "business-draft", userId: "departed", businessId: "business" });
+    fake.listings.push({ id: "personal-car", sellerId: "departed", contactPhone: "+99365123456", businessId: null }, { id: "business-car", sellerId: "departed", contactPhone: "+99365111222", businessId: "business" });
+    await job.execute({ now: NOW });
+    expect(fake.listingDrafts).toEqual([{ id: "business-draft", userId: "departed", businessId: "business" }]);
+    expect(fake.listings).toEqual([{ id: "personal-car", sellerId: "departed", contactPhone: null, businessId: null }, { id: "business-car", sellerId: "departed", contactPhone: "+99365111222", businessId: "business" }]);
+    expect(fake.users[0]?.phone).toBeNull();
   });
 
   it("frees both Sign-in Methods and clears PII for users whose deletion grace has expired", async () => {

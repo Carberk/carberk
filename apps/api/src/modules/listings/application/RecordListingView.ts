@@ -10,13 +10,13 @@ export class RecordListingView {
     @Inject(IDENTITY_CLOCK_PORT) private readonly clock: ClockPort,
   ) {}
 
-  async execute(input: { listingId: string; installId?: string; requestingUserId?: string }): Promise<void> {
+  async execute(input: { listingId: string; installId?: string; requestingUserId?: string; sessionId?: string }): Promise<void> {
     const userId = input.requestingUserId;
     if (userId && await this.identity.isAdmin(userId)) return;
     const viewerKey = input.installId ? `install:${input.installId}` : userId ? `account:${userId}` : undefined;
     if (!viewerKey) return;
     await this.views.record({
-      listingId: input.listingId, viewerKey, now: this.clock.now(),
+      listingId: input.listingId, viewerKey, ...(input.sessionId ? { sessionId: input.sessionId } : {}), now: this.clock.now(),
       ...(userId ? { requestingUserId: userId } : {}),
     });
   }

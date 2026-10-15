@@ -1,3 +1,4 @@
+import type { BusinessContactPhoneRepository } from "./ports/BusinessContactPhoneRepository";
 import type { AccountPhonePort } from "./ports/AccountPhonePort";
 import type { VerifiedContactPhoneRepository } from "./ports/VerifiedContactPhoneRepository";
 import type { VerifiedContactPhone } from "./VerifiedContactPhone";
@@ -19,14 +20,22 @@ export class ContactPhonePolicy {
   constructor(
     private readonly accountPhones: AccountPhonePort,
     private readonly confirmations: VerifiedContactPhoneRepository,
+    private readonly businessPhones?: BusinessContactPhoneRepository,
   ) {}
 
   async standing(
     sellerId: string,
     phone: string | null | undefined,
     now: Date,
+    businessId?: string,
+    transaction?: unknown,
   ): Promise<ContactPhoneStanding> {
     if (phone == null || phone.trim() === "") return { kind: "missing" };
+    if (businessId) {
+      const confirmation = await this.businessPhones?.find(businessId, transaction);
+      if (!confirmation || confirmation.phone !== phone) return { kind: "not_confirmed" };
+      return confirmation.isReusableAt(now) ? { kind: "confirmed", confirmation } : { kind: "expired" };
+    }
     if (await this.accountPhones.holdsSignInPhone(sellerId, phone)) {
       return { kind: "account" };
     }

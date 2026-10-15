@@ -1,10 +1,12 @@
 import { router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { NavigationContext } from "@react-navigation/native";
 import { useContext, useEffect, useReducer, useState, useCallback, useMemo, useRef } from "react";
-import { BackHandler } from "react-native";
+import { BackHandler, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ListingsSchemas, type WizardSchemas } from "@auto-tm/contracts";
 
+import { inventoryCopy } from "../../src/business/inventoryCopy";
+import { useBusinessWorkspace } from "../../src/business/api";
 import { ApiError } from "../../src/api/client";
 import { useCreateDraft } from "../../src/api/listings/useCreateDraft";
 import { useDiscardDraft } from "../../src/api/listings/useDiscardDraft";
@@ -92,23 +94,24 @@ function withinCloseWait<T>(work: Promise<T>, onTimeout: T): Promise<T> {
 }
 
 export default function SellScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const c = inventoryCopy(i18n.language);
   // `phone` follows the live auth session, so signing in from this tab's own
   // sign-in sheet preselects the Contact step's account phone (ADR-0081).
-  const { isAuthenticated, phone: accountPhone } = useAuth();
+  const { isAuthenticated, phone: accountPhone, userId } = useAuth();
   const viewer = useViewer();
-  const { data: contactPhonesData } = useMyContactPhones({
-    userId: viewer?.userId ?? null,
-    enabled: !!isAuthenticated,
-  });
   const { show } = useToast();
   const navigation = useContext(NavigationContext);
   const isFocused = useIsFocused();
-  const params = useLocalSearchParams<{
-    resumeDraftId?: string;
-    confirmedContactPhone?: string;
-  }>();
+  const params = useLocalSearchParams<{ resumeDraftId?: string; confirmedContactPhone?: string; businessId?: string }>();
+  const businessQuery = useBusinessWorkspace();
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string | undefined>(params.businessId);
+  const businessId = selectedBusinessId;
+  const business = businessQuery.data?.workspace;
+  const contextPhone = businessId ? null : accountPhone;
+  const { data: contactPhonesData } = useMyContactPhones({ userId: viewer?.userId ?? null, enabled: !!isAuthenticated, businessId });
   const [showSignIn, setShowSignIn] = useState(false);
+  const [businessAccessError, setBusinessAccessError] = useState(false);
   const [draftLimitOpen, setDraftLimitOpen] = useState(false);
   const [publishPhoneError, setPublishPhoneError] = useState(false);
   const [unsavedDialogOpen, setUnsavedDialogOpen] = useState(false);
@@ -132,6 +135,7 @@ export default function SellScreen() {
 
   // Hide the bottom tab bar while the wizard is open — the wizard is a focused
   // flow that should not advertise navigation to other tabs.
+  useEffect(() => { if (machineState.status === "idle" && params.businessId) setSelectedBusinessId(params.businessId); }, [params.businessId, machineState.status]);
   const inWizard =
     machineState.status !== "idle" && machineState.draftId !== null;
   useEffect(() => {
@@ -153,11 +157,12 @@ export default function SellScreen() {
   } = useMyDrafts({
     enabled: !!isAuthenticated,
     limit: params.resumeDraftId ? 50 : 20,
+    businessId,
   });
 
-  const createDraft = useCreateDraft();
-  const publishDraft = usePublishDraft();
-  const discardDraft = useDiscardDraft();
+  const createDraft = useCreateDraft(businessId);
+  const publishDraft = usePublishDraft(businessId);
+  const discardDraft = useDiscardDraft(businessId);
 
   const { data: brandsData } = useBrands();
   const draftBrandId = draftsData?.items?.[0]?.payload.brandId ?? "";
@@ -170,11 +175,20 @@ export default function SellScreen() {
   )?.name;
 
   const { save, forceSave, flush, discardPending, retrySave, saveStatus, saveError } =
-    useWizardAutosave(machineState.draftId ?? undefined);
+    useWizardAutosave(machineState.draftId ?? undefined, businessId);
   const uploadQueue = useUploadQueue(
     machineState.draftId ? `draft-${machineState.draftId}` : "",
     machineState.payload,
+    { businessId },
   );
+
+  const draftUserRef = useRef(userId);
+  useEffect(() => {
+    if (draftUserRef.current !== userId) {
+      draftUserRef.current = userId;
+      discardPending(); newDraftIdRef.current = null; dispatch({ type: "DISCARD" });
+    }
+  }, [userId, discardPending]);
 
   const ctx = buildMachineContext(machineState);
 
@@ -255,6 +269,8 @@ export default function SellScreen() {
   }, [isAuthenticated, draftsData]);
 
   const handleCreateNewDraft = useCallback(() => {
+    if (businessId && (business?.business.id !== businessId || business.business.status !== "active")) { show({ title: c.denied, variant: "destructive" }); return; }
+    setBusinessAccessError(false);
     if (!isAuthenticated) {
       setShowSignIn(true);
       return;
@@ -262,7 +278,9 @@ export default function SellScreen() {
 
     createDraft.mutate(undefined, {
       onSuccess: (draft) => {
+        if (draftUserRef.current !== userId) return;
         newDraftIdRef.current = draft.id;
+        setSelectedBusinessId(draft.businessId);
         dispatch({
           type: "INIT",
           draftId: draft.id,
@@ -275,6 +293,7 @@ export default function SellScreen() {
         });
       },
       onError: (err) => {
+        if (businessId && err instanceof ApiError && err.status === 403) { setBusinessAccessError(true); void businessQuery.refetch(); show({ title: c.denied, variant: "destructive" }); return; }
         if (err instanceof ApiError && err.code === ListingsSchemas.ListingsErrorCode.DraftLimitReached) {
           setDraftLimitOpen(true);
           void refetchDrafts();
@@ -285,10 +304,11 @@ export default function SellScreen() {
         show({ title: message, variant: "destructive" });
       },
     });
-  }, [isAuthenticated, createDraft, show, refetchDrafts]);
+  }, [isAuthenticated, createDraft, show, refetchDrafts, businessId, business, c.denied, businessQuery.refetch, userId]);
 
   const handleContinueDraft = useCallback(
     (draft: NonNullable<typeof draftsData>["items"][number]) => {
+      setSelectedBusinessId(draft.businessId);
       dispatch({
         type: "INIT",
         draftId: draft.id,
@@ -362,7 +382,7 @@ export default function SellScreen() {
     if (machineState.currentStep === "contact") {
       const selection = resolveContactPhoneSelection({
         phone: machineState.payload.contactPhone,
-        accountPhone,
+        accountPhone: contextPhone,
         confirmedPhones: contactPhonesData?.items,
       });
       if (
@@ -396,7 +416,7 @@ export default function SellScreen() {
       validatedSteps: moved.validatedSteps,
     };
     void forceSave(fullPayload);
-  }, [ctx.canContinue, ctx.editDetourActive, machineState, photosToSave, forceSave, discardDraft.isPending, publishDraft.isPending, accountPhone, contactPhonesData, publishPhoneError]);
+  }, [ctx.canContinue, ctx.editDetourActive, machineState, photosToSave, forceSave, discardDraft.isPending, publishDraft.isPending, contextPhone, contactPhonesData, publishPhoneError]);
 
   const handlePublish = useCallback(async () => {
     // One publish at a time: a second tap lands before the button re-renders disabled.
@@ -433,6 +453,7 @@ export default function SellScreen() {
       newDraftIdRef.current = null;
       dispatch({ type: "DISCARD" });
     } catch (err) {
+      if (businessId && err instanceof ApiError && err.status === 403) { setBusinessAccessError(true); void businessQuery.refetch(); }
       // ADR-0081: the contact phone needs a confirmation. Nothing was published
       // and the draft is saved, so this is not a publish failure to word on
       // Check: the seller goes to the Contact step, and Done brings them back.
@@ -448,7 +469,7 @@ export default function SellScreen() {
     } finally {
       publishingRef.current = false;
     }
-  }, [machineState, photosToSave, flush, publishDraft, show]);
+  }, [machineState, photosToSave, flush, publishDraft, show, businessId, businessQuery.refetch]);
 
   const closeWizard = useCallback(() => {
     newDraftIdRef.current = null;
@@ -573,7 +594,7 @@ export default function SellScreen() {
       currentStep === "contact"
         ? resolveContactPhoneSelection({
             phone: machineState.payload.contactPhone,
-            accountPhone,
+            accountPhone: contextPhone,
             confirmedPhones: contactPhonesData?.items,
           })
         : null;
@@ -633,7 +654,7 @@ export default function SellScreen() {
           (ctx.canContinue || currentStep === "specs" || currentStep === "contact") &&
           !discardDraft.isPending && !publishDraft.isPending
         }
-        canPublish={ctx.canPublish && queueReady && uploadQueue.publishGate.canPublish}
+        canPublish={ctx.canPublish && queueReady && uploadQueue.publishGate.canPublish && (!businessId || (!businessAccessError && business?.business.id === businessId && business.business.status === "active"))}
         canGoBack={ctx.canGoBack}
         isLastStep={ctx.isLastStep}
         saveStatus={saveStatus}
@@ -654,6 +675,8 @@ export default function SellScreen() {
           dispatch({ type: ctx.isLastStep ? "CHANGE_FROM_REVIEW" : "GO_TO_STEP", step: "photos" })
         }
       >
+        <Text className="py-2 text-callout font-semibold">{c.context}: {businessId ? business?.business.name ?? c.title : c.personal}</Text>
+        {businessId && (businessAccessError || business?.business.id !== businessId || business.business.status !== "active") ? <Text accessibilityRole="alert">{c.denied}</Text> : null}
         {currentStep === "photos" && (
           <Step2Photos
             photos={uploadQueue.photos}
@@ -703,12 +726,13 @@ export default function SellScreen() {
           <Step7DescContact
             payload={machineState.payload}
             onChange={handlePayloadChange}
-            accountPhone={accountPhone}
+            accountPhone={contextPhone}
+            canChangeNumber={!businessId || business?.membership.role === "owner"}
             confirmedPhones={contactPhonesData?.items}
             onAnotherNumber={() =>
               router.push({
                 pathname: "/listings/contact-phone",
-                params: { returnPathname: "/(tabs)/sell" },
+                params: { returnPathname: "/(tabs)/sell", ...(businessId ? { businessId } : {}) },
               })
             }
             onConfirmExpired={(phone) =>
@@ -718,6 +742,7 @@ export default function SellScreen() {
                   phone,
                   reconfirm: "1",
                   returnPathname: "/(tabs)/sell",
+                  ...(businessId ? { businessId } : {}),
                 },
               })
             }
@@ -750,6 +775,8 @@ export default function SellScreen() {
     <TabScreen>
       <LargeTitle title={t("sell")} />
 
+      {isAuthenticated && business?.business.status === "active" && !params.businessId ? <View className="gap-3 px-4 pb-4"><Text>{c.context}</Text><Button disabled={createDraft.isPending} variant={businessId ? "outline" : "default"} onPress={() => setSelectedBusinessId(undefined)}><Text>{c.personal}</Text></Button><Button disabled={createDraft.isPending} variant={businessId ? "default" : "outline"} onPress={() => setSelectedBusinessId(business.business.id)}><Text>{business.business.name}</Text></Button><Text className="text-muted-foreground">{c.fixedContext}</Text></View> : null}
+      {params.businessId ? <Text className="px-4 py-2">{c.context}: {business?.business.name ?? c.title}</Text> : null}
       {isAuthenticated ? (
         <SellEntry
           drafts={draftsData?.items}

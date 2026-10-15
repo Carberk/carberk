@@ -4,10 +4,12 @@ import type { ListingSummary } from "../../listings/domain/ports/ListingsReadPor
 import { Message } from "../domain/Message";
 
 import { SendConversationMessage } from "./SendConversationMessage";
+import type { ConversationActor } from "../domain/ports/BusinessEnquiryRepository";
 
 export interface SendTextMessageInput {
   senderId: string;
   conversationId: string;
+  actor?: ConversationActor;
   text: string;
 }
 
@@ -27,6 +29,7 @@ export class SendTextMessage {
     const result = await this.sendConversationMessage.execute({
       senderId: input.senderId,
       conversationId: input.conversationId,
+      ...(input.actor ? { actor: input.actor } : {}),
       createMessage: ({ id, conversationId, senderId }) =>
         Message.createText({
           id,

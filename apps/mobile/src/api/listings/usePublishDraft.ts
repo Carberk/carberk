@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
+import { useInventoryRequestOptions } from "../../business/useInventoryRequestOptions";
 import { apiClient } from "../client";
 import { queryKeys } from "../queryKeys";
 
@@ -15,8 +16,9 @@ const PublishDraftResponseSchema = z.object({
   publishedAt: z.string().datetime(),
 });
 
-export function usePublishDraft() {
+export function usePublishDraft(businessId?: string) {
   const queryClient = useQueryClient();
+  const requestOptions = useInventoryRequestOptions(businessId);
 
   return useMutation({
     // Offline, fail now instead of pausing: a paused publish never settles, and
@@ -27,6 +29,7 @@ export function usePublishDraft() {
         `/listings/drafts/${draftId}/publish`,
         {},
         PublishDraftResponseSchema,
+        ...(businessId ? [requestOptions] : []),
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.listings.all() });

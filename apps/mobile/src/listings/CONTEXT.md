@@ -2,6 +2,8 @@
 
 This area contains create-wizard state, draft persistence, upload staging, edit-save orchestration, discovery state, and listing presentation. The create route and edit route have different orchestration; inspect both before consolidating shared UI. Server lifecycle and contact rules belong to [API Listings](../../../api/src/modules/listings/CONTEXT.md).
 
+Business inventory enters Sell with an explicit business context. The entry screen offers Personal or the current active business before creating a draft; a resumed draft supplies its stored context. That context stays fixed through all seven steps and Review, autosave, upload presign, media editing and publication. Business contact controls let Sales reuse the business number while only Owner can verify another number. `useInventoryRequestOptions` binds queued writes to the current User and business, refusing a retry after the signed-in User changes. The business inventory screen owns shared draft/history access and weekly availability confirmation; personal My listings remains personal.
+
 ## Native video proof boundary
 
 `videoPreparation/VideoPreparation.ts` validates the selected interval and completed local output before a future uploader can consume it. Its native port is implemented in the local Expo module `../../modules/listing-video-preparation`, using AVFoundation and Media3 Transformer 1.8.0. No seller UI calls it yet. The [issue 888 evidence](../../../../docs/evidence/issue-888/verification.md) separates simulator exports and compiled targets from remaining Android/physical-device, provider, HDR and storage checks.

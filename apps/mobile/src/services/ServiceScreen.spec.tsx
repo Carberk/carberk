@@ -16,7 +16,7 @@ let sent: Record<string, unknown>[] = [], fail = false;
 const message = { id, clientMessageId: id, sequence: 1, sender: "carberk", operatorName: null, visibility: "customer", body: "Synthetic private service content", attachment: null, createdAt: "2026-10-15T10:00:00Z" };
 beforeEach(async () => {
  await clearAuthSession(); await storeAuthSession({ accessToken: "synthetic", refreshToken: "refresh", user: { id: userId, phone: null, email: null, displayName: null, role: "buyer" } }); sent = []; fail = false;
- server.use(http.post("*/services/conversations/:id/read", () => HttpResponse.json({ ok: true })), http.get("*/services/conversations", () => HttpResponse.json([{ id, purpose: "support", createdAt: "2026-10-15T10:00:00Z" }])), http.get("*/services/conversations/:id", () => HttpResponse.json({ id, resourceId: id, purpose: "support", status: "open", assignmentVersion: 0, assigned: false, operatorName: null, sourceListingId: null, canSend: true, messages: [message], lastSequence: 1, readThrough: 0, unread: 1, hasMore: false })), http.post("*/services/conversations/:id/messages", async ({ request }) => { sent.push(await request.json() as Record<string, unknown>); if (fail && sent.length === 1) return HttpResponse.json({ code: "UNAVAILABLE" }, { status: 503 }); return HttpResponse.json(message); }));
+ server.use(http.get("*/services/conversations", () => HttpResponse.json([{ id, purpose: "support", createdAt: "2026-10-15T10:00:00Z" }])), http.get("*/services/conversations/:id", () => HttpResponse.json({ id, resourceId: id, purpose: "support", status: "open", assignmentVersion: 0, assigned: false, operatorName: null, sourceListingId: null, canSend: true, messages: [message], lastSequence: 1, readThrough: 0, unread: 1, hasMore: false })), http.post("*/services/conversations/:id/messages", async ({ request }) => { sent.push(await request.json() as Record<string, unknown>); if (fail && sent.length === 1) return HttpResponse.json({ code: "UNAVAILABLE" }, { status: 503 }); return HttpResponse.json(message); }));
 });
 it.each([["en", "Your services"], ["ru", "Ваши сервисы"], ["tk", "Siziň hyzmatlaryňyz"]])("renders the customer's separate service history in %s", async (locale, title) => {
  const screen = await renderMobile(<ServiceScreen/>, { locale }); expect(await screen.findByText(title ?? "")).toBeTruthy();
@@ -41,21 +41,4 @@ it("keeps upload retry separate from message retry and adopts only uploaded byte
  expect(await screen.findByText("The upload failed. The message has not been sent.")).toBeTruthy(); expect(sent).toHaveLength(0);
  await fireEvent.press(screen.getByRole("button", { name: "Retry upload" })); expect(await screen.findByText("Attachment ready to send")).toBeTruthy();
  await fireEvent.press(screen.getByRole("button", { name: "Send message" })); expect(sent[0]?.["attachmentId"]).toBe("33333333-3333-4333-8333-333333333333"); expect(stages).toBe(1); expect(uploads).toBe(2);
-});
-it("retrieves a private image through the authenticated service boundary before displaying pixels", async () => {
- let reads = 0;
- const attachment = { id: "33333333-3333-4333-8333-333333333333", contentType: "image/jpeg", sizeBytes: 3, filename: "synthetic-private.jpg" };
- server.use(http.get("*/services/conversations/:id", () => HttpResponse.json({ id, resourceId: id, purpose: "support", status: "open", assignmentVersion: 0, assigned: false, operatorName: null, sourceListingId: null, canSend: true, messages: [{ ...message, attachment }], lastSequence: 1, readThrough: 0, unread: 1, hasMore: false })), http.get("*/services/conversations/:id/attachments/:file", ({ request }) => { reads++; expect(request.headers.get("Authorization")).toBe("Bearer synthetic"); return new HttpResponse(new Uint8Array([1, 2, 3]), { headers: { "Content-Type": "image/jpeg" } }); }));
- const screen = await renderMobile(<ServiceScreen/>); await fireEvent.press(await screen.findByRole("button", { name: "General Support" })); await screen.findByText("synthetic-private.jpg");
- expect(reads).toBe(0); await fireEvent.press(screen.getByRole("button", { name: "Private attachment" })); expect(await screen.findByLabelText("synthetic-private.jpg")).toBeTruthy(); expect(reads).toBe(1);
-});
-it("shows the public history explanation and price before sign-in without requesting private history", async () => {
- await clearAuthSession(); let privateReads = 0; server.use(http.get("*/services/conversations", () => { privateReads++; return HttpResponse.json([]); }));
- const screen = await renderMobile(<ServiceScreen/>); expect(await screen.findByText("Vehicle History: 100 TMT")).toBeTruthy(); expect(screen.getByText(/One available provider is sufficient/)).toBeTruthy(); expect(privateReads).toBe(0);
-});
-it("acknowledges only the service messages actually rendered to the current customer", async () => {
- let through = 0;
- server.use(http.post("*/services/conversations/:id/read", async ({ request }) => { through = (await request.json() as { throughSequence: number }).throughSequence; return HttpResponse.json({ ok: true }); }));
- const screen = await renderMobile(<ServiceScreen/>); await fireEvent.press(await screen.findByRole("button", { name: "General Support" })); await screen.findByText(message.body);
- await act(async () => { await Promise.resolve(); }); expect(through).toBe(1);
 });

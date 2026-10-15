@@ -19,3 +19,15 @@ export interface MeasurementLedgerPort {
   * Deletion and restore invalidation serialize with this insert. */
  appendIfEligible(record: { event: MeasurementSchemas.MeasurementEvent; authority: MeasurementAuthority; receivedAt: Date; expiresAt: Date }): Promise<"accepted" | "duplicate" | "revoked">;
 }
+
+export interface MeasurementSessionPort {
+ bootstrap(input: { authenticatedUserId?: string; guestCapability?: string; visitId?: string }): Promise<{ visitId: string; generation: string; guestCapability?: string } | null>;
+ eraseGuest(capability: string): Promise<void>;
+}
+
+export const MEASUREMENT_COMMIT_PORT = Symbol("MeasurementCommitPort");
+/** Infrastructure passes its existing source transaction as an opaque context.
+ * Domain/application callers do not inspect collector persistence or await transport. */
+export interface MeasurementCommitPort {
+ capture(transaction: object, userId: string, event: MeasurementSchemas.MeasurementEvent): Promise<"captured" | "disabled" | "unavailable">;
+}
