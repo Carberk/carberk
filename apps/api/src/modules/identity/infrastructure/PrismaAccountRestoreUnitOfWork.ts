@@ -21,7 +21,7 @@ export class PrismaAccountRestoreUnitOfWork implements AccountRestoreUnitOfWork 
         // top of Newest (#871), the same rule as an owner's relist.
         republishListingsArchivedByDeletion: async (sellerId) => {
           await tx.listing.updateMany({
-            where: { sellerId, status: "archived", archivedByDeletion: true },
+            where: { sellerId, businessId: null, status: "archived", archivedByDeletion: true },
             data: { status: "active", archivedByDeletion: false },
           });
         },

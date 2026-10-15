@@ -129,7 +129,7 @@ export class PurgeExpiredAccounts {
       this.prisma.dealershipMember.deleteMany({ where: { userId } }),
 
       // Prune listing drafts
-      this.prisma.listingDraft.deleteMany({ where: { userId } }),
+      this.prisma.listingDraft.deleteMany({ where: { userId, businessId: null } }),
 
       // Prune confirmed Listing contact phones (ADR-0081)
       this.prisma.verifiedContactPhone.deleteMany({ where: { sellerId: userId } }),
@@ -139,7 +139,7 @@ export class PurgeExpiredAccounts {
 
       // Kept Listings stay archived; nobody can reach a purged User, so their
       // contact phone goes too
-      this.prisma.listing.updateMany({ where: { sellerId: userId }, data: { contactPhone: null } }),
+      this.prisma.listing.updateMany({ where: { sellerId: userId, businessId: null }, data: { contactPhone: null } }),
     ]);
   }
 }
