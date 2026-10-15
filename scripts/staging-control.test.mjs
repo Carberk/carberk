@@ -36,3 +36,67 @@ test('oldest ready request wins within founder priority and keeps all authority 
   assert.equal(state.reservation.lifecycle, 'active'); assert.match(state.reservation.namespace, /^cf_[a-f0-9]{32}$/);
   await assert.rejects(control.acquire(second), /reserved/);
 });
+
+test('fresh authoritative identity rejects wrong IDs, production, ambiguous origins and wrong credential scope before mutation', async(t) => {
+  for (const change of [
+    { projectId: 'wrong' }, { environmentId: 'production-id' }, { environmentName: 'production' },
+    { environmentName: '' }, { services: { api: 'other', worker: 'worker-id' } },
+    { credentialScope: 'account-wide' }, { origins: { ...policy.origins, database: 'postgresql://production/railway' } },
+  ]) {
+    const { platform, claim } = await setup(t); Object.assign(platform.policy, change);
+    await assert.rejects(claim(), /identity|scope|origins/); assert.deepEqual(platform.operations, []);
+  }
+});
+test('changed candidate, former owner and changed policy fail closed on each mutation', async(t) => {
+  const { control, platform, claim } = await setup(t); const lease = await claim();
+  await assert.rejects(control.operate({ ...lease, candidate: 'b'.repeat(40) }, 'fixture'), /candidate/);
+  control.actor = 'bob'; await assert.rejects(control.operate(lease, 'fixture'), /owner/);
+  control.actor = 'alice'; platform.policy.services.api = 'other';
+  await assert.rejects(control.operate(lease, 'deploy'), /identity/);
+  assert.deepEqual(platform.operations, []);
+});
+test('fixture and reset use only the durable disposable namespace; arbitrary commands are refused', async(t) => {
+  const { control, platform, claim } = await setup(t); const lease = await claim();
+  await assert.rejects(control.operate(lease, 'truncate-public'), /operation/);
+  await control.operate(lease, 'fixture'); await control.operate(lease, 'reset');
+  assert.deepEqual(platform.operations.map(x => [x.kind, x.namespace]), [['fixture', `cf_${lease.id}`], ['reset', `cf_${lease.id}`]]);
+  const state = await control.inspect(); assert.equal(state.reservation.operation, null);
+});
+test('a durable in-flight operation excludes deployments, resets, release and another owner', async(t) => {
+  const { control, ledger, claim } = await setup(t); const lease = await claim();
+  const current = await ledger.read(); current.state.reservation.operation = { kind: 'deploy', id: 'uncertain' };
+  await ledger.compareAndSwap(current.revision, current.state);
+  await assert.rejects(control.operate(lease, 'reset'), /in-flight/);
+  await assert.rejects(control.release(lease), /in-flight/);
+  await assert.rejects(control.restore(lease), /in-flight/);
+  assert.equal((await control.inspect()).reservation.operation.id, 'uncertain');
+});
+test('an interrupted mutation retains blocked recovery state and redacts provider diagnostics', async(t) => {
+  const { control, platform, claim } = await setup(t); const lease = await claim(); platform.fail = true;
+  await assert.rejects(control.operate(lease, 'fixture'), (error) => /blocked/.test(error.message) && !/Secret/.test(error.message));
+  const state = await control.inspect(); assert.equal(state.reservation.lifecycle, 'blocked');
+  assert.equal(state.reservation.operation.kind, 'fixture'); assert.equal(state.reservation.recovery.owner, 'alice');
+  await assert.rejects(control.release(lease), /in-flight/);
+});
+test('current-main restoration and readiness proof are required before release; moved main needs another restore', async(t) => {
+  const { control, ledger, platform, claim } = await setup(t); const lease = await claim();
+  await assert.rejects(control.release(lease), /restoration/);
+  await control.operate(lease, 'deploy');
+  await control.restore(lease);
+  assert.equal(platform.operations.at(-1).target, 'c'.repeat(40));
+  ledger.latestMain = async () => 'd'.repeat(40);
+  await assert.rejects(control.release(lease), /main changed/);
+  await control.restore(lease); await control.release(lease);
+  const state = await control.inspect(); assert.equal(state.reservation, null);
+  assert.equal(state.history.at(-1).restoredSha, 'd'.repeat(40));
+});
+test('persistent schema differences and incomplete readiness prevent restoration/release', async(t) => {
+  const { control, ledger, platform, claim } = await setup(t); const lease = await claim();
+  ledger.assertNoSchemaChange = async () => { throw new Error('Persistent schema disposition unresolved'); };
+  await assert.rejects(control.operate(lease, 'deploy'), /schema/); assert.deepEqual(platform.operations, []);
+  ledger.assertNoSchemaChange = async () => {};
+  platform.verify = async () => ({ sha: 'c'.repeat(40), readyz: true, worker: false, media: true, mock: true, fixtures: 'absent', schema: 'unchanged' });
+  await assert.rejects(control.restore(lease), /blocked/);
+  assert.equal((await control.inspect()).reservation.lifecycle, 'blocked');
+  await assert.rejects(control.release(lease), /in-flight/);
+});
