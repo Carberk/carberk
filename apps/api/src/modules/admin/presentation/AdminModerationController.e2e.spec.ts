@@ -136,6 +136,22 @@ describe("AdminModerationController e2e smoke", () => {
     return mintAdminJwt(adminUserId, session.id);
   }
 
+  it("confirms only current marketplace admins with current-session TOTP", async () => {
+    await request.get("/api/v1/admin/authority").expect(401);
+    await createUser("admin-one", "admin");
+    await createUser("reporter-one");
+    const token = await createAdminSession(adminOneId);
+    await request.get("/api/v1/admin/authority").set("Authorization", `Bearer ${mintAdminJwt(adminOneId)}`).expect(403);
+    await request.get("/api/v1/admin/authority").set("Authorization", `Bearer ${mintUserJwt(reporterOneId)}`).expect(403);
+    const response = await request.get("/api/v1/admin/authority").set("Authorization", `Bearer ${token}`).expect(200);
+    expect(response.body).toEqual({ marketplaceAdmin: true });
+    await prisma.session.updateMany({ where: { userId: adminOneId }, data: { adminTotpExpiresAt: new Date(0) } });
+    await request.get("/api/v1/admin/authority").set("Authorization", `Bearer ${token}`).expect(403);
+    const elevatedAgain = await createAdminSession(adminOneId);
+    await prisma.user.update({ where: { id: adminOneId }, data: { role: "buyer" } });
+    await request.get("/api/v1/admin/authority").set("Authorization", `Bearer ${elevatedAgain}`).expect(403);
+  });
+
   async function createActiveListing(sellerId: string) {
     const catalog = await seedCatalog();
     const listing = await prisma.listing.create({
