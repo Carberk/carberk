@@ -4,6 +4,7 @@ export const PresignKindSchema = z.enum(["image", "video"]);
 export type PresignKind = z.infer<typeof PresignKindSchema>;
 
 export const PresignRequestSchema = z.object({
+  businessId: z.string().uuid().optional(),
   kind: PresignKindSchema,
   contentType: z.string(),
   sizeBytes: z.number().int().positive(),

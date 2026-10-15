@@ -1,3 +1,10 @@
+import { BusinessInventoryController } from "./presentation/BusinessInventoryController";
+import { PrismaBusinessInventoryRepository } from "./infrastructure/PrismaBusinessInventoryRepository";
+import { BUSINESS_INVENTORY_REPOSITORY } from "./domain/ports/BusinessInventoryRepository";
+import { PrismaBusinessContactPhoneRepository } from "./infrastructure/PrismaBusinessContactPhoneRepository";
+import { BUSINESS_CONTACT_PHONE_REPOSITORY, type BusinessContactPhoneRepository } from "./domain/ports/BusinessContactPhoneRepository";
+import { ListingOwnership } from "./application/ListingOwnership";
+import { MeasurementModule } from "../measurement/measurement.module";
 import { Module } from "@nestjs/common";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 
@@ -96,9 +103,12 @@ import { PrismaListingViews } from "./infrastructure/PrismaListingViews";
 import { LISTING_VIEWS_PORT } from "./domain/ports/ListingViewsPort";
 
 @Module({
-  imports: [PrismaModule, EventEmitterModule, IdentityModule],
-  controllers: [ListingViewsController, ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController],
+  imports: [PrismaModule, EventEmitterModule, IdentityModule, MeasurementModule],
+  controllers: [BusinessInventoryController,ListingViewsController, ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController],
   providers: [
+    { provide: BUSINESS_INVENTORY_REPOSITORY, useClass: PrismaBusinessInventoryRepository },
+    { provide: BUSINESS_CONTACT_PHONE_REPOSITORY, useClass: PrismaBusinessContactPhoneRepository },
+    ListingOwnership,
     // Infrastructure adapters
     NullVinDecoder,
     NullContentClassifier,
@@ -219,8 +229,9 @@ import { LISTING_VIEWS_PORT } from "./domain/ports/ListingViewsPort";
       useFactory: (
         accountPhones: AccountPhonePort,
         confirmations: VerifiedContactPhoneRepository,
-      ) => new ContactPhonePolicy(accountPhones, confirmations),
-      inject: [ACCOUNT_PHONE_PORT, VERIFIED_CONTACT_PHONE_REPOSITORY],
+        businessPhones: BusinessContactPhoneRepository,
+      ) => new ContactPhonePolicy(accountPhones, confirmations, businessPhones),
+      inject: [ACCOUNT_PHONE_PORT, VERIFIED_CONTACT_PHONE_REPOSITORY, BUSINESS_CONTACT_PHONE_REPOSITORY],
     },
 
     // Application use-cases

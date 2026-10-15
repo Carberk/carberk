@@ -1,6 +1,7 @@
+import { ListingOwnership, assertListingOwnership } from "../application/ListingOwnership";
 import { randomUUID } from "node:crypto";
 
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { PrismaService } from "@auto-tm/db";
 
 import {
@@ -23,6 +24,7 @@ type Tx = Pick<PrismaService, "$queryRaw" | "$executeRaw">;
 interface LockedUpload {
   id: string;
   userId: string;
+  businessId: string | null;
   key: string;
   state: string;
   claimToken: string | null;
@@ -51,13 +53,15 @@ export class PrismaUploadClaims implements UploadClaimPort {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(IDENTITY_CLOCK_PORT) private readonly clock: ClockPort,
+    @Optional() @Inject(ListingOwnership) private readonly ownership?: ListingOwnership,
   ) {}
 
   async reserve(input: Parameters<UploadClaimPort["reserve"]>[0]): Promise<UploadReservation> {
     return this.prisma.$transaction(async (tx) => {
+      if (input.businessId) await assertListingOwnership(this.ownership, input, { businessId: input.businessId }, tx);
       const uploads = await this.lock(tx, input.uploadIds);
       if (uploads.length !== new Set(input.uploadIds).size ||
-        uploads.some((upload) => upload.userId !== input.userId || closed(upload))) {
+        uploads.some((upload) => (input.businessId ? upload.businessId !== input.businessId : upload.businessId || upload.userId !== input.userId) || closed(upload))) {
         throw notAvailable();
       }
       const mine = uploads.every((upload) => heldBy(upload, input.target));
@@ -152,7 +156,7 @@ export class PrismaUploadClaims implements UploadClaimPort {
   async settle(token: string, retiredUploadId: string): Promise<boolean> {
     return this.prisma.$transaction(async (tx) => {
       const held = await tx.$queryRaw<LockedUpload[]>`
-        SELECT id, "userId", "key", "state", "claimToken", "claimTargetType", "claimTargetId",
+        SELECT id, "userId", "businessId", "key", "state", "claimToken", "claimTargetType", "claimTargetId",
           "writeProtocol", "objectKeys"
         FROM media_uploads
         WHERE "claimToken" = ${token} AND "state" = 'PREPARING' ORDER BY id FOR UPDATE`;
@@ -197,7 +201,7 @@ export class PrismaUploadClaims implements UploadClaimPort {
 
   private lock(db: Tx, ids: string[]): Promise<LockedUpload[]> {
     return db.$queryRaw<LockedUpload[]>`
-      SELECT id, "userId", "key", "state", "claimToken", "claimTargetType", "claimTargetId",
+      SELECT id, "userId", "businessId", "key", "state", "claimToken", "claimTargetType", "claimTargetId",
         "writeProtocol", "objectKeys"
       FROM media_uploads WHERE id = ANY(${ids}::text[]) ORDER BY id FOR UPDATE`;
   }

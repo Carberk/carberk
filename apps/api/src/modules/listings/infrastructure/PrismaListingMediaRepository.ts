@@ -1,4 +1,6 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { lockEditableBusinessStock } from "./lockEditableBusinessStock";
+import { ListingOwnership, assertListingOwnership, type ListingActor } from "../application/ListingOwnership";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { PrismaService } from "@auto-tm/db";
 
 import { ListingMedia } from "../domain/ListingMedia";
@@ -11,6 +13,7 @@ export class PrismaListingMediaRepository implements ListingMediaRepository {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(UPLOAD_CLAIM_PORT) private readonly claims: UploadClaimPort,
+    @Optional() @Inject(ListingOwnership) private readonly ownership?: ListingOwnership,
   ) {}
 
   async save(media: ListingMedia, claim?: ListingMediaClaim): Promise<ListingMedia> {
@@ -35,6 +38,12 @@ export class PrismaListingMediaRepository implements ListingMediaRepository {
     // The row and the adoption commit together (ADR-0088). Listing before
     // upload is the lock order removal uses too.
     return this.prisma.$transaction(async (tx) => {
+      const listing = await tx.listing.findUnique({ where: { id: media.listingId } });
+      if (listing?.businessId) {
+        if (!claim.actor) throw new Error("Business media needs current actor");
+        await assertListingOwnership(this.ownership, claim.actor, { sellerId: listing.sellerId, businessId: listing.businessId }, tx);
+        await lockEditableBusinessStock(tx, listing.id);
+      }
       await tx.$queryRaw`SELECT id FROM listings WHERE id = ${media.listingId} FOR UPDATE`;
       const outcome = await this.claims.finalize(tx, {
         token: claim.token,
@@ -72,11 +81,17 @@ export class PrismaListingMediaRepository implements ListingMediaRepository {
     await this.prisma.listingMedia.delete({ where: { id } });
   }
 
-  async deleteReleasingUpload(id: string, minimumPhotos?: number): Promise<{ removed: boolean }> {
+  async deleteReleasingUpload(id: string, minimumPhotos?: number, actor?: ListingActor): Promise<{ removed: boolean }> {
     return this.prisma.$transaction(async (tx) => {
       let row = await tx.listingMedia.findUnique({ where: { id } });
       if (!row) return { removed: false };
 
+      const listing = await tx.listing.findUnique({ where: { id: row.listingId } });
+      if (listing?.businessId) {
+        if (!actor) throw new Error("Business media needs current actor");
+        await assertListingOwnership(this.ownership, actor, { sellerId: listing.sellerId, businessId: listing.businessId }, tx);
+        await lockEditableBusinessStock(tx, listing.id);
+      }
       if (minimumPhotos !== undefined) {
         // All removals of one Listing serialize, including distinct media IDs.
         await tx.$queryRaw`SELECT id FROM listings WHERE id = ${row.listingId} FOR UPDATE`;
@@ -108,18 +123,16 @@ export class PrismaListingMediaRepository implements ListingMediaRepository {
     });
   }
 
-  async updateSortOrder(
-    listingId: string,
-    orders: { mediaId: string; sortOrder: number }[],
-  ): Promise<void> {
-    await this.prisma.$transaction(
-      orders.map((o) =>
-        this.prisma.listingMedia.update({
-          where: { id: o.mediaId, listingId },
-          data: { sortOrder: o.sortOrder },
-        }),
-      ),
-    );
+  async updateSortOrder(listingId: string, orders: { mediaId: string; sortOrder: number }[], actor?: ListingActor): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const listing = await tx.listing.findUnique({ where: { id: listingId } });
+      if (listing?.businessId) {
+        if (!actor) throw new Error("Business media needs current actor");
+        await assertListingOwnership(this.ownership, actor, { sellerId: listing.sellerId, businessId: listing.businessId }, tx);
+        await lockEditableBusinessStock(tx, listing.id);
+      }
+      for (const order of orders) await tx.listingMedia.update({ where: { id: order.mediaId, listingId }, data: { sortOrder: order.sortOrder } });
+    });
   }
 
   private toDomain(row: {

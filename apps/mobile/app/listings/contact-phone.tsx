@@ -32,6 +32,7 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 export default function ContactPhoneScreen() {
   const params = useLocalSearchParams<{
     phone?: string;
+    businessId?: string;
     reconfirm?: string;
     purpose?: string;
     listingId?: string;
@@ -40,7 +41,7 @@ export default function ContactPhoneScreen() {
   const { t } = useTranslation();
   const goBack = useSafeBack();
   const { show } = useToast();
-  const requestCode = useRequestContactPhoneCode();
+  const requestCode = useRequestContactPhoneCode(firstParam(params.businessId));
   const republish = useRepublishListing();
 
   const reconfirm = firstParam(params.reconfirm) === "1";
@@ -73,6 +74,7 @@ export default function ContactPhoneScreen() {
     router.dismissTo(
       contactPhoneReturnHref(returnPathname, purpose, {
         confirmedContactPhone: canonicalPhone,
+        ...(params.businessId ? { businessId: params.businessId } : {}),
       }),
     );
   }
@@ -100,6 +102,7 @@ export default function ContactPhoneScreen() {
           resendInSeconds: String(result.resendInSeconds),
           purpose,
           returnPathname,
+          ...(params.businessId ? { businessId: params.businessId } : {}),
           ...(listingId ? { listingId } : {}),
           ...(__DEV__ && result.testCode ? { testCode: result.testCode } : {}),
         },

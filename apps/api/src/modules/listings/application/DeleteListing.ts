@@ -1,4 +1,5 @@
-import { Inject, Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
+import { Optional , Inject, Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
+import { ListingOwnership, assertListingOwnership } from "./ListingOwnership";
 import { PrismaService } from "@auto-tm/db";
 
 import {
@@ -13,6 +14,8 @@ import {
 export interface DeleteListingInput {
   listingId: string;
   userId: string;
+  sessionId?: string | undefined;
+  businessId?: string | undefined;
 }
 
 @Injectable()
@@ -24,6 +27,7 @@ export class DeleteListing {
     private readonly prisma: PrismaService,
     @Inject(LISTING_EVENT_PUBLISHER)
     private readonly events: ListingEventPublisher,
+    @Optional() @Inject(ListingOwnership) private readonly ownership?: ListingOwnership,
   ) {}
 
   async execute(input: DeleteListingInput): Promise<void> {
@@ -31,9 +35,7 @@ export class DeleteListing {
     if (!existing) {
       throw new NotFoundException("Listing not found");
     }
-    if (existing.sellerId !== input.userId) {
-      throw new ForbiddenException("Not the owner of this listing");
-    }
+    await assertListingOwnership(this.ownership, input, existing);
     if (existing.status === "banned") {
       throw new ForbiddenException({
         code: "FORBIDDEN",
@@ -45,7 +47,7 @@ export class DeleteListing {
       where: { listingId: existing.id },
     });
 
-    await this.listings.softDelete(existing.id, new Date());
+    await this.listings.softDelete(existing.id, new Date(), input);
 
     await this.prisma.auditLog.create({
       data: {

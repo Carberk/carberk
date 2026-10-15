@@ -265,6 +265,7 @@ export function useSaveListingEdit(
   payload: WizardSchemas.WizardDraftPayload,
   photos: StagedPhoto[],
   seedMedia: ListingsSchemas.ListingMedia[],
+  businessId?: string,
 ) {
   const [state, dispatch] = useReducer(reducer, {
     status: "idle",
@@ -272,10 +273,10 @@ export function useSaveListingEdit(
     error: null,
   });
 
-  const editListing = useEditListing();
-  const attachMedia = useAttachMedia(listingId);
-  const removeMedia = useRemoveMedia(listingId);
-  const reorderMedia = useReorderMedia(listingId);
+  const editListing = useEditListing(businessId);
+  const attachMedia = useAttachMedia(listingId, businessId);
+  const removeMedia = useRemoveMedia(listingId, businessId);
+  const reorderMedia = useReorderMedia(listingId, businessId);
 
   // Survives refetches and re-renders: what the server accepted and the plan
   // the current save is working through. Never derived from the live seed.

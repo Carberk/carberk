@@ -1,7 +1,4 @@
-import { ListingsSchemas } from "@auto-tm/contracts";
-import { randomUUID } from "node:crypto";
-
-import {
+import { Optional ,
   Inject,
   Injectable,
   NotFoundException,
@@ -9,6 +6,10 @@ import {
   ConflictException,
   ForbiddenException,
 } from "@nestjs/common";
+import { ListingOwnership, assertListingOwnership } from "./ListingOwnership";
+import { ListingsSchemas } from "@auto-tm/contracts";
+import { randomUUID } from "node:crypto";
+
 
 import { ListingMedia } from "../domain/ListingMedia";
 import { DomainError, LISTING_ERROR_CODES } from "../domain/types";
@@ -39,6 +40,8 @@ import { UploadAdoptionGuard, type UploadClaim } from "./UploadAdoptionGuard";
 export interface AttachMediaInput {
   listingId: string;
   userId: string;
+  sessionId?: string | undefined;
+  businessId?: string | undefined;
   key: string;
   kind: "image" | "video";
   sortOrder: number;
@@ -67,13 +70,16 @@ export class AttachMedia {
     private readonly uploadGuard: UploadAdoptionGuard,
     @Inject(UPLOAD_CLAIM_PORT)
     private readonly claims: UploadClaimPort,
+    @Optional() @Inject(ListingOwnership) private readonly ownership?: ListingOwnership,
   ) {}
 
   async execute(input: AttachMediaInput): Promise<AttachMediaResult> {
     const listing = await this.listings.findById(input.listingId);
-    if (!listing || listing.sellerId !== input.userId || listing.deletedAt) {
+    if (!listing || listing.deletedAt) {
       throw new NotFoundException("Listing not found");
     }
+    if (!listing.businessId && listing.sellerId !== input.userId) throw new NotFoundException("Listing not found");
+    await assertListingOwnership(this.ownership, input, listing);
     if (listing.status === "banned") {
       throw new ForbiddenException({
         code: "FORBIDDEN",
@@ -113,7 +119,7 @@ export class AttachMedia {
     if (input.posterKey !== undefined) {
       claims.push({ key: input.posterKey, kind: "image" });
     }
-    const [upload, poster] = await this.uploadGuard.authorize(input.userId, claims);
+    const [upload, poster] = await this.uploadGuard.authorize(input.userId, claims, listing.businessId);
     if (!upload) {
       throw new Error("Upload guard returned no upload for the media key");
     }
@@ -130,6 +136,7 @@ export class AttachMedia {
     const reservation = await this.claims
       .reserve({
         userId: input.userId,
+        ...(input.businessId ? { businessId: input.businessId, sessionId: input.sessionId } : {}),
         uploadIds: [upload.id],
         target: { type: "listing", id: input.listingId },
       })
@@ -176,7 +183,7 @@ export class AttachMedia {
 
       const saved = await this.mediaRepo.save(
         ListingMedia.create({ ...details, uploadId: upload.id, ...(thumbHash !== undefined ? { thumbHash } : {}) }),
-        { token: reservation.token, ...(poster ? { posterUploadId: poster.id } : {}) },
+        { token: reservation.token, actor: input, ...(poster ? { posterUploadId: poster.id } : {}) },
       );
       return { media: saved };
     } catch (err) {

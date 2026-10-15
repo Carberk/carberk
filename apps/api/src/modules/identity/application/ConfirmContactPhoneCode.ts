@@ -8,6 +8,7 @@ import { VerifySignInCode } from "./VerifySignInCode";
 
 export interface ConfirmContactPhoneCodeInput {
   userId: string;
+  businessId?: string | undefined;
   phone: string;
   code: string;
 }
@@ -33,6 +34,7 @@ export class ConfirmContactPhoneCode {
       destination: signInCodeDestination({ phone: input.phone }),
       code: input.code,
       userId: input.userId,
+      ...(input.businessId ? { businessId: input.businessId } : {}),
     });
 
     // Claim the code before the caller records the confirmation, so two

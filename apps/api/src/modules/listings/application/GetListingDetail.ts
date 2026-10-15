@@ -1,6 +1,8 @@
+import { Optional , Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { ListingOwnership } from "./ListingOwnership";
+import { BUSINESS_INVENTORY_REPOSITORY, type BusinessInventoryRepository } from "../domain/ports/BusinessInventoryRepository";
 import { UploadsSchemas } from "@auto-tm/contracts";
 
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import type { z } from "zod";
@@ -41,6 +43,8 @@ import { IDENTITY_CLOCK_PORT, type ClockPort } from "../../identity/identity.pub
 export interface GetListingDetailInput {
   listingId: string;
   requestingUserId?: string | undefined;
+  sessionId?: string | undefined;
+  businessId?: string | undefined;
 }
 
 export type ListingDetailDto = z.infer<typeof ListingsSchemas.ListingDetailSchema>;
@@ -64,6 +68,8 @@ export class GetListingDetail {
     private readonly sellerProfiles: SellerProfilePort,
     @Inject(LISTING_VIEWS_PORT) private readonly views: ListingViewsPort,
     @Inject(IDENTITY_CLOCK_PORT) private readonly clock: ClockPort,
+    @Optional() @Inject(BUSINESS_INVENTORY_REPOSITORY) private readonly inventory?: BusinessInventoryRepository,
+    @Optional() @Inject(ListingOwnership) private readonly ownership?: ListingOwnership,
   ) {}
 
   async execute(input: GetListingDetailInput): Promise<ListingDetailDto> {
@@ -73,13 +79,14 @@ export class GetListingDetail {
       throw new NotFoundException("Listing not found");
     }
 
-    // Banned listings: non-owner → 404; owner → show detail (frontend shows generic notice)
-    if (listing.status === "banned") {
-      if (input.requestingUserId !== listing.sellerId) {
-        throw new NotFoundException("Listing not found");
-      }
+    let currentMember = false;
+    const business = listing.businessId ? await this.inventory?.publicBusiness(listing.businessId) : null;
+    if (listing.businessId && input.requestingUserId && input.businessId === listing.businessId && this.ownership) {
+      try { await this.ownership.authorize({ userId: input.requestingUserId, sessionId: input.sessionId, businessId: input.businessId }, listing, undefined, true); currentMember = true; } catch { /* Public reads retain their ordinary audience. */ }
     }
-    const seller = await this.sellerProfiles.getSellerProfile(listing.sellerId);
+    if (listing.businessId && (!business || business.status !== "active") && !currentMember) throw new NotFoundException("Listing not found");
+    if (listing.status === "banned" && !(listing.businessId ? currentMember : input.requestingUserId === listing.sellerId)) throw new NotFoundException("Listing not found");
+    const seller = business ? { displayName: business.name, nameNumber: 1000, avatarIndex: 0, avatarKey: null, deleted: false, memberSince: business.createdAt } : await this.sellerProfiles.getSellerProfile(listing.sellerId);
     if (!seller) throw new NotFoundException("Seller not found");
 
     const media = await this.mediaRepo.findByListingId(input.listingId);
@@ -98,6 +105,7 @@ export class GetListingDetail {
       id: listing.id,
       publicNumber: listing.publicNumber,
       sellerId: listing.sellerId,
+      ...(listing.businessId ? { businessId: listing.businessId } : {}),
       seller: {
         displayName: seller.displayName,
         nameNumber: seller.nameNumber,
@@ -144,7 +152,7 @@ export class GetListingDetail {
         posterKey: m.posterKey,
         ...(m.thumbHash !== undefined ? { thumbHash: m.thumbHash } : {}),
       })),
-      ...((listing.status === "active" || input.requestingUserId === listing.sellerId)
+      ...((listing.status === "active" || currentMember || (!listing.businessId && input.requestingUserId === listing.sellerId))
         ? await this.views.counts(listing.id, this.clock.now()) : { viewCount: 0 }),
       favoriteCount: listing.favoriteCount,
       isFavorited,

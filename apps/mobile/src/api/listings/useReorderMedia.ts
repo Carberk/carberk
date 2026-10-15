@@ -1,11 +1,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ListingsSchemas } from "@auto-tm/contracts";
 
+import { useInventoryRequestOptions } from "../../business/useInventoryRequestOptions";
 import { apiClient } from "../client";
 import { queryKeys } from "../queryKeys";
 
-export function useReorderMedia(listingId: string) {
+export function useReorderMedia(listingId: string, businessId?: string) {
   const queryClient = useQueryClient();
+  const requestOptions = useInventoryRequestOptions(businessId);
 
   return useMutation({
     mutationFn: (input: ListingsSchemas.ReorderMediaRequest) =>
@@ -13,6 +15,7 @@ export function useReorderMedia(listingId: string) {
         `/listings/${listingId}/media/order`,
         input,
         ListingsSchemas.ReorderMediaResponseSchema,
+        ...(businessId ? [requestOptions] : []),
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({
