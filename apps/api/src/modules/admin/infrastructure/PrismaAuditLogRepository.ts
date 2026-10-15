@@ -9,12 +9,13 @@ export class PrismaAuditLogRepository implements AuditLogRepository {
 
   async findMany(params: {
     action?: string;
+    allowedActions?: readonly string[];
     targetType?: string;
     targetId?: string;
     page: number;
     pageSize: number;
   }): Promise<{ items: AuditLogRow[]; total: number }> {
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = params.allowedActions ? { AND: [{ action: { in: [...params.allowedActions] } }] } : {};
     if (params.action) {
       where["action"] = params.action;
     }

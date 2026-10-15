@@ -13,7 +13,8 @@ export class FakeAuditLogRepository implements AuditLogRepository {
     pageSize: number;
   }): Promise<{ items: AuditLogRow[]; total: number }> {
     let filtered = this.rows;
-    if (params.allowedActions) filtered = filtered.filter((row) => params.allowedActions!.includes(row.action));
+    const allowedActions = params.allowedActions;
+    if (allowedActions) filtered = filtered.filter((row) => allowedActions.includes(row.action));
     if (params.action) {
       filtered = filtered.filter((r) => r.action === params.action);
     }

@@ -102,11 +102,16 @@ export class PrismaSessionRepository implements SessionRepository {
   async updateAdminTotpExpiresAt(
     id: string,
     adminTotpExpiresAt: Date | null,
+    currentStaff?: { userId: string; now: Date },
   ): Promise<void> {
-    await this.prisma.session.update({
-      where: { id },
-      data: { adminTotpExpiresAt },
+    const updated = await this.prisma.session.updateMany({
+      where: { id, ...(currentStaff ? {
+        userId: currentStaff.userId, expiresAt: { gt: currentStaff.now },
+        user: { suspendedAt: null, deletionScheduledAt: null,
+          OR: [{ role: "admin" }, { staffGrants: { some: { revokedAt: null } } }] },
+      } : {}) }, data: { adminTotpExpiresAt },
     });
+    if (updated.count !== 1) throw new Error("SESSION_NOT_FOUND");
   }
 
   async delete(id: string): Promise<void> {

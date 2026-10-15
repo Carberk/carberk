@@ -7,6 +7,7 @@ import { z } from "zod";
 
 extendZodWithOpenApi(z);
 
+import { StaffCapabilitySchema, StaffSummarySchema, StaffGrantChangeSchema } from "./schemas/staff";
 import {
   ErrorResponseSchema,
   UploadObjectInvalidDetailsSchema,
@@ -342,6 +343,10 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
   registry.register("SuspendUserResponse", SuspendUserResponseSchema);
   registry.register("RemoveUserPhotoRequest", RemoveUserPhotoRequestSchema);
   registry.register("RemoveUserPhotoResponse", RemoveUserPhotoResponseSchema);
+
+  registry.register("StaffCapability", StaffCapabilitySchema);
+  registry.registerPath({ method: "get", path: "/api/v1/staff/capabilities", summary: "Current staff capabilities and elevation", tags: ["Identity"], responses: { 200: { description: "Current scoped staff or pending admin summary", content: { "application/json": { schema: S(StaffSummarySchema) } } }, 403: { description: "Current active staff Session required", content: { "application/json": { schema: S(ErrorResponseSchema) } } } } });
+  registry.registerPath({ method: "post", path: "/api/v1/staff/grants", summary: "Grant or revoke a named staff capability with audit", tags: ["Identity"], request: { body: { content: { "application/json": { schema: S(StaffGrantChangeSchema) } } } }, responses: { 204: { description: "Authoritative audited transition, or idempotent no-op" }, 400: { description: "Invalid staff change", content: { "application/json": { schema: S(ErrorResponseSchema) } } }, 403: { description: "Explicit current elevated management authority required", content: { "application/json": { schema: S(ErrorResponseSchema) } } } } });
 
   registry.registerPath({
     method: "post",

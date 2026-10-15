@@ -1,3 +1,9 @@
+import { CheckStaffAuthority } from "./application/CheckStaffAuthority";
+import { ChangeStaffGrant } from "./application/ChangeStaffGrant";
+import { StaffController } from "./presentation/StaffController";
+import { PrismaStaffAuthority } from "./infrastructure/PrismaStaffAuthority";
+import { STAFF_AUTHORITY_PORT } from "./domain/ports/StaffAuthorityPort";
+import { STAFF_AUTHORITY_REPOSITORY } from "./domain/ports/StaffAuthorityRepository";
 import { Module } from "@nestjs/common";
 import { BullModule } from "@nestjs/bullmq";
 import { EventEmitterModule } from "@nestjs/event-emitter";
@@ -75,7 +81,7 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     PrismaModule,
     BullModule.registerQueue({ name: AuthSchemas.EMAIL_CODE_QUEUE }),
   ],
-  controllers: [
+  controllers: [StaffController,
     IdentityController,
     AuthController,
     MeController,
@@ -83,6 +89,9 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     AccountDeletionController,
   ],
   providers: [
+    CheckStaffAuthority, ChangeStaffGrant,
+    { provide: STAFF_AUTHORITY_PORT, useExisting: CheckStaffAuthority },
+    { provide: STAFF_AUTHORITY_REPOSITORY, useClass: PrismaStaffAuthority },
     PrismaOtpRequestRepository,
     PrismaUserRepository,
     PrismaSessionRepository,
@@ -237,6 +246,7 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     },
   ],
   exports: [
+    STAFF_AUTHORITY_PORT,
     SELLER_PROFILE_READ_PORT,
     IDENTITY_TOKENS.IdentityCheckPort,
     IDENTITY_TOKENS.ContactPhoneCodePort,

@@ -51,6 +51,7 @@ export class ListAuditEntries {
     const validated = this.validate(input);
 
     const { items, total } = await this.auditRepo.findMany({
+      allowedActions: Object.values(AdminSchemas.AdminAuditAction),
       action: validated.action,
       targetType: validated.targetType,
       targetId: validated.targetId,
