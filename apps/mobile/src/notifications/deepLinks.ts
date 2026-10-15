@@ -17,6 +17,8 @@ export function parseDirectMessageConversationId(
 
   const record = data as Record<string, unknown>;
 
+  if (record["kind"] === "service_update") return null;
+
   const conversationId = record["conversationId"];
   if (typeof conversationId === "string" && conversationId.length > 0) {
     return conversationId;
@@ -31,4 +33,10 @@ export function parseDirectMessageConversationId(
   }
 
   return null;
+}
+
+export function parseServiceConversationId(data: unknown): string | null {
+ if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+ const value = data as Record<string, unknown>;
+ return value["kind"] === "service_update" && typeof value["conversationId"] === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value["conversationId"]) ? value["conversationId"] : null;
 }

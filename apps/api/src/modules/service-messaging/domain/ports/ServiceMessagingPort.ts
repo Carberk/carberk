@@ -6,6 +6,7 @@ export interface ServiceMessagingPort {
   read(subject: ServiceSubject, id: string, after: number, limit: number): Promise<ServiceMessagingSchemas.ServiceConversation>;
   send(subject: ServiceSubject, id: string, message: ServiceMessagingSchemas.ServiceSend): Promise<ServiceMessagingSchemas.ServiceMessage>;
   assign(subject: ServiceSubject, id: string, expectedVersion: number, targetUserId?: string): Promise<void>;
+  subscribePush(subject: ServiceSubject, id: string, deviceToken: string): Promise<void>;
   markRead(subject: ServiceSubject, id: string, throughSequence: number): Promise<void>;
   stage(subject: ServiceSubject, id: string, upload: ServiceMessagingSchemas.ServiceStageAttachment): Promise<{ id: string }>;
   upload(subject: ServiceSubject, id: string, attachmentId: string, bytes: Uint8Array): Promise<void>;

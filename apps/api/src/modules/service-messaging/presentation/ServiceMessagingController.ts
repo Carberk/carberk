@@ -49,6 +49,11 @@ export class ServiceMessagingController {
   const data = parse(ServiceMessagingSchemas.ServiceAssignSchema, body);
   return this.run(async () => { await this.services.assign(this.subject(req), parse(uuid, id), data.expectedVersion, data.targetUserId); this.events.emit("service.changed", id); return { ok: true }; });
  }
+ @Post("conversations/:id/push") @Header("Cache-Control", "no-store, private")
+ subscribePush(@Req() req: ServiceRequest, @Param("id") id: string, @Body() body: unknown) {
+  const data = parse(z.object({ deviceToken: z.string().min(1).max(4096) }).strict(), body);
+  return this.run(async () => { await this.services.subscribePush(this.subject(req), parse(uuid, id), data.deviceToken); return { ok: true }; });
+ }
  @Post("conversations/:id/read") @Header("Cache-Control", "no-store, private")
  markRead(@Req() req: ServiceRequest, @Param("id") id: string, @Body() body: unknown) { return this.run(async () => { await this.services.markRead(this.subject(req), parse(uuid, id), parse(ServiceMessagingSchemas.ServiceReadSchema, body).throughSequence); return { ok: true }; }); }
  @Post("conversations/:id/attachments") @Header("Cache-Control", "no-store, private")

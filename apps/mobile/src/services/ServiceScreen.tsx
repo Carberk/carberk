@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
-import { Stack, router, useFocusEffect } from "expo-router";
+import { Stack, router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { randomUUID } from "expo-crypto";
 import { useTranslation } from "react-i18next";
 
@@ -10,6 +10,7 @@ import { apiClient, ApiError } from "../api/client";
 import { localeTag } from "../i18n/resources";
 
 import { pickServiceImage, uploadServiceImage, type ServiceImage } from "./serviceImage";
+import { useServicePush } from "./useServicePush";
 import { useServiceRealtime } from "./useServiceRealtime";
 import { ServiceAttachment } from "./ServiceAttachment";
 import { serviceCopy } from "./copy";
@@ -20,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 
 export function ServiceScreen() {
+ const params = useLocalSearchParams<{ conversationId?: string }>();
  const { i18n } = useTranslation(), c = serviceCopy(i18n.language); const { userId, isAuthenticated } = useAuth();
  const list = useServiceList(), [selected, setSelected] = useState<string | null>(null), conversation = useServiceConversation(selected), send = useServiceSend(selected), open = useServiceOpen();
  const [body, setBody] = useState(""), [error, setError] = useState<"permission" | "conflict" | "disabled" | "error" | null>(null);
@@ -27,11 +29,13 @@ export function ServiceScreen() {
  const currentOwner = useRef({ userId, selected }); currentOwner.current = { userId, selected };
  const retry = useRef<{ fingerprint: string; id: string } | null>(null);
  useEffect(() => { setSelected(null); setBody(""); setError(null); setImage(null); setAttachmentId(null); retry.current = null; }, [userId]);
+ useEffect(() => { const id = params.conversationId; if (isAuthenticated === true && typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id)) setSelected(id); }, [params.conversationId, userId, isAuthenticated]);
  useFocusEffect(useCallback(() => { if (isAuthenticated === true) { void list.refetch(); if (selected) void conversation.refetch(); } }, [isAuthenticated, selected, list.refetch, conversation.refetch]));
  const failure = (value: unknown) => setError(value instanceof ApiError ? value.status === 403 ? "permission" : value.status === 409 ? "conflict" : value.status === 503 ? "disabled" : "error" : "error");
  const onDenied = useCallback(() => { setError("permission"); setImage(null); setAttachmentId(null); }, []);
  useServiceRealtime(selected, onDenied);
  const detail = isAuthenticated === true && !conversation.isError && error !== "permission" && error !== "conflict" ? conversation.data?.pages[0] ? { ...conversation.data.pages[0], messages: conversation.data.pages.flatMap(page => page.messages) } : undefined : undefined;
+ useServicePush(detail?.id);
  const readFence = useRef("");
  const renderedThrough = detail?.messages.at(-1)?.sequence ?? 0;
  useEffect(() => {
