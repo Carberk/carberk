@@ -30,6 +30,12 @@ describe("first-party measurement HTTP", () => {
   jwt = module.get(JwtService); app = module.createNestApplication<NestFastifyApplication>(new FastifyAdapter()); await app.listen(0, "127.0.0.1"); request = supertest(app.getHttpServer());
  });
  afterAll(async () => { await app?.close(); });
+ it("offers foreground bootstrap with no actor/body credential injection and no caching", async () => {
+  const response = await request.post("/api/v1/measurement/bootstrap").send({}).expect(201);
+  expect(response.headers["cache-control"]).toBe("no-store");
+  expect(response.body).toMatchObject({ visitId: "00000000-0000-4000-8000-000000000002", generation: "generation-http", purposes: ["product_improvement"] });
+  await request.post("/api/v1/measurement/bootstrap").send({ userId: "buyer", token: "SENSITIVE_SENTINEL" }).expect(400);
+ });
  it("uses verified JWT or scoped guest capability, never body actor metadata", async () => {
   const response = await request.post("/api/v1/measurement/events").set("authorization", `Bearer ${jwt.sign({ sub: "buyer" })}`).send({ events: [event] }).expect(204);
   expect(response.text).toBe(""); expect(ledger.records[0]?.authority.subject.kind).toBe("account");
