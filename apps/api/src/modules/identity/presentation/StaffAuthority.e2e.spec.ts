@@ -48,7 +48,7 @@ describe("current staff authority on real HTTP and disposable PostgreSQL", () =>
   await cleanSuiteFixtures(prisma, suite, { userAliases: actors });
   for (const who of actors) {
    await prisma.user.create({ data: { id: suite.id(who), phone: suite.phone(who), phoneVerifiedAt: new Date(), role: who === "admin" ? "admin" : who === "moderator" ? "moderator" : "buyer" } });
-   await prisma.session.create({ data: { id: sessionId(who), userId: suite.id(who), refreshTokenHash: "synthetic-unused", expiresAt: new Date(Date.now() + 86400000), adminTotpExpiresAt: who === "staff" ? null : new Date(Date.now() + 3600000) } });
+   await prisma.session.create({ data: { id: sessionId(who), userId: suite.id(who), refreshTokenHash: suite.id(`${who}-refresh`), expiresAt: new Date(Date.now() + 86400000), adminTotpExpiresAt: who === "staff" ? null : new Date(Date.now() + 3600000) } });
   }
   await prisma.staffGrant.createMany({ data: ["staff.manage", "founder.control"].map((capability) => ({ userId: suite.id("founder"), capability })) });
  });
