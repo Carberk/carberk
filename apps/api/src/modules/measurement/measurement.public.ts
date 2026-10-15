@@ -19,3 +19,8 @@ export interface MeasurementLedgerPort {
   * Deletion and restore invalidation serialize with this insert. */
  appendIfEligible(record: { event: MeasurementSchemas.MeasurementEvent; authority: MeasurementAuthority; receivedAt: Date; expiresAt: Date }): Promise<"accepted" | "duplicate" | "revoked">;
 }
+
+export interface MeasurementSessionPort {
+ bootstrap(input: { authenticatedUserId?: string; guestCapability?: string; visitId?: string }): Promise<{ visitId: string; generation: string; guestCapability?: string } | null>;
+ eraseGuest(capability: string): Promise<void>;
+}

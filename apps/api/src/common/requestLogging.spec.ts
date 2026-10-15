@@ -96,6 +96,12 @@ describe("API request logging", () => {
     expect(log).not.toContain('"query"');
   });
 
+  it("redacts the scoped guest association credential from every request log", async () => {
+    const log = await logOneRequest({ "x-measurement-guest": "mg_scoped-guest-secret-sentinel", "x-measurement-synthetic": "ms_synthetic-bootstrap-secret-sentinel" });
+    expect(log).not.toContain("scoped-guest-secret-sentinel");
+    expect(log).not.toContain("synthetic-bootstrap-secret-sentinel");
+  });
+
   it("never retains the raw app-install identifier in request logs", async () => {
     const log = await logOneRequest({ "x-app-install-id": "raw-install-sentinel" });
     expect(log).not.toContain("raw-install-sentinel");

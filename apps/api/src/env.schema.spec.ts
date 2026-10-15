@@ -15,6 +15,11 @@ const baseEnv = {
 };
 
 describe("EnvSchema socket defaults", () => {
+  it("defaults measurement closed and refuses activation without epoch and evidence", () => {
+    expect(EnvSchema.parse(baseEnv).MEASUREMENT_ENABLED).toBe(false);
+    expect(EnvSchema.safeParse({ ...baseEnv, MEASUREMENT_ENABLED: "true" }).success).toBe(false);
+    expect(EnvSchema.safeParse({ ...baseEnv, MEASUREMENT_ENABLED: "true", MEASUREMENT_COLLECTOR_EPOCH: "00000000-0000-4000-8000-000000000001", MEASUREMENT_EVIDENCE_REF: "synthetic-905" }).success).toBe(true);
+  });
   it("defaults Socket.IO settings to single-node mode", () => {
     const env = EnvSchema.parse(baseEnv);
 
