@@ -66,3 +66,9 @@ This discovery used existing account-authorized operator tools. It is not the sc
 5. Schema changes remain refused until persistent migration disposition is proven. This foundation does not claim code rollback reverses migrations. Interrupted unknown operations stay blocked with owner/action and known deployment IDs; there is no force unlock. Changed fixture originals or new references also require explicit reviewed disposition.
 
 Docs: https://cli.github.com/manual/gh_auth_git-credential verified the credential-helper protocol; the CLI uses authenticated gh identity for owner and Git remote credential lookup. https://docs.railway.com/integrations/api verified environment-scoped project-token authentication. No provider/branch-protection setting or paid infrastructure was added.
+
+### Final affected verification
+
+Final root-script rerun passed 257 tests after the additional process-contention, authenticated-owner, deployment-journal and main-move checks. An additional actual Railway-adapter proof test found that a latest active instance marked BUILDING could be accepted alongside SUCCESS deployment metadata. Red checkpoint `fc673a7a` records the missing rejection. The adapter now requires both actual deployment and current active-instance status SUCCESS; the affected focused suite passes 23 tests, including success, stale active ID, wrong SHA and active BUILDING cases.
+
+A constant-output read-only SSH identity probe using the same encoded Node invocation was attempted with existing operator authentication. It was unavailable; diagnostics were suppressed. Remote command quoting/SSH execution therefore remains part of the required first reviewed deployed drill, not proven by account-level variable discovery.

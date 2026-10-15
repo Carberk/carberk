@@ -27,7 +27,7 @@ Other commands require a credential-free policy JSON with exactly these fields:
 }
 ```
 
-The IDs above were read through the Railway CLI on 15 October 2026 UTC. They are discovery evidence only. Origins in the example are placeholders; use the sanitized live-discovery receipt in issue 901 evidence, then revalidate before use. Include `admin`/`web` service IDs when they are part of the candidate. A project token scoped to the exact staging environment must be supplied through `STAGING_RAILWAY_PROJECT_TOKEN` from the operator secret store. Never put its value in arguments, JSON files, commits or evidence. Account-wide credentials are not accepted by the GraphQL adapter.
+The IDs above were read through the Railway CLI on 15 October 2026 UTC. They are discovery evidence only. Origins in the example are placeholders; use the sanitized live-discovery receipt in issue 901 evidence, then revalidate before use. Include `admin`/`web` service IDs when they are part of the candidate. Current read-only discovery found staging worker EMAIL_DRIVER=resend and PUSH_TRANSPORT=fcm. Application mutations correctly refuse that configuration until the coordinator prepares mock email/test push under a reservation. A project token scoped to the exact staging environment must be supplied through `STAGING_RAILWAY_PROJECT_TOKEN` from the operator secret store. Never put its value in arguments, JSON files, commits or evidence. Account-wide credentials are not accepted by the GraphQL adapter.
 
 ```sh
 pnpm staging:control identity /tmp/staging-policy.json

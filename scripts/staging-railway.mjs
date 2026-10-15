@@ -130,7 +130,7 @@ export class RailwayPlatform {
       const instance = await this.query(`query active($serviceId: String!, $environmentId: String!) {
         serviceInstance(serviceId: $serviceId, environmentId: $environmentId) { latestDeployment { id status } } }`,
       { serviceId, environmentId: lease.identity.environmentId });
-      if (current.id !== id || current.status !== 'SUCCESS' || current.meta?.commitHash !== target || instance.serviceInstance.latestDeployment?.id !== id) throw new Error('Actual deployed candidate mismatch');
+      if (current.id !== id || current.status !== 'SUCCESS' || current.meta?.commitHash !== target || instance.serviceInstance.latestDeployment?.id !== id || instance.serviceInstance.latestDeployment?.status !== 'SUCCESS') throw new Error('Actual deployed candidate mismatch');
     }
     const response = await this.fetch(`${lease.identity.origins.api}/readyz`, { signal: AbortSignal.timeout(15000), redirect: 'error' });
     const ready = await response.json();
