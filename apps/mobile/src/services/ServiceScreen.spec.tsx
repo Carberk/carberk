@@ -49,3 +49,7 @@ it("retrieves a private image through the authenticated service boundary before 
  const screen = await renderMobile(<ServiceScreen/>); await fireEvent.press(await screen.findByRole("button", { name: "General Support" })); await screen.findByText("synthetic-private.jpg");
  expect(reads).toBe(0); await fireEvent.press(screen.getByRole("button", { name: "Private attachment" })); expect(await screen.findByLabelText("synthetic-private.jpg")).toBeTruthy(); expect(reads).toBe(1);
 });
+it("shows the public history explanation and price before sign-in without requesting private history", async () => {
+ await clearAuthSession(); let privateReads = 0; server.use(http.get("*/services/conversations", () => { privateReads++; return HttpResponse.json([]); }));
+ const screen = await renderMobile(<ServiceScreen/>); expect(await screen.findByText("Vehicle History: 100 TMT")).toBeTruthy(); expect(screen.getByText(/One available provider is sufficient/)).toBeTruthy(); expect(privateReads).toBe(0);
+});
