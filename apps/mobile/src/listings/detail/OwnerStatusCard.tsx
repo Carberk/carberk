@@ -2,6 +2,8 @@ import { View } from "react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
+import { ListingViewCount } from "./ListingViewCount";
+
 import { SkeletonText } from "@/components/ui/skeleton-text";
 import { Text } from "@/components/ui/text";
 
@@ -12,9 +14,13 @@ import { Text } from "@/components/ui/text";
 export function OwnerStatusCard({
   status,
   favoriteCount,
+  viewCount,
+  viewsToday,
 }: {
   status: ListingsSchemas.ListingSummary["status"];
   favoriteCount?: number;
+  viewCount?: number;
+  viewsToday?: number;
 }) {
   const { t } = useTranslation();
   return (
@@ -22,7 +28,7 @@ export function OwnerStatusCard({
       <Text className="text-body font-semibold">
         {t("yourListing")} · {t(status)}
       </Text>
-      {/* Saves are counted by the API. Views are not counted yet, so no view figure is shown. */}
+      <ListingViewCount total={viewCount} today={viewsToday} className="text-callout text-muted-foreground" />
       {favoriteCount === undefined ? (
         <SkeletonText testID="owner-saves-loading" className="text-callout" width="40%" />
       ) : (

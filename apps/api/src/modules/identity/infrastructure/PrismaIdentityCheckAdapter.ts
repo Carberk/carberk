@@ -20,9 +20,9 @@ export class PrismaIdentityCheckAdapter implements IdentityCheckPort {
   ): Promise<boolean> {
     const row = await this.prisma.dealershipMember.findUnique({
       where: { userId },
-      select: { dealershipId: true },
+      select: { dealershipId: true, status: true, user: { select: { suspendedAt: true, deletionScheduledAt: true } }, dealership: { select: { status: true } } },
     });
-    return row?.dealershipId === dealershipId;
+    return !!row && row.dealershipId === dealershipId && row.status === "active" && row.dealership.status === "active" && !row.user.suspendedAt && !row.user.deletionScheduledAt;
   }
 
   async isSuspended(userId: string): Promise<boolean> {

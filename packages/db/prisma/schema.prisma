@@ -86,6 +86,7 @@ model User {
   listingDrafts                ListingDraft[]
   verifiedContactPhones        VerifiedContactPhone[]
   mediaUploads                 MediaUpload[]
+  businessInvitations          DealershipInvitation[]
   staffGrants                  StaffGrant[]
   totpEnrollment               TotpEnrollment?
   reportsSubmitted             ContentReport[]           @relation("Reporter")
@@ -143,6 +144,12 @@ enum DealershipMemberRole {
 }
 
 model Dealership {
+  /// Checked business identity is never a claim about vehicle condition.
+  status String @default("recovery")
+  admissionMode String @default("synthetic")
+  admittedAt DateTime?
+  checkedEvidence String?
+  invitations DealershipInvitation[]
   id        String   @id @default(uuid())
   slug      String   @unique
   name      String
@@ -159,6 +166,7 @@ model Dealership {
 }
 
 model DealershipMember {
+  status String @default("active")
   id           String               @id @default(uuid())
   dealershipId String
   dealership   Dealership           @relation(fields: [dealershipId], references: [id])
@@ -168,6 +176,22 @@ model DealershipMember {
   createdAt    DateTime             @default(now())
 
   @@map("dealership_members")
+}
+
+model DealershipInvitation {
+  id String @id @default(uuid())
+  dealershipId String
+  dealership Dealership @relation(fields: [dealershipId], references: [id], onDelete: Cascade)
+  recipientUserId String
+  recipient User @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  role DealershipMemberRole @default(sales)
+  tokenHash String @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  redeemedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([dealershipId])
+  @@map("dealership_invitations")
 }
 
 model OwnedVehicle {
