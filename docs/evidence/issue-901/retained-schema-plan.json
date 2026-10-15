@@ -1,0 +1,324 @@
+{
+  "kind": "offline-git-schema-proof-only",
+  "candidate": "e9281c6497aa24410b830820610c4f106ef90ea7",
+  "restorationMain": "7af49d4c1474b2c3d841b14736c4ef59ce155a4e",
+  "profile": {
+    "baseline": "7af49d4c1474b2c3d841b14736c4ef59ce155a4e",
+    "schemaHashes": [
+      "3cf9a92dc50367112d7e41cfadaf9e3199e0000ef75a7181861c09ebe9d7e51d",
+      "6156fef81231e244f52c85b3cabaf2c18597a6d9c7699782144b2a85e324a42b",
+      "c02cefa47ade5650ea02f79dd07ba7c42fbb4524e938a6fd08bbbfca161a7735"
+    ],
+    "schemaMigrations": {
+      "3cf9a92dc50367112d7e41cfadaf9e3199e0000ef75a7181861c09ebe9d7e51d": [],
+      "6156fef81231e244f52c85b3cabaf2c18597a6d9c7699782144b2a85e324a42b": [
+        "20261015003500_listing_view_counts"
+      ],
+      "c02cefa47ade5650ea02f79dd07ba7c42fbb4524e938a6fd08bbbfca161a7735": [
+        "20261015003500_listing_view_counts",
+        "20261015010000_staff_capabilities"
+      ]
+    },
+    "additions": [
+      {
+        "name": "20261015003500_listing_view_counts",
+        "checksum": "bdb25bde750cd12de85ca3a4bf4201ac927681539f1b1b70105a633f4dc26d5d"
+      },
+      {
+        "name": "20261015010000_staff_capabilities",
+        "checksum": "88f7b84d80a31ee2918ea4a8e2ce9c578f8de766ca2d1317fe1f2713d6fd0c43"
+      }
+    ]
+  },
+  "deploy": {
+    "disposition": "retained-additive",
+    "migrations": [
+      {
+        "name": "20260513201407_init",
+        "checksum": "8047c0ad646e98e1302c158d32d9d1dc6f54a05024ae29ed1e7ffaee4791a860"
+      },
+      {
+        "name": "20260514090000_multi_device_sessions_and_role_split",
+        "checksum": "f2b6b1d0d655ece5dfd64d9d800bcad4a05c91550969f4a3ce08de3da4d5a3c0"
+      },
+      {
+        "name": "20260514100000_otp_request_ip",
+        "checksum": "70ab10afbc02ab9d9296d2e9c452ba0dc44c92b3a0b8ad32b0f2b4a0776dd8cc"
+      },
+      {
+        "name": "20260514104615_delete_me_cascades",
+        "checksum": "af24a05134219508e15794874c252d8a1bc6780850d7388eeccdcad56553e193"
+      },
+      {
+        "name": "20260518081943_add_engine_type_transmission_drive_type",
+        "checksum": "8a7068c700f352714f558bf46492484770b8e9ea6a5c2293566256dc290c2841"
+      },
+      {
+        "name": "20260518083234_s4_listings_crud",
+        "checksum": "ab90ddaf05f5034928eb5ffacd871b20538c5d33b97201918411e8d17a612010"
+      },
+      {
+        "name": "20260518180741_add_seller_terms_to_listing",
+        "checksum": "10ec9bdf271645b46d08e9d017da0ba78257d8a82b02516db52b7eb6d612c454"
+      },
+      {
+        "name": "20260608010000_s7_admin_moderation",
+        "checksum": "7faad97bf4fc734a9bc519e6dd8019ba0aeac17810c5b5bd564a0cce0e8c0a8a"
+      },
+      {
+        "name": "20260609000000_account_deletion_grace",
+        "checksum": "e91fe7bbaa26c63d26c95c637cbd3f6c22bf9bd5ec7e0b544c06124a9c244698"
+      },
+      {
+        "name": "20260711000000_add_condition_disclosure_to_listing",
+        "checksum": "69f549c0121aa415cf3cc9afdc0c8a26ae8d1de235c921991f73cb5dbf61c846"
+      },
+      {
+        "name": "20260711100000_add_inspection_interest",
+        "checksum": "2aa118ed29b0fe321feab0a95325d66e083059ea4cae581464da0934f0aa5176"
+      },
+      {
+        "name": "20260713000000_s10_rich_chat_foundation",
+        "checksum": "ddd8437876b5cf1653f00bcec6138aff653ddb53bf1d64a3eabfd7190048fe2e"
+      },
+      {
+        "name": "20260713170000_add_notification_history_status",
+        "checksum": "8de22e29cb7ee0345155ef82c7343054b57ce6190e971937788a42fadd792b61"
+      },
+      {
+        "name": "20260719010000_align_prisma_schema_with_existing_database",
+        "checksum": "45e4e3d6acc26ca5275af153fbcc1163e3d832c695c39f1bd28c052db6aef2c8"
+      },
+      {
+        "name": "20260922000000_add_user_sign_in_methods",
+        "checksum": "485f470dc45b4f84ded7032d1a6fda31993103f44bb2d686a433bac0af6e2016"
+      },
+      {
+        "name": "20260923000000_add_sign_in_code_channel",
+        "checksum": "d8e3acc864e098b19a15c1cbaa1adc1d4478a9231b9cc6c925d8d5d897c1fe97"
+      },
+      {
+        "name": "20260928000000_add_listing_price_tmt",
+        "checksum": "65aee1669e4df2e004117e3168de4b15f978b1e305eaea73b2f8639dbac76009"
+      },
+      {
+        "name": "20260929000000_add_listing_public_number",
+        "checksum": "99e90be6eed8715ace3136cfd97a4f1f2131efb9804af52f5693bc3d706206c8"
+      },
+      {
+        "name": "20260929120000_add_brand_logo_key",
+        "checksum": "b1943a5457351d9b63c7f1ea9f103ed3e1a5dc3a402764f4ef1f44c4d30a9488"
+      },
+      {
+        "name": "20260929130000_damaged_condition_disclosure",
+        "checksum": "9c861900135a09861e9a44b522e69bb6ab56908619a77c3132766d39da5467f0"
+      },
+      {
+        "name": "20261002000000_remove_reported_listing_status",
+        "checksum": "e9252f91ba28c9910151804a83db02daa236df12967fbd81c15d37fb41190bc0"
+      },
+      {
+        "name": "20261002120000_add_media_uploads",
+        "checksum": "bdc2a56e53a0670be0bcd44240b5ab015eb49f1616877f678a85d758c388ab6a"
+      },
+      {
+        "name": "20261003120000_add_otp_request_purpose",
+        "checksum": "a53f8d07762d19e8fa86715cfefa4686e69ba0396dacbcd2e5ef6535338aea40"
+      },
+      {
+        "name": "20261003180000_add_verified_contact_phones",
+        "checksum": "5733060102f2bcc56d0adf2815814e8b78b56d0e8afb14b98611a5a624e13d41"
+      },
+      {
+        "name": "20261003180100_clear_unverified_listing_contact_phones",
+        "checksum": "c9b70d53087dbc84f6967f41b8a2e84ea85a5266912732f52f8e36a06a4e155e"
+      },
+      {
+        "name": "20261005120000_add_user_name_number_and_avatar_index",
+        "checksum": "4edee95c37b5645feaddc75290dd6b2f742964cb932b3d563ff6451337c82085"
+      },
+      {
+        "name": "20261007120000_conditional_upload_protocol",
+        "checksum": "0ea7b599545fa4e6c05d259670dbd00349be352fef8b690660f1bbb0c5b3b481"
+      },
+      {
+        "name": "20261007130000_exclusive_upload_adoption",
+        "checksum": "6842d1028b6aadac98fcd4a1f081b8e7dcf752913edcfbf34f6a436d0aa0f451"
+      },
+      {
+        "name": "20261007130100_backfill_upload_adoption_state",
+        "checksum": "076017f1538827f2d906d8cfc4dcfbcd799f1103e194f28c2cc0bdff77329249"
+      },
+      {
+        "name": "20261011130000_correct_lugong_liugong_models",
+        "checksum": "2fb2cbdcce9c65e385c4ff539c1d822d8181fad75651df8284f24c285373e74b"
+      },
+      {
+        "name": "20261011140000_add_listing_media_thumb_hash",
+        "checksum": "b364a381237d9eeca4e29480443510304b4117118366249cad9bf7fa9c0a352d"
+      },
+      {
+        "name": "20261011150000_expand_conditional_media_manifest",
+        "checksum": "31c4af84bf9be9353c930e399366428b79266988043342ef61680ea6af584490"
+      },
+      {
+        "name": "20261014120000_restore_relisted_listings_published_at",
+        "checksum": "327290525e35afc76031dd46e820400478060d08dd9780202683b91b6bbcf718"
+      },
+      {
+        "name": "20261015003500_listing_view_counts",
+        "checksum": "bdb25bde750cd12de85ca3a4bf4201ac927681539f1b1b70105a633f4dc26d5d"
+      },
+      {
+        "name": "20261015010000_staff_capabilities",
+        "checksum": "88f7b84d80a31ee2918ea4a8e2ce9c578f8de766ca2d1317fe1f2713d6fd0c43"
+      }
+    ]
+  },
+  "restore": {
+    "disposition": "retained-additive",
+    "migrations": [
+      {
+        "name": "20260513201407_init",
+        "checksum": "8047c0ad646e98e1302c158d32d9d1dc6f54a05024ae29ed1e7ffaee4791a860"
+      },
+      {
+        "name": "20260514090000_multi_device_sessions_and_role_split",
+        "checksum": "f2b6b1d0d655ece5dfd64d9d800bcad4a05c91550969f4a3ce08de3da4d5a3c0"
+      },
+      {
+        "name": "20260514100000_otp_request_ip",
+        "checksum": "70ab10afbc02ab9d9296d2e9c452ba0dc44c92b3a0b8ad32b0f2b4a0776dd8cc"
+      },
+      {
+        "name": "20260514104615_delete_me_cascades",
+        "checksum": "af24a05134219508e15794874c252d8a1bc6780850d7388eeccdcad56553e193"
+      },
+      {
+        "name": "20260518081943_add_engine_type_transmission_drive_type",
+        "checksum": "8a7068c700f352714f558bf46492484770b8e9ea6a5c2293566256dc290c2841"
+      },
+      {
+        "name": "20260518083234_s4_listings_crud",
+        "checksum": "ab90ddaf05f5034928eb5ffacd871b20538c5d33b97201918411e8d17a612010"
+      },
+      {
+        "name": "20260518180741_add_seller_terms_to_listing",
+        "checksum": "10ec9bdf271645b46d08e9d017da0ba78257d8a82b02516db52b7eb6d612c454"
+      },
+      {
+        "name": "20260608010000_s7_admin_moderation",
+        "checksum": "7faad97bf4fc734a9bc519e6dd8019ba0aeac17810c5b5bd564a0cce0e8c0a8a"
+      },
+      {
+        "name": "20260609000000_account_deletion_grace",
+        "checksum": "e91fe7bbaa26c63d26c95c637cbd3f6c22bf9bd5ec7e0b544c06124a9c244698"
+      },
+      {
+        "name": "20260711000000_add_condition_disclosure_to_listing",
+        "checksum": "69f549c0121aa415cf3cc9afdc0c8a26ae8d1de235c921991f73cb5dbf61c846"
+      },
+      {
+        "name": "20260711100000_add_inspection_interest",
+        "checksum": "2aa118ed29b0fe321feab0a95325d66e083059ea4cae581464da0934f0aa5176"
+      },
+      {
+        "name": "20260713000000_s10_rich_chat_foundation",
+        "checksum": "ddd8437876b5cf1653f00bcec6138aff653ddb53bf1d64a3eabfd7190048fe2e"
+      },
+      {
+        "name": "20260713170000_add_notification_history_status",
+        "checksum": "8de22e29cb7ee0345155ef82c7343054b57ce6190e971937788a42fadd792b61"
+      },
+      {
+        "name": "20260719010000_align_prisma_schema_with_existing_database",
+        "checksum": "45e4e3d6acc26ca5275af153fbcc1163e3d832c695c39f1bd28c052db6aef2c8"
+      },
+      {
+        "name": "20260922000000_add_user_sign_in_methods",
+        "checksum": "485f470dc45b4f84ded7032d1a6fda31993103f44bb2d686a433bac0af6e2016"
+      },
+      {
+        "name": "20260923000000_add_sign_in_code_channel",
+        "checksum": "d8e3acc864e098b19a15c1cbaa1adc1d4478a9231b9cc6c925d8d5d897c1fe97"
+      },
+      {
+        "name": "20260928000000_add_listing_price_tmt",
+        "checksum": "65aee1669e4df2e004117e3168de4b15f978b1e305eaea73b2f8639dbac76009"
+      },
+      {
+        "name": "20260929000000_add_listing_public_number",
+        "checksum": "99e90be6eed8715ace3136cfd97a4f1f2131efb9804af52f5693bc3d706206c8"
+      },
+      {
+        "name": "20260929120000_add_brand_logo_key",
+        "checksum": "b1943a5457351d9b63c7f1ea9f103ed3e1a5dc3a402764f4ef1f44c4d30a9488"
+      },
+      {
+        "name": "20260929130000_damaged_condition_disclosure",
+        "checksum": "9c861900135a09861e9a44b522e69bb6ab56908619a77c3132766d39da5467f0"
+      },
+      {
+        "name": "20261002000000_remove_reported_listing_status",
+        "checksum": "e9252f91ba28c9910151804a83db02daa236df12967fbd81c15d37fb41190bc0"
+      },
+      {
+        "name": "20261002120000_add_media_uploads",
+        "checksum": "bdc2a56e53a0670be0bcd44240b5ab015eb49f1616877f678a85d758c388ab6a"
+      },
+      {
+        "name": "20261003120000_add_otp_request_purpose",
+        "checksum": "a53f8d07762d19e8fa86715cfefa4686e69ba0396dacbcd2e5ef6535338aea40"
+      },
+      {
+        "name": "20261003180000_add_verified_contact_phones",
+        "checksum": "5733060102f2bcc56d0adf2815814e8b78b56d0e8afb14b98611a5a624e13d41"
+      },
+      {
+        "name": "20261003180100_clear_unverified_listing_contact_phones",
+        "checksum": "c9b70d53087dbc84f6967f41b8a2e84ea85a5266912732f52f8e36a06a4e155e"
+      },
+      {
+        "name": "20261005120000_add_user_name_number_and_avatar_index",
+        "checksum": "4edee95c37b5645feaddc75290dd6b2f742964cb932b3d563ff6451337c82085"
+      },
+      {
+        "name": "20261007120000_conditional_upload_protocol",
+        "checksum": "0ea7b599545fa4e6c05d259670dbd00349be352fef8b690660f1bbb0c5b3b481"
+      },
+      {
+        "name": "20261007130000_exclusive_upload_adoption",
+        "checksum": "6842d1028b6aadac98fcd4a1f081b8e7dcf752913edcfbf34f6a436d0aa0f451"
+      },
+      {
+        "name": "20261007130100_backfill_upload_adoption_state",
+        "checksum": "076017f1538827f2d906d8cfc4dcfbcd799f1103e194f28c2cc0bdff77329249"
+      },
+      {
+        "name": "20261011130000_correct_lugong_liugong_models",
+        "checksum": "2fb2cbdcce9c65e385c4ff539c1d822d8181fad75651df8284f24c285373e74b"
+      },
+      {
+        "name": "20261011140000_add_listing_media_thumb_hash",
+        "checksum": "b364a381237d9eeca4e29480443510304b4117118366249cad9bf7fa9c0a352d"
+      },
+      {
+        "name": "20261011150000_expand_conditional_media_manifest",
+        "checksum": "31c4af84bf9be9353c930e399366428b79266988043342ef61680ea6af584490"
+      },
+      {
+        "name": "20261014120000_restore_relisted_listings_published_at",
+        "checksum": "327290525e35afc76031dd46e820400478060d08dd9780202683b91b6bbcf718"
+      },
+      {
+        "name": "20261015003500_listing_view_counts",
+        "checksum": "bdb25bde750cd12de85ca3a4bf4201ac927681539f1b1b70105a633f4dc26d5d"
+      },
+      {
+        "name": "20261015010000_staff_capabilities",
+        "checksum": "88f7b84d80a31ee2918ea4a8e2ce9c578f8de766ca2d1317fe1f2713d6fd0c43"
+      }
+    ]
+  },
+  "exactRetained": true
+}

@@ -47,4 +47,4 @@ Choose final skill names during implementation and update every consumer in the 
 
 ## Current state
 
-ADR accepted; guidance cleanup prepared for review. Operational implementation has not begun. The test audit is checkpointed with 657 full active test-body reads and six sampled files remaining. No branch-protection, CI, staging or production settings have been changed by this transition.
+ADR accepted; guidance cleanup prepared for review. The #901 [staging control foundation](../../agents/shared-staging-controls.md) implements bounded executable coordination and operation controls; its activation gates and actual evidence remain explicit. Direct-push implementation has not begun. The test audit is checkpointed with 657 full active test-body reads and six sampled files remaining. No branch-protection, CI, staging or production settings have been changed by this transition.

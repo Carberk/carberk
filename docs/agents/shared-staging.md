@@ -1,6 +1,6 @@
 # Shared staging reservation
 
-Operational contract prepared for [ADR-0098](../adr/0098-integration-delivery-with-shared-staging-and-concise-agent-guidance.md). Activation requires the [transition gates](../prd/ops/89-integration-delivery-transition.md). Reservation automation and guarded staging fixture/reset operations are pending; the current `native-pr-seed` intentionally rejects staging. Preserve that guard until its replacement is implemented and verified. Use the [deployment runbook](../prd/ops/80-deployment-runbook.md) for service procedures.
+Operational contract prepared for [ADR-0098](../adr/0098-integration-delivery-with-shared-staging-and-concise-agent-guidance.md). Activation requires the [transition gates](../prd/ops/89-integration-delivery-transition.md). The [executable control foundation](shared-staging-controls.md) provides durable reservations and a narrow owned application fixture path, with activation still gated by independent review, hosted SQL proof, authoritative live identity/origins and a reserved deployed restoration drill; the current `native-pr-seed` intentionally rejects staging. Preserve that guard until its replacement is implemented and verified. Use the [deployment runbook](../prd/ops/80-deployment-runbook.md) for service procedures.
 
 ## Reserve
 
