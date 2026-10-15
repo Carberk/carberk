@@ -24,6 +24,6 @@ it('switches all shell labels without remounting unfinished work or changing fil
   expect(container.textContent).toContain('Iş meýdançasy');expect(container.textContent).toContain('Sebäp');expect(input.value).toBe('Keep this reason');
 });
 it('never turns staff navigation into moderation or private feature permission',async()=>{
-  await act(async()=>root.render(<AdminLocaleProvider initialLocale="en"><AdminNav capabilities={['analytics.aggregate']}/></AdminLocaleProvider>));
+  await act(async()=>root.render(<AdminLocaleProvider initialLocale="en"><AdminNav capabilities={['support.operations']}/></AdminLocaleProvider>));
   expect([...container.querySelectorAll('a')].map(a=>a.getAttribute('href'))).toEqual(['/workspace']);
 });

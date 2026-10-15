@@ -16,7 +16,7 @@ beforeAll(async()=>{
     response.setHeader('Content-Type','application/json');
     if(unavailable){response.writeHead(503);response.end(JSON.stringify({code:'UNAVAILABLE',message:'secret backend diagnostics'}));return;}
     if(request.url==='/api/v1/staff/capabilities'){response.end(JSON.stringify({capabilities,elevated}));return;}
-    if(request.url==='/api/v1/admin/config'){response.statusCode=admin?200:403;response.end(JSON.stringify(admin?{adminModerationActionsEnabled:true}:{code:'FORBIDDEN'}));return;}
+    if(request.url==='/api/v1/admin/authority'){response.statusCode=admin?200:403;response.end(JSON.stringify(admin?{marketplaceAdmin:true}:{code:'FORBIDDEN'}));return;}
     response.statusCode=404;response.end('{}');
   });
   await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
