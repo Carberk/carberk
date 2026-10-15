@@ -453,6 +453,8 @@ model Listing {
   favorites           Favorite[]
   conversations       Conversation[]
   inspectionInterests InspectionInterest[]
+  viewDays            ListingViewDay[]
+  viewFingerprints    ListingViewFingerprint[]
 
   @@index([status, publishedAt(sort: Desc)])
   @@index([status, priceTmt, id])
@@ -837,4 +839,28 @@ model InspectionInterest {
   @@index([listingId, createdAt])
   @@index([requesterUserId, createdAt])
   @@map("inspection_interests")
+}
+
+/// Durable counts only. No viewer identifier or raw view events.
+model ListingViewDay {
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  day       Int
+  count     Int @default(0)
+
+  @@id([listingId, day])
+  @@map("listing_view_days")
+}
+
+/// Daily scoped one-way fingerprints. #899 sweeps immutable expiresAt within 5m.
+model ListingViewFingerprint {
+  listingId   String
+  listing     Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  day         Int
+  fingerprint String @db.Char(64)
+  expiresAt   DateTime
+
+  @@id([listingId, day, fingerprint])
+  @@index([expiresAt])
+  @@map("listing_view_fingerprints")
 }

@@ -5,6 +5,7 @@ import { PrismaModule } from "../../common/prisma.module";
 import { IdentityModule } from "../identity/identity.module";
 import { IDENTITY_CHECK_PORT, PROFILE_PHOTO_PORT } from "../identity/identity.public";
 
+import { ListingViewsController } from "./presentation/ListingViewsController";
 import { ListingsController } from "./presentation/listings.controller";
 import { DraftsController } from "./presentation/DraftsController";
 import { UploadsController } from "./presentation/UploadsController";
@@ -90,9 +91,13 @@ import {
 } from "./domain/ports/VerifiedContactPhoneRepository";
 import { ACCOUNT_PHONE_PORT, type AccountPhonePort } from "./domain/ports/AccountPhonePort";
 
+import { RecordListingView } from "./application/RecordListingView";
+import { PrismaListingViews } from "./infrastructure/PrismaListingViews";
+import { LISTING_VIEWS_PORT } from "./domain/ports/ListingViewsPort";
+
 @Module({
   imports: [PrismaModule, EventEmitterModule, IdentityModule],
-  controllers: [ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController],
+  controllers: [ListingViewsController, ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController],
   providers: [
     // Infrastructure adapters
     NullVinDecoder,
@@ -240,6 +245,8 @@ import { ACCOUNT_PHONE_PORT, type AccountPhonePort } from "./domain/ports/Accoun
     RemoveMedia,
     ReorderMedia,
     GetListingDetail,
+    RecordListingView,
+    { provide: LISTING_VIEWS_PORT, useClass: PrismaListingViews },
     ListFeed,
     ListMyListings,
     CountMyListings,

@@ -35,6 +35,9 @@ import {
   type SellerProfilePort,
 } from "../domain/ports/SellerProfilePort";
 
+import { LISTING_VIEWS_PORT, type ListingViewsPort } from "../domain/ports/ListingViewsPort";
+import { IDENTITY_CLOCK_PORT, type ClockPort } from "../../identity/identity.public";
+
 export interface GetListingDetailInput {
   listingId: string;
   requestingUserId?: string | undefined;
@@ -59,6 +62,8 @@ export class GetListingDetail {
     private readonly vinDecoder: VinDecoderPort,
     @Inject(SELLER_PROFILE_PORT)
     private readonly sellerProfiles: SellerProfilePort,
+    @Inject(LISTING_VIEWS_PORT) private readonly views: ListingViewsPort,
+    @Inject(IDENTITY_CLOCK_PORT) private readonly clock: ClockPort,
   ) {}
 
   async execute(input: GetListingDetailInput): Promise<ListingDetailDto> {
@@ -139,7 +144,8 @@ export class GetListingDetail {
         posterKey: m.posterKey,
         ...(m.thumbHash !== undefined ? { thumbHash: m.thumbHash } : {}),
       })),
-      viewCount: listing.viewCount,
+      ...((listing.status === "active" || input.requestingUserId === listing.sellerId)
+        ? await this.views.counts(listing.id, this.clock.now()) : { viewCount: 0 }),
       favoriteCount: listing.favoriteCount,
       isFavorited,
       conditionDisclosure: listing.conditionDisclosure,
