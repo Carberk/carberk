@@ -33,6 +33,7 @@ interface RequestOptions<TResponse> {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   binaryBody?: Uint8Array;
+  responseBytesLimit?: number;
   schema?: ZodSchema<TResponse>;
   // If false, do not attach Authorization header (used for OTP request/verify pre-login)
   auth?: boolean;
@@ -136,7 +137,7 @@ async function refreshOnce(): Promise<void> {
       throw refreshUnavailable("Refresh is temporarily unavailable");
     }
 
-    let json: unknown;
+      let json: unknown;
     try {
       json = (await res.json()) as unknown;
     } catch {
@@ -231,6 +232,14 @@ async function rawRequest<TResponse>(
     return undefined as TResponse;
   }
 
+  if (res.ok && opts.responseBytesLimit !== undefined) {
+    const declared = Number(res.headers.get("Content-Length"));
+    if (declared > opts.responseBytesLimit) throw new ApiError("INVALID_ATTACHMENT", 502);
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes.length > opts.responseBytesLimit) throw new ApiError("INVALID_ATTACHMENT", 502);
+    return bytes as TResponse;
+  }
+
   let json: unknown;
   let rawText: string | undefined;
 
@@ -275,7 +284,10 @@ async function rawRequest<TResponse>(
 }
 
 export const apiClient = {
-  getBytes(_path: string, _maxBytes: number): Promise<Uint8Array> { return Promise.reject(new Error("not implemented")); },
+  getBytes(path: string, maxBytes: number, opts: ClientOptions = {}): Promise<Uint8Array> {
+    if (maxBytes <= 0 || maxBytes > 20 * 1024 * 1024) return Promise.reject(new ApiError("INVALID_ATTACHMENT", 400));
+    return rawRequest(path, { method: "GET", responseBytesLimit: maxBytes, ...opts }, false);
+  },
   postBinary(path: string, bytes: Uint8Array, opts: ClientOptions = {}): Promise<unknown> {
     if (bytes.byteLength > 20 * 1024 * 1024) return Promise.reject(new ApiError("INVALID_ATTACHMENT", 400));
     return rawRequest(path, { method: "POST", binaryBody: bytes, ...opts, headers: { ...opts.headers, "Content-Type": "application/octet-stream" } }, false);

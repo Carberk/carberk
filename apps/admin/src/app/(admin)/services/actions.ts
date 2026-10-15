@@ -17,6 +17,6 @@ async function run<T>(work: () => Promise<T>): Promise<ServiceResult<T>> {
  }
 }
 export async function serviceQueue(purpose: S.ServicePurpose): Promise<ServiceResult<ServiceQueue>> { return run(async () => queueSchema.parse(await apiFetch(`/services/queue/${S.ServicePurposeSchema.parse(purpose)}`))); }
-export async function serviceRead(id: string): Promise<ServiceResult<S.ServiceConversation>> { return run(async () => S.ServiceConversationSchema.parse(await apiFetch(`/services/conversations/${z.string().uuid().parse(id)}?limit=50`))); }
+export async function serviceRead(id: string, after = 0): Promise<ServiceResult<S.ServiceConversation>> { return run(async () => S.ServiceConversationSchema.parse(await apiFetch(`/services/conversations/${z.string().uuid().parse(id)}?limit=50&after=${z.number().int().nonnegative().parse(after)}`))); }
 export async function serviceSend(id: string, input: S.ServiceSend): Promise<ServiceResult<S.ServiceMessage>> { return run(async () => S.ServiceMessageSchema.parse(await apiFetch(`/services/conversations/${z.string().uuid().parse(id)}/messages`, { method: "POST", body: S.ServiceSendSchema.parse(input) }))); }
 export async function serviceAssign(id: string, expectedVersion: number, targetUserId?: string): Promise<ServiceResult<null>> { return run(async () => { await apiFetch(`/services/conversations/${z.string().uuid().parse(id)}/assignment`, { method: "POST", body: S.ServiceAssignSchema.parse({ expectedVersion, targetUserId }) }); return null; }); }
