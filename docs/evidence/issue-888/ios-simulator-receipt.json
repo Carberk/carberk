@@ -1,0 +1,82 @@
+{
+  "finished": true,
+  "records": [
+    {
+      "case": "flower",
+      "facts": {
+        "audioCodec": "aac",
+        "colour": "bt709",
+        "durationMs": 3000,
+        "fps": 30,
+        "height": 540,
+        "sizeBytes": 1511194,
+        "uri": "documents/proof-v2/flower/prepared.mp4",
+        "videoCodec": "h264",
+        "width": 960
+      },
+      "result": "pass"
+    },
+    {
+      "case": "landscape60",
+      "facts": {
+        "audioCodec": null,
+        "colour": "bt709",
+        "durationMs": 1000,
+        "fps": 30,
+        "height": 720,
+        "sizeBytes": 739754,
+        "uri": "documents/proof-v2/landscape60/prepared.mp4",
+        "videoCodec": "h264",
+        "width": 1280
+      },
+      "result": "pass"
+    },
+    {
+      "case": "portrait60",
+      "facts": {
+        "audioCodec": null,
+        "colour": "bt709",
+        "durationMs": 1000,
+        "fps": 30,
+        "height": 1280,
+        "sizeBytes": 488849,
+        "uri": "documents/proof-v2/portrait60/prepared.mp4",
+        "videoCodec": "h264",
+        "width": 720
+      },
+      "result": "pass"
+    },
+    {
+      "case": "exact90",
+      "facts": {
+        "audioCodec": null,
+        "colour": "bt709",
+        "durationMs": 90000,
+        "fps": 30,
+        "height": 180,
+        "sizeBytes": 12793577,
+        "uri": "documents/proof-v2/exact90/prepared.mp4",
+        "videoCodec": "h264",
+        "width": 320
+      },
+      "result": "pass"
+    },
+    {
+      "case": "cancelled",
+      "result": "pass"
+    },
+    {
+      "case": "unsafe-id",
+      "result": "pass"
+    },
+    {
+      "case": "recreated-engine-completed-file",
+      "result": "pass"
+    },
+    {
+      "case": "duplicate-retains-completed",
+      "result": "pass"
+    }
+  ],
+  "system": "26.2"
+}

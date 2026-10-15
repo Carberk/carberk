@@ -2,6 +2,10 @@
 
 This area contains create-wizard state, draft persistence, upload staging, edit-save orchestration, discovery state, and listing presentation. The create route and edit route have different orchestration; inspect both before consolidating shared UI. Server lifecycle and contact rules belong to [API Listings](../../../api/src/modules/listings/CONTEXT.md).
 
+## Native video proof boundary
+
+`videoPreparation/VideoPreparation.ts` validates the selected interval and completed local output before a future uploader can consume it. Its native port is implemented in the local Expo module `../../modules/listing-video-preparation`, using AVFoundation and Media3 Transformer 1.8.0. No seller UI calls it yet. The [issue 888 evidence](../../../../docs/evidence/issue-888/verification.md) separates simulator exports and compiled targets from remaining Android/physical-device, provider, HDR and storage checks.
+
 ## Important constraints
 
 Create flow uses the wizard machine and autosave; edit flow computes and sequences changes against an existing listing. `useSaveListingEdit` runs the sequential best-effort save of [ADR-0025](../../../../docs/adr/0025-edit-save-atomicity.md): it fixes an edit plan when Save starts and keeps a session ledger of the server media IDs attach returned and the media it removed. Reorder, retry and a repeated Save use those server IDs, never a photo's local staging ID, and neither a refetched Listing nor a retry attaches or removes the same photo twice. Retry replays the fixed plan only while the fields and photos are unchanged; edits made after a failure re-plan from the ledger like a fresh Save. Save and Retry return whether they ran, and one runs at a time. Shared contract schemas own validation. Do not make the UI's visual step number a second validation model. Photo UI receives its actual props from the live component interface; old Step2Photos warnings and historical refactor plans are not current requirements.
