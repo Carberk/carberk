@@ -13,6 +13,9 @@ export interface MeasurementAuthority {
 }
 export type MeasurementReceipt = "accepted" | "duplicate" | "disabled" | "invalid" | "revoked" | "unavailable";
 export interface MeasurementLedgerPort {
- /** Atomic identity-generation/rights check and durable event-ID insert. Never revive a revoked generation. */
+ /** Atomic identity-generation/rights check and durable event-ID insert. Client visits
+  * must already exist and belong to this exact principal generation and collector epoch.
+  * Only bootstrap issues visits. Ingress never creates/rebinds an unknown or old visit.
+  * Deletion and restore invalidation serialize with this insert. */
  appendIfEligible(record: { event: MeasurementSchemas.MeasurementEvent; authority: MeasurementAuthority; receivedAt: Date; expiresAt: Date }): Promise<"accepted" | "duplicate" | "revoked">;
 }

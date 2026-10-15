@@ -29,6 +29,9 @@ export class PrismaAccountDeletionUnitOfWork implements AccountDeletionUnitOfWor
             if (membership.role === "owner") await tx.dealership.updateMany({ where: { id: membership.dealershipId, status: { not: "suspended" } }, data: { status: "recovery" } });
             await tx.auditLog.create({ data: { actorId: userId, action: "BUSINESS_MEMBERSHIP_ENDED_FOR_DELETION", targetType: "Dealership", targetId: membership.dealershipId, details: { role: membership.role, recoveryRequired: membership.role === "owner" } } });
           }
+          // Erase measurement identities now, including raw facts/outbox and only
+          // linked current guest visits by cascading FKs. Core recovery cannot revive them.
+          await tx.measurementPrincipal.deleteMany({ where: { userId } });
           await tx.dealershipInvitation.deleteMany({ where: { recipientUserId: userId } });
           // Restoration creates a fresh ordinary identity session, never silently
           // reactivates staff grants that existed before the deletion request.
