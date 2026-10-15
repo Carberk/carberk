@@ -332,6 +332,7 @@ export class ConversationsController {
       conversationId,
       contentType: parsed.contentType,
       sizeBytes: parsed.sizeBytes,
+      ...(this.actor(req).businessId ? { actor: this.actor(req) } : {}),
     });
 
     return {
