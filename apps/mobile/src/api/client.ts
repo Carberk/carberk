@@ -275,6 +275,7 @@ async function rawRequest<TResponse>(
 }
 
 export const apiClient = {
+  getBytes(_path: string, _maxBytes: number): Promise<Uint8Array> { return Promise.reject(new Error("not implemented")); },
   postBinary(path: string, bytes: Uint8Array, opts: ClientOptions = {}): Promise<unknown> {
     if (bytes.byteLength > 20 * 1024 * 1024) return Promise.reject(new ApiError("INVALID_ATTACHMENT", 400));
     return rawRequest(path, { method: "POST", binaryBody: bytes, ...opts, headers: { ...opts.headers, "Content-Type": "application/octet-stream" } }, false);
