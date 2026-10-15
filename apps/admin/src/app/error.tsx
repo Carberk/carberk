@@ -1,5 +1,7 @@
 "use client";
 
+import { AdminText } from "@/lib/i18n";
+
 export default function ErrorPage({ unstable_retry }: {
   error: Error & { digest?: string };
   reset: () => void;
@@ -11,5 +13,5 @@ export default function ErrorPage({ unstable_retry }: {
       <button type="button" onClick={unstable_retry}><AdminText>Попробовать ещё раз</AdminText></button>
     </main>
   );
-}import { AdminText } from "@/lib/i18n";
+}
 

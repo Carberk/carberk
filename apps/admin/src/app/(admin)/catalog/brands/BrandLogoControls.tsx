@@ -7,7 +7,7 @@ import { AlertCircle, Loader2 } from "lucide-react";
 
 import { removeBrandLogo, uploadBrandLogo } from "./actions";
 
-import { AdminText } from "@/lib/i18n";
+import { useAdminLocale, AdminText } from "@/lib/i18n";
 
 interface BrandLogoControlsProps {
   brandId: string;
@@ -16,6 +16,7 @@ interface BrandLogoControlsProps {
 }
 
 export function BrandLogoControls({ brandId, brandName, hasLogo }: BrandLogoControlsProps) {
+  const {locale}=useAdminLocale();
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +62,7 @@ export function BrandLogoControls({ brandId, brandName, hasLogo }: BrandLogoCont
           accept="image/svg+xml,image/png,image/webp"
           className="hidden"
           onChange={onFileChosen}
-          aria-label={`Файл логотипа для ${brandName}`}
+          aria-label={locale==="tk"?`${brandName} üçin logotip faýly`:locale==="en"?`Logo file for ${brandName}`:`Файл логотипа для ${brandName}`}
         />
         <Button
           type="button"

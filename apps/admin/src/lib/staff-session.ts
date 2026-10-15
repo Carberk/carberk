@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { StaffSchemas, type AuthSchemas } from "@auto-tm/contracts";
+import { StaffSchemas } from "@auto-tm/contracts";
 
 import { rejectExpiredSession } from "./action-session";
 import { apiFetchOptional, ApiError } from "./api-client";
@@ -20,7 +20,7 @@ export async function requireStaffCapability(capability: StaffSchemas.StaffCapab
 }
 export async function currentMarketplaceAdmin() {
   try {
-    const config = await apiFetchOptional<AuthSchemas.AdminTotpStatusResponse>("/admin/config", {cache:"no-store"});
+    const config = await apiFetchOptional<unknown>("/admin/config", {cache:"no-store"});
     return config !== null;
   } catch (error) { if (error instanceof ApiError && error.status===403) return false; throw error; }
 }

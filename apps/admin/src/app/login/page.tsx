@@ -227,7 +227,7 @@ function LoginPageContent() {
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" /><AdminText>Отправка...</AdminText></>
                 ) : (
-                  "Отправить код"
+                  <AdminText>Отправить код</AdminText>
                 )}
               </Button>
             </form>
@@ -273,7 +273,7 @@ function LoginPageContent() {
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" /><AdminText>Проверка...</AdminText></>
                 ) : (
-                  "Подтвердить"
+                  <AdminText>Подтвердить</AdminText>
                 )}
               </Button>
               <Button
@@ -327,7 +327,7 @@ function LoginPageContent() {
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" /><AdminText>Проверка...</AdminText></>
                 ) : (
-                  "Подтвердить"
+                  <AdminText>Подтвердить</AdminText>
                 )}
               </Button>
             </form>
@@ -367,7 +367,7 @@ function LoginPageContent() {
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" /><AdminText>Проверка...</AdminText></>
                 ) : (
-                  "Подтвердить"
+                  <AdminText>Подтвердить</AdminText>
                 )}
               </Button>
             </form>

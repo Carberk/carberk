@@ -228,7 +228,7 @@ export default async function ReportsPage({
 
           {totalPages > 1 && (
             <div className="mt-4 flex items-center justify-between">
-              <div className="text-sm text-neutral-500"><AdminText>Страница</AdminText>{currentPage}<AdminText>из</AdminText>{totalPages}
+              <div className="text-sm text-neutral-500"><AdminText>Страница</AdminText>{" "}{currentPage}{" "}<AdminText>из</AdminText>{" "}{totalPages}
               </div>
               <div className="flex gap-2">
                 {currentPage > 1 && (

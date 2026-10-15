@@ -27,7 +27,7 @@ function handleApiError(err: unknown): ActionResult<never> {
   if (err instanceof ApiError) {
     return {
       ok: false,
-      error: err.message,
+      error: err.status === 403 ? "Недостаточно прав." : "Временно недоступно. Попробуйте ещё раз.",
       code: err.code,
       details: err.responseBody,
     };

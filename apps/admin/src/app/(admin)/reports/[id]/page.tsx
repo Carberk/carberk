@@ -112,7 +112,7 @@ export default async function ReportDetailPage({ params }: PageProps) {
 
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold"><AdminText>Жалоба</AdminText>{id.slice(0, 8)}</h1>
+          <h1 className="text-2xl font-bold"><AdminText>Жалоба</AdminText>{" "}{id.slice(0, 8)}</h1>
           <div className="mt-2">
             <span
               className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${statusBadgeClass(report.status)}`}

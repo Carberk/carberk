@@ -47,7 +47,7 @@ export async function requestOtp(
       if (err.code === ErrorCode.RateLimited) {
         return { ok: false, error: "Слишком много попыток. Попробуйте позже." };
       }
-      return { ok: false, error: err.message };
+      return { ok: false, error: "Временно недоступно. Попробуйте ещё раз." };
     }
     return { ok: false, error: "Не удалось отправить код. Попробуйте позже." };
   }
@@ -91,9 +91,11 @@ export async function verifyOtp(
     if (result.user.role !== "admin") {
       try {
         const summary = await apiFetchOptional<ReturnType<typeof StaffSchemas.StaffSummarySchema.parse>>("/staff/capabilities", { cache: "no-store" });
-        if (!summary || summary.capabilities.length === 0) throw new Error("No scoped authority");
+        if (!summary || summary.capabilities.length === 0) throw new ApiError(403,"FORBIDDEN",{},"Current staff authority required");
       } catch (error) {
         unstable_rethrow(error);
+        if (!(error instanceof ApiError) || ![401,403].includes(error.status))
+          return { ok: false, error: "Временно недоступно. Попробуйте ещё раз." };
         await clearAuthCookies();
         return { ok: false, error: "Доступ к панели администратора ограничен. Обратитесь к администратору." };
       }
@@ -131,7 +133,7 @@ export async function verifyOtp(
           error: "Неверный код. Попробуйте ещё раз.",
         };
       }
-      return { ok: false, error: err.message };
+      return { ok: false, error: "Временно недоступно. Попробуйте ещё раз." };
     }
     return { ok: false, error: "Не удалось подтвердить код. Попробуйте позже." };
   }
@@ -199,7 +201,7 @@ export async function enrollTotp(): Promise<TotpEnrollResult> {
           error: "Двухфакторная аутентификация уже настроена.",
         };
       }
-      return { ok: false, error: err.message };
+      return { ok: false, error: "Временно недоступно. Попробуйте ещё раз." };
     }
     return {
       ok: false,
@@ -250,7 +252,7 @@ export async function verifyTotp(
           error: "Неверный код. Попробуйте ещё раз.",
         };
       }
-      return { ok: false, error: err.message };
+      return { ok: false, error: "Временно недоступно. Попробуйте ещё раз." };
     }
     return {
       ok: false,

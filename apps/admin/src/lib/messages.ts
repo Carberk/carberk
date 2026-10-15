@@ -848,6 +848,8 @@ const messages: Record<string, [string, string]> = {
 };
 export function translateAdmin(text: string, locale: AdminLocale): string {
   if (locale === "ru") return text;
+  const size = text.match(/^Файл больше (\d+) КБ\.$/);
+  if (size) return locale === "tk" ? `Faýl ${size[1]} KB-dan uly.` : `The file exceeds ${size[1]} KB.`;
   const otp = text.match(/^Введите 6-значный код, отправленный на (.+)$/);
   if (otp) return locale === "tk" ? `${otp[1]} belgisine iberilen 6 sanly kody giriziň` : `Enter the 6-digit code sent to ${otp[1]}`;
   return messages[text]?.[locale === "tk" ? 0 : 1] ?? text;

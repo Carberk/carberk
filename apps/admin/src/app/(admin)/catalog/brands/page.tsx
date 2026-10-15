@@ -1,6 +1,7 @@
 import { CatalogSchemas } from "@auto-tm/contracts";
 
 import { listAllBrands } from "./actions";
+import { BrandLogo } from "./BrandLogo";
 import { BrandLogoControls } from "./BrandLogoControls";
 
 import { AdminText } from "@/lib/i18n";
@@ -14,8 +15,8 @@ export default async function BrandsPage() {
     <div className="p-6 md:p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold"><AdminText>Бренды</AdminText></h1>
-        <p className="text-sm text-neutral-500"><AdminText>Логотипы:</AdminText>{withLogo}<AdminText>из</AdminText>{brands.length}<AdminText>. SVG, PNG или WebP, до</AdminText>{" "}
-          {CatalogSchemas.BRAND_LOGO_MAX_BYTES / 1024}<AdminText>КБ, почти квадратные. Без логотипа приложение показывает первую букву.</AdminText></p>
+        <p className="text-sm text-neutral-500"><AdminText>Логотипы:</AdminText>{" "}{withLogo}{" "}<AdminText>из</AdminText>{" "}{brands.length}<AdminText>. SVG, PNG или WebP, до</AdminText>{" "}{" "}
+          {CatalogSchemas.BRAND_LOGO_MAX_BYTES / 1024}{" "}<AdminText>КБ, почти квадратные. Без логотипа приложение показывает первую букву.</AdminText></p>
       </div>
 
       {!result.ok ? (
@@ -44,30 +45,4 @@ export default async function BrandsPage() {
       )}
     </div>
   );
-}
-
-function BrandLogo({ name, logoUrl }: { name: string; logoUrl: string | undefined }) {
-  if (logoUrl) {
-    return (
-      <img
-        src={logoUrl}
-        alt={`Логотип ${name}`}
-        width={40}
-        height={40}
-        className="h-10 w-10 shrink-0 object-contain"
-      />
-    );
-  }
-  return (
-    <div
-      aria-label={`Нет логотипа, буква ${brandLetter(name)}`}
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-sm font-semibold text-neutral-600"
-    >
-      {brandLetter(name)}
-    </div>
-  );
-}
-
-function brandLetter(name: string): string {
-  return name.trim().charAt(0).toUpperCase() || "?";
 }

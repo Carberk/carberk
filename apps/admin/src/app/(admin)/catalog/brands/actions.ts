@@ -40,7 +40,7 @@ function toError(err: unknown): { ok: false; error: string } {
     }
     if (err.status === 403) return { ok: false, error: "Недостаточно прав." };
     if (err.status === 404) return { ok: false, error: "Бренд не найден." };
-    return { ok: false, error: err.message };
+    return { ok: false, error: "Временно недоступно. Попробуйте ещё раз." };
   }
   return { ok: false, error: "Неизвестная ошибка. Попробуйте позже." };
 }
