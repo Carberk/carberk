@@ -44,3 +44,18 @@ test('remote fixture commands reject public namespace and credential-bearing med
     assert.equal(process.exitCode,1);assert.equal(calls,0,'refused identity must not reach SQL');assert.equal(message.includes('SECRET'),false);
   }
 });
+
+test('a real application fixture succeeds only after the deployed API can read its owned listing',async()=>{
+  const id='1'.repeat(32),listingId='fixture-listing',sellerId='fixture-seller';
+  const lease={id,candidate:'a'.repeat(40),namespace:`cf_${id}`,identity:policy};
+  let visible=false;
+  const api=boundary();
+  const fetch=async(url,options)=>{
+    if(url===`${policy.origins.api}/api/v1/listings/${listingId}`)return{ok:true,json:async()=>({id:visible?listingId:'unrelated',sellerId,status:'active'})};
+    return api(url,options);
+  };
+  const platform=new RailwayPlatform({token:'SECRET',authorization:`${id}:${lease.candidate}`,fetch,command:async()=>JSON.stringify({fixtures:'present',namespace:lease.namespace,listingId,sellerId})});
+  await assert.rejects(platform.execute('fixture',lease,lease.candidate),/application fixture/);
+  visible=true;
+  assert.equal((await platform.execute('fixture',lease,lease.candidate)).listingId,listingId);
+});
