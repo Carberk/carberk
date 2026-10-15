@@ -31,6 +31,9 @@ export class OtplibTotpVerifier implements TotpVerifierPort {
   }
 
   verify(secret: string, code: string): boolean {
+    // Backup codes are checked by the application after this returns false.
+    // otplib rejects malformed TOTP tokens by throwing before verification.
+    if (!/^\d{6}$/.test(code)) return false;
     // epochTolerance = period allows current step + 1 adjacent step for skew
     const result = verifySync({ token: code, secret, strategy: "totp", period: this.step, epochTolerance: this.step });
     return result.valid;
