@@ -51,3 +51,5 @@ for supported queries, shared helpers and native runtime limitations.
 - [Listing feature boundary](src/listings/CONTEXT.md)
 
 Listing, chat and Profile Photo uploads encode WebP within the existing 2400 px long-side and 5 MB limits. Profile Photos keep their square crop. Clients request `image/webp` and build `.webp` derivative URLs; detail/fullscreen derivatives preserve natural proportions under [ADR-0096](../../docs/adr/0096-webp-only-photos.md).
+
+The Cabinet business row opens `/business`, whose actual API hooks and localized feature UI live in `src/business`. It accepts a recipient-bound invitation and shows current Owner/Sales membership, protected recovery and owner settings/member/invitation actions. Identity changes hide the previous account's workspace; personal inventory stays separate. Inventory and enquiry workflows consume the current business principal in their own features.

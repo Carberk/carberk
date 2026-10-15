@@ -24,3 +24,5 @@ Tests beside the API client, cookies, validators, and server actions cover these
 - [Auth actions and tests](src/app/actions.ts)
 - [Moderation routes and actions](src/app/(admin))
 - [Identity implementation](../api/src/modules/identity/CONTEXT.md)
+
+`/business-admission` is a bounded admission/recovery feature outside the legacy marketplace-admin-only layout. Its server read and actions require the current elevated `founder.admission`/`founder.recovery` capability, with final transaction authority in Identity. It supports TK/RU/EN, defaults disposable admission to synthetic, and prepares a recipient-bound single-use owner invitation without sending messages. Global staff navigation, locale and auth-shell composition remain owned by the staff shell.
