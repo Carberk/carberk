@@ -9,8 +9,8 @@ import { StaffAuthorityDenied, type StaffAuthorityPort, type StaffSubject, type 
 export class CheckStaffAuthority implements StaffAuthorityPort {
   constructor(@Inject(STAFF_AUTHORITY_REPOSITORY) private readonly repository: StaffAuthorityRepository,
     @Inject(IDENTITY_TOKENS.ClockPort) private readonly clock: ClockPort) {}
-  async authorize(input: StaffSubject & { capability: string }): Promise<void> {
-    const actor = await this.repository.current(input);
+  async authorize(input: StaffSubject & { capability: string }, transaction?: unknown): Promise<void> {
+    const actor = await this.repository.current(input, transaction);
     const now = this.clock.now();
     assertCurrentStaffSession(actor, input, now);
     if (!StaffSchemas.StaffCapabilitySchema.safeParse(input.capability).success || !actor.capabilities.includes(input.capability)) throw new StaffAuthorityDenied("CAPABILITY_REQUIRED");
