@@ -14,6 +14,12 @@ _Avoid_: Account type, dealership role
 
 ## Identity
 
+**Dealership**
+
+An identifiable car-selling business whose inventory and enquiries belong to the business independently of the people who manage them.
+
+_Avoid_: Shared dealer login, paid seller tier
+
 **User**
 
 A person who signs in to AutoTM with a Sign-in Code sent to one of their Sign-in Methods, and who holds one Marketplace Role. Dealership permissions are not encoded in this identity.
@@ -84,6 +90,12 @@ _Avoid_: Pending file, staged key
 
 ## Conversations
 
+**Business Enquiry**
+
+A Listing-scoped discussion between a buyer and a Dealership, handled by its authorized members with shared business responsibility.
+
+_Avoid_: Personal staff lead, showroom-wide chat
+
 **Conversation**
 
 A discussion between a buyer and seller about a Listing.
@@ -103,3 +115,81 @@ _Avoid_: Chat
 A request for AutoTM moderators to review a reportable marketplace target for a stated concern.
 
 _Avoid_: Complaint, support ticket
+
+## Cross-context
+
+**Service Conversation**
+
+A user's private communication with a Carberk-operated service, whose purpose and authorized staff access are independent of a Listing buyer/seller Conversation.
+
+_Avoid_: Support seller, fake Listing chat
+
+**Support Case**
+
+An assistance or appeal request handled by Carberk Support, with its own response, closure and reopening lifecycle. It is not a Content Report or paid history order.
+
+_Avoid_: Assistance complaint, paid lookup
+
+**Vehicle History Request**
+
+An enquiry to Carberk about available third-party vehicle history. It can begin without a VIN or purchase and can lead to one Vehicle History Order.
+
+_Avoid_: Inspection request, diagnosis
+
+**Vehicle History Order**
+
+A user's accepted purchase of available provider history for one confirmed VIN under an agreed offer and fulfilment commitment.
+
+_Avoid_: Paid inspection, condition check
+
+**Provider Report Artifact**
+
+An original dated report document or link attributed to a vehicle-history provider, with its source and permitted use. It is distinct from Carberk's physical diagnostic findings.
+
+_Avoid_: Carberk inspection score, complete vehicle history
+
+**Vehicle History Archive**
+
+Carberk's internal collection of permitted vehicle-history artifacts and attributed observations, preserving provenance and access/use restrictions separately from purchaser communications and payment evidence.
+
+_Avoid_: Public report library, unrestricted company data
+
+**Service Assignment**
+
+The named operator's current responsibility for a service request or case, changed through an explicit handover. It grants only the access appropriate to that service and role.
+
+_Avoid_: Global operator role, dealer permission
+
+## Reports
+
+**Inspection Order**
+
+A request for a physical vehicle inspection with its own appointment, authorization and service lifecycle.
+
+_Avoid_: Provider lookup, inspection interest
+
+**Inspection Report**
+
+Recorded physical vehicle observations and their scope, evidence, inspection date and mileage, released to an explicitly authorized private or public audience.
+
+_Avoid_: Vehicle guarantee, condition grade
+
+**Checklist Version**
+
+A fixed edition of the checks and assessment rules used for an inspection.
+
+_Avoid_: Mutable live rubric, pass score
+
+**Report Snapshot**
+
+An immutable released version of an Inspection Report, preserving its observations and audience through linked corrections.
+
+_Avoid_: Editable final report, latest template
+
+## Listings
+
+**Listing View**
+
+A countable opening of full Listing detail by an eligible viewer, distinct from a card preview or a detail-data fetch.
+
+_Avoid_: Impression, contact intent

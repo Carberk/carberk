@@ -1,20 +1,14 @@
-# 40 — Admin Dashboard
+# 40 - Admin and scoped operator workspaces
 
 ## Summary
 
-Internal-only Next.js dashboard at `admin.auto.tm`. The MLP beta ships minimal moderation: TOTP-protected admin login, listing/user reports, listing ban/unban, user suspension, and audit log. Message reports are included only if S6 explicitly ships report-from-thread; blog reports and the broader dashboard — dealership verification, broadcasts, SMS health UI, catalog mega-editor, analytics, and inspection reports — are post-MLP.
+Internal Next.js console for marketplace moderation and the approved post-review campaign. The earlier reviewer release shipped minimal moderation, TOTP staff access, content-report review and audit. The current campaign adds the bounded operational overview, purpose-scoped service inbox, read-only Listing/User directories and context, licensed vehicle archive, scoped staff grants, dealer/diagnostic operations under their owning contracts and Improvement/diagnostics under the analytics contract. All areas support Turkmen, Russian and English.
+
+This specification describes intended behavior, not implementation status. Source still establishes what is shipped. Broad catalog editor, flags/rates/CMS, promotional broadcasts, arbitrary seller edits and unrestricted private-record browsing remain outside this campaign. Public service activation and provider/payment/center readiness are separate from verified software delivery.
 
 ## Why it exists
 
-Bagtyýar (the admin persona) needs to:
-- Find and act on reported listings before they harm users
-- Verify dealerships so the PRO badge means something
-- Send announcements to users about new features or outages
-- Confirm the SMS gateway is healthy (5 phones humming = OTPs flowing)
-- Maintain catalog data (new car models, regions, colors)
-- Audit who did what
-
-A mobile admin UI would be cramped. Desktop web with shadcn/ui gives the room and density admins need.
+Operators need to review harmful marketplace content with sufficient target context, assist users and preserve appeals, fulfil paid available-provider history, manage permitted archive provenance and support authorized center/dealer workflows. Named capabilities keep those duties separate from private analytics investigations and founder-only decisions. Desktop-first layouts support tablet use without creating a phone-first admin requirement. Filters, status and detail navigation preserve the operator's current work.
 
 ## What it does (user-visible behavior)
 
@@ -33,22 +27,17 @@ A mobile admin UI would be cramped. Desktop web with shadcn/ui gives the room an
 - The admin app server stores tokens in HTTP-only cookies and forwards bearer auth to `apps/api` from server actions / route handlers. `apps/api` does not accept cookie auth directly in the MLP, and browser components never call `apps/api` directly.
 - Admin token cookies use `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, max ages aligned to the API access-token and refresh/session lifetimes. Canonical production names are `__Host-auto_tm_admin_access` and `__Host-auto_tm_admin_refresh` with no `Domain` when admin runs on its own host; local dev may use unprefixed `auto_tm_admin_access` / `auto_tm_admin_refresh` only when `__Host-` constraints cannot be satisfied.
 - Browser client code never receives admin tokens. S7 does not add a separate CSRF-token system because admin mutations stay behind same-site server actions / route handlers; any browser-posted public route handler must validate `Origin` against the configured admin origin, with no `Referer` fallback.
-- Admin server actions / route handlers refresh once on API 401, rotate cookies on success, retry the original API request once, then clear cookies and redirect to login if refresh fails. Refresh can recover bearer auth but never extends TOTP elevation.
+- Current request-proxy renewal follows ADR-0090 before protected rendering/actions, preserves cookies on temporary failure and never automatically executes/replays a failed mutation. Only missing refresh or API rejection ends the session. Keep exactly one Node process/replica until shared coordination is separately implemented and verified. Refresh never extends TOTP elevation.
 - `returnTo` after TOTP re-verification accepts only relative internal admin paths; absolute URLs, protocol-relative URLs, and cross-host redirects are rejected. There is no multi-tab heartbeat in S7: tabs discover expired TOTP on their next protected route/action.
 - If OTP succeeds on the admin host for a non-admin user, the admin app clears admin cookies and shows generic "Admin access required" copy without revealing normal-user account details.
 - Admin logout attempts API logout server-side with the refresh token, but clears both admin cookies locally even if API logout fails. Logout-all attempts the bearer-protected API logout-all endpoint and then clears both cookies locally even if revoke fails.
-- Admin recovery follows ADR-0006 backup codes: store only hashes and handle lost phone plus lost/exhausted backup codes through manual operator recovery. S7 has no backup-code regeneration UI, no admin demotion/deprovision UI, and no moderation-based admin suspension; mistaken or compromised admin access uses operator runbook/session revocation until post-MLP admin-account management is shaped.
+- Recovery keeps hashed backup codes and manual operator handling for lost sign-in method plus lost/exhausted backup codes. This campaign adds named scoped grants/revocations with audit and session/access re-evaluation. It does not add moderation-based admin suspension or unrestricted backup-code regeneration/recovery automation.
 
-### Dashboard (post-MLP)
+### Operational overview and scoped Improvement
 
-- Overview cards:
-  - **Active listings** count + 7-day trend
-  - **Pending moderation** (reports awaiting review)
-  - **Pending verifications** (dealerships awaiting review)
-  - **SMS gateway health** (X of N phones connected, error rate)
-  - **DAU / WAU** (active users)
-  - **City supply / demand** (active listings, searches, saved searches, favorite/chat/call starts by listing city; no raw GPS)
-- Recent activity feed (5 latest admin actions)
+- Operational cards show unassigned/overdue Support, payment review, due report orders, refund escalations and pending moderation, linking to the corresponding purpose-filtered work. Expose only categories the viewer may read. Founder financial/archive views distinguish verified receipt/refund execution and provenance rather than speculative revenue.
+- Improvement product metrics, diagnostic health, comparisons, suppressed/empty states and investigation flows follow their owning analytics and operations contracts, not independent dashboard formulas. Shared shell does not confer their grants.
+- Recent authorized audit activity may link to the exact recorded action. No automatic GitHub mutation, fix verification, deployment, pause or rollback authority follows from a card.
 
 ### Listings moderation
 
@@ -56,13 +45,12 @@ A mobile admin UI would be cramped. Desktop web with shadcn/ui gives the room an
 - S7 report queue is driven by `ContentReport`, not by a Listing status. The `reported` Listing status was removed from the database (#328, #497); a review-hold status would need a new decision and migration
 - S7 report list rows stay lean but include enough target context for triage: exactly `id`, `status`, `createdAt`, `reason`, `targetType`, `targetId`, and `targetSummary`. `targetSummary` is live-resolved: listing targets use a display title such as year/make/model or listing title when available; user targets use a public display label when available; missing targets use an unavailable/deleted marker while preserving `targetType` + `targetId`. List rows do not include report `details` preview text, reporter identity fields, full target state, counts, actionability flags, or user target role; full details, reporter summary, target state, counts, actionability, and `target.role` are fetched only on report detail where review/action controls need them.
 - S7 report list filters stay limited to `status` + `targetType`; invalid filters or invalid `page`/`pageSize` return `VALIDATION_FAILED`, and the admin UI resets to the default pending queue. The pending queue uses a simple empty state, not dashboard cards or analytics.
-- S7 does not ship a `/listings` admin index or listing search. It only exposes `/listings/:id` as a narrow action page reachable from report detail or by known id.
-- S7 does not ship a "banned listings" queue; admins reach unban through known listing id, report-detail links, or audit-log target links. Banned-listing filters are post-MLP dashboard work.
-- Open listing action page → minimal detail view + moderation toolbar:
+- The reviewer-release `/listings/:id` action page was narrow. This campaign adds a Listing directory/search and full read-only viewer with gallery/video, description/specifications, price, VIN, seller summary, state and permitted related complaints/service context. Preserve source ownership and avoid exposing private order/payment or diagnostic data through a Listing link.
+- The new directory supports current status filtering, including banned Listings, without inventing a reported Listing state or automatically taking moderation action.
+- Open full Listing viewer with separately authorized moderation toolbar:
   - **Ban** active listing with required internal plain-text reason. This is the S7 MLP listing action.
   - **Unban** banned listing back to `active` with required internal plain-text reason; S7 does not restore a stored previous status
-  - **Hide from feed** (archive) — post-MLP if admins need a softer visibility action than ban
-  - **Edit metadata** (admin override — used sparingly) — post-MLP
+  - Seller archive/price/description/VIN/photo edits are not staff actions in this campaign. Request correction through Support; preserve existing explicit ban/unban contracts.
 - Every action writes to audit log
 - When a ban/suspend is triggered from a pending report, only the supplied matching report is marked `actioned` in the same transaction. Other pending reports on the same listing/user remain pending and can be dismissed manually; S7 does not cascade `actioned` or `dismissed` across sibling reports. If a supplied `reportId` is unknown, the API returns `NOT_FOUND`; if it exists but targets a different listing/user than the route target, the API returns `VALIDATION_FAILED` / `REPORT_TARGET_MISMATCH`; if it matches but is already resolved, the API returns `CONFLICT` / `REPORT_ALREADY_RESOLVED`. These failed requests do not mutate targets or write audit rows. Direct ban/suspend outside a report is still allowed and leaves all pending reports untouched, even when reports exist for that target. Dismiss is the only report-only resolution action.
 - Pending reports whose target changed before review can still be dismissed. Report-backed ban/suspend requires the target to still be actionable; otherwise the API returns `CONFLICT` / `REPORT_TARGET_NOT_ACTIONABLE`, leaves the report pending, and writes no audit row.
@@ -90,49 +78,25 @@ A mobile admin UI would be cramped. Desktop web with shadcn/ui gives the room an
 ### Users
 
 - Full dashboard list + search by phone, name, email
-- S7 does not ship a `/users` admin index or user search. It only exposes `/users/:id` as a narrow action page reachable from report detail or by known id.
-- S7 does not ship a "suspended users" queue; admins reach unsuspend through known user id, report-detail links, or audit-log target links. Suspended-user filters are post-MLP dashboard work.
+- The reviewer-release `/users/:id` action page was narrow. This campaign adds scoped user directory/search and context for permitted Listings, Support/history requests and moderation audit. Minimize contact/sign-in details, separate private diagnostic/payment access and prohibit impersonation/arbitrary private-message browsing.
+- User directory status filters may locate suspended users; existing non-admin/self moderation protections still govern every action.
 - Open user action page → minimal detail: phone, role, suspension state, and action history link
 - Actions: Suspend / Unsuspend (with required internal plain-text reason, trimmed before validation/storage, non-empty after trim, capped at 1000 chars after trim). S7 stores simple current suspension state on `User`: suspend sets `suspendedAt`, `suspendedById`, and internal `suspensionReason` from the normalized reason; unsuspend clears those fields. Suspend/unsuspend is for non-admin user targets only: `role = admin` targets return `FORBIDDEN` / `ADMIN_TARGET_NOT_MODERATABLE`, and self suspend/unsuspend returns `FORBIDDEN` / `SELF_MODERATION_NOT_ALLOWED`; these failures do not mutate users, resolve reports, or write audit rows. AuditLog owns full history; no separate suspension-history entity, duration, automatic expiry, or warning ladder ships in the MLP. Suspended users see only a generic suspension banner; admin free-text reasons are internal.
 - Reports against visible admin accounts can exist and be dismissed, but they cannot be action-suspended in S7. Staff abuse handling stays in operator/admin-account-management work, not automatic report-queue behavior.
 - Suspended users keep login/account-deletion access, but authenticated marketplace mutations are blocked with HTTP 403 `FORBIDDEN` and `details.reason = "USER_SUSPENDED"`. Suspension does not auto-ban or hide the user's listings; admins ban listings separately when needed. Existing conversations remain readable, but new contact/messages are blocked when either participant is suspended.
 - Cannot delete users in MVP (preserve audit trail and conversation history)
 
-### Dealerships
+### Dealer and diagnostic operations
 
-- List of dealerships, sortable by verified status / tenure
-- Tap → detail: logo, members, listings, contact, hours
-- Actions: Verify (set `verifiedAt`) / Unverify / Edit metadata
-- Add member (by phone, sends invite SMS)
+Dealer application/manual identity approval and business membership/inventory/enquiries follow [38](38-showroom.md). Evidence-specific business identity is separate from inspection and no generic paid PRO badge is introduced. Marketplace admin privileges do not become dealership membership or permission to read business enquiries/private reports.
 
-### Broadcast notifications
+Center reception, technician, reviewer and checklist-manager workspaces follow [50](50-reports-tier.md), [PDF export](51-pdf-export.md) and the owning diagnostic flow. Staff need scoped elevation/capability boundaries, not automatic promotion to marketplace admin. Buyer-private reports stay private to commissioning buyer and explicitly authorized staff; seller/dealer public reports require separate publication consent and qualified review. Final report/PDF share immutable snapshots and complete findings. Company service failure gets correction/reinspection at company cost or founder refund decision, never selective removal of unfavorable findings. Exact final public/private review and audience contracts govern release.
 
-- "New notification" page:
-  - Title (RU / TK / EN)
-  - Body (RU / TK / EN)
-  - Target: All users / Specific user / Brand subscribers / Saved-search subscribers / TOPIC name
-  - Optional deep link
-  - `Important` flag (bypasses category mute — use sparingly)
-- Preview shown
-- Send → fans out via worker queue → records `NotificationHistory`
-- History page:
-  - List past notifications
-  - Each shows: title, sent date, recipients, delivered, failed, success rate
-  - Click → detail with per-recipient delivery log
+### Catalog and operational controls
 
-### SMS gateway health
+Current protected API already supports brand/model create/update/delete and logo lifecycle; current admin UI supports brand logos. Reuse actual contracts and preserve stable IDs/localized names/search invalidation. A broad catalog editor with order/hide/merge, generations or other reference editors is outside this campaign, as are feature flags, exchange-rate write UI, legal CMS, promotional broadcast composer and SMS fleet mutation console. Their older roadmap descriptions are not accepted implementation scope. Existing logo management remains available.
 
-- Per-phone view: ID, label, connected status (green/red), last successful send, today's send count, error rate, SIM credit (manually updated)
-- Recent SMS log: phone number sent to (masked), OTP request ID, phone used, status, timestamp
-- Per-phone actions: mark inactive / re-enable / view detailed log
-
-### Catalog editor
-
-- Post-MLP dashboard work. S7 hardens existing catalog admin API auth but does not build `/catalog` UI in `apps/admin`; beta-critical corrections use protected API/operator tooling unless S8 explicitly shapes a small correction UI.
-- Brands list with logo + trilingual names
-- Click brand → edit form (3 name fields, slug, logo upload, isActive)
-- Add new brand button
-- Similar for Models (scoped to Brand) / Generations / Colors / Regions / Cities / Body types / Engine types / Transmissions / Drive types
+Operational health/alerts belong to the approved monitoring contract; no console menu implicitly authorizes fleet provisioning, deployment or emergency production mutation. General Support allows only reasoned one-to-one operational notices under its own contract, not notification broadcasts.
 
 ### Audit log
 
@@ -142,32 +106,24 @@ A mobile admin UI would be cramped. Desktop web with shadcn/ui gives the room an
 - Deleted/null actors render as "Deleted admin" for ordinary admin actions and "Operator script" for `ADMIN_BOOTSTRAP_PROMOTE`.
 - Missing or deleted targets keep their audit row visible and render "Unavailable target"; list/detail rendering must not fail because a listing, user, or report row disappeared after the audit row was written.
 - S7 can show audit detail through an expanded row or side panel when `details.reason`, `before`, or `after` are needed. A dedicated audit detail page is not required for the MLP.
-- Full dashboard filter expansion: actor (admin user), action type, target type, date range, and full-text where needed
+- Current filters remain available. New service/capability/sensitive-read events must be findable through bounded purpose/target/actor context without exposing raw private evidence in audit rows. Broader full-text audit BI is deferred unless separately specified.
 - S7 detail view reads structured `AuditLog.details` (`reason`, `reportId?`, `reportedTargetType?`, `reportedTargetId?`, `before?`, `after?`, action-specific fields). `reason` is a required internal plain-text string, trimmed before validation/storage, non-empty after trim, capped at 1000 chars after trim, rendered to admins as escaped plain text, and not an enum/picker/template/classifier value. Dismiss audit rows target the `content_report` row and preserve the reported listing/user in details; ban/suspend audit rows target the moderated listing/user and carry `reportId`. A first-class before/after diff UI and typed DB action enum are post-MLP hardening.
 - S7 `before` / `after` snapshots stay minimal: report status for dismiss, report status plus listing/user state for report-backed ban/suspend, listing status for ban/unban, and user suspension fields for suspend/unsuspend. Admin mutation endpoints return HTTP 200 JSON with `auditLogId` and updated target/report state rather than `204`; double submits use current-state conflicts instead of idempotency keys.
 - Invalid S7 audit filters or pagination return `VALIDATION_FAILED`; the UI resets to the default audit view instead of preserving an invalid table URL.
 - CSV export, retention controls, and retention policy UI are post-MLP dashboard/compliance work. S7 audit rows are append-only and retained indefinitely for the MLP.
 
-### Phase 2 additions
+## Screens and states
 
-- `/inspection-reports/*` — inspection reports CRUD
-- `/rubric` — rubric template editor (versioned)
-
-## Screens / states
-
-| Screen | State | Notes |
-|---|---|---|
-| Login | OTP entry | Admin-specific look, no marketing chrome |
-| Login | TOTP entry | After OTP success |
-| Reports | Default | S7 landing page after TOTP elevation |
-| Dashboard | Default | Post-MLP overview cards + activity |
-| Dashboard | Gateway unhealthy | Post-MLP red banner: "SMS gateway: 2 of 5 phones down" |
-| Listings | Default | Table with filters |
-| Listings | Filtered to reports | Reports flagged with red badge |
-| User detail | Suspended | Red banner + Unsuspend button |
-| Broadcast composer | Default | Form + preview |
-| Broadcast composer | Targeting all users | Warning: "This will notify {count} users" — require confirm |
-| Audit log | Default | Table with filter chips |
+| Area | Required state/behavior |
+|---|---|
+| Login/elevation | Safe destination-preserving return, expired/revoked/temporarily unavailable session, no credential exposure |
+| Shared shell | TK/RU/EN, purpose-scoped navigation, keyboard/tablet usability, retained locale/filter context |
+| Overview/Improvement | Authorized operational links; honest empty/delayed/suppressed/error metrics from owning contract |
+| Listing/User directory | Search/filter/pagination, full authorized read-only context, unavailable/deleted targets, existing reasoned moderation |
+| Support/history inbox | Assignment/handover, public reply/private note, payment claim versus verification, delivery/refund states and access conflict |
+| Archive | Original provider/date/provenance, permitted reuse, no previous purchaser evidence leak |
+| Diagnostic workspace | Authorized intake/evidence/review, immutable version, private/public audience, PDF pending/failure/retry, correction/reinspection |
+| Grants/audit | Named capability grant/revoke, sensitive historical access/export limits, reason/audit and server authorization |
 
 ## Data references
 
@@ -183,36 +139,45 @@ A mobile admin UI would be cramped. Desktop web with shadcn/ui gives the room an
 - [ADR-0023](../../adr/0023-first-party-product-analytics.md) — First-party product analytics for MVP
 - [ADR-0027](../../adr/0027-mlp-beta-scope.md) — MLP beta scope; minimal moderation first
 
-## Phase
+## Delivery and deferred boundaries
 
-**Phase 1 MLP beta for minimal moderation.** Full admin dashboard expansion is a post-MLP marketplace bet. Phase 3 adds reports if the trust layer is bet on.
+Minimal reviewer-release history remains unchanged. This post-review campaign implements the bounded areas above with governed dependency-ready slices, one integrated candidate, independent review and consolidated acceptance. Dealer/center/provider/payment/collection activation requires each owning contract's concrete readiness evidence. Scoped workspaces and grants are admitted now; they are not deferred by the older single-admin MVP statement.
 
-## Out of scope
+The following remain excluded: phone-first admin, generic role hierarchy beyond explicit capabilities, impersonation, promotional broadcasts, bulk moderation, unrestricted CSV/data export, audit-retention policy editor, broad catalog/flag/rate/CMS operations, public reporter status/edit/retract tooling, automatic spam/trust scoring and automatic infrastructure mutations. Account abuse involving staff uses explicit access-management/session revocation and audited founder recovery, not self-suspension or public moderation of admin targets. Existing logged-in/deletion and restricted-user appeal rights remain intact.
 
-- Mobile admin (defer indefinitely; desktop is fine for admin workload)
-- Admin role hierarchy (super-admin vs moderator) — single admin role for MVP
-- Admin account management through moderation — S7 report queue cannot suspend/unsuspend admins or self-moderate; operator runbook/post-MLP admin-account-management handles compromised staff accounts
-- Read-only admin accounts (e.g., support team that can view but not modify) — defer
-- A/B testing tools — never planned
-- Full-fledged CMS (blog editorial workflow) — admins post via the regular blog UI for now
-
-## Open questions
-
-- Should admins be able to impersonate users for support? (High value, high abuse risk — defer)
-- Bulk operations (e.g., "ban all listings from this user") — likely needed eventually; when shaped, they use one audit row per target with shared `details.batchId`/`details.batchReason`, not a single bulk audit row with a `targetIds` array
-- Admin auth recovery details are owned by [Feature 30 — Identity](./30-identity.md).
-- Admin notification preferences for incoming reports — alerts via Telegram via TM Proxy PC (covered in [ADR-0010](../../adr/0010-testing-obs.md)); alert severity should be threshold/computed/admin-set, not reporter-supplied urgency
-- Report-spam controls — per-reporter quotas, reporter trust scores, and reporting-rate analytics should be shaped only after beta data shows queue spam across many targets
-
-## Deferred moderation ownership
-
-| Deferred capability | Owner before implementation |
+| Boundary | Owner |
 |---|---|
-| Assignment/claim queues, SLA filters, escalation, banned-listing/suspended-user queues | Admin dashboard expansion in this PRD |
-| Bulk moderation | Admin dashboard expansion in this PRD; audit still writes one row per target |
-| CSV export and audit retention controls | Admin/compliance dashboard expansion in this PRD |
-| Message reports | [Feature 34 — Conversations](./34-conversations.md) first, then admin queue support |
-| Blog/content reports | [Feature 39 — Bortzhurnal](./39-content-blogs.md) first, then admin queue support |
-| Reporter-facing status, edit/retract, appeals, support inbox | New trust/support PRD when shaped; this PRD only owns the admin side |
-| Per-reporter quotas, trust scores, reporting-rate analytics | [85 — Launch analytics](../ops/85-launch-analytics-plan.md) plus this PRD after beta evidence |
-| Admin role hierarchy, deprovision, read-only support accounts | [Feature 30 — Identity](./30-identity.md) plus this PRD; not S7 moderation |
+| Assistance/appeals, operational notices, closure/reopening/content purge | [54 - Support](54-support.md) |
+| History offer, quote/payment/capacity/fulfilment/refund, licensed archive | [53 - Vehicle History](53-vehicle-history.md) |
+| Diagnostic consent, role separation, evidence, report corrections/reader/PDF | [50](50-reports-tier.md), [51](51-pdf-export.md) and owning diagnostic flow |
+| Dealer identity/business membership and enquiry ownership | [38](38-showroom.md) and owning dealer flow |
+| Analytics aggregate/investigation/rights, diagnostics/incident health | Owning analytics and operations specifications |
+| Scoped staff capability/session grants and recovery | [30 - Identity](30-identity.md) plus this bounded admin contract |
+| Public marketplace Message report context | [34 - Conversations](34-conversations.md), then audited Admin read port |
+| Future bulk/catalog/flags/rates/CMS/BI | Separate shaping; not admitted by a route or old roadmap row |
+
+## Approved service and bounded admin campaign, 2026-10-14
+
+This section admits the bounded post-review campaign and supersedes earlier broad dashboard deferral/single-admin-only exclusions only for the capabilities named here. It does not rewrite the minimal reviewer-release history or admit every future screen listed elsewhere in this document. [ADR-0106](../../adr/0106-service-owned-support-and-vehicle-history.md), [Vehicle History](53-vehicle-history.md), [Support](54-support.md) and [service workspace](../ui/service-workspace.md) own service behavior. Dealer, diagnostic and analytics additions retain their owning specifications.
+
+Accepted console expansion is operational overview and purpose-filtered inbox, Listing directory/full read-only viewer, scoped user lookup/context, permitted internal vehicle archive, moderation/audit and scoped staff grants. Desktop first, tablets usable. Listing price/description/VIN/photos remain seller-managed; staff use existing explicit moderation and request correction through Support. No unrestricted peer-to-peer message browser or impersonation.
+
+All admin areas, including analytics, service and inspection workspaces, support Turkmen/Russian/English. Translate shell/navigation, screens, charts, filters, forms/validation, empty/loading/error/denied states and generated user-facing exports. Preserve technical identifiers and original provider artifacts. This supersedes the earlier Russian-only initial Improvement exception; retaining a shared shell does not grant cross-purpose private data access.
+
+Separate capabilities cover General Support, Vehicle History fulfilment/payment verification, marketplace moderation, founder refund approval, founder-controlled historical payment evidence/bulk export, staff grants, diagnostic reception/technician/reviewer/template work and analytics aggregate/investigation. One named person may hold multiple explicit grants. Capability removal and handover affect direct reads/mutations/file URLs, not merely menu visibility. Support public identity stays business-only; report service shows named assigned operator/handovers. Incidents retain their separate response team/schedule; service daily 09:00-20:00 Asia/Ashgabat does not change weekday Shanghai incident coverage.
+
+Diagnostic staff do not become marketplace admins merely to enter a shared console. Buyer-private report audiences and evidence remain isolated from sellers/dealer members and analytics investigators. Public release requires the diagnostic owner/consent/review contract. Corrections preserve immutable prior versions; material reinspection and company-error recovery follow the diagnostic specification. No staff action can selectively remove unfavorable findings as a refund condition.
+
+Archive views preserve original provider/date, permitted purposes, provenance and restrictions. Reusing an artifact never exposes previous purchaser chat/payment data. Long-term permitted vehicle knowledge and genuinely anonymized commercial insights are separate from personal/private/provider records. The rejected blanket service/inspection purge is not a policy; neither is indefinite private-chat retention. Existing Support 90-day-after-closure/deletion and analytics schedules remain purpose-specific unless amended. Actual sale/disclosure and data-sales tooling are outside scope.
+
+Broad catalog editor, flags, exchange-rate controls, CMS, promotional broadcasts, bulk moderation/export and infrastructure mutation controls are outside this bounded expansion unless separately admitted. Existing brand/model API CRUD and logo UI are reusable current capabilities, not proof the entire catalog editor exists. Preserve original admin TOTP/server-only tokens and ADR-0090's single-process/single-replica restriction until independently approved shared session coordination exists.
+
+Acceptance must exercise scoped listing/user reads, privacy/evidence grants, direct unauthorized downloads, role removal/handover, stale conflicts, reason/audit, filter-preserving navigation, original-snapshot display, TK/RU/EN switching and tablet/keyboard workflows. Independent reviews and consolidated campaign browser/native/deployed verification remain required; synthetic role switches are not authorization evidence.
+
+## Approved analytics campaign addition
+
+[ADR-0102](../../adr/0102-pilot-first-party-scorecard-and-investigation.md) records the scoped pilot exception to ADR-0027 and complements ADR-0023. The 2026-10-14 #602 shaping scope adds the minimal Improvement scorecard after the first Google Play reviewer submission; it does not admit the broader admin/Support/moderation backlog. [85](../ops/85-launch-analytics-plan.md) owns metric/event/rights contracts and [81](../ops/81-monitoring-alarms.md) owns diagnostics/operations.
+
+Approved interactions: Overview first, Journeys & returns, Reliability & fixes; seven completed UTC days versus previous seven with Today separate and incomplete comparisons withheld; filter-preserving evidence drawer; reason and fail-closed audit for detailed reads/scoped exports; existing GitHub issue references with owner/status/evidence and manual verification. All admin and analytics workspaces support Turkmen, Russian and English, including navigation, screens, charts, filters, forms, validation, empty/loading/error/denied states and user-facing exports. Locale switching preserves authorized task/filter state and selects localized labels, number/date formats and export headings. Keep stable technical identifiers and original provider artifacts unchanged; identify source language rather than inventing translated originals. This final founder requirement supersedes the earlier Russian-only initial Improvement exception. Verify all three locales and affected layouts in consolidated acceptance.
+
+Founder-only analytics access initially, with distinct aggregate and investigation permissions enforced server-side. Future named grants/revocations are explicit and audited. Diagnostic permission does not grant private Message/moderation evidence access. The narrowly scoped investigative export is a pilot exception; broader BI, audit CSV export and retention-policy management UI remain deferred. No bulk unrestricted export, automatic GitHub mutation, fix verification, pause/rollback/deploy authority or blanket TM-handler access. Approved interaction details are in [the analytics design](../ui/analytics-improvement.md); the reviewed prototype is synthetic, memory-only and not production authorization.

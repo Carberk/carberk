@@ -1,147 +1,78 @@
-# 61 — Create listing flow
+# 61 — Create Listing flow
 
-## Summary
+## Summary and authority
 
-Aman wants to sell his Lada. From "Sell" button tap to publish, ≤ 5 minutes (with photos).
+A seller opens Sell, completes the current seven-step wizard and publishes a car. This flow is reconciled on 2026-10-14 with [32 — Listings](../features/32-listings.md), [wizard contracts](../../../packages/contracts/src/schemas/wizard.ts) and the [mobile wizard machine](../../../apps/mobile/src/listings/wizard/wizardMachine.ts). It replaces this flow's stale VIN-first ordering and one-photo minimum. It does not redesign the shipped wizard.
 
-## Goal
+The proposed dealer extension below is separate from the current personal flow and needs material-decision ADR formalization. Detailed fields/limits belong to Feature 32 and contracts, not a second wizard specification here.
 
-- Minimize fields shown at once
-- Save draft automatically — never lose work
-- Defer blocking on photo upload — start staging/upload early, but let user fill specs while media finishes
-- Successful first listing should feel rewarding
+## Entry
 
-## Step-by-step
+The existing Sell tab offers Continue for the latest draft and New listing when appropriate. My listings exposes drafts. An existing Listing opens the edit path with published vehicle identity locked under the existing edit rules. Sell-from-Garage and VIN decoding are not introduced.
 
-### Step 0 — Entry
+## Current seven steps
 
-Sprint 4 starts from the Sell tab only:
+| Step | Seller action | Existing requirement to preserve |
+|---|---|---|
+| 1. Car | Select brand, model, optional generation, year; optionally enter VIN | Vehicle first. Optional format-checked VIN within Car; no separate VIN step, decoder or OCR promise |
+| 2. Details and condition | Enter mileage/specs and seller condition disclosure | Used mileage and damaged disclosure follow the existing contracts; new-car damaged policy stays intact |
+| 3. Photos | Pick camera/library photos and arrange cover/order | Three picked photos to continue; max 20. Uploads run while later steps are filled. Publish needs at least three attached and no unresolved upload failures/in-progress items |
+| 4. Price | Enter full asking amount, currency and optional seller terms | Currency change clears amount; missing required FX blocks publish. No financing promise |
+| 5. Description and place | Write description and select where the car is physically available | Required description and city/region; optional area. No GPS requirement, home-address request or forced translation |
+| 6. Contact | Select/verify Listing contact and allowed contact methods | Verified Contact Phone is distinct from Sign-in Methods. Email-only sellers verify here without adding account phone. At least one permitted contact method |
+| 7. Check and publish | Review all sections, correct a section, publish | Review links use the existing correction/Done return. Recheck validation, phone proof and upload readiness |
 
-1. Tap "+" (center) tab → Sell entry
-   - If drafts exist: show latest draft as primary Continue action plus New listing
-   - If no drafts exist: create/open the 7-step wizard directly
-2. Edit an existing listing uses the same wizard state with post-publish identity fields disabled
+```mermaid
+flowchart LR
+    E[Sell / resume draft] --> V[Car]
+    V --> D[Details and condition]
+    D --> P[Photos]
+    P --> R[Price]
+    R --> L[Description and place]
+    L --> C[Contact]
+    C --> K[Check and publish]
+    K -->|Change section| X[Existing section editor]
+    X -->|Done / Back| K
+    K --> A{Publish requirements satisfied?}
+    A -->|No| F[Explain blocker / preserve draft]
+    A -->|Yes| U[Publish]
+    U -->|Failure| F
+    U -->|Success| O[Listing detail]
+```
 
-Sell-from-Garage entry and Garage prefill are post-MLP per [ADR-0027](../../adr/0027-mlp-beta-scope.md).
+Back/Continue and corrections preserve entered data through the existing reducer, autosave and staged-media recovery. Draft discard remains a confirmed destructive action in the wizard menu. Do not add arbitrary step jumps or change saved payload compatibility as a side effect of dealer work.
 
-### Step 1 — VIN entry
+## Recovery and publication
 
-- "Введите VIN или номер кузова" (Enter VIN or chassis number)
-- Skip button prominent — VIN is optional
-- Manual text entry only in Sprint 4. No OCR button, VIN checking, decode call, or auto-fill promise in the mobile wizard.
-- Real VIN decode/OCR is Phase 2.
+- Photo failure offers retry/remove for that photo. Retry uses the current staged file and new authorized upload request as required; it does not restart the wizard or promise multipart byte resume.
+- A failed autosave shows recovery without losing the currently entered form. Do not promise full offline server persistence.
+- Background/kill recovery uses the existing draft and compressed-file staging behavior. Restored media must reconcile against server ownership and readiness.
+- Contact verification expiry/error keeps Contact recoverable with existing SMS budgets. Contact proof never creates a Sign-in Method.
+- Publish failure preserves the draft, explains the blocker and supports retry. Do not display a successful listing or clear staged files until success is confirmed.
+- Successful publish follows the current detail/navigation behavior. No inspection-interest sheet is re-enabled under this flow; [ADR-0057](../../adr/0057-defer-the-in-app-inspection-demand-signal.md) remains effective.
 
-### Step 2 — Photos
+## Proposed dealer extension, 2026-10-14
 
-- "Add photos" with two buttons: Camera / Library
-- Multi-select from library; compression + upload staging starts immediately
-- During upload: thumbnail with progress overlay
-- Drag to reorder; first photo is cover and shows a Cover badge. No separate Set cover action in Sprint 4.
-- Min 1, max 20
-- Helper text: "Photos under 5 MB upload faster"
-- "Continue" disabled until ≥1 photo
+[38 — Dealer workspace](../features/38-showroom.md) owns business rules; [flow 67](67-dealer-workspace-and-sharing.md#journey-2-create-and-publish-a-dealer-car) owns the dealer journey.
 
-### Step 3 — Brand / Model / Generation / Year
+A member entering from ordinary Sell explicitly chooses Personal or Showroom before starting. Inventory → Add car fixes the business context and shows it. Both entries open **this same wizard**. Review states which business will own the Listing and which verified public contact it uses. Neither an app workspace switch nor membership change silently transfers a draft or its media.
 
-- Brand trigger row opens searchable picker sheet (shared catalog picker, see Feature 31)
-- Model trigger row is disabled until Brand; sheet is scoped to selected brand
-- Generation trigger row is optional; disabled until Model; empty state says no generations exist for this model yet
-- Year input/picker is required; no generated default
-- "Continue"
+The server rechecks business membership, ownership, media authorization and contact authority on save/publish/edit. Losing membership fails with a recoverable access explanation, preserves business work for authorized members and never falls back to publishing personally. Exact draft access after removal and ownership transfer must be agreed before implementation.
 
-### Step 4 — Vehicle specs
+Diagnostic inspection is optional after ordinary publication through listing management when the real center service is ready. The car goes to a center, initially the own Aşgabat center. No diagnostic booking, result or payment is a prerequisite for publishing. Private buyer requests use [flow 66](66-diagnostic-inspection.md), outside this wizard.
 
-- Condition segmented control defaults to Used
-- Mileage visible and required when Used; optional/hidden when New
-- Optional completeness fields, not publish-blocking in Sprint 4:
-  - Color (swatches)
-  - Body type
-  - Transmission
-  - Drive type
-  - Engine type
-  - Engine power
-- "Continue"
+## Evidence before changing the wizard
 
-### Step 5 — Price & currency
-
-- Price input
-- Currency selector: TMT (default) / USD / AED
-- Changing currency clears the entered amount and focuses the price input; the wizard does not auto-convert seller-entered prices.
-- Helper: "About 1,990,000 TMT" if a non-TMT currency selected (using admin FX)
-- If the required non-TMT exchange rate is unavailable, Publish is blocked and the helper says "Exchange rate unavailable. Try TMT or contact support."
-- Seller terms switches, both optional and default OFF:
-  - Exchange possible
-  - Installment possible
-- No separate negotiable toggle in Sprint 4; sellers can mention negotiation in Description.
-- Helper: "Enter the full asking price. AutoTM does not finance or verify seller payment terms."
-- "Continue"
-
-### Step 6 — Location
-
-- Header: "Car location"
-- Region picker
-- City picker (scoped to region)
-- Free-text area/landmark (optional, e.g., "30 mkr near Lukoil")
-- Helper text: "Choose where the car can be inspected. Do not enter your home address."
-- No current-location button, GPS prompt, map pin, or exact address field.
-- "Continue"
-
-The location is the car's location, not the user's current GPS location. A user posting for a dealer, family member, or remote seller chooses where the car is physically available.
-
-### Step 7 — Description & contact
-
-- Description textarea (required; max 2000 chars; no minimum beyond non-empty)
-- Store seller text exactly as written; no auto-translation or language selector in Sprint 4.
-- Phone defaults to the user's verified account phone when they have one.
-- A different `+993` number must be verified with a purpose-bound SMS code before Continue / Publish. Email-only sellers verify a contact phone here; they do not need to add an account phone first.
-- The account phone, when present, remains a quick pick. Verified extra numbers can be reused by the same seller on new Listings for 7 days and appear as quick picks with days left.
-- Contact preferences:
-  - Allow calls (default ON)
-  - Allow chat (default ON) with helper that messaging launches later
-  - At least one of calls/chat must remain enabled
-- Compact Review summary above Publish: photo count, vehicle identity, price, city, contact method
-- "Publish" button
-
-### Publish
-
-- Loading state with spinner
-- On success:
-  - Confetti micro-animation (optional)
-  - Toast: "Listing published"
-  - Land on the new listing's detail page
-  - "Share to WhatsApp" CTA
-- If draft: just "Saved as draft, continue later"
-
-## Draft behavior
-
-- Wizard navigation is linear Next/Back in Sprint 4. The Review summary may link back to completed steps for corrections; no arbitrary step-jump navigation.
-- Auto-save on every step transition
-- "Discard draft" lives in the wizard header overflow menu and only runs after destructive AlertDialog confirmation
-- Sell tab shows latest draft only plus New listing when drafts exist; full draft list is visible in "My Listings"
-- Resume picks up at the last completed step
-- Staged media is stored locally with the draft until it is uploaded/attached, removed, published, or the draft is discarded.
-- Media uploads run in the background relative to the wizard UI; the user can continue filling later steps while photos upload.
-- Publish is blocked until at least one photo is attached successfully and all pending/failed required uploads are resolved.
-
-## Edge cases
-
-- Photo upload fails on slow data → retry per failed photo (don't restart wizard)
-- User loses connection mid-wizard → server autosave may fail; keep the user on the current step and show Retry. Sprint 4 does not promise offline draft persistence.
-- App backgrounds/kills mid-upload → draft and staged compressed files remain; upload retries when the app is reopened and online
-- Upload retry is whole-file retry from the staged compressed file; Phase 1 does not promise multipart byte-level resume
-- VIN decode is not called from the Sprint 4 mobile wizard
-- Contact-phone SMS code expires or has too many wrong attempts → keep the seller on Step 7, explain that the number must be confirmed, and let them request a new code within the shared SMS budgets.
-- Someone shares a contact-phone code for their number → the Listing may show that number, but it does not become a Sign-in Method and cannot be used to sign in.
-- Publish fails (server error) → keep wizard state, show retry
+Exercise existing personal create/edit, contact verification, Review correction, autosave, process restart/media recovery and upload/publish failure paths. Then exercise business context persistence, revoked-member refusal and business Review identity with the same production wizard. Native rendered verification must show existing tokens/components, keyboard handling, safe areas and RU/TK/EN. A throwaway HTML demo is not regression evidence.
 
 ## References
 
-- [Feature 32 — Listings](../features/32-listings.md)
-- [Feature 31 — Catalog](../features/31-catalog.md)
+- [32 — Listings](../features/32-listings.md)
+- [31 — Catalog](../features/31-catalog.md)
+- [38 — Dealer workspace](../features/38-showroom.md)
+- [50 — Diagnostic reports](../features/50-reports-tier.md)
 - [ADR-0008 — Media](../../adr/0008-media.md)
-- [ADR-0022 — City-first listing location](../../adr/0022-city-first-listing-location.md)
-- [ADR-0056 — Listing contact phones are verified](../../adr/0056-listing-contact-phones-are-verified.md)
-
-## Open questions
-
-None for Sprint 4 create-listing wireframe. Sell-from-Garage, fixed-angle guidance enforcement, VIN OCR/decode, and translation assistance are deferred outside #93. Sell-from-Garage is post-MLP.
+- [ADR-0052 — Seller condition disclosure](../../adr/0052-seller-condition-disclosure-is-damaged-plus-known-issues.md)
+- [ADR-0053 — Deferred VIN decoding](../../adr/0053-defer-vin-decoding-until-a-real-decoder-exists.md)
+- [ADR-0056 — Verified Listing contact](../../adr/0056-listing-contact-phones-are-verified.md)
+- [ADR-0080 — New-car damaged policy](../../adr/0080-a-new-car-skips-the-damaged-question.md)

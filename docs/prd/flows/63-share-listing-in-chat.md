@@ -1,116 +1,22 @@
-# 63 — Share listing link (deep-link round trip)
+# 63 — External Listing sharing entry
 
-## Summary
+> Revised target flow, 2026-10-14. External sharing of both an individual Listing and a public showroom is part of the founder's proposed dealer scope. [Flow 67 — Dealer workspace and external sharing](67-dealer-workspace-and-sharing.md#journey-4-share-a-car-or-the-whole-showroom) owns the complete link round trip, metadata and lifecycle matrix. This stable filename is retained for existing references.
 
-Aman wants to send Maral a listing he just saw on AutoTM via WhatsApp. The MLP beta scope is the public listing URL and OG preview. In-chat post-card sharing is deferred with rich chat per [ADR-0027](../../adr/0027-mlp-beta-scope.md).
+## Entry and dependencies
 
-> **Status:** this is the target flow. The mobile app currently hides Share and Copy link on Listing detail until a public web Listing page and App Links exist ([#495](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/495), decided in [#322](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/322)).
+A viewer opens a Listing, chooses the system share sheet or Copy link and sends its canonical HTTPS URL. The recipient reads public vehicle content in Carberk when installed/associated, or in a mobile-friendly browser without installation or sign-in. Public showroom links follow the same contract.
 
-## Goal
+Share and Copy link currently remain hidden until the public Listing page and App Links exist, as decided in [#322](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/322) and tracked in [#495](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/495). Scope reopening does not establish those capabilities. Verify the actual browser page, native association, current availability and preview metadata before enabling controls.
 
-- The shared link "looks right" (rich preview with photo, title, price)
-- Tapping the link opens the AutoTM app if installed (no browser detour)
-- Fallback to web if the app isn't installed
-- Works on iOS and Android equally
+Canonical host, locale routing, stable IDs/slug redirects and deferred-install behavior remain open. Do not treat an old example URL as the approved hostname. A sold Listing stays clearly sold with no new enquiry; removed/moderated content stays hidden. Third-party previews may be cached, so the live page is authoritative. Never put a private diagnostic report or its existence into public share metadata.
 
-## Step-by-step
+## Separate internal sharing
 
-### Step 1 — Aman copies the link
-
-- Inside the AutoTM mobile app, on a listing detail
-- Tap Share → "Copy link" or "Send via…"
-- Link format: `https://auto.tm/ru/listings/<id>`
-- Note: locale prefix included (Aman's locale); if missing, the web app redirects to default locale
-
-### Step 2 — Aman pastes into WhatsApp
-
-- Standard paste; WhatsApp begins fetching OG meta from the URL
-
-### Step 3 — WhatsApp fetches OG meta
-
-- WhatsApp's link preview crawler hits `https://auto.tm/ru/listings/<id>`
-- Next.js renders the page with full OG meta:
-  - `og:title` = "Toyota Camry, 2019 — 189,000 TMT"
-  - `og:image` = first photo of the listing, cropped to 1200×630
-  - `og:description` = "47,000 km · Аşgabat · Used"
-  - `og:url` = canonical
-  - `twitter:card` = `summary_large_image`
-- WhatsApp caches the preview
-
-### Step 4 — Maral sees the message
-
-- The chat in WhatsApp now shows:
-  - Image preview (car photo)
-  - Title (model + price)
-  - Description
-  - "auto.tm"
-
-### Step 5 — Maral taps the preview
-
-#### If AutoTM app is installed (iOS Universal Link / Android App Link)
-
-- iOS: Apple checks the `/.well-known/apple-app-site-association` file on `auto.tm`
-- The AASA file declares that paths matching `/{ru|tk|en}/listings/*` are associated with the AutoTM app
-- iOS opens the app directly at the deep link
-- App routes to `app://listings/<id>` via `expo-linking`
-- Listing detail screen renders
-
-- Android: same flow with `assetlinks.json` declaring the AutoTM app for those paths
-
-#### If AutoTM app is NOT installed
-
-- Default browser opens the URL
-- `https://auto.tm/ru/listings/<id>` server-renders the listing detail
-- Page shows full listing info + "Open in AutoTM app" + "Get the app" CTAs
-- Tapping "Get the app" goes to App Store / Play Store with the listing URL preserved as a deferred deep link (Phase 2 — for now just goes to store)
-
-### Step 6 — Maral is now on the listing in the app
-
-- Same flow as Step 5 of [Flow 62](62-buy-flow.md): she can favorite, message, browse more
-
-## Implementation requirements
-
-### `auto.tm` web side (Next.js)
-
-- `/.well-known/apple-app-site-association` served with `Content-Type: application/json`, no extension
-- `/.well-known/assetlinks.json` served similarly
-- Public listing detail route has `generateMetadata()` returning full OG tags
-- Image used for OG must be 1200×630 (separate variant from listing media)
-
-### Mobile app (Expo)
-
-- `app.json` declares `associatedDomains: ["applinks:auto.tm"]` (iOS) + Android intent filters for `https://auto.tm/*`
-- `expo-linking` configured to route paths to internal routes
-- Custom URI scheme `autotm://` as a fallback for explicit deep links (rare)
-
-### In-chat post-card sharing (post-MLP)
-
-When rich chat is bet on later, Aman may send Maral a listing **inside the AutoTM chat** (not via WhatsApp):
-- He's already in a conversation with Maral
-- Tap the attachment icon → "Share listing"
-- Picks a listing from his recent views / favorites / my listings
-- Sends as a post_ref Message type
-- Renders inline as a clickable card in the chat
-- Tap → opens that listing inside the app
-
-This is a separate (but related) flow — same UX outcome (Maral sees a clear listing card), different transport.
-
-## Edge cases
-
-- WhatsApp doesn't render the preview → URL still works; Maral sees the bare link
-- App is installed but not signed in → opens app; if `/chat/*` link, redirect to login; for `/listings/*`, anonymous view works
-- Shared link is to a deleted/banned listing → web page shows "This listing is no longer available"; mobile app shows same message
-- Locale mismatch (link is `/ru/listings/x`, Maral's app is set to `tk`) → app respects URL locale OR overrides to user locale; design choice TBD (probably: respect URL locale for shared content, app locale for browsing)
+A Listing card or attachment sent inside an existing Carberk Conversation belongs to [34 — Conversations](../features/34-conversations.md). It is distinct from external system sharing and is not implied implemented by this flow's historical filename.
 
 ## References
 
-- [Feature 32 — Listings](../features/32-listings.md)
-- [Feature 34 — Conversations](../features/34-conversations.md) — rich in-chat sharing deferred
-- [Feature 38 — Showroom](../features/38-showroom.md) — same flow for dealer pages after showroom is bet on
-- [ADR-0027 — MLP beta scope](../../adr/0027-mlp-beta-scope.md)
-- `apps/web/CONTEXT.md` — OG meta generation
-
-## Open questions
-
-- Deferred deep links — show the right listing after install in Phase 2? (Yes; Branch.io alternative is needed since we're air-gapped; could roll our own with a query param + first-launch handler)
-- Per-listing canonical URL — never change once set; even on archive
+- [38 — Dealer workspace and showroom](../features/38-showroom.md)
+- [32 — Listings](../features/32-listings.md)
+- [67 — Full dealer and external sharing journeys](67-dealer-workspace-and-sharing.md)
+- [50 — Inspection report audience](../features/50-reports-tier.md)

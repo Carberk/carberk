@@ -1,442 +1,136 @@
-# 85 - Launch analytics and scaling plan
+# 85 - First-party product measurement and pilot scorecard
 
-## Summary
+Approved target for the Chief of Staff campaign #897, reusing analytics parent #602. Founder-approved scope and prototype choices are recorded in the 2026-10-14 campaign decisions and governing ADRs. Source, tests and deployed evidence establish implementation status.
 
-This is the operating plan for AutoTM's first MLP beta launch: what must be ready before launch, what analytics we collect, what the minimal admin surface shows, how we act on the data, and when we scale from private beta to public soft launch to broader growth.
+## Purpose and phase boundary
 
-The plan is intentionally practical. It is not a marketing wish list and not a generic analytics spec. It answers:
+Answer whether buyers find Listings, sellers publish, contacts result in accepted Messages and seller replies, users return, and technical failures prevent those actions. Product measurement stays first-party under ADR-0023. Self-hosted GlitchTip owns diagnostics; its SDK is not permission for third-party product analytics.
 
-- Are we ready to launch?
-- Is the marketplace working after launch?
-- Which city needs more supply or more demand?
-- Which reliability issue blocks growth?
-- Which post-MLP bets are justified by real launch data?
+First Google Play reviewer submission remains Railway-only, without GlitchTip, the admin scorecard or TM VPS. This campaign implements and verifies monitoring on Railway after submission. Before real-user invitations, require core measurement and diagnostics evidence, applicable collection/disclosure readiness, regional delivery evidence, alert receipt and the incident drill. TM purchase/provisioning and actual cutover are separate human-authorized actions. Google Play approval alone does not pass cutover readiness.
 
-## Locked decisions
+The initial app pilot is 20 invited Ashgabat users, aiming for ten sellers and ten buyers; 50 total and Mary follow the exact accepted gates in [84](84-launch-plan.md#invited-pilot-checklist-and-expansion). Canonical rollout sequencing depends on the proposed scoped ADR-0037 amendment and the pilot analytics exception to ADR-0027 in ADR-0102. This specification does not authorize invitations. ADR-0057 continues to defer in-app inspection-demand prompts. Broad moderation/Support/dealer/report expansion stays with owning discovery and issues.
 
-These decisions are treated as the default unless a future ADR or PRD revision supersedes them:
+## Shared contract and ownership
 
-1. **First launch means controlled private beta after S8.** Wider public soft launch and full app-store polish come after the MLP loop is stable.
-2. **North-star launch metric is qualified buyer-seller connections per active listing.** Downloads and DAU matter, but the marketplace works only if buyers contact sellers.
-3. **MLP analytics are first-party only.** No PostHog, Mixpanel, Google Analytics, Firebase Analytics, session replay, ad identifiers, or third-party analytics SDKs in the beta.
-4. **Analytics measure product health, not surveillance.** No raw GPS, background location, contact-book scraping, keystroke tracking, exact home-address tracking, or hidden paid ranking.
-5. **Location analytics are city-level.** Store catalog `regionId` / `cityId` and listing city. If future "Use my location" resolves GPS to a nearest catalog City, store the resolved City ID and source action, not the coordinate.
-6. **Admin analytics are operational.** The MLP admin surface tells admins what to fix today: moderation, reliability, supply, demand, and seller responsiveness.
-7. **Growth is stage-gated.** Increase marketing only after OTP, uploads, listing creation, contact actions, and moderation are stable.
-8. **Launch plan separates blocking MLP work from later work.** A metric can be important without blocking first launch.
+One validated event contract serves the app and feature campaigns. Packages/contracts owns schema names/versioning; API ingress owns envelope validation, actor authorization, durable deduplication and collection eligibility; worker jobs own retention/deletion and reproducible rollups; each source feature owns meaningful emission at its outcome boundary; admin owns permission-enforced queries and presentation. These are proposed implementation assignments within ADR-0023, not a new independent analytics platform or bounded context.
 
-ADR-0023 still governs the architectural choice: product analytics are first-party, not third-party SDKs. ADR-0027 narrows the beta event subset. Do not create a new analytics ADR unless the team changes the first-party requirement, removes launch-critical analytics entirely, accepts third-party analytics, or turns the event taxonomy into a broader shared platform commitment.
+Mobile foreground actions and guest visits are client facts. Conversation creation, accepted Message, publication, public visibility transitions and durable seller reply are server facts. Emit only after authoritative commit, with an outbox or equivalent retry-safe approach that cannot misreport a rolled-back transaction. Client/server must not both count the same outcome. For the reply metric, qualify the chronologically first committed non-deleted buyer Message in a newly created eligible buyer-to-Listing-owner Conversation, excluding owner/test conversion. Rejects/local pending/retries do not qualify until accepted; duplicate commit/event delivery counts once. A seller reply is the first subsequent committed Message by that Listing's seller within 24 elapsed hours. Opening an existing Conversation does not create another contact-start or first-Message cohort. Reply eligibility belongs to the first-Message cohort, not every buyer Message. An internal domain event carrying Message content must never be forwarded wholesale.
 
-## Canonical terms
+## Event families
 
-| Term | Meaning |
+Exact stable names and schema fields become the contracts implementation's reviewed manifest. Each field needs a metric or reliability purpose. These families define the accepted outcome coverage; names below are the draft contract.
+
+| Events | Owner and qualifying fact |
 |---|---|
-| **Active listing** | Public listing visible in browse/search. Excludes drafts, archived, banned, and deleted listings. |
-| **Qualified connection** | A buyer-intent action from listing detail: `chat_started` or `call_tapped`. |
-| **Connection rate** | Qualified connections divided by active listings for the same period. Also viewable by city. |
-| **Supply** | Active listings, new listings, publish success, and verified dealers only after the dealer bet ships. |
-| **Demand** | Searches, listing views, contact starts, call taps, and post-MLP signals such as saved searches/favorites only after they ship. |
-| **Liquidity** | Whether supply and demand produce buyer-seller contact. |
-| **Reliability** | OTP, uploads, API, contact flow, SMS gateway, and any shipped background jobs working at launch quality. Native push is post-MLP unless shaped earlier. |
-| **City gap** | Demand and supply are mismatched for a city. Example: many searches for Mary, few Mary listings. |
-| **Raw product event** | Append-only event row from API/mobile/web, retained short term. |
-| **Aggregate metric** | Daily/hourly precomputed metric used by admin dashboard and reviews. |
-
-## Scope boundaries
-
-### MLP beta-blocking
-
-These must be ready before the S8 private beta:
-
-- First-party event ingestion path for MLP-critical events, or an explicit S8 retro note explaining the manual substitute.
-- Minimal admin/scorecard views for marketplace health, reliability, and moderation, or a documented operator query/runbook for the private beta.
-- Daily aggregate metrics for the beta scorecard.
-- Private-beta gates and rollback/pause flags.
-- Privacy/legal text matching actual data collection.
-- A repeatable launch review cadence.
-
-### MLP important but not beta-blocking
-
-These should be added during S8 if cheap, or immediately after beta if needed:
-
-- CSV export for analytics tables.
-- More detailed city drilldowns.
-- Seller response-time distribution by city/dealer.
-- Zero-result search review queue for catalog cleanup.
-- Simple feedback form linked from Help.
-
-### Post-MLP bets
-
-These are explicitly later:
-
-- BI warehouse or external dashboarding.
-- Cohort retention analysis beyond simple DAU/WAU.
-- Dealer monthly email reports.
-- Inspection-program analytics.
-- Ad campaign reporting.
-- A/B testing framework.
-- Radius search, map search, or exact GPS analytics.
-- ML ranking or personalization analytics beyond agreed first-party events.
-
-## Launch shape
-
-### First launch definition
-
-First launch is **controlled private beta after S8**:
-
-- App is available through TestFlight, Play internal testing, direct APK, or another documented private distribution path.
-- Public web is live.
-- Invited real users can browse, create listings, search/filter, open listing detail, and contact sellers.
-- Marketing is intentionally absent or limited to hand-invited users.
-- Founder/team watch metrics daily.
-- The goal is learning plus operational safety, not maximum traffic.
-
-### Why not full national launch immediately
-
-AutoTM is a two-sided marketplace. Full demand before supply creates disappointment. Full seller onboarding before reliability creates support load. The first launch must prove:
-
-- buyers can find enough real listings;
-- sellers can publish without friction;
-- OTP and uploads survive real users;
-- moderation can keep up;
-- city-level supply/demand data tells us where to push next.
-
-## MLP feature boundary
-
-### Must be present for private beta
-
-- Anonymous browse.
-- Catalog-backed listing creation.
-- Photo upload and listing media display.
-- Price/currency handling.
-- City-first listing location.
-- Listing detail.
-- OTP login.
-- Simple buyer-to-seller contact flow.
-- Minimal admin moderation.
-- Legal/account deletion/store readiness.
-- Monitoring, alerts, rollback, and support channels.
-
-### Public soft-launch candidates, not private-beta requirements
-
-- Saved searches.
-- Direct-message push.
-- Dealer profiles and verified dealer badge.
-- Admin catalog tools.
-- Admin metrics dashboard.
-
-### Explicitly not required for launch
-
-- Map/radius search.
-- Exact listing GPS.
-- Inspections.
-- Paid ads.
-- Paid listing boosts.
-- Advanced personalization.
-- Public API.
-- Full dealer subscription billing automation.
-- ML ranking.
-- Comparison tool.
-- Heavy analytics BI tooling.
-- Session replay.
-
-## Launch gates
-
-Private beta is blocked unless all critical gates are green.
-
-### Engineering gates
-
-| Gate | Requirement | Blocking? |
-|---|---|---|
-| Phase 1 scope | S1-S8 MLP beta scope complete or explicitly deferred in sprint/retro docs | Yes |
-| E2E tests | Critical happy paths pass | Yes |
-| Production deploy | At least one successful production deploy | Yes |
-| Rollback | Rollback command/process tested | Yes |
-| Backup/restore | Full restore drill from staging/prod-like backup | Yes |
-| Feature flags | Server-side config can pause signups (`SIGNUPS_ENABLED`), listing publish (`LISTING_PUBLISH_ENABLED`), listing mutations/read-only mode (`LISTING_MUTATIONS_ENABLED`), contact writes (`CONTACT_ENABLED`), report entry (`REPORT_ENTRY_ENABLED`), and admin moderation writes (`ADMIN_MODERATION_ACTIONS_ENABLED`); disabled writes return `FEATURE_DISABLED` without leaking flag names | Yes |
-| Beta builds | Android/iOS available through internal/private beta distribution | Yes |
-| Legal URLs | Privacy/Terms live in RU/TK/EN | Yes |
-
-### Reliability gates
-
-| Gate | Target | Blocking? |
-|---|---|---|
-| OTP success | >= 95% in beta | Yes |
-| Image upload success | >= 95% in beta | Yes |
-| API stability | No unresolved P0/P1 bugs | Yes |
-| Contact reliability | Buyer-to-seller contact path verified on real Android and iOS devices | Yes |
-| SMS gateway | 5 phones provisioned, spare phone ready | Yes |
-| Alerts | Telegram alert drill passed | Yes |
-
-### Marketplace gates
-
-| Gate | Target | Blocking? |
-|---|---|---|
-| Seed listings | 10-20 real-looking listings | Yes |
-| Verified dealers | Not required for private beta unless the dealer bet is explicitly shaped before launch | No |
-| Catalog | Common launch-market cars covered | Yes |
-| Moderation | Admin can review reports, ban listings, suspend abusive users, see audit rows, and pass the report -> TOTP admin action -> audit -> enforcement smoke | Yes |
-| Support | Support phone/email or Telegram process ready | Yes |
-
-### Analytics gates
-
-| Gate | Target | Blocking? |
-|---|---|---|
-| Core events | OTP, listing, search, contact, upload, report events ingest | Yes |
-| Daily aggregates | Scorecard metrics roll up | Yes |
-| Dashboard | Admin can view launch scorecard | Yes |
-| Privacy check | No raw GPS, ad IDs, session replay, or third-party analytics SDKs | Yes |
-| Data retention | Raw/aggregate retention policy documented | Yes |
-
-## Analytics architecture
-
-### Decision
-
-The MLP beta uses a custom first-party analytics system.
-
-The product emits marketplace events to AutoTM's own API. The API validates and stores raw events in an append-only table or log. A scheduled worker rolls events into daily/hourly aggregates for admin dashboards and reviews.
-
-### Why this shape
-
-- Works with TM-local hosting and privacy constraints.
-- Avoids third-party SDK/legal drift.
-- Captures marketplace-specific semantics that generic tools do not understand.
-- Keeps admin dashboard fast through aggregates.
-- Leaves a future export path to BI without giving external tools raw user behavior.
-
-### High-level data flow
-
-```text
-mobile/web/admin
-  -> API analytics endpoint
-  -> AnalyticsEvent append-only storage
-  -> worker aggregate job
-  -> AnalyticsDailyMetric / dashboard read models
-  -> admin dashboard + launch review
-```
-
-### Raw event principles
-
-- Append-only.
-- Server timestamp always recorded.
-- Client timestamp optional and treated as advisory.
-- User ID optional because anonymous browse is allowed.
-- Session ID can be ephemeral and resettable.
-- Never store raw GPS.
-- Never store exact private address.
-- Never store full phone numbers in analytics payloads.
-- Prefer IDs over strings where possible: `listingId`, `cityId`, `brandId`, `modelId`.
-
-### Suggested storage model
-
-This is a planning shape, not a committed Prisma schema:
-
-```text
-AnalyticsEvent
-- id
-- eventName
-- actorUserId?
-- anonymousSessionId?
-- occurredAt
-- receivedAt
-- source: mobile | web | admin | api | worker
-- appVersion?
-- platform?
-- locale?
-- regionId?
-- cityId?
-- listingId?
-- dealershipId?
-- payloadJson
-```
-
-```text
-AnalyticsDailyMetric
-- id
-- date
-- metricName
-- dimensionsJson
-- value
-- calculatedAt
-```
-
-### Retention
-
-| Data | Retention | Reason |
-|---|---|---|
-| Raw analytics events | 90-180 days | Enough for launch debugging and short-term funnel analysis |
-| Daily aggregates | 2+ years | Long-term planning and trend analysis |
-| Error traces/logs | Per observability runbook | Operational debugging |
-| Audit logs | Long-term | Admin/legal accountability |
-| Raw GPS | Not collected in the MLP beta | Privacy and ADR-0022 |
-
-## Event taxonomy
-
-### Naming rules
-
-- Event names use snake_case.
-- Events describe completed facts, not intentions.
-- Prefer domain nouns: listing, search, saved_search, conversation, notification.
-- Do not include PII in event names or payload fields.
-- Add new events deliberately; every event should answer an operating question.
-
-### Identity and session events
-
-| Event | When recorded | Key dimensions | Used for |
-|---|---|---|---|
-| `app_opened` | App foregrounds or web session begins | source, platform, appVersion, locale | DAU/WAU |
-| `otp_requested` | User requests OTP | source, phoneCountry?, rateLimitStatus | OTP funnel |
-| `otp_verified` | OTP accepted | source, userId | Auth success |
-| `otp_failed` | OTP rejected or expired | reason bucket | Reliability/fraud |
-| `logout_completed` | User logs out | source | Session health |
-| `account_delete_requested` | User starts delete flow | source | Legal/admin |
-
-### Listing creation events
-
-| Event | When recorded | Key dimensions | Used for |
-|---|---|---|---|
-| `listing_draft_started` | Seller starts wizard | source, userId | Publish funnel |
-| `listing_step_completed` | Wizard step completed | stepName | Dropoff |
-| `listing_media_uploaded` | Photo/video upload succeeds | mediaType, sizeBucket | Upload reliability |
-| `listing_media_upload_failed` | Upload fails | reason bucket, mediaType | Launch reliability |
-| `listing_publish_attempted` | Seller taps publish | cityId, brandId, modelId | Funnel |
-| `listing_published` | Listing becomes active | cityId, brandId, modelId, sellerType | Supply |
-| `listing_publish_failed` | Publish fails | reason bucket | Funnel reliability |
-| `listing_edited` | Active listing edited | fieldFamily | Seller behavior |
-| `listing_price_changed` | Price changes | currency, changeDirection | Pricing behavior |
-| `listing_marked_sold` | Seller marks sold | cityId, brandId, modelId | Liquidity |
-| `seller_sold_confirmed_autotm_buyer` | Seller answers "buyer from AutoTM?" yes/no | answer | Attribution |
-
-### Discovery events
-
-| Event | When recorded | Key dimensions | Used for |
-|---|---|---|---|
-| `feed_loaded` | Feed returns listings | cityId?, resultCountBucket | Demand |
-| `listing_viewed` | Listing detail opened | listingId, cityId, brandId, modelId | Demand |
-| `search_submitted` | Text search submitted | resultCountBucket, cityId? | Demand/catalog gaps |
-| `filter_applied` | Filter sheet applied | filterFamilies, cityId?, resultCountBucket | Filter behavior |
-| `zero_result_search` | Search/filter returns zero | filterFamilies, cityId? | Catalog/supply gaps |
-| `saved_search_created` | User saves search | cityId?, brandId?, modelId? | Demand |
-| `favorite_added` | Listing favorited | listingId, cityId | Buyer intent |
-| `favorite_removed` | Listing unfavorited | listingId, cityId | Buyer intent |
-
-### Contact events
-
-| Event | When recorded | Key dimensions | Used for |
-|---|---|---|---|
-| `call_tapped` | Buyer taps call | listingId, cityId, sellerType | Qualified connection |
-| `chat_started` | Conversation created from listing | listingId, cityId, sellerType | Qualified connection |
-| `message_sent` | Message sent | conversationId, senderRole | Chat health |
-| `seller_first_response_sent` | Seller replies first time | responseTimeBucket | Seller quality |
-| `conversation_reported` | User reports conversation after report-from-thread ships | reason | Trust; post-MLP rich-chat/moderation bet |
-
-### Notification events
-
-These are post-MLP unless direct-message push is explicitly shaped before public soft launch.
-
-| Event | When recorded | Key dimensions | Used for |
-|---|---|---|---|
-| `push_token_registered` | Device token saved | platform | Push reach |
-| `push_sent` | Worker sends push | category | Delivery funnel |
-| `push_delivery_failed` | FCM/APNS rejects send | reason bucket | Reliability |
-| `push_opened` | User opens push | category, deepLinkType | Notification value |
-| `saved_search_match_created` | Worker finds a match after saved searches ship | savedSearchId, cityId | Match quality |
-
-### Moderation and trust events
-
-| Event | When recorded | Key dimensions | Used for |
-|---|---|---|---|
-| `report_submitted` | User submits report | targetType, reason | Trust |
-| `admin_action_recorded` | Admin action writes audit log | actionType, targetType | Governance |
-| `moderation_action_failed` | Admin moderation action fails after validation or infrastructure error | actionType, reason bucket | Launch safety |
-| `audit_write_failed` | Audit write fails in a moderation path | actionType, targetType | Governance/reliability |
-| `listing_banned` | Listing removed by admin | reason | Trust |
-| `user_suspended` | User suspended | reason | Trust |
-| `dealership_verified` | Dealer verified after the dealer bet ships | cityId | Dealer supply |
-
-Moderation analytics answer operating questions only. S7 should not add reporter trust scores, public report status analytics, per-reporter quotas, or auto-hide thresholds until beta data shows queue spam or moderation bottlenecks. If that happens, shape a moderation-abuse bet with [Feature 40 — Admin](../features/40-admin.md) instead of quietly growing the S7 report model.
-
-### Banned Launch Analytics
-
-Do not collect:
-
-- raw GPS coordinates;
-- background location;
-- advertising identifiers;
-- contact book data;
-- keystrokes;
-- session replay;
-- screen recordings;
-- exact private home addresses;
-- hidden paid-ranking signals;
-- third-party tracker cookies;
-- full phone numbers in analytics payloads.
-
-## Admin dashboard
-
-The beta dashboard should be operational, dense, and decision-oriented.
-
-### Section 1: Marketplace health
-
-| Metric | Definition | Action |
-|---|---|---|
-| DAU / WAU | Unique active users | Demand trend |
-| Active listings | Visible listings | Supply baseline |
-| New listings today / 7 days | Published listings | Seller activation |
-| Qualified connections | `call_tapped + chat_started` or the shipped contact equivalent | Liquidity |
-| Connections per active listing | Qualified connections / active listings | North-star launch health |
-
-### Section 2: City supply / demand
-
-| Metric | Definition | Action |
-|---|---|---|
-| Active listings by city | Current supply | Recruit sellers where low |
-| Searches by city | Demand signal | Seed supply where high |
-| Saved searches by city | Strong demand; post-MLP if saved searches have shipped | Dealer outreach |
-| Contact starts by listing city | Conversion by city | Improve city quality |
-| Zero-result searches by city | Unmet demand | Catalog/supply cleanup |
-
-### Section 3: Funnel
-
-| Funnel | Steps | Action |
-|---|---|---|
-| Auth | OTP requested -> verified | Fix SMS/rate limits |
-| Listing publish | draft started -> publish attempted -> published | Fix wizard/uploads |
-| Buyer intent | listing viewed -> contact started | Fix listing detail/contact UX |
-| Saved search | filter applied -> saved search created -> push opened (post-MLP) | Fix matching/notifications |
-
-### Section 4: Reliability
-
-| Metric | Target | Action |
-|---|---|---|
-| OTP success | >= 95% | Stop growth if below target |
-| Upload success | >= 95% | Fix media pipeline |
-| API error rate | < 2% sustained | Investigate/rollback |
-| Push delivery | >= 90% initially after native push ships | Fix tokens/provider |
-| SMS phone health | 5/5 preferred, 4/5 acceptable short term | Repair phone fleet |
-
-### Section 5: Moderation and trust
-
-| Metric | Target | Action |
-|---|---|---|
-| Pending reports | Cleared daily | Add moderation time; no report auto-expiry or auto-dismiss in S7 |
-| Oldest pending report age | Same day in launch week | Add moderation time or pause growth |
-| Report rate | Watch spikes | Tighten abuse controls; shape post-MLP per-reporter quotas only if beta shows queue spam |
-| Moderation action failures | Near zero | Investigate API/DB/audit path before adding traffic |
-| Audit write failures | Zero | Pause moderation actions; no unaudited moderation state changes |
-| Banned listings | Review patterns | Improve listing validation |
-| Suspended users | Review patterns | Improve fraud controls |
-| Average moderation response time | Same day in launch week | Protect trust |
-
-### Section 6: Dealer
-
-| Metric | Definition | Action |
-|---|---|---|
-| Active dealers | Dealers with active listings | Dealer supply |
-| Verified dealers | Dealers with PRO badge | Trust/supply |
-| Dealer listings | Active listings from dealers | Inventory growth |
-| Dealer response time | First response bucket | Dealer quality |
-| Dealer lead count | Call/chat starts on dealer listings | Dealer ROI |
+| visit_started, foreground_activity | Mobile/web; foreground qualifying action, not background retry |
+| discovery_opened, search_completed, listing_detail_opened | Feature client; rendered result, result-count category and catalog filters, no entered free text |
+| sign_in_started, sign_in_result | Identity; start correlation plus accepted/expected rejection/technical failure, no method value or code |
+| draft_started, wizard_step_opened, wizard_step_result | Listings client; stable draft correlation; canonical vehicle/specs/photos/price/location/contact/review identifiers |
+| media_preparation_result, media_upload_result | Upload owner; attempt/result/category/duration, distinct photo/video kind, no media/path/URL |
+| listing_published, listing_visibility_changed | Listings server; committed outcome and public eligibility interval |
+| call_intent | Client; genuine enabled Call action; intent only |
+| conversation_created | Conversations server; newly committed Conversation only |
+| first_buyer_message_accepted, seller_first_reply | Conversations server; first accepted eligible buyer Message and first seller reply to it; no text or attachment |
+| video_processing_result, video_playback_result | Worker/player; job/attempt or playback correlation; preparation/upload/processing/playback stay distinct |
+| diagnostic/health signals | Diagnostics contract in 81; not product autocapture |
+
+Video instrumentation follows ADR-0099's phase and access restrictions. Tester video can prove collection/reliability without counting as real marketplace conversion. Dealer/report event additions wait for their accepted scopes. Existing public Listing views work #874 remains separately owned; shared measurement must reconcile semantics without taking ownership or exposing private analytics publicly.
+
+## Envelope and field boundary
+
+A versioned envelope contains random eventId, known eventName, occurredAt/receivedAt, environment, release/build, trusted population classification, visit correlation and an allowlisted typed payload. The server supplies authenticated actor pseudonym rather than trusting a submitted accountId or role. Guest installation pseudonyms are opaque random app-scoped IDs. Event IDs prevent repeat receipt from creating repeat facts. Outcome attempt IDs separate retries from successful actions.
+
+Allowed contextual fields are approved app/OS version, coarse device model, locale, connection type, named screen/action, duration/result/category, catalog IDs and bounded structured filters. Listing city describes the marketplace, not physical user location. Reject unknown names, versions, keys, unbounded strings, arrays and implausible timestamps. Whitelist route templates, not raw URLs; query strings and signed URLs never enter telemetry. No chat text, media, contact values, passwords, OTPs, tokens, precise location, advertising IDs, contacts, keystrokes, replay, autocapture or fingerprinting. Do not retain raw search text. SDK-generated breadcrumbs/context require the same scrutiny; a field allowlist alone is insufficient.
+
+Reviewer/demo/test population is trusted server/config metadata, never a client-selectable escape from controls. Test reliability evidence is visible separately. Exclude known owner interactions from conversion; do not infer guest ownership or remove real marketplace activity simply because an actor is also an admin.
+
+## Identity, collection and rights
+
+Guest pseudonym continuity lasts at most 90 days and visits reset after 30 minutes without foreground activity. Sign-in associates only the current guest visit, never earlier guest visits. Signed-in measurement uses a separate pseudonym; logout/account switch separates associations. Accounts and guest installations are not unique people and must not be summed.
+
+The founder prefers broad useful collection, default-on where permitted, with clear explanation of collected data and improvement purposes in Terms and privacy disclosures. Provide only the rights/controls required by applicable law and store policy; do not add a blanket optional-analytics toggle without an identified requirement or founder decision. This preference is subject to a documented applicable collection basis and required rights. Do not treat ordinary sign-in Terms agreement as guest telemetry consent. Before collection in an admitted phase, complete its purpose, lawful-basis, storage/transfer, retention, notice and rights matrix. Operational/security diagnostics require their own basis and minimal fields. Unresolved longitudinal collection remains disabled for that region/population. Language, citizenship, IP-derived assumptions or Listing city do not prove eligibility or physical region. A region-selection/enforcement mechanism is an explicit remaining design decision if applicability cannot be established.
+
+On account-deletion request, immediately stop account-linked collection, purge linked raw product/diagnostic history and identity associations, and reject queued/late account-linked events. The core account's 30-day recovery period does not preserve analytics history. Recovery of a core account does not restore prior telemetry. Guest deletion/withdrawal rights require a usable guest-safe mechanism wherever applicable. Non-identifying aggregates may survive only after disclosure-risk review. Avoid keeping analytics identity mappings in account tombstones; choose and prove a deletion fence that also handles old app queues and backup restores.
+
+## Delivery and resource defaults for engineering review
+
+Telemetry never blocks browse, auth, upload/publication or chat. Core transactions do not wait for collector availability. Proposed bounded client queue: seven-day maximum age, 2 MiB or 1,000 events whichever comes first; batches no larger than 50 events or 128 KiB; drop expired/oldest product events with aggregate drop reasons; separate bounded crash handling. These are implementation proposals, not additional approved collection.
+
+Retry transient failure using exponential backoff with jitter, starting at five seconds and capped at one hour; honor Retry-After, retry only eligible transient/network failures, stop permanent schema/authorization failures and cap queue age. Recheck eligibility before enqueue and flush. Clearing/withdrawal/logout/delete must prevent old actor events reaching a new actor. Foreground resumes may schedule delivery but do not block the UI. Never store tokens in event envelopes or diagnostic artifacts.
+
+Proposed ingress defaults: authenticated normal user session for account events, scoped guest installation capability for guest events, separate service authorization for server emission, global/per-installation/per-account limits, body/field/time bounds, durable event-ID dedupe and explicit rejected/dropped counters. Guest credentials confer no other app privileges. Exact rate values follow measured pilot resource testing; changing collection semantics requires founder review. Raw IPs used transiently for abuse controls are not product event fields.
+
+Raw product events expire after 90 days; individual diagnostics after 30 days; routine product and diagnostic aggregates after 24 months. The explicitly qualified durable anonymous market-data class below is a scoped exception to the earlier blanket 24-month aggregate limit. Telemetry is excluded from year-long core archives. Daily retention sweep reports lag and failures. Restore replays applicable deletion fences before data is served or collection resumes. Performance/resource caps protect core services during a diagnostic storm. 81 owns actual cap sizing and evidence.
+
+
+## Durable vehicle and market knowledge
+
+Governed by proposed [ADR-0107](../../adr/0107-durable-permitted-vehicle-market-knowledge.md); effective after the scoped decision merges.
+
+The final founder objective is a durable Turkmenistan vehicle-market dataset and lawful commercial anonymized insights. Names and identifiable contact/customer records are not the commercial product. This campaign delivers data foundations, provenance and controlled derivation, not a sales portal, buyer access or an actual sale/disclosure.
+
+This is an explicit scoped amendment to the previous blanket 24-month aggregate planning limit. A separately registered class of genuinely anonymized, lawfully reusable vehicle/market observations and business statistics may be retained indefinitely where rights and applicable obligations allow. Retain for the longest justified permitted period if indefinite retention is unavailable. Routine diagnostic/release aggregates and ordinary product scorecard aggregates remain 24 months. Raw product events remain 90 days and individual diagnostics 30 days. No extension applies merely because a row is called an aggregate, an ID is hashed, a VIN is masked or names are absent. Accepted ADR-0023 keeps its first-party architecture and raw-data exclusions; this adds only the bounded permitted business-derived purpose/class.
+
+Each admitted durable dataset has an owner, source/version/provenance, purpose, permitted reuse and commercial redistribution rights, retention class, applicable destinations, identifiability assessment, derivation/suppression version and review date. Store the assessment without carrying raw actor mappings into the durable dataset. A registry entry that lacks adequate rights or anonymization evidence remains quarantined and cannot be treated as indefinite or exportable. Provider licenses may restrict even derived resale, not just copied PDFs; do not infer redistribution rights from purchase or source availability.
+
+Separate raw account-linked records, private conversations/payment evidence, buyer-private reports and supplier documents from permitted vehicle knowledge. No private-report existence or findings may leak through public vehicle records, tiny market groups or commercial extracts. VIN, rare vehicle combinations, precise mileage/date histories and stable pseudonyms can enable singling out or linkage. Exclude or generalize identifiers, event-level histories and rare combinations as required by the risk assessment. Anonymization must resist reasonable linkage, subtraction and repeated/filter-combined queries. The existing below-five rule is a starting safeguard, not an anonymization certificate. Aggregates must not retain reverse mapping tables or per-person contribution exports. Permission for public report viewing does not automatically authorize unrestricted commercial reuse.
+
+Optional self-reported age bands and coarse residence city/region may be useful only for a named metric/purpose with documented basis, notices, rights and minimization before collection. Default is unknown/unprovided. Never require demographics to browse, buy or publish, infer age from photos/messages, collect exact birth date/address/continuous precise location to compute bands, or silently repurpose selected search/Listing city as residence. Mark self-reported residence separately from market location, including unknown and outdated values. Do not introduce minors targeting or expanded sensitive attributes. Age-related eligibility and any youth protections must be assessed before enabling demographic collection.
+
+Raw demographic fields remain personal without names. Keep them purpose-bound, restricted and subject to deletion/correction and an explicitly justified shortest permitted retention; do not add them to the 90-day event envelope by default or assume indefinite profile storage. Exact band taxonomy and any account-profile persistence are technical/product proposals under the named research purpose, not authorization to collect live data. Use synthetic age-band/coarse-region fixtures until the field contract and applicability checkpoint are approved. At account deletion/withdrawal, stop collection and remove linked fields/queues/eligible raw history. Anonymous output survives only if it is genuinely non-identifying and lawfully retained; identified, reversible or restricted derivatives must be corrected, erased or recomputed under their obligations.
+
+Commercial export stays off. Before any real disclosure, record authorized recipient/purpose, license and regional obligations, a fresh reidentification/reuse review, minimum-cell/composition controls, permitted schema and approval. Administrative investigative exports remain a separate restricted purpose and cannot become raw commercial datasets. Reassess durable-class safety when new fields/linkage sources or supplier restrictions change. A deletion/restriction finding blocks affected extracts and triggers removal or safe rederivation, including serving copies/backups as applicable.
+
+Acceptance uses synthetic fixtures: direct and hashed actor IDs/VINs cannot enter anonymous outputs; tiny/combinable cells and buyer-private facts are suppressed; rights-restricted provider rows stay excluded; routine aggregates expire at 24 months while only qualified anonymous market classes survive; deleting raw actors purges personal sources and reversible derivatives without resurrecting data on restore; optional unknown demographics remain usable and no required marketplace action demands them. No real data collection, legal certification, paid-provider rights or commercial disclosure is established by these tests.
+
+## Metric definitions and acceptance fixtures
+
+| Metric | Definition and literal acceptance fixture |
+|---|---|
+| Discovery/search/detail | Fixture of 3 foreground discovery opens, 2 completed searches with 8 and 0 results, 4 rendered eligible detail opens plus duplicate deliveries => 3/2/4; zero-result rate 1/2. Technical failed search adds a failure signal, not a completed search. Owner/test detail events are excluded from conversion fixtures; reliability remains separately visible. |
+| First accepted Message | Three new eligible Conversations: one buyer Message accepted twice by retry/delivery, one rejected then accepted, one never accepted => 3 starts, 2 first accepted Messages. Opening an existing Conversation adds no start/cohort; owner/test cases add no conversion. |
+| Contacts per active Listing | 11 distinct Call intents + 5 committed new Conversations = 16 contacts; 12 time-weighted average publicly active Listings => 1.3333; 14 current active shown separately. No active inventory => not applicable, not zero conversion. |
+| Call intent | Once per account/guest installation, Listing, UTC day. Three taps by same unit/Listing/day count one; another UTC day counts another. No completed-call/sales claim. |
+| Chat start | New Conversation commit counts one; five opens of that Conversation count zero additional starts. First accepted Message shown separately. |
+| Seller publication | 7 of 18 eligible draft starts publish within seven days => 38.9%; incomplete windows withheld. Seven-day metric does not expire drafts. Upload retries are attempts, not new drafts. |
+| Seller response | 4 of 5 eligible first accepted buyer Messages get a seller reply within 24 hours => 80%; also show response-time distribution. Open windows excluded until matured. No seller deadline. |
+| Sign-in | 21 successful sign-ins of 22 eligible starts => 95.5%; technical transport failures and expected incorrect/expired-code outcomes distinct. |
+| Upload | 15 completed of 20 attempts => 75%; five failed attempts do not establish five affected people or five abandoned drafts. |
+| Returns | Separate first-observed account and guest cohorts. D1/D7/D30 mean exact next/seventh/thirtieth UTC calendar day. Matured account fixture 6/12 D1 and 4/12 D7; guest 3/8 and 2/8. Unmatured D30 unavailable. |
+| Reliability | Controlled failure/receipt fixtures in 81; genuine errors can be investigated immediately even when product sample sizes are small. |
+
+Public visibility history supplies time-weighted inventory, not end-of-period snapshots. Public eligibility requires active and actually publicly visible; drafts, banned/hidden, archived/sold and deleted states are excluded. Literal 24-hour interval fixture: Listing A active all 24 hours; B active for hours 0-6, hidden for 6-18, restored for 18-24; C draft until hour 12, active for 12-18, archived afterward. Total eligible 42 Listing-hours / 24 hours = 1.75 average active, current active at period end = 2. Duplicate/out-of-order interval facts must still yield 1.75 and must not count the hidden/draft/archived periods. Ensure delayed and duplicate visibility events cannot create overlaps or negative intervals. Date filters use complete UTC days. Collection watermark/late-event policy must make completeness reproducible; proposed pilot allowance is 24 hours after day end, with older late arrivals tracked and recomputation/version shown. Observation maturity and collection completeness are separate checks.
+
+Combine groups below five measured accounts/installations and assess combinations/filter leakage. Rates below 30 eligible starts display counts and small-sample labels, subject to grouping; this is not a significance claim. No identity count in a tiny suppressed group. Data unavailable is not zero; delayed collection withholds comparisons; matured empty data is distinct. No product-growth rule gains automatic pause/rollback authority.
+
+## Approved admin interaction
+
+One Improvement area has Overview first, Journeys & returns, Reliability & fixes. All admin and analytics workspaces support Turkmen, Russian and English, including navigation, screens, charts, filters, forms, validation, empty/loading/error/denied states and user-facing exports. Locale switching preserves authorized task/filter state and selects localized labels, number/date formats and export headings. Keep stable technical identifiers and original provider artifacts unchanged; identify source language rather than inventing translated originals. This final founder requirement supersedes the earlier Russian-only initial Improvement exception. Verify all three locales and affected layouts in consolidated acceptance. The English prototype records interaction decisions only. Preserve existing admin navigation and report/audit workflows.
+
+Default seven completed UTC days versus preceding seven. Today is separate triage, not a complete-day comparison. Filters include approved Listing city/release context; show the explicit scope for any independent cohort or fixed investigation fixture. Evidence drawer preserves filters and restores focus. Small-group, empty, loading, unavailable and delayed states remain distinguishable.
+
+Founder-only access initially. Enforce separate aggregate viewer and diagnostic investigation permissions server-side; later named grants/revocations audited. TM equipment handler receives no automatic access. Reason required before detailed timeline reads or scoped exports; log actor, purpose, scope/time, release and result, never the exported content. Audit failure refuses restricted reads/exports. Diagnostic access grants no private Message evidence permission. Export is a narrowly scoped investigation action, not unrestricted bulk raw data download; limits/redaction and retrieval expiry require implementation proof.
+
+Fixes link existing GitHub issues with owner/status/evidence and manual verification. The scorecard does not create a competing task tracker or automatically create/update issues, verify fixes, pause growth, deploy or roll back.
+
+## Campaign work packages and evidence
+
+Reuse #602/#604-#608. Chief of Staff reconciles ready work only after shaping approval/merge:
+
+1. Collection/disclosure and shared schema/identity/security contract, with unresolved regional eligibility explicitly gated.
+2. First-party ingest, queue isolation, dedupe, retention/deletion and authoritative outcome/visibility production.
+3. Sanitized attributed diagnostics and minimal health/alert delivery; protect core resources.
+4. Feature emission and reproducible rollups, including video at its campaign phase.
+5. Approved admin views, scoped permissions and audited investigation.
+6. Combined campaign acceptance and recovery/hosting preparation.
+
+Independent source features can instrument against the same verified contract; dealer/report extensions wait on their specs. #880 staging controls are checked by the coordinator, not assumed implemented. No independent issue PRs or implementation campaign is started here.
+
+Acceptance requires literal fixture checks through real owning interfaces for dedupe, denominators, windows, suppression, delete/late-event/restore and permissions; controlled end-to-end telemetry outages must leave core journeys usable. Chief of Staff runs one consolidated final native acceptance campaign after assembly, with affected reruns. Native crash symbolication, exact build delivery, deployed alerts and representative-network/restore proof remain release gates. Static prototype and unit tests do not pass them.
+
+## Wider launch operating policy retained
+
+The following earlier operating/scaling policy is retained for wider launch planning. The invited Android pilot's exact rollout/staffing/measurement rules above and in 84 take precedence over overlapping generic cohort, cadence, north-star, cities and thresholds below. Read this appendix as human review guidance, never new automatic pause/rollback authority. Feature-dependent signals apply only when shipped; older dealer/iOS/general-beta targets do not become additional pilot gates. Unrelated wider-launch policy is preserved rather than deleted by this bounded analytics addition.
 
 ## Operating cadence
 
@@ -674,56 +368,3 @@ Serious review outcomes:
 - Demand problem: improve SEO/content/community distribution.
 - Conversion problem: fix listing detail/contact UX.
 - Trust problem: tighten moderation, reports, and dealer verification.
-
-## Implementation mapping
-
-This plan should not silently rewrite sprint scope. Use this mapping when slicing issues.
-
-| Work | Sprint / phase | Blocking? |
-|---|---|---|
-| Listing view/publish/search/contact events | S4-S6 as features land | Yes for MLP launch-critical subset |
-| Moderation/report events | S7 | Yes for beta safety |
-| Minimal marketplace scorecard | S7/S8 | Yes |
-| Legal/beta data disclosures | S8 | Yes |
-| Launch gates/rollback support | S8 | Yes |
-| Saved-search and notification events | Post-MLP | No |
-| Feedback form | Post-MLP if needed | No |
-| Dealer monthly analytics report | Post-MLP dealer bet | No |
-| Inspection analytics | Trust bet | No |
-| Ad campaign analytics | Post-MLP ads bet | No |
-| BI exports | Phase 2+ | No |
-
-## Privacy and compliance checklist
-
-Before public app-store submission, confirm:
-
-- Privacy Policy says exactly what is collected.
-- App Store privacy nutrition labels match the code.
-- Google Play Data Safety answers match the code.
-- No third-party analytics SDK is bundled.
-- No raw GPS collection exists in the MLP beta.
-- Saved searches store catalog city/region IDs, not coordinates.
-- Analytics payloads do not include full phone numbers.
-- Account deletion flow exists and has been tested.
-- Admin audit logs are separate from product analytics.
-
-## Open questions
-
-- What exact first 30-day numeric target should we set for qualified connections per active listing after beta data exists?
-- Does S6 launch with the contact thread fully enabled, or does call/contact carry the first connection metric until the thread stabilizes?
-- Should the first city-focused push be Asgabat by default, or should beta demand choose the first city?
-- How much manual seller/dealer outreach is the team willing to do in launch month?
-- What is the minimum support schedule for week 1: business-hours only or near-real-time?
-
-## References
-
-- [ADR-0010](../../adr/0010-testing-obs.md) - Testing and observability stack
-- [ADR-0022](../../adr/0022-city-first-listing-location.md) - City-first listing location
-- [ADR-0023](../../adr/0023-first-party-product-analytics.md) - First-party product analytics for launch
-- [00-vision.md](../00-vision.md) - 12-month success metrics and anti-goals
-- [03-roadmap.md](../03-roadmap.md) - Phase 1 sprint trajectory
-- [40-admin.md](../features/40-admin.md) - Admin dashboard
-- [80-deployment-runbook.md](80-deployment-runbook.md) - Deploy and rollback
-- [81-monitoring-alarms.md](81-monitoring-alarms.md) - Operational monitoring
-- [83-legal.md](83-legal.md) - Privacy and Terms planning
-- [84-launch-plan.md](84-launch-plan.md) - Launch cutover checklist

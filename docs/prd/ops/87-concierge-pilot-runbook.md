@@ -6,6 +6,10 @@
 
 ---
 
+## Relationship to the app pilot
+
+The proposed [ADR-0101](../../adr/0101-app-pilot-separate-from-manual-inspections.md) changes only the sequence: once accepted, the 20-user Ashgabat app pilot may run after its own readiness gates without waiting for this inspection experiment. This runbook keeps its qualified mechanic, local coordination, consent, safety and no-payment requirements. A trusted equipment handler is not a pilot mechanic by default. This document does not authorize either pilot, restore the in-app inspection-demand prompt deferred by ADR-0057, or expand report-service scope.
+
 ## Purpose
 
 This runbook makes the S9b on-ground trust pilot executable by a founder or trusted helper, using only a human mechanic, a printed/hand-filled rubric, and a simple PDF template. It is a follow-on to the S9a remote trust-signals work ([`sprints/sprint-09-trust-wedge.md`](../sprints/sprint-09-trust-wedge.md)) and to the Phase 0 pilot described in [`business/inspection-program.md`](../business/inspection-program.md).

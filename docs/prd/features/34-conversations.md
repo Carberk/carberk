@@ -9,7 +9,7 @@ Buyer-to-seller contact scoped to a Listing. The release ships the Messages tab 
 Phone calls don't leave a trail. Telegram conversations get lost across channels. Scams are easier when there's no audit. A native, Listing-scoped chat:
 
 - Keeps the conversation about the car (pinned listing card at top)
-- Surfaces seller credibility (tenure, PRO badge; a response-time hint is a post-release candidate, see [Out of scope](#out-of-scope))
+- Surfaces available seller context, such as tenure. Proposed dealer identity must describe checked business evidence under [38](38-showroom.md), without a generic condition guarantee; a response-time hint remains a post-release candidate, see [Out of scope](#out-of-scope)
 - Allows post-card sharing (Aman sends Maral "this car too?")
 - Provides scam protection (admins can review reported conversations)
 - Lets us measure: how many buyers contact sellers? how fast does the seller respond?
@@ -212,3 +212,20 @@ Support is reached from **Cabinet → Help**, which shows the AutoTM email addre
 
 - Listing-card preview rendering in the WhatsApp share — handled via OG meta in public web (Feature 38)
 - Post-release: response time SLA shown on seller profile — what threshold gets the "fast responder" badge?
+
+
+## Proposed shared dealer enquiry extension, 2026-10-14
+
+Pending material-decision ADR; current personal Conversation behavior remains the baseline. [38](38-showroom.md) owns dealer enquiry policy and [flow 67](../flows/67-dealer-workspace-and-sharing.md) owns the journey. A business Listing enquiry belongs to the business, enters Unassigned, can be atomically claimed by authorized sales staff and reassigned by its owner. Open/Closed is distinct from responsibility. Retain the actual responding User and history; do not send under a shared human identity.
+
+Business membership checks must cover reads, sends, uploads, realtime subscriptions and notifications. Removing staff revokes access and future delivery while retaining history and inventory. Removal requeues assignments; owner may reopen/close. Business assets/history survive creator deletion, and personal-to-business transfer is deferred under ADR-0103. Existing Listing/buyer/seller uniqueness and participant authorization cannot become business-aware through a UI switch alone. Generic listing-less showroom chat is outside the present contract; guide a buyer to a car.
+
+Private diagnostic reports are not shared inbox attachments by default. A dealer participant cannot access them through business ownership or a Listing link. See [50](50-reports-tier.md).
+
+## Final campaign dealer enquiry extension
+
+ADR-0103 extends Listing-scoped enquiries to a business principal. Current members read business enquiry and authored history; sales atomically claim Unassigned, owner reassigns/reopens/closes. Open/Closed follow-up and assignment are separate. Removal revokes HTTP/socket/push/private-file access, requeues assignment and preserves history. Personal conversation access, blocking/reporting and sold-contact rules remain; no listing-less generic dealer chat. Shared privileged staff helpers must preserve distinct paid-history, General Support and diagnostic audiences rather than treating every case as peer buyer/seller chat. TK/RU/EN applies throughout related admin/staff UI.
+
+## Approved Support and Vehicle History ownership
+
+The approved post-review campaign adds [General Support](54-support.md) and [Vehicle History](53-vehicle-history.md) under [ADR-0106](../../adr/0106-service-owned-support-and-vehicle-history.md). They are separately owned Service Conversations, not Listing buyer/seller Conversations. Once Support is ready, one Messages Support row and Cabinet Help reach the same case/history; do not add other Support links. Vehicle History has a distinct request history/entry. Listing availability, buyer/seller blocking and ordinary send restrictions do not become Support appeal policy. Shared transport/unread/push components must authorize the service purpose and current staff capability. This amendment does not claim either service shipped in the earlier reviewer release.
