@@ -11,6 +11,7 @@ export const retainedSchemaProfile = {
     '3cf9a92dc50367112d7e41cfadaf9e3199e0000ef75a7181861c09ebe9d7e51d',
     '6156fef81231e244f52c85b3cabaf2c18597a6d9c7699782144b2a85e324a42b',
     'c02cefa47ade5650ea02f79dd07ba7c42fbb4524e938a6fd08bbbfca161a7735',
+    'e601862966c5b8ed74b11f8fb2dacac3f358fdc4a0ad7d06a9908d6e09dcefc0',
   ],
   schemaMigrations: {
     'f3de8e84330abf0bbec854a2929ca2d2f7a4f00fa2eab6e95b6be14defda747a': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities', '20261015020000_business_membership', '20261015030000_business_inventory', '20261015040000_first_party_measurement', '20261015050000_service_foundations', '20261015060000_business_enquiries', '20261015070000_diagnostic_intake'],
@@ -22,8 +23,10 @@ export const retainedSchemaProfile = {
     '3cf9a92dc50367112d7e41cfadaf9e3199e0000ef75a7181861c09ebe9d7e51d': [],
     '6156fef81231e244f52c85b3cabaf2c18597a6d9c7699782144b2a85e324a42b': ['20261015003500_listing_view_counts'],
     'c02cefa47ade5650ea02f79dd07ba7c42fbb4524e938a6fd08bbbfca161a7735': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities'],
+    'e601862966c5b8ed74b11f8fb2dacac3f358fdc4a0ad7d06a9908d6e09dcefc0': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities', '20261015020000_business_membership', '20261015030000_business_inventory', '20261015040000_first_party_measurement', '20261015050000_service_foundations', '20261015060000_business_enquiries', '20261015070000_diagnostic_intake', '20261015080000_service_push_subscriptions'],
   },
   additions: [
+    { name: '20261015080000_service_push_subscriptions', checksum: 'e2b04ea8e7f1c33924261fb2fcc0669c1c99dcfe628b8b0e8f0c7007ee47cf3b' },
     { name: '20261015070000_diagnostic_intake', checksum: '9f5ce216f2dd4cbbcb75c9ce78d058244f5262170e51815c111c66563b32ebc6' },
     { name: '20261015060000_business_enquiries', checksum: '4d491f64ae7601fce337591a4fed5e14fc717fe5c1234aa83e4b3b2f1e5c36d8' },
     { name: '20261015050000_service_foundations', checksum: '66c9eec07c4c715624d42c30a00202a0727cb36b05f5ca850fed38a9901f9c9a' },
