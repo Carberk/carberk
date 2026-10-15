@@ -64,3 +64,10 @@ it("keeps a failed operator upload separate from sending and retries its exact s
  const form = screen.getByRole("button", { name: "Send message" }).closest("form"); if (!form) throw new Error("Missing send form"); fireEvent.submit(form);
  await waitFor(() => expect(sends).toHaveLength(1)); expect(sends[0]?.["attachmentId"]).toBe(id); expect(stageCalls).toBe(1); expect(uploadCalls).toBe(2);
 });
+it("acknowledges only the messages currently rendered to the assigned operator", async () => {
+ let through = 0; const fetcher = globalThis.fetch;
+ vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => { if (String(url).endsWith("/read")) { through = (JSON.parse(String(init?.body)) as { throughSequence: number }).throughSequence; return Response.json({ ok: true }); } return fetcher(url, init); });
+ const screen = render(<AdminLocaleProvider initialLocale="en"><ServiceWorkspace/></AdminLocaleProvider>);
+ await waitFor(() => expect(screen.getByRole("button", { name: "General Support" })).toBeTruthy()); fireEvent.click(screen.getByRole("button", { name: "General Support" }));
+ await waitFor(() => expect(screen.getByText("Synthetic service reply")).toBeTruthy()); await waitFor(() => expect(through).toBe(1));
+});
