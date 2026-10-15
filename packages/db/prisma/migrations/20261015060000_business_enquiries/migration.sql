@@ -28,3 +28,44 @@ CREATE TABLE "business_enquiry_audits" (
 );
 CREATE UNIQUE INDEX "business_enquiry_audits_conversationId_version_key"
   ON "business_enquiry_audits"("conversationId", "version");
+
+-- Requeue at the same commit as removal/suspension, including account purge.
+-- These writers already hold the affected User; lock business before Conversation.
+CREATE FUNCTION requeue_departed_business_enquiries() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  departed_id TEXT;
+  owned_business TEXT;
+  changed RECORD;
+  reason TEXT;
+BEGIN
+  IF TG_TABLE_NAME = 'users' THEN
+    IF NEW."suspendedAt" IS NULL AND NEW."deletionScheduledAt" IS NULL THEN RETURN NEW; END IF;
+    departed_id := NEW."id";
+    reason := 'user_inactive';
+  ELSE
+    IF TG_OP = 'UPDATE' AND NEW."status" = 'active' THEN RETURN NEW; END IF;
+    departed_id := OLD."userId";
+    reason := 'membership_revoked';
+  END IF;
+  FOR owned_business IN SELECT DISTINCT "businessId" FROM "conversations"
+    WHERE "assigneeId" = departed_id AND "businessId" IS NOT NULL ORDER BY "businessId"
+  LOOP
+    PERFORM "id" FROM "dealerships" WHERE "id" = owned_business FOR UPDATE;
+    FOR changed IN UPDATE "conversations" SET "assigneeId" = NULL, "version" = "version" + 1,
+      "updatedAt" = CURRENT_TIMESTAMP WHERE "businessId" = owned_business AND "assigneeId" = departed_id
+      RETURNING "id", "version", "enquiryState"
+    LOOP
+      INSERT INTO "business_enquiry_audits" ("id", "conversationId", "version", "action", "previousAssigneeId", "enquiryState")
+        VALUES (gen_random_uuid()::text, changed."id", changed."version", reason, departed_id, changed."enquiryState");
+    END LOOP;
+  END LOOP;
+  IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE TRIGGER business_enquiry_membership_revocation
+  AFTER DELETE OR UPDATE OF "status" ON "dealership_members"
+  FOR EACH ROW EXECUTE FUNCTION requeue_departed_business_enquiries();
+CREATE TRIGGER business_enquiry_user_revocation
+  AFTER UPDATE OF "suspendedAt", "deletionScheduledAt" ON "users"
+  FOR EACH ROW EXECUTE FUNCTION requeue_departed_business_enquiries();
