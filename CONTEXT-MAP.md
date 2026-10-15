@@ -27,6 +27,7 @@ Find the owning area, read its short overview, then inspect source and tests. Th
 | notifications | [`notifications/CONTEXT.md`](apps/api/src/modules/notifications/CONTEXT.md) | Native device tokens, direct-message push decision/history, worker enqueue |
 | content | [`content/CONTEXT.md`](apps/api/src/modules/content/CONTEXT.md) | BlogPost schema; publishing not implemented |
 | reports | [`reports/CONTEXT.md`](apps/api/src/modules/reports/CONTEXT.md) | InspectionInterest demand capture and admin aggregates |
+| measurement infrastructure | [`measurement/CONTEXT.md`](apps/api/src/modules/measurement/CONTEXT.md) | Strict first-party intake and public emitter ports; durable identity/ledger composition pending |
 | admin | [`admin/CONTEXT.md`](apps/api/src/modules/admin/CONTEXT.md) | Audit log, listing/user/message reports, moderation |
 
 ## Mobile feature modules (inside `apps/mobile/src/`)
@@ -34,6 +35,7 @@ Find the owning area, read its short overview, then inspect source and tests. Th
 | Module | File | Owns |
 |---|---|---|
 | listings | [`listings/CONTEXT.md`](apps/mobile/src/listings/CONTEXT.md) | Create `sell` reducer + staging queue vs edit-route shell; uploads, autosave, wizard documentation |
+| measurement | [`measurement/CONTEXT.md`](apps/mobile/src/measurement/CONTEXT.md) | Bounded client queue and first-party sender; feature/identity host not composed |
 | conversations | [`conversations/CONTEXT.md`](apps/mobile/src/conversations/CONTEXT.md) | Conversation screen loaded by ID, socket and HTTP caches, local pending Messages, push entry |
 
 ## Packages
