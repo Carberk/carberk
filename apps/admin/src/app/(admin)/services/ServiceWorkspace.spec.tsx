@@ -45,3 +45,22 @@ it("removes protected content after denial and preserves draft while switching l
  deny = true; fireEvent.click(screen.getByRole("button", { name: "Täzele" }));
  await waitFor(() => expect(screen.queryByText("Synthetic service reply")).toBeNull());
 });
+it("keeps a failed operator upload separate from sending and retries its exact staged image", async () => {
+ let uploadCalls = 0, stageCalls = 0;
+ const fetcher = globalThis.fetch;
+ vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+  if (String(url).startsWith("/services/files/")) { uploadCalls++; return Response.json({ ok: true }, { status: uploadCalls === 1 ? 503 : 200 }); }
+  if (String(url).endsWith("/attachments")) { stageCalls++; return Response.json({ id }); }
+  return fetcher(url, init);
+ });
+ const screen = render(<AdminLocaleProvider initialLocale="en"><ServiceWorkspace/></AdminLocaleProvider>);
+ await waitFor(() => expect(screen.getByRole("button", { name: "General Support" })).toBeTruthy()); fireEvent.click(screen.getByRole("button", { name: "General Support" }));
+ await waitFor(() => expect(screen.getByText("Synthetic service reply")).toBeTruthy());
+ const file = new File([new Uint8Array([1, 2, 3])], "synthetic.jpg", { type: "image/jpeg" });
+ Object.defineProperty(file, "arrayBuffer", { value: async () => new Uint8Array([1, 2, 3]).buffer });
+ fireEvent.change(screen.getByLabelText("Upload attachment"), { target: { files: [file] } });
+ await waitFor(() => expect(screen.getByText("The upload failed. The message has not been sent.")).toBeTruthy()); expect(sends).toHaveLength(0);
+ fireEvent.click(screen.getByRole("button", { name: "Retry upload" })); await waitFor(() => expect(screen.getByText("Attachment ready to send")).toBeTruthy());
+ const form = screen.getByRole("button", { name: "Send message" }).closest("form"); if (!form) throw new Error("Missing send form"); fireEvent.submit(form);
+ await waitFor(() => expect(sends).toHaveLength(1)); expect(sends[0]?.["attachmentId"]).toBe(id); expect(stageCalls).toBe(1); expect(uploadCalls).toBe(2);
+});
