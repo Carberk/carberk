@@ -31,6 +31,19 @@ export class ServiceDenied extends Error {
 export function serviceCapability(purpose: ServicePurpose): "support.operations" | "history.fulfilment" {
   return purpose === "support" ? "support.operations" : "history.fulfilment";
 }
-export function assertServiceAccess(_scope: ServiceScope, _actor: ServiceActor, _action: ServiceAction, _file?: ServiceFileAudience): "customer" | "staff" {
-  throw new ServiceDenied("NO_ACCESS");
+export function assertServiceAccess(scope: ServiceScope, actor: ServiceActor, action: ServiceAction, file?: ServiceFileAudience): "customer" | "staff" {
+  if (!actor.sessionValid || actor.deleting) throw new ServiceDenied("NO_ACCESS");
+  if (scope.erased || !scope.customerId) throw new ServiceDenied("HISTORY_REMOVED");
+  const customer = actor.userId === scope.customerId;
+  if (customer) {
+    if (action !== "read" && action !== "send" && action !== "file") throw new ServiceDenied("NO_ACCESS");
+  } else {
+    if (!actor.staffAuthorized || actor.suspended) throw new ServiceDenied("NO_ACCESS");
+    const canClaim = action === "assign" && scope.assigneeId === null;
+    if (action !== "queue" && !canClaim && actor.userId !== scope.assigneeId) throw new ServiceDenied("NO_ACCESS");
+  }
+  if (action === "file") {
+    if (!file || file.conversationId !== scope.conversationId || file.lifecycleEpoch !== scope.lifecycleEpoch || !file.adopted || file.removed || (customer && file.visibility !== "customer")) throw new ServiceDenied("NO_ACCESS");
+  }
+  return customer ? "customer" : "staff";
 }

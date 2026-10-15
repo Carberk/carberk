@@ -12,6 +12,7 @@ import supertest from "supertest";
 import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
 import { GlobalErrorFilter } from "../../../common/error.filter";
 import { defineE2eSuite } from "../../../../test/helpers/e2eSuite";
+import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
 import { ServiceMessagingModule } from "../service-messaging.module";
 import { SERVICE_RUNTIME } from "../domain/ports/ServiceMessagingPort";
 
@@ -21,7 +22,7 @@ const customer = suite.id("customer"), oldStaff = suite.id("operator"), nextStaf
 const ids = [customer, oldStaff, nextStaff, stranger];
 const tokens = new Map<string, string>();
 beforeAll(async () => {
- const module = await Test.createTestingModule({ imports: [ServiceMessagingModule, JwtModule.register({ global: true, secret: "service-test-secret" })] }).overrideProvider(SERVICE_RUNTIME).useValue({ now: () => new Date(), id: randomUUID, syntheticEnabled: () => true }).compile();
+ const module = await Test.createTestingModule({ imports: [bullTestRoot(), ServiceMessagingModule, JwtModule.register({ global: true, secret: "service-test-secret" })] }).overrideProvider(SERVICE_RUNTIME).useValue({ now: () => new Date(), id: randomUUID, syntheticEnabled: () => true }).compile();
  app = module.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
  jwt = app.get(JwtService); db = app.get(PrismaService);
  app.useGlobalGuards(new JwtAuthGuard(app.get(Reflector), jwt)); app.useGlobalFilters(new GlobalErrorFilter());
