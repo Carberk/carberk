@@ -23,7 +23,7 @@ vi.mock("react-native", async (original) => ({ ...await original<typeof import("
 } }));
 const listing = () => fixture({ brandId: "00000000-0000-4000-8000-000000000010", modelId: "00000000-0000-4000-8000-000000000011", generationId: undefined,
   regionId: "00000000-0000-4000-8000-000000000012", cityId: "00000000-0000-4000-8000-000000000013", viewCount: 1234, viewsToday: 9 });
-beforeEach(() => { vi.stubEnv("EXPO_PUBLIC_LISTING_VIEWS_ENABLED", "true"); native.stored.clear(); AppState.currentState = "active"; });
+beforeEach(() => { vi.stubEnv("EXPO_PUBLIC_LISTING_VIEWS_ENABLED", "true"); native.stored.clear(); screenFocus.focused = false; AppState.currentState = "active"; });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
 
 async function advance(ms: number) { await act(async () => { await vi.advanceTimersByTimeAsync(ms); }); }
@@ -66,23 +66,23 @@ describe("full Listing detail view signal", () => {
   it("sends a private install header after two focused foreground seconds without changing displayed counts", async () => {
     const signals = serve();
     const screen = await renderMobile(<ListingDetailScreen />);
-    await waitFor(() => expect(screen.getByText("1,234 views · 9 today")).toBeTruthy());
-    vi.useFakeTimers();
+    await waitFor(() => expect(screen.getByText("ID 373")).toBeTruthy());
+    vi.useFakeTimers(); screenFocus.focused = true; await screen.rerender(<ListingDetailScreen />);
     await advance(1999); expect(signals).toEqual([]);
     await advance(2); expect(signals).toEqual(["10000000-0000-4000-8000-000000000001"]);
     expect(screen.getByText("1,234 views · 9 today")).toBeTruthy();
     await advance(5000); expect(signals).toHaveLength(1);
     await screen.unmount();
-    vi.useRealTimers();
+    vi.useRealTimers(); screenFocus.focused = false;
     const again = await renderMobile(<ListingDetailScreen />);
     await waitFor(() => expect(again.getByText("1,234 views · 9 today")).toBeTruthy());
-    vi.useFakeTimers(); await advance(2100);
+    vi.useFakeTimers(); screenFocus.focused = true; await again.rerender(<ListingDetailScreen />); await advance(2100);
     expect(signals).toEqual(["10000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001"]);
   });
   it("cancels background and covered-screen time, then starts a fresh dwell on return", async () => {
     const signals = serve(); const screen = await renderMobile(<ListingDetailScreen />);
-    await waitFor(() => expect(screen.getByText("1,234 views · 9 today")).toBeTruthy());
-    vi.useFakeTimers(); await advance(900); await foreground("background"); await advance(4000); expect(signals).toEqual([]);
+    await waitFor(() => expect(screen.getByText("ID 373")).toBeTruthy());
+    vi.useFakeTimers(); screenFocus.focused = true; await screen.rerender(<ListingDetailScreen />); await advance(900); await foreground("background"); await advance(4000); expect(signals).toEqual([]);
     await foreground("active"); await advance(1000); screenFocus.focused = false; await screen.rerender(<ListingDetailScreen />);
     await advance(4000); expect(signals).toEqual([]);
     screenFocus.focused = true; await screen.rerender(<ListingDetailScreen />);
@@ -90,13 +90,13 @@ describe("full Listing detail view signal", () => {
   });
   it.each(["sold", "archived"] as const)("never signals a %s Listing", async (status) => {
     const signals = serve({ ...listing(), status }); const screen = await renderMobile(<ListingDetailScreen />);
-    await waitFor(() => expect(screen.getByText("No. 373")).toBeTruthy());
-    vi.useFakeTimers(); await advance(4000); expect(signals).toEqual([]);
+    await waitFor(() => expect(screen.getByText("ID 373")).toBeTruthy());
+    vi.useFakeTimers(); screenFocus.focused = true; await screen.rerender(<ListingDetailScreen />); await advance(4000); expect(signals).toEqual([]);
   });
   it("leaves collection and identifier creation closed by default", async () => {
     vi.stubEnv("EXPO_PUBLIC_LISTING_VIEWS_ENABLED", ""); const signals = serve();
     const screen = await renderMobile(<ListingDetailScreen />);
-    await waitFor(() => expect(screen.getByText("No. 373")).toBeTruthy());
-    vi.useFakeTimers(); await advance(4000); expect(signals).toEqual([]); expect(native.stored.size).toBe(0);
+    await waitFor(() => expect(screen.getByText("ID 373")).toBeTruthy());
+    vi.useFakeTimers(); screenFocus.focused = true; await screen.rerender(<ListingDetailScreen />); await advance(4000); expect(signals).toEqual([]); expect(native.stored.size).toBe(0);
   });
 });
