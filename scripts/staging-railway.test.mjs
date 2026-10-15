@@ -59,3 +59,9 @@ test('a real application fixture succeeds only after the deployed API can read i
   visible=true;
   assert.equal((await platform.execute('fixture',lease,lease.candidate)).listingId,listingId);
 });
+
+test('safe identity can reserve before mock preparation while all application mutations refuse real delivery',async()=>{
+  const platform=new RailwayPlatform({token:'SECRET',fetch:boundary({variables:{EMAIL_DRIVER:'resend',PUSH_TRANSPORT:'fcm'}})});
+  assert.deepEqual(await platform.attest(policy,{requireMock:false}),policy);
+  await assert.rejects(platform.attest(policy),/mock delivery/);
+});

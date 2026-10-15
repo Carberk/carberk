@@ -36,7 +36,7 @@ export class RailwayPlatform {
       return value.data;
     } catch { throw new Error('Railway authoritative request failed; diagnostics suppressed'); }
   }
-  async attest(policy) {
+  async attest(policy, { requireMock = true } = {}) {
     if (policy.environmentName !== 'staging') throw new Error('Production or ambiguous identity refused');
     const data = await this.query(`query identity($id: String!) { projectToken { projectId environmentId }
       project(id: $id) { id environments { edges { node { id name } } } services { edges { node { id } } } } }`, { id: policy.projectId });
@@ -52,8 +52,8 @@ export class RailwayPlatform {
         variables(projectId: $projectId, environmentId: $environmentId, serviceId: $serviceId) }`, scope);
       if (['api', 'worker'].includes(role)) {
         if (vars.APP_ENV !== 'staging' || origin(vars.DATABASE_URL, true) !== policy.origins.database || origin(vars.MINIO_ENDPOINT) !== policy.origins.media ||
-            (role === 'api' && (vars.SMS_DRIVER !== 'mock' || origin(vars.MINIO_PUBLIC_URL) !== policy.origins.publicMedia)) ||
-            (role === 'worker' && (vars.EMAIL_DRIVER !== 'mock' || vars.PUSH_TRANSPORT !== 'test'))) throw new Error('Railway data/media origins or mock delivery refused');
+            (role === 'api' && ((requireMock && vars.SMS_DRIVER !== 'mock') || origin(vars.MINIO_PUBLIC_URL) !== policy.origins.publicMedia)) ||
+            (requireMock && role === 'worker' && (vars.EMAIL_DRIVER !== 'mock' || vars.PUSH_TRANSPORT !== 'test'))) throw new Error('Railway data/media origins or mock delivery refused');
       }
       if (role === 'api') {
         const { domains } = await this.query(`query domains($projectId: String!, $environmentId: String!, $serviceId: String!) {
@@ -85,10 +85,19 @@ export class RailwayPlatform {
     const { deployment } = await this.query(`query deployment($id: String!) { deployment(id: $id) { id status meta } }`, { id });
     return deployment;
   }
-  async execute(kind, lease, target) {
+  async execute(kind, lease, target, recordDeployment) {
     await this.authorize(lease);
     await this.attest(lease.identity);
-    if (['fixture', 'reset'].includes(kind)) return this.remote(kind, lease, target);
+    if (['fixture', 'reset'].includes(kind)) {
+      const receipt = await this.remote(kind, lease, target);
+      if (kind === 'fixture') {
+        if (typeof receipt.listingId !== 'string' || typeof receipt.sellerId !== 'string') throw new Error('Owned application fixture receipt required');
+        const response = await this.fetch(`${lease.identity.origins.api}/api/v1/listings/${encodeURIComponent(receipt.listingId)}`, { signal: AbortSignal.timeout(15000), redirect: 'error' });
+        const listing = await response.json();
+        if (!response.ok || listing.id !== receipt.listingId || listing.sellerId !== receipt.sellerId || listing.status !== 'active') throw new Error('Deployed application fixture read failed');
+      }
+      return receipt;
+    }
     if (!['deploy', 'restore'].includes(kind)) throw new Error('Unsupported Railway operation');
     const deployments = {};
     for (const [role, serviceId] of Object.entries(lease.identity.services)) {
@@ -97,6 +106,8 @@ export class RailwayPlatform {
       { serviceId, environmentId: lease.identity.environmentId, commitSha: target });
       const id = data.serviceInstanceDeployV2;
       if (typeof id !== 'string' || !/^[a-zA-Z0-9-]+$/.test(id)) throw new Error('Deployment ID unavailable; inspect recovery state');
+      if (!recordDeployment) throw new Error('Durable deployment journal required');
+      await recordDeployment(role, id);
       deployments[role] = id;
     }
     const deadline = Date.now() + 20 * 60 * 1000;
@@ -123,7 +134,7 @@ export class RailwayPlatform {
     }
     const response = await this.fetch(`${lease.identity.origins.api}/readyz`, { signal: AbortSignal.timeout(15000), redirect: 'error' });
     const ready = await response.json();
-    if (!response.ok || ready.status !== 'ready' || ready.commitSha !== target) throw new Error('Backend readiness or SHA mismatch');
+    if (!response.ok || ready.status !== 'ready' || ready.commitSha !== target || ready.environment !== 'staging' || ['postgres', 'redis', 'minio'].some(x => ready.checks?.[x] !== 'ok')) throw new Error('Backend readiness or SHA mismatch');
     const { deploymentLogs } = await this.query(`query logs($deploymentId: String!, $limit: Int) {
       deploymentLogs(deploymentId: $deploymentId, limit: $limit) { message } }`, { deploymentId: result.deployments.worker, limit: 500 });
     if (!deploymentLogs.some(x => x.message.includes('Worker started (BullMQ consumer)'))) throw new Error('Current worker boot evidence unavailable');

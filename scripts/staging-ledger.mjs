@@ -6,14 +6,14 @@ const run = promisify(execFile);
 
 /** Each caller owns its scratch object directory; the shared remote ref is the lock. */
 export class GitLedger {
-  constructor({ directory, remote, ref = 'refs/heads/ops/staging-lease' }) {
+  constructor({ directory, remote, ref = 'refs/heads/ops/staging-lease', authenticateWithGh = false }) {
     if (!/^refs\/heads\/ops\/staging-[a-z0-9-]+$/.test(ref)) throw new Error('Invalid coordination ref');
-    Object.assign(this, { directory, remote, ref });
+    Object.assign(this, { directory, remote, ref, authenticateWithGh });
   }
   async git(args, input) {
     // execFile has no input option. Blob/tree input uses the child's stdin without a shell.
     return new Promise((resolve, reject) => {
-      const child = execFile('git', ['--git-dir', this.directory, ...args], {
+      const child = execFile('git', [...(this.authenticateWithGh ? ['-c', 'credential.helper=', '-c', 'credential.helper=!gh auth git-credential'] : []), '--git-dir', this.directory, ...args], {
         encoding: 'utf8', timeout: 60000, maxBuffer: 1024 * 1024,
         env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_AUTHOR_NAME: 'Staging controls',
           GIT_AUTHOR_EMAIL: 'staging-controls@invalid', GIT_COMMITTER_NAME: 'Staging controls', GIT_COMMITTER_EMAIL: 'staging-controls@invalid' },

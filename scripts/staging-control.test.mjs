@@ -100,3 +100,34 @@ test('persistent schema differences and incomplete readiness prevent restoration
   assert.equal((await control.inspect()).reservation.lifecycle, 'blocked');
   await assert.rejects(control.release(lease), /in-flight/);
 });
+
+test('simultaneous deploy and reset contenders cannot both cross the mutation boundary',async(t)=>{
+  const {control,platform,claim}=await setup(t);const lease=await claim();
+  const results=await Promise.allSettled([control.operate(lease,'deploy'),control.operate(lease,'reset')]);
+  assert.equal(results.filter(x=>x.status==='fulfilled').length,1);
+  assert.equal(platform.operations.length,1);
+});
+
+test('a changed authenticated coordinator cannot persist another owner operation',async(t)=>{
+  const {control,platform,claim}=await setup(t);const lease=await claim();
+  control.actorIdentity=async()=>'bob';
+  await assert.rejects(control.operate(lease,'fixture'),/Authenticated/);
+  assert.deepEqual(platform.operations,[]);
+});
+test('main moving during restoration proof never records a releasable restoration',async(t)=>{
+  const {control,ledger,platform,claim}=await setup(t);const lease=await claim();
+  const verify=platform.verify.bind(platform);
+  platform.verify=async(...args)=>{ledger.latestMain=async()=>'d'.repeat(40);return verify(...args);};
+  await assert.rejects(control.restore(lease),/blocked/);
+  assert.equal((await control.inspect()).reservation.lifecycle,'blocked');
+  await assert.rejects(control.release(lease),/in-flight/);
+});
+
+test('interruption after a provider creates a deployment preserves its actual ID for recovery',async(t)=>{
+  const {control,platform,claim}=await setup(t);const lease=await claim();
+  platform.execute=async(kind,active,target,record)=>{await record('api','actual-api-deployment');throw new Error('Transport lost');};
+  await assert.rejects(control.operate(lease,'deploy'),/blocked/);
+  const state=await control.inspect();
+  assert.equal(state.reservation.operation.deployments.api,'actual-api-deployment');
+  assert.equal(state.reservation.lifecycle,'blocked');
+});

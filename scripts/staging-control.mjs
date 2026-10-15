@@ -4,6 +4,9 @@ const sha = (value) => /^[a-f0-9]{40}$/.test(value ?? '');
 const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const empty = () => ({ version: 1, queue: [], reservation: null, history: [] });
 function validPolicy(p) {
+  if (!p || Object.keys(p).sort().join(',') !== 'credentialScope,environmentId,environmentName,origins,projectId,services' ||
+      Object.keys(p.origins ?? {}).sort().join(',') !== 'api,database,media,publicMedia') throw new Error('Explicit staging identity schema required');
+  if ([p.projectId, p.environmentId, ...Object.values(p.services ?? {})].some(x => typeof x !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(x))) throw new Error('Invalid staging identity IDs');
   if (p.environmentName !== 'staging' || !p.projectId || !p.environmentId ||
       !p.services?.api || !p.services?.worker || p.credentialScope !== `project:${p.projectId}:${p.environmentId}`) throw new Error('Staging identity or credential scope refused');
   if (Object.keys(p.services).some((k) => !['api', 'worker', 'admin', 'web'].includes(k))) throw new Error('Unknown staging service');
@@ -21,10 +24,11 @@ export class StagingControl {
   constructor(dependencies) { Object.assign(this, dependencies); validPolicy(this.policy); }
   async inspect() { return (await this.ledger.read()).state ?? empty(); }
   async write(snapshot, next) {
+    if (this.actorIdentity && await this.actorIdentity() !== this.actor) throw new Error('Authenticated coordination owner changed');
     if (!await this.ledger.compareAndSwap(snapshot.revision, next)) throw new Error('Reservation changed or persistence uncertain; inspect before retry');
   }
-  async attest() {
-    let actual; try { actual = await this.platform.attest(this.policy); } catch { throw new Error('Authoritative staging attestation unavailable'); }
+  async attest(requireMock = true) {
+    let actual; try { actual = await this.platform.attest(this.policy, { requireMock }); } catch { throw new Error('Authoritative staging attestation unavailable'); }
     validPolicy(actual);
     if (digest(actual) !== digest(this.policy)) throw new Error('Authoritative staging identity or origins mismatch');
     return actual;
@@ -41,7 +45,7 @@ export class StagingControl {
     await this.write(snapshot, state); return id;
   }
   async acquire(id) {
-    const identity = await this.attest();
+    const identity = await this.attest(false);
     const snapshot = await this.ledger.read(); const state = snapshot.state ?? empty();
     if (state.reservation) throw new Error('Staging already reserved; inspect recovery state');
     // Stable stored insertion order breaks equal timestamp ties.
@@ -87,9 +91,17 @@ export class StagingControl {
       if (current.state?.reservation?.operation?.id !== operation.id || current.state.reservation.owner !== this.actor ||
           current.state.reservation.candidate !== claim.candidate) throw new Error('Operation authority changed');
       await this.attest();
-      const result = await this.platform.execute(restoring ? 'restore' : kind, current.state.reservation, target);
+      const result = await this.platform.execute(restoring ? 'restore' : kind, current.state.reservation, target, async (role, deploymentId) => {
+        if (!(role in lease.identity.services) || typeof deploymentId !== 'string' || !/^[a-zA-Z0-9-]{1,100}$/.test(deploymentId)) throw new Error('Invalid deployment receipt');
+        const progress = await this.ledger.read();
+        if (progress.state?.reservation?.operation?.id !== operation.id) throw new Error('Operation authority changed');
+        progress.state.reservation.operation.deployments ??= {};
+        progress.state.reservation.operation.deployments[role] = deploymentId;
+        await this.write(progress, progress.state);
+      });
       let receipt;
       if (kind === 'deploy') receipt = this.proof(await this.platform.verify(current.state.reservation, target, result), target, restoring);
+      if (restoring && await this.ledger.latestMain() !== target) throw new Error('Latest main moved during restoration; retain recovery state');
       const done = await this.ledger.read();
       if (done.state?.reservation?.operation?.id !== operation.id) throw new Error('Operation record changed');
       const owned = done.state.reservation;
@@ -98,10 +110,13 @@ export class StagingControl {
         owned.expectedMigrations = operation.expectedMigrations;
         owned.evidence.push({ ...receipt, observedAt: this.now(), deployments: result.deployments });
       }
+      if (['fixture', 'reset'].includes(kind)) owned.evidence.push({ kind, namespace: owned.namespace, observedAt: this.now(),
+        ...(kind === 'fixture' ? { listingId: result.listingId, sellerId: result.sellerId } : {}) });
       if (restoring) owned.restoration = { ...receipt, restoredSha: target };
       owned.operation = null; owned.lifecycle = restoring ? 'restored' : 'active';
       await this.write(done, done.state);
-      return { operation: operation.id, target, ...(receipt ?? {}) };
+      return { operation: operation.id, target, ...(receipt ?? {}),
+        ...(kind === 'fixture' ? { listingId: result.listingId, sellerId: result.sellerId, namespace: lease.namespace } : {}) };
     } catch {
       const failed = await this.ledger.read();
       if (failed.state?.reservation?.operation?.id === operation.id) {
