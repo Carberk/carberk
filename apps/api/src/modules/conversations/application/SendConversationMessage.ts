@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { BadRequestException, Inject, Injectable, Optional } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, Optional, NotFoundException } from "@nestjs/common";
 
 import type { ListingSummary, ListingsReadPort } from "../../listings/domain/ports/ListingsReadPort";
 import { LISTINGS_READ_PORT } from "../../listings/domain/ports/ListingsReadPort";
@@ -52,7 +52,7 @@ export class SendConversationMessage {
     input: SendConversationMessageInput,
   ): Promise<SendConversationMessageResult> {
     const conversation = await this.conversations.findById(input.conversationId);
-    if (!conversation) throw new BadRequestException("Conversation not found");
+    if (!conversation) throw new NotFoundException("Conversation not found");
     if (conversation.businessId) {
       if (!this.businessAccess || !this.listings || !input.actor) throw new BadRequestException("Business context required");
       const recipientId = await this.businessAccess.authorize(conversation, input.actor, { send: true });
