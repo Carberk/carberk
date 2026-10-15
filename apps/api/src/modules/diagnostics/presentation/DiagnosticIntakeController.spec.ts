@@ -35,4 +35,16 @@ describe("diagnostic intake HTTP", () => {
       .send({ audience: "buyer_private", requestKey: "synthetic-request" }).expect(403);
     expect(result.body.code).toBe("DIAGNOSTIC_SERVICE_UNAVAILABLE");
   });
+
+  it("does not disclose whether another customer's private inspection exists", async () => {
+    const result = await request.get("/api/v1/diagnostics/orders/9a758b7a-2c3c-41df-88a6-a996b010e611")
+      .set("authorization", `Bearer ${jwt.sign({ sub: "buyer-b", sid: "current-session" })}`).expect(403);
+    expect(result.body.code).toBe("DIAGNOSTIC_NO_ACCESS");
+  });
+
+  it("does not treat a marketplace admin token as center template authority", async () => {
+    const result = await request.get("/api/v1/diagnostics/centers/9a758b7a-2c3c-41df-88a6-a996b010e611/templates")
+      .set("authorization", `Bearer ${jwt.sign({ sub: "marketplace-admin", sid: "current-session", role: "admin" })}`).expect(403);
+    expect(result.body.code).toBe("DIAGNOSTIC_NO_ACCESS");
+  });
 });
