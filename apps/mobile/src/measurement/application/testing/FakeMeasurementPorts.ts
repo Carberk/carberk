@@ -1,4 +1,5 @@
 import type { MeasurementSchemas } from "@auto-tm/contracts";
+
 import type { DeliveryResult, MeasurementBuffer, MeasurementQueuePorts } from "../../MeasurementQueue";
 
 export class FakeMeasurementPorts implements MeasurementQueuePorts {

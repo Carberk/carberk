@@ -4,7 +4,7 @@ import type { MeasurementSchemas } from "@auto-tm/contracts";
 import { MeasurementQueue } from "./MeasurementQueue";
 import { FakeMeasurementPorts } from "./application/testing/FakeMeasurementPorts";
 
-const event = (sequence = 1): MeasurementSchemas.MeasurementEvent => ({ version: 1, eventId: `00000000-0000-4000-8000-${String(sequence).padStart(12, "0")}`,
+const event = (sequence = 1): Extract<MeasurementSchemas.MeasurementEvent, { eventName: "listing_detail_opened" }> => ({ version: 1, eventId: `00000000-0000-4000-8000-${String(sequence).padStart(12, "0")}`,
  occurredAt: "2026-10-15T00:00:00.000Z", purpose: "product_improvement", eventName: "listing_detail_opened",
  context: { platform: "android", locale: "en", release: "1.0", build: "1" }, payload: { listingId: "00000000-0000-4000-8000-000000000003" } });
 function ready() { const ports = new FakeMeasurementPorts(); const queue = new MeasurementQueue(ports); queue.setEligibility({ generation: "opaque-generation-1", purposes: ["product_improvement"] }); return { ports, queue }; }
@@ -26,6 +26,7 @@ describe("bounded nonblocking first-party queue", () => {
   queue.emit(event(1002)); await queue.flush();
   expect(ports.delivered[0]).toHaveLength(50); expect(ports.delivered[0]?.[0]?.eventId).toBe("00000000-0000-4000-8000-000000000003");
   expect(ports.stored?.events).toHaveLength(950);
+  expect(queue.metrics().capacity).toBe(2);
  });
  it("keeps transient failure bounded, respects retry delay and discards permanently refused events", async () => {
   const { ports, queue } = ready(); ports.response = { kind: "retry", retryAfterMs: 60000 };
@@ -50,5 +51,6 @@ describe("bounded nonblocking first-party queue", () => {
   const { ports, queue } = ready(); ports.throwTransport = true; ports.throwStorage = true; queue.emit(event());
   for (let i = 0; i < 13; i++) { await queue.flush(); ports.nowMs += 3600000; }
   expect(ports.delivered.length).toBeLessThanOrEqual(12);
+  expect(queue.metrics().retry_exhausted).toBe(1);
  });
 });
