@@ -66,6 +66,14 @@ model User {
   suspensionReason    String?
   deletionScheduledAt DateTime?
 
+  supportCasesAsCustomer SupportCase[] @relation("SupportCustomer")
+  supportCasesAssigned SupportCase[] @relation("SupportAssignee")
+  historyRequestsAsCustomer VehicleHistoryRequest[] @relation("HistoryCustomer")
+  historyRequestsAssigned VehicleHistoryRequest[] @relation("HistoryAssignee")
+  serviceMessages ServiceMessage[] @relation("ServiceMessageAuthor")
+  serviceUploads ServiceAttachment[] @relation("ServiceUploadOwner")
+  serviceReadStates ServiceReadState[]
+  serviceAuditEntries ServiceAudit[] @relation("ServiceAuditActor")
   otpRequests                  OtpRequest[]
   sessions                     Session[]
   dealershipMemberships        DealershipMember[]
@@ -485,6 +493,8 @@ model Listing {
   damaged         Boolean?
   knownIssuesText String?
 
+  supportCases SupportCase[]
+  vehicleHistoryRequests VehicleHistoryRequest[]
   media               ListingMedia[]
   favorites           Favorite[]
   conversations       Conversation[]
@@ -992,4 +1002,156 @@ model MeasurementOutbox {
   expiresAt   DateTime
   @@index([expiresAt])
   @@map("measurement_outbox")
+}
+
+// Service owners are separate from Listing Conversations and InspectionInterest.
+model SupportCase {
+  id String @id @default(uuid())
+  customerId String? @unique
+  customer User? @relation("SupportCustomer", fields: [customerId], references: [id], onDelete: Restrict)
+  assigneeId String?
+  assignee User? @relation("SupportAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  assignmentVersion Int @default(0)
+  sourceListingId String?
+  sourceListing Listing? @relation(fields: [sourceListingId], references: [id], onDelete: SetNull)
+  status String @default("open")
+  closedAt DateTime?
+  mode String @default("synthetic")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  conversation ServiceConversation?
+  @@index([assigneeId, status, createdAt])
+  @@map("support_cases")
+}
+model VehicleHistoryRequest {
+  id String @id @default(uuid())
+  customerId String?
+  customer User? @relation("HistoryCustomer", fields: [customerId], references: [id], onDelete: Restrict)
+  assigneeId String?
+  assignee User? @relation("HistoryAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  assignmentVersion Int @default(0)
+  sourceListingId String?
+  sourceListing Listing? @relation(fields: [sourceListingId], references: [id], onDelete: SetNull)
+  proposedVin String?
+  confirmedVin String?
+  status String @default("enquiry")
+  mode String @default("synthetic")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  conversation ServiceConversation?
+  @@index([customerId, createdAt])
+  @@index([assigneeId, status, createdAt])
+  @@map("vehicle_history_requests")
+}
+model ServiceConversation {
+  id String @id @default(uuid())
+  purpose String
+  supportCaseId String? @unique
+  supportCase SupportCase? @relation(fields: [supportCaseId], references: [id], onDelete: Restrict)
+  historyRequestId String? @unique
+  historyRequest VehicleHistoryRequest? @relation(fields: [historyRequestId], references: [id], onDelete: Restrict)
+  lifecycleEpoch Int @default(0)
+  lastSequence Int @default(0)
+  erasedAt DateTime?
+  createdAt DateTime @default(now())
+  messages ServiceMessage[]
+  attachments ServiceAttachment[]
+  readStates ServiceReadState[]
+  outbox ServiceOutbox[]
+  erasureFence ServiceErasureFence?
+  @@map("service_conversations")
+}
+model ServiceMessage {
+  id String @id @default(uuid())
+  conversationId String
+  conversation ServiceConversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  sequence Int
+  clientMessageId String
+  senderId String?
+  sender User? @relation("ServiceMessageAuthor", fields: [senderId], references: [id], onDelete: SetNull)
+  senderKind String
+  visibility String @default("customer")
+  body String?
+  attachmentId String? @unique
+  attachment ServiceAttachment? @relation("ServiceMessageAttachment", fields: [attachmentId], references: [id], onDelete: Restrict)
+  requestHash String
+  createdAt DateTime @default(now())
+  @@unique([conversationId, senderId, clientMessageId])
+  @@unique([conversationId, sequence])
+  @@index([conversationId, createdAt])
+  @@map("service_messages")
+}
+model ServiceAttachment {
+  id String @id @default(uuid())
+  conversationId String
+  conversation ServiceConversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  uploaderId String?
+  uploader User? @relation("ServiceUploadOwner", fields: [uploaderId], references: [id], onDelete: SetNull)
+  lifecycleEpoch Int
+  category String
+  visibility String
+  state String @default("staged")
+  stagingKey String @unique
+  objectKey String? @unique
+  contentType String
+  expectedBytes Int
+  sizeBytes Int?
+  sha256 String?
+  filename String
+  rights Json
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  adoptedAt DateTime?
+  removedAt DateTime?
+  message ServiceMessage? @relation("ServiceMessageAttachment")
+  @@index([state, expiresAt])
+  @@map("service_attachments")
+}
+model ServiceReadState {
+  conversationId String
+  conversation ServiceConversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastSequence Int @default(0)
+  updatedAt DateTime @updatedAt
+  @@id([conversationId, userId])
+  @@map("service_read_states")
+}
+model ServiceAudit {
+  id String @id @default(uuid())
+  actorId String?
+  actor User? @relation("ServiceAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  purpose String
+  resourceId String
+  action String
+  targetStaffId String?
+  assignmentVersion Int?
+  createdAt DateTime @default(now())
+  @@index([purpose, resourceId, createdAt])
+  @@map("service_audits")
+}
+model ServiceOutbox {
+  id String @id @default(uuid())
+  conversationId String
+  conversation ServiceConversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  eventType String
+  sequence Int
+  visibility String
+  lifecycleEpoch Int
+  createdAt DateTime @default(now())
+  deliveredAt DateTime?
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  @@unique([conversationId, eventType, sequence])
+  @@index([deliveredAt, nextAttemptAt])
+  @@map("service_outbox")
+}
+model ServiceErasureFence {
+  conversationId String @id
+  conversation ServiceConversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  epoch Int
+  objectKeys Json
+  erasedAt DateTime @default(now())
+  cleanupCompletedAt DateTime?
+  @@map("service_erasure_fences")
 }
