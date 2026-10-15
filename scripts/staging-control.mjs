@@ -51,4 +51,82 @@ export class StagingControl {
       evidence: [], recovery: { owner: this.actor, action: 'Restore latest fetched main and verify before release' } };
     await this.write(snapshot, state); return { id, candidate: next.candidate };
   }
+  async owned(claim) {
+    const snapshot = await this.ledger.read(); const lease = snapshot.state?.reservation;
+    if (!lease || lease.id !== claim.id || lease.owner !== this.actor) throw new Error('Current reservation owner required');
+    if (lease.candidate !== claim.candidate) throw new Error('Exact reservation candidate required');
+    if (digest(lease.identity) !== digest(this.policy)) throw new Error('Reservation identity changed');
+    if (lease.operation) throw new Error('Durable in-flight operation requires recovery; inspect before mutation');
+    return snapshot;
+  }
+  proof(receipt, target, restoring = false) {
+    if (!receipt || receipt.sha !== target || !receipt.readyz || !receipt.worker || !receipt.media || !receipt.mock ||
+        (restoring && (receipt.fixtures !== 'absent' || receipt.schema !== 'unchanged'))) throw new Error('Deployment/restoration proof incomplete');
+    return { sha: target, readyz: true, worker: true, media: true, mock: true,
+      ...(restoring ? { fixtures: 'absent', schema: 'unchanged' } : {}) };
+  }
+  async perform(claim, kind, restoring = false) {
+    let snapshot = await this.owned(claim);
+    await this.attest();
+    const target = restoring ? await this.ledger.latestMain() : claim.candidate;
+    if (!sha(target)) throw new Error('Exact latest main SHA required');
+    if (kind === 'deploy') await this.ledger.assertNoSchemaChange(claim.candidate, await this.ledger.latestMain());
+    // Re-read after external lookups. A previously read owner never grants a new operation.
+    snapshot = await this.owned(claim);
+    const lease = snapshot.state.reservation;
+    const operation = { id: this.id(), kind: restoring ? 'restore' : kind, target, startedAt: this.now() };
+    lease.operation = operation; lease.lifecycle = restoring ? 'restoring' : 'active';
+    lease.restoration = null;
+    await this.write(snapshot, snapshot.state);
+    try {
+      // A lost write response must not authorize mutation. Re-read the durable operation.
+      const current = await this.ledger.read();
+      if (current.state?.reservation?.operation?.id !== operation.id || current.state.reservation.owner !== this.actor ||
+          current.state.reservation.candidate !== claim.candidate) throw new Error('Operation authority changed');
+      await this.attest();
+      const result = await this.platform.execute(restoring ? 'restore' : kind, current.state.reservation, target);
+      let receipt;
+      if (kind === 'deploy') receipt = this.proof(await this.platform.verify(current.state.reservation, target, result), target, restoring);
+      const done = await this.ledger.read();
+      if (done.state?.reservation?.operation?.id !== operation.id) throw new Error('Operation record changed');
+      const owned = done.state.reservation;
+      if (receipt) {
+        owned.deployments = result.deployments;
+        owned.evidence.push({ ...receipt, observedAt: this.now(), deployments: result.deployments });
+      }
+      if (restoring) owned.restoration = { ...receipt, restoredSha: target };
+      owned.operation = null; owned.lifecycle = restoring ? 'restored' : 'active';
+      await this.write(done, done.state);
+      return { operation: operation.id, target, ...(receipt ?? {}) };
+    } catch {
+      const failed = await this.ledger.read();
+      if (failed.state?.reservation?.operation?.id === operation.id) {
+        failed.state.reservation.lifecycle = 'blocked';
+        failed.state.reservation.recovery = { owner: this.actor,
+          action: 'Inspect live operation and deployment IDs; unknown completion forbids release or takeover' };
+        await this.write(failed, failed.state);
+      }
+      throw new Error('Staging operation blocked; durable recovery retained; provider diagnostics suppressed');
+    }
+  }
+  async operate(claim, kind) {
+    if (!['deploy', 'fixture', 'reset'].includes(kind)) throw new Error('Unsupported staging operation');
+    return this.perform(claim, kind);
+  }
+  async restore(claim) { return this.perform(claim, 'deploy', true); }
+  async release(claim) {
+    let snapshot = await this.owned(claim);
+    const restored = snapshot.state.reservation.restoration;
+    if (!restored) throw new Error('Verified restoration required');
+    if (restored.restoredSha !== await this.ledger.latestMain()) throw new Error('Latest main changed; restore again');
+    await this.attest();
+    this.proof(await this.platform.verify(snapshot.state.reservation, restored.restoredSha, { deployments: snapshot.state.reservation.deployments }), restored.restoredSha, true);
+    snapshot = await this.owned(claim);
+    if (snapshot.state.reservation.restoration?.restoredSha !== restored.restoredSha) throw new Error('Restoration changed');
+    if (restored.restoredSha !== await this.ledger.latestMain()) throw new Error('Latest main changed; restore again');
+    snapshot.state.history.push({ id: claim.id, owner: this.actor, restoredSha: restored.restoredSha, releasedAt: this.now() });
+    snapshot.state.reservation = null;
+    await this.write(snapshot, snapshot.state);
+    return { released: true, restoredSha: restored.restoredSha };
+  }
 }
