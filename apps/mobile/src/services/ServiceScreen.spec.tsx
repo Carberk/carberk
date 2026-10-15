@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
+import * as Notifications from "expo-notifications";
 
 import { renderMobile, fireEvent, act } from "../../test/render";
 import { server } from "../../test/msw";
@@ -58,4 +59,13 @@ it("acknowledges only the service messages actually rendered to the current cust
  server.use(http.post("*/services/conversations/:id/read", async ({ request }) => { through = (await request.json() as { throughSequence: number }).throughSequence; return HttpResponse.json({ ok: true }); }));
  const screen = await renderMobile(<ServiceScreen/>); await fireEvent.press(await screen.findByRole("button", { name: "General Support" })); await screen.findByText(message.body);
  await act(async () => { await Promise.resolve(); }); expect(through).toBe(1);
+});
+
+it("binds the current native token to the opened private service using authenticated requests", async () => {
+ vi.mocked(Notifications.getPermissionsAsync).mockResolvedValueOnce({ granted: true, status: "granted" } as never);
+ vi.mocked(Notifications.getDevicePushTokenAsync).mockResolvedValueOnce({ data: "synthetic-current-device" } as never);
+ const calls: string[] = [];
+ server.use(http.post("*/notifications/tokens", async ({ request }) => { expect(request.headers.get("Authorization")).toBe("Bearer synthetic"); calls.push("register"); return HttpResponse.json({ registered: true }); }), http.post("*/services/conversations/:id/push", async ({ request }) => { expect(await request.json()).toEqual({ deviceToken: "synthetic-current-device" }); calls.push("subscribe"); return HttpResponse.json({ ok: true }); }));
+ const screen = await renderMobile(<ServiceScreen/>); await fireEvent.press(await screen.findByRole("button", { name: "General Support" })); await screen.findByText(message.body);
+ await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); }); expect(calls).toEqual(["register", "subscribe"]);
 });
