@@ -14,10 +14,10 @@ export class PrismaOwnerListingCountsRepository implements OwnerListingCountsPor
     const [listingGroups, drafts] = await Promise.all([
       this.prisma.listing.groupBy({
         by: ["status"],
-        where: { sellerId: ownerId, deletedAt: null },
+        where: { sellerId: ownerId, businessId: null, deletedAt: null },
         _count: { _all: true },
       }),
-      this.prisma.listingDraft.count({ where: { userId: ownerId } }),
+      this.prisma.listingDraft.count({ where: { userId: ownerId, businessId: null } }),
     ]);
 
     const byStatus: Record<string, number> = {};

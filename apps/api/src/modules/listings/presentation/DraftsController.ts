@@ -1,3 +1,4 @@
+import { inventoryActor } from "./inventoryActor";
 import {
   Controller,
   Delete,
@@ -78,6 +79,7 @@ export class DraftsController {
     await this.assertNotSuspended(userId);
 
     const result = await this.createDraftUC.execute({
+      ...inventoryActor(req, parsed?.businessId),
       userId,
       ...(parsed?.initialPayload !== undefined ? { initialPayload: parsed.initialPayload } : {}),
     });
@@ -85,6 +87,7 @@ export class DraftsController {
     return {
       id: result.draft.id,
       userId: result.draft.userId,
+      ...(result.draft.businessId ? { businessId: result.draft.businessId } : {}),
       payload: result.draft.payload,
       createdAt: result.draft.createdAt.toISOString(),
       updatedAt: result.draft.updatedAt.toISOString(),
@@ -102,6 +105,7 @@ export class DraftsController {
     await this.assertNotSuspended(userId);
 
     const result = await this.updateDraftUC.execute({
+      ...inventoryActor(req),
       draftId,
       userId,
       payload: parsed,
@@ -110,6 +114,7 @@ export class DraftsController {
     return {
       id: result.draft.id,
       userId: result.draft.userId,
+      ...(result.draft.businessId ? { businessId: result.draft.businessId } : {}),
       payload: result.draft.payload,
       createdAt: result.draft.createdAt.toISOString(),
       updatedAt: result.draft.updatedAt.toISOString(),
@@ -127,6 +132,7 @@ export class DraftsController {
     const userId = this.userId(req);
 
     const result = await this.validateStepUC.execute({
+      ...inventoryActor(req),
       draftId,
       userId,
       step: parsed.step,
@@ -147,7 +153,8 @@ export class DraftsController {
   ) {
     const userId = this.userId(req);
     await this.assertNotSuspended(userId);
-    await this.discardDraftUC.execute({ draftId, userId });
+    await this.discardDraftUC.execute({ ...inventoryActor(req),
+      draftId, userId });
     return { success: true };
   }
 
@@ -164,6 +171,7 @@ export class DraftsController {
       : undefined;
 
     const result = await this.listMyDraftsUC.execute({
+      ...inventoryActor(req),
       userId,
       ...(cursor !== undefined ? { cursor } : {}),
       limit: pagination.limit,

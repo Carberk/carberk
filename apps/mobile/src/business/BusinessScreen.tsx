@@ -9,6 +9,7 @@ import { useAuthIntentStore } from "../auth/intentStore";
 import { ApiError } from "../api/client";
 import { localeTag } from "../i18n/resources";
 
+import { inventoryCopy } from "./inventoryCopy";
 import { useBusinessAction, useBusinessWorkspace } from "./api";
 import { businessCopy } from "./copy";
 
@@ -46,6 +47,7 @@ export function BusinessScreen() {
      <Text>{c[workspace.membership.role]} · {c[workspace.business.status]}</Text><Text>{c.accountId}</Text><Text selectable className="font-mono text-footnote">{userId}</Text>
      <Text className="text-muted-foreground">{workspace.business.admissionMode === "synthetic" ? c.synthetic : c.checked}</Text>
      <Text className="text-muted-foreground">{c.personal}</Text>
+     {control(inventoryCopy(i18n.language).title, () => router.push("/business-inventory"))}
      {workspace.business.status !== "active" ? <Text accessibilityRole="alert">{c.inactive}</Text> : null}
      {workspace.membership.role === "sales" ? <Text>{c.salesAccess}</Text> : <>
       {heading(c.settings)}<Text>{c.name}</Text><Input accessibilityLabel={c.name} value={name} onChangeText={setName} maxLength={120} />

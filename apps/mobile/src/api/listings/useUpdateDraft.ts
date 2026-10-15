@@ -1,11 +1,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ListingsSchemas } from "@auto-tm/contracts";
 
+import { useInventoryRequestOptions } from "../../business/useInventoryRequestOptions";
 import { apiClient } from "../client";
 import { queryKeys } from "../queryKeys";
 
-export function useUpdateDraft() {
+export function useUpdateDraft(businessId?: string) {
   const queryClient = useQueryClient();
+  const requestOptions = useInventoryRequestOptions(businessId);
 
   return useMutation({
     // Offline, fail now instead of pausing: a paused save never settles, and the
@@ -22,6 +24,7 @@ export function useUpdateDraft() {
         `/listings/drafts/${draftId}`,
         payload,
         ListingsSchemas.ListingDraftSchema,
+        ...(businessId ? [requestOptions] : []),
       ),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.listings.myDrafts() });

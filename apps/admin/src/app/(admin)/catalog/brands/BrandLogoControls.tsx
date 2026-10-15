@@ -7,6 +7,8 @@ import { AlertCircle, Loader2 } from "lucide-react";
 
 import { removeBrandLogo, uploadBrandLogo } from "./actions";
 
+import { useAdminLocale, AdminText } from "@/lib/i18n";
+
 interface BrandLogoControlsProps {
   brandId: string;
   brandName: string;
@@ -14,6 +16,7 @@ interface BrandLogoControlsProps {
 }
 
 export function BrandLogoControls({ brandId, brandName, hasLogo }: BrandLogoControlsProps) {
+  const {locale}=useAdminLocale();
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +62,7 @@ export function BrandLogoControls({ brandId, brandName, hasLogo }: BrandLogoCont
           accept="image/svg+xml,image/png,image/webp"
           className="hidden"
           onChange={onFileChosen}
-          aria-label={`Файл логотипа для ${brandName}`}
+          aria-label={locale==="tk"?`${brandName} üçin logotip faýly`:locale==="en"?`Logo file for ${brandName}`:`Файл логотипа для ${brandName}`}
         />
         <Button
           type="button"
@@ -67,18 +70,16 @@ export function BrandLogoControls({ brandId, brandName, hasLogo }: BrandLogoCont
           disabled={isPending}
           onClick={() => inputRef.current?.click()}
         >
-          {hasLogo ? "Заменить" : "Загрузить"}
+          <AdminText>{hasLogo ? "Заменить" : "Загрузить"}</AdminText>
         </Button>
         {hasLogo && (
-          <Button type="button" variant="destructive" disabled={isPending} onClick={onRemove}>
-            Удалить
-          </Button>
+          <Button type="button" variant="destructive" disabled={isPending} onClick={onRemove}><AdminText>Удалить</AdminText></Button>
         )}
       </div>
       {error && (
         <div className="flex items-start gap-2 rounded-md bg-red-50 p-2 text-xs text-red-700">
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          {error}
+          <AdminText>{error}</AdminText>
         </div>
       )}
     </div>

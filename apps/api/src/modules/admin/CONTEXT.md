@@ -12,6 +12,8 @@ A Message report detail releases only its reported Message through Conversations
 
 Audit and report history intentionally survives account deletion with nullable actor/reporter relationships. Reviewer-auth audit records omit credential values. A table without an update restriction does not enforce append-only history by itself; inspect the application write paths.
 
+Admin also owns bounded marketplace Listing/User read projections behind the unchanged current-role and current-session TOTP `AdminGuard`. The projections select public/profile and moderation state explicitly and never release sign-in/contact data, private Conversations, payment evidence, staff grants or report bodies. Complaint context is a target-only count and a link to the existing separately guarded review flow. Photo URLs use released variants; videos have no descriptor or raw storage URL until authorized tester serving is integrated.
+
 ## Start here
 
 - [Module composition](admin.module.ts)

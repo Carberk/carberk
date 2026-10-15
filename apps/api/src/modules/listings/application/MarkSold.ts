@@ -1,4 +1,5 @@
-import { Inject, Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
+import { Optional , Inject, Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
+import { ListingOwnership, assertListingOwnership } from "./ListingOwnership";
 import { PrismaService } from "@auto-tm/db";
 
 import type { Listing } from "../domain/Listing";
@@ -14,6 +15,8 @@ import {
 export interface MarkSoldInput {
   listingId: string;
   userId: string;
+  sessionId?: string | undefined;
+  businessId?: string | undefined;
 }
 
 export interface MarkSoldResult {
@@ -29,6 +32,7 @@ export class MarkSold {
     private readonly prisma: PrismaService,
     @Inject(LISTING_EVENT_PUBLISHER)
     private readonly events: ListingEventPublisher,
+    @Optional() @Inject(ListingOwnership) private readonly ownership?: ListingOwnership,
   ) {}
 
   async execute(input: MarkSoldInput): Promise<MarkSoldResult> {
@@ -36,9 +40,7 @@ export class MarkSold {
     if (!existing) {
       throw new NotFoundException("Listing not found");
     }
-    if (existing.sellerId !== input.userId) {
-      throw new ForbiddenException("Not the owner of this listing");
-    }
+    await assertListingOwnership(this.ownership, input, existing);
     if (existing.status === "banned") {
       throw new ForbiddenException({
         code: "FORBIDDEN",
@@ -47,7 +49,7 @@ export class MarkSold {
     }
 
     const updated = existing.markSold(new Date());
-    const saved = await this.listings.update(updated);
+    const saved = await this.listings.update(updated, undefined, input);
 
     await this.prisma.auditLog.create({
       data: {

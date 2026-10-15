@@ -17,8 +17,10 @@ export class ListingViewsController {
     const value = req.headers["x-app-install-id"];
     const parsed = value === undefined ? undefined : ListingsSchemas.ListingViewInstallIdSchema.safeParse(value);
     if (parsed && !parsed.success) throw new BadRequestException({ code: "VALIDATION_ERROR", message: "Invalid app identifier" });
-    const userId = (req as FastifyRequest & { user?: { sub?: string } }).user?.sub;
+    const userId = (req as FastifyRequest & { user?: { sub?: string; sid?: string } }).user?.sub;
+    const sessionId = (req as FastifyRequest & { user?: { sid?: string } }).user?.sid;
     await this.recordViewUC.execute({
+      ...(sessionId ? { sessionId } : {}),
       listingId,
       ...(parsed?.success ? { installId: parsed.data } : {}),
       ...(userId ? { requestingUserId: userId } : {}),

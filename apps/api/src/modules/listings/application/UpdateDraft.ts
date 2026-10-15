@@ -1,4 +1,5 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Optional , BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { ListingOwnership, assertListingOwnership } from "./ListingOwnership";
 
 import {
   WizardSchemas,
@@ -16,6 +17,8 @@ import { MEDIA_UPLOAD_REPOSITORY, type MediaUploadRepository } from "../domain/p
 export interface UpdateDraftInput {
   draftId: string;
   userId: string;
+  sessionId?: string | undefined;
+  businessId?: string | undefined;
   payload: ListingsSchemas.ListingDraftPayload;
 }
 
@@ -30,19 +33,22 @@ export class UpdateDraft {
     private readonly drafts: ListingDraftRepository,
     @Inject(MEDIA_UPLOAD_REPOSITORY)
     private readonly uploads: MediaUploadRepository,
+    @Optional() @Inject(ListingOwnership) private readonly ownership?: ListingOwnership,
   ) {}
 
   async execute(input: UpdateDraftInput): Promise<UpdateDraftResult> {
     const existing = await this.drafts.findById(input.draftId);
-    if (!existing || existing.userId !== input.userId) {
+    if (!existing) {
       throw new NotFoundException("Draft not found");
     }
+    if (!existing.businessId && existing.userId !== input.userId) throw new NotFoundException("Draft not found");
+    await assertListingOwnership(this.ownership, input, existing);
 
     const oldPayload = existing.payload as ListingsSchemas.ListingDraftPayload & {
       validatedSteps?: WizardSchemas.WizardStep[];
     };
 
-    const payload = await this.canonicalizePhotoAliases(input.payload, oldPayload, input.userId);
+    const payload = await this.canonicalizePhotoAliases(input.payload, oldPayload, input.userId, existing.businessId);
 
     // Detect changed fields (excluding metadata)
     const changedFields = this.detectChangedFields(oldPayload, payload);
@@ -73,7 +79,7 @@ export class UpdateDraft {
     }
 
     const updated = existing.updatePayload(mergedPayload, new Date());
-    const saved = await this.drafts.update(updated);
+    const saved = await this.drafts.update(updated, input);
     return { draft: saved };
   }
 
@@ -82,7 +88,7 @@ export class UpdateDraft {
    * Before conversion, a draft resending the JPEG key it already stores for the
    * same photo keeps that key unchanged.
    */
-  private async canonicalizePhotoAliases(payload: ListingsSchemas.ListingDraftPayload, stored: ListingsSchemas.ListingDraftPayload, userId: string) {
+  private async canonicalizePhotoAliases(payload: ListingsSchemas.ListingDraftPayload, stored: ListingsSchemas.ListingDraftPayload, userId: string, businessId?: string) {
     const unchanged = (photo: ListingsSchemas.DraftPhoto) => stored.photos?.some((existing) => existing.photoId === photo.photoId && existing.key === photo.key) ?? false;
     const aliases = payload.photos?.filter((photo) => photo.key?.endsWith(".jpg") && !unchanged(photo)) ?? [];
     if (!payload.photos || !aliases.length) return payload;
@@ -92,7 +98,7 @@ export class UpdateDraft {
       if (!photo.key || !aliases.includes(photo)) return photo;
       const canonical = photo.key.replace(/\.jpg$/, ".webp");
       const knownDraftPhoto = stored.photos?.some((existing) => existing.photoId === photo.photoId && existing.key === canonical);
-      const ownedUpload = uploads.some((upload) => upload.key === canonical && upload.userId === userId && upload.kind === "image" && upload.contentType === "image/webp" && upload.state === "AVAILABLE" && !upload.adopted);
+      const ownedUpload = uploads.some((upload) => upload.key === canonical && (businessId ? upload.businessId === businessId : !upload.businessId && upload.userId === userId) && upload.kind === "image" && upload.contentType === "image/webp" && upload.state === "AVAILABLE" && !upload.adopted);
       if (!knownDraftPhoto && !ownedUpload) throw new BadRequestException({ code: "INVALID_DRAFT_PAYLOAD", message: "Photo reference is no longer available" });
       return { ...photo, key: canonical };
     });

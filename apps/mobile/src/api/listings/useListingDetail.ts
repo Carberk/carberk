@@ -9,17 +9,17 @@ import { queryKeys } from "../queryKeys";
  * screen and by a Results card's Call, which fetches the contact phone on
  * tap and so warms the screen the buyer may open next.
  */
-export function listingDetailQueryOptions(id: string) {
+export function listingDetailQueryOptions(id: string, businessId?: string) {
   return {
-    queryKey: queryKeys.listings.detail(id),
+    queryKey: businessId ? [...queryKeys.listings.detail(id), "business", businessId] : queryKeys.listings.detail(id),
     queryFn: () =>
-      apiClient.get(`/listings/${id}`, ListingsSchemas.ListingDetailSchema),
+      apiClient.get(`/listings/${id}`, ListingsSchemas.ListingDetailSchema, ...(businessId ? [{ headers: { "x-business-id": businessId } }] : [])),
   };
 }
 
-export function useListingDetail(id: string, options?: { enabled?: boolean }) {
+export function useListingDetail(id: string, options?: { enabled?: boolean; businessId?: string | undefined }) {
   return useQuery({
-    ...listingDetailQueryOptions(id),
+    ...listingDetailQueryOptions(id, options?.businessId),
     enabled: !!id && (options?.enabled ?? true),
   });
 }

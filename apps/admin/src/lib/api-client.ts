@@ -32,7 +32,7 @@ async function doFetch(
 
   const { body: _ignoredBody, ...rest } = options;
   void _ignoredBody;
-  const fetchInit: RequestInit = { ...rest, headers };
+  const fetchInit: RequestInit = { cache: "no-store", ...rest, headers };
   if (body != null) {
     fetchInit.body = body;
   }

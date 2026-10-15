@@ -1,4 +1,5 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Optional , Inject, Injectable } from "@nestjs/common";
+import { ListingOwnership } from "./ListingOwnership";
 
 import {
   CONTACT_PHONE_CODE_PORT,
@@ -15,6 +16,8 @@ import {
 
 export interface RequestContactPhoneCodeInput {
   userId: string;
+  sessionId?: string | undefined;
+  businessId?: string | undefined;
   phone: string;
   ip: string;
   locale: "ru" | "tk" | "en";
@@ -37,10 +40,15 @@ export class RequestContactPhoneCode {
     private readonly codes: ContactPhoneCodePort,
     @Inject(IDENTITY_CLOCK_PORT)
     private readonly clock: ClockPort,
+    @Optional() @Inject(ListingOwnership) private readonly ownership?: ListingOwnership,
   ) {}
 
   async execute(input: RequestContactPhoneCodeInput): Promise<RequestContactPhoneCodeResult> {
-    const standing = await this.policy.standing(input.userId, input.phone, this.clock.now());
+    if (input.businessId) {
+      if (!this.ownership) throw new Error("Business contact is unavailable");
+      await this.ownership.authorizeOwner(input);
+    }
+    const standing = await this.policy.standing(input.userId, input.phone, this.clock.now(), input.businessId);
     if (standing.kind === "account") {
       return { status: "confirmed", contactPhone: accountContactPhone(input.phone) };
     }

@@ -1,5 +1,7 @@
 "use client";
 
+import { AdminText } from "@/lib/i18n";
+
 export default function ErrorPage({ unstable_retry }: {
   error: Error & { digest?: string };
   reset: () => void;
@@ -7,8 +9,8 @@ export default function ErrorPage({ unstable_retry }: {
 }) {
   return (
     <main className="p-8" role="alert">
-      <h1>Временно недоступно. Попробуйте ещё раз.</h1>
-      <button type="button" onClick={unstable_retry}>Попробовать ещё раз</button>
+      <h1><AdminText>Временно недоступно. Попробуйте ещё раз.</AdminText></h1>
+      <button type="button" onClick={unstable_retry}><AdminText>Попробовать ещё раз</AdminText></button>
     </main>
   );
 }

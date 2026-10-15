@@ -33,6 +33,8 @@ export interface UploadClaimPort {
   /** Reserves all of the User's uploads for one target before any bytes are prepared, or none. */
   reserve(input: {
     userId: string;
+    businessId?: string | undefined;
+    sessionId?: string | undefined;
     uploadIds: string[];
     target: UploadClaimTarget;
   }): Promise<UploadReservation>;

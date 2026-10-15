@@ -136,6 +136,54 @@ describe("AdminModerationController e2e smoke", () => {
     return mintAdminJwt(adminUserId, session.id);
   }
 
+  it("confirms only current marketplace admins with current-session TOTP", async () => {
+    await request.get("/api/v1/admin/authority").expect(401);
+    await createUser("admin-one", "admin");
+    await createUser("reporter-one");
+    const token = await createAdminSession(adminOneId);
+    await request.get("/api/v1/admin/authority").set("Authorization", `Bearer ${mintAdminJwt(adminOneId)}`).expect(403);
+    await request.get("/api/v1/admin/authority").set("Authorization", `Bearer ${mintUserJwt(reporterOneId)}`).expect(403);
+    const response = await request.get("/api/v1/admin/authority").set("Authorization", `Bearer ${token}`).expect(200);
+    expect(response.body).toEqual({ marketplaceAdmin: true });
+    await prisma.session.updateMany({ where: { userId: adminOneId }, data: { adminTotpExpiresAt: new Date(0) } });
+    await request.get("/api/v1/admin/authority").set("Authorization", `Bearer ${token}`).expect(403);
+    const elevatedAgain = await createAdminSession(adminOneId);
+    await prisma.user.update({ where: { id: adminOneId }, data: { role: "buyer" } });
+    await request.get("/api/v1/admin/authority").set("Authorization", `Bearer ${elevatedAgain}`).expect(403);
+  });
+
+  it("reads bounded marketplace context without sign-in/contact or private report artifacts", async () => {
+    await createUser("admin-one", "admin");
+    await createUser("seller-one");
+    const token = await createAdminSession(adminOneId);
+    const listing = await createActiveListing(sellerOneId);
+    await prisma.listing.update({ where: { id: listing.id }, data: { contactPhone: "+99365123456", vin: "TESTVIN", description: "Read-only listing" } });
+    await prisma.listingMedia.create({ data: { listingId: listing.id, kind: "video", key: "private-video-original.mp4", sortOrder: 0 } });
+    const detail = await request.get(`/api/v1/admin/context/listings/${listing.id}`).set("Authorization", `Bearer ${token}`).expect(200);
+    expect(detail.body).toMatchObject({ id: listing.id, vin: "TESTVIN", description: "Read-only listing", seller: { id: sellerOneId }, media: [{ kind: "video", url: null }] });
+    expect(JSON.stringify(detail.body)).not.toContain("private-video-original");
+    expect(JSON.stringify(detail.body)).not.toMatch(/contactPhone|refreshToken|phoneVerified|messageContext|reporterUserId/);
+    const directory = await request.get(`/api/v1/admin/context/listings?q=${listing.id}&status=active&brandId=${listing.brandId}`).set("Authorization", `Bearer ${token}`).expect(200);
+    expect(directory.body.items.map((item: { id: string }) => item.id)).toEqual([listing.id]);
+    const noMatch = await request.get(`/api/v1/admin/context/listings?q=${listing.id}&status=sold`).set("Authorization", `Bearer ${token}`).expect(200);
+    expect(noMatch.body.items).toEqual([]);
+    const profile = await request.get(`/api/v1/admin/context/users/${sellerOneId}`).set("Authorization", `Bearer ${token}`).expect(200);
+    expect(profile.body).toMatchObject({ listingCount: 1, listings: [{ id: listing.id }] });
+    await prisma.staffGrant.create({ data: { userId: sellerOneId, capability: "support.operations" } });
+    const supportToken = await createAdminSession(sellerOneId);
+    await request.get("/api/v1/admin/context/users").set("Authorization", `Bearer ${supportToken}`).expect(403);
+    const users = await request.get(`/api/v1/admin/context/users?q=${sellerOneId}`).set("Authorization", `Bearer ${token}`).expect(200);
+    expect(users.body.items).toHaveLength(1);
+    expect(Object.keys(users.body.items[0]).sort()).toEqual(["createdAt", "deletionScheduled", "displayName", "id", "nameNumber", "suspended"]);
+    await request.get(`/api/v1/admin/context/listings?pageSize=500`).set("Authorization", `Bearer ${token}`).expect(400);
+    await request.get(`/api/v1/admin/context/users/${sellerOneId}`).set("Authorization", `Bearer ${mintUserJwt(sellerOneId)}`).expect(403);
+    await prisma.listing.update({ where: { id: listing.id }, data: { deletedAt: new Date() } });
+    const deleted = await request.get(`/api/v1/admin/context/listings/${listing.id}`).set("Authorization", `Bearer ${token}`).expect(200);
+    expect(deleted.body.deletedAt).not.toBeNull();
+    await prisma.session.updateMany({ where: { userId: adminOneId }, data: { adminTotpExpiresAt: new Date(0) } });
+    await request.get(`/api/v1/admin/context/users/${sellerOneId}`).set("Authorization", `Bearer ${token}`).expect(403);
+  });
+
   async function createActiveListing(sellerId: string) {
     const catalog = await seedCatalog();
     const listing = await prisma.listing.create({

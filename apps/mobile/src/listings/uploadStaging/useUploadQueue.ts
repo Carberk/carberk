@@ -91,12 +91,13 @@ export interface UploadQueueOptions {
    * coming back as photos that never upload.
    */
   restoreLocalPhotos?: boolean;
+  businessId?: string | undefined;
 }
 
 export function useUploadQueue(
   stagingKey: string,
   initialPayload: ListingsSchemas.ListingDraftPayload,
-  { restoreLocalPhotos = true }: UploadQueueOptions = {},
+  { restoreLocalPhotos = true, businessId }: UploadQueueOptions = {},
 ) {
   const { t } = useTranslation("common");
   const [queue, setQueue] = useState<UploadQueue>({ stagingKey, photos: [] });
@@ -327,6 +328,7 @@ export function useUploadQueue(
         startUpload();
 
         const presignResult = await presignMutation.mutateAsync({
+          ...(businessId ? { businessId } : {}),
           kind: "image",
           contentType: "image/webp",
           // A photo restored from staging has no recorded size; its file does.
@@ -355,7 +357,7 @@ export function useUploadQueue(
         endUpload();
       }
     },
-    [stagingKey, presignMutation, transitionToFailed, transitionToPresigned, transitionToUploading, transitionToUploaded],
+    [stagingKey, businessId, presignMutation, transitionToFailed, transitionToPresigned, transitionToUploading, transitionToUploaded],
   );
 
   uploadPhotoRef.current = uploadPhoto;

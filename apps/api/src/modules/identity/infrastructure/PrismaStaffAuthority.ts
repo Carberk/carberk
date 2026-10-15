@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { PrismaService, type Prisma } from "@auto-tm/db";
 import { StaffAuthorityDenied, type StaffSubject } from "../domain/ports/StaffAuthorityPort";
 import type { StaffAuthorityRepository, StaffAuthoritySnapshot, StaffGrantChange } from "../domain/ports/StaffAuthorityRepository";
 import { assertStaffGrantChange } from "../domain/staffPolicy";
@@ -7,8 +7,15 @@ import { assertStaffGrantChange } from "../domain/staffPolicy";
 @Injectable()
 export class PrismaStaffAuthority implements StaffAuthorityRepository {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
-  async current(input: StaffSubject): Promise<StaffAuthoritySnapshot | null> {
-    const session = await this.prisma.session.findUnique({ where: { id: input.sessionId }, include: { user: { include: { staffGrants: { where: { revokedAt: null } } } } } });
+  async current(input: StaffSubject, transaction?: unknown): Promise<StaffAuthoritySnapshot | null> {
+    const db = (transaction as Prisma.TransactionClient | undefined) ?? this.prisma;
+    if (transaction) {
+      // Grant changes and account deletion lock this same User before Sessions.
+      // A feature that locks several Users must acquire them in sorted order first.
+      await db.$queryRaw`SELECT "id" FROM "users" WHERE "id" = ${input.userId} FOR UPDATE`;
+      await db.$queryRaw`SELECT "id" FROM "sessions" WHERE "id" = ${input.sessionId} FOR UPDATE`;
+    }
+    const session = await db.session.findUnique({ where: { id: input.sessionId }, include: { user: { include: { staffGrants: { where: { revokedAt: null } } } } } });
     if (!session) return null;
     return { userId: session.user.id, sessionUserId: session.userId, role: session.user.role,
       suspended: !!session.user.suspendedAt, deleting: !!session.user.deletionScheduledAt,
