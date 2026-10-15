@@ -19,6 +19,7 @@ const now = new Date("2026-10-14T19:00:00Z");
 describe("dedicated Listing-view HTTP signal", () => {
   let app: NestFastifyApplication;
   let jwt: JwtService;
+  let request: ReturnType<typeof supertest>;
   beforeAll(async () => {
     const module = await Test.createTestingModule({
       imports: [JwtModule.register({ secret: "synthetic-http-test-secret-874" })],
@@ -31,38 +32,38 @@ describe("dedicated Listing-view HTTP signal", () => {
     }).compile();
     jwt = module.get(JwtService);
     app = module.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
-    await app.init();
-    await app.getHttpAdapter().getInstance().ready();
+    await app.listen(0, "127.0.0.1");
+    request = supertest(app.getHttpServer());
   });
   afterAll(async () => { await app?.close(); });
   it("accepts dedicated install signals with no count response", async () => {
-    const response = await supertest(app.getHttpServer()).post("/api/v1/listings/car/views").set("x-app-install-id", "550e8400-e29b-41d4-a716-446655440000").expect(204);
+    const response = await request.post("/api/v1/listings/car/views").set("x-app-install-id", "550e8400-e29b-41d4-a716-446655440000").expect(204);
     expect(response.text).toBe("");
     expect(views.records[0]).toMatchObject({ listingId: "car", viewerKey: "install:550e8400-e29b-41d4-a716-446655440000", now });
   });
   it("rejects malformed identifiers without reflecting them or recording", async () => {
     const before = views.records.length;
-    const response = await supertest(app.getHttpServer()).post("/api/v1/listings/car/views").set("x-app-install-id", "raw-invalid-secret").expect(400);
+    const response = await request.post("/api/v1/listings/car/views").set("x-app-install-id", "raw-invalid-secret").expect(400);
     expect(JSON.stringify(response.body)).not.toContain("raw-invalid-secret");
     expect(views.records).toHaveLength(before);
   });
   it("silently ignores unidentifiable traffic", async () => {
     const before = views.records.length;
-    await supertest(app.getHttpServer()).post("/api/v1/listings/car/views").expect(204);
+    await request.post("/api/v1/listings/car/views").expect(204);
     expect(views.records).toHaveLength(before);
   });
   it("uses verified account fallback and retains install precedence through sign-in", async () => {
     const before = views.records.length;
     const token = jwt.sign({ sub: "buyer" });
-    await supertest(app.getHttpServer()).post("/api/v1/listings/car/views").set("authorization", `Bearer ${token}`).expect(204);
-    await supertest(app.getHttpServer()).post("/api/v1/listings/car/views").set("authorization", `Bearer ${token}`).set("x-app-install-id", "550e8400-e29b-41d4-a716-446655440000").expect(204);
+    await request.post("/api/v1/listings/car/views").set("authorization", `Bearer ${token}`).expect(204);
+    await request.post("/api/v1/listings/car/views").set("authorization", `Bearer ${token}`).set("x-app-install-id", "550e8400-e29b-41d4-a716-446655440000").expect(204);
     expect(views.records.slice(before).map((row) => row.viewerKey)).toEqual(["account:buyer", "install:550e8400-e29b-41d4-a716-446655440000"]);
     expect(views.records.at(-1)?.requestingUserId).toBe("buyer");
   });
   it("excludes verified administrators and ignores invalid bearer identity", async () => {
     const before = views.records.length;
-    await supertest(app.getHttpServer()).post("/api/v1/listings/car/views").set("authorization", `Bearer ${jwt.sign({ sub: "admin" })}`).set("x-app-install-id", "550e8400-e29b-41d4-a716-446655440000").expect(204);
-    await supertest(app.getHttpServer()).post("/api/v1/listings/car/views").set("authorization", "Bearer invalid-token").expect(204);
+    await request.post("/api/v1/listings/car/views").set("authorization", `Bearer ${jwt.sign({ sub: "admin" })}`).set("x-app-install-id", "550e8400-e29b-41d4-a716-446655440000").expect(204);
+    await request.post("/api/v1/listings/car/views").set("authorization", "Bearer invalid-token").expect(204);
     expect(views.records).toHaveLength(before);
   });
 

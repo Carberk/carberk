@@ -25,7 +25,7 @@ describe("Listing-view persistence on hosted disposable PostgreSQL", () => {
   beforeEach(async () => {
     await cleanSuiteFixtures(prisma, suite, { userAliases: ["seller", "buyer"] });
     await seedSuiteCatalog(prisma, suite);
-    for (const who of ["seller", "buyer"]) await prisma.user.create({ data: { id: suite.id(who), phone: suite.phone(who) } });
+    for (const who of ["seller", "buyer"]) await prisma.user.create({ data: { id: suite.id(who), phone: suite.phone(who), phoneVerifiedAt: now } });
     await prisma.listing.create({ data: {
       id: car, sellerId: suite.id("seller"), status: "active",
       brandId: suite.catalog.brandId, modelId: suite.catalog.modelId, cityId: suite.catalog.cityId,
