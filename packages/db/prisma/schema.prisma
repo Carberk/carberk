@@ -162,6 +162,7 @@ model Dealership {
   listings Listing[]
   drafts ListingDraft[]
   uploads MediaUpload[]
+  enquiries Conversation[]
   contactPhone String?
   contactConfirmedAt DateTime?
   invitations DealershipInvitation[]
@@ -684,6 +685,12 @@ enum MessageKind {
 }
 
 model Conversation {
+  businessId String?
+  business Dealership? @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  assigneeId String?
+  enquiryState String @default("open")
+  version Int @default(0)
+  enquiryAudit BusinessEnquiryAudit[]
   id            String    @id @default(uuid())
   listingId     String
   listing       Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
@@ -699,10 +706,28 @@ model Conversation {
   participants ConversationParticipant[]
   messages     Message[]
 
+  @@index([businessId, enquiryState, assigneeId, updatedAt(sort: Desc)], map: "conversations_business_inbox")
   @@unique([listingId, buyerId])
   @@index([sellerId])
   @@index([lastMessageAt])
   @@map("conversations")
+}
+
+/// Business responsibility changes keep their actor attribution after membership departure.
+model BusinessEnquiryAudit {
+  id String @id @default(uuid())
+  conversationId String
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  version Int
+  actorId String?
+  action String
+  previousAssigneeId String?
+  assigneeId String?
+  enquiryState String
+  createdAt DateTime @default(now())
+
+  @@unique([conversationId, version])
+  @@map("business_enquiry_audits")
 }
 
 model ConversationParticipant {

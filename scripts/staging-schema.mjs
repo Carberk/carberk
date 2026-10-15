@@ -2,6 +2,7 @@
 export const retainedSchemaProfile = {
   baseline: '7af49d4c1474b2c3d841b14736c4ef59ce155a4e',
   schemaHashes: [
+    'eb1de2d42fdae4d15b7d181fd943189673b5a478ef47d71afdc1fd0b8cb715ca',
     '699490ac60c0eb724acd04af5d1f88853ef9d79ca5448f01b6b0236e662fcff4',
     'afc0aceaa8ddbb9cd42bbbb8a9e84d270965a7aefe47917e464ff934ab0f4a05',
     'fcccfb5425820267e806a9ff96688b67c36c65a1bf2ae1192c10ec404b91589f',
@@ -11,6 +12,7 @@ export const retainedSchemaProfile = {
     'c02cefa47ade5650ea02f79dd07ba7c42fbb4524e938a6fd08bbbfca161a7735',
   ],
   schemaMigrations: {
+    'eb1de2d42fdae4d15b7d181fd943189673b5a478ef47d71afdc1fd0b8cb715ca': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities', '20261015020000_business_membership', '20261015030000_business_inventory', '20261015040000_first_party_measurement', '20261015050000_service_foundations', '20261015060000_business_enquiries'],
     '699490ac60c0eb724acd04af5d1f88853ef9d79ca5448f01b6b0236e662fcff4': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities', '20261015020000_business_membership', '20261015030000_business_inventory', '20261015040000_first_party_measurement', '20261015050000_service_foundations'],
     'afc0aceaa8ddbb9cd42bbbb8a9e84d270965a7aefe47917e464ff934ab0f4a05': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities', '20261015020000_business_membership', '20261015030000_business_inventory', '20261015040000_first_party_measurement'],
     'fcccfb5425820267e806a9ff96688b67c36c65a1bf2ae1192c10ec404b91589f': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities', '20261015020000_business_membership'],
@@ -20,6 +22,7 @@ export const retainedSchemaProfile = {
     'c02cefa47ade5650ea02f79dd07ba7c42fbb4524e938a6fd08bbbfca161a7735': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities'],
   },
   additions: [
+    { name: '20261015060000_business_enquiries', checksum: 'c7795f03693f2dc862233b2149ed18e65f934765d3a567b654e9b7293847ac1e' },
     { name: '20261015050000_service_foundations', checksum: '66c9eec07c4c715624d42c30a00202a0727cb36b05f5ca850fed38a9901f9c9a' },
     { name: '20261015040000_first_party_measurement', checksum: '5da46ac7211e658eb1b1e96374c8be796ffad03c5ecb789a7692c4fc0dca384c' },
     { name: '20261015030000_business_inventory', checksum: '49143ea7a21fe5c6031a966794aedba44d69e3a3f9d6b6195dfbe57915ee93e8' },
