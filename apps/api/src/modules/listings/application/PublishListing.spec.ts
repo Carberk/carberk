@@ -1,3 +1,4 @@
+import { FakeMeasurementCommit } from "../../measurement/application/testing/FakeMeasurementCommit";
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   NotFoundException,
@@ -231,6 +232,7 @@ function makeUseCase(
   exchangeRates?: FakeExchangeRatePort,
   events?: FakeEventPublisher,
   variantGenerator?: FakeImageVariantGenerator,
+  measurement?: FakeMeasurementCommit,
 ) {
   return new PublishListing(
     draftRepo ?? new FakeListingDraftRepository(),
@@ -242,6 +244,8 @@ function makeUseCase(
     contactPhones.policy,
     clock,
     world.claims,
+    undefined,
+    measurement,
   );
 }
 
@@ -493,6 +497,18 @@ describe("PublishListing", () => {
     ]);
   });
 
+  it("commits a minimal authoritative publication fact and keeps publication usable during collection refusal", async () => {
+    seedDraft(draftRepo, validPayload);
+    const measurement = new FakeMeasurementCommit();
+    const result = await makeUseCase(draftRepo, prisma, exchangeRates, events, variantGenerator, measurement).execute({ draftId: "draft-1", userId: "user-1" });
+    expect(measurement.facts).toHaveLength(1);
+    expect(measurement.facts[0]?.event).toMatchObject({ eventName: "listing_published", context: { platform: "server" }, payload: { listingId: result.listing.id, cityId: validPayload.cityId } });
+    expect(JSON.stringify(measurement.facts)).not.toContain(validPayload.description);
+    expect(JSON.stringify(measurement.facts)).not.toContain(validPayload.contactPhone);
+    measurement.unavailable = true;
+    seedDraft(draftRepo, validPayload);
+    expect((await makeUseCase(draftRepo, prisma, exchangeRates, events, variantGenerator, measurement).execute({ draftId: "draft-1", userId: "user-1" })).listing.status).toBe("active");
+  });
   it("publishes a valid draft", async () => {
     seedDraft(draftRepo, validPayload);
 
