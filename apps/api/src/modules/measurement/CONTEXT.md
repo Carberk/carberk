@@ -1,0 +1,9 @@
+# First-party measurement boundary
+
+This module owns validated measurement intake and the public post-commit emitter port. Source contexts own their facts. It is separate from Listing-view counters, diagnostics SDK intake and durable market knowledge.
+
+[AcceptMeasurement](application/AcceptMeasurement.ts) applies the shared dictionary and server-owned purpose/population/origin policy. [The public ports](measurement.public.ts) require atomic generation, existing-visit and event-ID checks. [The durable store](infrastructure/PrismaMeasurementStore.ts) serializes those checks with principal erasure, issues scoped hash-only guest credentials and immutable foreground visits, and fences restoration against an independently supplied collector epoch. Identity's account-deletion transaction erases account principals; cascading keys remove linked raw history, staged outbox facts and the associated current guest visit. Core recovery cannot reconstruct those maps.
+
+The [HTTP controller](presentation/MeasurementController.ts) is tested with the real public JWT guard but is not installed in AppModule. Durable PostgreSQL scenarios are defined in [the store suite](infrastructure/PrismaMeasurementStore.e2e.spec.ts); local unit evidence does not establish their runtime results. Collection remains unavailable and defaults closed. Production restore must supply a fresh external epoch and erase old collector identities before serving, alongside core deletion replay; reusing a backed-up epoch does not provide a restore fence.
+
+Read [the measurement specification](../../../../../docs/prd/ops/85-launch-analytics-plan.md) before changing semantics. Feature outbox composition, host persistence, distributed resource proof, retention and admitted population/basis/rights evidence remain required. Do not treat fixture authority as real collection approval.

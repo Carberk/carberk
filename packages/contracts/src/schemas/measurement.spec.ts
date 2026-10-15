@@ -30,6 +30,11 @@ describe("versioned first-party event dictionary", () => {
    expect(MeasurementEventSchema.safeParse(value).success).toBe(false);
   }
  });
+ it("keeps client sign-in transport uncertainty separate from authoritative results", () => {
+  const transport = { ...event, eventName: "sign_in_transport_result", purpose: "product_reliability", payload: { attemptId: event.eventId, result: "unconfirmed_failure", category: "timeout", durationMs: 5000 } };
+  expect(MeasurementEventSchema.safeParse(transport).success).toBe(true);
+  expect(MeasurementEventSchema.safeParse({ ...transport, payload: { ...transport.payload, result: "success" } }).success).toBe(false);
+ });
  it("rejects impossible outcome fields, noncanonical wizard steps and oversized batches", () => {
   expect(MeasurementEventSchema.safeParse({ ...event, eventName: "call_intent", payload: { listingId: event.payload.listingId, completed: true } }).success).toBe(false);
   expect(MeasurementEventSchema.safeParse({ ...event, eventName: "wizard_step_opened", payload: { draftId: event.eventId, step: "entered secret" } }).success).toBe(false);
