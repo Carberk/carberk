@@ -438,4 +438,12 @@ describe("VerifyAdminTotp", () => {
     // Should not be rate limited yet (only 1 new failure after reset)
     expect(throttle.counts.get("user-1:" + session.id)).toBe(1);
   });
+  it.each([{ userId: "other" }, { expiresAt: NOW }])("refuses stale/mismatched sessions before consuming valid TOTP %j", async (patch) => {
+    await totpRepo.createPending("user-1", cipher.encrypt("TESTSECRET12345678"));
+    const session = makeSession(patch); sessionRepo.sessions.push(session);
+    const uc = new VerifyAdminTotp(totpRepo, sessionRepo, cipher, verifier, throttle, securityLogger, clock);
+    await expect(uc.execute({ userId: "user-1", sessionId: session.id, code: "TESTSECRET12345678-VALID" })).rejects.toMatchObject({ reason: "SESSION_REQUIRED" });
+    expect((await totpRepo.findByUserId("user-1"))?.verifiedAt).toBeNull();
+  });
+
 });
