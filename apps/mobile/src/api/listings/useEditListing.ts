@@ -1,11 +1,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ListingsSchemas } from "@auto-tm/contracts";
 
+import { useInventoryRequestOptions } from "../../business/useInventoryRequestOptions";
 import { apiClient } from "../client";
 import { queryKeys } from "../queryKeys";
 
-export function useEditListing() {
+export function useEditListing(businessId?: string) {
   const queryClient = useQueryClient();
+  const requestOptions = useInventoryRequestOptions(businessId);
 
   return useMutation({
     mutationFn: ({
@@ -19,6 +21,7 @@ export function useEditListing() {
         `/listings/${listingId}`,
         patch,
         ListingsSchemas.ListingDetailSchema,
+        ...(businessId ? [requestOptions] : []),
       ),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({

@@ -10,7 +10,7 @@ export class BusinessAuthorityDenied extends Error {
 }
 export interface BusinessAuthorityPort {
   /** No businessId explicitly selects personal context. Never chooses by membership. */
-  resolve(input: BusinessSubject & { businessId?: string }): Promise<BusinessPrincipal>;
+  resolve(input: BusinessSubject & { businessId?: string }, transaction?: unknown): Promise<BusinessPrincipal>;
   /** Retained history permits current members of inactive businesses, never inactive Users/members. */
-  authorize(input: BusinessSubject & { businessId: string; owner?: boolean; history?: boolean }): Promise<Extract<BusinessPrincipal, { kind: "business" }>>;
+  authorize(input: BusinessSubject & { businessId: string; owner?: boolean; history?: boolean }, transaction?: unknown): Promise<Extract<BusinessPrincipal, { kind: "business" }>>;
 }

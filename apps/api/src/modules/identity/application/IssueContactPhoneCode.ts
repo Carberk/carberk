@@ -19,6 +19,7 @@ import { HttpOtpSenderAdapter } from "../infrastructure/HttpOtpSenderAdapter";
 
 export interface IssueContactPhoneCodeInput {
   userId: string;
+  businessId?: string | undefined;
   phone: string;
   ip: string;
   locale: "ru" | "tk" | "en";
@@ -91,6 +92,7 @@ export class IssueContactPhoneCode {
       codeHash: createHash("sha256").update(code.value).digest("hex"),
       expiresAt: destination.expiresAt(now),
       userId: input.userId,
+      ...(input.businessId ? { businessId: input.businessId } : {}),
       ip: input.ip,
     });
 

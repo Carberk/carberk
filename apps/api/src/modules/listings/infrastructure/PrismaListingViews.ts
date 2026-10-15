@@ -1,5 +1,6 @@
+import { BUSINESS_AUTHORITY_PORT, BusinessAuthorityDenied, type BusinessAuthorityPort } from "../../identity/identity.public";
 import { createHmac } from "node:crypto";
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "@auto-tm/db";
 import type { ListingViewsPort } from "../domain/ports/ListingViewsPort";
@@ -10,6 +11,7 @@ export class PrismaListingViews implements ListingViewsPort {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(ConfigService) private readonly config: ConfigService,
+    @Optional() @Inject(BUSINESS_AUTHORITY_PORT) private readonly businessAuthority?: BusinessAuthorityPort,
   ) {}
 
   async record(input: Parameters<ListingViewsPort["record"]>[0]): Promise<boolean> {
@@ -22,11 +24,22 @@ export class PrismaListingViews implements ListingViewsPort {
       .update(JSON.stringify([input.viewerKey, input.listingId, day])).digest("hex");
     return this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SET LOCAL statement_timeout = '4s'`;
+      const resource = await tx.listing.findUnique({ where: { id: input.listingId }, select: { businessId: true } });
+      if (resource?.businessId) {
+        if (input.requestingUserId && input.sessionId && this.businessAuthority) {
+          try {
+            await this.businessAuthority.authorize({ userId: input.requestingUserId, sessionId: input.sessionId, businessId: resource.businessId, history: true }, tx);
+            return false;
+          } catch (error) { if (!(error instanceof BusinessAuthorityDenied)) throw error; }
+        }
+        const businesses = await tx.$queryRaw<Array<{ status: string }>>`SELECT "status" FROM "dealerships" WHERE "id" = ${resource.businessId} FOR SHARE`;
+        if (businesses[0]?.status !== "active") return false;
+      }
       const rows = await tx.$queryRaw<{ sellerId: string; status: string; deletedAt: Date | null }[]>`
         SELECT "sellerId", "status", "deletedAt" FROM "listings"
         WHERE "id" = ${input.listingId} FOR UPDATE`;
       const listing = rows[0];
-      if (!listing || listing.status !== "active" || listing.deletedAt || listing.sellerId === input.requestingUserId) return false;
+      if (!listing || listing.status !== "active" || listing.deletedAt || (!resource?.businessId && listing.sellerId === input.requestingUserId)) return false;
       const inserted = await tx.$executeRaw`
         INSERT INTO "listing_view_fingerprints" ("listingId", "day", "fingerprint", "expiresAt")
         VALUES (${input.listingId}, ${day}, ${fingerprint}, ${expiresAt})

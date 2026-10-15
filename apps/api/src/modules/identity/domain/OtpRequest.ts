@@ -14,6 +14,7 @@ export interface OtpRequest {
   readonly expiresAt: Date;
   readonly verifiedAt: Date | null;
   readonly attempts: number;
+  readonly businessId?: string | undefined;
   readonly userId: string | null;
   readonly ip: string;
   readonly createdAt: Date;

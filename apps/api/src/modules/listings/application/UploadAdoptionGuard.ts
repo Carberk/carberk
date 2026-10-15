@@ -47,7 +47,7 @@ export class UploadAdoptionGuard {
   }
 
   /** Returns the authorizing upload for each claim, in claim order. */
-  async authorize(userId: string, claims: UploadClaim[]): Promise<MediaUpload[]> {
+  async authorize(userId: string, claims: UploadClaim[], businessId?: string): Promise<MediaUpload[]> {
     const recorded = await this.uploads.findByKeys(claims.map((c) => c.key));
     const byKey = new Map(recorded.map((u) => [u.key, u]));
 
@@ -55,7 +55,7 @@ export class UploadAdoptionGuard {
       const upload = byKey.get(claim.key);
       // Unknown, forged, another User's, wrong-kind and retired keys are
       // indistinguishable on purpose: object keys are public in Listing detail.
-      if (!upload || upload.userId !== userId || upload.kind !== claim.kind ||
+      if (!upload || (businessId ? upload.businessId !== businessId : upload.businessId || upload.userId !== userId) || upload.kind !== claim.kind ||
         upload.state === "RETIRED" || upload.state === "DELETED") {
         throw new BadRequestException({
           code: LISTING_ERROR_CODES.UPLOAD_NOT_AVAILABLE,

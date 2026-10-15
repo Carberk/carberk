@@ -110,6 +110,7 @@ function checkParallel(
 export const ListingSummaryBaseSchema = z.object({
   id: z.string().uuid(),
   sellerId: z.string().uuid(),
+  businessId: z.string().uuid().optional(),
   status: ListingStatusSchema,
   brandId: z.string().uuid(),
   modelId: z.string().uuid(),
@@ -243,6 +244,7 @@ export const ListingDetailSchema = z.object({
   id: z.string().uuid(),
   publicNumber: z.number().int().positive(),
   sellerId: z.string().uuid(),
+  businessId: z.string().uuid().optional(),
   seller: PublicIdentitySchema.extend({
     memberSince: z.string().datetime(),
   }),
@@ -332,6 +334,7 @@ export type ListingDraftPayload = z.infer<typeof ListingDraftPayloadSchema>;
 // ── ListingDraft entity ──
 
 export const ListingDraftSchema = z.object({
+  businessId: z.string().uuid().optional(),
   id: z.string().uuid(),
   userId: z.string().uuid(),
   payload: ListingDraftPayloadSchema,
@@ -344,6 +347,7 @@ export type ListingDraft = z.infer<typeof ListingDraftSchema>;
 
 export const CreateDraftRequestSchema = z
   .object({
+    businessId: z.string().uuid().optional(),
     initialPayload: ListingDraftPayloadSchema.optional(),
   })
   .optional();
@@ -812,3 +816,13 @@ export type ListingsErrorCode =
 
 /** Dedicated app-only view signal header. No raw identifier in URLs, bodies or events. */
 export const ListingViewInstallIdSchema = z.string().uuid().toLowerCase();
+
+/** Business stock is separate from its creator's personal listings and drafts. */
+export const BusinessInventoryResponseSchema = z.object({
+  businessId: z.string().uuid(),
+  status: z.enum(["active", "suspended", "recovery"]),
+  listings: z.array(z.object({ id: z.string().uuid(), status: z.string(), brandId: z.string(), modelId: z.string(), year: z.number().nullable(), publishedAt: z.string().nullable(), availabilityConfirmedAt: z.string().nullable(), reviewDue: z.boolean() })),
+  drafts: z.array(ListingDraftSchema),
+  counts: z.object({ active: z.number().int().nonnegative(), sold: z.number().int().nonnegative(), archived: z.number().int().nonnegative(), banned: z.number().int().nonnegative(), drafts: z.number().int().nonnegative(), reviewDue: z.number().int().nonnegative() }),
+});
+export type BusinessInventoryResponse = z.infer<typeof BusinessInventoryResponseSchema>;

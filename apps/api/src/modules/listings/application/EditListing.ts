@@ -1,4 +1,5 @@
-import { Inject, Injectable, NotFoundException, BadRequestException, ForbiddenException } from "@nestjs/common";
+import { Optional , Inject, Injectable, NotFoundException, BadRequestException, ForbiddenException } from "@nestjs/common";
+import { ListingOwnership, assertListingOwnership } from "./ListingOwnership";
 import { PrismaService } from "@auto-tm/db";
 
 import {
@@ -30,6 +31,8 @@ import { contactPhoneRejection } from "./contactPhoneRejection";
 export interface EditListingInput {
   listingId: string;
   userId: string;
+  sessionId?: string | undefined;
+  businessId?: string | undefined;
   patch: typeof ListingsSchemas.EditListingRequestSchema._type;
 }
 
@@ -52,13 +55,16 @@ export class EditListing {
     private readonly contactPhones: ContactPhonePolicy,
     @Inject(IDENTITY_CLOCK_PORT)
     private readonly clock: ClockPort,
+    @Optional() @Inject(ListingOwnership) private readonly ownership?: ListingOwnership,
   ) {}
 
   async execute(input: EditListingInput): Promise<EditListingResult> {
     const existing = await this.listings.findById(input.listingId);
-    if (!existing || existing.sellerId !== input.userId || existing.deletedAt) {
+    if (!existing || existing.deletedAt) {
       throw new NotFoundException("Listing not found");
     }
+    if (!existing.businessId && existing.sellerId !== input.userId) throw new NotFoundException("Resource not found");
+    await assertListingOwnership(this.ownership, input, existing);
     if (existing.status === "banned") {
       throw new ForbiddenException({
         code: "FORBIDDEN",
@@ -112,7 +118,7 @@ export class EditListing {
     // cleared.
     if (patch.contactPhone !== undefined && patch.contactPhone !== existing.contactPhone) {
       const rejection = contactPhoneRejection(
-        await this.contactPhones.standing(existing.sellerId, patch.contactPhone, now),
+        await this.contactPhones.standing(existing.sellerId, patch.contactPhone, now, existing.businessId),
       );
       if (rejection) throw rejection;
     }
@@ -154,6 +160,7 @@ export class EditListing {
       id: existing.id,
       publicNumber: existing.publicNumber,
       sellerId: existing.sellerId,
+      ...(existing.businessId ? { businessId: existing.businessId } : {}),
       status: existing.status,
       brandId: existing.brandId,
       modelId: existing.modelId,
@@ -226,7 +233,7 @@ export class EditListing {
 
     const saved = await this.listings.update(updated, {
       priceTmt: toPriceTmt(updated.priceAmount, updated.priceCurrency, rateToTmt),
-    });
+    }, input);
 
     const priceChanged =
       saved.priceAmount !== oldPriceAmount || saved.priceCurrency !== oldPriceCurrency;

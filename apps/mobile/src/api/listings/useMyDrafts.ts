@@ -8,6 +8,7 @@ export function useMyDrafts(opts?: {
   cursor?: string;
   limit?: number;
   enabled?: boolean;
+  businessId?: string | undefined;
 }) {
   const cursor = opts?.cursor;
   const limit = opts?.limit ?? 20;
@@ -18,8 +19,8 @@ export function useMyDrafts(opts?: {
   params.set("limit", String(limit));
 
   return useQuery({
-    queryKey: [...queryKeys.listings.myDrafts(), { cursor, limit }],
-    queryFn: () =>
+    queryKey: [...queryKeys.listings.myDrafts(), { cursor, limit, businessId: opts?.businessId }],
+    queryFn: async () => opts?.businessId ? { items: (await apiClient.get(`/businesses/${opts.businessId}/inventory`, ListingsSchemas.BusinessInventoryResponseSchema)).drafts, nextCursor: null } :
       apiClient.get(
         `/me/drafts?${params.toString()}`,
         ListingsSchemas.MyDraftsResponseSchema,

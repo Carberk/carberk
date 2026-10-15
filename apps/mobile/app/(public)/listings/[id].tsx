@@ -81,7 +81,7 @@ export default function ListingDetailScreen() {
   const { maps } = useCatalogMaps(data?.brandId, data?.modelId, data?.regionId);
 
   const isOwner =
-    viewer != null && data != null && viewer.userId === data.sellerId;
+    viewer != null && data != null && !data.businessId && viewer.userId === data.sellerId;
 
   useListingViewSignal(data?.id, !isPending && !error && data?.status === "active" && !isOwner && viewer !== undefined);
 
@@ -107,7 +107,7 @@ export default function ListingDetailScreen() {
     return preview ? (
       <ListingPreview
         summary={preview}
-        isOwner={viewer != null && viewer.userId === preview.sellerId}
+        isOwner={viewer != null && !preview.businessId && viewer.userId === preview.sellerId}
         reportEnabled={config?.reportEntryEnabled !== false}
         onBack={goBack}
       />

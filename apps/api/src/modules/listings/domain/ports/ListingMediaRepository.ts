@@ -1,8 +1,10 @@
+import type { InventoryActor } from "./ListingRepository";
 import type { ListingMedia } from "../ListingMedia";
 
 /** The reservation an adopting row finalizes, and any poster upload it references. */
 export interface ListingMediaClaim {
   token: string;
+  actor?: InventoryActor;
   posterUploadId?: string;
 }
 
@@ -26,10 +28,11 @@ export interface ListingMediaRepository {
    * lock is taken before the upload's. A row without provenance retires
    * nothing. No caller deletes storage; the cleanup worker owns that.
    */
-  deleteReleasingUpload(id: string, minimumPhotos?: number): Promise<{ removed: boolean }>;
+  deleteReleasingUpload(id: string, minimumPhotos?: number, actor?: InventoryActor): Promise<{ removed: boolean }>;
   updateSortOrder(
     listingId: string,
     orders: { mediaId: string; sortOrder: number }[],
+    actor?: InventoryActor,
   ): Promise<void>;
 }
 

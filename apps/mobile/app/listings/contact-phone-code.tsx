@@ -46,6 +46,7 @@ function parseInitialSeconds(value: string | undefined): number {
 export default function ContactPhoneCodeScreen() {
   const params = useLocalSearchParams<{
     phone?: string;
+    businessId?: string;
     resendInSeconds?: string;
     testCode?: string;
     purpose?: string;
@@ -55,8 +56,8 @@ export default function ContactPhoneCodeScreen() {
   const { t } = useTranslation();
   const goBack = useSafeBack();
   const { show } = useToast();
-  const confirm = useConfirmContactPhone();
-  const requestCode = useRequestContactPhoneCode();
+  const confirm = useConfirmContactPhone(firstParam(params.businessId));
+  const requestCode = useRequestContactPhoneCode(firstParam(params.businessId));
   const republish = useRepublishListing();
 
   const phone = firstParam(params.phone);
@@ -123,7 +124,7 @@ export default function ContactPhoneCodeScreen() {
       contactPhoneReturnHref(
         returnPathname,
         purpose,
-        phone ? { confirmedContactPhone: phone } : {},
+        { ...(phone ? { confirmedContactPhone: phone } : {}), ...(params.businessId ? { businessId: params.businessId } : {}) },
       ),
     );
   }
