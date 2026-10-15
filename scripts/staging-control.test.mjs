@@ -14,7 +14,7 @@ async function setup(t) {
   const root = await mkdtemp(join(tmpdir(), 'staging-control-')); t.after(() => rm(root, { recursive: true, force: true }));
   const remote = join(root, 'shared.git'); execFileSync('git', ['init', '--bare', remote], { stdio: 'ignore' });
   const ledger = new GitLedger({ directory: join(root, 'objects'), remote });
-  ledger.latestMain = async () => 'c'.repeat(40); ledger.migrationsAt = async () => ['20260101_initial']; ledger.assertNoSchemaChange = async () => {};
+  ledger.latestMain = async () => 'c'.repeat(40); ledger.migrationsAt = async () => [{name:'20260101_initial',checksum:'1'.repeat(64)}]; ledger.schemaPlan = async () => ({disposition:'unchanged',migrations:await ledger.migrationsAt()});
   const platform = new FakeStagingPlatform(policy);
   let sequence = 0;
   const control = new StagingControl({ ledger, platform, policy, actor: 'alice', now: () => '2026-10-15T01:00:00.000Z', id: () => (++sequence).toString(16).padStart(32, '0') });
@@ -92,9 +92,9 @@ test('current-main restoration and readiness proof are required before release; 
 });
 test('persistent schema differences and incomplete readiness prevent restoration/release', async(t) => {
   const { control, ledger, platform, claim } = await setup(t); const lease = await claim();
-  ledger.assertNoSchemaChange = async () => { throw new Error('Persistent schema disposition unresolved'); };
+  ledger.schemaPlan = async () => { throw new Error('Persistent schema disposition unresolved'); };
   await assert.rejects(control.operate(lease, 'deploy'), /schema/); assert.deepEqual(platform.operations, []);
-  ledger.assertNoSchemaChange = async () => {};
+  ledger.schemaPlan = async () => ({disposition:'unchanged',migrations:await ledger.migrationsAt()});
   platform.verify = async () => ({ sha: 'c'.repeat(40), readyz: true, worker: false, media: true, mock: true, fixtures: 'absent', schema: 'unchanged' });
   await assert.rejects(control.restore(lease), /blocked/);
   assert.equal((await control.inspect()).reservation.lifecycle, 'blocked');
@@ -149,4 +149,44 @@ test('only proven complete interrupted deployments can recover; unknown or parti
   assert.equal(state.reservation.evidence.at(-1).kind,'recovery');
   assert.deepEqual(state.reservation.deployments,{api:'actual-api',worker:'actual-worker'});
   await assert.rejects(control.release(lease),/restoration/);
+});
+
+test('restoration carries retained schema forward but never assumes an undeployed candidate migration ran', async(t) => {
+  const {control,platform,claim,ledger}=await setup(t);const lease=await claim();const calls=[];
+  const base={name:'20260101_initial',checksum:'1'.repeat(64)};
+  const addition={name:'20261015_views',checksum:'2'.repeat(64)};
+  ledger.schemaPlan=async(candidate,main,retained)=>{
+    calls.push({candidate,main,retained});
+    return {disposition:retained?.some(x=>x.name===addition.name)||candidate===lease.candidate?'retained-additive':'unchanged',
+      migrations:candidate===lease.candidate?[base,addition]:retained??[base]};
+  };
+  const verify=platform.verify.bind(platform);
+  platform.verify=async(active,...args)=>({...await verify(active,...args),schema:active.operation.schemaDisposition,migrations:active.operation.expectedMigrations});
+  await control.restore(lease);
+  assert.equal(calls[0].candidate,'c'.repeat(40));assert.deepEqual(calls[0].retained,undefined);
+  await control.operate(lease,'deploy');
+  await control.restore(lease);
+  const state=await control.inspect();assert.equal(state.reservation.restoration.schema,'retained-additive');
+  assert.deepEqual(state.reservation.expectedMigrations,[base,addition]);
+});
+
+test('failed proof, wrong owner and moved-main recovery cannot clear the durable interrupted operation', async(t) => {
+  for(const fault of ['proof','owner','main']){
+    const {control,platform,claim,ledger}=await setup(t);const lease=await claim();
+    platform.execute=async(_kind,_active,_target,record)=>{await record('api','actual-api');await record('worker','actual-worker');throw new Error('lost');};
+    await assert.rejects(control.restore(lease),/blocked/);
+    if(fault==='proof')platform.recover=async()=>{throw new Error('Active deployment mismatch');};
+    if(fault==='owner')control.actor='bob';
+    if(fault==='main')ledger.latestMain=async()=>'d'.repeat(40);
+    await assert.rejects(control.recover(lease));
+    assert.ok((await control.inspect()).reservation.operation);
+    assert.equal((await control.inspect()).reservation.restoration,null);
+  }
+});
+
+test('release preserves retained migration disposition for the next reservation',async(t)=>{
+  const {control,claim}=await setup(t);const lease=await claim();
+  await control.operate(lease,'deploy');await control.restore(lease);await control.release(lease);
+  const history=(await control.inspect()).history.at(-1);assert.ok(history.migrations[0].checksum);
+  await claim();assert.deepEqual((await control.inspect()).reservation.expectedMigrations,history.migrations);
 });

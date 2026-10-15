@@ -79,9 +79,21 @@ test('actual deployment proof rejects stale active deployment, wrong SHA and a n
       else return base(url,options);
       return{ok:true,json:async()=>({data})};
     };
-    const platform=new RailwayPlatform({token:'SECRET',fetch,command:async()=>JSON.stringify({sha:target,fixtures:'absent',schema:'unchanged'})});
+    const platform=new RailwayPlatform({token:'SECRET',fetch,command:async()=>JSON.stringify({sha:target,fixtures:'absent',schema:'unchanged',migrations:[]})});
     const verify=()=>platform.verify(lease,target,{deployments:{api:'deployment-api',worker:'deployment-worker'}});
     if(fault==='none')assert.equal((await verify()).sha,target);
     else await assert.rejects(verify(),/deployed candidate mismatch/);
+  }
+});
+
+test('the actual remote probe proves exact migration checksums and rejects unfinished migrations and orphan fixtures',async()=>{
+  const {remoteProgram}=await import('./staging-remote.mjs');const {runInNewContext}=await import('node:vm');const {createRequire}=await import('node:module');const require=createRequire(import.meta.url);
+  const id='1'.repeat(32),target='a'.repeat(40),migration={name:'20261015_additive',checksum:'1'.repeat(64)};
+  const payload={kind:'probe',id,namespace:`cf_${id}`,target,identity:policy,expectedMigrations:[migration],schemaDisposition:'retained-additive'};
+  for(const fault of ['none','checksum','unfinished','orphan']){
+    let receipt;const process={exitCode:0,env:{RAILWAY_PROJECT_ID:'project',RAILWAY_ENVIRONMENT_ID:'stage',RAILWAY_SERVICE_ID:'api',RAILWAY_ENVIRONMENT_NAME:'staging',APP_ENV:'staging',SMS_DRIVER:'mock',AUTOTM_COMMIT_SHA:target,DATABASE_URL:'postgresql://u:secret@postgres.railway.internal:5432/railway',MINIO_ENDPOINT:policy.origins.media,MINIO_PUBLIC_URL:policy.origins.publicMedia}};
+    runInNewContext(remoteProgram(payload),{process,URL,require:name=>name==='node:child_process'?{spawnSync:(_program,_args,{input})=>({status:0,stdout:input.includes('json_agg')?JSON.stringify([{...migration,checksum:fault==='checksum'?'2'.repeat(64):migration.checksum}]):input.includes('finished_at IS NULL')?(fault==='unfinished'?'1':'0'):input.includes('public.users')?(fault==='orphan'?'1':'0'):'0'})}:require(name),console:{log:value=>{receipt=JSON.parse(value);},error:()=>{}}});
+    if(fault==='none'){assert.equal(process.exitCode,0);assert.deepEqual(receipt.migrations,[migration]);assert.equal(receipt.schema,'retained-additive');}
+    else{assert.equal(process.exitCode,1);assert.equal(receipt,undefined);}
   }
 });

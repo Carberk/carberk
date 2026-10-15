@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { GitLedger } from './staging-ledger.mjs';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -48,7 +49,7 @@ test('reviewed additive schema is retained with exact checksums on current-main 
   const { evaluateSchemaPlan } = await import('./staging-schema.mjs');
   const baseline = [{ name: '20260101_base', checksum: '1'.repeat(64) }];
   const addition = { name: '20261015_views', checksum: '2'.repeat(64) };
-  const profile = { schemaHashes: ['old', 'new'], additions: [addition] };
+  const profile = { schemaHashes: ['old', 'new'], schemaMigrations:{old:[],new:[addition.name]}, additions: [addition] };
   const plan = evaluateSchemaPlan({ baseline, candidate: [...baseline, addition], main: baseline,
     candidateSchema: 'new', mainSchema: 'old', profile });
   assert.equal(plan.disposition, 'retained-additive');
@@ -60,6 +61,17 @@ test('reviewed additive schema is retained with exact checksums on current-main 
     { candidate: [...baseline, { name: '20261016_drop_users', checksum: '3'.repeat(64) }] },
     { candidate: [{ ...baseline[0], checksum: '4'.repeat(64) }, addition] },
     { candidateSchema: 'unknown' },
+    { candidate: baseline },
   ]) assert.throws(() => evaluateSchemaPlan({ baseline, candidate: [...baseline, addition], main: baseline,
     candidateSchema: 'new', mainSchema: 'old', profile, ...change }), /schema|migration/i);
+});
+
+
+test('the Git migration inventory hashes exact committed SQL bytes including the final newline',async(t)=>{
+  const root=await mkdtemp(join(tmpdir(),'staging-migration-bytes-'));t.after(()=>rm(root,{recursive:true,force:true}));
+  const source=join(root,'source');await mkdir(join(source,'packages/db/prisma/migrations/20260101_base'),{recursive:true});
+  const sql='CREATE TABLE test(id text);\n';await writeFile(join(source,'packages/db/prisma/migrations/20260101_base/migration.sql'),sql);
+  git(source,'init');git(source,'add','.');git(source,'-c','user.name=Test','-c','user.email=test@invalid','commit','-m','schema fixture');
+  const ledger=new GitLedger({directory:join(root,'objects'),remote:source});
+  assert.deepEqual(await ledger.migrationsAt(git(source,'rev-parse','HEAD')),[{name:'20260101_base',checksum:createHash('sha256').update(sql).digest('hex')}]);
 });

@@ -1,12 +1,17 @@
 import { spawnSync, execFileSync } from "node:child_process";
+import { createHash, randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInNewContext } from "node:vm";
 
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { Pool } from "pg";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { PrismaClient } from "../generated/prisma/client/client";
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 const root = fileURLToPath(new URL("../../..", import.meta.url));
@@ -71,5 +76,51 @@ describe("reserved staging fixtures on disposable application schema", () => {
     await pool.query(`INSERT INTO favorites(id,"userId","listingId") VALUES('unrelated-favorite','unrelated-user',$1)`, [other.receipt?.listingId]);
     expect(execute("reset", "3".repeat(32)).code).toBe(1);
     expect((await pool.query(`SELECT count(*)::int AS count FROM favorites WHERE id='unrelated-favorite'`)).rows[0]).toEqual({ count: 1 });
+  });
+
+  it("retains reviewed additive tables while the baseline listing/user write/read/reset contract still works", async () => {
+    const profileSource = readFileSync(`${root}/scripts/staging-schema.mjs`, "utf8")
+      .replace("export const retainedSchemaProfile", "const retainedSchemaProfile")
+      .replace("export function evaluateSchemaPlan", "function evaluateSchemaPlan");
+    const profile = runInNewContext(`${profileSource}; retainedSchemaProfile`) as { additions: { name: string; checksum: string }[] };
+    for (const migration of profile.additions) {
+      const sql = readFileSync(`${root}/scripts/testing/retained-schema/${migration.name}.sql`, "utf8");
+      expect(createHash("sha256").update(sql).digest("hex")).toBe(migration.checksum);
+      const installed = (await pool.query(`SELECT checksum FROM _prisma_migrations WHERE migration_name=$1 AND finished_at IS NOT NULL AND rolled_back_at IS NULL`, [migration.name])).rows;
+      if (installed.length) expect(installed).toEqual([{ checksum: migration.checksum }]);
+      else {
+        await pool.query(sql);
+        await pool.query(`INSERT INTO _prisma_migrations(id,checksum,migration_name,finished_at,applied_steps_count) VALUES($1,$2,$3,now(),1)`, [randomUUID(), migration.checksum, migration.name]);
+      }
+    }
+    // Use the real Prisma predeploy command with the older migration inventory.
+    // Retained application tables/ledger entries must not force a down migration.
+    const older = mkdtempSync(join(packageRoot, ".staging-compat-"));
+    try {
+      mkdirSync(join(older, "prisma", "migrations"), { recursive: true });
+      cpSync(join(packageRoot, "prisma.config.ts"), join(older, "prisma.config.ts"));
+      cpSync(join(packageRoot, "prisma", "schema.prisma"), join(older, "prisma", "schema.prisma"));
+      for (const name of readdirSync(join(packageRoot, "prisma", "migrations"))) {
+        if (!profile.additions.some(migration => migration.name === name))
+          cpSync(join(packageRoot, "prisma", "migrations", name), join(older, "prisma", "migrations", name), { recursive: true });
+      }
+      execFileSync("pnpm", ["prisma", "migrate", "deploy", "--config", join(older, "prisma.config.ts")], {
+        cwd: packageRoot, env: { ...process.env, DATABASE_URL: databaseUrl }, stdio: "pipe",
+      });
+    } finally { rmSync(older, { recursive: true, force: true }); }
+    const seeded = execute("fixture", "4".repeat(32)); expect(seeded.code).toBe(0);
+    const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
+    try {
+      const listing = await prisma.listing.findUniqueOrThrow({ where: { id: seeded.receipt?.listingId },
+        select: { id: true, sellerId: true, status: true, priceAmount: true } });
+      expect(listing.sellerId).toBe(seeded.receipt?.sellerId); expect(listing.status).toBe("active");
+      await prisma.user.update({ where: { id: listing.sellerId }, data: { displayName: "Baseline write after retained schema" } });
+      // Baseline writes still work; cleanup correctly refuses the changed original.
+      expect(execute("reset", "4".repeat(32)).code).toBe(1);
+      const untouched = execute("fixture", "5".repeat(32)); expect(untouched.code).toBe(0);
+      expect(execute("reset", "5".repeat(32)).code).toBe(0);
+      for (const table of ["listing_view_days", "listing_view_fingerprints", "staff_grants"])
+        expect((await pool.query(`SELECT to_regclass($1) AS name`, [table])).rows[0]?.["name"]).toBe(table);
+    } finally { await prisma.$disconnect(); }
   });
 });

@@ -91,9 +91,14 @@ function remoteMain(input) {
       if (sql(`SELECT (SELECT count(*) FROM pg_namespace WHERE nspname='${namespace}')+(SELECT count(*) FROM public.users WHERE id='${user}')+(SELECT count(*) FROM public.listings WHERE id='${listing}');`) !== '0') throw new Error();
       console.log(JSON.stringify({ fixtures: 'absent', namespace }));
     } else {
-      const migrations = sql('SELECT migration_name FROM public._prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY migration_name;').split('\n').filter(Boolean);
-      if (JSON.stringify(migrations) !== JSON.stringify(input.expectedMigrations)) throw new Error();
-      console.log(JSON.stringify({ fixtures: exists ? 'present' : 'absent', schema: 'unchanged', sha: e.AUTOTM_COMMIT_SHA, listingId: exists ? listing : null }));
+      if (sql('SELECT count(*) FROM public._prisma_migrations WHERE finished_at IS NULL AND rolled_back_at IS NULL;') !== '0') throw new Error();
+      const migrations = JSON.parse(sql(`SELECT coalesce(json_agg(json_build_object('name',migration_name,'checksum',checksum) ORDER BY migration_name),'[]') FROM public._prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL;`));
+      if (JSON.stringify(migrations) !== JSON.stringify(input.expectedMigrations) ||
+          !['unchanged', 'retained-additive'].includes(input.schemaDisposition)) throw new Error();
+      if (exists) sql(`BEGIN; SELECT id FROM public.users WHERE id='${user}' FOR SHARE; SELECT id FROM public.listings WHERE id='${listing}' FOR SHARE; ${unchanged} COMMIT;`);
+      else if (sql(`SELECT (SELECT count(*) FROM public.users WHERE id='${user}')+(SELECT count(*) FROM public.listings WHERE id='${listing}');`) !== '0') throw new Error();
+      console.log(JSON.stringify({ fixtures: exists ? 'present' : 'absent', schema: input.schemaDisposition, migrations,
+        sha: e.AUTOTM_COMMIT_SHA, listingId: exists ? listing : null, sellerId: exists ? user : null }));
     }
   } catch {
     console.error('Reserved staging remote operation refused or incomplete; diagnostics suppressed');

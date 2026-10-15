@@ -69,7 +69,8 @@ export class RailwayPlatform {
   }
   async remote(kind, lease, target) {
     const payload = { kind, id: lease.id, namespace: lease.namespace, target, identity: lease.identity,
-      expectedMigrations: lease.operation?.expectedMigrations ?? lease.expectedMigrations };
+      expectedMigrations: lease.operation?.expectedMigrations ?? lease.expectedMigrations,
+      schemaDisposition: lease.operation?.schemaDisposition ?? lease.schemaDisposition ?? 'unchanged' };
     const encoded = Buffer.from(remoteProgram(payload)).toString('base64');
     const output = await this.command('railway', ['ssh', '--project', lease.identity.projectId,
       '--environment', lease.identity.environmentId, '--service', lease.identity.services.api,
@@ -91,10 +92,7 @@ export class RailwayPlatform {
     if (['fixture', 'reset'].includes(kind)) {
       const receipt = await this.remote(kind, lease, target);
       if (kind === 'fixture') {
-        if (typeof receipt.listingId !== 'string' || typeof receipt.sellerId !== 'string') throw new Error('Owned application fixture receipt required');
-        const response = await this.fetch(`${lease.identity.origins.api}/api/v1/listings/${encodeURIComponent(receipt.listingId)}`, { signal: AbortSignal.timeout(15000), redirect: 'error' });
-        const listing = await response.json();
-        if (!response.ok || listing.id !== receipt.listingId || listing.sellerId !== receipt.sellerId || listing.status !== 'active') throw new Error('Deployed application fixture read failed');
+        await this.fixtureVisible(lease, receipt);
       }
       return receipt;
     }
@@ -122,6 +120,17 @@ export class RailwayPlatform {
     if (kind === 'restore') await this.remote('reset', lease, target);
     return { deployments };
   }
+  async fixtureVisible(lease, receipt) {
+    if (typeof receipt.listingId !== 'string' || typeof receipt.sellerId !== 'string') throw new Error('Owned application fixture receipt required');
+    const response = await this.fetch(`${lease.identity.origins.api}/api/v1/listings/${encodeURIComponent(receipt.listingId)}`, { signal: AbortSignal.timeout(15000), redirect: 'error' });
+    const listing = await response.json();
+    if (!response.ok || listing.id !== receipt.listingId || listing.sellerId !== receipt.sellerId || listing.status !== 'active') throw new Error('Deployed application fixture read failed');
+  }
+  async recover(lease, target, result) {
+    const receipt = await this.verify(lease, target, result);
+    if (lease.operation.kind === 'fixture') await this.fixtureVisible(lease, receipt);
+    return receipt;
+  }
   async verify(lease, target, result) {
     await this.attest(lease.identity);
     if (!result?.deployments || Object.keys(result.deployments).length !== Object.keys(lease.identity.services).length) throw new Error('Exact deployment IDs required');
@@ -139,8 +148,9 @@ export class RailwayPlatform {
       deploymentLogs(deploymentId: $deploymentId, limit: $limit) { message } }`, { deploymentId: result.deployments.worker, limit: 500 });
     if (!deploymentLogs.some(x => x.message.includes('Worker started (BullMQ consumer)'))) throw new Error('Current worker boot evidence unavailable');
     const probe = await this.remote('probe', lease, target);
-    if (probe.sha !== target || probe.schema !== 'unchanged') throw new Error('Runtime schema proof unavailable');
-    return { sha: target, readyz: true, worker: true, media: true, mock: true, fixtures: probe.fixtures, schema: probe.schema };
+    if (probe.sha !== target || probe.schema !== (lease.operation?.schemaDisposition ?? lease.schemaDisposition ?? 'unchanged') ||
+        !equal(probe.migrations, lease.operation?.expectedMigrations ?? lease.expectedMigrations)) throw new Error('Runtime schema proof unavailable');
+    return { sha: target, readyz: true, worker: true, media: true, mock: true, fixtures: probe.fixtures, schema: probe.schema, migrations: probe.migrations, listingId: probe.listingId, sellerId: probe.sellerId };
   }
 
 }

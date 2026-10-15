@@ -18,6 +18,7 @@ pnpm staging:control identity POLICY.json
 pnpm staging:control enqueue POLICY.json REQUEST.json
 pnpm staging:control acquire POLICY.json REQUEST_ID
 pnpm staging:control operate POLICY.json CLAIM.json deploy|fixture|reset
+pnpm staging:control recover POLICY.json CLAIM.json
 pnpm staging:control restore POLICY.json CLAIM.json
 pnpm staging:control release POLICY.json CLAIM.json
 Live mutations require independent review and explicit reservation authorization. No force-unlock exists.`;
@@ -32,7 +33,7 @@ async function json(file) {
 }
 export async function runStagingCommand(args) {
   const [command = 'help', ...values] = args;
-  const lengths = { help: 0, discover: 0, inspect: 0, identity: 1, enqueue: 2, acquire: 2, operate: 3, restore: 2, release: 2 };
+  const lengths = { help: 0, discover: 0, inspect: 0, identity: 1, enqueue: 2, acquire: 2, operate: 3, restore: 2, recover: 2, release: 2 };
   if (!(command in lengths) || values.length !== lengths[command]) throw new Error('Unsupported command or arguments; use help');
   if (command === 'help') return { usage };
   if (command === 'discover') {
@@ -65,6 +66,7 @@ export async function runStagingCommand(args) {
     if (command === 'acquire') return control.acquire(values[1]);
     const claim = await json(values[1]);
     if (command === 'operate') return control.operate(claim, values[2]);
+    if (command === 'recover') return control.recover(claim);
     if (command === 'restore') return control.restore(claim);
     return control.release(claim);
   } finally { await rm(directory, { recursive: true, force: true }); }

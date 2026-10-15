@@ -1,6 +1,8 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdir } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { evaluateSchemaPlan, retainedSchemaProfile } from './staging-schema.mjs';
 
 const run = promisify(execFile);
 
@@ -10,14 +12,14 @@ export class GitLedger {
     if (!/^refs\/heads\/ops\/staging-[a-z0-9-]+$/.test(ref)) throw new Error('Invalid coordination ref');
     Object.assign(this, { directory, remote, ref, authenticateWithGh });
   }
-  async git(args, input) {
+  async git(args, input, raw = false) {
     // execFile has no input option. Blob/tree input uses the child's stdin without a shell.
     return new Promise((resolve, reject) => {
       const child = execFile('git', [...(this.authenticateWithGh ? ['-c', 'credential.helper=', '-c', 'credential.helper=!gh auth git-credential'] : []), '--git-dir', this.directory, ...args], {
         encoding: 'utf8', timeout: 60000, maxBuffer: 1024 * 1024,
         env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_AUTHOR_NAME: 'Staging controls',
           GIT_AUTHOR_EMAIL: 'staging-controls@invalid', GIT_COMMITTER_NAME: 'Staging controls', GIT_COMMITTER_EMAIL: 'staging-controls@invalid' },
-      }, (error, stdout) => error ? reject(new Error('Coordination Git operation failed')) : resolve(stdout.trim()));
+      }, (error, stdout) => error ? reject(new Error('Coordination Git operation failed')) : resolve(raw ? stdout : stdout.trim()));
       child.stdin.end(input);
     });
   }
@@ -45,19 +47,25 @@ export class GitLedger {
     await this.git(['fetch', '--no-tags', this.remote, revision]);
     return revision;
   }
-  async assertNoSchemaChange(candidate, main) {
-    for (const revision of [candidate, main]) {
+  async schemaPlan(candidate, main, retained = []) {
+    await this.initialize();
+    for (const revision of [candidate, main, retainedSchemaProfile.baseline]) {
       if (!/^[a-f0-9]{40}$/.test(revision)) throw new Error('Invalid schema revision');
       await this.git(['fetch', '--no-tags', this.remote, revision]);
     }
-    const changed = await this.git(['diff', '--name-only', main, candidate, '--', 'packages/db/prisma/migrations', 'packages/db/prisma/schema.prisma']);
-    if (changed) throw new Error('Persistent schema disposition unresolved; guarded deploy refused');
+    const schemaHash = async revision => createHash('sha256').update(await this.git(['show', `${revision}:packages/db/prisma/schema.prisma`], undefined, true)).digest('hex');
+    return evaluateSchemaPlan({ baseline: await this.migrationsAt(retainedSchemaProfile.baseline),
+      candidate: await this.migrationsAt(candidate), main: await this.migrationsAt(main), retained,
+      candidateSchema: await schemaHash(candidate), mainSchema: await schemaHash(main) });
   }
   async migrationsAt(revision) {
+    await this.initialize();
     if (!/^[a-f0-9]{40}$/.test(revision)) throw new Error('Invalid migration revision');
     await this.git(['fetch', '--no-tags', this.remote, revision]);
-    return (await this.git(['ls-tree', '--name-only', `${revision}:packages/db/prisma/migrations`]))
-      .split('\n').filter(x => /^\d+_/.test(x)).sort();
+    const names = (await this.git(['ls-tree', '--name-only', `${revision}:packages/db/prisma/migrations`]))
+      .split('\n').filter(x => /^\d+_[a-zA-Z0-9_]+$/.test(x)).sort();
+    return Promise.all(names.map(async name => ({ name, checksum: createHash('sha256').update(
+      await this.git(['show', `${revision}:packages/db/prisma/migrations/${name}/migration.sql`], undefined, true)).digest('hex') })));
   }
   async compareAndSwap(expected, state) {
     await this.initialize();
