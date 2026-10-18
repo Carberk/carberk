@@ -1,13 +1,15 @@
+import { VideoUploadSchemas } from "@auto-tm/contracts";
 import { requireOptionalNativeModule } from "expo";
 import { randomUUID } from "expo-crypto";
 
+import { apiClient } from "../../api/client";
 import { loadAuthSession } from "../../auth/session";
 import { VideoPreparation, type VideoPreparationPort, type VideoSelection } from "../videoPreparation/VideoPreparation";
 import { ExpoVideoTransferDevice } from "../videoTransfer/ExpoVideoTransferDevice";
 import { VideoTransfer, type VideoTransferRecord } from "../videoTransfer/VideoTransfer";
 
 export interface VideoTaskSnapshot {
-  phase: "EMPTY" | "PREPARING" | "UPLOADING" | "PAUSED" | "PROCESSING" | "FAILED" | "CANCELLED";
+  phase: "EMPTY" | "PREPARING" | "UPLOADING" | "PAUSED" | "PROCESSING" | "READY" | "FAILED" | "CANCELLED";
   record: VideoTransferRecord | null;
   error?: string;
 }
@@ -40,6 +42,12 @@ export class VideoUploadTask {
       if (record.businessId !== this.businessId) throw new Error("VIDEO_TRANSFER_SESSION_CHANGED");
       this.set({ phase: record.state, record });
       if (record.state === "UPLOADING") await this.run();
+      if (record.state === "PROCESSING" && record.sessionId) {
+        const status = await apiClient.get(`/listing-video-upload-sessions/${record.sessionId}`, VideoUploadSchemas.SessionSnapshot, { assertSession: () => this.owner(), ...(this.businessId ? { headers: { "x-business-id": this.businessId } } : {}) });
+        if (status.sessionId !== record.sessionId) throw new Error("VIDEO_SESSION_INVALID");
+        if (status.state === "READY") this.set({ phase: "READY", record });
+        else if (["FAILED", "CLEANUP_PENDING", "DELETED"].includes(status.state)) this.set({ phase: status.state === "FAILED" ? "FAILED" : "CANCELLED", record });
+      }
     } catch (error) { this.failed(error); }
   }
   async start(selection: Omit<VideoSelection, "jobId" | "maxBytes">, posterMs: number) {
