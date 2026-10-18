@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
+
 import { PrismaService } from "@auto-tm/db";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
 import { PrismaVideoCleanupLedger } from "./PrismaVideoCleanupLedger";
 const databaseUrl = process.env["DATABASE_URL"] ?? "";
 const hosted = process.env["GITHUB_ACTIONS"] === "true" && /^postgres(?:ql)?:\/\/[^/]+@(localhost|127\.0\.0\.1):\d+\//.test(databaseUrl);

@@ -1,4 +1,5 @@
 import type { PrismaService } from "@auto-tm/db";
+
 import type { VideoCleanupLease, VideoCleanupLedger } from "./VideoCleanupPorts";
 export class PrismaVideoCleanupLedger implements VideoCleanupLedger {
   constructor(private readonly prisma: PrismaService) {}
