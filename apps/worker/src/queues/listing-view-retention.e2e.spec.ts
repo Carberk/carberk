@@ -32,7 +32,8 @@ describe.skipIf(!hosted)("Listing retention actual Redis trigger/retry (#899)", 
       }, { timeout: 5000 });
       ledger.failing = false;
       await vi.waitFor(() => expect(ledger.expiresAt).toEqual([]), { timeout: 8000 });
-      const jobs = await queue.getJobs(["completed", "failed", "delayed", "wait", "active"]);
+      // BullMQ can remove a completed repeat job between the index scan and hydration.
+      const jobs = (await queue.getJobs(["completed", "failed", "delayed", "wait", "active"])).filter(job => job != null);
       expect(jobs.every((job) => JSON.stringify(job.data) === "{}")).toBe(true);
       expect(jobs.some((job) => job.failedReason?.includes("private-row-secret"))).toBe(false);
     } finally {

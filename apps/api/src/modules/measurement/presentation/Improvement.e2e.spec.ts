@@ -49,7 +49,7 @@ describe("authorized Improvement HTTP and real worker/PostgreSQL snapshots",()=>
    {provide:PrismaMarketKnowledge,inject:[PrismaService,STAFF_AUTHORITY_PORT],useFactory:(db:PrismaService,staff:StaffAuthorityPort)=>new PrismaMarketKnowledge(db,staff,epoch,()=>now)},
   ]}).compile();
   app=module.createNestApplication<NestFastifyApplication>(new FastifyAdapter());prisma=app.get(PrismaService);jwt=app.get(JwtService);authority=app.get(STAFF_AUTHORITY_PORT);
-  app.useGlobalGuards(new JwtAuthGuard(app.get(Reflector),jwt));await app.listen(0,"127.0.0.1");request=supertest(app.getHttpServer());
+  app.useGlobalGuards(new JwtAuthGuard(app.get(Reflector),jwt));await app.listen(0, "127.0.0.1");request=supertest(app.getHttpServer());
  });
  beforeEach(async()=>{
   await cleanup();now=new Date();clock=new Date(now);sequence=0;
