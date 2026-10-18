@@ -28,8 +28,9 @@ describe("real prepared bytes through processing publication", () => {
     const f = fixture();
     expect(await f.service.execute("generation")).toBe("adopted");
     expect(f.ledger.ready).toMatchObject({ sourceSha256: hash, durationMs: 500, width: 320, height: 240 });
-    expect(f.ledger.ready!.assets.length).toBe(f.objects.bytes.size);
-    expect(f.ledger.ready!.assets.every(asset => asset.key.startsWith("video/v1/upload/generation/") && /^[a-f0-9]{64}$/.test(asset.sha256))).toBe(true);
+    if (!f.ledger.ready) throw new Error("Expected adopted generation");
+    expect(f.ledger.ready.assets.length).toBe(f.objects.bytes.size);
+    expect(f.ledger.ready.assets.every(asset => asset.key.startsWith("video/v1/upload/generation/") && /^[a-f0-9]{64}$/.test(asset.sha256))).toBe(true);
   });
   it("never adopts a completed encode with failed object readback", async () => {
     const f = fixture(); f.objects.corruptReadback = true;
