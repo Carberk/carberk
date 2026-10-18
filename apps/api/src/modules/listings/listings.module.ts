@@ -6,6 +6,15 @@ import { BUSINESS_CONTACT_PHONE_REPOSITORY, type BusinessContactPhoneRepository 
 import { ListingOwnership } from "./application/ListingOwnership";
 import { MeasurementModule } from "../measurement/measurement.module";
 import { Module } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { S3Client } from "@aws-sdk/client-s3";
+import { randomBytes } from "node:crypto";
+import type { Env } from "../../env.schema";
+import { VideoGrantController } from "./presentation/VideoGrantController";
+import { VideoPlaybackController } from "./presentation/VideoPlaybackController";
+import { PrismaVideoPlayback, VIDEO_GRANT_SECRET_FACTORY, VIDEO_PLAYBACK_ELIGIBILITY } from "./infrastructure/PrismaVideoPlayback";
+import { S3VideoPlaybackObjects } from "./infrastructure/S3VideoPlaybackObjects";
+import { VIDEO_GRANT_ISSUER, VIDEO_PLAYBACK_AUTHORITY, VIDEO_PLAYBACK_OBJECTS } from "./application/VideoPlaybackPorts";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 
 import { PrismaModule } from "../../common/prisma.module";
@@ -108,7 +117,7 @@ import { LISTING_VIEWS_PORT } from "./domain/ports/ListingViewsPort";
 
 @Module({
   imports: [PrismaModule, EventEmitterModule, IdentityModule, MeasurementModule],
-  controllers: [BusinessInventoryController,ListingViewsController, ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController, VideoUploadController],
+  controllers: [BusinessInventoryController,ListingViewsController, ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController, VideoUploadController, VideoGrantController, VideoPlaybackController],
   providers: [
     { provide: BUSINESS_INVENTORY_REPOSITORY, useClass: PrismaBusinessInventoryRepository },
     { provide: BUSINESS_CONTACT_PHONE_REPOSITORY, useClass: PrismaBusinessContactPhoneRepository },
@@ -275,6 +284,24 @@ import { LISTING_VIEWS_PORT } from "./domain/ports/ListingViewsPort";
     VideoUploadSessionService,
     VideoEligibility,
     PrismaVideoUploadSessionRepository,
+    PrismaVideoPlayback,
+    { provide: VIDEO_GRANT_SECRET_FACTORY, useValue: () => randomBytes(32).toString("base64url") },
+    { provide: VIDEO_PLAYBACK_ELIGIBILITY, useExisting: VideoEligibility },
+    { provide: VIDEO_GRANT_ISSUER, useExisting: PrismaVideoPlayback },
+    { provide: VIDEO_PLAYBACK_AUTHORITY, useExisting: PrismaVideoPlayback },
+    {
+      provide: VIDEO_PLAYBACK_OBJECTS,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<Env, true>) => new S3VideoPlaybackObjects(new S3Client({
+        endpoint: config.get("MINIO_ENDPOINT", { infer: true }),
+        region: config.get("MINIO_REGION", { infer: true }),
+        forcePathStyle: true,
+        credentials: {
+          accessKeyId: config.get("MINIO_ACCESS_KEY", { infer: true }),
+          secretAccessKey: config.get("MINIO_SECRET_KEY", { infer: true }),
+        },
+      }), config.get("VIDEO_PRIVATE_BUCKET", { infer: true })),
+    },
   ],
   exports: [
     VIN_DECODER_PORT,

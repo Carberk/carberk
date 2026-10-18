@@ -17,6 +17,13 @@ export class VideoEligibility {
       this.config.get("VIDEO_TESTER_USER_IDS", { infer: true }).includes(userId);
   }
 
+  assertUploadEligible(userId: string): void {
+    this.assertEligible(userId);
+    if (!this.config.get("VIDEO_UPLOADS_ENABLED", { infer: true })) {
+      throw new ForbiddenException({ code: "VIDEO_UPLOADS_UNAVAILABLE", message: "Listing video uploads are currently unavailable" });
+    }
+  }
+
   assertEligible(userId: string): void {
     if (!this.isEligible(userId)) {
       throw new ForbiddenException({

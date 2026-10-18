@@ -45,6 +45,10 @@ const BaseSchema = z.object({
   TESTER_ACCOUNTS_JSON: z.string().default("[]"),
   /** Video is an explicitly gated tester experiment; both switches are required. */
   VIDEO_ROLLOUT_ENABLED: booleanFlag,
+  VIDEO_UPLOADS_ENABLED: booleanFlag,
+  VIDEO_PRIVATE_BUCKET: z.string().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+    .refine(value => !["listing-photos", "listing-videos", "chat-attachments", "catalog-assets"].includes(value), "Video requires a separate private bucket")
+    .default("listing-video-private"),
   VIDEO_TESTER_USER_IDS: z.string().default("").transform((value, ctx) => {
     const ids = value.split(",").map(id => id.trim()).filter(Boolean);
     const parsed = z.array(z.string().uuid()).max(50).safeParse(ids);

@@ -23,6 +23,7 @@ type Person = typeof people[number];
 const epoch = new Date("2026-10-17T12:00:00Z");
 const businessId = suite.id("business");
 const priorFlag = process.env["VIDEO_ROLLOUT_ENABLED"];
+const priorUploads = process.env["VIDEO_UPLOADS_ENABLED"];
 const priorTesters = process.env["VIDEO_TESTER_USER_IDS"];
 
 /** Actual PostgreSQL and full Nest composition. Storage provenance is a boundary fixture. */
@@ -53,6 +54,7 @@ describe("video upload current authority and retirement", () => {
   }
   beforeAll(async () => {
     process.env["VIDEO_ROLLOUT_ENABLED"] = "true";
+    process.env["VIDEO_UPLOADS_ENABLED"] = "true";
     process.env["VIDEO_TESTER_USER_IDS"] = people.map(p => suite.id(p)).join(",");
     const module = await Test.createTestingModule({ imports: [
       EventEmitterModule.forRoot(), bullTestRoot(),
@@ -67,6 +69,7 @@ describe("video upload current authority and retirement", () => {
   });
   afterAll(async () => {
     await cleanup(); await app?.close();
+    if (priorUploads === undefined) delete process.env["VIDEO_UPLOADS_ENABLED"]; else process.env["VIDEO_UPLOADS_ENABLED"] = priorUploads;
     if (priorFlag === undefined) delete process.env["VIDEO_ROLLOUT_ENABLED"]; else process.env["VIDEO_ROLLOUT_ENABLED"] = priorFlag;
     if (priorTesters === undefined) delete process.env["VIDEO_TESTER_USER_IDS"]; else process.env["VIDEO_TESTER_USER_IDS"] = priorTesters;
   });

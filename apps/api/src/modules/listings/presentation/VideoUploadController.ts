@@ -26,6 +26,7 @@ export class VideoUploadController {
   @Post("sessions")
   async create(@Req() req: FastifyRequest, @Body() body: unknown) {
     const actor = this.actor(req);
+    this.eligibility.assertUploadEligible(actor.userId);
     const parsed = createBody.safeParse(body);
     if (!parsed.success) throw new BadRequestException({ code: "VIDEO_UPLOAD_INVALID" });
     return this.repo.create({ id: randomUUID(), actor, uploadId: parsed.data.uploadId, ...(parsed.data.listingId ? { listingId: parsed.data.listingId } : {}) });

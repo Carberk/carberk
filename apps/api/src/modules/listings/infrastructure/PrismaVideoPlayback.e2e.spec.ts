@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { PrismaService } from "@auto-tm/db";
 import { beforeAll, beforeEach, afterAll, describe, expect, it } from "vitest";
 import { cleanSuiteFixtures, defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
@@ -21,7 +21,7 @@ describe("video playback authority on disposable PostgreSQL", () => {
     await prisma.videoGeneration.deleteMany({ where: { listingId: car } });
     await cleanSuiteFixtures(prisma, suite, { userAliases: ["seller", "viewer"] });
   };
-  beforeAll(async () => { prisma = new PrismaService(); await prisma.$connect(); playback = new PrismaVideoPlayback(prisma, identity, { isEligible: () => true }); });
+  beforeAll(async () => { prisma = new PrismaService(); await prisma.$connect(); playback = new PrismaVideoPlayback(prisma, identity, { isEligible: () => true }, { now: () => new Date() }, () => randomBytes(32).toString("base64url")); });
   beforeEach(async () => {
     await clean(); await seedSuiteCatalog(prisma, suite);
     for (const who of ["seller", "viewer"]) await prisma.user.create({ data: { id: suite.id(who), phone: suite.phone(who), phoneVerifiedAt: new Date() } });
