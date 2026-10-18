@@ -1,10 +1,12 @@
-import { BadRequestException, Body, Controller, ForbiddenException, Get, Header, HttpException, Inject, Param, Post, Req } from "@nestjs/common";
+import { BadRequestException, Body, Controller, ForbiddenException, Get, Header, HttpException, Inject, Param, Post, Put, Query, Req, Res } from "@nestjs/common";
 import { DiagnosticSchemas } from "@auto-tm/contracts";
-import type { FastifyRequest } from "fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { DiagnosticRuleError } from "../domain/InspectionOrder";
 import type { DiagnosticSubject } from "../domain/ports/DiagnosticIntakePort";
 import { DIAGNOSTIC_REPORTS_PORT, type DiagnosticReportsPort } from "../domain/ports/DiagnosticReportsPort";
+
+import { DIAGNOSTIC_EVIDENCE_PORT, type DiagnosticEvidencePort } from "../domain/ports/DiagnosticEvidencePort";
 
 type Request = FastifyRequest & { user?: { sub?: string; sid?: string } };
 const uuid = z.string().uuid();
@@ -15,7 +17,8 @@ function parse<S extends z.ZodType>(schema: S, value: unknown): z.output<S> {
 }
 @Controller("api/v1/diagnostics")
 export class DiagnosticReportsController {
-  constructor(@Inject(DIAGNOSTIC_REPORTS_PORT) private readonly reports: DiagnosticReportsPort) {}
+  constructor(@Inject(DIAGNOSTIC_REPORTS_PORT) private readonly reports: DiagnosticReportsPort,
+    @Inject(DIAGNOSTIC_EVIDENCE_PORT) private readonly evidence: DiagnosticEvidencePort) {}
   private subject(req: Request): DiagnosticSubject {
     if (!req.user?.sub || !req.user.sid) throw new ForbiddenException({ code: "DIAGNOSTIC_NO_ACCESS", message: "Inspection access unavailable" });
     return { userId: req.user.sub, sessionId: req.user.sid };
@@ -46,4 +49,18 @@ export class DiagnosticReportsController {
   @Post("reports/:id/corrections") @Header("Cache-Control", "no-store, private") correct(@Req() req: Request, @Param("id") id: string, @Body() body: unknown) {
     return this.run(() => this.reports.correct(this.subject(req), parse(uuid, id), parse(DiagnosticSchemas.DiagnosticCorrectionSchema, body)));
   }
+  @Put("reports/:id/evidence/:evidenceId") @Header("Cache-Control", "no-store, private") upload(@Req() req: Request, @Param("id") id: string, @Param("evidenceId") evidenceId: string, @Query() query: unknown, @Body() body: unknown) {
+    const input = parse(z.object({ findingId: z.string().uuid(), expectedVersion: z.coerce.number().int().nonnegative() }).strict(), query);
+    if (!Buffer.isBuffer(body)) throw new BadRequestException({ code: "REPORT_EVIDENCE_INVALID", message: "Binary evidence required" });
+    const mime = parse(z.enum(["image/jpeg", "image/png", "image/webp"]), req.headers["x-evidence-type"]);
+    return this.run(() => this.evidence.upload(this.subject(req), { reportId: parse(uuid, id), evidenceId: parse(uuid, evidenceId), ...input, mime, bytes: body }));
+  }
+  @Get("reports/:id/evidence/:evidenceId") @Header("Cache-Control", "no-store, private") async image(@Req() req: Request, @Param("id") id: string, @Param("evidenceId") evidenceId: string, @Res() reply: FastifyReply) {
+    const image = await this.run(() => this.evidence.read(this.subject(req), parse(uuid, id), parse(uuid, evidenceId)));
+    reply.header("Cache-Control", "no-store, private").header("X-Content-Type-Options", "nosniff").type(image.mime).send(Buffer.from(image.bytes));
+  }
+  @Post("reports/:id/evidence/:evidenceId/abandon") @Header("Cache-Control", "no-store, private") abandon(@Req() req: Request, @Param("id") id: string, @Param("evidenceId") evidenceId: string) {
+    return this.run(() => this.evidence.abandon(this.subject(req), parse(uuid, id), parse(uuid, evidenceId)));
+  }
+
 }

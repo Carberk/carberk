@@ -6,6 +6,7 @@ import { DiagnosticReport, type DiagnosticReportState } from "../domain/Diagnost
 import { DiagnosticRuleError } from "../domain/InspectionOrder";
 import { DIAGNOSTIC_RUNTIME, type DiagnosticRuntime, type DiagnosticSubject } from "../domain/ports/DiagnosticIntakePort";
 import type { DiagnosticReportsPort } from "../domain/ports/DiagnosticReportsPort";
+import { DiagnosticReportAccess } from "./DiagnosticReportAccess";
 import { DiagnosticAuthority } from "./DiagnosticAuthority";
 import { diagnosticListingDigest } from "./PrismaDiagnosticIntake";
 
@@ -26,15 +27,10 @@ const json = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.stringif
 export class PrismaDiagnosticReports implements DiagnosticReportsPort {
   constructor(@Inject(PrismaService) private readonly db: PrismaService,
     @Inject(DiagnosticAuthority) private readonly authority: DiagnosticAuthority,
-    @Inject(DIAGNOSTIC_RUNTIME) private readonly runtime: DiagnosticRuntime) {}
+    @Inject(DIAGNOSTIC_RUNTIME) private readonly runtime: DiagnosticRuntime,
+    @Inject(DiagnosticReportAccess) private readonly access: DiagnosticReportAccess) {}
   private async load(tx: Tx, subject: DiagnosticSubject, id: string, capability?: DiagnosticSchemas.DiagnosticCapability) {
-    const found = await tx.diagnosticReportRecord.findUnique({ where: { id } });
-    if (!found) throw denied();
-    const scope = await this.authority.order(tx, subject, found.orderId, capability);
-    await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${id} FOR UPDATE`;
-    const row = await tx.diagnosticReportRecord.findUnique({ where: { id } });
-    if (!row || row.erasedAt || (!scope.staff && !row.snapshot)) throw denied();
-    return { row, order: scope.row, staff: scope.staff };
+    return this.access.load(tx, subject, id, capability);
   }
   private version(row: Row, expected: number): void {
     if (row.version !== expected) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
@@ -110,6 +106,10 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
       const next = (await this.model(tx, row)).upsertFinding(subject.userId, input.finding).state;
       await this.evidence(tx, row, next);
       const saved = await this.persist(tx, row, next);
+      const prior = (row.state as unknown as DiagnosticReportState).findings.flatMap(finding => finding.evidenceIds);
+      const retained = new Set(next.findings.flatMap(finding => finding.evidenceIds));
+      const removed = prior.filter(id => !retained.has(id));
+      if (removed.length) await tx.diagnosticEvidence.updateMany({ where: { id: { in: removed }, reportId: row.id, state: "verified" }, data: { state: "cleanup_pending", cleanupRequestedAt: this.runtime.now() } });
       await this.audit(tx, subject, order, row.id, "REPORT_FINDING_SAVED", { findingId: input.finding.id, checkId: input.finding.checkId });
       return this.dto(tx, saved, true);
     });
