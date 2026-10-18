@@ -117,6 +117,14 @@ export class ListingVideoRemovalController {
 @UseFilters(VideoUploadErrorFilter)
 @Controller("api/v1/listing-video-targets")
 export class VideoTargetController {
+  private async perform<T>(run: () => Promise<T>): Promise<T> {
+    try { return await run(); }
+    catch (error) {
+      if (error instanceof HttpException) throw error;
+      if (error instanceof Error && error.message === "VIDEO_SESSION_UNAVAILABLE") throw new HttpException({ code: "VIDEO_SESSION_UNAVAILABLE" }, 404);
+      throw new HttpException({ code: "VIDEO_SERVICE_UNAVAILABLE" }, 503);
+    }
+  }
   constructor(@Inject(OWNED_VIDEO_UPLOAD_PROTOCOL) private readonly protocol: OwnedVideoUploadProtocol, @Inject(VideoEligibility) private readonly eligibility: VideoEligibility) {}
   private actor(req: FastifyRequest, kind: string, id: string) {
     const actor = inventoryActor(req);
@@ -128,12 +136,14 @@ export class VideoTargetController {
   @Get(":kind/:id")
   @Header("Cache-Control", "private, no-store")
   async state(@Req() req: FastifyRequest, @Param("kind") kind: "draft" | "listing", @Param("id") id: string) {
-    return this.protocol.targetState(this.actor(req, kind, id), kind, id);
+    const actor = this.actor(req, kind, id);
+    return this.perform(() => this.protocol.targetState(actor, kind, id));
   }
   @Delete("listing/:id/pending")
   @HttpCode(204)
   @Header("Cache-Control", "private, no-store")
   async cancelPending(@Req() req: FastifyRequest, @Param("id") id: string) {
-    return this.protocol.cancelPending(this.actor(req, "listing", id), id);
+    const actor = this.actor(req, "listing", id);
+    return this.perform(() => this.protocol.cancelPending(actor, id));
   }
 }
