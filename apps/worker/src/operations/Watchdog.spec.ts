@@ -84,3 +84,15 @@ describe("independent operational probes", () => {
   });
 
 });
+
+it("preserves the original incident age after watchdog restart", async () => {
+  const now = new Date("2026-10-18T01:00:00Z");
+  const ports = { restoreIncident: async () => ({ openedAt: "2026-10-17T00:00:00Z", lastObservedAt: "2026-10-18T00:59:00Z", resolvedAt: null }),
+    heartbeat: async () => null, http: async (): Promise<ProbeState> => "unknown", queueDepths: async () => [], publish: async () => undefined };
+  const watchdog = new Watchdog(ports);
+  expect((await watchdog.check(now)).incident?.openedAt).toBe("2026-10-17T00:00:00Z");
+});
+
+it("refuses enabled operational alerts without an explicitly configured sink", () => {
+  expect(() => operationsConfig({ OPERATIONS_ALERTS_ENABLED: "true" })).toThrow();
+});
