@@ -75,3 +75,52 @@ describe("Search parameters: count requests while the year range is edited", () 
     expect(requestedUrls()).toEqual(["/listings/count?yearMin=2018&yearMax=2022&sort=newest"]);
   });
 });
+
+describe("Search parameters: count error and Retry", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    api.get.mockReset();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("offers Retry when the count fails and shows the count once Retry succeeds", async () => {
+    api.get.mockRejectedValueOnce(new Error("count failed")).mockResolvedValue({ totalMatching: 7 });
+    const view = await open({ brandId: "toyota", sort: "newest" });
+    await settle(10);
+
+    expect(view.getByText("Could not load listing count")).toBeTruthy();
+    expect(view.getByRole("button", { name: "Show results" })).toBeTruthy();
+
+    await fireEvent.press(view.getByRole("button", { name: "Retry" }));
+    await settle(10);
+
+    expect(api.get).toHaveBeenCalledTimes(2);
+    expect(requestedUrls()[1]).toBe(requestedUrls()[0]);
+    expect(view.queryByText("Could not load listing count")).toBeNull();
+    expect(view.getByRole("button", { name: "Show 7 listings" })).toBeTruthy();
+  });
+});
+
+describe("Search parameters: Show N wording", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    api.get.mockReset();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it.each([
+    ["en", 0, "Show 0 listings"],
+    ["en", 1, "Show 1 listing"],
+    ["en", 12, "Show 12 listings"],
+    ["ru", 1, "Показать 1 объявление"],
+    ["ru", 3, "Показать 3 объявления"],
+    ["ru", 5, "Показать 5 объявлений"],
+    ["tk", 1, "1 bildirişi görkez"],
+  ])("in %s reads the count %i as %s", async (locale, total, label) => {
+    api.get.mockResolvedValue({ totalMatching: total });
+    const view = await renderMobile(<SearchParametersForm initial={{ sort: "newest" }} returnToResults onBack={vi.fn()} />, { locale });
+    await settle(10);
+
+    expect(view.getByRole("button", { name: label })).toBeTruthy();
+  });
+});
