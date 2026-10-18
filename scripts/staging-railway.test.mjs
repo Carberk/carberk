@@ -4,12 +4,12 @@ import { RailwayPlatform } from './staging-railway.mjs';
 const policy = { projectId:'project', environmentId:'stage', environmentName:'staging', services:{api:'api',worker:'worker'}, credentialScope:'project:project:stage',
   origins:{database:'postgresql://postgres.railway.internal:5432/railway',media:'http://minio.railway.internal:9000',publicMedia:'https://media.example',api:'https://api.example'} };
 function boundary(overrides = {}) {
-  const variables = { APP_ENV:'staging',SMS_DRIVER:'mock',EMAIL_DRIVER:'mock',PUSH_TRANSPORT:'test', DATABASE_URL:'postgresql://user:SECRET@postgres.railway.internal:5432/railway',MINIO_ENDPOINT:policy.origins.media,MINIO_PUBLIC_URL:policy.origins.publicMedia };
+  const variables = { APP_ENV:'staging',SMS_DRIVER:'mock',EMAIL_DRIVER:'mock',PUSH_TRANSPORT:'test', REDIS_URL:'redis://u:SECRET@redis.railway.internal:6379/0', DATABASE_URL:'postgresql://user:SECRET@postgres.railway.internal:5432/railway',MINIO_ENDPOINT:policy.origins.media,MINIO_PUBLIC_URL:policy.origins.publicMedia };
   return async (_url, options) => {
     const { query, variables: input } = JSON.parse(options.body);
     let data;
     if (query.includes('projectToken')) data = { projectToken:{projectId:'project',environmentId:'stage'},project:{id:'project',environments:{edges:[{node:{id:'stage',name:'staging'}}]},services:{edges:[{node:{id:'api'}},{node:{id:'worker'}}]}} };
-    else if (query.includes('variables(')) data={variables:{...variables,...overrides.variables}};
+    else if (query.includes('variables(')) data={variables:{...variables,...overrides.variables,...(input.serviceId==='worker'?overrides.workerVariables:{})}};
     else if (query.includes('domains(')) data={domains:{serviceDomains:[{domain:'api.example'}],customDomains:[]}};
     else if (query.includes('serviceInstance(')) data={serviceInstance:{preDeployCommand:['pnpm --filter @auto-tm/db migrate:deploy']}};
     else throw new Error('Unexpected network request');
@@ -151,4 +151,15 @@ test('campaign profile is disabled by default before the remote SQL boundary', a
     URL, process, require: () => ({ spawnSync: () => { sqlReached = true; return { status: 0, stdout: '0' }; } }), console: { log() {}, error() {} },
   });
   assert.equal(process.exitCode, 1); assert.equal(sqlReached, false);
+});
+
+test('queue disposal requires the same authoritative internal Redis database in API and worker', async () => {
+  for (const changes of [
+    { workerVariables: { REDIS_URL: 'redis://u:SECRET@redis.railway.internal:6379/1' } },
+    { workerVariables: { REDIS_URL: undefined } },
+    { variables: { REDIS_URL: 'redis://u:SECRET@foreign.example:6379/0' } },
+  ]) {
+    const platform = new RailwayPlatform({ token: 'SECRET', fetch: boundary(changes) });
+    await assert.rejects(platform.attest(policy), error => /Redis|delivery|origin/.test(error.message) && !error.message.includes('SECRET'));
+  }
 });
