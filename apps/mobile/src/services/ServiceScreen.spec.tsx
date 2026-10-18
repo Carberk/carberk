@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
 import * as Notifications from "expo-notifications";
 
-import { renderMobile, fireEvent, act, getAllHosts } from "../../test/render";
+import { renderMobile, fireEvent, act, getAllHosts, routeParams } from "../../test/render";
 import { server } from "../../test/msw";
 import { storeAuthSession, clearAuthSession } from "../auth/session";
 
@@ -114,4 +114,26 @@ it("requires explicit acceptance of the displayed recovery deadline and sends th
  await screen.findByRole("button", { name: "Accept this exact recovery deadline" }); expect(commands).toHaveLength(0);
  await fireEvent.press(screen.getByRole("button", { name: "Accept this exact recovery deadline" }));
  expect(commands).toEqual([{ kind: "recovery", orderId: id, expectedVersion: 7, agree: true, deadline }]);
+});
+
+it("keeps the owned educational example readable before sign-in", async () => {
+ await clearAuthSession(); const screen = await renderMobile(<ServiceScreen/>);
+ await fireEvent.press(await screen.findByRole("button", { name: "Read educational sample" }));
+ expect(await screen.findByText("Owned synthetic example. This is not a Carfax or AutoCheck report.")).toBeTruthy();
+ expect(screen.getByText(/64,000 km/)).toBeTruthy(); expect(screen.getByRole("button", { name: "Sign in to continue" })).toBeTruthy();
+});
+it("warns about the same purchased VIN and opens previous reports without creating another request", async () => {
+ let created = 0;
+ server.use(http.get("*/services/history/previous", () => HttpResponse.json([{ conversationId: id, vin: "1HGCM82633A004352" }])), http.post("*/services/conversations", () => { created++; return HttpResponse.json({ id, resourceId: id }); }));
+ const screen = await renderMobile(<ServiceScreen/>);
+ await fireEvent.changeText(await screen.findByLabelText("VIN for enquiry (optional)"), "1hgcm82633a004352");
+ await fireEvent.press(await screen.findByRole("button", { name: "Open previous reports" }));
+ await screen.findByText(message.body); expect(created).toBe(0);
+});
+it("retains source Listing and proposed VIN when starting a contextual enquiry", async () => {
+ routeParams.sourceListingId = id; routeParams.vin = "1HGCM82633A004352"; routeParams.purpose = "history";
+ const created: Record<string, unknown>[] = [];
+ server.use(http.get("*/services/history/previous", () => HttpResponse.json([])), http.post("*/services/conversations", async ({ request }) => { created.push(await request.json() as Record<string, unknown>); return HttpResponse.json({ id, resourceId: id }); }));
+ const screen = await renderMobile(<ServiceScreen/>); await fireEvent.press(await screen.findByRole("button", { name: "New request", disabled: false }));
+ await screen.findByText(message.body); expect(created).toEqual([{ purpose: "history", synthetic: true, sourceListingId: id, proposedVin: "1HGCM82633A004352" }]);
 });

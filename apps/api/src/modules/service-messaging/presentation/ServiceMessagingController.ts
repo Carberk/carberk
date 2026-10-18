@@ -31,10 +31,15 @@ export class ServiceMessagingController {
  open(@Req() req: ServiceRequest, @Body() body: unknown) {
   const data = parse(ServiceMessagingSchemas.ServiceCreateSchema, body);
   if (!data.synthetic) throw new HttpException({ code: "COLLECTION_DISABLED", message: "Real collection is disabled" }, 503);
-  return this.run(() => this.services.open(this.subject(req), data.purpose, data.sourceListingId));
+  return this.run(() => this.services.open(this.subject(req), data.purpose, data.sourceListingId, data.proposedVin));
  }
  @Get("conversations") @Header("Cache-Control", "no-store, private")
  mine(@Req() req: ServiceRequest) { return this.run(() => this.services.mine(this.subject(req))); }
+ @Get("history/previous") @Header("Cache-Control", "no-store, private")
+ historyPrevious(@Req() req: ServiceRequest, @Query() query: unknown) {
+  const data = parse(z.object({ vin: z.string().length(17) }).strict(), query);
+  return this.run(() => this.services.historyPrevious(this.subject(req), data.vin));
+ }
  @Get("queue/:purpose") @Header("Cache-Control", "no-store, private")
  queue(@Req() req: ServiceRequest, @Param("purpose") purpose: string) { return this.run(() => this.services.queue(this.subject(req), parse(ServiceMessagingSchemas.ServicePurposeSchema, purpose))); }
  @Get("conversations/:id") @Header("Cache-Control", "no-store, private")

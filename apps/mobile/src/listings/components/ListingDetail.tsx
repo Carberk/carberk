@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { ScrollView, View, type ScrollViewProps } from "react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { ChevronRight, Flag } from "lucide-react-native";
@@ -38,6 +38,7 @@ interface ListingDetailProps {
   onScroll?: ScrollViewProps["onScroll"];
   /** Room kept at the end of the scroll for a bar that floats over it. */
   bottomSpace?: number;
+  historyEntry?: ReactNode;
 }
 export function ListingDetailView({
   listing,
@@ -47,6 +48,7 @@ export function ListingDetailView({
   onSeeSimilar,
   onScroll,
   bottomSpace = 0,
+  historyEntry,
 }: ListingDetailProps) {
   const { t, i18n } = useTranslation();
   const scrollRef = useRef<View>(null);
@@ -205,6 +207,7 @@ export function ListingDetailView({
             />
           </View>
         )}
+        {historyEntry}
         {listing.vinHistory?.decoded === true && (
           <View className="gap-3">
             <Separator />

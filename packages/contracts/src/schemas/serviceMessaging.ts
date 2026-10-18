@@ -17,7 +17,7 @@ export const ServiceRightsSchema = z.object({
   supplierRestrictions: z.string().trim().max(1000),
   hold: z.object({ reason: z.string().min(1).max(500), until: z.string().datetime() }).nullable(),
 });
-export const ServiceCreateSchema = z.object({ purpose: ServicePurposeSchema, sourceListingId: z.string().uuid().optional(), synthetic: z.boolean().default(true) });
+export const ServiceCreateSchema = z.object({ purpose: ServicePurposeSchema, proposedVin: z.string().min(1).max(30).optional(), sourceListingId: z.string().uuid().optional(), synthetic: z.boolean().default(true) });
 export const SupportCommandSchema = z.discriminatedUnion("kind", [
  z.object({ kind: z.enum(["close_resolved", "reopen", "investigate", "investigation_done"]) }),
  z.object({ kind: z.literal("close_awaiting"), reason: z.string().trim().min(1).max(500), clientMessageId: z.string().uuid(), body: z.string().trim().min(1).max(4000) }),
@@ -68,13 +68,18 @@ export const HistorySnapshotSchema = z.object({
  payments: z.array(z.object({ id: z.string().uuid(), claim: z.string().nullable(), state: z.string(), amount: z.number().nullable(), receivedAt: z.string().datetime().nullable(), confirmedAt: z.string().datetime().nullable() })),
 });
 export type HistorySnapshot = z.infer<typeof HistorySnapshotSchema>;
+export const HistorySourceObservationSchema = z.object({ page: z.number().int().positive().max(1000), statement: z.string().trim().min(1).max(1000) }).strict();
+const historySourceFacts = { vehicleIdentity: z.string().trim().min(1).max(300).nullable().default(null), mileage: z.object({ value: z.number().int().nonnegative().max(2147483647), unit: z.enum(["km", "mi"]), observedAt: z.string().datetime() }).nullable().default(null), sourceObservations: z.array(HistorySourceObservationSchema).max(20).default([]) };
 export const HistoryArtifactCommandSchema = z.discriminatedUnion("kind", [
- z.object({ kind: z.literal("stage"), expectedAssignmentVersion: z.number().int().nonnegative(), orderId: z.string().uuid(), artifactId: z.string().uuid(), provider: historyProvider, vin: z.string().length(17), originalDate: z.string().datetime(), expectedPages: z.number().int().positive().max(1000), sizeBytes: z.number().int().positive().max(20*1024*1024), sha256: z.string().regex(/^[a-f0-9]{64}$/), rights: ServiceRightsSchema, provenance: z.string().trim().min(1).max(1000) }).strict(),
+ z.object({ kind: z.literal("stage"), ...historySourceFacts, expectedAssignmentVersion: z.number().int().nonnegative(), orderId: z.string().uuid(), artifactId: z.string().uuid(), provider: historyProvider, vin: z.string().length(17), originalDate: z.string().datetime(), expectedPages: z.number().int().positive().max(1000), sizeBytes: z.number().int().positive().max(20*1024*1024), sha256: z.string().regex(/^[a-f0-9]{64}$/), rights: ServiceRightsSchema, provenance: z.string().trim().min(1).max(1000) }).strict(),
  z.object({ kind: z.literal("verify"), expectedAssignmentVersion: z.number().int().nonnegative(), orderId: z.string().uuid(), artifactId: z.string().uuid(), vin: z.string().length(17), originalDate: z.string().datetime(), readablePages: z.number().int().positive().max(1000), readable: z.literal(true) }).strict(),
  z.object({ kind: z.literal("deliver"), expectedAssignmentVersion: z.number().int().nonnegative(), expectedVersion: z.number().int().nonnegative(), orderId: z.string().uuid(), artifactId: z.string().uuid(), sharedLink: z.string().url().max(2000), linkMatches: z.literal(true), linkChecked: z.literal(true) }).strict(),
  z.object({ kind: z.literal("archive"), expectedAssignmentVersion: z.number().int().nonnegative(), expectedVersion: z.number().int().nonnegative(), orderId: z.string().uuid(), artifactId: z.string().uuid() }).strict(),
 ]);
 export type HistoryArtifactCommand = z.infer<typeof HistoryArtifactCommandSchema>;
-export const HistoryReportSchema = z.object({ canShare: z.boolean().default(false), id: z.string().uuid(), provider: historyProvider, vin: z.string(), originalDate: z.string().datetime(), sizeBytes: z.number().int().positive(), expectedPages: z.number().int().positive(), sharedLink: z.string().url().nullable(), deliveredAt: z.string().datetime().nullable(), state: z.string() });
+export const HistoryReportSchema = z.object({ canShare: z.boolean().default(false), ...historySourceFacts, id: z.string().uuid(), provider: historyProvider, vin: z.string(), originalDate: z.string().datetime(), sizeBytes: z.number().int().positive(), expectedPages: z.number().int().positive(), sharedLink: z.string().url().nullable(), deliveredAt: z.string().datetime().nullable(), state: z.string() });
 export const HistoryReportsSchema = z.object({ delivered: z.array(HistoryReportSchema), archive: z.array(HistoryReportSchema), staged: z.array(HistoryReportSchema) });
 export type HistoryReports = z.infer<typeof HistoryReportsSchema>;
+
+export const HistoryPreviousSchema = z.array(z.object({ conversationId: z.string().uuid(), vin: z.string().length(17) })).max(20);
+export type HistoryPrevious = z.infer<typeof HistoryPreviousSchema>;

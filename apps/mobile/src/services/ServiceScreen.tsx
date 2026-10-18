@@ -13,25 +13,31 @@ import { localeTag } from "../i18n/resources";
 import { pickServiceImage, uploadServiceImage, type ServiceImage } from "./serviceImage";
 import { useServicePush } from "./useServicePush";
 import { useServiceRealtime } from "./useServiceRealtime";
+import { HistorySample } from "./HistorySample";
+import { discoveryCopy } from "./discoveryCopy";
 import { HistoryOrder } from "./HistoryOrder";
 import { ServiceAttachment } from "./ServiceAttachment";
 import { serviceCopy } from "./copy";
-import { useServiceConversation, useServiceList, useServiceOpen, useServiceSend } from "./api";
+import { useServiceConversation, useServiceList, useServiceOpen, useServiceSend, useHistoryPrevious } from "./api";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 
 export function ServiceScreen() {
- const params = useLocalSearchParams<{ conversationId?: string; purpose?: string }>();
+ const params = useLocalSearchParams<{ conversationId?: string; purpose?: string; sourceListingId?: string; vin?: string }>();
  const { i18n } = useTranslation(), c = serviceCopy(i18n.language); const { userId, isAuthenticated } = useAuth();
- const list = useServiceList(), [selected, setSelected] = useState<string | null>(null), conversation = useServiceConversation(selected), send = useServiceSend(selected), open = useServiceOpen();
+ const d = discoveryCopy(i18n.language);
+ const sourceListingId = typeof params.sourceListingId === "string" && /^[0-9a-f-]{36}$/i.test(params.sourceListingId) ? params.sourceListingId : undefined;
+ const [requestVin, setRequestVin] = useState(typeof params.vin === "string" ? params.vin.replace(/\s/g, "").toUpperCase() : "");
+ const previous = useHistoryPrevious(requestVin);
+ const list = useServiceList(), [selected, setSelected] = useState<string | null>(null), conversation = useServiceConversation(selected), send = useServiceSend(selected), open = useServiceOpen({ ...(sourceListingId ? { sourceListingId } : {}), ...(/^[A-HJ-NPR-Z0-9]{17}$/.test(requestVin) ? { proposedVin: requestVin } : {}) });
  const [body, setBody] = useState(""), [error, setError] = useState<"permission" | "conflict" | "disabled" | "error" | null>(null);
  const [image, setImage] = useState<ServiceImage | null>(null), [attachmentId, setAttachmentId] = useState<string | null>(null), [uploading, setUploading] = useState(false), [uploadFailed, setUploadFailed] = useState(false);
  const currentOwner = useRef({ userId, selected }); currentOwner.current = { userId, selected };
  const openedSupport = useRef<string | null>(null);
  const retry = useRef<{ fingerprint: string; id: string } | null>(null);
- useEffect(() => { setSelected(null); setBody(""); setError(null); setImage(null); setAttachmentId(null); retry.current = null; }, [userId]);
+ useEffect(() => { setSelected(null); setRequestVin(typeof params.vin === "string" ? params.vin.replace(/\s/g, "").toUpperCase() : ""); setBody(""); setError(null); setImage(null); setAttachmentId(null); retry.current = null; }, [userId]);
  useEffect(() => { const id = params.conversationId; if (isAuthenticated === true && typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id)) setSelected(id); }, [params.conversationId, userId, isAuthenticated]);
  useEffect(() => {
   if (params.purpose !== "support" || !userId || isAuthenticated !== true || openedSupport.current === userId) return;
@@ -70,10 +76,10 @@ export function ServiceScreen() {
  async function create(purpose: "support" | "history" = "history") { setError(null); try { const value = await open.mutateAsync(purpose); setSelected(value.id); } catch (value) { failure(value); } }
  const button = (title: string, action: () => void, disabled = false) => <Button accessibilityLabel={title} disabled={disabled} onPress={action}><Text>{title}</Text></Button>;
  return <><Stack.Screen options={{ title: c.customerTitle }}/><ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 48 }} keyboardShouldPersistTaps="handled"><Text className="font-heading text-title-2 font-semibold">{c.customerTitle}</Text>
-  {!selected && params.purpose !== "support" ? <><Text className="font-heading text-title-3 font-semibold">{c.history}</Text><Text>{c.historyIntro}</Text><Text>{c.price}</Text></> : null}
-  {isAuthenticated !== true ? <>{button(c.signedOut, () => useAuthIntentStore.getState().requireSignIn(router, { returnTo: "/services" }))}</> : <>
+  {!selected && params.purpose !== "support" ? <><Text className="font-heading text-title-3 font-semibold">{c.history}</Text><Text>{c.historyIntro}</Text><Text>{c.price}</Text><HistorySample locale={i18n.language}/>{sourceListingId ? <Text>{d.sourceListing}: {sourceListingId}</Text> : null}</> : null}
+  {isAuthenticated !== true ? <>{button(c.signedOut, () => useAuthIntentStore.getState().requireSignIn(router, { returnTo: { pathname: "/services", params: { purpose: params.purpose, ...(sourceListingId ? { sourceListingId } : {}), ...(requestVin ? { vin: requestVin } : {}) } } }))}</> : <>
    {error ? <Text accessibilityRole="alert">{c[error]}</Text> : null}
-   {!selected ? <>{button(params.purpose === "support" ? c.refresh : c.newRequest, () => { void create(params.purpose === "support" ? "support" : "history"); }, open.isPending)}
+   {!selected ? <>{params.purpose !== "support" ? <><Input accessibilityLabel={d.requestVin} value={requestVin} onChangeText={value => setRequestVin(value.replace(/\s/g, "").toUpperCase())} maxLength={17} autoCapitalize="characters"/>{requestVin.length === 17 && previous.isFetching ? <Text accessibilityRole="progressbar">{c.loading}</Text> : null}{previous.isError ? <><Text accessibilityRole="alert">{c.error}</Text>{button(c.refresh, () => { void previous.refetch(); })}</> : previous.data?.length ? <><Text>{d.repeatWarning}</Text>{previous.data.map(item => <View key={item.conversationId}>{button(d.previousReports, () => setSelected(item.conversationId))}</View>)}</> : null}</> : null}{button(params.purpose === "support" ? c.refresh : c.newRequest, () => { void create(params.purpose === "support" ? "support" : "history"); }, open.isPending || (params.purpose !== "support" && requestVin.length > 0 && (!/^[A-HJ-NPR-Z0-9]{17}$/.test(requestVin) || previous.isPending || previous.isError)))}
     {list.isPending ? <Text accessibilityRole="progressbar">{c.loading}</Text> : list.isError ? <><Text accessibilityRole="alert">{c.error}</Text>{button(c.refresh, () => { void list.refetch(); })}</> : list.data?.length === 0 ? <Text>{c.empty}</Text> : list.data?.map(item => <View key={item.id} className="gap-2 rounded-xl border border-border p-4">{button(c[item.purpose], () => { setError(null); setBody(""); setImage(null); setAttachmentId(null); setUploadFailed(false); setSelected(item.id); })}<Text className="text-muted-foreground">{new Date(item.createdAt).toLocaleString(localeTag(i18n.language))}</Text></View>)}</> : <>
     {button(c.back, () => { setSelected(null); setBody(""); setError(null); setImage(null); setAttachmentId(null); })}
     {conversation.isPending ? <Text accessibilityRole="progressbar">{c.loading}</Text> : conversation.isError ? <><Text accessibilityRole="alert">{conversation.error instanceof ApiError && conversation.error.status === 403 ? c.permission : c.error}</Text>{button(c.refresh, () => { setError(null); void conversation.refetch(); })}</> : detail ? <>

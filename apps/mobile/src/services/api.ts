@@ -19,9 +19,9 @@ export function useServiceSend(id: string | null) {
  const { userId } = useAuth(); const client = useQueryClient();
  return useMutation({ mutationFn: (input: S.ServiceSend) => apiClient.post(`/services/conversations/${id}/messages`, input, S.ServiceMessageSchema), onSuccess: () => { void client.invalidateQueries({ queryKey: serviceKeys.all(userId) }); } });
 }
-export function useServiceOpen() {
+export function useServiceOpen(context?: { sourceListingId?: string; proposedVin?: string }) {
  const client = useQueryClient(); const { userId } = useAuth();
- return useMutation({ mutationFn: (purpose: S.ServicePurpose) => apiClient.post("/services/conversations", { purpose, synthetic: true }, z.object({ id: z.string().uuid(), resourceId: z.string().uuid() })), onSuccess: () => { void client.invalidateQueries({ queryKey: serviceKeys.all(userId) }); } });
+ return useMutation({ mutationFn: (purpose: S.ServicePurpose) => apiClient.post("/services/conversations", { purpose, synthetic: true, ...(purpose === "history" ? context : {}) }, z.object({ id: z.string().uuid(), resourceId: z.string().uuid() })), onSuccess: () => { void client.invalidateQueries({ queryKey: serviceKeys.all(userId) }); } });
 }
 export function useHistoryOrder(id: string) {
  const { userId, isAuthenticated } = useAuth();
@@ -34,4 +34,9 @@ export function useHistoryCommand(id: string) {
 export function useHistoryReports(id: string) {
  const { userId, isAuthenticated } = useAuth();
  return useQuery({ queryKey: [...serviceKeys.all(userId), "reports", id], queryFn: () => apiClient.get(`/services/conversations/${id}/history/reports`, S.HistoryReportsSchema), enabled: isAuthenticated === true && !!userId, staleTime: 0, gcTime: 0, retry: false });
+}
+
+export function useHistoryPrevious(vin: string) {
+ const { userId, isAuthenticated } = useAuth();
+ return useQuery({ queryKey: [...serviceKeys.all(userId), "previous", vin], queryFn: () => apiClient.get(`/services/history/previous?vin=${encodeURIComponent(vin)}`, S.HistoryPreviousSchema), enabled: isAuthenticated === true && !!userId && /^[A-HJ-NPR-Z0-9]{17}$/.test(vin), staleTime: 0, gcTime: 0, retry: false });
 }
