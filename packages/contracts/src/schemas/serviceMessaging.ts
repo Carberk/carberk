@@ -61,3 +61,10 @@ export const HistoryCommandSchema = z.discriminatedUnion("kind", [
  z.object({ kind: z.literal("recovery"), expectedVersion: z.number().int().nonnegative(), orderId: z.string().uuid(), agree: z.boolean(), deadline: z.string().datetime().optional() }).strict(),
 ]);
 export type HistoryCommand = z.infer<typeof HistoryCommandSchema>;
+export const HistorySnapshotSchema = z.object({
+ synthetic: z.literal(true),
+ quotes: z.array(z.object({ id: z.string().uuid(), vin: z.string().nullable(), providers: z.array(historyProvider), amount: z.literal(100), preflightOutcome: z.string(), refundRule: z.string(), ...historyWindow, feasible: z.boolean(), acceptedAt: z.string().datetime().nullable(), supersededAt: z.string().datetime().nullable() })),
+ order: z.object({ id: z.string().uuid(), quoteId: z.string().uuid(), state: z.string(), version: z.number().int(), day: z.string(), holdExpiresAt: z.string().datetime(), promiseAt: z.string().datetime(), paidAt: z.string().datetime().nullable(), escalatedAt: z.string().datetime().nullable(), recoveryDeadline: z.string().datetime().nullable(), recoveryUsed: z.boolean(), refundState: z.string().nullable() }).nullable(),
+ payments: z.array(z.object({ id: z.string().uuid(), claim: z.string().nullable(), state: z.string(), amount: z.number().nullable(), receivedAt: z.string().datetime().nullable(), confirmedAt: z.string().datetime().nullable() })),
+});
+export type HistorySnapshot = z.infer<typeof HistorySnapshotSchema>;

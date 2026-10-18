@@ -9,6 +9,7 @@ import { assertServiceAccess, serviceCapability, ServiceDenied, type ServiceActi
 import { staffedMilliseconds, transitionSupport, type SupportState, type SupportAction } from "../domain/SupportOperations";
 import { assertServiceRights } from "../domain/ServiceRights";
 import { SERVICE_PRIVATE_STORE, SERVICE_RUNTIME, type ServiceMessagingPort, type ServicePrivateStore, type ServiceRuntime, type ServiceSubject } from "../domain/ports/ServiceMessagingPort";
+import { historyCommand } from "./history/PrismaHistoryOperations";
 import { cleanServiceBytes } from "./cleanServiceBytes";
 
 type Tx = Prisma.TransactionClient;
@@ -53,6 +54,27 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
    if (audience === "staff") await tx.serviceAudit.create({ data: { actorId: subject.userId, purpose: row.purpose, resourceId: owner.id, action: `SERVICE_${action.toUpperCase()}`, assignmentVersion: owner.assignmentVersion } });
    return work(tx, row, scope, actor, audience);
   }, { timeout: 20000 });
+ }
+ async historyCommand(subject: ServiceSubject, id: string, command: ServiceMessagingSchemas.HistoryCommand): Promise<void> {
+  await this.locked(subject, id, "send", (tx, _row, scope, _actor, audience) => historyCommand({ tx, scope, subject, audience, staff: this.staff, runtime: this.runtime }, command));
+ }
+ async historySnapshot(subject: ServiceSubject, id: string): Promise<ServiceMessagingSchemas.HistorySnapshot> {
+  return this.locked(subject, id, "read", async (tx, _row, scope, _actor, audience) => {
+   if (scope.purpose !== "history") throw new ServiceDenied("NO_ACCESS");
+   const quotes = await tx.historyQuote.findMany({ where: { requestId: scope.resourceId, erasedAt: null }, orderBy: { createdAt: "desc" }, take: 20 });
+   const order = await tx.historyOrder.findUnique({ where: { requestId: scope.resourceId }, include: { refund: true } });
+   let paymentAccess = audience === "customer";
+   if (!paymentAccess) {
+    try { await this.staff.authorize({ ...subject, capability: order && ["delivered", "refunded"].includes(order.state) ? "history.payment.history" : "history.payment.verify" }, tx); paymentAccess = true; }
+    catch (error) { if (!(error instanceof StaffAuthorityDenied)) throw error; }
+   }
+   const payments = order && paymentAccess ? await tx.historyPayment.findMany({ where: { orderId: order.id }, orderBy: { createdAt: "asc" }, take: 50 }) : [];
+   return ServiceMessagingSchemas.HistorySnapshotSchema.parse({ synthetic: true,
+    quotes: quotes.map(quote => ({ id: quote.id, vin: quote.vin, providers: quote.providers, amount: quote.amount, preflightOutcome: quote.preflightOutcome, refundRule: quote.refundRule, windowStart: quote.windowStart.toISOString(), windowEnd: quote.windowEnd.toISOString(), feasible: quote.feasible, acceptedAt: quote.acceptedAt?.toISOString() ?? null, supersededAt: quote.supersededAt?.toISOString() ?? null })),
+    order: order ? { id: order.id, quoteId: order.quoteId, state: order.state, version: order.version, day: order.day, holdExpiresAt: order.holdExpiresAt.toISOString(), promiseAt: order.promiseAt.toISOString(), paidAt: order.paidAt?.toISOString() ?? null, escalatedAt: order.escalatedAt?.toISOString() ?? null, recoveryDeadline: order.recoveryDeadline?.toISOString() ?? null, recoveryUsed: order.recoveryUsed, refundState: order.refund?.state ?? null } : null,
+    payments: payments.map(payment => ({ id: payment.id, claim: payment.claim, state: payment.state, amount: payment.amount, receivedAt: payment.receivedAt?.toISOString() ?? null, confirmedAt: payment.confirmedAt?.toISOString() ?? null })),
+   });
+  });
  }
  async subscribePush(subject: ServiceSubject, id: string, deviceToken: string): Promise<void> {
   await this.locked(subject, id, "read", async (tx, row) => {
