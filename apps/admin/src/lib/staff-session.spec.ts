@@ -44,3 +44,8 @@ it('rejects a failed renewed action before the API and keeps destinations intern
   await expect(currentStaff('https://outside.example')).rejects.toThrow('NEXT_REDIRECT:/login?reason=session-expired');
   expect(sawBearer).toBe(false);
 });
+
+it('returns an operations operator to the requested health view after elevation',async()=>{
+  elevated=false;capabilities=['analytics.aggregate'];
+  await expect(currentStaff('/operations?status=pending')).rejects.toThrow('NEXT_REDIRECT:/login?mode=totp&returnTo=%2Foperations%3Fstatus%3Dpending');
+});
