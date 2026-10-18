@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
+import * as SecureStore from "expo-secure-store";
 
 import { act, fireEvent, queryAllHosts, renderMobile } from "../../../test/render";
 import { server } from "../../../test/msw";
@@ -43,4 +44,14 @@ it("discards a pending previous-session image after the account changes", async 
  await act(async () => { await storeAuthSession({ accessToken: "other", refreshToken: "other-refresh", user: { id: "44444444-4444-4444-8444-444444444444", phone: null, email: null, displayName: null, role: "buyer" } }); release(); await new Promise(resolve => setTimeout(resolve, 20)); });
  if (!screen.root) throw new Error("Missing image view");
  expect(queryAllHosts(screen.root, "Image")).toHaveLength(0); expect(queryAllHosts(screen.root, "Modal")).toHaveLength(0);
+});
+
+it("loads a protected image after cold secure-storage hydration without a remembered session", async () => {
+ await clearAuthSession();
+ await SecureStore.setItemAsync("auto_tm_auth_session", JSON.stringify({ accessToken: "synthetic", refreshToken: "refresh", storedAt: "2026-10-18T00:00:00Z", user: { id: userId, phone: null, email: null, displayName: null, role: "buyer" } }));
+ server.use(http.get("*/conversations/:id/attachments/:file", () => new HttpResponse(new Uint8Array([1, 2, 3]), { headers: { "Content-Length": "3" } })));
+ const screen = await renderMobile(<BusinessChatImage objectKey={key}/>);
+ await act(async () => { await new Promise(resolve => setTimeout(resolve, 40)); });
+ if (!screen.root) throw new Error("Missing image view");
+ expect(queryAllHosts(screen.root, "Image")[0]?.props["source"]?.uri).toBe("data:image/webp;base64,AQID");
 });
