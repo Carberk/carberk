@@ -1139,6 +1139,7 @@ model MeasurementRecord {
   origin      String
   environment String
   population  String
+  conversionEligible Boolean @default(false)
   occurredAt  DateTime
   receivedAt  DateTime
   expiresAt   DateTime
@@ -1156,6 +1157,7 @@ model MeasurementOutbox {
   epoch       String
   environment String
   population  String
+  conversionEligible Boolean @default(false)
   event       Json
   createdAt   DateTime @default(now())
   expiresAt   DateTime
@@ -1723,4 +1725,93 @@ model DiagnosticPdfArtifact {
   @@unique([reportId, locale, rendererVersion, generation])
   @@index([state, retryAt])
   @@map("diagnostic_pdf_artifacts")
+}
+
+/// Anonymous snapshots contain permitted aggregates only, never event or actor maps.
+model MeasurementRollup {
+  key String @id
+  version Int
+  epoch String
+  environment String
+  population String
+  windowFrom DateTime
+  windowTo DateTime
+  completeThrough DateTime
+  inputDigest String
+  lateRecords Int @default(0)
+  metrics Json
+  generatedAt DateTime
+  expiresAt DateTime
+  @@index([expiresAt])
+  @@index([environment, population, windowFrom, windowTo])
+  @@map("measurement_rollups")
+}
+
+/// Short-lived investigative artifacts require current session authority on every read.
+model MeasurementInvestigationExport {
+  id String @id
+  actorId String
+  sessionId String
+  epoch String
+  reason String
+  auditId String
+  scope Json
+  evidence Json
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  @@index([expiresAt])
+  @@index([actorId, sessionId])
+  @@map("measurement_investigation_exports")
+}
+
+/// Rights are versioned independently of measurement retention. Unresolved rights quarantine sources.
+model MarketKnowledgeSource {
+  id String @id
+  version Int @default(1)
+  epoch String
+  status String @default("quarantined")
+  provenance Json
+  purposes Json
+  reuseRights Json
+  redistributionRights Json
+  restrictions Json
+  identifiabilityReview Json
+  destinations Json
+  accessPolicy Json
+  retentionBasis String
+  expiresAt DateTime?
+  revokedAt DateTime?
+  updatedAt DateTime @updatedAt
+  derivatives MarketKnowledgeDatasetSource[]
+  @@map("market_knowledge_sources")
+}
+
+/// Anonymous derivatives are withheld unless every current source fence still matches.
+model MarketKnowledgeDataset {
+  id String @id
+  version Int
+  epoch String
+  derivationVersion String
+  status String @default("quarantined")
+  review Json
+  data Json
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+  invalidatedAt DateTime?
+  sources MarketKnowledgeDatasetSource[]
+  @@index([status])
+  @@map("market_knowledge_datasets")
+}
+
+model MarketKnowledgeDatasetSource {
+  datasetId String
+  dataset MarketKnowledgeDataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  sourceId String
+  source MarketKnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  sourceVersion Int
+  sourceEpoch String
+  @@id([datasetId, sourceId])
+  @@index([sourceId])
+  @@map("market_knowledge_dataset_sources")
 }
