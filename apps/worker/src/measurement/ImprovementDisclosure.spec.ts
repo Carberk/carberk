@@ -36,6 +36,6 @@ it("does not add late draft or first-foreground cohort members after release",()
 
 it("withholds the full wizard when adjacent safe totals expose a small progression difference",()=>{
  const facts:ScorecardFact[]=[];
- for(const [step,count] of [["vehicle",10],["specs",9]] as const)for(let index=0;index<count;index++){facts.push(fact("wizard_step_opened",{step},`seller-${index}`),fact("wizard_step_result",{step,result:"success"},`seller-${index}`));}
+ for(const [step,count] of [["vehicle",10],["specs",9]] as const)for(let index=0;index<count;index++){facts.push(fact("wizard_step_opened",{step,draftId:`draft-${index}`},`seller-${index}`),fact("wizard_step_result",{step,draftId:`draft-${index}`,result:"success"},`seller-${index}`));}
  const result=release(facts);expect(result.steps.every(step=>step.opened===null&&step.completed===null)).toBe(true);expect(result.disclosure?.suppressedMetrics).toContain("steps");
 });
