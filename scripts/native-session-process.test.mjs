@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -12,9 +12,63 @@ const API = "api-autotm-rewrite-pr-841.up.railway.app";
 const MEDIA = "https://minio-autotm-rewrite-pr-841.up.railway.app";
 const SERVED = `https://${API}/api/v1;wss://${API}/ws/chat;${MEDIA}`;
 
+const sessionsByEnv = new WeakMap();
+
+// Poll an explicit outcome, never use elapsed time as evidence of readiness or stop.
+function observe(condition, description) {
+  return new Promise((resolve, reject) => {
+    const deadline = setTimeout(() => finish(new Error(`Timed out observing ${description}`)), 5000);
+    const poll = setInterval(check, 10);
+    function finish(error) {
+      clearTimeout(deadline);
+      clearInterval(poll);
+      if (error) reject(error);
+      else resolve();
+    }
+    function check() {
+      try { if (condition()) finish(); } catch (error) { finish(error); }
+    }
+    check();
+  });
+}
+
+function ownedProcesses(dir) {
+  const script = path.join(dir, "pnpm");
+  return execFileSync("ps", ["-axo", "pid=,command="], { encoding: "utf8" })
+    .trim().split("\n").flatMap(line => {
+      const [pidText, executable, scriptArg] = line.trim().split(/\s+/);
+      const pid = Number(pidText);
+      return Number.isSafeInteger(pid) && pid > 1 && pid !== process.pid &&
+        path.basename(executable ?? "") === "node" && scriptArg === script ? [pid] : [];
+    });
+}
+
+function processExists(pid) {
+  assert.ok(Number.isSafeInteger(pid) && pid > 1);
+  try { process.kill(pid, 0); return true; } catch (error) {
+    if (error.code === "ESRCH") return false;
+    throw error;
+  }
+}
+
 async function fixture(t, mode) {
   const dir = fs.mkdtempSync("/tmp/native-session-test-");
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const sessions = [];
+  // Registered before launch, including failures before the child writes its PID.
+  t.after(async () => {
+    for (const session of sessions) {
+      session.child.kill("SIGKILL");
+      await session.exited;
+    }
+    for (const pid of ownedProcesses(dir)) {
+      // Recheck the exact unique fixture executable before signaling a positive PID.
+      if (ownedProcesses(dir).includes(pid)) {
+        try { process.kill(pid, "SIGKILL"); } catch (error) { if (error.code !== "ESRCH") throw error; }
+      }
+    }
+    await observe(() => ownedProcesses(dir).length === 0, "fixture process cleanup");
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
   const railway = path.join(dir, "railway");
   fs.writeFileSync(railway, `#!/usr/bin/env node\nconsole.log(JSON.stringify({ RAILWAY_PUBLIC_DOMAIN: "${API}", MINIO_PUBLIC_URL: "${MEDIA}", DATABASE_URL: "PRIVATE-SECRET" }));\n`, { mode: 0o755 });
   fs.writeFileSync(path.join(dir, "pnpm"), `#!/usr/bin/env node
@@ -23,25 +77,30 @@ if (process.argv.includes("start")) {
   fs.writeFileSync(${JSON.stringify(path.join(dir, "started"))}, String(process.pid));
   ${mode === "signal" ? 'process.kill(process.pid, "SIGKILL");' : ""}
   process.on("SIGINT", () => { fs.writeFileSync(${JSON.stringify(path.join(dir, "stopped"))}, "yes"); process.exit(0); });
+  fs.writeFileSync(${JSON.stringify(path.join(dir, "handler-ready"))}, String(process.pid));
   setInterval(() => {}, 1000);
 }
 `, { mode: 0o755 });
   const preload = path.join(dir, "fetch.mjs");
   const bundle = mode === "ok" ? SERVED : "http://localhost:3006/api/v1";
-  fs.writeFileSync(preload, `globalThis.fetch = async (url) => {
+  fs.writeFileSync(preload, `import fs from "node:fs";
+const observe = ${observe.toString()};
+globalThis.fetch = async (url) => {
     const target = String(url);
     if (target.endsWith("/readyz")) return new Response("", { status: ${mode === "unready" ? 503 : 200} });
     if (target.endsWith("/status")) {
       if (${mode === "signal"}) throw new Error("not listening");
+      await observe(() => fs.existsSync(${JSON.stringify(path.join(dir, "handler-ready"))}), "SIGINT handler readiness");
       return new Response("packager-status:running");
     }
     if (target.includes(".bundle")) {
-      await new Promise(resolve => setTimeout(resolve, 150));
       return new Response(${JSON.stringify(bundle)}, { status: ${mode === "bundle-http" ? 500 : 200} });
     }
     return new Response("", { status: 403 });
   };`);
-  return { dir, env: { ...process.env, RAILWAY_CLI: railway, NODE_OPTIONS: `--import=${preload}`, PATH: `${dir}:${process.env.PATH}` } };
+  const env = { ...process.env, RAILWAY_CLI: railway, NODE_OPTIONS: `--import=${preload}`, PATH: `${dir}:${process.env.PATH}` };
+  sessionsByEnv.set(env, sessions);
+  return { dir, env };
 }
 
 function start(env, args) {
@@ -49,6 +108,7 @@ function start(env, args) {
   const result = { child, output: "" };
   for (const stream of [child.stdout, child.stderr]) stream.on("data", chunk => { result.output += chunk; });
   result.exited = new Promise(resolve => child.on("exit", resolve));
+  sessionsByEnv.get(env).push(result);
   return result;
 }
 
@@ -116,7 +176,12 @@ for (const mode of ["missing-origins", "bundle-http"]) {
     const { code, output } = await run(env, metroArgs(await freePort()));
     assert.equal(code, 1);
     assert.match(output, mode === "bundle-http" ? /bundle answered 500/ : /served bundle lacks/);
+    const metroPid = Number(fs.readFileSync(path.join(dir, "started"), "utf8"));
+    assert.ok(Number.isSafeInteger(metroPid) && metroPid > 1);
+    assert.equal(fs.readFileSync(path.join(dir, "handler-ready"), "utf8"), String(metroPid));
+    await observe(() => fs.existsSync(path.join(dir, "stopped")), "child-owned stopped marker");
     assert.equal(fs.readFileSync(path.join(dir, "stopped"), "utf8"), "yes");
+    await observe(() => !processExists(metroPid), `fixture child ${metroPid} exit`);
     assert.doesNotMatch(output, /PRIVATE-SECRET/);
   });
 }
@@ -133,17 +198,12 @@ test("writes the session receipt and leaves its Metro running on success", { tim
   const port = await freePort();
   const receipt = receiptFor(t, port);
   const session = start(env, metroArgs(port));
-  let metroPid;
-  t.after(async () => {
-    if (metroPid) try { process.kill(-metroPid, "SIGKILL"); } catch { /* already stopped */ }
-    session.child.kill("SIGKILL");
-    await session.exited;
-  });
-  while (!session.output.includes("OK: Metro serves")) {
-    if (session.child.exitCode !== null) assert.fail(session.output);
-    await new Promise(resolve => setTimeout(resolve, 50));
-  }
-  metroPid = Number(fs.readFileSync(path.join(dir, "started"), "utf8"));
+  await observe(() => {
+    if (session.child.exitCode !== null || session.child.signalCode !== null) assert.fail(session.output);
+    return session.output.includes("OK: Metro serves");
+  }, "guarded session receipt");
+  const metroPid = Number(fs.readFileSync(path.join(dir, "started"), "utf8"));
+  assert.ok(ownedProcesses(dir).includes(metroPid));
   const written = JSON.parse(fs.readFileSync(receipt, "utf8"));
   assert.equal(written.EXPO_PUBLIC_API_URL, `https://${API}/api/v1`);
   assert.equal(written.EXPO_PUBLIC_MEDIA_URL, MEDIA);
