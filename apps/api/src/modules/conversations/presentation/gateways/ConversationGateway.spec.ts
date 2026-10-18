@@ -159,6 +159,7 @@ describe("ConversationGateway", () => {
     expect(validateAccess.execute).toHaveBeenCalledWith({
       userId: "buyer-1",
       conversationId: CONV_1,
+      actor: { userId: "buyer-1", sessionId: "sid-1" },
     });
   });
 
@@ -373,6 +374,7 @@ describe("ConversationGateway", () => {
         }),
       });
       expect(sendMessage.execute).toHaveBeenCalledWith({
+        actor: { userId: "buyer-1", sessionId: "sid-1" },
         senderId: "buyer-1",
         conversationId: CONV_1,
         kind: "text",
@@ -1097,7 +1099,7 @@ describe("ConversationGateway", () => {
 describe("business enquiry socket access", () => {
   it("joins a buyer without a business header only while the current session is valid", async () => {
     const conversation = Conversation.create({ id: CONV_1, listingId: LISTING_1, buyerId: "buyer-1", sellerId: "departed", businessId: "business" });
-    const repository = { async findById() { return conversation; } } as ConversationRepository;
+    const repository = { async findById() { return conversation; } } as unknown as ConversationRepository;
     let revoked = false;
     const authority: BusinessAuthorityPort = {
       async resolve(subject) {

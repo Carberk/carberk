@@ -679,7 +679,7 @@ describe("business enquiry message history through the HTTP controller", () => {
     const repository = {
       async findById(id: string) { return id === conversation.id ? conversation : null; },
       async listMessages() { return { items: [message], nextCursor: null }; },
-    } as ConversationRepository;
+    } as unknown as ConversationRepository;
     let revoked = false;
     const authority: BusinessAuthorityPort = {
       async resolve(subject) {

@@ -96,7 +96,7 @@ export class ConversationsController {
     const result = await this.openConversationUC.execute({
       buyerId: userId,
       listingId: parsed.listingId,
-      ...(this.actor(req).businessId ? { actor: this.actor(req) } : {}),
+      ...(this.actor(req).sessionId || this.actor(req).businessId ? { actor: this.actor(req) } : {}),
     });
 
     return this.toConversationSummaryResponse(
@@ -122,7 +122,6 @@ export class ConversationsController {
       userId,
       ...(parsed.cursor ? { cursor: parsed.cursor } : {}),
       limit: parsed.limit,
-      ...(this.actor(req).businessId ? { actor: this.actor(req) } : {}),
     });
 
     const availabilityMap = await this.buildPostRefAvailabilityMap(
@@ -189,7 +188,7 @@ export class ConversationsController {
     const result = await this.getConversationUC.execute({
       userId,
       conversationId: id,
-      ...(this.actor(req).businessId ? { actor: this.actor(req) } : {}),
+      ...(this.actor(req).sessionId || this.actor(req).businessId ? { actor: this.actor(req) } : {}),
     });
 
     const availabilityMap = await this.buildPostRefAvailabilityMap(
@@ -233,6 +232,7 @@ export class ConversationsController {
     const result = await this.listMessagesUC.execute({
       userId,
       conversationId,
+      ...(this.actor(req).sessionId || this.actor(req).businessId ? { actor: this.actor(req) } : {}),
       ...(parsed.cursor ? { cursor: parsed.cursor } : {}),
       limit: parsed.limit,
     });
@@ -261,7 +261,7 @@ export class ConversationsController {
       senderId: userId,
       conversationId,
       text: parsed.text,
-      ...(this.actor(req).businessId ? { actor: this.actor(req) } : {}),
+      ...(this.actor(req).sessionId || this.actor(req).businessId ? { actor: this.actor(req) } : {}),
     });
 
     return this.toMessageSummary(result.message);
@@ -283,7 +283,7 @@ export class ConversationsController {
       senderId: userId,
       conversationId,
       ...parsed,
-      ...(this.actor(req).businessId ? { actor: this.actor(req) } : {}),
+      ...(this.actor(req).sessionId || this.actor(req).businessId ? { actor: this.actor(req) } : {}),
     });
 
     return this.toMessageSummary(result.message);
@@ -306,7 +306,7 @@ export class ConversationsController {
       conversationId,
       metadata: parsed.metadata,
       clientMessageId: parsed.clientMessageId,
-      ...(this.actor(req).businessId ? { actor: this.actor(req) } : {}),
+      ...(this.actor(req).sessionId || this.actor(req).businessId ? { actor: this.actor(req) } : {}),
     });
 
     const availabilityMap = await this.buildPostRefAvailabilityMap([
@@ -333,7 +333,7 @@ export class ConversationsController {
       conversationId,
       contentType: parsed.contentType,
       sizeBytes: parsed.sizeBytes,
-      ...(this.actor(req).businessId ? { actor: this.actor(req) } : {}),
+      ...(this.actor(req).sessionId || this.actor(req).businessId ? { actor: this.actor(req) } : {}),
     });
 
     return {
