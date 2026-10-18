@@ -98,6 +98,78 @@ test('the actual remote probe proves exact migration checksums and rejects unfin
   }
 });
 
+// This fake is the psql/process boundary only. PostgreSQL guard semantics are
+// exercised by the hosted business-graph suite, never inferred from this fake.
+async function businessProbe(overrides = {}, fault = 'none') {
+  const { remoteProgram } = await import('./staging-remote.mjs');
+  const { runInNewContext } = await import('node:vm');
+  const { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url);
+  const id = '9'.repeat(32), candidate = 'c'.repeat(40), target = 'd'.repeat(40);
+  const migration = { name: '20261015_additive', checksum: '1'.repeat(64) };
+  const payload = { kind: 'probe', id, namespace: `cf_${id}`, profile: 'campaign897-business-v2', candidate, target,
+    identity: policy, expectedMigrations: [migration], schemaDisposition: 'retained-additive', ...overrides };
+  const process = { exitCode: 0, env: { RAILWAY_PROJECT_ID: 'project', RAILWAY_ENVIRONMENT_ID: 'stage', RAILWAY_SERVICE_ID: 'api',
+    RAILWAY_ENVIRONMENT_NAME: 'staging', APP_ENV: 'staging', SMS_DRIVER: 'mock', AUTOTM_COMMIT_SHA: target,
+    DATABASE_URL: 'postgresql://u:secret@postgres.railway.internal:5432/railway', MINIO_ENDPOINT: policy.origins.media, MINIO_PUBLIC_URL: policy.origins.publicMedia } };
+  let receipt;
+  const queries = [];
+  runInNewContext(remoteProgram(payload), { URL, process, require: name => name === 'node:child_process' ? {
+    spawnSync: (command, _args, { input }) => {
+      assert.equal(command, 'psql', 'probe must not invoke delivery processes');
+      queries.push(input);
+      // Mutating statements embedded inside DO guards are not executed by this
+      // fake. Reject top-level mutation, bootstrap and lifecycle transitions.
+      assert.doesNotMatch(input, /CREATE (?:SCHEMA|TABLE|TRIGGER|FUNCTION)|UPDATE public\.|DELETE FROM public\.|SET state='(?:cleaning|disposed)'/);
+      const stdout = input.includes('pg_namespace WHERE') ? (fault === 'missing-namespace' ? '0' : '1')
+        : input.startsWith('SELECT state FROM') ? 'disposed'
+        : input.includes('finished_at IS NULL') ? (fault === 'unfinished' ? '1' : '0')
+        : input.includes('json_agg') && input.includes('_prisma_migrations') ? JSON.stringify(
+          fault === 'missing-migration' ? [] : fault === 'extra-migration' ? [migration, { name: '20261016_extra', checksum: '2'.repeat(64) }]
+            : [{ ...migration, checksum: fault === 'checksum' ? '2'.repeat(64) : migration.checksum }])
+        : input.startsWith('SELECT count(*)') && input.includes("table_name='audit_logs'") ? '2' : '0';
+      return { status: 0, stdout };
+    },
+  } : require(name), console: { log: value => { receipt = JSON.parse(value); }, error() {} } });
+  return { code: process.exitCode, receipt, queries, migration, payload };
+}
+
+test('business v2 disposed probe observes candidate C under runtime M with exact inventory and schema', async () => {
+  const { code, receipt, migration, payload, queries } = await businessProbe();
+  assert.equal(code, 0);
+  assert.ok(receipt, 'existing disposed graph emits a receipt');
+  assert.ok(queries.some(query => query.startsWith('SELECT state FROM')), 'disposed state was observed');
+  assert.equal(receipt.sha, payload.target, 'receipt SHA is the observed runtime M');
+  assert.equal(receipt.candidate, payload.candidate);
+  assert.deepEqual(receipt.migrations, [migration]);
+  assert.equal(receipt.schema, 'retained-additive');
+  assert.equal(receipt.profile, 'campaign897-business-v2');
+  assert.equal(receipt.namespace, payload.namespace);
+  assert.equal(receipt.reservationId, payload.id);
+});
+
+test('business v2 probe emits versioned storage disposal with retained redacted audits and tombstone', async () => {
+  const { code, receipt } = await businessProbe();
+  assert.equal(code, 0);
+  assert.deepEqual(receipt.storageDisposal, { version: 1, scope: 'business-v2-storage', state: 'disposed',
+    rows: 'absent', retainedAudits: 2, auditDisposition: 'redacted-synthetic-audit', tombstone: 'retained' });
+  assert.equal(receipt.tombstone, true);
+  assert.equal(receipt.fixtures, 'absent');
+  for (const field of ['queueJobs', 'sinkRecords', 'authenticated', 'admission', 'entities', 'emails']) assert.equal(Object.hasOwn(receipt, field), false);
+});
+
+for (const fault of ['unfinished', 'missing-migration', 'extra-migration', 'checksum', 'missing-namespace', 'invalid-schema', 'missing-inventory', 'stale-namespace', 'stale-profile']) {
+  test(`business v2 probe refuses ${fault} without a success receipt`, async () => {
+    const changes = fault === 'invalid-schema' ? { schemaDisposition: 'discarded' }
+      : fault === 'missing-inventory' ? { expectedMigrations: undefined }
+      : fault === 'stale-namespace' ? { namespace: `cf_${'8'.repeat(32)}` }
+      : fault === 'stale-profile' ? { profile: 'campaign897-arbitrary' } : {};
+    const result = await businessProbe(changes, fault);
+    assert.equal(result.code, 1, `${fault} must refuse`);
+    assert.equal(result.receipt, undefined);
+  });
+}
+
 test('unknown remote campaign profile is refused before SQL', async () => {
   const { remoteProgram } = await import('./staging-remote.mjs');
   const { runInNewContext } = await import('node:vm');
