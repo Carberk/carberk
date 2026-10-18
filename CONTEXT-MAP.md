@@ -27,6 +27,7 @@ Find the owning area, read its short overview, then inspect source and tests. Th
 | notifications | [`notifications/CONTEXT.md`](apps/api/src/modules/notifications/CONTEXT.md) | Native device tokens, direct-message push decision/history, worker enqueue |
 | content | [`content/CONTEXT.md`](apps/api/src/modules/content/CONTEXT.md) | BlogPost schema; publishing not implemented |
 | reports | [`reports/CONTEXT.md`](apps/api/src/modules/reports/CONTEXT.md) | InspectionInterest demand capture and admin aggregates |
+| diagnostics | [`diagnostics/CONTEXT.md`](apps/api/src/modules/diagnostics/CONTEXT.md) | Synthetic inspection intake, staff authoring/review, immutable releases and private/public readers |
 | measurement infrastructure | [`measurement/CONTEXT.md`](apps/api/src/modules/measurement/CONTEXT.md) | Strict first-party intake and public emitter ports; durable identity/ledger composition pending |
 | admin | [`admin/CONTEXT.md`](apps/api/src/modules/admin/CONTEXT.md) | Audit log, listing/user/message reports, moderation |
 

@@ -12,6 +12,8 @@ Listing-view fingerprint retention ([ADR-0105](../../docs/adr/0105-listing-views
 
 Read the queue processors and their tests for payload/retry behavior. Environment validation controls the transport; test/unconfigured transports are not production delivery evidence.
 
+Diagnostic work in `src/jobs/diagnostics` renders immutable releases to TK/RU/EN PDFs using embedded licensed fonts and verifies exact private-storage bytes before readiness. Database intents, bounded leases, epochs and retry state survive restarts. Cleanup fences late writes and removes only the recorded object, with readback verification. Account erasure composes `src/jobs/diagnosticAccountErasure.ts` before mutable intake is unlinked. API authorization controls every document/evidence read; successful rendering does not activate a center or public service. [Renderer evidence](../../docs/evidence/issue-916/renderer.md) distinguishes sample/PDF inspection from deployed and native acceptance.
+
 ## Start here
 
 - [Queues and composition](src/app.module.ts)

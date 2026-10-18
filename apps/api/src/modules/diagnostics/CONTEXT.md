@@ -1,0 +1,9 @@
+# Diagnostics
+
+Diagnostics owns one-center inspection intake, pinned templates, physical and publication authorization, staff assignments, observations, evidence, review and immutable report releases. Inspection-interest demand capture remains in [Reports](../reports/CONTEXT.md); provider Vehicle History belongs to service operations.
+
+Intake and public release remain synthetic-only behind explicit runtime gates. A template or stored report does not authorize a real center, payment or public service. Private commissioners and currently assigned staff use separate authority from anonymous readers. Public access also requires the current eligible Listing and validated vehicle association. Identity edits invalidate that association permanently until an authorized reobservation; reverting Listing fields alone cannot restore it.
+
+Released observations and their snapshot hash are immutable. Corrections create linked revisions without changing original dates or mileage. Evidence and per-locale PDF artifacts use dedicated private storage, exact hashes and generation epochs. Download authorization runs again after storage I/O. Account erasure fences access and cleanup before unlinking mutable intake; it preserves immutable observations under their governing retention rules.
+
+Start with [module composition](diagnostics.module.ts), [authority](infrastructure/DiagnosticAuthority.ts), [report persistence](infrastructure/PrismaDiagnosticReports.ts), [reader access](infrastructure/DiagnosticReportAccess.ts), [PDF delivery](infrastructure/PrismaDiagnosticDocuments.ts) and the [HTTP/PostgreSQL/storage suite](presentation/DiagnosticReports.e2e.spec.ts). The [worker](../../../../worker/CONTEXT.md) owns rendering and exact artifact cleanup. Customer readers live in mobile and public web; the admin diagnostics workspace owns staff authoring and review.

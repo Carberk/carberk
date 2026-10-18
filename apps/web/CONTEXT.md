@@ -10,6 +10,8 @@ Legal canonical links read runtime `WEB_BASE_URL`, matching mobile's `EXPO_PUBLI
 
 Web shares browser components and theme tokens with `packages/ui`; mobile has separate native components. User-facing text must remain available in the supported locales.
 
+Public diagnostic readers under `/[locale]/diagnostics/[id]` use the separate anonymous report projection and always fetch current access without caching. Known private IDs stay unavailable. Same-origin PDF and evidence routes reauthorize each request, refuse redirects and validate binary type/size before returning private no-store responses. Listing detail shows a neutral report-availability action only when that projection permits it. Synthetic release gates do not authorize a real diagnostic service.
+
 ## Start here
 
 - [Pages and route handlers](src/app)
