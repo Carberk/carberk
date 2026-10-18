@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next";
 import { useRegions } from "../../api/catalog/useRegions";
 import { useCities } from "../../api/catalog/useCities";
 
-import { FilterLabel } from "./FilterSection";
 import type { UseListingFiltersReturn } from "./useListingFilters";
 
 import { CatalogPickerSheet } from "@/components/listings/wizard/CatalogPickerSheet";
@@ -135,28 +134,6 @@ export function CityFilterControl({ draft, setField }: CityFilterControlProps) {
 
   return (
     <View className="gap-2">
-      <FilterLabel
-        trailing={
-          <>
-            {draft.cityId && (
-              <Button
-                variant="ghost"
-                size="sm"
-                // The label row is 24 dp tall; the slop makes the target 44 dp.
-                className="-mr-2 min-h-6 px-2 py-0"
-                hitSlop={10}
-                onPress={handleClearCity}
-                accessibilityLabel={t("clear")}
-              >
-                <Text className="text-callout font-medium text-foreground">{t("clear")}</Text>
-              </Button>
-            )}
-          </>
-        }
-      >
-        {t("city")}
-      </FilterLabel>
-
       <GroupedList inset="text" className="mx-0">
         <PickerRow
           grouped
@@ -175,6 +152,19 @@ export function CityFilterControl({ draft, setField }: CityFilterControlProps) {
           onPress={() => setCityOpen(true)}
         />
       </GroupedList>
+
+      {draft.cityId && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="self-start px-0"
+          hitSlop={10}
+          onPress={handleClearCity}
+          accessibilityLabel={t("clear")}
+        >
+          <Text className="text-callout font-medium text-foreground">{t("clear")}</Text>
+        </Button>
+      )}
 
       {/* Out of the flow: a closed sheet still mounts an empty root, which would take a gap. */}
       <View className="absolute">

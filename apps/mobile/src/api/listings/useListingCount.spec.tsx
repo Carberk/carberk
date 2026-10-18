@@ -189,6 +189,33 @@ describe("useListingCount", () => {
       await vi.advanceTimersByTimeAsync(300);
       await waitFor(() => expect(result.current.data?.totalMatching).toBe(9));
     });
+
+    it("shows the cached count of the earlier valid criteria, without a request, until the new ones settle", async () => {
+      const earlier = { yearMin: 2018, yearMax: 2020 } as ListingsSchemas.ListingFilter;
+      mockGet.mockResolvedValueOnce({ totalMatching: 3 }).mockResolvedValue({ totalMatching: 8 });
+
+      const { result, rerender } = renderHook(
+        ({ filters, enabled }) => useListingCount({ filters, enabled }),
+        { wrapper, initialProps: { filters: earlier, enabled: true } },
+      );
+      await vi.advanceTimersByTimeAsync(300);
+      await waitFor(() => expect(result.current.data?.totalMatching).toBe(3));
+      mockGet.mockClear();
+
+      rerender({ filters: invalid, enabled: false });
+      rerender({ filters: valid, enabled: true });
+
+      // Within the debounce window the hook still answers for the earlier criteria:
+      // their cached count, not a loading state or an error.
+      expect(result.current.data?.totalMatching).toBe(3);
+      expect(result.current.isPending).toBe(false);
+      expect(result.current.isError).toBe(false);
+      expect(mockGet).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(300);
+      await waitFor(() => expect(result.current.data?.totalMatching).toBe(8));
+      expect(requestedUrls()).toEqual(["/listings/count?yearMin=2025&yearMax=2026"]);
+    });
   });
 
   it("surfaces a count error for the current criteria and retries them with refetch", async () => {
