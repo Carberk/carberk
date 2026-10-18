@@ -101,3 +101,26 @@ it("retries a failed manual awaiting-customer closure with the same notice ident
  fireEvent.click(screen.getByRole("button", { name: "Close after 14 days awaiting customer" })); await waitFor(() => expect(commands).toHaveLength(2));
  expect(commands[0]?.clientMessageId).toBe(commands[1]?.clientMessageId);
 });
+
+it("retains the History quote draft across locales and sends measured feasibility through real actions", async () => {
+ const recorded: Record<string, unknown>[] = []; const original = globalThis.fetch;
+ vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+  if (String(url).endsWith("/history")) { if (init?.method === "POST") { recorded.push(JSON.parse(String(init.body))); return Response.json({ ok: true }); } return Response.json({ synthetic: true, quotes: [], order: null, payments: [] }); }
+  const response = await original(url, init); const data = await response.json();
+  return Response.json(data && typeof data === "object" && !Array.isArray(data) && data.id ? { ...data, purpose: "history" } : data);
+ });
+ const screen = render(<AdminLocaleProvider initialLocale="en"><AdminLanguageSwitch/><ServiceWorkspace/></AdminLocaleProvider>);
+ await waitFor(() => expect(screen.getByRole("button", { name: "General Support" })).toBeTruthy());
+ fireEvent.click(screen.getByRole("button", { name: "General Support" }));
+ await waitFor(() => expect(screen.getByLabelText("Exact VIN")).toBeTruthy());
+ fireEvent.change(screen.getByLabelText("Exact VIN"), { target: { value: "1HGCM82633A004352" } });
+ fireEvent.change(screen.getByLabelText("Language"), { target: { value: "ru" } });
+ expect((screen.getByLabelText("Точный VIN") as HTMLInputElement).value).toBe("1HGCM82633A004352");
+ fireEvent.change(screen.getByLabelText("Основание разрешённой проверки доступности"), { target: { value: "Synthetic authorized preflight" } });
+ fireEvent.change(screen.getByLabelText("Условия возврата"), { target: { value: "Synthetic refund policy" } });
+ fireEvent.change(screen.getByLabelText("Начало срока в UTC"), { target: { value: "2026-10-20T04:00:00Z" } });
+ fireEvent.change(screen.getByLabelText("Конец срока в UTC"), { target: { value: "2026-10-20T05:00:00Z" } });
+ fireEvent.click(screen.getByLabelText("Измеренная возможность выполнить срок подтверждена"));
+ fireEvent.click(screen.getByRole("button", { name: "Предложить точные условия" }));
+ await waitFor(() => expect(recorded).toHaveLength(1)); expect(recorded[0]?.["vin"]).toBe("1HGCM82633A004352"); expect(recorded[0]?.["feasible"]).toBe(true);
+});
