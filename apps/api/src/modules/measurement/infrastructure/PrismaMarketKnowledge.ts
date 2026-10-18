@@ -1,10 +1,12 @@
-import { createHash,randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 import type { Prisma, PrismaService } from "@auto-tm/db";
 import { z } from "zod";
 
 import type { StaffAuthorityPort, StaffSubject } from "../../identity/identity.public";
 import { deriveSyntheticMarketCells, qualifyAnonymousDataset, type AnonymousDataset, type KnowledgeSource } from "../domain/AnonymousMarketKnowledge";
+
+import { marketReleaseDigest } from "./MarketReleaseDigest";
 
 const text=z.object({summary:z.string().min(1)}).strict();
 const permission=z.object({status:z.enum(["permitted","unresolved","prohibited"])}).strict();
@@ -50,7 +52,7 @@ export class PrismaMarketKnowledge {
   const contents=data.safeParse(row.data),assessment=review.safeParse(row.review);
   if(!contents.success || !assessment.success || row.status!=="qualified") return {state:"quarantined" as const,reason:"schema"};
   const fixed=await tx.measurementState.findUnique({where:{key:`market_release:TM:${contents.data.release.period}`}});
-  const releasedDigest=createHash("sha256").update(JSON.stringify({cells:contents.data.cells,fences:[...fences].sort((a,b)=>a.sourceId.localeCompare(b.sourceId)).map(fence=>({id:fence.sourceId,version:fence.sourceVersion,epoch:fence.sourceEpoch})),epoch:row.epoch})).digest("hex");
+  const releasedDigest=marketReleaseDigest({cells:contents.data.cells,fences:[...fences].sort((a,b)=>a.sourceId.localeCompare(b.sourceId)).map(fence=>({id:fence.sourceId,version:fence.sourceVersion,epoch:fence.sourceEpoch})),epoch:row.epoch});
   if(fixed?.epoch!==releasedDigest || row.id!==`synthetic-tm-${contents.data.release.period}` || contents.data.cells.some(cell=>cell["period"]!==contents.data.release.period || typeof cell["observations"]!=="number" || cell["observations"]<10 || cell["observations"]%5!==0))return {state:"quarantined" as const,reason:"release"};
   const dataset:AnonymousDataset={id:row.id,version:row.version,epoch:row.epoch,derivationVersion:row.derivationVersion,
    ...contents.data,review:assessment.data,sourceFences:fences.map(fence=>({id:fence.sourceId,version:fence.sourceVersion,epoch:fence.sourceEpoch}))};
@@ -66,7 +68,7 @@ export class PrismaMarketKnowledge {
   if(derived.state!=="ready" || !derived.cells.length)throw new MarketKnowledgeDenied("No safe synthetic cells");
   const id=`synthetic-tm-${derived.period}`,releaseKey=`market_release:TM:${derived.period}`;
   const sourceFences=[...parsed.data.sourceFences].sort((a,b)=>a.id.localeCompare(b.id));
-  const digest=createHash("sha256").update(JSON.stringify({cells:derived.cells,fences:sourceFences,epoch:parsed.data.expectedEpoch})).digest("hex");
+  const digest=marketReleaseDigest({cells:derived.cells,fences:sourceFences,epoch:parsed.data.expectedEpoch});
   return this.prisma.$transaction(async tx=>{
    await this.authority.authorize({...subject,capability:"analytics.investigate"},tx);
    const collector=await tx.$queryRaw<{epoch:string}[]>`SELECT "epoch" FROM "measurement_state" WHERE "key"='collector' FOR SHARE`;
