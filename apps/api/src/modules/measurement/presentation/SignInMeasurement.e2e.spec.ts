@@ -7,7 +7,7 @@ import { beforeAll,beforeEach,afterAll,describe,it,expect } from "vitest";
 import supertest from "supertest";
 
 import { IdentityModule } from "../../identity/identity.module";
-import { BcryptHasherAdapter } from "../../identity/infrastructure/BcryptHasherAdapter";
+import { hash } from "bcryptjs";
 import { GlobalErrorFilter } from "../../../common/error.filter";
 import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
 import { cleanSuiteFixtures,defineE2eSuite } from "../../../../test/helpers/e2eSuite";
@@ -29,7 +29,7 @@ describe("real sign-in HTTP outcomes and durable measurement",()=>{
  });
  beforeEach(async()=>{
   await cleanup();await db.user.create({data:{id:suite.id("member"),phone,phoneVerifiedAt:new Date()}});await db.measurementState.create({data:{key:"collector",epoch}});
-  await db.otpRequest.create({data:{id:suite.id("otp"),purpose:"sign_in",channel:"phone",destination:phone,phone,codeHash:await new BcryptHasherAdapter().hash(code),expiresAt:new Date(Date.now()+60000),ip:"127.0.0.1"}});
+  await db.otpRequest.create({data:{id:suite.id("otp"),purpose:"sign_in",channel:"phone",destination:phone,phone,codeHash:await hash(code,10),expiresAt:new Date(Date.now()+60000),ip:"127.0.0.1"}});
   const admission=await store.bootstrap({});if(!admission?.guestCapability)throw new Error("Missing synthetic guest");guest=admission.guestCapability;
  });
  afterAll(async()=>{await cleanup();await app?.close();await db.$disconnect();});
