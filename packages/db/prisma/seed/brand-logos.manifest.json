@@ -1950,6 +1950,21 @@
       "upstreamSha256": "2f4b650f3ec25c5a9cd88bbf113ff0955f57a658ba18239f2aa1004ef5b29856",
       "normalization": "luminance mask; crop=null; source background and outer margins removed without changing identifying geometry.",
       "artworkKind": "manufacturer"
+    },
+    {
+      "slug": "international-harvester",
+      "tier": "E",
+      "source": "commons",
+      "commonsFile": "File:International Harvester Company logo.svg",
+      "pageRevisionId": 1217491956,
+      "sourceUrl": "https://commons.wikimedia.org/w/index.php?title=File%3AInternational_Harvester_Company_logo.svg&oldid=1217491956",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/5/5e/International_Harvester_Company_logo.svg",
+      "licence": "PD-shape",
+      "licenceUrl": "https://commons.wikimedia.org/wiki/Template:PD-shape",
+      "trademark": "The IH emblem is a trademark of CNH Industrial, shown only to identify the maker.",
+      "retrievedAt": "2026-10-18",
+      "sha256Master": "f05935521c919cb3aa34cff769f426cebac65fff8c40b62fc985552a9bf9ff05",
+      "transform": "alpha"
     }
   ]
 }
