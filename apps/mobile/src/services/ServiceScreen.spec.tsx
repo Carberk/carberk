@@ -75,3 +75,7 @@ it("opens the canonical Support case from a Support entry without creating a His
  server.use(http.post("*/services/conversations", async ({ request }) => { expect(await request.json()).toEqual({ purpose: "support", synthetic: true }); creates++; return HttpResponse.json({ id, resourceId: id }); }));
  try { const screen = await renderMobile(<ServiceScreen/>); expect(await screen.findByText(message.body)).toBeTruthy(); expect(creates).toBe(1); } finally { delete routeParams["purpose"]; }
 });
+it("shows a customer's sent versus read message from the current service recipient watermark", async () => {
+ server.use(http.get("*/services/conversations/:id", () => HttpResponse.json({ id, resourceId: id, purpose: "support", status: "open", assignmentVersion: 1, assigned: true, operatorName: null, sourceListingId: null, canSend: true, messages: [{ ...message, sender: "customer" }], lastSequence: 1, readThrough: 1, peerReadThrough: 1, unread: 0, hasMore: false })));
+ const screen = await renderMobile(<ServiceScreen/>); await fireEvent.press(await screen.findByRole("button", { name: "General Support" })); await screen.findByText(message.body); expect(await screen.findByText("Read")).toBeTruthy();
+});
