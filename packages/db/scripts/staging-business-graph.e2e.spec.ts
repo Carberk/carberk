@@ -158,7 +158,7 @@ describe("reservation-owned synthetic business v2 storage graph, without admissi
   it("refuses existing slug, contact and alias collisions without adopting or damaging them", async () => {
     for (const [index, collision] of ["slug", "contact", "email"].entries()) {
       const id = `${31 + index}`.repeat(16);
-      const foreign = collision === "email" ? await db.user.create({ data: { email: `buyer-b.${id}.${candidate.slice(0, 12)}@campaign897.invalid` } }) :
+      const foreign = collision === "email" ? await db.user.create({ data: { email: `buyer-b.${id}.${candidate.slice(0, 12)}@campaign897.invalid`, emailVerifiedAt: new Date() } }) :
         await db.dealership.create({ data: { slug: collision === "slug" ? slug(id) : `contact-collision-${id}`, name: "Foreign preexisting root", contactPhone: collision === "contact" ? contact(id) : null } });
       expect(execute("fixture", id).code).toBe(1);
       expect((await pool.query("SELECT count(*)::int AS count FROM pg_namespace WHERE nspname=$1", [`cf_${id}`])).rows).toEqual([{ count: 0 }]);
