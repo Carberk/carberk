@@ -22,6 +22,7 @@ export class VideoUploadTask {
   private readonly transfer: VideoTransfer;
   private preparation: VideoPreparation | undefined;
   private preparingJob: string | undefined;
+  private intent = 0;
   private recovering: Promise<void> | undefined;
   constructor(readonly ownerId: string, readonly target: { kind: "draft" | "listing"; id: string }, readonly businessId?: string) {
     this.device = new ExpoVideoTransferDevice(ownerId, target.id, target.kind);
@@ -35,23 +36,26 @@ export class VideoUploadTask {
     return this.recovering ??= this.restore().finally(() => { this.recovering = undefined; });
   }
   private async restore() {
+    const intent = this.intent;
     try {
       await this.owner();
       const record = await this.device.load();
-      if (!record) return;
+      if (!record || intent !== this.intent) return;
       if (record.businessId !== this.businessId) throw new Error("VIDEO_TRANSFER_SESSION_CHANGED");
       this.set({ phase: record.state, record });
       if (record.state === "UPLOADING") await this.run();
       if (record.state === "PROCESSING" && record.sessionId) {
         const status = await apiClient.get(`/listing-video-upload-sessions/${record.sessionId}`, VideoUploadSchemas.SessionSnapshot, { assertSession: () => this.owner(), ...(this.businessId ? { headers: { "x-business-id": this.businessId } } : {}) });
+        if (intent !== this.intent) return;
         if (status.sessionId !== record.sessionId) throw new Error("VIDEO_SESSION_INVALID");
         if (status.state === "READY") this.set({ phase: "READY", record });
         else if (["FAILED", "CLEANUP_PENDING", "DELETED"].includes(status.state)) this.set({ phase: status.state === "FAILED" ? "FAILED" : "CANCELLED", record });
       }
-    } catch (error) { this.failed(error); }
+    } catch (error) { if (intent === this.intent) this.failed(error); }
   }
   async start(selection: Omit<VideoSelection, "jobId" | "maxBytes">, posterMs: number) {
     if (["PREPARING", "UPLOADING", "PROCESSING"].includes(this.value.phase)) throw new Error("VIDEO_TASK_BUSY");
+    const intent = ++this.intent;
     await this.owner();
     if (!Number.isInteger(posterMs) || posterMs < selection.startMs || posterMs >= selection.endMs) throw new Error("INVALID_POSTER");
     const native = requireOptionalNativeModule<VideoPreparationPort>("ListingVideoPreparation");
@@ -61,10 +65,11 @@ export class VideoUploadTask {
     try {
       const prepared = await this.preparation.prepare({ ...selection, jobId, maxBytes: 15 * 1024 * 1024 });
       await this.owner();
+      if (intent !== this.intent) { await native.discard(jobId); return; }
       const record: VideoTransferRecord = { version: 1, ownerId: this.ownerId, idempotencyKey: jobId, target: this.target, prepared, posterMs: posterMs - selection.startMs, state: "UPLOADING", confirmedBytes: 0, ...(this.businessId ? { businessId: this.businessId } : {}) };
       await this.device.save(record); this.set({ phase: "UPLOADING", record });
       await this.run();
-    } catch (error) { this.failed(error); }
+    } catch (error) { if (intent === this.intent) this.failed(error); }
     finally { this.preparingJob = undefined; this.preparation = undefined; }
   }
   async pause() {
@@ -75,6 +80,7 @@ export class VideoUploadTask {
   }
   async resume() { try { await this.owner(); await this.transfer.resume(); } catch (error) { this.failed(error); } }
   async cancel() {
+    this.intent++;
     try {
       if (this.preparingJob) await this.preparation?.cancel(this.preparingJob);
       await this.transfer.cancel();
