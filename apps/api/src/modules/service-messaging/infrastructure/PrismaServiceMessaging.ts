@@ -11,6 +11,7 @@ import { staffedMilliseconds, transitionSupport, type SupportState, type Support
 import { assertServiceRights } from "../domain/ServiceRights";
 import { SERVICE_PRIVATE_STORE, SERVICE_RUNTIME, type ServiceMessagingPort, type ServicePrivateStore, type ServiceRuntime, type ServiceSubject } from "../domain/ports/ServiceMessagingPort";
 import { artifactRights, historyArtifactCommand } from "./history/PrismaHistoryArtifacts";
+import { normalizeVin, HistoryDenied } from "../domain/history/HistoryPolicy";
 import { historyCommand } from "./history/PrismaHistoryOperations";
 import { cleanServiceBytes } from "./cleanServiceBytes";
 
@@ -88,27 +89,27 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
  async historyReports(subject: ServiceSubject, id: string): Promise<ServiceMessagingSchemas.HistoryReports> {
   return this.locked(subject, id, "read", async (tx, _row, scope, _actor, audience) => {
    if (scope.purpose !== "history") throw new ServiceDenied("NO_ACCESS");
-   const order = await tx.historyOrder.findUnique({ where: { requestId: scope.resourceId }, include: { quote: true } });
+   const order = await tx.historyOrder.findUnique({ where: { requestId: scope.resourceId }, include: { quote: true, purchase: true } });
    if (!order || order.erasedAt) return { delivered: [], archive: [], staged: [] };
    const rows = await tx.historyDelivery.findMany({ where: { orderId: order.id, erasedAt: null }, include: { artifact: true } });
    const now = this.runtime.now();
    const permitted = (artifact: Prisma.HistoryArtifactGetPayload<object>, reuse = false) => { if (artifact.removedAt || artifact.restrictedAt) return false; try { artifactRights(artifact.rights, now, reuse); return true; } catch { return false; } };
-   const dto = (artifact: Prisma.HistoryArtifactGetPayload<object>, delivery?: Prisma.HistoryDeliveryGetPayload<object>) => ({ canShare: artifactRights(artifact.rights, now).use.includes("redistribute"), id: artifact.id, provider: artifact.provider, vin: artifact.vin ?? "", originalDate: artifact.originalDate.toISOString(), sizeBytes: artifact.sizeBytes, expectedPages: artifact.expectedPages, sharedLink: delivery?.sharedLink ?? null, deliveredAt: delivery?.deliveredAt.toISOString() ?? null, state: artifact.state });
+   const dto = (artifact: Prisma.HistoryArtifactGetPayload<object>, delivery?: Prisma.HistoryDeliveryGetPayload<object>) => ({ vehicleIdentity: artifact.vehicleIdentity, mileage: artifact.mileageValue !== null && artifact.mileageUnit && artifact.mileageObservedAt ? { value: artifact.mileageValue, unit: artifact.mileageUnit, observedAt: artifact.mileageObservedAt.toISOString() } : null, sourceObservations: artifact.sourceObservations, canShare: artifactRights(artifact.rights, now).use.includes("redistribute"), id: artifact.id, provider: artifact.provider, vin: artifact.vin ?? "", originalDate: artifact.originalDate.toISOString(), sizeBytes: artifact.sizeBytes, expectedPages: artifact.expectedPages, sharedLink: delivery?.sharedLink ?? null, deliveredAt: delivery?.deliveredAt.toISOString() ?? null, state: artifact.state });
    // Contextual archive selection requires a paid matching-VIN order. No universal browser.
    const archive = audience === "staff" && order.paidAt && order.quote.vin ? await tx.historyArtifact.findMany({ where: { vin: order.quote.vin, state: "verified", removedAt: null, restrictedAt: null }, take: 20 }) : [];
-   const staged = audience === "staff" ? await tx.historyArtifact.findMany({ where: { acquiredForOrderId: order.id, removedAt: null, restrictedAt: null }, take: 20 }) : [];
+   const staged = audience === "staff" ? await tx.historyArtifact.findMany({ where: { OR: [{ acquiredForOrderId: order.id }, ...(order.purchase?.sourceArtifactId ? [{ id: order.purchase.sourceArtifactId }] : [])], removedAt: null, restrictedAt: null }, take: 20 }) : [];
    return ServiceMessagingSchemas.HistoryReportsSchema.parse({ delivered: rows.filter(row => permitted(row.artifact)).map(row => dto(row.artifact, row)), archive: archive.filter(row => permitted(row, true)).map(row => dto(row)), staged: staged.filter(row => permitted(row)).map(row => dto(row)) });
   });
  }
  async historyReportFile(subject: ServiceSubject, id: string, artifactId: string) {
   return this.locked(subject, id, "read", async (tx, _row, scope, _actor, audience) => {
    if (scope.purpose !== "history") throw new ServiceDenied("NO_ACCESS");
-   const order = await tx.historyOrder.findUnique({ where: { requestId: scope.resourceId } });
+   const order = await tx.historyOrder.findUnique({ where: { requestId: scope.resourceId }, include: { purchase: true } });
    if (!order || order.erasedAt) throw new ServiceDenied("NO_ACCESS");
    await tx.$queryRaw`SELECT id FROM history_artifacts WHERE id=${artifactId} FOR UPDATE`;
    const artifact = await tx.historyArtifact.findUnique({ where: { id: artifactId } });
    const delivery = await tx.historyDelivery.findUnique({ where: { orderId_artifactId: { orderId: order.id, artifactId } } });
-   const ownStaged = audience === "staff" && artifact?.acquiredForOrderId === order.id;
+   const ownStaged = audience === "staff" && (artifact?.acquiredForOrderId === order.id || (order.purchase?.state === "completed" && order.purchase.sourceArtifactId === artifactId));
    if (!artifact || artifact.removedAt || artifact.restrictedAt || (!ownStaged && (!delivery || delivery.erasedAt))) throw new ServiceDenied("NO_ACCESS");
    artifactRights(artifact.rights, this.runtime.now(), artifact.acquiredForOrderId !== order.id);
    const bytes = await this.store.get(artifact.objectKey, artifact.sizeBytes);
@@ -118,6 +119,16 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
  }
  async historyCommand(subject: ServiceSubject, id: string, command: ServiceMessagingSchemas.HistoryCommand): Promise<void> {
   await this.locked(subject, id, "send", (tx, _row, scope, _actor, audience) => historyCommand({ tx, scope, subject, audience, staff: this.staff, runtime: this.runtime }, command));
+ }
+ async historyPrevious(subject: ServiceSubject, input: string): Promise<ServiceMessagingSchemas.HistoryPrevious> {
+  let vin: string;
+  try { vin = normalizeVin(input); } catch (error) { if (error instanceof HistoryDenied) throw new ServiceDenied("INVALID_MESSAGE"); throw error; }
+  return this.db.$transaction(async tx => {
+   const actor = await this.actor(tx, subject, "history");
+   if (!actor.sessionValid || actor.deleting || actor.suspended) throw new ServiceDenied("NO_ACCESS");
+   const orders = await tx.historyOrder.findMany({ where: { erasedAt: null, state: "delivered", quote: { vin }, request: { customerId: subject.userId, conversation: { erasedAt: null } }, deliveries: { some: { erasedAt: null } } }, include: { request: { include: { conversation: true } } }, orderBy: { createdAt: "desc" }, take: 20 });
+   return orders.flatMap(order => order.request.conversation ? [{ conversationId: order.request.conversation.id, vin }] : []);
+  });
  }
  async historySnapshot(subject: ServiceSubject, id: string, paymentHistoryReason?: string): Promise<ServiceMessagingSchemas.HistorySnapshot> {
   return this.locked(subject, id, "read", async (tx, _row, scope, _actor, audience) => {
@@ -151,7 +162,7 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
    await tx.servicePushSubscription.upsert({ where: { sessionId_deviceId_conversationId: { sessionId: subject.sessionId, deviceId: device.id, conversationId: id } }, create: { sessionId: subject.sessionId, deviceId: device.id, conversationId: id, lifecycleEpoch: row.lifecycleEpoch }, update: { lifecycleEpoch: row.lifecycleEpoch } });
   });
  }
- async open(subject: ServiceSubject, purpose: ServiceMessagingSchemas.ServicePurpose, sourceListingId?: string) {
+ async open(subject: ServiceSubject, purpose: ServiceMessagingSchemas.ServicePurpose, sourceListingId?: string, proposedVin?: string) {
   if (!this.runtime.syntheticEnabled()) throw new ServiceDenied("COLLECTION_DISABLED");
   return this.db.$transaction(async tx => {
    const actor = await this.actor(tx, subject, purpose);
@@ -161,8 +172,13 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
     if (prior?.conversation && !prior.conversation.erasedAt) return { id: prior.conversation.id, resourceId: prior.id };
    }
    if (sourceListingId && !await tx.listing.findUnique({ where: { id: sourceListingId }, select: { id: true } })) throw new ServiceDenied("NO_ACCESS");
+   let vin: string | undefined;
+   if (proposedVin) {
+    if (purpose !== "history") throw new ServiceDenied("INVALID_MESSAGE");
+    try { vin = normalizeVin(proposedVin); } catch (error) { if (error instanceof HistoryDenied) throw new ServiceDenied("INVALID_MESSAGE"); throw error; }
+   }
    const ownerData = { id: this.runtime.id(), customerId: subject.userId, ...(sourceListingId ? { sourceListingId } : {}), mode: "synthetic" };
-   const owner = purpose === "support" ? await tx.supportCase.create({ data: ownerData }) : await tx.vehicleHistoryRequest.create({ data: ownerData });
+   const owner = purpose === "support" ? await tx.supportCase.create({ data: ownerData }) : await tx.vehicleHistoryRequest.create({ data: { ...ownerData, ...(vin ? { proposedVin: vin } : {}) } });
    const conversation = await tx.serviceConversation.create({ data: { id: this.runtime.id(), purpose, ...(purpose === "support" ? { supportCaseId: owner.id } : { historyRequestId: owner.id }) } });
    return { id: conversation.id, resourceId: owner.id };
   });

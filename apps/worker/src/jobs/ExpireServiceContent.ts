@@ -66,7 +66,7 @@ export class ExpireServiceContent {
     const hold = (artifact?.rights as { hold?: { until?: string } | null } | undefined)?.hold;
     if (!artifact || artifact.state !== "restricted" || !artifact.restrictedAt || artifact.objectKey !== work.objectKey || artifact.sha256 !== work.sha256 || work.objectKey !== `history-artifacts/${artifact.id}/${artifact.sha256}` || (hold?.until && new Date(hold.until) > now)) return;
     await this.objects.deleteAndVerify([work.objectKey]);
-    await tx.historyArtifact.update({ where: { id: artifact.id }, data: { state: "removed", removedAt: now, vin: null, provenance: null, acquiredForOrderId: null, sourceListingId: null, verifiedById: null } });
+    await tx.historyArtifact.update({ where: { id: artifact.id }, data: { state: "removed", removedAt: now, vin: null, vehicleIdentity: null, mileageValue: null, mileageUnit: null, mileageObservedAt: null, sourceObservations: [], provenance: null, acquiredForOrderId: null, sourceListingId: null, verifiedById: null } });
     await tx.historyArtifactCleanup.updateMany({ where: { artifactId: work.artifactId, epoch: work.epoch, completedAt: null }, data: { completedAt: now } });
    }, { timeout: 20000 });
   }

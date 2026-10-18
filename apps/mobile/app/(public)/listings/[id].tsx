@@ -4,6 +4,7 @@ import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 
+import { HistoryEntry } from "../../../src/services/HistoryEntry";
 import { useListingViewSignal } from "../../../src/listings/detail/useListingViewSignal";
 import { useListingDetail } from "../../../src/api/listings/useListingDetail";
 import { useListingPreview } from "../../../src/api/listings/useListingPreview";
@@ -168,6 +169,7 @@ export default function ListingDetailScreen() {
       <View className="flex-1" style={hasBar ? undefined : { paddingBottom: insets.bottom }}>
         <ListingDetailView
           bottomSpace={hasBar ? bar.space : 0}
+          historyEntry={<HistoryEntry sourceListingId={data.id} vin={data.vin}/>}
           listing={data}
           maps={maps}
           isOwner={isOwner}

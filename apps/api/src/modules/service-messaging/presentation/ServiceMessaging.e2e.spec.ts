@@ -24,7 +24,8 @@ import { SERVICE_PRIVATE_STORE, SERVICE_RUNTIME, type ServicePrivateStore } from
 const suite = defineE2eSuite("service-messaging-boundaries");
 let app: NestFastifyApplication; let db: PrismaService; let request: ReturnType<typeof supertest>; let jwt: JwtService;
 const customer = suite.id("customer"), oldStaff = suite.id("operator"), nextStaff = suite.id("next"), stranger = suite.id("stranger");
-const ids = [customer, oldStaff, nextStaff, stranger];
+const reportBuyer = suite.id("report-buyer");
+const ids = [customer, oldStaff, nextStaff, stranger, reportBuyer];
 const tokens = new Map<string, string>();
 beforeAll(async () => {
  const module = await Test.createTestingModule({ imports: [EventEmitterModule.forRoot(), bullTestRoot(), ServiceMessagingModule, JwtModule.register({ global: true, secret: "service-test-secret" })] }).overrideProvider(SERVICE_RUNTIME).useValue({ now: () => new Date(), id: randomUUID, syntheticEnabled: () => true, syntheticSubjectAllowed: (subject: { userId: string }) => ids.includes(subject.userId) }).compile();
@@ -263,15 +264,21 @@ it("delivers original PDFs only through the purchased order and reuses licensed 
   const order = await db.historyOrder.create({ data: { requestId: opened.body.resourceId, quoteId: quote.id, day, morning: false, holdExpiresAt: new Date(), promiseAt: quote.windowEnd, state: "paid", paidAt: new Date(), receivedAt: new Date(), rights: { category: "payment_evidence", schedule: { kind: "until", until: "2027-01-01T00:00:00Z" }, hold: null } } });
   return { id, order };
  };
- const first = await create(stranger), second = await create(customer);
+ const first = await create(stranger), second = await create(reportBuyer);
+ const enquiry = await request.post("/api/v1/services/conversations").set("Authorization", auth(reportBuyer)).send({ purpose: "history", synthetic: true, proposedVin: "1hg cm82633a004352" }).expect(201);
+ expect((await db.vehicleHistoryRequest.findUniqueOrThrow({ where: { id: enquiry.body.resourceId } })).proposedVin).toBe("1HGCM82633A004352");
  await db.historyPurchaseIntent.create({ data: { orderId: first.order.id, vin: "1HGCM82633A004352", providers: ["carfax"], state: "completed" } });
  await db.historyOrder.update({ where: { id: first.order.id }, data: { state: "fulfilling" } });
  const artifactId = randomUUID();
  const document = await PDFDocument.create(); document.addPage([100,100]); const pdf = Buffer.from(await document.save());
  const hash = (await import("node:crypto")).createHash("sha256").update(pdf).digest("hex");
- const rights = { category: "provider_artifact", purpose: "Synthetic licensed archive", basis: "Owned synthetic report", provenance: "Test-generated original PDF", identifiability: "anonymous", use: ["service", "archive", "redistribute"], schedule: { kind: "until", until: "2027-01-01T00:00:00Z", reason: "Synthetic source license" }, supplierRestrictions: "Synthetic reuse and customer PDF/link permitted", hold: null };
+ const rights = { category: "provider_artifact", purpose: "Synthetic licensed archive", basis: "Owned synthetic report", provenance: "Test-generated original PDF", identifiability: "anonymous", use: ["service", "archive", "redistribute"], schedule: { kind: "until", until: "2027-01-01T00:00:00Z", reason: "Synthetic source license" }, supplierRestrictions: "Synthetic reuse and reportBuyer PDF/link permitted", hold: null };
  const command = (id: string, data: object) => request.post(`/api/v1/services/conversations/${id}/history/artifacts`).set("Authorization", auth(nextStaff)).send(data);
- await command(first.id, { kind: "stage", expectedAssignmentVersion: 1, orderId: first.order.id, artifactId, provider: "carfax", vin: "1HGCM82633A004352", originalDate: "2026-01-01T00:00:00Z", expectedPages: 1, sizeBytes: pdf.length, sha256: hash, rights, provenance: "Synthetic original source" }).expect(201);
+ const facts = { vehicleIdentity: "Synthetic sedan 2010", mileage: { value: 64000, unit: "km", observedAt: "2025-12-31T00:00:00Z" }, sourceObservations: [{ page: 1, statement: "Synthetic source observation, preserved in original language" }] };
+ await command(first.id, { kind: "stage", expectedAssignmentVersion: 1, orderId: first.order.id, artifactId, ...facts, provider: "carfax", vin: "1HGCM82633A004352", originalDate: "2026-01-01T00:00:00Z", expectedPages: 1, sizeBytes: pdf.length, sha256: hash, rights, provenance: "Synthetic original source" }).expect(201);
+ expect((await db.historyArtifact.findUniqueOrThrow({ where: { id: artifactId } })).mileageValue).toBe(64000);
+ await expect(db.historyArtifact.update({ where: { id: artifactId }, data: { mileageValue: 64001 } })).rejects.toThrow("history_artifact_source_facts_immutable");
+ await request.post(`/api/v1/services/conversations/${first.id}/messages`).set("Authorization", auth(nextStaff)).send({ clientMessageId: randomUUID(), visibility: "staff", body: "Synthetic prior purchaser private operator note" }).expect(201);
  await request.post(`/api/v1/services/conversations/${first.id}/history/artifacts/${artifactId}/bytes`).set("Authorization", auth(nextStaff)).set("Content-Type", "application/octet-stream").send(pdf).expect(201);
  await request.get(`/api/v1/services/conversations/${first.id}/history/artifacts/${artifactId}`).set("Authorization", auth(stranger)).expect(403);
  await command(first.id, { kind: "verify", expectedAssignmentVersion: 1, orderId: first.order.id, artifactId, vin: "1HGCM82633A004352", originalDate: "2026-01-01T00:00:00Z", readablePages: 1, readable: true }).expect(201);
@@ -288,14 +295,22 @@ it("delivers original PDFs only through the purchased order and reuses licensed 
  await request.post(`/api/v1/services/conversations/${first.id}/history/payment-history`).set("Authorization", auth(nextStaff)).send({ reason: "No longer authorized" }).expect(403);
  const file = await request.get(`/api/v1/services/conversations/${first.id}/history/artifacts/${artifactId}`).set("Authorization", auth(stranger)).expect(200);
  expect(Buffer.from(file.body)).toEqual(pdf);
- await request.get(`/api/v1/services/conversations/${second.id}/history/artifacts/${artifactId}`).set("Authorization", auth(customer)).expect(403);
+ await request.get(`/api/v1/services/conversations/${second.id}/history/artifacts/${artifactId}`).set("Authorization", auth(reportBuyer)).expect(403);
  await command(second.id, { kind: "archive", expectedAssignmentVersion: 1, expectedVersion: 0, orderId: second.order.id, artifactId }).expect(201);
+ const selected = await request.get(`/api/v1/services/conversations/${second.id}/history/reports`).set("Authorization", auth(nextStaff)).expect(200);
+ expect(selected.body.staged[0].mileage).toEqual(facts.mileage); expect(selected.body.staged[0].sourceObservations).toEqual(facts.sourceObservations);
+ expect(JSON.stringify(selected.body)).not.toContain("Synthetic prior purchaser private operator note");
+ await request.get(`/api/v1/services/conversations/${second.id}/history/artifacts/${artifactId}`).set("Authorization", auth(nextStaff)).expect(200);
+ const previousFirst = await request.get("/api/v1/services/history/previous?vin=1HGCM82633A004352").set("Authorization", auth(stranger)).expect(200);
+ expect(previousFirst.body).toEqual([{ conversationId: first.id, vin: "1HGCM82633A004352" }]);
+ // The second buyer has no delivered prior report yet, despite paying for the same VIN.
+ const previousSecond = await request.get("/api/v1/services/history/previous?vin=1HGCM82633A004352").set("Authorization", auth(reportBuyer)).expect(200); expect(previousSecond.body).toEqual([]);
  await command(second.id, { kind: "deliver", expectedAssignmentVersion: 1, expectedVersion: 1, orderId: second.order.id, artifactId, sharedLink: "https://example.invalid/synthetic-report", linkMatches: true, linkChecked: true }).expect(201);
- const reopened = await request.get(`/api/v1/services/conversations/${second.id}/history/reports`).set("Authorization", auth(customer)).expect(200);
+ const reopened = await request.get(`/api/v1/services/conversations/${second.id}/history/reports`).set("Authorization", auth(reportBuyer)).expect(200);
  expect(reopened.body.delivered[0].originalDate).toBe("2026-01-01T00:00:00.000Z");
  expect(JSON.stringify(reopened.body)).not.toContain(stranger); expect(reopened.body.archive).toEqual([]); expect(reopened.body.staged).toEqual([]);
  await db.historyArtifact.update({ where: { id: artifactId }, data: { state: "restricted", restrictedAt: new Date() } });
- await request.get(`/api/v1/services/conversations/${second.id}/history/artifacts/${artifactId}`).set("Authorization", auth(customer)).expect(403);
+ await request.get(`/api/v1/services/conversations/${second.id}/history/artifacts/${artifactId}`).set("Authorization", auth(reportBuyer)).expect(403);
 });
 
 it("records fixed recovery offers, rejects deadline drift/expired acceptance and gates late-funds refunds", async () => {

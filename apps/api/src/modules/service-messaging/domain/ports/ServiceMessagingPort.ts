@@ -2,13 +2,14 @@ import type { ServiceMessagingSchemas } from "@auto-tm/contracts";
 
 export interface ServiceSubject { userId: string; sessionId: string }
 export interface ServiceMessagingPort {
-  open(subject: ServiceSubject, purpose: ServiceMessagingSchemas.ServicePurpose, sourceListingId?: string): Promise<{ id: string; resourceId: string }>;
+  open(subject: ServiceSubject, purpose: ServiceMessagingSchemas.ServicePurpose, sourceListingId?: string, proposedVin?: string): Promise<{ id: string; resourceId: string }>;
   read(subject: ServiceSubject, id: string, after: number, limit: number): Promise<ServiceMessagingSchemas.ServiceConversation>;
   send(subject: ServiceSubject, id: string, message: ServiceMessagingSchemas.ServiceSend): Promise<ServiceMessagingSchemas.ServiceMessage>;
   historyArtifactCommand(subject: ServiceSubject, id: string, command: ServiceMessagingSchemas.HistoryArtifactCommand): Promise<void>;
   historyArtifactUpload(subject: ServiceSubject, id: string, artifactId: string, bytes: Uint8Array): Promise<void>;
   historyReports(subject: ServiceSubject, id: string): Promise<ServiceMessagingSchemas.HistoryReports>;
   historyReportFile(subject: ServiceSubject, id: string, artifactId: string): Promise<{ bytes: Uint8Array; contentType: string; filename: string }>;
+  historyPrevious(subject: ServiceSubject, vin: string): Promise<ServiceMessagingSchemas.HistoryPrevious>;
   historyCommand(subject: ServiceSubject, id: string, command: ServiceMessagingSchemas.HistoryCommand): Promise<void>;
   historySnapshot(subject: ServiceSubject, id: string, paymentHistoryReason?: string): Promise<ServiceMessagingSchemas.HistorySnapshot>;
   supportCommand(subject: ServiceSubject, id: string, command: ServiceMessagingSchemas.SupportCommand): Promise<void>;
