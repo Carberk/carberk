@@ -15,10 +15,10 @@ export class PrismaVideoCleanupLedger implements VideoCleanupLedger {
     for (const candidate of candidates) {
       const leased = await this.transaction(async tx => {
         const work = await this.lock(tx, candidate);
-        if (!work || !activeStates.includes(work.state) || work.nextAttemptAt > now || (work.leaseExpiresAt && work.leaseExpiresAt > now) || !await this.safe(tx, work, now)) return null;
+        if (!work || !work.sessionId || !work.generationId || !work.sourceKey || !activeStates.includes(work.state) || work.nextAttemptAt > now || (work.leaseExpiresAt && work.leaseExpiresAt > now) || !await this.safe(tx, work, now)) return null;
         const verifying = ["VERIFYING", "VERIFYING_LEASED"].includes(work.state);
         await tx.videoCleanupWork.update({ where: { id: work.id }, data: { state: verifying ? "VERIFYING_LEASED" : "CLEANING", attempts: { increment: 1 }, leaseToken: token, leaseExpiresAt: new Date(now.getTime() + leaseMs) } });
-        return { id: work.id, uploadId: work.uploadId, sessionId: work.sessionId!, generationId: work.generationId!, sourceKey: work.sourceKey!, objectKeys: work.objectKeys, token, verifying };
+        return { id: work.id, uploadId: work.uploadId, sessionId: work.sessionId, generationId: work.generationId, sourceKey: work.sourceKey, objectKeys: work.objectKeys, token, verifying };
       });
       if (leased) return leased;
     }
@@ -58,13 +58,13 @@ export class PrismaVideoCleanupLedger implements VideoCleanupLedger {
     return tx.videoCleanupWork.findUnique({ where: { id: candidate.id } });
   }
   private async safe(tx: Prisma.TransactionClient, work: Work, now: Date): Promise<boolean> {
-    if (work.writeProtocol !== "video-v1" || !work.sessionId || !work.generationId || ![work.uploadId, work.sessionId, work.generationId].every(id => z.string().uuid().safeParse(id).success) || work.sourceKey !== `video/v1/${work.uploadId}/${work.sessionId}/source.mp4` || work.objectKeys.length > 1024 || new Set(work.objectKeys).size !== work.objectKeys.length) return false;
+    if (work.writeProtocol !== "video-v1" || !work.sourceKey || !work.sessionId || !work.generationId || ![work.uploadId, work.sessionId, work.generationId].every(id => z.string().uuid().safeParse(id).success) || work.sourceKey !== `video/v1/${work.uploadId}/${work.sessionId}/source.mp4` || work.objectKeys.length > 1024 || new Set(work.objectKeys).size !== work.objectKeys.length) return false;
     const prefix = `video/v1/${work.uploadId}/${work.generationId}/`;
     if (work.objectKeys.some(key => !key.startsWith(prefix) || !/^(?:master\.m3u8|poster\.jpg|(?:240|360|720)\/(?:index\.m3u8|seg-[0-9]+\.ts))$/.test(key.slice(prefix.length)))) return false;
     const [upload, generation, session, processing, listing, media] = await Promise.all([
       tx.mediaUpload.findUnique({ where: { id: work.uploadId } }), tx.videoGeneration.findUnique({ where: { id: work.generationId } }), tx.videoUploadSession.findUnique({ where: { id: work.sessionId } }), tx.videoProcessWork.findUnique({ where: { generationId: work.generationId } }),
       tx.listing.count({ where: { OR: [{ activeVideoGenerationId: work.generationId }, { pendingVideoGenerationId: work.generationId }] } }),
-      tx.listingMedia.count({ where: { OR: [{ uploadId: work.uploadId }, { key: { in: [work.sourceKey!, ...work.objectKeys] } }, { posterKey: { in: work.objectKeys } }] } }),
+      tx.listingMedia.count({ where: { OR: [{ uploadId: work.uploadId }, { key: { in: [work.sourceKey, ...work.objectKeys] } }, { posterKey: { in: work.objectKeys } }] } }),
     ]);
     return !listing && !media && (!upload || (upload.writeProtocol === "video-v1" && upload.kind === "video" && upload.key === work.sourceKey && ["RETIRED", "DELETED"].includes(upload.state))) && (!generation || (generation.uploadId === work.uploadId && generation.state === "RETIRED" && !!generation.retiredAt)) && (!session || (session.uploadId === work.uploadId && session.protocolVersion === 1 && session.sourceKey === work.sourceKey)) && (!processing?.leaseExpiresAt || processing.leaseExpiresAt.getTime() + 120_000 <= now.getTime());
   }
