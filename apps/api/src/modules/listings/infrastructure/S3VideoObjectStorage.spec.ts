@@ -1,10 +1,28 @@
 import { describe, expect, it, vi } from "vitest";
-import { S3Client, CreateMultipartUploadCommand, ListPartsCommand, CompleteMultipartUploadCommand, UploadPartCommand, AbortMultipartUploadCommand } from "@aws-sdk/client-s3";
+import { S3Client, CreateMultipartUploadCommand, ListPartsCommand, CompleteMultipartUploadCommand, UploadPartCommand, AbortMultipartUploadCommand, ListMultipartUploadsCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { S3VideoObjectStorage } from "./S3VideoObjectStorage";
 import type { VideoStorageSession } from "../domain/ports/VideoObjectStorage";
 const session: VideoStorageSession = { sessionId: "00000000-0000-4000-8000-000000000001", uploadId: "00000000-0000-4000-8000-000000000002", storageUploadId: "owned-storage-id", expectedBytes: 6 * 1024 * 1024, expiresAt: new Date("2026-10-17T01:00:00Z") };
 const now = () => new Date("2026-10-17T00:00:00Z");
 describe("owned video multipart storage", () => {
+  it("recovers a lost initialization response only by its unique owned source key", async () => {
+    const client = new S3Client({ region: "us-east-1" });
+    vi.spyOn(client, "send").mockImplementation(async (command: unknown) => {
+      if (!(command instanceof ListMultipartUploadsCommand) || command.input.Prefix !== `video/v1/${session.uploadId}/${session.sessionId}/source.mp4`) throw new Error("WRONG_STORAGE_SCOPE");
+      return { Uploads: [{ Key: `video/v1/${session.uploadId}/${session.sessionId}/source.mp4`, UploadId: "recovered-storage-id" }, { Key: `video/v1/${session.uploadId}/${session.sessionId}/source.mp4-extra`, UploadId: "foreign" }] };
+    });
+    expect(await new S3VideoObjectStorage(client, "private-video", now).recoverInitialization(session.sessionId, session.uploadId)).toBe("recovered-storage-id");
+  });
+  it("reconciles lost completion only from exact size and server-created provenance", async () => {
+    const client = new S3Client({ region: "us-east-1" }); let foreign = false;
+    vi.spyOn(client, "send").mockImplementation(async (command: unknown) => {
+      if (!(command instanceof HeadObjectCommand) || command.input.Bucket !== "private-video") throw new Error("WRONG_STORAGE_SCOPE");
+      return { ContentLength: session.expectedBytes, Metadata: { "video-session": foreign ? "other" : session.sessionId, "video-upload": session.uploadId } };
+    });
+    const store = new S3VideoObjectStorage(client, "private-video", now);
+    expect(await store.sourceCommitted(session)).toBe(true);
+    foreign = true; expect(await store.sourceCommitted(session)).toBe(false);
+  });
   it("derives private keys and exact lengths, caps credential expiry at session deadline", async () => {
     const client = new S3Client({ region: "us-east-1" });
     vi.spyOn(client, "send").mockImplementation(async (command: unknown) => {
