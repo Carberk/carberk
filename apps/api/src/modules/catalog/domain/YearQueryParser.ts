@@ -5,8 +5,9 @@
  * ("лексус 2014-2019", "2014–2019" with an en/em dash). A standalone
  * four-digit token is always a year candidate: candidates inside
  * [MIN_YEAR, currentYear + 1] become the year range, candidates outside it
- * are ignored (dropped from the text, no year emitted). Digits glued to
- * letters ("B2000") are name text, not year candidates.
+ * are ignored unless the caller identifies them as numeric catalog models.
+ * Valid years always take precedence over numeric model names. Digits glued
+ * to letters ("B2000") are name text, not year candidates.
  */
 export const MIN_YEAR = 1950;
 
@@ -15,7 +16,7 @@ export function maxSearchYear(now: Date = new Date()): number {
 }
 
 export interface ParsedYearQuery {
-  /** The query text with year candidate tokens removed. */
+  /** Query text after removing years and unknown out-of-range year candidates. */
   text: string;
   yearFrom?: number;
   yearTo?: number;
@@ -33,6 +34,7 @@ function isValidYear(year: number, maxYear: number): boolean {
 export function parseYearQuery(
   raw: string,
   now: Date = new Date(),
+  numericModelNames: ReadonlySet<string> = new Set(),
 ): ParsedYearQuery {
   const maxYear = maxSearchYear(now);
   let text = ` ${raw} `;
@@ -52,6 +54,8 @@ export function parseYearQuery(
     const year = Number(y);
     if (isValidYear(year, maxYear)) {
       years.push(year);
+    } else if (numericModelNames.has(y)) {
+      return y;
     }
     return " ";
   });

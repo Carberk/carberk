@@ -235,9 +235,9 @@ describe("SearchCatalog", () => {
         expect(tractor.yearTo).toBe(1982);
       }
       // PPM 2007 and YTO 2004 are catalog models, but valid year-only queries stay years.
-      for (const query of ["2007", "2004"]) {
+      for (const [query, year] of [["2007", 2007], ["2004", 2004]] as const) {
         expect(await uc.execute({ query, locale })).toEqual({
-          results: [], yearFrom: Number(query), yearTo: Number(query),
+          results: [], yearFrom: year, yearTo: year,
         });
       }
       for (const query of ["Camry 1800", "Camry 2500", "Camry 2.0", "Camry 0000"]) {
