@@ -509,13 +509,25 @@ export class PrismaConversationRepository
       await tx.$executeRaw`SAVEPOINT measurement_message_outcomes`;savepoint=true;
       const previous=await tx.$queryRaw<{statement:string;lock:string}[]>`SELECT current_setting('statement_timeout') AS statement,current_setting('lock_timeout') AS lock`;
       await tx.$queryRaw`SELECT set_config('statement_timeout','50ms',true),set_config('lock_timeout','10ms',true)`;
-      const first=await tx.message.findFirst({where:{conversationId:conversation.id,senderId:conversation.buyerId,kind:{not:"system"}},orderBy:[{createdAt:"asc"},{id:"asc"}],select:{id:true,createdAt:true}});
+      const current=await tx.conversation.findUniqueOrThrow({where:{id:conversation.id},select:{firstBuyerMessageId:true,firstSellerReplyId:true}});
       const envelope={version:1 as const,eventId:randomUUID(),occurredAt:message.createdAt.toISOString(),purpose:"product_improvement" as const,context:{platform:"server" as const,release:"server",build:"server",locale:"ru" as const}};
-      if(first?.id===message.id) await this.measure(tx,message.senderId,{...envelope,eventName:"first_buyer_message_accepted",payload:{conversationId:conversation.id,listingId:conversation.listingId,messageId:message.id}});
-      else if(first && message.senderId!==conversation.buyerId && message.kind!=="system") {
-        const reply=await tx.message.findFirst({where:{conversationId:conversation.id,senderId:{not:conversation.buyerId},kind:{not:"system"},createdAt:{gte:first.createdAt}},orderBy:[{createdAt:"asc"},{id:"asc"}],select:{id:true}});
-        const elapsedMs=message.createdAt.getTime()-first.createdAt.getTime();
-        if(reply?.id===message.id && elapsedMs>=0 && elapsedMs<=90*86_400_000) await this.measure(tx,message.senderId,{...envelope,eventName:"seller_first_reply",payload:{conversationId:conversation.id,listingId:conversation.listingId,firstBuyerMessageId:first.id,replyMessageId:message.id,elapsedMs}});
+      if(message.senderId===conversation.buyerId && message.kind!=="system" && !current.firstBuyerMessageId){
+        // The Conversation lock serializes accepted writes. A later same-time UUID
+        // cannot redefine the first committed cohort. Existing history stays closed.
+        const existing=await tx.message.findFirst({where:{conversationId:conversation.id,senderId:conversation.buyerId,kind:{not:"system"},id:{not:message.id}},select:{id:true}});
+        if(!existing){
+          await tx.conversation.update({where:{id:conversation.id},data:{firstBuyerMessageId:message.id}});
+          await this.measure(tx,message.senderId,{...envelope,eventName:"first_buyer_message_accepted",payload:{conversationId:conversation.id,listingId:conversation.listingId,messageId:message.id}});
+        }
+      }else if(current.firstBuyerMessageId && !current.firstSellerReplyId && message.senderId!==conversation.buyerId && message.kind!=="system"){
+        const first=await tx.message.findUnique({where:{id:current.firstBuyerMessageId},select:{createdAt:true,deletedAt:true}});
+        // Never fabricate historical acceptance or substitute a deleted first Message.
+        const priorReply=await tx.message.findFirst({where:{conversationId:conversation.id,senderId:{not:conversation.buyerId},kind:{not:"system"},id:{not:message.id},...(first?{createdAt:{gte:first.createdAt}}:{})},select:{id:true}});
+        if(first && !first.deletedAt && !priorReply){
+          await tx.conversation.update({where:{id:conversation.id},data:{firstSellerReplyId:message.id}});
+          const elapsedMs=message.createdAt.getTime()-first.createdAt.getTime();
+          if(elapsedMs>=0 && elapsedMs<=90*86_400_000)await this.measure(tx,message.senderId,{...envelope,eventName:"seller_first_reply",payload:{conversationId:conversation.id,listingId:conversation.listingId,firstBuyerMessageId:current.firstBuyerMessageId,replyMessageId:message.id,elapsedMs}});
+        }
       }
       await tx.$queryRaw`SELECT set_config('statement_timeout',${previous[0]?.statement??"0"},true),set_config('lock_timeout',${previous[0]?.lock??"0"},true)`;
       await tx.$executeRaw`RELEASE SAVEPOINT measurement_message_outcomes`;

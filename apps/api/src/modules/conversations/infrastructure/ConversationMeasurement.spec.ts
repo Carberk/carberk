@@ -14,10 +14,12 @@ function database() {
   $queryRaw:async()=>[],
   $executeRaw:async()=>0,
   conversation:{create:async({data}:{data:Record<string,unknown>})=>{conversation={...data};return conversation;},
-   findUnique:async()=>conversation,update:async()=>conversation},
+   findUnique:async()=>conversation,findUniqueOrThrow:async()=>conversation,update:async({data}:{data:Record<string,unknown>})=>{conversation={...conversation,...data};return conversation;}},
   conversationParticipant:{create:async()=>({})},
   message:{create:async({data}:{data:Record<string,unknown>})=>{messages.push({...data});return data;},
-   findFirst:async({where}:{where:{senderId?:string|{not:string};conversationId:string;createdAt?:{gte:Date}}})=>messages.filter(row=>row["conversationId"]===where.conversationId
+   findUnique:async({where}:{where:{id:string}})=>messages.find(row=>row["id"]===where.id)??null,
+   findFirst:async({where}:{where:{id?:{not:string};senderId?:string|{not:string};conversationId:string;createdAt?:{gte:Date}}})=>messages.filter(row=>row["conversationId"]===where.conversationId
+    && (!where.id?.not||row["id"]!==where.id.not)
     && (typeof where.senderId==="string"?row["senderId"]===where.senderId:where.senderId?row["senderId"]!==where.senderId.not:true)
     && (!where.createdAt?.gte || (row["createdAt"] as Date)>=where.createdAt.gte)).sort((a,b)=>(a["createdAt"] as Date).getTime()-(b["createdAt"] as Date).getTime())[0]??null},
  };
