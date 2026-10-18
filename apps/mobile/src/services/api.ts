@@ -23,3 +23,11 @@ export function useServiceOpen() {
  const client = useQueryClient(); const { userId } = useAuth();
  return useMutation({ mutationFn: (purpose: S.ServicePurpose) => apiClient.post("/services/conversations", { purpose, synthetic: true }, z.object({ id: z.string().uuid(), resourceId: z.string().uuid() })), onSuccess: () => { void client.invalidateQueries({ queryKey: serviceKeys.all(userId) }); } });
 }
+export function useHistoryOrder(id: string) {
+ const { userId, isAuthenticated } = useAuth();
+ return useQuery({ queryKey: [...serviceKeys.all(userId), "history", id], queryFn: () => apiClient.get(`/services/conversations/${id}/history`, S.HistorySnapshotSchema), enabled: isAuthenticated === true && !!userId, staleTime: 0, gcTime: 0, retry: false });
+}
+export function useHistoryCommand(id: string) {
+ const { userId } = useAuth(), client = useQueryClient();
+ return useMutation({ mutationFn: (command: S.HistoryCommand) => apiClient.post(`/services/conversations/${id}/history`, command, z.object({ ok: z.literal(true) })), onSuccess: () => { void client.invalidateQueries({ queryKey: serviceKeys.all(userId) }); } });
+}
