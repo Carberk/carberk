@@ -90,7 +90,9 @@ export class PrismaDiagnosticEvidence implements DiagnosticEvidencePort {
       const state = scope.row.state as unknown as DiagnosticReportState;
       if (state.findings.some(finding => finding.evidenceIds.includes(evidenceId))) throw new DiagnosticRuleError("REPORT_EVIDENCE_IN_USE");
       const row = await tx.diagnosticEvidence.findUnique({ where: { id: evidenceId } });
-      if (!row || row.reportId !== reportId) throw denied();
+      if (!row) return;
+      if (row.reportId !== reportId) throw denied();
+      if (row.cleanupRequestedAt) return;
       await tx.diagnosticEvidence.update({ where: { id: evidenceId }, data: { state: "cleanup_pending", cleanupRequestedAt: this.runtime.now() } });
     });
   }

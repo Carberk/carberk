@@ -75,6 +75,7 @@ export const DiagnosticReleasedSnapshotSchema = z.object({
 export type DiagnosticReleasedSnapshot = z.infer<typeof DiagnosticReleasedSnapshotSchema>;
 
 export const DiagnosticWorkspaceSchema = z.object({
+  actorId: z.string().uuid(),
   order: DiagnosticOrderSchema, template: DiagnosticTemplateSchema,
   capabilities: z.array(DiagnosticCapabilitySchema),
   assignments: z.array(z.object({ userId: z.string().uuid(), capability: DiagnosticCapabilitySchema })),
