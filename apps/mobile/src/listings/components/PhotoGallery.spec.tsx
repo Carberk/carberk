@@ -1,13 +1,16 @@
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import * as RN from "react-native";
 
-import { act, fireEvent, renderMobile, within, first, getAllHosts, getHost } from "../../../test/render";
+import { act, fireEvent, renderMobile, within, first, getAllHosts, getHost, routeParams } from "../../../test/render";
 import { mediaFixture } from "../../../test/fixtures/listing";
-
 import { server } from "../../../test/msw";
 import { storeAuthSession } from "../../auth/session";
+
 import { PhotoGallery } from "./PhotoGallery";
+
+const secure = vi.hoisted(() => new Map<string, string>());
+vi.mock("expo-secure-store", () => ({ getItemAsync: async (key: string) => secure.get(key) ?? null, setItemAsync: async (key: string, value: string) => { secure.set(key, value); }, deleteItemAsync: async (key: string) => { secure.delete(key); } }));
 
 /** A 390 dp screen less 16 dp margins each side; one swipe moves a tile and its 2 dp seam. */
 const TILE_WIDTH = 390 - 32;
@@ -28,10 +31,18 @@ describe("Photo gallery and viewer", () => {
       http.get(`http://localhost:3006/api/v1/listings/${listingId}/video`, () => HttpResponse.json({ generationId, durationMs: 5000, renditions: [240, 360] })),
       http.post(`http://localhost:3006/api/v1/listings/${listingId}/video-grants`, async ({ request }) => { const body = await request.json() as { purpose: string }; if (body.purpose === "playback") playbackRequests++; return HttpResponse.json({ generationId, expiresAt: "2099-01-01T00:00:00Z", url: `/video-grants/${"p".repeat(43)}/poster.jpg` }, { status: 201 }); }),
     );
+    routeParams.video = generationId;
     const screen = await renderMobile(<PhotoGallery listingId={listingId} media={mediaFixture(3)} />);
     expect(await screen.findByRole("button", { name: "Play video, 5 seconds" })).toBeTruthy();
     const strip = screen.getByTestId("detail-photo-strip");
     expect(strip.props.data.map((item: { kind: string }) => item.kind)).toEqual(["image", "video", "image", "image"]);
+    expect(scrollRequests).toContainEqual(expect.objectContaining({ method: "scrollToOffset", offset: TILE_WIDTH + 2 }));
+    expect(playbackRequests).toBe(0);
+    await fireEvent.press(first(screen.getAllByRole("button", { name: "Photo 1 of 4" })));
+    const videoThumb = viewer(screen).getAllByRole("button", { name: "Play video, 5 seconds" }).find(button => button.props.accessibilityState?.selected === false);
+    expect(videoThumb).toBeTruthy(); if (!videoThumb) throw new Error("Video thumbnail missing");
+    await fireEvent.press(videoThumb);
+    expect(viewer(screen).getByText("2 / 4")).toBeTruthy();
     expect(playbackRequests).toBe(0);
   });
   it.each([[900, 1600], [1920, 1080]])("cover-fits the %sx%s vehicle photo into its inset 4:3 tile", async (width, height) => {

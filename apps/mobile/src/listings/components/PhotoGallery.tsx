@@ -1,13 +1,19 @@
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useLocalSearchParams } from "expo-router";
 import type { ListingsSchemas } from "@auto-tm/contracts";
+
+import { useListingVideo } from "../videoEditor/useListingVideo";
 
 import { DetailPhotoStrip, type DetailPhotoStripHandle } from "./DetailPhotoStrip";
 import type { PhotoGeometry } from "./photoTransitionMath";
 import { PhotoViewer } from "./PhotoViewer";
 
+const VideoPlaybackModal = lazy(async () => ({ default: (await import("../videoEditor/VideoPlaybackModal")).VideoPlaybackModal }));
+
 type ListingMedia = ListingsSchemas.ListingMedia;
 
 interface PhotoGalleryProps {
+  listingId?: string | undefined;
   media: ListingMedia[];
   visibleTop?: number;
   /** Status strip across the bottom of each photo, e.g. "Sold" on a closed Listing. */
@@ -24,12 +30,17 @@ interface PhotoGalleryProps {
  * the strip on the photo the viewer was left on.
  */
 export function PhotoGallery({
-  media,
+  media: photos,
+  listingId,
   visibleTop,
   banner,
   viewerHeaderAction,
   viewerFooter,
 }: PhotoGalleryProps) {
+  const video = useListingVideo(listingId);
+  const media = video ? [...photos.slice(0, 1), video.media, ...photos.slice(1)] : photos;
+  const [playing, setPlaying] = useState<string | null>(null);
+  const params = useLocalSearchParams<{ video?: string }>();
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [origin, setOrigin] = useState<PhotoGeometry | null>(null);
   const [hiddenIndex, setHiddenIndex] = useState<number | null>(null);
@@ -37,6 +48,7 @@ export function PhotoGallery({
   const openingRequest = useRef(0);
   const stripRef = useRef<DetailPhotoStripHandle>(null);
 
+  useEffect(() => { if (params.video && params.video === video?.media.id) stripRef.current?.scrollToPhoto(photos.length ? 1 : 0); }, [params.video, video?.media.id, photos.length]);
   const prepareReturn = useCallback((index: number) => {
     stripRef.current?.scrollToPhoto(index);
     // The strip scroll crosses native frames before the tile lands; measuring
@@ -48,6 +60,7 @@ export function PhotoGallery({
     })));
   }, []);
   const openViewer = useCallback((index: number) => {
+    if (media[index]?.kind === "video") { stripRef.current?.scrollToPhoto(index); setPlaying(media[index]?.id ?? null); return; }
     setOrigin(null);
     returns.current.clear();
     const request = ++openingRequest.current;
@@ -66,7 +79,7 @@ export function PhotoGallery({
     // Fabric measurements may cross native frames. Give both nested reads a
     // frame before presenting; a missing/virtualized ref still opens by fade.
     requestAnimationFrame(() => requestAnimationFrame(present));
-  }, []);
+  }, [media]);
   const closeViewer = useCallback((index: number) => {
     setViewerIndex(null);
     setHiddenIndex(null);
@@ -89,8 +102,10 @@ export function PhotoGallery({
           onClose={closeViewer}
           headerAction={viewerHeaderAction}
           footer={viewerFooter}
+          onPlayVideo={() => setPlaying(video?.media.id ?? null)}
         />
       )}
+      {playing && playing === video?.media.id && video && listingId ? <Suspense fallback={null}><VideoPlaybackModal listingId={listingId} generationId={video.media.id} renditions={video.renditions} onClose={() => setPlaying(null)} /></Suspense> : null}
     </>
   );
 }

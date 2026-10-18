@@ -77,7 +77,7 @@ export function VideoPlaybackModal({ listingId, generationId, renditions, onClos
   const ownerId = peekAuthSession()?.user.id;
   const unsubscribe = subscribeAuthSession(() => { if (peekAuthSession()?.user.id !== ownerId) void actions.current.close(); });
   const background = AppState.addEventListener("change", value => { if (value !== "active") void actions.current.close(); });
-  return () => { alive.current = false; request.current++; clearTimeout(timer.current); clearTimeout(upgrade.current); state.remove(); play.remove(); end.remove(); background.remove(); unsubscribe(); };
+  return () => { alive.current = false; request.current++; clearTimeout(timer.current); clearTimeout(upgrade.current); state.remove(); play.remove(); end.remove(); background.remove(); unsubscribe(); report("cancelled"); };
  }, [player]);
  useEffect(() => { if (!focused) void actions.current.close(); }, [focused]);
  function choose(next: number | "auto", nextSaver = saver) { setQuality(next); setSaver(nextSaver); selection.current = { quality: next, saver: nextSaver, available }; void load(); }
