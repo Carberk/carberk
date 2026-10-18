@@ -128,9 +128,35 @@ export class DiagnosticArtifactWorker {
     if (failed) throw new Error("DIAGNOSTIC_ARTIFACT_RETRY");
   }
 
+  private async expireUnattached(now: Date): Promise<void> {
+    // Only unreferenced temporary uploads expire. A finding in any revision,
+    // including an immutable predecessor, keeps its exact evidence bytes.
+    const cutoff = new Date(now.getTime() - 86400_000);
+    const candidates = await this.db.$queryRaw<{ id: string; reportId: string; orderId: string; epoch: string }[]>`
+      SELECT e.id, e."reportId", r."orderId", e.epoch FROM diagnostic_evidence e
+      JOIN diagnostic_reports r ON r.id=e."reportId"
+      WHERE e.state='verified' AND e."cleanupRequestedAt" IS NULL AND e."verifiedAt"<=${cutoff}
+      AND NOT EXISTS (SELECT 1 FROM diagnostic_reports refs,
+        LATERAL jsonb_array_elements(COALESCE(refs.snapshot->'report'->'findings',refs.state->'findings','[]'::jsonb)) finding
+        WHERE refs."orderId"=r."orderId" AND (finding->'evidenceIds') ? e.id)
+      ORDER BY e."verifiedAt", e.id LIMIT 100`;
+    for (const item of candidates) await this.db.$transaction(async tx => {
+      // The same order/report lock order used by authoring fences late attachment.
+      await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${item.orderId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${item.reportId} FOR UPDATE`;
+      const referenced = await tx.$queryRaw<{ id: string }[]>`
+        SELECT refs.id FROM diagnostic_reports refs,
+        LATERAL jsonb_array_elements(COALESCE(refs.snapshot->'report'->'findings',refs.state->'findings','[]'::jsonb)) finding
+        WHERE refs."orderId"=${item.orderId} AND (finding->'evidenceIds') ? ${item.id} LIMIT 1`;
+      if (referenced.length) return;
+      await tx.diagnosticEvidence.updateMany({ where: { id: item.id, epoch: item.epoch, state: "verified", cleanupRequestedAt: null, verifiedAt: { lte: cutoff } }, data: { state: "cleanup_pending", cleanupRequestedAt: now } });
+    });
+  }
+
   async cleanup(): Promise<number> {
     if (!this.runtime.enabled()) return 0;
     const now = this.runtime.now(); let completed = 0;
+    await this.expireUnattached(now);
     // Erasure fences access before network cleanup. Active reports have no blanket purge.
     const erased = await this.db.diagnosticReportRecord.findMany({ where: { AND: [{ OR: [{ erasedAt: { not: null } }, { order: { erasedAt: { not: null } } }, { audience: "buyer_private", order: { commissionerId: null } }] }, { OR: [{ artifacts: { some: { cleanupRequestedAt: null } } }, { evidence: { some: { cleanupRequestedAt: null } } }] }] }, orderBy: { id: "asc" }, take: 100 });
     for (const report of erased) {
