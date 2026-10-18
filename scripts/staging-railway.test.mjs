@@ -111,11 +111,20 @@ test('unknown remote campaign profile is refused before SQL', async () => {
 
 test('campaign receipts bind profile and candidate and never masquerade as public listing proof', async () => {
   const id = '1'.repeat(32), candidate = 'a'.repeat(40);
-  const lease = { id, candidate, namespace: `cf_${id}`, identity: policy, fixtureProfile: 'campaign897-identities-v1' };
+  const lease = { id, candidate, namespace: `cf_${id}`, identity: policy, fixtureProfile: 'campaign897-identities-v1', deployments: { api: 'deployment-api', worker: 'deployment-worker' }, expectedMigrations: [] };
   const good = { fixtures: 'present', namespace: lease.namespace, profile: lease.fixtureProfile, candidate, state: 'identities', identities: 4, protectedReceipt: `${lease.namespace}.campaign_entities` };
   for (const fault of ['none', 'candidate', 'profile', 'count']) {
     const receipt = { ...good, ...(fault === 'candidate' ? { candidate: 'b'.repeat(40) } : {}), ...(fault === 'profile' ? { profile: 'listing-v1' } : {}), ...(fault === 'count' ? { identities: 20 } : {}) };
-    const platform = new RailwayPlatform({ token: 'SECRET', authorization: `${id}:${candidate}`, fetch: boundary(), command: async () => JSON.stringify(receipt) });
+    const base = boundary();
+    const fetch = async (url, options) => {
+      if (url === `${policy.origins.api}/readyz`) return { ok: true, json: async () => ({ status: 'ready', commitSha: candidate, environment: 'staging', checks: { postgres: 'ok', redis: 'ok', minio: 'ok' } }) };
+      const { query, variables } = JSON.parse(options.body);
+      if (query.includes('deployment(id:')) return { ok: true, json: async () => ({ data: { deployment: { id: variables.id, status: 'SUCCESS', meta: { commitHash: candidate } } } }) };
+      if (query.includes('latestDeployment')) return { ok: true, json: async () => ({ data: { serviceInstance: { latestDeployment: { id: `deployment-${variables.serviceId}`, status: 'SUCCESS' } } } }) };
+      if (query.includes('deploymentLogs')) return { ok: true, json: async () => ({ data: { deploymentLogs: [{ message: 'Worker started (BullMQ consumer)' }] } }) };
+      return base(url, options);
+    };
+    const platform = new RailwayPlatform({ token: 'SECRET', authorization: `${id}:${candidate}`, fetch, command: async () => JSON.stringify({ ...receipt, sha: candidate, migrations: [], schema: 'unchanged' }) });
     if (fault === 'none') assert.equal((await platform.execute('fixture', lease, candidate)).state, 'identities');
     else await assert.rejects(platform.execute('fixture', lease, candidate), /campaign/);
   }
@@ -131,4 +140,15 @@ test('campaign fixture refuses mutation without the complete active deployment j
   } });
   await assert.rejects(platform.execute('fixture', lease, candidate), /deployment/);
   assert.equal(remoteMutated, false);
+});
+
+test('campaign profile is disabled by default before the remote SQL boundary', async () => {
+  const { remoteProgram } = await import('./staging-remote.mjs');
+  const { runInNewContext } = await import('node:vm');
+  let sqlReached = false;
+  const process = { exitCode: 0, env: { RAILWAY_PROJECT_ID: 'project', RAILWAY_ENVIRONMENT_ID: 'stage', RAILWAY_SERVICE_ID: 'api', RAILWAY_ENVIRONMENT_NAME: 'staging', APP_ENV: 'staging', SMS_DRIVER: 'mock', AUTOTM_COMMIT_SHA: 'a'.repeat(40), DATABASE_URL: 'postgresql://u:secret@postgres.railway.internal:5432/railway', MINIO_ENDPOINT: policy.origins.media, MINIO_PUBLIC_URL: policy.origins.publicMedia } };
+  runInNewContext(remoteProgram({ kind: 'fixture', id: '1'.repeat(32), namespace: `cf_${'1'.repeat(32)}`, candidate: 'a'.repeat(40), target: 'a'.repeat(40), identity: policy, profile: 'campaign897-identities-v1' }), {
+    URL, process, require: () => ({ spawnSync: () => { sqlReached = true; return { status: 0, stdout: '0' }; } }), console: { log() {}, error() {} },
+  });
+  assert.equal(process.exitCode, 1); assert.equal(sqlReached, false);
 });

@@ -68,7 +68,7 @@ export class RailwayPlatform {
     return structuredClone(policy);
   }
   async remote(kind, lease, target) {
-    const payload = { kind, id: lease.id, namespace: lease.namespace, target, identity: lease.identity,
+    const payload = { kind, candidate: lease.candidate, profile: lease.fixtureProfile, id: lease.id, namespace: lease.namespace, target, identity: lease.identity,
       expectedMigrations: lease.operation?.expectedMigrations ?? lease.expectedMigrations,
       schemaDisposition: lease.operation?.schemaDisposition ?? lease.schemaDisposition ?? 'unchanged' };
     const encoded = Buffer.from(remoteProgram(payload)).toString('base64');
@@ -80,7 +80,14 @@ export class RailwayPlatform {
     if (lines.length !== 1) throw new Error('Remote operation receipt unavailable');
     let result; try { result = JSON.parse(lines[0]); } catch { throw new Error('Remote receipt invalid'); }
     if (!['present', 'absent'].includes(result.fixtures) || (kind !== 'probe' && result.namespace !== lease.namespace)) throw new Error('Remote namespace proof unavailable');
+    if (lease.fixtureProfile === 'campaign897-identities-v1') this.campaignReceipt(lease, result);
     return result;
+  }
+  campaignReceipt(lease, result) {
+    if (result.profile !== lease.fixtureProfile || result.candidate !== lease.candidate || result.namespace !== lease.namespace ||
+        result.protectedReceipt !== `${lease.namespace}.campaign_entities` ||
+        !['identities', 'disposed'].includes(result.state) || result.identities !== (result.state === 'identities' ? 4 : 0) ||
+        result.fixtures !== (result.state === 'identities' ? 'present' : 'absent')) throw new Error('Reserved campaign proof incomplete');
   }
   async deployment(id) {
     const { deployment } = await this.query(`query deployment($id: String!) { deployment(id: $id) { id status meta } }`, { id });
@@ -90,8 +97,9 @@ export class RailwayPlatform {
     await this.authorize(lease);
     await this.attest(lease.identity);
     if (['fixture', 'reset'].includes(kind)) {
+      if (lease.fixtureProfile === 'campaign897-identities-v1') await this.verify(lease, target, { deployments: lease.deployments });
       const receipt = await this.remote(kind, lease, target);
-      if (kind === 'fixture') {
+      if (kind === 'fixture' && lease.fixtureProfile !== 'campaign897-identities-v1') {
         await this.fixtureVisible(lease, receipt);
       }
       return receipt;
@@ -128,7 +136,7 @@ export class RailwayPlatform {
   }
   async recover(lease, target, result) {
     const receipt = await this.verify(lease, target, result);
-    if (lease.operation.kind === 'fixture') await this.fixtureVisible(lease, receipt);
+    if (lease.operation.kind === 'fixture' && lease.fixtureProfile !== 'campaign897-identities-v1') await this.fixtureVisible(lease, receipt);
     return receipt;
   }
   async verify(lease, target, result) {
@@ -150,7 +158,7 @@ export class RailwayPlatform {
     const probe = await this.remote('probe', lease, target);
     if (probe.sha !== target || probe.schema !== (lease.operation?.schemaDisposition ?? lease.schemaDisposition ?? 'unchanged') ||
         !equal(probe.migrations, lease.operation?.expectedMigrations ?? lease.expectedMigrations)) throw new Error('Runtime schema proof unavailable');
-    return { sha: target, readyz: true, worker: true, media: true, mock: true, fixtures: probe.fixtures, schema: probe.schema, migrations: probe.migrations, listingId: probe.listingId, sellerId: probe.sellerId };
+    return { ...(lease.fixtureProfile === 'campaign897-identities-v1' ? { profile: probe.profile, candidate: probe.candidate, namespace: probe.namespace, state: probe.state, identities: probe.identities, protectedReceipt: probe.protectedReceipt, retainedAudits: probe.retainedAudits, tombstone: probe.tombstone } : {}), sha: target, readyz: true, worker: true, media: true, mock: true, fixtures: probe.fixtures, schema: probe.schema, migrations: probe.migrations, listingId: probe.listingId, sellerId: probe.sellerId };
   }
 
 }

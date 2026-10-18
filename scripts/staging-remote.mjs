@@ -1,11 +1,14 @@
+import { campaignMain } from './staging-campaign.mjs';
+
 /** Serialized into one fixed remote Node process. There is no arbitrary shell/SQL input. */
 export function remoteProgram(payload) {
-  return `(${remoteMain.toString()})(${JSON.stringify(payload)})`;
+  return `(${remoteMain.toString()})(${JSON.stringify(payload)}, ${campaignMain.toString()})`;
 }
-function remoteMain(input) {
+function remoteMain(input, campaign) {
   try {
     const { spawnSync } = require('node:child_process');
     const p = input.identity; const e = process.env;
+    if (input.profile !== undefined && !['listing-v1', 'campaign897-identities-v1'].includes(input.profile)) throw new Error();
     if (!['fixture', 'reset', 'probe'].includes(input.kind) || !/^[a-f0-9]{32}$/.test(input.id) ||
         input.namespace !== `cf_${input.id}` || !/^[a-f0-9]{40}$/.test(input.target)) throw new Error();
     if (e.RAILWAY_PROJECT_ID !== p.projectId || e.RAILWAY_ENVIRONMENT_ID !== p.environmentId || e.RAILWAY_SERVICE_ID !== p.services.api ||
@@ -25,12 +28,13 @@ function remoteMain(input) {
     };
     const namespace = input.namespace; // Exact prefix plus hex ID, never caller SQL.
     const exists = sql(`SELECT count(*) FROM pg_namespace WHERE nspname='${namespace}';`) === '1';
-    if (exists && sql(`SELECT reservation_id FROM "${namespace}".manifest;`) !== input.id) throw new Error();
     const { createHash } = require('node:crypto');
     const uuid = (label) => {
       const hex = createHash('sha256').update(`${input.id}:${label}`).digest('hex').slice(0,32);
       return `${hex.slice(0,8)}-${hex.slice(8,12)}-4${hex.slice(13,16)}-a${hex.slice(17,20)}-${hex.slice(20)}`;
     };
+    if (input.profile === 'campaign897-identities-v1') return campaign(input, { sql, uuid, exists });
+    if (exists && sql(`SELECT reservation_id FROM "${namespace}".manifest;`) !== input.id) throw new Error();
     const user = uuid('seller'); const listing = uuid('listing');
     const unchanged = `DO $guard$ BEGIN
       IF (SELECT count(*) FROM "${namespace}".records) <> 2 OR

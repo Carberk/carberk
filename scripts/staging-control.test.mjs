@@ -201,7 +201,7 @@ test('campaign profile is explicit, durable before the first side effect and can
     const state = (await ledger.read()).state.reservation;
     assert.equal(state.fixtureProfile, 'campaign897-identities-v1');
     assert.equal(state.operation.profile, 'campaign897-identities-v1');
-    return { ...await execute(...args), profile: state.fixtureProfile, state: 'identities', fixtures: 'present', identities: 4,
+    return { ...await execute(...args), profile: state.fixtureProfile, candidate: state.candidate, state: 'identities', fixtures: 'present', identities: 4,
       protectedReceipt: `${state.namespace}.campaign_entities` };
   };
   const receipt = await control.operate(lease, 'fixture', 'campaign897-identities-v1');
