@@ -20,6 +20,16 @@ const photoOf = (screen: Awaited<ReturnType<typeof renderMobile>>) => {
 const blurOf = (screen: Awaited<ReturnType<typeof renderMobile>>) =>
   images(screen).filter((image) => image.props.source.thumbhash === HASH);
 
+describe("Private video poster", () => {
+  it("does not cache grant URLs or fall back to a public bucket on expiry", async () => {
+    const video = { ...item, kind: "video" as const, variants: { thumbnail: "https://api.test/api/v1/video-grants/private/poster.jpg", list: "https://api.test/api/v1/video-grants/private/poster.jpg", detail: "https://api.test/api/v1/video-grants/private/poster.jpg", fullscreen: "https://api.test/api/v1/video-grants/private/poster.jpg" } };
+    const screen = await renderMobile(<GalleryImage item={video} variant="detail" contentFit="cover" style={style} />);
+    expect(photoOf(screen).props.cachePolicy).toBe("none");
+    await fireEvent(photoOf(screen), "error");
+    expect(photoOf(screen).props.source.uri).toBe(video.variants.detail);
+  });
+});
+
 describe("Viewer photo with a ThumbHash", () => {
   it("sharpens in place when a zoom asks for the fullscreen size, never remounting the photo", async () => {
     const screen = await renderMobile(<GalleryImage item={item} variant="detail" contentFit="contain" style={style} />);
