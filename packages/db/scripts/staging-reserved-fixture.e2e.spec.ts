@@ -284,27 +284,37 @@ describe("reserved staging fixtures on disposable application schema", () => {
     await (await queue.getJob(requestId))?.remove();
 
     const applicationName = `campaign-otp-red-${randomUUID()}`;
-    const producer = fork(`${root}/scripts/testing/delayed-campaign-enqueue.cjs`, [], {
+    const holder = fork(`${root}/scripts/testing/campaign-transaction-holder.cjs`, [], {
       env: {
         ...process.env,
         DATABASE_URL: `${databaseUrl}?application_name=${encodeURIComponent(applicationName)}`,
-        REDIS_URL: redisUrl,
-        CAMPAIGN_REQUEST_ID: requestId,
-        CAMPAIGN_EMAIL: email,
         CAMPAIGN_NAMESPACE: `cf_${id}`,
       },
       stdio: ["ignore", "pipe", "pipe", "ipc"],
     });
-    const admitted = new Promise<number>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("delayed producer did not reach the SQL/Redis barrier")), 30000);
-      producer.on("message", message => {
+    const producer = fork(`${root}/scripts/testing/delayed-campaign-enqueue.cjs`, [], {
+      env: { ...process.env, REDIS_URL: redisUrl, CAMPAIGN_REQUEST_ID: requestId, CAMPAIGN_EMAIL: email, CAMPAIGN_NAMESPACE: `cf_${id}` },
+      stdio: ["ignore", "pipe", "pipe", "ipc"],
+    });
+    const holderPid = new Promise<number>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("transaction holder did not reach the advisory barrier")), 30000);
+      holder.on("message", message => {
         if (message && typeof message === "object" && "backendPid" in message) {
           clearTimeout(timer); resolve(Number((message as { backendPid: number }).backendPid));
         }
       });
+      holder.once("error", reject);
+    });
+    const producerAdmitted = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("delayed producer did not reach the Redis barrier")), 30000);
+      producer.on("message", message => {
+        if (message && typeof message === "object" && "admitted" in message) { clearTimeout(timer); resolve(); }
+      });
       producer.once("error", reject);
     });
-    const backendPid = await admitted;
+    const holderExit = new Promise<number>(resolve => holder.once("exit", code => resolve(code ?? 0)));
+    const backendPid = await holderPid;
+    await producerAdmitted;
     const terminated = await pool.query("SELECT pg_terminate_backend($1) AS terminated", [backendPid]);
     expect(terminated.rows[0]).toEqual({ terminated: true });
     // pg_terminate_backend is asynchronous from the caller's perspective. Do
@@ -321,7 +331,9 @@ describe("reserved staging fixtures on disposable application schema", () => {
     // holds its post-admission IPC barrier. The old implementation has no
     // Redis-side fence, so releasing the producer recreates the exact job.
     expect(execute("reset", id, "campaign897-identities-v1").code).toBe(0);
+    if (holder.connected) holder.send({ finish: true });
     producer.send({ continue: true });
+    await holderExit;
     const producerExit = await new Promise<number>(resolve => producer.once("exit", code => resolve(code ?? 0)));
     expect(producerExit).toBe(0);
     expect(await queue.getJob(requestId)).toBeUndefined();
