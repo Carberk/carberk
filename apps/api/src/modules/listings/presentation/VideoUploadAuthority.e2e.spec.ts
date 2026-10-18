@@ -109,6 +109,20 @@ describe("video upload current authority and retirement", () => {
     expect(response.body).toMatchObject({ state: "READY", sessionId: row.id });
     expect(response.body.sourceKey).toBeUndefined();
   });
+  it("returns only ready media metadata, never source/storage authority, for a current tester", async () => {
+    const row = await readyVideo();
+    const prefix = `video/v1/${row.uploadId}/${row.id}/`;
+    await db.videoGeneration.update({ where: { id: row.id }, data: { manifest: { assets: [
+      { path: "poster.jpg", purpose: "poster", key: `${prefix}poster.jpg`, sizeBytes: 100, contentType: "image/jpeg" },
+      { path: "master.m3u8", purpose: "playback", key: `${prefix}master.m3u8`, sizeBytes: 100, contentType: "application/vnd.apple.mpegurl" },
+      { path: "240/index.m3u8", purpose: "playback", key: `${prefix}240/index.m3u8`, sizeBytes: 100, contentType: "application/vnd.apple.mpegurl" },
+      { path: "360/index.m3u8", purpose: "playback", key: `${prefix}360/index.m3u8`, sizeBytes: 100, contentType: "application/vnd.apple.mpegurl" },
+    ] } } });
+    const response = await request.get(`/api/v1/listings/${suite.id("owner-listing")}/video`).set("authorization", `Bearer ${token("other")}`).expect(200);
+    expect(response.body).toEqual({ generationId: row.id, durationMs: 5000, renditions: [240, 360] });
+    await db.listing.update({ where: { id: suite.id("owner-listing") }, data: { activeVideoGenerationId: null } });
+    await request.get(`/api/v1/listings/${suite.id("owner-listing")}/video`).set("authorization", `Bearer ${token("other")}`).expect(404);
+  });
   it("removes the current video immediately while retaining exact asynchronous cleanup", async () => {
     const row = await readyVideo();
     await request.delete(`/api/v1/listings/${suite.id("owner-listing")}/video`).set("authorization", `Bearer ${token("other")}`).expect(404);
