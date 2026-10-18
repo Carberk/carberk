@@ -47,7 +47,7 @@ export class RecomputeImprovement {
     const inventoryAvailable=Boolean(baseline && Number.isFinite(Date.parse(baseline.epoch)) && Date.parse(baseline.epoch)<=from.getTime());
     const lateRecords=(previous?.lateRecords ?? 0)+(previous?rows.filter(row=>row.receivedAt>previous.generatedAt && row.occurredAt<previous.windowTo).length:0);
     const snapshot:ImprovementSchemas.ImprovementSnapshot={state,period,windowFrom:from.toISOString(),windowTo:to.toISOString(),generatedAt:new Date(releaseAt).toISOString(),completeThrough:completeThrough.toISOString(),
-     environment:this.scope.environment,population:this.scope.population,version:1,lateRecords:null,inventoryAvailable:period!=="today"&&inventoryAvailable,scorecard:state==="suppressed" || state==="delayed"?null:computed};
+     environment:this.scope.environment,population:this.scope.population,version:1,lateRecords:null,inventoryAvailable:period!=="today"&&inventoryAvailable&&computed.inventory.averageActive!==null,scorecard:state==="suppressed" || state==="delayed"?null:computed};
     if(snapshot.scorecard && !inventoryAvailable) {
      snapshot.scorecard.inventory={listingHours:null,averageActive:null,currentActive:null};
      snapshot.scorecard.contacts.perActiveListing=null;

@@ -56,11 +56,12 @@ export function compileScorecard(input: ScorecardInput): ImprovementSchemas.Impr
 
   // Integrate current visibility from historical transitions, including the baseline before from.
   const listings = new Map<string, { active: boolean; since: number }>();
-  let listingMs = 0;
+  let listingMs = 0,ambiguousVisibility=false;
   for (const fact of eligible) {
     const event = fact.event;
     if (event.eventName !== "listing_visibility_changed") continue;
     const time = at(fact), previous = listings.get(event.payload.listingId);
+    if(previous?.since===time && previous.active!==(event.payload.visibility==="public"))ambiguousVisibility=true;
     if (previous?.active) listingMs += Math.max(0, Math.min(time, to) - Math.max(previous.since, from));
     listings.set(event.payload.listingId, { active: event.payload.visibility === "public", since: time });
   }
@@ -68,7 +69,7 @@ export function compileScorecard(input: ScorecardInput): ImprovementSchemas.Impr
     if (listing.active) listingMs += Math.max(0, to - Math.max(listing.since, from));
   }
   const averageActive = listingMs / (to - from);
-  const inventory = { listingHours: listingMs / 3_600_000, averageActive,
+  const inventory = ambiguousVisibility?{listingHours:null,averageActive:null,currentActive:null}:{ listingHours: listingMs / 3_600_000, averageActive,
     currentActive: [...listings.values()].filter(listing => listing.active).length };
 
   const calls = new Set<string>(), conversations = new Set<string>();
@@ -79,7 +80,7 @@ export function compileScorecard(input: ScorecardInput): ImprovementSchemas.Impr
   }
   const contactTotal = calls.size + conversations.size;
   const contacts = { calls: calls.size, conversations: conversations.size, total: contactTotal,
-    perActiveListing: averageActive > 0 ? contactTotal / averageActive : null };
+    perActiveListing: !ambiguousVisibility && averageActive > 0 ? contactTotal / averageActive : null };
 
   const drafts = new Map<string, ScorecardFact>();
   const publications = new Map<string, number>();
