@@ -6,6 +6,7 @@ const source: KnowledgeSource = {
  id: "synthetic-market", version: 1, epoch: "current", status: "permitted", provenance: "generated independent synthetic fixtures",
  purpose: "synthetic_research", reuse: "permitted", redistribution: "unresolved", retentionBasis: "independent synthetic observations",
  expiresAt: null, deletedAt: null, review: { singlingOut: "passed", linkage: "passed", rareVehicles: "passed", combinations: "passed", repeatedQueries: "passed" },
+ restrictions:{syntheticOnly:true,retention:"indefinite",deletion:"invalidate_derivatives",export:"internal_synthetic_only",demographics:"synthetic_self_reported"},
  destinations: ["internal_synthetic_research"],
 };
 const dataset: AnonymousDataset = {
@@ -24,6 +25,13 @@ describe("rights-qualified synthetic anonymous market knowledge", () => {
    expect(qualifyAnonymousDataset(dataset,[{...source,...replacement} as KnowledgeSource],{epoch:"current",now}).state).not.toBe("qualified");
   }
   expect(qualifyAnonymousDataset(dataset,[source],{epoch:"restored",now})).toMatchObject({state:"invalidated",reason:"epoch"});
+ });
+ it("fails closed on unresolved retention, deletion, export and demographic restrictions",()=>{
+  for(const restrictions of [null,{}, {...source.restrictions,retention:"unresolved"},{...source.restrictions,deletion:"ignore"},{...source.restrictions,export:"public"},{...source.restrictions,retention:"until_source_expiry"}]) {
+   expect(qualifyAnonymousDataset(dataset,[{...source,restrictions} as KnowledgeSource],{epoch:"current",now})).toMatchObject({state:"quarantined",reason:"rights"});
+  }
+  const demographic={...dataset,cells:[{...dataset.cells[0],ageBand:"25_34",demographicSource:"self_reported_synthetic"}]};
+  expect(qualifyAnonymousDataset(demographic,[{...source,restrictions:{...source.restrictions,demographics:"prohibited"}} as KnowledgeSource],{epoch:"current",now})).toMatchObject({state:"quarantined",reason:"rights"});
  });
  it("refuses rare groups, linkage gaps, arbitrary extra identifiers and live demographics", () => {
   expect(qualifyAnonymousDataset({...dataset,cells:[{...dataset.cells[0],observations:4}]},[source],{epoch:"current",now})).toMatchObject({state:"quarantined",reason:"anonymity"});
