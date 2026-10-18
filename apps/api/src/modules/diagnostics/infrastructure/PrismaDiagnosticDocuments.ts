@@ -1,0 +1,56 @@
+import { Inject, Injectable } from "@nestjs/common";
+import { DiagnosticSchemas as D } from "@auto-tm/contracts";
+import { PrismaService, type Prisma } from "@auto-tm/db";
+
+import { DiagnosticRuleError } from "../domain/InspectionOrder";
+import type { DiagnosticDocumentsPort } from "../domain/ports/DiagnosticDocumentsPort";
+import type { DiagnosticSubject } from "../domain/ports/DiagnosticIntakePort";
+import { DIAGNOSTIC_OBJECTS, type DiagnosticObjects } from "../domain/ports/DiagnosticObjects";
+
+import { DiagnosticReportAccess } from "./DiagnosticReportAccess";
+
+type Tx = Prisma.TransactionClient;
+type Subject = DiagnosticSubject | null;
+const unavailable = () => new DiagnosticRuleError("DIAGNOSTIC_PDF_NOT_READY");
+@Injectable()
+export class PrismaDiagnosticDocuments implements DiagnosticDocumentsPort {
+  constructor(@Inject(PrismaService) private readonly db: PrismaService,
+    @Inject(DiagnosticReportAccess) private readonly access: DiagnosticReportAccess,
+    @Inject(DIAGNOSTIC_OBJECTS) private readonly objects: DiagnosticObjects) {}
+  private load(tx: Tx, subject: Subject, reportId: string) {
+    return subject ? this.access.load(tx, subject, reportId) : this.access.loadPublic(tx, reportId);
+  }
+  async list(subject: Subject, reportId: string): Promise<D.DiagnosticDocument[]> {
+    return this.db.$transaction(async tx => {
+      const { row } = await this.load(tx, subject, reportId);
+      if (!row.snapshotHash) return [];
+      const artifacts = await tx.diagnosticPdfArtifact.findMany({ where: { reportId, snapshotHash: row.snapshotHash, rendererVersion: "v1" }, orderBy: [{ locale: "asc" }, { generation: "desc" }] });
+      const seen = new Set<string>();
+      return artifacts.filter(item => { if (seen.has(item.locale)) return false; seen.add(item.locale); return true; }).map(item => D.DiagnosticDocumentSchema.parse({
+        id: item.id, locale: item.locale, generation: item.generation, rendererVersion: item.rendererVersion,
+        state: item.cleanupRequestedAt || ["cleanup_pending", "removed"].includes(item.state) ? "unavailable" : item.state,
+        generatedAt: item.verifiedAt?.toISOString() ?? null, retryAt: item.retryAt?.toISOString() ?? null,
+      }));
+    });
+  }
+  private async ready(tx: Tx, subject: Subject, reportId: string, locale: string) {
+    const { row } = await this.load(tx, subject, reportId);
+    if (!row.snapshotHash) throw unavailable();
+    const artifact = await tx.diagnosticPdfArtifact.findFirst({ where: { reportId, locale, snapshotHash: row.snapshotHash, rendererVersion: "v1" }, orderBy: { generation: "desc" } });
+    if (!artifact || artifact.state !== "ready" || artifact.cleanupRequestedAt || !artifact.verifiedAt || !artifact.sizeBytes || !artifact.sha256 ||
+      artifact.objectKey !== `diagnostic-pdf/${reportId}/${artifact.id}.pdf`) throw unavailable();
+    return { ...artifact, sha256: artifact.sha256, sizeBytes: artifact.sizeBytes };
+  }
+  async download(subject: Subject, reportId: string, locale: "tk" | "ru" | "en"): Promise<Uint8Array> {
+    const artifact = await this.db.$transaction(tx => this.ready(tx, subject, reportId, locale));
+    let bytes: Uint8Array;
+    try { bytes = await this.objects.read(artifact.objectKey, artifact.sizeBytes, artifact.sha256); }
+    catch { throw new DiagnosticRuleError("DIAGNOSTIC_PDF_UNAVAILABLE"); }
+    // Current permissions, public identity and artifact epoch must still match after I/O.
+    await this.db.$transaction(async tx => {
+      const current = await this.ready(tx, subject, reportId, locale);
+      if (current.id !== artifact.id || current.epoch !== artifact.epoch || current.sha256 !== artifact.sha256 || current.sizeBytes !== artifact.sizeBytes) throw unavailable();
+    });
+    return bytes;
+  }
+}

@@ -57,7 +57,7 @@ export const DiagnosticReportSchema = z.object({
   authorId: z.string().nullable(), reviewerId: z.string().nullable(), successorOf: z.string().uuid().nullable(),
   correctionReason: z.string().nullable(), returnReason: z.string().nullable(), finalizedAt: z.string().datetime().nullable(),
   withdrawnAt: z.string().datetime().nullable(), withdrawalReason: z.string().nullable(), version: z.number().int().nonnegative(),
-  template: DiagnosticTemplateDefinitionSchema, synthetic: z.boolean(),
+  template: DiagnosticTemplateDefinitionSchema, synthetic: z.boolean(), supersededBy: z.string().uuid().nullable().default(null),
 });
 export type DiagnosticFinding = z.infer<typeof DiagnosticFindingSchema>;
 export type DiagnosticDraftCreate = z.infer<typeof DiagnosticDraftCreateSchema>;
@@ -68,7 +68,7 @@ export type DiagnosticReportRecord = z.infer<typeof DiagnosticReportSchema>;
 
 /** Stored release input. No live Listing, booking or customer fields enter rendering. */
 export const DiagnosticReleasedSnapshotSchema = z.object({
-  report: DiagnosticReportSchema.omit({ version: true, template: true, synthetic: true }),
+  report: DiagnosticReportSchema.omit({ version: true, template: true, synthetic: true, supersededBy: true }),
   template: DiagnosticTemplateDefinitionSchema,
   synthetic: z.boolean(),
 }).strict();
@@ -82,3 +82,19 @@ export const DiagnosticWorkspaceSchema = z.object({
   staffChoices: z.array(z.object({ userId: z.string().uuid(), label: z.string(), capability: DiagnosticCapabilitySchema })),
 });
 export type DiagnosticWorkspace = z.infer<typeof DiagnosticWorkspaceSchema>;
+
+/** Safe readiness metadata. Object locators, digests and storage failures stay private. */
+export const DiagnosticDocumentSchema = z.object({
+  id: z.string().uuid(), locale: z.enum(["tk", "ru", "en"]),
+  state: z.enum(["pending", "processing", "ready", "failed", "unavailable"]),
+  generation: z.number().int().positive(), rendererVersion: z.string(),
+  generatedAt: z.string().datetime().nullable(), retryAt: z.string().datetime().nullable(),
+}).strict();
+export type DiagnosticDocument = z.infer<typeof DiagnosticDocumentSchema>;
+export const PublicDiagnosticAvailabilitySchema = z.object({
+  listingId: z.string().uuid(), reportId: z.string().uuid(), observedAt: z.string().datetime(),
+  mileageKm: z.number().int().nonnegative(), synthetic: z.boolean(),
+}).strict();
+export type PublicDiagnosticAvailability = z.infer<typeof PublicDiagnosticAvailabilitySchema>;
+export const PublicDiagnosticReportSchema = DiagnosticReportSchema.omit({ orderId: true });
+export type PublicDiagnosticReport = z.infer<typeof PublicDiagnosticReportSchema>;

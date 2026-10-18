@@ -8,6 +8,8 @@ import { DIAGNOSTIC_REPORTS_PORT, type DiagnosticReportsPort } from "../domain/p
 
 import { DIAGNOSTIC_EVIDENCE_PORT, type DiagnosticEvidencePort } from "../domain/ports/DiagnosticEvidencePort";
 
+import { DIAGNOSTIC_DOCUMENTS_PORT, type DiagnosticDocumentsPort } from "../domain/ports/DiagnosticDocumentsPort";
+
 type Request = FastifyRequest & { user?: { sub?: string; sid?: string } };
 const uuid = z.string().uuid();
 function parse<S extends z.ZodType>(schema: S, value: unknown): z.output<S> {
@@ -18,7 +20,8 @@ function parse<S extends z.ZodType>(schema: S, value: unknown): z.output<S> {
 @Controller("api/v1/diagnostics")
 export class DiagnosticReportsController {
   constructor(@Inject(DIAGNOSTIC_REPORTS_PORT) private readonly reports: DiagnosticReportsPort,
-    @Inject(DIAGNOSTIC_EVIDENCE_PORT) private readonly evidence: DiagnosticEvidencePort) {}
+    @Inject(DIAGNOSTIC_EVIDENCE_PORT) private readonly evidence: DiagnosticEvidencePort,
+    @Inject(DIAGNOSTIC_DOCUMENTS_PORT) private readonly documents: DiagnosticDocumentsPort) {}
   private subject(req: Request): DiagnosticSubject {
     if (!req.user?.sub || !req.user.sid) throw new ForbiddenException({ code: "DIAGNOSTIC_NO_ACCESS", message: "Inspection access unavailable" });
     return { userId: req.user.sub, sessionId: req.user.sid };
@@ -27,7 +30,7 @@ export class DiagnosticReportsController {
     try { return await work(); }
     catch (error) {
       if (!(error instanceof DiagnosticRuleError)) throw error;
-      const status = error.code.includes("STALE") || error.code.includes("CONFLICT") || error.code.includes("EXISTS") ? 409 : error.code === "DIAGNOSTIC_NO_ACCESS" ? 403 : 400;
+      const status = error.code.includes("STALE") || error.code.includes("CONFLICT") || error.code.includes("EXISTS") || error.code === "DIAGNOSTIC_PDF_NOT_READY" ? 409 : error.code === "DIAGNOSTIC_NO_ACCESS" ? 403 : error.code === "DIAGNOSTIC_PDF_UNAVAILABLE" ? 503 : 400;
       throw new HttpException({ code: error.code, message: "Inspection request could not be completed" }, status);
     }
   }
@@ -61,6 +64,14 @@ export class DiagnosticReportsController {
   }
   @Post("reports/:id/evidence/:evidenceId/abandon") @Header("Cache-Control", "no-store, private") abandon(@Req() req: Request, @Param("id") id: string, @Param("evidenceId") evidenceId: string) {
     return this.run(() => this.evidence.abandon(this.subject(req), parse(uuid, id), parse(uuid, evidenceId)));
+  }
+
+  @Get("reports/:id/documents") @Header("Cache-Control", "no-store, private") listDocuments(@Req() req: Request, @Param("id") id: string) {
+    return this.run(() => this.documents.list(this.subject(req), parse(uuid, id)));
+  }
+  @Get("reports/:id/documents/:locale") @Header("Cache-Control", "no-store, private") async download(@Req() req: Request, @Param("id") id: string, @Param("locale") locale: string, @Res() reply: FastifyReply) {
+    const bytes = await this.run(() => this.documents.download(this.subject(req), parse(uuid, id), parse(z.enum(["tk", "ru", "en"]), locale)));
+    reply.header("Cache-Control", "no-store, private").header("X-Content-Type-Options", "nosniff").header("Content-Disposition", "attachment; filename=inspection-report.pdf").type("application/pdf").send(Buffer.from(bytes));
   }
 
 }

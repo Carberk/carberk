@@ -2,11 +2,13 @@ import { Inject, Injectable } from "@nestjs/common";
 import type { DiagnosticSchemas } from "@auto-tm/contracts";
 import type { Prisma } from "@auto-tm/db";
 import { DiagnosticRuleError } from "../domain/InspectionOrder";
-import type { DiagnosticSubject } from "../domain/ports/DiagnosticIntakePort";
+import { DIAGNOSTIC_RUNTIME, type DiagnosticRuntime, type DiagnosticSubject } from "../domain/ports/DiagnosticIntakePort";
 import { DiagnosticAuthority } from "./DiagnosticAuthority";
+import { diagnosticListingDigest } from "./PrismaDiagnosticIntake";
 @Injectable()
 export class DiagnosticReportAccess {
-  constructor(@Inject(DiagnosticAuthority) private readonly authority: DiagnosticAuthority) {}
+  constructor(@Inject(DiagnosticAuthority) private readonly authority: DiagnosticAuthority,
+    @Inject(DIAGNOSTIC_RUNTIME) private readonly runtime: DiagnosticRuntime) {}
   async load(tx: Prisma.TransactionClient, subject: DiagnosticSubject, id: string, capability?: DiagnosticSchemas.DiagnosticCapability) {
     const found = await tx.diagnosticReportRecord.findUnique({ where: { id } });
     if (!found) throw new DiagnosticRuleError("DIAGNOSTIC_NO_ACCESS");
@@ -16,4 +18,23 @@ export class DiagnosticReportAccess {
     if (!row || row.erasedAt || (!scope.staff && !row.snapshot)) throw new DiagnosticRuleError("DIAGNOSTIC_NO_ACCESS");
     return { row, order: scope.row, staff: scope.staff };
   }
+  /** Public release has its own gate and never derives access from a commissioner. */
+  async loadPublic(tx: Prisma.TransactionClient, id: string) {
+    const denied = () => new DiagnosticRuleError("DIAGNOSTIC_PUBLIC_UNAVAILABLE");
+    if (!this.runtime.publicSyntheticAllowed?.()) throw denied();
+    const found = await tx.diagnosticReportRecord.findFirst({ where: { id, audience: "listing_public" }, include: { order: true } });
+    if (!found || !found.order.listingId) throw denied();
+    await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${found.orderId} FOR SHARE`;
+    await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${id} FOR SHARE`;
+    const row = await tx.diagnosticReportRecord.findUniqueOrThrow({ where: { id }, include: { order: true } });
+    const order = row.order;
+    if (row.erasedAt || row.withdrawnAt || row.status !== "finalized" || !row.snapshotHash || !row.snapshot || order.erasedAt || !order.synthetic ||
+      order.audience !== "listing_public" || !order.listingId || !order.publicationAuthorization || !order.associationValidatedAt || !order.listingIdentityDigest) throw denied();
+    await tx.$queryRaw`SELECT id FROM listings WHERE id=${order.listingId} FOR SHARE`;
+    const listing = await tx.listing.findUnique({ where: { id: order.listingId }, include: { business: true, seller: { select: { deletionScheduledAt: true, suspendedAt: true } } } });
+    if (!listing || listing.deletedAt || listing.status !== "active" || listing.seller.deletionScheduledAt || listing.seller.suspendedAt ||
+      (listing.businessId && listing.business?.status !== "active") || diagnosticListingDigest(listing) !== order.listingIdentityDigest) throw denied();
+    return { row, order, staff: false };
+  }
+
 }

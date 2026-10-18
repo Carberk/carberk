@@ -45,7 +45,9 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
   }
   private async dto(tx: Tx, row: Row, staff: boolean): Promise<DiagnosticSchemas.DiagnosticReportRecord> {
     const state = row.state as unknown as DiagnosticReportState;
-    return DiagnosticSchemas.DiagnosticReportSchema.parse({ ...state, authorId: staff ? state.authorId : null,
+    const released = row.snapshot ? DiagnosticSchemas.DiagnosticReleasedSnapshotSchema.parse(row.snapshot).report : state;
+    const successor = await tx.diagnosticReportRecord.findFirst({ where: { predecessorId: row.id, snapshotHash: { not: null }, erasedAt: null } });
+    return DiagnosticSchemas.DiagnosticReportSchema.parse({ ...released, status: row.status, withdrawnAt: row.withdrawnAt?.toISOString() ?? null, withdrawalReason: row.withdrawalReason, supersededBy: successor?.id ?? null, authorId: staff ? state.authorId : null,
       reviewerId: staff ? state.reviewerId : null, version: row.version, template: await this.definition(tx, row), synthetic: true });
   }
   private async audit(tx: Tx, subject: DiagnosticSubject, order: Order, reportId: string, action: string, details: Prisma.InputJsonObject = {}): Promise<void> {
