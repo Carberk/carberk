@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
 import * as Notifications from "expo-notifications";
 
-import { renderMobile, fireEvent, act } from "../../test/render";
+import { renderMobile, fireEvent, act, getAllHosts } from "../../test/render";
 import { server } from "../../test/msw";
 import { storeAuthSession, clearAuthSession } from "../auth/session";
 
@@ -40,7 +40,7 @@ it("keeps upload retry separate from message retry and adopts only uploaded byte
  const screen = await renderMobile(<ServiceScreen/>); await fireEvent.press(await screen.findByRole("button", { name: "General Support" })); await screen.findByText(message.body);
  await fireEvent.press(screen.getByRole("button", { name: "Upload attachment" }));
  expect(await screen.findByText("The upload failed. The message has not been sent.")).toBeTruthy(); expect(sent).toHaveLength(0);
- await fireEvent.press(screen.getByRole("button", { name: "Retry upload" })); expect(await screen.findByText("Attachment ready to send")).toBeTruthy();
+ await fireEvent.press(screen.getByRole("button", { name: "Retry upload" })); expect(await screen.findByText("Attachment ready to send")).toBeTruthy(); expect(screen.getByLabelText("Selected image")).toBeTruthy();
  await fireEvent.press(screen.getByRole("button", { name: "Send message" })); expect(sent[0]?.["attachmentId"]).toBe("33333333-3333-4333-8333-333333333333"); expect(stages).toBe(1); expect(uploads).toBe(2);
 });
 it("retrieves a private image through the authenticated service boundary before displaying pixels", async () => {
@@ -48,7 +48,7 @@ it("retrieves a private image through the authenticated service boundary before 
  const attachment = { id: "33333333-3333-4333-8333-333333333333", contentType: "image/jpeg", sizeBytes: 3, filename: "synthetic-private.jpg" };
  server.use(http.get("*/services/conversations/:id", () => HttpResponse.json({ id, resourceId: id, purpose: "support", status: "open", assignmentVersion: 0, assigned: false, operatorName: null, sourceListingId: null, canSend: true, messages: [{ ...message, attachment }], lastSequence: 1, readThrough: 0, unread: 1, hasMore: false })), http.get("*/services/conversations/:id/attachments/:file", ({ request }) => { reads++; expect(request.headers.get("Authorization")).toBe("Bearer synthetic"); return new HttpResponse(new Uint8Array([1, 2, 3]), { headers: { "Content-Type": "image/jpeg" } }); }));
  const screen = await renderMobile(<ServiceScreen/>); await fireEvent.press(await screen.findByRole("button", { name: "General Support" })); await screen.findByText("synthetic-private.jpg");
- expect(reads).toBe(0); await fireEvent.press(screen.getByRole("button", { name: "Private attachment" })); expect(await screen.findByLabelText("synthetic-private.jpg")).toBeTruthy(); expect(reads).toBe(1);
+ expect(reads).toBe(0); await fireEvent.press(screen.getByRole("button", { name: "Private attachment" })); expect(await screen.findByLabelText("synthetic-private.jpg")).toBeTruthy(); expect(reads).toBe(1); expect(getAllHosts(screen.root, "Modal", { visible: true })).toHaveLength(1);
 });
 it("shows the public history explanation and price before sign-in without requesting private history", async () => {
  await clearAuthSession(); let privateReads = 0; server.use(http.get("*/services/conversations", () => { privateReads++; return HttpResponse.json([]); }));

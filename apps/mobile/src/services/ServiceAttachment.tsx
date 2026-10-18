@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Image, View } from "react-native";
+import { Image, Modal, View } from "react-native";
 import type { ServiceMessagingSchemas as S } from "@auto-tm/contracts";
 
 import { apiClient } from "../api/client";
@@ -21,5 +21,5 @@ export function ServiceAttachment({ conversationId, attachment, locale }: { conv
    setImage(`data:${attachment.contentType};base64,${btoa(binary)}`);
   } catch { setFailed(true); } finally { setBusy(false); }
  }
- return <View className="gap-2"><Text>{attachment.filename}</Text>{["image/jpeg", "image/webp"].includes(attachment.contentType) ? <Button onPress={() => { void open(); }} disabled={busy}><Text>{failed ? c.refresh : c.attachment}</Text></Button> : null}{failed ? <Text accessibilityRole="alert">{c.permission}</Text> : null}{image ? <Image accessibilityLabel={attachment.filename} source={{ uri: image }} className="h-72 w-full" resizeMode="contain"/> : null}</View>;
+ return <View className="gap-2"><Text>{attachment.filename}</Text>{["image/jpeg", "image/webp"].includes(attachment.contentType) ? <Button onPress={() => { void open(); }} disabled={busy}><Text>{failed ? c.refresh : c.attachment}</Text></Button> : null}{failed ? <Text accessibilityRole="alert">{c.permission}</Text> : null}{image ? <Modal visible transparent={false} onRequestClose={() => setImage(null)}><View className="flex-1 gap-3 bg-background p-5"><Button accessibilityLabel={c.back} onPress={() => setImage(null)}><Text>{c.back}</Text></Button><Image accessibilityLabel={attachment.filename} source={{ uri: image }} className="flex-1 w-full" resizeMode="contain"/></View></Modal> : null}</View>;
 }

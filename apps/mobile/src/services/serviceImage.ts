@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { apiClient } from "../api/client";
 
-export type ServiceImage = { bytes: Uint8Array; filename: string; stagedId?: string };
+export type ServiceImage = { bytes: Uint8Array; filename: string; preview?: string; stagedId?: string };
 export async function pickServiceImage(): Promise<ServiceImage | null> {
  const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: false, quality: 1 });
  if (picked.canceled || !picked.assets[0]) return null;
@@ -20,7 +20,9 @@ export async function pickServiceImage(): Promise<ServiceImage | null> {
   rendered = await context.renderAsync(); const encoded = await rendered.saveAsync({ format: SaveFormat.JPEG, compress: 0.8 });
   output = new File(encoded.uri);
   if (output.size <= 0 || output.size > 5 * 1024 * 1024) throw new Error("INVALID_ATTACHMENT");
-  return { bytes: await output.bytes(), filename: "service-image.jpg" };
+  const bytes = await output.bytes();
+  let binary = ""; for (let start = 0; start < bytes.length; start += 8192) binary += String.fromCharCode(...bytes.subarray(start, start + 8192));
+  return { bytes, filename: "service-image.jpg", preview: `data:image/jpeg;base64,${btoa(binary)}` };
  } finally { output?.delete(); rendered?.release(); decoded?.release(); context.release(); }
 }
 export async function uploadServiceImage(id: string, purpose: S.ServicePurpose, image: ServiceImage): Promise<string> {
