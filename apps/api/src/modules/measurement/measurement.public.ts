@@ -36,3 +36,9 @@ export const MEASUREMENT_CONVERSION_PORT=Symbol("MeasurementConversionPort");
 export interface MeasurementConversionPort {
  eligible(transaction:object,input:{userId:string|null;event:MeasurementSchemas.MeasurementEvent}):Promise<boolean>;
 }
+
+export const MEASUREMENT_SIGN_IN_OUTCOME_PORT=Symbol("MeasurementSignInOutcomePort");
+export interface MeasurementSignInOutcomePort {
+ /** Only the source auth boundary supplies accepted outcomes. Guest credential is never an event field. */
+ record(input:{attemptId?:string;guestCapability?:string;result:"success"|"expected_rejection"|"technical_failure";durationMs:number;category?:"validation"|"permission"|"unknown"}):Promise<void>;
+}
