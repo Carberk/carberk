@@ -8,7 +8,8 @@ import { diagnosticCopy } from "./copy";
 
 import { AdminLanguageSwitch, AdminLocaleProvider } from "@/lib/i18n";
 
-vi.mock("next/headers",()=>({cookies:async()=>({get:()=>({value:"synthetic-access"})}),headers:async()=>new Headers()}));
+const framework = vi.hoisted(() => ({ rejectHeaders: false }));
+vi.mock("next/headers",()=>({cookies:async()=>({get:()=>({value:"synthetic-access"})}),headers:async()=>{if(framework.rejectHeaders)throw new TypeError("request context unavailable");return new Headers();}}));
 vi.mock("next/navigation",()=>({redirect:(path:string)=>{throw new Error(path);},unstable_rethrow:()=>{}}));
 const actor="11111111-1111-4111-8111-111111111111",orderId="22222222-2222-4222-8222-222222222222",templateId="33333333-3333-4333-8333-333333333333",centerId="44444444-4444-4444-8444-444444444444",reportId="55555555-5555-4555-8555-555555555555";
 const text={en:"Synthetic brake check",ru:"Синтетическая проверка тормозов",tk:"Emeli tormoz barlagy"};
@@ -19,7 +20,7 @@ const reportFixture=():D.DiagnosticReportRecord=>({id:reportId,orderId,audience:
 function setup(locale:"en"|"ru"|"tk"="en"){return render(<AdminLocaleProvider initialLocale={locale}><AdminLanguageSwitch/><DiagnosticWorkspace/></AdminLocaleProvider>);}
 async function open(view:ReturnType<typeof setup>,locale:"en"|"ru"|"tk"="en"){fireEvent.click(await view.findByRole("button",{name:diagnosticCopy[locale].open}));await view.findByText(text[locale],{selector:"h4"});}
 beforeEach(()=>{
- denied=false;conflict=false;uploadFailures=0;savedRequests=[];uploads=[];transitions=[];report=reportFixture();
+ framework.rejectHeaders=false;denied=false;conflict=false;uploadFailures=0;savedRequests=[];uploads=[];transitions=[];report=reportFixture();
  context={actorId:actor,order:{id:orderId,centerId,templateVersionId:templateId,audience:"buyer_private",listingId:null,status:"arrived",version:7,synthetic:true,createdAt:"2026-10-17T00:00:00.000Z",physicalAuthorized:true,publicationAuthorized:false,vehicleMatched:false,physicalAuthorization:{authorityReference:"Synthetic authorization",recordedBy:actor,recordedAt:"2026-10-17T00:00:00.000Z"},publicationAuthorization:null,observedVehicle:{observedAt:report.observedAt,mileageKm:report.mileageKm,method:"manual",vin:null,manualReference:"Synthetic manual match"},events:[]},template:{id:templateId,centerId,version:1,definition,synthetic:true,publishedAt:"2026-10-17T00:00:00.000Z"},capabilities:["diagnostics.technician"],assignments:[{userId:actor,capability:"diagnostics.technician"}],staffChoices:[]};
  vi.stubGlobal("fetch",async(url:string,init?:RequestInit)=>{
   const path=new URL(String(url),"http://localhost").pathname;
@@ -118,4 +119,17 @@ it("disables report decisions and selection while current workspace evidence is 
   expect((view.getByRole("button",{name:diagnosticCopy.en.submit}) as HTMLButtonElement).disabled).toBe(true);
   expect((view.getByRole("combobox",{name:diagnosticCopy.en.selectReport}) as HTMLSelectElement).disabled).toBe(true);
  }finally{release();await waitFor(()=>expect(view.queryByText(diagnosticCopy.en.loading)).toBeNull());}
+});
+
+it("hides protected decisions when a real action rejects while reading the framework request context", async () => {
+ const view=setup();await open(view);
+ expect(view.getByRole("button",{name:diagnosticCopy.en.submit})).toBeTruthy();
+ framework.rejectHeaders=true;
+ fireEvent.click(view.getByRole("button",{name:diagnosticCopy.en.refresh}));
+ await view.findByText(diagnosticCopy.en.error);
+ expect(view.queryByRole("button",{name:diagnosticCopy.en.submit})).toBeNull();
+ expect(view.queryByRole("combobox",{name:diagnosticCopy.en.selectReport})).toBeNull();
+ framework.rejectHeaders=false;
+ fireEvent.click(view.getByRole("button",{name:diagnosticCopy.en.retry}));
+ expect(await view.findByRole("button",{name:diagnosticCopy.en.open})).toBeTruthy();
 });
