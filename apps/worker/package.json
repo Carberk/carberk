@@ -7,6 +7,7 @@
     "predev": "pnpm --filter @auto-tm/contracts build && pnpm --filter @auto-tm/db build",
     "dev": "nest start --watch",
     "start": "node dist/main",
+    "start:watchdog": "node dist/operations/watchdog.main",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run --passWithNoTests",
     "test:unit": "vitest run --exclude '**/*.e2e.spec.ts' --passWithNoTests",
