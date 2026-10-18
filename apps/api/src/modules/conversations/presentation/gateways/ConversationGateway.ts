@@ -546,9 +546,10 @@ export class ConversationGateway implements OnGatewayDisconnect {
   private socketActor(client: Socket): ConversationActor | undefined {
     const user = this.authenticatedUser(client);
     if (!user) return undefined;
-    const raw = client.handshake.headers["x-business-id"];
+    const raw = client.handshake?.headers?.["x-business-id"];
     const businessId = Array.isArray(raw) ? raw[0] : raw;
-    return { userId: user.sub, sessionId: user.sid, ...(businessId ? { businessId } : {}) };
+    if (!businessId) return undefined;
+    return { userId: user.sub, sessionId: user.sid, businessId };
   }
 
   private authenticatedUser(client: Socket): AuthenticatedSocketUser | null {
