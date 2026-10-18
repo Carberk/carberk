@@ -29,8 +29,8 @@ const { Queue, Worker } = queueRequire("bullmq") as {
   Queue: new (name: string, options: object) => DeliveryQueue;
   Worker: new (name: string, handler: () => Promise<void>, options: object) => { close(): Promise<void> };
 };
-const source = readFileSync(`${root}/scripts/staging-campaign.mjs`, "utf8").replace("export function campaignMain", "function campaignMain") +
-  readFileSync(`${root}/scripts/staging-remote.mjs`, "utf8").replace("import { campaignMain } from './staging-campaign.mjs';", "").replace("export function remoteProgram", "function remoteProgram");
+const source = readFileSync(`${root}/scripts/staging-campaign.mjs`, "utf8").replaceAll("export function ", "function ").replaceAll("export async function ", "async function ") +
+  readFileSync(`${root}/scripts/staging-remote.mjs`, "utf8").replace("import { campaignMain, campaignQueueMain } from './staging-campaign.mjs';", "").replace("export function remoteProgram", "function remoteProgram");
 
 describe("reserved staging fixtures on disposable application schema", () => {
   let postgres: StartedPostgreSqlContainer;
@@ -61,8 +61,8 @@ describe("reserved staging fixtures on disposable application schema", () => {
     let receipt; let code = 0;
     const identity = { projectId: "test-project", environmentId: "test-staging", services: { api: "test-api" },
       origins: { database: "postgresql://postgres.railway.internal:5432/railway", media: "http://minio.railway.internal:9000", publicMedia: "https://media.example" } };
-    const process = { execPath: globalThis.process.execPath, env: { STAGING_CAMPAIGN_PROFILE_ENABLED: "campaign897-identities-v1", RAILWAY_PROJECT_ID: "test-project", RAILWAY_ENVIRONMENT_ID: "test-staging", RAILWAY_SERVICE_ID: "test-api", RAILWAY_ENVIRONMENT_NAME: "staging", APP_ENV: "staging", SMS_DRIVER: "mock", AUTOTM_COMMIT_SHA: "a".repeat(40), DATABASE_URL: "postgresql://u:secret@postgres.railway.internal:5432/railway", MINIO_ENDPOINT: "http://minio.railway.internal:9000", MINIO_PUBLIC_URL: "https://media.example" }, exitCode: 0 };
-    const payload = { kind, id, namespace: `cf_${id}`, target: "a".repeat(40), identity, profile, candidate };
+    const process = { execPath: globalThis.process.execPath, env: { STAGING_CAMPAIGN_PROFILE_ENABLED: "campaign897-identities-v1", RAILWAY_PROJECT_ID: "test-project", RAILWAY_ENVIRONMENT_ID: "test-staging", RAILWAY_SERVICE_ID: "test-api", RAILWAY_ENVIRONMENT_NAME: "staging", APP_ENV: "staging", SMS_DRIVER: "mock", REDIS_URL: "redis://u:secret@redis.railway.internal:6379/0", AUTOTM_COMMIT_SHA: "a".repeat(40), DATABASE_URL: "postgresql://u:secret@postgres.railway.internal:5432/railway", MINIO_ENDPOINT: "http://minio.railway.internal:9000", MINIO_PUBLIC_URL: "https://media.example" }, exitCode: 0 };
+    const payload = { redisOrigin: "redis://redis.railway.internal:6379/0", kind, id, namespace: `cf_${id}`, target: "a".repeat(40), identity, profile, candidate };
     const program = runInNewContext(`${source}; remoteProgram(payload)`, { payload });
     runInNewContext(program, { URL, process, require: (name: string) => name === "node:child_process" ? {
       spawnSync: (_program: string, _args: string[], options: { input: string }) => {
@@ -263,6 +263,13 @@ describe("reserved staging fixtures on disposable application schema", () => {
     expect(execute("reset", id, "campaign897-identities-v1").code).toBe(0);
     expect(await queue.getJob(requestId)).toBeUndefined();
     expect((await queue.getJob("unrelated-delivery"))?.data.to).toBe("unrelated@example.invalid");
+    // A producer admitted before cleaning can reach Redis after its SQL lock is
+    // gone. The durable queue fence must reject this already-in-flight payload.
+    const email = (await pool.query(`SELECT email FROM "cf_${id}".campaign_entities WHERE alias='buyer-a'`)).rows[0]?.email as string;
+    await queue.add("sign-in-code", { to: email, code: "123456", locale: "en", purpose: "sign-in" }, {
+      jobId: requestId, deduplication: { id: `campaign-cf_${id}-${requestId}` },
+    });
+    expect(await queue.getJob(requestId)).toBeUndefined();
     expect(execute("reset", id, "campaign897-identities-v1").code).toBe(0);
     expect((await pool.query(`SELECT count(*)::int AS count FROM "cf_${id}".campaign_delivery_sink`)).rows[0]).toEqual({ count: 0 });
     expect((await pool.query(`SELECT count(*)::int AS count FROM otp_requests WHERE id=$1`, [requestId])).rows[0]).toEqual({ count: 0 });
