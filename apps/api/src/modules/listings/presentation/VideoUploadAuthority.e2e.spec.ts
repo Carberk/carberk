@@ -92,6 +92,32 @@ describe("video upload current authority and retirement", () => {
     }
   });
   const body = (listing = "owner-listing", key = "first-video") => ({ protocolVersion: 1, target: { kind: "listing", id: suite.id(listing) }, prepared: { sizeBytes: 1000, sha256: "a".repeat(64) }, posterMs: 0, idempotencyKey: key });
+  async function readyVideo() {
+    const { body: created } = await create("owner", body()).expect(201);
+    await action(created.sessionId, "complete").expect(200);
+    const row = await db.videoUploadSession.findUniqueOrThrow({ where: { id: created.sessionId } });
+    const posterKey = `video/v1/${row.uploadId}/${row.id}/poster.jpg`;
+    await db.videoGeneration.update({ where: { id: row.id }, data: { state: "READY", readyAt: epoch, durationMs: 5000, posterKey, manifest: { assets: [{ key: posterKey }] } } });
+    await db.videoUploadSession.update({ where: { id: row.id }, data: { state: "READY" } });
+    await db.mediaUpload.update({ where: { id: row.uploadId }, data: { state: "ADOPTED", claimTargetType: "listing", claimTargetId: suite.id("owner-listing"), claimToken: null, claimDeadline: null } });
+    await db.listing.update({ where: { id: suite.id("owner-listing") }, data: { activeVideoGenerationId: row.id, pendingVideoGenerationId: null } });
+    return { ...row, posterKey };
+  }
+  it("lets its seller observe the current ready adopted video after processing", async () => {
+    const row = await readyVideo();
+    const response = await request.get(`/api/v1/listing-video-upload-sessions/${row.id}`).set("authorization", `Bearer ${token("owner")}`).expect(200);
+    expect(response.body).toMatchObject({ state: "READY", sessionId: row.id });
+    expect(response.body.sourceKey).toBeUndefined();
+  });
+  it("removes the current video immediately while retaining exact asynchronous cleanup", async () => {
+    const row = await readyVideo();
+    await request.delete(`/api/v1/listings/${suite.id("owner-listing")}/video`).set("authorization", `Bearer ${token("other")}`).expect(404);
+    expect((await db.listing.findUniqueOrThrow({ where: { id: suite.id("owner-listing") } })).activeVideoGenerationId).toBe(row.id);
+    await request.delete(`/api/v1/listings/${suite.id("owner-listing")}/video`).set("authorization", `Bearer ${token("owner")}`).expect(204);
+    expect(await db.listing.findUniqueOrThrow({ where: { id: suite.id("owner-listing") } })).toMatchObject({ activeVideoGenerationId: null, pendingVideoGenerationId: null });
+    expect(await db.mediaUpload.findUniqueOrThrow({ where: { id: row.uploadId } })).toMatchObject({ state: "RETIRED" });
+    expect(await db.videoCleanupWork.findUniqueOrThrow({ where: { id: `session:${row.id}` } })).toMatchObject({ state: "PENDING", sourceKey: row.sourceKey, objectKeys: [row.posterKey] });
+  });
   it("refuses another seller's target and rejects forged upload/source authority", async () => {
     await create("owner", body("other-listing")).expect(404);
     await create("owner", { ...body(), sourceKey: "forged.mp4" }).expect(400);
