@@ -6,6 +6,7 @@ export const ImprovementRateSchema=z.object({
  state:z.enum(["ready","empty","immature","delayed"]),numerator:z.number().nonnegative().nullable(),denominator:z.number().nonnegative().nullable(),
  value:z.number().nonnegative().nullable(),smallSample:z.boolean(),
 }).strict();
+export type ImprovementRate=z.infer<typeof ImprovementRateSchema>;
 export const ImprovementScorecardSchema=z.object({
  version:z.literal(1),state:z.enum(["ready","empty","delayed"]),
  inventory:z.object({listingHours:z.number().nonnegative().nullable(),averageActive:z.number().nonnegative().nullable(),currentActive:z.number().int().nonnegative().nullable()}).strict(),
