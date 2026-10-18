@@ -44,7 +44,7 @@ export const MeasurementEventSchema = z.discriminatedUnion("eventName", [
   z.object({ ...envelope, ...product, eventName: z.literal("wizard_step_result"), payload: z.object({ draftId: id, step, ...outcome }).strict() }).strict(),
   z.object({ ...envelope, ...reliability, eventName: z.literal("media_preparation_result"), payload: z.object(media).strict() }).strict(),
   z.object({ ...envelope, ...reliability, eventName: z.literal("media_upload_result"), payload: z.object(media).strict() }).strict(),
-  z.object({ ...envelope, ...product, eventName: z.literal("listing_published"), payload: z.object({ listingId: id, cityId: id }).strict() }).strict(),
+  z.object({ ...envelope, ...product, eventName: z.literal("listing_published"), payload: z.object({ listingId: id, cityId: id, draftId: id.optional() }).strict() }).strict(),
   z.object({ ...envelope, ...product, eventName: z.literal("listing_visibility_changed"), payload: z.object({ listingId: id, visibility: z.enum(["public", "hidden"]), reason: z.enum(["published", "sold", "archived", "deleted", "moderated", "restored", "business_suspended"]) }).strict() }).strict(),
   z.object({ ...envelope, ...product, eventName: z.literal("call_intent"), payload: z.object({ listingId: id }).strict() }).strict(),
   z.object({ ...envelope, ...product, eventName: z.literal("conversation_created"), payload: z.object({ conversationId: id, listingId: id }).strict() }).strict(),
