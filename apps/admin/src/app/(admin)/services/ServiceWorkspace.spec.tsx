@@ -124,3 +124,23 @@ it("retains the History quote draft across locales and sends measured feasibilit
  fireEvent.click(screen.getByRole("button", { name: "Предложить точные условия" }));
  await waitFor(() => expect(recorded).toHaveLength(1)); expect(recorded[0]?.["vin"]).toBe("1HGCM82633A004352"); expect(recorded[0]?.["feasible"]).toBe(true);
 });
+
+it("requires original readability and matching-link checks before delivering a stored PDF", async () => {
+ const recorded: Record<string, unknown>[] = []; const original = globalThis.fetch;
+ let state = "staged";
+ const report = () => ({ id, provider: "carfax", vin: "1HGCM82633A004352", originalDate: "2020-01-01T00:00:00Z", sizeBytes: 300, expectedPages: 2, sharedLink: null, deliveredAt: null, state, canShare: true });
+ vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+  if (String(url).endsWith("/history/artifacts")) { const command = JSON.parse(String(init?.body)); recorded.push(command); if (command.kind === "verify") state="verified"; return Response.json({ ok: true }); }
+  if (String(url).endsWith("/history/reports")) return Response.json({ delivered: [], archive: [], staged: [report()] });
+  if (String(url).endsWith("/history")) return Response.json({ synthetic: true, quotes: [], order: { id, quoteId: id, state: "fulfilling", version: 0, day: "2026-10-20", holdExpiresAt: "2026-10-20T04:00:00Z", promiseAt: "2026-10-20T05:00:00Z", paidAt: "2026-10-20T04:00:00Z", escalatedAt: null, recoveryDeadline: null, recoveryUsed: false, refundState: null }, payments: [] });
+  const response = await original(url, init); const data = await response.json(); return Response.json(data && typeof data === "object" && !Array.isArray(data) && data.id ? { ...data, purpose: "history" } : data);
+ });
+ const screen = render(<AdminLocaleProvider initialLocale="en"><ServiceWorkspace/></AdminLocaleProvider>);
+ await waitFor(() => expect(screen.getByRole("button", { name: "General Support" })).toBeTruthy()); fireEvent.click(screen.getByRole("button", { name: "General Support" }));
+ const verify = await screen.findByRole("button", { name: "Confirm VIN, date and readable pages" }); expect((verify as HTMLButtonElement).disabled).toBe(true);
+ fireEvent.click(screen.getByLabelText("I opened the original and checked VIN, date, provider and every expected page")); fireEvent.click(verify);
+ const deliver = await screen.findByRole("button", { name: "Deliver verified original and link" }); expect((deliver as HTMLButtonElement).disabled).toBe(true);
+ fireEvent.change(screen.getByLabelText("Matching approved provider link carfax"), { target: { value: "https://example.invalid/report" } });
+ fireEvent.click(screen.getByLabelText("The link opens the same checked report")); fireEvent.click(deliver);
+ await waitFor(() => expect(recorded).toHaveLength(2)); expect(recorded.map(command => command["kind"])).toEqual(["verify","deliver"]); expect(recorded[1]?.["linkMatches"]).toBe(true);
+});
