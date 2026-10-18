@@ -10,6 +10,8 @@ import { Text } from "@/components/ui/text";
 
 /** What `GalleryImage` needs of a photo: a Listing's media, or a card's photo key and ThumbHash. */
 export type GalleryPhoto = Pick<ListingsSchemas.ListingMedia, "key"> & {
+  kind?: "image" | "video" | undefined;
+  durationMs?: number | undefined;
   variants?: Partial<ListingsSchemas.ListingMedia["variants"]> | undefined;
   thumbHash?: string | null | undefined;
   width?: number | null | undefined;
@@ -78,7 +80,7 @@ export function GalleryImage({
   sourceOverride?: string;
 }) {
   const [useOriginalImage, setUseOriginalImage] = useState(false);
-  const sourceUri = useOriginalImage ? buildOriginalUrl(item.key) : (sourceOverride ?? listingPhotoUrl(item, variant));
+  const sourceUri = useOriginalImage && item.kind !== "video" ? buildOriginalUrl(item.key) : (sourceOverride ?? listingPhotoUrl(item, variant));
   const placeholderUri = placeholderVariant ? listingPhotoUrl(item, placeholderVariant) : undefined;
   const thumbHash = item.thumbHash;
   const [loaded, setLoaded] = useState(false);
@@ -91,14 +93,14 @@ export function GalleryImage({
       style={thumbHash ? StyleSheet.absoluteFill : style}
       contentFit={contentFit}
       priority={priority}
-      cachePolicy="memory-disk"
+      cachePolicy={item.kind === "video" ? "none" : "memory-disk"}
       onDisplay={() => onDisplayedUri?.(sourceUri)}
       onLoad={(event) => {
         setLoaded(true);
         const { width, height } = event.source;
         if (width > 0 && height > 0) onAspectRatio?.(width / height);
       }}
-      onError={() => setUseOriginalImage(true)}
+      onError={() => item.kind !== "video" && setUseOriginalImage(true)}
     />
   );
   if (!thumbHash) return photo;

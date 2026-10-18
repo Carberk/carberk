@@ -1,7 +1,13 @@
+import { router } from "expo-router";
+import type { ListingsSchemas } from "@auto-tm/contracts";
 import { Enums } from "@auto-tm/contracts";
 import { useCallback, useMemo } from "react";
 import { FlatList, Pressable, View, useWindowDimensions, type ListRenderItem } from "react-native";
 import { useTranslation } from "react-i18next";
+
+import { useListingVideo } from "../videoEditor/useListingVideo";
+import { videoPosterLabel } from "../videoEditor/videoPosterLabel";
+import { GalleryImage } from "../components/GalleryImage";
 
 import { ListingPhoto, PhotoChip } from "./ListingPhoto";
 
@@ -20,7 +26,7 @@ export const STRIP_HEIGHT_SHARE = 0.4575;
 /** The seam between two photos, in dp: a thin line of the card, as on Auto.ru. */
 export const STRIP_GAP = 2;
 
-type Tile = { kind: "photo"; key: string; thumbHash?: string } | { kind: "more"; count: number };
+type Tile = { kind: "video"; media: ListingsSchemas.ListingMedia } | { kind: "photo"; key: string; thumbHash?: string } | { kind: "more"; count: number };
 
 /** The tiles of a strip: every photo key in order with its ThumbHash, then "+N" when the Listing has more photos than keys. */
 export function stripTiles(photoKeys: readonly string[], photoCount: number, thumbHashes: readonly (string | null)[] = []): Tile[] {
@@ -34,6 +40,7 @@ export function stripTiles(photoKeys: readonly string[], photoCount: number, thu
 }
 
 interface ListingPhotoStripProps {
+  listingId?: string | undefined;
   photoKeys: readonly string[];
   /** ThumbHashes parallel to `photoKeys`; a missing or null slot has no blurred preview. */
   thumbHashes?: readonly (string | null)[];
@@ -71,21 +78,26 @@ interface ListingPhotoStripProps {
  * count: the "+N photos" tile says there are more, and the full-screen viewer
  * counts.
  */
-export function ListingPhotoStrip({ photoKeys, thumbHashes, photoCount, condition, onOpen, onPressIn, onPressOut }: ListingPhotoStripProps) {
-  const { t } = useTranslation();
+export function ListingPhotoStrip({ listingId, photoKeys, thumbHashes, photoCount, condition, onOpen, onPressIn, onPressOut }: ListingPhotoStripProps) {
+  const { t, i18n } = useTranslation();
+  const video = useListingVideo(listingId);
   const { width: screenWidth } = useWindowDimensions();
   const cardWidth = screenWidth - CARD_INSET * 2;
   const height = Math.round(cardWidth * STRIP_HEIGHT_SHARE);
   const photoWidth = Math.round(cardWidth * STRIP_PHOTO_SHARE);
-  const tiles = useMemo(() => stripTiles(photoKeys, photoCount, thumbHashes), [photoKeys, photoCount, thumbHashes]);
+  const photos = useMemo(() => stripTiles(photoKeys, photoCount, thumbHashes), [photoKeys, photoCount, thumbHashes]);
+  const tiles: Tile[] = video ? [...photos.slice(0, 1), { kind: "video", media: video.media }, ...photos.slice(1)] : photos;
   const interval = photoWidth + STRIP_GAP;
 
   // Photos meet square at a thin seam; only the strip's two outer ends are rounded.
   const renderItem = useCallback<ListRenderItem<Tile>>(({ item, index }) => {
     const ends = cn(index === 0 && "rounded-l-xl", index === tiles.length - 1 && "rounded-r-xl");
     return <Pressable
-    accessible={false} onPress={onOpen} onPressIn={onPressIn} onPressOut={onPressOut}
-  >{item.kind === "photo"
+    accessible={item.kind === "video"} accessibilityRole={item.kind === "video" ? "button" : undefined} accessibilityLabel={item.kind === "video" ? videoPosterLabel(item.media.durationMs, i18n.language) : undefined} onPress={item.kind === "video" && listingId ? () => router.push({ pathname: "/(public)/listings/[id]", params: { id: listingId, video: item.media.id } }) : onOpen} onPressIn={onPressIn} onPressOut={onPressOut}
+  >{item.kind === "video" ? <View testID="listing-video-poster" style={{ width: photoWidth, height }} className={cn("overflow-hidden bg-secondary", ends)}>
+      <GalleryImage item={item.media} variant="detail" contentFit="cover" style={{ width: "100%", height: "100%" }} />
+      <View className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-1"><Text className="font-bold text-white">▶ {Math.ceil((item.media.durationMs ?? 0) / 1000)}s</Text></View>
+    </View> : item.kind === "photo"
     ? <View testID="listing-photo" style={{ width: photoWidth, height }} className={cn("overflow-hidden bg-secondary", ends)}>
       <ListingPhoto mediaKey={item.key} thumbHash={item.thumbHash} emptyLabel={t("noPhotos")} variant="detail" />
     </View>
@@ -93,7 +105,7 @@ export function ListingPhotoStrip({ photoKeys, thumbHashes, photoCount, conditio
       <Text className="font-heading text-title font-semibold text-foreground" style={tabularFigures}>{`+${item.count}`}</Text>
       <Text className="text-footnote text-muted-foreground">{t("photos")}</Text>
     </View>}</Pressable>;
-  }, [height, photoWidth, tiles.length, t, onOpen, onPressIn, onPressOut]);
+  }, [height, photoWidth, tiles.length, t, i18n.language, listingId, onOpen, onPressIn, onPressOut]);
 
   // 8 dp inside the first photo's corner at rest, which also lines the chip up with the text below.
   const chips = <View pointerEvents="none" className="absolute bottom-2 left-4 flex-row gap-1.5">
@@ -119,7 +131,7 @@ export function ListingPhotoStrip({ photoKeys, thumbHashes, photoCount, conditio
       testID="listing-photo-strip"
       horizontal
       data={tiles}
-      keyExtractor={(item) => item.kind === "photo" ? item.key : "more"}
+      keyExtractor={(item) => item.kind === "photo" ? item.key : item.kind === "video" ? item.media.id : "more"}
       renderItem={renderItem}
       ItemSeparatorComponent={StripSeam}
       contentContainerStyle={STRIP_CONTENT}

@@ -100,6 +100,7 @@ export function ListingDetailView({
       scrollEventThrottle={16}
     >
       <PhotoGallery
+        listingId={listing.id}
         visibleTop={visibleTop}
         media={listing.media}
         banner={banner ? t(banner) : undefined}

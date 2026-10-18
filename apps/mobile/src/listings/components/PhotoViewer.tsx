@@ -16,6 +16,8 @@ import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 import Animated from "react-native-reanimated";
 
+import { videoPosterLabel } from "../videoEditor/videoPosterLabel";
+
 import { PhotoTransitionOverlay } from "./PhotoTransitionOverlay";
 import { usePhotoTransition } from "./usePhotoTransition";
 import type { PhotoGeometry } from "./photoTransitionMath";
@@ -36,6 +38,7 @@ const STRIP_PADDING = 12;
 
 export interface PhotoViewerProps {
   visible: boolean;
+  onPlayVideo?: (() => void) | undefined;
   origin?: PhotoGeometry | null;
   getReturnGeometry?: (index: number) => PhotoGeometry | null;
   onTileHidden?: (index: number | null) => void;
@@ -69,6 +72,7 @@ export function PhotoViewer({
   onClose,
   headerAction,
   footer,
+  onPlayVideo,
   ...transitionProps
 }: PhotoViewerProps) {
   // The photo the viewer is on lives in the content, which mounts fresh on
@@ -99,6 +103,7 @@ export function PhotoViewer({
           onClose={onClose}
           headerAction={headerAction}
           footer={footer}
+          onPlayVideo={onPlayVideo}
         />
       </GestureHandlerRootView>
     </Modal>
@@ -112,6 +117,7 @@ function ViewerContent({
   onClose,
   headerAction,
   footer,
+  onPlayVideo,
   onIndexChange,
   showRef,
   closeRef,
@@ -121,7 +127,7 @@ function ViewerContent({
   closeRef: { current: () => void };
   indexRef: { current: number };
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const [index, setIndex] = useState(initialIndex);
@@ -236,6 +242,10 @@ function ViewerContent({
             if (position !== index && !(loadNeighbours && isNearPhoto(position, index))) {
               return <View style={{ width, height: pagerHeight }} />;
             }
+            if (item.kind === "video") return <Pressable accessibilityRole="button" accessibilityLabel={videoPosterLabel(item.durationMs, i18n.language)} onPress={onPlayVideo} style={{ width, height: pagerHeight }}>
+              <GalleryImage item={item} variant="detail" contentFit="contain" style={{ width: "100%", height: "100%" }} onDisplayedUri={position === initialIndex ? transition.onPageDisplay : undefined} onAspectRatio={(ratio) => rememberRatio(item.id, ratio)} />
+              <View className="absolute bottom-4 left-4 rounded-md bg-black/70 px-3 py-2"><Text className="font-bold text-white">▶ {Math.ceil((item.durationMs ?? 0) / 1000)}s</Text></View>
+            </Pressable>;
             const isSharp = sharp.has(item.id);
             return (
               <ZoomableImage
@@ -290,7 +300,7 @@ function ViewerContent({
         renderItem={({ item, index: position }) => (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={t("photoOf", { n: position + 1, total: media.length })}
+            accessibilityLabel={item.kind === "video" ? videoPosterLabel(item.durationMs, i18n.language) : t("photoOf", { n: position + 1, total: media.length })}
             accessibilityState={{ selected: position === index }}
             onPress={() => selectThumbnail(position)}
             className={cn(
