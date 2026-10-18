@@ -34,7 +34,7 @@ import { MyListingsController } from "./presentation/MyListingsController";
 import { ExchangeRatesController } from "./presentation/ExchangeRatesController";
 import { FavoritesController } from "./presentation/FavoritesController";
 import { ContactPhonesController } from "./presentation/ContactPhonesController";
-import { VideoUploadController, ListingVideoRemovalController } from "./presentation/VideoUploadController";
+import { VideoUploadController, ListingVideoRemovalController, VideoTargetController } from "./presentation/VideoUploadController";
 import { OWNED_VIDEO_UPLOAD_PROTOCOL, OwnedVideoUploadProtocol } from "./application/OwnedVideoUploadProtocol";
 import { PrismaOwnedVideoSessionLedger, VIDEO_ID_FACTORY } from "./infrastructure/PrismaOwnedVideoSessionLedger";
 import { VIDEO_OBJECT_STORAGE } from "./domain/ports/VideoObjectStorage";
@@ -124,7 +124,7 @@ import { LISTING_VIEWS_PORT } from "./domain/ports/ListingViewsPort";
 
 @Module({
   imports: [PrismaModule, EventEmitterModule, IdentityModule, MeasurementModule],
-  controllers: [PublicMarketplaceController, BusinessInventoryController,ListingViewsController, ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController, VideoUploadController, ListingVideoRemovalController, VideoCapabilitiesController, VideoGrantController, VideoDescriptorController, VideoPlaybackController],
+  controllers: [PublicMarketplaceController, BusinessInventoryController, ListingViewsController, ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController, VideoUploadController, ListingVideoRemovalController, VideoTargetController, VideoCapabilitiesController, VideoGrantController, VideoDescriptorController, VideoPlaybackController],
   providers: [
     { provide: PUBLIC_MARKETPLACE_READ_PORT, useClass: PrismaPublicMarketplaceReadRepository },
     { provide: BUSINESS_INVENTORY_REPOSITORY, useClass: PrismaBusinessInventoryRepository },

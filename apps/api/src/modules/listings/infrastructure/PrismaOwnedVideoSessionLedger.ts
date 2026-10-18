@@ -71,6 +71,26 @@ export class PrismaOwnedVideoSessionLedger implements OwnedVideoSessionLedger {
       for (const id of generations) await this.retire(tx, id, now);
     });
   }
+  async targetState(actor: ListingActor, kind: "draft" | "listing", id: string) {
+    return this.transaction(async tx => {
+      await this.actor(tx, actor);
+      const target = await this.target(tx, actor, kind, id);
+      const active = target.kind === "listing" && target.row.activeVideoGenerationId
+        ? await tx.videoGeneration.findUnique({ where: { id: target.row.activeVideoGenerationId } }) : null;
+      const pending = target.kind === "listing"
+        ? target.row.pendingVideoGenerationId ? await tx.videoUploadSession.findUnique({ where: { id: target.row.pendingVideoGenerationId } }) : null
+        : await tx.videoUploadSession.findFirst({ where: { targetKind: "draft", targetId: id, protocolVersion: 1, cancelledAt: null, state: { notIn: ["CLEANUP_PENDING", "DELETED", "CANCELLED"] } }, orderBy: { targetRevision: "desc" } });
+      return { active: active?.state === "READY" && active.durationMs ? { generationId: active.id, durationMs: active.durationMs } : null, pending: pending ? { sessionId: pending.id, state: pending.state } : null };
+    });
+  }
+  async cancelPending(actor: ListingActor, listingId: string) {
+    await this.transaction(async tx => {
+      await this.actor(tx, actor);
+      const target = await this.target(tx, actor, "listing", listingId);
+      if (target.kind !== "listing") throw unavailable();
+      if (target.row.pendingVideoGenerationId) await this.retire(tx, target.row.pendingVideoGenerationId, this.clock.now());
+    });
+  }
   async read(actor: ListingActor, id: string) { return this.transaction(async tx => snapshot(await this.current(tx, actor, id))); }
   async bindInitialization(actor: ListingActor, id: string, storageUploadId: string) {
     if (!storageUploadId || storageUploadId.length > 2048) throw unavailable();
@@ -108,7 +128,10 @@ export class PrismaOwnedVideoSessionLedger implements OwnedVideoSessionLedger {
       if (action === "cancel") {
         if (row.state === "CLEANUP_PENDING") return snapshot(row);
         const generation = await tx.videoGeneration.findUnique({ where: { id } });
-        if (!generation || await tx.listing.count({ where: { activeVideoGenerationId: id } })) throw unavailable();
+        if (!generation) throw unavailable();
+        // The target row is locked by current(). Remove only this adopted
+        // generation; a newer pending replacement keeps its revision fence.
+        await tx.listing.updateMany({ where: { activeVideoGenerationId: id }, data: { activeVideoGenerationId: null } });
         await this.retire(tx, id, this.clock.now());
         return snapshot(await tx.videoUploadSession.findUniqueOrThrow({ where: { id } }));
       }
@@ -119,7 +142,7 @@ export class PrismaOwnedVideoSessionLedger implements OwnedVideoSessionLedger {
     });
   }
   private transaction<T>(run: (tx: Prisma.TransactionClient) => Promise<T>) {
-    return this.prisma.$transaction(async tx => { await tx.$executeRaw`SET LOCAL statement_timeout = '1500ms'`; return run(tx); }, { timeout: 5000, maxWait: 1500 });
+    return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => { await tx.$executeRaw`SET LOCAL statement_timeout = '1500ms'`; return run(tx); }, { timeout: 5000, maxWait: 1500 });
   }
   private async actor(tx: Prisma.TransactionClient, actor: ListingActor, uploading = false) {
     if (!actor.sessionId) throw unavailable();
@@ -155,7 +178,7 @@ export class PrismaOwnedVideoSessionLedger implements OwnedVideoSessionLedger {
     const upload = await tx.mediaUpload.findUnique({ where: { id: row.uploadId } });
     if (cancelling && row.state === "CLEANUP_PENDING") return row;
     if (!upload || upload.writeProtocol !== "video-v1" || upload.userId !== actor.userId || upload.businessId !== (actor.businessId ?? null) || row.cancelledAt || ["FAILED", "CLEANUP_PENDING", "DELETED", "CANCELLED"].includes(row.state)) throw unavailable();
-    const activeReady = !uploading && !cancelling && row.state === "READY" && target.kind === "listing" && target.row.activeVideoGenerationId === id && upload.state === "ADOPTED" && upload.claimTargetType === "listing" && upload.claimTargetId === target.row.id;
+    const activeReady = !uploading && row.state === "READY" && target.kind === "listing" && target.row.activeVideoGenerationId === id && upload.state === "ADOPTED" && upload.claimTargetType === "listing" && upload.claimTargetId === target.row.id;
     if (activeReady) {
       const generation = await tx.videoGeneration.findUnique({ where: { id } });
       if (!generation || generation.state !== "READY" || generation.uploadId !== row.uploadId || generation.listingId !== target.row.id) throw unavailable();

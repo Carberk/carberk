@@ -38,6 +38,8 @@ export interface OwnedVideoSessionLedger {
   beginCompletion(actor: ListingActor, id: string): Promise<OwnedVideoSession>;
   commitCompletion(actor: ListingActor, id: string, fence: string): Promise<OwnedVideoSession>;
   change(actor: ListingActor, id: string, action: "pause" | "resume" | "cancel"): Promise<OwnedVideoSession>;
+  targetState(actor: ListingActor, kind: "draft" | "listing", id: string): Promise<{ active: { generationId: string; durationMs: number } | null; pending: { sessionId: string; state: string } | null }>;
+  cancelPending(actor: ListingActor, listingId: string): Promise<void>;
 }
 export const OWNED_VIDEO_SESSION_LEDGER = Symbol("OwnedVideoSessionLedger");
 export const OWNED_VIDEO_UPLOAD_PROTOCOL = Symbol("OwnedVideoUploadProtocol");
@@ -90,6 +92,8 @@ export class OwnedVideoUploadProtocol {
   async change(actor: ListingActor, id: string, action: "pause" | "resume" | "cancel"): Promise<VideoSessionSnapshot> {
     return this.snapshot(await this.ledger.change(actor, id, action));
   }
+  async targetState(actor: ListingActor, kind: "draft" | "listing", id: string) { return this.ledger.targetState(actor, kind, id); }
+  async cancelPending(actor: ListingActor, listingId: string) { return this.ledger.cancelPending(actor, listingId); }
   private storageSession(session: OwnedVideoSession): VideoStorageSession {
     if (!session.storageUploadId) throw new Error("VIDEO_SESSION_INITIALIZING");
     return { sessionId: session.id, uploadId: session.uploadId, storageUploadId: session.storageUploadId, expectedBytes: session.sizeBytes, expiresAt: session.expiresAt };
