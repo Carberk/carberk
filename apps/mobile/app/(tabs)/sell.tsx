@@ -39,6 +39,7 @@ import {
 } from "../../src/listings/wizard/wizardErrors";
 import { SignInDialog } from "../../components/auth/SignInDialog";
 import { SellEntry } from "../../src/listings/sell/SellEntry";
+import { rebindPublishedVideo } from "../../src/listings/videoEditor/VideoUploadTasks";
 import { ListingVideoEditor } from "../../src/listings/videoEditor/ListingVideoEditor";
 import Step2Photos from "../../src/listings/wizard/Step2Photos";
 import Step3VehicleId from "../../src/listings/wizard/Step3VehicleId";
@@ -451,6 +452,7 @@ export default function SellScreen() {
 
     try {
       const result = await publishDraft.mutateAsync(machineState.draftId);
+      if (userId) void rebindPublishedVideo(userId, machineState.draftId, result.id, businessId).catch(() => { /* Server publication remains authoritative; local video can be recovered from the Listing. */ });
       show({
         title: t("listingPublished"),
         variant: "success",

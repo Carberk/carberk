@@ -45,6 +45,7 @@ export class VideoTransfer {
     this.pending = this.transfer().finally(() => { this.pending = null; });
     return this.pending;
   }
+  async settle(): Promise<void> { await this.pending; await this.writes; }
   async pause(): Promise<void> { await this.stop("PAUSED"); }
   async cancel(): Promise<void> { await this.stop("CANCELLED"); }
   async resume(): Promise<void> {
