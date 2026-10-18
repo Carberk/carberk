@@ -77,3 +77,14 @@ export function beginSignInMeasurement(method:"email"|"phone"):{headers:Record<s
 export function recordWizardStepResult(draftId:string,step:Extract<MeasurementSchemas.MeasurementEvent,{eventName:"wizard_step_result"}>["payload"]["step"],result:"success"|"expected_rejection"):void {
  try {emitMeasurement({eventName:"wizard_step_result",purpose:"product_improvement",payload:{draftId,step,attemptId:Crypto.randomUUID(),result,durationMs:0,...(result==="expected_rejection"?{category:"validation" as const}:{})}});}catch{/* Validation never waits for telemetry. */}
 }
+
+export function beginPhotoMeasurement(phase:"preparation"|"upload"):(result:"success"|"expected_rejection"|"technical_failure",category?:"validation"|"permission"|"network"|"unknown")=>void {
+ try {
+  const visit=measurementHost.currentVisit();if(!visit)return()=>undefined;
+  const attemptId=Crypto.randomUUID(),started=Date.now();let finished=false;
+  return(result,category)=>{
+   if(finished || measurementHost.currentVisit()!==visit)return;finished=true;
+   emitMeasurement({eventName:phase==="preparation"?"media_preparation_result":"media_upload_result",purpose:"product_reliability",payload:{attemptId,kind:"photo",result,durationMs:Math.min(86400000,Math.max(0,Date.now()-started)),...(category?{category}:{})}});
+  };
+ }catch{return()=>undefined;}
+}

@@ -3,6 +3,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { useTranslation } from "react-i18next";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 
+import { beginPhotoMeasurement } from "../../measurement/nativeMeasurement";
 import { usePresignUpload } from "../../api/uploads/usePresignUpload";
 import { ApiError } from "../../api/client";
 
@@ -323,6 +324,7 @@ export function useUploadQueue(
         return;
       }
 
+      const measurement=beginPhotoMeasurement("upload");
       try {
         transitionToPresigned(photoId);
         startUpload();
@@ -350,7 +352,9 @@ export function useUploadQueue(
         transitionToUploading(photoId, presignResult.uploadUrl);
         await uploadFileToPresignedUrl(presignResult.uploadUrl, photo.localUri, presignResult.headers);
         transitionToUploaded(photoId, presignResult.key);
+        measurement("success");
       } catch (err) {
+        measurement(err instanceof ApiError && err.status===403?"expected_rejection":"technical_failure",err instanceof ApiError && err.status===403?"permission":err instanceof ApiError && err.code==="NETWORK_ERROR"?"network":"unknown");
         const uploadError = buildUploadError(err, t);
         transitionToFailed(photoId, uploadError);
       } finally {
@@ -391,6 +395,7 @@ export function useUploadQueue(
     async (photoId: string, { sourceUri, stagingKey: jobKey }: CompressionJob) => {
       // Removed while it waited, or left behind by another draft.
       if (jobKey !== activeStagingKey.current || !findPhotoById(queueRef.current, photoId)) return;
+      const measurement=beginPhotoMeasurement("preparation");
       try {
         await ensureDraftDir(jobKey);
         const destinationUri = getStagingPath(jobKey, photoId);
@@ -412,8 +417,10 @@ export function useUploadQueue(
         });
         setQueue(queueRef.current);
 
+        measurement("success");
         enqueueUploads([photoId]);
       } catch (err) {
+        measurement(err instanceof CompressionError && err.code==="SOURCE_MISSING"?"expected_rejection":"technical_failure",err instanceof CompressionError && err.code==="SOURCE_MISSING"?"validation":"unknown");
         const uploadError = buildUploadError(err, t);
         queueRef.current = transitionPhotoToFailed(queueRef.current, photoId, uploadError);
         setQueue(queueRef.current);
