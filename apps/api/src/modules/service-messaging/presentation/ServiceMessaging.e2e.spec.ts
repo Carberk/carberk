@@ -11,6 +11,7 @@ import { JwtModule, JwtService } from "@nestjs/jwt";
 import { Reflector } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import { PrismaService } from "@auto-tm/db";
+import { ServiceMessagingSchemas } from "@auto-tm/contracts";
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import supertest from "supertest";
 
@@ -403,6 +404,15 @@ it("serializes shared holds and paid FIFO, fences duplicate purchase intents and
   if (attachmentId) {
    expect((await db.serviceAttachment.findUniqueOrThrow({ where: { id: attachmentId } })).state).toBe("adopted");
    await request.get(`/api/v1/services/conversations/${entry.id}/attachments/${attachmentId}`).set("Authorization", auth(nextStaff)).expect(200);
+   const stored = await db.serviceAttachment.findUniqueOrThrow({ where: { id: attachmentId } });
+   const originalRights = ServiceMessagingSchemas.ServiceRightsSchema.parse(stored.rights);
+   await db.serviceAttachment.update({ where: { id: attachmentId }, data: { rights: { ...originalRights,
+    schedule: { kind: "until", until: now.toISOString(), reason: "Synthetic expired audience before cleanup" },
+    hold: { until: new Date(now.getTime() + 86_400_000).toISOString(), reason: "Synthetic storage preservation does not extend audience" },
+   } } });
+   await request.get(`/api/v1/services/conversations/${entry.id}/attachments/${attachmentId}`).set("Authorization", auth(nextStaff)).expect(403);
+   expect((await db.serviceAttachment.findUniqueOrThrow({ where: { id: attachmentId } })).removedAt).toBeNull();
+   await db.serviceAttachment.update({ where: { id: attachmentId }, data: { rights: originalRights } });
    expect((await db.historyOrder.findUniqueOrThrow({ where: { id: order.id } })).paidAt).toBeNull();
   }
   const payment = await db.historyPayment.findUniqueOrThrow({ where: { orderId_clientPaymentId: { orderId: order.id, clientPaymentId } } });

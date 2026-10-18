@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import type { ServiceMessagingSchemas } from "@auto-tm/contracts";
 
-import { assertServiceRights } from "./ServiceRights";
+import { assertReadableServiceRights, assertServiceRights } from "./ServiceRights";
 import { ServiceDenied } from "./serviceAccess";
 
 const now = new Date("2026-10-15T00:00:00Z");
@@ -22,4 +22,15 @@ it("keeps original provider PDF rights separate and rejects absent or expired Hi
   expect(() => assertServiceRights("history", pdf, now)).not.toThrow();
   expect(() => assertServiceRights("history", { ...pdf, rights: { ...pdf.rights, schedule: image.rights.schedule } }, now)).toThrow(ServiceDenied);
   expect(() => assertServiceRights("history", { ...pdf, rights: { ...pdf.rights, schedule: { kind: "until", until: "2026-01-01T00:00:00Z", reason: "Expired" } } }, now)).toThrow(ServiceDenied);
+});
+it("denies expired ordinary attachment access before asynchronous cleanup, including a storage hold", () => {
+ const rights = { ...image.rights, category: "payment_evidence" as const, schedule: { kind: "until" as const, until: now.toISOString(), reason: "Expired personal record" }, hold: { until: "2026-12-01T00:00:00Z", reason: "Preserve for dispute only" } };
+ expect(() => assertReadableServiceRights(rights, "payment_evidence", now)).toThrow(ServiceDenied);
+ expect(() => assertReadableServiceRights({ ...rights, schedule: { ...rights.schedule, until: "2026-12-01T00:00:00Z" } }, "payment_evidence", now)).not.toThrow();
+});
+it("denies malformed, misclassified or expired Support access while keeping a recently closed case readable", () => {
+ expect(() => assertReadableServiceRights({}, "support_communication", now)).toThrow(ServiceDenied);
+ expect(() => assertReadableServiceRights(image.rights, "payment_evidence", now)).toThrow(ServiceDenied);
+ expect(() => assertReadableServiceRights(image.rights, "support_communication", now, new Date(now.getTime() - 90 * 86_400_000))).toThrow(ServiceDenied);
+ expect(() => assertReadableServiceRights(image.rights, "support_communication", now, new Date(now.getTime() - 89 * 86_400_000))).not.toThrow();
 });
