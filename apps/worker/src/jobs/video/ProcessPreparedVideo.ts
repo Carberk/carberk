@@ -15,8 +15,36 @@ export class ProcessPreparedVideo {
     private readonly randomToken: () => string,
   ) {}
 
-  async execute(_generationId: string): Promise<"unavailable" | "adopted" | "superseded" | "failed"> {
-    return "unavailable";
+  async execute(generationId: string): Promise<"unavailable" | "adopted" | "superseded" | "failed"> {
+    const lease = await this.ledger.claim(generationId, this.now(), this.randomToken());
+    if (!lease) return "unavailable";
+    let source: Awaited<ReturnType<VideoProcessingObjects["download"]>> | undefined;
+    let output: Awaited<ReturnType<VideoMediaProcessor["process"]>> | undefined;
+    try {
+      source = await this.objects.download(lease);
+      output = await this.codec.process({ path: source.path, sha256: lease.sha256, posterMs: lease.posterMs });
+      const assets = output.assets.map(asset => ({ ...asset, key: `video/v1/${lease.uploadId}/${lease.generationId}/${asset.path}` }));
+      await this.validateManifests(output.directory, assets);
+      // Persist every exact key before the first write, so cancellation and
+      // process death cannot leave an unrecorded generation directory.
+      if (!await this.ledger.plan(lease, assets, this.now())) return "superseded";
+      for (const asset of assets) await this.objects.publish(output.directory, asset);
+      for (const asset of assets) {
+        if (!await this.objects.verify(asset)) throw new Error("VIDEO_READBACK_FAILED");
+      }
+      const adopted = await this.ledger.adopt(lease, {
+        durationMs: output.durationMs, width: output.width, height: output.height,
+        sourceSha256: output.sourceSha256, assets,
+      }, this.now());
+      return adopted ? "adopted" : "superseded";
+    } catch (error) {
+      const code = error instanceof Error && /^VIDEO_[A-Z_]+$/.test(error.message) ? error.message : "VIDEO_PROCESSING_FAILED";
+      await this.ledger.fail(lease, code, this.now());
+      return "failed";
+    } finally {
+      await output?.dispose();
+      await source?.dispose();
+    }
   }
 
   private async validateManifests(directory: string, assets: VideoPublishedAsset[]): Promise<void> {
