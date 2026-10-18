@@ -134,15 +134,14 @@ describe("UploadsController e2e", () => {
       });
     });
 
-    it("returns presigned URL for video", async () => {
+    it("requires the private prepared protocol for video", async () => {
       const res = await request
         .post("/api/v1/uploads/presign")
         .set("Authorization", `Bearer ${getToken()}`)
         .send({ kind: "video", contentType: "video/mp4", sizeBytes: 1024 })
-        .expect(201);
+        .expect(400);
 
-      expect(res.body.key).toMatch(/original\.mp4$/);
-      expect(res.body.maxSizeBytes).toBe(10 * 1024 * 1024);
+      expect(res.body.code).toBe("VIDEO_PREPARED_PROTOCOL_REQUIRED");
     });
 
     it("returns webp extension for image/webp", async () => {
@@ -190,7 +189,7 @@ describe("UploadsController e2e", () => {
         })
         .expect(400);
 
-      expect(res.body.code).toBe("HTTP_ERROR");
+      expect(res.body.code).toBe("VIDEO_PREPARED_PROTOCOL_REQUIRED");
     });
   });
 });
