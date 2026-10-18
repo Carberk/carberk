@@ -30,7 +30,7 @@ describe("anonymous marketplace through real HTTP and PostgreSQL", () => {
  afterAll(async () => { await cleanup(); await app?.close(); });
  beforeEach(async () => {
   await cleanup(); await seedSuiteCatalog(prisma, suite);
-  await prisma.user.create({ data: { id: suite.id("seller"), phone: suite.phone("seller") } });
+  await prisma.user.create({ data: { id: suite.id("seller"), phone: suite.phone("seller"), phoneVerifiedAt: new Date() } });
   await prisma.dealership.create({ data: { id: businessId, slug: suite.slugFor("business"), name: "Synthetic showroom", status: "active", admissionMode: "synthetic", checkedEvidence: "PRIVATE evidence", address: "Public address" } });
   await prisma.listing.create({ data: { id: listingId, sellerId: suite.id("seller"), businessId, brandId: suite.catalog.brandId, modelId: suite.catalog.modelId, cityId: suite.catalog.cityId, status: "active", priceAmount: 100000, priceTmt: 100000, priceCurrency: "TMT", allowChat: true, allowCalls: true, contactPhone: suite.phone("seller"), description: "Public car" } });
  });
