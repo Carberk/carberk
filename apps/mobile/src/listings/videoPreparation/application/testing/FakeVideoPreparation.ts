@@ -7,7 +7,7 @@ export class FakeVideoPreparation implements VideoPreparationPort {
   private finish: ((video: PreparedVideo) => void) | undefined;
   output: PreparedVideo = {
     uri: "file:///documents/videos/job-1/prepared.mp4", durationMs: 3000,
-    sizeBytes: 100_000, width: 640, height: 360, fps: 30,
+    sha256: "a".repeat(64), sizeBytes: 100_000, width: 640, height: 360, fps: 30,
     videoCodec: "h264", audioCodec: "aac", colour: "bt709",
   };
 
