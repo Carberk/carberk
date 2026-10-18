@@ -82,3 +82,22 @@ it("sends operational notices with a required reason and explicit information-re
  const form = screen.getByRole("button", { name: "Send message" }).closest("form"); if (!form) throw new Error("Missing message form"); fireEvent.submit(form);
  await waitFor(() => expect(sends[0]).toMatchObject({ supportKind: "notice", reason: "Affects this synthetic account", visibility: "customer" }));
 });
+it("retries a failed manual awaiting-customer closure with the same notice identity", async () => {
+ const commands: { clientMessageId: string }[] = []; const fetcher = globalThis.fetch;
+ vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+  if (String(url).endsWith("/support") && init?.method === "POST") { commands.push(JSON.parse(String(init?.body))); return Response.json({ ok: true }, { status: commands.length === 1 ? 503 : 201 }); }
+  const response = await fetcher(url, init);
+  if (String(url).includes("/conversations/") && !init?.method) {
+   const payload = await response.json(); return Response.json({ ...payload, support: { unansweredSince: null, awaitingCustomerSince: "2026-10-01T12:00:00Z", investigation: false, category: "ordinary", escalatedAt: null, staffedElapsedMs: 0, overdue: false } });
+  }
+  return response;
+ });
+ const screen = render(<AdminLocaleProvider initialLocale="en"><ServiceWorkspace/></AdminLocaleProvider>);
+ await waitFor(() => expect(screen.getByRole("button", { name: "General Support" })).toBeTruthy()); fireEvent.click(screen.getByRole("button", { name: "General Support" })); await screen.findByText("Synthetic service reply");
+ fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Closing this request. Reply to reopen." } });
+ fireEvent.change(screen.getByLabelText("Close after 14 days awaiting customer: Reason"), { target: { value: "No requested information for 14 days" } });
+ fireEvent.click(screen.getByRole("button", { name: "Close after 14 days awaiting customer" })); await waitFor(() => expect(commands).toHaveLength(1));
+ await waitFor(() => expect((screen.getByRole("button", { name: "Close after 14 days awaiting customer" }) as HTMLButtonElement).disabled).toBe(false));
+ fireEvent.click(screen.getByRole("button", { name: "Close after 14 days awaiting customer" })); await waitFor(() => expect(commands).toHaveLength(2));
+ expect(commands[0]?.clientMessageId).toBe(commands[1]?.clientMessageId);
+});

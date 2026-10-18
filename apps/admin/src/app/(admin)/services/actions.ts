@@ -23,3 +23,5 @@ export async function serviceAssign(id: string, expectedVersion: number, targetU
 export async function serviceStage(id: string, input: S.ServiceStageAttachment): Promise<ServiceResult<{ id: string }>> { return run(async () => z.object({ id: z.string().uuid() }).parse(await apiFetch(`/services/conversations/${z.string().uuid().parse(id)}/attachments`, { method: "POST", body: S.ServiceStageAttachmentSchema.parse(input) }))); }
 
 export async function serviceMarkRead(id: string, throughSequence: number): Promise<ServiceResult<null>> { return run(async () => { await apiFetch(`/services/conversations/${z.string().uuid().parse(id)}/read`, { method: "POST", body: S.ServiceReadSchema.parse({ throughSequence }) }); return null; }); }
+
+export async function serviceSupportCommand(id: string, command: S.SupportCommand): Promise<ServiceResult<null>> { return run(async () => { await apiFetch(`/services/conversations/${z.string().uuid().parse(id)}/support`, { method: "POST", body: S.SupportCommandSchema.parse(command) }); return null; }); }
