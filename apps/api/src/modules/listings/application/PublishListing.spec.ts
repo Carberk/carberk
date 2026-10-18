@@ -145,6 +145,9 @@ class FakePrisma {
     this.auditLogs = [];
   }
 
+  $queryRaw = async () => [{ id: "locked-fixture" }];
+  videoUploadSession = { findFirst: async () => null };
+
   $transaction = async <T>(work: Promise<T>[] | ((tx: FakePrisma) => Promise<T>)): Promise<T | T[]> => {
     if (typeof work === "function") {
       try {
