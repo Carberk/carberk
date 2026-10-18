@@ -11,7 +11,8 @@ import {
   MessageAlreadySavedError,
   type ConversationRepository,
 } from "../domain/ports/ConversationRepository";
-import type { MessageEventPublisher } from "../domain/ports/MessageEventPublisher";
+import type { BusinessEnquiryRepository } from "../domain/ports/BusinessEnquiryRepository";
+import type { MessageSentEvent , MessageEventPublisher } from "../domain/ports/MessageEventPublisher";
 
 import { ConversationAccessPolicy } from "./ConversationAccessPolicy";
 import { ConversationMessageCommitter } from "./ConversationMessageCommitter";
@@ -177,3 +178,13 @@ describe("SendConversationMessage", () => {
     expect(messageEvents.emitMessageSent).not.toHaveBeenCalled();
   });
 });
+
+ it("fans out buyer messages to current business recipients without a business header or creator recipient", async () => {
+  const enquiry = Conversation.create({ id: conversation.id, listingId: "listing-1", buyerId: "buyer-1", sellerId: "departed-creator", businessId: "business" });
+  const repository = { saveMessage: async () => {}, findById: async () => enquiry } as unknown as ConversationRepository;
+  const recipients = { recipients: async () => ["current-owner", "current-sales"] } as unknown as BusinessEnquiryRepository;
+  const events: MessageSentEvent[] = [];
+  const committer = new ConversationMessageCommitter(repository, { emitMessageSent: async event => { events.push(event); } }, recipients);
+  await committer.commit(textMessage(), "departed-creator", { userId: "buyer-1", sessionId: "current-session" });
+  expect(events.map(event => event.recipientId)).toEqual(["current-owner", "current-sales"]);
+ });
