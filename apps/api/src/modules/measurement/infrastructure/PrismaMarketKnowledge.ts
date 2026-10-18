@@ -46,6 +46,15 @@ export class PrismaMarketKnowledge {
   const qualification=qualifyAnonymousDataset(dataset,sources,{epoch:this.epoch,now:this.now()});
   return qualification.state==="qualified"?{...qualification,dataset:{id:row.id,version:row.version,derivationVersion:row.derivationVersion,cells:contents.data.cells}}:qualification;
  }
+ async list(subject:StaffSubject) {
+  return this.prisma.$transaction(async tx=>{
+   await this.authority.authorize({...subject,capability:"analytics.aggregate"},tx);
+   const rows=await tx.marketKnowledgeDataset.findMany({where:{epoch:this.epoch},select:{id:true},orderBy:{id:"asc"},take:20});
+   const result=[];
+   for(const row of rows)result.push(await this.current(tx,row.id));
+   return result;
+  });
+ }
  async read(subject:StaffSubject,id:string) {
   return this.prisma.$transaction(async tx=>{
    await this.authority.authorize({...subject,capability:"analytics.aggregate"},tx);
