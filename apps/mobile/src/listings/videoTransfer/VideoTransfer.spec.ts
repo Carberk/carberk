@@ -29,6 +29,19 @@ beforeEach(async () => {
   );
 });
 describe("prepared video resumable foreground transfer", () => {
+  it("retries a lost create response with the same idempotency key and completes one session", async () => {
+    let creates = 0;
+    server.use(http.post(base, async ({ request }) => {
+      creates++;
+      const body = await request.json() as Record<string, unknown>;
+      expect(body.idempotencyKey).toBe("fixture-video");
+      if (creates === 1) return HttpResponse.error();
+      return HttpResponse.json(snapshot(), { status: 201 });
+    }));
+    await new VideoTransfer(device).run();
+    expect(creates).toBe(2);
+    expect(completed).toBe(true);
+  });
   it("uploads only missing prepared parts then records processing without public readiness", async () => {
     parts = [1]; await new VideoTransfer(device).run();
     expect(puts).toEqual([2]); expect(completed).toBe(true);
