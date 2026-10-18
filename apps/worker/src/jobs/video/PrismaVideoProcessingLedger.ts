@@ -1,8 +1,13 @@
+import type { MeasurementSchemas } from "@auto-tm/contracts";
 import type { PrismaService, Prisma } from "@auto-tm/db";
 import { z } from "zod";
 
 import type { VideoProcessingLedger, VideoProcessingLease, VideoProcessingFacts, VideoPublishedAsset } from "./VideoProcessingPorts";
 
+export interface VideoProcessingMeasurement {
+  capture(transaction: object, userId: string, event: MeasurementSchemas.MeasurementEvent): Promise<"captured" | "disabled" | "unavailable">;
+  context: MeasurementSchemas.MeasurementEvent["context"];
+}
 export interface VideoWorkerEligibility { isEligible(userId: string): boolean; }
 const version = "ffmpeg-debian-5.1.9-v1";
 const leaseMs = 20 * 60_000;
@@ -14,7 +19,7 @@ type Current = NonNullable<Context>;
 /** PostgreSQL owns current authority, leases, finite output intent and adoption.
  * Storage/codec I/O never runs in a database transaction. */
 export class PrismaVideoProcessingLedger implements VideoProcessingLedger {
-  constructor(private readonly prisma: PrismaService, private readonly eligibility: VideoWorkerEligibility) {}
+  constructor(private readonly prisma: PrismaService, private readonly eligibility: VideoWorkerEligibility, private readonly measurement?: VideoProcessingMeasurement) {}
 
   async claim(id: string, now: Date, token: string): Promise<VideoProcessingLease | null> {
     if (!z.string().uuid().safeParse(id).success || !z.string().uuid().safeParse(token).success) return null;
