@@ -126,12 +126,24 @@ export async function historyCommand(context: Context, command: ServiceMessaging
      if (!order.paidAt || ["delivered","refunded"].includes(order.state) || (order.recoveryDeadline ?? order.promiseAt) > now) deny();
      await tx.historyOrder.update({ where: { id: order.id }, data: { escalatedAt: order.escalatedAt ?? now, state: order.recoveryUsed ? "refund_pending" : order.state, version: { increment: 1 } } });
      if (order.recoveryUsed) await tx.historyRefund.upsert({ where: { orderId: order.id }, create: { orderId: order.id, reason: command.reason }, update: {} });
+    } else if (command.kind === "recovery_offer") {
+     if (!order.escalatedAt || !order.paidAt || order.recoveryUsed || ["delivered", "refunded", "refund_pending"].includes(order.state)) deny();
+     // Refresh only an expired offer; an active offer is immutable for the customer's review.
+     if (order.recoveryOfferExpiresAt && order.recoveryOfferExpiresAt > now) return;
+     await tx.historyOrder.update({ where: { id: order.id }, data: { recoveryOfferedAt: now, recoveryOfferedDeadline: addStaffedHour(now), recoveryOfferExpiresAt: new Date(now.getTime()+60000), version: { increment: 1 } } });
     } else if (command.kind === "recovery") {
      if (!order.escalatedAt || !order.paidAt || ["delivered","refunded","refund_pending"].includes(order.state)) deny();
-     const deadline = command.deadline ? new Date(command.deadline) : addStaffedHour(now);
-     const result = recoveryOutcome({ recoveryUsed: order.recoveryUsed, customerAgreed: command.agree, deadline }, now);
+     const deadline = command.deadline ? new Date(command.deadline) : null;
+     const result = recoveryOutcome({ recoveryUsed: order.recoveryUsed, customerAgreed: command.agree, deadline, offeredAt: order.recoveryOfferedAt, offeredDeadline: order.recoveryOfferedDeadline, offerExpiresAt: order.recoveryOfferExpiresAt }, now);
      await tx.historyOrder.update({ where: { id: order.id }, data: { state: result === "agreed" ? "recovery" : "refund_pending", ...(result === "agreed" ? { recoveryUsed: true, recoveryAgreedAt: now, recoveryDeadline: deadline } : {}), version: { increment: 1 } } });
      if (result === "refund_pending") await tx.historyRefund.upsert({ where: { orderId: order.id }, create: { orderId: order.id, reason: "Recovery declined or exhausted" }, update: {} });
+    } else if (command.kind === "refund_request") {
+     if (order.refund) return;
+     if (!["review", "expired"].includes(order.state) || order.paidAt || order.purchase) deny();
+     const verified = await tx.historyPayment.findFirst({ where: { orderId: order.id, verifiedFunds: true, amount: 100, receivedAt: { not: null }, confirmedAt: { not: null } } });
+     if (!verified) deny();
+     await tx.historyRefund.create({ data: { orderId: order.id, reason: command.reason } });
+     await tx.historyOrder.update({ where: { id: order.id }, data: { state: "refund_pending", version: { increment: 1 } } });
     } else if (command.kind === "refund_approve" || command.kind === "refund_execute") {
      await staff.authorize({ ...subject, capability: "founder.refund.approve" }, tx);
      if (order.state !== "refund_pending" || !order.refund) deny();

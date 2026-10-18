@@ -25,8 +25,12 @@ export function addStaffedHour(now: Date): Date {
 export function receiptOutcome(hold: { expiresAt: Date; active: boolean }, receipt: { receivedAt: Date; verifiedAt: Date; amount: number; verifiedFunds: boolean }): "paid" | "review" {
  return hold.active && receipt.verifiedFunds && receipt.amount === 100 && receipt.receivedAt <= receipt.verifiedAt && receipt.receivedAt < hold.expiresAt && receipt.verifiedAt < hold.expiresAt && staffed(receipt.verifiedAt) ? "paid" : "review";
 }
-export function recoveryOutcome(state: { recoveryUsed: boolean; customerAgreed: boolean; deadline: Date | null }, agreedAt: Date): "agreed" | "refund_pending" {
+export function recoveryOutcome(state: { recoveryUsed: boolean; customerAgreed: boolean; deadline: Date | null; offeredAt: Date | null; offeredDeadline: Date | null; offerExpiresAt: Date | null }, agreedAt: Date): "agreed" | "refund_pending" {
  if (state.recoveryUsed || !state.customerAgreed) return "refund_pending";
- if (!state.deadline || state.deadline.getTime() !== addStaffedHour(agreedAt).getTime()) throw new HistoryDenied("RECOVERY_DEADLINE_INVALID");
+ if (!state.deadline || !state.offeredAt || !state.offeredDeadline || !state.offerExpiresAt ||
+  state.offeredDeadline.getTime() !== addStaffedHour(state.offeredAt).getTime() ||
+  state.deadline.getTime() !== state.offeredDeadline.getTime() ||
+  state.offerExpiresAt <= state.offeredAt || state.offerExpiresAt.getTime() - state.offeredAt.getTime() > 60000 ||
+  agreedAt < state.offeredAt || agreedAt >= state.offerExpiresAt) throw new HistoryDenied("RECOVERY_DEADLINE_INVALID");
  return "agreed";
 }
