@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService } from "@auto-tm/db";
 
+import { videoAccountErasureWrites } from "./video/videoAccountErasure";
 import { serviceAccountErasureWrites } from "./serviceAccountErasure";
 
 export interface PurgeExpiredAccountsInput {
@@ -61,6 +62,7 @@ export class PurgeExpiredAccounts {
       // of a Profile Photo uses (ADR-0088).
       this.prisma.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`,
       ...serviceAccountErasureWrites(this.prisma, userId, now),
+      ...videoAccountErasureWrites(this.prisma, userId, now),
 
       // Retire the Profile Photo's upload and record its storage deletion, in
       // the transaction that clears the photo below. The API's claim does the
