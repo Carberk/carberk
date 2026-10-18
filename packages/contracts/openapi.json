@@ -135,6 +135,42 @@
           "retryInSeconds"
         ]
       },
+      "RateLimitedResponse": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "integer"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "RATE_LIMITED"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "$ref": "#/components/schemas/RateLimitedDetails"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "statusCode",
+          "code",
+          "message",
+          "details",
+          "timestamp",
+          "requestId"
+        ]
+      },
       "InvalidOtpDetails": {
         "type": "object",
         "properties": {
@@ -943,6 +979,76 @@
             "type": "string",
             "format": "uuid"
           },
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "logoUrl": {
+                "type": "string",
+                "nullable": true
+              },
+              "city": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "tk": {
+                    "type": "string"
+                  },
+                  "ru": {
+                    "type": "string"
+                  },
+                  "en": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tk",
+                  "ru",
+                  "en"
+                ]
+              },
+              "identityChecked": {
+                "type": "boolean"
+              },
+              "address": {
+                "type": "string",
+                "nullable": true
+              },
+              "description": {
+                "type": "string",
+                "nullable": true
+              },
+              "hours": {
+                "type": "string",
+                "nullable": true
+              },
+              "services": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "logoUrl",
+              "city",
+              "identityChecked"
+            ]
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -1095,6 +1201,76 @@
           "sellerId": {
             "type": "string",
             "format": "uuid"
+          },
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "logoUrl": {
+                "type": "string",
+                "nullable": true
+              },
+              "city": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "tk": {
+                    "type": "string"
+                  },
+                  "ru": {
+                    "type": "string"
+                  },
+                  "en": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tk",
+                  "ru",
+                  "en"
+                ]
+              },
+              "identityChecked": {
+                "type": "boolean"
+              },
+              "address": {
+                "type": "string",
+                "nullable": true
+              },
+              "description": {
+                "type": "string",
+                "nullable": true
+              },
+              "hours": {
+                "type": "string",
+                "nullable": true
+              },
+              "services": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "logoUrl",
+              "city",
+              "identityChecked"
+            ]
           },
           "status": {
             "type": "string",
@@ -1294,6 +1470,76 @@
           "sellerId": {
             "type": "string",
             "format": "uuid"
+          },
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "logoUrl": {
+                "type": "string",
+                "nullable": true
+              },
+              "city": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "tk": {
+                    "type": "string"
+                  },
+                  "ru": {
+                    "type": "string"
+                  },
+                  "en": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tk",
+                  "ru",
+                  "en"
+                ]
+              },
+              "identityChecked": {
+                "type": "boolean"
+              },
+              "address": {
+                "type": "string",
+                "nullable": true
+              },
+              "description": {
+                "type": "string",
+                "nullable": true
+              },
+              "hours": {
+                "type": "string",
+                "nullable": true
+              },
+              "services": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "logoUrl",
+              "city",
+              "identityChecked"
+            ]
           },
           "seller": {
             "type": "object",
@@ -1731,6 +1977,76 @@
       "ListingDraft": {
         "type": "object",
         "properties": {
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "logoUrl": {
+                "type": "string",
+                "nullable": true
+              },
+              "city": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "tk": {
+                    "type": "string"
+                  },
+                  "ru": {
+                    "type": "string"
+                  },
+                  "en": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tk",
+                  "ru",
+                  "en"
+                ]
+              },
+              "identityChecked": {
+                "type": "boolean"
+              },
+              "address": {
+                "type": "string",
+                "nullable": true
+              },
+              "description": {
+                "type": "string",
+                "nullable": true
+              },
+              "hours": {
+                "type": "string",
+                "nullable": true
+              },
+              "services": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "logoUrl",
+              "city",
+              "identityChecked"
+            ]
+          },
           "id": {
             "type": "string",
             "format": "uuid"
@@ -2061,6 +2377,76 @@
       "CreateDraftRequest": {
         "type": "object",
         "properties": {
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "logoUrl": {
+                "type": "string",
+                "nullable": true
+              },
+              "city": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "tk": {
+                    "type": "string"
+                  },
+                  "ru": {
+                    "type": "string"
+                  },
+                  "en": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tk",
+                  "ru",
+                  "en"
+                ]
+              },
+              "identityChecked": {
+                "type": "boolean"
+              },
+              "address": {
+                "type": "string",
+                "nullable": true
+              },
+              "description": {
+                "type": "string",
+                "nullable": true
+              },
+              "hours": {
+                "type": "string",
+                "nullable": true
+              },
+              "services": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "logoUrl",
+              "city",
+              "identityChecked"
+            ]
+          },
           "initialPayload": {
             "type": "object",
             "properties": {
@@ -2556,6 +2942,76 @@
                   "type": "string",
                   "format": "uuid"
                 },
+                "businessId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "business": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "logoUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "city": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "tk": {
+                          "type": "string"
+                        },
+                        "ru": {
+                          "type": "string"
+                        },
+                        "en": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "tk",
+                        "ru",
+                        "en"
+                      ]
+                    },
+                    "identityChecked": {
+                      "type": "boolean"
+                    },
+                    "address": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "hours": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "services": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "slug",
+                    "name",
+                    "logoUrl",
+                    "city",
+                    "identityChecked"
+                  ]
+                },
                 "status": {
                   "type": "string",
                   "enum": [
@@ -2753,6 +3209,13 @@
       "ListingCountQuery": {
         "type": "object",
         "properties": {
+          "sellerType": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "business"
+            ]
+          },
           "brandId": {
             "type": "string",
             "format": "uuid"
@@ -2840,6 +3303,13 @@
       "ListingModelCountQuery": {
         "type": "object",
         "properties": {
+          "sellerType": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "business"
+            ]
+          },
           "brandId": {
             "type": "string",
             "format": "uuid"
@@ -2912,6 +3382,13 @@
       "ListingBrandCountQuery": {
         "type": "object",
         "properties": {
+          "sellerType": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "business"
+            ]
+          },
           "cityId": {
             "type": "string",
             "format": "uuid"
@@ -3000,6 +3477,76 @@
                 "sellerId": {
                   "type": "string",
                   "format": "uuid"
+                },
+                "businessId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "business": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "logoUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "city": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "tk": {
+                          "type": "string"
+                        },
+                        "ru": {
+                          "type": "string"
+                        },
+                        "en": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "tk",
+                        "ru",
+                        "en"
+                      ]
+                    },
+                    "identityChecked": {
+                      "type": "boolean"
+                    },
+                    "address": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "hours": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "services": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "slug",
+                    "name",
+                    "logoUrl",
+                    "city",
+                    "identityChecked"
+                  ]
                 },
                 "status": {
                   "type": "string",
@@ -3199,6 +3746,76 @@
             "items": {
               "type": "object",
               "properties": {
+                "businessId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "business": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "logoUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "city": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "tk": {
+                          "type": "string"
+                        },
+                        "ru": {
+                          "type": "string"
+                        },
+                        "en": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "tk",
+                        "ru",
+                        "en"
+                      ]
+                    },
+                    "identityChecked": {
+                      "type": "boolean"
+                    },
+                    "address": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "hours": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "services": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "slug",
+                    "name",
+                    "logoUrl",
+                    "city",
+                    "identityChecked"
+                  ]
+                },
                 "id": {
                   "type": "string",
                   "format": "uuid"
@@ -3397,6 +4014,76 @@
             "type": "string",
             "format": "uuid"
           },
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "logoUrl": {
+                "type": "string",
+                "nullable": true
+              },
+              "city": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "tk": {
+                    "type": "string"
+                  },
+                  "ru": {
+                    "type": "string"
+                  },
+                  "en": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tk",
+                  "ru",
+                  "en"
+                ]
+              },
+              "identityChecked": {
+                "type": "boolean"
+              },
+              "address": {
+                "type": "string",
+                "nullable": true
+              },
+              "description": {
+                "type": "string",
+                "nullable": true
+              },
+              "hours": {
+                "type": "string",
+                "nullable": true
+              },
+              "services": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "logoUrl",
+              "city",
+              "identityChecked"
+            ]
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -3578,6 +4265,76 @@
                 "sellerId": {
                   "type": "string",
                   "format": "uuid"
+                },
+                "businessId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "business": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "logoUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "city": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "tk": {
+                          "type": "string"
+                        },
+                        "ru": {
+                          "type": "string"
+                        },
+                        "en": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "tk",
+                        "ru",
+                        "en"
+                      ]
+                    },
+                    "identityChecked": {
+                      "type": "boolean"
+                    },
+                    "address": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "hours": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "services": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "slug",
+                    "name",
+                    "logoUrl",
+                    "city",
+                    "identityChecked"
+                  ]
                 },
                 "status": {
                   "type": "string",
@@ -3777,6 +4534,10 @@
       "PresignRequest": {
         "type": "object",
         "properties": {
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "kind": {
             "type": "string",
             "enum": [
@@ -5166,16 +5927,23 @@
         "type": "object",
         "properties": {
           "uploadUrl": {
-            "type": "string",
-            "format": "uri"
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri"
+              },
+              {
+                "type": "string",
+                "pattern": "^\\/conversations\\/[0-9a-f-]+\\/attachments\\/[0-9a-f-]+\\/bytes$"
+              }
+            ]
           },
           "key": {
             "type": "string"
           },
           "expiresIn": {
             "type": "integer",
-            "minimum": 0,
-            "exclusiveMinimum": true
+            "minimum": 0
           },
           "maxSizeBytes": {
             "type": "integer",
@@ -11158,52 +11926,58 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "statusCode": {
-                      "type": "integer"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/RateLimitedResponse"
                     },
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "VALIDATION_FAILED",
-                        "UNAUTHORIZED",
-                        "FORBIDDEN",
-                        "NOT_FOUND",
-                        "USER_NOT_FOUND",
-                        "CONFLICT",
-                        "RATE_LIMITED",
-                        "OTP_EXPIRED",
-                        "OTP_ALREADY_USED",
-                        "INVALID_OTP",
-                        "OTP_LOCKED",
-                        "OTP_NOT_FOUND",
-                        "SIGN_IN_METHOD_TAKEN",
-                        "INVALID_DISPLAY_NAME",
-                        "INTERNAL"
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "integer"
+                        },
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "VALIDATION_FAILED",
+                            "UNAUTHORIZED",
+                            "FORBIDDEN",
+                            "NOT_FOUND",
+                            "USER_NOT_FOUND",
+                            "CONFLICT",
+                            "OTP_EXPIRED",
+                            "OTP_ALREADY_USED",
+                            "INVALID_OTP",
+                            "OTP_LOCKED",
+                            "OTP_NOT_FOUND",
+                            "SIGN_IN_METHOD_TAKEN",
+                            "INVALID_DISPLAY_NAME",
+                            "INTERNAL"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "nullable": true
+                        },
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "code",
+                        "message",
+                        "timestamp",
+                        "requestId"
                       ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "nullable": true
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
                     }
-                  },
-                  "required": [
-                    "statusCode",
-                    "code",
-                    "message",
-                    "timestamp",
-                    "requestId"
                   ]
                 }
               }
@@ -11692,52 +12466,58 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "statusCode": {
-                      "type": "integer"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/RateLimitedResponse"
                     },
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "VALIDATION_FAILED",
-                        "UNAUTHORIZED",
-                        "FORBIDDEN",
-                        "NOT_FOUND",
-                        "USER_NOT_FOUND",
-                        "CONFLICT",
-                        "RATE_LIMITED",
-                        "OTP_EXPIRED",
-                        "OTP_ALREADY_USED",
-                        "INVALID_OTP",
-                        "OTP_LOCKED",
-                        "OTP_NOT_FOUND",
-                        "SIGN_IN_METHOD_TAKEN",
-                        "INVALID_DISPLAY_NAME",
-                        "INTERNAL"
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "integer"
+                        },
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "VALIDATION_FAILED",
+                            "UNAUTHORIZED",
+                            "FORBIDDEN",
+                            "NOT_FOUND",
+                            "USER_NOT_FOUND",
+                            "CONFLICT",
+                            "OTP_EXPIRED",
+                            "OTP_ALREADY_USED",
+                            "INVALID_OTP",
+                            "OTP_LOCKED",
+                            "OTP_NOT_FOUND",
+                            "SIGN_IN_METHOD_TAKEN",
+                            "INVALID_DISPLAY_NAME",
+                            "INTERNAL"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "nullable": true
+                        },
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "code",
+                        "message",
+                        "timestamp",
+                        "requestId"
                       ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "nullable": true
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
                     }
-                  },
-                  "required": [
-                    "statusCode",
-                    "code",
-                    "message",
-                    "timestamp",
-                    "requestId"
                   ]
                 }
               }
@@ -13672,52 +14452,58 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "statusCode": {
-                      "type": "integer"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/RateLimitedResponse"
                     },
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "VALIDATION_FAILED",
-                        "UNAUTHORIZED",
-                        "FORBIDDEN",
-                        "NOT_FOUND",
-                        "USER_NOT_FOUND",
-                        "CONFLICT",
-                        "RATE_LIMITED",
-                        "OTP_EXPIRED",
-                        "OTP_ALREADY_USED",
-                        "INVALID_OTP",
-                        "OTP_LOCKED",
-                        "OTP_NOT_FOUND",
-                        "SIGN_IN_METHOD_TAKEN",
-                        "INVALID_DISPLAY_NAME",
-                        "INTERNAL"
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "integer"
+                        },
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "VALIDATION_FAILED",
+                            "UNAUTHORIZED",
+                            "FORBIDDEN",
+                            "NOT_FOUND",
+                            "USER_NOT_FOUND",
+                            "CONFLICT",
+                            "OTP_EXPIRED",
+                            "OTP_ALREADY_USED",
+                            "INVALID_OTP",
+                            "OTP_LOCKED",
+                            "OTP_NOT_FOUND",
+                            "SIGN_IN_METHOD_TAKEN",
+                            "INVALID_DISPLAY_NAME",
+                            "INTERNAL"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "nullable": true
+                        },
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "code",
+                        "message",
+                        "timestamp",
+                        "requestId"
                       ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "nullable": true
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
                     }
-                  },
-                  "required": [
-                    "statusCode",
-                    "code",
-                    "message",
-                    "timestamp",
-                    "requestId"
                   ]
                 }
               }
@@ -14616,6 +15402,18 @@
           {
             "schema": {
               "type": "string",
+              "enum": [
+                "personal",
+                "business"
+              ]
+            },
+            "required": false,
+            "name": "sellerType",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid"
             },
             "required": false,
@@ -14823,6 +15621,18 @@
           {
             "schema": {
               "type": "string",
+              "enum": [
+                "personal",
+                "business"
+              ]
+            },
+            "required": false,
+            "name": "sellerType",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid"
             },
             "required": true,
@@ -14993,6 +15803,18 @@
           "Listings"
         ],
         "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "personal",
+                "business"
+              ]
+            },
+            "required": false,
+            "name": "sellerType",
+            "in": "query"
+          },
           {
             "schema": {
               "type": "string",

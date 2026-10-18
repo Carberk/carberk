@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import type { OtpRequest, SignInCodePurpose } from "../domain/OtpRequest";
 import type { User } from "../domain/User";
@@ -235,22 +235,50 @@ describe("RequestAccountDeletion", () => {
     ).rejects.toMatchObject({ reason: "BACKOFF", retryInSeconds: 60 });
   });
 
-  it("refuses with the same reason whether or not a User holds the destination", async () => {
-    const held = setup([makeUser({ phone: "+99361234567", email: null })]);
-    const unheld = setup([]);
-    held.otpRepo.destinationCount = 5;
-    unheld.otpRepo.destinationCount = 5;
-
-    const heldRefusal = await held.useCase
-      .execute({ phone: "+99361234567", ip: "10.0.0.1" })
-      .catch((error: unknown) => error);
-    const unheldRefusal = await unheld.useCase
-      .execute({ phone: "+99361234567", ip: "10.0.0.1" })
-      .catch((error: unknown) => error);
-
-    expect(heldRefusal).toBeInstanceOf(SignInCodeRateLimitedError);
-    expect(unheldRefusal).toBeInstanceOf(SignInCodeRateLimitedError);
-    expect(heldRefusal).toMatchObject({ reason: "DESTINATION_LIMIT", retryInSeconds: 0 });
-    expect(unheldRefusal).toMatchObject({ reason: "DESTINATION_LIMIT", retryInSeconds: 0 });
+  describe.each([
+    { phone: "+99361234567", email: null },
+    { phone: null, email: "seller@example.com" },
+  ])("privacy for $phone / $email", (methods) => {
+    it.each([
+      { reason: "DESTINATION_LIMIT", destinationCount: 5, ipCount: 0, retryInSeconds: 0 },
+      { reason: "IP_LIMIT", destinationCount: 0, ipCount: 10, retryInSeconds: 0 },
+      { reason: "BACKOFF", destinationCount: 1, ipCount: 0, retryInSeconds: 45 },
+    ])("refuses held and unheld destinations identically for $reason", async (limit) => {
+      const held = setup([makeUser(methods)]);
+      const unheld = setup([]);
+      assert(methods.phone ?? methods.email);
+      const destination = methods.phone ? { phone: methods.phone } : { email: methods.email ?? "" };
+      const refusals: unknown[] = [];
+      for (const scenario of [held, unheld]) {
+        scenario.otpRepo.destinationCount = limit.destinationCount;
+        scenario.otpRepo.ipCount = limit.ipCount;
+        if (limit.reason === "BACKOFF") {
+          const earlier = await scenario.otpRepo.create({
+            purpose: "sign-in",
+            channel: methods.phone ? "phone" : "email",
+            destination: methods.phone ?? methods.email ?? "",
+            codeHash: "earlier-sign-in-code",
+            expiresAt: NOW,
+            userId: null,
+            ip: "10.0.0.1",
+          });
+          scenario.otpRepo.records[0] = {
+            ...earlier,
+            createdAt: new Date(NOW.getTime() - 15_000),
+          };
+        }
+        const before = scenario.otpRepo.records.length;
+        const refusal: unknown = await scenario.useCase
+          .execute({ ...destination, ip: "10.0.0.1" })
+          .catch((error: unknown) => error);
+        expect(refusal).toBeInstanceOf(SignInCodeRateLimitedError);
+        expect(refusal).toMatchObject({ reason: limit.reason, retryInSeconds: limit.retryInSeconds });
+        expect(scenario.otpRepo.records).toHaveLength(before);
+        expect(scenario.sms).toHaveLength(0);
+        expect(scenario.emails).toHaveLength(0);
+        refusals.push(refusal);
+      }
+      expect(refusals[1]).toEqual(refusals[0]);
+    });
   });
 });
