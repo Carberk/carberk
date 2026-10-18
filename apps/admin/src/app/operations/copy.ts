@@ -1,0 +1,29 @@
+export const operationsCopy = {
+  en: {
+    title: "Operational health", scope: "Current measured probes. Unknown or missing evidence does not establish health or release readiness.",
+    loading: "Checking current evidence…", denied: "Your current access does not permit this view.", error: "Operational evidence could not be loaded.",
+    unavailable: "No current independent watchdog evidence is available.", refresh: "Refresh", observed: "Last observation", api: "API readiness", collector: "Diagnostic collector", worker: "Background worker",
+    healthy: "Healthy", failing: "Failure observed", unknown: "Unknown", queues: "Queue backlog", queue: "Queue", waiting: "Outstanding jobs", sustained: "Over 100 jobs for ten observed minutes",
+    noQueues: "No queue measurements are available.", incident: "Incident", opened: "First observed", resolved: "Resolved", ongoing: "Ongoing", yes: "Yes", no: "No",
+    budgets: "Hosting budget limits", budgetScope: "Railway ceiling: 100 USD per month, including monitoring. Warning from 80 USD. TM ceiling: 8,000 TMT, warning from 6,400 TMT. Spending projections are unavailable until billing evidence is connected.",
+    readiness: "Release readiness", readinessScope: "These probes do not establish native crash delivery, authorized alert receipt, recovery within four staffed hours, backup consistency or regional hosting readiness. Missing acceptance evidence keeps the affected activation closed.",
+  },
+  ru: {
+    title: "Работоспособность", scope: "Текущие измеренные проверки. Неизвестные или отсутствующие данные не подтверждают исправность и готовность к выпуску.",
+    loading: "Проверка текущих данных…", denied: "Ваш текущий доступ не разрешает этот просмотр.", error: "Не удалось загрузить эксплуатационные данные.",
+    unavailable: "Нет актуальных данных независимого наблюдателя.", refresh: "Обновить", observed: "Последнее наблюдение", api: "Готовность API", collector: "Сборщик диагностики", worker: "Фоновый обработчик",
+    healthy: "Исправно", failing: "Обнаружен сбой", unknown: "Неизвестно", queues: "Задержки очередей", queue: "Очередь", waiting: "Незавершённые задания", sustained: "Более 100 заданий за десять минут наблюдения",
+    noQueues: "Измерения очередей отсутствуют.", incident: "Инцидент", opened: "Первое наблюдение", resolved: "Устранён", ongoing: "Продолжается", yes: "Да", no: "Нет",
+    budgets: "Лимиты расходов на хостинг", budgetScope: "Предел Railway: 100 USD в месяц, включая мониторинг. Предупреждение от 80 USD. Предел TM: 8 000 TMT, предупреждение от 6 400 TMT. Прогноз расходов недоступен без данных оплаты.",
+    readiness: "Готовность к выпуску", readinessScope: "Эти проверки не подтверждают доставку нативных сбоев, получение разрешённых оповещений, восстановление за четыре рабочих часа, согласованность резервных копий или готовность регионального хостинга. Без обязательных подтверждений соответствующее включение запрещено.",
+  },
+  tk: {
+    title: "Ulgamyň işleýşi", scope: "Häzirki ölçenen barlaglar. Näbelli ýa-da ýok maglumatlar ulgamyň sagdynlygyny we çykaryşa taýýarlygyny tassyklamaýar.",
+    loading: "Häzirki maglumatlar barlanýar…", denied: "Häzirki ygtyýaryňyz bu maglumatlary görmäge rugsat bermeýär.", error: "Ulgam maglumatlaryny ýükläp bolmady.",
+    unavailable: "Garaşsyz gözegçiniň häzirki maglumatlary ýok.", refresh: "Täzele", observed: "Soňky gözegçilik", api: "API taýýarlygy", collector: "Ýalňyş maglumatlaryny ýygnaýjy", worker: "Arka plandaky işçi",
+    healthy: "Kadaly işleýär", failing: "Näsazlyk ýüze çykdy", unknown: "Näbelli", queues: "Nobatdaky işler", queue: "Nobat", waiting: "Tamamlanmadyk işler", sustained: "On minutlyk gözegçilikde 100-den köp iş",
+    noQueues: "Nobat ölçegleri ýok.", incident: "Näsazlyk", opened: "Ilkinji gözegçilik", resolved: "Düzedildi", ongoing: "Dowam edýär", yes: "Hawa", no: "Ýok",
+    budgets: "Hosting çykdajylarynyň çäkleri", budgetScope: "Railway aýlyk çägi: gözegçiligi goşmak bilen 100 USD. 80 USD-dan duýduryş berilýär. TM çägi: 8 000 TMT, 6 400 TMT-den duýduryş berilýär. Töleg maglumatlary birikdirilýänçä çykdajy çaklamasy elýeterli däl.",
+    readiness: "Çykaryşa taýýarlyk", readinessScope: "Bu barlaglar ýerli programma ýalňyşlarynyň iberilmegini, rugsat berlen duýduryşlaryň alynmagyny, dört iş sagadynda dikeldilmegini, ätiýaç nusgalaryň sazlaşygyny ýa-da sebitleýin hosting taýýarlygyny tassyklamaýar. Zerur subutnamalar ýok bolsa degişli mümkinçilik ýapyk galýar.",
+  },
+} as const;

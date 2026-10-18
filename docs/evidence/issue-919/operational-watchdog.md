@@ -25,3 +25,11 @@ Docs: https://github.com/taskforcesh/bullmq/blob/v5.76.8/src/classes/queue-gette
 ## Remaining acceptance
 
 Actual independent deployment, deliberate worker death, actual collector failure, receipt of a real authorized alert, metrics thresholds, disk/TLS probes and resource isolation remain unverified or unimplemented. A watchdog cannot prove its own independent availability. Native diagnostic SDK collection, release symbolication, sanitization and deletion fences remain separate obligations. The legacy Compose monitoring configuration supplies no deployed evidence. Nothing here enables service/provider collection, production or paid provisioning.
+
+## Safe staff health reader and workspace
+
+The separate OperationsModule exposes `GET /api/v1/operations/health`. The root API must compose this module. Current elevated `analytics.aggregate` authority is checked before infrastructure access and again before response release. Responses use `Cache-Control: no-store`. A strict shared contract rejects unexpected private fields, unknown queues, malformed counts, stale or future evidence. Absent evidence is unavailable, never an inferred healthy state.
+
+`/operations` is a separate TK/RU/EN workspace with current probes, bounded queue counts, original incident timing and explicit missing billing/recovery/native evidence. It clears prior data on refresh/denial and expires displayed evidence after 90 seconds. Budget ceilings are policy text; no current spending is invented. Root owns navigation linkage and independent final browser/keyboard acceptance.
+
+Six API behavior/real JWT HTTP checks and six rendered actual-component/server-action checks passed. They cover missing/revoked Session, grant/elevation denial, current no-store reads, stale/future/private payload rejection, all three locales, revocation clearing, missing evidence and displayed snapshot expiry. API/admin typechecks and affected lint passed. Real production identity/storage deployment remains outside these synthetic HTTP checks.
