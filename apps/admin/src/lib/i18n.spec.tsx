@@ -23,7 +23,8 @@ it('switches all shell labels without remounting unfinished work or changing fil
   await act(async()=>{select.value='tk';select.dispatchEvent(new Event('change',{bubbles:true}));});
   expect(container.textContent).toContain('Iş meýdançasy');expect(container.textContent).toContain('Sebäp');expect(input.value).toBe('Keep this reason');
 });
-it('never turns staff navigation into moderation or private feature permission',async()=>{
+it('keeps scoped service navigation separate from moderation and other private permissions',async()=>{
   await act(async()=>root.render(<AdminLocaleProvider initialLocale="en"><AdminNav capabilities={['support.operations']}/></AdminLocaleProvider>));
-  expect([...container.querySelectorAll('a')].map(a=>a.getAttribute('href'))).toEqual(['/workspace']);
+  expect([...container.querySelectorAll('a')].map(a=>a.getAttribute('href'))).toEqual(['/workspace','/services']);
+  expect(container.querySelector('a[href="/reports"]')).toBeNull();
 });
