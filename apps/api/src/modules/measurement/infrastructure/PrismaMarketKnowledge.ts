@@ -93,6 +93,28 @@ export class PrismaMarketKnowledge {
    return this.current(tx,id);
   });
  }
+ /** Registry deletion is a retained source fence. Derived cells and known artifacts are invalidated atomically. */
+ async invalidateSource(subject:StaffSubject,id:string,input:unknown) {
+  const parsed=z.object({expectedEpoch:z.string().min(1),expectedVersion:z.number().int().positive(),action:z.enum(["delete","restrict"]),reason:z.string().trim().min(8).max(500)}).strict().safeParse(input);
+  if(!/^[A-Za-z0-9_-]{1,100}$/.test(id) || !parsed.success)throw new MarketKnowledgeDenied("Invalid source lifecycle request");
+  return this.prisma.$transaction(async tx=>{
+   await this.authority.authorize({...subject,capability:"analytics.investigate"},tx);
+   // Exclusive collector lock precedes source/dataset locks, while readers take its shared lock first.
+   const collector=await tx.$queryRaw<{epoch:string}[]>`SELECT "epoch" FROM "measurement_state" WHERE "key"='collector' FOR UPDATE`;
+   if(!this.epoch || parsed.data.expectedEpoch!==this.epoch || collector[0]?.epoch!==this.epoch)throw new MarketKnowledgeDenied("Stale source lifecycle epoch");
+   await tx.$queryRaw`SELECT "id" FROM "market_knowledge_sources" WHERE "id"=${id} FOR UPDATE`;
+   const source=await tx.marketKnowledgeSource.findUnique({where:{id}});
+   if(!source || source.epoch!==this.epoch || source.version!==parsed.data.expectedVersion || source.revokedAt)throw new MarketKnowledgeDenied("Stale source lifecycle version");
+   const links=await tx.marketKnowledgeDatasetSource.findMany({where:{sourceId:id},select:{datasetId:true},take:1001});
+   if(links.length>1000)throw new MarketKnowledgeDenied("Source lifecycle requires bounded operator batches");
+   const datasetIds=links.map(link=>link.datasetId),now=this.now();
+   await tx.marketKnowledgeSource.update({where:{id},data:{status:parsed.data.action==="delete"?"deleted":"restricted",version:{increment:1},revokedAt:now}});
+   await tx.marketKnowledgeDataset.updateMany({where:{id:{in:datasetIds}},data:{status:"invalidated",invalidatedAt:now,data:{}}});
+   await tx.measurementInvestigationExport.updateMany({where:{epoch:this.epoch,revokedAt:null,AND:[{scope:{path:["kind"],equals:"market_knowledge"}},{OR:datasetIds.map(datasetId=>({scope:{path:["datasetId"],equals:datasetId}}))}]},data:{revokedAt:now}});
+   await tx.auditLog.create({data:{actorId:subject.userId,action:`analytics.synthetic_research.source.${parsed.data.action}`,targetType:"market_knowledge_source",targetId:id,details:{reason:parsed.data.reason,expectedVersion:parsed.data.expectedVersion,newVersion:source.version+1,datasetIds}}});
+   return {id,version:source.version+1,state:"invalidated" as const};
+  });
+ }
  async list(subject:StaffSubject) {
   return this.prisma.$transaction(async tx=>{
    await this.authority.authorize({...subject,capability:"analytics.aggregate"},tx);
