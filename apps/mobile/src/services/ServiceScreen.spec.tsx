@@ -11,7 +11,8 @@ vi.mock("expo-secure-store", () => { const store = new Map<string, string>(); re
 vi.mock("expo-crypto", () => ({ randomUUID: () => "44444444-4444-4444-8444-444444444444" }));
 vi.mock("expo-image-picker", () => ({ launchImageLibraryAsync: async () => ({ canceled: false, assets: [{ uri: "file:///synthetic.jpg" }] }) }));
 vi.mock("expo-image-manipulator", () => ({ SaveFormat: { JPEG: "jpeg" }, ImageManipulator: { manipulate: () => ({ renderAsync: async () => ({ width: 40, height: 20, saveAsync: async () => ({ uri: "file:///clean.jpg" }), release: () => {} }), resize: () => {}, release: () => {} }) } }));
-vi.mock("expo-file-system", () => ({ File: class { size = 3; async bytes() { return new Uint8Array([1, 2, 3]); } delete() {} } }));
+vi.mock("expo-sharing", () => ({ isAvailableAsync: async () => true, shareAsync: async () => {} }));
+vi.mock("expo-file-system", () => ({ Paths: { cache: "file:///cache" }, File: class { uri = "file:///cache/synthetic.pdf"; create() {} write() {} size = 3; async bytes() { return new Uint8Array([1, 2, 3]); } delete() {} } }));
 const id = "11111111-1111-4111-8111-111111111111", userId = "22222222-2222-4222-8222-222222222222";
 let sent: Record<string, unknown>[] = [], fail = false;
 const message = { id, clientMessageId: id, sequence: 1, sender: "carberk", operatorName: null, visibility: "customer", body: "Synthetic private service content", attachment: null, createdAt: "2026-10-15T10:00:00Z" };
@@ -93,4 +94,14 @@ it("requires re-entering exact quoted VIN and keeps receipt claims separate from
  await screen.findByText("A receipt claim is not verified payment."); expect(commands[0]?.["kind"]).toBe("accept"); expect(commands[0]?.["vin"]).toBe(quote.vin);
  await fireEvent.changeText(screen.getByLabelText("Receipt claim"), "Synthetic transfer claim"); await fireEvent.press(screen.getByRole("button", { name: "Submit for reconciliation" }));
  expect(commands[1]?.["kind"]).toBe("payment"); expect(commands[1]).not.toHaveProperty("verifiedFunds");
+});
+
+it.each([["en", "Open, save or share PDF"], ["ru", "Открыть, сохранить или отправить PDF"], ["tk", "PDF-i aç, sakla ýa-da paýlaş"]])("reopens the same purchased original through authenticated bytes in %s", async (locale, label) => {
+ let reads = 0;
+ server.use(http.get("*/services/conversations", () => HttpResponse.json([{ id, purpose: "history", createdAt: "2026-10-15T10:00:00Z" }])), http.get("*/services/conversations/:id", () => HttpResponse.json({ id, resourceId: id, purpose: "history", status: "completed", assignmentVersion: 1, assigned: true, operatorName: "Synthetic operator", sourceListingId: null, canSend: true, messages: [], lastSequence: 0, readThrough: 0, unread: 0, hasMore: false })), http.get("*/services/conversations/:id/history", () => HttpResponse.json({ synthetic: true, quotes: [], order: { id, quoteId: id, state: "delivered", version: 2, day: "2026-10-15", holdExpiresAt: "2026-10-15T10:00:00Z", promiseAt: "2026-10-15T12:00:00Z", paidAt: "2026-10-15T11:00:00Z", escalatedAt: null, recoveryDeadline: null, recoveryUsed: false, refundState: null }, payments: [] })), http.get("*/services/conversations/:id/history/reports", () => HttpResponse.json({ delivered: [{ id, provider: "carfax", vin: "1HGCM82633A004352", originalDate: "2020-01-01T00:00:00Z", sizeBytes: 4, expectedPages: 1, sharedLink: "https://example.invalid/report", deliveredAt: "2026-10-15T12:00:00Z", state: "verified", canShare: true }], archive: [], staged: [] })), http.get("*/services/conversations/:id/history/artifacts/:artifact", () => { reads++; return HttpResponse.arrayBuffer(new Uint8Array([37,80,68,70]).buffer); }));
+ const screen = await renderMobile(<ServiceScreen/>, { locale });
+ const history = locale === "ru" ? "История автомобиля" : locale === "tk" ? "Awtoulag taryhy" : "Vehicle History";
+ await fireEvent.press(await screen.findByRole("button", { name: history })); await fireEvent.press(await screen.findByRole("button", { name: label })); await screen.findByRole("button", { name: label });
+ expect(reads).toBe(1); expect(sent).toEqual([]);
+ await act(async () => { await clearAuthSession(); }); expect(screen.queryByRole("button", { name: label })).toBeNull();
 });
