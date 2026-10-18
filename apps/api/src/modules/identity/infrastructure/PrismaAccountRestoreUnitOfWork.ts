@@ -20,6 +20,8 @@ export class PrismaAccountRestoreUnitOfWork implements AccountRestoreUnitOfWork 
         // Each Listing keeps its first publishedAt: a restore is no bump to the
         // top of Newest (#871), the same rule as an owner's relist.
         republishListingsArchivedByDeletion: async (sellerId) => {
+          const collector=await tx.$queryRaw<{epoch:string}[]>`SELECT "epoch" FROM "measurement_state" WHERE "key"='collector' FOR UPDATE`;
+          if(collector[0])await tx.measurementState.deleteMany({where:{key:`inventory_baseline:${collector[0].epoch}`}});
           await tx.listing.updateMany({
             where: { sellerId, businessId: null, status: "archived", archivedByDeletion: true },
             data: { status: "active", archivedByDeletion: false },

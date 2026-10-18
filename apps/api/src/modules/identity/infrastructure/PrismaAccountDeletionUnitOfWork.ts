@@ -33,7 +33,10 @@ export class PrismaAccountDeletionUnitOfWork implements AccountDeletionUnitOfWor
           // linked current guest visits by cascading FKs. Core recovery cannot revive them.
           // Fence investigative reads before erasing actor maps. Exports carry no reverse
           // map, so conservatively invalidate every short-lived artifact on erasure.
-          await tx.$queryRaw`SELECT "epoch" FROM "measurement_state" WHERE "key"='collector' FOR UPDATE`;
+          const collector=await tx.$queryRaw<{epoch:string}[]>`SELECT "epoch" FROM "measurement_state" WHERE "key"='collector' FOR UPDATE`;
+          // Actor-owned visibility history is erased too. Fresh denominators must
+          // wait for authoritative rebaseline rather than silently losing inventory.
+          if(collector[0])await tx.measurementState.deleteMany({where:{key:`inventory_baseline:${collector[0].epoch}`}});
           await tx.measurementInvestigationExport.deleteMany();
           await tx.measurementPrincipal.deleteMany({ where: { userId } });
           await tx.dealershipInvitation.deleteMany({ where: { recipientUserId: userId } });
