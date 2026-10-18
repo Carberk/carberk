@@ -6,10 +6,11 @@ import type { MeasurementSchemas } from "@auto-tm/contracts";
 import { server } from "../../test/msw";
 import { act,fireEvent,renderMobile } from "../../test/render";
 import SellScreen from "../../app/(tabs)/sell";
-import { ToastProvider } from "@/components/ui/toast";
 import { storeAuthSession,clearAuthSession } from "../auth/session";
 
 import { measurementHost } from "./nativeMeasurement";
+
+import { ToastProvider } from "@/components/ui/toast";
 vi.mock("expo-secure-store",()=>{const values=new Map<string,string>();return {getItemAsync:async(key:string)=>values.get(key)??null,setItemAsync:async(key:string,value:string)=>{values.set(key,value);},deleteItemAsync:async(key:string)=>{values.delete(key);}};});
 vi.mock("expo-file-system/legacy",()=>({getInfoAsync:async()=>({exists:false}),readDirectoryAsync:async()=>[],makeDirectoryAsync:async()=>undefined,deleteAsync:async()=>undefined,documentDirectory:"file:///doc/"}));
 vi.mock("expo-image-manipulator",()=>({SaveFormat:{JPEG:"jpeg"},ImageManipulator:{manipulate:()=>undefined}}));
@@ -27,15 +28,22 @@ vi.hoisted(()=>{process.env["EXPO_PUBLIC_MEASUREMENT_ENABLED"]="true";});
 const events:MeasurementSchemas.MeasurementEvent[]=[],draftId="00000000-0000-4000-8000-000000000701",visitId="00000000-0000-4000-8000-000000000501";
 beforeEach(async()=>{events.length=0;await clearAuthSession();measurementHost.invalidate();server.use(http.post("*/api/v1/measurement/bootstrap",()=>HttpResponse.json({visitId,generation:"synthetic-generation",purposes:["product_improvement"],guestCapability:`mg_${"a".repeat(43)}`})),http.post("*/api/v1/measurement/events",async({request})=>{events.push(...(await request.json() as {events:MeasurementSchemas.MeasurementEvent[]}).events);return new HttpResponse(null,{status:204});}));await measurementHost.foreground();});
 
-it("opens the actual resumed wizard vehicle step without copying draft content",async()=>{
- await storeAuthSession({accessToken:"test",refreshToken:"test",user:{id:visitId,email:null,phone:null,displayName:null,role:"buyer"}});
+it.each(["vehicle","specs","photos","price","location","contact","review"] as const)("opens actual resumed wizard %s without copying draft content",async(step)=>{
+ await storeAuthSession({accessToken:"test",refreshToken:"test",user:{id:visitId,email:null,phone:null,displayName:null,role:"buyer"}});await measurementHost.foreground();
  server.use(http.patch("*/api/v1/listings/drafts/*",async({request})=>HttpResponse.json({id:draftId,userId:visitId,payload:await request.json(),createdAt:"2026-10-18T00:00:00Z",updatedAt:"2026-10-18T00:00:00Z"})),http.get("*/api/v1/*",({request})=>{
   const path=new URL(request.url).pathname;
-  if(path.endsWith("/me/drafts"))return HttpResponse.json({items:[{id:draftId,userId:visitId,payload:{description:"private seller text"},createdAt:"2026-10-18T00:00:00Z",updatedAt:"2026-10-18T00:00:00Z"}],nextCursor:null});
+  if(path.endsWith("/me/drafts"))return HttpResponse.json({items:[{id:draftId,userId:visitId,payload:{description:"private seller text",brandId:visitId,modelId:visitId,year:2020,condition:"used",mileageKm:10000,conditionDisclosure:{damaged:false},priceAmount:100000,priceCurrency:"TMT",regionId:visitId,cityId:visitId,contactPhone:"+99361234567",allowCalls:true,allowChat:true,photos:[0,1,2].map(index=>({photoId:`00000000-0000-4000-8000-00000000070${index}`,key:`uploads/photo-${index}.webp`,sortOrder:index})),currentStep:["vehicle","specs","photos","price","location","contact","review"].indexOf(step)+1,validatedSteps:["vehicle","specs","photos","price","location","contact"],...(step==="vehicle"?{modelId:undefined,validatedSteps:[]}: {})},createdAt:"2026-10-18T00:00:00Z",updatedAt:"2026-10-18T00:00:00Z"}],nextCursor:null});
   return HttpResponse.json({items:[],workspace:null});
  }));
  const view=await renderMobile(<ToastProvider><SellScreen/></ToastProvider>);
  await waitFor(()=>expect(view.getByText("Continue")).toBeTruthy());
  await act(async()=>{fireEvent.press(view.getByText("Continue"));});
- await waitFor(async()=>{await measurementHost.queue.flush();expect(events.some(event=>event.eventName==="wizard_step_opened"&&event.payload.step==="vehicle"&&event.payload.draftId===draftId)).toBe(true);});
+ await waitFor(async()=>{await measurementHost.queue.flush();expect(events.some(event=>event.eventName==="wizard_step_opened"&&event.payload.step===step&&event.payload.draftId===draftId)).toBe(true);});
+ if(step==="specs" || step==="contact") {
+  await act(async()=>{fireEvent.press(view.getByText("Continue"));});
+  await waitFor(async()=>{await measurementHost.queue.flush();expect(events.filter(event=>event.eventName==="wizard_step_result").map(event=>event.payload)).toEqual([expect.objectContaining({draftId,step,result:step==="contact"?"expected_rejection":"success"})]);});
+ }
+ expect(JSON.stringify(events)).not.toContain("private seller text");
+ expect(JSON.stringify(events)).not.toContain("+99361234567");
+
 });
