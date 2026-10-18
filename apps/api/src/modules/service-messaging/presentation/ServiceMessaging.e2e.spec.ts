@@ -276,6 +276,16 @@ it("delivers original PDFs only through the purchased order and reuses licensed 
  await request.get(`/api/v1/services/conversations/${first.id}/history/artifacts/${artifactId}`).set("Authorization", auth(stranger)).expect(403);
  await command(first.id, { kind: "verify", expectedAssignmentVersion: 1, orderId: first.order.id, artifactId, vin: "1HGCM82633A004352", originalDate: "2026-01-01T00:00:00Z", readablePages: 1, readable: true }).expect(201);
  await command(first.id, { kind: "deliver", expectedAssignmentVersion: 1, expectedVersion: 0, orderId: first.order.id, artifactId, sharedLink: "https://example.invalid/synthetic-report", linkMatches: true, linkChecked: true }).expect(201);
+ const payment = await db.historyPayment.create({ data: { orderId: first.order.id, clientPaymentId: randomUUID(), claim: "Synthetic historical receipt", evidence: "Synthetic private payment evidence" } });
+ await db.staffGrant.createMany({ data: [{ userId: nextStaff, capability: "history.payment.history" }], skipDuplicates: true });
+ const ordinary = await request.get(`/api/v1/services/conversations/${first.id}/history`).set("Authorization", auth(nextStaff)).expect(200);
+ expect(ordinary.body.payments).toEqual([]);
+ await request.post(`/api/v1/services/conversations/${first.id}/history/payment-history`).set("Authorization", auth(nextStaff)).send({ reason: " " }).expect(400);
+ const historical = await request.post(`/api/v1/services/conversations/${first.id}/history/payment-history`).set("Authorization", auth(nextStaff)).send({ reason: "Synthetic founder-authorized reconciliation" }).expect(201);
+ expect(historical.body.payments[0].id).toBe(payment.id);
+ expect(await db.serviceAudit.count({ where: { resourceId: first.order.requestId, action: "HISTORY_PAYMENT_HISTORY_READ", reason: "Synthetic founder-authorized reconciliation" } })).toBe(1);
+ await db.staffGrant.updateMany({ where: { userId: nextStaff, capability: "history.payment.history", revokedAt: null }, data: { revokedAt: new Date() } });
+ await request.post(`/api/v1/services/conversations/${first.id}/history/payment-history`).set("Authorization", auth(nextStaff)).send({ reason: "No longer authorized" }).expect(403);
  const file = await request.get(`/api/v1/services/conversations/${first.id}/history/artifacts/${artifactId}`).set("Authorization", auth(stranger)).expect(200);
  expect(Buffer.from(file.body)).toEqual(pdf);
  await request.get(`/api/v1/services/conversations/${second.id}/history/artifacts/${artifactId}`).set("Authorization", auth(customer)).expect(403);

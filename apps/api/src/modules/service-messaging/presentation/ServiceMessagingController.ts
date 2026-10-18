@@ -59,6 +59,11 @@ export class ServiceMessagingController {
  }
  @Get("conversations/:id/history") @Header("Cache-Control", "no-store, private")
  historySnapshot(@Req() req: ServiceRequest, @Param("id") id: string) { return this.run(() => this.services.historySnapshot(this.subject(req), parse(uuid, id))); }
+ @Post("conversations/:id/history/payment-history") @Header("Cache-Control", "no-store, private")
+ historyPayments(@Req() req: ServiceRequest, @Param("id") id: string, @Body() body: unknown) {
+  const data = parse(z.object({ reason: z.string().trim().min(1).max(1000) }).strict(), body);
+  return this.run(() => this.services.historySnapshot(this.subject(req), parse(uuid, id), data.reason));
+ }
  @Post("conversations/:id/history") @Header("Cache-Control", "no-store, private")
  historyCommand(@Req() req: ServiceRequest, @Param("id") id: string, @Body() body: unknown) { return this.run(async () => { await this.services.historyCommand(this.subject(req), parse(uuid, id), parse(ServiceMessagingSchemas.HistoryCommandSchema, body)); this.events.emit("service.changed", id); return { ok: true }; }); }
  @Post("conversations/:id/support") @Header("Cache-Control", "no-store, private")
@@ -85,7 +90,7 @@ export class ServiceMessagingController {
  @Get("conversations/:id/attachments/:attachmentId")
  async file(@Req() req: ServiceRequest, @Param("id") id: string, @Param("attachmentId") attachmentId: string, @Res() reply: FastifyReply) {
   reply.header("Cache-Control", "no-store, private").header("X-Content-Type-Options", "nosniff");
-  const file = await this.run(() => this.services.file(this.subject(req), parse(uuid, id), parse(uuid, attachmentId)));
+  const file = await this.run(() => this.services.file(this.subject(req), parse(uuid, id), parse(uuid, attachmentId), req.headers["x-service-access-reason"] === undefined ? undefined : parse(z.string().trim().min(1).max(1000), req.headers["x-service-access-reason"])));
   reply.header("Content-Type", file.contentType).header("Content-Disposition", `attachment; filename="attachment"; filename*=UTF-8''${encodeURIComponent(file.filename).replaceAll("'", "%27")}`);
   return reply.send(Buffer.from(file.bytes));
  }

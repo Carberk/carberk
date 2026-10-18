@@ -10,14 +10,14 @@ export interface ServiceMessagingPort {
   historyReports(subject: ServiceSubject, id: string): Promise<ServiceMessagingSchemas.HistoryReports>;
   historyReportFile(subject: ServiceSubject, id: string, artifactId: string): Promise<{ bytes: Uint8Array; contentType: string; filename: string }>;
   historyCommand(subject: ServiceSubject, id: string, command: ServiceMessagingSchemas.HistoryCommand): Promise<void>;
-  historySnapshot(subject: ServiceSubject, id: string): Promise<ServiceMessagingSchemas.HistorySnapshot>;
+  historySnapshot(subject: ServiceSubject, id: string, paymentHistoryReason?: string): Promise<ServiceMessagingSchemas.HistorySnapshot>;
   supportCommand(subject: ServiceSubject, id: string, command: ServiceMessagingSchemas.SupportCommand): Promise<void>;
   assign(subject: ServiceSubject, id: string, expectedVersion: number, targetUserId?: string): Promise<void>;
   subscribePush(subject: ServiceSubject, id: string, deviceToken: string): Promise<void>;
   markRead(subject: ServiceSubject, id: string, throughSequence: number): Promise<void>;
   stage(subject: ServiceSubject, id: string, upload: ServiceMessagingSchemas.ServiceStageAttachment): Promise<{ id: string }>;
   upload(subject: ServiceSubject, id: string, attachmentId: string, bytes: Uint8Array): Promise<void>;
-  file(subject: ServiceSubject, id: string, attachmentId: string): Promise<{ bytes: Uint8Array; contentType: string; filename: string }>;
+  file(subject: ServiceSubject, id: string, attachmentId: string, paymentHistoryReason?: string): Promise<{ bytes: Uint8Array; contentType: string; filename: string }>;
   queue(subject: ServiceSubject, purpose: ServiceMessagingSchemas.ServicePurpose): Promise<{ id: string; resourceId: string; assigned: boolean; assignmentVersion: number; createdAt: string }[]>;
   mine(subject: ServiceSubject): Promise<{ id: string; purpose: ServiceMessagingSchemas.ServicePurpose; createdAt: string }[]>;
 }

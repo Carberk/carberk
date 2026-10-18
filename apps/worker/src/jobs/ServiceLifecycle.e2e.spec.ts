@@ -16,7 +16,7 @@ describe.skipIf(!hosted)("private service lifecycle on disposable PostgreSQL and
  const db = new PrismaService();
  const s3 = new S3Client({ endpoint, region: "us-east-1", forcePathStyle: true, credentials: { accessKeyId: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin", secretAccessKey: process.env["MINIO_SECRET_KEY"] ?? "minioadmin" } });
  const objects = new S3RetiredObjectStore(s3, "service-private");
- const users: string[] = [], conversations: string[] = [], owners: string[] = [], keys: string[] = [];
+ const users: string[] = [], conversations: string[] = [], owners: string[] = [], keys: string[] = [], artifactIds: string[] = [];
  beforeAll(async () => {
   await db.$connect();
   try { await s3.send(new CreateBucketCommand({ Bucket: "service-private" })); } catch (error) { if (!(error instanceof Error) || !["BucketAlreadyExists", "BucketAlreadyOwnedByYou"].includes(error.name)) throw error; }
@@ -34,6 +34,8 @@ describe.skipIf(!hosted)("private service lifecycle on disposable PostgreSQL and
   const orderIds = (await db.historyOrder.findMany({ where: { requestId: { in: owners } }, select: { id: true } })).map(order => order.id);
   await db.historyPayment.deleteMany({ where: { orderId: { in: orderIds } } });
   await db.historyRefund.deleteMany({ where: { orderId: { in: orderIds } } });
+  await db.historyArtifactCleanup.deleteMany({ where: { artifactId: { in: artifactIds } } });
+  await db.historyArtifact.deleteMany({ where: { id: { in: artifactIds } } });
   await db.historyPurchaseIntent.deleteMany({ where: { orderId: { in: orderIds } } });
   await db.historyOrder.deleteMany({ where: { id: { in: orderIds } } });
   await db.historyQuote.deleteMany({ where: { requestId: { in: owners } } });
@@ -88,6 +90,33 @@ describe.skipIf(!hosted)("private service lifecycle on disposable PostgreSQL and
   expect((await db.historyOrder.findUniqueOrThrow({ where: { id: order.id } })).state).toBe("refund_pending");
   expect((await db.historyRefund.findUniqueOrThrow({ where: { orderId: order.id } })).state).toBe("pending");
   expect((await db.historyPayment.findUniqueOrThrow({ where: { id: payment.id } })).claim).toBeNull();
+ });
+ it("restricts due originals before deletion, honors a specific hold and retries exact bytes without revival", async () => {
+  const create = async (held: boolean) => {
+   const id = randomUUID(), sha256 = "a".repeat(64), key = `history-artifacts/${id}/${sha256}`;
+   artifactIds.push(id); keys.push(key);
+   await s3.send(new PutObjectCommand({ Bucket: "service-private", Key: key, Body: "synthetic original PDF" }));
+   await db.historyArtifact.create({ data: { id, provider: "carfax", vin: "1HGCM82633A004352", originalDate: new Date("1999-01-01T00:00:00Z"), objectKey: key, sha256, sizeBytes: 22, expectedPages: 1, provenance: "Synthetic source license", state: "verified", rights: { category: "provider_artifact", identifiability: "anonymous", use: ["service", "archive"], schedule: { kind: "until", until: "2000-05-31T00:00:00Z" }, hold: held ? { until: "2000-06-02T00:00:00Z" } : null } } });
+   return { id, key };
+  };
+  const due = await create(false), held = await create(true);
+  await new AdvanceHistoryOrders(db).execute(now);
+  expect((await db.historyArtifact.findUniqueOrThrow({ where: { id: due.id } })).state).toBe("restricted");
+  expect((await db.historyArtifact.findUniqueOrThrow({ where: { id: held.id } })).state).toBe("verified");
+  expect(await db.historyArtifactCleanup.count({ where: { artifactId: held.id } })).toBe(0);
+  let failed = false;
+  const flaky = { deleteAndVerify: async (manifest: string[]) => { if (!failed && manifest.includes(due.key)) { failed = true; throw new Error("Synthetic original storage outage"); } await objects.deleteAndVerify(manifest); } };
+  await expect(new ExpireServiceContent(db, flaky).execute(now)).rejects.toThrow("Synthetic original storage outage");
+  expect((await db.historyArtifact.findUniqueOrThrow({ where: { id: due.id } })).state).toBe("restricted");
+  expect((await db.historyArtifactCleanup.findUniqueOrThrow({ where: { artifactId: due.id } })).completedAt).toBeNull();
+  await new ExpireServiceContent(db, objects).execute(now);
+  expect((await db.historyArtifact.findUniqueOrThrow({ where: { id: due.id } })).state).toBe("removed");
+  expect((await db.historyArtifactCleanup.findUniqueOrThrow({ where: { artifactId: due.id } })).completedAt).not.toBeNull();
+  await expect(s3.send(new HeadObjectCommand({ Bucket: "service-private", Key: due.key }))).rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
+  await s3.send(new HeadObjectCommand({ Bucket: "service-private", Key: held.key }));
+  const later = new Date("2000-06-03T12:00:00Z"); await new AdvanceHistoryOrders(db).execute(later); await new ExpireServiceContent(db, objects).execute(later);
+  expect((await db.historyArtifact.findUniqueOrThrow({ where: { id: held.id } })).state).toBe("removed");
+  await expect(s3.send(new HeadObjectCommand({ Bucket: "service-private", Key: held.key }))).rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
  });
  it("fences private service content with completed account deletion and keeps restoration unable to resurrect it", async () => {
   const support = await fixture("support", "open");
