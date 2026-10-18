@@ -14,7 +14,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
-import { ListingsSchemas, AdminSchemas } from "@auto-tm/contracts";
+import { ErrorCode, ListingsSchemas, AdminSchemas } from "@auto-tm/contracts";
 import type { z } from "zod";
 
 import { Public } from "../../../common/public.decorator";
@@ -96,7 +96,7 @@ export class ListingsController {
       } catch (err) {
         if (err instanceof DomainError) {
           throw new BadRequestException({
-            code: "VALIDATION_ERROR",
+            code: ErrorCode.ValidationFailed,
             message: err.message,
             details: { reason: err.code },
           });
@@ -118,7 +118,7 @@ export class ListingsController {
       if (err && typeof err === "object" && "issues" in err) {
         const zodError = err as z.ZodError;
         throw new BadRequestException({
-          code: "VALIDATION_ERROR",
+          code: ErrorCode.ValidationFailed,
           message: "Invalid query parameters",
           details: zodError.flatten(),
         });
@@ -281,7 +281,7 @@ export class ListingsController {
       if (err && typeof err === "object" && "issues" in err) {
         const zodError = err as z.ZodError;
         throw new BadRequestException({
-          code: "VALIDATION_ERROR",
+          code: ErrorCode.ValidationFailed,
           message: "Invalid request body",
           details: zodError.flatten(),
         });
@@ -322,7 +322,7 @@ export class ListingsController {
       if (err && typeof err === "object" && "issues" in err) {
         const zodError = err as z.ZodError;
         throw new BadRequestException({
-          code: "VALIDATION_ERROR",
+          code: ErrorCode.ValidationFailed,
           message: "Invalid request body",
           details: zodError.flatten(),
         });
@@ -380,7 +380,7 @@ export class ListingsController {
       if (err && typeof err === "object" && "issues" in err) {
         const zodError = err as z.ZodError;
         throw new BadRequestException({
-          code: "VALIDATION_ERROR",
+          code: ErrorCode.ValidationFailed,
           message: "Invalid request body",
           details: zodError.flatten(),
         });

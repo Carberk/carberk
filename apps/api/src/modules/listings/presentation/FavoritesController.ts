@@ -12,7 +12,7 @@ import {
 } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
 import type { ZodError } from "zod";
-import { ListingsSchemas, AdminSchemas } from "@auto-tm/contracts";
+import { ErrorCode, ListingsSchemas, AdminSchemas } from "@auto-tm/contracts";
 
 import { IDENTITY_CHECK_PORT, type IdentityCheckPort } from "../../identity/identity.public";
 import { AddFavorite } from "../application/AddFavorite";
@@ -57,7 +57,7 @@ export class FavoritesController {
         // eslint-disable-next-line no-console
         console.error("[Zod validation failed]", Object.keys(zodError.flatten().fieldErrors));
         throw new BadRequestException({
-          code: "VALIDATION_ERROR",
+          code: ErrorCode.ValidationFailed,
           message: "Request validation failed",
           details: zodError.flatten(),
         });
