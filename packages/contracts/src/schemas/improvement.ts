@@ -42,7 +42,7 @@ export const AnonymousMarketCellSchema=z.object({
  residence:z.enum(["TM-A","TM-B","TM-D","TM-L","TM-M","TM-S","unknown"]).default("unknown"),demographicSource:z.enum(["self_reported_synthetic","unknown"]).default("unknown"),
 }).strict();
 export const MarketKnowledgeViewSchema=z.union([
- z.object({state:z.literal("qualified"),commercialDisclosure:z.literal(false),retention:z.literal("qualified_source_policy"),dataset:z.object({id:z.string(),version:z.number().int(),derivationVersion:z.string(),cells:z.array(AnonymousMarketCellSchema).max(1000)}).strict()}).strict(),
+ z.object({state:z.literal("qualified"),commercialDisclosure:z.literal(false),retention:z.literal("qualified_source_policy"),dataset:z.object({id:z.string(),version:z.number().int(),derivationVersion:z.string(),retentionClass:z.enum(["qualified_indefinite","qualified_expiring"]),expiresAt:z.string().datetime().nullable(),sources:z.array(z.object({id:z.string(),version:z.number().int().positive(),provenance:z.string(),retentionBasis:z.string()}).strict()).min(1).max(20),cells:z.array(AnonymousMarketCellSchema).max(1000)}).strict()}).strict(),
  z.object({state:z.enum(["quarantined","invalidated","unavailable"]),reason:z.string().optional()}).strict(),
 ]);
 export type MarketKnowledgeView=z.infer<typeof MarketKnowledgeViewSchema>;
