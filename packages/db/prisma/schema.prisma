@@ -1501,6 +1501,9 @@ model HistoryProviderAllowance {
   @@map("history_provider_allowances")
 }
 model HistoryOrder {
+  recoveryOfferedAt DateTime?
+  recoveryOfferedDeadline DateTime?
+  recoveryOfferExpiresAt DateTime?
   bookings HistoryBooking[]
   deliveries HistoryDelivery[]
   version Int @default(0)
