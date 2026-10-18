@@ -291,6 +291,7 @@ describe("reserved staging fixtures on disposable application schema", () => {
         REDIS_URL: redisUrl,
         CAMPAIGN_REQUEST_ID: requestId,
         CAMPAIGN_EMAIL: email,
+        CAMPAIGN_NAMESPACE: `cf_${id}`,
       },
       stdio: ["ignore", "pipe", "pipe", "ipc"],
     });

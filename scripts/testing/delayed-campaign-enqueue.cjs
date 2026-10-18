@@ -34,6 +34,7 @@ const queue = {
       await queue.add("sign-in-code", { to: input.email, code: "123456", locale: "en", purpose: "sign-in" }, {
         jobId: input.requestId,
         delay: 3600000,
+        deduplication: { id: `campaign-${process.env.CAMPAIGN_NAMESPACE}-${input.requestId}` },
       });
     });
   } catch (error) {
