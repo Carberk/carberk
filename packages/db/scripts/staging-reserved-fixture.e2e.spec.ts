@@ -20,7 +20,7 @@ const localRequire = createRequire(import.meta.url);
 // Use the installed application queue implementation, including its Lua scripts.
 const queueRequire = createRequire(`${root}/apps/api/package.json`);
 const Redis = queueRequire("ioredis") as new (url: string) => { set(key: string, value: string): Promise<unknown>; get(key: string): Promise<string | null>; del(key: string): Promise<unknown>; quit(): Promise<unknown> };
-type DeliveryJob = { data: { to?: string }; getState(): Promise<string>; remove(): Promise<void> };
+type DeliveryJob = { id?: string; data: { to?: string }; getState(): Promise<string>; remove(): Promise<void>; moveToWait(token: string): Promise<unknown> };
 type DeliveryQueue = {
   add(name: string, data: object, options: object): Promise<unknown>;
   getJob(id: string): Promise<DeliveryJob | undefined>;
@@ -28,7 +28,7 @@ type DeliveryQueue = {
 };
 const { Queue, Worker } = queueRequire("bullmq") as {
   Queue: new (name: string, options: object) => DeliveryQueue;
-  Worker: new (name: string, handler: () => Promise<void>, options: object) => { close(): Promise<void> };
+  Worker: new (name: string, handler: () => Promise<void>, options: object) => { getNextJob(token: string, options: { block: boolean }): Promise<DeliveryJob | undefined>; close(): Promise<void> };
 };
 const source = readFileSync(`${root}/scripts/staging-campaign.mjs`, "utf8").replaceAll("export function ", "function ").replaceAll("export async function ", "async function ") +
   readFileSync(`${root}/scripts/staging-remote.mjs`, "utf8").replace(/import \{[^}]+\} from '\.\/staging-campaign\.mjs';/, "").replace("export function remoteProgram", "function remoteProgram");
@@ -304,6 +304,11 @@ describe("reserved staging fixtures on disposable application schema", () => {
     });
     const holderExit = exitOf(holder);
     const producerExit = exitOf(producer);
+    const holderPhases: string[] = [];
+    holder.on("message", message => {
+      if (message && typeof message === "object" && "holderPhase" in message && typeof message.holderPhase === "string" &&
+        ["advisory-held", "backend-57P01", "socket-end-after-57P01", "connection-ended", "unexpected-client-error", "missing-57P01", "unexpected-operation-error", "unexpected-end-error", "terminated-cleanly", "holder-failed"].includes(message.holderPhase)) holderPhases.push(message.holderPhase);
+    });
     const bounded = async <T,>(promise: Promise<T>, label: string): Promise<T> => {
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
@@ -352,7 +357,10 @@ describe("reserved staging fixtures on disposable application schema", () => {
       if (holder.connected) holder.send({ finish: true });
       producer.send({ continue: true });
       const holderResult = await bounded(holderExit, "transaction holder did not exit");
-      expect(holderResult).toEqual({ code: 0, signal: null });
+      expect(holderResult, holderPhases.join(",")).toEqual({ code: 0, signal: null });
+      expect(holderPhases).toContain("backend-57P01");
+      expect(holderPhases).toContain("connection-ended");
+      expect(holderPhases).toContain("terminated-cleanly");
       const producerResult = await bounded(producerExit, "delayed producer did not exit");
       expect(producerResult).toEqual({ code: 0, signal: null });
       expect(await queue.getJob(requestId)).toBeUndefined();
@@ -413,7 +421,7 @@ describe("reserved staging fixtures on disposable application schema", () => {
   });
 
   it("refuses a foreign BullMQ dedup value without mutating the foreign key or owned job", async () => {
-    const id = "8".repeat(32), requestId = "campaign-cleanup-dedup-collision";
+    const id = "b8".repeat(16), requestId = "campaign-cleanup-dedup-collision";
     const email = await queuedOtp(id, requestId);
     const dedupId = `campaign-cf_${id}-${requestId}`;
     const redisClient = new Redis(redisUrl);
@@ -434,18 +442,28 @@ describe("reserved staging fixtures on disposable application schema", () => {
     const email = await queuedOtp(id, requestId);
     // Replace the delayed job through BullMQ's public interface so a real worker locks it.
     const job = await queue.getJob(requestId) as DeliveryJob & { promote(): Promise<void> };
-    let release!: () => void;
-    let started!: () => void;
-    const running = new Promise<void>(resolve => { started = resolve; });
-    const hold = new Promise<void>(resolve => { release = resolve; });
-    const worker = new Worker("email-code", async () => { started(); await hold; }, { connection, concurrency: 1 });
+    const token = randomUUID();
+    const acquired: DeliveryJob[] = [];
+    const worker = new Worker("email-code", async () => {}, { connection, autorun: false });
     try {
-      await job.promote(); await running;
+      await job.promote();
+      // Manual acquisition keeps unrelated jobs locked only for this bounded
+      // assertion; none are processed, completed, failed or removed.
+      for (let count = 0; count < 128; count += 1) {
+        const next = await worker.getNextJob(token, { block: false });
+        if (!next) throw new Error("exact promoted job was not available");
+        acquired.push(next);
+        if (next.id === requestId) break;
+      }
+      expect(acquired.at(-1)?.id).toBe(requestId);
       expect(await job.getState()).toBe("active");
       expect(execute("reset", id, "campaign897-identities-v1").code).toBe(1);
       expect((await pool.query(`SELECT state FROM "cf_${id}".campaign_manifest`)).rows[0]).toEqual({ state: "cleaning" });
       expect((await queue.getJob(requestId))?.data.to).toBe(email);
-    } finally { release(); await worker.close(); }
+    } finally {
+      try { for (const held of acquired) await held.moveToWait(token); }
+      finally { await worker.close(); }
+    }
     expect(execute("reset", id, "campaign897-identities-v1").code).toBe(0);
     expect(await queue.getJob(requestId)).toBeUndefined();
   });
