@@ -107,7 +107,7 @@ export class StagingControl {
     if (snapshot.revision !== plannedRevision) throw new Error('Reservation changed during operation planning; inspect before retry');
     if (restoring) await this.requireCampaignDisposal(snapshot);
     const lease = snapshot.state.reservation;
-    const operation = { id: this.id(), kind: restoring ? 'restore' : kind, target, startedAt: this.now(), expectedMigrations: schemaPlan?.migrations ?? lease.expectedMigrations ?? await this.ledger.migrationsAt(target), schemaDisposition: schemaPlan?.disposition ?? lease.schemaDisposition ?? 'unchanged' };
+    const operation = { id: this.id(), reservationId: lease.id, owner: lease.owner, namespace: lease.namespace, candidate: lease.candidate, kind: restoring ? 'restore' : kind, target, startedAt: this.now(), expectedMigrations: schemaPlan?.migrations ?? lease.expectedMigrations ?? await this.ledger.migrationsAt(target), schemaDisposition: schemaPlan?.disposition ?? lease.schemaDisposition ?? 'unchanged' };
     if (kind === 'fixture') lease.fixtureProfile = profile ?? selectedProfile;
     operation.profile = lease.fixtureProfile ?? selectedProfile;
     lease.operation = operation; lease.lifecycle = restoring ? 'restoring' : 'active';
@@ -170,8 +170,48 @@ export class StagingControl {
       profile: result.profile, state: result.state, identities: result.identities,
       protectedReceipt: result.protectedReceipt, retainedAudits: result.retainedAudits, tombstone: result.tombstone };
   }
+  async continueCampaignReset(claim, snapshot) {
+    const lease = snapshot.state.reservation; const operation = lease.operation;
+    if (lease.fixtureProfile !== 'campaign897-identities-v1' || operation.kind !== 'reset' ||
+        operation.profile !== lease.fixtureProfile || operation.reservationId !== lease.id || operation.owner !== this.actor ||
+        operation.namespace !== lease.namespace || operation.candidate !== lease.candidate || operation.target !== lease.candidate ||
+        !/^[a-f0-9]{32}$/.test(operation.id ?? '') || !Array.isArray(operation.expectedMigrations))
+      throw new Error('Only the exact bound in-flight campaign reset can continue; retain ownership and inspect legacy or changed operation');
+    await this.platform.authorize(claim); await this.attest();
+    const checked = await this.owned(claim, true);
+    if (checked.revision !== snapshot.revision || digest(checked.state.reservation.operation) !== digest(operation))
+      throw new Error('Campaign reset changed during attestation; retain recovery state');
+    // A CAS attempt journal excludes stale contenders without replacing the cleanup operation ID.
+    operation.continuation = { id: this.id(), requestedAt: this.now() };
+    lease.recovery = { owner: this.actor, action: 'Continue only this explicit campaign reset while candidate fences remain deployed; retain the operation until exact queue/sink disposal is durably recorded' };
+    await this.write(snapshot, snapshot.state);
+    try {
+      const current = await this.owned(claim, true);
+      if (digest(current.state.reservation.operation) !== digest(operation)) throw new Error('Reset continuation authority changed');
+      // The platform reattests identity, current candidate deployment IDs and readiness.
+      // Remote cleaning/disposal idempotency is the authority, never a caller success flag.
+      const result = await this.platform.execute('reset', current.state.reservation, operation.target);
+      const proof = this.campaignReceipt(result, current.state.reservation, 'reset');
+      const done = await this.owned(claim, true);
+      if (digest(done.state.reservation.operation) !== digest(operation)) throw new Error('Reset completion authority changed');
+      const completed = done.state.reservation;
+      completed.evidence.push({ ...proof, kind: 'reset', operationId: operation.id, observedAt: this.now() });
+      completed.operation = null; completed.lifecycle = 'active';
+      completed.recovery = { owner: this.actor, action: 'Restore latest fetched main and verify before release' };
+      await this.write(done, done.state);
+      return { operation: operation.id, target: operation.target, ...proof };
+    } catch {
+      // A lost response never clears the operation. Another explicit same-reset call
+      // rechecks authority and observes/resumes the durable remote cleaning state.
+      throw new Error('Campaign reset incomplete; retain candidate fences and ownership, inspect and explicitly repeat only this exact reset');
+    }
+  }
   async operate(claim, kind, profile) {
     if (!['deploy', 'fixture', 'reset'].includes(kind)) throw new Error('Unsupported staging operation');
+    if (kind === 'reset' && profile === undefined) {
+      const snapshot = await this.owned(claim, true);
+      if (snapshot.state.reservation.operation) return this.continueCampaignReset(claim, snapshot);
+    }
     return this.perform(claim, kind, false, profile);
   }
   async restore(claim) { return this.perform(claim, 'deploy', true); }
