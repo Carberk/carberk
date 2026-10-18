@@ -8,7 +8,8 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 
-interface Props { asset: ImagePickerAsset; disabled?: boolean | undefined; onUse(selection: { sourceUri: string; startMs: number; endMs: number }, posterMs: number): void; }
+export interface VideoInterval { startMs: number; endMs: number; posterMs: number; explicit: boolean; }
+interface Props { initial?: VideoInterval | null | undefined; onChange?(interval: VideoInterval): void; asset: ImagePickerAsset; disabled?: boolean | undefined; onUse(selection: { sourceUri: string; startMs: number; endMs: number }, posterMs: number): void; }
 const words = {
  en: { start: "Video start", end: "Video end", use: "Use video", play: "Preview video", poster: "Choose poster at", trim: "Choose an interval of up to 90 seconds", duration: "Selected duration", failure: "This video could not be read. Choose another video." },
  ru: { start: "Начало видео", end: "Конец видео", use: "Использовать видео", play: "Просмотр видео", poster: "Выбрать кадр", trim: "Выберите отрезок до 90 секунд", duration: "Длительность отрезка", failure: "Не удалось прочитать видео. Выберите другое." },
@@ -16,14 +17,14 @@ const words = {
 };
 /** Selection is always in source milliseconds. Native export later maps the
  * chosen poster into that prepared interval, never an untrimmed original. */
-export function VideoSelectionPreview({ asset, disabled, onUse }: Props) {
+export function VideoSelectionPreview({ asset, disabled, onUse, initial, onChange }: Props) {
  const { i18n } = useTranslation(); const c = words[i18n.language === "ru" ? "ru" : i18n.language === "tk" ? "tk" : "en"];
  const [duration, setDuration] = useState(Math.max(0, Math.floor(asset.duration ?? 0)));
- const [start, setStart] = useState(0), [end, setEnd] = useState(Math.min(duration, 90000)), [poster, setPoster] = useState(0);
+ const [start, setStart] = useState(initial?.startMs ?? 0), [end, setEnd] = useState(initial?.endMs ?? Math.min(duration, 90000)), [poster, setPoster] = useState(initial?.posterMs ?? 0);
  const [timeline, setTimeline] = useState<VideoThumbnail[]>([]);
- const [explicit, setExplicit] = useState(false), [error, setError] = useState(false), [thumbnails, setThumbnails] = useState<VideoThumbnail[]>([]);
+ const [explicit, setExplicit] = useState(initial?.explicit ?? false), [error, setError] = useState(false), [thumbnails, setThumbnails] = useState<VideoThumbnail[]>([]);
  const width = useRef(1), dragging = useRef({ x: 0, value: 0 });
- const edited = useRef(false);
+ const edited = useRef(initial?.explicit ?? false);
  const interval = useRef({ start, end }); interval.current = { start, end };
  const player = useVideoPlayer(asset.uri, video => { video.loop = false; video.muted = false; video.timeUpdateEventInterval = 0.1; });
  useEffect(() => {
@@ -64,6 +65,7 @@ export function VideoSelectionPreview({ asset, disabled, onUse }: Props) {
    onResponderMove={(event: GestureResponderEvent) => move(kind, dragging.current.value + (event.nativeEvent.pageX - dragging.current.x) / width.current * duration)}
    className="absolute top-0 h-14 w-8 rounded-md border-2 border-primary bg-primary/20" style={{ left: `${duration ? value / duration * 90 : 0}%` }} />;
  }
+ useEffect(() => { if (end > start) onChange?.({ startMs: start, endMs: end, posterMs: poster, explicit }); }, [start, end, poster, explicit, onChange]);
  const firstThumbnail = thumbnails[0];
  const chosenThumbnail = firstThumbnail ? thumbnails.reduce((closest, image) => Math.abs(image.requestedTime * 1000 - poster) < Math.abs(closest.requestedTime * 1000 - poster) ? image : closest, firstThumbnail) : undefined;
  const valid = duration > 0 && end > start && end - start <= 90000 && (duration <= 90000 || explicit) && !error;
