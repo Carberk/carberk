@@ -8,6 +8,7 @@ function remoteMain(input, campaign) {
   try {
     const { spawnSync } = require('node:child_process');
     const p = input.identity; const e = process.env;
+    if (input.profile === 'campaign897-identities-v1' && input.kind === 'fixture' && e.STAGING_CAMPAIGN_PROFILE_ENABLED !== 'campaign897-identities-v1') throw new Error();
     if (input.profile !== undefined && !['listing-v1', 'campaign897-identities-v1'].includes(input.profile)) throw new Error();
     if (!['fixture', 'reset', 'probe'].includes(input.kind) || !/^[a-f0-9]{32}$/.test(input.id) ||
         input.namespace !== `cf_${input.id}` || !/^[a-f0-9]{40}$/.test(input.target)) throw new Error();

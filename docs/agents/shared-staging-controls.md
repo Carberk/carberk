@@ -69,3 +69,38 @@ Interrupted operations retain ownership. `recover` observes the durable operatio
 ## Evidence
 
 `pnpm test:staging-control` runs deterministic command, real Git contention, authority, network-boundary and recovery tests without containers. `packages/db/scripts/staging-reserved-fixture.e2e.spec.ts` runs the executable remote SQL against a migrated disposable PostgreSQL instance in the existing hosted `db` job. The required `pr` check includes that job. Repository typecheck, affected lint and unit tests remain separate gates. See [issue 901 evidence](../evidence/issue-901/verification.md) for actual results and missing gates.
+
+## Campaign897 identity prerequisite profile, default closed
+
+`campaign897-identities-v1` is an implementation checkpoint awaiting independent review and hosted disposable PostgreSQL evidence. It does **not** unlock the campaign acceptance plan. Preparation refuses before SQL unless the API process has `STAGING_CAMPAIGN_PROFILE_ENABLED` set to the exact profile name. Leave it unset until the assembly owner records successful hosted RED/GREEN, independent review and a supported cleanup contract for the intended use. The flag gates preparation only, so turning it off cannot prevent observation or guarded disposal. Existing reservation authorization, fresh Railway scope/origin/mock checks and exact active deployment/readiness/schema proof still apply. No new production API, fixed code, JWT/session creation, TOTP secret or elevation bypass is introduced.
+
+The command accepts one exact profile argument and no state file, arbitrary SQL, identity overrides or historical imports:
+
+```sh
+pnpm staging:control operate /tmp/staging-policy.json /tmp/staging-claim.json fixture campaign897-identities-v1
+pnpm staging:control operate /tmp/staging-policy.json /tmp/staging-claim.json reset
+pnpm staging:control recover /tmp/staging-policy.json /tmp/staging-claim.json
+pnpm staging:control restore /tmp/staging-policy.json /tmp/staging-claim.json
+pnpm staging:control release /tmp/staging-policy.json /tmp/staging-claim.json
+```
+
+Profile selection is persisted before side effects and cannot change within a reservation. A reservation with an earlier narrow fixture cannot adopt campaign identities. Omitted profile continues to select the narrow fixture for a fresh reservation. Reset, recovery and restoration derive the campaign profile from the durable lease, never a new caller override. Restoration uses the original reservation candidate to identify owned rows while proving the freshly fetched main deployment separately.
+
+| Alias | Bootstrap authority | Supported prerequisite |
+|---|---|---|
+| `buyer-a` | Marketplace buyer | Synthetic verified email |
+| `owner` | Marketplace seller | Synthetic verified email, no business membership |
+| `sales-a` | Marketplace buyer | Synthetic verified email, no Sales membership |
+| `coordinator` | Marketplace buyer; exactly `staff.manage`, `founder.control` | Synthetic verified email and two atomic system bootstrap audits |
+
+IDs and `.invalid` email methods are deterministic from reservation, candidate and alias. Bootstrap refuses existing ID/email/OTP destinations and audit IDs, never adopts another User, and creates no phone method. The protected alias-to-ID/method receipt lives in `cf_<reservation>.campaign_entities`. Read it only through the reserved operator database channel; do not publish its contents. The ledger/CLI return only profile, state, counts and that protected receipt location. No code, token, QR secret, session hash or encrypted TOTP material enters public receipts or the control ledger.
+
+`identities` is the only supported active state. `disposed` is a terminal cleanup state. There is no scenario transition/import command. Use production OTP/TOTP endpoints for authentication; code observability depends on the separately reviewed mock delivery sink. No deployed authentication proof exists for this profile. Signed-in application writes can change auth rows through the normal adapters; triggers record exact row keys, versions, hashes and mutation events in the reservation schema. Allowed tables are Users, Sessions, sign-in email OTP requests, TOTP enrollments/backups, the two coordinator grants, and wholly owned User audit targets. The graph is capped at 128 distinct records and 2048 events. The trigger refuses identity/method/role transfers, profile photos, foreign audit targets, unsupported grants and unsupported OTP purposes. It does not grant permission to exercise untracked domain graphs.
+
+Cleanup locks the supported auth tables, rechecks manifest binding, trigger availability, current row hashes and every incoming FK. Any unknown child, composite/non-ID FK or foreign reference refuses the transaction before deletion, including rows that PostgreSQL would otherwise cascade or unlink. It explicitly deletes tracked auth children before the exact Users. Owned bootstrap audits retain only a redacted synthetic-campaign target and disposition; no other audit-retention policy is implied. A terminal reservation schema, aliases, hash journal and triggers remain as an explicit tombstone to reject late auth writes and identity recreation. This is retained control metadata, not complete schema erasure. It must be included in schema inventory and independently reviewed. Repeated reset of a disposed profile observes the same disposition; a disposed reservation cannot bootstrap again.
+
+An owned OTP request means a separate email queue job and mock-sink record may exist. This version has no reviewed queue/sink cleanup adapter. **Reset therefore refuses after any owned OTP has ever been tracked**, even if that OTP row was subsequently deleted or expired. It preserves ownership instead of declaring database-only cleanup successful. Do not start authenticated acceptance with this profile. Session/TOTP storage lifecycle tests exercise tracking and disposal on hosted disposable PG; their direct SQL is a test boundary, not a staging authentication procedure. No media/object/job absence proof is returned. Unknown domain writes such as business admission, Listing, attachment or service data block reset via foreign references and require a separately implemented cleanup profile. Never repair them with ad hoc deletes against staging.
+
+Buyer B, Sales B, business admission/invite/redeem, founder admission/recovery/refund grants, Support, History/payment/export, Reception/template/center, Technician, independent Reviewer, private self-review, Aggregate, Investigator and marketplace moderation remain unsupported. So do every photo/video/upload/rendition/job, message/attachment/push binding, service/history/payment/artifact, diagnostic graph, historical cohort, time-aged state and analytics/Operations evidence import. No mature telemetry, synthetic center or full campaign cleanup claim follows from this checkpoint.
+
+Preflight uses variable **names** only in evidence: `STAGING_RAILWAY_PROJECT_TOKEN`, `STAGING_MUTATIONS_AUTHORIZATION`, `STAGING_CAMPAIGN_PROFILE_ENABLED`, `APP_ENV`, `SMS_DRIVER`, `EMAIL_DRIVER`, `PUSH_TRANSPORT`, `AUTOTM_COMMIT_SHA`, `DATABASE_URL`, `MINIO_ENDPOINT`, `MINIO_PUBLIC_URL`. Current API/worker service scope, database/media origins and exact deployment IDs remain independently checked. Future video/service/diagnostic/measurement allowlists are not enabled by this profile. No token creation, deployment, lease, configuration or staging mutation was performed by its implementation writer. See [checkpoint evidence](../evidence/campaign897-fixtures/verification.md) for ordered tests and missing gates.
