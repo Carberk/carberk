@@ -24,6 +24,11 @@ export function MarketResearchPanel({canInvestigate}:{canInvestigate:boolean}) {
   window.addEventListener("focus",focus);
   return()=>{clearInterval(timer);window.removeEventListener("focus",focus);};
  },[]);
+ useEffect(()=>{
+  const deadlines=Object.values(receipts).map(receipt=>Date.parse(receipt.expiresAt));if(!deadlines.length)return;
+  const timer=setTimeout(()=>setReceipts(value=>Object.fromEntries(Object.entries(value).filter(([,receipt])=>Date.parse(receipt.expiresAt)>Date.now()))),Math.max(0,Math.min(2147483647,Math.min(...deadlines)-Date.now())));
+  return()=>clearTimeout(timer);
+ },[receipts]);
  async function prepare(event:FormEvent,id:string) {
   event.preventDefault();setFailed(false);
   if(reason.trim().length<8){setFailed(true);return;}

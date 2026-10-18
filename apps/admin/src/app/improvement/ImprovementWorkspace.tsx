@@ -21,6 +21,7 @@ export function ImprovementWorkspace({canInvestigate}:{canInvestigate:boolean}) 
  const format=(value:number|null|undefined)=>value===null||value===undefined?"—":number.format(value);
  const date=(value:string)=>new Intl.DateTimeFormat(locale==="tk"?"tk-TM":locale==="ru"?"ru-RU":"en-GB",{dateStyle:"medium",timeStyle:"short",timeZone:"UTC"}).format(new Date(value))+" UTC";
  useEffect(()=>{let alive=true;setLoad(null);setDetail(null);detailRequest.current++;setBusy(false);void loadImprovement(period).then(result=>{if(alive)setLoad(result);}).catch(()=>{if(alive)setLoad({ok:false,error:"error"});});return()=>{alive=false;};},[period,refresh]);
+ useEffect(()=>{if(!detail)return;const expiry=Math.min(Date.parse(detail.receipt.expiresAt),Date.parse(detail.timeline.expiresAt));const timer=setTimeout(()=>setDetail(null),Math.max(0,Math.min(2147483647,expiry-Date.now())));return()=>clearTimeout(timer);},[detail]);
  useEffect(()=>{const timer=setInterval(()=>setRefresh(value=>value+1),60_000);return()=>clearInterval(timer);},[]);
  useEffect(()=>{
   if(!drawer) return;
