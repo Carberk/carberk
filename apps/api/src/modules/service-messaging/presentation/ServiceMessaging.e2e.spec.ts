@@ -56,6 +56,13 @@ afterAll(async () => {
   await db.serviceConversation.deleteMany({ where: { id: { in: conversations } } });
   await db.serviceAudit.deleteMany({ where: { actorId: { in: ids } } });
   await db.supportCase.deleteMany({ where: { customerId: { in: ids } } });
+  const historyIds = (await db.vehicleHistoryRequest.findMany({ where: { customerId: { in: ids } }, select: { id: true } })).map(row => row.id);
+  const historyOrderIds = (await db.historyOrder.findMany({ where: { requestId: { in: historyIds } }, select: { id: true } })).map(row => row.id);
+  await db.historyPayment.deleteMany({ where: { orderId: { in: historyOrderIds } } });
+  await db.historyPurchaseIntent.deleteMany({ where: { orderId: { in: historyOrderIds } } });
+  await db.historyRefund.deleteMany({ where: { orderId: { in: historyOrderIds } } });
+  await db.historyOrder.deleteMany({ where: { id: { in: historyOrderIds } } });
+  await db.historyQuote.deleteMany({ where: { requestId: { in: historyIds } } });
   await db.vehicleHistoryRequest.deleteMany({ where: { customerId: { in: ids } } });
   await db.user.deleteMany({ where: { id: { in: ids } } });
  }
@@ -198,7 +205,7 @@ it("holds one exact History quote atomically and never treats a screenshot or ex
  await request.post(`/api/v1/services/conversations/${id}/assignment`).set("Authorization", auth(oldStaff)).send({ expectedVersion: 0 }).expect(201);
  const now = new Date(); const tomorrow = new Date(now.getTime() + 86400000 + 5 * 3600000).toISOString().slice(0, 10);
  const windowStart = `${tomorrow}T04:00:00.000Z`, windowEnd = `${tomorrow}T05:00:00.000Z`;
- const command = (user: string, data: unknown) => request.post(`/api/v1/services/conversations/${id}/history`).set("Authorization", auth(user)).send(data);
+ const command = (user: string, data: object) => request.post(`/api/v1/services/conversations/${id}/history`).set("Authorization", auth(user)).send(data);
  await command(oldStaff, { kind: "capacity", expectedAssignmentVersion: 1, day: tomorrow, slotLimit: 1, morningLimit: 1, evidence: "Synthetic measured one slot", providers: [{ provider: "carfax", allowance: 1, consumed: 0, resetAt: `${tomorrow}T03:00:00.000Z`, evidence: "Synthetic account allowance" }] }).expect(201);
  const quoteId = randomUUID(), vin = "1HGCM82633A004352";
  const quote = { kind: "quote", expectedAssignmentVersion: 1, quoteId, vin, providers: ["carfax"], preflightOutcome: "available", preflightEvidence: "Synthetic licensed preflight", refundRule: "Founder decision if unusable", windowStart, windowEnd, feasible: true };

@@ -38,6 +38,15 @@ export function serviceAccountErasureWrites(db: PrismaService, userId: string, n
   db.$executeRaw`UPDATE service_audits SET reason=NULL WHERE "resourceId" IN (SELECT id FROM support_cases WHERE "customerId"=${userId} UNION SELECT id FROM vehicle_history_requests WHERE "customerId"=${userId})`,
   db.$executeRaw`UPDATE service_audits SET "actorId"=NULL, reason=NULL WHERE "actorId"=${userId}`,
   db.$executeRaw`UPDATE support_cases SET "customerId"=NULL, "assigneeId"=NULL, "sourceListingId"=NULL WHERE "customerId"=${userId}`,
+  db.$executeRaw`UPDATE history_payments p SET claim=NULL, "attachmentId"=NULL, evidence=NULL, "confirmedById"=NULL FROM history_orders o JOIN vehicle_history_requests h ON h.id=o."requestId" WHERE p."orderId"=o.id AND h."customerId"=${userId} AND NOT (COALESCE((o.rights->'hold'->>'until')::timestamptz, '-infinity'::timestamptz) > ${now}::timestamptz)`,
+  db.$executeRaw`UPDATE history_purchase_intents p SET vin=NULL, "externalReference"=NULL, "createdById"=NULL FROM history_orders o JOIN vehicle_history_requests h ON h.id=o."requestId" WHERE p."orderId"=o.id AND h."customerId"=${userId}`,
+  db.$executeRaw`UPDATE history_refunds r SET reason='[erased]', "approvedById"=NULL, "executedById"=NULL, "executionReference"=CASE WHEN r.state='executed' THEN '[erased]' ELSE NULL END FROM history_orders o JOIN vehicle_history_requests h ON h.id=o."requestId" WHERE r."orderId"=o.id AND h."customerId"=${userId} AND NOT (COALESCE((o.rights->'hold'->>'until')::timestamptz, '-infinity'::timestamptz) > ${now}::timestamptz)`,
+  db.$executeRaw`UPDATE history_orders o SET "erasedAt"=${now}::timestamp, rights=jsonb_build_object('category','payment_evidence','schedule',o.rights->'schedule','hold',o.rights->'hold') FROM vehicle_history_requests h WHERE o."requestId"=h.id AND h."customerId"=${userId}`,
+  db.$executeRaw`UPDATE history_payments SET "confirmedById"=NULL WHERE "confirmedById"=${userId}`,
+  db.$executeRaw`UPDATE history_purchase_intents SET "createdById"=NULL WHERE "createdById"=${userId}`,
+  db.$executeRaw`UPDATE history_refunds SET "approvedById"=CASE WHEN "approvedById"=${userId} THEN NULL ELSE "approvedById" END, "executedById"=CASE WHEN "executedById"=${userId} THEN NULL ELSE "executedById" END WHERE "approvedById"=${userId} OR "executedById"=${userId}`,
+  db.$executeRaw`UPDATE history_quotes SET "offeredById"=NULL WHERE "offeredById"=${userId}`,
   db.$executeRaw`UPDATE vehicle_history_requests SET "customerId"=NULL, "assigneeId"=NULL, "sourceListingId"=NULL, "proposedVin"=NULL WHERE "customerId"=${userId}`,
+  db.$executeRaw`UPDATE history_quotes q SET vin=NULL, "preflightEvidence"=NULL, "offeredById"=NULL, "erasedAt"=${now}::timestamp FROM vehicle_history_requests h JOIN service_conversations c ON c."historyRequestId"=h.id WHERE q."requestId"=h.id AND h."customerId" IS NULL AND c."erasedAt" IS NOT NULL AND q."erasedAt" IS NULL`,
  ];
 }
