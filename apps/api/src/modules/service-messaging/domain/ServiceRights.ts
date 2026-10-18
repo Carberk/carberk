@@ -1,6 +1,16 @@
-import type { ServiceMessagingSchemas } from "@auto-tm/contracts";
+import { ServiceMessagingSchemas } from "@auto-tm/contracts";
 
 import { ServiceDenied, type ServicePurpose } from "./serviceAccess";
+
+/** Retained bytes do not extend ordinary audiences. A hold preserves storage for its recorded purpose only. */
+export function assertReadableServiceRights(raw: unknown, category: string, now: Date, supportClosedAt?: Date | null): void {
+  const parsed = ServiceMessagingSchemas.ServiceRightsSchema.safeParse(raw);
+  if (!parsed.success || parsed.data.category !== category || !parsed.data.use.includes("service")) throw new ServiceDenied("NO_ACCESS");
+  const schedule = parsed.data.schedule;
+  if ((schedule.kind === "until" && new Date(schedule.until) <= now)
+    || (schedule.kind === "permitted_knowledge" && new Date(schedule.reviewAt) <= now)
+    || (schedule.kind === "support_case" && supportClosedAt && supportClosedAt.getTime() <= now.getTime() - 90 * 86_400_000)) throw new ServiceDenied("NO_ACCESS");
+}
 
 /** Classification must exist before bytes are accepted. Support's schedule is
  * confined to its communications; History categories never inherit it. */

@@ -8,7 +8,7 @@ import { ServiceMessagingSchemas } from "@auto-tm/contracts";
 import { STAFF_AUTHORITY_PORT, type StaffAuthorityPort, StaffAuthorityDenied } from "../../identity/identity.public";
 import { assertServiceAccess, serviceCapability, ServiceDenied, type ServiceAction, type ServiceActor, type ServiceScope } from "../domain/serviceAccess";
 import { staffedMilliseconds, transitionSupport, type SupportState, type SupportAction } from "../domain/SupportOperations";
-import { assertServiceRights } from "../domain/ServiceRights";
+import { assertReadableServiceRights, assertServiceRights } from "../domain/ServiceRights";
 import { SERVICE_PRIVATE_STORE, SERVICE_RUNTIME, type ServiceMessagingPort, type ServicePrivateStore, type ServiceRuntime, type ServiceSubject } from "../domain/ports/ServiceMessagingPort";
 import { artifactRights, historyArtifactCommand } from "./history/PrismaHistoryArtifacts";
 import { normalizeVin, HistoryDenied } from "../domain/history/HistoryPolicy";
@@ -308,10 +308,11 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
   await tx.serviceAudit.create({ data: { actorId: subject.userId, purpose: "history", resourceId: scope.resourceId, action: "HISTORY_PAYMENT_HISTORY_READ", reason: reason.trim(), assignmentVersion: scope.assignmentVersion } });
  }
  async file(subject: ServiceSubject, id: string, attachmentId: string, paymentHistoryReason?: string) {
-  return this.locked(subject, id, "file", async (tx, _row, scope, actor, audience) => {
+  return this.locked(subject, id, "file", async (tx, row, scope, actor, audience) => {
    const file = await tx.serviceAttachment.findUnique({ where: { id: attachmentId } });
    if (!file || !file.objectKey) throw new ServiceDenied("NO_ACCESS");
    assertServiceAccess(scope, actor, "file", { conversationId: file.conversationId, lifecycleEpoch: file.lifecycleEpoch, adopted: file.state === "adopted", removed: !!file.removedAt, visibility: file.visibility === "staff" ? "staff" : "customer" });
+   assertReadableServiceRights(file.rights, file.category, this.runtime.now(), row.supportCase?.status === "closed" ? row.supportCase.closedAt : null);
    if (audience === "staff" && file.category === "payment_evidence") {
     const order = scope.purpose === "history" ? await tx.historyOrder.findUnique({ where: { requestId: scope.resourceId } }) : null;
     if (order && ["delivered", "refunded"].includes(order.state)) await this.historicalPaymentAccess(tx, subject, scope, paymentHistoryReason);
