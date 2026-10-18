@@ -123,6 +123,17 @@ describe("video upload current authority and retirement", () => {
     await db.listing.update({ where: { id: suite.id("owner-listing") }, data: { activeVideoGenerationId: null } });
     await request.get(`/api/v1/listings/${suite.id("owner-listing")}/video`).set("authorization", `Bearer ${token("other")}`).expect(404);
   });
+  it("distinguishes the seller's active video from a pending replacement and cancels only that replacement", async () => {
+    const active = await readyVideo();
+    const replacement = await create("owner", body("owner-listing", "replacement")).expect(201);
+    const url = `/api/v1/listing-video-targets/listing/${suite.id("owner-listing")}`;
+    await request.get(url).set("authorization", `Bearer ${token("other")}`).expect(404);
+    const response = await request.get(url).set("authorization", `Bearer ${token("owner")}`).expect(200);
+    expect(response.body).toEqual({ active: { generationId: active.id, durationMs: 5000 }, pending: { sessionId: replacement.body.sessionId, state: "UPLOADING" } });
+    await request.delete(`${url}/pending`).set("authorization", `Bearer ${token("owner")}`).expect(204);
+    expect(await db.listing.findUniqueOrThrow({ where: { id: suite.id("owner-listing") } })).toMatchObject({ activeVideoGenerationId: active.id, pendingVideoGenerationId: null });
+    expect(await db.videoCleanupWork.findUniqueOrThrow({ where: { id: `session:${replacement.body.sessionId}` } })).toMatchObject({ state: "PENDING" });
+  });
   it("removes the current video immediately while retaining exact asynchronous cleanup", async () => {
     const row = await readyVideo();
     await request.delete(`/api/v1/listings/${suite.id("owner-listing")}/video`).set("authorization", `Bearer ${token("other")}`).expect(404);
