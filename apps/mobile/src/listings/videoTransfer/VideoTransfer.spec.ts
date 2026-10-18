@@ -2,7 +2,7 @@ import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { server } from "../../../test/msw";
-import { storeAuthSession } from "../../auth/session";
+import { clearAuthSession, storeAuthSession } from "../../auth/session";
 
 import { VideoTransfer } from "./VideoTransfer";
 import { InMemoryVideoTransferDevice } from "./testing/InMemoryVideoTransferDevice";
@@ -79,6 +79,11 @@ describe("prepared video resumable foreground transfer", () => {
     server.use(http.put("https://video.test/part/1", () => { puts.push(1); if (puts.length > 4) state = "FAILED"; return new HttpResponse(null); }));
     await expect(new VideoTransfer(device).run()).rejects.toThrow("VIDEO_PART_RETRY_EXHAUSTED");
     expect(puts).toEqual([1, 1, 1]); expect(completed).toBe(false);
+  });
+  it("durably stops local bytes even when account authority has already ended", async () => {
+    await clearAuthSession();
+    await expect(new VideoTransfer(device).pause()).rejects.toThrow("VIDEO_TRANSFER_SESSION_CHANGED");
+    expect(device.record?.state).toBe("PAUSED"); expect(puts).toEqual([]);
   });
   it("refuses missing or changed local prepared bytes without sending them", async () => {
     device.valid = false; await expect(new VideoTransfer(device).run()).rejects.toThrow("VIDEO_LOCAL_SOURCE_UNAVAILABLE");
