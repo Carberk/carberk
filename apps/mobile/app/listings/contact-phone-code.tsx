@@ -76,6 +76,7 @@ export default function ContactPhoneCodeScreen() {
     parseInitialSeconds(firstParam(params.resendInSeconds)),
   );
   const [error, setError] = useState<string | null>(null);
+  const [isBackoffError, setIsBackoffError] = useState(false);
   const [needsNewCode, setNeedsNewCode] = useState(false);
   const [dailyLimit, setDailyLimit] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -93,6 +94,12 @@ export default function ContactPhoneCodeScreen() {
     }, 1000);
     return () => clearInterval(timer);
   }, [secondsRemaining]);
+
+  useEffect(() => {
+    if (secondsRemaining !== 0 || !isBackoffError) return;
+    setError(null);
+    setIsBackoffError(false);
+  }, [isBackoffError, secondsRemaining]);
 
   useEffect(() => {
     if (phone) return;
@@ -133,6 +140,7 @@ export default function ContactPhoneCodeScreen() {
     if (!phone || nextCode.length !== OTP_LENGTH || isVerifying) return;
 
     setError(null);
+    setIsBackoffError(false);
     setIsVerifying(true);
     try {
       await confirm.mutateAsync({ phone, code: nextCode });
@@ -171,6 +179,7 @@ export default function ContactPhoneCodeScreen() {
   function handleCodeChange(value: string) {
     if (dailyLimit) return;
     setError(null);
+    setIsBackoffError(false);
     setCode(value);
   }
 
@@ -178,6 +187,7 @@ export default function ContactPhoneCodeScreen() {
     if (!phone || dailyLimit || isResending || secondsRemaining > 0) return;
 
     setError(null);
+    setIsBackoffError(false);
     setCode("");
     lastSubmittedCode.current = null;
     setIsResending(true);
@@ -197,6 +207,7 @@ export default function ContactPhoneCodeScreen() {
       // A backoff refusal carries the wait: the message says it and the
       // countdown holds the button, also for "Send a new code".
       if (copy.retryInSeconds != null) {
+        setIsBackoffError(true);
         setError(
           t("contactPhoneRateWait", {
             time: formatResendWait(copy.retryInSeconds),
@@ -204,6 +215,7 @@ export default function ContactPhoneCodeScreen() {
         );
         setSecondsRemaining(copy.retryInSeconds);
       } else {
+        setIsBackoffError(false);
         setError(copy.message);
       }
     } finally {
