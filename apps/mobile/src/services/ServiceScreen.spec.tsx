@@ -79,3 +79,18 @@ it("shows a customer's sent versus read message from the current service recipie
  server.use(http.get("*/services/conversations/:id", () => HttpResponse.json({ id, resourceId: id, purpose: "support", status: "open", assignmentVersion: 1, assigned: true, operatorName: null, sourceListingId: null, canSend: true, messages: [{ ...message, sender: "customer" }], lastSequence: 1, readThrough: 1, peerReadThrough: 1, unread: 0, hasMore: false })));
  const screen = await renderMobile(<ServiceScreen/>); await fireEvent.press(await screen.findByRole("button", { name: "General Support" })); await screen.findByText(message.body); expect(await screen.findByText("Read")).toBeTruthy();
 });
+
+it("requires re-entering exact quoted VIN and keeps receipt claims separate from verified payment", async () => {
+ const quote = { id, vin: "1HGCM82633A004352", providers: ["carfax"], amount: 100, preflightOutcome: "available", refundRule: "Founder review if undeliverable", windowStart: "2026-10-20T04:00:00.000Z", windowEnd: "2026-10-20T05:00:00.000Z", feasible: true, acceptedAt: null, supersededAt: null };
+ let order: object | null = null; const commands: Record<string, unknown>[] = [];
+ server.use(http.get("*/services/conversations", () => HttpResponse.json([{ id, purpose: "history", createdAt: "2026-10-15T10:00:00Z" }])), http.get("*/services/conversations/:id", () => HttpResponse.json({ id, resourceId: id, purpose: "history", status: "enquiry", assignmentVersion: 1, assigned: true, operatorName: "Synthetic operator", sourceListingId: null, canSend: true, messages: [], lastSequence: 0, readThrough: 0, unread: 0, hasMore: false })), http.get("*/services/conversations/:id/history", () => HttpResponse.json({ synthetic: true, quotes: [quote], order, payments: [] })), http.post("*/services/conversations/:id/history", async ({ request }) => { const data = await request.json() as Record<string, unknown>; commands.push(data); order = { id, quoteId: id, state: "held", version: 0, day: "2026-10-20", holdExpiresAt: "2026-10-19T18:00:00.000Z", promiseAt: quote.windowEnd, paidAt: null, escalatedAt: null, recoveryDeadline: null, recoveryUsed: false, refundState: null }; return HttpResponse.json({ ok: true }); }));
+ const screen = await renderMobile(<ServiceScreen/>); await fireEvent.press(await screen.findByRole("button", { name: "Vehicle History" }));
+ await screen.findByText("Synthetic exercise. No real payment or provider purchase.");
+ await fireEvent.changeText(screen.getByLabelText("Re-enter the exact VIN"), "1HGCM82633A004353");
+ await fireEvent.press(screen.getByRole("button", { name: "Confirm VIN, offer and window" })); expect(commands).toHaveLength(0);
+ await fireEvent.changeText(screen.getByLabelText("Re-enter the exact VIN"), quote.vin);
+ await fireEvent.press(screen.getByRole("button", { name: "Confirm VIN, offer and window" }));
+ await screen.findByText("A receipt claim is not verified payment."); expect(commands[0]?.["kind"]).toBe("accept"); expect(commands[0]?.["vin"]).toBe(quote.vin);
+ await fireEvent.changeText(screen.getByLabelText("Receipt claim"), "Synthetic transfer claim"); await fireEvent.press(screen.getByRole("button", { name: "Submit for reconciliation" }));
+ expect(commands[1]?.["kind"]).toBe("payment"); expect(commands[1]).not.toHaveProperty("verifiedFunds");
+});
