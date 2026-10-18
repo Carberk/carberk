@@ -165,8 +165,9 @@ export class VideoTransfer {
   private options(record: VideoTransferRecord) { return { assertSession: () => this.owner(record), ...(record.businessId ? { headers: { "x-business-id": record.businessId } } : {}) }; }
   private save(record: VideoTransferRecord) {
     const value = { ...record, target: { ...record.target }, prepared: { ...record.prepared } };
-    this.writes = this.writes.then(() => this.device.save(value));
-    return this.writes;
+    const write = this.writes.then(() => this.device.save(value));
+    this.writes = write.catch(() => {});
+    return write;
   }
   private validateSnapshot(record: VideoTransferRecord, snapshot: Snapshot) {
     if (snapshot.sessionId !== record.sessionId || snapshot.partCount !== Math.ceil(record.prepared.sizeBytes / partBytes) || new Set(snapshot.parts?.map(part => part.partNumber)).size !== (snapshot.parts?.length ?? 0) || snapshot.parts?.some(part => part.partNumber > snapshot.partCount || part.sizeBytes !== Math.min(partBytes, record.prepared.sizeBytes - (part.partNumber - 1) * partBytes))) throw new Error("VIDEO_SESSION_INVALID");

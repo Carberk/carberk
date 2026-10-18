@@ -123,8 +123,9 @@ export class VideoUploadTask {
     try { await (await import("expo")).requireOptionalNativeModule<VideoPreparationPort>("ListingVideoPreparation")?.discard(record.idempotencyKey); } catch { /* Native cleanup can retry on the next bounded journal recovery. */ }
   }
   private async saveRecord(record: VideoTransferRecord) {
-    this.saving = this.saving.then(() => this.device.save(record));
-    await this.saving; this.set({ phase: record.state, record });
+    const write = this.saving.then(() => this.device.save(record));
+    this.saving = write.catch(() => {});
+    await write; this.set({ phase: record.state, record });
   }
   private mediaResult(eventName: "media_preparation_result" | "media_upload_result", attemptId: string, started: number, result: "success" | "technical_failure" | "expected_rejection" | "cancelled", category?: "unsupported" | "unknown" | "network") {
     emitMeasurement({ eventName, purpose: "product_reliability", payload: { attemptId, kind: "video", result, durationMs: Math.min(86400000, Math.max(0, Date.now() - started)), ...(category ? { category } : {}) } });

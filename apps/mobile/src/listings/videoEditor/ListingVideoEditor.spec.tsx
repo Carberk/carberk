@@ -35,7 +35,7 @@ describe("optional video editor current capabilities", () => {
  });
  it("lets the seller trim and use a replacement while the active video remains available", async () => {
   server.use(http.get("http://localhost:3006/api/v1/listing-video/capabilities", () => HttpResponse.json({ canUpload: true, canView: true })), http.get("http://localhost:3006/api/v1/listing-video-targets/:kind/:id", () => HttpResponse.json({ active: { generationId: target.id, durationMs: 3000 }, pending: null })));
-  vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({ canceled: false, assets: [{ uri: "file:///library/replacement.mov", width: 960, height: 540, duration: 120000, type: "video" }] });
+  vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({ canceled: false, assets: [{ uri: "file:///library/replacement.mov", width: 960, height: 540, duration: 3000, type: "video" }] });
   const screen = await renderMobile(<ListingVideoEditor ownerId={ownerId} target={target} />);
   await screen.findByText(/Current video/);
   await act(async () => { fireEvent.press(await screen.findByRole("button", { name: "Add video" })); });
