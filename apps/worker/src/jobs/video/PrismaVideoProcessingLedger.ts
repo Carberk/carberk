@@ -25,7 +25,11 @@ export class PrismaVideoProcessingLedger implements VideoProcessingLedger {
     if (!z.string().uuid().safeParse(id).success || !z.string().uuid().safeParse(token).success) return null;
     return this.transaction(async tx => {
       const context = await this.locked(tx, id);
-      if (!context || !this.current(context) || !["PENDING", "PROCESSING"].includes(context.work.state) || context.work.attempts >= 3 || context.work.nextAttemptAt > now || (context.work.leaseExpiresAt && context.work.leaseExpiresAt > now)) return null;
+      if (!context || !["PENDING", "PROCESSING"].includes(context.work.state) || context.work.nextAttemptAt > now || (context.work.leaseExpiresAt && context.work.leaseExpiresAt > now)) return null;
+      if (!this.current(context) || context.work.attempts >= 3) {
+        await this.retire(tx, context, now, context.work.attempts >= 3 ? "VIDEO_PROCESSING_EXHAUSTED" : "VIDEO_SUPERSEDED");
+        return null;
+      }
       const { session, work } = context;
       if (!session.completionFence || !session.sizeBytes || !session.sha256 || session.posterMs === null) return null;
       await tx.videoProcessWork.update({ where: { generationId: id }, data: { state: "PROCESSING", attempts: { increment: 1 }, leaseToken: token, leaseExpiresAt: new Date(now.getTime() + leaseMs) } });
