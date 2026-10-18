@@ -21,7 +21,7 @@ export interface MeasurementStoreConfig {
 export class PrismaMeasurementStore implements MeasurementLedgerPort, MeasurementSubjectPort {
  constructor(private readonly prisma: PrismaService, private readonly config: MeasurementStoreConfig, private readonly now: () => Date = () => new Date(),private readonly conversion?:MeasurementConversionPort) {}
  private admitted(): boolean {
-  return !this.config.expiresAt || Date.parse(this.config.expiresAt) > this.now().getTime();
+  return this.config.expiresAt===undefined || Date.parse(this.config.expiresAt) > this.now().getTime();
  }
  private authority(row: Principal): MeasurementAuthority {
   return { origin: "client", environment: this.config.environment, population: this.config.population,
