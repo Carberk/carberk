@@ -5,7 +5,7 @@ import { PrismaVideoPlayback } from "./PrismaVideoPlayback";
 
 const secret = "s".repeat(43);
 function fixture() {
-  const grant = { id: "grant", ownerUserId: "viewer", ownerSessionId: "session", purpose: "playback", listingId: "listing", generationId: "generation", expiresAt: new Date(Date.now() + 60_000), revokedAt: null };
+  const grant = { id: "grant", ownerUserId: "viewer", ownerSessionId: "session", purpose: "playback", listingId: "listing", generationId: "generation", expiresAt: new Date(Date.now() + 60_000), revokedAt: null as Date | null };
   const listing = { id: "listing", activeVideoGenerationId: "generation", sellerId: "seller", businessId: null, status: "sold" };
   const generation = { id: "generation", listingId: "listing", uploadId: "upload", state: "READY", readyAt: new Date(), retiredAt: null as Date | null, manifest: { assets: [{ path: "master.m3u8", key: "video/v1/upload/generation/master.m3u8", purpose: "playback", sizeBytes: 23, contentType: "application/vnd.apple.mpegurl" }] } };
   let active = true; let eligible = true;
@@ -19,7 +19,7 @@ describe("current persisted playback authority", () => {
   it("refuses each later request after session, tester, grant or active-generation revocation", async () => {
     const session = fixture(); session.revokeSession(); expect(await session.service.authorize(secret)).toBeNull();
     const tester = fixture(); tester.revokeTester(); expect(await tester.service.authorize(secret)).toBeNull();
-    const grant = fixture(); grant.grant.revokedAt = new Date() as never; expect(await grant.service.authorize(secret)).toBeNull();
+    const grant = fixture(); grant.grant.revokedAt = new Date(); expect(await grant.service.authorize(secret)).toBeNull();
     const replaced = fixture(); replaced.listing.activeVideoGenerationId = "replacement"; expect(await replaced.service.authorize(secret)).toBeNull();
     const retired = fixture(); retired.generation.retiredAt = new Date(); expect(await retired.service.authorize(secret)).toBeNull();
   });

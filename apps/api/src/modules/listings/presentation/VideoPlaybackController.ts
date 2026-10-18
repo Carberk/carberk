@@ -1,4 +1,5 @@
 import { Controller, Get, Inject, Param, Req, Res } from "@nestjs/common";
+import { Readable } from "node:stream";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { Public } from "../../../common/public.decorator";
 import { VIDEO_PLAYBACK_AUTHORITY, VIDEO_PLAYBACK_OBJECTS, type VideoPlaybackAuthority, type VideoPlaybackObjects } from "../application/VideoPlaybackPorts";
@@ -33,7 +34,11 @@ export class VideoPlaybackController {
         range = { start: Number(matched[1]), end: matched[2] ? Number(matched[2]) : asset.sizeBytes - 1 };
         if (!Number.isSafeInteger(range.start) || !Number.isSafeInteger(range.end) || range.start < 0 || range.end < range.start || range.end >= asset.sizeBytes) { reply.header("Content-Range", `bytes */${asset.sizeBytes}`).code(416).send(); return; }
       }
-      if (request.method === "HEAD") { reply.header("Content-Type", asset.contentType).header("Content-Length", asset.sizeBytes).code(200).send(); return; }
+      if (request.method === "HEAD") {
+        reply.header("Content-Type", asset.contentType).header("Content-Length", range ? range.end - range.start + 1 : asset.sizeBytes).header("Accept-Ranges", "bytes");
+        if (range) reply.header("Content-Range", `bytes ${range.start}-${range.end}/${asset.sizeBytes}`).code(206);
+        reply.send(Readable.from([])); return;
+      }
       const stream = await this.objects.open(asset, range, abort.signal);
       abort.signal.addEventListener("abort", () => stream.destroy(), { once: true });
       if (playlist) {
