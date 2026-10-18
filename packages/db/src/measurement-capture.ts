@@ -11,7 +11,8 @@ export class PrismaMeasurementCommit {
  constructor(private readonly activation: MeasurementCaptureActivation, private readonly epoch: string, private readonly now: () => Date = () => new Date(), private readonly expiresAt?: string) {}
  async capture(transaction: object, userId: string, event: MeasurementSchemas.MeasurementEvent, classification: { conversionEligible: boolean } = { conversionEligible: true }): Promise<"captured" | "disabled" | "unavailable"> {
   const now = this.now();
-  if (!this.activation.enabled || !this.epoch || !this.activation.evidenceRef || (this.expiresAt && Date.parse(this.expiresAt) <= now.getTime())) return "disabled";
+  const expiry = this.expiresAt === undefined ? undefined : Date.parse(this.expiresAt);
+  if (!this.activation.enabled || !this.epoch || !this.activation.evidenceRef || (expiry !== undefined && (!Number.isFinite(expiry) || expiry <= now.getTime()))) return "disabled";
   const parsed = MeasurementSchemas.MeasurementEventSchema.safeParse(event);
   if (!parsed.success || MeasurementSchemas.EVENT_DICTIONARY[parsed.data.eventName].origin !== "server" || parsed.data.context.platform !== "server"
    || !this.activation.purposes.includes(parsed.data.purpose)) return "disabled";
