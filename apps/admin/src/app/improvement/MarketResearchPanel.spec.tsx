@@ -9,7 +9,7 @@ import { AdminLanguageSwitch,AdminLocaleProvider } from "@/lib/i18n";
 vi.mock("next/headers",()=>({cookies:async()=>({get:()=>({value:"synthetic-access"})}),headers:async()=>new Headers()}));
 vi.mock("next/navigation",()=>({redirect:(path:string)=>{throw new Error(path);},unstable_rethrow:()=>{}}));
 let response:unknown=[],denied=false;
-const dataset={state:"qualified",commercialDisclosure:false,retention:"qualified_source_policy",dataset:{id:"synthetic-cars",version:1,derivationVersion:"fixed-cells-v1",cells:[{market:"TM",period:"2026-10",vehicleClass:"passenger",observations:12,priceBand:"5000_14999",ageBand:"unknown",residence:"unknown",demographicSource:"unknown"}]}};
+const dataset={state:"qualified",commercialDisclosure:false,retention:"qualified_source_policy",dataset:{id:"synthetic-cars",version:1,derivationVersion:"fixed-cells-v1",retentionClass:"qualified_indefinite",expiresAt:null,sources:[{id:"synthetic-source",version:1,provenance:"Independent synthetic market fixture",retentionBasis:"Reviewed synthetic research"}],cells:[{market:"TM",period:"2026-10",vehicleClass:"passenger",observations:12,priceBand:"5000_14999",ageBand:"unknown",residence:"unknown",demographicSource:"unknown"}]}};
 beforeEach(()=>{response=[dataset];denied=false;vi.stubGlobal("fetch",async(url:string)=>{
  if(denied)return Response.json({}, {status:403});
  if(String(url).endsWith("/exports"))return Response.json({id:"11111111-1111-4111-8111-111111111111",expiresAt:"2099-10-18T00:00:00.000Z"});
@@ -19,6 +19,8 @@ afterEach(()=>{cleanup();vi.unstubAllGlobals();});
 it.each(["en","ru","tk"] as const)("shows qualified synthetic cells and unknown demographics in %s",async locale=>{
  const copy=improvementCopy[locale],view=render(<AdminLocaleProvider initialLocale={locale}><MarketResearchPanel canInvestigate={false}/></AdminLocaleProvider>);
  await waitFor(()=>expect(view.getByText("12")).toBeTruthy());
+ expect(view.getByText("Independent synthetic market fixture")).toBeTruthy();
+ expect(view.getByText(copy.qualified_indefinite)).toBeTruthy();
  expect(view.getByText(copy.noDisclosure)).toBeTruthy();expect(view.getAllByText(copy.unknown)).toHaveLength(2);
  expect(view.queryByRole("textbox")).toBeNull();
 });

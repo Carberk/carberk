@@ -20,6 +20,7 @@ export class PrismaMarketKnowledge {
  constructor(private readonly prisma:PrismaService,private readonly authority:StaffAuthorityPort,private readonly epoch:string,private readonly now:()=>Date=()=>new Date()) {}
  private async sources(tx:Prisma.TransactionClient,fences:readonly {sourceId:string}[]) {
   // Lock in stable order so source revocation and derivation have one serialization point.
+  if(fences.length<1 || fences.length>20)return null;
   const sources:KnowledgeSource[]=[];
   for(const fence of [...fences].sort((a,b)=>a.sourceId.localeCompare(b.sourceId))) {
    await tx.$queryRaw`SELECT "id" FROM "market_knowledge_sources" WHERE "id"=${fence.sourceId} FOR SHARE`;
@@ -54,7 +55,8 @@ export class PrismaMarketKnowledge {
   const dataset:AnonymousDataset={id:row.id,version:row.version,epoch:row.epoch,derivationVersion:row.derivationVersion,
    ...contents.data,review:assessment.data,sourceFences:fences.map(fence=>({id:fence.sourceId,version:fence.sourceVersion,epoch:fence.sourceEpoch}))};
   const qualification=qualifyAnonymousDataset(dataset,sources,{epoch:this.epoch,now:this.now()});
-  return qualification.state==="qualified"?{...qualification,dataset:{id:row.id,version:row.version,derivationVersion:row.derivationVersion,cells:contents.data.cells}}:qualification;
+  const expiresAt=[row.expiresAt,...sources.map(source=>source.expiresAt)].filter((value):value is Date=>value!==null).sort((a,b)=>a.getTime()-b.getTime())[0]??null;
+  return qualification.state==="qualified"?{...qualification,dataset:{id:row.id,version:row.version,derivationVersion:row.derivationVersion,retentionClass:expiresAt?"qualified_expiring" as const:"qualified_indefinite" as const,expiresAt:expiresAt?.toISOString()??null,sources:sources.map(source=>({id:source.id,version:source.version,provenance:source.provenance,retentionBasis:source.retentionBasis})),cells:contents.data.cells}}:qualification;
  }
  /** Synthetic reviewed aggregate input only. No raw source records or personal demographics enter this interface. */
  async admitSynthetic(subject:StaffSubject,input:unknown) {
