@@ -80,6 +80,7 @@ export class RailwayPlatform {
     return structuredClone(policy);
   }
   async remote(kind, lease, target) {
+    if (lease.fixtureProfile === 'campaign897-business-v2') throw new Error('Business profile operational receipts unavailable');
     const payload = { kind, redisOrigin: this.redisOrigin, candidate: lease.candidate, profile: lease.fixtureProfile, id: lease.id, namespace: lease.namespace, target, identity: lease.identity,
       expectedMigrations: lease.operation?.expectedMigrations ?? lease.expectedMigrations,
       schemaDisposition: lease.operation?.schemaDisposition ?? lease.schemaDisposition ?? 'unchanged' };
@@ -108,6 +109,7 @@ export class RailwayPlatform {
     return deployment;
   }
   async execute(kind, lease, target, recordDeployment) {
+    if (lease.fixtureProfile === 'campaign897-business-v2') throw new Error('Business profile operational receipts unavailable');
     await this.authorize(lease);
     await this.attest(lease.identity);
     if (['fixture', 'reset'].includes(kind)) {

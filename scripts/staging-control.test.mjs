@@ -330,3 +330,16 @@ test('explicit reset refuses incomplete or changed in-flight identity, runtime a
     });
   }
 });
+
+test('business profile cannot enter operations or recovery through an unsupported durable lease', async t => {
+  const { control, ledger, platform, claim } = await setup(t);
+  const lease = await claim();
+  const current = await ledger.read();
+  current.state.reservation.fixtureProfile = 'campaign897-business-v2';
+  await ledger.compareAndSwap(current.revision, current.state);
+  for (const kind of ['fixture', 'reset', 'deploy']) await assert.rejects(control.operate(lease, kind), /Business profile controller/);
+  await assert.rejects(control.restore(lease), /Business profile controller/);
+  await assert.rejects(control.recover(lease), /Business profile controller/);
+  assert.deepEqual(platform.operations, []);
+  assert.equal((await control.inspect()).reservation.fixtureProfile, 'campaign897-business-v2');
+});

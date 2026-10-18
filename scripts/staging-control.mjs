@@ -61,6 +61,7 @@ export class StagingControl {
   async owned(claim, recovering = false) {
     const snapshot = await this.ledger.read(); const lease = snapshot.state?.reservation;
     if (!lease || lease.id !== claim.id || lease.owner !== this.actor) throw new Error('Current reservation owner required');
+    if (lease.fixtureProfile === 'campaign897-business-v2') throw new Error('Business profile controller disposal/continuation/restore receipts unavailable; retain reservation');
     if (lease.candidate !== claim.candidate) throw new Error('Exact reservation candidate required');
     if (digest(lease.identity) !== digest(this.policy)) throw new Error('Reservation identity changed');
     if (lease.operation && !recovering) throw new Error('Durable in-flight operation requires recovery; inspect before mutation');

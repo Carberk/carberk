@@ -187,3 +187,26 @@ test('post-main campaign restoration observes established disposal and cannot st
   await assert.rejects(platform.execute('restore', lease, target, async () => {}), /dispos|cleanup/i);
   assert.deepEqual(remoteKinds, ['probe']);
 });
+
+test('business storage fixture refuses missing or wrong preparation enables before SQL', async () => {
+  const { remoteProgram } = await import('./staging-remote.mjs');
+  const { runInNewContext } = await import('node:vm');
+  for (const enabled of [undefined, 'campaign897-identities-v1']) {
+    let calls = 0;
+    const process = { exitCode: 0, env: { STAGING_CAMPAIGN_PROFILE_ENABLED: enabled } };
+    runInNewContext(remoteProgram({ kind: 'fixture', profile: 'campaign897-business-v2' }), {
+      process, require: () => ({ spawnSync: () => { calls++; } }), console: { log() {}, error() {} },
+    });
+    assert.equal(process.exitCode, 1);
+    assert.equal(calls, 0);
+  }
+});
+
+test('business profile cannot bypass the closed controller through the Railway adapter', async () => {
+  let touched = false;
+  const platform = new RailwayPlatform({ token: 'SECRET', fetch: async () => { touched = true; throw new Error(); }, command: async () => { touched = true; throw new Error(); } });
+  const lease = { fixtureProfile: 'campaign897-business-v2' };
+  for (const kind of ['fixture', 'reset', 'deploy', 'restore']) await assert.rejects(platform.execute(kind, lease, 'a'.repeat(40)), /operational receipts/);
+  await assert.rejects(platform.remote('probe', lease, 'a'.repeat(40)), /operational receipts/);
+  assert.equal(touched, false);
+});

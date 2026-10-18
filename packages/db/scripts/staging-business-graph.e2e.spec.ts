@@ -244,4 +244,152 @@ describe("reservation-owned synthetic business v2 storage graph, without admissi
     expect(await db.dealership.findUnique({ where: { id: owned.business.id } })).toBeNull();
     expect(execute("reset", id).code).toBe(0);
   });
+
+  it("leaves unrelated writes unowned before and after disposal and permits a future reservation", async () => {
+    const id = "81".repeat(16), owned = await graph(id);
+    const original = await liveRecords(id);
+    await db.user.update({ where: { id: "graph-foreign-user" }, data: { displayName: "Foreign update while active" } });
+    await db.listing.update({ where: { id: "graph-foreign-listing" }, data: { description: "Foreign active edit" } });
+    expect(await liveRecords(id)).toEqual(original);
+    expect(execute("reset", id).code).toBe(0);
+    await db.user.update({ where: { id: "graph-foreign-user" }, data: { displayName: "Foreign update after disposal" } });
+    await db.listing.update({ where: { id: "graph-foreign-listing" }, data: { description: "Foreign terminal edit" } });
+    expect(await db.user.findUnique({ where: { id: "graph-foreign-user" } })).toMatchObject({ displayName: "Foreign update after disposal" });
+    expect(execute("fixture", id).code).toBe(1);
+    expect(execute("reset", id, profile, "b".repeat(40)).code).toBe(1);
+    expect(execute("fixture", "82".repeat(16)).code).toBe(0);
+    expect(execute("reset", "82".repeat(16)).code).toBe(0);
+    const buyer = owned.rows.find(row => row.alias === "buyer-a");
+    if (!buyer) throw new Error("fixed buyer missing");
+    await expect(db.user.create({ data: { id: buyer.user_id, email: buyer.email, emailVerifiedAt: new Date() } })).rejects.toThrow();
+    await pool.query(`ALTER TABLE public.users DISABLE TRIGGER "cf_${id}_business"`);
+    try { await db.user.create({ data: { id: buyer.user_id, email: buyer.email, emailVerifiedAt: new Date() } }); }
+    finally { await pool.query(`ALTER TABLE public.users ENABLE TRIGGER "cf_${id}_business"`); }
+    expect(execute("reset", id).code).toBe(1);
+    await pool.query(`ALTER TABLE public.users DISABLE TRIGGER "cf_${id}_business"`);
+    try { await db.user.delete({ where: { id: buyer.user_id } }); }
+    finally { await pool.query(`ALTER TABLE public.users ENABLE TRIGGER "cf_${id}_business"`); }
+    expect(execute("reset", id).code).toBe(0);
+    expect(execute("reset", "83".repeat(16)).code).toBe(1);
+  });
+
+  it("tracks composite grants and retains only redacted bootstrap audits after verified disposal", async () => {
+    const id = "84".repeat(16), owned = await seed(id);
+    const grants = (await pool.query(`SELECT row_key FROM "cf_${id}".campaign_records WHERE table_name='staff_grants' ORDER BY row_key::text`)).rows;
+    expect(grants).toHaveLength(2);
+    expect(grants.map(row => row.row_key)).toEqual(expect.arrayContaining([
+      { userId: owned.actor("coordinator"), capability: "staff.manage" },
+      { userId: owned.actor("coordinator"), capability: "founder.control" },
+    ]));
+    expect(await db.auditLog.count({ where: { targetId: owned.actor("coordinator") } })).toBe(2);
+    expect(execute("reset", id).code).toBe(0);
+    expect(await db.staffGrant.count({ where: { userId: owned.actor("coordinator") } })).toBe(0);
+    const retained = await db.auditLog.findMany({ where: { targetType: "SyntheticCampaign", targetId: id } });
+    expect(retained).toHaveLength(2);
+    for (const row of retained) expect(row).toMatchObject({ actorId: null, details: { profile, disposition: "redacted-synthetic-audit" } });
+    expect((await liveRecords(id)).map(row => row.table_name)).toEqual(["audit_logs", "audit_logs"]);
+    expect(execute("reset", id).code).toBe(0);
+  });
+
+  it("refuses nullable parent removal, identity transfers, foreign assignees, pointers and media payloads", async () => {
+    const id = "85".repeat(16), owned = await graph(id), before = await liveRecords(id);
+    await expect(db.listing.update({ where: { id: owned.car.id }, data: { businessId: null } })).rejects.toThrow();
+    await expect(db.listing.update({ where: { id: owned.car.id }, data: { id: randomUUID() } })).rejects.toThrow();
+    await expect(db.user.update({ where: { id: owned.actor("buyer-a") }, data: { email: "transferred@campaign897.invalid" } })).rejects.toThrow();
+    await expect(db.businessEnquiryAudit.updateMany({ where: { conversationId: owned.conversation.id }, data: { previousAssigneeId: "graph-foreign-user" } })).rejects.toThrow();
+    await expect(db.conversation.update({ where: { id: owned.conversation.id }, data: { lastMessageId: randomUUID() } })).rejects.toThrow();
+    await expect(db.message.update({ where: { id: owned.message.id }, data: { metadata: { uploadId: randomUUID() } } })).rejects.toThrow();
+    await expect(db.listingDraft.update({ where: { id: owned.draft.id }, data: { payload: { media: [randomUUID()] } } })).rejects.toThrow();
+    await expect(db.staffGrant.update({ where: { userId_capability: { userId: owned.actor("coordinator"), capability: "staff.manage" } }, data: { capability: "marketplace.moderate" } })).rejects.toThrow();
+    expect(await liveRecords(id)).toEqual(before);
+    expect(execute("reset", id).code).toBe(0);
+  });
+
+  it("detects journal hashes, explicit keys, event and missing-trigger tampering before any deletion", async () => {
+    const id = "86".repeat(16), owned = await graph(id), before = await liveRecords(id);
+    const records = (await pool.query(`SELECT * FROM "cf_${id}".campaign_records ORDER BY table_name,row_key::text`)).rows;
+    const listingRecord = records.find(row => row.table_name === "listings");
+    if (!listingRecord) throw new Error("listing ownership missing");
+    await pool.query(`UPDATE "cf_${id}".campaign_records SET row_hash='changed' WHERE table_name='listings'`);
+    expect(execute("reset", id).code).toBe(1);
+    expect(await db.listing.findUnique({ where: { id: owned.car.id } })).toEqual(owned.car);
+    await pool.query(`UPDATE "cf_${id}".campaign_records SET row_hash=$1 WHERE table_name='listings'`, [listingRecord.row_hash]);
+    await pool.query(`UPDATE "cf_${id}".campaign_records SET row_key=jsonb_build_object('id',NULL) WHERE table_name='listings'`);
+    expect(execute("reset", id).code).toBe(1);
+    await pool.query(`UPDATE "cf_${id}".campaign_records SET row_key=$1 WHERE table_name='listings'`, [listingRecord.row_key]);
+    const event = (await pool.query(`SELECT * FROM "cf_${id}".campaign_events ORDER BY sequence LIMIT 1`)).rows[0];
+    if (!event) throw new Error("bootstrap event missing");
+    await pool.query(`UPDATE "cf_${id}".campaign_events SET row_hash='changed' WHERE sequence=$1`, [event.sequence]);
+    expect(execute("reset", id).code).toBe(1);
+    await pool.query(`UPDATE "cf_${id}".campaign_events SET row_hash=$1 WHERE sequence=$2`, [event.row_hash, event.sequence]);
+    await pool.query(`DROP TRIGGER "cf_${id}_business" ON public.listings`);
+    expect(execute("reset", id).code).toBe(1);
+    await pool.query(`CREATE TRIGGER "cf_${id}_business" AFTER INSERT OR UPDATE OR DELETE ON public.listings FOR EACH ROW EXECUTE FUNCTION "cf_${id}".track_business()`);
+    await pool.query(`ALTER TABLE public.listings DISABLE TRIGGER "cf_${id}_business"`);
+    try { await pool.query('UPDATE public.listings SET description=$1 WHERE id=$2', ["Untracked bypassed mutation", owned.car.id]); }
+    finally { await pool.query(`ALTER TABLE public.listings ENABLE TRIGGER "cf_${id}_business"`); }
+    expect(execute("reset", id).code).toBe(1);
+    await expect(db.listing.update({ where: { id: owned.car.id }, data: { description: "Must not launder tamper" } })).rejects.toThrow();
+    await pool.query(`ALTER TABLE public.listings DISABLE TRIGGER "cf_${id}_business"`);
+    try { await pool.query('UPDATE public.listings SET description=$1 WHERE id=$2', [owned.car.description, owned.car.id]); }
+    finally { await pool.query(`ALTER TABLE public.listings ENABLE TRIGGER "cf_${id}_business"`); }
+    expect(await liveRecords(id)).toEqual(before);
+    expect(execute("reset", id).code).toBe(0);
+  });
+
+  it("refuses unsupported FK and JSON descendants without adopting or unlinking them", async () => {
+    const id = "87".repeat(16), owned = await graph(id), before = await liveRecords(id);
+    const search = await db.savedSearch.create({ data: { userId: owned.actor("buyer-a"), filters: {} } });
+    expect(execute("reset", id).code).toBe(1);
+    expect(await liveRecords(id)).toEqual(before);
+    expect(await db.savedSearch.findUnique({ where: { id: search.id } })).toEqual(search);
+    await db.savedSearch.delete({ where: { id: search.id } });
+    const media = await db.listingMedia.create({ data: { listingId: owned.car.id, kind: "image", key: "synthetic-no-object.webp", sortOrder: 0 } });
+    expect(execute("reset", id).code).toBe(1);
+    expect(await db.listingMedia.findUnique({ where: { id: media.id } })).toEqual(media);
+    expect(await liveRecords(id)).toEqual(before);
+    await db.listingMedia.delete({ where: { id: media.id } });
+    await pool.query("CREATE SCHEMA graph_unknown; CREATE TABLE graph_unknown.reference (id text PRIMARY KEY)");
+    try { expect(execute("reset", id).code).toBe(1); expect(await liveRecords(id)).toEqual(before); }
+    finally { await pool.query("DROP TABLE graph_unknown.reference; DROP SCHEMA graph_unknown"); }
+    const foreign = await db.listingDraft.create({ data: { userId: "graph-foreign-user", payload: { reference: { listingId: owned.car.id } } } });
+    expect(execute("reset", id).code).toBe(1);
+    expect(await liveRecords(id)).toEqual(before);
+    await db.listingDraft.delete({ where: { id: foreign.id } });
+    expect(execute("reset", id).code).toBe(0);
+  });
+
+  it("holds an ordinary writer on the shared fence and refuses it after cleaning commits", async () => {
+    const id = "88".repeat(16), owned = await graph(id), client = await pool.connect();
+    let lateWrite: Promise<unknown> | undefined;
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`cf_${id}`]);
+      lateWrite = db.listing.update({ where: { id: owned.car.id }, data: { description: "Held writer must not commit" } }).then(value => ({ value }), error => ({ error }));
+      let waiting = false;
+      for (let attempt = 0; attempt < 100; attempt++) {
+        const result = await client.query("SELECT count(*)::int AS count FROM pg_stat_activity WHERE wait_event='advisory' AND query LIKE '%listings%'");
+        if (result.rows[0]?.count > 0) { waiting = true; break; }
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      expect(waiting).toBe(true);
+      await client.query(`UPDATE "cf_${id}".campaign_manifest SET state='cleaning'`);
+      await client.query("COMMIT");
+      expect(await lateWrite).toHaveProperty("error");
+      await expect(db.message.delete({ where: { id: owned.message.id } })).rejects.toThrow();
+      await db.user.update({ where: { id: "graph-foreign-user" }, data: { displayName: "Unrelated while cleaning" } });
+      expect(await db.listing.findUnique({ where: { id: owned.car.id } })).toEqual(owned.car);
+      expect(execute("reset", id).code).toBe(0);
+    } finally { await client.query("ROLLBACK"); client.release(); await lateWrite; }
+  });
+
+  it("bounds the exact row journal while retaining enough authority to dispose a full graph", async () => {
+    const id = "89".repeat(16), owned = await seed(id);
+    for (let index = 0; index < 107; index++) await db.listingDraft.create({ data: { userId: owned.actor("owner"), businessId: owned.business.id, payload: {} } });
+    expect(await liveRecords(id)).toHaveLength(128);
+    await expect(db.listingDraft.create({ data: { userId: owned.actor("owner"), businessId: owned.business.id, payload: {} } })).rejects.toThrow();
+    expect(await liveRecords(id)).toHaveLength(128);
+    expect(execute("reset", id).code).toBe(0);
+    expect(await db.listingDraft.count({ where: { businessId: owned.business.id } })).toBe(0);
+  });
 });

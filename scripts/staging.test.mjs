@@ -16,3 +16,7 @@ test('campaign operation help names the exact supported profile; unknown profile
     ['operate', 'policy', 'claim', 'fixture', 'campaign897-identities-v1', 'historical-cohort'],
   ]) await assert.rejects(runStagingCommand(args), /Unsupported command or arguments/);
 });
+
+test('business storage profile remains closed at the operator CLI pending its disposal receipt controller', async () => {
+  await assert.rejects(runStagingCommand(['operate', 'policy', 'claim', 'fixture', 'campaign897-business-v2']), /Unsupported command or arguments/);
+});
