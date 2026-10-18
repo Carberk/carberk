@@ -99,6 +99,14 @@ export class VideoUploadTask {
       if (this.value.record) await this.discardPrepared(this.value.record);
     } catch (error) { this.failed(error); }
   }
+  async removed(): Promise<void> {
+    this.intent++;
+    if (this.preparingJob) await this.preparation?.cancel(this.preparingJob);
+    try { await this.transfer.cancel(); } catch { /* The target removal already committed. */ }
+    try { await this.transfer.settle(); } catch { /* Keep local cleanup independent of the old answer. */ }
+    if (this.value.record) await this.discardPrepared(this.value.record);
+    await this.device.clear(); this.set({ phase: "EMPTY", record: null });
+  }
   async detachForPublication(): Promise<VideoTransferRecord | null> {
     this.intent++;
     if (this.preparingJob) await this.preparation?.cancel(this.preparingJob);
