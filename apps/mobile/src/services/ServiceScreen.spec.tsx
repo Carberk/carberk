@@ -69,3 +69,9 @@ it("binds the current native token to the opened private service using authentic
  const screen = await renderMobile(<ServiceScreen/>); await fireEvent.press(await screen.findByRole("button", { name: "General Support" })); await screen.findByText(message.body);
  await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); }); expect(calls).toEqual(["register", "subscribe"]);
 });
+it("opens the canonical Support case from a Support entry without creating a History enquiry", async () => {
+ const { routeParams } = await import("../../test/render"); routeParams["purpose"] = "support";
+ let creates = 0;
+ server.use(http.post("*/services/conversations", async ({ request }) => { expect(await request.json()).toEqual({ purpose: "support", synthetic: true }); creates++; return HttpResponse.json({ id, resourceId: id }); }));
+ try { const screen = await renderMobile(<ServiceScreen/>); expect(await screen.findByText(message.body)).toBeTruthy(); expect(creates).toBe(1); } finally { delete routeParams["purpose"]; }
+});
