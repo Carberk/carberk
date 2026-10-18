@@ -1,4 +1,5 @@
-import { z } from "zod";
+import { VideoUploadSchemas } from "@auto-tm/contracts";
+import type { z } from "zod";
 
 import { apiClient } from "../../api/client";
 import { loadAuthSession } from "../../auth/session";
@@ -25,9 +26,8 @@ export interface VideoTransferDevice {
 }
 const partBytes = 5 * 1024 * 1024;
 const apiPath = "/listing-video-upload-sessions";
-const partSchema = z.object({ partNumber: z.number().int().min(1).max(3), sizeBytes: z.number().int().positive().max(partBytes), etag: z.string().min(1).max(1024) });
-const snapshotSchema = z.object({ version: z.literal(1), sessionId: z.string().uuid(), generation: z.string().uuid(), state: z.enum(["INITIALIZING", "UPLOADING", "PAUSED", "COMPLETING", "PROCESSING", "READY", "FAILED", "CLEANUP_PENDING"]), expiresAt: z.string().datetime(), partBytes: z.literal(partBytes), partCount: z.number().int().min(1).max(3), parts: z.array(partSchema).max(3).optional() });
-const credentialsSchema = z.object({ version: z.literal(1), sessionId: z.string().uuid(), parts: z.array(z.object({ partNumber: z.number().int().min(1).max(3), sizeBytes: z.number().int().positive().max(partBytes), url: z.string().url().max(8192), expiresAt: z.string().datetime() })).length(1) });
+const snapshotSchema = VideoUploadSchemas.SessionSnapshot;
+const credentialsSchema = VideoUploadSchemas.PartCredentialsResponse;
 type Snapshot = z.infer<typeof snapshotSchema>;
 
 /** Owns foreground transfer and durable intent. Reconcile opaque server-confirmed
@@ -103,7 +103,7 @@ export class VideoTransfer {
       const credential = await apiClient.post(`${apiPath}/${record.sessionId}/part-credentials`, { partNumbers: [missing] }, credentialsSchema, this.options(record));
       if (this.stopped) return;
       const part = credential.parts[0];
-      if (!part) throw new Error("VIDEO_CREDENTIAL_INVALID");
+      if (!part || credential.parts.length !== 1) throw new Error("VIDEO_CREDENTIAL_INVALID");
       const size = Math.min(partBytes, record.prepared.sizeBytes - (missing - 1) * partBytes);
       if (credential.sessionId !== record.sessionId || part.partNumber !== missing || part.sizeBytes !== size || Date.parse(part.expiresAt) <= Date.now()) throw new Error("VIDEO_CREDENTIAL_INVALID");
       const url = new URL(part.url);

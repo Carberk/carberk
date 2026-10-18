@@ -1,0 +1,92 @@
+[
+  {
+    "file": "alternate-body-en.pdf",
+    "pages": 3,
+    "sha256": "9c464a9283facc704cdb1a55dba02dbe57248b7c3a0a8c87e3e78b46651bf55a"
+  },
+  {
+    "file": "alternate-body-ru.pdf",
+    "pages": 3,
+    "sha256": "68a4eb1863e593ceea3a3701291756770361cc9148a26093e847f3a0a595c737"
+  },
+  {
+    "file": "alternate-body-tk.pdf",
+    "pages": 3,
+    "sha256": "e533eba0041c5464c8502c9c6005cfbafa4cc5ce6cdf3fb9e97793c96f5e7bbe"
+  },
+  {
+    "file": "draft-en.pdf",
+    "pages": 3,
+    "sha256": "2e447d1ed832880b9b28f45f2352d5f32a16278d56b83d5e14183a51d0268b76"
+  },
+  {
+    "file": "draft-ru.pdf",
+    "pages": 3,
+    "sha256": "a1f89ef4822f76aa1611b73bcd6c9b96b9b8ea5cc1c49d5b3ec9bb4c52fc7324"
+  },
+  {
+    "file": "draft-tk.pdf",
+    "pages": 3,
+    "sha256": "61269ee4be4b88e1cd17391dc6ddb5a9124528ec508a568b61bcddd952c73b4e"
+  },
+  {
+    "file": "long-en.pdf",
+    "pages": 4,
+    "sha256": "24c5a7eea914daba319bc29fe8b688d66798485f18fc53802dfdf5aede9b38fb"
+  },
+  {
+    "file": "long-ru.pdf",
+    "pages": 4,
+    "sha256": "c98b109a6bffae1afd5c3aed09196f7a89436156ee09f3577596435483b9b903"
+  },
+  {
+    "file": "long-tk.pdf",
+    "pages": 4,
+    "sha256": "fb060ee2ae873498c6f3f5c5b98a6095f853d8dbbcd7d05872d90f88b0f221a0"
+  },
+  {
+    "file": "many-findings-en.pdf",
+    "pages": 4,
+    "sha256": "6d0730aeb97ac64ce187cb585ba2c83888ff0e6f675318b920a31f3b31958c37"
+  },
+  {
+    "file": "many-findings-ru.pdf",
+    "pages": 4,
+    "sha256": "8081df36a24ecd201ef7c8297b486b7d0b2016c674b49895c8dd8b0b2dd6bba9"
+  },
+  {
+    "file": "many-findings-tk.pdf",
+    "pages": 4,
+    "sha256": "de9a0d567cdfe1c803050a6381f890b6ba7f67eb5ad2805b2b1d6be537323426"
+  },
+  {
+    "file": "short-en.pdf",
+    "pages": 3,
+    "sha256": "6f6907a72c59d0c8f4a4a96172d746fcd43cbfaff7d4c4138ac8e1ee04824e3f"
+  },
+  {
+    "file": "short-ru.pdf",
+    "pages": 3,
+    "sha256": "bf693d35bddbcddf4d8121865a38bc3f7c87e8f2c5411d46a8e021c311401990"
+  },
+  {
+    "file": "short-tk.pdf",
+    "pages": 3,
+    "sha256": "65fa7fabe484f19585e7a79937d0f98e40d89ced0662a901a7a47175141b1205"
+  },
+  {
+    "file": "zero-photo-en.pdf",
+    "pages": 3,
+    "sha256": "dd20af5abf4bd559f4ccc77807d094e647249ee70d80986bd220e7c1a11dd05f"
+  },
+  {
+    "file": "zero-photo-ru.pdf",
+    "pages": 3,
+    "sha256": "cbbf06f6121b137dde486b684b7a96eacfb781080a81b5c4bffa9cdf0af6c8da"
+  },
+  {
+    "file": "zero-photo-tk.pdf",
+    "pages": 3,
+    "sha256": "b1d172779ea2a75591c88ed6146e14ab11793df40b3e2ff99bc19000a221b487"
+  }
+]

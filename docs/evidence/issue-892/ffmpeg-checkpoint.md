@@ -1,6 +1,6 @@
 # Prepared byte processing checkpoint
 
-The local `FFmpegVideoProcessor` processes real files into HLS and a cropped JPEG poster. It does not download source objects, upload/read back generated objects, persist durable work or mark a generation READY. The registered video queue still rejects work. The worker image still lacks FFmpeg; production activation remains closed.
+The local `FFmpegVideoProcessor` processes real files into HLS and a cropped JPEG poster. It does not download source objects, upload/read back generated objects, persist durable work or mark a generation READY. The registered video queue still rejects work. The worker Dockerfile now pins and installs FFmpeg/ffprobe under77e30050; no image build or deployed binary receipt is claimed. Production activation remains closed.
 
 The adapter permits only a local regular prepared file with a matching SHA-256, at most15 MiB, H264/yuv420p SDR MP4/MOV, at most90 seconds, at most30 fps, at most1280x720 or720x1280, and optional AAC mono/stereo. It fully decodes accepted bytes before generating even-pixel240/360/720 envelope tiers without upscaling. Poster offset must be inside the measured clip. Output inventory contains exact relative names, byte lengths, hashes, content types and poster/playback purposes. Commands use no shell or network input protocols, bounded process times and bounded captured output. One adapter instance processes one job at a time.
 
