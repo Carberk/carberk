@@ -207,6 +207,91 @@ export function campaignMain(input, { sql, uuid, exists, disposeDeliveries }) {
 
 
 /** Runs only inside the API service process. No scan, drain, obliterate or caller queue name. */
+
+/** Fixed media-free business graph profile. It shares the reservation manifest,
+ * trigger journal and reset fence with the identity profile but has no auth path. */
+export function businessMain(input, { sql, uuid, exists }) {
+  const profile = 'campaign897-business-v2';
+  if (input.profile !== profile || !/^[a-f0-9]{40}$/.test(input.candidate ?? '')) throw new Error();
+  const n = input.namespace;
+  const aliases = ['buyer-a', 'buyer-b', 'owner', 'sales-a', 'sales-b', 'coordinator', 'support', 'history-fulfiller', 'payment-verifier', 'reception-steward', 'technician', 'independent-reviewer', 'private-reviewer', 'aggregate-viewer', 'investigator'];
+  const identities = aliases.map(alias => ({ alias, id: uuid(`campaign897-business:${input.candidate}:${profile}:${input.id}:${alias}`), email: `${alias}.${input.id}.${input.candidate.slice(0, 12)}@campaign897.invalid` }));
+  const owner = identities.find(identity => identity.alias === 'owner');
+  const coordinator = identities.find(identity => identity.alias === 'coordinator');
+  const rootId = uuid(`campaign897-business:${input.candidate}:${profile}:${input.id}:root`);
+  const rootSlug = `campaign897-${input.id}-${input.candidate.slice(0, 12)}`;
+  const rootContact = `+999${(BigInt(`0x${require('node:crypto').createHash('sha256').update(`${input.id}:${input.candidate}:business-contact`).digest('hex').slice(0, 12)}`) % 1000000000000n).toString().padStart(12, '0')}`;
+  const tables = ['users', 'dealerships', 'dealership_members', 'dealership_invitations', 'listings', 'listing_drafts', 'conversations', 'conversation_participants', 'messages', 'business_enquiry_audits', 'favorites', 'verified_contact_phones', 'owned_vehicles', 'blocked_users', 'notification_preferences', 'content_reports'];
+  const identityValues = identities.map(identity => `('${identity.alias}','${identity.id}','${identity.email}')`).join(',');
+  const ownedIds = identities.map(identity => `'${identity.id}'`).concat(`'${rootId}'`).join(',');
+  const lock = `SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='20s'; SELECT pg_advisory_xact_lock(hashtextextended('${n}',0));`;
+  const binding = `DO $guard$ BEGIN
+    IF (SELECT count(*) FROM "${n}".campaign_manifest) <> 1 OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_manifest WHERE reservation_id='${input.id}' AND candidate='${input.candidate}' AND profile='${profile}' AND delivery_version=2) THEN RAISE EXCEPTION 'Campaign binding changed'; END IF;
+    IF (SELECT count(*) FROM "${n}".campaign_entities) <> 15 OR EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE (alias,user_id,email) NOT IN (${identityValues})) THEN RAISE EXCEPTION 'Campaign roster changed'; END IF;
+  END $guard$;`;
+  const setup = `CREATE SCHEMA "${n}";
+    CREATE TABLE "${n}".campaign_manifest(reservation_id text PRIMARY KEY,candidate text NOT NULL,profile text NOT NULL,state text NOT NULL CHECK(state IN ('identities','cleaning','disposed')),delivery_version integer NOT NULL DEFAULT 2);
+    INSERT INTO "${n}".campaign_manifest VALUES('${input.id}','${input.candidate}','${profile}','identities',2);
+    CREATE TABLE "${n}".campaign_entities(alias text PRIMARY KEY,user_id text UNIQUE NOT NULL,email text UNIQUE NOT NULL);
+    INSERT INTO "${n}".campaign_entities VALUES ${identityValues};
+    CREATE TABLE "${n}".campaign_records(table_name text NOT NULL,row_key jsonb NOT NULL,row_hash text NOT NULL,version bigint NOT NULL DEFAULT 1,deleted boolean NOT NULL DEFAULT false,PRIMARY KEY(table_name,row_key));
+    CREATE OR REPLACE FUNCTION "${n}".track_business() RETURNS trigger LANGUAGE plpgsql AS $fn$
+    DECLARE value jsonb; k jsonb; lifecycle text; bad text;
+    BEGIN
+      SELECT state INTO lifecycle FROM "${n}".campaign_manifest;
+      IF lifecycle='disposed' THEN RAISE EXCEPTION 'Campaign graph disposed'; END IF;
+      value := CASE WHEN TG_OP='DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END;
+      IF TG_OP='UPDATE' AND TG_TABLE_NAME IN ('dealerships','dealership_members') AND value->>'id' IN ('${rootId}') THEN
+        IF value->>'slug' IS DISTINCT FROM '${rootSlug}' OR value->>'contactPhone' IS DISTINCT FROM '${rootContact}' THEN RAISE EXCEPTION 'Synthetic root identity changed'; END IF;
+      END IF;
+      IF TG_OP IN ('INSERT','UPDATE') THEN
+        FOR k IN SELECT * FROM jsonb_each_text(value) LOOP
+          IF k.key IN ('businessId','dealershipId','sellerId','userId','buyerId','recipientUserId','senderId','blockerId','blockedId','conversationId','listingId','reporterUserId','actorId','assigneeId') AND k.value IS NOT NULL AND k.value <> '' AND k.value NOT IN (${ownedIds}) AND NOT (TG_TABLE_NAME='content_reports' AND k.key='reporterUserId') THEN
+            RAISE EXCEPTION 'Foreign campaign graph reference';
+          END IF;
+        END LOOP;
+      END IF;
+      IF TG_OP='UPDATE' AND EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=TG_TABLE_NAME AND row_key=jsonb_build_object('id',(to_jsonb(OLD)->>'id')) AND NOT deleted) THEN
+        IF TG_TABLE_NAME IN ('users','dealerships','dealership_members') AND (to_jsonb(OLD)->>'id') IN (${ownedIds}) AND TG_TABLE_NAME='users' AND value->>'email' IS DISTINCT FROM (to_jsonb(OLD)->>'email') THEN RAISE EXCEPTION 'Owned identity changed'; END IF;
+      END IF;
+      IF TG_OP='DELETE' THEN k=jsonb_build_object('id',value->>'id'); ELSE k=jsonb_build_object('id',value->>'id'); END IF;
+      INSERT INTO "${n}".campaign_records(table_name,row_key,row_hash,deleted) VALUES(TG_TABLE_NAME,k,md5(value::text),TG_OP='DELETE') ON CONFLICT(table_name,row_key) DO UPDATE SET row_hash=excluded.row_hash,version="${n}".campaign_records.version+1,deleted=excluded.deleted;
+      RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
+    END $fn$;
+    ${tables.map(table => `CREATE TRIGGER "${n}_${table}_business" AFTER INSERT OR UPDATE OR DELETE ON public.${table} FOR EACH ROW EXECUTE FUNCTION "${n}".track_business();`).join('\n')}`;
+  const audit = `INSERT INTO public.users(id,email,"displayName",role,"updatedAt") VALUES ${identities.map(identity => `('${identity.id}','${identity.email}','Campaign ${identity.alias}','buyer',now())`).join(',')};
+    INSERT INTO public.dealerships(id,slug,name,status,"admissionMode","contactPhone","updatedAt") VALUES('${rootId}','${rootSlug}','Campaign 897 synthetic business','recovery','synthetic','${rootContact}',now());
+    INSERT INTO public.dealership_members(id,"dealershipId","userId",role) VALUES('${uuid(`campaign897-business:${input.id}:membership:owner`)}','${rootId}','${owner.id}','owner');
+    INSERT INTO public.staff_grants("userId",capability) VALUES('${coordinator.id}','staff.manage'),('${coordinator.id}','founder.control');`;
+  const live = `SELECT count(*) FROM "${n}".campaign_records WHERE NOT deleted;`;
+  if (input.kind === 'fixture') {
+    if (exists) {
+      if (sql(`SELECT reservation_id||'|'||candidate||'|'||profile||'|'||delivery_version FROM "${n}".campaign_manifest;`) !== `${input.id}|${input.candidate}|${profile}|2`) throw new Error();
+      sql(`BEGIN; ${lock} ${binding} COMMIT;`);
+    } else {
+      if (sql(`SELECT count(*) FROM public.dealerships WHERE id='${rootId}' OR slug='${rootSlug}' OR "contactPhone"='${rootContact}'`) !== '0' || sql(`SELECT count(*) FROM public.users WHERE email IN (${identities.map(identity => `'${identity.email}'`).join(',')})`) !== '0') throw new Error();
+      sql(`BEGIN; ${lock} ${setup} ${audit} COMMIT;`);
+    }
+    console.log(JSON.stringify({ profile, state: 'identities', identities: identities.length, fixtures: 'present', tombstone: false }));
+    return;
+  }
+  if (input.kind !== 'reset') throw new Error();
+  if (!exists) { console.log(JSON.stringify({ profile, state: 'disposed', identities: 0, fixtures: 'absent', tombstone: true })); return; }
+  const state = sql(`SELECT state FROM "${n}".campaign_manifest;`);
+  if (state === 'disposed') { console.log(JSON.stringify({ profile, state, identities: 0, fixtures: 'absent', tombstone: true })); return; }
+  if (state === 'identities') sql(`BEGIN; ${lock} ${binding} UPDATE "${n}".campaign_manifest SET state='cleaning'; COMMIT;`);
+  const fkGuard = `DO $guard$ DECLARE fk record; found bigint; BEGIN
+    ${tables.map(table => `IF EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='public.${table}'::regclass AND tgname LIKE '${n}_${table.slice(0, 12)}%' AND NOT tgenabled='O') THEN RAISE EXCEPTION 'Missing campaign tracking'; END IF;`).join('\n')}
+    IF EXISTS(SELECT 1 FROM public.content_reports r WHERE r.target_id IN (SELECT row_key->>'id' FROM "${n}".campaign_records WHERE table_name='listings' AND NOT deleted) AND (r."reporterUserId" IS NULL OR r."reporterUserId" NOT IN (${ownedIds}))) THEN RAISE EXCEPTION 'Foreign polymorphic report'; END IF;
+    FOR fk IN SELECT conrelid::regclass source,confrelid::regclass target FROM pg_constraint WHERE contype='f' AND confrelid::regclass::text IN ('public.dealerships','public.users','public.listings','public.conversations') LOOP
+      IF fk.source::text NOT IN (${tables.map(table => `'public.${table}'`).concat("'public.staff_grants'").join(',')}) AND EXISTS(SELECT 1 FROM "${n}".campaign_records r WHERE NOT r.deleted AND r.table_name=replace(fk.target::text,'public.','s')) THEN RAISE EXCEPTION 'Unknown foreign reference'; END IF;
+    END LOOP;
+  END $guard$;`;
+  const deletes = [...tables].reverse().map(table => `DELETE FROM public.${table} t USING "${n}".campaign_records r WHERE r.table_name='${table}' AND NOT r.deleted AND t.id=r.row_key->>'id';`).join('\n');
+  sql(`BEGIN; ${lock} ${binding} ${fkGuard} ${deletes} UPDATE "${n}".campaign_records SET deleted=true; UPDATE "${n}".campaign_manifest SET state='disposed'; COMMIT;`);
+  console.log(JSON.stringify({ profile, state: 'disposed', identities: 0, fixtures: 'absent', tombstone: true }));
+}
+
 export async function campaignQueueMain(deliveries, observeOnly = false, binding) {
   let queue;
   try {
