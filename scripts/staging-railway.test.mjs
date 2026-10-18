@@ -120,3 +120,15 @@ test('campaign receipts bind profile and candidate and never masquerade as publi
     else await assert.rejects(platform.execute('fixture', lease, candidate), /campaign/);
   }
 });
+
+test('campaign fixture refuses mutation without the complete active deployment journal', async () => {
+  const id = '1'.repeat(32), candidate = 'a'.repeat(40);
+  const lease = { id, candidate, namespace: `cf_${id}`, identity: policy, fixtureProfile: 'campaign897-identities-v1' };
+  let remoteMutated = false;
+  const platform = new RailwayPlatform({ token: 'SECRET', authorization: `${id}:${candidate}`, fetch: boundary(), command: async () => {
+    remoteMutated = true;
+    return JSON.stringify({ fixtures: 'present', namespace: lease.namespace, profile: lease.fixtureProfile, candidate, state: 'identities', identities: 4, protectedReceipt: `${lease.namespace}.campaign_entities` });
+  } });
+  await assert.rejects(platform.execute('fixture', lease, candidate), /deployment/);
+  assert.equal(remoteMutated, false);
+});
