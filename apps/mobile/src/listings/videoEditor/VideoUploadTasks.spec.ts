@@ -7,11 +7,11 @@ import { server } from "../../../test/msw";
 import { storeAuthSession } from "../../auth/session";
 import { videoNativeStorage } from "../videoTransfer/testing/InMemoryVideoNativeStorage";
 
-import { VideoUploadTask } from "./VideoUploadTasks";
+import { VideoUploadTask, videoUploadTask, rebindPublishedVideo } from "./VideoUploadTasks";
 
 const boundary = vi.hoisted(() => ({ secure: new Map<string, string>(), nativeSelections: [] as unknown[], unavailable: false }));
 vi.mock("expo-secure-store", () => ({ getItemAsync: async (key: string) => boundary.secure.get(key) ?? null, setItemAsync: async (key: string, value: string) => { boundary.secure.set(key, value); }, deleteItemAsync: async (key: string) => { boundary.secure.delete(key); } }));
-vi.mock("@react-native-async-storage/async-storage", async () => { const { videoNativeStorage: storage } = await import("../videoTransfer/testing/InMemoryVideoNativeStorage"); return { default: { getItem: async (key: string) => storage.values.get(key) ?? null, setItem: async (key: string, value: string) => { storage.values.set(key, value); } } }; });
+vi.mock("@react-native-async-storage/async-storage", async () => { const { videoNativeStorage: storage } = await import("../videoTransfer/testing/InMemoryVideoNativeStorage"); return { default: { getItem: async (key: string) => storage.values.get(key) ?? null, setItem: async (key: string, value: string) => { storage.values.set(key, value); }, removeItem: async (key: string) => { storage.values.delete(key); } } }; });
 vi.mock("expo-file-system", async () => ({ File: (await import("../videoTransfer/testing/InMemoryVideoNativeStorage")).VideoNativeFile }));
 vi.mock("expo-crypto", async () => { const { webcrypto, randomUUID } = await import("node:crypto"); return { randomUUID, CryptoDigestAlgorithm: { SHA256: "SHA-256" }, digest: (algorithm: string, bytes: Uint8Array) => webcrypto.subtle.digest(algorithm, bytes) }; });
 vi.mock("expo", async () => ({ requireOptionalNativeModule: () => boundary.unavailable ? null : {
@@ -65,6 +65,18 @@ describe("native seller task uses actual preparation and transfer boundaries", (
   const recovering = task.recover(); await entered;
   await task.cancel(); release(); await recovering;
   expect(task.snapshot().phase).toBe("CANCELLED");
+ });
+ it("moves a processing draft journal to the published Listing without uploading again", async () => {
+  const task = videoUploadTask(ownerId, target);
+  await task.start({ sourceUri: "file:///library/selected.mov", startMs: 0, endMs: 3000 }, 0);
+  const listingId = "00000000-0000-4000-8000-000000000043";
+  await rebindPublishedVideo(ownerId, target.id, listingId);
+  state = "READY";
+  const published = videoUploadTask(ownerId, { kind: "listing", id: listingId });
+  await published.recover();
+  expect(published.snapshot()).toMatchObject({ phase: "READY", record: { target: { kind: "listing", id: listingId }, sessionId } });
+  expect(uploads).toBe(1);
+  expect(videoNativeStorage.values.has(`listing-video-transfer:v1:${ownerId}:draft:${target.id}`)).toBe(false);
  });
  it("reports an unavailable native preparation module without sending an original", async () => {
   boundary.unavailable = true;
