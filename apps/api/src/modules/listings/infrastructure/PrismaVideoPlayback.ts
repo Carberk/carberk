@@ -9,7 +9,7 @@ import { VideoManifestGateway } from "./VideoManifestGateway";
 export const VIDEO_GRANT_SECRET_FACTORY = Symbol("VideoGrantSecretFactory");
 export const VIDEO_PLAYBACK_ELIGIBILITY = Symbol("VideoPlaybackEligibility");
 export interface VideoPlaybackEligibility { isEligible(userId: string): boolean; }
-const manifestSchema = z.object({ assets: z.array(z.object({ path: z.string().max(256), purpose: z.enum(["poster", "playback"]), key: z.string().max(512), sizeBytes: z.number().int().positive().max(100 * 1024 * 1024), contentType: z.enum(["application/vnd.apple.mpegurl", "video/mp2t", "video/mp4", "image/webp", "image/jpeg"]) }).strict()).min(1).max(1024) }).strict();
+const manifestSchema = z.object({ assets: z.array(z.object({ path: z.string().max(256), purpose: z.enum(["poster", "playback"]), key: z.string().max(512), sha256: z.string().regex(/^[a-f0-9]{64}$/).optional(), sizeBytes: z.number().int().positive().max(100 * 1024 * 1024), contentType: z.enum(["application/vnd.apple.mpegurl", "video/mp2t", "video/mp4", "image/webp", "image/jpeg"]) }).strict()).min(1).max(1024) }).strict();
 
 /** Legacy unbound grants deny. This never selects a newest generation or public URL. */
 @Injectable()
