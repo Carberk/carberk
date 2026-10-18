@@ -113,3 +113,27 @@ export class ListingVideoRemovalController {
     }
   }
 }
+
+@UseFilters(VideoUploadErrorFilter)
+@Controller("api/v1/listing-video-targets")
+export class VideoTargetController {
+  constructor(@Inject(OWNED_VIDEO_UPLOAD_PROTOCOL) private readonly protocol: OwnedVideoUploadProtocol, @Inject(VideoEligibility) private readonly eligibility: VideoEligibility) {}
+  private actor(req: FastifyRequest, kind: string, id: string) {
+    const actor = inventoryActor(req);
+    if (!actor.sessionId) throw new UnauthorizedException();
+    this.eligibility.assertEligible(actor.userId);
+    if (!["listing", "draft"].includes(kind) || !z.string().uuid().safeParse(id).success) throw new BadRequestException({ code: "VIDEO_SESSION_INVALID" });
+    return actor;
+  }
+  @Get(":kind/:id")
+  @Header("Cache-Control", "private, no-store")
+  async state(@Req() req: FastifyRequest, @Param("kind") kind: "draft" | "listing", @Param("id") id: string) {
+    return this.protocol.targetState(this.actor(req, kind, id), kind, id);
+  }
+  @Delete("listing/:id/pending")
+  @HttpCode(204)
+  @Header("Cache-Control", "private, no-store")
+  async cancelPending(@Req() req: FastifyRequest, @Param("id") id: string) {
+    return this.protocol.cancelPending(this.actor(req, "listing", id), id);
+  }
+}

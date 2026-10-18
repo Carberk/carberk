@@ -15,6 +15,8 @@ export class InMemoryOwnedVideoSessionLedger implements OwnedVideoSessionLedger 
     this.session ??= { id: "00000000-0000-4000-8000-000000000001", uploadId: "00000000-0000-4000-8000-000000000002", generationId: "00000000-0000-4000-8000-000000000003", state: "INITIALIZING", expiresAt: new Date("2026-10-24T00:00:00Z"), storageUploadId: null, sizeBytes: input.prepared.sizeBytes, completionFence: null };
     return { session: structuredClone(this.session), initialize };
   }
+  async targetState() { return { active: null, pending: this.session ? { sessionId: this.session.id, state: this.session.state } : null }; }
+  async cancelPending() { this.cancelled = true; }
   async removeListing(_actor: ListingActor, _listingId: string) { this.cancelled = true; }
   async read(_actor: ListingActor, _id: string) {
     if (!this.session || this.cancelled) throw new Error("VIDEO_SESSION_UNAVAILABLE");
