@@ -190,3 +190,29 @@ test('release preserves retained migration disposition for the next reservation'
   const history=(await control.inspect()).history.at(-1);assert.ok(history.migrations[0].checksum);
   await claim();assert.deepEqual((await control.inspect()).reservation.expectedMigrations,history.migrations);
 });
+
+test('campaign profile is explicit, durable before the first side effect and cannot replace a narrow fixture', async (t) => {
+  const { control, ledger, platform, claim } = await setup(t); const lease = await claim();
+  for (const profile of ['campaign897', '', { profile: 'campaign897-identities-v1', sql: 'unsafe' }])
+    await assert.rejects(control.operate(lease, 'fixture', profile), /profile/);
+  assert.deepEqual(platform.operations, []);
+  const execute = platform.execute.bind(platform);
+  platform.execute = async (...args) => {
+    const state = (await ledger.read()).state.reservation;
+    assert.equal(state.fixtureProfile, 'campaign897-identities-v1');
+    assert.equal(state.operation.profile, 'campaign897-identities-v1');
+    return { ...await execute(...args), profile: state.fixtureProfile, state: 'identities', fixtures: 'present', identities: 4,
+      protectedReceipt: `${state.namespace}.campaign_entities` };
+  };
+  const receipt = await control.operate(lease, 'fixture', 'campaign897-identities-v1');
+  assert.equal(receipt.profile, 'campaign897-identities-v1');
+  assert.equal(receipt.protectedReceipt, `cf_${lease.id}.campaign_entities`);
+  assert.equal((await control.inspect()).reservation.evidence.at(-1).profile, 'campaign897-identities-v1');
+  await assert.rejects(control.operate(lease, 'fixture', 'listing-v1'), /profile/);
+});
+
+test('a completed narrow fixture cannot silently become campaign identities', async (t) => {
+  const { control, claim } = await setup(t); const lease = await claim();
+  await control.operate(lease, 'fixture');
+  await assert.rejects(control.operate(lease, 'fixture', 'campaign897-identities-v1'), /profile/);
+});
