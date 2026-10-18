@@ -1,11 +1,9 @@
 import { assert, describe, expect, it } from "vitest";
 
-import type { OtpRequest, SignInCodePurpose } from "../domain/OtpRequest";
 import type { User } from "../domain/User";
-import type { SignInCodeChannel } from "../domain/types";
 import type { ClockPort } from "../domain/ports/ClockPort";
 import type { EmailCodeSenderPort } from "../domain/ports/EmailCodeSenderPort";
-import type { OtpRequestRepository } from "../domain/ports/OtpRequestRepository";
+import { InMemoryOtpRequests } from "./testing/InMemoryOtpRequests";
 import type { OtpSenderPort, OtpSms } from "../domain/ports/OtpSenderPort";
 import type { SignInMethodRepository } from "../domain/ports/SignInMethodRepository";
 import { SignInCodeRateLimitedError } from "../domain/SignInCodeRateLimitedError";
@@ -33,56 +31,6 @@ function makeUser(methods: Pick<User, "phone" | "email">): User {
   };
 }
 
-class FakeOtpRepo implements OtpRequestRepository {
-  records: OtpRequest[] = [];
-  destinationCount = 0;
-  ipCount = 0;
-  countedIp: string | null = null;
-
-  async create(input: {
-    purpose: SignInCodePurpose;
-    channel: SignInCodeChannel;
-    destination: string;
-    codeHash: string;
-    expiresAt: Date;
-    userId: string | null;
-    ip: string;
-  }): Promise<OtpRequest> {
-    const record: OtpRequest = {
-      id: `request-${this.records.length + 1}`,
-      ...input,
-      verifiedAt: null,
-      attempts: 0,
-      createdAt: NOW,
-    };
-    this.records.push(record);
-    return record;
-  }
-
-  async findLatestByDestination(
-    channel: SignInCodeChannel,
-    destination: string,
-  ): Promise<OtpRequest | null> {
-    return this.records.findLast(
-      (record) => record.channel === channel && record.destination === destination,
-    ) ?? null;
-  }
-
-  async countByDestinationSince(): Promise<number> {
-    return this.destinationCount;
-  }
-
-  async countByIpSince(ip: string): Promise<number> {
-    this.countedIp = ip;
-    return this.ipCount;
-  }
-
-  async findById(): Promise<OtpRequest | null> { return null; }
-  async findLatestForPurpose(): Promise<OtpRequest | null> { return null; }
-  async consumeIfUnused(): Promise<boolean> { throw new Error("unused"); }
-  async markVerified(): Promise<OtpRequest> { throw new Error("unused"); }
-  async incrementAttempts(): Promise<OtpRequest> { throw new Error("unused"); }
-}
 
 class FakeUsers implements SignInMethodRepository {
   constructor(private readonly users: User[] = []) {}
@@ -100,7 +48,7 @@ class FakeUsers implements SignInMethodRepository {
 }
 
 function setup(users: User[] = [], testMode = true) {
-  const otpRepo = new FakeOtpRepo();
+  const otpRepo = new InMemoryOtpRequests(() => NOW);
   const sms: OtpSms[] = [];
   const emails: Array<Parameters<EmailCodeSenderPort["enqueue"]>[0]> = [];
   const otpSender: OtpSenderPort = {
@@ -119,6 +67,18 @@ function setup(users: User[] = [], testMode = true) {
     emailSender,
   );
   return { useCase, otpRepo, sms, emails };
+}
+
+function seedLimits(repo: InMemoryOtpRequests, destinationCount: number, ipCount: number,
+  destination = "+99361234567", channel: "phone" | "email" = "phone") {
+  for (let i = 0; i < destinationCount; i++) repo.seed({
+    purpose: "sign-in", channel, destination, codeHash: "old", ip: "other-ip",
+    createdAt: new Date(NOW.getTime() - 2 * 60 * 60_000),
+  });
+  for (let i = 0; i < ipCount; i++) repo.seed({
+    purpose: "sign-in-method", channel: "email", destination: `other-${i}@example.com`,
+    codeHash: "old", ip: "10.0.0.9", createdAt: new Date(NOW.getTime() - 60_000),
+  });
 }
 
 describe("RequestAccountDeletion", () => {
@@ -153,7 +113,7 @@ describe("RequestAccountDeletion", () => {
       makeUser({ phone: null, email: "seller@example.com" }),
     ]);
 
-    await useCase.execute({
+    const result = await useCase.execute({
       email: " Seller@Example.COM ",
       ip: "10.0.0.1",
       locale: "tk",
@@ -167,7 +127,7 @@ describe("RequestAccountDeletion", () => {
     });
     expect(emails).toEqual([
       expect.objectContaining({
-        requestId: "request-1",
+        requestId: result.requestId,
         email: "seller@example.com",
         locale: "tk",
         purpose: "account-deletion",
@@ -197,29 +157,27 @@ describe("RequestAccountDeletion", () => {
 
   it("refuses a request over the per-destination budget without sending", async () => {
     const { useCase, otpRepo, sms } = setup();
-    otpRepo.destinationCount = 5;
+    seedLimits(otpRepo, 5, 0);
 
     await expect(
       useCase.execute({ phone: "+99361234567", ip: "10.0.0.1" }),
     ).rejects.toMatchObject({ reason: "DESTINATION_LIMIT", retryInSeconds: 0 });
-    expect(otpRepo.records).toHaveLength(0);
+    expect(otpRepo.records).toHaveLength(5);
     expect(sms).toHaveLength(0);
   });
 
   it("refuses a request over the shared per-IP budget", async () => {
     const { useCase, otpRepo, emails } = setup();
-    otpRepo.ipCount = 10;
+    seedLimits(otpRepo, 0, 10);
 
     await expect(
       useCase.execute({ email: "seller@example.com", ip: "10.0.0.9" }),
     ).rejects.toMatchObject({ reason: "IP_LIMIT", retryInSeconds: 0 });
-    expect(otpRepo.countedIp).toBe("10.0.0.9");
     expect(emails).toHaveLength(0);
   });
 
   it("applies the shared cooldown after an earlier code for the same destination", async () => {
     const { useCase, otpRepo } = setup();
-    otpRepo.destinationCount = 1;
     await otpRepo.create({
       purpose: "sign-in",
       channel: "phone",
@@ -250,8 +208,8 @@ describe("RequestAccountDeletion", () => {
       const destination = methods.phone ? { phone: methods.phone } : { email: methods.email ?? "" };
       const refusals: unknown[] = [];
       for (const scenario of [held, unheld]) {
-        scenario.otpRepo.destinationCount = limit.destinationCount;
-        scenario.otpRepo.ipCount = limit.ipCount;
+        seedLimits(scenario.otpRepo, limit.reason === "BACKOFF" ? 0 : limit.destinationCount,
+          limit.ipCount, methods.phone ?? methods.email ?? "", methods.phone ? "phone" : "email");
         if (limit.reason === "BACKOFF") {
           const earlier = await scenario.otpRepo.create({
             purpose: "sign-in",
@@ -269,7 +227,7 @@ describe("RequestAccountDeletion", () => {
         }
         const before = scenario.otpRepo.records.length;
         const refusal: unknown = await scenario.useCase
-          .execute({ ...destination, ip: "10.0.0.1" })
+          .execute({ ...destination, ip: "10.0.0.9" })
           .catch((error: unknown) => error);
         expect(refusal).toBeInstanceOf(SignInCodeRateLimitedError);
         expect(refusal).toMatchObject({ reason: limit.reason, retryInSeconds: limit.retryInSeconds });

@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import type { User } from "../domain/User";
-import type { SignInCodeChannel } from "../domain/types";
 import type { ClockPort } from "../domain/ports/ClockPort";
 import type { EmailCodeSenderPort } from "../domain/ports/EmailCodeSenderPort";
-import type { OtpRequest, SignInCodePurpose } from "../domain/OtpRequest";
-import type { OtpRequestRepository } from "../domain/ports/OtpRequestRepository";
+import { InMemoryOtpRequests } from "./testing/InMemoryOtpRequests";
 import type { OtpSenderPort, OtpSms } from "../domain/ports/OtpSenderPort";
 import type { SignInMethodRepository } from "../domain/ports/SignInMethodRepository";
 import { SignInCodeRateLimitedError } from "../domain/SignInCodeRateLimitedError";
@@ -30,68 +28,6 @@ function user(methods: Pick<User, "phone" | "phoneVerifiedAt" | "email" | "email
   };
 }
 
-class FakeOtpRepo implements OtpRequestRepository {
-  records: OtpRequest[] = [];
-
-  async create(input: {
-    purpose: SignInCodePurpose;
-    channel: SignInCodeChannel;
-    destination: string;
-    codeHash: string;
-    expiresAt: Date;
-    userId: string | null;
-    ip: string;
-  }): Promise<OtpRequest> {
-    const record: OtpRequest = {
-      id: `request-${this.records.length + 1}`,
-      ...input,
-      verifiedAt: null,
-      attempts: 0,
-      createdAt: NOW,
-    };
-    this.records.push(record);
-    return record;
-  }
-
-  async findById(id: string): Promise<OtpRequest | null> {
-    return this.records.find((record) => record.id === id) ?? null;
-  }
-
-  async findLatestByDestination(
-    channel: SignInCodeChannel,
-    destination: string,
-  ): Promise<OtpRequest | null> {
-    return this.records.findLast(
-      (record) => record.channel === channel && record.destination === destination,
-    ) ?? null;
-  }
-
-  async findLatestForPurpose(): Promise<OtpRequest | null> { throw new Error("unused"); }
-
-  async countByDestinationSince(
-    channel: SignInCodeChannel,
-    destination: string,
-    since: Date,
-  ): Promise<number> {
-    return this.records.filter(
-      (record) =>
-        record.channel === channel &&
-        record.destination === destination &&
-        record.createdAt >= since,
-    ).length;
-  }
-
-  async countByIpSince(ip: string, since: Date): Promise<number> {
-    return this.records.filter(
-      (record) => record.ip === ip && record.createdAt >= since,
-    ).length;
-  }
-
-  async consumeIfUnused(): Promise<boolean> { throw new Error("unused"); }
-
-  async markVerified(): Promise<OtpRequest> { throw new Error("unused"); }
-  async incrementAttempts(): Promise<OtpRequest> { throw new Error("unused"); }
-}
 
 class FakeUsers implements SignInMethodRepository {
   constructor(readonly current: User | null) {}
@@ -102,7 +38,7 @@ class FakeUsers implements SignInMethodRepository {
 }
 
 function harness(current: User | null) {
-  const otpRepo = new FakeOtpRepo();
+  const otpRepo = new InMemoryOtpRequests(() => NOW);
   const sms: OtpSms[] = [];
   const email: Array<Parameters<EmailCodeSenderPort["enqueue"]>[0]> = [];
   const smsSender: OtpSenderPort = {
@@ -171,7 +107,7 @@ describe("RequestSignInMethodChange", () => {
     });
 
     expect(email).toEqual([{
-      requestId: "request-1",
+      requestId: result.requestId,
       email: "buyer@example.com",
       code: result.testCode,
       locale: "en",

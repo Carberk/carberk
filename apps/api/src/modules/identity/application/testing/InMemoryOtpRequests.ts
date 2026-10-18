@@ -1,3 +1,6 @@
+import type { ClockPort } from "../../domain/ports/ClockPort";
+import { OtpAttemptLedger, SIGN_IN_CODE_RATE_POLICY } from "../../domain/OtpAttemptLedger";
+import { SignInCodeRateLimitedError } from "../../domain/SignInCodeRateLimitedError";
 import type { OtpRequest, SignInCodePurpose } from "../../domain/OtpRequest";
 import type { OtpRequestRepository } from "../../domain/ports/OtpRequestRepository";
 import type { SignInCodeChannel } from "../../domain/types";
@@ -23,6 +26,33 @@ export class InMemoryOtpRequests implements OtpRequestRepository {
     };
     this.records.push(stored);
     return stored;
+  }
+
+  // Sequential policy fake only. PostgreSQL contention is proved by the e2e suite.
+  async reserve(
+    input: Parameters<OtpRequestRepository["reserve"]>[0],
+    clock: ClockPort,
+  ): ReturnType<OtpRequestRepository["reserve"]> {
+    const now = clock.now();
+    const { destination } = input;
+    const rateCheck = new OtpAttemptLedger(
+      SIGN_IN_CODE_RATE_POLICY.destinationLimit,
+      SIGN_IN_CODE_RATE_POLICY.ipLimit,
+      SIGN_IN_CODE_RATE_POLICY.baseBackoffSeconds,
+    ).check({
+      destinationCount24h: await this.countByDestinationSince(destination.channel, destination.value,
+        new Date(now.getTime() - SIGN_IN_CODE_RATE_POLICY.destinationWindowMs)),
+      ipCount1h: await this.countByIpSince(input.ip,
+        new Date(now.getTime() - SIGN_IN_CODE_RATE_POLICY.ipWindowMs)),
+      lastAttemptAt: (await this.findLatestByDestination(destination.channel, destination.value))?.createdAt ?? null,
+      now,
+    });
+    if (!rateCheck.allowed) throw new SignInCodeRateLimitedError(rateCheck);
+    const record = await this.create({ ...input, channel: destination.channel,
+      destination: destination.value, expiresAt: destination.expiresAt(now) });
+    const admitted = { ...record, createdAt: now };
+    this.records[this.records.indexOf(record)] = admitted;
+    return { record: admitted, resendInSeconds: rateCheck.resendInSeconds };
   }
 
   async create(input: {
@@ -54,7 +84,8 @@ export class InMemoryOtpRequests implements OtpRequestRepository {
     channel: SignInCodeChannel,
     destination: string,
   ): Promise<OtpRequest | null> {
-    return this.records.findLast((r) => r.channel === channel && r.destination === destination) ?? null;
+    return this.records.filter((r) => r.channel === channel && r.destination === destination)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null;
   }
 
   async findLatestForPurpose(input: {

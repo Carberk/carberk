@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type {
-  OtpRequest,
-  SignInCodeChannel,
-  SignInCodePurpose,
-} from "../domain/OtpRequest";
-import type { OtpRequestRepository } from "../domain/ports/OtpRequestRepository";
+import { InMemoryOtpRequests } from "./testing/InMemoryOtpRequests";
 import type { OtpSenderPort, OtpSms } from "../domain/ports/OtpSenderPort";
 import type { EmailCodeSenderPort } from "../domain/ports/EmailCodeSenderPort";
 import type { ClockPort } from "../domain/ports/ClockPort";
@@ -28,70 +23,6 @@ class FakeClock implements ClockPort {
   }
 }
 
-class FakeOtpRequestRepository implements OtpRequestRepository {
-  records: OtpRequest[] = [];
-  private idCounter = 0;
-  constructor(private readonly clock: ClockPort) {}
-
-  async create(input: {
-    purpose: SignInCodePurpose;
-    channel: SignInCodeChannel;
-    destination: string;
-    codeHash: string;
-    expiresAt: Date;
-    userId: string | null;
-    ip: string;
-  }): Promise<OtpRequest> {
-    const record: OtpRequest = {
-      id: `00000000-0000-4000-8000-${String(++this.idCounter).padStart(12, "0")}`,
-      ...input,
-      verifiedAt: null,
-      attempts: 0,
-      createdAt: this.clock.now(),
-    };
-    this.records.push(record);
-    return record;
-  }
-
-  async findById(id: string): Promise<OtpRequest | null> {
-    return this.records.find((record) => record.id === id) ?? null;
-  }
-
-  async findLatestByDestination(
-    channel: SignInCodeChannel,
-    destination: string,
-  ): Promise<OtpRequest | null> {
-    return this.records
-      .filter((record) => record.channel === channel && record.destination === destination)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null;
-  }
-
-  async findLatestForPurpose(): Promise<OtpRequest | null> { throw new Error("unused"); }
-
-  async countByDestinationSince(
-    channel: SignInCodeChannel,
-    destination: string,
-    since: Date,
-  ): Promise<number> {
-    return this.records.filter(
-      (record) =>
-        record.channel === channel &&
-        record.destination === destination &&
-        record.createdAt >= since,
-    ).length;
-  }
-
-  async countByIpSince(ip: string, since: Date): Promise<number> {
-    return this.records.filter(
-      (record) => record.ip === ip && record.createdAt >= since,
-    ).length;
-  }
-
-  async consumeIfUnused(): Promise<boolean> { throw new Error("unused"); }
-
-  async markVerified(): Promise<OtpRequest> { throw new Error("unused"); }
-  async incrementAttempts(): Promise<OtpRequest> { throw new Error("unused"); }
-}
 
 class FakeOtpSender implements OtpSenderPort {
   sent: OtpSms[] = [];
@@ -123,7 +54,7 @@ function harness(options: {
   reviewerConfig?: ReviewerOtpBypassConfig;
 } = {}) {
   const clock = new FakeClock();
-  const repo = new FakeOtpRequestRepository(clock);
+  const repo = new InMemoryOtpRequests(() => clock.now());
   const sms = new FakeOtpSender();
   const email = new FakeEmailCodeSender();
   const useCase = new RequestOtp(
@@ -424,5 +355,76 @@ describe("RequestOtp", () => {
     await expect(
       disabled.useCase.execute({ email: "two@example.com", ip: "127.0.0.1" }),
     ).resolves.not.toHaveProperty("testCode");
+  });
+});
+
+describe("code reservation boundaries", () => {
+  it.each([
+    { ageMs: 86_400_000, allowed: false },
+    { ageMs: 86_400_001, allowed: true },
+  ])("counts the rolling destination lower bound inclusively at $ageMs ms", async ({ ageMs, allowed }) => {
+    const { repo, useCase, sms } = harness();
+    for (let i = 0; i < 5; i++) repo.seed({
+      purpose: "account-deletion", destination: "+99361234567", codeHash: "old",
+      createdAt: new Date(START.getTime() - ageMs), verifiedAt: START, expiresAt: START,
+    });
+    const result = useCase.execute({ phone: "+99361234567", ip: "fresh-ip" });
+    if (allowed) await expect(result).resolves.toMatchObject({ resendInSeconds: 60 });
+    else await expect(result).rejects.toMatchObject({ reason: "DESTINATION_LIMIT", retryInSeconds: 0 });
+    expect(repo.records).toHaveLength(allowed ? 6 : 5);
+    expect(sms.sent).toHaveLength(allowed ? 1 : 0);
+  });
+
+  it.each([
+    { ageMs: 3_600_000, allowed: false },
+    { ageMs: 3_600_001, allowed: true },
+  ])("counts the shared IP lower bound inclusively at $ageMs ms", async ({ ageMs, allowed }) => {
+    const { repo, useCase, email } = harness();
+    for (let i = 0; i < 10; i++) repo.seed({
+      purpose: "listing-contact-phone", destination: `historical-${i}`, codeHash: "old", ip: "same-ip",
+      createdAt: new Date(START.getTime() - ageMs), verifiedAt: START, expiresAt: START,
+    });
+    const result = useCase.execute({ email: "fresh@example.com", ip: "same-ip" });
+    if (allowed) await expect(result).resolves.toMatchObject({ resendInSeconds: 60 });
+    else await expect(result).rejects.toMatchObject({ reason: "IP_LIMIT", retryInSeconds: 0 });
+    expect(repo.records).toHaveLength(allowed ? 11 : 10);
+    expect(email.jobs).toHaveLength(allowed ? 1 : 0);
+  });
+
+  it.each([
+    { ageMs: 59_999, allowed: false },
+    { ageMs: 60_000, allowed: true },
+  ])("ends the shared cooldown exactly at 60 seconds, age $ageMs ms", async ({ ageMs, allowed }) => {
+    const { repo, useCase } = harness();
+    repo.seed({ purpose: "sign-in-method", destination: "+99361234567", codeHash: "old",
+      createdAt: new Date(START.getTime() - ageMs) });
+    const result = useCase.execute({ phone: "+99361234567", ip: "fresh-ip" });
+    if (allowed) await expect(result).resolves.toMatchObject({ resendInSeconds: 120 });
+    else await expect(result).rejects.toMatchObject({ reason: "BACKOFF", retryInSeconds: 1 });
+    expect(repo.records).toHaveLength(allowed ? 2 : 1);
+  });
+
+  it("keeps destination refusal priority over IP exhaustion and cooldown", async () => {
+    const { repo, useCase } = harness();
+    for (let i = 0; i < 10; i++) repo.seed({
+      purpose: "account-deletion", destination: i < 5 ? "+99361234567" : `other-${i}`,
+      codeHash: "old", ip: "same-ip",
+    });
+    await expect(useCase.execute({ phone: "+99361234567", ip: "same-ip" }))
+      .rejects.toMatchObject({ reason: "DESTINATION_LIMIT", retryInSeconds: 0 });
+    expect(repo.records).toHaveLength(10);
+  });
+
+  it.each(["phone", "email"] as const)("keeps the %s reservation counted when delivery fails", async (channel) => {
+    const { repo, useCase, sms, email } = harness();
+    const failure = new Error("transport unavailable");
+    if (channel === "phone") sms.send = async () => { throw failure; };
+    else email.enqueue = async () => { throw failure; };
+    const destination = channel === "phone" ? { phone: "+99361234567" } : { email: "buyer@example.com" };
+    await expect(useCase.execute({ ...destination, ip: "same-ip" })).rejects.toBe(failure);
+    expect(repo.records).toHaveLength(1);
+    await expect(useCase.execute({ ...destination, ip: "same-ip" }))
+      .rejects.toMatchObject({ reason: "BACKOFF", retryInSeconds: 60 });
+    expect(repo.records).toHaveLength(1);
   });
 });

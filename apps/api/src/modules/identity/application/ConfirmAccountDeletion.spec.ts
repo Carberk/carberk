@@ -50,6 +50,8 @@ function hash(code: string): string {
 }
 
 class FakeOtpRepo implements OtpRequestRepository {
+  async reserve(): ReturnType<OtpRequestRepository["reserve"]> { throw new Error("unused"); }
+
   records: OtpRequest[] = [];
   consumed: string[] = [];
 
