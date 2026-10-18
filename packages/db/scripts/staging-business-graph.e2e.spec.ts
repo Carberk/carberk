@@ -100,11 +100,11 @@ describe("reservation-owned synthetic business v2 storage graph, without admissi
     const { actor, business } = seeded;
     const car = await db.listing.create({ data: listing(randomUUID(), actor("owner"), business.id) });
     const draft = await db.listingDraft.create({ data: { userId: actor("owner"), businessId: business.id, payload: { description: "Unpublished synthetic draft", media: [] } } });
-    const conversation = await db.conversation.create({ data: { businessId: business.id, listingId: car.id, buyerId: actor("buyer-a"), sellerId: actor("owner") } });
+    const conversation = await db.conversation.create({ data: { businessId: business.id, listingId: car.id, buyerId: actor("buyer-a"), sellerId: actor("owner"), enquiryState: "closed", version: 1 } });
     await db.conversationParticipant.createMany({ data: ["buyer-a", "owner"].map(alias => ({ conversationId: conversation.id, userId: actor(alias) })) });
     const message = await db.message.create({ data: { conversationId: conversation.id, senderId: actor("buyer-a"), kind: "text", body: "Synthetic enquiry" } });
     await db.conversation.update({ where: { id: conversation.id }, data: { lastMessageId: message.id, firstBuyerMessageId: message.id } });
-    await db.businessEnquiryAudit.create({ data: { conversationId: conversation.id, version: 0, actorId: actor("owner"), action: "closed", enquiryState: "closed" } });
+    await db.businessEnquiryAudit.create({ data: { conversationId: conversation.id, version: 1, actorId: actor("owner"), action: "closed", enquiryState: "closed" } });
     await db.favorite.create({ data: { userId: actor("buyer-b"), listingId: car.id } });
     // Storage-only invitation hash, never issued/redeemed as a credential.
     const invitation = await db.dealershipInvitation.create({ data: { dealershipId: business.id, recipientUserId: actor("sales-a"), tokenHash: randomUUID(), expiresAt: new Date("2099-01-01T00:00:00Z") } });
