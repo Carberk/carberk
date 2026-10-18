@@ -29,6 +29,18 @@ beforeEach(async () => {
   );
 });
 describe("prepared video resumable foreground transfer", () => {
+  it("persists a later Pause after one journal write fails", async () => {
+    const save = device.save.bind(device);
+    let writes = 0;
+    device.save = async record => { writes++; if (writes === 1) throw new Error("DISK_FULL"); await save(record); };
+    const transfer = new VideoTransfer(device);
+    await expect(transfer.pause()).rejects.toThrow("DISK_FULL");
+    await transfer.pause();
+    expect(writes).toBe(2);
+    expect(device.record?.state).toBe("PAUSED");
+    await new VideoTransfer(device).run();
+    expect(puts).toEqual([]);
+  });
   it("retries a lost create response with the same idempotency key and completes one session", async () => {
     let creates = 0;
     server.use(http.post(base, async ({ request }) => {

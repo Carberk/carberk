@@ -11,9 +11,9 @@ import { videoNativeStorage } from "../videoTransfer/testing/InMemoryVideoNative
 
 import { VideoUploadTask, videoUploadTask, rebindPublishedVideo, pauseVideoUploads } from "./VideoUploadTasks";
 
-const boundary = vi.hoisted(() => ({ secure: new Map<string, string>(), nativeSelections: [] as unknown[], unavailable: false }));
+const boundary = vi.hoisted(() => ({ secure: new Map<string, string>(), nativeSelections: [] as unknown[], unavailable: false, journalWrites: 0, failJournalWrite: false }));
 vi.mock("expo-secure-store", () => ({ getItemAsync: async (key: string) => boundary.secure.get(key) ?? null, setItemAsync: async (key: string, value: string) => { boundary.secure.set(key, value); }, deleteItemAsync: async (key: string) => { boundary.secure.delete(key); } }));
-vi.mock("@react-native-async-storage/async-storage", async () => { const { videoNativeStorage: storage } = await import("../videoTransfer/testing/InMemoryVideoNativeStorage"); return { default: { getItem: async (key: string) => storage.values.get(key) ?? null, setItem: async (key: string, value: string) => { storage.values.set(key, value); }, removeItem: async (key: string) => { storage.values.delete(key); } } }; });
+vi.mock("@react-native-async-storage/async-storage", async () => { const { videoNativeStorage: storage } = await import("../videoTransfer/testing/InMemoryVideoNativeStorage"); return { default: { getItem: async (key: string) => storage.values.get(key) ?? null, setItem: async (key: string, value: string) => { boundary.journalWrites++; if (boundary.failJournalWrite) { boundary.failJournalWrite = false; throw new Error("DISK_FULL"); } storage.values.set(key, value); }, removeItem: async (key: string) => { storage.values.delete(key); } } }; });
 vi.mock("expo-file-system", async () => ({ File: (await import("../videoTransfer/testing/InMemoryVideoNativeStorage")).VideoNativeFile }));
 vi.mock("expo-crypto", async () => { const { webcrypto, randomUUID } = await import("node:crypto"); return { randomUUID, CryptoDigestAlgorithm: { SHA256: "SHA-256" }, digest: (algorithm: string, bytes: Uint8Array) => webcrypto.subtle.digest(algorithm, bytes) }; });
 vi.mock("expo", async () => ({ requireOptionalNativeModule: () => boundary.unavailable ? null : {
@@ -30,7 +30,7 @@ const base = "http://localhost:3006/api/v1/listing-video-upload-sessions";
 let state: string, complete: boolean, uploads: number, createBody: unknown;
 const snapshot = () => ({ version: 1, sessionId, generation: sessionId, state, expiresAt: "2099-01-01T00:00:00Z", partBytes: 5242880, partCount: 1, parts: complete ? [{ partNumber: 1, sizeBytes: 4, etag: "opaque" }] : [] });
 beforeEach(async () => {
- boundary.secure.clear(); boundary.nativeSelections = []; boundary.unavailable = false; videoNativeStorage.files.clear(); videoNativeStorage.values.clear(); state = "UPLOADING"; complete = false; uploads = 0;
+ boundary.journalWrites = 0; boundary.failJournalWrite = false; boundary.secure.clear(); boundary.nativeSelections = []; boundary.unavailable = false; videoNativeStorage.files.clear(); videoNativeStorage.values.clear(); state = "UPLOADING"; complete = false; uploads = 0;
  await storeAuthSession({ accessToken: "synthetic", refreshToken: "synthetic-refresh", user: { id: ownerId, phone: null, email: null, displayName: null, role: "buyer" } });
  server.use(
   http.post(base, async ({ request }) => { createBody = await request.json(); return HttpResponse.json(snapshot(), { status: 201 }); }),
@@ -44,6 +44,20 @@ beforeEach(async () => {
  );
 });
 describe("native seller task uses actual preparation and transfer boundaries", () => {
+ it("recovers durable preparation after one journal failure instead of poisoning later saves", async () => {
+  const task = new VideoUploadTask(ownerId, target);
+  boundary.failJournalWrite = true;
+  await task.start({ sourceUri: "file:///library/selected.mov", startMs: 0, endMs: 3000 }, 0);
+  expect(task.snapshot().phase).toBe("FAILED");
+  expect(boundary.journalWrites).toBe(1);
+  await task.start({ sourceUri: "file:///library/selected.mov", startMs: 0, endMs: 3000 }, 0);
+  expect(task.snapshot().phase).toBe("PROCESSING");
+  expect(boundary.journalWrites).toBeGreaterThan(1);
+  await task.pause();
+  const reopened = new VideoUploadTask(ownerId, target);
+  await reopened.recover();
+  expect(reopened.snapshot().phase).toBe("PROCESSING");
+ });
  it("prepares the chosen interval, uses a relative poster, and uploads only staged bytes", async () => {
   const task = new VideoUploadTask(ownerId, target);
   await task.start({ sourceUri: "file:///library/selected.mov", startMs: 1000, endMs: 4000 }, 2000);
