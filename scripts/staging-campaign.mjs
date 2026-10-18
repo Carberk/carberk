@@ -257,7 +257,7 @@ export function businessMain(input, { sql, uuid, exists }) {
       WHERE t.tgname='${n}_business' AND t.tgenabled='O' AND t.tgtype=29 AND t.tgqual IS NULL AND t.tgnargs=0 AND t.tgattr=''::int2vector AND t.tgconstraint=0 AND NOT t.tgdeferrable AND NOT t.tgisinternal AND ns.nspname='${n}' AND p.proname='track_business' AND t.tgrelid IN (${relationIds}))<>${tables.length}
       THEN RAISE EXCEPTION 'Missing campaign tracking'; END IF;
     FOR entry IN SELECT * FROM "${n}".campaign_records LOOP
-      IF entry.table_name NOT IN (${tableNames}) OR entry.row_key IS DISTINCT FROM CASE WHEN entry.table_name='staff_grants' THEN jsonb_build_object('userId',entry.row_key->>'userId','capability',entry.row_key->>'capability') ELSE jsonb_build_object('id',entry.row_key->>'id') END OR
+      IF entry.table_name NOT IN (${tableNames}) OR entry.row_key IS DISTINCT FROM (CASE WHEN entry.table_name='staff_grants' THEN jsonb_build_object('userId',entry.row_key->>'userId','capability',entry.row_key->>'capability') ELSE jsonb_build_object('id',entry.row_key->>'id') END) OR
         EXISTS(SELECT 1 FROM jsonb_each(entry.row_key) e WHERE e.value='null'::jsonb) THEN RAISE EXCEPTION 'Unknown campaign row key'; END IF;
       EXECUTE format('SELECT to_jsonb(t) FROM public.%I t WHERE to_jsonb(t) @> $1',entry.table_name) INTO actual USING entry.row_key;
       IF (entry.deleted AND actual IS NOT NULL) OR (NOT entry.deleted AND (actual IS NULL OR md5(actual::text) IS DISTINCT FROM entry.row_hash)) THEN RAISE EXCEPTION 'Untracked campaign mutation'; END IF;
