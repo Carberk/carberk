@@ -29,6 +29,8 @@ The demo inventory for reviewer production (`scripts/demo-inventory.ts`, `--mode
 
 Temporary tester provisioning and removal live in `scripts/tester-accounts.ts`, under ADR-0086. The seed owns only Users whose deterministic ids start with `de300712-0000-4000-8000-`, separate from demo inventory and reviewer scenarios. It refuses to claim existing unrelated phone/email holders, or privileged Users. Removal preflights ownership, schedules deletion now, revokes Sessions and archives active Listings atomically for the existing worker purge. Keep the original secret list until removal; the script refuses changed Sign-in Methods and never reseeds a scheduled or purged User. See the deployment runbook's Tester accounts section. Never create unrelated Users in that id namespace.
 
+The [campaign email fence](src/campaign-email-delivery.ts) serializes API enqueue and worker staging mock delivery with reservation cleanup. It reads the fixed operational namespace journal rather than creating authentication records. Missing journals and cleaning/disposed namespaces refuse delivery. The [fixed fixture program](../../scripts/staging-campaign.mjs) owns that operational schema and terminal metadata, separate from application migrations. Protected mock content is removed only after exact BullMQ disposition; activation still requires hosted and deployed acceptance.
+
 ## Start here
 
 - [Schema](prisma/schema.prisma)

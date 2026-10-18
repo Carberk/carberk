@@ -13,6 +13,14 @@ function origin(value, database = false) {
   return database ? url.toString().replace(/\/$/, '') : url.origin;
 }
 
+function deliveryOrigin(value) {
+  let url; try { url = new URL(value); } catch { throw new Error('Redis delivery origin unavailable'); }
+  if (!['redis:', 'rediss:'].includes(url.protocol) || url.hostname !== 'redis.railway.internal' || url.search || url.hash ||
+      !/^\/\d*$/.test(url.pathname || '/')) throw new Error('Redis delivery origin refused');
+  url.username = ''; url.password = '';
+  return url.toString();
+}
+
 /** Railway network and remote-process boundary. No raw variables, logs or stderr leave it. */
 export class RailwayPlatform {
   constructor({ token, fetch = globalThis.fetch, command, authorization }) {
@@ -46,11 +54,13 @@ export class RailwayPlatform {
     for (const id of Object.values(policy.services)) {
       if (!data.project.services.edges.some(x => x.node.id === id)) throw new Error('Wrong Railway service');
     }
+    const deliveryOrigins = [];
     for (const [role, serviceId] of Object.entries(policy.services)) {
       const scope = { projectId: policy.projectId, environmentId: policy.environmentId, serviceId };
       const { variables: vars } = await this.query(`query vars($projectId: String!, $environmentId: String!, $serviceId: String!) {
         variables(projectId: $projectId, environmentId: $environmentId, serviceId: $serviceId) }`, scope);
       if (['api', 'worker'].includes(role)) {
+        deliveryOrigins.push(deliveryOrigin(vars.REDIS_URL));
         if (vars.APP_ENV !== 'staging' || origin(vars.DATABASE_URL, true) !== policy.origins.database || origin(vars.MINIO_ENDPOINT) !== policy.origins.media ||
             (role === 'api' && ((requireMock && vars.SMS_DRIVER !== 'mock') || origin(vars.MINIO_PUBLIC_URL) !== policy.origins.publicMedia)) ||
             (requireMock && role === 'worker' && (vars.EMAIL_DRIVER !== 'mock' || vars.PUSH_TRANSPORT !== 'test'))) throw new Error('Railway data/media origins or mock delivery refused');
@@ -65,10 +75,12 @@ export class RailwayPlatform {
         if (!equal(Array.isArray(commands) ? commands : [commands], ['pnpm --filter @auto-tm/db migrate:deploy'])) throw new Error('API predeploy migration ownership changed');
       }
     }
+    if (deliveryOrigins.length !== 2 || deliveryOrigins[0] !== deliveryOrigins[1]) throw new Error('Redis delivery authorities differ');
+    this.redisOrigin = deliveryOrigins[0];
     return structuredClone(policy);
   }
   async remote(kind, lease, target) {
-    const payload = { kind, candidate: lease.candidate, profile: lease.fixtureProfile, id: lease.id, namespace: lease.namespace, target, identity: lease.identity,
+    const payload = { kind, redisOrigin: this.redisOrigin, candidate: lease.candidate, profile: lease.fixtureProfile, id: lease.id, namespace: lease.namespace, target, identity: lease.identity,
       expectedMigrations: lease.operation?.expectedMigrations ?? lease.expectedMigrations,
       schemaDisposition: lease.operation?.schemaDisposition ?? lease.schemaDisposition ?? 'unchanged' };
     const encoded = Buffer.from(remoteProgram(payload)).toString('base64');
@@ -80,14 +92,16 @@ export class RailwayPlatform {
     if (lines.length !== 1) throw new Error('Remote operation receipt unavailable');
     let result; try { result = JSON.parse(lines[0]); } catch { throw new Error('Remote receipt invalid'); }
     if (!['present', 'absent'].includes(result.fixtures) || (kind !== 'probe' && result.namespace !== lease.namespace)) throw new Error('Remote namespace proof unavailable');
-    if (lease.fixtureProfile === 'campaign897-identities-v1') this.campaignReceipt(lease, result);
+    if (lease.fixtureProfile === 'campaign897-identities-v1') this.campaignReceipt(lease, result, kind === 'probe' && lease.operation?.kind === 'reset');
     return result;
   }
-  campaignReceipt(lease, result) {
+  campaignReceipt(lease, result, allowCleaning = false) {
     if (result.profile !== lease.fixtureProfile || result.candidate !== lease.candidate || result.namespace !== lease.namespace ||
         result.protectedReceipt !== `${lease.namespace}.campaign_entities` ||
-        !['identities', 'disposed'].includes(result.state) || result.identities !== (result.state === 'identities' ? 4 : 0) ||
-        result.fixtures !== (result.state === 'identities' ? 'present' : 'absent')) throw new Error('Reserved campaign proof incomplete');
+        !(allowCleaning ? ['identities', 'cleaning', 'disposed'] : ['identities', 'disposed']).includes(result.state) || result.identities !== (result.state === 'disposed' ? 0 : 4) ||
+        result.fixtures !== (result.state === 'disposed' ? 'absent' : 'present')) throw new Error('Reserved campaign proof incomplete');
+    if (result.state === 'disposed' && (result.reservationId !== lease.id || result.cleanupVersion !== 1 || result.deliveryCleanup !== 'disposed' ||
+        result.queueJobs !== 0 || result.sinkRecords !== 0 || result.tombstone !== true)) throw new Error('Reserved delivery disposal proof incomplete');
   }
   async deployment(id) {
     const { deployment } = await this.query(`query deployment($id: String!) { deployment(id: $id) { id status meta } }`, { id });
@@ -125,7 +139,12 @@ export class RailwayPlatform {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
-    if (kind === 'restore') await this.remote('reset', lease, target);
+    if (kind === 'restore') {
+      if (lease.fixtureProfile === 'campaign897-identities-v1') {
+        const proof = await this.remote('probe', lease, target);
+        if (proof.state !== 'disposed' || proof.deliveryCleanup !== 'disposed') throw new Error('Established campaign disposal required after main restoration; retain ownership');
+      } else await this.remote('reset', lease, target);
+    }
     return { deployments };
   }
   async fixtureVisible(lease, receipt) {
@@ -158,7 +177,7 @@ export class RailwayPlatform {
     const probe = await this.remote('probe', lease, target);
     if (probe.sha !== target || probe.schema !== (lease.operation?.schemaDisposition ?? lease.schemaDisposition ?? 'unchanged') ||
         !equal(probe.migrations, lease.operation?.expectedMigrations ?? lease.expectedMigrations)) throw new Error('Runtime schema proof unavailable');
-    return { ...(lease.fixtureProfile === 'campaign897-identities-v1' ? { profile: probe.profile, candidate: probe.candidate, namespace: probe.namespace, state: probe.state, identities: probe.identities, protectedReceipt: probe.protectedReceipt, retainedAudits: probe.retainedAudits, tombstone: probe.tombstone } : {}), sha: target, readyz: true, worker: true, media: true, mock: true, fixtures: probe.fixtures, schema: probe.schema, migrations: probe.migrations, listingId: probe.listingId, sellerId: probe.sellerId };
+    return { ...(lease.fixtureProfile === 'campaign897-identities-v1' ? { profile: probe.profile, candidate: probe.candidate, namespace: probe.namespace, state: probe.state, identities: probe.identities, protectedReceipt: probe.protectedReceipt, retainedAudits: probe.retainedAudits, tombstone: probe.tombstone, reservationId: probe.reservationId, cleanupVersion: probe.cleanupVersion, deliveryCleanup: probe.deliveryCleanup, queueJobs: probe.queueJobs, sinkRecords: probe.sinkRecords } : {}), sha: target, readyz: true, worker: true, media: true, mock: true, fixtures: probe.fixtures, schema: probe.schema, migrations: probe.migrations, listingId: probe.listingId, sellerId: probe.sellerId };
   }
 
 }

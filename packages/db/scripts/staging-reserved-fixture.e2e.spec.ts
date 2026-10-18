@@ -1,4 +1,4 @@
-import { spawnSync, execFileSync } from "node:child_process";
+import { spawnSync, execFileSync, fork } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
@@ -19,6 +19,7 @@ const root = fileURLToPath(new URL("../../..", import.meta.url));
 const localRequire = createRequire(import.meta.url);
 // Use the installed application queue implementation, including its Lua scripts.
 const queueRequire = createRequire(`${root}/apps/api/package.json`);
+const Redis = queueRequire("ioredis") as new (url: string) => { set(key: string, value: string): Promise<unknown>; get(key: string): Promise<string | null>; del(key: string): Promise<unknown>; quit(): Promise<unknown> };
 type DeliveryJob = { data: { to?: string }; getState(): Promise<string> };
 type DeliveryQueue = {
   add(name: string, data: object, options: object): Promise<unknown>;
@@ -30,7 +31,7 @@ const { Queue, Worker } = queueRequire("bullmq") as {
   Worker: new (name: string, handler: () => Promise<void>, options: object) => { close(): Promise<void> };
 };
 const source = readFileSync(`${root}/scripts/staging-campaign.mjs`, "utf8").replaceAll("export function ", "function ").replaceAll("export async function ", "async function ") +
-  readFileSync(`${root}/scripts/staging-remote.mjs`, "utf8").replace("import { campaignMain, campaignQueueMain } from './staging-campaign.mjs';", "").replace("export function remoteProgram", "function remoteProgram");
+  readFileSync(`${root}/scripts/staging-remote.mjs`, "utf8").replace(/import \{[^}]+\} from '\.\/staging-campaign\.mjs';/, "").replace("export function remoteProgram", "function remoteProgram");
 
 describe("reserved staging fixtures on disposable application schema", () => {
   let postgres: StartedPostgreSqlContainer;
@@ -251,7 +252,9 @@ describe("reserved staging fixtures on disposable application schema", () => {
     const email = (await pool.query(`SELECT email FROM "cf_${id}".campaign_entities WHERE alias='buyer-a'`)).rows[0]?.email as string;
     await pool.query(`INSERT INTO otp_requests(id,purpose,channel,destination,"codeHash","expiresAt",ip,"updatedAt")
       VALUES($1,'sign_in','email',$2,'synthetic-cleanup-hash',now()+interval '5 minutes','127.0.0.1',now())`, [requestId, email]);
-    await queue.add("sign-in-code", { to: recipient ?? email, code: "123456", locale: "en", purpose: "sign-in" }, { jobId: requestId, delay: 3600000 });
+    await queue.add("sign-in-code", { to: recipient ?? email, code: "123456", locale: "en", purpose: "sign-in" }, {
+      jobId: requestId, delay: 3600000, deduplication: { id: `campaign-cf_${id}-${requestId}` },
+    });
     return email;
   }
 
@@ -273,6 +276,45 @@ describe("reserved staging fixtures on disposable application schema", () => {
     expect(execute("reset", id, "campaign897-identities-v1").code).toBe(0);
     expect((await pool.query(`SELECT count(*)::int AS count FROM "cf_${id}".campaign_delivery_sink`)).rows[0]).toEqual({ count: 0 });
     expect((await pool.query(`SELECT count(*)::int AS count FROM otp_requests WHERE id=$1`, [requestId])).rows[0]).toEqual({ count: 0 });
+  });
+
+  it("does not resurrect an OTP when its producer transaction dies before the Redis enqueue", async () => {
+    const id = "9".repeat(32), requestId = "campaign-cleanup-delayed-producer";
+    const email = await queuedOtp(id, requestId);
+    await queue.getJob(requestId)?.remove();
+
+    const applicationName = `campaign-otp-red-${randomUUID()}`;
+    const producer = fork(`${root}/scripts/testing/delayed-campaign-enqueue.cjs`, [], {
+      env: {
+        ...process.env,
+        DATABASE_URL: `${databaseUrl}?application_name=${encodeURIComponent(applicationName)}`,
+        REDIS_URL: redisUrl,
+        CAMPAIGN_REQUEST_ID: requestId,
+        CAMPAIGN_EMAIL: email,
+      },
+      stdio: ["ignore", "pipe", "pipe", "ipc"],
+    });
+    const admitted = new Promise<number>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("delayed producer did not reach the SQL/Redis barrier")), 30000);
+      producer.on("message", message => {
+        if (message && typeof message === "object" && "backendPid" in message) {
+          clearTimeout(timer); resolve(Number((message as { backendPid: number }).backendPid));
+        }
+      });
+      producer.once("error", reject);
+    });
+    const backendPid = await admitted;
+    const terminated = await pool.query("SELECT pg_terminate_backend($1) AS terminated", [backendPid]);
+    expect(terminated.rows[0]).toEqual({ terminated: true });
+
+    // The cleanup commits the durable disposed state while the producer still
+    // holds its post-admission IPC barrier. The old implementation has no
+    // Redis-side fence, so releasing the producer recreates the exact job.
+    expect(execute("reset", id, "campaign897-identities-v1").code).toBe(0);
+    producer.send({ continue: true });
+    const producerExit = await new Promise<number>(resolve => producer.once("exit", code => resolve(code ?? 0)));
+    expect(producerExit).toBe(0);
+    expect(await queue.getJob(requestId)).toBeUndefined();
   });
 
   it("persists mock delivery only in its owned namespace and erases message content during disposal", async () => {
@@ -315,6 +357,23 @@ describe("reserved staging fixtures on disposable application schema", () => {
     expect(execute("reset", id, "campaign897-identities-v1").code).toBe(1);
     expect((await queue.getJob(requestId))?.data.to).toBe("foreign@example.invalid");
     expect((await pool.query(`SELECT count(*)::int AS count FROM "cf_${id}".campaign_entities e JOIN users u ON u.id=e.user_id`)).rows[0]).toEqual({ count: 4 });
+  });
+
+  it("refuses a foreign BullMQ dedup value without mutating the foreign key or owned job", async () => {
+    const id = "8".repeat(32), requestId = "campaign-cleanup-dedup-collision";
+    const email = await queuedOtp(id, requestId);
+    const dedupId = `campaign-cf_${id}-${requestId}`;
+    const redisClient = new Redis(redisUrl);
+    const dedupKey = `bull:email-code:de:${dedupId}`;
+    try {
+      await redisClient.set(dedupKey, "foreign-job-ownership");
+      expect(execute("reset", id, "campaign897-identities-v1").code).toBe(1);
+      expect(await redisClient.get(dedupKey)).toBe("foreign-job-ownership");
+      expect((await queue.getJob(requestId))?.data.to).toBe(email);
+    } finally {
+      await redisClient.del(dedupKey);
+      await redisClient.quit();
+    }
   });
 
   it("retains a cleaning reservation while its exact job is active, then retries disposal after the worker exits", async () => {
