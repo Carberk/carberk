@@ -59,3 +59,18 @@ it("acknowledges only the service messages actually rendered to the current cust
  const screen = await renderMobile(<ServiceScreen/>); await fireEvent.press(await screen.findByRole("button", { name: "General Support" })); await screen.findByText(message.body);
  await act(async () => { await Promise.resolve(); }); expect(through).toBe(1);
 });
+
+it("binds the current native token to the opened private service using authenticated requests", async () => {
+ vi.mocked(Notifications.getPermissionsAsync).mockResolvedValueOnce({ granted: true, status: "granted" } as never);
+ vi.mocked(Notifications.getDevicePushTokenAsync).mockResolvedValueOnce({ data: "synthetic-current-device" } as never);
+ const calls: string[] = [];
+ server.use(http.post("*/notifications/tokens", async ({ request }) => { expect(request.headers.get("Authorization")).toBe("Bearer synthetic"); calls.push("register"); return HttpResponse.json({ registered: true }); }), http.post("*/services/conversations/:id/push", async ({ request }) => { expect(await request.json()).toEqual({ deviceToken: "synthetic-current-device" }); calls.push("subscribe"); return HttpResponse.json({ ok: true }); }));
+ const screen = await renderMobile(<ServiceScreen/>); await fireEvent.press(await screen.findByRole("button", { name: "General Support" })); await screen.findByText(message.body);
+ await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); }); expect(calls).toEqual(["register", "subscribe"]);
+});
+it("opens the canonical Support case from a Support entry without creating a History enquiry", async () => {
+ const { routeParams } = await import("../../test/render"); routeParams["purpose"] = "support";
+ let creates = 0;
+ server.use(http.post("*/services/conversations", async ({ request }) => { expect(await request.json()).toEqual({ purpose: "support", synthetic: true }); creates++; return HttpResponse.json({ id, resourceId: id }); }));
+ try { const screen = await renderMobile(<ServiceScreen/>); expect(await screen.findByText(message.body)).toBeTruthy(); expect(creates).toBe(1); } finally { delete routeParams["purpose"]; }
+});
