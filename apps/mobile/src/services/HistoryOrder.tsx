@@ -15,7 +15,7 @@ export function HistoryOrder({ id, locale }: { id: string; locale: string }) {
  const query = useHistoryOrder(id), action = useHistoryCommand(id), c = historyCopy(locale);
  const [vin, setVin] = useState(""), [claim, setClaim] = useState(""), [error, setError] = useState(false);
  const retry = useRef<{ claim: string; id: string } | null>(null);
- const data = query.data, order = data?.order;
+ const data = query.isError ? undefined : query.data, order = data?.order;
  const quote = data?.quotes.find(value => !value.supersededAt && value.preflightOutcome === "available" && value.feasible);
  const date = (value: string) => new Date(value).toLocaleString(localeTag(locale));
  const accept = async () => {
