@@ -40,6 +40,7 @@ Find the owning area, read its short overview, then inspect source and tests. Th
 |---|---|---|
 | listings | [`listings/CONTEXT.md`](apps/mobile/src/listings/CONTEXT.md) | Create `sell` reducer + staging queue vs edit-route shell; uploads, autosave, wizard documentation |
 | measurement | [`measurement/CONTEXT.md`](apps/mobile/src/measurement/CONTEXT.md) | Bounded client queue and first-party sender; feature/identity host not composed |
+| diagnostic telemetry | [`diagnostic-telemetry/CONTEXT.md`](apps/mobile/src/diagnostic-telemetry/CONTEXT.md) | Default-closed synthetic JS capture and first-party relay; native capture remains unproven |
 | conversations | [`conversations/CONTEXT.md`](apps/mobile/src/conversations/CONTEXT.md) | Conversation screen loaded by ID, socket and HTTP caches, local pending Messages, push entry |
 
 ## Packages
