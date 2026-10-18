@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { ScrollView, View, Alert } from "react-native";
-import { router, Stack } from "expo-router";
+import { router, Stack, useFocusEffect } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ListingsSchemas } from "@auto-tm/contracts";
@@ -31,12 +31,19 @@ export function InventoryScreen() {
   if (action === "discard") return apiClient.delete(`/listings/drafts/${id}`, undefined, opts);
   return apiClient.post(action === "confirm" ? `/businesses/${businessId}/inventory/${id}/confirm-availability` : `/listings/${id}/${action}`, {}, undefined, opts);
  }, onSuccess: () => { setMessage(c.saved); void cache.invalidateQueries({ queryKey: key }); }, onError: (error) => { setMessage(error instanceof ApiError && error.status === 403 ? c.denied : c.failed); void stock.refetch(); } });
+ useFocusEffect(useCallback(() => {
+  if (isAuthenticated !== true) return;
+  void cache.invalidateQueries({ queryKey: ["business", userId, "current"] });
+  void cache.invalidateQueries({ queryKey: ["business", userId, businessId, "inventory"] });
+  void phones.refetch();
+ }, [isAuthenticated, cache, userId, businessId, phones.refetch]));
+ const workspaceDenied = workspace.error instanceof ApiError && (workspace.error.status === 403 || workspace.error.status === 401);
  const active = business?.business.status === "active";
  const act = (id: string, action: Parameters<typeof mutation.mutate>[0]["action"]) => mutation.mutate({ id, action });
  const button = (label: string, onPress: () => void, disabled = false) => <Button disabled={disabled || mutation.isPending} onPress={onPress}><Text>{label}</Text></Button>;
  const openDraft = (resumeDraftId?: string) => { if (!businessId) return; router.push({ pathname: "/(tabs)/sell", params: { businessId, ...(resumeDraftId ? { resumeDraftId } : {}) } }); };
  return <><Stack.Screen options={{ title: c.title, headerBackTitle: c.back }} /><ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 48 }}>
-  {isAuthenticated !== true || workspace.isError || (!workspace.isPending && !business) ? <Text accessibilityRole="alert">{c.denied}</Text> : workspace.isPending || stock.isPending ? <Text accessibilityRole="progressbar">{c.working}</Text> : stock.isError ? <><Text accessibilityRole="alert">{stock.error instanceof ApiError && stock.error.status === 403 ? c.denied : c.error}</Text>{button(c.retry, () => { void stock.refetch(); })}</> : stock.data ? <>
+  {isAuthenticated !== true || workspaceDenied || (!workspace.isPending && !workspace.isError && !business) ? <Text accessibilityRole="alert">{c.denied}</Text> : workspace.isError ? <><Text accessibilityRole="alert">{c.error}</Text>{button(c.retry, () => { void workspace.refetch(); })}</> : workspace.isPending || stock.isPending ? <Text accessibilityRole="progressbar">{c.working}</Text> : stock.isError ? <><Text accessibilityRole="alert">{stock.error instanceof ApiError && stock.error.status === 403 ? c.denied : c.error}</Text>{button(c.retry, () => { void stock.refetch(); })}</> : stock.data ? <>
    <Text className="font-heading text-title-2 font-semibold">{business?.business.name}</Text>
    {!active ? <Text accessibilityRole="alert">{c.inactive}</Text> : null}
    {message ? <Text accessibilityRole="alert">{message}</Text> : null}

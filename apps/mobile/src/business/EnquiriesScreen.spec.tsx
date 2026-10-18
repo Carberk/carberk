@@ -4,6 +4,7 @@ import { http, HttpResponse } from "msw";
 import { renderMobile, fireEvent, act } from "../../test/render";
 import { server } from "../../test/msw";
 import { clearAuthSession, storeAuthSession } from "../auth/session";
+import { getSharedConversationSocket } from "../conversations/socket/ConversationSocket";
 
 // Socket.IO is the network boundary; keep the real socket wrapper and screen.
 const wire = vi.hoisted(() => ({ handlers: new Map<string, (event?: unknown) => void>(), connected: true }));
@@ -12,7 +13,6 @@ vi.mock("socket.io-client", () => ({ io: () => ({
  on: (event: string, handler: (event?: unknown) => void) => { wire.handlers.set(event, handler); },
  disconnect: () => {},
 }) }));
-import { getSharedConversationSocket } from "../conversations/socket/ConversationSocket";
 import { EnquiriesScreen } from "./EnquiriesScreen";
 vi.mock("expo-secure-store", () => { const values = new Map<string, string>(); return { getItemAsync: async (key: string) => values.get(key) ?? null, setItemAsync: async (key: string, value: string) => { values.set(key, value); }, deleteItemAsync: async (key: string) => { values.delete(key); } }; });
 const userId = "00000000-0000-4000-8000-000000000001";
@@ -120,11 +120,11 @@ describe("current member business inbox", () => {
  it.each([["en", "Could not load enquiries.", "Refresh"], ["ru", "Не удалось загрузить обращения.", "Обновить"], ["tk", "Ýüz tutmalar ýüklenmedi.", "Täzele"]])("recovers workspace network failure without calling it permission loss in %s", async (locale, error, retry) => {
   server.use(http.get("*/business/current", () => HttpResponse.error()));
   const screen = await renderMobile(<EnquiriesScreen />, { locale });
-  expect(await screen.findByText(error!)).toBeTruthy();
+  expect(await screen.findByText(error ?? "")).toBeTruthy();
   expect(screen.queryByText(/Your business access changed/)).toBeNull();
   server.resetHandlers();
   server.use(http.get("*/business/current", () => HttpResponse.json({ workspace: { business: { id: businessId, name: "Ahal Motors", slug: "ahal-motors", status: "active", admissionMode: "synthetic", cityId: null }, membership: { id: enquiryId, role, status: "active" }, members: [], invitations: [] } })), http.get("*/conversations/business/:business", () => HttpResponse.json({ businessId, unanswered: 0, nextCursor: null, items: [] })));
-  await fireEvent.press(screen.getByRole("button", { name: retry! }));
+  await fireEvent.press(screen.getByRole("button", { name: retry ?? "" }));
   expect(await screen.findByText("Ahal Motors")).toBeTruthy();
  });
 
