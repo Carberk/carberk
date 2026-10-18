@@ -1328,7 +1328,7 @@ describe("ListingsController e2e", () => {
         .expect(400);
 
       expect(res.body.code).toBe("VALIDATION_FAILED");
-      expect(res.body.details).toEqual({ reason: "INVALID_FILTER_RANGE" });
+      expect(res.body.details).toEqual({ reason: "INVALID_PRICE" });
     });
   });
 
