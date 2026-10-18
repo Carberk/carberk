@@ -16,9 +16,10 @@ const db = new PrismaService();
 const redis = new URL(process.env.REDIS_URL);
 const actualQueue = new Queue("email-code", { connection: { host: redis.hostname, port: Number(redis.port), maxRetriesPerRequest: 1 } });
 let admitted = false;
+let producerTransaction;
 const queue = {
   add: async (name, data, options) => {
-    const backend = await db.$queryRawUnsafe("SELECT pg_backend_pid() AS pid");
+    const backend = await producerTransaction.$queryRawUnsafe("SELECT pg_backend_pid() AS pid");
     admitted = true;
     process.send?.({ backendPid: Number(backend[0].pid) });
     await new Promise((resolve) => process.once("message", message => message && message.continue ? resolve() : undefined));
@@ -28,7 +29,8 @@ const queue = {
 
 (async () => {
   try {
-    await withCampaignEmailDelivery(db, input.requestId, input.email, async () => {
+    await withCampaignEmailDelivery(db, input.requestId, input.email, async campaign => {
+      producerTransaction = campaign.transaction;
       await queue.add("sign-in-code", { to: input.email, code: "123456", locale: "en", purpose: "sign-in" }, {
         jobId: input.requestId,
         delay: 3600000,
