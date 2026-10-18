@@ -13,7 +13,7 @@ import { CleanRetiredUploads } from "./CleanRetiredUploads";
 import { PrismaRetiredUploadLedger } from "./PrismaRetiredUploadLedger";
 import { PurgeExpiredAccounts } from "./PurgeExpiredAccounts";
 import { RETIRED_UPLOAD_BUCKET, S3RetiredObjectStore } from "./S3RetiredObjectStore";
-import type { RetiredObjectStore } from "./retiredUploadCleanup";
+import type { CleanupWork, RetiredObjectStore } from "./retiredUploadCleanup";
 
 /**
  * Issue #721 / ADR-0088 against the hosted disposable Postgres and the
@@ -410,6 +410,17 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
     expect(await workOf(upload.id)).toMatchObject({ status: "DONE" });
   });
 
+  it("keeps a single PostgreSQL lease within the sweep limit (#770 diagnostic)", async () => {
+    const uploads = [await retiredUpload(), await retiredUpload(), await retiredUpload()];
+    const first = await ledger.lease(SWEEP, 2);
+    expect(first.length).toBeLessThanOrEqual(2);
+    expect(first).toHaveLength(2);
+    const second = await ledger.lease(SWEEP, 2);
+    expect(second).toHaveLength(1);
+    expect([...first, ...second].map((work) => work.uploadId).sort())
+      .toEqual(uploads.map((upload) => upload.id).sort());
+  });
+
   it("takes bounded batches, and overlapping sweeps process each piece of work once", async () => {
     const uploads = [await retiredUpload(), await retiredUpload(), await retiredUpload()];
     const processed: string[] = [];
@@ -419,11 +430,35 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
         await store.deleteAndVerify(keys);
       },
     };
-    const sweep = () => new CleanRetiredUploads(new PrismaRetiredUploadLedger(prisma), counting)
+    // Hold both returned leases before deletion. No sleep or scheduling guess:
+    // each job must report the work its own production SQL lease returned.
+    const leases: CleanupWork[][] = [];
+    let arrivals = 0;
+    let release!: () => void;
+    const bothLeased = new Promise<void>((resolve) => { release = resolve; });
+    class ObservedLedger extends PrismaRetiredUploadLedger {
+      override async lease(now: Date, limit: number): Promise<CleanupWork[]> {
+        let leased: CleanupWork[];
+        try {
+          leased = await super.lease(now, limit);
+          leases.push(leased);
+        } finally {
+          arrivals += 1;
+          if (arrivals === 2) release();
+        }
+        await bothLeased;
+        return leased;
+      }
+    }
+    const sweep = () => new CleanRetiredUploads(new ObservedLedger(prisma), counting)
       .execute({ now: SWEEP, limit: 2 });
 
     const [one, two] = await Promise.all([sweep(), sweep()]);
 
+    expect(leases).toHaveLength(2);
+    for (const leased of leases) expect(leased.length).toBeLessThanOrEqual(2);
+    expect(leases.flat().map((work) => work.uploadId).sort())
+      .toEqual(uploads.map((upload) => upload.id).sort());
     expect(Math.max(one.deleted, two.deleted)).toBeLessThanOrEqual(2);
     expect(one.deleted + two.deleted).toBe(3);
     expect([...processed].sort()).toEqual(uploads.map((upload) => upload.key).sort());
