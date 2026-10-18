@@ -29,6 +29,7 @@ import { ServiceMessagingModule } from "./modules/service-messaging/service-mess
 import { requestLoggingOptions } from "./common/requestLogging";
 import { DiagnosticsModule } from "./modules/diagnostics/diagnostics.module";
 import { OperationsModule } from "./modules/operations/operations.module";
+import { TelemetryDiagnosticsModule } from "./modules/telemetry-diagnostics/telemetry-diagnostics.module";
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { OperationsModule } from "./modules/operations/operations.module";
     ServiceMessagingModule,
     DiagnosticsModule,
     OperationsModule,
+    TelemetryDiagnosticsModule,
   ],
   controllers: [HealthController],
   providers: [

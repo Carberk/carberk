@@ -29,6 +29,7 @@ Find the owning area, read its short overview, then inspect source and tests. Th
 | reports | [`reports/CONTEXT.md`](apps/api/src/modules/reports/CONTEXT.md) | InspectionInterest demand capture and admin aggregates |
 | diagnostics | [`diagnostics/CONTEXT.md`](apps/api/src/modules/diagnostics/CONTEXT.md) | Synthetic inspection intake, staff authoring/review, immutable releases and private/public readers |
 | service messaging | [`service-messaging/CONTEXT.md`](apps/api/src/modules/service-messaging/CONTEXT.md) | Private Support and Vehicle History conversations, assignment, fulfilment and protected artifacts |
+| diagnostic telemetry | [`telemetry-diagnostics/CONTEXT.md`](apps/api/src/modules/telemetry-diagnostics/CONTEXT.md) | Strict synthetic diagnostic relay, current staff admission and bounded collector transport |
 | operations | [`operations/CONTEXT.md`](apps/api/src/modules/operations/CONTEXT.md) | Current scoped operational health reads and bounded technical counters |
 | measurement infrastructure | [`measurement/CONTEXT.md`](apps/api/src/modules/measurement/CONTEXT.md) | Strict first-party intake and public emitter ports; durable identity/ledger composition pending |
 | admin | [`admin/CONTEXT.md`](apps/api/src/modules/admin/CONTEXT.md) | Audit log, listing/user/message reports, moderation |
