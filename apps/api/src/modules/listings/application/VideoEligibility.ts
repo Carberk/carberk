@@ -17,6 +17,10 @@ export class VideoEligibility {
       this.config.get("VIDEO_TESTER_USER_IDS", { infer: true }).includes(userId);
   }
 
+  isUploadEligible(userId: string): boolean {
+    return this.isEligible(userId) && this.config.get("VIDEO_UPLOADS_ENABLED", { infer: true }) === true;
+  }
+
   assertUploadEligible(userId: string): void {
     this.assertEligible(userId);
     if (!this.config.get("VIDEO_UPLOADS_ENABLED", { infer: true })) {
