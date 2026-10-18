@@ -40,27 +40,30 @@ describe.skipIf(!hosted)("diagnostic artifacts on disposable PostgreSQL and priv
     await db.diagnosticEvidence.deleteMany({ where: { reportId: { in: reports.map(row => row.id) } } });
     await db.diagnosticPdfArtifact.deleteMany({ where: { reportId: { in: reports.map(row => row.id) } } });
     await db.diagnosticReportRecord.deleteMany({ where: { id: { in: reports.map(row => row.id) } } });
+    await db.diagnosticAudit.deleteMany({ where: { centerId: { in: centers } } });
+    await db.diagnosticOrderAssignment.deleteMany({ where: { orderId: { in: orders.map(row => row.id) } } });
+    await db.diagnosticCenterAssignment.deleteMany({ where: { centerId: { in: centers } } });
     await db.inspectionOrder.deleteMany({ where: { id: { in: orders.map(row => row.id) } } });
     await db.diagnosticTemplateVersion.deleteMany({ where: { centerId: { in: centers } } });
     await db.diagnosticCenter.deleteMany({ where: { id: { in: centers } } });
     await db.user.deleteMany({ where: { id: { in: users } } });
     await db.$disconnect(); s3.destroy();
   });
-  async function fixture(evidenceId?: string) {
+  async function fixture(evidenceId?: string, staffId?: string) {
     const userId = randomUUID(), centerId = randomUUID(), templateId = randomUUID(), orderId = randomUUID(), reportId = randomUUID(), id = randomUUID();
     users.push(userId); centers.push(centerId);
     await db.user.create({ data: { id: userId } });
     await db.diagnosticCenter.create({ data: { id: centerId, code: centerId, names: localized } });
     const template = { title: localized, limitations: localized, syntheticNotice: localized, checks: [{ id: "brakes", label: localized, required: true, evidenceRequired: false, measurement: null }], panels: [] };
-    await db.diagnosticTemplateVersion.create({ data: { id: templateId, centerId, version: 1, definition: template } });
+    await db.diagnosticTemplateVersion.create({ data: { id: templateId, centerId, version: 1, definition: template, publishedById: staffId ?? null } });
     await db.inspectionOrder.create({ data: { id: orderId, centerId, templateVersionId: templateId, commissionerId: userId, requestKey: randomUUID(), audience: "buyer_private", synthetic: true } });
     const findingId = randomUUID();
-    const report = { id: reportId, orderId, templateVersionId: templateId, audience: "buyer_private", status: "finalized", observedAt: clock.toISOString(), mileageKm: 123456, findings: [{ id: findingId, checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: evidenceId ? [evidenceId] : [], kind: null, source: null, measurement: null, location: null }], authorId: userId, reviewerId: randomUUID(), successorOf: null, correctionReason: null, returnReason: null, finalizedAt: clock.toISOString(), withdrawnAt: null, withdrawalReason: null };
+    const report = { id: reportId, orderId, templateVersionId: templateId, audience: "buyer_private", status: "finalized", observedAt: clock.toISOString(), mileageKm: 123456, findings: [{ id: findingId, checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: evidenceId ? [evidenceId] : [], kind: null, source: null, measurement: null, location: null }], authorId: staffId ?? userId, reviewerId: randomUUID(), successorOf: null, correctionReason: null, returnReason: null, finalizedAt: clock.toISOString(), withdrawnAt: null, withdrawalReason: null };
     const snapshot = { report, template, synthetic: true }, hash = sha(canonical(snapshot));
     await db.diagnosticReportRecord.create({ data: { id: reportId, orderId, templateVersionId: templateId, audience: "buyer_private", state: json(report), status: "finalized", snapshot: json(snapshot), snapshotHash: hash, finalizedAt: clock } });
     const key = `diagnostic-pdf/${reportId}/${id}.pdf`; keys.push(key);
     await db.diagnosticPdfArtifact.create({ data: { id, reportId, snapshotHash: hash, locale: "tk", rendererVersion: "v1", objectKey: key, createdAt: clock } });
-    return { id, reportId, key, orderId, userId, findingId, snapshot, hash };
+    return { id, reportId, key, orderId, userId, centerId, templateId, findingId, snapshot, hash };
   }
   it("claims one renderer and adopts only actual verified immutable PDF bytes", async () => {
     const row = await fixture(), worker = new DiagnosticArtifactWorker(db, storage, await fonts(), runtime);
@@ -154,4 +157,24 @@ describe.skipIf(!hosted)("diagnostic artifacts on disposable PostgreSQL and priv
     await db.user.update({ where: { id: row.userId }, data: { deletionScheduledAt: new Date(clock.getTime() - 1) } });
     await expect(new PurgeExpiredAccounts(db).execute({ now: clock })).resolves.toMatchObject({ purgedCount: expect.any(Number) });
   });
+  it("staff account purge removes current assignments and attribution while preserving another commissioner's report and exact historical snapshot", async () => {
+    const staffId = randomUUID(); users.push(staffId);
+    await db.user.create({ data: { id: staffId, deletionScheduledAt: new Date(clock.getTime() - 1) } });
+    const row = await fixture(undefined, staffId);
+    await db.diagnosticCenterAssignment.create({ data: { centerId: row.centerId, userId: staffId, capability: "diagnostics.technician", qualifiedUntil: new Date(clock.getTime() + 86400_000) } });
+    await db.diagnosticOrderAssignment.create({ data: { orderId: row.orderId, userId: staffId, capability: "diagnostics.technician" } });
+    await db.diagnosticAudit.create({ data: { centerId: row.centerId, orderId: row.orderId, actorId: staffId, action: "REPORT_DRAFT_CREATED", details: { reportId: row.reportId, reason: "private staff note" } } });
+    await new PurgeExpiredAccounts(db).execute({ now: clock });
+    const report = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: row.reportId } });
+    expect(report.erasedAt).toBeNull(); expect(report.snapshot).toEqual(row.snapshot); expect(report.snapshotHash).toBe(row.hash);
+    expect(report.state).toMatchObject({ authorId: null });
+    expect((await db.inspectionOrder.findUniqueOrThrow({ where: { id: row.orderId } })).commissionerId).toBe(row.userId);
+    expect((await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: row.id } })).cleanupRequestedAt).toBeNull();
+    expect((await db.diagnosticTemplateVersion.findUniqueOrThrow({ where: { id: row.templateId } })).publishedById).toBeNull();
+    expect(await db.diagnosticCenterAssignment.count({ where: { userId: staffId } })).toBe(0);
+    expect(await db.diagnosticOrderAssignment.count({ where: { userId: staffId } })).toBe(0);
+    expect(await db.diagnosticAudit.findMany({ where: { orderId: row.orderId } })).toMatchObject([{ actorId: null, details: { reportId: row.reportId } }]);
+    expect((await db.diagnosticAudit.findFirstOrThrow({ where: { orderId: row.orderId } })).details).not.toHaveProperty("reason");
+  });
+
 });
