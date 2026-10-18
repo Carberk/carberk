@@ -53,4 +53,13 @@ describe("V1 owned video HTTP protocol", () => {
     const complete = await request.post(`${sessionUrl}/complete`).set("authorization", `Bearer ${token}`).send({}).expect(200);
     expect(complete.body.state).toBe("PROCESSING");
   });
+  it("keeps infrastructure failure retryable without exposing database details", async () => {
+    ledger.reserveError = new Error("synthetic database adapter failure private-key");
+    try {
+      const response = await supertest(app.getHttpServer()).post(url).set("authorization", `Bearer ${token}`).send(body).expect(503);
+      expect(response.body).toEqual({ code: "VIDEO_SERVICE_UNAVAILABLE" });
+      expect(response.headers["cache-control"]).toBe("private, no-store");
+    } finally { ledger.reserveError = null; }
+  });
+
 });
