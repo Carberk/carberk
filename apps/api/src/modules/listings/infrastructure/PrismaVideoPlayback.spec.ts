@@ -25,6 +25,11 @@ function fixture() {
   return { grant, listing, generation, stored: () => stored, service: new PrismaVideoPlayback(prisma, identity, { isEligible: () => eligible }), revokeSession: () => { active = false; }, revokeTester: () => { eligible = false; } };
 }
 describe("current persisted playback authority", () => {
+  it("denies banned Listing video even to the seller on both mint and asset reads", async () => {
+    const f = fixture(); f.listing.status = "banned"; f.listing.sellerId = "viewer";
+    expect(await f.service.authorize(secret)).toBeNull();
+    expect(await f.service.issue({ userId: "viewer", sessionId: "session", listingId: "listing", purpose: "playback" })).toBeNull();
+  });
   it("issues over authenticated HTTP from the verified session and refuses body authority injection", async () => {
     const f = fixture();
     const module = await Test.createTestingModule({ imports: [JwtModule.register({ secret: "video-http-synthetic-fixture" })], controllers: [VideoGrantController], providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }, { provide: VIDEO_GRANT_ISSUER, useValue: f.service }] }).compile();
