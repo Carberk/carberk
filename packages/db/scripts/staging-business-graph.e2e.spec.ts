@@ -1,7 +1,7 @@
 // Storage/cleanup contract only. No authentication, admission, Session or token proof.
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { runInNewContext } from "node:vm";
@@ -50,16 +50,21 @@ describe("reservation-owned synthetic business v2 storage graph, without admissi
   }, 120000);
   afterAll(async () => { await db?.$disconnect(); await pool?.end(); await redis?.stop(); await postgres?.stop(); });
 
-  function execute(kind: "fixture" | "reset", id: string, selectedProfile = profile, selectedCandidate = candidate, beforeQuery?: (query: string) => void) {
+  const expectedMigrations = readdirSync(`${packageRoot}/prisma/migrations`).filter(name => /^\d+_[a-zA-Z0-9_]+$/.test(name)).sort()
+    .map(name => ({ name, checksum: createHash("sha256").update(readFileSync(`${packageRoot}/prisma/migrations/${name}/migration.sql`)).digest("hex") }));
+  type ProbeOptions = { target?: string; expectedMigrations?: { name: string; checksum: string }[]; schemaDisposition?: string };
+  function execute(kind: "fixture" | "reset" | "probe", id: string, selectedProfile = profile, selectedCandidate = candidate, beforeQuery?: (query: string) => void, probe: ProbeOptions = {}) {
     let code = 0;
     let sqlDiagnostic: string | undefined;
-    let receipt: { profile: string; state: string; identities: number; fixtures: string; tombstone: boolean } | undefined;
+    let receipt: { profile: string; state: string; identities: number; fixtures: string; tombstone: boolean;
+      sha?: string; candidate?: string; namespace?: string; reservationId?: string; schema?: string; migrations?: { name: string; checksum: string }[];
+      storageDisposal?: { version: number; scope: string; state: string; rows: string; retainedAudits: number; auditDisposition: string; tombstone: string } } | undefined;
     const remoteProcess = { execPath: process.execPath, exitCode: 0, env: {
       STAGING_CAMPAIGN_PROFILE_ENABLED: selectedProfile, RAILWAY_PROJECT_ID: "graph-project", RAILWAY_ENVIRONMENT_ID: "graph-staging", RAILWAY_SERVICE_ID: "graph-api", RAILWAY_ENVIRONMENT_NAME: "staging",
-      APP_ENV: "staging", SMS_DRIVER: "mock", AUTOTM_COMMIT_SHA: candidate, DATABASE_URL: "postgresql://fixture:synthetic@postgres.railway.internal:5432/railway",
+      APP_ENV: "staging", SMS_DRIVER: "mock", AUTOTM_COMMIT_SHA: probe.target ?? candidate, DATABASE_URL: "postgresql://fixture:synthetic@postgres.railway.internal:5432/railway",
       REDIS_URL: "redis://fixture:synthetic@redis.railway.internal:6379/0", MINIO_ENDPOINT: "http://minio.railway.internal:9000", MINIO_PUBLIC_URL: "https://media.example",
     } };
-    const payload = { kind, id, namespace: `cf_${id}`, profile: selectedProfile, candidate: selectedCandidate, target: candidate, redisOrigin: "redis://redis.railway.internal:6379/0", identity: {
+    const payload = { kind, id, namespace: `cf_${id}`, profile: selectedProfile, candidate: selectedCandidate, target: probe.target ?? candidate, expectedMigrations: probe.expectedMigrations ?? expectedMigrations, schemaDisposition: probe.schemaDisposition ?? "retained-additive", redisOrigin: "redis://redis.railway.internal:6379/0", identity: {
       projectId: "graph-project", environmentId: "graph-staging", services: { api: "graph-api" }, origins: { database: "postgresql://postgres.railway.internal:5432/railway", media: "http://minio.railway.internal:9000", publicMedia: "https://media.example" },
     } };
     const program = runInNewContext(`${source}; remoteProgram(payload)`, { payload });
@@ -399,4 +404,128 @@ describe("reservation-owned synthetic business v2 storage graph, without admissi
     expect(execute("reset", id).code).toBe(0);
     expect(await db.listingDraft.count({ where: { businessId: owned.business.id } })).toBe(0);
   });
+  // Snapshot control records and application data, not only the emitted receipt.
+  // These queries run only against this suite's hosted disposable PostgreSQL.
+  async function observationSnapshot(id: string) {
+    const control = await Promise.all(["campaign_manifest", "campaign_entities", "campaign_records", "campaign_events"].map(async table =>
+      (await pool.query(`SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text),'[]'::jsonb) AS rows FROM "cf_${id}".${table} t`)).rows));
+    const application = await Promise.all(["users", "dealerships", "dealership_members", "staff_grants", "audit_logs", "listings", "listing_drafts", "conversations", "conversation_participants", "messages", "business_enquiry_audits", "favorites", "dealership_invitations", "verified_contact_phones", "owned_vehicles", "blocked_users", "notification_preferences", "content_reports"].map(async table =>
+      (await pool.query(`SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text),'[]'::jsonb) AS rows FROM public.${table} t`)).rows));
+    return { control, application };
+  }
+
+  it.each(["identities", "cleaning", "disposed"] as const)("probe preserves %s state and every record/event on repeat", async state => {
+    const id = { identities: "b1", cleaning: "b2", disposed: "b3" }[state].repeat(16);
+    await graph(id);
+    if (state === "cleaning") {
+      const interrupted = execute("reset", id, profile, candidate, query => {
+        if (query.includes("DELETE FROM public.")) throw new Error("interrupt before disposal");
+      });
+      expect(interrupted.code).toBe(1);
+    }
+    if (state === "disposed") expect(execute("reset", id).code).toBe(0);
+    expect((await pool.query(`SELECT state FROM "cf_${id}".campaign_manifest`)).rows).toEqual([{ state }]);
+    const before = await observationSnapshot(id);
+    for (let repeat = 0; repeat < 2; repeat++) {
+      const result = execute("probe", id);
+      expect(result.code, result.sqlDiagnostic).toBe(0);
+      expect(result.receipt).toMatchObject({ state, candidate, namespace: `cf_${id}`, reservationId: id, profile,
+        fixtures: state === "disposed" ? "absent" : "present", tombstone: state === "disposed" });
+      expect(await observationSnapshot(id)).toEqual(before);
+      expect(result.receipt?.sha).toBe(candidate);
+      expect(result.receipt?.migrations).toEqual(expectedMigrations);
+      expect(result.receipt?.schema).toBe("retained-additive");
+      if (state === "disposed") {
+        expect(result.receipt?.storageDisposal).toEqual({ version: 1, scope: "business-v2-storage", state: "disposed",
+          rows: "absent", retainedAudits: 2, auditDisposition: "redacted-synthetic-audit", tombstone: "retained" });
+        const audits = await db.auditLog.findMany({ where: { targetType: "SyntheticCampaign", targetId: id } });
+        expect(audits).toHaveLength(2);
+        for (const audit of audits) expect(audit).toMatchObject({ actorId: null, details: { profile, disposition: "redacted-synthetic-audit" } });
+        expect((await liveRecords(id)).map(row => row.table_name)).toEqual(["audit_logs", "audit_logs"]);
+      } else {
+        expect(result.receipt?.storageDisposal?.state).not.toBe("disposed");
+      }
+      for (const field of ["queueJobs", "sinkRecords", "authenticated", "admission", "entities", "emails"]) expect(result.receipt).not.toHaveProperty(field);
+    }
+    if (state !== "disposed") expect(execute("reset", id).code).toBe(0);
+  });
+
+  it.each(["missing", "extra", "checksum", "unfinished", "schema"])("probe refuses %s migration/schema evidence without writes", async fault => {
+    const id = ({ missing: "b4", extra: "b5", checksum: "b6", unfinished: "b7", schema: "b8" } as Record<string, string>)[fault]?.repeat(16);
+    if (!id) throw new Error("unknown migration fault");
+    await seed(id);
+    expect(execute("reset", id).code).toBe(0);
+    const before = await observationSnapshot(id);
+    const migrations = expectedMigrations.map(row => ({ ...row }));
+    if (fault === "missing") migrations.pop();
+    if (fault === "extra") migrations.push({ name: "99999999_probe_extra", checksum: "f".repeat(64) });
+    if (fault === "checksum") {
+      const first = migrations[0];
+      if (!first) throw new Error("migration inventory is empty");
+      first.checksum = "f".repeat(64);
+    }
+    if (fault === "unfinished") await pool.query(`INSERT INTO public._prisma_migrations(id,checksum,migration_name,started_at) VALUES('probe-unfinished','synthetic','99999999_probe_unfinished',now())`);
+    try {
+      const result = execute("probe", id, profile, candidate, undefined, { expectedMigrations: migrations, schemaDisposition: fault === "schema" ? "discarded" : "retained-additive" });
+      expect(await observationSnapshot(id)).toEqual(before);
+      expect(result.code).toBe(1);
+      expect(result.receipt).toBeUndefined();
+    } finally {
+      if (fault === "unfinished") await pool.query(`DELETE FROM public._prisma_migrations WHERE id='probe-unfinished'`);
+    }
+  });
+
+  it("observes disposed candidate C under restored runtime M without rebinding or resetting C", async () => {
+    const id = "b9".repeat(16), runtimeMain = "d".repeat(40);
+    await graph(id);
+    expect(execute("reset", id).code).toBe(0);
+    const before = await observationSnapshot(id);
+    const result = execute("probe", id, profile, candidate, undefined, { target: runtimeMain });
+    expect(result.code, result.sqlDiagnostic).toBe(0);
+    expect(await observationSnapshot(id)).toEqual(before);
+    expect(result.receipt?.sha).toBe(runtimeMain);
+    expect(result.receipt?.candidate).toBe(candidate);
+    expect(result.receipt?.migrations).toEqual(expectedMigrations);
+    expect(result.receipt?.schema).toBe("retained-additive");
+    expect(result.receipt?.storageDisposal?.state).toBe("disposed");
+  });
+
+  it("refuses missing namespace, stale candidate and mixed profile without inventing disposal authority", async () => {
+    const id = "ba".repeat(16), missing = "bb".repeat(16);
+    await seed(id);
+    expect(execute("reset", id).code).toBe(0);
+    const before = await observationSnapshot(id);
+    for (const result of [execute("probe", missing), execute("probe", id, profile, "b".repeat(40)), execute("probe", id, "campaign897-identities-v1")]) {
+      expect(result.code).toBe(1);
+      expect(result.receipt).toBeUndefined();
+    }
+    expect((await pool.query("SELECT count(*)::int AS count FROM pg_namespace WHERE nspname=$1", [`cf_${missing}`])).rows).toEqual([{ count: 0 }]);
+    expect(await observationSnapshot(id)).toEqual(before);
+  });
+
+  it.each(["trigger", "journal", "binding", "audit"])("refuses changed terminal %s authority and preserves the observed damaged state", async fault => {
+    const id = ({ trigger: "bc", journal: "bd", binding: "be", audit: "bf" } as Record<string, string>)[fault]?.repeat(16);
+    if (!id) throw new Error("unknown authority fault");
+    await seed(id);
+    expect(execute("reset", id).code).toBe(0);
+    // Deliberate corruption belongs only to this disposable test database.
+    if (fault === "trigger") await pool.query(`ALTER TABLE public.users DISABLE TRIGGER "cf_${id}_business"`);
+    if (fault === "journal") await pool.query(`UPDATE "cf_${id}".campaign_manifest SET journal_hash='corrupt'`);
+    if (fault === "binding") await pool.query(`UPDATE "cf_${id}".campaign_manifest SET candidate='${"b".repeat(40)}'`);
+    if (fault === "audit") {
+      await pool.query(`ALTER TABLE public.audit_logs DISABLE TRIGGER "cf_${id}_business"`);
+      await pool.query(`UPDATE public.audit_logs SET details='{"corrupt":true}'::jsonb WHERE "targetType"='SyntheticCampaign' AND "targetId"=$1`, [id]);
+    }
+    const before = await observationSnapshot(id);
+    try {
+      const result = execute("probe", id);
+      expect(result.code).toBe(1);
+      expect(result.receipt).toBeUndefined();
+      expect(await observationSnapshot(id)).toEqual(before);
+    } finally {
+      if (fault === "trigger") await pool.query(`ALTER TABLE public.users ENABLE TRIGGER "cf_${id}_business"`);
+      if (fault === "audit") await pool.query(`ALTER TABLE public.audit_logs ENABLE TRIGGER "cf_${id}_business"`);
+    }
+  });
+
 });
