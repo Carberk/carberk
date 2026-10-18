@@ -134,7 +134,8 @@ Support is reached from **Cabinet → Help**, which shows the AutoTM email addre
 - Typing and presence are ephemeral in-memory/socket state, not TanStack Query data and not persisted offline.
 - Chat keeps a small durable outbox for messages/images that were already accepted by the composer but not confirmed by the server. It does not store full chat history offline in Phase 1.
 - If the app is clearly offline, new sends are disabled. If a send was already attempted and then fails, it stays in the outbox with retry.
-- Image attachments use the media upload path into the `chat-attachments` bucket. The local image is staged for preview/retry until the message is sent or discarded.
+- Personal Conversation image attachments use the media upload path into `chat-attachments`. Business enquiry images use the separate private `business-chat-private` bucket and authenticated API upload/download paths. Uploads require current assignment; downloads require current buyer or business history authority. No business storage bearer URL is issued. The local image is staged for preview/retry until the message is sent or discarded.
+- Native business image views keep downloaded bytes in memory, disable image disk caching, clear on session changes/backgrounding, and reauthorize opening full screen. Historical public business keys require the [explicit remediation gate](../../evidence/issue-909/private-business-images.md) before activation.
 
 ### Message types
 

@@ -290,7 +290,7 @@ export const apiClient = {
   },
   postBinary(path: string, bytes: Uint8Array, opts: ClientOptions = {}): Promise<unknown> {
     if (bytes.byteLength > 20 * 1024 * 1024) return Promise.reject(new ApiError("INVALID_ATTACHMENT", 400));
-    return rawRequest(path, { method: "POST", binaryBody: bytes, ...opts, headers: { ...opts.headers, "Content-Type": "application/octet-stream" } }, false);
+    return rawRequest(path, { method: "POST", binaryBody: bytes, ...opts, headers: { ...opts.headers, "Content-Type": opts.headers?.["Content-Type"] ?? "application/octet-stream" } }, false);
   },
   get<T>(path: string, schema?: ZodSchema<T>, opts: ClientOptions = {}) {
     return rawRequest<T>(path, { method: "GET", schema, ...opts }, false);

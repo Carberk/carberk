@@ -1,7 +1,8 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 
-import { ApiError } from "../../api/client";
+import { loadAuthSession } from "../../auth/session";
+import { apiClient, ApiError } from "../../api/client";
 
 const CHAT_STAGING_ROOT = `${FileSystem.documentDirectory}chat-staging/`;
 
@@ -154,6 +155,18 @@ export async function uploadChatImageToPresignedUrl(
       "file_missing",
       false,
     );
+  }
+
+  if (uploadUrl.startsWith("/conversations/")) {
+    const owner = await loadAuthSession();
+    if (!owner) throw new ApiError("FORBIDDEN", 403);
+    const encoded = await FileSystem.readAsStringAsync(localUri, { encoding: FileSystem.EncodingType.Base64 });
+    const binary = atob(encoded); const bytes = Uint8Array.from(binary, value => value.charCodeAt(0));
+    await apiClient.postBinary(uploadUrl, bytes, { headers: { "Content-Type": "image/webp" }, assertSession: async () => {
+      const current = await loadAuthSession();
+      if (current?.user.id !== owner.user.id || current.storedAt !== owner.storedAt) throw new ApiError("FORBIDDEN", 403);
+    } });
+    return;
   }
 
   const uploadResult = await FileSystem.uploadAsync(uploadUrl, localUri, {

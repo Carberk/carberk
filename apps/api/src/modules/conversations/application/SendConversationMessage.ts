@@ -22,6 +22,7 @@ export interface SendConversationMessageInput {
   clientMessageId?: string | undefined;
   actor?: ConversationActor;
   createMessage: (data: {
+    businessId?: string | undefined;
     id: string;
     conversationId: string;
     senderId: string;
@@ -58,13 +59,13 @@ export class SendConversationMessage {
       if (!this.businessAccess || !this.listings || !input.actor) throw new BadRequestException("Business context required");
       const recipientId = await this.businessAccess.authorize(conversation, input.actor, { send: true });
       const authorized = await this.sendPolicy.authorizeBusiness(conversation, input.senderId, recipientId);
-      return this.executeAuthorized(input, authorized);
+      return this.executeAuthorized(input, authorized, conversation.businessId ?? undefined);
     }
     const authorized = await this.sendPolicy.authorize(input.conversationId, input.senderId);
-    return this.executeAuthorized(input, authorized);
+    return this.executeAuthorized(input, authorized, conversation.businessId ?? undefined);
   }
 
-  private async executeAuthorized(input: SendConversationMessageInput, authorized: { recipientId: string; listing: ListingSummary }) {
+  private async executeAuthorized(input: SendConversationMessageInput, authorized: { recipientId: string; listing: ListingSummary }, businessId?: string) {
     if (input.clientMessageId) {
       const existing = await this.conversations.findMessageByClientMessageId(
         input.conversationId,
@@ -76,7 +77,7 @@ export class SendConversationMessage {
       }
     }
 
-    const message = await this.createMessage(input);
+    const message = await this.createMessage(input, businessId);
     const committed = await this.committer.commit(
       message,
       authorized.recipientId,
@@ -85,9 +86,10 @@ export class SendConversationMessage {
     return { ...committed, listing: authorized.listing };
   }
 
-  private async createMessage(input: SendConversationMessageInput) {
+  private async createMessage(input: SendConversationMessageInput, businessId?: string) {
     try {
       return await input.createMessage({
+        businessId,
         id: randomUUID(),
         conversationId: input.conversationId,
         senderId: input.senderId,
