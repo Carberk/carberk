@@ -3,6 +3,7 @@ const { createRequire } = require('node:module');
 const { resolve } = require('node:path');
 const root = resolve(__dirname, '../..');
 const workspaceRequire = createRequire(`${root}/package.json`);
+process.env.TSX_TSCONFIG_PATH = `${root}/apps/worker/tsconfig.json`;
 workspaceRequire('tsx/cjs');
 const workerRequire = createRequire(`${root}/apps/worker/package.json`);
 const { ConfigService } = workerRequire('@nestjs/config');
