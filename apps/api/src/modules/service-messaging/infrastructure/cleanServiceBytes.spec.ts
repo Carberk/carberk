@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import { PDFDocument } from "pdf-lib";
 import { expect, it } from "vitest";
 
 import { cleanServiceBytes } from "./cleanServiceBytes";
@@ -11,7 +12,8 @@ it("stores usable image pixels with EXIF and location metadata removed", async (
  expect(metadata.width).toBe(10); expect(metadata.height).toBe(20);
 });
 it("preserves original provider PDF bytes and rejects PDF expansion into Support", async () => {
- const pdf = Buffer.from("%PDF-1.4\nsynthetic original report\n%%EOF\n");
+ const document = await PDFDocument.create(); document.addPage([100, 100]);
+ const pdf = Buffer.from(await document.save());
  expect(Buffer.from(await cleanServiceBytes(pdf, "application/pdf", "history"))).toEqual(pdf);
  await expect(cleanServiceBytes(pdf, "application/pdf", "support")).rejects.toMatchObject({ code: "INVALID_ATTACHMENT" });
  await expect(cleanServiceBytes(Buffer.from("not a PDF"), "application/pdf", "history")).rejects.toMatchObject({ code: "INVALID_ATTACHMENT" });
@@ -26,4 +28,10 @@ it("requires decodable image pixels even when the header claims a valid metadata
  const scan = original.indexOf(Buffer.from([0xff, 0xda]));
  const truncated = original.subarray(0, scan + 12);
  await expect(cleanServiceBytes(truncated, "image/jpeg", "support")).rejects.toMatchObject({ code: "INVALID_ATTACHMENT" });
+});
+
+it("rejects marker-only and empty PDFs instead of treating header/footer as usable report bytes", async () => {
+ await expect(cleanServiceBytes(Buffer.from("%PDF-1.4\nnot a document\n%%EOF"), "application/pdf", "history")).rejects.toMatchObject({ code: "INVALID_ATTACHMENT" });
+ const empty = await PDFDocument.create();
+ await expect(cleanServiceBytes(await empty.save({ addDefaultPage: false }), "application/pdf", "history")).rejects.toMatchObject({ code: "INVALID_ATTACHMENT" });
 });
