@@ -140,7 +140,7 @@ export class GetListingDetail {
       allowChat: listing.allowChat,
       acceptsExchange: listing.acceptsExchange,
       installmentAvailable: listing.installmentAvailable,
-      media: media.map((m) => ({
+      media: media.filter((m) => m.kind === "image").map((m) => ({
         id: m.id,
         kind: m.kind,
         key: m.key,
