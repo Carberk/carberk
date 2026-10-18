@@ -51,3 +51,5 @@ export * as PublicMarketplaceSchemas from "./schemas/public-marketplace";
 export * as VideoUploadSchemas from "./schemas/video-upload";
 export * as ImprovementSchemas from "./schemas/improvement";
 export * as OperationsSchemas from "./schemas/operations";
+
+export * as DiagnosticTelemetrySchemas from "./schemas/diagnostic-telemetry";
