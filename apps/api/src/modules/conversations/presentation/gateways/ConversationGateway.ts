@@ -469,11 +469,13 @@ export class ConversationGateway implements OnGatewayDisconnect {
       };
     }
 
+    const actor = this.socketActor(client);
     let result: SendRealtimeMessageResult;
     try {
       result = await this.sendMessage.execute({
         senderId: user.sub,
         ...payload,
+        ...(actor ? { actor } : {}),
       });
     } catch (err) {
       return this.toSocketError(err);
@@ -546,7 +548,7 @@ export class ConversationGateway implements OnGatewayDisconnect {
   private socketActor(client: Socket): ConversationActor | undefined {
     const user = this.authenticatedUser(client);
     if (!user) return undefined;
-    const raw = client.handshake.headers["x-business-id"];
+    const raw = client.handshake?.headers?.["x-business-id"];
     const businessId = Array.isArray(raw) ? raw[0] : raw;
     return { userId: user.sub, sessionId: user.sid, ...(businessId ? { businessId } : {}) };
   }

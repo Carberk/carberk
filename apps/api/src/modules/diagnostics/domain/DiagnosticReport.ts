@@ -35,7 +35,7 @@ export class DiagnosticReport {
     if (!actorId || actorId === this.value.authorId) {
       if (!(this.value.audience === "buyer_private" && actorId === this.value.reviewerId)) throw new DiagnosticRuleError("REPORT_REVIEWER_SEPARATION_REQUIRED");
     }
-    if (decision === "return") return this.copy({ status: "returned", reviewerId: actorId });
+    if (decision === "return") return this.copy({ status: "returned", reviewerId: actorId, correctionReason: reason?.trim() || null });
     if (this.value.findings.some(f => f.assessment === "not_checked")) throw new DiagnosticRuleError("REPORT_INCOMPLETE");
     return this.copy({ status: "finalized", reviewerId: actorId, finalizedAt: new Date().toISOString() });
   }
