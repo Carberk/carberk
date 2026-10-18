@@ -65,3 +65,11 @@ export type DiagnosticFindingSave = z.infer<typeof DiagnosticFindingSaveSchema>;
 export type DiagnosticReportTransition = z.infer<typeof DiagnosticReportTransitionSchema>;
 export type DiagnosticCorrection = z.infer<typeof DiagnosticCorrectionSchema>;
 export type DiagnosticReportRecord = z.infer<typeof DiagnosticReportSchema>;
+
+/** Stored release input. No live Listing, booking or customer fields enter rendering. */
+export const DiagnosticReleasedSnapshotSchema = z.object({
+  report: DiagnosticReportSchema.omit({ version: true, template: true, synthetic: true }),
+  template: DiagnosticTemplateDefinitionSchema,
+  synthetic: z.boolean(),
+}).strict();
+export type DiagnosticReleasedSnapshot = z.infer<typeof DiagnosticReleasedSnapshotSchema>;

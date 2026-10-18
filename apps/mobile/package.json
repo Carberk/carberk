@@ -60,6 +60,7 @@
     "expo-splash-screen": "~55.0.25",
     "expo-status-bar": "~55.0.6",
     "expo-system-ui": "~55.0.22",
+    "expo-video": "~55.0.21",
     "i18next": "^24.2.3",
     "lucide-react-native": "^0.469.0",
     "nativewind": "^4.2.0",
