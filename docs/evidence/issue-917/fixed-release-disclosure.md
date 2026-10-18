@@ -2,7 +2,7 @@
 
 Latest founder authority, reconfirmed by campaign owner on 2026-10-18, authorizes autonomous implementation through release preparation. Historical research-first pause is superseded. Live collection, demographics and commercial disclosure remain closed.
 
-The campaign owner explicitly approved fixed Monday UTC partitions, per-metric suppression, freshness-only Today and an honest withheld scorecard. This checkpoint implements that conservative resolution and records its difference from the historical rolling prototype in the owning specification.
+The founder delegated autonomous implementation and balancing in the campaign conversation. Acting within that delegation, the campaign integration owner authorized fixed Monday UTC partitions, per-metric suppression, freshness-only Today and an honest withheld scorecard. The exact policy provenance is the integration owner's instruction, recorded in the owning UI disclosure resolution and PRD85; no direct founder quote selecting Monday weeks is asserted. This checkpoint implements that conservative resolution and records its difference from the historical rolling prototype in the owning specification.
 
 Actual policy fixtures cover repeated single-actor contacts inside a larger discovery window, a one-failure rate complement, immutable corrected counts, one-time full-cohort maturation, late cohort exclusion and wizard inter-step subtraction. Exact internal calculation fixtures remain separate from protected public output. A hosted API/worker fixture now reruns after an accepted late Call fact, reads the immutable release through HTTP and checks Today freshness-only output. Hosted execution is pending through the root-owned PostgreSQL lane. No local services or simulators were started.
 
@@ -23,3 +23,10 @@ Conversation source review found same-time UUID ordering could change already ac
 Campaign owner authorized atomic baseline invalidation for current synthetic scope. Account deletion removes actor-owned raw visibility history, so an actor-owned hidden fact cannot survive erasure. Deletion and restore therefore remove the current inventory baseline in the owning transaction. Business owner recovery/activation also remove that baseline because public availability changes outside Listing status. Fresh denominators withhold until authoritative rebaseline. Already released values and their inventory-availability flag stay fixed, preventing subtractive republishing. There is no app-owned business suspension operation in this candidate; direct database fixture mutations are not claimed as instrumented runtime sources.
 
 Hosted red fixtures were prepared for deletion rollback/commit, restore and actual business-activation HTTP. Local API/worker typechecks and focused lint pass; actual PostgreSQL red/green remains pending. Live collection remains blocked on legal/anonymity qualification, including erasure obligations for retained derivatives. The conservative synthetic policy is not an epoch-wide lifecycle or anonymity certification.
+
+
+## Hosted RED receipts and reconciliation update
+
+The integration owner confirmed genuine hosted RED in run `39099248410`, `/tmp/carberk-api-791fd143.log`, for aggregate expiry extending from recomputation time instead of the fixed window end, and for business attachment presigns still returning public keys. Earlier hosted `ee9e7d50` confirmed Conversation cohort instability, legacy reply invention, missing deletion/restore/owner-activation baseline invalidation and ambiguous-inventory zero. The respective GREEN checkpoints are prepared for the integration owner's assembled verification; this note does not claim their hosted completion.
+
+The [scoped criterion reconciliation](../issue-897/dealer-measurement-criterion-reconciliation.md) identifies the fixed-week/raw-literal departure explicitly and separates compiler formulas from actual source-to-HTTP evidence and final activation gates.
