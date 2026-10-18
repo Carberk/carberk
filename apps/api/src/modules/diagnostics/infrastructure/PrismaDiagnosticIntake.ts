@@ -2,9 +2,11 @@ import { createHash } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService, type Prisma } from "@auto-tm/db";
 import { DiagnosticSchemas } from "@auto-tm/contracts";
-import { BUSINESS_AUTHORITY_PORT, STAFF_AUTHORITY_PORT, StaffAuthorityDenied, type BusinessAuthorityPort, type StaffAuthorityPort } from "../../identity/identity.public";
+import { BUSINESS_AUTHORITY_PORT, type BusinessAuthorityPort } from "../../identity/identity.public";
 import { InspectionOrder, DiagnosticRuleError, type InspectionOrderState } from "../domain/InspectionOrder";
 import { DIAGNOSTIC_RUNTIME, type DiagnosticIntakePort, type DiagnosticRuntime, type DiagnosticSubject } from "../domain/ports/DiagnosticIntakePort";
+
+import { DiagnosticAuthority } from "./DiagnosticAuthority";
 
 type Tx = Prisma.TransactionClient;
 type Order = Prisma.InspectionOrderGetPayload<object>;
@@ -19,36 +21,13 @@ export function diagnosticListingDigest(listing: { id: string; sellerId: string;
 @Injectable()
 export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
   constructor(@Inject(PrismaService) private readonly db: PrismaService,
-    @Inject(STAFF_AUTHORITY_PORT) private readonly staff: StaffAuthorityPort,
+    @Inject(DiagnosticAuthority) private readonly authority: DiagnosticAuthority,
     @Inject(BUSINESS_AUTHORITY_PORT) private readonly business: BusinessAuthorityPort,
     @Inject(DIAGNOSTIC_RUNTIME) private readonly runtime: DiagnosticRuntime) {}
 
-  private async current(tx: Tx, subject: DiagnosticSubject): Promise<void> {
-    if (!this.runtime.syntheticAllowed(subject)) throw denial();
-    try { await this.business.resolve(subject, tx); } catch { throw denial(); }
-  }
-  private async centerAuthority(tx: Tx, subject: DiagnosticSubject, centerId: string, capability: DiagnosticSchemas.DiagnosticCapability): Promise<void> {
-    try { await this.staff.authorize({ ...subject, capability }, tx); }
-    catch (error) { if (error instanceof StaffAuthorityDenied) throw denial(); throw error; }
-    await tx.$queryRaw`SELECT id FROM diagnostic_center_assignments WHERE "centerId"=${centerId} AND "userId"=${subject.userId} AND capability=${capability} FOR SHARE`;
-    const assignment = await tx.diagnosticCenterAssignment.findUnique({ where: { centerId_userId_capability: { centerId, userId: subject.userId, capability } } });
-    if (!assignment || assignment.revokedAt || !assignment.qualifiedUntil || assignment.qualifiedUntil <= this.runtime.now()) throw denial();
-  }
-  private async scope(tx: Tx, subject: DiagnosticSubject, id: string, capability?: DiagnosticSchemas.DiagnosticCapability): Promise<{ row: Order; staff: boolean }> {
-    await this.current(tx, subject);
-    await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${id} FOR UPDATE`;
-    const row = await tx.inspectionOrder.findUnique({ where: { id } });
-    if (!row || row.erasedAt || !row.synthetic) throw denial();
-    if (!capability && row.commissionerId === subject.userId) return { row, staff: false };
-    const assignments = await tx.diagnosticOrderAssignment.findMany({ where: { orderId: id, userId: subject.userId, revokedAt: null, ...(capability ? { capability } : {}) } });
-    for (const assignment of assignments) {
-      const parsed = DiagnosticSchemas.DiagnosticCapabilitySchema.safeParse(assignment.capability);
-      if (!parsed.success) continue;
-      try { await this.centerAuthority(tx, subject, row.centerId, parsed.data); return { row, staff: true }; }
-      catch (error) { if (!(error instanceof DiagnosticRuleError)) throw error; }
-    }
-    throw denial();
-  }
+  private current(tx: Tx, subject: DiagnosticSubject): Promise<void> { return this.authority.current(tx, subject); }
+  private centerAuthority(tx: Tx, subject: DiagnosticSubject, centerId: string, capability: DiagnosticSchemas.DiagnosticCapability): Promise<void> { return this.authority.center(tx, subject, centerId, capability); }
+  private scope(tx: Tx, subject: DiagnosticSubject, id: string, capability?: DiagnosticSchemas.DiagnosticCapability): Promise<{ row: Order; staff: boolean }> { return this.authority.order(tx, subject, id, capability); }
   private version(row: Order, expected: number): void { if (row.version !== expected) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION"); }
   private async audit(tx: Tx, subject: DiagnosticSubject, row: Pick<Order, "id" | "centerId">, action: string, details: Prisma.InputJsonValue = {}): Promise<void> {
     await tx.diagnosticAudit.create({ data: { id: this.runtime.id(), centerId: row.centerId, orderId: row.id, actorId: subject.userId, action, details, createdAt: this.runtime.now() } });

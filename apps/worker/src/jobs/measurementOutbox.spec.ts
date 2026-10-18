@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { MeasurementOutboxDelivery } from "./measurementOutbox";
 
 const event = { version: 1, eventId: "00000000-0000-4000-8000-000000000001", occurredAt: "2026-10-15T00:00:00.000Z", purpose: "product_improvement", eventName: "listing_published", context: { platform: "server", release: "server", build: "test", locale: "en" }, payload: { listingId: "00000000-0000-4000-8000-000000000002", cityId: "00000000-0000-4000-8000-000000000003" } };

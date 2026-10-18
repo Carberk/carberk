@@ -8,6 +8,8 @@ export interface VideoStorageSession {
 }
 export interface VideoConfirmedPart { partNumber: number; sizeBytes: number; etag: string; }
 export interface VideoObjectStorage {
+  recoverInitialization(sessionId: string, uploadId: string): Promise<string | null>;
+  sourceCommitted(session: VideoStorageSession): Promise<boolean>;
   initialize(sessionId: string, uploadId: string): Promise<string>;
   listParts(session: VideoStorageSession): Promise<VideoConfirmedPart[]>;
   partCredential(session: VideoStorageSession, partNumber: number): Promise<{ url: string; expiresAt: Date; sizeBytes: number }>;

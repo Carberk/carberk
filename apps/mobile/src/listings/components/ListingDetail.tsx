@@ -4,6 +4,7 @@ import type { ListingsSchemas } from "@auto-tm/contracts";
 import { ChevronRight, Flag } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 
+import { MarketplaceShareActions } from "../../business/MarketplaceShareActions";
 import type { CatalogMaps } from "../detail/useCatalogMaps";
 import {
   closedListingBannerKey,
@@ -210,10 +211,12 @@ export function ListingDetailView({
             <VinHistorySection vinHistory={listing.vinHistory} />
           </View>
         )}
+        <MarketplaceShareActions kind="listings" id={listing.id} />
         {!isOwner && (
           <View className="gap-3">
             <Separator />
             <SellerBlock
+              business={listing.business}
               seller={listing.seller}
               cityName={maps.cityName(listing.cityId)}
               locationText={listing.locationText}

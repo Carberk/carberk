@@ -1,6 +1,7 @@
-import { Injectable, Inject, type OnModuleInit } from "@nestjs/common";
+import { Injectable, type OnModuleInit } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bullmq";
 import type { Queue } from "bullmq";
+
 import { MEASUREMENT_OUTBOX_QUEUE } from "./measurement-outbox.processor";
 @Injectable()
 export class MeasurementOutboxScheduler implements OnModuleInit {
