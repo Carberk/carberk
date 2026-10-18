@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import sharp from "sharp";
 import { S3Client, CreateBucketCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Test } from "@nestjs/testing";
 import { ConfigModule } from "@nestjs/config";
 import { JwtModule, JwtService } from "@nestjs/jwt";
@@ -17,6 +17,7 @@ import { GlobalErrorFilter } from "../../../common/error.filter";
 import { EnvSchema } from "../../../env.schema";
 import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
 import { cleanSuiteFixtures, defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
+import { BUSINESS_CHAT_FILE_STORE, type BusinessChatFileStore } from "../domain/ports/BusinessChatFileStore";
 import type { MessageSentEvent } from "../domain/ports/MessageEventPublisher";
 
 const suite = defineE2eSuite("business-enquiries-909");
@@ -109,7 +110,22 @@ describe("business enquiries through real HTTP and PostgreSQL", () => {
    await get("buyer", download, false).expect(200).expect("Cache-Control", "no-store, private");
    await get("sales-a", download).expect(200);
    expect((await fetch(`${endpoint}/business-chat-private/${key}`)).status).toBe(403);
-   await prisma.dealershipMember.delete({ where: { userId: suite.id("sales-a") } });
+   // Read the actual object before holding the HTTP response at the storage boundary.
+   const store = app.get<BusinessChatFileStore>(BUSINESS_CHAT_FILE_STORE);
+   const actualGet = store.get.bind(store);
+   let entered!: () => void; let release!: () => void;
+   const read = new Promise<void>(resolve => { entered = resolve; });
+   const barrier = new Promise<void>(resolve => { release = resolve; });
+   const blocked = vi.spyOn(store, "get").mockImplementationOnce(async objectKey => {
+    const stored = await actualGet(objectKey);
+    entered(); await barrier; return stored;
+   });
+   const pending = get("sales-a", download).then(response => response);
+   try {
+    await read;
+    await prisma.dealershipMember.delete({ where: { userId: suite.id("sales-a") } });
+   } finally { release(); }
+   try { expect((await pending).status).toBe(403); } finally { blocked.mockRestore(); }
    await get("sales-a", download).expect(403);
    await request.post(`/api/v1/conversations${path}`).set("authorization", `Bearer ${token("sales-a")}`).set("x-business-id", businessId).set("Content-Type", "image/webp").send(bytes).expect(403);
    await get("owner", download).expect(200);
