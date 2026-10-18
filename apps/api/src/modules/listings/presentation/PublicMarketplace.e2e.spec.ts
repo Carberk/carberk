@@ -57,9 +57,9 @@ describe("anonymous marketplace through real HTTP and PostgreSQL", () => {
   await prisma.listing.update({ where: { id: listingId }, data: { publishedAt: new Date("2026-10-01T00:00:00Z") } });
   await create(personalId, null, new Date("2026-10-03T00:00:00Z"));
   const ranking = new SortedFeedRankingAdapter(prisma, new PrismaExchangeRateRepository(prisma));
-  expect((await ranking.rank({ sort: "newest", limit: 20 })).items.map(item => item.id)).toEqual([personalId, listingId]);
-  expect((await ranking.rank({ sort: "newest", filters: { sellerType: "business" }, limit: 20 })).items.map(item => item.id)).toEqual([listingId]);
-  expect((await ranking.count({ filters: { sellerType: "personal" } })).totalMatching).toBe(1);
+  expect((await ranking.rank({ sort: "newest", filters: { brandId: suite.catalog.brandId }, limit: 20 })).items.map(item => item.id)).toEqual([personalId, listingId]);
+  expect((await ranking.rank({ sort: "newest", filters: { brandId: suite.catalog.brandId, sellerType: "business" }, limit: 20 })).items.map(item => item.id)).toEqual([listingId]);
+  expect((await ranking.count({ filters: { brandId: suite.catalog.brandId, sellerType: "personal" } })).totalMatching).toBe(1);
   for (let index = 0; index < 21; index++) await create(suite.id(`page-${index}`), businessId, new Date("2026-10-02T00:00:00Z"));
   const first = (await request.get(`/api/v1/public-marketplace/showrooms/${businessId}`).expect(200)).body;
   expect(first.listings).toHaveLength(20); expect(first.nextCursor).toBeTruthy();
