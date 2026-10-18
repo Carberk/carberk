@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import seededBrands from "../../../../../../packages/db/prisma/seed/brands.json";
 import seededModels from "../../../../../../packages/db/prisma/seed/models.json";
 
 import type { Brand } from "../domain/Brand";
@@ -194,6 +195,38 @@ describe("SearchCatalog", () => {
       }
     }
   });
+
+  it.each(["ru", "tk", "en"] as const)(
+    "finds seeded International Harvester machinery separately from Navistar in %s",
+    async (locale) => {
+      brandRepo.brands = seededBrands.map((brand) =>
+        makeBrand({ ...brand, id: brand.slug }),
+      );
+      modelRepo.models = seededModels.map((model) =>
+        makeModel({ ...model, id: `${model.brandSlug}/${model.slug}`, brandId: model.brandSlug }),
+      );
+      index.invalidate();
+
+      const brand = await uc.execute({ query: "International Harvester", locale });
+      expect(brand.results[0]).toMatchObject({
+        kind: "brand", brandId: "international-harvester", label: "International Harvester",
+      });
+      const tractor = await uc.execute({ query: "844", locale });
+      expect(tractor.results).toContainEqual(expect.objectContaining({
+        kind: "model", brandId: "international-harvester",
+        modelId: "international-harvester/844", label: "844",
+        brandLabel: "International Harvester",
+      }));
+      const navistar = await uc.execute({ query: "ProStar", locale });
+      expect(navistar.results[0]).toMatchObject({
+        kind: "model", brandId: "international", label: "ProStar",
+      });
+      const modernCase = await uc.execute({ query: "STX375", locale });
+      expect(modernCase.results[0]).toMatchObject({
+        kind: "model", brandId: "case", label: "STX375 Quadtrac",
+      });
+    },
+  );
 
   it("returns brand and model results together in one list", async () => {
     const result = await uc.execute({ query: "toyota", locale: "en" });
