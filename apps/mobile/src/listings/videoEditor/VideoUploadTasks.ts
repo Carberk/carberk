@@ -107,3 +107,4 @@ export async function reconcileVideoUploadOwner() {
   const ownerId = peekAuthSession()?.user.id;
   await Promise.all([...tasks.values()].filter(task => task.ownerId !== ownerId && ["PREPARING", "UPLOADING"].includes(task.snapshot().phase)).map(task => task.pause()));
 }
+export async function rebindPublishedVideo(_ownerId: string, _draftId: string, _listingId: string, _businessId?: string): Promise<void> {}
