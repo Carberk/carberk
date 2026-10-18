@@ -91,6 +91,11 @@ describe.skipIf(!hosted)("private service lifecycle on disposable PostgreSQL and
   expect((await db.historyRefund.findUniqueOrThrow({ where: { orderId: order.id } })).state).toBe("pending");
   expect((await db.historyPayment.findUniqueOrThrow({ where: { id: payment.id } })).claim).toBeNull();
  });
+ it("rejects a mileage value with a missing unit instead of accepting SQL UNKNOWN", async () => {
+  const id = randomUUID(), sha256 = "b".repeat(64); artifactIds.push(id);
+  await expect(db.historyArtifact.create({ data: { id, provider: "carfax", vin: "1HGCM82633A004352", originalDate: now, objectKey: `history-artifacts/${id}/${sha256}`, sha256, sizeBytes: 10, expectedPages: 1, mileageValue: 64000, mileageUnit: null, mileageObservedAt: now, rights: {} } })).rejects.toThrow("history_artifact_source_facts_bounded");
+  expect(await db.historyArtifact.count({ where: { id } })).toBe(0);
+ });
  it("restricts due originals before deletion, honors a specific hold and retries exact bytes without revival", async () => {
   const create = async (held: boolean) => {
    const id = randomUUID(), sha256 = "a".repeat(64), key = `history-artifacts/${id}/${sha256}`;
