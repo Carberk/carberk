@@ -36,7 +36,7 @@ async function openCard(card = cardPayload(), detail = detailPayload()) {
   const screen = await renderMobile(<CardToDetail />);
   await fireEvent.press(await screen.findByText("2020 Toyota Camry"));
   await screen.findByText("Toyota Camry, 2020");
-  await screen.findByText("Automatic");
+  for (const text of ["Automatic", "Petrol", "20 Sep · Ashgabat"]) await screen.findByText(text);
   return screen;
 }
 
@@ -62,15 +62,19 @@ function chrome(screen: Screen) {
   return {
     badges: ["Exchange possible", "Installment possible"].filter((text) => screen.queryByText(text)),
     buttons: ["Call", "Message"].flatMap((name) => screen.queryAllByRole("button", { name })
-      .map((button) => ({ name, layout: String(button.props.className).split(" ").filter((token) => /^(flex-1$|min-h-|px-|py-|rounded-)/.test(token)), container: button.parent?.props.className }))),
+      .map((button) => ({
+        name,
+        layout: String(button.props.className).split(" ")
+          .filter((token) => /^(flex-1$|min-h-|px-|py-|rounded-)/.test(token)),
+        container: button.parent?.props.className,
+      }))),
   };
 }
 
 describe("Listing detail from a card fetched through MSW", () => {
   it("keeps complete Specifications, VIN space, badges and contact layout as delayed detail arrives", async () => {
     const screen = await openCard();
-    await screen.findByText("Front wheel");
-    await screen.findByText("White");
+    for (const text of ["Front wheel", "Sedan", "White"]) await screen.findByText(text);
     const preview = entries(screen);
     expect(preview.map((entry) => entry.text)).toEqual([
       "Year 2020", "Mileage 12,000 km", "Transmission Automatic", "Engine type Petrol",
@@ -95,7 +99,7 @@ describe("Listing detail from a card fetched through MSW", () => {
     for (const name of ["Call", "Message"]) expect(screen.getByRole("button", { name })).toBeEnabled();
     // Real auth hooks finish signed out; the loaded action preserves its intent.
     await fireEvent.press(screen.getByRole("button", { name: "Message" }));
-    expect(useAuthIntentStore.getState().intent?.action).toEqual({ kind: "message", listingId: cardPayload().id });
+    expect(useAuthIntentStore.getState().intent?.action).toEqual({ kind: "message", listingId: "00000000-0000-4000-8000-000000000373" });
     expect(routerMock.push).toHaveBeenCalledWith(expect.objectContaining({ pathname: "/(auth)/phone" }));
   });
 
@@ -143,7 +147,7 @@ describe("Listing detail from a card fetched through MSW", () => {
     expect(screen.queryByTestId("spec-cell-loading")).toBeNull();
     expect(screen.queryByTestId("spec-row-loading")).toBeNull();
     for (const text of ["150 hp", "Front wheel", "Sedan", "White", "JTDKB20U793456789"])
-      expect(screen.getByText(text)).toBeTruthy();
+      expect(await screen.findByText(text)).toBeTruthy();
     expect(chrome(screen).badges).toEqual(["Exchange possible", "Installment possible"]);
   });
 });
