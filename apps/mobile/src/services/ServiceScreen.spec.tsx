@@ -146,3 +146,14 @@ it("retries the same private receipt bytes and submits evidence without marking 
  await screen.findByText("Receipt ready for reconciliation"); expect(stages).toBe(1); expect(uploads).toBe(2); expect(commands).toHaveLength(0);
  await fireEvent.press(screen.getByRole("button", { name: "Submit for reconciliation" })); expect(commands[0]?.["attachmentId"]).toBe(id); expect(commands[0]).not.toHaveProperty("verifiedFunds");
 });
+
+it("preserves an unsent draft when leaving and returning to a service conversation", async () => {
+ const second = "33333333-3333-4333-8333-333333333333";
+ server.use(http.get("*/services/conversations", () => HttpResponse.json([{ id, purpose: "support", createdAt: "2026-10-15T10:00:00Z" }, { id: second, purpose: "support", createdAt: "2026-10-16T10:00:00Z" }])), http.get("*/services/conversations/:id", ({ params }) => HttpResponse.json({ id: params.id, resourceId: params.id, purpose: "support", status: "open", assignmentVersion: 0, assigned: false, operatorName: null, sourceListingId: null, canSend: true, messages: [message], lastSequence: 1, readThrough: 0, unread: 1, hasMore: false })));
+ const screen = await renderMobile(<ServiceScreen/>);
+ await fireEvent.press((await screen.findAllByRole("button", { name: "General Support" }))[0]); await screen.findByText(message.body);
+ await fireEvent.changeText(screen.getByLabelText("Message"), "Keep this draft");
+ await fireEvent.press(screen.getByRole("button", { name: "Back to queue" }));
+ await fireEvent.press((await screen.findAllByRole("button", { name: "General Support" }))[0]);
+ expect(await screen.findByDisplayValue("Keep this draft")).toBeTruthy();
+});
