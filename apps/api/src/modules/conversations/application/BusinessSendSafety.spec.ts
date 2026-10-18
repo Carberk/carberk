@@ -10,7 +10,7 @@ import { ConversationSendPolicy } from "./ConversationSendPolicy";
 import { ConversationMessageCommitter } from "./ConversationMessageCommitter";
 import { SendConversationMessage } from "./SendConversationMessage";
 
-function setup(options: { blocked?: boolean; buyerSuspended?: boolean; buyerDeleting?: boolean; status?: ListingSummary["status"] } = {}) {
+function setup(options: { blocked?: boolean; buyerSuspended?: boolean; buyerDeleting?: boolean; status?: ListingSummary["status"] | "draft" } = {}) {
  const conversation = Conversation.create({ id: "conversation", listingId: "listing", buyerId: "buyer", sellerId: "departed-creator", businessId: "business", assigneeId: "sales" });
  const saved: Message[] = [];
  const repository = { findById: async () => conversation, saveMessage: async (message: Message) => { saved.push(message); } } as unknown as ConversationRepository;
