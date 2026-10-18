@@ -89,3 +89,27 @@ export class VideoUploadController {
     }
   }
 }
+
+@UseFilters(VideoUploadErrorFilter)
+@Controller("api/v1/listings")
+export class ListingVideoRemovalController {
+  constructor(
+    @Inject(OWNED_VIDEO_UPLOAD_PROTOCOL) private readonly protocol: OwnedVideoUploadProtocol,
+    @Inject(VideoEligibility) private readonly eligibility: VideoEligibility,
+  ) {}
+  @Delete(":id/video")
+  @HttpCode(204)
+  @Header("Cache-Control", "private, no-store")
+  async remove(@Req() req: FastifyRequest, @Param("id") id: string) {
+    const actor = inventoryActor(req);
+    if (!actor.userId || !actor.sessionId) throw new UnauthorizedException();
+    this.eligibility.assertEligible(actor.userId);
+    if (!z.string().uuid().safeParse(id).success) throw new BadRequestException({ code: "VIDEO_SESSION_INVALID" });
+    try { await this.protocol.removeListing(actor, id); }
+    catch (error) {
+      if (error instanceof HttpException) throw error;
+      if (error instanceof Error && error.message === "VIDEO_SESSION_UNAVAILABLE") throw new HttpException({ code: "VIDEO_SESSION_UNAVAILABLE" }, 404);
+      throw new HttpException({ code: "VIDEO_SERVICE_UNAVAILABLE" }, 503);
+    }
+  }
+}
