@@ -136,6 +136,7 @@ describe.skipIf(!hosted)("video processing durable fences on disposable PostgreS
     await ledger.plan(lease, row.assets, now);
     expect(await ledger.adopt(lease, row.facts, now)).toBe(true);
     expect((await db.videoGeneration.findUniqueOrThrow({ where: { id: row.id } })).state).toBe("READY");
+    expect(outcomes).toEqual([expect.objectContaining({ eventName: "video_processing_result", payload: { draftId, jobId: row.id, attemptId: lease.leaseToken, result: "success", durationMs: 0 } })]);
     expect(await db.mediaUpload.findUniqueOrThrow({ where: { id: row.uploadId } })).toMatchObject({ state: "PREPARING", claimTargetType: "video_session", claimToken: row.id });
     expect((await db.listing.findUniqueOrThrow({ where: { id: listingId } })).activeVideoGenerationId).toBeNull();
   });

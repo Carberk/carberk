@@ -31,7 +31,7 @@ Exact stable names and schema fields become the contracts implementation's revie
 | call_intent | Client; genuine enabled Call action; intent only |
 | conversation_created | Conversations server; newly committed Conversation only |
 | first_buyer_message_accepted, seller_first_reply | Conversations server; first accepted eligible buyer Message and first seller reply to it; no text or attachment |
-| video_processing_result, video_playback_result | Worker/player; job/attempt or playback correlation; preparation/upload/processing/playback stay distinct |
+| video_processing_result, video_playback_result | Worker/player; processing identifies exactly one owning Listing or Draft with `listingId` or `draftId`, plus job/attempt correlation. Playback identifies its Listing and playback attempt. Preparation/upload/processing/playback stay distinct |
 | diagnostic/health signals | Diagnostics contract in 81; not product autocapture |
 
 Video instrumentation follows ADR-0099's phase and access restrictions. Tester video can prove collection/reliability without counting as real marketplace conversion. Dealer/report event additions wait for their accepted scopes. Existing public Listing views work #874 remains separately owned; shared measurement must reconcile semantics without taking ownership or exposing private analytics publicly.

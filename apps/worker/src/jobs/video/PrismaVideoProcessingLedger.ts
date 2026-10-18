@@ -90,13 +90,12 @@ export class PrismaVideoProcessingLedger implements VideoProcessingLedger {
     });
   }
   private async outcome(tx: Prisma.TransactionClient, context: Current, lease: VideoProcessingLease, now: Date, result: "success" | "technical_failure" | "expected_rejection" | "cancelled", category?: "timeout" | "permission" | "unknown") {
-    // The settled dictionary requires a real Listing ID. Draft processing is
-    // durable operational evidence until its separate event contract is agreed.
-    if (!this.measurement || context.target.kind !== "listing") return;
+    if (!this.measurement) return;
+    const target = context.target.kind === "listing" ? { listingId: context.target.row.id } : { draftId: context.target.row.id };
     const startedAt = (context.work.leaseExpiresAt?.getTime() ?? now.getTime() + leaseMs) - leaseMs;
     try {
       await this.measurement.capture(tx, context.session.userId, { version: 1, eventId: lease.leaseToken, occurredAt: now.toISOString(), context: this.measurement.context,
-        eventName: "video_processing_result", purpose: "product_reliability", payload: { listingId: context.target.row.id, jobId: lease.generationId, attemptId: lease.leaseToken, result, durationMs: Math.max(0, Math.min(86_400_000, now.getTime() - startedAt)), ...(category ? { category } : {}) } });
+        eventName: "video_processing_result", purpose: "product_reliability", payload: { ...target, jobId: lease.generationId, attemptId: lease.leaseToken, result, durationMs: Math.max(0, Math.min(86_400_000, now.getTime() - startedAt)), ...(category ? { category } : {}) } });
     } catch { /* Source writes survive best-effort measurement failure. */ }
   }
   private transaction<T>(run: (tx: Prisma.TransactionClient) => Promise<T>) {
