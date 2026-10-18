@@ -27,6 +27,16 @@ describe("owned multipart protocol", () => {
     const f = fixture(); const created = await f.service.create(actor, input); f.storage.loseCompleteResponse = true;
     expect((await f.service.complete(actor, created.sessionId)).state).toBe("PROCESSING");
   });
+  it("returns persisted pause intent before refusing new part credentials, then resumes bounded renewal", async () => {
+    const f = fixture(); const created = await f.service.create(actor, input);
+    expect((await f.service.change(actor, created.sessionId, "pause")).state).toBe("PAUSED");
+    await expect(f.service.credentials(actor, created.sessionId, [1])).rejects.toThrow("VIDEO_PART_INVALID");
+    expect((await f.service.change(actor, created.sessionId, "resume")).state).toBe("UPLOADING");
+    expect(await f.service.credentials(actor, created.sessionId, [2])).toMatchObject({ version: 1, parts: [{ partNumber: 2 }] });
+    await expect(f.service.credentials(actor, created.sessionId, [3])).rejects.toThrow("VIDEO_PART_INVALID");
+    await expect(f.service.credentials(actor, created.sessionId, [1, 1])).rejects.toThrow("VIDEO_PART_INVALID");
+    expect((await f.service.get(actor, created.sessionId)).parts).toEqual([]);
+  });
   it("lets persisted cancellation win a late successful provider completion", async () => {
     const f = fixture(); const created = await f.service.create(actor, input);
     f.storage.afterComplete = () => { f.ledger.cancelled = true; };
