@@ -9,6 +9,7 @@ import { useListingCount } from "../../api/listings/useListingCount";
 import { showResultsCount } from "./showResultsCount";
 import { BrandPicker } from "./BrandPicker";
 import { CityFilterControl } from "./CityFilterControl";
+import { SellerTypeFilterControl } from "./SellerTypeFilterControl";
 import { ConditionFilterControl } from "./ConditionFilterControl";
 import { FilterLabel } from "./FilterSection";
 import { ModelPicker } from "./ModelPicker";
@@ -147,6 +148,7 @@ export function SearchParametersForm({ initial, returnToResults, onBack }: Searc
           keyboardShouldPersistTaps="handled"
         >
           <ConditionFilterControl value={draft.condition} onChange={(value) => setField("condition", value)} />
+          <SellerTypeFilterControl value={draft.sellerType} onChange={(value) => setField("sellerType", value)} />
           <CityFilterControl key={cityResetVersion} draft={draft} setField={setField} />
           <View className="gap-2">
           <FilterLabel>{t("brandModel")}</FilterLabel>

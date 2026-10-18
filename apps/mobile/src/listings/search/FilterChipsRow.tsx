@@ -14,7 +14,7 @@ import { Text } from "@/components/ui/text";
 import { tabularFigures } from "@/lib/font";
 import { cn } from "@/lib/utils";
 
-export type ChipGroup = "city" | "price" | "year";
+export type ChipGroup = "city" | "price" | "year" | "seller";
 
 /**
  * The Filters entry and one chip per active filter group, in a row that
@@ -40,6 +40,7 @@ export function FilterChipsRow({ filters, cityName, onOpen, onRemove, floating =
     const format = (n: number) => n.toLocaleString(localeTag(i18n.language), { useGrouping: unit === "TMT" });
     return min != null && max != null ? `${format(min)} – ${format(max)} ${unit}`.trim() : min != null ? t("resultsFrom", { value: `${format(min)} ${unit}`.trim() }) : max != null ? t("resultsUpTo", { value: `${format(max)} ${unit}`.trim() }) : "";
   };
+  if (filters.sellerType) chips.push({ group: "seller", label: t(filters.sellerType === "business" ? "sellerTypeBusiness" : "sellerTypePersonal") });
   if (filters.cityId) chips.push({ group: "city", label: cityName ?? t("city") });
   if (filters.priceMin != null || filters.priceMax != null) chips.push({ group: "price", label: range(filters.priceMin, filters.priceMax, "TMT") });
   if (filters.yearMin != null || filters.yearMax != null) chips.push({ group: "year", label: range(filters.yearMin, filters.yearMax) });
