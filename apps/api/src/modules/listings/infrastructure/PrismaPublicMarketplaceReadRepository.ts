@@ -14,6 +14,11 @@ const business = (row: Prisma.DealershipGetPayload<{ select: typeof identity }>)
 @Injectable()
 export class PrismaPublicMarketplaceReadRepository implements PublicMarketplaceReadPort {
  constructor(@Inject(PrismaService) private readonly prisma: PrismaService, @Inject(MEDIA_STORAGE_PORT) private readonly storage: MediaStoragePort) {}
+ async businessIdentities(ids: string[]) {
+  if (!ids.length) return new Map();
+  const rows = await this.prisma.dealership.findMany({ where: { id: { in: ids }, status: "active" }, select: identity });
+  return new Map(rows.map(row => [row.id, business(row)]));
+ }
  async listing(id: string) {
   const row = await this.prisma.listing.findFirst({ where: { id, deletedAt: null, status: { in: ["active", "sold"] }, OR: [{ businessId: null }, { business: { status: "active" } }] }, select: projection });
   return row ? this.map(row) : null;
