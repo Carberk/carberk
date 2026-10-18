@@ -38,9 +38,10 @@ export class SendRealtimeMessage {
       conversationId: input.conversationId,
       ...(input.actor ? { actor: input.actor } : {}),
       clientMessageId: input.clientMessageId,
-      createMessage: ({ id, conversationId, senderId }) =>
+      createMessage: ({ id, conversationId, senderId, businessId }) =>
         createCleanRichMessage(this.attachmentCleaner, {
           id,
+          businessId,
           conversationId,
           senderId,
           input,

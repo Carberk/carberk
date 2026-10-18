@@ -9,12 +9,13 @@ export function chatAttachmentKey(
   conversationId: string,
   attachmentId: string,
   extension: ChatAttachmentExtension,
+  business = false,
 ): string {
-  return `chat-attachments/${conversationId}/${attachmentId}/original.${extension}`;
+  return `${business ? "business-chat-private" : "chat-attachments"}/${conversationId}/${attachmentId}/original.${extension}`;
 }
 
 /** True only for a key the attachment presign issued for this Conversation. */
-export function isChatAttachmentKeyOf(conversationId: string, key: string): boolean {
-  const prefix = `chat-attachments/${conversationId}/`;
+export function isChatAttachmentKeyOf(conversationId: string, key: string, business = false): boolean {
+  const prefix = `${business ? "business-chat-private" : "chat-attachments"}/${conversationId}/`;
   return key.startsWith(prefix) && ATTACHMENT_FILE.test(key.slice(prefix.length));
 }

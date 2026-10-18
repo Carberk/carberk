@@ -20,6 +20,7 @@ export type RichMessageInput =
     };
 
 export function createRichMessage(data: {
+  businessId?: string | undefined;
   id: string;
   conversationId: string;
   senderId: string;
@@ -60,7 +61,7 @@ export async function createCleanRichMessage(
 ): Promise<Message> {
   if (data.input.kind === "image") {
     const { key } = data.input.metadata;
-    if (!isChatAttachmentKeyOf(data.conversationId, key)) {
+    if (!isChatAttachmentKeyOf(data.conversationId, key, !!data.businessId)) {
       throw new ConversationDomainError(
         CONVERSATION_ERROR_CODES.IMAGE_ATTACHMENT_NOT_USABLE,
         "Image key is not an attachment of this conversation",

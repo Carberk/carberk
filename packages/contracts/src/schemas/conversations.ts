@@ -131,9 +131,11 @@ export type PresignChatAttachmentRequest = z.infer<
 >;
 
 export const PresignChatAttachmentResponseSchema = z.object({
-  uploadUrl: z.string().url(),
+  // Business uploads use a same-API authenticated path, never a storage bearer URL.
+  uploadUrl: z.union([z.string().url(), z.string().regex(/^\/conversations\/[0-9a-f-]+\/attachments\/[0-9a-f-]+\/bytes$/)]),
   key: z.string(),
-  expiresIn: z.number().int().positive(),
+  // Zero means no bearer grant was issued; current authority is checked per upload.
+  expiresIn: z.number().int().nonnegative(),
   maxSizeBytes: z.number().int().positive(),
 });
 export type PresignChatAttachmentResponse = z.infer<

@@ -1,3 +1,7 @@
+import { BusinessChatFiles } from "./application/BusinessChatFiles";
+import { MinioBusinessChatFileStore } from "./infrastructure/MinioBusinessChatFileStore";
+import { BUSINESS_CHAT_FILE_STORE } from "./domain/ports/BusinessChatFileStore";
+import { ConversationBinaryParser } from "./presentation/ConversationBinaryParser";
 import { MeasurementModule } from "../measurement/measurement.module";
 import { Module } from "@nestjs/common";
 import { EventEmitterModule } from "@nestjs/event-emitter";
@@ -43,6 +47,8 @@ import { BUSINESS_ENQUIRY_REPOSITORY } from "./domain/ports/BusinessEnquiryRepos
   imports: [MeasurementModule,EventEmitterModule, ListingsModule, IdentityModule, RealtimeModule],
   controllers: [ConversationsController],
   providers: [
+    BusinessChatFiles, ConversationBinaryParser,
+    { provide: BUSINESS_CHAT_FILE_STORE, useClass: MinioBusinessChatFileStore },
     PrismaConversationRepository,
     BusinessEnquiryAccess,
     PrismaBusinessEnquiryRepository,

@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { http, HttpResponse } from "msw";
 import { ImageManipulator } from "expo-image-manipulator";
 import {
   getInfoAsync,
   makeDirectoryAsync,
   copyAsync,
   uploadAsync,
+  readAsStringAsync,
 } from "expo-file-system/legacy";
 
 vi.mock("../../auth/session", () => ({
@@ -20,6 +22,8 @@ vi.mock("../../locale/localeStore", () => ({
   },
 }));
 
+import { server } from "../../../test/msw";
+import { loadAuthSession } from "../../auth/session";
 import { ApiError } from "../../api/client";
 
 import {
@@ -40,6 +44,8 @@ vi.mock("expo-image-manipulator", () => ({
 
 vi.mock("expo-file-system/legacy", () => ({
   documentDirectory: "file:///doc/",
+  EncodingType: { Base64: "base64" },
+  readAsStringAsync: vi.fn(),
   FileSystemUploadType: { BINARY_CONTENT: "BINARY_CONTENT" },
   getInfoAsync: vi.fn(),
   makeDirectoryAsync: vi.fn(),
@@ -268,4 +274,19 @@ describe("classifyChatUploadError", () => {
     expect(err.code).toBe("put_failed");
     expect(err.retryable).toBe(true);
   });
+});
+
+
+it("uploads business image bytes through the authenticated bounded API rather than a public storage PUT", async () => {
+  mockGetInfoAsync.mockResolvedValue({ exists: true, size: 3, isDirectory: false, uri: "file:///image.webp", modificationTime: 0 });
+  vi.mocked(readAsStringAsync).mockResolvedValue("AQID");
+  vi.mocked(loadAuthSession).mockResolvedValue({ accessToken: "synthetic", refreshToken: "refresh", storedAt: "2026-10-18T00:00:00Z", user: { id: "11111111-1111-4111-8111-111111111111", phone: null, email: null, displayName: null, role: "buyer" } });
+  let uploaded: number[] = [];
+  server.use(http.post("*/conversations/:id/attachments/:file/bytes", async ({ request }) => {
+    expect(request.headers.get("Authorization")).toBe("Bearer synthetic");
+    expect(request.headers.get("Content-Type")).toBe("image/webp");
+    uploaded = [...new Uint8Array(await request.arrayBuffer())]; return HttpResponse.json({ ok: true });
+  }));
+  await uploadChatImageToPresignedUrl("/conversations/11111111-1111-4111-8111-111111111111/attachments/22222222-2222-4222-8222-222222222222/bytes", "file:///image.webp");
+  expect(uploaded).toEqual([1, 2, 3]);
 });

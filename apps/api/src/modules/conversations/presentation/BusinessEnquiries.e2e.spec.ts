@@ -103,7 +103,7 @@ describe("business enquiries through real HTTP and PostgreSQL", () => {
    expect(key).toMatch(new RegExp(`^business-chat-private/${id}/`));
    const path = `/${id}/attachments/${key.split("/")[2]}/bytes`;
    expect(staged.body.uploadUrl).toBe(`/conversations${path}`);
-   await request.post(`/api/v1/conversations${path}`).set("authorization", `Bearer ${token("sales-a")}`).set("x-business-id", businessId).set("Content-Type", "application/octet-stream").send(bytes).expect(201);
+   await request.post(`/api/v1/conversations${path}`).set("authorization", `Bearer ${token("sales-a")}`).set("x-business-id", businessId).set("Content-Type", "image/webp").send(bytes).expect(201);
    await post("sales-a", `/${id}/messages/rich`, { kind: "image", metadata: { key }, clientMessageId: suite.id("image-client") }).expect(201);
    const download = path.replace(/\/bytes$/, "");
    await get("buyer", download, false).expect(200).expect("Cache-Control", "no-store, private");
@@ -111,7 +111,7 @@ describe("business enquiries through real HTTP and PostgreSQL", () => {
    expect((await fetch(`${endpoint}/business-chat-private/${key}`)).status).toBe(403);
    await prisma.dealershipMember.delete({ where: { userId: suite.id("sales-a") } });
    await get("sales-a", download).expect(403);
-   await request.post(`/api/v1/conversations${path}`).set("authorization", `Bearer ${token("sales-a")}`).set("x-business-id", businessId).set("Content-Type", "application/octet-stream").send(bytes).expect(403);
+   await request.post(`/api/v1/conversations${path}`).set("authorization", `Bearer ${token("sales-a")}`).set("x-business-id", businessId).set("Content-Type", "image/webp").send(bytes).expect(403);
    await get("owner", download).expect(200);
    await get("other", download, false).expect(403);
   } finally { await s3.send(new DeleteObjectCommand({ Bucket: "business-chat-private", Key: key })); s3.destroy(); }

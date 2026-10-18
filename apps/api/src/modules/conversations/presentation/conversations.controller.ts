@@ -1,5 +1,6 @@
 import {
   Controller,
+  Res,
   Optional,
   Get,
   Post,
@@ -11,7 +12,7 @@ import {
   BadRequestException,
   Inject,
 } from "@nestjs/common";
-import type { FastifyRequest } from "fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import type { z } from "zod";
 import { ConversationsSchemas } from "@auto-tm/contracts";
 
@@ -30,6 +31,7 @@ import { ListMessages } from "../application/ListMessages";
 import { SendTextMessage } from "../application/SendTextMessage";
 import { SendMessage } from "../application/SendMessage";
 import { SendPostRefMessage } from "../application/SendPostRefMessage";
+import { BusinessChatFiles } from "../application/BusinessChatFiles";
 import { PresignChatAttachmentUpload } from "../application/PresignChatAttachmentUpload";
 import { UpdateWatermark } from "../application/UpdateWatermark";
 import { MuteConversation } from "../application/MuteConversation";
@@ -74,6 +76,7 @@ export class ConversationsController {
     @Inject(BUSINESS_ENQUIRY_REPOSITORY)
     @Optional()
     private readonly businessEnquiries?: BusinessEnquiryRepository,
+    @Inject(BusinessChatFiles) @Optional() private readonly businessFiles?: BusinessChatFiles,
   ) {}
 
   @Public()
@@ -314,6 +317,20 @@ export class ConversationsController {
     ]);
 
     return this.toMessageSummary(result.message, availabilityMap);
+  }
+
+  @Post(":id/attachments/:attachmentId/bytes")
+  uploadBusinessAttachment(@Param("id") id: string, @Param("attachmentId") attachmentId: string, @Body() body: unknown, @Req() req: FastifyRequest) {
+    if (!this.businessFiles) throw new BadRequestException();
+    return this.businessFiles.upload(this.actor(req), id, attachmentId, body);
+  }
+
+  @Get(":id/attachments/:attachmentId")
+  async downloadBusinessAttachment(@Param("id") id: string, @Param("attachmentId") attachmentId: string, @Req() req: FastifyRequest, @Res() reply: FastifyReply) {
+    if (!this.businessFiles) throw new BadRequestException();
+    const bytes = await this.businessFiles.download(this.actor(req), id, attachmentId);
+    reply.header("Cache-Control", "no-store, private").header("Content-Type", "image/webp").header("X-Content-Type-Options", "nosniff");
+    return reply.send(Buffer.from(bytes));
   }
 
   @Post(":id/attachments/presign")

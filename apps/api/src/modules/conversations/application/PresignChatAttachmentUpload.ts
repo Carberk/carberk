@@ -98,7 +98,12 @@ export class PresignChatAttachmentUpload {
     }
 
     const ext = "webp";
-    const key = chatAttachmentKey(input.conversationId, randomUUID(), ext);
+    const key = chatAttachmentKey(input.conversationId, randomUUID(), ext, !!conversation.businessId);
+
+    if (conversation.businessId) return {
+      uploadUrl: `/conversations/${conversation.id}/attachments/${key.split("/")[2]}/bytes`,
+      key, expiresIn: 0, maxSizeBytes: CHAT_ATTACHMENT_MAX_SIZE_BYTES,
+    };
 
     const { url } = await this.storage.presignUpload({
       key,

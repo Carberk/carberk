@@ -6,6 +6,7 @@ import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-q
 import { ConversationsSchemas } from "@auto-tm/contracts";
 import { z } from "zod";
 
+import { BusinessChatImage } from "../conversations/components/BusinessChatImage";
 import { apiClient, ApiError } from "../api/client";
 import { useAuth } from "../auth/useAuth";
 
@@ -62,7 +63,7 @@ export function EnquiriesScreen() {
     {button(selected === enquiry.id ? c.hide : c.history, () => { setSelected(selected === enquiry.id ? null : enquiry.id); setDraft(""); setNotice(""); })}
     {selected === enquiry.id ? <>
      {messages.isPending ? <Text accessibilityRole="progressbar">{c.loading}</Text> : messages.isError ? <><Text accessibilityRole="alert">{messages.error instanceof ApiError && messages.error.status === 403 ? c.denied : c.error}</Text>{button(c.retry, () => { void messages.refetch(); })}</> : <>
-      {!messages.data?.pages.some(page => page.items.length) ? <Text>{c.noMessages}</Text> : messages.data.pages.flatMap(page => page.items).map(message => <View key={message.id} className="gap-1 border-b border-border py-2"><Text>{message.senderId === enquiry.buyerId ? c.buyer : c.staff}: {message.senderId}</Text><Text>{message.deletedAt ? c.deleted : message.text ?? (message.kind === "image" ? c.image : message.kind === "post_ref" ? c.listing : c.system)}</Text><Text>{new Date(message.createdAt).toLocaleString(i18n.language === "tk" ? "tk-TM" : i18n.language === "ru" ? "ru-RU" : "en-US")}</Text></View>)}
+      {!messages.data?.pages.some(page => page.items.length) ? <Text>{c.noMessages}</Text> : messages.data.pages.flatMap(page => page.items).map(message => <View key={message.id} className="gap-1 border-b border-border py-2"><Text>{message.senderId === enquiry.buyerId ? c.buyer : c.staff}: {message.senderId}</Text><Text>{message.deletedAt ? c.deleted : message.text ?? (message.kind === "image" ? c.image : message.kind === "post_ref" ? c.listing : c.system)}</Text>{!message.deletedAt && message.kind === "image" && message.metadata && "key" in message.metadata && message.metadata.key.startsWith("business-chat-private/") ? <BusinessChatImage objectKey={message.metadata.key} businessId={businessId} /> : null}<Text>{new Date(message.createdAt).toLocaleString(i18n.language === "tk" ? "tk-TM" : i18n.language === "ru" ? "ru-RU" : "en-US")}</Text></View>)}
       {messages.hasNextPage ? button(c.more, () => { void messages.fetchNextPage(); }, messages.isFetchingNextPage) : null}
       {active && enquiry.status === "open" && enquiry.assigneeId === userId ? <><Text>{c.reply}</Text><Input accessibilityLabel={c.draft} value={draft} onChangeText={setDraft} maxLength={4000} multiline />{button(c.send, () => send.mutate(), !draft.trim())}</> : null}
      </>}
