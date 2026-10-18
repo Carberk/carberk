@@ -80,7 +80,7 @@ export class VideoTransfer {
       }
       await this.save(record);
     }
-    let failures = 0;
+    const attempts = new Map<number, number>();
     while (!this.stopped) {
       await this.owner(record);
       const current: Snapshot = await apiClient.get(`${apiPath}/${record.sessionId}`, snapshotSchema, this.options(record));
@@ -99,6 +99,7 @@ export class VideoTransfer {
         if (!this.stopped && result.state === "PROCESSING") await this.save({ ...record, state: "PROCESSING", confirmedBytes: record.prepared.sizeBytes });
         return;
       }
+      if ((attempts.get(missing) ?? 0) >= 3) throw new Error("VIDEO_PART_RETRY_EXHAUSTED");
       const credential = await apiClient.post(`${apiPath}/${record.sessionId}/part-credentials`, { partNumbers: [missing] }, credentialsSchema, this.options(record));
       if (this.stopped) return;
       const part = credential.parts[0];
@@ -111,6 +112,7 @@ export class VideoTransfer {
       if (bytes.length !== size) throw new Error("VIDEO_LOCAL_SOURCE_UNAVAILABLE");
       await this.owner(record);
       if (this.stopped) return;
+      attempts.set(missing, (attempts.get(missing) ?? 0) + 1);
       this.controller = new AbortController();
       const controller = this.controller;
       let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -120,10 +122,8 @@ export class VideoTransfer {
           new Promise<never>((_, reject) => { timeout = setTimeout(() => { controller.abort(); reject(new Error("VIDEO_PART_TIMEOUT")); }, 60_000); }),
         ]);
         if (!response.ok) throw new Error("VIDEO_PART_UNCERTAIN");
-        failures = 0;
-      } catch (error) {
+      } catch {
         if (this.stopped) return;
-        if (++failures > 3) throw error;
         // Reconcile before renewal/retry. A failed answer may have committed.
       } finally { clearTimeout(timeout); if (this.controller === controller) this.controller = null; }
     }
