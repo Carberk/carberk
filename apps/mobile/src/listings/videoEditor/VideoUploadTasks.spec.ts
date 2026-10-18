@@ -85,4 +85,18 @@ describe("native seller task uses actual preparation and transfer boundaries", (
   await task.start({ sourceUri: "file:///library/selected.mov", startMs: 0, endMs: 3000 }, 0);
   expect(task.snapshot()).toMatchObject({ phase: "FAILED", error: "VIDEO_PREPARATION_UNAVAILABLE" }); expect(uploads).toBe(0);
  });
+ it("retries offline cancellation after reopening before disposing its prepared file", async () => {
+  const task = new VideoUploadTask(ownerId, target);
+  await task.start({ sourceUri: "file:///library/selected.mov", startMs: 0, endMs: 3000 }, 0);
+  server.use(http.delete(`${base}/${sessionId}`, () => HttpResponse.error()));
+  await task.cancel();
+  expect(videoNativeStorage.files.size).toBe(1);
+  server.use(http.delete(`${base}/${sessionId}`, () => { state = "CLEANUP_PENDING"; return HttpResponse.json(snapshot(), { status: 202 }); }));
+  const reopened = new VideoUploadTask(ownerId, target);
+  await reopened.recover();
+  expect(state).toBe("CLEANUP_PENDING");
+  expect(reopened.snapshot().phase).toBe("CANCELLED");
+  expect(videoNativeStorage.files.size).toBe(0);
+ });
+
 });
