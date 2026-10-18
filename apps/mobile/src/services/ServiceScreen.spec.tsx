@@ -165,3 +165,69 @@ it("preserves an unsent draft when leaving and returning to a service conversati
  await fireEvent.press(reopened);
  expect(await screen.findByDisplayValue("Keep this draft")).toBeTruthy();
 });
+
+it.each([false, true])("keeps text and attachment drafts scoped when starting a new request after account change=%s", async changeAccount => {
+ const next = "33333333-3333-4333-8333-333333333333", attachment = "55555555-5555-4555-8555-555555555555";
+ if (changeAccount) routeParams.conversationId = id;
+ server.use(http.post("*/services/conversations", () => HttpResponse.json({ id: next, resourceId: next })),
+  http.get("*/services/conversations/:id", ({ params, request }) => request.headers.get("Authorization") === "Bearer second" && params.id === id
+   ? HttpResponse.json({ code: "FORBIDDEN" }, { status: 403 })
+   : HttpResponse.json({ id: params.id, resourceId: params.id, purpose: "support", status: "open", assignmentVersion: 0, assigned: false, operatorName: null, sourceListingId: null, canSend: true, messages: [message], lastSequence: 1, readThrough: 1, unread: 0, hasMore: false })),
+  http.post("*/services/conversations/:id/attachments", () => HttpResponse.json({ id: attachment })),
+  http.post("*/services/conversations/:id/attachments/:file/bytes", () => HttpResponse.json({ ok: true })));
+ const screen = await renderMobile(<ServiceScreen/>);
+ if (!changeAccount) await fireEvent.press(await screen.findByRole("button", { name: "General Support" }));
+ await screen.findByText(message.body);
+ await fireEvent.changeText(screen.getByLabelText("Message"), "Private old case draft");
+ await fireEvent.press(screen.getByRole("button", { name: "Upload attachment" }));
+ await screen.findByText("Attachment ready to send");
+ if (changeAccount) {
+  await act(async () => { await storeAuthSession({ accessToken: "second", refreshToken: "second-refresh", user: { id: next, phone: null, email: null, displayName: null, role: "buyer" } }); });
+  await screen.findByText("Access is no longer available. Refresh the queue.");
+ }
+ await fireEvent.press(screen.getByRole("button", { name: "Back to queue" }));
+ await fireEvent.press(screen.getByRole("button", { name: "New request" }));
+ await screen.findByText(message.body);
+ expect(screen.getByLabelText("Message").props.value).toBe("");
+ expect(screen.queryByLabelText("Selected image")).toBeNull();
+ expect(screen.queryByText("Attachment ready to send")).toBeNull();
+ await fireEvent.changeText(screen.getByLabelText("Message"), "New case message");
+ await fireEvent.press(screen.getByRole("button", { name: "Send message" }));
+ expect(sent[0]).toMatchObject({ body: "New case message" }); expect(sent[0]).not.toHaveProperty("attachmentId");
+ if (!changeAccount) {
+  await fireEvent.press(screen.getByRole("button", { name: "Back to queue" }));
+  await fireEvent.press(await screen.findByRole("button", { name: "General Support" }));
+  expect(await screen.findByDisplayValue("Private old case draft")).toBeTruthy();
+  expect(screen.getByLabelText("Selected image")).toBeTruthy(); expect(screen.getByText("Attachment ready to send")).toBeTruthy();
+  await fireEvent.press(screen.getByRole("button", { name: "Send message" }));
+  expect(sent[1]).toMatchObject({ body: "Private old case draft", attachmentId: attachment });
+ }
+});
+
+it.each([["create", false], ["send", false], ["upload", false], ["create", true], ["send", true], ["upload", true]] as const)("ignores a late %s completion after selecting another conversation with account change=%s", async (operation, changeAccount) => {
+ const next = "33333333-3333-4333-8333-333333333333", created = "66666666-6666-4666-8666-666666666666";
+ let release!: () => void, started!: () => void;
+ const pending = new Promise<void>(resolve => { release = resolve; }), requested = new Promise<void>(resolve => { started = resolve; });
+ server.use(http.get("*/services/conversations", () => HttpResponse.json([{ id, purpose: "support", createdAt: "2026-10-15T10:00:00Z" }, { id: next, purpose: "history", createdAt: "2026-10-16T10:00:00Z" }])),
+  http.get("*/services/conversations/:id", ({ params }) => HttpResponse.json({ id: params.id, resourceId: params.id, purpose: "support", status: "open", assignmentVersion: 0, assigned: false, operatorName: null, sourceListingId: null, canSend: true, messages: [{ ...message, body: params.id === next ? "Current case" : message.body }], lastSequence: 1, readThrough: 1, unread: 0, hasMore: false })),
+  http.post("*/services/conversations", async () => { started(); await pending; return HttpResponse.json({ id: created, resourceId: created }); }),
+  http.post("*/services/conversations/:id/messages", async () => { started(); await pending; return HttpResponse.json(message); }),
+  http.post("*/services/conversations/:id/attachments", () => HttpResponse.json({ id: created })),
+  http.post("*/services/conversations/:id/attachments/:file/bytes", async () => { started(); await pending; return HttpResponse.json({ ok: true }); }));
+ const screen = await renderMobile(<ServiceScreen/>);
+ await fireEvent.press(await screen.findByRole("button", { name: "General Support" })); await screen.findByText(message.body);
+ await fireEvent.changeText(screen.getByLabelText("Message"), "Old case draft");
+ try {
+  if (operation === "create") { await fireEvent.press(screen.getByRole("button", { name: "Back to queue" })); await fireEvent.press(screen.getByRole("button", { name: "New request" })); }
+  else await fireEvent.press(screen.getByRole("button", { name: operation === "send" ? "Send message" : "Upload attachment" }));
+  await act(async () => { await requested; });
+  if (changeAccount) await act(async () => { await storeAuthSession({ accessToken: "second", refreshToken: "second-refresh", user: { id: created, phone: null, email: null, displayName: null, role: "buyer" } }); });
+  if (operation !== "create" && !changeAccount) await fireEvent.press(screen.getByRole("button", { name: "Back to queue" }));
+  await fireEvent.press(await screen.findByRole("button", { name: "Vehicle History" })); await screen.findByText("Current case");
+  await fireEvent.changeText(screen.getByLabelText("Message"), "Current case draft");
+  await act(async () => { release(); await pending; });
+  expect(await screen.findByDisplayValue("Current case draft")).toBeTruthy();
+  expect(screen.getByText("Current case")).toBeTruthy();
+  expect(screen.queryByLabelText("Selected image")).toBeNull(); expect(screen.queryByText("Attachment ready to send")).toBeNull();
+ } finally { release(); }
+});
