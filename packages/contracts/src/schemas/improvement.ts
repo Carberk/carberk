@@ -3,18 +3,19 @@ import { z } from "zod";
 export const ImprovementPeriodSchema=z.enum(["completed_week","previous_week","today"]);
 export type ImprovementPeriod=z.infer<typeof ImprovementPeriodSchema>;
 export const ImprovementRateSchema=z.object({
- state:z.enum(["ready","empty","immature","delayed"]),numerator:z.number().nonnegative().nullable(),denominator:z.number().nonnegative().nullable(),
+ state:z.enum(["ready","empty","immature","delayed","suppressed"]),numerator:z.number().nonnegative().nullable(),denominator:z.number().nonnegative().nullable(),
  value:z.number().nonnegative().nullable(),smallSample:z.boolean(),
 }).strict();
 export type ImprovementRate=z.infer<typeof ImprovementRateSchema>;
 export const ImprovementScorecardSchema=z.object({
  version:z.literal(1),state:z.enum(["ready","empty","delayed"]),
+ disclosure:z.object({policy:z.literal("fixed-week-v1"),suppressedMetrics:z.array(z.string()).max(30)}).strict().optional(),
  inventory:z.object({listingHours:z.number().nonnegative().nullable(),averageActive:z.number().nonnegative().nullable(),currentActive:z.number().int().nonnegative().nullable()}).strict(),
- contacts:z.object({calls:z.number().int().nonnegative(),conversations:z.number().int().nonnegative(),total:z.number().int().nonnegative(),perActiveListing:z.number().nonnegative().nullable()}).strict(),
+ contacts:z.object({calls:z.number().int().nonnegative().nullable(),conversations:z.number().int().nonnegative().nullable(),total:z.number().int().nonnegative().nullable(),perActiveListing:z.number().nonnegative().nullable()}).strict(),
  publication:ImprovementRateSchema,replies:ImprovementRateSchema,signIn:ImprovementRateSchema,upload:ImprovementRateSchema,
- firstBuyerMessages:z.number().int().nonnegative(),
- steps:z.array(z.object({step:z.enum(["vehicle","specs","photos","price","location","contact","review"]),opened:z.number().int().nonnegative(),completed:z.number().int().nonnegative()}).strict()).length(7),
- discovery:z.object({opens:z.number().int().nonnegative(),searches:z.number().int().nonnegative(),detailOpens:z.number().int().nonnegative()}).strict(),
+ firstBuyerMessages:z.number().int().nonnegative().nullable(),
+ steps:z.array(z.object({step:z.enum(["vehicle","specs","photos","price","location","contact","review"]),opened:z.number().int().nonnegative().nullable(),completed:z.number().int().nonnegative().nullable()}).strict()).length(7),
+ discovery:z.object({opens:z.number().int().nonnegative().nullable(),searches:z.number().int().nonnegative().nullable(),detailOpens:z.number().int().nonnegative().nullable()}).strict(),
  zeroSearches:ImprovementRateSchema,
  retention:z.object({accounts:z.object({d1:ImprovementRateSchema,d7:ImprovementRateSchema,d30:ImprovementRateSchema}).strict(),guests:z.object({d1:ImprovementRateSchema,d7:ImprovementRateSchema,d30:ImprovementRateSchema}).strict()}).strict(),
 }).strict();
@@ -23,7 +24,7 @@ export const ImprovementSnapshotSchema=z.object({
  state:z.enum(["ready","empty","delayed","unavailable","suppressed"]),period:ImprovementPeriodSchema,
  windowFrom:z.string().datetime(),windowTo:z.string().datetime(),generatedAt:z.string().datetime().nullable(),completeThrough:z.string().datetime().nullable(),
  environment:z.enum(["test","staging","production"]),population:z.enum(["synthetic","reviewer","pilot","marketplace"]),
- version:z.number().int().positive(),lateRecords:z.number().int().nonnegative(),inventoryAvailable:z.boolean(),
+ version:z.number().int().positive(),lateRecords:z.number().int().nonnegative().nullable(),inventoryAvailable:z.boolean(),
  scorecard:ImprovementScorecardSchema.nullable(),
 }).strict();
 export type ImprovementSnapshot=z.infer<typeof ImprovementSnapshotSchema>;
@@ -46,3 +47,9 @@ export const MarketKnowledgeViewSchema=z.union([
  z.object({state:z.enum(["quarantined","invalidated","unavailable"]),reason:z.string().optional()}).strict(),
 ]);
 export type MarketKnowledgeView=z.infer<typeof MarketKnowledgeViewSchema>;
+
+/** Fixed disjoint UTC calendar weeks. Today has no aggregate release. */
+export function improvementWindow(period:ImprovementPeriod,now:Date):{from:Date;to:Date} {
+ const day=86400000,midnight=Math.floor(now.getTime()/day)*day,monday=midnight-((now.getUTCDay()+6)%7)*day;
+ return {from:new Date(period==="today"?midnight:monday-(period==="previous_week"?14:7)*day),to:new Date(period==="today"?now.getTime():period==="previous_week"?monday-7*day:monday)};
+}

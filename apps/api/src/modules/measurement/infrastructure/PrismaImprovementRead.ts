@@ -5,13 +5,11 @@ import { ImprovementSchemas, MeasurementSchemas } from "@auto-tm/contracts";
 
 import type { StaffAuthorityPort, StaffSubject } from "../../identity/identity.public";
 
-const DAY=86_400_000;
 export class ImprovementAccessDenied extends Error {}
 export class PrismaImprovementRead {
  constructor(private readonly prisma:PrismaService,private readonly authority:StaffAuthorityPort,private readonly scope:{epoch:string;environment:"test"|"staging"|"production";population:"synthetic"},private readonly now:()=>Date=()=>new Date()) {}
  private window(period:ImprovementSchemas.ImprovementPeriod) {
-  const now=this.now(),midnight=Math.floor(now.getTime()/DAY)*DAY;
-  return {from:new Date(period==="today"?midnight:midnight-(period==="previous_week"?14:7)*DAY),to:new Date(period==="today"?now:period==="previous_week"?midnight-7*DAY:midnight)};
+  return ImprovementSchemas.improvementWindow(period,this.now());
  }
  async scorecard(subject:StaffSubject,period:ImprovementSchemas.ImprovementPeriod) {
   const {from,to}=this.window(period);
@@ -20,12 +18,13 @@ export class PrismaImprovementRead {
    await this.authority.authorize({...subject,capability:"analytics.aggregate"},tx);
    const states=await tx.$queryRaw<{epoch:string}[]>`SELECT "epoch" FROM "measurement_state" WHERE "key"='collector' FOR SHARE`;
    if(!this.scope.epoch || states[0]?.epoch!==this.scope.epoch) return unavailable;
-   const key=`${this.scope.epoch}:${this.scope.environment}:${this.scope.population}:${period}:${from.toISOString()}`;
+   const key=`${this.scope.epoch}:${this.scope.environment}:${this.scope.population}:${period==="today"?"today":"week"}:${from.toISOString()}`;
    const row=await tx.measurementRollup.findUnique({where:{key}});
    if(!row || row.epoch!==this.scope.epoch || row.expiresAt<=this.now() || this.now().getTime()-row.generatedAt.getTime()>5*60_000) return unavailable;
    const parsed=ImprovementSchemas.ImprovementSnapshotSchema.safeParse(row.metrics);
-   if(!parsed.success || parsed.data.environment!==this.scope.environment || parsed.data.population!==this.scope.population || parsed.data.period!==period) return unavailable;
-   return parsed.data;
+   if(!parsed.success || parsed.data.environment!==this.scope.environment || parsed.data.population!==this.scope.population || (period==="today"?parsed.data.period!=="today":parsed.data.period==="today")) return unavailable;
+   if(parsed.data.scorecard && (period==="today" || parsed.data.scorecard.disclosure?.policy!=="fixed-week-v1")) return unavailable;
+   return {...parsed.data,period};
   });
  }
  async investigate(subject:StaffSubject,input:unknown) {

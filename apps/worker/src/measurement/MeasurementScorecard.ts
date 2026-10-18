@@ -7,6 +7,8 @@ export interface ScorecardFact {
   firstObservedAt?:Date;
   /** Trusted source classification. This is never accepted from an event payload. */
   conversionEligible: boolean;
+  /** Fixed release membership; later facts may complete outcomes but cannot add an opening cohort. */
+  cohortEligible?:boolean;
   event: MeasurementSchemas.MeasurementEvent;
 }
 export interface ScorecardInput {
@@ -85,9 +87,9 @@ export function compileScorecard(input: ScorecardInput): ImprovementSchemas.Impr
   const replies = new Map<string, number>();
   for (const fact of eligible) {
     const event = fact.event;
-    if (event.eventName === "draft_started" && !drafts.has(event.payload.draftId)) drafts.set(event.payload.draftId, fact);
+    if (event.eventName === "draft_started" && fact.cohortEligible!==false && !drafts.has(event.payload.draftId)) drafts.set(event.payload.draftId, fact);
     if (event.eventName === "listing_published" && event.payload.draftId && !publications.has(event.payload.draftId)) publications.set(event.payload.draftId, at(fact));
-    if (event.eventName === "first_buyer_message_accepted" && !firstMessages.has(event.payload.conversationId)) firstMessages.set(event.payload.conversationId, fact);
+    if (event.eventName === "first_buyer_message_accepted" && fact.cohortEligible!==false && !firstMessages.has(event.payload.conversationId)) firstMessages.set(event.payload.conversationId, fact);
     if (event.eventName === "seller_first_reply" && !replies.has(event.payload.firstBuyerMessageId)) replies.set(event.payload.firstBuyerMessageId, at(fact));
   }
   function cohortRate(cohort: ScorecardFact[], horizon: number, succeeded: (fact: ScorecardFact) => boolean) {
@@ -125,7 +127,7 @@ export function compileScorecard(input: ScorecardInput): ImprovementSchemas.Impr
     const firstVisit = new Map<string, number>(), activeDays = new Map<string, Set<number>>();
     for (const fact of eligible) {
       if (fact.kind !== kind || !["visit_started", "foreground_activity"].includes(fact.event.eventName)) continue;
-      if (!firstVisit.has(fact.subject)) firstVisit.set(fact.subject, fact.firstObservedAt?.getTime()??at(fact));
+      if (fact.cohortEligible!==false && !firstVisit.has(fact.subject)) firstVisit.set(fact.subject, fact.firstObservedAt?.getTime()??at(fact));
       const active = activeDays.get(fact.subject) ?? new Set<number>();
       active.add(utcDay(at(fact))); activeDays.set(fact.subject, active);
     }

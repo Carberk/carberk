@@ -7,7 +7,7 @@ import { Reflector } from "@nestjs/core";
 import { Test } from "@nestjs/testing";
 import { FastifyAdapter,type NestFastifyApplication } from "@nestjs/platform-fastify";
 import { PrismaService } from "@auto-tm/db";
-import type { MeasurementSchemas } from "@auto-tm/contracts";
+import { ImprovementSchemas,type MeasurementSchemas } from "@auto-tm/contracts";
 import { afterAll,beforeAll,beforeEach,describe,expect,it } from "vitest";
 import supertest from "supertest";
 
@@ -63,19 +63,21 @@ describe("authorized Improvement HTTP and real worker/PostgreSQL snapshots",()=>
   store=new PrismaMeasurementStore(prisma,{epoch,environment:"test",population:"synthetic"},()=>clock,app.get<MeasurementConversionPort>(MEASUREMENT_CONVERSION_PORT));
  });
  afterAll(async()=>{await cleanup();await app?.close();});
- async function fact(who:string,eventName:string,payload:object,time:Date) {
+ async function fact(who:string,eventName:string,payload:object,time:Date,receivedAt:Date=time) {
   clock=time;const boot=await store.bootstrap({authenticatedUserId:suite.id(who)}),resolved=await store.resolve({authenticatedUserId:suite.id(who)});
   if(!boot || !resolved)throw new Error("Synthetic principal missing");
   const origin:"client"|"server"=eventName==="call_intent"?"client":"server";
   const event={version:1,eventId:suite.id(`event-${sequence++}`),visitId:boot.visitId,occurredAt:time.toISOString(),purpose:"product_improvement",eventName,context:{platform:origin==="server"?"server":"android",release:"1.0",build:"1",locale:"en"},payload} as MeasurementSchemas.MeasurementEvent;
+  clock=receivedAt;
   const accept=new AcceptMeasurement(store,()=>clock,{enabled:true,environment:"test",purposes:["product_improvement","product_reliability"],evidenceRef:"synthetic-hosted-917",realCollectionApproved:false});
   expect(await accept.afterCommit(event,{...resolved,origin})).toBe("accepted");return {accept,event,authority:{...resolved,origin} as import("../measurement.public").MeasurementAuthority};
  }
  it("reproduces 16 / 12 through accepted owning facts, dedupe, worker persistence and actual HTTP",async()=>{
-  const midnight=Math.floor(now.getTime()/DAY)*DAY,from=new Date(midnight-14*DAY),to=new Date(midnight-7*DAY);
+  const {from,to}=ImprovementSchemas.improvementWindow("completed_week",now);
+  now=new Date(to.getTime()+3600000);
   await prisma.measurementState.create({data:{key:`inventory_baseline:${epoch}`,epoch:from.toISOString()}});
   await prisma.listing.create({data:{id:suite.id("listing"),sellerId:suite.id("ordinary"),brandId:suite.catalog.brandId,modelId:suite.catalog.modelId,cityId:suite.catalog.cityId,status:"active",priceAmount:1000,priceCurrency:"TMT"}});
-  for(let index=0;index<12;index++)await fact("ordinary","listing_visibility_changed",{listingId:suite.id(`active-${index}`),visibility:"public",reason:"published"},from);
+  for(let index=0;index<12;index++)await fact(`buyer-${index}`,"listing_visibility_changed",{listingId:suite.id(`active-${index}`),visibility:"public",reason:"published"},from);
   let duplicate:Awaited<ReturnType<typeof fact>>|undefined;
   for(let index=0;index<11;index++)duplicate=await fact(`buyer-${index}`,"call_intent",{listingId:suite.id("listing")},new Date(from.getTime()+3600000));
   await fact("ordinary","call_intent",{listingId:suite.id("listing")},new Date(from.getTime()+3600000));
@@ -87,9 +89,22 @@ describe("authorized Improvement HTTP and real worker/PostgreSQL snapshots",()=>
   const workerPath=resolve(__dirname,"../../../../../worker/src/measurement/RecomputeImprovement.ts");
   const script=`import {PrismaService} from "@auto-tm/db";import {RecomputeImprovement} from ${JSON.stringify(workerPath)};async function main(){const db=new PrismaService();try{await db.$connect();await new RecomputeImprovement(db,{epoch:${JSON.stringify(epoch)},environment:"test",population:"synthetic"},()=>new Date(${JSON.stringify(now.toISOString())})).execute();}finally{await db.$disconnect();}}void main().catch(()=>{process.exitCode=1;});`;
   await promisify(execFile)("pnpm",["exec","tsx","--eval",script],{cwd:process.cwd(),env:process.env,timeout:30000});
-  const result=await get("scorecard?period=previous_week").expect(200);
+  const result=await get("scorecard?period=completed_week").expect(200);
+  expect(result.body.state).toBe("ready");
   expect(result.body.scorecard.contacts).toEqual({calls:11,conversations:5,total:16,perActiveListing:16/12});
-  expect(result.body.scorecard.inventory).toMatchObject({averageActive:12,currentActive:14});
+  expect(result.body.scorecard.inventory).toMatchObject({averageActive:12,currentActive:12});
+  const firstReleasedAt=result.body.generatedAt;
+  await fact("buyer-0","call_intent",{listingId:suite.id("listing")},new Date(to.getTime()-3600000),new Date(now.getTime()+1000));
+  now=new Date(now.getTime()+1000);
+  const rerun=script.replaceAll(JSON.stringify(new Date(now.getTime()-1000).toISOString()),JSON.stringify(now.toISOString()));
+  await promisify(execFile)("pnpm",["exec","tsx","--eval",rerun],{cwd:process.cwd(),env:process.env,timeout:30000});
+  const unchanged=await get("scorecard?period=completed_week").expect(200);
+  expect(unchanged.body.generatedAt).toBe(firstReleasedAt);
+  expect(unchanged.body.scorecard.contacts).toEqual(result.body.scorecard.contacts);
+  expect(unchanged.body.lateRecords).toBeNull();
+  const today=await get("scorecard?period=today").expect(200);
+  expect(today.body).toMatchObject({state:"suppressed",scorecard:null,lateRecords:null});
+  expect(today.body.completeThrough).toBe(now.toISOString());
   expect(JSON.stringify(result.body)).not.toContain(suite.id("buyer-0"));
   await get("scorecard","ordinary").expect(403);
  });
@@ -129,6 +144,7 @@ describe("authorized Improvement HTTP and real worker/PostgreSQL snapshots",()=>
   await prisma.marketKnowledgeSource.update({where:{id:sourceId},data:{restrictions:{syntheticOnly:true,retention:"indefinite",deletion:"invalidate_derivatives",export:"internal_synthetic_only",demographics:"synthetic_self_reported"}}});
   await admit({...admission,expectedEpoch:"stale-job"}).expect(403);
   const released=(await admit(admission).expect(201)).body;
+  expect(released.state).toBe("qualified");
   expect(released.dataset.cells).toEqual([{market:"TM",period:"2001-10",vehicleClass:"passenger",observations:30,priceBand:"15000_29999",ageBand:"unknown",residence:"unknown",demographicSource:"unknown"}]);
   expect((await admit(admission).expect(201)).body).toEqual(released);
   await admit({...admission,cells:[{...admission.cells[0],observations:37}]}).expect(403);
