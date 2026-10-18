@@ -34,6 +34,7 @@ export class ExpoVideoTransferDevice implements VideoTransferDevice {
     if (!z.string().uuid().safeParse(ownerId).success || !z.string().uuid().safeParse(targetId).success) throw new Error("VIDEO_JOURNAL_INVALID");
     this.key = `listing-video-transfer:v1:${ownerId}:${targetKind}:${targetId}`;
   }
+  async clear(): Promise<void> { await AsyncStorage.removeItem(this.key); }
   async load(): Promise<VideoTransferRecord | null> {
     const value = await AsyncStorage.getItem(this.key);
     if (value === null) return null;
