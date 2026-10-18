@@ -1,9 +1,14 @@
 import { randomUUID } from "node:crypto";
 
+import type { S3Client } from "@aws-sdk/client-s3";
 import { PrismaService } from "@auto-tm/db";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { PrismaRetiredUploadLedger } from "../PrismaRetiredUploadLedger";
+
+import { CleanVideo } from "./CleanVideo";
+import { S3VideoCleanupObjects } from "./S3VideoCleanupObjects";
+import { InMemoryS3VideoCleanup } from "./testing/InMemoryS3VideoCleanup";
 import { PrismaVideoCleanupLedger } from "./PrismaVideoCleanupLedger";
 const databaseUrl = process.env["DATABASE_URL"] ?? "";
 const hosted = process.env["GITHUB_ACTIONS"] === "true" && /^postgres(?:ql)?:\/\/[^/]+@(localhost|127\.0\.0\.1):\d+\//.test(databaseUrl);
@@ -44,6 +49,22 @@ describe.skipIf(!hosted)("durable video cleanup authority on disposable PostgreS
     await ledger.recordAbsence(proof, later);
     expect(await db.videoCleanupWork.findUniqueOrThrow({ where: { id: row.cleanupId } })).toMatchObject({ state: "DONE", completedAt: later });
     expect((await db.mediaUpload.findUniqueOrThrow({ where: { id: row.uploadId } })).state).toBe("DELETED");
+  });
+  it("retries storage failures and completes two full sweeps through the actual deletion adapter", async () => {
+    const row = await retired(), transport = new InMemoryS3VideoCleanup();
+    transport.objects.add(row.key); transport.holdDeletes = true;
+    let time = now;
+    const cleanup = new CleanVideo(ledger, new S3VideoCleanupObjects(transport as unknown as S3Client, "private-video"), () => time, randomUUID);
+    expect(await cleanup.execute()).toBe("retry");
+    expect(transport.objects.has(row.key)).toBe(true);
+    expect((await db.videoCleanupWork.findUniqueOrThrow({ where: { id: row.cleanupId } })).state).toBe("PENDING");
+    transport.holdDeletes = false; time = new Date("2000-01-02T00:01:00Z");
+    expect(await cleanup.execute()).toBe("absent");
+    expect(transport.objects.size).toBe(0);
+    expect((await db.videoCleanupWork.findUniqueOrThrow({ where: { id: row.cleanupId } })).state).toBe("VERIFYING");
+    time = new Date("2000-01-02T00:02:00Z");
+    expect(await cleanup.execute()).toBe("absent");
+    expect((await db.videoCleanupWork.findUniqueOrThrow({ where: { id: row.cleanupId } })).state).toBe("DONE");
   });
   it("never leases live uploads, HELD inventory or a still-active processing lease", async () => {
     const row = await retired();
