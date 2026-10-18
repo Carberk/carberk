@@ -6,6 +6,8 @@ export class S3VideoObjectStorage implements VideoObjectStorage {
   constructor(private readonly client: S3Client, private readonly bucket: string, private readonly now: () => Date, private readonly sign: SignPart = getSignedUrl) {
     if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(bucket)) throw new Error("VIDEO_STORAGE_CONFIG_INVALID");
   }
+  async recoverInitialization(_sessionId: string, _uploadId: string): Promise<string | null> { return null; }
+  async sourceCommitted(_session: VideoStorageSession): Promise<boolean> { return false; }
   async initialize(sessionId: string, uploadId: string): Promise<string> {
     const result = await this.client.send(new CreateMultipartUploadCommand({ Bucket: this.bucket, Key: this.key(sessionId, uploadId), ContentType: "video/mp4", CacheControl: "private, no-store", Metadata: { "video-session": sessionId, "video-upload": uploadId } }), { abortSignal: AbortSignal.timeout(10_000) });
     if (!result.UploadId) throw new Error("VIDEO_STORAGE_UNAVAILABLE");
