@@ -6,6 +6,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-na
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { useMeasurementScreen } from "../../../src/measurement/useMeasurementScreen";
 import { ApiError } from "../../../src/api/client";
 import { useListings } from "../../../src/api/listings/useListings";
 import { useListingCount } from "../../../src/api/listings/useListingCount";
@@ -39,6 +40,7 @@ import { timing } from "@/lib/motion";
 
 /** Results keeps the applied query in search params and leaves its list mounted on Listing navigation. */
 export default function ResultsScreen() {
+  useMeasurementScreen("results",{eventName:"discovery_opened",purpose:"product_improvement",payload:{screen:"results"}});
   const { t } = useTranslation();
   const goBack = useSafeBack(HOME_HREF);
   const params = useLocalSearchParams<ResultsRouteState>();
@@ -63,6 +65,11 @@ export default function ResultsScreen() {
   useFeedFavoriteReplay(returnTo);
   const feed = useListings({ filters: applied, viewerId: viewer?.userId ?? null });
   const count = useListingCount({ filters: applied });
+  const total=count.isEnabled&&count.isSuccess?count.data.totalMatching:null;
+  const resultCount=total===null?null:total===0?"zero":total<=5?"1_5":total<=20?"6_20":"21_plus";
+  useMeasurementScreen("results",resultCount&&!feed.isError?{eventName:"search_completed",purpose:"product_improvement",payload:{resultCount,filters:{
+    ...(applied.brandId?{brandId:applied.brandId}:{}),...(applied.cityId?{cityId:applied.cityId}:{}),...(applied.modelId?{modelId:applied.modelId}:{}),...(applied.condition?{condition:applied.condition}:{}),
+  }}}:null,JSON.stringify(applied));
   const items = feed.data?.pages.flatMap((page) => page.items) ?? [];
   // Include a selected brand even when there are no matching Listings, so its names remain visible.
   const catalog = useFeedCatalogMaps(items, filters.active.brandId ? [filters.active.brandId] : []);

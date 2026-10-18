@@ -9,6 +9,7 @@ import { Calendar, ChevronRight, History, SlidersHorizontal, X } from "lucide-re
 import { useTranslation } from "react-i18next";
 import type { CatalogSchemas } from "@auto-tm/contracts";
 
+import { useMeasurementScreen } from "../../measurement/useMeasurementScreen";
 import { ApiError } from "../../api/client";
 import { useBrands } from "../../api/catalog/useBrands";
 import { CATALOG_SEARCH_MIN_LENGTH, useCatalogSearch } from "../../api/catalog/useCatalogSearch";
@@ -34,6 +35,7 @@ import { Text } from "@/components/ui/text";
 
 /** Search consumes catalog matches and parsed years; the API owns spelling and parsing. */
 export function SearchScreen() {
+  useMeasurementScreen("search",{eventName:"discovery_opened",purpose:"product_improvement",payload:{screen:"search"}});
   const { t } = useTranslation();
   const goBack = useSafeBack(HOME_HREF);
   const bar = useStickyActionBar();
