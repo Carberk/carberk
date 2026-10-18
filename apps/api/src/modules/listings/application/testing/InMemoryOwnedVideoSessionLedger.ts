@@ -4,8 +4,10 @@ import type { OwnedVideoSession, OwnedVideoSessionLedger, VideoSessionCreate } f
 export class InMemoryOwnedVideoSessionLedger implements OwnedVideoSessionLedger {
   session: OwnedVideoSession | null = null;
   cancelled = false;
+  reserveError: Error | null = null;
   input: string | null = null;
   async reserve(_actor: ListingActor, input: VideoSessionCreate) {
+    if (this.reserveError) throw this.reserveError;
     const serialized = JSON.stringify(input);
     if (this.input && this.input !== serialized) throw new Error("VIDEO_IDEMPOTENCY_CONFLICT");
     const initialize = this.session === null;
