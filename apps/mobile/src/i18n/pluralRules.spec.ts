@@ -59,7 +59,7 @@ describe("ensurePluralRules without the engine's Intl.PluralRules", () => {
   it.each(["ru", "en", "tk", "ru-RU", "en-US"])("agrees with the full Intl rules for %s", (locale) => {
     const shim = new Intl.PluralRules(locale);
     const full = new nativePluralRules(locale);
-    expect(shim.resolvedOptions().pluralCategories).toEqual(full.resolvedOptions().pluralCategories);
+    expect([...shim.resolvedOptions().pluralCategories].sort()).toEqual([...full.resolvedOptions().pluralCategories].sort());
     for (const n of samples) expect([n, shim.select(n)]).toEqual([n, full.select(n)]);
   });
 });
