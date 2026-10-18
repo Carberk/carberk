@@ -6,6 +6,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-na
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { usePublicDiagnosticAvailability } from "../../../src/diagnostics/PublicDiagnosticAction";
 import { useMeasurementScreen } from "../../../src/measurement/useMeasurementScreen";
 import { ApiError } from "../../../src/api/client";
 import { useListings } from "../../../src/api/listings/useListings";
@@ -115,6 +116,7 @@ export default function ResultsScreen() {
   // The count and the brand/city names are separate queries. After an outage they must reload with the feed.
   // Only queries a mounted screen is watching: failed queries left behind by other screens stay untouched.
   const retry = () => { void queryClient.refetchQueries({ type: "active", predicate: (query) => query.state.status === "error" || query.state.fetchStatus === "paused" }); };
+  const diagnosticAvailability = usePublicDiagnosticAvailability(items.map(item => item.id));
   const empty = offline ? <FeedError error={new ApiError("NETWORK_ERROR", 0)} onRetry={retry} /> : feed.isPending ? <View accessibilityLabel={t("resultsLoading")} className="gap-3">{[0, 1, 2].map((id) => <ListingLargeCardSkeleton key={id} />)}</View>
     : feed.isError ? <FeedError error={feed.error} onRetry={retry} />
       : filters.count ? <FilteredEmpty onReset={reset} /> : <FeedEmpty />;
@@ -124,7 +126,7 @@ export default function ResultsScreen() {
     <ResultsHeader count={count.data} sort={sort} onSort={() => setSortOpen(true)} onBack={goBack} />
     <FlatList testID="results-list" data={feed.isPending || feed.isError ? [] : items} keyExtractor={(item) => item.id} ListHeaderComponent={header} ListEmptyComponent={empty}
       contentContainerClassName="grow" contentContainerStyle={{ paddingBottom: tabBarSpace + (items.length ? 68 : 8) }} showsVerticalScrollIndicator={false} onScroll={onScroll} scrollEventThrottle={16}
-      renderItem={({ item, index }) => <ListingLargeCard listing={item} enterOrder={enterOrder(index)} onPress={(id) => router.push(`/(public)/listings/${id}`)}
+      renderItem={({ item, index }) => <ListingLargeCard listing={item} diagnostic={diagnosticAvailability.get(item.id)} enterOrder={enterOrder(index)} onPress={(id) => router.push(`/(public)/listings/${id}`)}
         brandName={catalog.brandName(item.brandId)} modelName={catalog.modelName(item.modelId)} cityName={catalog.cityName(item.cityId)}
         transmissionName={transmissions.data?.items.find((entry) => entry.id === item.transmissionId)?.name}
         engineTypeName={engineTypes.data?.items.find((entry) => entry.id === item.engineTypeId)?.name}

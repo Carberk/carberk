@@ -4,6 +4,7 @@ import type { ListingsSchemas } from "@auto-tm/contracts";
 import { ChevronRight, Flag } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 
+import { PublicDiagnosticAction } from "../../diagnostics/PublicDiagnosticAction";
 import { MarketplaceShareActions } from "../../business/MarketplaceShareActions";
 import type { CatalogMaps } from "../detail/useCatalogMaps";
 import {
@@ -131,6 +132,7 @@ export function ListingDetailView({
         }
       />
       <View testID="detail-body" className="gap-4 px-4 py-5">
+        <PublicDiagnosticAction listingId={listing.id}/>
         {isOwner && (
           <OwnerStatusCard status={listing.status} favoriteCount={listing.favoriteCount} viewCount={listing.viewCount} viewsToday={listing.viewsToday} />
         )}

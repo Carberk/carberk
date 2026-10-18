@@ -1,10 +1,11 @@
 import { router } from "expo-router";
-import type { ListingsSchemas } from "@auto-tm/contracts";
+import type { DiagnosticSchemas, ListingsSchemas } from "@auto-tm/contracts";
 import { Heart, MessageCircle, Phone } from "lucide-react-native";
 import { memo, type ReactNode } from "react";
 import { Pressable, View, useWindowDimensions } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { DiagnosticAvailabilityAction } from "../../diagnostics/PublicDiagnosticAction";
 import { BusinessIdentityLink } from "../../business/BusinessIdentityLink";
 import { useAuthIntentStore, type AuthHref } from "../../auth/intentStore";
 import { useOpenListingConversation } from "../../conversations/useOpenListingConversation";
@@ -29,6 +30,7 @@ import { tabularFigures } from "@/lib/font";
 export { formatListingDate } from "./formatListingDate";
 
 interface ListingLargeCardProps {
+  diagnostic?: DiagnosticSchemas.PublicDiagnosticAvailability | null;
   listing: ListingsSchemas.FeedListingSummary;
   onPress: (id: string) => void;
   brandName?: string; modelName?: string; cityName?: string; transmissionName?: string; engineTypeName?: string;
@@ -139,6 +141,7 @@ export const ListingLargeCard = memo(function ListingLargeCard(props: ListingLar
         </View>
       </Pressable>
       <View className="gap-3 px-4 pb-4 pt-3.5">
+        <DiagnosticAvailabilityAction value={props.diagnostic}/>
         {canCall || canMessage ? <View className="flex-row gap-2">
           {canCall ? <Button variant="brand" className="flex-1" onPress={contacts.phone.call} accessibilityLabel={t("call")} accessibilityState={{ busy: contacts.phone.isPending }}>
             <Icon as={Phone} className="size-5" /><Text numberOfLines={1}>{t("call")}</Text>
