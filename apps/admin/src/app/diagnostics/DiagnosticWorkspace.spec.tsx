@@ -105,3 +105,17 @@ describe("actual diagnostic staff workspace and server actions",()=>{
  });
 
 });
+
+it("disables report decisions and selection while current workspace evidence is refreshing", async () => {
+ const view=setup();await open(view);
+ let release!:()=>void;
+ const gate=new Promise<void>(resolve=>{release=resolve;});
+ const request=fetch;
+ vi.stubGlobal("fetch",async(...args:Parameters<typeof fetch>)=>{if(String(args[0]).endsWith("/workspace"))await gate;return request(...args);});
+ try {
+  fireEvent.click(view.getByRole("button",{name:diagnosticCopy.en.refresh}));
+  await view.findByText(diagnosticCopy.en.loading);
+  expect((view.getByRole("button",{name:diagnosticCopy.en.submit}) as HTMLButtonElement).disabled).toBe(true);
+  expect((view.getByRole("combobox",{name:diagnosticCopy.en.selectReport}) as HTMLSelectElement).disabled).toBe(true);
+ }finally{release();await waitFor(()=>expect(view.queryByText(diagnosticCopy.en.loading)).toBeNull());}
+});
