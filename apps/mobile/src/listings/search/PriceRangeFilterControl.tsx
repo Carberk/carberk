@@ -31,9 +31,14 @@ export function PriceRangeFilterControl({
     onValidityChange?.(!isInvalid);
   }, [isInvalid, onValidityChange]);
 
-  // The fields show grouped digits; the draft keeps plain numbers.
-  const handleMinChange = (text: string) => setField("priceMin", parseAmountInput(text));
-  const handleMaxChange = (text: string) => setField("priceMax", parseAmountInput(text));
+  // Cap whole digits before numeric conversion: every 15-digit integer is exact.
+  // Keep the shared parser's pasted-decimal handling before counting digits.
+  const setPrice = (key: "priceMin" | "priceMax", text: string) => {
+    const digits = text.replace(/[.,]\d{1,2}(?=\D*$)/, "").replace(/\D/g, "");
+    setField(key, parseAmountInput(digits.slice(0, 15)));
+  };
+  const handleMinChange = (text: string) => setPrice("priceMin", text);
+  const handleMaxChange = (text: string) => setPrice("priceMax", text);
 
   return (
     <View className="gap-2">
