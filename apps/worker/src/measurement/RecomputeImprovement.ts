@@ -58,7 +58,7 @@ export class RecomputeImprovement {
     }
     const metrics=JSON.parse(JSON.stringify(snapshot));
     const inputDigest=createHash("sha256").update(JSON.stringify(rows.map(row=>[row.id,row.receivedAt.toISOString(),row.conversionEligible]))).digest("hex");
-    const expiresAt=new Date(now);expiresAt.setUTCMonth(expiresAt.getUTCMonth()+24);
+    const expiresAt=new Date(to);expiresAt.setUTCMonth(expiresAt.getUTCMonth()+24);
     const values={version:1,epoch:this.scope.epoch,environment:this.scope.environment,population:this.scope.population,windowFrom:from,windowTo:to,completeThrough,inputDigest,lateRecords,metrics,generatedAt:now,expiresAt};
     await tx.measurementRollup.upsert({where:{key},create:{key,...values},update:values});
    }
