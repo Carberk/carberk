@@ -1,3 +1,5 @@
+import { SortedFeedRankingAdapter } from "../infrastructure/SortedFeedRankingAdapter";
+import { PrismaExchangeRateRepository } from "../infrastructure/PrismaExchangeRateRepository";
 import "reflect-metadata";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Test } from "@nestjs/testing";
@@ -49,6 +51,23 @@ describe("anonymous marketplace through real HTTP and PostgreSQL", () => {
   await prisma.listing.update({ where: { id: listingId }, data: { status: "active", deletedAt: new Date() } });
   await request.get(`/api/v1/public-marketplace/listings/${listingId}`).expect(404);
  });
+ it("pages showroom inventory without duplicates and keeps seller choice out of ranking order", async () => {
+  const personalId = suite.id("personal");
+  const create = (id: string, business: string | null, publishedAt: Date) => prisma.listing.create({ data: { id, sellerId: suite.id("seller"), businessId: business, brandId: suite.catalog.brandId, modelId: suite.catalog.modelId, cityId: suite.catalog.cityId, status: "active", priceAmount: 100000, priceTmt: 100000, priceCurrency: "TMT", publishedAt } });
+  await prisma.listing.update({ where: { id: listingId }, data: { publishedAt: new Date("2026-10-01T00:00:00Z") } });
+  await create(personalId, null, new Date("2026-10-03T00:00:00Z"));
+  const ranking = new SortedFeedRankingAdapter(prisma, new PrismaExchangeRateRepository(prisma));
+  expect((await ranking.rank({ sort: "newest", limit: 20 })).items.map(item => item.id)).toEqual([personalId, listingId]);
+  expect((await ranking.rank({ sort: "newest", filters: { sellerType: "business" }, limit: 20 })).items.map(item => item.id)).toEqual([listingId]);
+  expect((await ranking.count({ filters: { sellerType: "personal" } })).totalMatching).toBe(1);
+  for (let index = 0; index < 21; index++) await create(suite.id(`page-${index}`), businessId, new Date("2026-10-02T00:00:00Z"));
+  const first = (await request.get(`/api/v1/public-marketplace/showrooms/${businessId}`).expect(200)).body;
+  expect(first.listings).toHaveLength(20); expect(first.nextCursor).toBeTruthy();
+  const next = (await request.get(`/api/v1/public-marketplace/showrooms/${businessId}?cursor=${first.nextCursor}`).expect(200)).body;
+  expect(next.listings).toHaveLength(2); expect(next.nextCursor).toBeNull();
+  expect(new Set([...first.listings, ...next.listings].map((item: { id: string }) => item.id)).size).toBe(22);
+ });
+
  it("hides a suspended business from both reader routes", async () => {
   await prisma.dealership.update({ where: { id: businessId }, data: { status: "suspended" } });
   await request.get(`/api/v1/public-marketplace/showrooms/${businessId}`).expect(404);
