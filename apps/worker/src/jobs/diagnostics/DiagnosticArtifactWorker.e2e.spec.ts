@@ -71,7 +71,7 @@ describe.skipIf(!hosted)("diagnostic artifacts on disposable PostgreSQL and priv
   });
   it("recovers the same bytes after a lost write reply without a second report revision", async () => {
     const row = await fixture(); let lost = true;
-    const flaky = { ...storage, async put(key: string, bytes: Uint8Array, mime: "application/pdf") { await storage.put(key, bytes, mime); if (lost) { lost = false; throw new Error("Synthetic lost reply"); } } };
+    const flaky: DiagnosticArtifactObjects = { read: storage.read.bind(storage), deleteAndVerify: storage.deleteAndVerify.bind(storage), async put(key: string, bytes: Uint8Array, mime: "application/pdf") { await storage.put(key, bytes, mime); if (lost) { lost = false; throw new Error("Synthetic lost reply"); } } };
     const worker = new DiagnosticArtifactWorker(db, flaky, await fonts(), runtime);
     await expect(worker.generate(row.id)).rejects.toThrow("DIAGNOSTIC_ARTIFACT_RETRY");
     const failed = await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: row.id } });
@@ -85,7 +85,7 @@ describe.skipIf(!hosted)("diagnostic artifacts on disposable PostgreSQL and priv
   });
   it("fences erasure during storage and reconciles a resumed late write after cleanup", async () => {
     const row = await fixture(); let original: Uint8Array | undefined;
-    const erasing = { ...storage, async put(key: string, bytes: Uint8Array, mime: "application/pdf") { original = bytes; await storage.put(key, bytes, mime); await db.diagnosticReportRecord.update({ where: { id: row.reportId }, data: { erasedAt: clock } }); } };
+    const erasing: DiagnosticArtifactObjects = { read: storage.read.bind(storage), deleteAndVerify: storage.deleteAndVerify.bind(storage), async put(key: string, bytes: Uint8Array, mime: "application/pdf") { original = bytes; await storage.put(key, bytes, mime); await db.diagnosticReportRecord.update({ where: { id: row.reportId }, data: { erasedAt: clock } }); } };
     const worker = new DiagnosticArtifactWorker(db, erasing, await fonts(), runtime);
     expect(await worker.generate(row.id)).toBe(false);
     const artifact = await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: row.id } });
