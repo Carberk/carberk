@@ -60,6 +60,9 @@ export class OpenConversation {
   ) {}
 
   async execute(input: OpenConversationInput): Promise<OpenConversationResult> {
+    if (input.actor?.businessId) {
+      throw new ForbiddenException({ code: "FORBIDDEN", details: { reason: "PERSONAL_CONTEXT_REQUIRED" } });
+    }
     const listing = await this.listings.getListingSummary(input.listingId);
 
     if (!listing) {
@@ -151,7 +154,7 @@ export class OpenConversation {
       listingId: input.listingId,
       buyerId: input.buyerId,
       sellerId: listing.sellerId,
-      ...(input.actor?.businessId ? { businessId: input.actor.businessId } : {}),
+      ...(listing.businessId ? { businessId: listing.businessId } : {}),
     });
 
     await this.conversations.save(conversation, input.actor);
