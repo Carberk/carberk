@@ -527,6 +527,7 @@ const ModelIdsFilterSchema = z.preprocess(
 // ── Feed filters ──
 
 export const ListingFilterFieldsSchema = z.object({
+  sellerType: z.enum(["personal", "business"]).optional(),
   brandId: z.string().uuid().optional(),
   modelId: z.string().uuid().optional(),
   modelIds: ModelIdsFilterSchema,

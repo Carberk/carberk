@@ -89,7 +89,7 @@ export default function ResultsScreen() {
     }
   }, [floated]);
   const reset = () => { filters.replace({ sort }); router.setParams(writeResultsRouteState({ sort })); };
-  const remove = (group: ChipGroup) => commit(group === "city" ? { cityId: undefined } : group === "price" ? { priceMin: undefined, priceMax: undefined } : { yearMin: undefined, yearMax: undefined });
+  const remove = (group: ChipGroup) => commit(group === "seller" ? { sellerType: undefined } : group === "city" ? { cityId: undefined } : group === "price" ? { priceMin: undefined, priceMax: undefined } : { yearMin: undefined, yearMax: undefined });
   // The form is its own screen: it opens with what Results shows, and its Show N updates this screen in place.
   const openParameters = () => router.push({ pathname: PARAMETERS_PATH, params: { ...writeResultsRouteState(applied), returnToResults: "1" } });
   const chipsProps = { filters: applied, cityName: filters.active.cityId ? catalog.cityName(filters.active.cityId) : undefined, onOpen: openParameters, onRemove: remove };

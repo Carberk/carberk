@@ -57,7 +57,7 @@ describe("writeResultsRouteState", () => {
   it("writes every key, joining models and leaving absent filters undefined", () => {
     expect(writeResultsRouteState({ brandId: "toyota", modelIds: ["camry", "corolla"], priceMin: 70000, sort: "price_asc" })).toEqual({
       brandId: "toyota", modelIds: "camry,corolla", modelId: undefined, cityId: undefined, priceMin: "70000", priceMax: undefined,
-      yearMin: undefined, yearMax: undefined, condition: undefined, sort: "price_asc",
+      yearMin: undefined, yearMax: undefined, condition: undefined, sellerType: undefined, sort: "price_asc",
     });
   });
 

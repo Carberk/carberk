@@ -89,6 +89,7 @@ export class ListingsController {
     if (filterFields.priceMax !== undefined) filters.priceMax = filterFields.priceMax;
     if (filterFields.yearMin !== undefined) filters.yearMin = filterFields.yearMin;
     if (filterFields.yearMax !== undefined) filters.yearMax = filterFields.yearMax;
+    if (filterFields.sellerType !== undefined) filters.sellerType = filterFields.sellerType;
     if (filterFields.condition !== undefined) filters.condition = filterFields.condition;
 
     if (Object.keys(filters).length > 0) {

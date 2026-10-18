@@ -44,6 +44,7 @@ export interface FeedCountSummary {
 }
 
 export interface ListingFilterCriteria {
+  sellerType?: "personal" | "business";
   // Forward-defined for S5 / #92 — S4 always passes empty filters
   brandId?: string;
   modelId?: string;
