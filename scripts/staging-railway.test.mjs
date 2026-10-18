@@ -163,3 +163,27 @@ test('queue disposal requires the same authoritative internal Redis database in 
     await assert.rejects(platform.attest(policy), error => /Redis|delivery|origin/.test(error.message) && !error.message.includes('SECRET'));
   }
 });
+
+test('post-main campaign restoration observes established disposal and cannot start cleanup of an active graph', async () => {
+  const candidate = 'a'.repeat(40), target = 'c'.repeat(40), id = '1'.repeat(32);
+  const remoteKinds = [];
+  const ordinary = boundary();
+  const fetch = async (url, options) => {
+    const { query, variables } = JSON.parse(options.body);
+    if (query.includes('mutation deploy')) return { ok: true, json: async () => ({ data: { serviceInstanceDeployV2: `deployment-${variables.serviceId}` } }) };
+    if (query.includes('query deployment')) return { ok: true, json: async () => ({ data: { deployment: { id: variables.id, status: 'SUCCESS', meta: { commitHash: target } } } }) };
+    return ordinary(url, options);
+  };
+  const platform = new RailwayPlatform({ token: 'SECRET', authorization: `${id}:${candidate}`, fetch,
+    command: async (_program, args) => {
+      const encoded = args.at(-1).match(/Buffer\.from\('([^']+)'/)[1];
+      const program = Buffer.from(encoded, 'base64').toString();
+      remoteKinds.push(program.match(/"kind":"([^"]+)"/)[1]);
+      return JSON.stringify({ fixtures: 'present', namespace: `cf_${id}`, profile: 'campaign897-identities-v1',
+        candidate, state: 'identities', identities: 4, protectedReceipt: `cf_${id}.campaign_entities` });
+    },
+  });
+  const lease = { id, candidate, namespace: `cf_${id}`, identity: policy, fixtureProfile: 'campaign897-identities-v1' };
+  await assert.rejects(platform.execute('restore', lease, target, async () => {}), /dispos|cleanup/i);
+  assert.deepEqual(remoteKinds, ['probe']);
+});
