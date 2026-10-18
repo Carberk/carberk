@@ -44,6 +44,8 @@ export class ServiceMessagingController {
  }
  @Post("conversations/:id/messages") @Header("Cache-Control", "no-store, private")
  send(@Req() req: ServiceRequest, @Param("id") id: string, @Body() body: unknown) { return this.run(async () => { const message = await this.services.send(this.subject(req), parse(uuid, id), parse(ServiceMessagingSchemas.ServiceSendSchema, body)); if (message.visibility === "customer") this.events.emit("service.changed", id); return message; }); }
+ @Post("conversations/:id/support") @Header("Cache-Control", "no-store, private")
+ supportCommand(@Req() req: ServiceRequest, @Param("id") id: string, @Body() body: unknown) { return this.run(async () => { await this.services.supportCommand(this.subject(req), parse(uuid, id), parse(ServiceMessagingSchemas.SupportCommandSchema, body)); this.events.emit("service.changed", id); return { ok: true }; }); }
  @Post("conversations/:id/assignment") @Header("Cache-Control", "no-store, private")
  assign(@Req() req: ServiceRequest, @Param("id") id: string, @Body() body: unknown) {
   const data = parse(ServiceMessagingSchemas.ServiceAssignSchema, body);

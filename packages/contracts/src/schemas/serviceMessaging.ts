@@ -18,7 +18,14 @@ export const ServiceRightsSchema = z.object({
   hold: z.object({ reason: z.string().min(1).max(500), until: z.string().datetime() }).nullable(),
 });
 export const ServiceCreateSchema = z.object({ purpose: ServicePurposeSchema, sourceListingId: z.string().uuid().optional(), synthetic: z.boolean().default(true) });
-export const ServiceSendSchema = z.object({ clientMessageId: z.string().uuid(), body: z.string().trim().max(4000).optional(), attachmentId: z.string().uuid().optional(), visibility: z.enum(["customer", "staff"]).default("customer") }).refine(value => !!value.body || !!value.attachmentId, "Message content required");
+export const SupportCommandSchema = z.discriminatedUnion("kind", [
+ z.object({ kind: z.enum(["close_resolved", "reopen", "investigate", "investigation_done"]) }),
+ z.object({ kind: z.literal("close_awaiting"), reason: z.string().trim().min(1).max(500), clientMessageId: z.string().uuid(), body: z.string().trim().min(1).max(4000) }),
+ z.object({ kind: z.literal("category"), category: z.enum(["exposure", "account", "ordinary"]) }),
+]);
+export const SupportSnapshotSchema = z.object({ unansweredSince: z.string().datetime().nullable(), awaitingCustomerSince: z.string().datetime().nullable(), investigation: z.boolean(), category: z.enum(["exposure", "account", "ordinary"]), escalatedAt: z.string().datetime().nullable(), staffedElapsedMs: z.number().nonnegative(), overdue: z.boolean() });
+export type SupportCommand = z.infer<typeof SupportCommandSchema>;
+export const ServiceSendSchema = z.object({ clientMessageId: z.string().uuid(), body: z.string().trim().max(4000).optional(), attachmentId: z.string().uuid().optional(), visibility: z.enum(["customer", "staff"]).default("customer"), supportKind: z.enum(["reply", "request_information", "notice"]).optional(), reason: z.string().trim().min(1).max(500).optional() }).refine(value => !!value.body || !!value.attachmentId, "Message content required");
 export const ServiceAssignSchema = z.object({ expectedVersion: z.number().int().nonnegative(), targetUserId: z.string().uuid().optional() });
 export const ServiceReadSchema = z.object({ throughSequence: z.number().int().nonnegative() });
 export const ServicePageQuerySchema = z.object({ after: z.coerce.number().int().nonnegative().default(0), limit: z.coerce.number().int().min(1).max(50).default(25) });
@@ -32,7 +39,7 @@ export const ServiceStageAttachmentSchema = z.object({
 });
 export const ServiceAttachmentSchema = z.object({ id: z.string().uuid(), contentType: z.string(), sizeBytes: z.number().int(), filename: z.string() });
 export const ServiceMessageSchema = z.object({ id: z.string().uuid(), clientMessageId: z.string().uuid(), sequence: z.number().int(), sender: z.enum(["customer", "carberk", "operator"]), operatorName: z.string().nullable(), visibility: z.enum(["customer", "staff"]), body: z.string().nullable(), attachment: ServiceAttachmentSchema.nullable(), createdAt: z.string().datetime() });
-export const ServiceConversationSchema = z.object({ id: z.string().uuid(), resourceId: z.string().uuid(), purpose: ServicePurposeSchema, status: z.string(), assignmentVersion: z.number().int(), assigned: z.boolean(), operatorName: z.string().nullable(), sourceListingId: z.string().uuid().nullable(), canSend: z.boolean(), messages: z.array(ServiceMessageSchema), lastSequence: z.number().int(), readThrough: z.number().int(), unread: z.number().int(), hasMore: z.boolean() });
+export const ServiceConversationSchema = z.object({ id: z.string().uuid(), resourceId: z.string().uuid(), purpose: ServicePurposeSchema, status: z.string(), assignmentVersion: z.number().int(), assigned: z.boolean(), operatorName: z.string().nullable(), sourceListingId: z.string().uuid().nullable(), canSend: z.boolean(), support: SupportSnapshotSchema.nullable().optional(), messages: z.array(ServiceMessageSchema), lastSequence: z.number().int(), readThrough: z.number().int(), unread: z.number().int(), hasMore: z.boolean() });
 export type ServicePurpose = z.infer<typeof ServicePurposeSchema>;
 export type ServiceRights = z.infer<typeof ServiceRightsSchema>;
 export type ServiceSend = z.infer<typeof ServiceSendSchema>;

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { retainedSchemaProfile, evaluateSchemaPlan } from './staging-schema.mjs';
+import { inventoryForSchema } from './testing/schema-profile-fixture.mjs';
 
 test('service restoration preserves exact separate-owner and erasure-fenced schema bytes', () => {
  const name = '20261015050000_service_foundations';
@@ -14,7 +15,7 @@ test('service restoration preserves exact separate-owner and erasure-fenced sche
  const current = createHash('sha256').update(readFileSync(new URL('../packages/db/prisma/schema.prisma', import.meta.url))).digest('hex');
  const baseline = [{ name: 'baseline', checksum: '1'.repeat(64) }];
  const candidate = [...baseline, ...retainedSchemaProfile.additions];
- const main = candidate.filter(item => ![name, "20261015060000_business_enquiries", "20261015070000_diagnostic_intake", "20261015080000_service_push_subscriptions"].includes(item.name));
+ const main = inventoryForSchema('afc0aceaa8ddbb9cd42bbbb8a9e84d270965a7aefe47917e464ff934ab0f4a05', baseline);
  const input = { baseline, candidate, main, candidateSchema: current, mainSchema: 'afc0aceaa8ddbb9cd42bbbb8a9e84d270965a7aefe47917e464ff934ab0f4a05' };
  assert.equal(evaluateSchemaPlan(input).disposition, 'retained-additive');
  assert.throws(() => evaluateSchemaPlan({ ...input, candidate: main }), /inventory mismatch/);

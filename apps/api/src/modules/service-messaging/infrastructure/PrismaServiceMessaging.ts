@@ -6,6 +6,7 @@ import { ServiceMessagingSchemas } from "@auto-tm/contracts";
 
 import { STAFF_AUTHORITY_PORT, type StaffAuthorityPort, StaffAuthorityDenied } from "../../identity/identity.public";
 import { assertServiceAccess, serviceCapability, ServiceDenied, type ServiceAction, type ServiceActor, type ServiceScope } from "../domain/serviceAccess";
+import { staffedMilliseconds, transitionSupport, type SupportState, type SupportAction } from "../domain/SupportOperations";
 import { assertServiceRights } from "../domain/ServiceRights";
 import { SERVICE_PRIVATE_STORE, SERVICE_RUNTIME, type ServiceMessagingPort, type ServicePrivateStore, type ServiceRuntime, type ServiceSubject } from "../domain/ports/ServiceMessagingPort";
 import { cleanServiceBytes } from "./cleanServiceBytes";
@@ -89,15 +90,15 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
     scope.assigneeId && scope.purpose === "history" ? tx.user.findUnique({ where: { id: scope.assigneeId }, select: { displayName: true, nameNumber: true } }) : null,
    ]);
    const owner = row.supportCase ?? row.historyRequest;
-   return { id, resourceId: scope.resourceId, purpose: scope.purpose, status: owner?.status ?? "unavailable", assignmentVersion: scope.assignmentVersion, assigned: scope.assigneeId !== null, operatorName: assigned ? assigned.displayName ?? `#${assigned.nameNumber}` : null, sourceListingId: owner?.sourceListingId ?? null, canSend: true, messages: messages.slice(0, limit).map(message => this.messageDto(message, scope.purpose)), lastSequence: row.lastSequence, readThrough: state?.lastSequence ?? 0, unread, hasMore: messages.length > limit };
+   return { id, resourceId: scope.resourceId, purpose: scope.purpose, status: owner?.status ?? "unavailable", assignmentVersion: scope.assignmentVersion, assigned: scope.assigneeId !== null, operatorName: assigned ? assigned.displayName ?? `#${assigned.nameNumber}` : null, sourceListingId: owner?.sourceListingId ?? null, canSend: true, support: row.supportCase ? { unansweredSince: row.supportCase.unansweredSince?.toISOString() ?? null, awaitingCustomerSince: row.supportCase.awaitingCustomerSince?.toISOString() ?? null, investigation: row.supportCase.investigationState === "active", category: this.supportState(row.supportCase).category, escalatedAt: row.supportCase.escalatedAt?.toISOString() ?? null, staffedElapsedMs: row.supportCase.unansweredSince ? staffedMilliseconds(row.supportCase.unansweredSince, this.runtime.now()) : 0, overdue: !!row.supportCase.unansweredSince && staffedMilliseconds(row.supportCase.unansweredSince, this.runtime.now()) >= 4 * 3600000 } : null, messages: messages.slice(0, limit).map(message => this.messageDto(message, scope.purpose)), lastSequence: row.lastSequence, readThrough: state?.lastSequence ?? 0, unread, hasMore: messages.length > limit };
   });
  }
  private messageDto(row: Prisma.ServiceMessageGetPayload<{ include: { attachment: true; sender: { select: { displayName: true; nameNumber: true } } } }>, purpose: ServiceMessagingSchemas.ServicePurpose): ServiceMessagingSchemas.ServiceMessage {
   return { id: row.id, clientMessageId: row.clientMessageId, sequence: row.sequence, sender: row.senderKind === "customer" ? "customer" : purpose === "support" ? "carberk" : "operator", operatorName: row.senderKind === "staff" && purpose === "history" && row.sender ? row.sender.displayName ?? `#${row.sender.nameNumber}` : null, visibility: row.visibility === "staff" ? "staff" : "customer", body: row.body, createdAt: row.createdAt.toISOString(), attachment: row.attachment && !row.attachment.removedAt ? { id: row.attachment.id, contentType: row.attachment.contentType, filename: row.attachment.filename, sizeBytes: row.attachment.sizeBytes ?? 0 } : null };
  }
  async send(subject: ServiceSubject, id: string, message: ServiceMessagingSchemas.ServiceSend): Promise<ServiceMessagingSchemas.ServiceMessage> {
-  return this.locked(subject, id, message.visibility === "staff" ? "note" : "send", async (tx, _row, scope, _actor, audience) => {
-   const hash = digest(JSON.stringify({ body: message.body ?? null, attachmentId: message.attachmentId ?? null, visibility: message.visibility }));
+  return this.locked(subject, id, message.visibility === "staff" ? "note" : "send", async (tx, row, scope, _actor, audience) => {
+   const hash = digest(JSON.stringify({ supportKind: message.supportKind ?? null, reason: message.reason ?? null, body: message.body ?? null, attachmentId: message.attachmentId ?? null, visibility: message.visibility }));
    const prior = await tx.serviceMessage.findUnique({ where: { conversationId_senderId_clientMessageId: { conversationId: id, senderId: subject.userId, clientMessageId: message.clientMessageId } }, include: { attachment: true, sender: { select: { displayName: true, nameNumber: true } } } });
    if (prior) { if (prior.requestHash !== hash) throw new ServiceDenied("IDEMPOTENCY_CONFLICT"); return this.messageDto(prior, scope.purpose); }
    if (!message.body?.trim() && !message.attachmentId) throw new ServiceDenied("INVALID_MESSAGE");
@@ -108,10 +109,40 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
     assertServiceRights(scope.purpose, { category: ServiceMessagingSchemas.ServiceContentCategorySchema.parse(file.category), visibility: message.visibility, contentType: ServiceMessagingSchemas.ServiceStageAttachmentSchema.shape.contentType.parse(file.contentType), sizeBytes: file.sizeBytes ?? 0, filename: file.filename, rights }, this.runtime.now());
     await tx.serviceAttachment.update({ where: { id: file.id }, data: { state: "adopted", adoptedAt: this.runtime.now() } });
    }
+   if (row.supportCase) {
+    if (audience === "customer" && (message.supportKind || message.reason)) throw new ServiceDenied("INVALID_MESSAGE");
+    if (message.visibility === "staff" && (message.supportKind || message.reason)) throw new ServiceDenied("INVALID_MESSAGE");
+    const kind = audience === "customer" ? "customer_message" : message.visibility === "staff" ? "private_note" : message.supportKind ?? "reply";
+    const action: SupportAction = kind === "notice" ? { kind, reason: message.reason ?? "" } : { kind };
+    if ((kind === "reply" || kind === "request_information" || kind === "notice") && !message.body?.trim()) throw new ServiceDenied("INVALID_MESSAGE");
+    await this.applySupport(tx, row.supportCase, action, subject.userId);
+   } else if (message.supportKind || message.reason) throw new ServiceDenied("INVALID_MESSAGE");
    const updated = await tx.serviceConversation.update({ where: { id }, data: { lastSequence: { increment: 1 } } });
    const saved = await tx.serviceMessage.create({ data: { id: this.runtime.id(), conversationId: id, sequence: updated.lastSequence, clientMessageId: message.clientMessageId, senderId: subject.userId, senderKind: audience, visibility: message.visibility, body: message.body?.trim() || null, attachmentId: message.attachmentId ?? null, requestHash: hash }, include: { attachment: true, sender: { select: { displayName: true, nameNumber: true } } } });
    await tx.serviceOutbox.create({ data: { id: this.runtime.id(), conversationId: id, eventType: "message", sequence: saved.sequence, visibility: message.visibility, lifecycleEpoch: scope.lifecycleEpoch } });
    return this.messageDto(saved, scope.purpose);
+  });
+ }
+ private supportState(row: Prisma.SupportCaseGetPayload<Record<string, never>>): SupportState {
+  return { status: row.status === "closed" ? "closed" : "open", closedAt: row.closedAt, unansweredSince: row.unansweredSince, awaitingCustomerSince: row.awaitingCustomerSince, investigation: row.investigationState === "active", category: row.priority === "exposure" || row.priority === "account" ? row.priority : "ordinary", escalatedAt: row.escalatedAt };
+ }
+ private async applySupport(tx: Tx, row: Prisma.SupportCaseGetPayload<Record<string, never>>, action: SupportAction, actorId: string) {
+  const next = transitionSupport(this.supportState(row), action, this.runtime.now());
+  await tx.supportCase.update({ where: { id: row.id }, data: { status: next.status, closedAt: next.closedAt, unansweredSince: next.unansweredSince, awaitingCustomerSince: next.awaitingCustomerSince, investigationState: next.investigation ? "active" : "none", priority: next.category, escalatedAt: next.escalatedAt } });
+  await tx.serviceAudit.create({ data: { actorId, purpose: "support", resourceId: row.id, action: `SUPPORT_${action.kind.toUpperCase()}`, reason: "reason" in action ? action.reason : null, assignmentVersion: row.assignmentVersion } });
+ }
+ async supportCommand(subject: ServiceSubject, id: string, command: ServiceMessagingSchemas.SupportCommand): Promise<void> {
+  await this.locked(subject, id, "note", async (tx, row, scope) => {
+   if (!row.supportCase) throw new ServiceDenied("NO_ACCESS");
+   if (command.kind === "close_awaiting") {
+    const hash = digest(JSON.stringify(command));
+    const prior = await tx.serviceMessage.findUnique({ where: { conversationId_senderId_clientMessageId: { conversationId: id, senderId: subject.userId, clientMessageId: command.clientMessageId } } });
+    if (prior) { if (prior.requestHash !== hash) throw new ServiceDenied("IDEMPOTENCY_CONFLICT"); return; }
+    await this.applySupport(tx, row.supportCase, { kind: "close_awaiting", reason: command.reason }, subject.userId);
+    const updated = await tx.serviceConversation.update({ where: { id }, data: { lastSequence: { increment: 1 } } });
+    await tx.serviceMessage.create({ data: { conversationId: id, clientMessageId: command.clientMessageId, sequence: updated.lastSequence, senderId: subject.userId, senderKind: "staff", visibility: "customer", body: command.body, requestHash: hash } });
+    await tx.serviceOutbox.create({ data: { conversationId: id, eventType: "message", sequence: updated.lastSequence, visibility: "customer", lifecycleEpoch: scope.lifecycleEpoch } });
+   } else await this.applySupport(tx, row.supportCase, command, subject.userId);
   });
  }
  async assign(subject: ServiceSubject, id: string, expectedVersion: number, targetUserId?: string) {

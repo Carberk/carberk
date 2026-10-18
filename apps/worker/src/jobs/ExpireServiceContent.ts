@@ -34,6 +34,7 @@ export class ExpireServiceContent {
    await tx.serviceReadState.deleteMany({ where: { conversationId: id } });
    await tx.serviceMessage.deleteMany({ where: { conversationId: id } });
    await tx.serviceAttachment.updateMany({ where: { conversationId: id }, data: { state: "removed", removedAt: now, uploaderId: null } });
+   await tx.serviceAudit.updateMany({ where: { purpose: "support", resourceId: current.id }, data: { reason: null } });
    await tx.supportCase.update({ where: { id: current.id }, data: { customerId: null, assigneeId: null, sourceListingId: null, assignmentVersion: { increment: 1 } } });
    await tx.serviceAudit.create({ data: { id: randomUUID(), purpose: "support", resourceId: current.id, action: "SERVICE_CONTENT_PURGED", assignmentVersion: current.assignmentVersion } });
    supportPurged++;
