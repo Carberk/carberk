@@ -87,3 +87,8 @@ it("does not turn an old retained principal into a new cohort after raw history 
  const returning={...fact("foreground_activity",{screen:"home",action:"open"},"2026-10-02T01:00:00Z","fresh-account"),firstObservedAt:new Date("2026-10-01T01:00:00Z")};
  expect(compile([old,fresh,returning]).retention.accounts.d1).toMatchObject({numerator:1,denominator:1,value:1});
 });
+
+it("withholds inventory when contradictory same-millisecond transitions have no authoritative order",()=>{
+ const facts=[fact("listing_visibility_changed",{listingId:"same-listing",visibility:"public",reason:"published"},"2026-10-01T01:00:00Z"),fact("listing_visibility_changed",{listingId:"same-listing",visibility:"hidden",reason:"archived"},"2026-10-01T01:00:00Z")];
+ for(const ordered of [facts,[...facts].reverse()]){const score=compile(ordered);expect(score.inventory).toEqual({listingHours:null,averageActive:null,currentActive:null});expect(score.contacts.perActiveListing).toBeNull();}
+});
