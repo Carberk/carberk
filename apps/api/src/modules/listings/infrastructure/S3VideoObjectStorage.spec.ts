@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { S3Client, CreateMultipartUploadCommand, ListPartsCommand, CompleteMultipartUploadCommand, UploadPartCommand } from "@aws-sdk/client-s3";
+import { S3Client, CreateMultipartUploadCommand, ListPartsCommand, CompleteMultipartUploadCommand, UploadPartCommand, AbortMultipartUploadCommand } from "@aws-sdk/client-s3";
 import { S3VideoObjectStorage } from "./S3VideoObjectStorage";
 import type { VideoStorageSession } from "../domain/ports/VideoObjectStorage";
 const session: VideoStorageSession = { sessionId: "00000000-0000-4000-8000-000000000001", uploadId: "00000000-0000-4000-8000-000000000002", storageUploadId: "owned-storage-id", expectedBytes: 6 * 1024 * 1024, expiresAt: new Date("2026-10-17T01:00:00Z") };
@@ -36,5 +36,21 @@ describe("owned video multipart storage", () => {
     const client = new S3Client({ region: "us-east-1" });
     vi.spyOn(client, "send").mockImplementation(async () => ({ Parts: [{ PartNumber: 1, Size: 123, ETag: "wrong-size" }] }));
     await expect(new S3VideoObjectStorage(client, "private-video", now).complete(session)).rejects.toThrow("VIDEO_PARTS_INVALID");
+  });
+  it("reconciles paginated storage parts without assuming ETags are hashes", async () => {
+    const client = new S3Client({ region: "us-east-1" });
+    vi.spyOn(client, "send").mockImplementation(async (command: unknown) => {
+      if (!(command instanceof ListPartsCommand)) throw new Error("UNEXPECTED_COMMAND");
+      return command.input.PartNumberMarker === "1"
+        ? { Parts: [{ PartNumber: 2, Size: 1024 * 1024, ETag: "not-a-hash" }] }
+        : { IsTruncated: true, NextPartNumberMarker: "1", Parts: [{ PartNumber: 1, Size: 5 * 1024 * 1024, ETag: "opaque" }] };
+    });
+    expect(await new S3VideoObjectStorage(client, "private-video", now).listParts(session)).toEqual([{ partNumber: 1, sizeBytes: 5 * 1024 * 1024, etag: "opaque" }, { partNumber: 2, sizeBytes: 1024 * 1024, etag: "not-a-hash" }]);
+  });
+  it("allows abort after expiry but does not claim object deletion", async () => {
+    const client = new S3Client({ region: "us-east-1" });
+    vi.spyOn(client, "send").mockImplementation(async (command: unknown) => { if (!(command instanceof AbortMultipartUploadCommand) || command.input.UploadId !== session.storageUploadId) throw new Error("WRONG_ABORT_SCOPE"); return {}; });
+    expect(await new S3VideoObjectStorage(client, "private-video", now).abort({ ...session, expiresAt: now() })).toBeUndefined();
+    await expect(new S3VideoObjectStorage(client, "private-video", now).initialize("../other", session.uploadId)).rejects.toThrow("VIDEO_SESSION_UNAVAILABLE");
   });
 });
