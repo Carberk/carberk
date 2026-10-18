@@ -128,6 +128,13 @@ describe("PrismaAccountRestoreUnitOfWork e2e", () => {
     },
   };
 
+  it("withholds fresh inventory after restore until an authoritative rebaseline",async()=>{
+    const epoch=suite.id("restore-baseline"),key=`inventory_baseline:${epoch}`;
+    await prisma.measurementState.create({data:{key:"collector",epoch}});await prisma.measurementState.create({data:{key,epoch:new Date().toISOString()}});
+    try{await unitOfWork.run(async writes=>{await writes.republishListingsArchivedByDeletion(USER_ID);await writes.clearDeletionSchedule(USER_ID);});expect(await prisma.measurementState.findUnique({where:{key}})).toBeNull();}
+    finally{await prisma.measurementState.deleteMany({where:{key:{in:[key,"collector"]}}});}
+  });
+
   it("commits both writes together", async () => {
     await new RecoverAccount(userRepo, unitOfWork).execute({ userId: USER_ID });
 

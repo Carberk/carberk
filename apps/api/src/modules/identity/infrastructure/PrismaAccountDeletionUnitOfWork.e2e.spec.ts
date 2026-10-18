@@ -151,6 +151,15 @@ describe("PrismaAccountDeletionUnitOfWork e2e", () => {
     expect(selfArchived).toMatchObject({ status: "archived", archivedByDeletion: false });
   });
 
+  it("invalidates synthetic inventory evidence atomically without publishing an erased actor fact",async()=>{
+    const epoch=suite.id("baseline-epoch"),key=`inventory_baseline:${epoch}`;
+    await prisma.measurementState.create({data:{key:"collector",epoch}});await prisma.measurementState.create({data:{key,epoch:NOW.toISOString()}});
+    try{
+      await expect(deleteMe(failingAfter(unitOfWork,"archiveActiveListings")).execute({userId:USER_ID})).rejects.toThrow("archiveActiveListings failed");expect(await prisma.measurementState.findUnique({where:{key}})).not.toBeNull();
+      await deleteMe().execute({userId:USER_ID});expect(await prisma.measurementState.findUnique({where:{key}})).toBeNull();
+    }finally{await prisma.measurementState.deleteMany({where:{key:{in:[key,"collector"]}}});}
+  });
+
   it("erases telemetry immediately and rolls its erase back with a failed core deletion", async () => {
     const principalId = randomUUID();
     const guestId = randomUUID();
