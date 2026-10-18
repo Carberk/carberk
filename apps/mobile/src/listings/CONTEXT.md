@@ -6,7 +6,7 @@ Business inventory enters Sell with an explicit business context. The entry scre
 
 ## Native video proof boundary
 
-`videoPreparation/VideoPreparation.ts` validates the selected interval and completed local output before a future uploader can consume it. Its native port is implemented in the local Expo module `../../modules/listing-video-preparation`, using AVFoundation and Media3 Transformer 1.8.0. No seller UI calls it yet. The [issue 888 evidence](../../../../docs/evidence/issue-888/verification.md) separates simulator exports and compiled targets from remaining Android/physical-device, provider, HDR and storage checks.
+`videoPreparation/VideoPreparation.ts` validates selected intervals and app-private native output. The local Expo module `../../modules/listing-video-preparation` uses AVFoundation and Media3 Transformer 1.8.0. `videoEditor/ListingVideoEditor.tsx` is mounted in Sell/Edit Photos, asks current server capabilities and lazily loads a deliberate native preview, accessible trim handles and interval-constrained poster thumbnails. `VideoUploadTasks` connects preparation to the foreground resumable transfer journal; background/account changes stop local transfer, paused uploads require Continue, and PROCESSING polls current server readiness. Original library bytes never become upload fallback. Durable selection recovery, publication journal rebinding, active/pending replacement state and buyer poster/player surfaces remain incomplete. The [issue 888 evidence](../../../../docs/evidence/issue-888/verification.md) distinguishes native target/export proof from remaining provider/HDR/storage and consolidated physical-device acceptance. Flags and tester admission remain server-owned and closed by default.
 
 ## Important constraints
 
