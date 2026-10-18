@@ -18,7 +18,7 @@ export function HistoryReports({ id, locale }: { id: string; locale: string }) {
   {query.isError || linkFailed ? <Text accessibilityRole="alert">{c.error}</Text> : null}
   <Button accessibilityRole="button" accessibilityLabel={c.refresh} onPress={() => { void query.refetch(); }}><Text>{c.refresh}</Text></Button>
   {reports.length === 0 ? <Text>{c.empty}</Text> : reports.map(report => <View key={report.id} className="gap-2"><Text>{report.provider === "carfax" ? "Carfax" : "AutoCheck"} / {report.vin}</Text><Text>{c.date}: {new Date(report.originalDate).toLocaleDateString(localeTag(locale))}</Text>
-   {report.canShare ? <><PrivateDocumentAction download={() => apiClient.getBytes(`/services/conversations/${id}/history/artifacts/${report.id}`, report.sizeBytes)} label={c.open} busyLabel={c.opening} errorLabel={c.retry}/>{report.sharedLink ? <Button accessibilityRole="button" accessibilityLabel={c.link} onPress={() => { setLinkFailed(false); void Linking.openURL(report.sharedLink!).catch(() => setLinkFailed(true)); }}><Text>{c.link}</Text></Button> : null}</> : <Text>{c.restricted}</Text>}
+   {report.canShare ? <><PrivateDocumentAction download={() => apiClient.getBytes(`/services/conversations/${id}/history/artifacts/${report.id}`, report.sizeBytes)} label={c.open} busyLabel={c.opening} errorLabel={c.retry}/>{report.sharedLink ? <Button accessibilityRole="button" accessibilityLabel={c.link} onPress={() => { if (!report.sharedLink) return; setLinkFailed(false); void Linking.openURL(report.sharedLink).catch(() => setLinkFailed(true)); }}><Text>{c.link}</Text></Button> : null}</> : <Text>{c.restricted}</Text>}
   </View>)}
  </View>;
 }
