@@ -48,8 +48,8 @@ COPY . .
 # Runtime-shared packages export dist/, so build them before the app.
 # Prisma 7 loads packages/db/prisma.config.ts during generate and requires a
 # datasource URL even though no connection is made.
-RUN DATABASE_URL=postgresql://build:build@localhost:5432/build pnpm --filter @auto-tm/db build
 RUN pnpm --filter @auto-tm/contracts build
+RUN DATABASE_URL=postgresql://build:build@localhost:5432/build pnpm --filter @auto-tm/db build
 RUN pnpm --filter @auto-tm/admin build
 
 FROM base AS runtime
