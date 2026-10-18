@@ -45,6 +45,9 @@ export class ImprovementController {
  @Post("research/derivations")
  researchAdmission(@Body() body:unknown,@Req() request:StaffRequest) {return this.authorized(()=>this.knowledge.admitSynthetic(this.subject(request),body));}
  @Header("Cache-Control","no-store")
+ @Post("research/sources/:id/invalidate")
+ researchSourceInvalidation(@Param("id") id:string,@Body() body:unknown,@Req() request:StaffRequest) {return this.authorized(()=>this.knowledge.invalidateSource(this.subject(request),id,body));}
+ @Header("Cache-Control","no-store")
  @Get("research")
  researchList(@Req() request:StaffRequest) {return this.authorized(()=>this.knowledge.list(this.subject(request)));}
  @Header("Cache-Control","no-store")
