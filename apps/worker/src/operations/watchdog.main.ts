@@ -22,7 +22,10 @@ async function main(): Promise<void> {
   redis.on("error", () => undefined);
   const queues = QUEUES.map(name => new Queue(name, { connection: redis }));
   const disk = new DiskProbe(config.diskPath);
-  const alerts = new AlertSink(config.alertSinkUrl, config.alertSinkSecret);
+  const alerts = new AlertSink(config.alertSinkUrl, config.alertSinkSecret, fetch, {
+    read: () => redis.get(`${config.prefix}:alert-receipt`),
+    save: async transition => { await redis.set(`${config.prefix}:alert-receipt`, transition, "EX", 30 * 86_400); },
+  });
   const watchdog = new Watchdog({
     restoreIncident: async () => restoreIncident(await redis.get(`${config.prefix}:incident`), new Date()),
     disk: () => disk.check(),
