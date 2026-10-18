@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AppState, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { Stack, useFocusEffect } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -37,12 +37,12 @@ export function EnquiriesScreen() {
  useEffect(() => { setSelected(null); setDrafts({}); setNotice(""); setFilter("all"); }, [userId, businessId]);
  const inbox = useInfiniteQuery({ queryKey: key, initialPageParam: undefined as string | undefined, queryFn: ({ pageParam }) => apiClient.get(`/conversations/business/${businessId}${pageParam ? `?cursor=${encodeURIComponent(pageParam)}` : ""}`, pageSchema, options), getNextPageParam: page => page.nextCursor ?? undefined, enabled: isAuthenticated === true && !!businessId, staleTime: 0, gcTime: 0 });
  const messages = useInfiniteQuery({ queryKey: [...key, selected, "messages"], initialPageParam: undefined as string | undefined, queryFn: ({ pageParam }) => apiClient.get(`/conversations/${selected}/messages${pageParam ? `?cursor=${encodeURIComponent(pageParam)}` : ""}`, ConversationsSchemas.ListMessagesResponseSchema, options), getNextPageParam: page => page.nextCursor ?? undefined, enabled: isAuthenticated === true && !!businessId && !!selected && !inbox.isError, staleTime: 0, gcTime: 0 });
- const refresh = () => { void workspace.refetch(); void inbox.refetch(); if (selected) void messages.refetch(); };
+ const refresh = () => { void workspace.refetch(); if (businessId) void inbox.refetch(); if (selected && businessId) void messages.refetch(); };
  const reconcile = useCallback(() => {
   void cache.invalidateQueries({ queryKey: ["business", userId, "current"] });
   void cache.invalidateQueries({ queryKey: ["business", userId, businessId, "enquiries"] });
  }, [cache, userId, businessId]);
- useFocusEffect(useCallback(() => { if (isAuthenticated === true && businessId) reconcile(); }, [isAuthenticated, businessId, reconcile]));
+ useFocusEffect(useCallback(() => { if (isAuthenticated === true) reconcile(); }, [isAuthenticated, businessId, reconcile]));
  useEffect(() => {
   if (isAuthenticated !== true || !businessId) return;
   const socket = getSharedConversationSocket();
@@ -54,10 +54,9 @@ export function EnquiriesScreen() {
    if (next === "connected" && (previous === "disconnected" || previous === "error")) reconcile();
    previous = next;
   });
-  const foreground = AppState.addEventListener("change", state => { if (state === "active") reconcile(); });
   // The root owns this shared connection's lifetime, including sign-out.
   void socket.connect();
-  return () => { unsubscribeMessage(); unsubscribeDeleted(); unsubscribeWatermark(); unsubscribeStatus(); foreground.remove(); };
+  return () => { unsubscribeMessage(); unsubscribeDeleted(); unsubscribeWatermark(); unsubscribeStatus(); };
  }, [isAuthenticated, businessId, reconcile]);
  const failure = (error: unknown) => { setNotice(error instanceof ApiError && error.status === 409 ? c.conflict : error instanceof ApiError && error.status === 403 ? c.denied : c.failed); refresh(); };
  const change = useMutation({ mutationFn: ({ enquiry, action, assigneeId }: Change) => apiClient.post(`/conversations/business/${businessId}/${enquiry.id}/${action}`, { expectedVersion: enquiry.version, ...(assigneeId !== undefined ? { assigneeId } : {}) }, undefined, options), onSuccess: () => { setNotice(""); void cache.invalidateQueries({ queryKey: key }); }, onError: failure });
