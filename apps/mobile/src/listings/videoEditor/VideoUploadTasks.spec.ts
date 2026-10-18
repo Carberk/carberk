@@ -1,3 +1,5 @@
+import { onlineManager, focusManager } from "@tanstack/react-query";
+
 import { createHash } from "node:crypto";
 
 import { http, HttpResponse } from "msw";
@@ -7,7 +9,7 @@ import { server } from "../../../test/msw";
 import { storeAuthSession } from "../../auth/session";
 import { videoNativeStorage } from "../videoTransfer/testing/InMemoryVideoNativeStorage";
 
-import { VideoUploadTask, videoUploadTask, rebindPublishedVideo } from "./VideoUploadTasks";
+import { VideoUploadTask, videoUploadTask, rebindPublishedVideo, pauseVideoUploads } from "./VideoUploadTasks";
 
 const boundary = vi.hoisted(() => ({ secure: new Map<string, string>(), nativeSelections: [] as unknown[], unavailable: false }));
 vi.mock("expo-secure-store", () => ({ getItemAsync: async (key: string) => boundary.secure.get(key) ?? null, setItemAsync: async (key: string, value: string) => { boundary.secure.set(key, value); }, deleteItemAsync: async (key: string) => { boundary.secure.delete(key); } }));
@@ -108,6 +110,36 @@ describe("native seller task uses actual preparation and transfer boundaries", (
   await entered; await task.pause(); release(); await running;
   expect(task.snapshot().phase).toBe("PAUSED");
   expect(state).toBe("PAUSED");
+ });
+
+ it("continues a network-interrupted upload on reconnect without an explicit retry", async () => {
+  let offline = true;
+  server.use(http.get(`${base}/${sessionId}`, () => offline ? HttpResponse.error() : HttpResponse.json(snapshot())));
+  const unique = { kind: "listing" as const, id: "00000000-0000-4000-8000-000000000091" };
+  const task = videoUploadTask(ownerId, unique);
+  await task.start({ sourceUri: "file:///library/selected.mov", startMs: 0, endMs: 3000 }, 0);
+  expect(task.snapshot().phase).toBe("FAILED");
+  onlineManager.setOnline(false); offline = false; onlineManager.setOnline(true);
+  await vi.waitFor(() => { expect(task.snapshot().phase).toBe("PROCESSING"); });
+ });
+ it("continues a lifecycle suspension on foreground but preserves an explicit Pause", async () => {
+  const unique = { kind: "listing" as const, id: "00000000-0000-4000-8000-000000000092" };
+  let enter!: () => void, release!: () => void;
+  const entered = new Promise<void>(resolve => { enter = resolve; }), held = new Promise<void>(resolve => { release = resolve; });
+  server.use(http.put("https://video.test/task-part", async () => { enter(); await held; complete = true; return new HttpResponse(null); }));
+  const task = videoUploadTask(ownerId, unique);
+  const running = task.start({ sourceUri: "file:///library/selected.mov", startMs: 0, endMs: 3000 }, 0);
+  await entered; focusManager.setFocused(false); await pauseVideoUploads(); release(); await running;
+  expect(task.snapshot().phase).toBe("PAUSED");
+  focusManager.setFocused(true);
+  await vi.waitFor(() => { expect(task.snapshot().phase).toBe("PROCESSING"); });
+  // The seller's Pause remains an explicit durable intent, even after reconnect.
+  const paused = new VideoUploadTask(ownerId, target);
+  state = "UPLOADING"; complete = false;
+  const record = task.snapshot().record!;
+  videoNativeStorage.values.set(`listing-video-transfer:v1:${ownerId}:draft:${target.id}`, JSON.stringify({ ...record, target, state: "PAUSED", resumeOnForeground: false }));
+  await paused.recover();
+  expect(paused.snapshot().phase).toBe("PAUSED");
  });
 
 });
