@@ -13,6 +13,7 @@ const receiptSchema = z.object({
 
 interface Receipts { read(): Promise<string | null>; save(value: string): Promise<void> }
 interface SmtpBoundary { host: string; port: number; servername: string; ca?: Buffer; timeoutMs: number }
+const timestamp = z.string().max(30).datetime();
 const probe = (value: unknown) => value === "healthy" || value === "failing" ? value : "unknown";
 
 /** One incident transition at a time, three persisted attempts, no payload queue or provider error output. */
@@ -25,8 +26,8 @@ export class SmtpAlertSink {
     if (this.pending || !snapshot.incident) return false;
     const { openedAt, lastObservedAt, resolvedAt } = snapshot.incident;
     // Pick fields individually. Neither incident extensions nor other snapshot data may enter mail.
-    if (![openedAt, lastObservedAt, snapshot.observedAt, ...(resolvedAt ? [resolvedAt] : [])]
-      .every(value => typeof value === "string" && value.length <= 30 && Number.isFinite(Date.parse(value)))) return false;
+    if (![openedAt, lastObservedAt, snapshot.observedAt].every(value => timestamp.safeParse(value).success)
+      || (resolvedAt !== null && !timestamp.safeParse(resolvedAt).success)) return false;
     const transition = `${openedAt}:${resolvedAt ?? "open"}`;
     this.pending = true;
     try {

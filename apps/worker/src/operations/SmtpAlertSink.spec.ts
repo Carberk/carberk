@@ -28,7 +28,7 @@ afterAll(async () => { await rm(dir, { recursive: true, force: true }); });
 
 async function smtp() {
   const commands: string[] = [], messages: string[] = [], sockets = new Set<TLSSocket>();
-  let rejectRecipient = false, stall = false, stallAck = false;
+  let rejectRecipient = false, stall = false, stallAck = false, advertiseAuth = true, rejectAuth = false;
   const server = createServer({ key, cert }, socket => {
     sockets.add(socket); socket.on("close", () => sockets.delete(socket)); socket.on("error", () => undefined);
     if (stall) return;
@@ -50,8 +50,8 @@ async function smtp() {
           continue;
         }
         commands.push(line);
-        if (line.startsWith("EHLO")) socket.write("250-smtp.gmail.test\r\n250 AUTH PLAIN\r\n");
-        else if (line.startsWith("AUTH PLAIN")) socket.write("235 2.7.0 authenticated\r\n");
+        if (line.startsWith("EHLO")) socket.write(advertiseAuth ? "250-smtp.gmail.test\r\n250 AUTH PLAIN\r\n" : "250 smtp.gmail.test\r\n");
+        else if (line.startsWith("AUTH")) socket.write(rejectAuth ? "535 5.7.8 synthetic-password-only denied\r\n" : "235 2.7.0 authenticated\r\n");
         else if (line.startsWith("MAIL FROM")) socket.write("250 2.1.0 OK\r\n");
         else if (line.startsWith("RCPT TO")) socket.write(rejectRecipient ? "550 5.1.1 synthetic-password-only private server error\r\n" : "250 2.1.5 OK\r\n");
         else if (line === "DATA") { data = []; socket.write("354 send message\r\n"); }
@@ -65,6 +65,7 @@ async function smtp() {
   const address = server.address(); if (!address || typeof address === "string") throw new Error("Missing fixture port");
   return { commands, messages, boundary: { host: "127.0.0.1", port: address.port, servername: "localhost", ca: cert, timeoutMs: 400 },
     holdAcknowledgment: () => { stallAck = true; },
+    rejectAuthentication: () => { rejectAuth = true; }, omitAuthentication: () => { advertiseAuth = false; },
     reject: (value: boolean) => { rejectRecipient = value; }, stall: () => { stall = true; },
     close: async () => { for (const socket of sockets) socket.destroy(); await new Promise<void>(resolve => server.close(() => resolve())); } };
 }
@@ -86,14 +87,15 @@ it("delivers only allowlisted transitions over authenticated TLS and deduplicate
     const state = snapshot();
     if (!state.incident) throw new Error("Missing fixture incident");
     Object.assign(state.incident, { private: "private-identity-token" });
-    Object.assign(state, { private: "private-user-content" });
+    Object.assign(state, { private: "private-user-content", collector: "private-probe-token" });
     expect(await create().publish(state, now)).toBe(true);
     expect(await create().publish(state, now + 30_000)).toBe(false);
     state.incident.resolvedAt = state.observedAt;
     expect(await create().publish(state, now + 60_000)).toBe(true);
     expect(await create().publish(state, now + 90_000)).toBe(false);
     expect(server.messages).toHaveLength(2);
-    expect(server.commands.some(line => line.startsWith("AUTH PLAIN"))).toBe(true);
+    expect(server.commands.filter(line => line.startsWith("AUTH PLAIN"))).toEqual(Array(2).fill(
+      `AUTH PLAIN ${Buffer.from("\0tkmdevelopers@gmail.com\0synthetic-password-only").toString("base64")}`));
     expect(server.commands.filter(line => line.startsWith("RCPT TO"))).toEqual(Array(2).fill("RCPT TO:<bagtyyarkowusow.dev@gmail.com>"));
     expect(server.messages.join()).toContain("Carberk operational incident recovered");
     expect(server.messages.join()).not.toMatch(/private-|synthetic-password|attachment|hostname/i);
@@ -173,5 +175,35 @@ it("rejects date-shaped private content before SMTP or receipt writes", async ()
     expect(await new SmtpAlertSink(config(), receipts, server.boundary).publish(state, now)).toBe(false);
     expect(server.commands).toHaveLength(0);
     expect(await receipts.read()).toBeNull();
+  } finally { await server.close(); }
+});
+
+it("bounds ambiguous acceptance when acknowledgment persistence fails and keeps a stable Message-ID", async () => {
+  const server = await smtp();
+  let stored: string | null = null;
+  const receipts = { read: async () => stored, save: async (value: string) => {
+    if ((JSON.parse(value) as { delivered: boolean }).delivered) throw new Error("synthetic-password-only private storage");
+    stored = value;
+  } };
+  try {
+    for (const offset of [0, 30_000, 90_000, 300_000]) {
+      expect(await new SmtpAlertSink(config(), receipts, server.boundary).publish(snapshot(), now + offset)).toBe(false);
+    }
+    expect(server.messages).toHaveLength(3);
+    const ids = server.messages.map(message => message.match(/^Message-ID: (.+)$/mi)?.[1]);
+    expect(ids[0]).toBeDefined(); expect(new Set(ids).size).toBe(1);
+    expect(JSON.parse(stored ?? "{}")).toMatchObject({ attempts: 3, delivered: false });
+  } finally { await server.close(); }
+});
+
+it("requires authentication before MAIL even when AUTH capability disappears", async () => {
+  const server = await smtp();
+  try {
+    server.rejectAuthentication();
+    expect(await new SmtpAlertSink(config(), receiptStore(), server.boundary).publish(snapshot(), now)).toBe(false);
+    server.omitAuthentication();
+    expect(await new SmtpAlertSink(config(), receiptStore(), server.boundary).publish(snapshot(), now)).toBe(false);
+    expect(server.commands.filter(line => line.startsWith("MAIL FROM"))).toHaveLength(0);
+    expect(server.messages).toHaveLength(0);
   } finally { await server.close(); }
 });
