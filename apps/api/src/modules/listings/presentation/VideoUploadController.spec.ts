@@ -57,7 +57,8 @@ describe("V1 owned video HTTP protocol", () => {
     ledger.reserveError = new Error("synthetic database adapter failure private-key");
     try {
       const response = await supertest(app.getHttpServer()).post(url).set("authorization", `Bearer ${token}`).send(body).expect(503);
-      expect(response.body).toEqual({ code: "VIDEO_SERVICE_UNAVAILABLE" });
+      expect(response.body).toMatchObject({ code: "VIDEO_SERVICE_UNAVAILABLE", statusCode: 503 });
+      expect(JSON.stringify(response.body)).not.toContain("private-key");
       expect(response.headers["cache-control"]).toBe("private, no-store");
     } finally { ledger.reserveError = null; }
   });

@@ -84,7 +84,8 @@ export class VideoUploadController {
       if (code === "VIDEO_IDEMPOTENCY_CONFLICT") throw new HttpException({ code }, 409);
       if (code === "VIDEO_PART_INVALID") throw new BadRequestException({ code });
       if (["VIDEO_SESSION_INITIALIZING", "VIDEO_COMPLETION_UNCERTAIN", "VIDEO_STORAGE_UNAVAILABLE"].includes(code)) throw new HttpException({ code }, 503);
-      throw new HttpException({ code: "VIDEO_SESSION_UNAVAILABLE" }, 404);
+      if (["VIDEO_SESSION_UNAVAILABLE", "VIDEO_PARTS_INVALID"].includes(code)) throw new HttpException({ code: "VIDEO_SESSION_UNAVAILABLE" }, 404);
+      throw new HttpException({ code: "VIDEO_SERVICE_UNAVAILABLE" }, 503);
     }
   }
 }
