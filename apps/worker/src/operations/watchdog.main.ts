@@ -2,6 +2,7 @@ import Redis from "ioredis";
 import { Queue } from "bullmq";
 import { OperationsSchemas } from "@auto-tm/contracts";
 
+import { AlertSink, restoreIncident } from "./AlertSink";
 import { operationsConfig } from "./OperationsConfig";
 import { Watchdog } from "./Watchdog";
 import { DiskProbe, tlsExpiryProbe } from "./hostProbes";
@@ -21,7 +22,9 @@ async function main(): Promise<void> {
   redis.on("error", () => undefined);
   const queues = QUEUES.map(name => new Queue(name, { connection: redis }));
   const disk = new DiskProbe(config.diskPath);
+  const alerts = new AlertSink(config.alertSinkUrl, config.alertSinkSecret);
   const watchdog = new Watchdog({
+    restoreIncident: async () => restoreIncident(await redis.get(`${config.prefix}:incident`), new Date()),
     disk: () => disk.check(),
     tls: () => tlsExpiryProbe(config.apiHealthUrl, new Date()),
     heartbeat: () => redis.get(`${config.prefix}:worker`),
@@ -36,7 +39,11 @@ async function main(): Promise<void> {
       const counts = await queue.getJobCounts("wait", "prioritized", "active");
       return { name: queue.name, waiting: (counts["wait"] ?? 0) + (counts["prioritized"] ?? 0) + (counts["active"] ?? 0) };
     })),
-    publish: async snapshot => { await redis.set(`${config.prefix}:snapshot`, JSON.stringify(snapshot), "PX", 90_000); },
+    publish: async snapshot => {
+      if (snapshot.incident) await redis.set(`${config.prefix}:incident`, JSON.stringify(snapshot.incident), "EX", 30 * 86_400);
+      await redis.set(`${config.prefix}:snapshot`, JSON.stringify(snapshot), "PX", 90_000);
+      await alerts.publish(snapshot);
+    },
   });
   let pending = false;
   const tick = async () => {

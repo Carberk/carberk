@@ -22,6 +22,7 @@ export interface WatchdogPorts {
   http(target: "api" | "collector"): Promise<ProbeState>;
   queueDepths(): Promise<{ name: string; waiting: number }[]>;
   publish(snapshot: OperationsSnapshot): Promise<void>;
+  restoreIncident?(): Promise<OperationalIncident | null>;
   technical?(): Promise<OperationsSchemas.TechnicalSnapshot | null>;
   disk?(): Promise<DiskObservation>;
   tls?(): Promise<TlsObservation>;
@@ -31,10 +32,16 @@ export interface WatchdogPorts {
 export class Watchdog {
   private backlogSince = new Map<string, number>();
   private incident: OperationalIncident | null = null;
+  private restored = false;
   private lastCheckAt: number | null = null;
   constructor(private readonly ports: WatchdogPorts) {}
 
   async check(now: Date): Promise<OperationsSnapshot> {
+    if (!this.restored) {
+      // Do not publish a replacement incident until persisted state has been read successfully.
+      this.incident = await (this.ports.restoreIncident?.() ?? Promise.resolve(null));
+      this.restored = true;
+    }
     if (this.lastCheckAt !== null && now.getTime() - this.lastCheckAt > 60_000) this.backlogSince.clear();
     this.lastCheckAt = now.getTime();
     const [heartbeat, api, collector, depths, measured, diskResult, tlsResult] = await Promise.allSettled([
