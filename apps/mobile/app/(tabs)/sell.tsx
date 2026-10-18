@@ -37,6 +37,7 @@ import {
 } from "../../src/listings/wizard/wizardErrors";
 import { SignInDialog } from "../../components/auth/SignInDialog";
 import { SellEntry } from "../../src/listings/sell/SellEntry";
+import { ListingVideoEditor } from "../../src/listings/videoEditor/ListingVideoEditor";
 import Step2Photos from "../../src/listings/wizard/Step2Photos";
 import Step3VehicleId from "../../src/listings/wizard/Step3VehicleId";
 import Step4Specs from "../../src/listings/wizard/Step4Specs";
@@ -678,6 +679,7 @@ export default function SellScreen() {
         <Text className="py-2 text-callout font-semibold">{c.context}: {businessId ? business?.business.name ?? c.title : c.personal}</Text>
         {businessId && (businessAccessError || business?.business.id !== businessId || business.business.status !== "active") ? <Text accessibilityRole="alert">{c.denied}</Text> : null}
         {currentStep === "photos" && (
+          <>
           <Step2Photos
             photos={uploadQueue.photos}
             onAddPhoto={uploadQueue.addPhoto}
@@ -689,6 +691,8 @@ export default function SellScreen() {
             fieldErrors={fieldErrors}
             showErrors={attemptedSteps.photos === true}
           />
+          {userId && machineState.draftId ? <ListingVideoEditor ownerId={userId} target={{ kind: "draft", id: machineState.draftId }} businessId={businessId} /> : null}
+          </>
         )}
         {currentStep === "vehicle" && (
           <Step3VehicleId

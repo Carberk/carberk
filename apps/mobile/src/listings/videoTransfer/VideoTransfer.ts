@@ -139,8 +139,8 @@ export class VideoTransfer {
     await this.writes;
     const record = await this.device.load();
     if (!record || record.state === "CANCELLED" || (record.state === "PROCESSING" && state === "PAUSED")) return;
-    await this.owner(record);
     await this.save({ ...record, state });
+    await this.owner(record);
     if (!record.sessionId) return;
     if (state === "CANCELLED") await apiClient.delete(`${apiPath}/${record.sessionId}`, snapshotSchema, this.options(record));
     else await apiClient.post(`${apiPath}/${record.sessionId}/pause`, {}, snapshotSchema, this.options(record));

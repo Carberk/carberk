@@ -41,7 +41,7 @@ describe("optional video editor current capabilities", () => {
   vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({ canceled: false, assets: [{ uri: "file:///library/selected.mov", width: 960, height: 540, duration: 120000, type: "video" }] });
   const screen = await renderMobile(<ListingVideoEditor ownerId={ownerId} target={target} />);
   await act(async () => { fireEvent.press(await screen.findByRole("button", { name: "Add video" })); });
-  expect(screen.getByRole("adjustable", { name: "Video start" })).toBeTruthy();
+  expect(await screen.findByRole("adjustable", { name: "Video start" })).toBeTruthy();
   expect(screen.getByRole("adjustable", { name: "Video end" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Use video" }).props.accessibilityState?.disabled).toBe(true);
   await act(() => { fireEvent(screen.getByRole("adjustable", { name: "Video start" }), "accessibilityAction", { nativeEvent: { actionName: "increment" } }); });

@@ -1,8 +1,8 @@
 import { VideoUploadSchemas } from "@auto-tm/contracts";
-import { requireOptionalNativeModule } from "expo";
 import { randomUUID } from "expo-crypto";
 
 import { apiClient } from "../../api/client";
+import { peekAuthSession } from "../../auth/sessionSnapshot";
 import { loadAuthSession } from "../../auth/session";
 import { VideoPreparation, type VideoPreparationPort, type VideoSelection } from "../videoPreparation/VideoPreparation";
 import { ExpoVideoTransferDevice } from "../videoTransfer/ExpoVideoTransferDevice";
@@ -54,15 +54,15 @@ export class VideoUploadTask {
     } catch (error) { if (intent === this.intent) this.failed(error); }
   }
   async start(selection: Omit<VideoSelection, "jobId" | "maxBytes">, posterMs: number) {
-    if (["PREPARING", "UPLOADING", "PROCESSING"].includes(this.value.phase)) throw new Error("VIDEO_TASK_BUSY");
+    if (["PREPARING", "UPLOADING", "PROCESSING"].includes(this.value.phase)) return;
     const intent = ++this.intent;
-    await this.owner();
-    if (!Number.isInteger(posterMs) || posterMs < selection.startMs || posterMs >= selection.endMs) throw new Error("INVALID_POSTER");
-    const native = requireOptionalNativeModule<VideoPreparationPort>("ListingVideoPreparation");
-    if (!native) { this.failed(new Error("VIDEO_PREPARATION_UNAVAILABLE")); return; }
-    const jobId = randomUUID(); this.preparingJob = jobId; this.preparation = new VideoPreparation(native);
     this.set({ phase: "PREPARING", record: this.value.record });
     try {
+    await this.owner();
+    if (!Number.isInteger(posterMs) || posterMs < selection.startMs || posterMs >= selection.endMs) throw new Error("INVALID_POSTER");
+    const native = (await import("expo")).requireOptionalNativeModule<VideoPreparationPort>("ListingVideoPreparation");
+    if (!native) { this.failed(new Error("VIDEO_PREPARATION_UNAVAILABLE")); return; }
+    const jobId = randomUUID(); this.preparingJob = jobId; this.preparation = new VideoPreparation(native);
       const prepared = await this.preparation.prepare({ ...selection, jobId, maxBytes: 15 * 1024 * 1024 });
       await this.owner();
       if (intent !== this.intent) { await native.discard(jobId); return; }
@@ -74,8 +74,11 @@ export class VideoUploadTask {
   }
   async pause() {
     try {
-      if (this.preparingJob) await this.preparation?.cancel(this.preparingJob);
-      else await this.transfer.pause();
+      if (this.preparingJob) {
+        this.intent++;
+        await this.preparation?.cancel(this.preparingJob);
+        this.set({ phase: "FAILED", record: this.value.record, error: "VIDEO_PREPARATION_INTERRUPTED" });
+      } else await this.transfer.pause();
     } catch (error) { this.failed(error); }
   }
   async resume() { try { await this.owner(); await this.transfer.resume(); } catch (error) { this.failed(error); } }
@@ -99,4 +102,8 @@ export function videoUploadTask(ownerId: string, target: { kind: "draft" | "list
   if (!task) { task = new VideoUploadTask(ownerId, target, businessId); tasks.set(key, task); }
   return task;
 }
-export async function pauseVideoUploads() { await Promise.all([...tasks.values()].map(task => task.pause())); }
+export async function pauseVideoUploads() { await Promise.all([...tasks.values()].filter(task => ["PREPARING", "UPLOADING"].includes(task.snapshot().phase)).map(task => task.pause())); }
+export async function reconcileVideoUploadOwner() {
+  const ownerId = peekAuthSession()?.user.id;
+  await Promise.all([...tasks.values()].filter(task => task.ownerId !== ownerId && ["PREPARING", "UPLOADING"].includes(task.snapshot().phase)).map(task => task.pause()));
+}
