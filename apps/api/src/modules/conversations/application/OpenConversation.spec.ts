@@ -108,6 +108,7 @@ class FakeListingsReadPort implements ListingsReadPort {
   listings: Array<{
     id: string;
     sellerId: string;
+    businessId?: string;
     status: "active" | "sold" | "archived" | "banned";
     brandId: string;
     modelId: string;
@@ -266,6 +267,20 @@ describe("OpenConversation", () => {
   beforeEach(() => {
     repo = new FakeConversationRepository();
     listings = new FakeListingsReadPort();
+  });
+
+  it("takes enquiry ownership from the listing when a buyer has no business context", async () => {
+    seedListing(listings, { businessId: "listing-business" });
+    const result = await makeUseCase(repo, listings).execute({ buyerId: "buyer-1", listingId: "listing-1", actor: { userId: "buyer-1", sessionId: "session" } });
+    expect(result.conversation.businessId).toBe("listing-business");
+    expect(result.conversation.assigneeId).toBeNull();
+    expect(result.conversation.isParticipant("seller-1")).toBe(false);
+  });
+
+  it("refuses an explicit business actor opening buyer contact rather than copying its business", async () => {
+    seedListing(listings, { businessId: "listing-business" });
+    await expect(makeUseCase(repo, listings).execute({ buyerId: "buyer-1", listingId: "listing-1", actor: { userId: "buyer-1", sessionId: "session", businessId: "unrelated-business" } })).rejects.toThrow(ForbiddenException);
+    expect(repo.conversations).toHaveLength(0);
   });
 
   it("creates a conversation for a valid non-owner active listing", async () => {

@@ -41,6 +41,7 @@ const CARD_INCLUDE = {
 type CardRow = {
   id: string;
   sellerId: string;
+  businessId?: string | null;
   status: string;
   brandId: string;
   modelId: string;
@@ -267,6 +268,7 @@ export class PrismaListingsReadRepository
     const card: ListingCard = {
       id: row.id,
       sellerId: row.sellerId,
+      ...(row.businessId ? { businessId: row.businessId } : {}),
       status: row.status as "active" | "sold" | "archived" | "banned",
       brandId: row.brandId,
       modelId: row.modelId,
@@ -323,6 +325,7 @@ function toListingSummary(card: ListingCard): ListingSummary {
   const summary: ListingSummary = {
     id: card.id,
     sellerId: card.sellerId,
+    ...(card.businessId ? { businessId: card.businessId } : {}),
     status: card.status,
     brandId: card.brandId,
     modelId: card.modelId,
