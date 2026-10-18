@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { CreateBucketCommand, DeleteObjectCommand, HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { CreateBucketCommand, DeleteObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { PrismaService, type Prisma } from "@auto-tm/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -82,6 +82,22 @@ describe.skipIf(!hosted)("diagnostic artifacts on disposable PostgreSQL and priv
     const ready = await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: row.id } });
     expect(ready.sha256).toBe(failed.sha256); expect(ready.sizeBytes).toBe(failed.sizeBytes);
     expect(await db.diagnosticReportRecord.count({ where: { orderId: (await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: row.reportId } })).orderId } })).toBe(1);
+  });
+  it("removes expired verified upload bytes only when no report revision references them", async () => {
+    const row = await fixture();
+    const bytes = new Uint8Array([1, 2, 3]); const hash = sha(bytes); const id = randomUUID();
+    const key = `diagnostic-evidence/${id}/${hash}`; keys.push(key);
+    // The fixture crosses the storage boundary directly; production evidence upload
+    // sanitization has its own HTTP contract.
+    await s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: bytes, ContentType: "image/webp" }));
+    await db.diagnosticEvidence.create({ data: { id, reportId: row.reportId, findingId: randomUUID(), objectKey: key, sha256: hash, sizeBytes: bytes.length, mime: "image/webp", state: "verified", createdAt: clock, verifiedAt: clock } });
+    const worker = new DiagnosticArtifactWorker(db, storage, await fonts(), runtime);
+    await worker.cleanup();
+    expect((await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }))).ContentLength).toBe(3);
+    clock = new Date(clock.getTime() + 2 * 86400_000);
+    await worker.cleanup();
+    await expect(s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }))).rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
+    expect((await db.diagnosticEvidence.findUniqueOrThrow({ where: { id } })).state).toBe("removed");
   });
   it("fences erasure during storage and reconciles a resumed late write after cleanup", async () => {
     const row = await fixture(); let original: Uint8Array | undefined;
