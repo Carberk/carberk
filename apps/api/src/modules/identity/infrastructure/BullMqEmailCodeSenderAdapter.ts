@@ -28,8 +28,8 @@ export class BullMqEmailCodeSenderAdapter implements EmailCodeSenderPort {
     locale: "ru" | "tk" | "en";
     purpose: "sign-in" | "sign-in-method" | "account-deletion";
   }): Promise<void> {
-    await withCampaignEmailDelivery(this.db, input.requestId, input.email, async () => {
-      await this.queue.add(
+    await withCampaignEmailDelivery(this.db, input.requestId, input.email, async campaign => {
+      const job = await this.queue.add(
         AuthSchemas.EMAIL_CODE_JOB_NAME,
         {
           to: input.email,
@@ -37,8 +37,11 @@ export class BullMqEmailCodeSenderAdapter implements EmailCodeSenderPort {
           locale: input.locale,
           purpose: input.purpose,
         },
-        { ...EMAIL_CODE_JOB_OPTIONS, jobId: input.requestId },
+        { ...EMAIL_CODE_JOB_OPTIONS, jobId: input.requestId,
+          ...(campaign ? { deduplication: { id: `campaign-${campaign.namespace}-${input.requestId}` } } : {}),
+        },
       );
+      if (campaign && job.id !== input.requestId) throw new Error("Campaign delivery is fenced or has conflicting ownership");
     });
   }
 }

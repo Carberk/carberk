@@ -207,12 +207,24 @@ export function campaignMain(input, { sql, uuid, exists, disposeDeliveries }) {
 
 
 /** Runs only inside the API service process. No scan, drain, obliterate or caller queue name. */
-export async function campaignQueueMain(deliveries, observeOnly = false) {
+export async function campaignQueueMain(deliveries, observeOnly = false, binding) {
   let queue;
   try {
     const { Queue } = require('bullmq');
     const { AuthSchemas } = require('@auto-tm/contracts');
     if (!Array.isArray(deliveries) || deliveries.length > 128) throw new Error();
+    if (!binding || !/^[a-f0-9]{32}$/.test(binding.reservationId ?? '') ||
+        binding.namespace !== `cf_${binding.reservationId}` || !/^[a-f0-9]{40}$/.test(binding.candidate ?? '') ||
+        binding.profile !== 'campaign897-identities-v1' || typeof observeOnly !== 'boolean') throw new Error();
+    const keys = [], argumentsByKey = [], seen = new Set();
+    for (const delivery of deliveries) {
+      if (!/^[a-zA-Z0-9_-]{1,128}$/.test(delivery.requestId ?? '') || seen.has(delivery.requestId) ||
+          typeof delivery.email !== 'string' ||
+          !new RegExp(`^(buyer-a|owner|sales-a|coordinator)\\.${binding.reservationId}\\.${binding.candidate.slice(0,12)}@campaign897\\.invalid$`).test(delivery.email)) throw new Error();
+      seen.add(delivery.requestId);
+      keys.push(`de:campaign-${binding.namespace}-${delivery.requestId}`);
+      argumentsByKey.push(delivery.requestId, `disposed:${binding.namespace}:${binding.candidate}:${delivery.requestId}`);
+    }
     const redis = new URL(process.env.REDIS_URL);
     if (!['redis:', 'rediss:'].includes(redis.protocol) || redis.search || redis.hash || !/^\/\d*$/.test(redis.pathname || '/')) throw new Error();
     queue = new Queue(AuthSchemas.EMAIL_CODE_QUEUE, { connection: {
@@ -224,23 +236,57 @@ export async function campaignQueueMain(deliveries, observeOnly = false) {
     }});
     queue.on('error', () => {});
     await queue.waitUntilReady();
-    const owned = [];
-    for (const delivery of deliveries) {
-      if (!/^[a-zA-Z0-9_-]{1,128}$/.test(delivery.requestId ?? '') || typeof delivery.email !== 'string') throw new Error();
+    const inspect = async delivery => {
       const job = await queue.getJob(delivery.requestId);
-      if (!job) continue;
+      if (!job) return;
       const parsed = AuthSchemas.EmailCodeJobSchema.safeParse(job.data);
       if (observeOnly || job.name !== AuthSchemas.EMAIL_CODE_JOB_NAME || !parsed.success || parsed.data.to !== delivery.email ||
           parsed.data.purpose !== 'sign-in' || job.opts.parent || job.parentKey || job.repeatJobKey || job.opts.repeat ||
-          !['waiting','delayed','completed','failed','paused','prioritized'].includes(await job.getState())) throw new Error();
+          !['active','waiting','delayed','completed','failed','paused','prioritized'].includes(await job.getState())) throw new Error();
       const counts = await job.getDependenciesCount();
       if (Object.values(counts).some(count => count !== 0)) throw new Error();
-      owned.push(job);
+      return job;
+    };
+    // Refuse foreign job payloads before changing any dedup key. Reinspect after
+    // fencing: a previously admitted producer can arrive between these reads.
+    for (const delivery of deliveries) await inspect(delivery);
+    const client = await queue.client;
+    const exactKeys = keys.map(key => queue.toKey(key));
+    if (exactKeys.length) {
+      // All comparisons precede all writes. No TTL: the retained SQL delivery
+      // ledger is the permanent ownership journal for these bounded exact keys.
+      const fenced = await client.eval(`
+        for i,key in ipairs(KEYS) do
+          local value = redis.call('GET',key)
+          local request = ARGV[i*2-1]
+          local tombstone = ARGV[i*2]
+          if value and value ~= request and value ~= tombstone then return 0 end
+          if value == tombstone and redis.call('PTTL',key) ~= -1 then return 0 end
+          if ARGV[#KEYS*2+1] == 'observe' and value ~= tombstone then return 0 end
+        end
+        if ARGV[#KEYS*2+1] ~= 'observe' then
+          for i,key in ipairs(KEYS) do redis.call('SET',key,ARGV[i*2]) end
+        end
+        return 1`, exactKeys.length, ...exactKeys, ...argumentsByKey, observeOnly ? 'observe' : 'fence');
+      if (fenced !== 1) throw new Error();
+    }
+    const owned = [];
+    for (const delivery of deliveries) {
+      const job = await inspect(delivery);
+      if (job) {
+        if (await job.getState() === 'active') throw new Error();
+        owned.push(job);
+      }
     }
     // Validate the complete bounded inventory before removing any job. BullMQ also
     // refuses a job that becomes locked between getState and removal.
     for (const job of owned) await job.remove({ removeChildren: false });
     for (const delivery of deliveries) if (await queue.getJob(delivery.requestId)) throw new Error();
+    // Removal/finalization in pinned BullMQ5.76.8 deletes dedup keys only when
+    // their value equals the job ID. Require the retained tombstone afterward.
+    for (let i = 0; i < exactKeys.length; i += 1) {
+      if (await client.get(exactKeys[i]) !== argumentsByKey[i*2+1] || await client.pttl(exactKeys[i]) !== -1) throw new Error();
+    }
     console.log(JSON.stringify({ queueJobs: 0 }));
   } catch {
     process.exitCode = 1;
