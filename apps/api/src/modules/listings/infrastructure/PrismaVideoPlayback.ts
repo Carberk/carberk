@@ -51,12 +51,10 @@ export class PrismaVideoPlayback implements VideoPlaybackAuthority, VideoGrantIs
     await this.identity.resolve(subject, tx);
     await tx.$queryRaw`SELECT "id" FROM "listings" WHERE "id" = ${listingId} FOR SHARE`;
     const listing = await tx.listing.findUnique({ where: { id: listingId }, include: { business: true } });
-    if (!listing || listing.deletedAt || !listing.activeVideoGenerationId || (expectedGeneration && listing.activeVideoGenerationId !== expectedGeneration)) return null;
-    let member = false;
-    if (listing.businessId && ((listing.business?.status !== "active") || listing.status === "banned")) {
-      try { await this.identity.authorize({ ...subject, businessId: listing.businessId, history: true }, tx); member = true; } catch { return null; }
+    if (!listing || listing.deletedAt || listing.status === "banned" || !listing.activeVideoGenerationId || (expectedGeneration && listing.activeVideoGenerationId !== expectedGeneration)) return null;
+    if (listing.businessId && listing.business?.status !== "active") {
+      try { await this.identity.authorize({ ...subject, businessId: listing.businessId, history: true }, tx); } catch { return null; }
     }
-    if (listing.status === "banned" && !(listing.businessId ? member : listing.sellerId === subject.userId)) return null;
     await tx.$queryRaw`SELECT "id" FROM "video_generations" WHERE "id" = ${listing.activeVideoGenerationId} FOR SHARE`;
     const generation = await tx.videoGeneration.findUnique({ where: { id: listing.activeVideoGenerationId } });
     if (!generation || generation.listingId !== listing.id || generation.state !== "READY" || !generation.readyAt || generation.retiredAt) return null;
