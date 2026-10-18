@@ -311,7 +311,7 @@ describe("reserved staging fixtures on disposable application schema", () => {
     // not let reset race the backend's actual disappearance and turn the
     // intended late-producer assertion into a lock-release/setup failure.
     for (let attempt = 0; attempt < 100; attempt += 1) {
-      const active = await pool.query("SELECT 1 FROM pg_stat_activity WHERE pid=$1", [backendPid]);
+      const active = await pool.query("SELECT 1 FROM pg_stat_activity WHERE pid=$1 OR application_name=$2", [backendPid, applicationName]);
       if (active.rowCount === 0) break;
       await new Promise(resolve => setTimeout(resolve, 50));
       if (attempt === 99) throw new Error("terminated producer backend remained active");
