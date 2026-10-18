@@ -39,7 +39,8 @@ function remoteMain(input, campaign, queueMain) {
       if (!['redis:', 'rediss:'].includes(redis.protocol) || redis.hostname !== 'redis.railway.internal' || redis.search || redis.hash) throw new Error();
       redis.username = ''; redis.password = '';
       if (redis.toString() !== input.redisOrigin) throw new Error();
-      const result = spawnSync(process.execPath, ['-e', `(${queueMain.toString()})(${JSON.stringify(deliveries)},${JSON.stringify(observeOnly)})`], {
+      const binding = { namespace: input.namespace, reservationId: input.id, candidate: input.candidate, profile: input.profile };
+      const result = spawnSync(process.execPath, ['-e', `(${queueMain.toString()})(${JSON.stringify(deliveries)},${JSON.stringify(observeOnly)},${JSON.stringify(binding)})`], {
         encoding: 'utf8', timeout: 30000, maxBuffer: 1024 * 1024, env: e,
       });
       if (result.status !== 0 || result.error || result.stdout.trim() !== '{"queueJobs":0}') throw new Error();
