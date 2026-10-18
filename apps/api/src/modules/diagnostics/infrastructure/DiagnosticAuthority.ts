@@ -26,9 +26,15 @@ export class DiagnosticAuthority {
   }
   async order(tx: Tx, subject: DiagnosticSubject, id: string, capability?: DiagnosticSchemas.DiagnosticCapability): Promise<{ row: Prisma.InspectionOrderGetPayload<object>; staff: boolean }> {
     await this.current(tx, subject);
+    const initial = await tx.inspectionOrder.findUnique({ where: { id } });
+    if (!initial) throw denied();
+    // Listing identity edits invalidate associations while holding Listing first.
+    if (initial.audience === "listing_public" && initial.listingId) {
+      await tx.$queryRaw`SELECT id FROM listings WHERE id=${initial.listingId} FOR SHARE`;
+    }
     await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${id} FOR UPDATE`;
     const row = await tx.inspectionOrder.findUnique({ where: { id } });
-    if (!row || row.erasedAt || !row.synthetic) throw denied();
+    if (!row || row.erasedAt || !row.synthetic || row.listingId !== initial.listingId) throw denied();
     if (!capability && row.commissionerId === subject.userId) return { row, staff: false };
     await tx.$queryRaw`SELECT id FROM diagnostic_order_assignments WHERE "orderId"=${id} AND "userId"=${subject.userId} ORDER BY id FOR SHARE`;
     const assignments = await tx.diagnosticOrderAssignment.findMany({ where: { orderId: id, userId: subject.userId, revokedAt: null, ...(capability ? { capability } : {}) } });

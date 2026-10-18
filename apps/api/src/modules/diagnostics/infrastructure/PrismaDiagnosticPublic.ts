@@ -27,7 +27,7 @@ export class PrismaDiagnosticPublic implements DiagnosticPublicPort {
   async batch(listingIds: string[]): Promise<D.PublicDiagnosticAvailability[]> {
     return this.db.$transaction(async tx => {
       const result: D.PublicDiagnosticAvailability[] = [];
-      for (const id of [...new Set(listingIds)]) {
+      for (const id of [...new Set(listingIds)].sort()) {
         try { result.push(await this.projection(tx, id)); }
         catch (error) { if (!(error instanceof DiagnosticRuleError) || error.code !== "DIAGNOSTIC_PUBLIC_UNAVAILABLE") throw error; }
       }

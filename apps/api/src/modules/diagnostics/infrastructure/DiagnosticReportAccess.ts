@@ -24,15 +24,15 @@ export class DiagnosticReportAccess {
     if (!this.runtime.publicSyntheticAllowed?.()) throw denied();
     const found = await tx.diagnosticReportRecord.findFirst({ where: { id, audience: "listing_public" }, include: { order: true } });
     if (!found || !found.order.listingId) throw denied();
+    await tx.$queryRaw`SELECT id FROM listings WHERE id=${found.order.listingId} FOR SHARE`;
     await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${found.orderId} FOR SHARE`;
     await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${id} FOR SHARE`;
     const row = await tx.diagnosticReportRecord.findUniqueOrThrow({ where: { id }, include: { order: true } });
     const order = row.order;
     if (row.erasedAt || row.withdrawnAt || row.status !== "finalized" || !row.snapshotHash || !row.snapshot || order.erasedAt || !order.synthetic ||
-      order.audience !== "listing_public" || !order.listingId || !order.publicationAuthorization || !order.associationValidatedAt || !order.listingIdentityDigest) throw denied();
-    await tx.$queryRaw`SELECT id FROM listings WHERE id=${order.listingId} FOR SHARE`;
+      order.audience !== "listing_public" || !order.listingId || !order.publicationAuthorization || !order.associationValidatedAt || !order.listingIdentityDigest || order.listingId !== found.order.listingId) throw denied();
     const listing = await tx.listing.findUnique({ where: { id: order.listingId }, include: { business: true, seller: { select: { deletionScheduledAt: true, suspendedAt: true } } } });
-    if (!listing || listing.deletedAt || listing.status !== "active" || listing.seller.deletionScheduledAt || listing.seller.suspendedAt ||
+    if (!listing || listing.deletedAt || listing.status !== "active" || (!listing.businessId && (listing.seller.deletionScheduledAt || listing.seller.suspendedAt)) ||
       (listing.businessId && listing.business?.status !== "active") || diagnosticListingDigest(listing) !== order.listingIdentityDigest) throw denied();
     return { row, order, staff: false };
   }
