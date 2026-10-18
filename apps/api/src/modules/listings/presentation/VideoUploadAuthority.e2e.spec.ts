@@ -140,6 +140,20 @@ describe("video upload current authority and retirement", () => {
     const listing = await db.listing.findUniqueOrThrow({ where: { id: suite.id("owner-listing") } });
     expect(listing.activeVideoGenerationId).toBeNull(); expect(listing.pendingVideoGenerationId).toBe(session.generation);
   });
+  it("defers cancelled output cleanup beyond active processing and signed part authority", async () => {
+    const { body: session } = await create("owner", body()).expect(201);
+    await action(session.sessionId, "complete").expect(200);
+    const row = await db.videoUploadSession.findUniqueOrThrow({ where: { id: session.sessionId } });
+    const leaseExpiry = new Date("2026-10-17T12:20:00Z");
+    await db.videoProcessWork.update({ where: { generationId: row.id }, data: { state: "PROCESSING", leaseToken: suite.id("worker-lease"), leaseExpiresAt: leaseExpiry } });
+    const key = `video/v1/${row.uploadId}/${row.id}/master.m3u8`;
+    await db.videoGeneration.update({ where: { id: row.id }, data: { manifest: { assets: [{ key }] } } });
+    await db.videoCleanupWork.create({ data: { id: `session:${row.id}`, sessionId: row.id, generationId: row.id, uploadId: row.uploadId, sourceKey: row.sourceKey, storageUploadId: row.storageUploadId, objectKeys: [key], state: "HELD" } });
+    await request.delete(`/api/v1/listing-video-upload-sessions/${row.id}`).set("authorization", `Bearer ${token("owner")}`).expect(202);
+    const cleanup = await db.videoCleanupWork.findUniqueOrThrow({ where: { id: `session:${row.id}` } });
+    expect(cleanup).toMatchObject({ state: "PENDING", objectKeys: [key], nextAttemptAt: new Date("2026-10-17T12:22:00Z") });
+    expect(await db.videoProcessWork.findUniqueOrThrow({ where: { generationId: row.id } })).toMatchObject({ state: "CANCELLED", leaseExpiresAt: leaseExpiry });
+  });
   it("rechecks business membership for every mutation", async () => {
     await db.dealership.create({ data: { id: businessId, name: "Synthetic video business", slug: suite.slugFor("business"), status: "active", admissionMode: "synthetic" } });
     await db.dealershipMember.create({ data: { userId: suite.id("owner"), dealershipId: businessId, role: "owner", status: "active" } });
