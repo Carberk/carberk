@@ -1,8 +1,6 @@
 import { onlineManager, focusManager } from "@tanstack/react-query";
-
 import { VideoUploadSchemas } from "@auto-tm/contracts";
 import { randomUUID } from "expo-crypto";
-
 
 import { emitMeasurement } from "../../measurement/nativeMeasurement";
 import { apiClient } from "../../api/client";

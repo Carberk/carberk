@@ -1,6 +1,6 @@
-import { onlineManager, focusManager } from "@tanstack/react-query";
-
 import { createHash } from "node:crypto";
+
+import { onlineManager, focusManager } from "@tanstack/react-query";
 
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -137,7 +137,9 @@ describe("native seller task uses actual preparation and transfer boundaries", (
   // The seller's Pause remains an explicit durable intent, even after reconnect.
   const paused = new VideoUploadTask(ownerId, target);
   state = "UPLOADING"; complete = false;
-  const record = task.snapshot().record!;
+  const record = task.snapshot().record;
+  expect(record).toBeTruthy();
+  if (!record) return;
   videoNativeStorage.values.set(`listing-video-transfer:v1:${ownerId}:draft:${target.id}`, JSON.stringify({ ...record, target, state: "PAUSED", resumeOnForeground: false }));
   await paused.recover();
   expect(paused.snapshot().phase).toBe("PAUSED");
