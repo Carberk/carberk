@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import type { OtpRequest, SignInCodePurpose } from "../domain/OtpRequest";
 import type { User } from "../domain/User";
@@ -246,22 +246,26 @@ describe("RequestAccountDeletion", () => {
     ])("refuses held and unheld destinations identically for $reason", async (limit) => {
       const held = setup([makeUser(methods)]);
       const unheld = setup([]);
-      const destination = methods.phone ? { phone: methods.phone } : { email: methods.email! };
+      assert(methods.phone ?? methods.email);
+      const destination = methods.phone ? { phone: methods.phone } : { email: methods.email ?? "" };
       const refusals: unknown[] = [];
       for (const scenario of [held, unheld]) {
         scenario.otpRepo.destinationCount = limit.destinationCount;
         scenario.otpRepo.ipCount = limit.ipCount;
         if (limit.reason === "BACKOFF") {
-          await scenario.otpRepo.create({
+          const earlier = await scenario.otpRepo.create({
             purpose: "sign-in",
             channel: methods.phone ? "phone" : "email",
-            destination: methods.phone ?? methods.email!,
+            destination: methods.phone ?? methods.email ?? "",
             codeHash: "earlier-sign-in-code",
             expiresAt: NOW,
             userId: null,
             ip: "10.0.0.1",
           });
-          scenario.otpRepo.records[0]!.createdAt = new Date(NOW.getTime() - 15_000);
+          scenario.otpRepo.records[0] = {
+            ...earlier,
+            createdAt: new Date(NOW.getTime() - 15_000),
+          };
         }
         const before = scenario.otpRepo.records.length;
         const refusal: unknown = await scenario.useCase

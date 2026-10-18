@@ -9,6 +9,7 @@ extendZodWithOpenApi(z);
 
 import { StaffCapabilitySchema, StaffSummarySchema, StaffGrantChangeSchema } from "./schemas/staff";
 import {
+  ErrorCode,
   ErrorResponseSchema,
   UploadObjectInvalidDetailsSchema,
   UploadObjectInvalidResponseSchema,
@@ -192,7 +193,18 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
   registry.register("ErrorResponse", ErrorResponseSchema);
   const uploadDetails = registry.register("UploadObjectInvalidDetails", UploadObjectInvalidDetailsSchema);
   const uploadError = registry.register("UploadObjectInvalidResponse", UploadObjectInvalidResponseSchema.extend({ details: uploadDetails }));
-  registry.register("RateLimitedDetails", RateLimitedDetailsSchema);
+  const rateLimitedDetails = registry.register("RateLimitedDetails", RateLimitedDetailsSchema);
+  const { RateLimited, ...otherErrorCodes } = ErrorCode;
+  const rateLimitedError = registry.register("RateLimitedResponse", ErrorResponseSchema.extend({
+    code: z.literal(RateLimited),
+    details: rateLimitedDetails,
+  }));
+  // Other 400 errors retain arbitrary details, but cannot bypass the typed
+  // RATE_LIMITED branch through the generic error response.
+  const codeRequestError = z.union([
+    rateLimitedError,
+    ErrorResponseSchema.extend({ code: z.nativeEnum(otherErrorCodes) }),
+  ]);
   registry.register("InvalidOtpDetails", InvalidOtpDetailsSchema);
 
   // Catalog read schemas
@@ -578,7 +590,7 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
       400: {
         description:
           "Validation error, or RATE_LIMITED with details (RateLimitedDetails): reason destination_limit, ip_limit or backoff, and retryInSeconds",
-        content: { "application/json": { schema: S(ErrorResponseSchema) } },
+        content: { "application/json": { schema: S(codeRequestError) } },
       },
     },
   });
@@ -657,7 +669,7 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
       400: {
         description:
           "Validation error, or RATE_LIMITED with details (RateLimitedDetails): reason destination_limit, ip_limit or backoff, and retryInSeconds",
-        content: { "application/json": { schema: S(ErrorResponseSchema) } },
+        content: { "application/json": { schema: S(codeRequestError) } },
       },
       401: {
         description: "Authentication required",
@@ -906,7 +918,7 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
       400: {
         description:
           "Validation error, or RATE_LIMITED with details (RateLimitedDetails): reason destination_limit, ip_limit or backoff, and retryInSeconds",
-        content: { "application/json": { schema: S(ErrorResponseSchema) } },
+        content: { "application/json": { schema: S(codeRequestError) } },
       },
     },
   });
