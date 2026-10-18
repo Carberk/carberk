@@ -450,9 +450,7 @@ export class ConversationGateway implements OnGatewayDisconnect {
         event.lastDeliveredAt = result.lastDeliveredAt.toISOString();
       }
 
-      this.server
-        .to(conversationRoom(payload.conversationId))
-        .emit("watermark", event);
+      await this.deliverConversationEvent(payload.conversationId, user.sub, "watermark", event);
 
       return { ok: true, conversationId: payload.conversationId };
     } catch (err) {
@@ -520,6 +518,16 @@ export class ConversationGateway implements OnGatewayDisconnect {
     await this.deliverBusiness(conversation, recipients, "message:new", { message: this.toBroadcastSummary(event) });
   }
 
+  private async deliverConversationEvent(conversationId: string, senderId: string, name: string, payload: unknown): Promise<void> {
+    const conversation = await this.conversations?.findById(conversationId);
+    if (conversation?.businessId) {
+      const recipients = await this.businessEnquiries?.recipients(conversationId, senderId) ?? [];
+      await this.deliverBusiness(conversation, [...recipients, senderId], name, payload);
+      return;
+    }
+    this.server.to(conversationRoom(conversationId)).emit(name, payload);
+  }
+
   private async deliverBusiness(conversation: Conversation, recipients: string[], name: string, payload: unknown): Promise<void> {
     for (const userId of new Set(recipients)) {
       const sockets = await this.server.in(userRoom(userId)).fetchSockets();
@@ -567,8 +575,7 @@ export class ConversationGateway implements OnGatewayDisconnect {
       return this.toSocketError(err);
     }
 
-    const room = conversationRoom(payload.conversationId);
-    this.server.to(room).emit("message:deleted", {
+    await this.deliverConversationEvent(payload.conversationId, user.sub, "message:deleted", {
       messageId: result.messageId,
       conversationId: payload.conversationId,
       deletedAt: result.deletedAt.toISOString(),
