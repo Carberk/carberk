@@ -33,11 +33,12 @@ export class PrismaMarketKnowledge {
    const source=await tx.marketKnowledgeSource.findUnique({where:{id:fence.sourceId}});
    if(!source) return {state:"invalidated" as const,reason:"source"};
    const provenance=text.safeParse(source.provenance),purposes=strings.safeParse(source.purposes),reuse=permission.safeParse(source.reuseRights),redistribution=permission.safeParse(source.redistributionRights),assessment=review.safeParse(source.identifiabilityReview),destinations=strings.safeParse(source.destinations);
+   const restrictions=z.record(z.string(),z.unknown()).safeParse(source.restrictions);
    const access=z.object({audience:z.literal("analytics.aggregate")}).strict().safeParse(source.accessPolicy);
-   if(!provenance.success || !purposes.success || !reuse.success || !redistribution.success || !assessment.success || !destinations.success || !access.success) return {state:"quarantined" as const,reason:"rights"};
+   if(!provenance.success || !purposes.success || !reuse.success || !redistribution.success || !assessment.success || !destinations.success || !access.success || !restrictions.success) return {state:"quarantined" as const,reason:"rights"};
    sources.push({id:source.id,version:source.version,epoch:source.epoch,status:source.status,provenance:provenance.data.summary,
     purpose:purposes.data.includes("synthetic_research")?"synthetic_research":"unresolved",reuse:reuse.data.status,redistribution:redistribution.data.status,
-    retentionBasis:source.retentionBasis,expiresAt:source.expiresAt,deletedAt:source.revokedAt,review:assessment.data,destinations:destinations.data});
+    retentionBasis:source.retentionBasis,expiresAt:source.expiresAt,deletedAt:source.revokedAt,restrictions:restrictions.data,review:assessment.data,destinations:destinations.data});
   }
   const contents=data.safeParse(row.data),assessment=review.safeParse(row.review);
   if(!contents.success || !assessment.success || row.status!=="qualified") return {state:"quarantined" as const,reason:"schema"};
