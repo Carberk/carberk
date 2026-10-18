@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService, type Prisma } from "@auto-tm/db";
+import { z } from "zod";
 
 import { BUSINESS_AUTHORITY_PORT, IDENTITY_CLOCK_PORT, type BusinessAuthorityPort, type ClockPort } from "../../identity/identity.public";
 import { ListingOwnership, type ListingActor } from "../application/ListingOwnership";
@@ -153,17 +154,26 @@ export class PrismaOwnedVideoSessionLedger implements OwnedVideoSessionLedger {
   private async retire(tx: Prisma.TransactionClient, sessionId: string, now: Date) {
     const row = await tx.videoUploadSession.findUnique({ where: { id: sessionId } });
     if (!row || row.protocolVersion !== 1) throw unavailable();
+    await tx.$queryRaw`SELECT "id" FROM "media_uploads" WHERE "id" = ${row.uploadId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT "id" FROM "video_upload_sessions" WHERE "id" = ${sessionId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT "id" FROM "video_generations" WHERE "id" = ${sessionId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT "generationId" FROM "video_process_work" WHERE "generationId" = ${sessionId} FOR UPDATE`;
     const generation = await tx.videoGeneration.findUnique({ where: { id: sessionId } });
+    const processing = await tx.videoProcessWork.findUnique({ where: { generationId: sessionId } });
+    const cleanup = await tx.videoCleanupWork.findUnique({ where: { id: `session:${sessionId}` } });
+    if (cleanup && (cleanup.uploadId !== row.uploadId || cleanup.sessionId !== sessionId || cleanup.generationId !== sessionId || cleanup.sourceKey !== row.sourceKey || cleanup.writeProtocol !== "video-v1")) throw unavailable();
     if (await tx.listing.count({ where: { activeVideoGenerationId: sessionId } })) throw unavailable();
     const prefix = `video/v1/${row.uploadId}/${sessionId}/`;
-    const manifest = generation?.manifest as { assets?: { key?: unknown }[] } | null;
-    const objectKeys = (manifest?.assets ?? []).map(asset => asset.key);
-    if (objectKeys.some(key => typeof key !== "string" || !key.startsWith(prefix) || key.includes(".."))) throw unavailable();
+    const manifest = z.object({ assets: z.array(z.object({ key: z.string() }).passthrough()).max(1024) }).strict().safeParse(generation?.manifest);
+    if (generation?.manifest !== null && generation?.manifest !== undefined && !manifest.success) throw unavailable();
+    const objectKeys = [...new Set([...(manifest.success ? manifest.data.assets.map(asset => asset.key) : []), ...(cleanup?.objectKeys ?? [])])].sort();
+    if (row.sourceKey !== `${prefix}source.mp4` || objectKeys.length > 1024 || objectKeys.some(key => !key.startsWith(prefix) || !/^(?:master\.m3u8|poster\.jpg|(?:240|360|720)\/(?:index\.m3u8|seg-[0-9]+\.ts))$/.test(key.slice(prefix.length)))) throw unavailable();
+    const nextAttemptAt = new Date(Math.max(now.getTime() + 15 * 60_000, processing?.leaseExpiresAt?.getTime() ?? 0) + 120_000);
     await this.claims.retire(tx, row.uploadId);
     await tx.videoUploadSession.update({ where: { id: sessionId }, data: { state: "CLEANUP_PENDING", cancelledAt: now } });
     await tx.videoGeneration.updateMany({ where: { id: sessionId }, data: { state: "RETIRED", retiredAt: now } });
-    await tx.videoProcessWork.updateMany({ where: { generationId: sessionId }, data: { state: "CANCELLED", leaseToken: null, leaseExpiresAt: null } });
-    await tx.videoCleanupWork.upsert({ where: { id: `session:${sessionId}` }, create: { id: `session:${sessionId}`, uploadId: row.uploadId, sessionId, generationId: sessionId, sourceKey: row.sourceKey, storageUploadId: row.storageUploadId, objectKeys: objectKeys as string[] }, update: {} });
+    await tx.videoProcessWork.updateMany({ where: { generationId: sessionId }, data: { state: "CANCELLED" } });
+    await tx.videoCleanupWork.upsert({ where: { id: `session:${sessionId}` }, create: { id: `session:${sessionId}`, uploadId: row.uploadId, sessionId, generationId: sessionId, sourceKey: row.sourceKey, storageUploadId: row.storageUploadId, objectKeys, nextAttemptAt }, update: { state: "PENDING", objectKeys, nextAttemptAt } });
     await tx.listing.updateMany({ where: { pendingVideoGenerationId: sessionId }, data: { pendingVideoGenerationId: null, activeVideoRevision: { increment: 1 } } });
   }
 }
