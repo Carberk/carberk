@@ -55,7 +55,7 @@ export class SmtpAlertSink {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const { host, port, servername, ca, timeoutMs } = this.boundary;
     const transport = nodemailer.createTransport({
-      host, port, secure: true, requireTLS: true, logger: false, debug: false,
+      host, port, secure: true, requireTLS: true, forceAuth: true, logger: false, debug: false,
       name: "watchdog.carberk.invalid", disableFileAccess: true, disableUrlAccess: true,
       connectionTimeout: timeoutMs, greetingTimeout: timeoutMs, socketTimeout: timeoutMs, dnsTimeout: timeoutMs,
       auth: { user: this.config.user, pass: this.config.password },

@@ -26,3 +26,5 @@ Diagnostic work in `src/jobs/diagnostics` renders immutable releases to TK/RU/EN
 - [Email architecture](../../docs/adr/0055-resend-sends-sign-in-codes-from-the-worker.md)
 
 `PHOTO_CONVERSION_MAINTENANCE=true` boots an idle, signal-aware operator container without application providers or Bull consumers. Restore it to false and redeploy after the [photo conversion runbook](../../packages/db/scripts/convert-photos-webp.md).
+
+Operational monitoring runs in the separate watchdog entrypoint. Alerts default closed and choose either the existing HTTP sink or the restricted Gmail SMTP adapter. SMTP uses verified implicit TLS, a fixed monitoring recipient, an absolute deadline and its own bounded Redis transition receipt. It does not share the sign-in email driver. [SMTP runtime and rotation guidance](../../docs/evidence/issue-919/smtp-alert-transport.md) explains the three-attempt budget, single-watchdog scope ownership, ambiguous-delivery limits and separate real-recipient acceptance gate.
