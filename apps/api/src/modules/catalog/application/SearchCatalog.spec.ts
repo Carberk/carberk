@@ -216,6 +216,7 @@ describe("SearchCatalog", () => {
         ["744", "744", "744"],
         ["844", "844", "844"],
         ["955", "955", "955"],
+        ["1055", "1055", "1055"],
         ["Farmall DED 3", "farmall-ded-3", "Farmall DED 3"],
       ] as const) {
         const tractor = await uc.execute({ query, locale });
@@ -225,11 +226,33 @@ describe("SearchCatalog", () => {
           brandLabel: "International Harvester",
         }));
       }
-      // Standalone four-digit tokens are reserved for years by the existing search contract.
-      // The complete brand query must still expose the 1055 alongside its other machinery.
-      expect(brand.results).toContainEqual(expect.objectContaining({
-        kind: "model", modelId: "international-harvester/1055", label: "1055",
-      }));
+      for (const query of ["1055 1982", "International Harvester 1055 1982"]) {
+        const tractor = await uc.execute({ query, locale });
+        expect(tractor.results[0]).toMatchObject({
+          kind: "model", modelId: "international-harvester/1055", label: "1055",
+        });
+        expect(tractor.yearFrom).toBe(1982);
+        expect(tractor.yearTo).toBe(1982);
+      }
+      // PPM 2007 and YTO 2004 are catalog models, but valid year-only queries stay years.
+      for (const query of ["2007", "2004"]) {
+        expect(await uc.execute({ query, locale })).toEqual({
+          results: [], yearFrom: Number(query), yearTo: Number(query),
+        });
+      }
+      for (const query of ["Camry 1800", "Camry 2500", "Camry 2.0", "Camry 0000"]) {
+        const camry = await uc.execute({ query, locale });
+        if (query === "Camry 2.0") {
+          expect(camry.results).toEqual([]);
+        } else {
+          expect(camry.results).toContainEqual(expect.objectContaining({
+            kind: "model", modelId: "toyota/camry",
+          }));
+        }
+        expect(camry.results.some((result) => result.modelId === "chevrolet/2500")).toBe(false);
+        expect(camry.yearFrom).toBeUndefined();
+        expect(camry.yearTo).toBeUndefined();
+      }
       const navistar = await uc.execute({ query: "ProStar", locale });
       expect(navistar.results[0]).toMatchObject({
         kind: "model", brandId: "international", label: "ProStar",
@@ -238,6 +261,27 @@ describe("SearchCatalog", () => {
       expect(modernCase.results[0]).toMatchObject({
         kind: "model", brandId: "case", label: "STX375 Quadtrac",
       });
+    },
+  );
+
+  it.each(["ru", "tk", "en"] as const)(
+    "finds existing numeric catalog models by ordinary model query in %s",
+    async (locale) => {
+      brandRepo.brands = seededBrands.map((brand) => makeBrand({ ...brand, id: brand.slug }));
+      modelRepo.models = seededModels.map((model) =>
+        makeModel({ ...model, id: `${model.brandSlug}/${model.slug}`, brandId: model.brandSlug }),
+      );
+      index.invalidate();
+      for (const [query, brandId, modelId] of [
+        ["1500", "chevrolet", "chevrolet/1500"],
+        ["2106", "lada", "lada/2106"],
+        ["9000", "saab", "saab/9000"],
+      ] as const) {
+        const result = await uc.execute({ query, locale });
+        expect(result.results).toContainEqual(expect.objectContaining({ kind: "model", brandId, modelId }));
+        expect(result.yearFrom).toBeUndefined();
+        expect(result.yearTo).toBeUndefined();
+      }
     },
   );
 
