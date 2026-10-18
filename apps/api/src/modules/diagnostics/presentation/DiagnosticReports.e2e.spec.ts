@@ -97,6 +97,22 @@ describe("diagnostic authoring and immutable audience release", () => {
     const { body: report } = await post("technician", `orders/${order.id}/reports`, { reportId: randomUUID(), expectedOrderVersion: order.version }).expect(201);
     return { order, report };
   }
+  it("finds only current assigned work and preserves the exact pinned template after newer publications", async () => {
+    const { order } = await draft();
+    for (let version = 1; version < 27; version++) await post("reception", `centers/${centerId}/templates`, { expectedVersion: version, definition, synthetic: true }).expect(201);
+    const work = await get("technician", "assigned").expect(200);
+    expect(work.body.map((item: { id: string }) => item.id)).toEqual([order.id]);
+    const context = await get("technician", `orders/${order.id}/workspace`).expect(200);
+    expect(context.body.template.id).toBe(order.templateVersionId);
+    expect(context.body.capabilities).toEqual(["diagnostics.technician"]);
+    expect(context.body.staffChoices).toEqual([]);
+    const reception = await get("reception", `orders/${order.id}/workspace`).expect(200);
+    expect(reception.body.staffChoices.some((item: { userId: string }) => item.userId === suite.id("reviewer"))).toBe(true);
+    for (const who of ["buyer", "other", "admin"] as const) await get(who, `orders/${order.id}/workspace`).expect(403);
+    await db.diagnosticCenterAssignment.updateMany({ where: { centerId, userId: suite.id("technician") }, data: { revokedAt: now } });
+    expect((await get("technician", "assigned").expect(200)).body).toEqual([]);
+    await get("technician", `orders/${order.id}/workspace`).expect(403);
+  });
   const normal = () => ({ id: randomUUID(), checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: [], kind: null, source: null, measurement: null, location: null });
   it("serializes edits, releases complete private readers separately from PDFs and rechecks revoked assignments", async () => {
     const { report, order } = await draft();
