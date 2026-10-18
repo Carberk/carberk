@@ -36,7 +36,8 @@ export class ConversationMessageCommitter {
       throw error;
     }
 
-    const recipients = actor?.businessId && this.businessEnquiries
+    const persisted = this.businessEnquiries ? await this.conversations.findById(message.conversationId) : null;
+    const recipients = persisted?.businessId && this.businessEnquiries
       ? await this.businessEnquiries.recipients(message.conversationId, message.senderId)
       : [recipientId];
     for (const targetId of recipients) {

@@ -3,6 +3,7 @@ import { NotFoundException, ForbiddenException } from "@nestjs/common";
 
 import { Conversation } from "../domain/Conversation";
 import { Message } from "../domain/Message";
+import type { BusinessEnquiryRepository } from "../domain/ports/BusinessEnquiryRepository";
 import type { ConversationRepository } from "../domain/ports/ConversationRepository";
 import type { ListingsReadPort } from "../../listings/domain/ports/ListingsReadPort";
 import type {
@@ -281,6 +282,16 @@ describe("OpenConversation", () => {
     seedListing(listings, { businessId: "listing-business" });
     await expect(makeUseCase(repo, listings).execute({ buyerId: "buyer-1", listingId: "listing-1", actor: { userId: "buyer-1", sessionId: "session", businessId: "unrelated-business" } })).rejects.toThrow(ForbiddenException);
     expect(repo.conversations).toHaveLength(0);
+  });
+
+  it("keeps dealer contact available after the creator is suspended and shows the business identity", async () => {
+    seedListing(listings, { businessId: "listing-business" });
+    const identityCheck = new FakeIdentityCheckPort(); identityCheck.suspend("seller-1");
+    const businesses = { businessName: async () => "Ahal Motors" } as unknown as BusinessEnquiryRepository;
+    const useCase = new OpenConversation(repo, listings, identityCheck, new FakeIdentityReadPort(), businesses);
+    const result = await useCase.execute({ buyerId: "buyer-1", listingId: "listing-1", actor: { userId: "buyer-1", sessionId: "session" } });
+    expect(result.peer).toMatchObject({ id: "listing-business", displayName: "Ahal Motors", deleted: false });
+    expect(result.conversation.sellerId).toBe("seller-1");
   });
 
   it("creates a conversation for a valid non-owner active listing", async () => {
