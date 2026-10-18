@@ -1,6 +1,6 @@
-import type { MeasurementSchemas } from "@auto-tm/contracts";
 import { randomUUID } from "node:crypto";
 
+import type { MeasurementSchemas } from "@auto-tm/contracts";
 import { PrismaService } from "@auto-tm/db";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
