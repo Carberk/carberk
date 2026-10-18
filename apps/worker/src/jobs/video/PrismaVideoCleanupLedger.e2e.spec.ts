@@ -12,7 +12,7 @@ import { InMemoryS3VideoCleanup } from "./testing/InMemoryS3VideoCleanup";
 import { PrismaVideoCleanupLedger } from "./PrismaVideoCleanupLedger";
 const databaseUrl = process.env["DATABASE_URL"] ?? "";
 const hosted = process.env["GITHUB_ACTIONS"] === "true" && /^postgres(?:ql)?:\/\/[^/]+@(localhost|127\.0\.0\.1):\d+\//.test(databaseUrl);
-const now = new Date("2000-01-02T00:00:00Z");
+const now = new Date("1990-01-02T00:00:00Z");
 describe.skipIf(!hosted)("durable video cleanup authority on disposable PostgreSQL", () => {
   let db: PrismaService, ledger: PrismaVideoCleanupLedger;
   const userId = randomUUID(), ids: string[] = [], uploads: string[] = [];
@@ -43,7 +43,7 @@ describe.skipIf(!hosted)("durable video cleanup authority on disposable PostgreS
     await ledger.recordAbsence(lease, now);
     expect((await db.mediaUpload.findUniqueOrThrow({ where: { id: row.uploadId } })).state).toBe("RETIRED");
     expect(await ledger.claim(now, randomUUID())).toBeNull();
-    const later = new Date("2000-01-02T00:01:00Z"), proof = await ledger.claim(later, randomUUID());
+    const later = new Date("1990-01-02T00:01:00Z"), proof = await ledger.claim(later, randomUUID());
     expect(proof).not.toBeNull(); if (!proof) return;
     expect(proof.verifying).toBe(true);
     await ledger.recordAbsence(proof, later);
@@ -58,11 +58,11 @@ describe.skipIf(!hosted)("durable video cleanup authority on disposable PostgreS
     expect(await cleanup.execute()).toBe("retry");
     expect(transport.objects.has(row.key)).toBe(true);
     expect((await db.videoCleanupWork.findUniqueOrThrow({ where: { id: row.cleanupId } })).state).toBe("PENDING");
-    transport.holdDeletes = false; time = new Date("2000-01-02T00:01:00Z");
+    transport.holdDeletes = false; time = new Date("1990-01-02T00:01:00Z");
     expect(await cleanup.execute()).toBe("absent");
     expect(transport.objects.size).toBe(0);
     expect((await db.videoCleanupWork.findUniqueOrThrow({ where: { id: row.cleanupId } })).state).toBe("VERIFYING");
-    time = new Date("2000-01-02T00:02:00Z");
+    time = new Date("1990-01-02T00:02:00Z");
     expect(await cleanup.execute()).toBe("absent");
     expect((await db.videoCleanupWork.findUniqueOrThrow({ where: { id: row.cleanupId } })).state).toBe("DONE");
   });
@@ -74,12 +74,12 @@ describe.skipIf(!hosted)("durable video cleanup authority on disposable PostgreS
     await db.videoCleanupWork.update({ where: { id: row.cleanupId }, data: { state: "HELD" } });
     expect(await ledger.claim(now, randomUUID())).toBeNull();
     await db.videoCleanupWork.update({ where: { id: row.cleanupId }, data: { state: "PENDING" } });
-    await db.videoProcessWork.create({ data: { generationId: row.id, uploadId: row.uploadId, sessionId: row.id, completionFence: randomUUID(), targetRevision: 1, processingVersion: "ffmpeg-debian-5.1.9-v1", state: "CANCELLED", leaseExpiresAt: new Date("2000-01-02T00:20:00Z") } });
+    await db.videoProcessWork.create({ data: { generationId: row.id, uploadId: row.uploadId, sessionId: row.id, completionFence: randomUUID(), targetRevision: 1, processingVersion: "ffmpeg-debian-5.1.9-v1", state: "CANCELLED", leaseExpiresAt: new Date("1990-01-02T00:20:00Z") } });
     expect(await ledger.claim(now, randomUUID())).toBeNull();
   });
   it("leaves video expiry to its dedicated lifecycle rather than image cleanup", async () => {
     const row = await retired();
-    await db.mediaUpload.update({ where: { id: row.uploadId }, data: { state: "PREPARING", retiredAt: null, claimToken: row.id, claimTargetType: "video_session", claimTargetId: row.id, claimDeadline: new Date("2000-01-01T00:00:00Z") } });
+    await db.mediaUpload.update({ where: { id: row.uploadId }, data: { state: "PREPARING", retiredAt: null, claimToken: row.id, claimTargetType: "video_session", claimTargetId: row.id, claimDeadline: new Date("1990-01-01T00:00:00Z") } });
     await new PrismaRetiredUploadLedger(db).retireExpiredPreparations(now, 100);
     expect((await db.mediaUpload.findUniqueOrThrow({ where: { id: row.uploadId } })).state).toBe("PREPARING");
     expect(await db.mediaUploadCleanup.findUnique({ where: { uploadId: row.uploadId } })).toBeNull();
