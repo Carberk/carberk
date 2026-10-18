@@ -36,3 +36,12 @@ it("reads anonymous public findings without attaching a private session",async()
  let auth:string|null="unused";server.use(http.get("*/public-diagnostics/reports/:id",({request})=>{auth=request.headers.get("Authorization");return HttpResponse.json({...report,audience:"listing_public",status:"finalized",withdrawnAt:null});}),http.get("*/public-diagnostics/reports/:id/documents",()=>HttpResponse.json([])));
  const view=await renderMobile(<DiagnosticReader id={id} audience="public"/>);await view.findByText("Synthetic observed fault");expect(auth).toBeNull();
 });
+it("keeps a labeled report reference while hiding implementation IDs from normal reading", async () => {
+ const view=await renderMobile(<DiagnosticReader id={id} audience="private"/>);
+ await view.findByText("Brake response");
+ expect(view.getByText(`Report reference: ${id}`)).toBeTruthy();
+ expect(view.queryByText(`Template reference: ${id}`)).toBeNull();
+ expect(view.queryByText(new RegExp(`^${id} /`))).toBeNull();
+ expect(view.queryByText("brakes")).toBeNull();
+ expect(view.queryByText(/Panel: hood/)).toBeNull();
+});
