@@ -162,6 +162,10 @@ enum DealershipMemberRole {
 }
 
 model Dealership {
+  address String?
+  description String?
+  hours String?
+  services String?
   /// Checked business identity is never a claim about vehicle condition.
   status String @default("recovery")
   admissionMode String @default("synthetic")
@@ -445,6 +449,8 @@ enum Currency {
 
 model Listing {
   diagnosticOrders InspectionOrder[]
+  pendingVideoGenerationId String?
+  pendingVideoGeneration VideoGeneration? @relation("PendingListingVideo", fields: [pendingVideoGenerationId], references: [id], onDelete: SetNull)
   activeVideoGenerationId String?
   activeVideoRevision Int @default(0)
   activeVideoGeneration VideoGeneration? @relation("ActiveListingVideo", fields: [activeVideoGenerationId], references: [id], onDelete: SetNull)
@@ -613,6 +619,17 @@ model MediaUploadCleanup {
 }
 
 model VideoUploadSession {
+  protocolVersion Int?
+  targetKind String?
+  targetId String?
+  targetRevision Int?
+  storageUploadId String?
+  posterMs Int?
+  idempotencyKey String?
+  idempotencyHash String?
+  completionFence String?
+  cancelledAt DateTime?
+  completedAt DateTime?
   id String @id @default(uuid())
   uploadId String @unique
   userId String
@@ -625,10 +642,19 @@ model VideoUploadSession {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([state, expiresAt])
+  @@unique([userId, idempotencyKey])
   @@map("video_upload_sessions")
 }
 
 model VideoGeneration {
+  pendingForListings Listing[] @relation("PendingListingVideo")
+  sessionId String?
+  completionFence String?
+  targetRevision Int?
+  processingVersion String?
+  sourceSha256 String?
+  sourceWidth Int?
+  sourceHeight Int?
   activeForListings Listing[] @relation("ActiveListingVideo")
   id String @id @default(uuid())
   listingId String
@@ -642,6 +668,51 @@ model VideoGeneration {
   retiredAt DateTime?
   @@index([listingId, state])
   @@map("video_generations")
+}
+
+/// Durable private work, never queue success as readiness. Legacy sessions have no work.
+model VideoProcessWork {
+  generationId String @id
+  uploadId String
+  sessionId String
+  completionFence String
+  targetRevision Int
+  processingVersion String
+  state String @default("PENDING")
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  leaseToken String?
+  leaseExpiresAt DateTime?
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  completedAt DateTime?
+  @@index([state, nextAttemptAt])
+  @@map("video_process_work")
+}
+
+/// No cascade: exact deletion authority survives account/upload/session deletion.
+model VideoCleanupWork {
+  id String @id @default(uuid())
+  uploadId String
+  sessionId String?
+  generationId String?
+  writeProtocol String @default("video-v1")
+  sourceKey String?
+  storageUploadId String?
+  objectKeys String[] @default([])
+  state String @default("PENDING")
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  leaseToken String?
+  leaseExpiresAt DateTime?
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  completedAt DateTime?
+  @@index([state, nextAttemptAt])
+  @@index([uploadId])
+  @@map("video_cleanup_work")
 }
 
 model VideoGrant {

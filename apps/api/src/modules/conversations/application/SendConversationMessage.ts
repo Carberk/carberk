@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { BadRequestException, Inject, Injectable, NotFoundException, Optional } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException, Optional } from "@nestjs/common";
 
 import type { ListingSummary, ListingsReadPort } from "../../listings/domain/ports/ListingsReadPort";
 import { LISTINGS_READ_PORT } from "../../listings/domain/ports/ListingsReadPort";
@@ -51,14 +51,13 @@ export class SendConversationMessage {
   async execute(
     input: SendConversationMessageInput,
   ): Promise<SendConversationMessageResult> {
+    if (input.actor && input.actor.userId !== input.senderId) throw new ForbiddenException({ code: "FORBIDDEN", details: { reason: "ACTOR_MISMATCH" } });
     const conversation = await this.conversations.findById(input.conversationId);
     if (!conversation) throw new NotFoundException("Conversation not found");
     if (conversation.businessId) {
       if (!this.businessAccess || !this.listings || !input.actor) throw new BadRequestException("Business context required");
       const recipientId = await this.businessAccess.authorize(conversation, input.actor, { send: true });
-      const listing = await this.listings.getListingSummary(conversation.listingId);
-      if (!listing || listing.status === "banned" || !listing.allowChat) throw new BadRequestException("Listing is not contactable");
-      const authorized = { conversation, recipientId, listing };
+      const authorized = await this.sendPolicy.authorizeBusiness(conversation, input.senderId, recipientId);
       return this.executeAuthorized(input, authorized);
     }
     const authorized = await this.sendPolicy.authorize(input.conversationId, input.senderId);

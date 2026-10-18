@@ -40,9 +40,11 @@ export class ConversationMessageCommitter {
     const recipients = persisted?.businessId && this.businessEnquiries
       ? await this.businessEnquiries.recipients(message.conversationId, message.senderId)
       : [recipientId];
-    for (const targetId of recipients) {
+    const targets = persisted?.businessId && !recipients.length ? [message.senderId] : recipients;
+    for (const [index, targetId] of targets.entries()) {
       await this.messageEvents.emitMessageSent({
         event: "MessageSent",
+        ...(persisted?.businessId ? { businessId: persisted.businessId, echoSender: index === 0 } : {}),
         conversationId: message.conversationId,
         messageId: message.id,
         senderId: message.senderId,

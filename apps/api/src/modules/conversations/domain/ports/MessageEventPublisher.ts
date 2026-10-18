@@ -3,6 +3,9 @@ import type { MessageKind, MessageMetadata } from "../types";
 export interface MessageSentEvent {
   event: "MessageSent";
   conversationId: string;
+  /** Business events never broadcast to historical conversation rooms. */
+  businessId?: string;
+  echoSender?: boolean;
   messageId: string;
   senderId: string;
   recipientId: string;

@@ -1,6 +1,6 @@
 # Public web
 
-The public site provides a localized landing page, legal pages, trust information, and the public account deletion page. At this branch's implementation, listing/dealer/blog routes and SSR marketplace data fetching are absent. Use the route tree to establish shipped pages; roadmap descriptions do not establish implementation.
+The public site provides a localized landing page, legal pages, trust information, and the public account deletion page. Anonymous Listing and showroom readers use a narrow public API projection, fetch current lifecycle state without caching, and render supported locales without an install wall. Listing contact remains scoped to the active Listing. Suppressed or unavailable data returns an unavailable page; the public read boundary excludes private service evidence. Blog routes remain absent. Use the route tree to establish shipped pages; roadmap descriptions do not establish implementation.
 
 `/healthz` is dependency-free and bypasses locale routing. The standalone production image uses Next.js output tracing at the monorepo root. Preserve deployment identity in health responses.
 

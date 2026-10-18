@@ -1,0 +1,131 @@
+{
+  "sourceSha256": "0cd83d944a6ca7822b4a8306cecc60a36e859b041f6702c6a1ad9ead78924451",
+  "durationMs": 5055,
+  "width": 960,
+  "height": 540,
+  "renditions": [
+    {
+      "label": 240,
+      "width": 426,
+      "height": 240
+    },
+    {
+      "label": 360,
+      "width": 640,
+      "height": 360
+    },
+    {
+      "label": 720,
+      "width": 960,
+      "height": 540
+    }
+  ],
+  "assets": [
+    {
+      "path": "240/index.m3u8",
+      "sizeBytes": 200,
+      "sha256": "dd2a98190689ab8a43992f14a3f3f299f1cece42d36ff66e81ae1d4b4e73aa2a",
+      "purpose": "playback",
+      "contentType": "application/vnd.apple.mpegurl"
+    },
+    {
+      "path": "240/seg-000.ts",
+      "sizeBytes": 66552,
+      "sha256": "167fca65cb8db304826176be5b05f7f10745261b66943b30580548160bc2fbe3",
+      "purpose": "playback",
+      "contentType": "video/mp2t"
+    },
+    {
+      "path": "240/seg-001.ts",
+      "sizeBytes": 78020,
+      "sha256": "00cd79eaf65fb25c37cb7133d53a60aa03f2b77f3df4422a96a28caded2aa600",
+      "purpose": "playback",
+      "contentType": "video/mp2t"
+    },
+    {
+      "path": "240/seg-002.ts",
+      "sizeBytes": 43992,
+      "sha256": "bb5857c0e0cc00b7971288e53e2c6456edf8ff3092317987de970b60e0e97828",
+      "purpose": "playback",
+      "contentType": "video/mp2t"
+    },
+    {
+      "path": "360/index.m3u8",
+      "sizeBytes": 200,
+      "sha256": "dd2a98190689ab8a43992f14a3f3f299f1cece42d36ff66e81ae1d4b4e73aa2a",
+      "purpose": "playback",
+      "contentType": "application/vnd.apple.mpegurl"
+    },
+    {
+      "path": "360/seg-000.ts",
+      "sizeBytes": 122200,
+      "sha256": "a3de86fd4a929bca05f350e54381c63e37d8523a2535fdc0531a78016461de59",
+      "purpose": "playback",
+      "contentType": "video/mp2t"
+    },
+    {
+      "path": "360/seg-001.ts",
+      "sizeBytes": 140812,
+      "sha256": "1ac0d182593ce9c89f8297106ed1031b8815d8d89aa8b25471e1cdc659462b97",
+      "purpose": "playback",
+      "contentType": "video/mp2t"
+    },
+    {
+      "path": "360/seg-002.ts",
+      "sizeBytes": 81968,
+      "sha256": "a5d6117fd7e94a45bb9ee6e8771d72dc23b708636336ac38c24eacf5bfb8f2d9",
+      "purpose": "playback",
+      "contentType": "video/mp2t"
+    },
+    {
+      "path": "720/index.m3u8",
+      "sizeBytes": 200,
+      "sha256": "dd2a98190689ab8a43992f14a3f3f299f1cece42d36ff66e81ae1d4b4e73aa2a",
+      "purpose": "playback",
+      "contentType": "application/vnd.apple.mpegurl"
+    },
+    {
+      "path": "720/seg-000.ts",
+      "sizeBytes": 295536,
+      "sha256": "7cd19b8e8a543b192bfe9af0aee0060ea8351fa94e98a8b595480dcee85ee77e",
+      "purpose": "playback",
+      "contentType": "video/mp2t"
+    },
+    {
+      "path": "720/seg-001.ts",
+      "sizeBytes": 336896,
+      "sha256": "13f3743439ccc3225b2980068b25cb0d864a2042e71d13134522ad8699c2dd94",
+      "purpose": "playback",
+      "contentType": "video/mp2t"
+    },
+    {
+      "path": "720/seg-002.ts",
+      "sizeBytes": 188752,
+      "sha256": "adb3cf8c292f978f479bc1ee213b48c10f206c64ba693c09e7b448d8718fcea8",
+      "purpose": "playback",
+      "contentType": "video/mp2t"
+    },
+    {
+      "path": "master.m3u8",
+      "sizeBytes": 233,
+      "sha256": "ff62e6adaf5e3ebe91e5cdb29ac9d4b39322b4d940e3865448676e4a3dcf4f3b",
+      "purpose": "playback",
+      "contentType": "application/vnd.apple.mpegurl"
+    },
+    {
+      "path": "poster.jpg",
+      "sizeBytes": 21333,
+      "sha256": "9913240ffbf70e1d72908d1db067189d34359fc9218b574211de48bf65243659",
+      "purpose": "poster",
+      "contentType": "image/jpeg"
+    }
+  ],
+  "poster": [
+    {
+      "codec": "mjpeg",
+      "width": 640,
+      "height": 480
+    }
+  ],
+  "decodedAllRenditions": true
+}

@@ -130,12 +130,11 @@ export class GetConversation {
     };
   }
   private async businessRestriction(conversation: Conversation, actor: ConversationActor | undefined, listing: ListingSummary | null): Promise<SendRestriction | null> {
-    if (!listing || listing.status === "banned") return "listing_unavailable";
-    if (!listing.allowChat) return "chat_disabled";
+
     if (!actor || !this.businessAccess) return "participant_unavailable";
     try { await this.businessAccess.authorize(conversation, actor, { send: true }); }
     catch (error) { if (error instanceof ForbiddenException) return "participant_unavailable"; throw error; }
-    return null;
+    return this.sendPolicy.businessRestrictionFor(conversation, actor.userId, listing);
   }
 
 }
