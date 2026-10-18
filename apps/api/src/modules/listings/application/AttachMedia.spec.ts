@@ -365,30 +365,6 @@ describe("AttachMedia", () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it("rejects when video limit (1) is exceeded", async () => {
-    seedActiveListing(repo);
-    world.media.push(
-      ListingMedia.create({
-        id: "media-video",
-        listingId: "listing-1",
-        kind: "video",
-        key: "pending/vid/original.mp4",
-        sortOrder: 0,
-        durationMs: 30000,
-      }),
-    );
-    presignedUpload("pending/extra/original.mp4", "video");
-
-    await expect(
-      uc.execute({
-        listingId: "listing-1",
-        userId: "user-1",
-        key: "pending/extra/original.mp4",
-        kind: "video",
-        sortOrder: 1,
-      }),
-    ).rejects.toThrow(BadRequestException);
-  });
 
   it("returns 404 for non-owner", async () => {
     seedActiveListing(repo);

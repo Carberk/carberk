@@ -42,6 +42,7 @@ export class PresignUpload {
   ) {}
 
   async execute(input: PresignUploadInput): Promise<PresignUploadResult> {
+    if (input.kind === "video") throw new BadRequestException({ code: "VIDEO_PREPARED_PROTOCOL_REQUIRED", message: "Use the prepared private video upload session" });
     if (input.businessId) await assertListingOwnership(this.ownership, input, { businessId: input.businessId });
     const cap = UPLOAD_CAPS[input.kind];
     if (!cap) {

@@ -74,6 +74,7 @@ export class AttachMedia {
   ) {}
 
   async execute(input: AttachMediaInput): Promise<AttachMediaResult> {
+    if (input.kind === "video") throw new BadRequestException({ code: "VIDEO_PREPARED_PROTOCOL_REQUIRED", message: "Video becomes ready through private processing" });
     const listing = await this.listings.findById(input.listingId);
     if (!listing || listing.deletedAt) {
       throw new NotFoundException("Listing not found");
@@ -98,18 +99,11 @@ export class AttachMedia {
     }
 
     const photoCount = existingMedia.filter((m) => m.kind === "image").length;
-    const videoCount = existingMedia.filter((m) => m.kind === "video").length;
 
     if (input.kind === "image" && photoCount >= ListingsSchemas.MAX_LISTING_PHOTOS) {
       throw new BadRequestException({
         code: LISTING_ERROR_CODES.MEDIA_LIMIT_EXCEEDED,
         message: "Maximum 20 photos per listing",
-      });
-    }
-    if (input.kind === "video" && videoCount >= 1) {
-      throw new BadRequestException({
-        code: LISTING_ERROR_CODES.MEDIA_LIMIT_EXCEEDED,
-        message: "Maximum 1 video per listing",
       });
     }
 
