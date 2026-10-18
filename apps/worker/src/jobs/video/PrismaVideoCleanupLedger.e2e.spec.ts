@@ -20,6 +20,7 @@ describe.skipIf(!hosted)("durable video cleanup authority on disposable PostgreS
   async function clear() {
     await db.videoCleanupWork.deleteMany({ where: { id: { in: ids.map(id => `session:${id}`) } } });
     await db.videoProcessWork.deleteMany({ where: { generationId: { in: ids } } });
+    await db.videoUploadSession.deleteMany({ where: { id: { in: ids } } });
     await db.videoGeneration.deleteMany({ where: { id: { in: ids } } });
     await db.mediaUploadCleanup.deleteMany({ where: { uploadId: { in: uploads } } });
     await db.mediaUpload.deleteMany({ where: { id: { in: uploads } } });
@@ -83,6 +84,19 @@ describe.skipIf(!hosted)("durable video cleanup authority on disposable PostgreS
     await new PrismaRetiredUploadLedger(db).retireExpiredPreparations(now, 100);
     expect((await db.mediaUpload.findUniqueOrThrow({ where: { id: row.uploadId } })).state).toBe("PREPARING");
     expect(await db.mediaUploadCleanup.findUnique({ where: { uploadId: row.uploadId } })).toBeNull();
+  });
+  it.each(["UPLOADING", "READY", "PROCESSING"])("retires expired private %s sessions with exact inventory and credential grace", async state => {
+    const row = await retired(), sourceKey = `video/v1/${row.uploadId}/${row.id}/source.mp4`;
+    await db.videoCleanupWork.delete({ where: { id: row.cleanupId } });
+    await db.mediaUpload.update({ where: { id: row.uploadId }, data: { state: "PREPARING", retiredAt: null, claimToken: row.id, claimTargetType: "video_session", claimTargetId: row.id, claimDeadline: new Date("1990-01-01T00:00:00Z") } });
+    await db.videoUploadSession.create({ data: { id: row.id, uploadId: row.uploadId, userId, protocolVersion: 1, targetKind: "draft", targetId: randomUUID(), targetRevision: 1, state, sourceKey, sizeBytes: 1000, sha256: "a".repeat(64), posterMs: 0, expiresAt: new Date("1990-01-01T00:00:00Z") } });
+    const assets = [{ path: "poster.jpg", key: row.key, sizeBytes: 100, sha256: "b".repeat(64), purpose: "poster", contentType: "image/jpeg" }];
+    await db.videoGeneration.update({ where: { id: row.id }, data: { sessionId: row.id, state, retiredAt: null, manifest: { assets } } });
+    expect(await ledger.claim(now, randomUUID())).toBeNull();
+    expect(await db.mediaUpload.findUniqueOrThrow({ where: { id: row.uploadId } })).toMatchObject({ state: "RETIRED", claimToken: null, claimDeadline: null });
+    expect(await db.videoGeneration.findUniqueOrThrow({ where: { id: row.id } })).toMatchObject({ state: "RETIRED", retiredAt: now });
+    expect(await db.videoUploadSession.findUniqueOrThrow({ where: { id: row.id } })).toMatchObject({ state: "CLEANUP_PENDING" });
+    expect(await db.videoCleanupWork.findUniqueOrThrow({ where: { id: row.cleanupId } })).toMatchObject({ state: "PENDING", sourceKey, objectKeys: [row.key], nextAttemptAt: new Date("1990-01-02T00:17:00Z") });
   });
   it("keeps exact durable authority when source records disappear and ignores stale workers", async () => {
     const row = await retired();
