@@ -362,3 +362,71 @@ it("records fixed recovery offers, rejects deadline drift/expired acceptance and
  await late.command(nextStaff, { ...refund, expectedVersion: 1 }).expect(201);
  expect(await db.historyRefund.count({ where: { orderId: late.order.id } })).toBe(1);
 });
+
+it("serializes shared holds and paid FIFO, fences duplicate purchase intents and rejects stale handover/capability", async () => {
+ await db.staffGrant.createMany({ data: ["history.fulfilment", "history.payment.verify"].map(capability => ({ userId: nextStaff, capability })), skipDuplicates: true });
+ let now = new Date("2001-01-01T04:10:00Z");
+ vi.spyOn(app.get<{ now: () => Date }>(SERVICE_RUNTIME), "now").mockImplementation(() => now);
+ const day = "2001-01-01", vin = "1HGCM82633A004352";
+ const setup = async (buyer: string) => {
+  const opened = await request.post("/api/v1/services/conversations").set("Authorization", auth(buyer)).send({ purpose: "history", synthetic: true }).expect(201);
+  const id = opened.body.id as string;
+  await request.post(`/api/v1/services/conversations/${id}/assignment`).set("Authorization", auth(nextStaff)).send({ expectedVersion: 0 }).expect(201);
+  const quoteId = randomUUID();
+  const quote = { quoteId, expectedAssignmentVersion: 1, kind: "quote", vin, providers: ["carfax"], preflightOutcome: "available", preflightEvidence: "Owned synthetic preflight", refundRule: "Founder-authorized failure refund", windowStart: "2001-01-01T04:10:00.000Z", windowEnd: "2001-01-01T05:00:00.000Z", feasible: true };
+  const command = (actor: string, data: object) => request.post(`/api/v1/services/conversations/${id}/history`).set("Authorization", auth(actor)).send(data);
+  await command(nextStaff, quote).expect(201);
+  const acceptance = { kind: "accept", quoteId, vin, providers: quote.providers, amount: 100, refundRule: quote.refundRule, windowStart: quote.windowStart, windowEnd: quote.windowEnd, rights: { category: "payment_evidence", purpose: "Synthetic concurrency proof", basis: "Owned fixtures", provenance: "Synthetic buyer", identifiability: "personal", use: ["service"], schedule: { kind: "until", until: "2027-01-01T00:00:00Z", reason: "Synthetic schedule" }, supplierRestrictions: "No actual provider action", hold: null } };
+  return { id, buyer, requestId: opened.body.resourceId as string, command, acceptance };
+ };
+ const one = await setup(stranger), two = await setup(reportBuyer);
+ const capacity = { kind: "capacity", expectedAssignmentVersion: 1, day, slotLimit: 1, morningLimit: 1, evidence: "Measured synthetic single slot", providers: [{ provider: "carfax", allowance: 10, consumed: 0, resetAt: "2001-01-01T04:00:00Z", evidence: "Synthetic verified allowance" }] };
+ await one.command(nextStaff, capacity).expect(201);
+ const holds = await Promise.all([one.command(one.buyer, one.acceptance), two.command(two.buyer, two.acceptance)]);
+ expect(holds.map(value => value.status).sort()).toEqual([201,400]);
+ expect(await db.historyOrder.count({ where: { day, state: "held" } })).toBe(1);
+ const first = holds[0]?.status === 201 ? one : two, second = holds[0]?.status === 201 ? two : one;
+ await first.command(nextStaff, { ...capacity, slotLimit: 2 }).expect(201);
+ await second.command(second.buyer, second.acceptance).expect(201);
+ const confirm = async (entry: typeof one, minute: number) => {
+  now = new Date(`2001-01-01T04:${minute}:00Z`);
+  const order = await db.historyOrder.findUniqueOrThrow({ where: { requestId: entry.requestId } });
+  const clientPaymentId = randomUUID();
+  let attachmentId: string | undefined;
+  if (minute === 11) {
+   const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: "#ffffff" } }).jpeg().toBuffer();
+   const stage = await request.post(`/api/v1/services/conversations/${entry.id}/attachments`).set("Authorization", auth(entry.buyer)).send({ category: "payment_evidence", visibility: "customer", contentType: "image/jpeg", filename: "synthetic-receipt.jpg", sizeBytes: image.length, rights: { ...entry.acceptance.rights, category: "payment_evidence" } }).expect(201);
+   attachmentId = stage.body.id as string;
+   await request.post(`/api/v1/services/conversations/${entry.id}/attachments/${attachmentId}/bytes`).set("Authorization", auth(entry.buyer)).set("Content-Type", "application/octet-stream").send(image).expect(201);
+  }
+  await entry.command(entry.buyer, { kind: "payment", orderId: order.id, clientPaymentId, claim: "Synthetic verified receipt", ...(attachmentId ? { attachmentId } : {}) }).expect(201);
+  if (attachmentId) {
+   expect((await db.serviceAttachment.findUniqueOrThrow({ where: { id: attachmentId } })).state).toBe("adopted");
+   await request.get(`/api/v1/services/conversations/${entry.id}/attachments/${attachmentId}`).set("Authorization", auth(nextStaff)).expect(200);
+   expect((await db.historyOrder.findUniqueOrThrow({ where: { id: order.id } })).paidAt).toBeNull();
+  }
+  const payment = await db.historyPayment.findUniqueOrThrow({ where: { orderId_clientPaymentId: { orderId: order.id, clientPaymentId } } });
+  await entry.command(nextStaff, { kind: "verify", orderId: order.id, paymentId: payment.id, expectedAssignmentVersion: 1, expectedVersion: 0, amount: 100, verifiedFunds: true, receivedAt: now.toISOString(), evidence: "Synthetic actual receipt reconciliation" }).expect(201);
+  return order.id;
+ };
+ const firstOrder = await confirm(first, 11), secondOrder = await confirm(second, 12);
+ const purchase = { kind: "purchase", expectedAssignmentVersion: 1, expectedVersion: 1, reason: "Synthetic FIFO purchase intent" };
+ await second.command(nextStaff, { ...purchase, orderId: secondOrder }).expect(400);
+ const intents = await Promise.all([first.command(nextStaff, { ...purchase, orderId: firstOrder }), first.command(nextStaff, { ...purchase, orderId: firstOrder })]);
+ expect(intents.map(value => value.status).sort()).toEqual([201,409]);
+ expect(await db.historyPurchaseIntent.count({ where: { orderId: firstOrder } })).toBe(1);
+ expect((await db.historyProviderAllowance.findUniqueOrThrow({ where: { provider_day: { provider: "carfax", day } } })).consumed).toBe(1);
+ await first.command(nextStaff, { kind: "purchase_uncertain", expectedAssignmentVersion: 1, expectedVersion: 2, orderId: firstOrder, reason: "Synthetic timeout; external outcome unknown" }).expect(201);
+ await first.command(nextStaff, { ...purchase, expectedVersion: 3, orderId: firstOrder }).expect(201);
+ expect(await db.historyPurchaseIntent.count({ where: { orderId: firstOrder } })).toBe(1);
+ expect((await db.historyProviderAllowance.findUniqueOrThrow({ where: { provider_day: { provider: "carfax", day } } })).consumed).toBe(1);
+ await db.staffGrant.createMany({ data: [{ userId: oldStaff, capability: "history.fulfilment" }], skipDuplicates: true });
+ await request.post(`/api/v1/services/conversations/${second.id}/assignment`).set("Authorization", auth(nextStaff)).send({ expectedVersion: 1, targetUserId: oldStaff }).expect(201);
+ await second.command(nextStaff, { ...purchase, orderId: secondOrder }).expect(403);
+ await second.command(oldStaff, { ...purchase, orderId: secondOrder }).expect(409);
+ await db.staffGrant.updateMany({ where: { userId: oldStaff, capability: "history.fulfilment", revokedAt: null }, data: { revokedAt: new Date() } });
+ await second.command(oldStaff, { ...purchase, expectedAssignmentVersion: 2, orderId: secondOrder }).expect(403);
+ await second.command(second.buyer, { kind: "refund_request", cause: "company_error", expectedAssignmentVersion: 2, expectedVersion: 1, orderId: secondOrder, reason: "Customer cannot cancel a paid order" }).expect(403);
+ await first.command(nextStaff, { kind: "refund_request", cause: "company_error", expectedAssignmentVersion: 1, expectedVersion: 3, orderId: firstOrder, reason: "Synthetic operator purchased incorrect VIN" }).expect(201);
+ expect((await db.historyRefund.findUniqueOrThrow({ where: { orderId: firstOrder } })).reason).toContain("company_error");
+});

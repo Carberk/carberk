@@ -1,11 +1,13 @@
-import { useRef, useState } from "react";
-import { View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Image, View } from "react-native";
 import { randomUUID } from "expo-crypto";
 
 import { localeTag } from "../i18n/resources";
 
 import { useHistoryCommand, useHistoryOrder } from "./api";
 import { HistoryReports } from "./HistoryReports";
+import { paymentCopy } from "./paymentCopy";
+import { pickServiceImage, uploadServiceImage, type ServiceImage } from "./serviceImage";
 import { historyCopy } from "./historyCopy";
 
 import { Button } from "@/components/ui/button";
@@ -15,7 +17,20 @@ import { Text } from "@/components/ui/text";
 export function HistoryOrder({ id, locale }: { id: string; locale: string }) {
  const query = useHistoryOrder(id), action = useHistoryCommand(id), c = historyCopy(locale);
  const [vin, setVin] = useState(""), [claim, setClaim] = useState(""), [error, setError] = useState(false);
- const retry = useRef<{ claim: string; id: string } | null>(null);
+ const p = paymentCopy(locale);
+ const [receipt, setReceipt] = useState<ServiceImage | null>(null), [attachmentId, setAttachmentId] = useState<string | null>(null), [uploading, setUploading] = useState(false), [uploadFailed, setUploadFailed] = useState(false);
+ const epoch = useRef(0); useEffect(() => () => { epoch.current++; }, []);
+ const retry = useRef<{ fingerprint: string; id: string; claim: string } | null>(null);
+ const uploadReceipt = async () => {
+  if (uploading || action.isPending) return; const version = epoch.current;
+  setUploading(true); setUploadFailed(false);
+  try {
+   const chosen = receipt ?? await pickServiceImage(); if (!chosen || version !== epoch.current) return;
+   setReceipt(chosen); const value = await uploadServiceImage(id, "history", chosen, "payment_evidence");
+   if (version === epoch.current) setAttachmentId(value);
+  } catch { if (version === epoch.current) setUploadFailed(true); }
+  finally { if (version === epoch.current) setUploading(false); }
+ };
  const data = query.isError ? undefined : query.data, order = data?.order;
  const quote = data?.quotes.find(value => !value.acceptedAt && !value.supersededAt && value.preflightOutcome === "available" && value.feasible);
  const date = (value: string) => new Date(value).toLocaleString(localeTag(locale));
@@ -26,10 +41,11 @@ export function HistoryOrder({ id, locale }: { id: string; locale: string }) {
   catch { setError(true); }
  };
  const submit = async () => {
-  if (!order || !claim.trim() || action.isPending) return;
-  if (retry.current?.claim !== claim) retry.current = { claim, id: randomUUID() };
+  if (!order || (!claim.trim() && !attachmentId) || action.isPending || uploading || (receipt && !attachmentId)) return;
+  const fingerprint = JSON.stringify([claim, attachmentId]);
+  if (retry.current?.fingerprint !== fingerprint) retry.current = { fingerprint, id: randomUUID(), claim: claim.trim() || p.claim };
   setError(false);
-  try { await action.mutateAsync({ kind: "payment", orderId: order.id, clientPaymentId: retry.current.id, claim }); setClaim(""); retry.current = null; }
+  try { await action.mutateAsync({ kind: "payment", orderId: order.id, clientPaymentId: retry.current.id, claim: retry.current.claim, ...(attachmentId ? { attachmentId } : {}) }); setClaim(""); setReceipt(null); setAttachmentId(null); retry.current = null; }
   catch { setError(true); }
  };
  const recover = async (agree: boolean) => {
@@ -47,7 +63,7 @@ export function HistoryOrder({ id, locale }: { id: string; locale: string }) {
    <Text>{c.state}: {order.state === "paid" ? c.paid : order.state === "review" ? c.review : order.state === "delivered" ? c.delivered : order.state.startsWith("refund") ? c.refund : c.pending}</Text>
    <Text>{c.promise}: {date(order.promiseAt)}</Text>
    {order.state === "held" ? <Text>{c.held} {date(order.holdExpiresAt)}</Text> : null}
-   {["held", "expired", "review"].includes(order.state) ? <><Text>{c.unverified}</Text><Text>{c.afterHours}</Text>{order.state === "expired" ? <Text>{c.expired}</Text> : null}<Input accessibilityLabel={c.claim} value={claim} onChangeText={setClaim} maxLength={1000} multiline/>{button(c.submit, () => { void submit(); }, !claim.trim())}</> : null}
+   {["held", "expired", "review"].includes(order.state) ? <><Text>{c.unverified}</Text><Text>{c.afterHours}</Text>{order.state === "expired" ? <Text>{c.expired}</Text> : null}<Text>{p.hint}</Text>{receipt?.preview ? <Image accessibilityLabel={p.preview} source={{ uri: receipt.preview }} className="h-48 w-full" resizeMode="contain"/> : null}{uploading ? <Text accessibilityRole="progressbar">{p.uploading}</Text> : null}{attachmentId ? <Text>{p.ready}</Text> : null}{uploadFailed ? <Text accessibilityRole="alert">{c.error}</Text> : null}{button(uploadFailed ? p.retry : p.upload, () => { void uploadReceipt(); }, uploading || !!attachmentId)}{receipt ? button(p.remove, () => { setReceipt(null); setAttachmentId(null); setUploadFailed(false); }, uploading) : null}<Input accessibilityLabel={c.claim} value={claim} onChangeText={setClaim} maxLength={1000} multiline/>{button(c.submit, () => { void submit(); }, (!claim.trim() && !attachmentId) || uploading || (!!receipt && !attachmentId))}</> : null}
    {order.paidAt ? <Text>{c.noCancel}</Text> : null}
    {order.state === "delivered" ? <HistoryReports id={id} locale={locale}/> : null}
    {!order.recoveryUsed && order.escalatedAt && !["delivered", "refunded", "refund_pending"].includes(order.state) ? <>

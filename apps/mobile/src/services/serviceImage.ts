@@ -25,10 +25,10 @@ export async function pickServiceImage(): Promise<ServiceImage | null> {
   return { bytes, filename: "service-image.jpg", preview: `data:image/jpeg;base64,${btoa(binary)}` };
  } finally { output?.delete(); rendered?.release(); decoded?.release(); context.release(); }
 }
-export async function uploadServiceImage(id: string, purpose: S.ServicePurpose, image: ServiceImage): Promise<string> {
- const category = purpose === "support" ? "support_communication" : "history_communication";
+export async function uploadServiceImage(id: string, purpose: S.ServicePurpose, image: ServiceImage, categoryOverride?: "payment_evidence"): Promise<string> {
+ const category = categoryOverride ?? (purpose === "support" ? "support_communication" : "history_communication");
  if (!image.stagedId) {
-  const staged = await apiClient.post(`/services/conversations/${id}/attachments`, { category, visibility: "customer", contentType: "image/jpeg", sizeBytes: image.bytes.length, filename: image.filename, rights: { category, purpose: "Synthetic service conversation verification", basis: "Owned synthetic fixture", provenance: "Synthetic test image selected by admitted fixture", identifiability: "personal", use: ["service"], schedule: purpose === "support" ? { kind: "support_case", closedDays: 90, eraseOnAccountDeletion: true } : { kind: "until", until: new Date(Date.now() + 7 * 86400000).toISOString(), reason: "Bounded synthetic verification" }, supplierRestrictions: "", hold: null } }, z.object({ id: z.string().uuid() }));
+  const staged = await apiClient.post(`/services/conversations/${id}/attachments`, { category, visibility: "customer", contentType: "image/jpeg", sizeBytes: image.bytes.length, filename: image.filename, rights: { category, purpose: "Synthetic service conversation verification", basis: "Owned synthetic fixture", provenance: "Synthetic test image selected by admitted fixture", identifiability: "personal", use: ["service"], schedule: purpose === "support" ? { kind: "support_case", closedDays: 90, eraseOnAccountDeletion: true } : { kind: "until", until: new Date(Date.now() + (category === "payment_evidence" ? 30 : 7) * 86400000).toISOString(), reason: "Bounded synthetic verification" }, supplierRestrictions: "", hold: null } }, z.object({ id: z.string().uuid() }));
   image.stagedId = staged.id;
  }
  await apiClient.postBinary(`/services/conversations/${id}/attachments/${image.stagedId}/bytes`, image.bytes);
