@@ -2,12 +2,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { CreateBucketCommand, DeleteObjectCommand, HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { PrismaService, type Prisma } from "@auto-tm/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { S3RetiredObjectStore } from "../S3RetiredObjectStore";
-
+import { S3DiagnosticArtifactObjects } from "./S3DiagnosticArtifactObjects";
 import { DiagnosticArtifactWorker, type DiagnosticArtifactObjects } from "./DiagnosticArtifactWorker";
 
 const endpoint = process.env["MINIO_ENDPOINT"] ?? "";
@@ -25,16 +24,7 @@ describe.skipIf(!hosted)("diagnostic artifacts on disposable PostgreSQL and priv
   let clock = new Date("2000-01-01T00:00:00.000Z");
   const runtime = { now: () => clock, id: randomUUID, enabled: () => true };
   const fonts = async () => ({ regular: await readFile(join(__dirname, "../../../assets/fonts/NotoSans-Regular.ttf")), bold: await readFile(join(__dirname, "../../../assets/fonts/NotoSans-Bold.ttf")) });
-  const storage: DiagnosticArtifactObjects = {
-    async put(key, bytes, mime) { await s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: bytes, ContentType: mime, IfNoneMatch: "*" })); },
-    async read(key, size, digest) {
-      const object = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-      const bytes = await object.Body?.transformToByteArray();
-      if (!bytes || bytes.length !== size || sha(bytes) !== digest) throw new Error("Synthetic exact readback mismatch");
-      return bytes;
-    },
-    deleteAndVerify: keys => new S3RetiredObjectStore(s3, bucket).deleteAndVerify(keys),
-  };
+  const storage: DiagnosticArtifactObjects = new S3DiagnosticArtifactObjects(s3, bucket);
   beforeAll(async () => {
     await db.$connect();
     try { await s3.send(new CreateBucketCommand({ Bucket: bucket })); }

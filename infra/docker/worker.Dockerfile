@@ -64,6 +64,7 @@ RUN ffmpeg -version && ffprobe -version
 COPY --from=build /app/node_modules /app/node_modules
 COPY --from=build /app/apps/worker/node_modules /app/apps/worker/node_modules
 COPY --from=build /app/apps/worker/dist /app/apps/worker/dist
+COPY --from=build /app/apps/worker/assets/fonts /app/apps/worker/assets/fonts
 COPY --from=build /app/apps/worker/package.json /app/apps/worker/package.json
 COPY --from=build /app/packages /app/packages
 RUN groupadd -r auto-tm && useradd -r -g auto-tm -s /bin/false auto-tm && chown -R auto-tm:auto-tm /app
