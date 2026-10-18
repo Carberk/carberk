@@ -1,3 +1,6 @@
+import { PublicMarketplaceController } from "./presentation/PublicMarketplaceController";
+import { PrismaPublicMarketplaceReadRepository } from "./infrastructure/PrismaPublicMarketplaceReadRepository";
+import { PUBLIC_MARKETPLACE_READ_PORT } from "./domain/ports/PublicMarketplaceReadPort";
 import { BusinessInventoryController } from "./presentation/BusinessInventoryController";
 import { PrismaBusinessInventoryRepository } from "./infrastructure/PrismaBusinessInventoryRepository";
 import { BUSINESS_INVENTORY_REPOSITORY } from "./domain/ports/BusinessInventoryRepository";
@@ -108,8 +111,9 @@ import { LISTING_VIEWS_PORT } from "./domain/ports/ListingViewsPort";
 
 @Module({
   imports: [PrismaModule, EventEmitterModule, IdentityModule, MeasurementModule],
-  controllers: [BusinessInventoryController,ListingViewsController, ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController, VideoUploadController],
+  controllers: [PublicMarketplaceController,BusinessInventoryController,ListingViewsController, ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController, VideoUploadController],
   providers: [
+    { provide: PUBLIC_MARKETPLACE_READ_PORT, useClass: PrismaPublicMarketplaceReadRepository },
     { provide: BUSINESS_INVENTORY_REPOSITORY, useClass: PrismaBusinessInventoryRepository },
     { provide: BUSINESS_CONTACT_PHONE_REPOSITORY, useClass: PrismaBusinessContactPhoneRepository },
     ListingOwnership,
