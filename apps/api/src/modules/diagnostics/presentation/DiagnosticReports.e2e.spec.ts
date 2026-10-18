@@ -1,5 +1,7 @@
 import "reflect-metadata";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { S3Client, CreateBucketCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { ConfigModule } from "@nestjs/config";
 import { Reflector } from "@nestjs/core";
@@ -10,12 +12,13 @@ import { Test } from "@nestjs/testing";
 import { PrismaService } from "@auto-tm/db";
 import sharp from "sharp";
 import supertest from "supertest";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { GlobalErrorFilter } from "../../../common/error.filter";
 import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
 import { IDENTITY_CLOCK_PORT } from "../../identity/identity.public";
 import { DiagnosticsModule } from "../diagnostics.module";
 import { DIAGNOSTIC_RUNTIME } from "../domain/ports/DiagnosticIntakePort";
+import { DIAGNOSTIC_OBJECTS, type DiagnosticObjects } from "../domain/ports/DiagnosticObjects";
 import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
 import { cleanSuiteFixtures, defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
 
@@ -43,6 +46,8 @@ describe("diagnostic authoring and immutable audience release", () => {
     const reports = await db.diagnosticReportRecord.findMany({ where: { order: { centerId } }, orderBy: { createdAt: "desc" } });
     const evidence = await db.diagnosticEvidence.findMany({ where: { reportId: { in: reports.map(row => row.id) } } });
     for (const item of evidence) await objects.send(new DeleteObjectCommand({ Bucket: "diagnostic-test-private", Key: item.objectKey }));
+    const artifacts = await db.diagnosticPdfArtifact.findMany({ where: { reportId: { in: reports.map(row => row.id) } } });
+    for (const item of artifacts) await objects.send(new DeleteObjectCommand({ Bucket: "diagnostic-test-private", Key: item.objectKey }));
     await db.diagnosticPdfArtifact.deleteMany({ where: { reportId: { in: reports.map(row => row.id) } } });
     await db.diagnosticEvidence.deleteMany({ where: { id: { in: evidence.map(row => row.id) } } });
     // Corrections reference their predecessor, so retire leaves before roots.
@@ -166,6 +171,71 @@ describe("diagnostic authoring and immutable audience release", () => {
     }
     await db.session.delete({ where: { id: suite.id("reviewer-session") } });
     await get("reviewer", `reports/${report.id}/documents/tk`).expect(403);
+  });
+  /** Existing download safeguards, now verified over real PostgreSQL, HTTP and
+   * private S3 bytes. Only the storage port is wrapped to pause after real I/O. */
+  async function readyDocument(audience: "buyer_private" | "listing_public" = "buyer_private") {
+    const { report } = await draft(audience);
+    await post("technician", `reports/${report.id}/findings`, { expectedVersion: 0, finding: normal() }).expect(201);
+    await post("technician", `reports/${report.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
+    await post("reviewer", `reports/${report.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    const storage = app.get<DiagnosticObjects>(DIAGNOSTIC_OBJECTS);
+    const artifact = await db.diagnosticPdfArtifact.findFirstOrThrow({ where: { reportId: report.id, locale: "tk" } });
+    const bytes = await readFile(resolve(__dirname, "../../../../../../docs/evidence/issue-916/pdf/short-tk.pdf"));
+    await storage.put(artifact.objectKey, bytes, "application/pdf");
+    await db.diagnosticPdfArtifact.update({ where: { id: artifact.id }, data: { state: "ready", sizeBytes: bytes.byteLength, sha256: createHash("sha256").update(bytes).digest("hex"), verifiedAt: now } });
+    return { report, artifact, bytes, storage };
+  }
+  it("downloads exact verified PDF bytes privately and denies access after session revocation during storage I/O", async () => {
+    const { report, bytes, storage } = await readyDocument();
+    const downloaded = await get("buyer", `reports/${report.id}/documents/tk`).expect(200);
+    expect(downloaded.headers["content-type"]).toContain("application/pdf");
+    expect(downloaded.headers["cache-control"]).toContain("no-store");
+    expect(downloaded.headers["content-disposition"]).toBe("attachment; filename=inspection-report.pdf");
+    expect(Buffer.from(downloaded.body)).toEqual(bytes);
+    const read = storage.read.bind(storage);
+    const paused = vi.spyOn(storage, "read").mockImplementationOnce(async (...args) => {
+      const result = await read(...args);
+      await db.session.delete({ where: { id: suite.id("buyer-session") } });
+      return result;
+    });
+    try {
+      const denied = await get("buyer", `reports/${report.id}/documents/tk`).expect(403);
+      expect(denied.headers["content-type"]).not.toContain("application/pdf");
+      expect(denied.headers["cache-control"]).toContain("no-store");
+    } finally { paused.mockRestore(); }
+  });
+  it("withholds public PDF bytes when the report is withdrawn during real storage I/O", async () => {
+    const { report, bytes, storage } = await readyDocument("listing_public");
+    const path = `/api/v1/public-diagnostics/reports/${report.id}/documents/tk`;
+    const downloaded = await request.get(path).expect(200);
+    expect(Buffer.from(downloaded.body)).toEqual(bytes);
+    const read = storage.read.bind(storage);
+    const paused = vi.spyOn(storage, "read").mockImplementationOnce(async (...args) => {
+      const result = await read(...args);
+      await post("reviewer", `reports/${report.id}/transition`, { expectedVersion: 3, action: "withdraw", reason: "Synthetic withdrawal during download" }).expect(201);
+      return result;
+    });
+    try {
+      const denied = await request.get(path).expect(404);
+      expect(denied.headers["content-type"]).not.toContain("application/pdf");
+      expect(denied.headers["cache-control"]).toContain("no-store");
+      expect(JSON.stringify(denied.body)).not.toContain(report.id);
+    } finally { paused.mockRestore(); }
+  });
+  it("withholds downloaded bytes after the artifact generation epoch changes during storage I/O", async () => {
+    const { report, artifact, storage } = await readyDocument();
+    const read = storage.read.bind(storage);
+    const paused = vi.spyOn(storage, "read").mockImplementationOnce(async (...args) => {
+      const result = await read(...args);
+      await db.diagnosticPdfArtifact.update({ where: { id: artifact.id }, data: { epoch: randomUUID() } });
+      return result;
+    });
+    try {
+      const denied = await get("buyer", `reports/${report.id}/documents/tk`).expect(409);
+      expect(denied.body.code).toBe("DIAGNOSTIC_PDF_NOT_READY");
+      expect(denied.headers["content-type"]).not.toContain("application/pdf");
+    } finally { paused.mockRestore(); }
   });
   it("projects complete public findings only while the exact vehicle association remains eligible", async () => {
     const { report, order } = await draft("listing_public"); const finding = normal();
