@@ -34,7 +34,8 @@ describe("V1 owned video HTTP protocol", () => {
   afterAll(async () => { await app?.close(); });
   it("requires verified authentication and forbids client upload/key authority", async () => {
     const request = supertest(app.getHttpServer());
-    await request.post(url).send(body).expect(401);
+    const denied = await request.post(url).send(body).expect(401);
+    expect(denied.headers["cache-control"]).toBe("private, no-store");
     await request.post(url).set("authorization", `Bearer ${token}`).send({ ...body, uploadId: "arbitrary" }).expect(400);
   });
   it("exposes create, status, renewal, persisted pause/resume and processing completion on the agreed namespace", async () => {
