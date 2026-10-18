@@ -84,6 +84,8 @@ const messages: Record<string, [string, string]> = {
     "Hyzmat we goldaw",
     "Service and Support"
   ],
+  "Открыть очередь сервисов": ["Hyzmat ýüz tutmalaryny aç", "Open service inbox"],
+  "Выберите доступный раздел. Доступ определяется текущими полномочиями.": ["Elýeterli bölümi saýlaň. Giriş häzirki ygtyýarlyklara baglydyr.", "Choose an available section. Access follows current capabilities."],
   "Открыть назначенные осмотры": ["Bellenen barlaglary aç", "Open assigned inspections"],
   "Диагностика": [
     "Diagnostika",
