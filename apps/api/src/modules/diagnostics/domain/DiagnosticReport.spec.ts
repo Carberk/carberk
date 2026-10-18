@@ -70,3 +70,31 @@ it("records a new observation only against a new inspection order", () => {
  expect(next.state).toMatchObject({ observedAt: "2026-10-17T12:00:00.000Z", mileageKm: 120100, findings: [], audience: "listing_public", successorOf: "report" });
  expect(report.state.mileageKm).toBe(120000);
 });
+
+
+describe("pinned diagnostic scope", () => {
+ const scope = { checks: [{ id: "brakes", required: true, evidenceRequired: true, measurement: { unit: "mm", method: { tk: "Ölçeg", ru: "Измерение", en: "Measurement" } } }], panels: [{ id: "door", evidenceRequired: false }] };
+ const measured = { ...finding, measurement: { value: 2.5, unit: "mm", method: "Caliper", uncertainty: "±0.1 mm" }, kind: "observed_damage" as const, source: null };
+ it("refuses findings outside the immutable template", () => {
+  expect(() => new DiagnosticReport(base, scope).upsertFinding("tech", { ...measured, checkId: "invented" })).toThrow("REPORT_UNKNOWN_CHECK");
+ });
+ it("requires measurement units and method from the pinned check", () => {
+  expect(() => new DiagnosticReport(base, scope).upsertFinding("tech", finding)).toThrow("REPORT_MEASUREMENT_REQUIRED");
+  expect(() => new DiagnosticReport(base, scope).upsertFinding("tech", { ...measured, measurement: { ...measured.measurement, unit: "inch" } })).toThrow("REPORT_MEASUREMENT_INVALID");
+ });
+ it("cannot replace an explicit assessment using a new finding identity", () => {
+  const report = new DiagnosticReport(base, scope).upsertFinding("tech", measured);
+  expect(() => report.upsertFinding("tech", { ...measured, id: "new-finding" })).toThrow("REPORT_DUPLICATE_CHECK");
+ });
+ it("requires all body panels to be assessed rather than treating absent markers as normal", () => {
+  expect(() => new DiagnosticReport(base, scope).upsertFinding("tech", measured).submit("tech", ["brakes"])).toThrow("REPORT_UNASSESSED_REQUIRED");
+ });
+ it("requires attribution for confirmed history and panel-bound map locations", () => {
+  expect(() => new DiagnosticReport(base, scope).upsertFinding("tech", { ...measured, kind: "source_history" as const })).toThrow("REPORT_SOURCE_REQUIRED");
+  expect(() => new DiagnosticReport(base, scope).upsertFinding("tech", { ...measured, location: { view: "left" as const, panelId: "other", x: 0.5, y: 0.5 } })).toThrow("REPORT_LOCATION_INVALID");
+ });
+ it("keeps zero findings as an explicit normal panel assessment", () => {
+  const report = new DiagnosticReport(base, scope).upsertFinding("tech", measured).upsertFinding("tech", { id: "panel-1", checkId: "door", assessment: "normal", explanation: null, evidenceIds: [] });
+  expect(report.submit("tech", ["brakes"]).state.findings).toHaveLength(2);
+ });
+});
