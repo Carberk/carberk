@@ -21,3 +21,7 @@ The prior issue-280 drill was verified on 2026-09-05. Its historical success rem
 ## Current missing evidence
 
 Actual fresh inclusive Railway billing/projection and measured resource limits; a current consistent isolated DB/media recovery drill with deletion replay; independent watchdog death and collector outage in deployment; authorized alert receipt; native minimization/cache deletion/symbolication; resource saturation isolation; actual TLS/disk probes; and all TM provider/hardware/network/handler facts remain unproven. The software and successful fixture tests do not close #919 or #920 by themselves.
+
+## Current measured runtime evidence
+
+The repository retains `docs/evidence/issue-920/railway-runtime-20261018.json`, a sanitized read-only Railway query for 2026-10-18. It describes old-main staging and production environments, not this campaign candidate. Samples are idle 300-second metrics and do not prove load headroom, saturation isolation, inclusive billing, restore consistency, alert receipt or final resource limits. The separate usage readback records USD 13.8313 current project usage for the provider billing period; it excludes no inferred forecast and is not spending authorization. Workspace usage includes other projects and is excluded from Carberk billing claims.
