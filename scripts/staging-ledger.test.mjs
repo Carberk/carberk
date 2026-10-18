@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -64,6 +64,24 @@ test('reviewed additive schema is retained with exact checksums on current-main 
     { candidate: baseline },
   ]) assert.throws(() => evaluateSchemaPlan({ baseline, candidate: [...baseline, addition], main: baseline,
     candidateSchema: 'new', mainSchema: 'old', profile, ...change }), /schema|migration/i);
+});
+
+test('the assembled application schema can restore baseline code while retaining its exact campaign migrations', async () => {
+  const { evaluateSchemaPlan } = await import('./staging-schema.mjs');
+  const directory = new URL('../packages/db/prisma/migrations/', import.meta.url);
+  const names = (await readdir(directory)).filter(name => /^\d/.test(name)).sort();
+  const candidate = await Promise.all(names.map(async name => ({ name,
+    checksum: createHash('sha256').update(await readFile(new URL(`${name}/migration.sql`, directory))).digest('hex'),
+  })));
+  const baseline = candidate.filter(entry => entry.name < '20261015003500_listing_view_counts');
+  const baselineSchema = '3cf9a92dc50367112d7e41cfadaf9e3199e0000ef75a7181861c09ebe9d7e51d';
+  const candidateSchema = createHash('sha256').update(await readFile(new URL('../packages/db/prisma/schema.prisma', import.meta.url))).digest('hex');
+  const plan = evaluateSchemaPlan({ baseline, candidate, main: baseline, candidateSchema, mainSchema: baselineSchema });
+  assert.equal(plan.disposition, 'retained-additive');
+  assert.deepEqual(plan.migrations, candidate);
+  const restored = evaluateSchemaPlan({ baseline, candidate: baseline, main: baseline,
+    candidateSchema: baselineSchema, mainSchema: baselineSchema, retained: plan.migrations });
+  assert.deepEqual(restored.migrations, candidate);
 });
 
 
