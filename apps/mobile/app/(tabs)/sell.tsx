@@ -5,6 +5,8 @@ import { BackHandler, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ListingsSchemas, type WizardSchemas } from "@auto-tm/contracts";
 
+import { useMeasurementScreen } from "../../src/measurement/useMeasurementScreen";
+import { recordWizardStepResult } from "../../src/measurement/nativeMeasurement";
 import { inventoryCopy } from "../../src/business/inventoryCopy";
 import { useBusinessWorkspace } from "../../src/business/api";
 import { ApiError } from "../../src/api/client";
@@ -126,6 +128,7 @@ export default function SellScreen() {
     wizardMachineReducer,
     createInitialState(),
   );
+  useMeasurementScreen("sell", machineState.draftId && machineState.status === "step" ? {eventName:"wizard_step_opened",purpose:"product_improvement",payload:{draftId:machineState.draftId,step:machineState.currentStep}} : null);
   const [attemptedSteps, setAttemptedSteps] = useState<
     Partial<Record<WizardSchemas.WizardStep, boolean>>
   >({});
@@ -390,6 +393,7 @@ export default function SellScreen() {
         selection.kind === "none" ||
         (selection.kind === "pending" && publishPhoneError)
       ) {
+        if(machineState.draftId)recordWizardStepResult(machineState.draftId,machineState.currentStep,"expected_rejection");
         setAttemptedSteps((current) =>
           current.contact ? current : { ...current, contact: true },
         );
@@ -397,6 +401,7 @@ export default function SellScreen() {
       }
     }
     if (!ctx.canContinue) {
+      if(machineState.draftId)recordWizardStepResult(machineState.draftId,machineState.currentStep,"expected_rejection");
       setAttemptedSteps((current) =>
         current[machineState.currentStep]
           ? current
@@ -405,6 +410,7 @@ export default function SellScreen() {
       return;
     }
 
+    if(machineState.draftId)recordWizardStepResult(machineState.draftId,machineState.currentStep,"success");
     // Done on a step opened from Check returns there; Continue moves on.
     const advance = { type: ctx.editDetourActive ? "RETURN_TO_REVIEW" : "NEXT" } as const;
     dispatch(advance);
@@ -430,6 +436,7 @@ export default function SellScreen() {
       validatedSteps: machineState.validatedSteps,
     };
 
+    recordWizardStepResult(machineState.draftId,"review","success");
     dispatch({ type: "PUBLISH_START" });
 
     // Publish sends what the server holds, so the draft must be saved first. One

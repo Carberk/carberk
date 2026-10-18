@@ -1,3 +1,8 @@
+import { DIAGNOSTIC_DOCUMENTS_PORT } from "./domain/ports/DiagnosticDocumentsPort";
+import { DIAGNOSTIC_PUBLIC_PORT } from "./domain/ports/DiagnosticPublicPort";
+import { PrismaDiagnosticDocuments } from "./infrastructure/PrismaDiagnosticDocuments";
+import { PrismaDiagnosticPublic } from "./infrastructure/PrismaDiagnosticPublic";
+import { DiagnosticPublicController } from "./presentation/DiagnosticPublicController";
 import { DIAGNOSTIC_OBJECTS } from "./domain/ports/DiagnosticObjects";
 import { DIAGNOSTIC_EVIDENCE_PORT } from "./domain/ports/DiagnosticEvidencePort";
 import { DiagnosticReportAccess } from "./infrastructure/DiagnosticReportAccess";
@@ -16,7 +21,7 @@ import { PrismaDiagnosticIntake } from "./infrastructure/PrismaDiagnosticIntake"
 import { PrismaDiagnosticReports } from "./infrastructure/PrismaDiagnosticReports";
 import { PrismaModule } from "../../common/prisma.module";
 import { diagnosticRuntime } from "./infrastructure/diagnosticRuntime";
-@Module({ imports: [ConfigModule, PrismaModule, IdentityModule], controllers: [DiagnosticIntakeController, DiagnosticReportsController], providers: [DiagnosticAuthority, DiagnosticReportAccess, DiagnosticBinaryParser,
+@Module({ imports: [ConfigModule, PrismaModule, IdentityModule], controllers: [DiagnosticIntakeController, DiagnosticReportsController, DiagnosticPublicController], providers: [{ provide: DIAGNOSTIC_DOCUMENTS_PORT, useClass: PrismaDiagnosticDocuments }, { provide: DIAGNOSTIC_PUBLIC_PORT, useClass: PrismaDiagnosticPublic }, DiagnosticAuthority, DiagnosticReportAccess, DiagnosticBinaryParser,
   { provide: DIAGNOSTIC_OBJECTS, useClass: S3DiagnosticObjects },
   { provide: DIAGNOSTIC_EVIDENCE_PORT, useClass: PrismaDiagnosticEvidence },
   { provide: DIAGNOSTIC_REPORTS_PORT, useClass: PrismaDiagnosticReports },

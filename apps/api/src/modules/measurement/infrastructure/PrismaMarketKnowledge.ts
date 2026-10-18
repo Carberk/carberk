@@ -1,10 +1,12 @@
-import { createHash,randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 import type { Prisma, PrismaService } from "@auto-tm/db";
 import { z } from "zod";
 
 import type { StaffAuthorityPort, StaffSubject } from "../../identity/identity.public";
 import { deriveSyntheticMarketCells, qualifyAnonymousDataset, type AnonymousDataset, type KnowledgeSource } from "../domain/AnonymousMarketKnowledge";
+
+import { marketReleaseDigest } from "./MarketReleaseDigest";
 
 const text=z.object({summary:z.string().min(1)}).strict();
 const permission=z.object({status:z.enum(["permitted","unresolved","prohibited"])}).strict();
@@ -50,7 +52,7 @@ export class PrismaMarketKnowledge {
   const contents=data.safeParse(row.data),assessment=review.safeParse(row.review);
   if(!contents.success || !assessment.success || row.status!=="qualified") return {state:"quarantined" as const,reason:"schema"};
   const fixed=await tx.measurementState.findUnique({where:{key:`market_release:TM:${contents.data.release.period}`}});
-  const releasedDigest=createHash("sha256").update(JSON.stringify({cells:contents.data.cells,fences:[...fences].sort((a,b)=>a.sourceId.localeCompare(b.sourceId)).map(fence=>({id:fence.sourceId,version:fence.sourceVersion,epoch:fence.sourceEpoch})),epoch:row.epoch})).digest("hex");
+  const releasedDigest=marketReleaseDigest({cells:contents.data.cells,fences:[...fences].sort((a,b)=>a.sourceId.localeCompare(b.sourceId)).map(fence=>({id:fence.sourceId,version:fence.sourceVersion,epoch:fence.sourceEpoch})),epoch:row.epoch});
   if(fixed?.epoch!==releasedDigest || row.id!==`synthetic-tm-${contents.data.release.period}` || contents.data.cells.some(cell=>cell["period"]!==contents.data.release.period || typeof cell["observations"]!=="number" || cell["observations"]<10 || cell["observations"]%5!==0))return {state:"quarantined" as const,reason:"release"};
   const dataset:AnonymousDataset={id:row.id,version:row.version,epoch:row.epoch,derivationVersion:row.derivationVersion,
    ...contents.data,review:assessment.data,sourceFences:fences.map(fence=>({id:fence.sourceId,version:fence.sourceVersion,epoch:fence.sourceEpoch}))};
@@ -66,7 +68,7 @@ export class PrismaMarketKnowledge {
   if(derived.state!=="ready" || !derived.cells.length)throw new MarketKnowledgeDenied("No safe synthetic cells");
   const id=`synthetic-tm-${derived.period}`,releaseKey=`market_release:TM:${derived.period}`;
   const sourceFences=[...parsed.data.sourceFences].sort((a,b)=>a.id.localeCompare(b.id));
-  const digest=createHash("sha256").update(JSON.stringify({cells:derived.cells,fences:sourceFences,epoch:parsed.data.expectedEpoch})).digest("hex");
+  const digest=marketReleaseDigest({cells:derived.cells,fences:sourceFences,epoch:parsed.data.expectedEpoch});
   return this.prisma.$transaction(async tx=>{
    await this.authority.authorize({...subject,capability:"analytics.investigate"},tx);
    const collector=await tx.$queryRaw<{epoch:string}[]>`SELECT "epoch" FROM "measurement_state" WHERE "key"='collector' FOR SHARE`;
@@ -91,6 +93,28 @@ export class PrismaMarketKnowledge {
     expiresAt:expiry,data:{synthetic:true,destination:dataset.destination,release:{policy:"fixed-month-v1",period:derived.period,suppressedCells:derived.suppressedCells},cells:derived.cells},
     sources:{create:sourceFences.map(fence=>({sourceId:fence.id,sourceVersion:fence.version,sourceEpoch:fence.epoch}))}}});
    return this.current(tx,id);
+  });
+ }
+ /** Registry deletion is a retained source fence. Derived cells and known artifacts are invalidated atomically. */
+ async invalidateSource(subject:StaffSubject,id:string,input:unknown) {
+  const parsed=z.object({expectedEpoch:z.string().min(1),expectedVersion:z.number().int().positive(),action:z.enum(["delete","restrict"]),reason:z.string().trim().min(8).max(500)}).strict().safeParse(input);
+  if(!/^[A-Za-z0-9_-]{1,100}$/.test(id) || !parsed.success)throw new MarketKnowledgeDenied("Invalid source lifecycle request");
+  return this.prisma.$transaction(async tx=>{
+   await this.authority.authorize({...subject,capability:"analytics.investigate"},tx);
+   // Exclusive collector lock precedes source/dataset locks, while readers take its shared lock first.
+   const collector=await tx.$queryRaw<{epoch:string}[]>`SELECT "epoch" FROM "measurement_state" WHERE "key"='collector' FOR UPDATE`;
+   if(!this.epoch || parsed.data.expectedEpoch!==this.epoch || collector[0]?.epoch!==this.epoch)throw new MarketKnowledgeDenied("Stale source lifecycle epoch");
+   await tx.$queryRaw`SELECT "id" FROM "market_knowledge_sources" WHERE "id"=${id} FOR UPDATE`;
+   const source=await tx.marketKnowledgeSource.findUnique({where:{id}});
+   if(!source || source.epoch!==this.epoch || source.version!==parsed.data.expectedVersion || source.revokedAt)throw new MarketKnowledgeDenied("Stale source lifecycle version");
+   const links=await tx.marketKnowledgeDatasetSource.findMany({where:{sourceId:id},select:{datasetId:true},take:1001});
+   if(links.length>1000)throw new MarketKnowledgeDenied("Source lifecycle requires bounded operator batches");
+   const datasetIds=links.map(link=>link.datasetId),now=this.now();
+   await tx.marketKnowledgeSource.update({where:{id},data:{status:parsed.data.action==="delete"?"deleted":"restricted",version:{increment:1},revokedAt:now}});
+   await tx.marketKnowledgeDataset.updateMany({where:{id:{in:datasetIds}},data:{status:"invalidated",invalidatedAt:now,data:{}}});
+   await tx.measurementInvestigationExport.updateMany({where:{epoch:this.epoch,revokedAt:null,AND:[{scope:{path:["kind"],equals:"market_knowledge"}},{OR:datasetIds.map(datasetId=>({scope:{path:["datasetId"],equals:datasetId}}))}]},data:{revokedAt:now}});
+   await tx.auditLog.create({data:{actorId:subject.userId,action:`analytics.synthetic_research.source.${parsed.data.action}`,targetType:"market_knowledge_source",targetId:id,details:{reason:parsed.data.reason,expectedVersion:parsed.data.expectedVersion,newVersion:source.version+1,datasetIds}}});
+   return {id,version:source.version+1,state:"invalidated" as const};
   });
  }
  async list(subject:StaffSubject) {

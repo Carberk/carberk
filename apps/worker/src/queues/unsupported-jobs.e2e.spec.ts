@@ -4,7 +4,6 @@ import { Queue, Worker } from "bullmq";
 import { describe, expect, it } from "vitest";
 
 import { OrphanCleanupProcessor } from "./orphan-cleanup.processor";
-import { VideoTranscodeProcessor } from "./video-transcode.processor";
 
 const redisUrl = process.env["REDIS_URL"] ?? "";
 const FAILURE_WAIT_MS = 10_000;
@@ -12,7 +11,6 @@ const FAILURE_WAIT_MS = 10_000;
 // Each case owns its Redis prefix; it never consumes or clears production queues.
 describe.skipIf(redisUrl === "")("unsupported worker jobs — real Redis", () => {
   it.each([
-    ["video-transcode", () => new VideoTranscodeProcessor()],
     ["orphan-cleanup", () => new OrphanCleanupProcessor()],
   ] as const)("%s fails without completing or retrying", async (name, makeProcessor) => {
     const options = {

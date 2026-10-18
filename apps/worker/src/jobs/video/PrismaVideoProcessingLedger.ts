@@ -25,7 +25,11 @@ export class PrismaVideoProcessingLedger implements VideoProcessingLedger {
     if (!z.string().uuid().safeParse(id).success || !z.string().uuid().safeParse(token).success) return null;
     return this.transaction(async tx => {
       const context = await this.locked(tx, id);
-      if (!context || !this.current(context) || !["PENDING", "PROCESSING"].includes(context.work.state) || context.work.attempts >= 3 || context.work.nextAttemptAt > now || (context.work.leaseExpiresAt && context.work.leaseExpiresAt > now)) return null;
+      if (!context || !["PENDING", "PROCESSING"].includes(context.work.state) || context.work.nextAttemptAt > now || (context.work.leaseExpiresAt && context.work.leaseExpiresAt > now)) return null;
+      if (!this.current(context) || context.work.attempts >= 3) {
+        await this.retire(tx, context, now, context.work.attempts >= 3 ? "VIDEO_PROCESSING_EXHAUSTED" : "VIDEO_SUPERSEDED");
+        return null;
+      }
       const { session, work } = context;
       if (!session.completionFence || !session.sizeBytes || !session.sha256 || session.posterMs === null) return null;
       await tx.videoProcessWork.update({ where: { generationId: id }, data: { state: "PROCESSING", attempts: { increment: 1 }, leaseToken: token, leaseExpiresAt: new Date(now.getTime() + leaseMs) } });
@@ -60,7 +64,7 @@ export class PrismaVideoProcessingLedger implements VideoProcessingLedger {
     return this.transaction(async tx => {
       const context = await this.locked(tx, lease.generationId);
       if (!context || !this.owns(context, lease, now)) return false;
-      if (!this.current(context)) { await this.retire(tx, context, now); return false; }
+      if (!this.current(context)) { await this.retire(tx, context, now); await this.outcome(tx, context, lease, now, context.session.cancelledAt ? "cancelled" : "expected_rejection", "permission"); return false; }
       const plan = manifestSchema.safeParse(context.generation.manifest);
       if (!plan.success || this.inventory(plan.data.assets) !== this.inventory(manifest.assets)) return false;
       const poster = manifest.assets.find(asset => asset.purpose === "poster");
@@ -75,6 +79,7 @@ export class PrismaVideoProcessingLedger implements VideoProcessingLedger {
       await tx.videoGeneration.update({ where: { id: lease.generationId }, data: { state: "READY", readyAt: now, durationMs: facts.durationMs, posterKey: poster.key, sourceSha256: facts.sourceSha256, sourceWidth: facts.width, sourceHeight: facts.height } });
       await tx.videoUploadSession.update({ where: { id: session.id }, data: { state: "READY" } });
       await tx.videoProcessWork.update({ where: { generationId: lease.generationId }, data: { state: "COMPLETED", completedAt: now, leaseToken: null, leaseExpiresAt: null, lastError: null } });
+      await this.outcome(tx, context, lease, now, "success");
       return true;
     });
   }
@@ -83,9 +88,19 @@ export class PrismaVideoProcessingLedger implements VideoProcessingLedger {
       const context = await this.locked(tx, lease.generationId);
       if (!context || !this.owns(context, lease, now, false)) return;
       const lastError = /^VIDEO_[A-Z_]{1,70}$/.test(reason) ? reason : "VIDEO_PROCESSING_FAILED";
-      if (!this.current(context) || context.work.attempts >= 3) { await this.retire(tx, context, now, lastError); return; }
+      if (!this.current(context) || context.work.attempts >= 3) { await this.retire(tx, context, now, lastError); await this.outcome(tx, context, lease, now, context.session.cancelledAt ? "cancelled" : "technical_failure", lastError === "VIDEO_PROCESSING_TIMEOUT" ? "timeout" : "unknown"); return; }
       await tx.videoProcessWork.update({ where: { generationId: lease.generationId }, data: { state: "PENDING", leaseToken: null, leaseExpiresAt: null, lastError, nextAttemptAt: new Date(now.getTime() + 60_000 * 2 ** (context.work.attempts - 1)) } });
+      await this.outcome(tx, context, lease, now, "technical_failure", lastError === "VIDEO_PROCESSING_TIMEOUT" ? "timeout" : "unknown");
     });
+  }
+  private async outcome(tx: Prisma.TransactionClient, context: Current, lease: VideoProcessingLease, now: Date, result: "success" | "technical_failure" | "expected_rejection" | "cancelled", category?: "timeout" | "permission" | "unknown") {
+    if (!this.measurement) return;
+    const target = context.target.kind === "listing" ? { listingId: context.target.row.id } : { draftId: context.target.row.id };
+    const startedAt = (context.work.leaseExpiresAt?.getTime() ?? now.getTime() + leaseMs) - leaseMs;
+    try {
+      await this.measurement.capture(tx, context.session.userId, { version: 1, eventId: lease.leaseToken, occurredAt: now.toISOString(), context: this.measurement.context,
+        eventName: "video_processing_result", purpose: "product_reliability", payload: { ...target, jobId: lease.generationId, attemptId: lease.leaseToken, result, durationMs: Math.max(0, Math.min(86_400_000, now.getTime() - startedAt)), ...(category ? { category } : {}) } });
+    } catch { /* Source writes survive best-effort measurement failure. */ }
   }
   private transaction<T>(run: (tx: Prisma.TransactionClient) => Promise<T>) {
     return this.prisma.$transaction(async tx => { await tx.$executeRaw`SET LOCAL statement_timeout = '2000ms'`; return run(tx); }, { timeout: 5000, maxWait: 1500 });

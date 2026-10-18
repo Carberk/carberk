@@ -64,7 +64,7 @@ describe("diagnostic authoring and immutable audience release", () => {
     const testing = await Test.createTestingModule({ imports: [ConfigModule.forRoot({ isGlobal: true, load: [() => ({ DIAGNOSTIC_PRIVATE_BUCKET: "diagnostic-test-private" })] }),
       EventEmitterModule.forRoot(), bullTestRoot(), DiagnosticsModule, JwtModule.register({ global: true, secret: "synthetic-diagnostic-test" })] })
       .overrideProvider(IDENTITY_CLOCK_PORT).useValue({ now: () => now })
-      .overrideProvider(DIAGNOSTIC_RUNTIME).useValue({ now: () => now, id: randomUUID, syntheticAllowed: ({ userId }: { userId: string }) => people.some(who => suite.id(who) === userId) }).compile();
+      .overrideProvider(DIAGNOSTIC_RUNTIME).useValue({ now: () => now, id: randomUUID, publicSyntheticAllowed: () => true, syntheticAllowed: ({ userId }: { userId: string }) => people.some(who => suite.id(who) === userId) }).compile();
     app = testing.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
     db = app.get(PrismaService); jwt = app.get(JwtService);
     app.useGlobalGuards(new JwtAuthGuard(app.get(Reflector), jwt)); app.useGlobalFilters(new GlobalErrorFilter());
@@ -168,7 +168,7 @@ describe("diagnostic authoring and immutable audience release", () => {
     await get("reviewer", `reports/${report.id}/documents/tk`).expect(403);
   });
   it("projects complete public findings only while the exact vehicle association remains eligible", async () => {
-    const { report } = await draft("listing_public"); const finding = normal();
+    const { report, order } = await draft("listing_public"); const finding = normal();
     const publicGet = (path: string) => request.get(`/api/v1/public-diagnostics/${path}`);
     await publicGet(`reports/${report.id}`).expect(404);
     await publicGet(`listings/${suite.id("public-car")}`).expect(404);
@@ -185,6 +185,9 @@ describe("diagnostic authoring and immutable audience release", () => {
     await publicGet(`listings/${suite.id("public-car")}`).expect(404);
     await publicGet(`reports/${report.id}`).expect(404);
     await db.listing.update({ where: { id: suite.id("public-car") }, data: { year: null } });
+    await publicGet(`reports/${report.id}`).expect(404);
+    const currentOrder = await get("technician", `orders/${order.id}`).expect(200);
+    await post("technician", `orders/${order.id}/vehicle`, { expectedVersion: currentOrder.body.version, observedAt: now.toISOString(), mileageKm: 123000, method: "manual", manualReference: "Synthetic identity revalidation", vin: null }).expect(201);
     await publicGet(`reports/${report.id}`).expect(200);
     await post("reviewer", `reports/${report.id}/transition`, { expectedVersion: 3, action: "withdraw", reason: "Synthetic consent dispute" }).expect(201);
     await publicGet(`listings/${suite.id("public-car")}`).expect(404);

@@ -49,13 +49,13 @@ describe("authorized Improvement HTTP and real worker/PostgreSQL snapshots",()=>
    {provide:PrismaMarketKnowledge,inject:[PrismaService,STAFF_AUTHORITY_PORT],useFactory:(db:PrismaService,staff:StaffAuthorityPort)=>new PrismaMarketKnowledge(db,staff,epoch,()=>now)},
   ]}).compile();
   app=module.createNestApplication<NestFastifyApplication>(new FastifyAdapter());prisma=app.get(PrismaService);jwt=app.get(JwtService);authority=app.get(STAFF_AUTHORITY_PORT);
-  app.useGlobalGuards(new JwtAuthGuard(app.get(Reflector),jwt));await app.listen(0,"127.0.0.1");request=supertest(app.getHttpServer());
+  app.useGlobalGuards(new JwtAuthGuard(app.get(Reflector),jwt));await app.listen(0, "127.0.0.1");request=supertest(app.getHttpServer());
  });
  beforeEach(async()=>{
   await cleanup();now=new Date();clock=new Date(now);sequence=0;
   await seedSuiteCatalog(prisma,suite);
   for(const who of users) {
-   await prisma.user.create({data:{id:suite.id(who),role:who==="ordinary"?"admin":"buyer",phone:suite.phone(who)}});
+   await prisma.user.create({data:{id:suite.id(who),role:who==="ordinary"?"admin":"buyer",phone:suite.phone(who),phoneVerifiedAt:now}});
    await prisma.session.create({data:{id:suite.id(`${who}-session`),userId:suite.id(who),refreshTokenHash:suite.id(`${who}-refresh`),expiresAt:new Date(Date.now()+DAY),adminTotpExpiresAt:new Date(Date.now()+DAY)}});
   }
   await prisma.staffGrant.createMany({data:[{userId:suite.id("viewer"),capability:"analytics.aggregate"},{userId:suite.id("investigator"),capability:"analytics.aggregate"},{userId:suite.id("investigator"),capability:"analytics.investigate"}]});
@@ -138,7 +138,13 @@ describe("authorized Improvement HTTP and real worker/PostgreSQL snapshots",()=>
   expect((await get(`research/${datasetId}`).expect(200)).body).toMatchObject({state:"qualified",commercialDisclosure:false});
   const artifact=(await request.post(`/api/v1/improvement/research/${datasetId}/exports`).set("Authorization",`Bearer ${token("investigator")}`).send({reason:"Synthetic rights verification"}).expect(201)).body;
   await get(`research-artifacts/${artifact.id}`).expect(200);
-  await prisma.marketKnowledgeSource.update({where:{id:sourceId},data:{version:{increment:1},status:"revoked",revokedAt:now}});
+  const invalidate=(body:object,who="investigator")=>request.post(`/api/v1/improvement/research/sources/${sourceId}/invalidate`).set("Authorization",`Bearer ${token(who)}`).send(body);
+  const deletion={expectedEpoch:epoch,expectedVersion:1,action:"delete",reason:"Synthetic source deletion verification"};
+  await invalidate(deletion,"viewer").expect(403);
+  await invalidate({...deletion,expectedVersion:2}).expect(403);
+  await invalidate(deletion).expect(201);
+  expect(await prisma.marketKnowledgeDataset.findUnique({where:{id:datasetId},select:{status:true,data:true,invalidatedAt:true}})).toEqual({status:"invalidated",data:{},invalidatedAt:now});
+  expect((await prisma.measurementInvestigationExport.findUniqueOrThrow({where:{id:artifact.id}})).revokedAt).toEqual(now);
   expect((await get(`research/${datasetId}`).expect(200)).body.state).toBe("invalidated");
   await get(`research-artifacts/${artifact.id}`).expect(403);
   await admit(admission).expect(403);

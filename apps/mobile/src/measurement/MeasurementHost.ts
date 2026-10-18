@@ -37,6 +37,8 @@ export class MeasurementHost {
   void this.ports.writeQueue(null).catch(() => undefined);
  }
  currentVisit(): string | null { return this.session?.visitId ?? null; }
+ /** Scoped source correlation is available only for the currently admitted guest. */
+ currentGuestCapability():string|null {return this.session?.actorKey === "guest" ? this.session.guestCapability ?? null : null;}
  emit(event: MeasurementSchemas.MeasurementEvent): void {
   if (this.session && event.visitId === this.session.visitId) this.queue.emit(event);
  }

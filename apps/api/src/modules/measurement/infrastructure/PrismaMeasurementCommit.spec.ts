@@ -25,3 +25,9 @@ describe("PrismaMeasurementCommit savepoint isolation", () => {
     expect(result).toBe("disabled"); expect(tx.$executeRaw).not.toHaveBeenCalled(); expect(tx.$queryRaw).not.toHaveBeenCalled();
   });
 });
+
+it.each(["invalid", "", "2026-10-14T00:00:00Z"])("fails closed for invalid or expired supplied activation expiry %j", async (expiresAt) => {
+ const tx = txThatFailsOutbox();
+ const result = await new PrismaMeasurementCommit({...activation,environment:"staging"},"epoch-1",()=>new Date("2026-10-15T00:00:00Z"),expiresAt).capture(tx,"user-1",event);
+ expect(result).toBe("disabled");expect(tx.$executeRaw).not.toHaveBeenCalled();expect(tx.$queryRaw).not.toHaveBeenCalled();
+});

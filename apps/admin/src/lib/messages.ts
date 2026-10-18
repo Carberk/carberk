@@ -5,6 +5,7 @@ export function normalizeAdminLocale(value: unknown): AdminLocale {
 export const adminLocaleNames = { tk: "Türkmençe", ru: "Русский", en: "English" };
 export const adminLocaleTags = { tk: "tk-TM", ru: "ru-RU", en: "en-GB" };
 const messages: Record<string, [string, string]> = {
+  "Работоспособность": ["Ulgamyň işleýşi", "Operational health"],
   "Заблокирован": ["Bloklanan", "Suspended"],
   "Далее": ["Indiki", "Next"],
   "pending_review": ["Barlaga garaşylýar", "Pending review"],

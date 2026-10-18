@@ -19,6 +19,7 @@ const userId = "00000000-0000-4000-8000-000000000010";
 const body = { protocolVersion: 1, target: { kind: "listing", id: "00000000-0000-4000-8000-000000000011" }, prepared: { sizeBytes: 1000, sha256: "a".repeat(64) }, posterMs: 0, idempotencyKey: "first-video" };
 describe("V1 owned video HTTP protocol", () => {
   let app: NestFastifyApplication, token: string;
+  let request: ReturnType<typeof supertest>;
   const ledger = new InMemoryOwnedVideoSessionLedger();
   const storage = new InMemoryVideoObjectStorage();
   beforeAll(async () => {
@@ -30,16 +31,15 @@ describe("V1 owned video HTTP protocol", () => {
     app = module.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
     token = module.get(JwtService).sign({ sub: userId, sid: "auth-session" });
     await app.listen(0, "127.0.0.1");
+    request = supertest(app.getHttpServer());
   });
   afterAll(async () => { await app?.close(); });
   it("requires verified authentication and forbids client upload/key authority", async () => {
-    const request = supertest(app.getHttpServer());
     const denied = await request.post(url).send(body).expect(401);
     expect(denied.headers["cache-control"]).toBe("private, no-store");
     await request.post(url).set("authorization", `Bearer ${token}`).send({ ...body, uploadId: "arbitrary" }).expect(400);
   });
   it("exposes create, status, renewal, persisted pause/resume and processing completion on the agreed namespace", async () => {
-    const request = supertest(app.getHttpServer());
     const create = await request.post(url).set("authorization", `Bearer ${token}`).send(body).expect(201);
     expect(create.headers["cache-control"]).toBe("private, no-store");
     expect(create.body).toMatchObject({ version: 1, state: "UPLOADING", partBytes: 5242880, partCount: 1 });
@@ -56,7 +56,7 @@ describe("V1 owned video HTTP protocol", () => {
   it("keeps infrastructure failure retryable without exposing database details", async () => {
     ledger.reserveError = new Error("synthetic database adapter failure private-key");
     try {
-      const response = await supertest(app.getHttpServer()).post(url).set("authorization", `Bearer ${token}`).send(body).expect(503);
+      const response = await request.post(url).set("authorization", `Bearer ${token}`).send(body).expect(503);
       expect(response.body).toMatchObject({ code: "VIDEO_SERVICE_UNAVAILABLE", statusCode: 503 });
       expect(JSON.stringify(response.body)).not.toContain("private-key");
       expect(response.headers["cache-control"]).toBe("private, no-store");

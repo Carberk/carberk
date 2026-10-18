@@ -50,7 +50,7 @@ export const MeasurementEventSchema = z.discriminatedUnion("eventName", [
   z.object({ ...envelope, ...product, eventName: z.literal("conversation_created"), payload: z.object({ conversationId: id, listingId: id }).strict() }).strict(),
   z.object({ ...envelope, ...product, eventName: z.literal("first_buyer_message_accepted"), payload: z.object({ conversationId: id, listingId: id, messageId: id }).strict() }).strict(),
   z.object({ ...envelope, ...product, eventName: z.literal("seller_first_reply"), payload: z.object({ conversationId: id, listingId: id, firstBuyerMessageId: id, replyMessageId: id, elapsedMs: z.number().int().min(0).max(90 * 86_400_000) }).strict() }).strict(),
-  z.object({ ...envelope, ...reliability, eventName: z.literal("video_processing_result"), payload: z.object({ listingId: id, jobId: id, ...outcome }).strict() }).strict(),
+  z.object({ ...envelope, ...reliability, eventName: z.literal("video_processing_result"), payload: z.union([z.object({ listingId: id, jobId: id, ...outcome }).strict(), z.object({ draftId: id, jobId: id, ...outcome }).strict()]) }).strict(),
   z.object({ ...envelope, ...reliability, eventName: z.literal("video_playback_result"), payload: z.object({ listingId: id, playbackId: id, ...outcome }).strict() }).strict(),
 ]);
 export type MeasurementEvent = z.infer<typeof MeasurementEventSchema>;

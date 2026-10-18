@@ -51,3 +51,14 @@ describe("fixed synthetic monthly releases",()=>{
   expect(deriveSyntheticMarketCells([dataset.cells[0],{...dataset.cells[0],period:"2026-11"}])).toEqual({state:"quarantined"});
  });
 });
+
+it("requires a separate documented synthetic demographic purpose, basis, notice and personal lifecycle",()=>{
+ const demographic={...dataset,cells:[{...dataset.cells[0],ageBand:"25_34",demographicSource:"self_reported_synthetic"}]};
+ expect(qualifyAnonymousDataset(demographic,[source],{epoch:"current",now})).toMatchObject({state:"quarantined",reason:"rights"});
+ const policy={purpose:"synthetic_demographic_research",basis:"synthetic_fixture",notice:"synthetic_fixture_documented",personalLifecycle:"no_personal_records"};
+ expect(qualifyAnonymousDataset(demographic,[{...source,restrictions:{...source.restrictions,demographicPolicy:policy}}],{epoch:"current",now})).toMatchObject({state:"qualified"});
+ for(const field of Object.keys(policy)){
+  const incomplete=Object.fromEntries(Object.entries(policy).filter(([key])=>key!==field));
+  expect(qualifyAnonymousDataset(demographic,[{...source,restrictions:{...source.restrictions,demographicPolicy:incomplete}}],{epoch:"current",now})).toMatchObject({state:"quarantined",reason:"rights"});
+ }
+});

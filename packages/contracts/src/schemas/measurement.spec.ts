@@ -35,6 +35,14 @@ describe("versioned first-party event dictionary", () => {
   expect(MeasurementEventSchema.safeParse(transport).success).toBe(true);
   expect(MeasurementEventSchema.safeParse({ ...transport, payload: { ...transport.payload, result: "success" } }).success).toBe(false);
  });
+ it("records processing for exactly one real Listing or Draft without inventing ownership", () => {
+  const payload = { jobId: event.eventId, attemptId: event.eventId, result: "success", durationMs: 1000 };
+  const processing = { ...event, eventName: "video_processing_result", purpose: "product_reliability", context: { ...event.context, platform: "server" } };
+  expect(MeasurementEventSchema.safeParse({ ...processing, payload: { ...payload, listingId: event.payload.listingId } }).success).toBe(true);
+  expect(MeasurementEventSchema.safeParse({ ...processing, payload: { ...payload, draftId: event.payload.listingId } }).success).toBe(true);
+  expect(MeasurementEventSchema.safeParse({ ...processing, payload }).success).toBe(false);
+  expect(MeasurementEventSchema.safeParse({ ...processing, payload: { ...payload, listingId: event.payload.listingId, draftId: event.payload.listingId } }).success).toBe(false);
+ });
  it("rejects impossible outcome fields, noncanonical wizard steps and oversized batches", () => {
   expect(MeasurementEventSchema.safeParse({ ...event, eventName: "call_intent", payload: { listingId: event.payload.listingId, completed: true } }).success).toBe(false);
   expect(MeasurementEventSchema.safeParse({ ...event, eventName: "wizard_step_opened", payload: { draftId: event.eventId, step: "entered secret" } }).success).toBe(false);

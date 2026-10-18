@@ -47,7 +47,7 @@ export class DiagnosticArtifactWorker {
   }
   private async retire(tx: Tx, artifact: Artifact) {
     await tx.diagnosticPdfArtifact.updateMany({ where: { id: artifact.id, epoch: artifact.epoch },
-      data: { state: "retired", epoch: this.runtime.id(), cleanupRequestedAt: this.runtime.now() } });
+      data: { state: "cleanup_pending", epoch: this.runtime.id(), cleanupRequestedAt: this.runtime.now() } });
   }
   async generate(id: string): Promise<boolean> {
     if (!this.runtime.enabled()) return false;
@@ -128,13 +128,39 @@ export class DiagnosticArtifactWorker {
     if (failed) throw new Error("DIAGNOSTIC_ARTIFACT_RETRY");
   }
 
+  private async expireUnattached(now: Date): Promise<void> {
+    // Only unreferenced temporary uploads expire. A finding in any revision,
+    // including an immutable predecessor, keeps its exact evidence bytes.
+    const cutoff = new Date(now.getTime() - 86400_000);
+    const candidates = await this.db.$queryRaw<{ id: string; reportId: string; orderId: string; epoch: string }[]>`
+      SELECT e.id, e."reportId", r."orderId", e.epoch FROM diagnostic_evidence e
+      JOIN diagnostic_reports r ON r.id=e."reportId"
+      WHERE e.state='verified' AND e."cleanupRequestedAt" IS NULL AND e."verifiedAt"<=${cutoff}
+      AND NOT EXISTS (SELECT 1 FROM diagnostic_reports refs,
+        LATERAL jsonb_array_elements(COALESCE(refs.snapshot->'report'->'findings',refs.state->'findings','[]'::jsonb)) finding
+        WHERE refs."orderId"=r."orderId" AND (finding->'evidenceIds') ? e.id)
+      ORDER BY e."verifiedAt", e.id LIMIT 100`;
+    for (const item of candidates) await this.db.$transaction(async tx => {
+      // The same order/report lock order used by authoring fences late attachment.
+      await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${item.orderId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${item.reportId} FOR UPDATE`;
+      const referenced = await tx.$queryRaw<{ id: string }[]>`
+        SELECT refs.id FROM diagnostic_reports refs,
+        LATERAL jsonb_array_elements(COALESCE(refs.snapshot->'report'->'findings',refs.state->'findings','[]'::jsonb)) finding
+        WHERE refs."orderId"=${item.orderId} AND (finding->'evidenceIds') ? ${item.id} LIMIT 1`;
+      if (referenced.length) return;
+      await tx.diagnosticEvidence.updateMany({ where: { id: item.id, epoch: item.epoch, state: "verified", cleanupRequestedAt: null, verifiedAt: { lte: cutoff } }, data: { state: "cleanup_pending", cleanupRequestedAt: now } });
+    });
+  }
+
   async cleanup(): Promise<number> {
     if (!this.runtime.enabled()) return 0;
     const now = this.runtime.now(); let completed = 0;
+    await this.expireUnattached(now);
     // Erasure fences access before network cleanup. Active reports have no blanket purge.
     const erased = await this.db.diagnosticReportRecord.findMany({ where: { AND: [{ OR: [{ erasedAt: { not: null } }, { order: { erasedAt: { not: null } } }, { audience: "buyer_private", order: { commissionerId: null } }] }, { OR: [{ artifacts: { some: { cleanupRequestedAt: null } } }, { evidence: { some: { cleanupRequestedAt: null } } }] }] }, orderBy: { id: "asc" }, take: 100 });
     for (const report of erased) {
-      await this.db.diagnosticPdfArtifact.updateMany({ where: { reportId: report.id, cleanupRequestedAt: null }, data: { state: "retired", cleanupRequestedAt: now } });
+      await this.db.diagnosticPdfArtifact.updateMany({ where: { reportId: report.id, cleanupRequestedAt: null }, data: { state: "cleanup_pending", cleanupRequestedAt: now } });
       await this.db.diagnosticEvidence.updateMany({ where: { reportId: report.id, cleanupRequestedAt: null }, data: { state: "cleanup_pending", cleanupRequestedAt: now } });
     }
     // An unfinished staging attempt is temporary upload data, not a retained report.
@@ -144,11 +170,11 @@ export class DiagnosticArtifactWorker {
     for (const item of artifacts) {
       if (item.objectKey !== `diagnostic-pdf/${item.reportId}/${item.id}.pdf`) throw new Error("DIAGNOSTIC_CLEANUP_INVALID");
       const epoch = this.runtime.id();
-      const claim = await this.db.diagnosticPdfArtifact.updateMany({ where: { id: item.id, epoch: item.epoch, cleanupRequestedAt: { not: null }, OR: [{ leaseUntil: null }, { leaseUntil: { lte: now } }] }, data: { epoch, state: "retired", leaseUntil: leaseEnd(now) } });
+      const claim = await this.db.diagnosticPdfArtifact.updateMany({ where: { id: item.id, epoch: item.epoch, cleanupRequestedAt: { not: null }, OR: [{ leaseUntil: null }, { leaseUntil: { lte: now } }] }, data: { epoch, state: "cleanup_pending", leaseUntil: leaseEnd(now) } });
       if (!claim.count) continue;
       try {
         await this.objects.deleteAndVerify([item.objectKey]);
-        completed += (await this.db.diagnosticPdfArtifact.updateMany({ where: { id: item.id, epoch, state: "retired" }, data: { cleanupCompletedAt: this.runtime.now(), leaseUntil: null, failureCode: null } })).count;
+        completed += (await this.db.diagnosticPdfArtifact.updateMany({ where: { id: item.id, epoch, state: "cleanup_pending" }, data: { state: "removed", cleanupCompletedAt: this.runtime.now(), leaseUntil: null, failureCode: null } })).count;
       } catch {
         await this.db.diagnosticPdfArtifact.updateMany({ where: { id: item.id, epoch }, data: { failureCode: "cleanup_storage", leaseUntil: new Date(now.getTime() + 60_000) } });
         throw new Error("DIAGNOSTIC_CLEANUP_RETRY");

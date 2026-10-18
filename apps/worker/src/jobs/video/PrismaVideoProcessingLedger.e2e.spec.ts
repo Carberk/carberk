@@ -1,9 +1,22 @@
 import { randomUUID } from "node:crypto";
 
 import type { MeasurementSchemas } from "@auto-tm/contracts";
+import { ConfigService } from "@nestjs/config";
+import type { S3Client } from "@aws-sdk/client-s3";
+import { Queue, Worker } from "bullmq";
 import { PrismaService } from "@auto-tm/db";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { EnvSchema, type Env } from "../../env.schema";
+import { VideoTranscodeProcessor } from "../../queues/video-transcode.processor";
+
+import { ProcessPreparedVideo } from "./ProcessPreparedVideo";
+import { CleanVideo } from "./CleanVideo";
+import { PrismaVideoCleanupLedger } from "./PrismaVideoCleanupLedger";
+import { S3VideoProcessingObjects } from "./S3VideoProcessingObjects";
+import { S3VideoCleanupObjects } from "./S3VideoCleanupObjects";
+import { FFmpegVideoProcessor } from "./FFmpegVideoProcessor";
+import { InMemoryS3VideoTransport } from "./testing/InMemoryS3VideoTransport";
 import { PrismaVideoProcessingLedger } from "./PrismaVideoProcessingLedger";
 import type { VideoProcessingFacts, VideoPublishedAsset } from "./VideoProcessingPorts";
 
@@ -12,7 +25,7 @@ const hosted = process.env["GITHUB_ACTIONS"] === "true" && /^postgres(?:ql)?:\/\
 const now = new Date("2000-01-02T00:00:00Z");
 describe.skipIf(!hosted)("video processing durable fences on disposable PostgreSQL", () => {
   let db: PrismaService, ledger: PrismaVideoProcessingLedger;
-  const userId = randomUUID(), listingId = randomUUID();
+  const userId = randomUUID(), listingId = randomUUID(), draftId = randomUUID();
   const catalog = { brandId: randomUUID(), modelId: randomUUID(), regionId: randomUUID(), cityId: randomUUID() };
   const sessions: string[] = [], uploads: string[] = [];
   let eligible = true;
@@ -25,11 +38,13 @@ describe.skipIf(!hosted)("video processing durable fences on disposable PostgreS
     await db.region.create({ data: { id: catalog.regionId, slug: `${slug}-region`, ...names } });
     await db.city.create({ data: { id: catalog.cityId, regionId: catalog.regionId, slug: `${slug}-city`, ...names } });
     await db.user.create({ data: { id: userId } });
+    await db.listingDraft.create({ data: { id: draftId, userId, payload: {} } });
     await db.listing.create({ data: { id: listingId, sellerId: userId, status: "active", brandId: catalog.brandId, modelId: catalog.modelId, cityId: catalog.cityId, priceAmount: 100000, priceCurrency: "TMT" } });
   });
   beforeEach(async () => {
     eligible = true; outcomes.length = 0;
     await db.listing.update({ where: { id: listingId }, data: { activeVideoGenerationId: null, pendingVideoGenerationId: null, activeVideoRevision: 0 } });
+    await db.videoGrant.deleteMany({ where: { generationId: { in: sessions } } });
     await db.videoProcessWork.deleteMany({ where: { generationId: { in: sessions } } });
     await db.videoCleanupWork.deleteMany({ where: { uploadId: { in: uploads } } });
     await db.videoGeneration.deleteMany({ where: { id: { in: sessions } } });
@@ -39,6 +54,7 @@ describe.skipIf(!hosted)("video processing durable fences on disposable PostgreS
   afterAll(async () => {
     if (!db) return;
     await db.listing.deleteMany({ where: { id: listingId } });
+    await db.videoGrant.deleteMany({ where: { generationId: { in: sessions } } });
     await db.videoProcessWork.deleteMany({ where: { generationId: { in: sessions } } });
     await db.videoCleanupWork.deleteMany({ where: { uploadId: { in: uploads } } });
     await db.videoGeneration.deleteMany({ where: { id: { in: sessions } } });
@@ -48,14 +64,14 @@ describe.skipIf(!hosted)("video processing durable fences on disposable PostgreS
     await db.model.deleteMany({ where: { id: catalog.modelId } }); await db.brand.deleteMany({ where: { id: catalog.brandId } });
     await db.onModuleDestroy();
   });
-  async function prepared() {
+  async function prepared(revision = 1) {
     const id = randomUUID(), uploadId = randomUUID(), completionFence = randomUUID(); sessions.push(id); uploads.push(uploadId);
     const sourceKey = `video/v1/${uploadId}/${id}/source.mp4`;
     await db.mediaUpload.create({ data: { id: uploadId, userId, key: sourceKey, kind: "video", contentType: "video/mp4", sizeBytes: 1000, state: "PREPARING", writeProtocol: "video-v1", objectKeys: [sourceKey], claimTargetType: "video_session", claimTargetId: id, claimToken: id, claimDeadline: new Date("2000-01-09T00:00:00Z") } });
-    await db.videoUploadSession.create({ data: { id, uploadId, userId, listingId, protocolVersion: 1, targetKind: "listing", targetId: listingId, targetRevision: 1, state: "PROCESSING", completionFence, completedAt: now, sourceKey, sizeBytes: 1000, sha256: "a".repeat(64), posterMs: 0, expiresAt: new Date("2000-01-09T00:00:00Z") } });
-    await db.videoGeneration.create({ data: { id, sessionId: id, uploadId, listingId, state: "PROCESSING", targetRevision: 1, completionFence, processingVersion: "ffmpeg-debian-5.1.9-v1" } });
-    await db.videoProcessWork.create({ data: { generationId: id, sessionId: id, uploadId, completionFence, targetRevision: 1, processingVersion: "ffmpeg-debian-5.1.9-v1", nextAttemptAt: now } });
-    await db.listing.update({ where: { id: listingId }, data: { pendingVideoGenerationId: id, activeVideoRevision: 1 } });
+    await db.videoUploadSession.create({ data: { id, uploadId, userId, listingId, protocolVersion: 1, targetKind: "listing", targetId: listingId, targetRevision: revision, state: "PROCESSING", completionFence, completedAt: now, sourceKey, sizeBytes: 1000, sha256: "a".repeat(64), posterMs: 0, expiresAt: new Date("2000-01-09T00:00:00Z") } });
+    await db.videoGeneration.create({ data: { id, sessionId: id, uploadId, listingId, state: "PROCESSING", targetRevision: revision, completionFence, processingVersion: "ffmpeg-debian-5.1.9-v1" } });
+    await db.videoProcessWork.create({ data: { generationId: id, sessionId: id, uploadId, completionFence, targetRevision: revision, processingVersion: "ffmpeg-debian-5.1.9-v1", nextAttemptAt: now } });
+    await db.listing.update({ where: { id: listingId }, data: { pendingVideoGenerationId: id, activeVideoRevision: revision } });
     const assets: VideoPublishedAsset[] = [
       { path: "master.m3u8", key: `video/v1/${uploadId}/${id}/master.m3u8`, sizeBytes: 100, sha256: "b".repeat(64), purpose: "playback", contentType: "application/vnd.apple.mpegurl" },
       { path: "poster.jpg", key: `video/v1/${uploadId}/${id}/poster.jpg`, sizeBytes: 100, sha256: "c".repeat(64), purpose: "poster", contentType: "image/jpeg" },
@@ -90,6 +106,63 @@ describe.skipIf(!hosted)("video processing durable fences on disposable PostgreS
     const cleanup = await db.videoCleanupWork.findUniqueOrThrow({ where: { id: `session:${row.id}` } });
     expect(cleanup.objectKeys.sort()).toEqual(row.assets.map(asset => asset.key).sort());
   });
+  it("retires exhausted crashed work after its final lease instead of rescheduling it forever", async () => {
+    const row = await prepared();
+    await db.videoProcessWork.update({ where: { generationId: row.id }, data: { state: "PROCESSING", attempts: 3, leaseToken: randomUUID(), leaseExpiresAt: now } });
+    expect(await ledger.claim(row.id, now, randomUUID())).toBeNull();
+    expect((await db.videoGeneration.findUniqueOrThrow({ where: { id: row.id } })).state).toBe("RETIRED");
+    expect(await db.videoCleanupWork.findUniqueOrThrow({ where: { id: `session:${row.id}` } })).toMatchObject({ state: "PENDING", sourceKey: `video/v1/${row.uploadId}/${row.id}/source.mp4` });
+  });
+  it("keeps the previous ready video public until replacement adoption and revokes its grants atomically", async () => {
+    const first = await prepared(), oldLease = await ledger.claim(first.id, now, randomUUID()); expect(oldLease).not.toBeNull(); if (!oldLease) return;
+    await ledger.plan(oldLease, first.assets, now); await ledger.adopt(oldLease, first.facts, now);
+    const grantId = randomUUID();
+    await db.videoGrant.create({ data: { id: grantId, secretHash: randomUUID(), listingId, generationId: first.id, purpose: "playback", expiresAt: new Date("2000-01-02T01:00:00Z") } });
+    const second = await prepared(2), newLease = await ledger.claim(second.id, now, randomUUID()); expect(newLease).not.toBeNull(); if (!newLease) return;
+    expect((await db.listing.findUniqueOrThrow({ where: { id: listingId } })).activeVideoGenerationId).toBe(first.id);
+    await ledger.plan(newLease, second.assets, now);
+    expect(await ledger.adopt(newLease, second.facts, now)).toBe(true);
+    expect((await db.listing.findUniqueOrThrow({ where: { id: listingId } })).activeVideoGenerationId).toBe(second.id);
+    expect((await db.videoGrant.findUniqueOrThrow({ where: { id: grantId } })).revokedAt).toEqual(now);
+    expect((await db.mediaUpload.findUniqueOrThrow({ where: { id: first.uploadId } })).state).toBe("RETIRED");
+    expect((await db.videoCleanupWork.findUniqueOrThrow({ where: { id: `session:${first.id}` } })).state).toBe("PENDING");
+  });
+  it("makes prepared draft video ready privately while preserving its publication claim", async () => {
+    const row = await prepared();
+    await db.listing.update({ where: { id: listingId }, data: { pendingVideoGenerationId: null } });
+    await db.videoUploadSession.update({ where: { id: row.id }, data: { targetKind: "draft", targetId: draftId, listingId: null } });
+    await db.videoGeneration.update({ where: { id: row.id }, data: { listingId: draftId } });
+    const lease = await ledger.claim(row.id, now, randomUUID()); expect(lease).not.toBeNull(); if (!lease) return;
+    await ledger.plan(lease, row.assets, now);
+    expect(await ledger.adopt(lease, row.facts, now)).toBe(true);
+    expect((await db.videoGeneration.findUniqueOrThrow({ where: { id: row.id } })).state).toBe("READY");
+    expect(outcomes).toEqual([expect.objectContaining({ eventName: "video_processing_result", payload: { draftId, jobId: row.id, attemptId: lease.leaseToken, result: "success", durationMs: 0 } })]);
+    expect(await db.mediaUpload.findUniqueOrThrow({ where: { id: row.uploadId } })).toMatchObject({ state: "PREPARING", claimTargetType: "video_session", claimToken: row.id });
+    expect((await db.listing.findUniqueOrThrow({ where: { id: listingId } })).activeVideoGenerationId).toBeNull();
+  });
+  it("dispatches a real Redis generation job through current durable authority and records storage failure for retry", async () => {
+    const row = await prepared(), redisUrl = process.env["REDIS_URL"];
+    if (!redisUrl) throw new Error("Hosted video dispatch requires disposable Redis");
+    const options = { connection: { url: redisUrl }, prefix: `test-video-dispatch-${randomUUID()}` };
+    const queue = new Queue("video-transcode", options);
+    const transport = new InMemoryS3VideoTransport() as unknown as S3Client;
+    const processing = new ProcessPreparedVideo(ledger, new S3VideoProcessingObjects(transport, "private-video"), new FFmpegVideoProcessor(), () => now, randomUUID);
+    const cleanup = new CleanVideo(new PrismaVideoCleanupLedger(db), new S3VideoCleanupObjects(transport, "private-video"), () => now, randomUUID);
+    const config = new ConfigService<Env, true>(EnvSchema.parse({ DATABASE_URL: databaseUrl, REDIS_URL: redisUrl, MINIO_ENDPOINT: "http://localhost:9000", MINIO_ACCESS_KEY: "synthetic", MINIO_SECRET_KEY: "synthetic", VIDEO_PROCESSING_ENABLED: "true" }));
+    const processor = new VideoTranscodeProcessor(processing, cleanup, db, config, queue);
+    const worker = new Worker("video-transcode", job => processor.process(job), options);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const completed = new Promise<void>((resolve, reject) => {
+      timer = setTimeout(() => reject(new Error("Video dispatch did not finish")), 10_000);
+      worker.once("completed", () => resolve()); worker.once("failed", (_job, error) => reject(error));
+    });
+    completed.catch(() => undefined);
+    try {
+      await worker.waitUntilReady(); await queue.add("process-generation", { generationId: row.id }); await completed;
+      expect(await db.videoProcessWork.findUniqueOrThrow({ where: { generationId: row.id } })).toMatchObject({ state: "PENDING", attempts: 1, lastError: "VIDEO_PROCESSING_FAILED", nextAttemptAt: new Date("2000-01-02T00:01:00Z") });
+      expect((await db.listing.findUniqueOrThrow({ where: { id: listingId } })).activeVideoGenerationId).toBeNull();
+    } finally { if (timer) clearTimeout(timer); await worker.close(); await queue.obliterate({ force: true }); await queue.close(); }
+  }, 15_000);
   it("records only committed processing outcomes without media or credential content", async () => {
     const row = await prepared(), lease = await ledger.claim(row.id, now, randomUUID()); expect(lease).not.toBeNull(); if (!lease) return;
     expect(outcomes).toEqual([]);

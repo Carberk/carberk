@@ -132,7 +132,7 @@ export class VideoTransfer {
     this.stopped = true; this.controller?.abort();
     await this.writes;
     const record = await this.device.load();
-    if (!record || record.state === "PROCESSING" || record.state === "CANCELLED") return;
+    if (!record || record.state === "CANCELLED" || (record.state === "PROCESSING" && state === "PAUSED")) return;
     await this.owner(record);
     await this.save({ ...record, state });
     if (!record.sessionId) return;
