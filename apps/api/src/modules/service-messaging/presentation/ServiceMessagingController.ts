@@ -44,6 +44,19 @@ export class ServiceMessagingController {
  }
  @Post("conversations/:id/messages") @Header("Cache-Control", "no-store, private")
  send(@Req() req: ServiceRequest, @Param("id") id: string, @Body() body: unknown) { return this.run(async () => { const message = await this.services.send(this.subject(req), parse(uuid, id), parse(ServiceMessagingSchemas.ServiceSendSchema, body)); if (message.visibility === "customer") this.events.emit("service.changed", id); return message; }); }
+ @Get("conversations/:id/history/reports") @Header("Cache-Control", "no-store, private")
+ historyReports(@Req() req: ServiceRequest, @Param("id") id: string) { return this.run(() => this.services.historyReports(this.subject(req), parse(uuid, id))); }
+ @Post("conversations/:id/history/artifacts") @Header("Cache-Control", "no-store, private")
+ historyArtifactCommand(@Req() req: ServiceRequest, @Param("id") id: string, @Body() body: unknown) { return this.run(async () => { await this.services.historyArtifactCommand(this.subject(req), parse(uuid, id), parse(ServiceMessagingSchemas.HistoryArtifactCommandSchema, body)); this.events.emit("service.changed", id); return { ok: true }; }); }
+ @Post("conversations/:id/history/artifacts/:artifactId/bytes") @Header("Cache-Control", "no-store, private")
+ historyArtifactUpload(@Req() req: ServiceRequest, @Param("id") id: string, @Param("artifactId") artifactId: string, @Body() body: unknown) { if (!(body instanceof Uint8Array)) throw new BadRequestException(); return this.run(async () => { await this.services.historyArtifactUpload(this.subject(req), parse(uuid, id), parse(uuid, artifactId), body); return { ok: true }; }); }
+ @Get("conversations/:id/history/artifacts/:artifactId")
+ async historyReportFile(@Req() req: ServiceRequest, @Param("id") id: string, @Param("artifactId") artifactId: string, @Res() reply: FastifyReply) {
+  reply.header("Cache-Control", "no-store, private").header("X-Content-Type-Options", "nosniff");
+  const file = await this.run(() => this.services.historyReportFile(this.subject(req), parse(uuid, id), parse(uuid, artifactId)));
+  reply.header("Content-Type", "application/pdf").header("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(file.filename)}`);
+  return reply.send(Buffer.from(file.bytes));
+ }
  @Get("conversations/:id/history") @Header("Cache-Control", "no-store, private")
  historySnapshot(@Req() req: ServiceRequest, @Param("id") id: string) { return this.run(() => this.services.historySnapshot(this.subject(req), parse(uuid, id))); }
  @Post("conversations/:id/history") @Header("Cache-Control", "no-store, private")

@@ -58,6 +58,18 @@ export class ExpireServiceContent {
     attachmentsRetired++;
    });
   }
+  const artifactWork = await this.db.historyArtifactCleanup.findMany({ where: { completedAt: null }, orderBy: { requestedAt: "asc" }, take: 100 });
+  for (const work of artifactWork) {
+   await this.db.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM history_artifacts WHERE id=${work.artifactId} FOR UPDATE`;
+    const artifact = await tx.historyArtifact.findUnique({ where: { id: work.artifactId } });
+    const hold = (artifact?.rights as { hold?: { until?: string } | null } | undefined)?.hold;
+    if (!artifact || artifact.state !== "restricted" || !artifact.restrictedAt || artifact.objectKey !== work.objectKey || artifact.sha256 !== work.sha256 || work.objectKey !== `history-artifacts/${artifact.id}/${artifact.sha256}` || (hold?.until && new Date(hold.until) > now)) return;
+    await this.objects.deleteAndVerify([work.objectKey]);
+    await tx.historyArtifact.update({ where: { id: artifact.id }, data: { state: "removed", removedAt: now, vin: null, provenance: null, acquiredForOrderId: null, sourceListingId: null, verifiedById: null } });
+    await tx.historyArtifactCleanup.updateMany({ where: { artifactId: work.artifactId, epoch: work.epoch, completedAt: null }, data: { completedAt: now } });
+   }, { timeout: 20000 });
+  }
   const pending = await this.db.serviceErasureFence.findMany({ where: { cleanupCompletedAt: null }, orderBy: { erasedAt: "asc" }, take: 100 });
   for (const work of pending) {
    const keys = Array.isArray(work.objectKeys) ? work.objectKeys : [];

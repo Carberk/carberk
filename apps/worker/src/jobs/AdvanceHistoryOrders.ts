@@ -19,6 +19,14 @@ export class AdvanceHistoryOrders {
     await tx.serviceAudit.create({ data: { purpose: "history", resourceId: order.requestId, action: order.recoveryUsed ? "HISTORY_RECOVERY_MISSED" : "HISTORY_PROMISE_MISSED", assignmentVersion: order.request.assignmentVersion } });
    }
   });
+  // Restrict expired provider rights before queuing byte deletion. No restored
+  // account or known artifact key can revive a removed/restricted original.
+  await this.db.$executeRaw`WITH retired AS (
+   UPDATE history_artifacts SET state='restricted', "restrictedAt"=COALESCE("restrictedAt",${now}::timestamp)
+   WHERE "removedAt" IS NULL AND ("restrictedAt" IS NOT NULL OR (rights->'schedule'->>'kind'='until' AND (rights->'schedule'->>'until')::timestamptz <= ${now}))
+    AND COALESCE((rights->'hold'->>'until')::timestamptz,'-infinity'::timestamptz) <= ${now}
+   RETURNING id,"objectKey",sha256)
+   INSERT INTO history_artifact_cleanup ("artifactId","objectKey",sha256,epoch,"requestedAt") SELECT id,"objectKey",sha256,1,${now}::timestamp FROM retired ON CONFLICT ("artifactId") DO NOTHING`;
   // Payment claims follow only their recorded category schedule and specific hold.
   // Account erasure may have already removed access, but retained held records
   // still become erasable when their specific hold ends.
