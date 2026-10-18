@@ -300,15 +300,15 @@ it("delivers original PDFs only through the purchased order and reuses licensed 
 
 it("records fixed recovery offers, rejects deadline drift/expired acceptance and gates late-funds refunds", async () => {
  await db.staffGrant.createMany({ data: [{ userId: nextStaff, capability: "history.fulfilment" }], skipDuplicates: true });
- let now = new Date("2026-10-20T14:30:00Z");
+ let now = new Date("2026-10-15T14:30:00Z");
  vi.spyOn(app.get<{ now: () => Date }>(SERVICE_RUNTIME), "now").mockImplementation(() => now);
  const setup = async (state: string, paid: boolean) => {
   const opened = await request.post("/api/v1/services/conversations").set("Authorization", auth(stranger)).send({ purpose: "history", synthetic: true }).expect(201);
   const id = opened.body.id as string;
   await request.post(`/api/v1/services/conversations/${id}/assignment`).set("Authorization", auth(nextStaff)).send({ expectedVersion: 0 }).expect(201);
-  const day = "2026-10-20";
+  const day = "2026-10-15";
   await db.historyCapacityDay.upsert({ where: { day }, create: { day, slotLimit: 10, morningLimit: 5, evidence: "Synthetic recovery capacity" }, update: {} });
-  const quote = await db.historyQuote.create({ data: { requestId: opened.body.resourceId, vin: "1HGCM82633A004352", providers: ["carfax"], preflightOutcome: "available", preflightEvidence: "Synthetic evidence", refundRule: "Founder decision", windowStart: new Date("2026-10-20T04:00:00Z"), windowEnd: new Date("2026-10-20T05:00:00Z"), feasible: true, acceptedAt: now } });
+  const quote = await db.historyQuote.create({ data: { requestId: opened.body.resourceId, vin: "1HGCM82633A004352", providers: ["carfax"], preflightOutcome: "available", preflightEvidence: "Synthetic evidence", refundRule: "Founder decision", windowStart: new Date("2026-10-15T04:00:00Z"), windowEnd: new Date("2026-10-15T05:00:00Z"), feasible: true, acceptedAt: now } });
   const order = await db.historyOrder.create({ data: { requestId: opened.body.resourceId, quoteId: quote.id, day, morning: false, state, holdExpiresAt: quote.windowEnd, promiseAt: quote.windowEnd, ...(paid ? { paidAt: quote.windowStart, receivedAt: quote.windowStart, escalatedAt: now } : {}), rights: { category: "payment_evidence", schedule: { kind: "until", until: "2027-01-01T00:00:00Z" }, hold: null } } });
   const command = (actor: string, data: object) => request.post(`/api/v1/services/conversations/${id}/history`).set("Authorization", auth(actor)).send(data);
   return { id, order, command };
@@ -319,11 +319,11 @@ it("records fixed recovery offers, rejects deadline drift/expired acceptance and
  await first.command(nextStaff, offer).expect(201);
  const snapshot = await request.get(`/api/v1/services/conversations/${first.id}/history`).set("Authorization", auth(stranger)).expect(200);
  const deadline = snapshot.body.order.recoveryOfferedDeadline;
- expect(deadline).toBe("2026-10-21T04:30:00.000Z");
+ expect(deadline).toBe("2026-10-16T04:30:00.000Z");
  expect(snapshot.body.order.recoveryDeadline).toBeNull();
- now = new Date("2026-10-20T14:30:42Z");
+ now = new Date("2026-10-15T14:30:42Z");
  const accept = { kind: "recovery", orderId: first.order.id, expectedVersion: 1, agree: true, deadline };
- await first.command(stranger, { ...accept, deadline: "2026-10-21T04:30:42.000Z" }).expect(400);
+ await first.command(stranger, { ...accept, deadline: "2026-10-16T04:30:42.000Z" }).expect(400);
  await first.command(stranger, accept).expect(201);
  const agreed = await db.historyOrder.findUniqueOrThrow({ where: { id: first.order.id } });
  expect(agreed.recoveryDeadline?.toISOString()).toBe(deadline); expect(agreed.recoveryAgreedAt).toEqual(now); expect(agreed.recoveryUsed).toBe(true);
