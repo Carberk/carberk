@@ -55,7 +55,7 @@ describe("authorized Improvement HTTP and real worker/PostgreSQL snapshots",()=>
   await cleanup();now=new Date();clock=new Date(now);sequence=0;
   await seedSuiteCatalog(prisma,suite);
   for(const who of users) {
-   await prisma.user.create({data:{id:suite.id(who),role:who==="ordinary"?"admin":"buyer",phone:suite.phone(who)}});
+   await prisma.user.create({data:{id:suite.id(who),role:who==="ordinary"?"admin":"buyer",phone:suite.phone(who),phoneVerifiedAt:now}});
    await prisma.session.create({data:{id:suite.id(`${who}-session`),userId:suite.id(who),refreshTokenHash:suite.id(`${who}-refresh`),expiresAt:new Date(Date.now()+DAY),adminTotpExpiresAt:new Date(Date.now()+DAY)}});
   }
   await prisma.staffGrant.createMany({data:[{userId:suite.id("viewer"),capability:"analytics.aggregate"},{userId:suite.id("investigator"),capability:"analytics.aggregate"},{userId:suite.id("investigator"),capability:"analytics.investigate"}]});
