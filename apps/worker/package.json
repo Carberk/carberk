@@ -9,7 +9,7 @@
     "start": "node dist/main",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run --passWithNoTests",
-    "test:unit": "vitest run --exclude '**/*.e2e.spec.ts' --passWithNoTests",
+    "test:unit": "AUTO_TM_TEST_DATABASES=off vitest run --exclude '**/*.e2e.spec.ts' --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
