@@ -15,8 +15,8 @@ export class TechnicalHttpMetrics implements OnModuleInit {
     server.addHook("onResponse", (request, reply, done) => {
       const at = started.get(request);
       started.delete(request);
-      // Independent probes must not manufacture a large successful denominator on a quiet service.
-      const probe = ["/healthz", "/readyz", "/api/v1/operations/health"].includes(request.routeOptions.url ?? "");
+      // Probes and telemetry delivery must not bias core service denominators.
+      const probe = ["/healthz", "/readyz", "/api/v1/operations/health", "/api/v1/diagnostic-telemetry/events"].includes(request.routeOptions.url ?? "");
       if (at !== undefined && !probe) this.metrics.record(reply.statusCode, performance.now() - at);
       done();
     });
