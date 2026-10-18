@@ -61,3 +61,19 @@ describe("actual Improvement workspace and authorized server reads",()=>{
  });
 
 });
+
+it("shows all seven ready journey steps and separates mature retention from immature cohorts",async()=>{
+ const rate={state:"ready",numerator:4,denominator:10,value:0.4,smallSample:true},immature={state:"immature",numerator:null,denominator:null,value:null,smallSample:false};
+ vi.stubGlobal("fetch",async(url:string)=>Response.json({...snapshot(new URL(String(url)).searchParams.get("period")??"completed_week"),state:"ready",inventoryAvailable:true,scorecard:{version:1,state:"ready",inventory:{listingHours:240,averageActive:10,currentActive:10},contacts:{calls:4,conversations:6,total:10,perActiveListing:1},publication:rate,replies:rate,signIn:rate,upload:rate,firstBuyerMessages:6,steps:["vehicle","specs","photos","price","location","contact","review"].map(step=>({step,opened:10,completed:4})),discovery:{opens:100,searches:50,detailOpens:25},zeroSearches:rate,retention:{accounts:{d1:rate,d7:rate,d30:immature},guests:{d1:rate,d7:immature,d30:immature}}}}));
+ const view=render(<AdminLocaleProvider initialLocale="en"><ImprovementWorkspace canInvestigate={false}/></AdminLocaleProvider>);await waitFor(()=>expect(view.getByRole("status").textContent).toBe(improvementCopy.en.ready));
+ fireEvent.click(view.getByRole("button",{name:improvementCopy.en.journeys}));
+ for(const step of ["vehicle","specs","photos","price","location","contact","review"] as const)expect(view.getByText(improvementCopy.en[step])).toBeTruthy();
+ expect(view.getAllByText(improvementCopy.en.immature).length).toBeGreaterThan(0);
+ expect(view.getAllByText(improvementCopy.en.small).length).toBeGreaterThan(0);
+});
+
+it("removes expired investigation evidence and its export link at the actual deadline",async()=>{
+ const receipt={id:"11111111-1111-4111-8111-111111111111",expiresAt:new Date(Date.now()+250).toISOString()};
+ vi.stubGlobal("fetch",async(url:string)=>String(url).includes("/artifacts/")?Response.json({generatedAt:new Date().toISOString(),expiresAt:receipt.expiresAt,reason:"Synthetic expiry verification",events:[]}):String(url).endsWith("/investigations")?Response.json(receipt):Response.json(snapshot("completed_week")));
+ const view=render(<AdminLocaleProvider initialLocale="en"><ImprovementWorkspace canInvestigate/></AdminLocaleProvider>);await waitFor(()=>expect(view.getByRole("button",{name:improvementCopy.en.evidence})).toBeTruthy());fireEvent.click(view.getByRole("button",{name:improvementCopy.en.evidence}));fireEvent.change(view.getByRole("textbox"),{target:{value:"Synthetic expiry verification"}});fireEvent.click(view.getByRole("button",{name:improvementCopy.en.investigate}));await waitFor(()=>expect(view.getByRole("link",{name:improvementCopy.en.export})).toBeTruthy());await waitFor(()=>expect(view.queryByRole("link",{name:improvementCopy.en.export})).toBeNull(),{timeout:1000});
+});
