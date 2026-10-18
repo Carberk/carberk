@@ -52,7 +52,13 @@ export class VideoTransfer {
     const record = await this.device.load();
     if (!record || record.state === "CANCELLED" || record.state === "PROCESSING") return;
     await this.owner(record);
-    if (record.sessionId) await apiClient.post(`${apiPath}/${record.sessionId}/resume`, {}, snapshotSchema, this.options(record));
+    if (record.sessionId) {
+      const current = await apiClient.get(`${apiPath}/${record.sessionId}`, snapshotSchema, this.options(record));
+      this.validateSnapshot(record, current);
+      if (["PROCESSING", "READY"].includes(current.state)) { await this.save({ ...record, state: "PROCESSING", confirmedBytes: record.prepared.sizeBytes }); return; }
+      if (current.state === "PAUSED") await apiClient.post(`${apiPath}/${record.sessionId}/resume`, {}, snapshotSchema, this.options(record));
+      else if (!["UPLOADING", "COMPLETING"].includes(current.state)) throw new Error("VIDEO_TRANSFER_UNAVAILABLE");
+    }
     await this.save({ ...record, state: "UPLOADING" });
     await this.run();
   }
