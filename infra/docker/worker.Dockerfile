@@ -57,7 +57,10 @@ FROM base AS runtime
 # boot logs identify the exact revision even when Railway rebuilds it.
 ARG RAILWAY_GIT_COMMIT_SHA=unknown
 ENV AUTOTM_COMMIT_SHA=${RAILWAY_GIT_COMMIT_SHA}
-RUN apt-get update && apt-get install -y --no-install-recommends curl openssl postgresql-client && rm -rf /var/lib/apt/lists/*
+# Reviewed Debian bookworm-security package. A moved/removed version fails the
+# build instead of silently changing the media processing executable.
+RUN apt-get update && apt-get install -y --no-install-recommends curl openssl postgresql-client ffmpeg=7:5.1.9-0+deb12u1 && rm -rf /var/lib/apt/lists/*
+RUN ffmpeg -version && ffprobe -version
 COPY --from=build /app/node_modules /app/node_modules
 COPY --from=build /app/apps/worker/node_modules /app/apps/worker/node_modules
 COPY --from=build /app/apps/worker/dist /app/apps/worker/dist
