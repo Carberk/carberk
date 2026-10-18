@@ -24,3 +24,37 @@ describe("diagnostic report workflow", () => {
     expect(final.withdraw("tech").state.status).toBe("withdrawn");
   });
 });
+
+describe("diagnostic immutable observation boundaries", () => {
+ it("does not retain caller-owned nested state", () => {
+  const source = structuredClone(base); source.findings = [structuredClone(finding)];
+  const report = new DiagnosticReport(source);
+  source.findings[0]!.explanation = "mutated after construction";
+  source.findings[0]!.evidenceIds.push("foreign");
+  expect(report.state.findings[0]).toEqual(finding);
+ });
+ it("requires an explanation for Not applicable", () => {
+  expect(() => new DiagnosticReport(base).upsertFinding("tech", { ...finding, assessment: "not_applicable", explanation: null, evidenceIds: [] })).toThrow("REPORT_EXPLANATION_REQUIRED");
+ });
+ it("does not submit mandatory unchecked scope as complete", () => {
+  const report = new DiagnosticReport(base).upsertFinding("tech", { ...finding, assessment: "not_checked", explanation: "Not accessible", evidenceIds: [] });
+  expect(() => report.submit("tech", ["brakes"])).toThrow("REPORT_INCOMPLETE");
+ });
+ it("requires a return reason and keeps it separate from a correction reason", () => {
+  const submitted = new DiagnosticReport(base).upsertFinding("tech", finding).submit("tech", ["brakes"]);
+  expect(() => submitted.review("reviewer", "return")).toThrow("REPORT_RETURN_REASON_REQUIRED");
+  const returned = submitted.review("reviewer", "return", " Explain the measurement ");
+  expect(returned.state).toMatchObject({ returnReason: "Explain the measurement", correctionReason: null });
+ });
+ it("cannot relabel old observations as a new inspection during correction", () => {
+  const original = new DiagnosticReport(base).upsertFinding("tech", finding).submit("tech", ["brakes"]).review("reviewer", "finalize");
+  const corrected = original.correct("corrected", "tech", "Editorial correction", "2026-10-16T12:00:00.000Z", 120100);
+  expect(corrected.state.observedAt).toBe("2026-10-15T12:00:00.000Z");
+  expect(corrected.state.mileageKm).toBe(120000);
+  expect(corrected.state.findings).toEqual([finding]);
+ });
+ it("does not claim a badge solely because a public snapshot was finalized", () => {
+  const report = new DiagnosticReport(base).upsertFinding("tech", finding).submit("tech", ["brakes"]).review("reviewer", "finalize");
+  expect(report.publicBadgeAvailable()).toBe(false);
+ });
+});
