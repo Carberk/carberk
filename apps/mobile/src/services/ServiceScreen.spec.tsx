@@ -155,6 +155,9 @@ it("preserves an unsent draft when leaving and returning to a service conversati
  await fireEvent.press(initial); await screen.findByText(message.body);
  await fireEvent.changeText(screen.getByLabelText("Message"), "Keep this draft");
  await fireEvent.press(screen.getByRole("button", { name: "Back to queue" }));
+ const rows = await screen.findAllByRole("button", { name: "General Support" }); const other = rows[1]; if (!other) throw new Error("Missing second service conversation");
+ await fireEvent.press(other); await screen.findByText(message.body); expect(screen.getByLabelText("Message").props.value).toBe("");
+ await fireEvent.press(screen.getByRole("button", { name: "Back to queue" }));
  const reopened = (await screen.findAllByRole("button", { name: "General Support" }))[0]; if (!reopened) throw new Error("Missing service conversation");
  await fireEvent.press(reopened);
  expect(await screen.findByDisplayValue("Keep this draft")).toBeTruthy();
