@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useTranslation } from "react-i18next";
@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { apiClient } from "../../api/client";
 
+import { VideoSelectionJournal, type RetainedVideoSelection } from "./VideoSelectionJournal";
 import { videoUploadTask } from "./VideoUploadTasks";
 const VideoSelectionPreview = lazy(async () => ({ default: (await import("./VideoSelectionPreview")).VideoSelectionPreview }));
 
@@ -37,6 +38,11 @@ export function ListingVideoEditor({ ownerId, target, businessId, disabled }: Li
   useEffect(() => { if (capability.data?.canView) void task.recover(); }, [task, capability.data?.canView]);
   useEffect(() => { if (taskState.phase !== "PROCESSING") return; const timer = setInterval(() => { void task.recover(); }, 3000); return () => clearInterval(timer); }, [task, taskState.phase]);
   const busy = ["PREPARING", "UPLOADING", "PROCESSING"].includes(taskState.phase);
+  const journal = useMemo(() => new VideoSelectionJournal(ownerId, target, businessId), [ownerId, target.id, target.kind, businessId]);
+  const [retained, setRetained] = useState<RetainedVideoSelection | null>(null);
+  const [selectionReady, setSelectionReady] = useState(false);
+  useEffect(() => { let current = true; setSelectionReady(false); void journal.load().then(value => { if (current) { setRetained(value); setSelected(value ? { ...value.asset, type: "video" } : null); setSelectionReady(true); } }).catch(() => { if (current) setSelectionReady(true); }); return () => { current = false; }; }, [journal]);
+  const updateInterval = useCallback((interval: NonNullable<RetainedVideoSelection["interval"]>) => { setRetained(value => { if (!value) return value; const next = { ...value, interval }; void journal.save(next).catch(() => setError(true)); return next; }); }, [journal]);
   const [selected, setSelected] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [error, setError] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -44,14 +50,17 @@ export function ListingVideoEditor({ ownerId, target, businessId, disabled }: Li
     setPicking(true); setError(false);
     try {
       const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["videos"], allowsMultipleSelection: false, allowsEditing: false, quality: 1 });
-      if (!result.canceled && result.assets[0]) setSelected(result.assets[0]);
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0], next: RetainedVideoSelection = { version: 1, asset: { uri: asset.uri, duration: asset.duration ?? null, width: asset.width, height: asset.height }, interval: null };
+        await journal.save(next); setRetained(next); setSelected(asset);
+      }
     } catch { setError(true); }
     finally { setPicking(false); }
   }
   if (!capability.data?.canView && taskState.phase === "EMPTY") return null;
   return <View className="gap-3 py-4" testID={`video-editor-${target.kind}-${target.id}`}>
     <Text className="text-callout text-muted-foreground">{c.optional}</Text>
-    {selected ? <View className="gap-2"><Text>{c.selected}</Text><Suspense fallback={null}><VideoSelectionPreview key={selected.uri} asset={selected} disabled={disabled || busy || !capability.data?.canUpload} onUse={(selection, poster) => { void task.start(selection, poster); }} /></Suspense><Button variant="outline" disabled={disabled} onPress={() => { setSelected(null); if (taskState.phase !== "EMPTY" && taskState.phase !== "READY") void task.cancel(); }}><Text>{c.remove}</Text></Button></View> : null}
+    {selected ? <View className="gap-2"><Text>{c.selected}</Text><Suspense fallback={null}><VideoSelectionPreview key={selected.uri} asset={selected} initial={retained?.interval} onChange={updateInterval} disabled={disabled || busy || !capability.data?.canUpload} onUse={(selection, poster) => { void task.start(selection, poster); }} /></Suspense><Button variant="outline" disabled={disabled} onPress={() => { setSelected(null); setRetained(null); void journal.save(null).catch(() => setError(true)); if (taskState.phase !== "EMPTY" && taskState.phase !== "READY") void task.cancel(); }}><Text>{c.remove}</Text></Button></View> : null}
     {taskState.phase !== "EMPTY" && taskState.phase !== "CANCELLED" ? <View className="gap-2">
       <Text accessibilityLiveRegion="polite">{c.phases[taskState.phase]}</Text>
       {taskState.record ? <Text>{(taskState.record.prepared.sizeBytes / 1024 / 1024).toFixed(1)} MB · {Math.floor(taskState.record.confirmedBytes / taskState.record.prepared.sizeBytes * 100)}%</Text> : null}
@@ -59,7 +68,7 @@ export function ListingVideoEditor({ ownerId, target, businessId, disabled }: Li
       {capability.data?.canUpload && (taskState.phase === "PAUSED" || taskState.phase === "FAILED" && taskState.record) ? <Button variant="outline" onPress={() => { void task.resume(); }}><Text>{taskState.phase === "FAILED" ? c.retry : c.resume}</Text></Button> : null}
       {taskState.phase !== "READY" ? <Button variant="outline" onPress={() => { void task.cancel(); }}><Text>{c.cancel}</Text></Button> : null}
     </View> : null}
-    {capability.data?.canUpload ? <Button variant="outline" disabled={disabled || picking || busy} onPress={() => { void pick(); }}><Text>{c.add}</Text></Button> : null}
+    {capability.data?.canUpload ? <Button variant="outline" disabled={disabled || picking || busy || !selectionReady} onPress={() => { void pick(); }}><Text>{c.add}</Text></Button> : null}
     {error ? <Text accessibilityRole="alert">{c.failure}</Text> : null}
   </View>;
 }
