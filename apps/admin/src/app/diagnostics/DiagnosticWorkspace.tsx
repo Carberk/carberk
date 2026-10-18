@@ -17,8 +17,8 @@ export function DiagnosticWorkspace() {
  const epoch=useRef(0),busyFence=useRef(false),draftKey=useRef<{orderId:string;id:string}|null>(null),correctionKey=useRef<{fingerprint:string;id:string}|null>(null);
  const report=reports.find(item=>item.id===reportId)??reports.at(-1);
  function deny(){epoch.current++;setContext(null);setReports([]);setQueue([]);setError("denied");setReason("");setDirty(false);setLoading(false);}
- async function list(){const current=++epoch.current;setLoading(true);setError(null);const result=await diagnosticAssigned();if(current!==epoch.current)return;if(result.ok)setQueue(result.data);else{setError(result.error);if(result.error==="denied")deny();}setLoading(false);}
- async function open(id:string){const current=++epoch.current;setLoading(true);setError(null);const result=await diagnosticWorkspace(id);if(current!==epoch.current)return;if(result.ok){setContext(result.data.context);setReports(result.data.reports);setNeedsRefresh(false);}else if(result.error==="denied")deny();else setError(result.error);setLoading(false);}
+ async function list(){const current=++epoch.current;setLoading(true);setError(null);try {const result=await diagnosticAssigned();if(current!==epoch.current)return;if(result.ok)setQueue(result.data);else{setError(result.error);if(result.error==="denied")deny();}}catch{if(current===epoch.current)setError("error");}finally{if(current===epoch.current)setLoading(false);}}
+ async function open(id:string){const current=++epoch.current;setLoading(true);setError(null);try {const result=await diagnosticWorkspace(id);if(current!==epoch.current)return;if(result.ok){setContext(result.data.context);setReports(result.data.reports);setNeedsRefresh(false);}else if(result.error==="denied")deny();else setError(result.error);}catch{if(current===epoch.current)setError("error");}finally{if(current===epoch.current)setLoading(false);}}
  useEffect(()=>{void list();return()=>{epoch.current++;};},[]);
  const perform:DiagnosticPerform=async work=>{
   if(busyFence.current)return false;busyFence.current=true;setBusy(true);setSaved(false);setError(null);const current=epoch.current;
@@ -27,7 +27,7 @@ export function DiagnosticWorkspace() {
    if(!result.ok){if(result.error==="denied")deny();else {setError(result.error);if(result.error==="conflict")setNeedsRefresh(true);}return false;}
    const parsed=D.DiagnosticReportSchema.safeParse(result.data);if(parsed.success)setReportId(parsed.data.id);
    setSaved(true);if(context)await open(context.order.id);return true;
-  }finally{busyFence.current=false;setBusy(false);}
+  }catch{if(current===epoch.current)setError("error");return false;}finally{busyFence.current=false;setBusy(false);}
  };
  const has=(capability:D.DiagnosticCapability)=>context?.capabilities.includes(capability)??false;
  const author=report?.authorId===context?.actorId,editable=!!report&&author&&has("diagnostics.technician")&&["draft","returned"].includes(report.status);

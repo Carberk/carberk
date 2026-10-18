@@ -28,27 +28,31 @@ export function ServiceWorkspace() {
  }, [conversation?.id, conversation?.readThrough, renderedThrough]);
  async function refresh(next = purpose) {
   const epoch = ++generation.current; setLoading(true); setError(""); setConversation(null);
-  const result = await serviceQueue(next); if (epoch !== generation.current) return;
-  setLoading(false); if (result.ok) setQueue(result.data); else { setQueue([]); setError(result.error); }
+  try { const result = await serviceQueue(next); if (epoch !== generation.current) return;
+   if (result.ok) setQueue(result.data); else { setQueue([]); setError(result.error); }
+  } catch { if (epoch === generation.current) { setQueue([]); setError("error"); } } finally { if (epoch === generation.current) setLoading(false); }
  }
  useEffect(() => { void refresh(purpose); return () => { generation.current++; }; }, [purpose]);
  async function open(id: string) {
   const epoch = ++generation.current; setLoading(true); setError(""); setConversation(null); setBody(""); setImage(null); setAttachmentId(null); retry.current = null;
-  const result = await serviceRead(id); if (epoch !== generation.current) return;
-  setLoading(false); if (result.ok) setConversation(result.data); else setError(result.error);
+  try { const result = await serviceRead(id); if (epoch !== generation.current) return;
+   if (result.ok) setConversation(result.data); else setError(result.error);
+  } catch { if (epoch === generation.current) setError("error"); } finally { if (epoch === generation.current) setLoading(false); }
  }
  async function assign(id: string, version: number, next?: string) {
-  setBusy(true); setError(""); const result = await serviceAssign(id, version, next); setBusy(false);
-  if (result.ok) { setTarget(""); await open(id); } else { setConversation(null); setError(result.error); }
+  setBusy(true); setError(""); try { const result = await serviceAssign(id, version, next);
+   if (result.ok) { setTarget(""); await open(id); } else { setConversation(null); setError(result.error); }
+  } catch { setError("error"); } finally { setBusy(false); }
  }
  async function command(value: S.SupportCommand) {
   if (!conversation || busy) return;
   const id = conversation.id, epoch = generation.current; setBusy(true); setError("");
-  const result = await serviceSupportCommand(id, value); if (epoch !== generation.current) return; setBusy(false);
-  if (!result.ok) { setError(result.error); if (result.error === "permission" || result.error === "conflict") setConversation(null); return; }
+  try { const result = await serviceSupportCommand(id, value); if (epoch !== generation.current) return;
+   if (!result.ok) { setError(result.error); if (result.error === "permission" || result.error === "conflict") setConversation(null); return; }
   if (value.kind === "close_awaiting") { setBody(""); setReason(""); closeRetry.current = null; }
   const latest = await serviceRead(id); if (epoch !== generation.current) return;
-  if (latest.ok) setConversation(latest.data); else { setConversation(null); setError(latest.error); }
+   if (latest.ok) setConversation(latest.data); else { setConversation(null); setError(latest.error); }
+  } catch { if (epoch === generation.current) setError("error"); } finally { if (epoch === generation.current) setBusy(false); }
  }
  function closeAwaiting() {
   if (!conversation) return;
@@ -60,9 +64,10 @@ export function ServiceWorkspace() {
   if (!conversation || (!body.trim() && !attachmentId) || busy) return;
   setBusy(true); setError(""); const fingerprint = JSON.stringify([conversation.id, body.trim(), visibility, attachmentId, reason]);
   if (retry.current?.fingerprint !== fingerprint) retry.current = { fingerprint, id: crypto.randomUUID() };
-  const result = await serviceSend(conversation.id, { clientMessageId: retry.current.id, ...(body.trim() ? { body: body.trim() } : {}), ...(attachmentId ? { attachmentId } : {}), visibility: visibility === "staff" ? "staff" : "customer", ...(conversation.purpose === "support" && visibility !== "staff" ? { supportKind: visibility === "customer" ? "reply" : visibility, ...(visibility === "notice" ? { reason } : {}) } : {}) }); setBusy(false);
+  try { const result = await serviceSend(conversation.id, { clientMessageId: retry.current.id, ...(body.trim() ? { body: body.trim() } : {}), ...(attachmentId ? { attachmentId } : {}), visibility: visibility === "staff" ? "staff" : "customer", ...(conversation.purpose === "support" && visibility !== "staff" ? { supportKind: visibility === "customer" ? "reply" : visibility, ...(visibility === "notice" ? { reason } : {}) } : {}) });
   if (result.ok) { setBody(""); setReason(""); setImage(null); setAttachmentId(null); retry.current = null; const latest = await serviceRead(conversation.id); if (latest.ok) setConversation(latest.data); else { setConversation(null); setError(latest.error); } }
   else { setError(result.error); if (result.error === "permission" || result.error === "conflict") setConversation(null); }
+  } catch { setError("error"); } finally { setBusy(false); }
  }
  async function upload(file: File) {
   if (!conversation || uploading) return; const epoch = generation.current;
