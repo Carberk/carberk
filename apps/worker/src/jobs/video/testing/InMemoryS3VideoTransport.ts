@@ -1,6 +1,7 @@
 import { Readable } from "node:stream";
 
-import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import type { PutObjectCommand } from "@aws-sdk/client-s3";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
 
 /** Network boundary fake keeps private bucket names and immutable bytes. */
 export class InMemoryS3VideoTransport {
