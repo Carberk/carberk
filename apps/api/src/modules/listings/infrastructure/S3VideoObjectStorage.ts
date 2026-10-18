@@ -1,4 +1,4 @@
-import { type S3Client, CreateMultipartUploadCommand, ListPartsCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand } from "@aws-sdk/client-s3";
+import { type S3Client, CreateMultipartUploadCommand, ListPartsCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand, ListMultipartUploadsCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { VIDEO_PART_BYTES, type VideoObjectStorage, type VideoStorageSession, type VideoConfirmedPart } from "../domain/ports/VideoObjectStorage";
 type SignPart = (client: S3Client, command: UploadPartCommand, options: { expiresIn: number; signableHeaders: Set<string> }) => Promise<string>;
@@ -6,8 +6,32 @@ export class S3VideoObjectStorage implements VideoObjectStorage {
   constructor(private readonly client: S3Client, private readonly bucket: string, private readonly now: () => Date, private readonly sign: SignPart = getSignedUrl) {
     if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(bucket)) throw new Error("VIDEO_STORAGE_CONFIG_INVALID");
   }
-  async recoverInitialization(_sessionId: string, _uploadId: string): Promise<string | null> { return null; }
-  async sourceCommitted(_session: VideoStorageSession): Promise<boolean> { return false; }
+  /** Called only for an already durable initialization intent. An empty result
+   * leaves it uncertain; callers must not issue another create for this key. */
+  async recoverInitialization(sessionId: string, uploadId: string): Promise<string | null> {
+    const key = this.key(sessionId, uploadId);
+    const matches = new Set<string>(); let keyMarker: string | undefined; let uploadMarker: string | undefined;
+    for (let page = 0; page < 4; page++) {
+      const result = await this.client.send(new ListMultipartUploadsCommand({ Bucket: this.bucket, Prefix: key, MaxUploads: 100, ...(keyMarker ? { KeyMarker: keyMarker, UploadIdMarker: uploadMarker } : {}) }), { abortSignal: AbortSignal.timeout(10_000) });
+      for (const upload of result.Uploads ?? []) if (upload.Key === key && upload.UploadId) matches.add(upload.UploadId);
+      if (matches.size > 1) throw new Error("VIDEO_INITIALIZATION_AMBIGUOUS");
+      if (!result.IsTruncated) return [...matches][0] ?? null;
+      if (!result.NextKeyMarker || !result.NextUploadIdMarker || (result.NextKeyMarker === keyMarker && result.NextUploadIdMarker === uploadMarker)) throw new Error("VIDEO_INITIALIZATION_UNCERTAIN");
+      keyMarker = result.NextKeyMarker; uploadMarker = result.NextUploadIdMarker;
+    }
+    throw new Error("VIDEO_INITIALIZATION_UNCERTAIN");
+  }
+  /** Completion provenance only. The worker still hashes and decodes all bytes. */
+  async sourceCommitted(session: VideoStorageSession): Promise<boolean> {
+    this.validate(session, false);
+    try {
+      const result = await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: this.key(session.sessionId, session.uploadId) }), { abortSignal: AbortSignal.timeout(10_000) });
+      return result.ContentLength === session.expectedBytes && result.Metadata?.["video-session"] === session.sessionId && result.Metadata?.["video-upload"] === session.uploadId;
+    } catch (error) {
+      if ((error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404) return false;
+      throw new Error("VIDEO_STORAGE_UNAVAILABLE");
+    }
+  }
   async initialize(sessionId: string, uploadId: string): Promise<string> {
     const result = await this.client.send(new CreateMultipartUploadCommand({ Bucket: this.bucket, Key: this.key(sessionId, uploadId), ContentType: "video/mp4", CacheControl: "private, no-store", Metadata: { "video-session": sessionId, "video-upload": uploadId } }), { abortSignal: AbortSignal.timeout(10_000) });
     if (!result.UploadId) throw new Error("VIDEO_STORAGE_UNAVAILABLE");
