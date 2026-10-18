@@ -27,14 +27,14 @@ export function ServiceWorkspace() {
   });
  }, [conversation?.id, conversation?.readThrough, renderedThrough]);
  async function refresh(next = purpose) {
-  const epoch = ++generation.current; setLoading(true); setError(""); setConversation(null);
+  const epoch = ++generation.current; setBusy(false); setLoading(true); setError(""); setConversation(null);
   try { const result = await serviceQueue(next); if (epoch !== generation.current) return;
    if (result.ok) setQueue(result.data); else { setQueue([]); setError(result.error); }
   } catch { if (epoch === generation.current) { setQueue([]); setError("error"); } } finally { if (epoch === generation.current) setLoading(false); }
  }
  useEffect(() => { void refresh(purpose); return () => { generation.current++; }; }, [purpose]);
  async function open(id: string) {
-  const epoch = ++generation.current; setLoading(true); setError(""); setConversation(null); setBody(""); setImage(null); setAttachmentId(null); retry.current = null;
+  const epoch = ++generation.current; setBusy(false); setLoading(true); setError(""); setConversation(null); setBody(""); setImage(null); setAttachmentId(null); retry.current = null;
   try { const result = await serviceRead(id); if (epoch !== generation.current) return;
    if (result.ok) setConversation(result.data); else setError(result.error);
   } catch { if (epoch === generation.current) setError("error"); } finally { if (epoch === generation.current) setLoading(false); }
@@ -86,9 +86,13 @@ export function ServiceWorkspace() {
   } catch { if (epoch === generation.current) setUploadFailed(true); } finally { setUploading(false); }
  }
  async function more() {
-  if (!conversation || busy) return; setBusy(true);
-  const result = await serviceRead(conversation.id, conversation.messages.at(-1)?.sequence ?? 0); setBusy(false);
-  if (result.ok) setConversation({ ...result.data, messages: [...conversation.messages, ...result.data.messages] }); else { setError(result.error); if (result.error === "permission") setConversation(null); }
+  if (!conversation || busy) return; const epoch = generation.current; setBusy(true); setError("");
+  try {
+   const result = await serviceRead(conversation.id, conversation.messages.at(-1)?.sequence ?? 0);
+   if (epoch !== generation.current) return;
+   if (result.ok) setConversation({ ...result.data, messages: [...conversation.messages, ...result.data.messages] }); else { setError(result.error); if (result.error === "permission") setConversation(null); }
+  } catch { if (epoch === generation.current) setError("error"); }
+  finally { if (epoch === generation.current) setBusy(false); }
  }
  const button = "min-h-11 rounded-lg border px-4 py-2 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2";
  return <main className="mx-auto max-w-7xl space-y-6 p-6"><h1 className="text-2xl font-semibold">{c.title}</h1>
