@@ -1,3 +1,4 @@
+import type { MeasurementSchemas } from "@auto-tm/contracts";
 import { randomUUID } from "node:crypto";
 
 import { PrismaService } from "@auto-tm/db";
@@ -15,8 +16,9 @@ describe.skipIf(!hosted)("video processing durable fences on disposable PostgreS
   const catalog = { brandId: randomUUID(), modelId: randomUUID(), regionId: randomUUID(), cityId: randomUUID() };
   const sessions: string[] = [], uploads: string[] = [];
   let eligible = true;
+  const outcomes: MeasurementSchemas.MeasurementEvent[] = [];
   beforeAll(async () => {
-    db = new PrismaService(); ledger = new PrismaVideoProcessingLedger(db, { isEligible: () => eligible });
+    db = new PrismaService(); ledger = new PrismaVideoProcessingLedger(db, { isEligible: () => eligible }, { context: { platform: "server", release: "test", build: "test", locale: "en" }, capture: async (_tx, _user, event) => { outcomes.push(event); return "captured"; } });
     const slug = `video-ledger-${randomUUID()}`, names = { nameRu: "Synthetic", nameTk: "Synthetic", nameEn: "Synthetic" };
     await db.brand.create({ data: { id: catalog.brandId, slug: `${slug}-brand`, ...names } });
     await db.model.create({ data: { id: catalog.modelId, brandId: catalog.brandId, slug: `${slug}-model`, ...names } });
@@ -26,7 +28,7 @@ describe.skipIf(!hosted)("video processing durable fences on disposable PostgreS
     await db.listing.create({ data: { id: listingId, sellerId: userId, status: "active", brandId: catalog.brandId, modelId: catalog.modelId, cityId: catalog.cityId, priceAmount: 100000, priceCurrency: "TMT" } });
   });
   beforeEach(async () => {
-    eligible = true;
+    eligible = true; outcomes.length = 0;
     await db.listing.update({ where: { id: listingId }, data: { activeVideoGenerationId: null, pendingVideoGenerationId: null, activeVideoRevision: 0 } });
     await db.videoProcessWork.deleteMany({ where: { generationId: { in: sessions } } });
     await db.videoCleanupWork.deleteMany({ where: { uploadId: { in: uploads } } });
@@ -87,6 +89,13 @@ describe.skipIf(!hosted)("video processing durable fences on disposable PostgreS
     expect((await db.listing.findUniqueOrThrow({ where: { id: listingId } })).activeVideoGenerationId).toBeNull();
     const cleanup = await db.videoCleanupWork.findUniqueOrThrow({ where: { id: `session:${row.id}` } });
     expect(cleanup.objectKeys.sort()).toEqual(row.assets.map(asset => asset.key).sort());
+  });
+  it("records only committed processing outcomes without media or credential content", async () => {
+    const row = await prepared(), lease = await ledger.claim(row.id, now, randomUUID()); expect(lease).not.toBeNull(); if (!lease) return;
+    expect(outcomes).toEqual([]);
+    await ledger.plan(lease, row.assets, now);
+    await ledger.adopt(lease, row.facts, new Date("2000-01-02T00:00:01Z"));
+    expect(outcomes).toEqual([{ version: 1, eventId: lease.leaseToken, occurredAt: "2000-01-02T00:00:01.000Z", context: { platform: "server", release: "test", build: "test", locale: "en" }, eventName: "video_processing_result", purpose: "product_reliability", payload: { listingId, jobId: row.id, attemptId: lease.leaseToken, result: "success", durationMs: 1000 } }]);
   });
   it("rechecks tester and current account authority before planning and readiness", async () => {
     const row = await prepared(), lease = await ledger.claim(row.id, now, randomUUID()); expect(lease).not.toBeNull(); if (!lease) return;
