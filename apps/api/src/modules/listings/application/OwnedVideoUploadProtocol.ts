@@ -33,6 +33,7 @@ export interface VideoSessionSnapshot {
 export interface OwnedVideoSessionLedger {
   reserve(actor: ListingActor, input: VideoSessionCreate): Promise<{ session: OwnedVideoSession; initialize: boolean }>;
   read(actor: ListingActor, id: string): Promise<OwnedVideoSession>;
+  removeListing(actor: ListingActor, listingId: string): Promise<void>;
   bindInitialization(actor: ListingActor, id: string, storageUploadId: string): Promise<OwnedVideoSession>;
   beginCompletion(actor: ListingActor, id: string): Promise<OwnedVideoSession>;
   commitCompletion(actor: ListingActor, id: string, fence: string): Promise<OwnedVideoSession>;
@@ -43,6 +44,7 @@ export const OWNED_VIDEO_UPLOAD_PROTOCOL = Symbol("OwnedVideoUploadProtocol");
 
 export class OwnedVideoUploadProtocol {
   constructor(private readonly ledger: OwnedVideoSessionLedger, private readonly storage: VideoObjectStorage) {}
+  async removeListing(actor: ListingActor, listingId: string): Promise<void> { await this.ledger.removeListing(actor, listingId); }
   async create(actor: ListingActor, input: VideoSessionCreate): Promise<VideoSessionSnapshot> {
     const reserved = await this.ledger.reserve(actor, input);
     let session = reserved.session;

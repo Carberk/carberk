@@ -60,6 +60,17 @@ export class PrismaOwnedVideoSessionLedger implements OwnedVideoSessionLedger {
       return { session: snapshot(session), initialize: true };
     });
   }
+  async removeListing(actor: ListingActor, listingId: string) {
+    await this.transaction(async tx => {
+      await this.actor(tx, actor);
+      const target = await this.target(tx, actor, "listing", listingId);
+      if (target.kind !== "listing") throw unavailable();
+      const generations = [...new Set([target.row.activeVideoGenerationId, target.row.pendingVideoGenerationId].filter((id): id is string => id !== null))].sort();
+      const now = this.clock.now();
+      await tx.listing.update({ where: { id: listingId }, data: { activeVideoGenerationId: null, pendingVideoGenerationId: null, activeVideoRevision: { increment: 1 } } });
+      for (const id of generations) await this.retire(tx, id, now);
+    });
+  }
   async read(actor: ListingActor, id: string) { return this.transaction(async tx => snapshot(await this.current(tx, actor, id))); }
   async bindInitialization(actor: ListingActor, id: string, storageUploadId: string) {
     if (!storageUploadId || storageUploadId.length > 2048) throw unavailable();
@@ -143,7 +154,14 @@ export class PrismaOwnedVideoSessionLedger implements OwnedVideoSessionLedger {
     const row = await tx.videoUploadSession.findUniqueOrThrow({ where: { id } });
     const upload = await tx.mediaUpload.findUnique({ where: { id: row.uploadId } });
     if (cancelling && row.state === "CLEANUP_PENDING") return row;
-    if (!upload || upload.writeProtocol !== "video-v1" || upload.userId !== actor.userId || upload.businessId !== (actor.businessId ?? null) || upload.state !== "PREPARING" || upload.claimToken !== id || row.cancelledAt || ["FAILED", "CLEANUP_PENDING", "DELETED", "CANCELLED"].includes(row.state) || (row.state !== "PROCESSING" && row.expiresAt <= this.clock.now())) throw unavailable();
+    if (!upload || upload.writeProtocol !== "video-v1" || upload.userId !== actor.userId || upload.businessId !== (actor.businessId ?? null) || row.cancelledAt || ["FAILED", "CLEANUP_PENDING", "DELETED", "CANCELLED"].includes(row.state)) throw unavailable();
+    const activeReady = !uploading && !cancelling && row.state === "READY" && target.kind === "listing" && target.row.activeVideoGenerationId === id && upload.state === "ADOPTED" && upload.claimTargetType === "listing" && upload.claimTargetId === target.row.id;
+    if (activeReady) {
+      const generation = await tx.videoGeneration.findUnique({ where: { id } });
+      if (!generation || generation.state !== "READY" || generation.uploadId !== row.uploadId || generation.listingId !== target.row.id) throw unavailable();
+      return row;
+    }
+    if (upload.state !== "PREPARING" || upload.claimToken !== id || (row.state !== "PROCESSING" && row.expiresAt <= this.clock.now())) throw unavailable();
     if (target.kind === "listing" && (target.row.pendingVideoGenerationId !== id || target.row.activeVideoRevision !== row.targetRevision)) throw unavailable();
     if (target.kind === "draft") {
       const newer = await tx.videoUploadSession.count({ where: { targetKind: "draft", targetId: target.row.id, targetRevision: { gt: row.targetRevision ?? 0 } } });
@@ -171,6 +189,7 @@ export class PrismaOwnedVideoSessionLedger implements OwnedVideoSessionLedger {
     const nextAttemptAt = new Date(Math.max(now.getTime() + 15 * 60_000, processing?.leaseExpiresAt?.getTime() ?? 0) + 120_000);
     await this.claims.retire(tx, row.uploadId);
     await tx.videoUploadSession.update({ where: { id: sessionId }, data: { state: "CLEANUP_PENDING", cancelledAt: now } });
+    await tx.videoGrant.updateMany({ where: { generationId: sessionId, revokedAt: null }, data: { revokedAt: now } });
     await tx.videoGeneration.updateMany({ where: { id: sessionId }, data: { state: "RETIRED", retiredAt: now } });
     await tx.videoProcessWork.updateMany({ where: { generationId: sessionId }, data: { state: "CANCELLED" } });
     await tx.videoCleanupWork.upsert({ where: { id: `session:${sessionId}` }, create: { id: `session:${sessionId}`, uploadId: row.uploadId, sessionId, generationId: sessionId, sourceKey: row.sourceKey, storageUploadId: row.storageUploadId, objectKeys, nextAttemptAt }, update: { state: "PENDING", objectKeys, nextAttemptAt } });
