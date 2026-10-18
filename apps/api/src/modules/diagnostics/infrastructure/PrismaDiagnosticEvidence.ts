@@ -3,7 +3,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService, type Prisma } from "@auto-tm/db";
 import type { DiagnosticReportState } from "../domain/DiagnosticReport";
 import { DiagnosticRuleError } from "../domain/InspectionOrder";
-import type { DiagnosticSubject , DIAGNOSTIC_RUNTIME, type DiagnosticRuntime } from "../domain/ports/DiagnosticIntakePort";
+import { DIAGNOSTIC_RUNTIME, type DiagnosticSubject, type DiagnosticRuntime } from "../domain/ports/DiagnosticIntakePort";
 import type { DiagnosticEvidencePort } from "../domain/ports/DiagnosticEvidencePort";
 import { DIAGNOSTIC_OBJECTS, type DiagnosticObjects } from "../domain/ports/DiagnosticObjects";
 import { DiagnosticReportAccess } from "./DiagnosticReportAccess";
