@@ -1,7 +1,7 @@
 import { VideoUploadSchemas } from "@auto-tm/contracts";
 import type { z } from "zod";
 
-import { apiClient } from "../../api/client";
+import { apiClient, ApiError } from "../../api/client";
 import { loadAuthSession } from "../../auth/session";
 import type { PreparedVideo } from "../videoPreparation/VideoPreparation";
 
@@ -76,7 +76,18 @@ export class VideoTransfer {
     if (!await this.device.verify(record.prepared)) throw new Error("VIDEO_LOCAL_SOURCE_UNAVAILABLE");
     if (this.stopped) return;
     if (!record.sessionId) {
-      const created = await apiClient.post(apiPath, { protocolVersion: 1, target: record.target, idempotencyKey: record.idempotencyKey, prepared: { sizeBytes: record.prepared.sizeBytes, sha256: record.prepared.sha256 }, posterMs: record.posterMs }, snapshotSchema, this.options(record));
+      const createBody = { protocolVersion: 1 as const, target: record.target, idempotencyKey: record.idempotencyKey, prepared: { sizeBytes: record.prepared.sizeBytes, sha256: record.prepared.sha256 }, posterMs: record.posterMs };
+      let created: Snapshot;
+      try {
+        created = await apiClient.post(apiPath, createBody, snapshotSchema, this.options(record));
+      } catch (error) {
+        // A lost response can leave a durable server session behind. Retry the
+        // same idempotency key once so the server reconciles that row instead
+        // of creating another upload or forcing the seller to start over.
+        const retryable = error instanceof ApiError ? error.status === 0 || error.status === 503 : error instanceof TypeError;
+        if (!retryable || this.stopped) throw error;
+        created = await apiClient.post(apiPath, createBody, snapshotSchema, this.options(record));
+      }
       // Even a stopped create must retain its identity for pause/cancellation.
       record = { ...record, sessionId: created.sessionId };
       if (this.stopped) {
