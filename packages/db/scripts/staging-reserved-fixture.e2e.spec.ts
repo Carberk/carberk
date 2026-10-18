@@ -8,6 +8,7 @@ import { runInNewContext } from "node:vm";
 
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { Pool } from "pg";
+import { GenericContainer, type StartedTestContainer } from "testcontainers";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -16,16 +17,34 @@ import { PrismaClient } from "../generated/prisma/client/client";
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 const root = fileURLToPath(new URL("../../..", import.meta.url));
 const localRequire = createRequire(import.meta.url);
+// Use the installed application queue implementation, including its Lua scripts.
+const queueRequire = createRequire(`${root}/apps/api/package.json`);
+type DeliveryJob = { data: { to?: string }; getState(): Promise<string> };
+type DeliveryQueue = {
+  add(name: string, data: object, options: object): Promise<unknown>;
+  getJob(id: string): Promise<DeliveryJob | undefined>;
+  close(): Promise<void>;
+};
+const { Queue, Worker } = queueRequire("bullmq") as {
+  Queue: new (name: string, options: object) => DeliveryQueue;
+  Worker: new (name: string, handler: () => Promise<void>, options: object) => { close(): Promise<void> };
+};
 const source = readFileSync(`${root}/scripts/staging-campaign.mjs`, "utf8").replace("export function campaignMain", "function campaignMain") +
   readFileSync(`${root}/scripts/staging-remote.mjs`, "utf8").replace("import { campaignMain } from './staging-campaign.mjs';", "").replace("export function remoteProgram", "function remoteProgram");
 
 describe("reserved staging fixtures on disposable application schema", () => {
   let postgres: StartedPostgreSqlContainer;
+  let redis: StartedTestContainer;
+  let redisUrl: string;
+  let queue: DeliveryQueue;
   let pool: Pool;
   let databaseUrl: string;
   beforeAll(async () => {
     postgres = await new PostgreSqlContainer("postgres:16-alpine").start();
     databaseUrl = postgres.getConnectionUri();
+    redis = await new GenericContainer("redis:7-alpine").withExposedPorts(6379).start();
+    redisUrl = `redis://${redis.getHost()}:${redis.getMappedPort(6379)}`;
+    queue = new Queue("email-code", { connection: { url: redisUrl } });
     execFileSync("pnpm", ["prisma", "migrate", "deploy"], { cwd: packageRoot, env: { ...process.env, DATABASE_URL: databaseUrl }, stdio: "pipe" });
     pool = new Pool({ connectionString: databaseUrl });
     await pool.query(`INSERT INTO brands(id,slug,"nameRu","nameTk","nameEn","updatedAt") VALUES('fixture-catalog-brand','fixture-catalog-brand','Test','Test','Test',now());
@@ -34,17 +53,22 @@ describe("reserved staging fixtures on disposable application schema", () => {
       INSERT INTO cities(id,"regionId",slug,"nameRu","nameTk","nameEn","updatedAt") VALUES('fixture-catalog-city','fixture-catalog-region','fixture-catalog-city','Test','Test','Test',now());
       INSERT INTO users(id,"displayName","updatedAt") VALUES('unrelated-user','Preserve me',now());`);
   }, 120000);
-  afterAll(async () => { await pool?.end(); await postgres?.stop(); });
+  afterAll(async () => { await queue?.close(); await redis?.stop(); await pool?.end(); await postgres?.stop(); });
 
   function execute(kind: string, id: string, profile?: string, candidate = "a".repeat(40), beforeQuery?: (query: string) => void): { code: number; receipt?: { listingId: string; sellerId: string; fixtures: string; profile: string; state: string; identities: number; retainedAudits: number; tombstone: boolean } } {
     let receipt; let code = 0;
     const identity = { projectId: "test-project", environmentId: "test-staging", services: { api: "test-api" },
       origins: { database: "postgresql://postgres.railway.internal:5432/railway", media: "http://minio.railway.internal:9000", publicMedia: "https://media.example" } };
-    const process = { env: { STAGING_CAMPAIGN_PROFILE_ENABLED: "campaign897-identities-v1", RAILWAY_PROJECT_ID: "test-project", RAILWAY_ENVIRONMENT_ID: "test-staging", RAILWAY_SERVICE_ID: "test-api", RAILWAY_ENVIRONMENT_NAME: "staging", APP_ENV: "staging", SMS_DRIVER: "mock", AUTOTM_COMMIT_SHA: "a".repeat(40), DATABASE_URL: "postgresql://u:secret@postgres.railway.internal:5432/railway", MINIO_ENDPOINT: "http://minio.railway.internal:9000", MINIO_PUBLIC_URL: "https://media.example" }, exitCode: 0 };
+    const process = { execPath: globalThis.process.execPath, env: { STAGING_CAMPAIGN_PROFILE_ENABLED: "campaign897-identities-v1", RAILWAY_PROJECT_ID: "test-project", RAILWAY_ENVIRONMENT_ID: "test-staging", RAILWAY_SERVICE_ID: "test-api", RAILWAY_ENVIRONMENT_NAME: "staging", APP_ENV: "staging", SMS_DRIVER: "mock", AUTOTM_COMMIT_SHA: "a".repeat(40), DATABASE_URL: "postgresql://u:secret@postgres.railway.internal:5432/railway", MINIO_ENDPOINT: "http://minio.railway.internal:9000", MINIO_PUBLIC_URL: "https://media.example" }, exitCode: 0 };
     const payload = { kind, id, namespace: `cf_${id}`, target: "a".repeat(40), identity, profile, candidate };
     const program = runInNewContext(`${source}; remoteProgram(payload)`, { payload });
     runInNewContext(program, { URL, process, require: (name: string) => name === "node:child_process" ? {
       spawnSync: (_program: string, _args: string[], options: { input: string }) => {
+        // The reviewed adapter uses a separate Node process for the real BullMQ boundary.
+        if (_program === globalThis.process.execPath) return spawnSync(_program, _args, {
+          ...options, encoding: "utf8", timeout: 30000, cwd: `${root}/apps/api`,
+          env: { ...globalThis.process.env, REDIS_URL: redisUrl },
+        });
         beforeQuery?.(options.input);
         return spawnSync(globalThis.process.execPath, [`${root}/scripts/testing/query-disposable-postgres.cjs`], {
         input: options.input, encoding: "utf8", timeout: 30000,
@@ -186,22 +210,20 @@ describe("reserved staging fixtures on disposable application schema", () => {
     expect((await pool.query(`SELECT count(*)::int AS count FROM users WHERE id='campaign-method-collision'`)).rows[0]).toEqual({ count: 1 });
   });
 
-  it("campaign reset retains ownership after OTP until delivery jobs and sink records have a reviewed disposition", async () => {
+  it("campaign reset disposes a journaled OTP even after its live row expired or was deleted", async () => {
     const id = "9".repeat(32), namespace = `cf_${id}`, profile = "campaign897-identities-v1";
     expect(execute("fixture", id, profile).code).toBe(0);
     const buyer = (await pool.query(`SELECT user_id,email FROM "${namespace}".campaign_entities WHERE alias='buyer-a'`)).rows[0];
     await pool.query(`INSERT INTO otp_requests(id,purpose,channel,destination,"codeHash","expiresAt",ip,"updatedAt") VALUES('campaign-otp','sign_in','email',$1,'synthetic-code-hash',now()+interval '5 minutes','127.0.0.1',now())`, [buyer?.email]);
     expect(execute("fixture", id, profile).code).toBe(0);
-    expect(execute("reset", id, profile).code).toBe(1);
-    expect((await pool.query(`SELECT state FROM "${namespace}".campaign_manifest`)).rows[0]).toEqual({ state: "identities" });
-    expect((await pool.query(`SELECT count(*)::int AS count FROM otp_requests WHERE id='campaign-otp'`)).rows[0]).toEqual({ count: 1 });
-    // Removing the row externally cannot masquerade as delivery cleanup.
     await pool.query(`DELETE FROM otp_requests WHERE id='campaign-otp'`);
-    expect(execute("reset", id, profile).code).toBe(1);
+    expect(execute("reset", id, profile).code).toBe(0);
+    expect((await pool.query(`SELECT state FROM "${namespace}".campaign_manifest`)).rows[0]).toEqual({ state: "disposed" });
+
   });
 
 
-  it("an OTP inserted between reset preflight and its locked transaction prevents a false cleanup receipt", async () => {
+  it("an OTP inserted between reset preflight and its locked transaction is included in delivery disposal", async () => {
     const id = "a".repeat(32), namespace = `cf_${id}`, profile = "campaign897-identities-v1";
     expect(execute("fixture", id, profile).code).toBe(0);
     const email = (await pool.query(`SELECT email FROM "${namespace}".campaign_entities WHERE alias='buyer-a'`)).rows[0]?.email;
@@ -215,9 +237,97 @@ describe("reserved staging fixtures on disposable application schema", () => {
       });
       expect(insertion.status).toBe(0); inserted = true;
     });
-    expect(inserted).toBe(true); expect(result.code).toBe(1);
-    expect((await pool.query(`SELECT state FROM "${namespace}".campaign_manifest`)).rows[0]).toEqual({ state: "identities" });
-    expect((await pool.query(`SELECT count(*)::int AS count FROM otp_requests WHERE id='campaign-racing-otp'`)).rows[0]).toEqual({ count: 1 });
+    expect(inserted).toBe(true); expect(result.code).toBe(0);
+    expect((await pool.query(`SELECT state FROM "${namespace}".campaign_manifest`)).rows[0]).toEqual({ state: "disposed" });
+    expect((await pool.query(`SELECT count(*)::int AS count FROM otp_requests WHERE id='campaign-racing-otp'`)).rows[0]).toEqual({ count: 0 });
+  });
+
+
+  async function queuedOtp(id: string, requestId: string, recipient?: string) {
+    const profile = "campaign897-identities-v1";
+    expect(execute("fixture", id, profile).code).toBe(0);
+    const email = (await pool.query(`SELECT email FROM "cf_${id}".campaign_entities WHERE alias='buyer-a'`)).rows[0]?.email as string;
+    await pool.query(`INSERT INTO otp_requests(id,purpose,channel,destination,"codeHash","expiresAt",ip,"updatedAt")
+      VALUES($1,'sign_in','email',$2,'synthetic-cleanup-hash',now()+interval '5 minutes','127.0.0.1',now())`, [requestId, email]);
+    await queue.add("sign-in-code", { to: recipient ?? email, code: "123456", locale: "en", purpose: "sign-in" }, { jobId: requestId, delay: 3600000 });
+    return email;
+  }
+
+  it("disposes exact persisted OTP jobs, keeps unrelated jobs and makes repeated reset safe", async () => {
+    const id = "b".repeat(32), requestId = "campaign-cleanup-delayed";
+    await queuedOtp(id, requestId);
+    await queue.add("sign-in-code", { to: "unrelated@example.invalid", code: "654321", locale: "en", purpose: "sign-in" }, { jobId: "unrelated-delivery", delay: 3600000 });
+    // This first success assertion must be genuine RED before adding delivery cleanup.
+    expect(execute("reset", id, "campaign897-identities-v1").code).toBe(0);
+    expect(await queue.getJob(requestId)).toBeUndefined();
+    expect((await queue.getJob("unrelated-delivery"))?.data.to).toBe("unrelated@example.invalid");
+    expect(execute("reset", id, "campaign897-identities-v1").code).toBe(0);
+    expect((await pool.query(`SELECT count(*)::int AS count FROM "cf_${id}".campaign_delivery_sink`)).rows[0]).toEqual({ count: 0 });
+    expect((await pool.query(`SELECT count(*)::int AS count FROM otp_requests WHERE id=$1`, [requestId])).rows[0]).toEqual({ count: 0 });
+  });
+
+  it("persists mock delivery only in its owned namespace and erases message content during disposal", async () => {
+    const id = "f".repeat(32), requestId = "campaign-cleanup-sink";
+    const email = await queuedOtp(id, requestId);
+    const send = spawnSync(globalThis.process.execPath, [`${root}/scripts/testing/send-campaign-mock-email.cjs`, JSON.stringify({ requestId, email })], {
+      encoding: "utf8", timeout: 30000, env: { ...globalThis.process.env, DATABASE_URL: databaseUrl },
+    });
+    expect(send.status).toBe(0);
+    // A missing persisted sink is an unmet storage outcome, not an import/setup failure.
+    expect((await pool.query(`SELECT to_regclass('"cf_${id}".campaign_delivery_sink')::text AS name`)).rows[0])
+      .toEqual({ name: `cf_${id}.campaign_delivery_sink` });
+    expect((await pool.query(`SELECT request_id,email,message->>'text' AS text FROM "cf_${id}".campaign_delivery_sink`)).rows)
+      .toEqual([{ request_id: requestId, email, text: "123456" }]);
+    expect(execute("reset", id, "campaign897-identities-v1").code).toBe(0);
+    expect((await pool.query(`SELECT count(*)::int AS count FROM "cf_${id}".campaign_delivery_sink`)).rows[0]).toEqual({ count: 0 });
+    const late = spawnSync(globalThis.process.execPath, [`${root}/scripts/testing/send-campaign-mock-email.cjs`, JSON.stringify({ requestId, email })], {
+      encoding: "utf8", timeout: 30000, env: { ...globalThis.process.env, DATABASE_URL: databaseUrl },
+    });
+    expect(late.status).toBe(1);
+    expect((await pool.query(`SELECT count(*)::int AS count FROM "cf_${id}".campaign_delivery_sink`)).rows[0]).toEqual({ count: 0 });
+  });
+
+  it("refuses a foreign queue recipient sharing an owned request ID and retains namespace ownership", async () => {
+    const id = "c".repeat(32), requestId = "campaign-cleanup-collision";
+    await queuedOtp(id, requestId, "foreign@example.invalid");
+    expect(execute("reset", id, "campaign897-identities-v1").code).toBe(1);
+    expect((await queue.getJob(requestId))?.data.to).toBe("foreign@example.invalid");
+    expect((await pool.query(`SELECT count(*)::int AS count FROM "cf_${id}".campaign_entities e JOIN users u ON u.id=e.user_id`)).rows[0]).toEqual({ count: 4 });
+  });
+
+  it("retains a cleaning reservation while its exact job is active, then retries disposal after the worker exits", async () => {
+    const id = "d".repeat(32), requestId = "campaign-cleanup-active";
+    const email = await queuedOtp(id, requestId);
+    // Replace the delayed job through BullMQ's public interface so a real worker locks it.
+    const job = await queue.getJob(requestId) as DeliveryJob & { promote(): Promise<void> };
+    let release!: () => void;
+    let started!: () => void;
+    const running = new Promise<void>(resolve => { started = resolve; });
+    const hold = new Promise<void>(resolve => { release = resolve; });
+    const worker = new Worker("email-code", async () => { started(); await hold; }, { connection: { url: redisUrl }, concurrency: 1 });
+    try {
+      await job.promote(); await running;
+      expect(await job.getState()).toBe("active");
+      expect(execute("reset", id, "campaign897-identities-v1").code).toBe(1);
+      expect((await pool.query(`SELECT state FROM "cf_${id}".campaign_manifest`)).rows[0]).toEqual({ state: "cleaning" });
+      expect((await queue.getJob(requestId))?.data.to).toBe(email);
+    } finally { release(); await worker.close(); }
+    expect(execute("reset", id, "campaign897-identities-v1").code).toBe(0);
+    expect(await queue.getJob(requestId)).toBeUndefined();
+  });
+
+  it("recovers a lost cleanup response after queue removal without trusting a missing OTP row", async () => {
+    const id = "e".repeat(32), requestId = "campaign-cleanup-lost-response";
+    await queuedOtp(id, requestId);
+    let interrupted = false;
+    expect(execute("reset", id, "campaign897-identities-v1", "a".repeat(40), query => {
+      if (!query.includes("DELETE FROM public.otp_requests")) return;
+      interrupted = true; throw new Error("synthetic lost response after delivery disposition");
+    }).code).toBe(1);
+    expect(interrupted).toBe(true);
+    expect(await queue.getJob(requestId)).toBeUndefined();
+    expect((await pool.query(`SELECT state FROM "cf_${id}".campaign_manifest`)).rows[0]).toEqual({ state: "cleaning" });
+    expect(execute("reset", id, "campaign897-identities-v1").code).toBe(0);
   });
 
 });
