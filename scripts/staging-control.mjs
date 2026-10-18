@@ -73,8 +73,11 @@ export class StagingControl {
       migrations: receipt.migrations, schema: receipt.schema,
       ...(restoring ? { fixtures: 'absent', schema: receipt.schema } : {}) };
   }
-  async perform(claim, kind, restoring = false) {
+  async perform(claim, kind, restoring = false, profile) {
     let snapshot = await this.owned(claim);
+    const selectedProfile = snapshot.state.reservation.fixtureProfile ?? 'listing-v1';
+    if (profile !== undefined && (!['listing-v1', 'campaign897-identities-v1'].includes(profile) || kind !== 'fixture' || restoring)) throw new Error('Unsupported fixture profile');
+    if (profile && profile !== selectedProfile && (snapshot.state.reservation.fixtureProfile || snapshot.state.reservation.evidence.some(e => e.kind === 'fixture'))) throw new Error('Fixture profile cannot change within a reservation');
     await this.platform.authorize(claim);
     await this.attest();
     const plannedRevision = snapshot.revision;
@@ -86,6 +89,8 @@ export class StagingControl {
     if (snapshot.revision !== plannedRevision) throw new Error('Reservation changed during operation planning; inspect before retry');
     const lease = snapshot.state.reservation;
     const operation = { id: this.id(), kind: restoring ? 'restore' : kind, target, startedAt: this.now(), expectedMigrations: schemaPlan?.migrations ?? lease.expectedMigrations ?? await this.ledger.migrationsAt(target), schemaDisposition: schemaPlan?.disposition ?? lease.schemaDisposition ?? 'unchanged' };
+    if (kind === 'fixture') lease.fixtureProfile = profile ?? selectedProfile;
+    operation.profile = lease.fixtureProfile ?? selectedProfile;
     lease.operation = operation; lease.lifecycle = restoring ? 'restoring' : 'active';
     lease.restoration = null;
     await this.write(snapshot, snapshot.state);
@@ -115,12 +120,13 @@ export class StagingControl {
         owned.schemaDisposition = operation.schemaDisposition;
         owned.evidence.push({ ...receipt, observedAt: this.now(), deployments: result.deployments, migrations: operation.expectedMigrations });
       }
-      if (['fixture', 'reset'].includes(kind)) owned.evidence.push({ kind, namespace: owned.namespace, observedAt: this.now(),
+      const campaignReceipt = operation.profile === 'campaign897-identities-v1' && ['fixture', 'reset'].includes(kind) ? this.campaignReceipt(result, owned, kind) : {};
+      if (['fixture', 'reset'].includes(kind)) owned.evidence.push({ kind, namespace: owned.namespace, observedAt: this.now(), ...campaignReceipt,
         ...(kind === 'fixture' ? { listingId: result.listingId, sellerId: result.sellerId } : {}) });
       if (restoring) owned.restoration = { ...receipt, restoredSha: target };
       owned.operation = null; owned.lifecycle = restoring ? 'restored' : 'active';
       await this.write(done, done.state);
-      return { operation: operation.id, target, ...(receipt ?? {}),
+      return { operation: operation.id, target, ...(receipt ?? {}), ...campaignReceipt,
         ...(kind === 'fixture' ? { listingId: result.listingId, sellerId: result.sellerId, namespace: lease.namespace } : {}) };
     } catch {
       const failed = await this.ledger.read();
@@ -133,9 +139,17 @@ export class StagingControl {
       throw new Error('Staging operation blocked; durable recovery retained; provider diagnostics suppressed');
     }
   }
-  async operate(claim, kind) {
+  campaignReceipt(result, lease, kind) {
+    if (result?.profile !== 'campaign897-identities-v1' || result.candidate !== lease.candidate ||
+        result.protectedReceipt !== `${lease.namespace}.campaign_entities` ||
+        result.fixtures !== (kind === 'fixture' ? 'present' : 'absent') ||
+        result.state !== (kind === 'fixture' ? 'identities' : 'disposed') || result.identities !== (kind === 'fixture' ? 4 : 0)) throw new Error('Campaign disposition proof incomplete');
+    return { profile: result.profile, state: result.state, identities: result.identities,
+      protectedReceipt: result.protectedReceipt, retainedAudits: result.retainedAudits, tombstone: result.tombstone };
+  }
+  async operate(claim, kind, profile) {
     if (!['deploy', 'fixture', 'reset'].includes(kind)) throw new Error('Unsupported staging operation');
-    return this.perform(claim, kind);
+    return this.perform(claim, kind, false, profile);
   }
   async restore(claim) { return this.perform(claim, 'deploy', true); }
   async recover(claim) {
@@ -149,6 +163,7 @@ export class StagingControl {
     const result = await this.platform.recover(lease, operation.target, { deployments });
     const restoring = operation.kind === 'restore';
     const receipt = this.proof(result, operation.target, restoring);
+    if (lease.fixtureProfile === 'campaign897-identities-v1' && ['fixture', 'reset'].includes(operation.kind)) Object.assign(receipt, this.campaignReceipt(result, lease, operation.kind));
     if ((operation.kind === 'fixture' && result.fixtures !== 'present') ||
         (operation.kind === 'reset' && result.fixtures !== 'absent')) throw new Error('Recovery fixture disposition incomplete');
     if (restoring && await this.ledger.latestMain() !== operation.target) throw new Error('Latest main moved; interrupted restoration cannot recover');

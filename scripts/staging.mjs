@@ -17,7 +17,7 @@ const usage = `pnpm staging:control help | discover | inspect
 pnpm staging:control identity POLICY.json
 pnpm staging:control enqueue POLICY.json REQUEST.json
 pnpm staging:control acquire POLICY.json REQUEST_ID
-pnpm staging:control operate POLICY.json CLAIM.json deploy|fixture|reset
+pnpm staging:control operate POLICY.json CLAIM.json deploy|fixture|reset [campaign897-identities-v1]
 pnpm staging:control recover POLICY.json CLAIM.json
 pnpm staging:control restore POLICY.json CLAIM.json
 pnpm staging:control release POLICY.json CLAIM.json
@@ -34,7 +34,7 @@ async function json(file) {
 export async function runStagingCommand(args) {
   const [command = 'help', ...values] = args;
   const lengths = { help: 0, discover: 0, inspect: 0, identity: 1, enqueue: 2, acquire: 2, operate: 3, restore: 2, recover: 2, release: 2 };
-  if (!(command in lengths) || values.length !== lengths[command]) throw new Error('Unsupported command or arguments; use help');
+  if (!(command in lengths) || (values.length !== lengths[command] && !(command === 'operate' && values.length === 4 && values[2] === 'fixture' && values[3] === 'campaign897-identities-v1'))) throw new Error('Unsupported command or arguments; use help');
   if (command === 'help') return { usage };
   if (command === 'discover') {
     const projects = JSON.parse(await execute('railway', ['list', '--json']));
@@ -65,7 +65,7 @@ export async function runStagingCommand(args) {
     if (command === 'enqueue') return { requestId: await control.enqueue(await json(values[1])) };
     if (command === 'acquire') return control.acquire(values[1]);
     const claim = await json(values[1]);
-    if (command === 'operate') return control.operate(claim, values[2]);
+    if (command === 'operate') return control.operate(claim, values[2], values[3]);
     if (command === 'recover') return control.recover(claim);
     if (command === 'restore') return control.restore(claim);
     return control.release(claim);
