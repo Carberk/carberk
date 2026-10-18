@@ -87,7 +87,7 @@ describe("authorized Improvement HTTP and real worker/PostgreSQL snapshots",()=>
   for(let index=0;index<5;index++)await fact(`buyer-${index}`,"conversation_created",{conversationId:suite.id(`conversation-${index}`),listingId:suite.id("listing")},new Date(from.getTime()+7200000));
   for(let index=12;index<14;index++)await fact("ordinary","listing_visibility_changed",{listingId:suite.id(`active-${index}`),visibility:"public",reason:"published"},to);
   const workerPath=resolve(__dirname,"../../../../../worker/src/measurement/RecomputeImprovement.ts");
-  const script=`import {PrismaService} from "@auto-tm/db";import {RecomputeImprovement} from ${JSON.stringify(workerPath)};async function main(){const db=new PrismaService();try{await db.$connect();await new RecomputeImprovement(db,{epoch:${JSON.stringify(epoch)},environment:"test",population:"synthetic"},()=>new Date(${JSON.stringify(now.toISOString())})).execute();}finally{await db.$disconnect();}}void main().catch(()=>{process.exitCode=1;});`;
+  const script=`import {PrismaService} from "@auto-tm/db";import {RecomputeImprovement} from ${JSON.stringify(workerPath)};async function main(){const db=new PrismaService();try{await db.$connect();await new RecomputeImprovement(db,{epoch:${JSON.stringify(epoch)},environment:"test",population:"synthetic"},()=>new Date(${JSON.stringify(now.toISOString())})).execute();}finally{await db.$disconnect();}}void main().catch(error=>{console.error(error);process.exitCode=1;});`;
   await promisify(execFile)("pnpm",["exec","tsx","--eval",script],{cwd:process.cwd(),env:process.env,timeout:30000});
   const result=await get("scorecard?period=completed_week").expect(200);
   expect(result.body.state).toBe("ready");

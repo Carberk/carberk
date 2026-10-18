@@ -30,7 +30,7 @@ export class RecomputeImprovement {
     const {from,to}=ImprovementSchemas.improvementWindow(period,now);
     if(from>=to) continue;
     const key=`${this.scope.epoch}:${this.scope.environment}:${this.scope.population}:${period==="today"?"today":"week"}:${from.toISOString()}`;
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
     const previous=await tx.measurementRollup.findUnique({where:{key}});
     const old=ImprovementSchemas.ImprovementSnapshotSchema.safeParse(previous?.metrics);
     const released=old.success && old.data.period!=="today" && old.data.state!=="delayed" && (old.data.scorecard?.disclosure?.policy==="fixed-week-v1" || old.data.state==="suppressed");
