@@ -10,6 +10,7 @@ const schema = z.object({
   OPERATIONS_SCOPE: z.string().regex(/^[a-z0-9-]{1,48}$/).default("development"),
   OPERATIONS_API_HEALTH_URL: probeUrl.optional(),
   OPERATIONS_COLLECTOR_HEALTH_URL: probeUrl.optional(),
+  OPERATIONS_DISK_PATH: z.string().min(1).max(512).refine(value => value.startsWith("/") && !value.includes("\0"), "Expected an absolute monitored mount path").optional(),
   REDIS_URL: z.string().url().optional(),
 });
 
@@ -22,5 +23,6 @@ export function operationsConfig(env: NodeJS.ProcessEnv) {
     redisUrl: parsed.REDIS_URL,
     apiHealthUrl: parsed.OPERATIONS_API_HEALTH_URL,
     collectorHealthUrl: parsed.OPERATIONS_COLLECTOR_HEALTH_URL,
+    diskPath: parsed.OPERATIONS_DISK_PATH,
   };
 }

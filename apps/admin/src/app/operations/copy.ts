@@ -2,7 +2,7 @@ export const operationsCopy = {
   en: {
     title: "Operational health", scope: "Current measured probes. Unknown or missing evidence does not establish health or release readiness.",
     loading: "Checking current evidence…", denied: "Your current access does not permit this view.", error: "Operational evidence could not be loaded.",
-    unavailable: "No current independent watchdog evidence is available.", refresh: "Refresh", observed: "Last observation", api: "API readiness", collector: "Diagnostic collector", worker: "Background worker",
+    unavailable: "No current independent watchdog evidence is available.", refresh: "Refresh", observed: "Last observation", api: "API readiness", collector: "Diagnostic collector", worker: "Background worker", disk: "Monitored disk", tls: "API TLS certificate", diskScope: "Disk capacity refers only to the explicitly mounted monitored filesystem. Separate database/media disks need their own measured evidence.",
     healthy: "Healthy", failing: "Failure observed", unknown: "Unknown", queues: "Queue backlog", queue: "Queue", waiting: "Outstanding jobs", sustained: "Over 100 jobs for ten observed minutes",
     noQueues: "No queue measurements are available.", incident: "Incident", opened: "First observed", resolved: "Resolved", ongoing: "Ongoing", yes: "Yes", no: "No",
     technical: "API measurements", errors: "Technical errors in five minutes", latency: "Ten-minute p95 latency upper bound", denominator: "Observed requests", metricScope: "Rates need a complete window and at least 100 requests. Independent health probes are excluded. Latency uses bounded histogram ranges.",
@@ -12,7 +12,7 @@ export const operationsCopy = {
   ru: {
     title: "Работоспособность", scope: "Текущие измеренные проверки. Неизвестные или отсутствующие данные не подтверждают исправность и готовность к выпуску.",
     loading: "Проверка текущих данных…", denied: "Ваш текущий доступ не разрешает этот просмотр.", error: "Не удалось загрузить эксплуатационные данные.",
-    unavailable: "Нет актуальных данных независимого наблюдателя.", refresh: "Обновить", observed: "Последнее наблюдение", api: "Готовность API", collector: "Сборщик диагностики", worker: "Фоновый обработчик",
+    unavailable: "Нет актуальных данных независимого наблюдателя.", refresh: "Обновить", observed: "Последнее наблюдение", api: "Готовность API", collector: "Сборщик диагностики", worker: "Фоновый обработчик", disk: "Наблюдаемый диск", tls: "Сертификат TLS API", diskScope: "Ёмкость относится только к явно подключённой наблюдаемой файловой системе. Для отдельных дисков базы данных и медиа нужны собственные измерения.",
     healthy: "Исправно", failing: "Обнаружен сбой", unknown: "Неизвестно", queues: "Задержки очередей", queue: "Очередь", waiting: "Незавершённые задания", sustained: "Более 100 заданий за десять минут наблюдения",
     noQueues: "Измерения очередей отсутствуют.", incident: "Инцидент", opened: "Первое наблюдение", resolved: "Устранён", ongoing: "Продолжается", yes: "Да", no: "Нет",
     technical: "Измерения API", errors: "Технические ошибки за пять минут", latency: "Верхняя граница p95 задержки за десять минут", denominator: "Наблюдаемые запросы", metricScope: "Для долей нужны полное окно и не менее 100 запросов. Независимые проверки работоспособности исключены. Задержки измеряются ограниченными диапазонами гистограммы.",
@@ -22,7 +22,7 @@ export const operationsCopy = {
   tk: {
     title: "Ulgamyň işleýşi", scope: "Häzirki ölçenen barlaglar. Näbelli ýa-da ýok maglumatlar ulgamyň sagdynlygyny we çykaryşa taýýarlygyny tassyklamaýar.",
     loading: "Häzirki maglumatlar barlanýar…", denied: "Häzirki ygtyýaryňyz bu maglumatlary görmäge rugsat bermeýär.", error: "Ulgam maglumatlaryny ýükläp bolmady.",
-    unavailable: "Garaşsyz gözegçiniň häzirki maglumatlary ýok.", refresh: "Täzele", observed: "Soňky gözegçilik", api: "API taýýarlygy", collector: "Ýalňyş maglumatlaryny ýygnaýjy", worker: "Arka plandaky işçi",
+    unavailable: "Garaşsyz gözegçiniň häzirki maglumatlary ýok.", refresh: "Täzele", observed: "Soňky gözegçilik", api: "API taýýarlygy", collector: "Ýalňyş maglumatlaryny ýygnaýjy", worker: "Arka plandaky işçi", disk: "Gözegçilik edilýän disk", tls: "API TLS şahadatnamasy", diskScope: "Disk sygymy diňe ýörite birikdirilen gözegçilik faýl ulgamyna degişlidir. Maglumat bazasynyň we media faýllarynyň aýratyn diskleri üçin öz ölçegleri gerek.",
     healthy: "Kadaly işleýär", failing: "Näsazlyk ýüze çykdy", unknown: "Näbelli", queues: "Nobatdaky işler", queue: "Nobat", waiting: "Tamamlanmadyk işler", sustained: "On minutlyk gözegçilikde 100-den köp iş",
     noQueues: "Nobat ölçegleri ýok.", incident: "Näsazlyk", opened: "Ilkinji gözegçilik", resolved: "Düzedildi", ongoing: "Dowam edýär", yes: "Hawa", no: "Ýok",
     technical: "API ölçegleri", errors: "Bäş minutdaky tehniki ýalňyşlar", latency: "On minutlyk p95 gijikmäniň ýokarky çägi", denominator: "Gözegçilik edilen haýyşlar", metricScope: "Görkezijiler üçin doly wagt aralygy we azyndan 100 haýyş gerek. Garaşsyz sagdynlyk barlaglary hasaba alynmaýar. Gijikmeler çäkli gistogramma aralyklarynda ölçenýär.",

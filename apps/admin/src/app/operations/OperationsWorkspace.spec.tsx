@@ -28,8 +28,10 @@ describe("actual operational workspace and server action", () => {
   it.each(["en", "ru", "tk"] as const)("shows measured states and honest missing budget evidence in %s", async locale => {
     const c = operationsCopy[locale], view = setup(locale);
     await view.findByText(c.healthy);
-    expect(view.getAllByText(c.unknown)).toHaveLength(3);
+    expect(view.getAllByText(c.unknown)).toHaveLength(5);
     expect(view.getByText(c.failing)).toBeTruthy();
+    expect(view.getByText(c.disk).parentElement?.textContent).toContain(c.unknown);
+    expect(view.getByText(c.tls).parentElement?.textContent).toContain(c.unknown);
     expect(view.getByText(c.budgetScope)).toBeTruthy();
     expect(view.getByText(c.readinessScope)).toBeTruthy();
   });

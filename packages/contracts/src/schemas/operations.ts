@@ -18,6 +18,8 @@ export const OperationsSnapshotSchema = z.object({
   collector: OperationalProbeSchema,
   worker: OperationalProbeSchema,
   technical: TechnicalSnapshotSchema.nullable().optional(),
+  disk: z.object({ state: OperationalProbeSchema, freeRatio: z.number().min(0).max(1).nullable() }).strict().optional(),
+  tls: z.object({ state: OperationalProbeSchema, expiresAt: z.string().datetime().nullable() }).strict().optional(),
   queues: z.array(z.object({ name: OperationalQueueNameSchema, waiting: z.number().int().min(0).max(1_000_000_000).nullable(), sustainedBacklog: z.boolean() }).strict()).max(12),
   incident: z.object({ openedAt: z.string().datetime(), lastObservedAt: z.string().datetime(), resolvedAt: z.string().datetime().nullable() }).strict().nullable(),
 }).strict();
