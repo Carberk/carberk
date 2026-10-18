@@ -23,6 +23,7 @@ vi.mock("expo-video", async () => {
 const ownerId = "00000000-0000-4000-8000-000000000020", target = { kind: "draft" as const, id: "00000000-0000-4000-8000-000000000021" };
 beforeEach(async () => {
  secure.clear(); videoNativeStorage.values.clear();
+ server.use(http.get("http://localhost:3006/api/v1/listing-video-targets/:kind/:id", () => HttpResponse.json({ active: null, pending: null })));
  vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({ canceled: true, assets: null });
  await storeAuthSession({ accessToken: "synthetic", refreshToken: "synthetic-refresh", user: { id: ownerId, phone: null, email: null, displayName: null, role: "buyer" } });
 });
@@ -61,6 +62,38 @@ describe("optional video editor current capabilities", () => {
   expect(screen.getByRole("button", { name: "Use video" }).props.accessibilityState?.disabled).toBe(true);
   await act(() => { fireEvent(screen.getByRole("adjustable", { name: "Video start" }), "accessibilityAction", { nativeEvent: { actionName: "increment" } }); });
   expect(screen.getByRole("button", { name: "Use video" }).props.accessibilityState?.disabled).toBe(false);
+ });
+
+ it("shows the public video separately from its replacement and cancels only the replacement", async () => {
+  const listing = { kind: "listing" as const, id: "00000000-0000-4000-8000-000000000081" };
+  let pending: { sessionId: string; state: string } | null = { sessionId: "00000000-0000-4000-8000-000000000082", state: "PROCESSING" };
+  server.use(
+   http.get("http://localhost:3006/api/v1/listing-video/capabilities", () => HttpResponse.json({ canUpload: true, canView: true })),
+   http.get(`http://localhost:3006/api/v1/listing-video-targets/listing/${listing.id}`, () => HttpResponse.json({ active: { generationId: listing.id, durationMs: 5000 }, pending })),
+   http.delete(`http://localhost:3006/api/v1/listing-video-targets/listing/${listing.id}/pending`, () => { pending = null; return new HttpResponse(null, { status: 204 }); }),
+  );
+  const screen = await renderMobile(<ListingVideoEditor ownerId={ownerId} target={listing} />);
+  expect(await screen.findByText("Current video · 5 s")).toBeTruthy();
+  expect(screen.getByText("Processing replacement")).toBeTruthy();
+  await fireEvent.press(screen.getByRole("button", { name: "Cancel replacement" }));
+  await vi.waitFor(() => { expect(screen.queryByText("Processing replacement")).toBeNull(); });
+  expect(screen.getByText("Current video · 5 s")).toBeTruthy();
+ });
+ it("keeps the current video visible when removal is offline and offers retry", async () => {
+  const listing = { kind: "listing" as const, id: "00000000-0000-4000-8000-000000000083" };
+  let active: { generationId: string; durationMs: number } | null = { generationId: listing.id, durationMs: 5000 }, offline = true;
+  server.use(
+   http.get("http://localhost:3006/api/v1/listing-video/capabilities", () => HttpResponse.json({ canUpload: false, canView: true })),
+   http.get(`http://localhost:3006/api/v1/listing-video-targets/listing/${listing.id}`, () => HttpResponse.json({ active, pending: null })),
+   http.delete(`http://localhost:3006/api/v1/listings/${listing.id}/video`, () => { if (offline) return HttpResponse.error(); active = null; return new HttpResponse(null, { status: 204 }); }),
+  );
+  const screen = await renderMobile(<ListingVideoEditor ownerId={ownerId} target={listing} />);
+  await fireEvent.press(await screen.findByRole("button", { name: "Remove video" }));
+  expect(await screen.findByText("Video could not be removed. Try again when connected.")).toBeTruthy();
+  expect(screen.getByText("Current video · 5 s")).toBeTruthy();
+  offline = false;
+  await fireEvent.press(screen.getByRole("button", { name: "Remove video" }));
+  await vi.waitFor(() => { expect(screen.queryByText("Current video · 5 s")).toBeNull(); });
  });
 
 });
