@@ -127,6 +127,24 @@ describe("diagnostic authoring and immutable audience release", () => {
     expect(after.snapshot).toEqual(before.snapshot); expect(after.snapshotHash).toBe(before.snapshotHash);
     expect((await get("buyer", `reports/${report.id}`).expect(200)).body.status).toBe("withdrawn");
   });
+  it("reports pending PDF honestly and denies known document requests to other audiences", async () => {
+    const { report } = await draft();
+    await post("technician", `reports/${report.id}/findings`, { expectedVersion: 0, finding: normal() }).expect(201);
+    await post("technician", `reports/${report.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
+    await post("reviewer", `reports/${report.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    const pending = await get("buyer", `reports/${report.id}/documents`).expect(200);
+    expect(pending.body.map((item: { locale: string; state: string }) => [item.locale, item.state])).toEqual([["en", "pending"], ["ru", "pending"], ["tk", "pending"]]);
+    expect(JSON.stringify(pending.body)).not.toMatch(/objectKey|sha256|diagnostic-pdf\//);
+    const download = await get("buyer", `reports/${report.id}/documents/tk`).expect(409);
+    expect(download.body.code).toBe("DIAGNOSTIC_PDF_NOT_READY");
+    expect(download.headers["cache-control"]).toContain("no-store");
+    for (const who of ["other", "admin"] as const) {
+      await get(who, `reports/${report.id}/documents`).expect(403);
+      await get(who, `reports/${report.id}/documents/tk`).expect(403);
+    }
+    await db.session.delete({ where: { id: suite.id("reviewer-session") } });
+    await get("reviewer", `reports/${report.id}/documents/tk`).expect(403);
+  });
   it("protects actual sanitized evidence bytes from other audiences and revoked sessions", async () => {
     const { report } = await draft(); const finding = { ...normal(), assessment: "fault", explanation: "Observed synthetic damage", evidenceIds: [randomUUID()] };
     const image = await sharp({ create: { width: 4, height: 4, channels: 3, background: "red" } }).jpeg().toBuffer();
