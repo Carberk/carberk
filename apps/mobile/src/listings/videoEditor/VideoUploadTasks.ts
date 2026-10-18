@@ -2,6 +2,7 @@ import { VideoUploadSchemas } from "@auto-tm/contracts";
 import { randomUUID } from "expo-crypto";
 
 
+import { emitMeasurement } from "../../measurement/nativeMeasurement";
 import { apiClient } from "../../api/client";
 import { peekAuthSession } from "../../auth/sessionSnapshot";
 import { loadAuthSession } from "../../auth/session";
@@ -52,30 +53,31 @@ export class VideoUploadTask {
         const status = await apiClient.get(`/listing-video-upload-sessions/${record.sessionId}`, VideoUploadSchemas.SessionSnapshot, { assertSession: () => this.owner(), ...(this.businessId ? { headers: { "x-business-id": this.businessId } } : {}) });
         if (intent !== this.intent) return;
         if (status.sessionId !== record.sessionId) throw new Error("VIDEO_SESSION_INVALID");
-        if (status.state === "READY") this.set({ phase: "READY", record });
+        if (status.state === "READY") { this.set({ phase: "READY", record }); await this.discardPrepared(record); }
         else if (["FAILED", "CLEANUP_PENDING", "DELETED"].includes(status.state)) this.set({ phase: status.state === "FAILED" ? "FAILED" : "CANCELLED", record });
       }
     } catch (error) { if (intent === this.intent) this.failed(error); }
   }
   async start(selection: Omit<VideoSelection, "jobId" | "maxBytes">, posterMs: number) {
     if (["PREPARING", "UPLOADING", "PROCESSING"].includes(this.value.phase)) return;
-    const intent = ++this.intent;
+    const intent = ++this.intent, attemptId = randomUUID(), started = Date.now();
     this.set({ phase: "PREPARING", record: this.value.record });
     try {
     await this.owner();
     if (intent !== this.intent) return;
     if (!Number.isInteger(posterMs) || posterMs < selection.startMs || posterMs >= selection.endMs) throw new Error("INVALID_POSTER");
     const native = (await import("expo")).requireOptionalNativeModule<VideoPreparationPort>("ListingVideoPreparation");
-    if (!native) { this.failed(new Error("VIDEO_PREPARATION_UNAVAILABLE")); return; }
+    if (!native) { this.mediaResult("media_preparation_result", attemptId, started, "expected_rejection", "unsupported"); this.failed(new Error("VIDEO_PREPARATION_UNAVAILABLE")); return; }
     const jobId = randomUUID(); this.preparingJob = jobId; this.preparation = new VideoPreparation(native);
       const prepared = await this.preparation.prepare({ ...selection, jobId, maxBytes: 15 * 1024 * 1024 });
       await this.owner();
-      if (intent !== this.intent) { await native.discard(jobId); return; }
+      if (intent !== this.intent) { this.mediaResult("media_preparation_result", attemptId, started, "cancelled"); await native.discard(jobId); return; }
+      this.mediaResult("media_preparation_result", attemptId, started, "success");
       const record: VideoTransferRecord = { version: 1, ownerId: this.ownerId, idempotencyKey: jobId, target: this.target, prepared, posterMs: posterMs - selection.startMs, state: "UPLOADING", confirmedBytes: 0, ...(this.businessId ? { businessId: this.businessId } : {}) };
       await this.saveRecord(record);
       if (intent !== this.intent) return;
       await this.run();
-    } catch (error) { if (intent === this.intent) this.failed(error); }
+    } catch (error) { this.mediaResult("media_preparation_result", attemptId, started, intent === this.intent ? "technical_failure" : "cancelled", intent === this.intent ? "unknown" : undefined); if (intent === this.intent) this.failed(error); }
     finally { this.preparingJob = undefined; this.preparation = undefined; }
   }
   async pause() {
@@ -94,6 +96,7 @@ export class VideoUploadTask {
       if (this.preparingJob) await this.preparation?.cancel(this.preparingJob);
       await this.transfer.cancel();
       this.set({ phase: "CANCELLED", record: this.value.record });
+      if (this.value.record) await this.discardPrepared(this.value.record);
     } catch (error) { this.failed(error); }
   }
   async detachForPublication(): Promise<VideoTransferRecord | null> {
@@ -104,11 +107,21 @@ export class VideoUploadTask {
     await this.saving;
     return this.device.load();
   }
+  private async discardPrepared(record: VideoTransferRecord) {
+    try { await (await import("expo")).requireOptionalNativeModule<VideoPreparationPort>("ListingVideoPreparation")?.discard(record.idempotencyKey); } catch { /* Native cleanup can retry on the next bounded journal recovery. */ }
+  }
   private async saveRecord(record: VideoTransferRecord) {
     this.saving = this.saving.then(() => this.device.save(record));
     await this.saving; this.set({ phase: record.state, record });
   }
-  private async run() { try { await this.transfer.run(); } catch (error) { this.failed(error); } }
+  private mediaResult(eventName: "media_preparation_result" | "media_upload_result", attemptId: string, started: number, result: "success" | "technical_failure" | "expected_rejection" | "cancelled", category?: "unsupported" | "unknown" | "network") {
+    emitMeasurement({ eventName, purpose: "product_reliability", payload: { attemptId, kind: "video", result, durationMs: Math.min(86400000, Math.max(0, Date.now() - started)), ...(category ? { category } : {}) } });
+  }
+  private async run() {
+    const attemptId = randomUUID(), started = Date.now();
+    try { await this.transfer.run(); this.mediaResult("media_upload_result", attemptId, started, this.value.phase === "PROCESSING" ? "success" : "cancelled"); }
+    catch (error) { this.mediaResult("media_upload_result", attemptId, started, "technical_failure", "network"); this.failed(error); }
+  }
   private async owner() { if ((await loadAuthSession())?.user.id !== this.ownerId) throw new Error("VIDEO_TRANSFER_SESSION_CHANGED"); }
   private failed(error: unknown) { this.set({ ...this.value, phase: "FAILED", error: error instanceof Error ? error.message : "VIDEO_TRANSFER_UNAVAILABLE" }); }
   private set(value: VideoTaskSnapshot) { this.value = value; for (const listener of this.listeners) listener(); }
