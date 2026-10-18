@@ -11,6 +11,12 @@ The following foundation paragraph records the 2026-09-13 evidence, not current 
 
 The [accepted ADR-0098](../../adr/0098-integration-delivery-with-shared-staging-and-concise-agent-guidance.md) prepares one shared staging acceptance lane. [Reservation operations](../../agents/shared-staging.md) own candidate identity, exclusive mutations, disposable data and restoration to latest `main`. The [executable staging controls](../../agents/shared-staging-controls.md) distinguish implemented commands from pending activation evidence. Activation awaits independent executable review, hosted fixture proof, authoritative scoped identity/origins and a reserved deployed restoration drill. Repository tests retain hosted disposable services; production promotion stays a separate release action. Historical evidence below establishes only its dated claims; inspect current deployment IDs, SHAs and readiness for a new release.
 
+## Operational monitoring alerts
+
+The founder-selected monitoring route is authenticated Gmail SMTP from `tkmdevelopers@gmail.com` to `bagtyyarkowusow.dev@gmail.com`. Resend remains the sign-in email and OTP driver. SMTP alerts default closed and belong only to the separate watchdog service. Configure the server-only variables and rotate its app password through [SMTP runtime and rotation guidance](../../evidence/issue-919/smtp-alert-transport.md). Keep credential values out of commands, files, logs and evidence. This procedure does not establish live staging configuration.
+
+Before claiming deployed alert readiness, inspect the exact candidate and use the applicable staging reservation/control workflow for any staging configuration or deployed test. Record a harmless synthetic incident, bounded SMTP acceptance and durable receipt, repeat/restart suppression, actual founder inbox receipt and acknowledgment. Recovery delivery is a separate controlled transition. A local adapter acceptance test or SMTP acceptance alone cannot satisfy the deployed-topology or human acknowledgment gate. Restore staging and release its reservation after acceptance. Existing founder coverage remains Monday-Friday 08:00-20:00 Asia/Shanghai, with weekends best effort and no 24/7 response promise. See [monitoring human response](81-monitoring-alarms.md#human-response).
+
 ## Pre-flight checklist
 
 Before kicking off a release:
@@ -622,8 +628,8 @@ If restore fails or takes too long for beta operations, private beta launch is b
 ## Post-deploy
 
 - Update `CHANGELOG.md` with the version + summary
-- Telegram message to AutoTM channel: "v0.X.Y deployed — <summary>"
-- Monitor Grafana for 30 min
+- Record the deployment summary in release evidence and recheck the selected Gmail SMTP monitoring receipt gate when monitoring changes
+- Observe deployed health/readiness for 30 min; use Grafana only when its deployment is verified
 - Close any deployment-related GitHub issues
 - Record whether rollback, restore, alert, and feature-flag drills remain current for the launch gate
 
