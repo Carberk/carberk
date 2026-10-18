@@ -101,7 +101,10 @@ it.each([["en", "Open, save or share PDF"], ["ru", "Открыть, сохран
  server.use(http.get("*/services/conversations", () => HttpResponse.json([{ id, purpose: "history", createdAt: "2026-10-15T10:00:00Z" }])), http.get("*/services/conversations/:id", () => HttpResponse.json({ id, resourceId: id, purpose: "history", status: "completed", assignmentVersion: 1, assigned: true, operatorName: "Synthetic operator", sourceListingId: null, canSend: true, messages: [], lastSequence: 0, readThrough: 0, unread: 0, hasMore: false })), http.get("*/services/conversations/:id/history", () => HttpResponse.json({ synthetic: true, quotes: [], order: { id, quoteId: id, state: "delivered", version: 2, day: "2026-10-15", holdExpiresAt: "2026-10-15T10:00:00Z", promiseAt: "2026-10-15T12:00:00Z", paidAt: "2026-10-15T11:00:00Z", escalatedAt: null, recoveryDeadline: null, recoveryUsed: false, refundState: null }, payments: [] })), http.get("*/services/conversations/:id/history/reports", () => HttpResponse.json({ delivered: [{ id, provider: "carfax", vin: "1HGCM82633A004352", originalDate: "2020-01-01T00:00:00Z", sizeBytes: 4, expectedPages: 1, sharedLink: "https://example.invalid/report", deliveredAt: "2026-10-15T12:00:00Z", state: "verified", canShare: true }], archive: [], staged: [] })), http.get("*/services/conversations/:id/history/artifacts/:artifact", () => { reads++; return HttpResponse.arrayBuffer(new Uint8Array([37,80,68,70]).buffer); }));
  const screen = await renderMobile(<ServiceScreen/>, { locale });
  const history = locale === "ru" ? "История автомобиля" : locale === "tk" ? "Awtoulag taryhy" : "Vehicle History";
- await fireEvent.press(await screen.findByRole("button", { name: history })); await fireEvent.press(await screen.findByRole("button", { name: label })); await screen.findByRole("button", { name: label });
+ await fireEvent.press(await screen.findByRole("button", { name: history }));
+ expect(await screen.findByText("carfax-1HGCM82633A004352.pdf")).toBeTruthy();
+ expect(screen.getByText("4 B")).toBeTruthy();
+ await fireEvent.press(await screen.findByRole("button", { name: label })); await screen.findByRole("button", { name: label });
  expect(reads).toBe(1); expect(sent).toEqual([]);
  await act(async () => { await clearAuthSession(); }); expect(screen.queryByRole("button", { name: label })).toBeNull();
 });
