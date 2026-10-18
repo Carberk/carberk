@@ -510,7 +510,7 @@ describe("ListingsController e2e", () => {
         .send({ brandId: "00000000-0000-0000-0000-000000000099" })
         .expect(400);
 
-      expect(res.body.code).toBe("VALIDATION_ERROR");
+      expect(res.body.code).toBe("VALIDATION_FAILED");
     });
 
     it("returns a complete mobile edit response and clears Known issues", async () => {
@@ -555,7 +555,7 @@ describe("ListingsController e2e", () => {
         .send({ conditionDisclosure: { knownIssuesText: "Rust" } })
         .expect(400);
 
-      expect(res.body.code).toBe("VALIDATION_ERROR");
+      expect(res.body.code).toBe("VALIDATION_FAILED");
     });
 
     it("rejects an edit of a Listing without a Damaged answer until it is answered", async () => {
@@ -1321,13 +1321,35 @@ describe("ListingsController e2e", () => {
       expect(page2.body.nextCursor).toBeNull();
     });
 
-    it("returns 400 VALIDATION_ERROR for invalid filter range", async () => {
+    it("returns 400 VALIDATION_FAILED for invalid filter range", async () => {
       const res = await request
         .get("/api/v1/listings")
         .query({ priceMin: 200000, priceMax: 100000 })
         .expect(400);
 
-      expect(res.body.code).toBe("VALIDATION_ERROR");
+      expect(res.body.code).toBe("VALIDATION_FAILED");
+      expect(res.body.details).toEqual({ reason: "INVALID_PRICE" });
+    });
+  });
+
+  describe("listing request validation", () => {
+    it.each([
+      { method: "patch", suffix: "", body: { priceAmount: -1 }, field: "priceAmount" },
+      { method: "post", suffix: "/media/attach", body: {}, field: "key" },
+      { method: "put", suffix: "/media/order", body: {}, field: "ordering" },
+    ] as const)("returns 400 VALIDATION_FAILED for $method $suffix", async ({ method, suffix, body, field }) => {
+      const token = await createUser("user-1");
+      const res = await request[method](`/api/v1/listings/${suite.id("invalid-request")}${suffix}`)
+        .set("Authorization", `Bearer ${token}`)
+        .send(body)
+        .expect(400);
+
+      expect(res.body.code).toBe("VALIDATION_FAILED");
+      expect(res.body.message).toBe("Invalid request body");
+      expect(res.body.details).toMatchObject({
+        formErrors: [],
+        fieldErrors: { [field]: expect.any(Array) },
+      });
     });
   });
 
@@ -1454,7 +1476,7 @@ describe("ListingsController e2e", () => {
 
     it("returns 400 for an unknown sort", async () => {
       const res = await request.get("/api/v1/listings").query({ sort: "best_deal" }).expect(400);
-      expect(res.body.code).toBe("VALIDATION_ERROR");
+      expect(res.body.code).toBe("VALIDATION_FAILED");
     });
 
     it("returns 400 for a cursor from another order or a malformed cursor", async () => {
@@ -1474,7 +1496,8 @@ describe("ListingsController e2e", () => {
           .get("/api/v1/listings")
           .query({ brandId: suite.catalog.brandId, ...query })
           .expect(400);
-        expect(res.body.code).toBe("VALIDATION_ERROR");
+        expect(res.body.code).toBe("VALIDATION_FAILED");
+        expect(res.body.details).toEqual({ reason: "INVALID_FEED_CURSOR" });
       }
     });
   });
@@ -1509,7 +1532,7 @@ describe("ListingsController e2e", () => {
         .get("/api/v1/listings/filter-options/brands")
         .query({ brandId: suite.catalog.brandId })
         .expect(400);
-      expect(res.body.code).toBe("VALIDATION_ERROR");
+      expect(res.body.code).toBe("VALIDATION_FAILED");
     });
 
     async function seedBrandCountListings(): Promise<void> {
@@ -1734,13 +1757,13 @@ describe("ListingsController e2e", () => {
       });
     });
 
-    it("returns 400 VALIDATION_ERROR for an unknown sort", async () => {
+    it("returns 400 VALIDATION_FAILED for an unknown sort", async () => {
       const res = await request
         .get("/api/v1/listings/count")
         .query({ sort: "relevance" })
         .expect(400);
 
-      expect(res.body.code).toBe("VALIDATION_ERROR");
+      expect(res.body.code).toBe("VALIDATION_FAILED");
     });
 
     it("respects FX-aware price filters", async () => {
@@ -1775,13 +1798,13 @@ describe("ListingsController e2e", () => {
       expect(res.body.totalMatching).toBe(1);
     });
 
-    it("returns 400 VALIDATION_ERROR for invalid filter range", async () => {
+    it("returns 400 VALIDATION_FAILED for invalid filter range", async () => {
       const res = await request
         .get("/api/v1/listings/count")
         .query({ priceMin: 200000, priceMax: 100000 })
         .expect(400);
 
-      expect(res.body.code).toBe("VALIDATION_ERROR");
+      expect(res.body.code).toBe("VALIDATION_FAILED");
     });
   });
 

@@ -31,7 +31,7 @@ describe("DraftsController validate-step", () => {
 
     await expect(call).rejects.toBeInstanceOf(BadRequestException);
     await expect(call).rejects.toMatchObject({
-      response: { code: "VALIDATION_ERROR" },
+      response: { code: "VALIDATION_FAILED" },
     });
     expect(validateStep).not.toHaveBeenCalled();
   });

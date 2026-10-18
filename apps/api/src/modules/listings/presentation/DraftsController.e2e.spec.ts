@@ -375,11 +375,18 @@ describe("DraftsController e2e", () => {
         .send({})
         .expect(201);
 
-      await request
+      const res = await request
         .post(`/api/v1/listings/drafts/${created.body.id}/validate-step`)
         .set("Authorization", `Bearer ${token}`)
         .send({ step: "vin", payload: {} })
         .expect(400);
+
+      expect(res.body.code).toBe("VALIDATION_FAILED");
+      expect(res.body.message).toBe("Request validation failed");
+      expect(res.body.details).toMatchObject({
+        formErrors: [],
+        fieldErrors: { step: expect.any(Array) },
+      });
     });
   });
 
