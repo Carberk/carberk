@@ -73,6 +73,24 @@ export class StagingControl {
       migrations: receipt.migrations, schema: receipt.schema,
       ...(restoring ? { fixtures: 'absent', schema: receipt.schema } : {}) };
   }
+  campaignDisposed(lease) {
+    const evidence = lease.evidence.findLast(e => ['fixture', 'reset'].includes(e.kind) ||
+      (e.kind === 'recovery' && ['fixture', 'reset'].includes(e.recoveredOperation?.kind)));
+    return evidence && (evidence.kind === 'reset' || evidence.recoveredOperation?.kind === 'reset') &&
+      evidence.reservationId === lease.id && evidence.candidate === lease.candidate && evidence.namespace === lease.namespace &&
+      evidence.profile === lease.fixtureProfile && evidence.state === 'disposed' && evidence.identities === 0 &&
+      evidence.protectedReceipt === `${lease.namespace}.campaign_entities` && evidence.tombstone === true &&
+      evidence.cleanupVersion === 1 && evidence.deliveryCleanup === 'disposed' && evidence.queueJobs === 0 && evidence.sinkRecords === 0 &&
+      /^[a-f0-9]{32}$/.test(evidence.operationId ?? '') && Number.isFinite(Date.parse(evidence.observedAt));
+  }
+  async requireCampaignDisposal(snapshot) {
+    const lease = snapshot.state.reservation;
+    if (lease.fixtureProfile !== 'campaign897-identities-v1' || this.campaignDisposed(lease)) return;
+    lease.recovery = { owner: this.actor,
+      action: 'Keep candidate enqueue/send fences deployed. Complete the current reservation campaign reset and persist exact disposed queue/sink proof before restoring latest main. Unknown or partial cleanup retains ownership.' };
+    await this.write(snapshot, snapshot.state);
+    throw new Error('Complete durable campaign disposal required before restoration; reset while candidate fences remain deployed');
+  }
   async perform(claim, kind, restoring = false, profile) {
     let snapshot = await this.owned(claim);
     const selectedProfile = snapshot.state.reservation.fixtureProfile ?? 'listing-v1';
@@ -87,6 +105,7 @@ export class StagingControl {
     // Re-read after external lookups. A previously read owner never grants a new operation.
     snapshot = await this.owned(claim);
     if (snapshot.revision !== plannedRevision) throw new Error('Reservation changed during operation planning; inspect before retry');
+    if (restoring) await this.requireCampaignDisposal(snapshot);
     const lease = snapshot.state.reservation;
     const operation = { id: this.id(), kind: restoring ? 'restore' : kind, target, startedAt: this.now(), expectedMigrations: schemaPlan?.migrations ?? lease.expectedMigrations ?? await this.ledger.migrationsAt(target), schemaDisposition: schemaPlan?.disposition ?? lease.schemaDisposition ?? 'unchanged' };
     if (kind === 'fixture') lease.fixtureProfile = profile ?? selectedProfile;
@@ -121,7 +140,7 @@ export class StagingControl {
         owned.evidence.push({ ...receipt, observedAt: this.now(), deployments: result.deployments, migrations: operation.expectedMigrations });
       }
       const campaignReceipt = operation.profile === 'campaign897-identities-v1' && ['fixture', 'reset'].includes(kind) ? this.campaignReceipt(result, owned, kind) : {};
-      if (['fixture', 'reset'].includes(kind)) owned.evidence.push({ kind, namespace: owned.namespace, observedAt: this.now(), ...campaignReceipt,
+      if (['fixture', 'reset'].includes(kind)) owned.evidence.push({ kind, operationId: operation.id, namespace: owned.namespace, observedAt: this.now(), ...campaignReceipt,
         ...(kind === 'fixture' ? { listingId: result.listingId, sellerId: result.sellerId } : {}) });
       if (restoring) owned.restoration = { ...receipt, restoredSha: target };
       owned.operation = null; owned.lifecycle = restoring ? 'restored' : 'active';
@@ -144,7 +163,11 @@ export class StagingControl {
         result.protectedReceipt !== `${lease.namespace}.campaign_entities` ||
         result.fixtures !== (kind === 'fixture' ? 'present' : 'absent') ||
         result.state !== (kind === 'fixture' ? 'identities' : 'disposed') || result.identities !== (kind === 'fixture' ? 4 : 0)) throw new Error('Campaign disposition proof incomplete');
-    return { profile: result.profile, state: result.state, identities: result.identities,
+    if (kind === 'reset' && (result.reservationId !== lease.id || result.cleanupVersion !== 1 || result.deliveryCleanup !== 'disposed' ||
+        result.queueJobs !== 0 || result.sinkRecords !== 0 || result.tombstone !== true)) throw new Error('Campaign delivery disposal proof incomplete');
+    return { reservationId: lease.id, candidate: lease.candidate, namespace: lease.namespace,
+      ...(kind === 'reset' ? { cleanupVersion: result.cleanupVersion, deliveryCleanup: result.deliveryCleanup, queueJobs: result.queueJobs, sinkRecords: result.sinkRecords } : {}),
+      profile: result.profile, state: result.state, identities: result.identities,
       protectedReceipt: result.protectedReceipt, retainedAudits: result.retainedAudits, tombstone: result.tombstone };
   }
   async operate(claim, kind, profile) {
@@ -159,6 +182,7 @@ export class StagingControl {
     await this.platform.authorize(claim); await this.attest();
     const deployments = ['deploy', 'restore'].includes(operation.kind) ? operation.deployments : lease.deployments;
     if (!deployments || Object.keys(deployments).sort().join(',') !== Object.keys(lease.identity.services).sort().join(',')) throw new Error('Complete deployment journal required for recovery; partial state retains reservation');
+    if (operation.kind === 'restore') await this.requireCampaignDisposal(snapshot);
     // Recovery observes only. It never retries a deployment, resets data or guesses a lost ID.
     const result = await this.platform.recover(lease, operation.target, { deployments });
     const restoring = operation.kind === 'restore';
@@ -172,7 +196,7 @@ export class StagingControl {
     const owned = current.state.reservation;
     owned.deployments = deployments; owned.expectedMigrations = operation.expectedMigrations;
     owned.schemaDisposition = operation.schemaDisposition;
-    owned.evidence.push({ ...receipt, kind: 'recovery', recoveredOperation: structuredClone(operation),
+    owned.evidence.push({ ...receipt, kind: 'recovery', operationId: operation.id, namespace: owned.namespace, recoveredOperation: structuredClone(operation),
       deployments, migrations: operation.expectedMigrations, fixtures: result.fixtures, observedAt: this.now() });
     if (restoring) owned.restoration = { ...receipt, restoredSha: operation.target };
     owned.operation = null; owned.lifecycle = restoring ? 'restored' : 'active';
@@ -184,6 +208,7 @@ export class StagingControl {
     let snapshot = await this.owned(claim);
     const restored = snapshot.state.reservation.restoration;
     if (!restored) throw new Error('Verified restoration required');
+    await this.requireCampaignDisposal(snapshot);
     if (restored.restoredSha !== await this.ledger.latestMain()) throw new Error('Latest main changed; restore again');
     await this.attest();
     this.proof(await this.platform.verify(snapshot.state.reservation, restored.restoredSha, { deployments: snapshot.state.reservation.deployments }), restored.restoredSha, true);
