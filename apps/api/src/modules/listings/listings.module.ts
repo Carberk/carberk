@@ -13,6 +13,7 @@ import { ConfigService } from "@nestjs/config";
 import { S3Client } from "@aws-sdk/client-s3";
 import { randomBytes, randomUUID } from "node:crypto";
 import type { Env } from "../../env.schema";
+import { VideoCapabilitiesController } from "./presentation/VideoCapabilitiesController";
 import { VideoGrantController } from "./presentation/VideoGrantController";
 import { VideoPlaybackController } from "./presentation/VideoPlaybackController";
 import { PrismaVideoPlayback, VIDEO_GRANT_SECRET_FACTORY, VIDEO_PLAYBACK_ELIGIBILITY } from "./infrastructure/PrismaVideoPlayback";
@@ -122,7 +123,7 @@ import { LISTING_VIEWS_PORT } from "./domain/ports/ListingViewsPort";
 
 @Module({
   imports: [PrismaModule, EventEmitterModule, IdentityModule, MeasurementModule],
-  controllers: [PublicMarketplaceController, BusinessInventoryController,ListingViewsController, ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController, VideoUploadController, VideoGrantController, VideoPlaybackController],
+  controllers: [PublicMarketplaceController, BusinessInventoryController,ListingViewsController, ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController, VideoUploadController, VideoCapabilitiesController, VideoGrantController, VideoPlaybackController],
   providers: [
     { provide: PUBLIC_MARKETPLACE_READ_PORT, useClass: PrismaPublicMarketplaceReadRepository },
     { provide: BUSINESS_INVENTORY_REPOSITORY, useClass: PrismaBusinessInventoryRepository },
