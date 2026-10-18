@@ -16,14 +16,17 @@ export function HistoryWorkspace({ conversation, locale, denied }: { conversatio
  const [refundCause, setRefundCause] = useState<"late_funds" | "company_error" | "unusable_report">("late_funds");
  const [reason, setReason] = useState(""), [reference, setReference] = useState(""), [paymentId, setPaymentId] = useState(""), [amount, setAmount] = useState(""), [received, setReceived] = useState(""), [funds, setFunds] = useState(false), [receiptEvidence, setReceiptEvidence] = useState("");
  const [day, setDay] = useState(""), [slots, setSlots] = useState(""), [morning, setMorning] = useState(""), [allowance, setAllowance] = useState(""), [consumed, setConsumed] = useState(""), [reset, setReset] = useState(""), [capacityEvidence, setCapacityEvidence] = useState("");
- const quoteRetry = useRef<{ fingerprint: string; id: string } | null>(null), generation = useRef(0);
+ const quoteRetry = useRef<{ fingerprint: string; id: string } | null>(null), generation = useRef(0), readSequence = useRef(0);
  async function refresh() {
-  const epoch = ++generation.current; const result = await historyRead(conversation.id);
-  if (epoch !== generation.current) return;
-  if (result.ok) { setData(result.data); setError(false); }
-  else { setData(null); setError(true); if (result.error === "permission" || result.error === "conflict") denied(); }
+  const epoch = generation.current, sequence = ++readSequence.current;
+  try {
+   const result = await historyRead(conversation.id);
+   if (epoch !== generation.current || sequence !== readSequence.current) return;
+   if (result.ok) { setData(result.data); setError(false); }
+   else { setData(null); setError(true); if (result.error === "permission" || result.error === "conflict") denied(); }
+  } catch { if (epoch === generation.current && sequence === readSequence.current) setError(true); }
  }
- useEffect(() => { void refresh(); return () => { generation.current++; }; }, [conversation.id, conversation.assignmentVersion]);
+ useEffect(() => { generation.current++; setBusy(false); void refresh(); return () => { generation.current++; }; }, [conversation.id, conversation.assignmentVersion]);
  const selectedReceipt = data?.payments.find(value => value.id === paymentId)?.attachmentId;
  useEffect(() => {
   if (receiptObjectUrl.current) URL.revokeObjectURL(receiptObjectUrl.current);
@@ -47,17 +50,22 @@ export function HistoryWorkspace({ conversation, locale, denied }: { conversatio
  async function readPayments() {
   if (busy || !reason.trim()) return;
   const epoch = generation.current; setBusy(true);
-  const result = await historyPayments(conversation.id, reason);
-  if (epoch !== generation.current) return;
-  setBusy(false);
-  if (result.ok) { setData(result.data); setError(false); }
-  else { setError(true); if (result.error === "permission" || result.error === "conflict") { setData(null); denied(); } }
+  try {
+   const result = await historyPayments(conversation.id, reason);
+   if (epoch !== generation.current) return;
+   if (result.ok) { setData(result.data); setError(false); }
+   else { setError(true); if (result.error === "permission" || result.error === "conflict") { setData(null); denied(); } }
+  } catch { if (epoch === generation.current) setError(true); }
+  finally { if (epoch === generation.current) setBusy(false); }
  }
  async function command(value: S.HistoryCommand) {
   if (busy) return; const epoch = generation.current; setBusy(true); setError(false);
-  const result = await historyCommand(conversation.id, value); if (epoch !== generation.current) return; setBusy(false);
-  if (!result.ok) { setError(true); if (result.error === "permission" || result.error === "conflict") { setData(null); denied(); } return; }
-  await refresh();
+  try {
+   const result = await historyCommand(conversation.id, value); if (epoch !== generation.current) return;
+   if (!result.ok) { setError(true); if (result.error === "permission" || result.error === "conflict") { setData(null); denied(); } return; }
+   await refresh();
+  } catch { if (epoch === generation.current) setError(true); }
+  finally { if (epoch === generation.current) setBusy(false); }
  }
  function offer() {
   const input = { vin, providers: providers === "both" ? ["carfax", "autocheck"] as const : [providers], preflightOutcome: outcome, preflightEvidence: evidence, refundRule, windowStart, windowEnd, feasible };
