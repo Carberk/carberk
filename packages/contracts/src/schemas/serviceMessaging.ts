@@ -46,3 +46,18 @@ export type ServiceSend = z.infer<typeof ServiceSendSchema>;
 export type ServiceStageAttachment = z.infer<typeof ServiceStageAttachmentSchema>;
 export type ServiceMessage = z.infer<typeof ServiceMessageSchema>;
 export type ServiceConversation = z.infer<typeof ServiceConversationSchema>;
+
+// Every command is synthetic-only; current authority and claim versions are server checks.
+const historyProvider = z.enum(["carfax", "autocheck"]);
+const historyProviders = z.array(historyProvider).min(1).max(2).refine(values => new Set(values).size === values.length);
+const historyWindow = { windowStart: z.string().datetime(), windowEnd: z.string().datetime() };
+export const HistoryCommandSchema = z.discriminatedUnion("kind", [
+ z.object({ kind: z.literal("capacity"), expectedAssignmentVersion: z.number().int().nonnegative(), day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), slotLimit: z.number().int().nonnegative().max(1000), morningLimit: z.number().int().nonnegative().max(1000), evidence: z.string().trim().min(1).max(1000), providers: z.array(z.object({ provider: historyProvider, allowance: z.number().int().nonnegative().max(10000), consumed: z.number().int().nonnegative(), resetAt: z.string().datetime(), evidence: z.string().trim().min(1).max(1000) })).min(1).max(2) }).strict(),
+ z.object({ kind: z.literal("quote"), expectedAssignmentVersion: z.number().int().nonnegative(), quoteId: z.string().uuid(), vin: z.string().min(1).max(30), providers: historyProviders, preflightOutcome: z.enum(["available", "malformed", "unsupported", "no_history", "mismatch", "temporary_failure"]), preflightEvidence: z.string().trim().min(1).max(1000), refundRule: z.string().trim().min(1).max(1000), ...historyWindow, feasible: z.boolean() }).strict(),
+ z.object({ kind: z.literal("accept"), quoteId: z.string().uuid(), vin: z.string().length(17), providers: historyProviders, amount: z.literal(100), refundRule: z.string().min(1).max(1000), ...historyWindow, rights: ServiceRightsSchema }).strict(),
+ z.object({ kind: z.literal("payment"), orderId: z.string().uuid(), clientPaymentId: z.string().uuid(), claim: z.string().trim().min(1).max(1000), attachmentId: z.string().uuid().optional() }).strict(),
+ z.object({ kind: z.literal("verify"), expectedAssignmentVersion: z.number().int().nonnegative(), expectedVersion: z.number().int().nonnegative(), orderId: z.string().uuid(), paymentId: z.string().uuid(), verifiedFunds: z.boolean(), amount: z.number().int().positive(), receivedAt: z.string().datetime(), evidence: z.string().trim().min(1).max(1000) }).strict(),
+ z.object({ kind: z.enum(["purchase", "purchase_uncertain", "purchase_completed", "purchase_no_data", "missed", "refund_approve", "refund_execute"]), expectedAssignmentVersion: z.number().int().nonnegative(), expectedVersion: z.number().int().nonnegative(), orderId: z.string().uuid(), reason: z.string().trim().min(1).max(1000), reference: z.string().trim().min(1).max(300).optional() }).strict(),
+ z.object({ kind: z.literal("recovery"), expectedVersion: z.number().int().nonnegative(), orderId: z.string().uuid(), agree: z.boolean(), deadline: z.string().datetime().optional() }).strict(),
+]);
+export type HistoryCommand = z.infer<typeof HistoryCommandSchema>;
