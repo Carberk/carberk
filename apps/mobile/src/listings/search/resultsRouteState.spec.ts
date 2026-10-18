@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import { readPickerResultsFilters, readResultsRouteState, writeResultsRouteState } from "./resultsRouteState";
 
 describe("readResultsRouteState", () => {
+  it("retains seller type through the applied Results route and rejects unknown choices", () => {
+    expect(readResultsRouteState({ sellerType: "business" })).toEqual({ sort: "newest", sellerType: "business" });
+    expect(readResultsRouteState({ sellerType: "promoted" })).toEqual({ sort: "newest" });
+  });
   it("returns the newest-first full feed when there are no parameters", () => {
     expect(readResultsRouteState({})).toEqual({ sort: "newest" });
   });
