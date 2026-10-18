@@ -1,4 +1,6 @@
 import "reflect-metadata";
+import sharp from "sharp";
+import { S3Client, CreateBucketCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Test } from "@nestjs/testing";
 import { ConfigModule } from "@nestjs/config";
@@ -88,4 +90,31 @@ describe("business enquiries through real HTTP and PostgreSQL", () => {
   await post("sales-a", `/${id}/messages`, { text: "Existing conversation continues" }).expect(201);
   await post("other", "", { listingId: suite.id("listing") }, false).expect(403);
  });
+ it("keeps business image bytes private and rechecks membership for an already known download and upload path", async () => {
+  const id = (await open().expect(201)).body.id as string;
+  await post("sales-a", `/business/${businessId}/${id}/claim`, { expectedVersion: 0 }).expect(201);
+  const endpoint = process.env["MINIO_ENDPOINT"]!;
+  const s3 = new S3Client({ endpoint, region: process.env["MINIO_REGION"] ?? "us-east-1", forcePathStyle: true, credentials: { accessKeyId: process.env["MINIO_ACCESS_KEY"]!, secretAccessKey: process.env["MINIO_SECRET_KEY"]! } });
+  try { await s3.send(new CreateBucketCommand({ Bucket: "business-chat-private" })); } catch (error) { if (!(error instanceof Error) || !["BucketAlreadyExists", "BucketAlreadyOwnedByYou"].includes(error.name)) throw error; }
+  const bytes = await sharp({ create: { width: 12, height: 12, channels: 3, background: "red" } }).webp().toBuffer();
+  const staged = await post("sales-a", `/${id}/attachments/presign`, { contentType: "image/webp", sizeBytes: bytes.length }).expect(201);
+  const key = staged.body.key as string;
+  try {
+   expect(key).toMatch(new RegExp(`^business-chat-private/${id}/`));
+   const path = `/${id}/attachments/${key.split("/")[2]}/bytes`;
+   expect(staged.body.uploadUrl).toBe(`/conversations${path}`);
+   await request.post(`/api/v1/conversations${path}`).set("authorization", `Bearer ${token("sales-a")}`).set("x-business-id", businessId).set("Content-Type", "application/octet-stream").send(bytes).expect(201);
+   await post("sales-a", `/${id}/messages/rich`, { kind: "image", metadata: { key }, clientMessageId: suite.id("image-client") }).expect(201);
+   const download = path.replace(/\/bytes$/, "");
+   await get("buyer", download, false).expect(200).expect("Cache-Control", "no-store, private");
+   await get("sales-a", download).expect(200);
+   expect((await fetch(`${endpoint}/business-chat-private/${key}`)).status).toBe(403);
+   await prisma.dealershipMember.delete({ where: { userId: suite.id("sales-a") } });
+   await get("sales-a", download).expect(403);
+   await request.post(`/api/v1/conversations${path}`).set("authorization", `Bearer ${token("sales-a")}`).set("x-business-id", businessId).set("Content-Type", "application/octet-stream").send(bytes).expect(403);
+   await get("owner", download).expect(200);
+   await get("other", download, false).expect(403);
+  } finally { await s3.send(new DeleteObjectCommand({ Bucket: "business-chat-private", Key: key })); s3.destroy(); }
+ });
+
 });
