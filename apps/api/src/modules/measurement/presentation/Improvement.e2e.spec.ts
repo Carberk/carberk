@@ -73,6 +73,7 @@ describe("authorized Improvement HTTP and real worker/PostgreSQL snapshots",()=>
   expect(await accept.afterCommit(event,{...resolved,origin})).toBe("accepted");return {accept,event,authority:{...resolved,origin} as import("../measurement.public").MeasurementAuthority};
  }
  it("reproduces 16 / 12 through accepted owning facts, dedupe, worker persistence and actual HTTP",async()=>{
+  now=new Date("2026-10-12T01:00:00.000Z");
   const {from,to}=ImprovementSchemas.improvementWindow("completed_week",now);
   now=new Date(to.getTime()+3600000);
   await prisma.measurementState.create({data:{key:`inventory_baseline:${epoch}`,epoch:from.toISOString()}});
@@ -102,6 +103,8 @@ describe("authorized Improvement HTTP and real worker/PostgreSQL snapshots",()=>
   expect(unchanged.body.generatedAt).toBe(firstReleasedAt);
   expect(unchanged.body.scorecard.contacts).toEqual(result.body.scorecard.contacts);
   expect(unchanged.body.lateRecords).toBeNull();
+  const retained=await prisma.measurementRollup.findUniqueOrThrow({where:{key:`${epoch}:test:synthetic:week:${from.toISOString()}`}});
+  expect(retained.expiresAt.toISOString()).toBe("2028-10-12T00:00:00.000Z");
   const today=await get("scorecard?period=today").expect(200);
   expect(today.body).toMatchObject({state:"suppressed",scorecard:null,lateRecords:null});
   expect(today.body.completeThrough).toBe(now.toISOString());
