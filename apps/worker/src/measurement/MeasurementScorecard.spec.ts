@@ -80,3 +80,10 @@ describe("reproducible first-party scorecard", () => {
  });
 
 });
+
+it("does not turn an old retained principal into a new cohort after raw history expires",()=>{
+ const old={...fact("foreground_activity",{screen:"home",action:"open"},"2026-10-01T01:00:00Z","existing-account"),firstObservedAt:new Date("2026-05-01T00:00:00Z")};
+ const fresh={...fact("visit_started",{screen:"home"},"2026-10-01T01:00:00Z","fresh-account"),firstObservedAt:new Date("2026-10-01T01:00:00Z")};
+ const returning={...fact("foreground_activity",{screen:"home",action:"open"},"2026-10-02T01:00:00Z","fresh-account"),firstObservedAt:new Date("2026-10-01T01:00:00Z")};
+ expect(compile([old,fresh,returning]).retention.accounts.d1).toMatchObject({numerator:1,denominator:1,value:1});
+});
