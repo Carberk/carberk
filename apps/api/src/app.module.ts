@@ -28,6 +28,7 @@ import { MeasurementModule } from "./modules/measurement/measurement.module";
 import { ServiceMessagingModule } from "./modules/service-messaging/service-messaging.module";
 import { requestLoggingOptions } from "./common/requestLogging";
 import { DiagnosticsModule } from "./modules/diagnostics/diagnostics.module";
+import { OperationsModule } from "./modules/operations/operations.module";
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { DiagnosticsModule } from "./modules/diagnostics/diagnostics.module";
     MeasurementModule,
     ServiceMessagingModule,
     DiagnosticsModule,
+    OperationsModule,
   ],
   controllers: [HealthController],
   providers: [

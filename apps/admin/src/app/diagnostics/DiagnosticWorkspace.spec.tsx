@@ -15,7 +15,7 @@ const text={en:"Synthetic brake check",ru:"Синтетическая прове
 const definition={title:text,limitations:text,syntheticNotice:text,checks:[{id:"brakes",label:text,required:true,evidenceRequired:false,measurement:null}],panels:[]};
 let context:D.DiagnosticWorkspace,report:D.DiagnosticReportRecord,denied=false,conflict=false,uploadFailures=0;
 let savedRequests:D.DiagnosticFindingSave[],uploads:string[],transitions:D.DiagnosticReportTransition[];
-const reportFixture=():D.DiagnosticReportRecord=>({id:reportId,orderId,audience:"buyer_private",status:"draft",templateVersionId:templateId,observedAt:"2026-10-17T05:00:00.000Z",mileageKm:123000,findings:[],authorId:actor,reviewerId:null,successorOf:null,correctionReason:null,returnReason:null,finalizedAt:null,withdrawnAt:null,withdrawalReason:null,version:0,template:definition,synthetic:true});
+const reportFixture=():D.DiagnosticReportRecord=>({id:reportId,orderId,audience:"buyer_private",status:"draft",templateVersionId:templateId,observedAt:"2026-10-17T05:00:00.000Z",mileageKm:123000,findings:[],authorId:actor,reviewerId:null,successorOf:null,supersededBy:null,correctionReason:null,returnReason:null,finalizedAt:null,withdrawnAt:null,withdrawalReason:null,version:0,template:definition,synthetic:true});
 function setup(locale:"en"|"ru"|"tk"="en"){return render(<AdminLocaleProvider initialLocale={locale}><AdminLanguageSwitch/><DiagnosticWorkspace/></AdminLocaleProvider>);}
 async function open(view:ReturnType<typeof setup>,locale:"en"|"ru"|"tk"="en"){fireEvent.click(await view.findByRole("button",{name:diagnosticCopy[locale].open}));await view.findByText(text[locale],{selector:"h4"});}
 beforeEach(()=>{
