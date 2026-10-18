@@ -71,3 +71,14 @@ it("acknowledges only the messages currently rendered to the assigned operator",
  await waitFor(() => expect(screen.getByRole("button", { name: "General Support" })).toBeTruthy()); fireEvent.click(screen.getByRole("button", { name: "General Support" }));
  await waitFor(() => expect(screen.getByText("Synthetic service reply")).toBeTruthy()); await waitFor(() => expect(through).toBe(1));
 });
+
+it("sends operational notices with a required reason and explicit information-request semantics", async () => {
+ const screen = render(<AdminLocaleProvider initialLocale="en"><ServiceWorkspace/></AdminLocaleProvider>);
+ await waitFor(() => expect(screen.getByRole("button", { name: "General Support" })).toBeTruthy()); fireEvent.click(screen.getByRole("button", { name: "General Support" })); await screen.findByText("Synthetic service reply");
+ fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Synthetic service notice" } });
+ fireEvent.change(screen.getByLabelText("Public reply"), { target: { value: "notice" } });
+ expect((screen.getByRole("button", { name: "Send message" }) as HTMLButtonElement).disabled).toBe(true);
+ fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "Affects this synthetic account" } });
+ const form = screen.getByRole("button", { name: "Send message" }).closest("form"); if (!form) throw new Error("Missing message form"); fireEvent.submit(form);
+ await waitFor(() => expect(sends[0]).toMatchObject({ supportKind: "notice", reason: "Affects this synthetic account", visibility: "customer" }));
+});
