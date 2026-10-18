@@ -23,7 +23,7 @@ const recordSchema = z.object({
   version: z.literal(1), ownerId: z.string().uuid(), idempotencyKey: z.string().min(1).max(128).regex(/^[A-Za-z0-9_-]+$/),
   target: z.object({ kind: z.enum(["draft", "listing"]), id: z.string().uuid() }).strict(), prepared: preparedSchema,
   posterMs: z.number().int().min(0), businessId: z.string().uuid().optional(), sessionId: z.string().uuid().optional(),
-  state: z.enum(["UPLOADING", "PAUSED", "PROCESSING", "CANCELLED", "FAILED"]), confirmedBytes: z.number().int().min(0).max(maxBytes),
+  state: z.enum(["UPLOADING", "PAUSED", "PROCESSING", "CANCELLED", "FAILED"]), resumeOnForeground: z.boolean().optional(), confirmedBytes: z.number().int().min(0).max(maxBytes),
 }).strict().refine(value => value.posterMs < value.prepared.durationMs && value.confirmedBytes <= value.prepared.sizeBytes);
 
 /** Bounded app-private prepared files. Persist only strict metadata, and hash

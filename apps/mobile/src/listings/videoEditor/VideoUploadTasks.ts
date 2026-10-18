@@ -1,3 +1,5 @@
+import { onlineManager, focusManager } from "@tanstack/react-query";
+
 import { VideoUploadSchemas } from "@auto-tm/contracts";
 import { randomUUID } from "expo-crypto";
 
@@ -44,10 +46,12 @@ export class VideoUploadTask {
     const intent = this.intent;
     try {
       await this.owner();
+      await this.saving;
       const record = await this.device.load();
       if (!record || intent !== this.intent) return;
       if (record.businessId !== this.businessId) throw new Error("VIDEO_TRANSFER_SESSION_CHANGED");
       this.set({ phase: record.state, record });
+      if (record.state === "PAUSED" && record.resumeOnForeground && onlineManager.isOnline() && focusManager.isFocused()) { await this.resume(); return; }
       if (record.state === "CANCELLED") { await this.transfer.run(); await this.discardPrepared(record); return; }
       if (record.state === "UPLOADING") await this.run();
       if (record.state === "PROCESSING" && record.sessionId) {
@@ -82,13 +86,13 @@ export class VideoUploadTask {
     } catch (error) { this.mediaResult("media_preparation_result", attemptId, started, intent === this.intent ? "technical_failure" : "cancelled", intent === this.intent ? "unknown" : undefined); if (intent === this.intent) this.failed(error); }
     finally { this.preparingJob = undefined; this.preparation = undefined; }
   }
-  async pause() {
+  async pause(automatic = false) {
     try {
       if (this.preparingJob) {
         this.intent++;
         await this.preparation?.cancel(this.preparingJob);
         this.set({ phase: "FAILED", record: this.value.record, error: "VIDEO_PREPARATION_INTERRUPTED" });
-      } else await this.transfer.pause();
+      } else await this.transfer.pause(automatic);
     } catch (error) { this.failed(error); }
   }
   async resume() { try { await this.owner(); await this.transfer.resume(); } catch (error) { this.failed(error); } }
@@ -137,13 +141,25 @@ export class VideoUploadTask {
   private set(value: VideoTaskSnapshot) { this.value = value; for (const listener of this.listeners) listener(); }
 }
 const tasks = new Map<string, VideoUploadTask>();
+let observing = false;
+function observeRecovery() {
+  if (observing) return;
+  observing = true;
+  const recover = () => {
+    if (!onlineManager.isOnline() || !focusManager.isFocused()) return;
+    const ownerId = peekAuthSession()?.user.id;
+    for (const task of tasks.values()) if (task.ownerId === ownerId) void task.recover();
+  };
+  onlineManager.subscribe(recover); focusManager.subscribe(recover);
+}
 export function videoUploadTask(ownerId: string, target: { kind: "draft" | "listing"; id: string }, businessId?: string): VideoUploadTask {
+  observeRecovery();
   const key = `${ownerId}:${target.kind}:${target.id}:${businessId ?? "personal"}`;
   let task = tasks.get(key);
   if (!task) { task = new VideoUploadTask(ownerId, target, businessId); tasks.set(key, task); }
   return task;
 }
-export async function pauseVideoUploads() { await Promise.all([...tasks.values()].filter(task => ["PREPARING", "UPLOADING"].includes(task.snapshot().phase)).map(task => task.pause())); }
+export async function pauseVideoUploads() { await Promise.all([...tasks.values()].filter(task => ["PREPARING", "UPLOADING"].includes(task.snapshot().phase)).map(task => task.pause(true))); }
 export async function reconcileVideoUploadOwner() {
   const ownerId = peekAuthSession()?.user.id;
   await Promise.all([...tasks.values()].filter(task => task.ownerId !== ownerId && ["PREPARING", "UPLOADING"].includes(task.snapshot().phase)).map(task => task.pause()));

@@ -16,6 +16,7 @@ export interface VideoTransferRecord {
   sessionId?: string;
   state: "UPLOADING" | "PAUSED" | "PROCESSING" | "CANCELLED" | "FAILED";
   confirmedBytes: number;
+  resumeOnForeground?: boolean;
 }
 /** Device-owned staged bytes and atomic journal, never credentials or original bytes. */
 export interface VideoTransferDevice {
@@ -46,7 +47,7 @@ export class VideoTransfer {
     return this.pending;
   }
   async settle(): Promise<void> { await this.pending; await this.writes; }
-  async pause(): Promise<void> { await this.stop("PAUSED"); }
+  async pause(automatic = false): Promise<void> { await this.stop("PAUSED", automatic); }
   async cancel(): Promise<void> { await this.stop("CANCELLED"); }
   async resume(): Promise<void> {
     await this.pending;
@@ -60,7 +61,7 @@ export class VideoTransfer {
       if (current.state === "PAUSED") await apiClient.post(`${apiPath}/${record.sessionId}/resume`, {}, snapshotSchema, this.options(record));
       else if (!["UPLOADING", "COMPLETING"].includes(current.state)) throw new Error("VIDEO_TRANSFER_UNAVAILABLE");
     }
-    await this.save({ ...record, state: "UPLOADING" });
+    await this.save({ ...record, state: "UPLOADING", resumeOnForeground: false });
     await this.run();
   }
   private async transfer(): Promise<void> {
@@ -135,12 +136,13 @@ export class VideoTransfer {
       } finally { clearTimeout(timeout); if (this.controller === controller) this.controller = null; }
     }
   }
-  private async stop(state: "PAUSED" | "CANCELLED") {
+  private async stop(state: "PAUSED" | "CANCELLED", automatic = false) {
     this.stopped = true; this.controller?.abort();
     await this.writes;
     const record = await this.device.load();
     if (!record || record.state === "CANCELLED" || (record.state === "PROCESSING" && state === "PAUSED")) return;
-    await this.save({ ...record, state });
+    if (automatic && record.state === "PAUSED") return;
+    await this.save({ ...record, state, resumeOnForeground: state === "PAUSED" && automatic });
     await this.owner(record);
     if (!record.sessionId) return;
     if (state === "CANCELLED") await apiClient.delete(`${apiPath}/${record.sessionId}`, snapshotSchema, this.options(record));
