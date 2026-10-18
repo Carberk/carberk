@@ -1,4 +1,5 @@
 import AVFoundation
+import CryptoKit
 import Foundation
 
 /// AVFoundation engine shared by the Expo boundary and a focused native proof harness.
@@ -147,6 +148,15 @@ final class VideoPreparationEngine {
                   abs(producedDuration - Double(input.endMs - input.startMs)) <= 100,
                   (facts["width"] as! Int) <= Int(size.width), (facts["height"] as! Int) <= Int(size.height),
                   (facts["fps"] as! Double) <= 30 else { throw self.failure("INVALID_OUTPUT") }
+                let handle = try FileHandle(forReadingFrom: partial)
+                defer { handle.closeFile() }
+                var hash = SHA256()
+                while true {
+                  let chunk = handle.readData(ofLength: 65_536)
+                  if chunk.isEmpty { break }
+                  hash.update(data: chunk)
+                }
+                facts["sha256"] = hash.finalize().map { String(format: "%02x", $0) }.joined()
                 try FileManager.default.moveItem(at: partial, to: destination)
                 facts["uri"] = destination.absoluteString; facts["sizeBytes"] = length
                 let journal = directory.appendingPathComponent("prepared.json")
