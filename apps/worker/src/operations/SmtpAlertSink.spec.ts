@@ -28,7 +28,7 @@ afterAll(async () => { await rm(dir, { recursive: true, force: true }); });
 
 async function smtp() {
   const commands: string[] = [], messages: string[] = [], sockets = new Set<TLSSocket>();
-  let rejectRecipient = false, stall = false;
+  let rejectRecipient = false, stall = false, stallAck = false;
   const server = createServer({ key, cert }, socket => {
     sockets.add(socket); socket.on("close", () => sockets.delete(socket)); socket.on("error", () => undefined);
     if (stall) return;
@@ -39,7 +39,13 @@ async function smtp() {
       while (buffer.includes("\r\n")) {
         const end = buffer.indexOf("\r\n"), line = buffer.slice(0, end); buffer = buffer.slice(end + 2);
         if (data) {
-          if (line === ".") { messages.push(data.join("\r\n")); data = null; socket.write("250 2.0.0 accepted\r\n"); }
+          if (line === ".") {
+            messages.push(data.join("\r\n")); data = null;
+            if (stallAck) {
+              const timer = setInterval(() => socket.write("250-still waiting\r\n"), 50);
+              socket.once("close", () => clearInterval(timer));
+            } else socket.write("250 2.0.0 accepted\r\n");
+          }
           else data.push(line);
           continue;
         }
@@ -58,6 +64,7 @@ async function smtp() {
   server.listen(0, "127.0.0.1"); await once(server, "listening");
   const address = server.address(); if (!address || typeof address === "string") throw new Error("Missing fixture port");
   return { commands, messages, boundary: { host: "127.0.0.1", port: address.port, servername: "localhost", ca: cert, timeoutMs: 400 },
+    holdAcknowledgment: () => { stallAck = true; },
     reject: (value: boolean) => { rejectRecipient = value; }, stall: () => { stall = true; },
     close: async () => { for (const socket of sockets) socket.destroy(); await new Promise<void>(resolve => server.close(() => resolve())); } };
 }
@@ -144,5 +151,27 @@ it("fails closed on unavailable or malformed receipt storage and allows only one
     const sink = new SmtpAlertSink(config(), receiptStore(), server.boundary);
     expect(await Promise.all([sink.publish(snapshot(), now), sink.publish(snapshot(), now)])).toEqual([true, false]);
     expect(server.messages).toHaveLength(1);
+  } finally { await server.close(); }
+});
+
+it("enforces an absolute deadline during a slow DATA acknowledgment and retries without reporting delivery", async () => {
+  const server = await smtp(), receipts = receiptStore();
+  server.holdAcknowledgment();
+  try {
+    const started = Date.now();
+    expect(await new SmtpAlertSink(config(), receipts, server.boundary).publish(snapshot(), now)).toBe(false);
+    expect(Date.now() - started).toBeLessThan(1_500);
+    expect(server.messages).toHaveLength(1);
+    expect(JSON.parse(await receipts.read() ?? "{}")).toMatchObject({ attempts: 1, delivered: false });
+  } finally { await server.close(); }
+});
+
+it("rejects date-shaped private content before SMTP or receipt writes", async () => {
+  const server = await smtp(), receipts = receiptStore();
+  try {
+    const state = snapshot(); state.observedAt = "2026-10-18 (alice)";
+    expect(await new SmtpAlertSink(config(), receipts, server.boundary).publish(state, now)).toBe(false);
+    expect(server.commands).toHaveLength(0);
+    expect(await receipts.read()).toBeNull();
   } finally { await server.close(); }
 });
