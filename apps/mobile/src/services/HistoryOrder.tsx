@@ -17,7 +17,7 @@ export function HistoryOrder({ id, locale }: { id: string; locale: string }) {
  const [vin, setVin] = useState(""), [claim, setClaim] = useState(""), [error, setError] = useState(false);
  const retry = useRef<{ claim: string; id: string } | null>(null);
  const data = query.isError ? undefined : query.data, order = data?.order;
- const quote = data?.quotes.find(value => !value.supersededAt && value.preflightOutcome === "available" && value.feasible);
+ const quote = data?.quotes.find(value => !value.acceptedAt && !value.supersededAt && value.preflightOutcome === "available" && value.feasible);
  const date = (value: string) => new Date(value).toLocaleString(localeTag(locale));
  const accept = async () => {
   if (!quote || vin !== quote.vin || action.isPending) return;
@@ -47,10 +47,11 @@ export function HistoryOrder({ id, locale }: { id: string; locale: string }) {
    {order.recoveryDeadline ? <Text>{c.recovery}: {date(order.recoveryDeadline)}</Text> : null}
    {order.refundState ? <Text>{c.refund}: {order.refundState === "executed" ? c.delivered : c.waiting}</Text> : null}
    {data?.payments.map(payment => <View key={payment.id}><Text>{payment.claim}</Text><Text>{payment.state === "confirmed" ? c.paid : c.review}</Text></View>)}
-  </> : quote ? <>
+  </> : null}
+  {quote && (!order || ["expired", "review"].includes(order.state)) ? <>
    <Text>{quote.vin}</Text><Text>{quote.providers.map(provider => provider === "carfax" ? "Carfax" : "AutoCheck").join(" / ")}</Text><Text>{c.amount}</Text><Text>{quote.refundRule}</Text><Text>{c.promise}: {date(quote.windowStart)} - {date(quote.windowEnd)}</Text><Text>{c.retained}</Text>
    <Input accessibilityLabel={c.confirmVin} value={vin} onChangeText={setVin} autoCapitalize="characters" maxLength={17}/>{vin && vin !== quote.vin ? <Text accessibilityRole="alert">{c.wrongVin}</Text> : null}
    {button(c.accept, () => { void accept(); }, vin !== quote.vin)}
-  </> : <Text>{c.unavailable}</Text>}
+  </> : !order ? <Text>{c.unavailable}</Text> : null}
  </View>;
 }

@@ -3,7 +3,7 @@ import { ServiceMessagingSchemas } from "@auto-tm/contracts";
 import { StaffAuthorityDenied, type StaffAuthorityPort } from "../../../identity/identity.public";
 import { ServiceDenied, type ServiceScope } from "../../domain/serviceAccess";
 import type { ServiceRuntime, ServiceSubject } from "../../domain/ports/ServiceMessagingPort";
-import { addStaffedHour, ashgabatDay, HistoryDenied, normalizeVin, receiptOutcome, recoveryOutcome, validateHistoryWindow } from "../../domain/history/HistoryPolicy";
+import { addStaffedHour, ashgabatDay, HistoryDenied, normalizeVin, receiptOutcome, recoveryOutcome, staffed, validateHistoryWindow } from "../../domain/history/HistoryPolicy";
 import { assertServiceRights } from "../../domain/ServiceRights";
 
 type Tx = Prisma.TransactionClient;
@@ -38,7 +38,8 @@ export async function historyCommand(context: Context, command: ServiceMessaging
     if (!same({ requestId: existing.requestId, vin: existing.vin, amount: existing.amount, providers: existing.providers, preflightOutcome: existing.preflightOutcome, preflightEvidence: existing.preflightEvidence, refundRule: existing.refundRule, windowStart: existing.windowStart, windowEnd: existing.windowEnd, feasible: existing.feasible }, data)) conflict();
     return;
    }
-   if (await tx.historyOrder.findUnique({ where: { requestId: scope.resourceId } })) deny();
+   const currentOrder = await tx.historyOrder.findUnique({ where: { requestId: scope.resourceId }, include: { quote: true, purchase: true } });
+   if (currentOrder && (currentOrder.paidAt || currentOrder.purchase || !["expired", "review"].includes(currentOrder.state) || currentOrder.quote.vin !== vin || !same(currentOrder.quote.providers, command.providers) || currentOrder.quote.refundRule !== command.refundRule)) deny();
    await tx.historyQuote.updateMany({ where: { requestId: scope.resourceId, acceptedAt: null, supersededAt: null }, data: { supersededAt: now } });
    await tx.historyQuote.create({ data: { ...data, id: command.quoteId, offeredById: subject.userId } });
    await tx.vehicleHistoryRequest.update({ where: { id: scope.resourceId }, data: { proposedVin: vin } });
@@ -47,7 +48,11 @@ export async function historyCommand(context: Context, command: ServiceMessaging
    if (!quote || quote.requestId !== scope.resourceId || quote.erasedAt || quote.supersededAt || quote.preflightOutcome !== "available") deny();
    if (!same([quote.vin, quote.providers, quote.amount, quote.refundRule, quote.windowStart.toISOString(), quote.windowEnd.toISOString()], [command.vin, command.providers, command.amount, command.refundRule, command.windowStart, command.windowEnd])) conflict();
    const prior = await tx.historyOrder.findUnique({ where: { requestId: scope.resourceId } });
-   if (prior) { if (prior.quoteId !== quote.id) conflict(); return; }
+   if (prior?.quoteId === quote.id) return;
+   const acceptedBooking = prior ? await tx.historyBooking.findUnique({ where: { orderId_clientBookingId: { orderId: prior.id, clientBookingId: quote.id } } }) : null;
+   if (acceptedBooking) return;
+   const receipt = prior ? await tx.historyPayment.findFirst({ where: { orderId: prior.id, verifiedFunds: true, amount: 100, confirmedAt: { not: null }, receivedAt: { not: null } }, orderBy: { confirmedAt: "asc" } }) : null;
+   if (prior && (prior.paidAt || !["review", "expired"].includes(prior.state) || !receipt?.confirmedAt || !receipt.receivedAt || receipt.receivedAt > receipt.confirmedAt || !staffed(receipt.confirmedAt) || !staffed(now))) deny();
    validateHistoryWindow(now, quote.windowStart, quote.windowEnd, quote.feasible);
    assertServiceRights("history", { category: "payment_evidence", visibility: "staff", contentType: "image/webp", sizeBytes: 1, filename: "order", rights: command.rights }, now);
    const day = ashgabatDay(quote.windowStart), morning = day !== ashgabatDay(now);
@@ -65,7 +70,11 @@ export async function historyCommand(context: Context, command: ServiceMessaging
     if (!allowance || allowance.mode !== "synthetic" || allowance.resetAt > quote.windowStart || allowance.consumed + reserved >= allowance.allowance) deny();
    }
    await tx.historyQuote.update({ where: { id: quote.id }, data: { acceptedAt: now } });
-   await tx.historyOrder.create({ data: { id: runtime.id(), requestId: scope.resourceId, quoteId: quote.id, day, morning, holdExpiresAt: new Date(now.getTime()+7200000), promiseAt: quote.windowEnd, rights: command.rights } });
+   if (prior && receipt?.confirmedAt && receipt.receivedAt) {
+    await tx.historyBooking.create({ data: { id: runtime.id(), orderId: prior.id, clientBookingId: quote.id, vin: quote.vin, providers: quote.providers as Prisma.InputJsonValue, amount: 100, refundRule: quote.refundRule, windowStart: quote.windowStart, windowEnd: quote.windowEnd, acceptedAt: now } });
+    await tx.historyOrder.update({ where: { id: prior.id }, data: { day, morning, state: "paid", promiseAt: quote.windowEnd, paidAt: receipt.confirmedAt, receivedAt: receipt.receivedAt, rights: command.rights, version: { increment: 1 } } });
+    await tx.historyPayment.update({ where: { id: receipt.id }, data: { state: "confirmed" } });
+   } else await tx.historyOrder.create({ data: { id: runtime.id(), requestId: scope.resourceId, quoteId: quote.id, day, morning, holdExpiresAt: new Date(now.getTime()+7200000), promiseAt: quote.windowEnd, rights: command.rights } });
   } else {
    const order = await tx.historyOrder.findUnique({ where: { id: command.orderId }, include: { quote: true, purchase: true, refund: true } });
    if (!order || order.requestId !== scope.resourceId || order.erasedAt) throw new ServiceDenied("NO_ACCESS");
@@ -88,7 +97,7 @@ export async function historyCommand(context: Context, command: ServiceMessaging
      await tx.$queryRaw`SELECT day FROM history_capacity_days WHERE day=${order.day} FOR UPDATE`;
      const current = await tx.historyOrder.findUniqueOrThrow({ where: { id: order.id } });
      const outcome = receiptOutcome({ expiresAt: current.holdExpiresAt, active: current.state === "held" }, { receivedAt, verifiedAt: now, amount: command.amount, verifiedFunds: command.verifiedFunds });
-     await tx.historyPayment.update({ where: { id: payment.id }, data: { amount: command.amount, receivedAt, confirmedAt: now, confirmedById: subject.userId, evidence: command.evidence, state: outcome === "paid" ? "confirmed" : "review" } });
+     await tx.historyPayment.update({ where: { id: payment.id }, data: { amount: command.amount, receivedAt, confirmedAt: now, confirmedById: subject.userId, evidence: command.evidence, verifiedFunds: command.verifiedFunds, state: outcome === "paid" ? "confirmed" : "review" } });
      if (current.paidAt) { await tx.historyPayment.update({ where: { id: payment.id }, data: { state: "duplicate" } }); }
      else await tx.historyOrder.update({ where: { id: order.id }, data: { state: outcome, ...(outcome === "paid" ? { paidAt: now, receivedAt } : {}), version: { increment: 1 } } });
     } else if (command.kind === "purchase") {
