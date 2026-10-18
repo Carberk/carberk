@@ -26,6 +26,8 @@ Docs: https://github.com/taskforcesh/bullmq/blob/v5.76.8/src/classes/queue-gette
 
 Actual independent deployment, deliberate worker death, actual collector failure, receipt of a real authorized alert, metrics thresholds, disk/TLS probes and resource isolation remain unverified or unimplemented. A watchdog cannot prove its own independent availability. Native diagnostic SDK collection, release symbolication, sanitization and deletion fences remain separate obligations. The legacy Compose monitoring configuration supplies no deployed evidence. Nothing here enables service/provider collection, production or paid provisioning.
 
+Technical metrics thresholds now have software implementation and focused proof below; deployed observation remains missing.
+
 ## Safe staff health reader and workspace
 
 The separate OperationsModule exposes `GET /api/v1/operations/health`. The root API must compose this module. Current elevated `analytics.aggregate` authority is checked before infrastructure access and again before response release. Responses use `Cache-Control: no-store`. A strict shared contract rejects unexpected private fields, unknown queues, malformed counts, stale or future evidence. Absent evidence is unavailable, never an inferred healthy state.
@@ -33,3 +35,11 @@ The separate OperationsModule exposes `GET /api/v1/operations/health`. The root 
 `/operations` is a separate TK/RU/EN workspace with current probes, bounded queue counts, original incident timing and explicit missing billing/recovery/native evidence. It clears prior data on refresh/denial and expires displayed evidence after 90 seconds. Budget ceilings are policy text; no current spending is invented. Root owns navigation linkage and independent final browser/keyboard acceptance.
 
 Six API behavior/real JWT HTTP checks and six rendered actual-component/server-action checks passed. They cover missing/revoked Session, grant/elevation denial, current no-store reads, stale/future/private payload rejection, all three locales, revocation clearing, missing evidence and displayed snapshot expiry. API/admin typechecks and affected lint passed. Real production identity/storage deployment remains outside these synthetic HTTP checks.
+
+## Nonblocking technical counters
+
+The operations module registers actual Fastify request/response hooks when explicitly enabled. Each request records only response status and duration into at most 61 ten-second aggregate buckets with fixed histogram bins. Guard-level failures are included. Health/readiness/operations probes are excluded so monitoring traffic cannot manufacture the denominator on a quiet service. No route, request body, actor, header or exception is retained by these counters.
+
+Redis flush occurs every 15 seconds outside request handling, with no overlapping flushes and a 45-second TTL. A complete five-minute window and 100 requests are required before an error rate is known. Only 5xx responses are technical errors. A complete ten-minute window and 100 requests are required for the p95 histogram upper bound. The independent watchdog validates fresh metric snapshots and opens incidents above 5% technical errors or above 2000 ms p95 upper bound. Missing/stale measurements cannot close an incident. Multi-process metrics aggregation is not established by this single-process implementation.
+
+Four additional API tests passed, including an actual HTTP hook test counting 200/400/guard-level 500 while excluding readiness probes. An additional watchdog test covers measured technical thresholds, stale metrics and recovery. API/worker/admin typechecks and affected API/admin lint passed; worker import-order correction receives its affected lint rerun before checkpoint. Existing six rendered tests remain green with explicit unknown metrics before evidence exists.

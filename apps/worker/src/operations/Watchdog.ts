@@ -1,3 +1,5 @@
+import type { OperationsSchemas } from "@auto-tm/contracts";
+
 import { advanceIncident, type OperationalIncident } from "./OperationsPolicy";
 
 export type ProbeState = "healthy" | "failing" | "unknown";
@@ -7,6 +9,7 @@ export interface OperationsSnapshot {
   api: ProbeState;
   collector: ProbeState;
   worker: ProbeState;
+  technical?: OperationsSchemas.TechnicalSnapshot | null;
   queues: { name: string; waiting: number | null; sustainedBacklog: boolean }[];
   incident: OperationalIncident | null;
 }
@@ -16,6 +19,7 @@ export interface WatchdogPorts {
   http(target: "api" | "collector"): Promise<ProbeState>;
   queueDepths(): Promise<{ name: string; waiting: number }[]>;
   publish(snapshot: OperationsSnapshot): Promise<void>;
+  technical?(): Promise<OperationsSchemas.TechnicalSnapshot | null>;
 }
 
 /** Runs outside the worker. Only bounded counts and fixed probe names leave this process. */
@@ -28,8 +32,9 @@ export class Watchdog {
   async check(now: Date): Promise<OperationsSnapshot> {
     if (this.lastCheckAt !== null && now.getTime() - this.lastCheckAt > 60_000) this.backlogSince.clear();
     this.lastCheckAt = now.getTime();
-    const [heartbeat, api, collector, depths] = await Promise.allSettled([
+    const [heartbeat, api, collector, depths, measured] = await Promise.allSettled([
       this.ports.heartbeat(), this.ports.http("api"), this.ports.http("collector"), this.ports.queueDepths(),
+      this.ports.technical?.() ?? Promise.resolve(null),
     ]);
     const heartbeatAt = heartbeat.status === "fulfilled" && heartbeat.value !== null ? Number(heartbeat.value) : NaN;
     const age = now.getTime() - heartbeatAt;
@@ -46,10 +51,16 @@ export class Watchdog {
     if (depths.status === "rejected") this.backlogSince.clear();
     const apiState = api.status === "fulfilled" ? api.value : "unknown";
     const collectorState = collector.status === "fulfilled" ? collector.value : "unknown";
-    const failing = apiState === "failing" || collectorState === "failing" || worker === "failing" || queues.some(q => q.sustainedBacklog);
-    const allKnown = apiState !== "unknown" && collectorState !== "unknown" && worker !== "unknown" && depths.status === "fulfilled";
+    const sample = measured.status === "fulfilled" ? measured.value : null;
+    const metricAge = sample ? now.getTime() - Date.parse(sample.observedAt) : NaN;
+    const technical = sample && metricAge >= -5_000 && metricAge <= 45_000 ? sample : null;
+    const metricFailure = (technical?.errors.rate !== null && technical?.errors.rate !== undefined && technical.errors.rate > .05)
+      || (technical?.latency.p95UpperMs !== null && technical?.latency.p95UpperMs !== undefined && technical.latency.p95UpperMs > 2_000);
+    const failing = metricFailure || apiState === "failing" || collectorState === "failing" || worker === "failing" || queues.some(q => q.sustainedBacklog);
+    const allKnown = apiState !== "unknown" && collectorState !== "unknown" && worker !== "unknown" && depths.status === "fulfilled"
+      && (!this.ports.technical || (technical !== null && technical.errors.rate !== null && technical.latency.p95UpperMs !== null));
     if (failing || allKnown) this.incident = advanceIncident(this.incident, failing, now);
-    const snapshot: OperationsSnapshot = { version: 1, observedAt: now.toISOString(), api: apiState, collector: collectorState, worker, queues, incident: this.incident };
+    const snapshot: OperationsSnapshot = { version: 1, observedAt: now.toISOString(), api: apiState, collector: collectorState, worker, technical, queues, incident: this.incident };
     await this.ports.publish(snapshot);
     return snapshot;
   }

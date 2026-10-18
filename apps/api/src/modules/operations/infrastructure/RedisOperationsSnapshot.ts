@@ -1,5 +1,6 @@
 import { Injectable, type OnModuleDestroy } from "@nestjs/common";
 import Redis from "ioredis";
+import type { OperationsSchemas } from "@auto-tm/contracts";
 
 @Injectable()
 export class RedisOperationsSnapshot implements OnModuleDestroy {
@@ -20,6 +21,11 @@ export class RedisOperationsSnapshot implements OnModuleDestroy {
     if (!this.redis) return null;
     if (this.redis.status === "wait" || this.redis.status === "end") await this.redis.connect();
     return this.redis.get(this.key);
+  }
+  async publishTechnical(snapshot: OperationsSchemas.TechnicalSnapshot): Promise<void> {
+    if (!this.redis) return;
+    if (this.redis.status === "wait" || this.redis.status === "end") await this.redis.connect();
+    await this.redis.set(this.key.replace(/:snapshot$/, ":technical"), JSON.stringify(snapshot), "PX", 45_000);
   }
   onModuleDestroy(): void { this.redis?.disconnect(); }
 }
