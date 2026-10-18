@@ -1133,6 +1133,8 @@ model VehicleHistoryRequest {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   conversation ServiceConversation?
+  quotes HistoryQuote[]
+  order HistoryOrder?
   @@index([customerId, createdAt])
   @@index([assigneeId, status, createdAt])
   @@map("vehicle_history_requests")
@@ -1377,4 +1379,124 @@ model DiagnosticAudit {
   createdAt DateTime @default(now())
   @@index([orderId, createdAt])
   @@map("diagnostic_audits")
+}
+
+/// Synthetic operational records. Live payment/provider activation is separate.
+model HistoryQuote {
+  erasedAt DateTime?
+  id String @id @default(uuid())
+  requestId String
+  request VehicleHistoryRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  vin String?
+  amount Int @default(100)
+  providers Json
+  preflightOutcome String
+  preflightEvidence String?
+  refundRule String
+  windowStart DateTime
+  windowEnd DateTime
+  feasible Boolean
+  offeredById String?
+  createdAt DateTime @default(now())
+  supersededAt DateTime?
+  acceptedAt DateTime?
+  order HistoryOrder?
+  @@index([requestId, createdAt])
+  @@map("history_quotes")
+}
+model HistoryCapacityDay {
+  day String @id
+  slotLimit Int
+  morningLimit Int
+  evidence String
+  mode String @default("synthetic")
+  createdAt DateTime @default(now())
+  orders HistoryOrder[]
+  @@map("history_capacity_days")
+}
+model HistoryProviderAllowance {
+  provider String
+  day String
+  allowance Int
+  consumed Int @default(0)
+  resetAt DateTime
+  evidence String
+  mode String @default("synthetic")
+  @@id([provider, day])
+  @@map("history_provider_allowances")
+}
+model HistoryOrder {
+  version Int @default(0)
+  id String @id @default(uuid())
+  requestId String @unique
+  request VehicleHistoryRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  quoteId String @unique
+  quote HistoryQuote @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  day String
+  capacity HistoryCapacityDay @relation(fields: [day], references: [day], onDelete: Restrict)
+  morning Boolean
+  state String @default("held")
+  holdExpiresAt DateTime
+  paidAt DateTime?
+  receivedAt DateTime?
+  promiseAt DateTime
+  recoveryUsed Boolean @default(false)
+  recoveryAgreedAt DateTime?
+  recoveryDeadline DateTime?
+  escalatedAt DateTime?
+  rights Json
+  erasedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  payments HistoryPayment[]
+  purchase HistoryPurchaseIntent?
+  refund HistoryRefund?
+  @@index([day, state, holdExpiresAt])
+  @@index([state, paidAt])
+  @@map("history_orders")
+}
+model HistoryPayment {
+  id String @id @default(uuid())
+  orderId String
+  order HistoryOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  clientPaymentId String
+  attachmentId String?
+  claim String?
+  amount Int?
+  receivedAt DateTime?
+  confirmedAt DateTime?
+  confirmedById String?
+  evidence String?
+  state String @default("submitted")
+  createdAt DateTime @default(now())
+  @@unique([orderId, clientPaymentId])
+  @@index([orderId, state])
+  @@map("history_payments")
+}
+model HistoryPurchaseIntent {
+  id String @id @default(uuid())
+  orderId String @unique
+  order HistoryOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  vin String?
+  providers Json
+  state String @default("prepared")
+  externalReference String?
+  createdById String?
+  createdAt DateTime @default(now())
+  reconciledAt DateTime?
+  @@map("history_purchase_intents")
+}
+model HistoryRefund {
+  id String @id @default(uuid())
+  orderId String @unique
+  order HistoryOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  reason String
+  state String @default("pending")
+  approvedById String?
+  approvedAt DateTime?
+  executedById String?
+  executedAt DateTime?
+  executionReference String?
+  createdAt DateTime @default(now())
+  @@map("history_refunds")
 }
