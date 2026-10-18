@@ -74,4 +74,13 @@ describe("independent operational probes", () => {
     snapshot.observedAt = now.toISOString(); snapshot.latency.p95UpperMs = 1_000;
     expect((await watchdog.check(now)).incident?.resolvedAt).toBe(now.toISOString());
   });
+  it("opens disk/TLS incidents and does not resolve them when a monitored volume is unknown", async () => {
+    const now = new Date("2026-10-18T00:00:00Z"); let state: ProbeState = "failing";
+    const watchdog = new Watchdog({ heartbeat: async () => String(now.getTime()), http: async () => "healthy", queueDepths: async () => [], publish: async () => undefined,
+      disk: async () => ({ state, freeRatio: state === "unknown" ? null : state === "healthy" ? .2 : .09 }), tls: async () => ({ state: "healthy", expiresAt: "2026-11-18T00:00:00Z" }) });
+    expect((await watchdog.check(now)).disk).toEqual({ state: "failing", freeRatio: .09 });
+    state = "unknown"; expect((await watchdog.check(now)).incident?.resolvedAt).toBeNull();
+    state = "healthy"; expect((await watchdog.check(now)).incident?.resolvedAt).toBe(now.toISOString());
+  });
+
 });

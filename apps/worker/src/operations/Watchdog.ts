@@ -1,5 +1,6 @@
 import type { OperationsSchemas } from "@auto-tm/contracts";
 
+import type { DiskObservation, TlsObservation } from "./hostProbes";
 import { advanceIncident, type OperationalIncident } from "./OperationsPolicy";
 
 export type ProbeState = "healthy" | "failing" | "unknown";
@@ -10,6 +11,8 @@ export interface OperationsSnapshot {
   collector: ProbeState;
   worker: ProbeState;
   technical?: OperationsSchemas.TechnicalSnapshot | null;
+  disk?: DiskObservation;
+  tls?: TlsObservation;
   queues: { name: string; waiting: number | null; sustainedBacklog: boolean }[];
   incident: OperationalIncident | null;
 }
@@ -20,6 +23,8 @@ export interface WatchdogPorts {
   queueDepths(): Promise<{ name: string; waiting: number }[]>;
   publish(snapshot: OperationsSnapshot): Promise<void>;
   technical?(): Promise<OperationsSchemas.TechnicalSnapshot | null>;
+  disk?(): Promise<DiskObservation>;
+  tls?(): Promise<TlsObservation>;
 }
 
 /** Runs outside the worker. Only bounded counts and fixed probe names leave this process. */
@@ -32,9 +37,11 @@ export class Watchdog {
   async check(now: Date): Promise<OperationsSnapshot> {
     if (this.lastCheckAt !== null && now.getTime() - this.lastCheckAt > 60_000) this.backlogSince.clear();
     this.lastCheckAt = now.getTime();
-    const [heartbeat, api, collector, depths, measured] = await Promise.allSettled([
+    const [heartbeat, api, collector, depths, measured, diskResult, tlsResult] = await Promise.allSettled([
       this.ports.heartbeat(), this.ports.http("api"), this.ports.http("collector"), this.ports.queueDepths(),
       this.ports.technical?.() ?? Promise.resolve(null),
+      this.ports.disk?.() ?? Promise.resolve({ state: "unknown" as const, freeRatio: null }),
+      this.ports.tls?.() ?? Promise.resolve({ state: "unknown" as const, expiresAt: null }),
     ]);
     const heartbeatAt = heartbeat.status === "fulfilled" && heartbeat.value !== null ? Number(heartbeat.value) : NaN;
     const age = now.getTime() - heartbeatAt;
@@ -56,11 +63,14 @@ export class Watchdog {
     const technical = sample && metricAge >= -5_000 && metricAge <= 45_000 ? sample : null;
     const metricFailure = (technical?.errors.rate !== null && technical?.errors.rate !== undefined && technical.errors.rate > .05)
       || (technical?.latency.p95UpperMs !== null && technical?.latency.p95UpperMs !== undefined && technical.latency.p95UpperMs > 2_000);
-    const failing = metricFailure || apiState === "failing" || collectorState === "failing" || worker === "failing" || queues.some(q => q.sustainedBacklog);
+    const disk: DiskObservation = diskResult.status === "fulfilled" ? diskResult.value : { state: "unknown", freeRatio: null };
+    const tls: TlsObservation = tlsResult.status === "fulfilled" ? tlsResult.value : { state: "unknown", expiresAt: null };
+    const failing = disk.state === "failing" || tls.state === "failing" || metricFailure || apiState === "failing" || collectorState === "failing" || worker === "failing" || queues.some(q => q.sustainedBacklog);
     const allKnown = apiState !== "unknown" && collectorState !== "unknown" && worker !== "unknown" && depths.status === "fulfilled"
+      && (!this.ports.disk || disk.state !== "unknown") && (!this.ports.tls || tls.state !== "unknown")
       && (!this.ports.technical || (technical !== null && technical.errors.rate !== null && technical.latency.p95UpperMs !== null));
     if (failing || allKnown) this.incident = advanceIncident(this.incident, failing, now);
-    const snapshot: OperationsSnapshot = { version: 1, observedAt: now.toISOString(), api: apiState, collector: collectorState, worker, technical, queues, incident: this.incident };
+    const snapshot: OperationsSnapshot = { version: 1, observedAt: now.toISOString(), api: apiState, collector: collectorState, worker, technical, disk, tls, queues, incident: this.incident };
     await this.ports.publish(snapshot);
     return snapshot;
   }

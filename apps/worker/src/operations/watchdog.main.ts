@@ -4,6 +4,7 @@ import { OperationsSchemas } from "@auto-tm/contracts";
 
 import { operationsConfig } from "./OperationsConfig";
 import { Watchdog } from "./Watchdog";
+import { DiskProbe, tlsExpiryProbe } from "./hostProbes";
 import { httpProbe } from "./httpProbe";
 
 // This entrypoint must be deployed as a separate process/service from the core worker.
@@ -19,7 +20,10 @@ async function main(): Promise<void> {
   });
   redis.on("error", () => undefined);
   const queues = QUEUES.map(name => new Queue(name, { connection: redis }));
+  const disk = new DiskProbe(config.diskPath);
   const watchdog = new Watchdog({
+    disk: () => disk.check(),
+    tls: () => tlsExpiryProbe(config.apiHealthUrl, new Date()),
     heartbeat: () => redis.get(`${config.prefix}:worker`),
     http: target => httpProbe(target === "api" ? config.apiHealthUrl : config.collectorHealthUrl, target),
     technical: async () => {
