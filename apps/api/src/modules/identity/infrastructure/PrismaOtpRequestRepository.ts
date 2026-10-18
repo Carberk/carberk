@@ -1,28 +1,80 @@
+import { createHash } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { Prisma, PrismaService } from "@auto-tm/db";
 import type {
   OtpRequest,
   SignInCodeChannel,
   SignInCodePurpose,
 } from "../domain/OtpRequest";
 import { SIGN_IN_CODE_CHANNELS } from "../domain/types";
-import type { OtpRequestRepository } from "../domain/ports/OtpRequestRepository";
+import type { ClockPort } from "../domain/ports/ClockPort";
+import type { CreateOtpRequest, OtpRequestRepository } from "../domain/ports/OtpRequestRepository";
+import { OtpAttemptLedger, SIGN_IN_CODE_RATE_POLICY } from "../domain/OtpAttemptLedger";
+import { SignInCodeRateLimitedError } from "../domain/SignInCodeRateLimitedError";
 import { fromCodePurpose, toCodePurpose } from "./codePurpose";
 
 @Injectable()
 export class PrismaOtpRequestRepository implements OtpRequestRepository {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
-  async create(input: {
-    purpose: SignInCodePurpose;
-    channel: SignInCodeChannel;
-    destination: string;
-    codeHash: string;
-    expiresAt: Date;
-    userId: string | null;
-    businessId?: string | undefined;
-    ip: string;
-  }): Promise<OtpRequest> {
+  async reserve(
+    input: Parameters<OtpRequestRepository["reserve"]>[0],
+    clock: ClockPort,
+  ): ReturnType<OtpRequestRepository["reserve"]> {
+    const { destination } = input;
+    return this.prisma.$transaction(async (tx) => {
+      // Two-int namespaces are separate from campaign's single-bigint fences.
+      // Every producer takes exactly one destination lock, THEN one IP lock.
+      // Fixed namespace order prevents admission cycles, even on hash collisions;
+      // collisions only serialize unrelated requests. Never parallelize locks.
+      await tx.$executeRaw`SET LOCAL lock_timeout = '4s'`;
+      const destinationKey = createHash("sha256")
+        .update(`${destination.channel}:${destination.value}`).digest().readInt32BE(0);
+      const ipKey = createHash("sha256").update(input.ip).digest().readInt32BE(0);
+      // Select an integer rather than decoding PostgreSQL's void lock result.
+      await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(41301::int, ${destinationKey}::int)`;
+      await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(41302::int, ${ipKey}::int)`;
+
+      // PostgreSQL now() is transaction-start time, before a possible lock wait.
+      const now = clock.now();
+      const [destinationCount24h, ipCount1h, latest] = await Promise.all([
+        tx.otpRequest.count({ where: {
+          channel: destination.channel, destination: destination.value,
+          createdAt: { gte: new Date(now.getTime() - SIGN_IN_CODE_RATE_POLICY.destinationWindowMs) },
+        } }),
+        tx.otpRequest.count({ where: {
+          ip: input.ip,
+          createdAt: { gte: new Date(now.getTime() - SIGN_IN_CODE_RATE_POLICY.ipWindowMs) },
+        } }),
+        tx.otpRequest.findFirst({
+          where: { channel: destination.channel, destination: destination.value },
+          orderBy: { createdAt: "desc" },
+        }),
+      ]);
+      const rateCheck = new OtpAttemptLedger(
+        SIGN_IN_CODE_RATE_POLICY.destinationLimit,
+        SIGN_IN_CODE_RATE_POLICY.ipLimit,
+        SIGN_IN_CODE_RATE_POLICY.baseBackoffSeconds,
+      ).check({ destinationCount24h, ipCount1h, lastAttemptAt: latest?.createdAt ?? null, now });
+      if (!rateCheck.allowed) throw new SignInCodeRateLimitedError(rateCheck);
+
+      const row = await tx.otpRequest.create({ data: {
+        purpose: toCodePurpose(input.purpose),
+        channel: destination.channel,
+        destination: destination.value,
+        phone: destination.channel === SIGN_IN_CODE_CHANNELS.PHONE ? destination.value : null,
+        codeHash: input.codeHash,
+        expiresAt: destination.expiresAt(now),
+        createdAt: now,
+        userId: input.userId,
+        businessId: input.businessId ?? null,
+        ip: input.ip,
+      } });
+      return { record: this.toDomain(row), resendInSeconds: rateCheck.resendInSeconds };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, maxWait: 2000, timeout: 10000 });
+  }
+
+  async create(input: CreateOtpRequest): Promise<OtpRequest> {
     const row = await this.prisma.otpRequest.create({
       data: {
         purpose: toCodePurpose(input.purpose),

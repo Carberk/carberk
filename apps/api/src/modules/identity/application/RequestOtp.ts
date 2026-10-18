@@ -3,13 +3,8 @@ import { Enums } from "@auto-tm/contracts";
 import { createHash, randomUUID } from "node:crypto";
 
 import { OtpCode } from "../domain/OtpCode";
-import {
-  OtpAttemptLedger,
-  SIGN_IN_CODE_RATE_POLICY,
-} from "../domain/OtpAttemptLedger";
 import { findReviewerAccount } from "../domain/ReviewerSignIn";
 import { signInCodeDestination } from "../domain/SignInCodeDestination";
-import { SignInCodeRateLimitedError } from "../domain/SignInCodeRateLimitedError";
 import { SIGN_IN_CODE_CHANNELS } from "../domain/types";
 import type { OtpRequestRepository } from "../domain/ports/OtpRequestRepository";
 import type { OtpSenderPort } from "../domain/ports/OtpSenderPort";
@@ -38,12 +33,6 @@ export interface RequestOtpResult {
 
 @Injectable()
 export class RequestOtp {
-  private readonly ledger = new OtpAttemptLedger(
-    SIGN_IN_CODE_RATE_POLICY.destinationLimit,
-    SIGN_IN_CODE_RATE_POLICY.ipLimit,
-    SIGN_IN_CODE_RATE_POLICY.baseBackoffSeconds,
-  );
-
   constructor(
     @Inject(PrismaOtpRequestRepository) private readonly otpRequestRepo: OtpRequestRepository,
     @Inject(HttpOtpSenderAdapter) private readonly otpSender: OtpSenderPort,
@@ -73,52 +62,18 @@ export class RequestOtp {
       return { requestId: randomUUID(), resendInSeconds: 0 };
     }
 
-    const now = this.clock.now();
-    const dayAgo = new Date(
-      now.getTime() - SIGN_IN_CODE_RATE_POLICY.destinationWindowMs,
-    );
-    const hourAgo = new Date(
-      now.getTime() - SIGN_IN_CODE_RATE_POLICY.ipWindowMs,
-    );
-
-    const [destinationCount24h, ipCount1h, latest] = await Promise.all([
-      this.otpRequestRepo.countByDestinationSince(
-        destination.channel,
-        destination.value,
-        dayAgo,
-      ),
-      this.otpRequestRepo.countByIpSince(input.ip, hourAgo),
-      this.otpRequestRepo.findLatestByDestination(
-        destination.channel,
-        destination.value,
-      ),
-    ]);
-
-    const rateCheck = this.ledger.check({
-      destinationCount24h,
-      ipCount1h,
-      lastAttemptAt: latest?.createdAt ?? null,
-      now,
-    });
-
-    if (!rateCheck.allowed) {
-      throw new SignInCodeRateLimitedError(rateCheck);
-    }
-
     const code = destination.channel === SIGN_IN_CODE_CHANNELS.EMAIL && reservedAccount !== null
       ? OtpCode.create(reservedAccount.code)
       : OtpCode.generate();
     const codeHash = createHash("sha256").update(code.value).digest("hex");
 
-    const record = await this.otpRequestRepo.create({
+    const { record, resendInSeconds } = await this.otpRequestRepo.reserve({
       purpose: Enums.SignInCodePurpose.SignIn,
-      channel: destination.channel,
-      destination: destination.value,
+      destination,
       codeHash,
-      expiresAt: destination.expiresAt(now),
       userId: null,
       ip: input.ip,
-    });
+    }, this.clock);
 
     if (destination.channel === SIGN_IN_CODE_CHANNELS.PHONE) {
       await this.otpSender.send({
@@ -140,7 +95,7 @@ export class RequestOtp {
 
     const result: RequestOtpResult = {
       requestId: record.id,
-      resendInSeconds: rateCheck.resendInSeconds,
+      resendInSeconds,
     };
 
     if (this.testMode) {
