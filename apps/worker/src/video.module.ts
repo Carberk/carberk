@@ -4,7 +4,7 @@ import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { S3Client } from "@aws-sdk/client-s3";
-import { PrismaService } from "@auto-tm/db";
+import { PrismaService, PrismaMeasurementCommit } from "@auto-tm/db";
 
 import type { Env } from "./env.schema";
 import { PrismaModule } from "./common/prisma.module";
@@ -22,7 +22,11 @@ const VIDEO_S3 = Symbol("VideoS3Client");
   providers: [
     VideoTranscodeProcessor, VideoWorkScheduler,
     { provide: VIDEO_S3, inject: [ConfigService], useFactory: (config: ConfigService<Env, true>) => new S3Client({ endpoint: config.get("MINIO_ENDPOINT", { infer: true }), region: config.get("MINIO_REGION", { infer: true }), credentials: { accessKeyId: config.get("MINIO_ACCESS_KEY", { infer: true }), secretAccessKey: config.get("MINIO_SECRET_KEY", { infer: true }) }, forcePathStyle: true }) },
-    { provide: PrismaVideoProcessingLedger, inject: [PrismaService, ConfigService], useFactory: (db: PrismaService, config: ConfigService<Env, true>) => new PrismaVideoProcessingLedger(db, { isEligible: userId => config.get("VIDEO_ROLLOUT_ENABLED", { infer: true }) && config.get("VIDEO_TESTER_USER_IDS", { infer: true }).includes(userId) }) },
+    { provide: PrismaVideoProcessingLedger, inject: [PrismaService, ConfigService], useFactory: (db: PrismaService, config: ConfigService<Env, true>) => {
+      const appEnv = config.get("APP_ENV", { infer: true });
+      const capture = new PrismaMeasurementCommit({ enabled: config.get("MEASUREMENT_ENABLED", { infer: true }) && ["test", "staging"].includes(appEnv), environment: appEnv === "staging" ? "staging" : appEnv === "production" ? "production" : "test", purposes: ["product_reliability"], evidenceRef: config.get("MEASUREMENT_EVIDENCE_REF", { infer: true }) ?? "", realCollectionApproved: false }, config.get("MEASUREMENT_COLLECTOR_EPOCH", { infer: true }) ?? "", () => new Date(), appEnv === "staging" ? config.get("MEASUREMENT_SYNTHETIC_CAPABILITY_EXPIRES_AT", { infer: true }) ?? "invalid" : undefined);
+      return new PrismaVideoProcessingLedger(db, { isEligible: userId => config.get("VIDEO_ROLLOUT_ENABLED", { infer: true }) && config.get("VIDEO_TESTER_USER_IDS", { infer: true }).includes(userId) }, { context: { platform: "server", release: "worker", build: config.get("AUTOTM_COMMIT_SHA", { infer: true }).slice(0, 64).replace(/[^0-9A-Za-z._-]/g, "_"), locale: "en" }, capture: (tx, userId, event) => capture.capture(tx, userId, event) });
+    } },
     { provide: PrismaVideoCleanupLedger, inject: [PrismaService], useFactory: (db: PrismaService) => new PrismaVideoCleanupLedger(db) },
     { provide: ProcessPreparedVideo, inject: [PrismaVideoProcessingLedger, VIDEO_S3, ConfigService], useFactory: (ledger: PrismaVideoProcessingLedger, client: S3Client, config: ConfigService<Env, true>) => new ProcessPreparedVideo(ledger, new S3VideoProcessingObjects(client, config.get("VIDEO_PRIVATE_BUCKET", { infer: true })), new FFmpegVideoProcessor(), () => new Date(), randomUUID) },
     { provide: CleanVideo, inject: [PrismaVideoCleanupLedger, VIDEO_S3, ConfigService], useFactory: (ledger: PrismaVideoCleanupLedger, client: S3Client, config: ConfigService<Env, true>) => new CleanVideo(ledger, new S3VideoCleanupObjects(client, config.get("VIDEO_PRIVATE_BUCKET", { infer: true })), () => new Date(), randomUUID) },
