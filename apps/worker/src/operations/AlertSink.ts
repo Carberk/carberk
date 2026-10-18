@@ -20,13 +20,14 @@ export function restoreIncident(raw: string | null, now: Date) {
 export class AlertSink {
   private delivered: string | null = null;
   private pending = false;
-  constructor(private readonly url: string | undefined, private readonly secret: string | undefined, private readonly request = fetch) {}
+  constructor(private readonly url: string | undefined, private readonly secret: string | undefined, private readonly request = fetch, private readonly receipts?: { read(): Promise<string | null>; save(transition: string): Promise<void> }) {}
   async publish(snapshot: OperationsSnapshot): Promise<boolean> {
     if (!this.url || !snapshot.incident) return false;
     const transition = `${snapshot.incident.openedAt}:${snapshot.incident.resolvedAt ?? "open"}`;
     if (this.pending || transition === this.delivered) return false;
     this.pending = true;
     try {
+      if (this.receipts && await this.receipts.read() === transition) { this.delivered = transition; return false; }
       const response = await this.request(this.url, { method: "POST", redirect: "error", signal: AbortSignal.timeout(3_000),
         headers: { "content-type": "application/json", ...(this.secret ? { authorization: `Bearer ${this.secret}` } : {}) },
         body: JSON.stringify({ version: 1, observedAt: snapshot.observedAt, incident: snapshot.incident,
@@ -34,6 +35,7 @@ export class AlertSink {
             disk: snapshot.disk?.state ?? "unknown", tls: snapshot.tls?.state ?? "unknown" } }) });
       await response.body?.cancel();
       if (!response.ok) return false;
+      if (this.receipts) await this.receipts.save(transition);
       this.delivered = transition;
       return true;
     } catch { return false; } finally { this.pending = false; }
