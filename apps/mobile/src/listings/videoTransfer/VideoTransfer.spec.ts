@@ -47,6 +47,15 @@ describe("prepared video resumable foreground transfer", () => {
     expect(device.record?.state).toBe("PAUSED"); expect(puts).toEqual([]); expect(completed).toBe(false);
     await new VideoTransfer(device).resume(); expect(completed).toBe(true);
   });
+  it("reconciles a failed transfer already processing without attempting resume or another PUT", async () => {
+    if (!device.record) throw new Error("Fixture missing");
+    device.record = { ...device.record, sessionId, state: "FAILED" };
+    state = "PROCESSING";
+    let resumes = 0;
+    server.use(http.post(`${base}/${sessionId}/resume`, () => { resumes++; return new HttpResponse(null, { status: 404 }); }));
+    await new VideoTransfer(device).resume();
+    expect(resumes).toBe(0); expect(puts).toEqual([]); expect(device.record.state).toBe("PROCESSING");
+  });
   it("cancels a processing optional video after upload has finished", async () => {
     if (!device.record) throw new Error("Fixture missing");
     device.record = { ...device.record, sessionId, state: "PROCESSING", confirmedBytes: 5242882 };
