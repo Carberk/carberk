@@ -144,7 +144,7 @@ export class VideoTransfer {
   }
   private options(record: VideoTransferRecord) { return { assertSession: () => this.owner(record), ...(record.businessId ? { headers: { "x-business-id": record.businessId } } : {}) }; }
   private save(record: VideoTransferRecord) {
-    const value = structuredClone(record);
+    const value = { ...record, target: { ...record.target }, prepared: { ...record.prepared } };
     this.writes = this.writes.then(() => this.device.save(value));
     return this.writes;
   }

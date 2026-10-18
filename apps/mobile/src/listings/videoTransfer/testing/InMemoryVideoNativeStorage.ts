@@ -6,7 +6,7 @@ export class VideoNativeFile {
   get size() { return videoNativeStorage.files.get(this.uri)?.length ?? 0; }
   async bytes() { return videoNativeStorage.files.get(this.uri)?.slice() ?? new Uint8Array(); }
   open() {
-    const file = this;
-    return { offset: 0, close() {}, readBytes(length: number) { return videoNativeStorage.files.get(file.uri)?.slice(this.offset, this.offset + length) ?? new Uint8Array(); } };
+    const uri = this.uri;
+    return { offset: 0, close() {}, readBytes(length: number) { return videoNativeStorage.files.get(uri)?.slice(this.offset, this.offset + length) ?? new Uint8Array(); } };
   }
 }
