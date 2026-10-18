@@ -400,7 +400,7 @@ export class PublishListing {
         });
         try {
           await this.measurement?.capture(tx, input.userId, { version: 1, eventId: randomUUID(), occurredAt: now.toISOString(), purpose: "product_improvement",
-            eventName: "listing_published", context: { platform: "server", release: "server", build: "server", locale: "ru" }, payload: { listingId, cityId: payload.cityId },
+            eventName: "listing_published", context: { platform: "server", release: "server", build: "server", locale: "ru" }, payload: { listingId, cityId: payload.cityId, draftId: input.draftId },
           });
         } catch { /* Measurement outage never rolls back the core publication. */ }
         return created;
