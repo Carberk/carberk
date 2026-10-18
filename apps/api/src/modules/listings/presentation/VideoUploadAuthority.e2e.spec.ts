@@ -123,6 +123,12 @@ describe("video upload current authority and retirement", () => {
     await db.listing.update({ where: { id: suite.id("owner-listing") }, data: { activeVideoGenerationId: null } });
     await request.get(`/api/v1/listings/${suite.id("owner-listing")}/video`).set("authorization", `Bearer ${token("other")}`).expect(404);
   });
+  it("honors cancellation after adoption without removing a newer pending generation", async () => {
+    const active = await readyVideo();
+    const replacement = await create("owner", body("owner-listing", "newer-replacement")).expect(201);
+    await request.delete(`/api/v1/listing-video-upload-sessions/${active.id}`).set("authorization", `Bearer ${token("owner")}`).expect(202);
+    expect(await db.listing.findUniqueOrThrow({ where: { id: suite.id("owner-listing") } })).toMatchObject({ activeVideoGenerationId: null, pendingVideoGenerationId: replacement.body.sessionId });
+  });
   it("distinguishes the seller's active video from a pending replacement and cancels only that replacement", async () => {
     const active = await readyVideo();
     const replacement = await create("owner", body("owner-listing", "replacement")).expect(201);
