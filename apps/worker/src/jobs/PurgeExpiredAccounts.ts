@@ -1,6 +1,8 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService } from "@auto-tm/db";
 
+import { serviceAccountErasureWrites } from "./serviceAccountErasure";
+
 export interface PurgeExpiredAccountsInput {
   now: Date;
 }
@@ -58,6 +60,7 @@ export class PurgeExpiredAccounts {
       // The User row lock comes before any upload lock, the order every writer
       // of a Profile Photo uses (ADR-0088).
       this.prisma.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`,
+      ...serviceAccountErasureWrites(this.prisma, userId, now),
 
       // Retire the Profile Photo's upload and record its storage deletion, in
       // the transaction that clears the photo below. The API's claim does the

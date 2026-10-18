@@ -1,0 +1,18 @@
+import type { DiagnosticSchemas } from "@auto-tm/contracts";
+
+export const DIAGNOSTIC_INTAKE_PORT = "DIAGNOSTIC_INTAKE_PORT";
+export const DIAGNOSTIC_RUNTIME = "DIAGNOSTIC_RUNTIME";
+export interface DiagnosticSubject { userId: string; sessionId: string }
+export interface DiagnosticRuntime { now(): Date; id(): string; syntheticAllowed(subject: DiagnosticSubject): boolean }
+export interface DiagnosticIntakePort {
+  create(subject: DiagnosticSubject, input: DiagnosticSchemas.DiagnosticCreate): Promise<DiagnosticSchemas.DiagnosticOrder>;
+  read(subject: DiagnosticSubject, id: string): Promise<DiagnosticSchemas.DiagnosticOrder>;
+  mine(subject: DiagnosticSubject): Promise<DiagnosticSchemas.DiagnosticOrder[]>;
+  queue(subject: DiagnosticSubject, centerId: string): Promise<DiagnosticSchemas.DiagnosticOrder[]>;
+  templates(subject: DiagnosticSubject, centerId: string): Promise<DiagnosticSchemas.DiagnosticTemplate[]>;
+  publishTemplate(subject: DiagnosticSubject, centerId: string, input: DiagnosticSchemas.PublishDiagnosticTemplate): Promise<DiagnosticSchemas.DiagnosticTemplate>;
+  authorize(subject: DiagnosticSubject, id: string, input: DiagnosticSchemas.DiagnosticAuthorization): Promise<DiagnosticSchemas.DiagnosticOrder>;
+  appointment(subject: DiagnosticSubject, id: string, input: DiagnosticSchemas.DiagnosticAppointmentChange): Promise<DiagnosticSchemas.DiagnosticOrder>;
+  assign(subject: DiagnosticSubject, id: string, input: DiagnosticSchemas.DiagnosticAssignmentChange): Promise<DiagnosticSchemas.DiagnosticOrder>;
+  observeVehicle(subject: DiagnosticSubject, id: string, input: DiagnosticSchemas.DiagnosticObservedVehicle): Promise<DiagnosticSchemas.DiagnosticOrder>;
+}

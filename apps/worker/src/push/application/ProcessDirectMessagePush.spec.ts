@@ -87,6 +87,24 @@ describe("ProcessDirectMessagePush", () => {
     );
   });
 
+  it("does not deliver queued business content after current membership is revoked", async () => {
+    deviceStore.devices = [{ token: "token-a", platform: "android" }];
+    const guarded = new ProcessDirectMessagePush(pushPort, deviceStore, historyStore, { mayDeliver: async () => false });
+    await guarded.execute(makeInput());
+    expect(pushPort.deliveries).toEqual([]);
+    expect(historyStore.updates[0]).toMatchObject({ status: NOTIFICATION_HISTORY_STATUS.Failed, details: { results: [{ token: "token-a", success: false, error: "CURRENT_BUSINESS_ACCESS_DENIED" }] } });
+  });
+
+  it("rechecks authority before each device and stops exposing content if access changes during fanout", async () => {
+    deviceStore.devices = [{ token: "token-a", platform: "android" }, { token: "token-b", platform: "ios" }];
+    let eligible = true;
+    const delivered: string[] = [];
+    const guarded = new ProcessDirectMessagePush({ send: async payload => { delivered.push(payload.deviceToken); eligible = false; return { ok: true }; } }, deviceStore, historyStore, { mayDeliver: async () => eligible });
+    await guarded.execute(makeInput());
+    expect(delivered).toEqual(["token-a"]);
+    expect(historyStore.updates[0]?.details?.["results"]).toEqual([{ token: "token-a", success: true }, { token: "token-b", success: false, error: "CURRENT_BUSINESS_ACCESS_DENIED" }]);
+  });
+
   it("delivers to every active device and records delivered status", async () => {
     deviceStore.devices = [
       { token: "token-a", platform: "ios" },

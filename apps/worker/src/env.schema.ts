@@ -16,6 +16,11 @@ const BaseSchema = z.object({
   AUTOTM_COMMIT_SHA: z.string().min(1).default("unknown"),
   /** Operator-only startup mode: no business request handlers or queue consumers run. */
   PHOTO_CONVERSION_MAINTENANCE: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+  SERVICE_SYNTHETIC_ENABLED: z.enum(["true", "false"]).default("false").transform(value => value === "true"),
+  SERVICE_SYNTHETIC_USER_IDS: z.string().default("[]").transform((value, ctx) => {
+    try { return z.array(z.string().uuid()).max(50).parse(JSON.parse(value)); }
+    catch { ctx.addIssue({ code: "custom", message: "Service synthetic IDs must be a JSON UUID array" }); return z.NEVER; }
+  }),
   LOG_LEVEL: z.enum(["error", "warn", "info", "debug"]).default("info"),
 
   DATABASE_URL: z.string().url(),
@@ -216,6 +221,7 @@ function validateEmailContract(env: BaseEnv, add: (path: string, message: string
 }
 
 export const EnvSchema = BaseSchema.superRefine((env, ctx) => {
+  if (env.APP_ENV === "production" && env.SERVICE_SYNTHETIC_ENABLED) ctx.addIssue({ code: "custom", path: ["SERVICE_SYNTHETIC_ENABLED"], message: "Synthetic service collection is forbidden in production" });
   const add = (path: string, message: string) =>
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
 

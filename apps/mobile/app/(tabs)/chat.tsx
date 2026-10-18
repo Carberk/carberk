@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../../src/auth/useAuth";
 import { useAuthIntentStore } from "../../src/auth/intentStore";
+import { SupportEntry } from "../../src/services/SupportEntry";
 import { ConversationList } from "../../src/conversations/components/ConversationList";
 import { LargeTitle } from "../../components/navigation/ScreenHeader";
 import { TabBarClear, TabScreen } from "../../components/navigation/TabScreen";
@@ -41,7 +42,7 @@ function ChatContent({ isAuthenticated }: { isAuthenticated: boolean | null }) {
   }
 
   if (isAuthenticated === true) {
-    return <ConversationList tabBarSpace={tabBarSpace} />;
+    return <><SupportEntry/><ConversationList tabBarSpace={tabBarSpace} /></>;
   }
 
   return (

@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException, Optional, ForbiddenException } from "@nestjs/common";
 
 import type {
   ListingsReadPort,
@@ -17,7 +17,9 @@ import {
 } from "../domain/ports/ConversationRepository";
 
 import { ConversationAccessPolicy } from "./ConversationAccessPolicy";
-import { toConversationPeer, type ConversationPeer } from "./ConversationPeers";
+import { BusinessEnquiryAccess } from "./BusinessEnquiryAccess";
+import { BUSINESS_ENQUIRY_REPOSITORY, type BusinessEnquiryRepository, type ConversationActor } from "../domain/ports/BusinessEnquiryRepository";
+import { toBusinessPeer, toConversationPeer, type ConversationPeer } from "./ConversationPeers";
 import {
   ConversationSendPolicy,
   type SendRestriction,
@@ -26,6 +28,7 @@ import {
 export interface GetConversationInput {
   userId: string;
   conversationId: string;
+  actor?: ConversationActor | undefined;
 }
 
 /** A list item plus whether the viewer's next Message would be accepted. */
@@ -55,6 +58,8 @@ export class GetConversation {
     private readonly accessPolicy: ConversationAccessPolicy,
     @Inject(ConversationSendPolicy)
     private readonly sendPolicy: ConversationSendPolicy,
+    @Inject(BusinessEnquiryAccess) @Optional() private readonly businessAccess?: BusinessEnquiryAccess,
+    @Inject(BUSINESS_ENQUIRY_REPOSITORY) @Optional() private readonly businesses?: BusinessEnquiryRepository,
   ) {}
 
   async execute(input: GetConversationInput): Promise<GetConversationResult> {
@@ -67,10 +72,14 @@ export class GetConversation {
         message: "Conversation not found",
       });
     }
-    const peerId = this.accessPolicy.assertParticipant(
-      conversation,
-      input.userId,
-    );
+    let peerId: string;
+    if (conversation.businessId) {
+      if (!input.actor || !this.businessAccess) throw new NotFoundException({ code: "NOT_FOUND", message: "Conversation not found" });
+      await this.businessAccess.authorize(conversation, input.actor, {});
+      peerId = conversation.buyerId;
+    } else {
+      peerId = this.accessPolicy.assertParticipant(conversation, input.userId);
+    }
 
     // History stays readable in every restricted case, so a refused send
     // never refuses the read: the restriction is reported, not thrown.
@@ -87,7 +96,9 @@ export class GetConversation {
         this.conversations
           .listMessages(conversation.id, { limit: 1 })
           .then(({ items }) => items[0] ?? null),
-        this.sendPolicy.restrictionFor(conversation, input.userId, listing),
+        conversation.businessId
+          ? this.businessRestriction(conversation, input.actor, listing)
+          : this.sendPolicy.restrictionFor(conversation, input.userId, listing),
       ]);
 
     const participantStates = states.get(conversation.id) ?? [];
@@ -95,6 +106,12 @@ export class GetConversation {
     const ownState = participantStates.find((s) => s.userId === input.userId);
     const peerUser = peerUsers.find((u) => u.id === peerId);
 
+    let peer = toConversationPeer(peerId, peerUser);
+    if (conversation.businessId && input.userId === conversation.buyerId) {
+      const name = await this.businesses?.businessName(conversation.businessId);
+      if (!name) throw new NotFoundException({ code: "NOT_FOUND", message: "Business not found" });
+      peer = toBusinessPeer(conversation.businessId, name);
+    }
     return {
       conversation,
       listing,
@@ -103,7 +120,7 @@ export class GetConversation {
       peerLastReadAt: peerState?.lastReadAt ?? null,
       peerLastDeliveredAt: peerState?.lastDeliveredAt ?? null,
       mutedAt: ownState?.mutedAt ?? null,
-      peer: toConversationPeer(peerId, peerUser),
+      peer,
       // The viewer's block is read once, inside the restriction, and
       // `blocked_by_me` outranks every other restriction. Deriving the flag
       // from it keeps both fields from one read, so a concurrent block or
@@ -112,4 +129,12 @@ export class GetConversation {
       sendRestriction,
     };
   }
+  private async businessRestriction(conversation: Conversation, actor: ConversationActor | undefined, listing: ListingSummary | null): Promise<SendRestriction | null> {
+
+    if (!actor || !this.businessAccess) return "participant_unavailable";
+    try { await this.businessAccess.authorize(conversation, actor, { send: true }); }
+    catch (error) { if (error instanceof ForbiddenException) return "participant_unavailable"; throw error; }
+    return this.sendPolicy.businessRestrictionFor(conversation, actor.userId, listing);
+  }
+
 }

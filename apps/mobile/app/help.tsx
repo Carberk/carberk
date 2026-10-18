@@ -4,6 +4,7 @@ import { Mail, Phone } from "lucide-react-native";
 import * as Linking from "expo-linking";
 import { useTranslation } from "react-i18next";
 
+import { SupportEntry } from "../src/services/SupportEntry";
 import { supportContacts } from "../src/config/supportContacts";
 import { useSafeBack } from "../src/navigation/useSafeBack";
 
@@ -38,6 +39,7 @@ export default function HelpScreen() {
       />
 
       <ScrollView className="flex-1" contentContainerClassName="pb-6 pt-1">
+        <SupportEntry/>
         {/* Each row reads its label, then the address or number, as before. */}
         <MenuGroup>
           <MenuRow

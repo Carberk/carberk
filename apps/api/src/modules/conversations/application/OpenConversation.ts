@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   Inject,
   Injectable,
+  Optional,
   NotFoundException,
   ForbiddenException,
 } from "@nestjs/common";
@@ -20,9 +21,11 @@ import {
   type IdentityReadPort,
 } from "../../identity/identity.public";
 import { Conversation } from "../domain/Conversation";
+import { BUSINESS_ENQUIRY_REPOSITORY, type BusinessEnquiryRepository, type ConversationActor } from "../domain/ports/BusinessEnquiryRepository";
 import { CONVERSATION_ERROR_CODES } from "../domain/types";
 import {
   missingPeer,
+  toBusinessPeer,
   peerIdOf,
   readConversationPeers,
   type ConversationPeer,
@@ -35,6 +38,7 @@ import {
 export interface OpenConversationInput {
   buyerId: string;
   listingId: string;
+  actor?: ConversationActor;
 }
 
 export interface OpenConversationResult {
@@ -55,9 +59,13 @@ export class OpenConversation {
     private readonly identityCheck: IdentityCheckPort,
     @Inject(IDENTITY_READ_PORT)
     private readonly identityRead: IdentityReadPort,
+    @Inject(BUSINESS_ENQUIRY_REPOSITORY) @Optional() private readonly businesses?: BusinessEnquiryRepository,
   ) {}
 
   async execute(input: OpenConversationInput): Promise<OpenConversationResult> {
+    if (input.actor?.businessId) {
+      throw new ForbiddenException({ code: "FORBIDDEN", details: { reason: "PERSONAL_CONTEXT_REQUIRED" } });
+    }
     const listing = await this.listings.getListingSummary(input.listingId);
 
     if (!listing) {
@@ -110,7 +118,7 @@ export class OpenConversation {
       });
     }
 
-    const sellerSuspended = await this.identityCheck.isSuspended(listing.sellerId);
+    const sellerSuspended = !listing.businessId && await this.identityCheck.isSuspended(listing.sellerId);
     if (sellerSuspended) {
       throw new ForbiddenException({
         code: "FORBIDDEN",
@@ -120,7 +128,7 @@ export class OpenConversation {
     }
 
     // Block new contact if either user has blocked the other
-    const blockedBySeller = await this.identityRead.isUserBlockedBy(
+    const blockedBySeller = !listing.businessId && await this.identityRead.isUserBlockedBy(
       listing.sellerId,
       input.buyerId,
     );
@@ -132,7 +140,7 @@ export class OpenConversation {
       });
     }
 
-    const blockedByBuyer = await this.identityRead.isUserBlockedBy(
+    const blockedByBuyer = !listing.businessId && await this.identityRead.isUserBlockedBy(
       input.buyerId,
       listing.sellerId,
     );
@@ -149,9 +157,10 @@ export class OpenConversation {
       listingId: input.listingId,
       buyerId: input.buyerId,
       sellerId: listing.sellerId,
+      ...(listing.businessId ? { businessId: listing.businessId } : {}),
     });
 
-    await this.conversations.save(conversation);
+    await this.conversations.save(conversation, input.actor);
 
     return this.withPeer(conversation, listing, input.buyerId);
   }
@@ -161,6 +170,11 @@ export class OpenConversation {
     listing: ListingSummary,
     viewerId: string,
   ): Promise<OpenConversationResult> {
+    if (conversation.businessId && viewerId === conversation.buyerId && this.businesses) {
+      const name = await this.businesses.businessName(conversation.businessId);
+      if (!name) throw new NotFoundException({ code: "NOT_FOUND", message: "Business not found" });
+      return { conversation, listing, peer: toBusinessPeer(conversation.businessId, name), blockedByMe: false };
+    }
     const peers = await readConversationPeers(this.identityRead, viewerId, [
       conversation,
     ]);

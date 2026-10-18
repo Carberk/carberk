@@ -1,5 +1,6 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 
+import { DIRECT_MESSAGE_DELIVERY_ELIGIBILITY, type DirectMessageDeliveryEligibility } from "../domain/DirectMessageDeliveryEligibility";
 import type { DirectMessagePushInput } from "../domain/DirectMessagePushInput";
 import type {
   NotificationHistoryStatus,
@@ -43,6 +44,7 @@ export class ProcessDirectMessagePush {
     private readonly deviceStore: PushDeviceStore,
     @Inject(NOTIFICATION_HISTORY_STORE)
     private readonly historyStore: NotificationHistoryStore,
+    @Inject(DIRECT_MESSAGE_DELIVERY_ELIGIBILITY) @Optional() private readonly eligibility?: DirectMessageDeliveryEligibility,
   ) {}
 
   async execute(input: DirectMessagePushInput): Promise<void> {
@@ -72,6 +74,11 @@ export class ProcessDirectMessagePush {
     for (const device of devices) {
       if (alreadyDelivered.has(device.token)) {
         results.push({ token: device.token, success: true, skipped: true });
+        continue;
+      }
+
+      if (this.eligibility && !await this.eligibility.mayDeliver(input)) {
+        results.push({ token: device.token, success: false, error: "CURRENT_BUSINESS_ACCESS_DENIED" });
         continue;
       }
 

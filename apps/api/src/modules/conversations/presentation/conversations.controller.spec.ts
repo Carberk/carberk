@@ -13,7 +13,10 @@ import type { ListMyConversations } from "../application/ListMyConversations";
 import type { CountMyUnreadMessages } from "../application/CountMyUnreadMessages";
 import { IS_PUBLIC_KEY } from "../../../common/public.decorator";
 import type { GetConversation } from "../application/GetConversation";
-import type { ListMessages } from "../application/ListMessages";
+import { ListMessages } from "../application/ListMessages";
+import { BusinessEnquiryAccess } from "../application/BusinessEnquiryAccess";
+import { BusinessAuthorityDenied, type BusinessAuthorityPort } from "../../identity/identity.public";
+import type { ConversationRepository } from "../domain/ports/ConversationRepository";
 import type { SendTextMessage } from "../application/SendTextMessage";
 import type { SendMessage } from "../application/SendMessage";
 import type { SendPostRefMessage } from "../application/SendPostRefMessage";
@@ -665,5 +668,31 @@ describe("ConversationsController unread count", () => {
 
     expect(gets).toContain("unread-count");
     expect(gets.indexOf("unread-count")).toBeLessThan(gets.indexOf(":id"));
+  });
+});
+
+
+describe("business enquiry message history through the HTTP controller", () => {
+  it("lets the buyer read with a current personal session and blocks a revoked session", async () => {
+    const conversation = Conversation.create({ id: "enquiry", listingId: "listing", buyerId: "buyer", sellerId: "departed", businessId: "business" });
+    const message = Message.createText({ id: "reply", conversationId: "enquiry", senderId: "buyer", text: "Is it available?" });
+    const repository = {
+      async findById(id: string) { return id === conversation.id ? conversation : null; },
+      async listMessages() { return { items: [message], nextCursor: null }; },
+    } as unknown as ConversationRepository;
+    let revoked = false;
+    const authority: BusinessAuthorityPort = {
+      async resolve(subject) {
+        if (revoked || subject.userId !== "buyer" || subject.sessionId !== "session") throw new BusinessAuthorityDenied("SESSION_REQUIRED");
+        return { kind: "personal", userId: subject.userId };
+      },
+      async authorize() { throw new BusinessAuthorityDenied("MEMBERSHIP_REQUIRED"); },
+    };
+    const controller = buildController({ listMessages: new ListMessages(repository, new BusinessEnquiryAccess(authority)) });
+    const request = { user: { sub: "buyer", sid: "session" }, headers: {} } as never;
+    const response = await controller.listMessages("enquiry", {}, request);
+    expect(response.items).toEqual([expect.objectContaining({ id: "reply", text: "Is it available?" })]);
+    revoked = true;
+    await expect(controller.listMessages("enquiry", {}, request)).rejects.toThrow(ForbiddenException);
   });
 });

@@ -1,11 +1,12 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService, type Prisma } from "@auto-tm/db";
 import { z } from "zod";
-import { BUSINESS_AUTHORITY_PORT, type BusinessAuthorityPort } from "../../identity/identity.public";
+import { BUSINESS_AUTHORITY_PORT, IDENTITY_CLOCK_PORT, type BusinessAuthorityPort, type ClockPort } from "../../identity/identity.public";
 import type { VideoPlaybackAuthority, VideoGrantIssuer } from "../application/VideoPlaybackPorts";
 import { VideoManifestGateway } from "./VideoManifestGateway";
 
+export const VIDEO_GRANT_SECRET_FACTORY = Symbol("VideoGrantSecretFactory");
 export const VIDEO_PLAYBACK_ELIGIBILITY = Symbol("VideoPlaybackEligibility");
 export interface VideoPlaybackEligibility { isEligible(userId: string): boolean; }
 const manifestSchema = z.object({ assets: z.array(z.object({ path: z.string().max(256), purpose: z.enum(["poster", "playback"]), key: z.string().max(512), sha256: z.string().regex(/^[a-f0-9]{64}$/).optional(), sizeBytes: z.number().int().positive().max(100 * 1024 * 1024), contentType: z.enum(["application/vnd.apple.mpegurl", "video/mp2t", "video/mp4", "image/webp", "image/jpeg"]) }).strict()).min(1).max(1024) }).strict();
@@ -13,7 +14,7 @@ const manifestSchema = z.object({ assets: z.array(z.object({ path: z.string().ma
 /** Legacy unbound grants deny. This never selects a newest generation or public URL. */
 @Injectable()
 export class PrismaVideoPlayback implements VideoPlaybackAuthority, VideoGrantIssuer {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService, @Inject(BUSINESS_AUTHORITY_PORT) private readonly identity: BusinessAuthorityPort, @Inject(VIDEO_PLAYBACK_ELIGIBILITY) private readonly eligibility: VideoPlaybackEligibility) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService, @Inject(BUSINESS_AUTHORITY_PORT) private readonly identity: BusinessAuthorityPort, @Inject(VIDEO_PLAYBACK_ELIGIBILITY) private readonly eligibility: VideoPlaybackEligibility, @Inject(IDENTITY_CLOCK_PORT) private readonly clock: ClockPort, @Inject(VIDEO_GRANT_SECRET_FACTORY) private readonly newSecret: () => string) {}
   async authorize(secret: string): ReturnType<VideoPlaybackAuthority["authorize"]> {
     if (!/^[A-Za-z0-9_-]{43}$/.test(secret)) return null;
     const secretHash = createHash("sha256").update(secret).digest("hex");
@@ -23,7 +24,7 @@ export class PrismaVideoPlayback implements VideoPlaybackAuthority, VideoGrantIs
         const locks = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "video_grants" WHERE "secretHash" = ${secretHash} FOR SHARE`;
         if (!locks.length) return null;
         const grant = await tx.videoGrant.findUnique({ where: { secretHash } });
-        if (!grant || !grant.ownerUserId || !grant.ownerSessionId || grant.revokedAt || grant.expiresAt <= new Date() || !["poster", "playback"].includes(grant.purpose) || !this.eligibility.isEligible(grant.ownerUserId)) return null;
+        if (!grant || !grant.ownerUserId || !grant.ownerSessionId || grant.revokedAt || grant.expiresAt <= this.clock.now() || !["poster", "playback"].includes(grant.purpose) || !this.eligibility.isEligible(grant.ownerUserId)) return null;
         const current = await this.current(tx, { userId: grant.ownerUserId, sessionId: grant.ownerSessionId }, grant.listingId, grant.generationId);
         if (!current) return null;
         return { purpose: grant.purpose as "poster" | "playback", assets: current.assets };
@@ -39,8 +40,9 @@ export class PrismaVideoPlayback implements VideoPlaybackAuthority, VideoGrantIs
         if (!current) return null;
         const asset = current.assets.find((entry) => entry.purpose === input.purpose && (input.purpose === "poster" || entry.path === "master.m3u8"));
         if (!asset) return null;
-        const secret = randomBytes(32).toString("base64url");
-        const expiresAt = new Date(Date.now() + (input.purpose === "poster" ? 60_000 : 300_000));
+        const secret = this.newSecret();
+        if (!/^[A-Za-z0-9_-]{43}$/.test(secret)) return null;
+        const expiresAt = new Date(this.clock.now().getTime() + (input.purpose === "poster" ? 60_000 : 300_000));
         await tx.videoGrant.create({ data: { secretHash: createHash("sha256").update(secret).digest("hex"), ownerUserId: input.userId, ownerSessionId: input.sessionId, listingId: input.listingId, generationId: current.generationId, purpose: input.purpose, expiresAt } });
         return { url: `/video-grants/${secret}/${asset.path}`, generationId: current.generationId, expiresAt };
       }, { maxWait: 250, timeout: 1500 });

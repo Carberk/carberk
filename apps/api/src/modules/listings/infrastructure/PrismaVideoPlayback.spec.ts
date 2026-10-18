@@ -22,7 +22,7 @@ function fixture() {
   const transaction = { $executeRaw: async () => 0, $queryRaw: async () => [{ id: "grant" }], videoGrant: { findUnique: async () => grant, create: async ({ data }: { data: unknown }) => { stored = data; return data; } }, listing: { findUnique: async () => listing }, videoGeneration: { findUnique: async () => generation } };
   const prisma = { $transaction: async (run: (tx: typeof transaction) => Promise<unknown>) => run(transaction) } as unknown as PrismaService;
   const identity = { resolve: async () => { if (!active) throw new Error("SESSION_REQUIRED"); return { kind: "personal", userId: "viewer" }; }, authorize: async () => { throw new Error("MEMBERSHIP_REQUIRED"); } } as BusinessAuthorityPort;
-  return { grant, listing, generation, stored: () => stored, service: new PrismaVideoPlayback(prisma, identity, { isEligible: () => eligible }), revokeSession: () => { active = false; }, revokeTester: () => { eligible = false; } };
+  return { grant, listing, generation, stored: () => stored, service: new PrismaVideoPlayback(prisma, identity, { isEligible: () => eligible }, { now: () => new Date() }, () => secret), revokeSession: () => { active = false; }, revokeTester: () => { eligible = false; } };
 }
 describe("current persisted playback authority", () => {
   it("admits worker readback hashes while refusing malformed immutable asset hashes", async () => {

@@ -521,3 +521,36 @@ it("requires a long dedicated view salt only for enabled collection", () => {
   expect(EnvSchema.safeParse({ ...baseEnv, LISTING_VIEWS_ENABLED: "true", LISTING_VIEW_SALT_SECRET: "short" }).success).toBe(false);
   expect(EnvSchema.parse({ ...baseEnv, LISTING_VIEWS_ENABLED: "true", LISTING_VIEW_SALT_SECRET: "synthetic-listing-view-secret-long-enough" }).LISTING_VIEWS_ENABLED).toBe(true);
 });
+
+describe("service synthetic fixture admission", () => {
+ it("defaults the exact fixture allowlist empty and bounds valid UUID configuration", () => {
+  expect(EnvSchema.parse(baseEnv)).toMatchObject({ SERVICE_SYNTHETIC_USER_IDS: [] });
+  const ids = ["11111111-1111-4111-8111-111111111111"];
+  expect(EnvSchema.parse({ ...baseEnv, SERVICE_SYNTHETIC_USER_IDS: JSON.stringify(ids) })).toMatchObject({ SERVICE_SYNTHETIC_USER_IDS: ids });
+  for (const value of ["not-json", JSON.stringify(["not-an-id"]), JSON.stringify(Array.from({ length: 51 }, () => ids[0]))]) expect(EnvSchema.safeParse({ ...baseEnv, SERVICE_SYNTHETIC_USER_IDS: value }).success).toBe(false);
+ });
+ it("forbids production fixture collection even with admitted identities", () => {
+  expect(EnvSchema.safeParse({ ...baseEnv, APP_ENV: "production", SERVICE_SYNTHETIC_ENABLED: "true", SERVICE_SYNTHETIC_USER_IDS: "[]" }).success).toBe(false);
+ });
+});
+
+describe("video tester configuration", () => {
+ it("rejects malformed or oversized tester lists", () => {
+  expect(EnvSchema.safeParse({ ...baseEnv, VIDEO_TESTER_USER_IDS: "arbitrary-name" }).success).toBe(false);
+  expect(EnvSchema.safeParse({ ...baseEnv, VIDEO_TESTER_USER_IDS: Array.from({ length: 51 }, () => "11111111-1111-4111-8111-111111111111").join(",") }).success).toBe(false);
+ });
+ it("normalizes the explicit UUID tester list", () => {
+  expect(EnvSchema.parse({ ...baseEnv, VIDEO_TESTER_USER_IDS: "11111111-1111-4111-8111-111111111111, 22222222-2222-4222-8222-222222222222" }).VIDEO_TESTER_USER_IDS).toEqual(["11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"]);
+ });
+});
+
+describe("private video serving configuration", () => {
+ it("rejects a bucket managed by the public media bootstrap", () => {
+  for (const bucket of ["listing-photos", "listing-videos", "chat-attachments", "catalog-assets"]) {
+   expect(EnvSchema.safeParse({ ...baseEnv, VIDEO_PRIVATE_BUCKET: bucket }).success).toBe(false);
+  }
+ });
+ it("defaults new uploads closed independently from existing playback", () => {
+  expect(EnvSchema.parse({ ...baseEnv, VIDEO_ROLLOUT_ENABLED: "true" }).VIDEO_UPLOADS_ENABLED).toBe(false);
+ });
+});

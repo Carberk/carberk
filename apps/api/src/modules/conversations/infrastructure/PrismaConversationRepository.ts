@@ -1,7 +1,10 @@
-import { Inject, Injectable } from "@nestjs/common";
-import { Prisma, PrismaService } from "@auto-tm/db";
+import { BusinessEnquiryAccess } from "../application/BusinessEnquiryAccess";
+import type { ConversationActor } from "../domain/ports/BusinessEnquiryRepository";
+import { toDomainConversation } from "./ConversationMapper";
+import { Inject, Injectable, Optional, ForbiddenException } from "@nestjs/common";
+import { PrismaService, Prisma } from "@auto-tm/db";
 
-import { Conversation } from "../domain/Conversation";
+import type { Conversation } from "../domain/Conversation";
 import type { Message } from "../domain/Message";
 import { MessageAlreadySavedError } from "../domain/ports/ConversationRepository";
 import type {
@@ -27,6 +30,7 @@ export class PrismaConversationRepository
   constructor(
     @Inject(PrismaService)
     private readonly prisma: PrismaService,
+    @Optional() @Inject(BusinessEnquiryAccess) private readonly businessAccess?: BusinessEnquiryAccess,
   ) {}
 
   async findById(id: string): Promise<Conversation | null> {
@@ -34,7 +38,7 @@ export class PrismaConversationRepository
       where: { id },
     });
     if (!row) return null;
-    return this.toDomain(row);
+    return toDomainConversation(row);
   }
 
   async findByListingAndBuyer(
@@ -45,10 +49,18 @@ export class PrismaConversationRepository
       where: { listingId_buyerId: { listingId, buyerId } },
     });
     if (!row) return null;
-    return this.toDomain(row);
+    return toDomainConversation(row);
   }
 
-  async save(conversation: Conversation): Promise<void> {
+  async save(conversation: Conversation, actor?: ConversationActor): Promise<void> {
+    if (conversation.businessId) {
+      await this.prisma.$transaction(async tx => {
+        await this.authorizeBusinessWrite(tx, conversation, actor, false);
+        await tx.conversation.create({ data: { id: conversation.id, listingId: conversation.listingId, buyerId: conversation.buyerId, sellerId: conversation.sellerId, businessId: conversation.businessId, createdAt: conversation.createdAt, updatedAt: conversation.updatedAt } });
+        await tx.conversationParticipant.create({ data: { conversationId: conversation.id, userId: conversation.buyerId } });
+      });
+      return;
+    }
     await this.prisma.$transaction([
       this.prisma.conversation.create({
         data: {
@@ -86,7 +98,7 @@ export class PrismaConversationRepository
 
     const rows = await this.prisma.conversation.findMany({
       where: {
-        OR: [{ buyerId: userId }, { sellerId: userId }],
+        OR: [{ buyerId: userId }, { sellerId: userId, businessId: null }],
       },
       orderBy: { updatedAt: "desc" },
       take,
@@ -119,7 +131,7 @@ export class PrismaConversationRepository
 
     return {
       items: items.map((r) => ({
-        conversation: this.toDomain(r),
+        conversation: toDomainConversation(r),
         lastMessage: r.lastMessageId
           ? (lastMessageMap.get(r.lastMessageId) ?? null)
           : null,
@@ -184,9 +196,18 @@ export class PrismaConversationRepository
     return toDomainMessage(row);
   }
 
-  async saveMessage(message: Message): Promise<void> {
+  async saveMessage(message: Message, actor?: ConversationActor): Promise<void> {
     const now = new Date();
     try {
+      const conversation = await this.prisma.conversation.findUnique({ where: { id: message.conversationId } });
+      if (conversation?.businessId) {
+        await this.prisma.$transaction(async tx => {
+          await this.authorizeBusinessWrite(tx, toDomainConversation(conversation), actor, true);
+          await tx.message.create({ data: { id: message.id, conversationId: message.conversationId, senderId: message.senderId, kind: message.kind, body: message.body, metadata: toRawMetadata(message.metadata) as Prisma.InputJsonValue, createdAt: message.createdAt, clientMessageId: message.clientMessageId ?? null } });
+          await tx.conversation.update({ where: { id: message.conversationId }, data: { updatedAt: now, lastMessageAt: message.createdAt, lastMessageId: message.id } });
+        });
+        return;
+      }
       await this.prisma.$transaction([
         this.prisma.message.create({
           data: {
@@ -399,7 +420,7 @@ export class PrismaConversationRepository
       JOIN "conversations" c ON c."id" = m."conversationId"
       LEFT JOIN "conversation_participants" p
         ON p."conversationId" = c."id" AND p."userId" = ${userId}
-      WHERE (c."buyerId" = ${userId} OR c."sellerId" = ${userId})
+      WHERE (c."buyerId" = ${userId} OR (c."sellerId" = ${userId} AND c."businessId" IS NULL))
         AND m."senderId" <> ${userId}
         AND m."deletedAt" IS NULL
         AND (p."lastReadAt" IS NULL OR m."createdAt" > p."lastReadAt")`;
@@ -522,21 +543,20 @@ export class PrismaConversationRepository
     return participant != null;
   }
 
-  private toDomain(row: {
-    id: string;
-    listingId: string;
-    buyerId: string;
-    sellerId: string;
-    createdAt: Date;
-    updatedAt: Date;
-  }): Conversation {
-    return Conversation.create({
-      id: row.id,
-      listingId: row.listingId,
-      buyerId: row.buyerId,
-      sellerId: row.sellerId,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-    });
+  private async authorizeBusinessWrite(tx: Prisma.TransactionClient, initial: Conversation, actor: ConversationActor | undefined, sending: boolean) {
+    if (!this.businessAccess || !actor) throw new ForbiddenException({ code: "FORBIDDEN" });
+    await this.businessAccess.authorize(initial, actor, { send: sending, transaction: tx });
+    await tx.$queryRaw`SELECT id FROM dealerships WHERE id = ${initial.businessId} FOR UPDATE`;
+    const business = await tx.dealership.findUnique({ where: { id: initial.businessId ?? "" } });
+    if (business?.status !== "active") throw new ForbiddenException({ code: "FORBIDDEN", details: { reason: "BUSINESS_INACTIVE" } });
+    await tx.$queryRaw`SELECT id FROM listings WHERE id = ${initial.listingId} FOR UPDATE`;
+    const listing = await tx.listing.findUnique({ where: { id: initial.listingId } });
+    if (!listing || listing.businessId !== initial.businessId || listing.deletedAt || listing.status === "banned" || !listing.allowChat || (!sending && listing.status !== "active")) throw new ForbiddenException({ code: "FORBIDDEN", details: { reason: "LISTING_NOT_CONTACTABLE" } });
+    if (sending) {
+      await tx.$queryRaw`SELECT id FROM conversations WHERE id = ${initial.id} FOR UPDATE`;
+      const current = await tx.conversation.findUniqueOrThrow({ where: { id: initial.id } });
+      await this.businessAccess.authorize(toDomainConversation(current), actor, { send: true, transaction: tx });
+    }
   }
+
 }

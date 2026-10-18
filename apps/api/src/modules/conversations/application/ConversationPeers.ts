@@ -45,6 +45,11 @@ export function toConversationPeer(
   };
 }
 
+/** Public business identity never impersonates the creator or assigned human. */
+export function toBusinessPeer(id: string, name: string): ConversationPeer {
+  return { id, displayName: name, nameNumber: 1000, avatarIndex: 0, avatarKey: null, deleted: false };
+}
+
 export interface ConversationPeerView {
   peer: ConversationPeer;
   blockedByMe: boolean;

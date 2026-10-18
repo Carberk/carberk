@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ThrottlerGuard } from "@nestjs/throttler";
 
+import { requestLogPath } from "./requestLogging";
 import { resolveClientIpDetails, type ClientIpRequest } from "./client-ip";
 
 /** One warning per window keeps a missing edge header visible without flooding logs. */
@@ -36,7 +37,7 @@ export class ClientIpThrottlerGuard extends ThrottlerGuard {
       {
         event: "client_ip.peer_fallback",
         peer,
-        path: typeof url === "string" ? url.split("?")[0] : undefined,
+        path: typeof url === "string" ? requestLogPath(url) : undefined,
       },
       "Trusted client IP header missing or invalid; rate limits count this request against the peer address (ADR-0078)",
     );

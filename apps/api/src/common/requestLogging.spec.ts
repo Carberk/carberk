@@ -46,6 +46,12 @@ class ProbeController {
   }
 }
 
+@Controller("video-grants")
+class VideoProbeController {
+  @Get(":secret/*")
+  read() { return { ok: true }; }
+}
+
 describe("API request logging", () => {
   let app: NestFastifyApplication | undefined;
 
@@ -75,7 +81,7 @@ describe("API request logging", () => {
 
     const moduleRef = await Test.createTestingModule({
       imports: [LoggerModule.forRoot({ pinoHttp: [requestLoggingOptions("info", clientIpHeader), out] })],
-      controllers: [ProbeController],
+      controllers: [ProbeController, VideoProbeController],
     }).compile();
     app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
     app.getHttpAdapter().getInstance().addHook("onSend", async (_req, reply) => {
@@ -86,6 +92,13 @@ describe("API request logging", () => {
     await supertest(app.getHttpServer())[method](path).set(headers).expect(method === "get" ? 200 : 201);
     return lines.join("");
   }
+
+  it("keeps playback capabilities out of request paths, parameters and Referer headers", async () => {
+    const secret = "video-playback-secret-sentinel";
+    const log = await logOneRequest({ referer: `https://auto.tm/video-grants/${secret}/master.m3u8` }, `/video-grants/${secret}/360p/segment-0001.ts`);
+    expect(log).toContain("/video-grants/[Redacted]/360p/segment-0001.ts");
+    expect(log).not.toContain(secret);
+  });
 
   it("logs the path of a search without its query string or its parsed query", async () => {
     const log = await logOneRequest({}, "/api/v1/listings?q=toyota+camry+secret-search&limit=20");

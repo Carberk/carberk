@@ -36,6 +36,14 @@ describe("Search parameters: count requests while the year range is edited", () 
   });
   afterEach(() => vi.useRealTimers());
 
+  it("counts the selected seller type through the real hook before applying", async () => {
+    const view = await open({ sort: "newest" });
+    await fireEvent.press(view.getByRole("button", { name: "Business Seller type" }));
+    await settle(500);
+    expect(requestedUrls().some(url => url.includes("sellerType=business"))).toBe(true);
+    expect(view.getByRole("button", { name: "Business Seller type" }).props.accessibilityState.selected).toBe(true);
+  });
+
   it("requests no invalid year range when an inverted range is corrected, then shows the current count", async () => {
     const view = await open({ yearMin: 2020, yearMax: 2018, sort: "newest" });
     await settle(500);
