@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import { createHash } from "node:crypto";
 import { Test } from "@nestjs/testing";
 import { JwtModule } from "@nestjs/jwt";
 import { FastifyAdapter,type NestFastifyApplication } from "@nestjs/platform-fastify";
@@ -7,7 +8,6 @@ import { beforeAll,beforeEach,afterAll,describe,it,expect } from "vitest";
 import supertest from "supertest";
 
 import { IdentityModule } from "../../identity/identity.module";
-import { hash } from "bcryptjs";
 import { GlobalErrorFilter } from "../../../common/error.filter";
 import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
 import { cleanSuiteFixtures,defineE2eSuite } from "../../../../test/helpers/e2eSuite";
@@ -25,11 +25,11 @@ describe("real sign-in HTTP outcomes and durable measurement",()=>{
   db=new PrismaService();await db.$connect();store=new PrismaMeasurementStore(db,{epoch,environment:"test",population:"synthetic"});
   const source=new RecordSignInMeasurement(store,new AcceptMeasurement(store,()=>new Date(),{enabled:true,environment:"test",purposes:["product_reliability"],evidenceRef:"synthetic-auth-source-917",realCollectionApproved:false}),()=>new Date());
   const module=await Test.createTestingModule({imports:[bullTestRoot(),IdentityModule,JwtModule.register({global:true,secret:"synthetic-auth-source-917"})]}).overrideProvider(MEASUREMENT_SIGN_IN_OUTCOME_PORT).useValue(source).compile();
-  app=module.createNestApplication<NestFastifyApplication>(new FastifyAdapter());app.useGlobalFilters(new GlobalErrorFilter());await app.listen(0,"127.0.0.1");request=supertest(app.getHttpServer());
+  app=module.createNestApplication<NestFastifyApplication>(new FastifyAdapter());app.useGlobalFilters(new GlobalErrorFilter());await app.listen(0, "127.0.0.1");request=supertest(app.getHttpServer());
  });
  beforeEach(async()=>{
   await cleanup();await db.user.create({data:{id:suite.id("member"),phone,phoneVerifiedAt:new Date()}});await db.measurementState.create({data:{key:"collector",epoch}});
-  await db.otpRequest.create({data:{id:suite.id("otp"),purpose:"sign_in",channel:"phone",destination:phone,phone,codeHash:await hash(code,10),expiresAt:new Date(Date.now()+60000),ip:"127.0.0.1"}});
+  await db.otpRequest.create({data:{id:suite.id("otp"),purpose:"sign_in",channel:"phone",destination:phone,phone,codeHash:createHash("sha256").update(code).digest("hex"),expiresAt:new Date(Date.now()+60000),ip:"127.0.0.1"}});
   const admission=await store.bootstrap({});if(!admission?.guestCapability)throw new Error("Missing synthetic guest");guest=admission.guestCapability;
  });
  afterAll(async()=>{await cleanup();await app?.close();await db.$disconnect();});
