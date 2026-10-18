@@ -23,7 +23,7 @@ export function OperationsWorkspace() {
         if (remaining <= 0) setLoad({ ok: true, data: { state: "unavailable", snapshot: null } });
         else expiry = setTimeout(() => setLoad({ ok: true, data: { state: "unavailable", snapshot: null } }), remaining);
       }
-    });
+    }).catch(() => { if (!cancelled) setLoad({ ok: false, error: "error" }); });
     return () => { cancelled = true; if (expiry) clearTimeout(expiry); };
   }, [refresh]);
   const snapshot: OperationsSchemas.OperationsSnapshot | null = load?.ok && load.data.state === "available" ? load.data.snapshot : null;
