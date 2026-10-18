@@ -120,7 +120,7 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
           if (parsed.success && candidate.user.staffGrants.some(grant => grant.capability === candidate.capability) && this.runtime.syntheticAllowed({ userId: candidate.userId, sessionId: "" })) staffChoices.push({ userId: candidate.userId, capability: parsed.data, label: candidate.user.displayName ?? candidate.userId });
         }
       }
-      return DiagnosticSchemas.DiagnosticWorkspaceSchema.parse({ order: await this.dto(tx, scope.row, true), template: this.template(template), capabilities,
+      return DiagnosticSchemas.DiagnosticWorkspaceSchema.parse({ actorId: subject.userId, order: await this.dto(tx, scope.row, true), template: this.template(template), capabilities,
         assignments: assignments.flatMap(item => { const parsed = DiagnosticSchemas.DiagnosticCapabilitySchema.safeParse(item.capability); return parsed.success ? [{ userId: item.userId, capability: parsed.data }] : []; }), staffChoices });
     });
   }

@@ -83,6 +83,7 @@ const messages: Record<string, [string, string]> = {
     "Hyzmat we goldaw",
     "Service and Support"
   ],
+  "Открыть назначенные осмотры": ["Bellenen barlaglary aç", "Open assigned inspections"],
   "Диагностика": [
     "Diagnostika",
     "Diagnostics"

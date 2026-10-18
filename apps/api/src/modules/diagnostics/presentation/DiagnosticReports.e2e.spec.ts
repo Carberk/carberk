@@ -202,6 +202,12 @@ describe("diagnostic authoring and immutable audience release", () => {
       expect(denied.headers["cache-control"]).toContain("no-store");
     }
   });
+  it("allows an authorized author to discard an upload that failed before creating an intent without leaking another report", async () => {
+    const { report } = await draft();
+    const absent = randomUUID();
+    await post("technician", `reports/${report.id}/evidence/${absent}/abandon`, {}).expect(201);
+    for (const who of ["buyer", "other", "admin", "reviewer"] as const) await post(who, `reports/${report.id}/evidence/${absent}/abandon`, {}).expect(403);
+  });
   it("protects actual sanitized evidence bytes from other audiences and revoked sessions", async () => {
     const { report } = await draft(); const finding = { ...normal(), assessment: "fault", explanation: "Observed synthetic damage", evidenceIds: [randomUUID()] };
     const image = await sharp({ create: { width: 4, height: 4, channels: 3, background: "red" } }).jpeg().toBuffer();
