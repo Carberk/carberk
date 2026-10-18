@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
+
 import { GET as apple } from "../app/.well-known/apple-app-site-association/route";
 import { GET as android } from "../app/.well-known/assetlinks.json/route";
 import { GET as sharing } from "../app/api/marketplace-sharing/route";

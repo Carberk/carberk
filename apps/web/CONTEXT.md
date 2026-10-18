@@ -18,3 +18,5 @@ Web shares browser components and theme tokens with `packages/ui`; mobile has se
 - [Production image](../../infra/docker/web.Dockerfile)
 - [Account deletion page](src/app/[locale]/account/delete)
 - [Shared UI](../../packages/ui/CONTEXT.md)
+
+The marketplace association routes under `.well-known` require configured actual application/signing identities. `api/marketplace-sharing` remains disabled until deployed reader and installed-link acceptance is recorded through its explicit activation input. See [public reader evidence](../../docs/evidence/issue-910/readers-and-sharing.md) for inputs and outstanding acceptance; generated application identities are never a substitute for deployed signing evidence.

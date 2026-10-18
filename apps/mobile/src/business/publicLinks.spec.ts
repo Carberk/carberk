@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
+
 import { redirectSystemPath } from "../../app/+native-intent";
 afterEach(() => vi.unstubAllEnvs());
 it("maps supported localized HTTPS reader links to the same native stable-ID target", () => {
