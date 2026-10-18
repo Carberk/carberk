@@ -1497,6 +1497,8 @@ model HistoryProviderAllowance {
   @@map("history_provider_allowances")
 }
 model HistoryOrder {
+  bookings HistoryBooking[]
+  deliveries HistoryDelivery[]
   version Int @default(0)
   id String @id @default(uuid())
   requestId String @unique
@@ -1527,6 +1529,7 @@ model HistoryOrder {
   @@map("history_orders")
 }
 model HistoryPayment {
+  verifiedFunds Boolean @default(false)
   id String @id @default(uuid())
   orderId String
   order HistoryOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
@@ -1545,6 +1548,8 @@ model HistoryPayment {
   @@map("history_payments")
 }
 model HistoryPurchaseIntent {
+  sourceArtifactId String?
+  deliveries HistoryDelivery[]
   id String @id @default(uuid())
   orderId String @unique
   order HistoryOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
@@ -1570,4 +1575,74 @@ model HistoryRefund {
   executionReference String?
   createdAt DateTime @default(now())
   @@map("history_refunds")
+}
+
+/// Explicit renewed booking acceptance never rewrites the original accepted offer.
+model HistoryBooking {
+  id String @id @default(uuid())
+  orderId String
+  order HistoryOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  clientBookingId String
+  vin String?
+  providers Json
+  amount Int
+  refundRule String
+  windowStart DateTime
+  windowEnd DateTime
+  acceptedAt DateTime
+  erasedAt DateTime?
+  @@unique([orderId, clientBookingId])
+  @@map("history_bookings")
+}
+/// Original provider bytes are independent of a purchaser's communication attachment.
+model HistoryArtifact {
+  id String @id @default(uuid())
+  provider String
+  vin String?
+  originalDate DateTime
+  mileageObservedAt DateTime?
+  sourceListingId String?
+  acquiredForOrderId String?
+  objectKey String @unique
+  sha256 String
+  sizeBytes Int
+  expectedPages Int
+  verifiedPages Int?
+  rights Json
+  provenance String?
+  state String @default("staged")
+  verifiedById String?
+  verifiedAt DateTime?
+  createdAt DateTime @default(now())
+  restrictedAt DateTime?
+  removedAt DateTime?
+  deliveries HistoryDelivery[]
+  @@index([vin, provider, state])
+  @@map("history_artifacts")
+}
+model HistoryDelivery {
+  id String @id @default(uuid())
+  orderId String
+  order HistoryOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  artifactId String
+  artifact HistoryArtifact @relation(fields: [artifactId], references: [id], onDelete: Restrict)
+  purchaseIntentId String
+  purchaseIntent HistoryPurchaseIntent @relation(fields: [purchaseIntentId], references: [id], onDelete: Restrict)
+  sharedLink String?
+  linkApprovedAt DateTime?
+  deliveredById String?
+  deliveredAt DateTime
+  erasedAt DateTime?
+  @@unique([orderId, artifactId])
+  @@map("history_deliveries")
+}
+/// Independent durable byte cleanup survives private linkage erasure and retries.
+model HistoryArtifactCleanup {
+  artifactId String @id
+  objectKey String
+  sha256 String
+  epoch Int @default(1)
+  requestedAt DateTime @default(now())
+  completedAt DateTime?
+  @@map("history_artifact_cleanup")
 }
