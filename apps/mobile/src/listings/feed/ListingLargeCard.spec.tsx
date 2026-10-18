@@ -4,7 +4,7 @@ import type { ListingsSchemas } from "@auto-tm/contracts";
 import * as Linking from "expo-linking";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { renderMobile, fireEvent, act, first, getHost } from "../../../test/render";
+import { renderMobile, fireEvent, act, first, getHost, routerMock } from "../../../test/render";
 import { useAuthIntentStore } from "../../auth/intentStore";
 import { queryKeys } from "../../api/queryKeys";
 
@@ -38,6 +38,13 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("Large Listing card", () => {
+  it("opens the actual business showroom and never labels business stock a private seller", async () => {
+    const business = { id: "business", name: "Ahal Motors", slug: "ahal", logoUrl: null, city: null, identityChecked: false };
+    const { view } = await renderCard({ ...feedItem, businessId: "business", business });
+    await fireEvent.press(view.getByRole("button", { name: "Ahal Motors" }));
+    expect(routerMock.push).toHaveBeenCalledWith({ pathname: "/showrooms/[id]", params: { id: "business" } });
+    expect(view.queryByText(/Private seller/)).toBeNull();
+  });
   it("shows the photo strip, TMT price, spec line, one-line title and city/date", async () => {
     const onPress = vi.fn();
     const view = await renderMobile(<ListingLargeCard listing={{ ...listing, mileageKm: 0 }} brandName="Toyota" modelName="Camry" cityName="Ashgabat" transmissionName="Automatic" engineTypeName="Petrol" isAuthenticated={false} returnTo={returnTo} onPress={onPress} />);
