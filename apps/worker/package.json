@@ -8,6 +8,7 @@
     "dev": "nest start --watch",
     "start": "node dist/main",
     "start:watchdog": "node dist/operations/watchdog.main",
+    "operations:readiness": "node dist/operations/readiness.main",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run --passWithNoTests",
     "test:unit": "vitest run --exclude '**/*.e2e.spec.ts' --passWithNoTests",
