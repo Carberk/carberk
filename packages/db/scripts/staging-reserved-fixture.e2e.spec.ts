@@ -20,7 +20,7 @@ const localRequire = createRequire(import.meta.url);
 // Use the installed application queue implementation, including its Lua scripts.
 const queueRequire = createRequire(`${root}/apps/api/package.json`);
 const Redis = queueRequire("ioredis") as new (url: string) => { set(key: string, value: string): Promise<unknown>; get(key: string): Promise<string | null>; del(key: string): Promise<unknown>; quit(): Promise<unknown> };
-type DeliveryJob = { data: { to?: string }; getState(): Promise<string> };
+type DeliveryJob = { data: { to?: string }; getState(): Promise<string>; remove(): Promise<void> };
 type DeliveryQueue = {
   add(name: string, data: object, options: object): Promise<unknown>;
   getJob(id: string): Promise<DeliveryJob | undefined>;
@@ -281,7 +281,7 @@ describe("reserved staging fixtures on disposable application schema", () => {
   it("does not resurrect an OTP when its producer transaction dies before the Redis enqueue", async () => {
     const id = "9".repeat(32), requestId = "campaign-cleanup-delayed-producer";
     const email = await queuedOtp(id, requestId);
-    await queue.getJob(requestId)?.remove();
+    await (await queue.getJob(requestId))?.remove();
 
     const applicationName = `campaign-otp-red-${randomUUID()}`;
     const producer = fork(`${root}/scripts/testing/delayed-campaign-enqueue.cjs`, [], {
@@ -291,6 +291,7 @@ describe("reserved staging fixtures on disposable application schema", () => {
         REDIS_URL: redisUrl,
         CAMPAIGN_REQUEST_ID: requestId,
         CAMPAIGN_EMAIL: email,
+        CAMPAIGN_NAMESPACE: `cf_${id}`,
       },
       stdio: ["ignore", "pipe", "pipe", "ipc"],
     });
