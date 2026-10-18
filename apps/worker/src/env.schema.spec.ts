@@ -334,3 +334,10 @@ describe("worker private video activation", () => {
     expect(EnvSchema.safeParse({ ...baseEnv, VIDEO_TESTER_USER_IDS: "someone" }).success).toBe(false);
   });
 });
+
+describe("worker measurement source capture", () => {
+  it("stays disabled unless collector authority is provisioned", () => {
+    expect(EnvSchema.parse(baseEnv)).toMatchObject({ MEASUREMENT_ENABLED: false });
+    expect(EnvSchema.safeParse({ ...baseEnv, MEASUREMENT_ENABLED: "true" }).success).toBe(false);
+  });
+});
