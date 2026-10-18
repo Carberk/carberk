@@ -58,8 +58,8 @@ describe("reserved staging fixtures on disposable application schema", () => {
   }, 120000);
   afterAll(async () => { await queue?.close(); await redis?.stop(); await pool?.end(); await postgres?.stop(); });
 
-  function execute(kind: string, id: string, profile?: string, candidate = "a".repeat(40), beforeQuery?: (query: string) => void): { code: number; receipt?: { listingId: string; sellerId: string; fixtures: string; profile: string; state: string; identities: number; retainedAudits: number; tombstone: boolean } } {
-    let receipt; let code = 0;
+  function execute(kind: string, id: string, profile?: string, candidate = "a".repeat(40), beforeQuery?: (query: string) => void): { code: number; failure?: string; receipt?: { listingId: string; sellerId: string; fixtures: string; profile: string; state: string; identities: number; retainedAudits: number; tombstone: boolean } } {
+    let receipt; let code = 0; let failure = "";
     const identity = { projectId: "test-project", environmentId: "test-staging", services: { api: "test-api" },
       origins: { database: "postgresql://postgres.railway.internal:5432/railway", media: "http://minio.railway.internal:9000", publicMedia: "https://media.example" } };
     const process = { execPath: globalThis.process.execPath, env: { STAGING_CAMPAIGN_PROFILE_ENABLED: "campaign897-identities-v1", RAILWAY_PROJECT_ID: "test-project", RAILWAY_ENVIRONMENT_ID: "test-staging", RAILWAY_SERVICE_ID: "test-api", RAILWAY_ENVIRONMENT_NAME: "staging", APP_ENV: "staging", SMS_DRIVER: "mock", REDIS_URL: "redis://u:secret@redis.railway.internal:6379/0", AUTOTM_COMMIT_SHA: "a".repeat(40), DATABASE_URL: "postgresql://u:secret@postgres.railway.internal:5432/railway", MINIO_ENDPOINT: "http://minio.railway.internal:9000", MINIO_PUBLIC_URL: "https://media.example" }, exitCode: 0 };
@@ -78,8 +78,8 @@ describe("reserved staging fixtures on disposable application schema", () => {
         env: { ...globalThis.process.env, STAGING_CONTROL_TEST_DATABASE_URL: databaseUrl, STAGING_TEST_DB_PACKAGE: `${packageRoot}/package.json` },
       });
       },
-    } : localRequire(name), console: { log: (value: string) => { receipt = JSON.parse(value); }, error: () => { code = 1; } } });
-    return { code: code || process.exitCode, receipt };
+      } : localRequire(name), console: { log: (value: string) => { receipt = JSON.parse(value); }, error: (...values: unknown[]) => { code = 1; failure = values.map(String).join(" "); } } });
+    return { code: code || process.exitCode, failure, receipt };
   }
 
   it("creates API-owned seller/listing rows, reuses unchanged originals and resets without touching unrelated data", async () => {
@@ -330,7 +330,8 @@ describe("reserved staging fixtures on disposable application schema", () => {
     // The cleanup commits the durable disposed state while the producer still
     // holds its post-admission IPC barrier. The old implementation has no
     // Redis-side fence, so releasing the producer recreates the exact job.
-    expect(execute("reset", id, "campaign897-identities-v1").code).toBe(0);
+    const reset = execute("reset", id, "campaign897-identities-v1");
+    expect(reset.code, reset.failure).toBe(0);
     if (holder.connected) holder.send({ finish: true });
     producer.send({ continue: true });
     await holderExit;
