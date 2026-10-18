@@ -52,6 +52,7 @@ describe("reservation-owned synthetic business v2 storage graph, without admissi
 
   function execute(kind: "fixture" | "reset", id: string, selectedProfile = profile, selectedCandidate = candidate, beforeQuery?: (query: string) => void) {
     let code = 0;
+    let sqlDiagnostic: string | undefined;
     let receipt: { profile: string; state: string; identities: number; fixtures: string; tombstone: boolean } | undefined;
     const remoteProcess = { execPath: process.execPath, exitCode: 0, env: {
       STAGING_CAMPAIGN_PROFILE_ENABLED: selectedProfile, RAILWAY_PROJECT_ID: "graph-project", RAILWAY_ENVIRONMENT_ID: "graph-staging", RAILWAY_SERVICE_ID: "graph-api", RAILWAY_ENVIRONMENT_NAME: "staging",
@@ -66,11 +67,16 @@ describe("reservation-owned synthetic business v2 storage graph, without admissi
       spawnSync: (command: string, args: string[], options: { input: string }) => {
         if (command === process.execPath) return spawnSync(command, args, { ...options, encoding: "utf8", timeout: 30000, cwd: `${root}/apps/api`, env: { ...process.env, REDIS_URL: redisUrl } });
         beforeQuery?.(options.input);
-        return spawnSync(process.execPath, [`${root}/scripts/testing/query-disposable-postgres.cjs`], { input: options.input, encoding: "utf8", timeout: 30000,
-          env: { ...process.env, STAGING_CONTROL_TEST_DATABASE_URL: databaseUrl, STAGING_TEST_DB_PACKAGE: `${packageRoot}/package.json` } });
+        const result = spawnSync(process.execPath, [`${root}/scripts/testing/query-disposable-postgres.cjs`], { input: options.input, encoding: "utf8", timeout: 30000,
+          env: { ...process.env, STAGING_CONTROL_TEST_DATABASE_URL: databaseUrl, STAGING_TEST_DB_PACKAGE: `${packageRoot}/package.json`, STAGING_TEST_SQL_DIAGNOSTICS: "1" } });
+        if (result.status !== 0) {
+          // Independently admit only the helper's bounded format, never arbitrary child stderr.
+          sqlDiagnostic = result.stderr?.split(/\r?\n/).find(line => /^Disposable database SQL diagnostic: SQLSTATE=[A-Z0-9]{5}(?: position=[0-9]{1,10})?(?: internalPosition=[0-9]{1,10})?$/.test(line));
+        }
+        return result;
       },
     } : localRequire(name), console: { log: (value: string) => { receipt = JSON.parse(value); }, error: () => { code = 1; } } });
-    return { code: code || remoteProcess.exitCode, receipt };
+    return { code: code || remoteProcess.exitCode, receipt, sqlDiagnostic };
   }
 
   function listing(id: string, sellerId: string, businessId: string) {
@@ -78,7 +84,8 @@ describe("reservation-owned synthetic business v2 storage graph, without admissi
   }
   async function seed(id: string) {
     // Intentional first behavioral RED on current source: fixed v2 profile is absent.
-    expect(execute("fixture", id).code).toBe(0);
+    const result = execute("fixture", id);
+    expect(result.code, result.sqlDiagnostic).toBe(0);
     const rows = (await pool.query(`SELECT alias,user_id,email FROM "cf_${id}".campaign_entities ORDER BY alias`)).rows as { alias: string; user_id: string; email: string }[];
     const actor = (alias: string) => {
       const row = rows.find(row => row.alias === alias);
