@@ -4,6 +4,7 @@ import { CreateBucketCommand, PutObjectCommand, HeadObjectCommand, S3Client } fr
 import { PrismaService } from "@auto-tm/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { AdvanceHistoryOrders } from "./AdvanceHistoryOrders";
 import { ExpireServiceContent } from "./ExpireServiceContent";
 import { PurgeExpiredAccounts } from "./PurgeExpiredAccounts";
 import { S3RetiredObjectStore } from "./S3RetiredObjectStore";
@@ -30,6 +31,12 @@ describe.skipIf(!hosted)("private service lifecycle on disposable PostgreSQL and
   await db.serviceConversation.deleteMany({ where: { id: { in: conversations } } });
   await db.serviceAudit.deleteMany({ where: { resourceId: { in: owners } } });
   await db.supportCase.deleteMany({ where: { id: { in: owners } } });
+  const orderIds = (await db.historyOrder.findMany({ where: { requestId: { in: owners } }, select: { id: true } })).map(order => order.id);
+  await db.historyPayment.deleteMany({ where: { orderId: { in: orderIds } } });
+  await db.historyRefund.deleteMany({ where: { orderId: { in: orderIds } } });
+  await db.historyPurchaseIntent.deleteMany({ where: { orderId: { in: orderIds } } });
+  await db.historyOrder.deleteMany({ where: { id: { in: orderIds } } });
+  await db.historyQuote.deleteMany({ where: { requestId: { in: owners } } });
   await db.vehicleHistoryRequest.deleteMany({ where: { id: { in: owners } } });
   await db.user.deleteMany({ where: { id: { in: users } } });
   await db.$disconnect(); s3.destroy();
@@ -61,6 +68,26 @@ describe.skipIf(!hosted)("private service lifecycle on disposable PostgreSQL and
   await expect(s3.send(new HeadObjectCommand({ Bucket: "service-private", Key: closed.key }))).rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
   expect(await db.serviceMessage.count({ where: { conversationId: { in: [reopened.id, history.id] } } })).toBe(2);
   expect((await db.supportCase.findUniqueOrThrow({ where: { id: closed.resourceId } })).customerId).toBeNull();
+ });
+ it("expires unpaid holds, escalates missed promises once and erases only due unheld payment claims", async () => {
+  const fixtureRow = await fixture("history", "enquiry");
+  const day = "2000-06-01";
+  await db.historyCapacityDay.upsert({ where: { day }, create: { day, slotLimit: 2, morningLimit: 1, evidence: "Synthetic one-slot measurement" }, update: {} });
+  const quote = await db.historyQuote.create({ data: { requestId: fixtureRow.resourceId, vin: "1HGCM82633A004352", providers: ["carfax"], preflightOutcome: "available", preflightEvidence: "Synthetic licensed preflight", refundRule: "Founder decision", windowStart: new Date("2000-06-01T04:00:00Z"), windowEnd: new Date("2000-06-01T05:00:00Z"), feasible: true, acceptedAt: new Date("2000-06-01T03:00:00Z") } });
+  const order = await db.historyOrder.create({ data: { requestId: fixtureRow.resourceId, quoteId: quote.id, day, morning: false, holdExpiresAt: new Date("2000-06-01T05:00:00Z"), promiseAt: new Date("2000-06-01T05:00:00Z"), rights: { category: "payment_evidence", schedule: { kind: "until", until: "2000-05-31T00:00:00Z" }, hold: { until: "2000-06-02T00:00:00Z" } } } });
+  const payment = await db.historyPayment.create({ data: { orderId: order.id, clientPaymentId: randomUUID(), claim: "Synthetic held receipt" } });
+  const advance = new AdvanceHistoryOrders(db);
+  await advance.execute(now);
+  expect((await db.historyOrder.findUniqueOrThrow({ where: { id: order.id } })).state).toBe("expired");
+  expect((await db.historyPayment.findUniqueOrThrow({ where: { id: payment.id } })).claim).toBe("Synthetic held receipt");
+  await db.historyOrder.update({ where: { id: order.id }, data: { state: "paid", paidAt: new Date("2000-06-01T04:00:00Z"), receivedAt: new Date("2000-06-01T04:00:00Z") } });
+  await advance.execute(now); await advance.execute(now);
+  expect(await db.serviceAudit.count({ where: { resourceId: fixtureRow.resourceId, action: "HISTORY_PROMISE_MISSED" } })).toBe(1);
+  await db.historyOrder.update({ where: { id: order.id }, data: { recoveryUsed: true, recoveryAgreedAt: now, recoveryDeadline: new Date("2000-06-01T12:30:00Z"), state: "recovery" } });
+  await advance.execute(new Date("2000-06-03T12:00:00Z"));
+  expect((await db.historyOrder.findUniqueOrThrow({ where: { id: order.id } })).state).toBe("refund_pending");
+  expect((await db.historyRefund.findUniqueOrThrow({ where: { orderId: order.id } })).state).toBe("pending");
+  expect((await db.historyPayment.findUniqueOrThrow({ where: { id: payment.id } })).claim).toBeNull();
  });
  it("fences private service content with completed account deletion and keeps restoration unable to resurrect it", async () => {
   const support = await fixture("support", "open");
