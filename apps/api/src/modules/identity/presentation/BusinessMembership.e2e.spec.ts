@@ -47,6 +47,12 @@ describe("business admission/membership/recovery through HTTP and disposable Pos
   }
   await prisma.staffGrant.createMany({ data: ["founder.admission", "founder.recovery"].map((capability) => ({ userId: suite.id("founder"), capability })) });
  });
+ it("invalidates fresh inventory proof when owner admission activates a recovered business",async()=>{
+  const invitation=await admit(),epoch=suite.id("baseline"),key=`inventory_baseline:${epoch}`;
+  await prisma.measurementState.create({data:{key:"collector",epoch}});await prisma.measurementState.create({data:{key,epoch:new Date().toISOString()}});
+  try{await join("owner",invitation).expect(201);expect(await prisma.measurementState.findUnique({where:{key}})).toBeNull();}
+  finally{await prisma.measurementState.deleteMany({where:{key:{in:[key,"collector"]}}});}
+ });
  it("requires current scoped elevated admission authority and records truthful synthetic identity scope", async () => {
   const body = { name: "Business", slug: suite.slugFor("refused"), ownerUserId: suite.id("owner"), mode: "synthetic", evidence: "Fixture only", reason: "Contract proof" };
   await post("/admission", "other", body).expect(403);
