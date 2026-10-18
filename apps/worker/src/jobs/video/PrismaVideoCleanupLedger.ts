@@ -11,6 +11,7 @@ export class PrismaVideoCleanupLedger implements VideoCleanupLedger {
   constructor(private readonly prisma: PrismaService) {}
   async claim(now: Date, token: string): Promise<VideoCleanupLease | null> {
     if (!Number.isFinite(now.getTime()) || !z.string().uuid().safeParse(token).success) return null;
+    await this.retireExpired(now);
     const candidates = await this.prisma.videoCleanupWork.findMany({ where: { state: { in: activeStates }, nextAttemptAt: { lte: now }, OR: [{ leaseExpiresAt: null }, { leaseExpiresAt: { lte: now } }] }, orderBy: [{ nextAttemptAt: "asc" }, { id: "asc" }], take: 20 });
     for (const candidate of candidates) {
       const leased = await this.transaction(async tx => {
@@ -23,6 +24,38 @@ export class PrismaVideoCleanupLedger implements VideoCleanupLedger {
       if (leased) return leased;
     }
     return null;
+  }
+  /** Expiry invalidates private writers first. Actual object deletion still waits
+   * for credential/processor grace and two complete absence observations. */
+  private async retireExpired(now: Date) {
+    const states = ["INITIALIZING", "UPLOADING", "PAUSED", "COMPLETING", "PROCESSING", "READY"];
+    const candidates = await this.prisma.videoUploadSession.findMany({ where: { protocolVersion: 1, expiresAt: { lte: now }, OR: [{ state: { in: states.filter(state => state !== "READY") } }, { state: "READY", targetKind: "draft" }] }, orderBy: [{ expiresAt: "asc" }, { id: "asc" }], take: 10 });
+    for (const candidate of candidates) await this.transaction(async tx => {
+      await tx.$queryRaw`SELECT "id" FROM "users" WHERE "id" = ${candidate.userId} FOR UPDATE`;
+      if (candidate.targetKind === "listing" && candidate.targetId) await tx.$queryRaw`SELECT "id" FROM "listings" WHERE "id" = ${candidate.targetId} FOR UPDATE`;
+      else if (candidate.targetKind === "draft" && candidate.targetId) await tx.$queryRaw`SELECT "id" FROM "listing_drafts" WHERE "id" = ${candidate.targetId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT "id" FROM "media_uploads" WHERE "id" = ${candidate.uploadId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT "id" FROM "video_upload_sessions" WHERE "id" = ${candidate.id} FOR UPDATE`;
+      await tx.$queryRaw`SELECT "id" FROM "video_generations" WHERE "id" = ${candidate.id} FOR UPDATE`;
+      await tx.$queryRaw`SELECT "generationId" FROM "video_process_work" WHERE "generationId" = ${candidate.id} FOR UPDATE`;
+      const [session, upload, generation, work] = await Promise.all([tx.videoUploadSession.findUnique({ where: { id: candidate.id } }), tx.mediaUpload.findUnique({ where: { id: candidate.uploadId } }), tx.videoGeneration.findUnique({ where: { id: candidate.id } }), tx.videoProcessWork.findUnique({ where: { generationId: candidate.id } })]);
+      if (!session || !upload || !generation || !states.includes(session.state) || session.targetKind !== candidate.targetKind || session.targetId !== candidate.targetId || session.expiresAt > now || session.protocolVersion !== 1 || upload.writeProtocol !== "video-v1" || upload.kind !== "video" || upload.state !== "PREPARING" || upload.claimToken !== session.id || upload.claimTargetType !== "video_session" || upload.claimTargetId !== session.id || session.uploadId !== upload.id || generation.uploadId !== upload.id || generation.sessionId !== session.id || session.sourceKey !== `video/v1/${upload.id}/${session.id}/source.mp4` || upload.key !== session.sourceKey || await tx.listing.count({ where: { activeVideoGenerationId: generation.id } })) return;
+      const existing = await tx.videoCleanupWork.findUnique({ where: { id: `session:${session.id}` } });
+      if (existing && (existing.uploadId !== upload.id || existing.sessionId !== session.id || existing.generationId !== generation.id || existing.sourceKey !== session.sourceKey)) throw new Error("VIDEO_CLEANUP_REFERENCE_CHANGED");
+      const inventory = z.object({ assets: z.array(z.object({ key: z.string() }).passthrough()).max(1024) }).strict().safeParse(generation.manifest);
+      if (generation.manifest !== null && !inventory.success) throw new Error("VIDEO_MANIFEST_INVALID");
+      const objectKeys = [...new Set([...(existing?.objectKeys ?? []), ...(inventory.success ? inventory.data.assets.map(asset => asset.key) : [])])];
+      const prefix = `video/v1/${upload.id}/${generation.id}/`;
+      if (objectKeys.length > 1024 || objectKeys.some(key => !key.startsWith(prefix) || !/^(?:master\.m3u8|poster\.jpg|(?:240|360|720)\/(?:index\.m3u8|seg-[0-9]+\.ts))$/.test(key.slice(prefix.length)))) throw new Error("VIDEO_MANIFEST_INVALID");
+      const nextAttemptAt = new Date(Math.max(now.getTime() + 15 * 60_000, work?.leaseExpiresAt?.getTime() ?? 0) + 120_000);
+      await tx.mediaUpload.update({ where: { id: upload.id }, data: { state: "RETIRED", retiredAt: now, claimToken: null, claimDeadline: null } });
+      await tx.videoGeneration.update({ where: { id: generation.id }, data: { state: "RETIRED", retiredAt: now } });
+      await tx.videoUploadSession.update({ where: { id: session.id }, data: { state: "CLEANUP_PENDING", cancelledAt: now } });
+      await tx.videoProcessWork.updateMany({ where: { generationId: generation.id }, data: { state: "CANCELLED", lastError: "VIDEO_SESSION_EXPIRED" } });
+      await tx.videoGrant.updateMany({ where: { generationId: generation.id, revokedAt: null }, data: { revokedAt: now } });
+      await tx.listing.updateMany({ where: { pendingVideoGenerationId: generation.id }, data: { pendingVideoGenerationId: null } });
+      await tx.videoCleanupWork.upsert({ where: { id: `session:${session.id}` }, create: { id: `session:${session.id}`, uploadId: upload.id, sessionId: session.id, generationId: generation.id, sourceKey: session.sourceKey, storageUploadId: session.storageUploadId, objectKeys, nextAttemptAt }, update: { state: "PENDING", objectKeys, nextAttemptAt } });
+    });
   }
   async recordAbsence(lease: VideoCleanupLease, now: Date): Promise<void> {
     await this.finish(lease, now, async (tx, work) => {
