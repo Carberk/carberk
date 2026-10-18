@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ServiceMessagingSchemas as S } from "@auto-tm/contracts";
 
 import { HistoryWorkspace } from "./HistoryWorkspace";
@@ -10,8 +10,8 @@ import { reportCopy } from "./reportCopy";
 
 // Framework boundary only: real actions and feature children execute. Next may
 // reject before the action result wrapper, just as a failed browser RPC does.
-const framework = vi.hoisted(() => ({ fail: false }));
-vi.mock("next/headers", () => ({ headers: async () => { if (framework.fail) throw new Error("private RPC failure"); return new Headers(); }, cookies: async () => ({ get: () => ({ value: "synthetic-access" }) }) }));
+const framework = vi.hoisted(() => ({ fail: false, pending: null as Promise<Headers> | null }));
+vi.mock("next/headers", () => ({ headers: async () => { if (framework.pending) return framework.pending; if (framework.fail) throw new Error("private RPC failure"); return new Headers(); }, cookies: async () => ({ get: () => ({ value: "synthetic-access" }) }) }));
 vi.mock("next/navigation", () => ({ redirect: (url: string) => { throw new Error(url); }, unstable_rethrow: () => {} }));
 const id = "11111111-1111-4111-8111-111111111111";
 const conversation: S.ServiceConversation = { id, resourceId: id, purpose: "history", status: "enquiry", assignmentVersion: 1, assigned: true, operatorName: "Operator", sourceListingId: null, canSend: true, messages: [], lastSequence: 0, readThrough: 0, unread: 0, hasMore: false };
@@ -19,7 +19,7 @@ const order = { id, quoteId: id, state: "paid", version: 1, day: "2026-10-20", h
 const artifact = { id, provider: "carfax", vin: "1HGCM82633A004352", originalDate: "2020-01-01T00:00:00Z", sizeBytes: 4, expectedPages: 1, sharedLink: null, deliveredAt: null, state: "verified", canShare: true, vehicleIdentity: null, mileage: null, sourceObservations: [] };
 let accepted: Record<string, unknown>[];
 beforeEach(() => {
- framework.fail = false; accepted = [];
+ framework.fail = false; framework.pending = null; accepted = [];
  vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
   if (init?.method === "POST") { accepted.push(JSON.parse(String(init.body))); return Response.json(String(url).endsWith("payment-history") ? { synthetic: true, quotes: [], order: { ...order, state: "delivered" }, payments: [] } : { ok: true }); }
   return Response.json(String(url).endsWith("reports") ? { delivered: [], staged: [], archive: [artifact] } : { synthetic: true, quotes: [], order: { ...order, state: "delivered" }, payments: [] });
@@ -75,4 +75,33 @@ it.each(["order", "reports"])("offers refresh after a rejected initial %s read",
  await screen.findByRole("alert"); framework.fail = false;
  fireEvent.click(screen.getByRole("button", { name: kind === "order" ? historyCopy("en").refresh : reportCopy("en").refresh }));
  await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+});
+
+it.each(["order", "reports"])("ignores a late %s rejection while the new assignment command is busy", async kind => {
+ const c = historyCopy("en"), r = reportCopy("en"); let changes = 0;
+ const view = (version: number) => kind === "order"
+  ? <HistoryWorkspace conversation={{ ...conversation, assignmentVersion: version }} locale="en" denied={() => {}}/>
+  : <HistoryReportsWorkspace id={id} order={order} assignmentVersion={version} locale="en" denied={() => {}} changed={() => { changes++; }}/>;
+ const rendered = render(view(1));
+ const action = kind === "order" ? c.missed : r.archive, refresh = kind === "order" ? c.refresh : r.refresh;
+ await screen.findByRole("button", { name: action });
+ if (kind === "order") fireEvent.change(screen.getByLabelText(c.reason), { target: { value: "Retained decision" } });
+ let rejectOld!: (error: Error) => void;
+ framework.pending = new Promise<Headers>((_, reject) => { rejectOld = reject; });
+ fireEvent.click(screen.getByRole("button", { name: action }));
+ expect((screen.getByRole("button", { name: refresh }) as HTMLButtonElement).disabled).toBe(true);
+ framework.pending = null;
+ await act(async () => { rendered.rerender(view(2)); });
+ expect((screen.getByRole("button", { name: refresh }) as HTMLButtonElement).disabled).toBe(false);
+ let resolveCurrent!: (headers: Headers) => void;
+ framework.pending = new Promise<Headers>(resolve => { resolveCurrent = resolve; });
+ fireEvent.click(screen.getByRole("button", { name: action }));
+ await act(async () => { rejectOld(new Error("late private failure")); });
+ expect(screen.queryByRole("alert")).toBeNull();
+ expect((screen.getByRole("button", { name: refresh }) as HTMLButtonElement).disabled).toBe(true);
+ framework.pending = null;
+ await act(async () => { resolveCurrent(new Headers()); });
+ await waitFor(() => expect((screen.getByRole("button", { name: refresh }) as HTMLButtonElement).disabled).toBe(false));
+ expect(accepted[0]).toMatchObject({ expectedAssignmentVersion: 2 });
+ expect(changes).toBe(kind === "reports" ? 1 : 0);
 });

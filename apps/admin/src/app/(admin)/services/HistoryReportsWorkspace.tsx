@@ -11,10 +11,26 @@ export function HistoryReportsWorkspace({ id, order, assignmentVersion, locale, 
  const [identity, setIdentity] = useState(""), [mileage, setMileage] = useState(""), [mileageUnit, setMileageUnit] = useState<"km" | "mi">("km"), [mileageDate, setMileageDate] = useState(""), [statement, setStatement] = useState(""), [sourcePage, setSourcePage] = useState("");
  const c = reportCopy(locale), [data, setData] = useState<S.HistoryReports | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState(false);
  const [provider, setProvider] = useState<"carfax" | "autocheck">("carfax"), [vin, setVin] = useState(""), [originalDate, setOriginalDate] = useState(""), [pages, setPages] = useState(""), [provenance, setProvenance] = useState(""), [supplier, setSupplier] = useState(""), [until, setUntil] = useState(""), [reuse, setReuse] = useState(false), [file, setFile] = useState<File | null>(null), [checked, setChecked] = useState<Record<string, boolean>>({}), [links, setLinks] = useState<Record<string, string>>({}), [linkChecks, setLinkChecks] = useState<Record<string, boolean>>({});
- const epoch = useRef(0), uploadRetry = useRef<{ fingerprint: string; id: string } | null>(null);
- async function refresh() { const version = ++epoch.current; const result = await historyReports(id); if (version !== epoch.current) return; if (result.ok) { setData(result.data); setError(false); } else { setError(true); setData(null); if (result.error === "permission" || result.error === "conflict") denied(); } }
- useEffect(() => { void refresh(); return () => { epoch.current++; }; }, [id, order.version, assignmentVersion]);
- async function command(value: S.HistoryArtifactCommand) { if (busy) return; const version = epoch.current; setBusy(true); const result = await historyArtifactCommand(id, value); if (version !== epoch.current) return; setBusy(false); if (!result.ok) { setError(true); if (result.error === "permission" || result.error === "conflict") { setData(null); denied(); } } else { await refresh(); changed(); } }
+ const epoch = useRef(0), readSequence = useRef(0), uploadRetry = useRef<{ fingerprint: string; id: string } | null>(null);
+ async function refresh() {
+  const version = epoch.current, sequence = ++readSequence.current;
+  try {
+   const result = await historyReports(id);
+   if (version !== epoch.current || sequence !== readSequence.current) return;
+   if (result.ok) { setData(result.data); setError(false); }
+   else { setError(true); setData(null); if (result.error === "permission" || result.error === "conflict") denied(); }
+  } catch { if (version === epoch.current && sequence === readSequence.current) setError(true); }
+ }
+ useEffect(() => { epoch.current++; setBusy(false); void refresh(); return () => { epoch.current++; }; }, [id, order.version, assignmentVersion]);
+ async function command(value: S.HistoryArtifactCommand) {
+  if (busy) return; const version = epoch.current; setBusy(true); setError(false);
+  try {
+   const result = await historyArtifactCommand(id, value); if (version !== epoch.current) return;
+   if (!result.ok) { setError(true); if (result.error === "permission" || result.error === "conflict") { setData(null); denied(); } }
+   else { await refresh(); if (version === epoch.current) changed(); }
+  } catch { if (version === epoch.current) setError(true); }
+  finally { if (version === epoch.current) setBusy(false); }
+ }
  async function upload() {
   if (!file || busy || file.type !== "application/pdf" || file.size <= 0 || file.size > 20*1024*1024) { setError(true); return; }
   const version = epoch.current; setBusy(true); setError(false);
