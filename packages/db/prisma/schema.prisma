@@ -575,6 +575,7 @@ model MediaUpload {
   contentType String
   // Null for rows backfilled from media that existed before the table.
   sizeBytes   Int?
+  /// Closed SQL protocol set: legacy, conditional-v1 images, video-v1 prepared sources.
   writeProtocol String @default("legacy")
   /// SQL guard keeps V1 video source inventory a bounded exact singleton in its server namespace.
   objectKeys String[] @default([])
