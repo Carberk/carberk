@@ -20,6 +20,7 @@ import { PushModule } from "./push/push.module";
 import { EmailModule } from "./email/email.module";
 import { MeasurementRetentionModule } from "./measurement-retention.module";
 import { DiagnosticArtifactsModule } from "./diagnostic-artifacts.module";
+import { WorkerHeartbeatModule } from "./operations/worker-heartbeat.module";
 import { ServiceLifecycleModule } from "./service-lifecycle.module";
 import { MeasurementOutboxModule } from "./jobs/measurement-outbox.module";
 import { ServicePushModule } from "./service-push.module";
@@ -68,6 +69,7 @@ import { LISTING_VIEW_RETENTION_QUEUE, ListingViewRetentionScheduler } from "./q
     ServicePushModule,
     DiagnosticArtifactsModule,
     VideoModule,
+    WorkerHeartbeatModule,
   ],
   providers: [
     PrismaListingViewRetentionLedger,

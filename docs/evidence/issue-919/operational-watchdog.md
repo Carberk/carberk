@@ -1,0 +1,27 @@
+# Operational watchdog implementation evidence
+
+Prepared 2026-10-18. This is software preparation, not deployed monitoring or alert-delivery acceptance.
+
+## Delivered behavior
+
+`OPERATIONS_ENABLED=false` is the default. When explicitly enabled with `REDIS_URL` and a deployment-specific `OPERATIONS_SCOPE`, the core worker writes a timestamp every 15 seconds with a 45-second Redis TTL. Heartbeat failures neither block business operations nor emit private Redis error content.
+
+`pnpm --filter @auto-tm/worker start:watchdog` starts a separate process. Deploy it separately from the worker. It observes the API's `/readyz`, a separately configured collector health endpoint, the real worker heartbeat and fixed BullMQ queue counts every 30 seconds. Maintenance readiness is denied even when HTTP returns 200. Probe redirects are denied; API bodies are bounded to 4096 bytes and requests to three seconds. No queue payloads, requests, customer identifiers, exception bodies or endpoints appear in snapshots.
+
+Configure `OPERATIONS_API_HEALTH_URL` to the intended deployed `/readyz`. Configure `OPERATIONS_COLLECTOR_HEALTH_URL` to a real collector health endpoint only after collector deployment. Missing endpoints produce unknown, which cannot resolve an existing incident. The Redis snapshot expires after 90 seconds; readers must treat missing or stale snapshots as unknown.
+
+Backlog over 100 must remain observed for ten minutes. Observation failure or a gap longer than 60 seconds restarts that duration. Incident original age survives outside staffed coverage. Error rate requires a complete five-minute window and at least 100 requests; low-volume errors remain unknown. Independently observed outages remain actionable. Staffed deadlines use weekdays 08:00–20:00 Asia/Shanghai. Budget warnings begin at 80 USD for Railway and 6400 TMT for TM, without authorizing spending or shutting down core services.
+
+## Checks
+
+- Nine focused policy, watchdog and real local HTTP tests passed. They include maintenance rejection, redirects, bounded response bodies, lost worker heartbeat, observation gaps, unknown dependency recovery and staffed-hour calculations.
+- One actual Redis/BullMQ test is prepared in `Watchdog.e2e.spec.ts`. It runs only in hosted CI against admitted CI Redis. Locally skipped; no local Docker or destructive DB suite was run.
+- Worker typecheck and affected ESLint passed. Frozen offline workspace install restored an already-declared fontkit package; no dependency version changed.
+
+Docs: https://github.com/redis/ioredis/blob/v5.10.1/README.md verifies explicit reconnect and disabled offline queue behavior for installed ioredis 5.10.1. Installed types verify command timeout options.
+
+Docs: https://github.com/taskforcesh/bullmq/blob/v5.76.8/src/classes/queue-getters.ts verifies fixed-state `getJobCounts` behavior for installed BullMQ 5.76.8. The generated API documentation endpoint failed TLS hostname verification; no TLS bypass was used.
+
+## Remaining acceptance
+
+Actual independent deployment, deliberate worker death, actual collector failure, receipt of a real authorized alert, metrics thresholds, disk/TLS probes and resource isolation remain unverified or unimplemented. A watchdog cannot prove its own independent availability. Native diagnostic SDK collection, release symbolication, sanitization and deletion fences remain separate obligations. The legacy Compose monitoring configuration supplies no deployed evidence. Nothing here enables service/provider collection, production or paid provisioning.
