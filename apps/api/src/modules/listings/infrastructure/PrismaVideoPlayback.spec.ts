@@ -25,6 +25,13 @@ function fixture() {
   return { grant, listing, generation, stored: () => stored, service: new PrismaVideoPlayback(prisma, identity, { isEligible: () => eligible }, { now: () => new Date() }, () => secret), revokeSession: () => { active = false; }, revokeTester: () => { eligible = false; } };
 }
 describe("current persisted playback authority", () => {
+  it("admits worker readback hashes while refusing malformed immutable asset hashes", async () => {
+    const f = fixture();
+    Object.assign(f.generation.manifest.assets[0]!, { sha256: "a".repeat(64) });
+    expect(await f.service.authorize(secret)).toMatchObject({ purpose: "playback", assets: [{ path: "master.m3u8" }] });
+    Object.assign(f.generation.manifest.assets[0]!, { sha256: "invalid" });
+    expect(await f.service.authorize(secret)).toBeNull();
+  });
   it("denies banned Listing video even to the seller on both mint and asset reads", async () => {
     const f = fixture(); f.listing.status = "banned"; f.listing.sellerId = "viewer";
     expect(await f.service.authorize(secret)).toBeNull();
