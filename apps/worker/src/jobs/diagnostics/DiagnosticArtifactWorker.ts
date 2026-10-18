@@ -47,7 +47,7 @@ export class DiagnosticArtifactWorker {
   }
   private async retire(tx: Tx, artifact: Artifact) {
     await tx.diagnosticPdfArtifact.updateMany({ where: { id: artifact.id, epoch: artifact.epoch },
-      data: { state: "retired", epoch: this.runtime.id(), cleanupRequestedAt: this.runtime.now() } });
+      data: { state: "cleanup_pending", epoch: this.runtime.id(), cleanupRequestedAt: this.runtime.now() } });
   }
   async generate(id: string): Promise<boolean> {
     if (!this.runtime.enabled()) return false;
@@ -134,7 +134,7 @@ export class DiagnosticArtifactWorker {
     // Erasure fences access before network cleanup. Active reports have no blanket purge.
     const erased = await this.db.diagnosticReportRecord.findMany({ where: { AND: [{ OR: [{ erasedAt: { not: null } }, { order: { erasedAt: { not: null } } }, { audience: "buyer_private", order: { commissionerId: null } }] }, { OR: [{ artifacts: { some: { cleanupRequestedAt: null } } }, { evidence: { some: { cleanupRequestedAt: null } } }] }] }, orderBy: { id: "asc" }, take: 100 });
     for (const report of erased) {
-      await this.db.diagnosticPdfArtifact.updateMany({ where: { reportId: report.id, cleanupRequestedAt: null }, data: { state: "retired", cleanupRequestedAt: now } });
+      await this.db.diagnosticPdfArtifact.updateMany({ where: { reportId: report.id, cleanupRequestedAt: null }, data: { state: "cleanup_pending", cleanupRequestedAt: now } });
       await this.db.diagnosticEvidence.updateMany({ where: { reportId: report.id, cleanupRequestedAt: null }, data: { state: "cleanup_pending", cleanupRequestedAt: now } });
     }
     // An unfinished staging attempt is temporary upload data, not a retained report.
@@ -144,11 +144,11 @@ export class DiagnosticArtifactWorker {
     for (const item of artifacts) {
       if (item.objectKey !== `diagnostic-pdf/${item.reportId}/${item.id}.pdf`) throw new Error("DIAGNOSTIC_CLEANUP_INVALID");
       const epoch = this.runtime.id();
-      const claim = await this.db.diagnosticPdfArtifact.updateMany({ where: { id: item.id, epoch: item.epoch, cleanupRequestedAt: { not: null }, OR: [{ leaseUntil: null }, { leaseUntil: { lte: now } }] }, data: { epoch, state: "retired", leaseUntil: leaseEnd(now) } });
+      const claim = await this.db.diagnosticPdfArtifact.updateMany({ where: { id: item.id, epoch: item.epoch, cleanupRequestedAt: { not: null }, OR: [{ leaseUntil: null }, { leaseUntil: { lte: now } }] }, data: { epoch, state: "cleanup_pending", leaseUntil: leaseEnd(now) } });
       if (!claim.count) continue;
       try {
         await this.objects.deleteAndVerify([item.objectKey]);
-        completed += (await this.db.diagnosticPdfArtifact.updateMany({ where: { id: item.id, epoch, state: "retired" }, data: { cleanupCompletedAt: this.runtime.now(), leaseUntil: null, failureCode: null } })).count;
+        completed += (await this.db.diagnosticPdfArtifact.updateMany({ where: { id: item.id, epoch, state: "cleanup_pending" }, data: { state: "removed", cleanupCompletedAt: this.runtime.now(), leaseUntil: null, failureCode: null } })).count;
       } catch {
         await this.db.diagnosticPdfArtifact.updateMany({ where: { id: item.id, epoch }, data: { failureCode: "cleanup_storage", leaseUntil: new Date(now.getTime() + 60_000) } });
         throw new Error("DIAGNOSTIC_CLEANUP_RETRY");
