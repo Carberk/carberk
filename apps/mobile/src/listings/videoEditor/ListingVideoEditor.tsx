@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useTranslation } from "react-i18next";
@@ -8,7 +8,7 @@ import { z } from "zod";
 import { apiClient } from "../../api/client";
 
 import { videoUploadTask } from "./VideoUploadTasks";
-import { VideoSelectionPreview } from "./VideoSelectionPreview";
+const VideoSelectionPreview = lazy(async () => ({ default: (await import("./VideoSelectionPreview")).VideoSelectionPreview }));
 
 
 import { Button } from "@/components/ui/button";
@@ -48,18 +48,18 @@ export function ListingVideoEditor({ ownerId, target, businessId, disabled }: Li
     } catch { setError(true); }
     finally { setPicking(false); }
   }
-  if (!capability.data?.canUpload) return null;
+  if (!capability.data?.canView && taskState.phase === "EMPTY") return null;
   return <View className="gap-3 py-4" testID={`video-editor-${target.kind}-${target.id}`}>
     <Text className="text-callout text-muted-foreground">{c.optional}</Text>
-    {selected ? <View className="gap-2"><Text>{c.selected}</Text><VideoSelectionPreview key={selected.uri} asset={selected} disabled={disabled || busy} onUse={(selection, poster) => { void task.start(selection, poster); }} /><Button variant="outline" disabled={disabled} onPress={() => setSelected(null)}><Text>{c.remove}</Text></Button></View> : null}
+    {selected ? <View className="gap-2"><Text>{c.selected}</Text><Suspense fallback={null}><VideoSelectionPreview key={selected.uri} asset={selected} disabled={disabled || busy || !capability.data?.canUpload} onUse={(selection, poster) => { void task.start(selection, poster); }} /></Suspense><Button variant="outline" disabled={disabled} onPress={() => { setSelected(null); if (taskState.phase !== "EMPTY" && taskState.phase !== "READY") void task.cancel(); }}><Text>{c.remove}</Text></Button></View> : null}
     {taskState.phase !== "EMPTY" && taskState.phase !== "CANCELLED" ? <View className="gap-2">
       <Text accessibilityLiveRegion="polite">{c.phases[taskState.phase]}</Text>
       {taskState.record ? <Text>{(taskState.record.prepared.sizeBytes / 1024 / 1024).toFixed(1)} MB · {Math.floor(taskState.record.confirmedBytes / taskState.record.prepared.sizeBytes * 100)}%</Text> : null}
       {taskState.phase === "UPLOADING" ? <Button variant="outline" onPress={() => { void task.pause(); }}><Text>{c.pause}</Text></Button> : null}
-      {taskState.phase === "PAUSED" || taskState.phase === "FAILED" && taskState.record ? <Button variant="outline" onPress={() => { void task.resume(); }}><Text>{taskState.phase === "FAILED" ? c.retry : c.resume}</Text></Button> : null}
+      {capability.data?.canUpload && (taskState.phase === "PAUSED" || taskState.phase === "FAILED" && taskState.record) ? <Button variant="outline" onPress={() => { void task.resume(); }}><Text>{taskState.phase === "FAILED" ? c.retry : c.resume}</Text></Button> : null}
       {taskState.phase !== "READY" ? <Button variant="outline" onPress={() => { void task.cancel(); }}><Text>{c.cancel}</Text></Button> : null}
     </View> : null}
-    <Button variant="outline" disabled={disabled || picking || busy} onPress={() => { void pick(); }}><Text>{c.add}</Text></Button>
+    {capability.data?.canUpload ? <Button variant="outline" disabled={disabled || picking || busy} onPress={() => { void pick(); }}><Text>{c.add}</Text></Button> : null}
     {error ? <Text accessibilityRole="alert">{c.failure}</Text> : null}
   </View>;
 }

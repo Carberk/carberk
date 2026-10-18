@@ -31,6 +31,8 @@ import type { NetInfoState } from "@react-native-community/netinfo";
 
 import { NAV_THEME } from "../lib/theme";
 import { ApiError } from "../src/api/client";
+import { subscribeAuthSession } from "../src/auth/session";
+import { pauseVideoUploads, reconcileVideoUploadOwner } from "../src/listings/videoEditor/VideoUploadTasks";
 import { useAuth } from "../src/auth/useAuth";
 import { useMyDrafts } from "../src/api/listings/useMyDrafts";
 import { useMyListings } from "../src/api/listings/useMyListings";
@@ -92,6 +94,7 @@ const queryClient = new QueryClient({
 
 function onAppStateChange(status: AppStateStatus) {
   focusManager.setFocused(status === "active");
+  if (status !== "active") void pauseVideoUploads();
 }
 
 function isOnline(state: NetInfoState): boolean {
@@ -254,7 +257,8 @@ export default function RootLayout() {
   }, [themeReady, appliedScheme, scheme]);
   useEffect(() => {
     const sub = AppState.addEventListener("change", onAppStateChange);
-    return () => sub.remove();
+    const unsubscribe = subscribeAuthSession(() => { void reconcileVideoUploadOwner(); });
+    return () => { sub.remove(); unsubscribe(); };
   }, []);
 
   useEffect(() => {

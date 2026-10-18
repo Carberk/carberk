@@ -20,6 +20,7 @@ import {
   type OpState,
 } from "../../../src/listings/edit/useSaveListingEdit";
 import { EditSectionList, useCarTitle } from "../../../src/listings/wizard/CheckAndPublish";
+import { ListingVideoEditor } from "../../../src/listings/videoEditor/ListingVideoEditor";
 import Step2Photos from "../../../src/listings/wizard/Step2Photos";
 import Step4Specs from "../../../src/listings/wizard/Step4Specs";
 import Step5Price from "../../../src/listings/wizard/Step5Price";
@@ -151,7 +152,7 @@ function EditListingSession({ listingId, businessId }: { listingId: string; busi
   }>();
   // The picker's rows (ADR-0081): the sign-in phone and the numbers still
   // inside their 7 days. The Listing's own number is always selectable.
-  const { isAuthenticated, phone: accountPhone } = useAuth();
+  const { isAuthenticated, phone: accountPhone, userId } = useAuth();
   const viewer = useViewer();
   const businessQuery = useBusinessWorkspace();
   const { data: contactPhonesData } = useMyContactPhones({
@@ -449,6 +450,7 @@ function EditListingSession({ listingId, businessId }: { listingId: string; busi
         publishLabel={t("saveChanges")}
       >
         {currentStep === "photos" && (
+          <>
           <Step2Photos
             photos={uploadQueue.photos}
             onAddPhoto={uploadQueue.addPhoto}
@@ -461,6 +463,8 @@ function EditListingSession({ listingId, businessId }: { listingId: string; busi
             showErrors={attemptedSteps.photos === true}
             continuesWhileUploading={false}
           />
+          {userId ? <ListingVideoEditor ownerId={userId} target={{ kind: "listing", id: listingId }} businessId={businessId} /> : null}
+          </>
         )}
         {currentStep === "specs" && (
           <Step4Specs
