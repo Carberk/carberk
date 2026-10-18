@@ -385,7 +385,7 @@ describe("GetListingDetail", () => {
     expect(JSON.parse(JSON.stringify(result.media[1]))).not.toHaveProperty("thumbHash");
   });
 
-  it("returns video url for all variant slots on video media", async () => {
+  it("never exposes an unprocessed legacy video source through photo variants", async () => {
     seedListing();
     const media = ListingMedia.create({
       id: "media-1",
@@ -399,9 +399,7 @@ describe("GetListingDetail", () => {
     const uc = makeUseCase(repo, mediaRepo, exchangeRates, storage, favorites);
     const result = await uc.execute({ listingId: "listing-1" });
 
-    expect(result.media[0]!.variants.thumbnail).toBe(
-      "https://media.auto.tm/listings/listing-1/media-1/video.mp4",
-    );
+    expect(result.media).toEqual([]);
   });
 
   it("returns 404 for banned listing when requester is not owner", async () => {
