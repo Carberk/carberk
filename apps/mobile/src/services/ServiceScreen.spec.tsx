@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
+import * as Notifications from "expo-notifications";
 
 import { renderMobile, fireEvent, act, getAllHosts } from "../../test/render";
 import { server } from "../../test/msw";
