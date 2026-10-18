@@ -1,36 +1,24 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { ConfigService } from "@nestjs/config";
 import { VideoEligibility } from "./VideoEligibility";
+import type { Env } from "../../../env.schema";
 
-const previous = {
-  enabled: process.env["VIDEO_ROLLOUT_ENABLED"],
-  testers: process.env["VIDEO_TESTER_USER_IDS"],
-};
-
-afterEach(() => {
-  if (previous.enabled === undefined) delete process.env["VIDEO_ROLLOUT_ENABLED"];
-  else process.env["VIDEO_ROLLOUT_ENABLED"] = previous.enabled;
-  if (previous.testers === undefined) delete process.env["VIDEO_TESTER_USER_IDS"];
-  else process.env["VIDEO_TESTER_USER_IDS"] = previous.testers;
-});
+const tester = "11111111-1111-4111-8111-111111111111";
+const seller = "22222222-2222-4222-8222-222222222222";
+const eligibility = (enabled: boolean) => new VideoEligibility(new ConfigService({
+  VIDEO_ROLLOUT_ENABLED: enabled,
+  VIDEO_TESTER_USER_IDS: [tester],
+}) as ConfigService<Env, true>);
 
 describe("VideoEligibility", () => {
   it("fails closed when rollout is not enabled", () => {
-    process.env["VIDEO_ROLLOUT_ENABLED"] = "false";
-    process.env["VIDEO_TESTER_USER_IDS"] = "tester-1";
-    expect(new VideoEligibility().isEligible("tester-1")).toBe(false);
+    expect(eligibility(false).isEligible(tester)).toBe(false);
   });
-
   it("allows only explicitly listed testers", () => {
-    process.env["VIDEO_ROLLOUT_ENABLED"] = "true";
-    process.env["VIDEO_TESTER_USER_IDS"] = "tester-1, tester-2";
-    const eligibility = new VideoEligibility();
-    expect(eligibility.isEligible("tester-1")).toBe(true);
-    expect(eligibility.isEligible("seller-1")).toBe(false);
+    expect(eligibility(true).isEligible(tester)).toBe(true);
+    expect(eligibility(true).isEligible(seller)).toBe(false);
   });
-
   it("reports a stable rollout error for ineligible users", () => {
-    process.env["VIDEO_ROLLOUT_ENABLED"] = "true";
-    process.env["VIDEO_TESTER_USER_IDS"] = "tester-1";
-    expect(() => new VideoEligibility().assertEligible("seller-1")).toThrow("Listing video is currently limited to approved testers");
+    expect(() => eligibility(true).assertEligible(seller)).toThrow("Listing video is currently limited to approved testers");
   });
 });

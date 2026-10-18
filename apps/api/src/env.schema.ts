@@ -45,7 +45,13 @@ const BaseSchema = z.object({
   TESTER_ACCOUNTS_JSON: z.string().default("[]"),
   /** Video is an explicitly gated tester experiment; both switches are required. */
   VIDEO_ROLLOUT_ENABLED: booleanFlag,
-  VIDEO_TESTER_USER_IDS: z.string().default(""),
+  VIDEO_TESTER_USER_IDS: z.string().default("").transform((value, ctx) => {
+    const ids = value.split(",").map(id => id.trim()).filter(Boolean);
+    const parsed = z.array(z.string().uuid()).max(50).safeParse(ids);
+    if (parsed.success) return [...new Set(parsed.data)];
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Expected at most 50 tester User UUIDs" });
+    return z.NEVER;
+  }),
 
   RATE_LIMIT_GENERAL: z.coerce.number().int().positive().default(60),
   RATE_LIMIT_OTP_PHONE_DAILY: z.coerce.number().int().positive().default(5),
