@@ -230,3 +230,39 @@ it("holds one exact History quote atomically and never treats a screenshot or ex
  expect((await db.historyOrder.findUniqueOrThrow({ where: { id: order.id } })).state).toBe("review");
  expect(await db.historyPurchaseIntent.count({ where: { orderId: order.id } })).toBe(0);
 });
+
+it("delivers original PDFs only through the purchased order and reuses licensed archives without earlier purchaser context", async () => {
+ await db.staffGrant.createMany({ data: [{ userId: nextStaff, capability: "history.fulfilment" }], skipDuplicates: true });
+ const create = async (buyer: string) => {
+  const opened = await request.post("/api/v1/services/conversations").set("Authorization", auth(buyer)).send({ purpose: "history", synthetic: true }).expect(201);
+  const id = opened.body.id as string;
+  await request.post(`/api/v1/services/conversations/${id}/assignment`).set("Authorization", auth(nextStaff)).send({ expectedVersion: 0 }).expect(201);
+  const day = "2026-10-20"; await db.historyCapacityDay.upsert({ where: { day }, create: { day, slotLimit: 10, morningLimit: 5, evidence: "Synthetic capacity" }, update: {} });
+  const quote = await db.historyQuote.create({ data: { requestId: opened.body.resourceId, vin: "1HGCM82633A004352", providers: ["carfax"], preflightOutcome: "available", preflightEvidence: "Synthetic availability", refundRule: "Founder refund review", windowStart: new Date("2026-10-20T04:00:00Z"), windowEnd: new Date("2026-10-20T05:00:00Z"), feasible: true, acceptedAt: new Date() } });
+  const order = await db.historyOrder.create({ data: { requestId: opened.body.resourceId, quoteId: quote.id, day, morning: false, holdExpiresAt: new Date(), promiseAt: quote.windowEnd, state: "paid", paidAt: new Date(), receivedAt: new Date(), rights: { category: "payment_evidence", schedule: { kind: "until", until: "2027-01-01T00:00:00Z" }, hold: null } } });
+  return { id, order };
+ };
+ const first = await create(stranger), second = await create(customer);
+ await db.historyPurchaseIntent.create({ data: { orderId: first.order.id, vin: "1HGCM82633A004352", providers: ["carfax"], state: "completed" } });
+ await db.historyOrder.update({ where: { id: first.order.id }, data: { state: "fulfilling" } });
+ const artifactId = randomUUID();
+ const pdf = Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 100 100]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n");
+ const hash = (await import("node:crypto")).createHash("sha256").update(pdf).digest("hex");
+ const rights = { category: "provider_artifact", purpose: "Synthetic licensed archive", basis: "Owned synthetic report", provenance: "Test-generated original PDF", identifiability: "anonymous", use: ["service", "archive", "redistribute"], schedule: { kind: "until", until: "2027-01-01T00:00:00Z", reason: "Synthetic source license" }, supplierRestrictions: "Synthetic reuse and customer PDF/link permitted", hold: null };
+ const command = (id: string, data: object) => request.post(`/api/v1/services/conversations/${id}/history/artifacts`).set("Authorization", auth(nextStaff)).send(data);
+ await command(first.id, { kind: "stage", expectedAssignmentVersion: 1, orderId: first.order.id, artifactId, provider: "carfax", vin: "1HGCM82633A004352", originalDate: "2026-01-01T00:00:00Z", expectedPages: 1, sizeBytes: pdf.length, sha256: hash, rights, provenance: "Synthetic original source" }).expect(201);
+ await request.post(`/api/v1/services/conversations/${first.id}/history/artifacts/${artifactId}/bytes`).set("Authorization", auth(nextStaff)).set("Content-Type", "application/octet-stream").send(pdf).expect(201);
+ await request.get(`/api/v1/services/conversations/${first.id}/history/artifacts/${artifactId}`).set("Authorization", auth(stranger)).expect(403);
+ await command(first.id, { kind: "verify", expectedAssignmentVersion: 1, orderId: first.order.id, artifactId, vin: "1HGCM82633A004352", originalDate: "2026-01-01T00:00:00Z", readablePages: 1, readable: true }).expect(201);
+ await command(first.id, { kind: "deliver", expectedAssignmentVersion: 1, expectedVersion: 0, orderId: first.order.id, artifactId, sharedLink: "https://example.invalid/synthetic-report", linkMatches: true, linkChecked: true }).expect(201);
+ const file = await request.get(`/api/v1/services/conversations/${first.id}/history/artifacts/${artifactId}`).set("Authorization", auth(stranger)).expect(200);
+ expect(Buffer.from(file.body)).toEqual(pdf);
+ await request.get(`/api/v1/services/conversations/${second.id}/history/artifacts/${artifactId}`).set("Authorization", auth(customer)).expect(403);
+ await command(second.id, { kind: "archive", expectedAssignmentVersion: 1, expectedVersion: 0, orderId: second.order.id, artifactId }).expect(201);
+ await command(second.id, { kind: "deliver", expectedAssignmentVersion: 1, expectedVersion: 1, orderId: second.order.id, artifactId, sharedLink: "https://example.invalid/synthetic-report", linkMatches: true, linkChecked: true }).expect(201);
+ const reopened = await request.get(`/api/v1/services/conversations/${second.id}/history/reports`).set("Authorization", auth(customer)).expect(200);
+ expect(reopened.body.delivered[0].originalDate).toBe("2026-01-01T00:00:00.000Z");
+ expect(JSON.stringify(reopened.body)).not.toContain(stranger); expect(reopened.body.archive).toEqual([]); expect(reopened.body.staged).toEqual([]);
+ await db.historyArtifact.update({ where: { id: artifactId }, data: { state: "restricted", restrictedAt: new Date() } });
+ await request.get(`/api/v1/services/conversations/${second.id}/history/artifacts/${artifactId}`).set("Authorization", auth(customer)).expect(403);
+});
