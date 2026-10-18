@@ -2,6 +2,7 @@
 export const retainedSchemaProfile = {
   baseline: '7af49d4c1474b2c3d841b14736c4ef59ce155a4e',
   schemaHashes: [
+    '1ffcfa54048e486563cc400bd6646d74b591b7d122614aa0e8658f10b3cb67dc',
     '373275c1a0b2382a4c11b2d2bf7d84f07ceda11d8800c87dac42b5293c79aacf',
     '78b3becc5eab4dad452482b65a84e19791300f9f935253444f9dcbbda328e773',
     '0f30b61d8ff4df0c5434dd0d9ad074594f48d4835afeafc59aa8657a0b782d1e',
@@ -18,6 +19,7 @@ export const retainedSchemaProfile = {
     'e601862966c5b8ed74b11f8fb2dacac3f358fdc4a0ad7d06a9908d6e09dcefc0',
   ],
   schemaMigrations: {
+    '1ffcfa54048e486563cc400bd6646d74b591b7d122614aa0e8658f10b3cb67dc': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities', '20261015020000_business_membership', '20261015030000_business_inventory', '20261015040000_first_party_measurement', '20261015050000_service_foundations', '20261015060000_business_enquiries', '20261015070000_diagnostic_intake', '20261015080000_service_push_subscriptions', '20261015120000_listing_video_foundation', '20261015130000_support_operations', '20261015140000_video_playback_authority', '20261015150000_history_orders', '20261015160000_showroom_public_fields'],
     '373275c1a0b2382a4c11b2d2bf7d84f07ceda11d8800c87dac42b5293c79aacf': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities', '20261015020000_business_membership', '20261015030000_business_inventory', '20261015040000_first_party_measurement', '20261015050000_service_foundations', '20261015060000_business_enquiries', '20261015070000_diagnostic_intake', '20261015080000_service_push_subscriptions', '20261015120000_listing_video_foundation', '20261015130000_support_operations', '20261015140000_video_playback_authority', '20261015150000_history_orders'],
     '78b3becc5eab4dad452482b65a84e19791300f9f935253444f9dcbbda328e773': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities', '20261015020000_business_membership', '20261015030000_business_inventory', '20261015040000_first_party_measurement', '20261015050000_service_foundations', '20261015060000_business_enquiries', '20261015070000_diagnostic_intake', '20261015080000_service_push_subscriptions', '20261015120000_listing_video_foundation', '20261015130000_support_operations', '20261015140000_video_playback_authority'],
     '0f30b61d8ff4df0c5434dd0d9ad074594f48d4835afeafc59aa8657a0b782d1e': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities', '20261015020000_business_membership', '20261015030000_business_inventory', '20261015040000_first_party_measurement', '20261015050000_service_foundations', '20261015060000_business_enquiries', '20261015070000_diagnostic_intake', '20261015080000_service_push_subscriptions', '20261015120000_listing_video_foundation', '20261015130000_support_operations'],
@@ -34,6 +36,7 @@ export const retainedSchemaProfile = {
     'e601862966c5b8ed74b11f8fb2dacac3f358fdc4a0ad7d06a9908d6e09dcefc0': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities', '20261015020000_business_membership', '20261015030000_business_inventory', '20261015040000_first_party_measurement', '20261015050000_service_foundations', '20261015060000_business_enquiries', '20261015070000_diagnostic_intake', '20261015080000_service_push_subscriptions'],
   },
   additions: [
+    { name: '20261015160000_showroom_public_fields', checksum: '2d38d6d7960fc66078dcf46444ffbbd85b6deedb9f51145e21304d7dff52c02b' },
     { name: '20261015150000_history_orders', checksum: '1eb35867354f2d8fcf9d15fdff2ce584eeeb4cdb252e4a5d47ce6c2a298a19b2' },
     { name: '20261015140000_video_playback_authority', checksum: '019b9ea21c459d9e4e5df313f97957eba80a043ada053d8bd80fd13515b86eae' },
     { name: '20261015130000_support_operations', checksum: '57389de2321c518efe4f1a96adf7ae5bbf7df6b7224ff97c6a854f2708c88163' },
