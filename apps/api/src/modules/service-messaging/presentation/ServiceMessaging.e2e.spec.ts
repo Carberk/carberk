@@ -177,3 +177,15 @@ it("persists Support response debt independently of notes/notices and fences man
  await request.post(`${path}/assignment`).set("Authorization", auth(oldStaff)).send({ expectedVersion: 1, targetUserId: nextStaff }).expect(201);
  await request.post(`${path}/support`).set("Authorization", auth(oldStaff)).send({ kind: "reopen" }).expect(403);
 });
+
+it("orders the actual Support queue by incident/account category then oldest unanswered time", async () => {
+ const a = await request.post("/api/v1/services/conversations").set("Authorization", auth(customer)).send({ purpose: "support", synthetic: true }).expect(201);
+ const b = await request.post("/api/v1/services/conversations").set("Authorization", auth(stranger)).send({ purpose: "support", synthetic: true }).expect(201);
+ const c = await request.post("/api/v1/services/conversations").set("Authorization", auth(oldStaff)).send({ purpose: "support", synthetic: true }).expect(201);
+ await db.supportCase.update({ where: { id: a.body.resourceId }, data: { priority: "account", unansweredSince: new Date("2026-10-01T00:00:00Z") } });
+ await db.supportCase.update({ where: { id: b.body.resourceId }, data: { priority: "exposure", unansweredSince: new Date("2026-10-10T00:00:00Z") } });
+ await db.supportCase.update({ where: { id: c.body.resourceId }, data: { priority: "account", unansweredSince: new Date("2026-10-02T00:00:00Z") } });
+ const queue = await request.get("/api/v1/services/queue/support").set("Authorization", auth(nextStaff)).expect(200);
+ const ids = (queue.body as { id: string }[]).map(row => row.id);
+ expect(ids.indexOf(b.body.id)).toBeLessThan(ids.indexOf(a.body.id)); expect(ids.indexOf(a.body.id)).toBeLessThan(ids.indexOf(c.body.id));
+});

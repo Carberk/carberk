@@ -211,7 +211,12 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
   return this.db.$transaction(async tx => {
    const actor = await this.actor(tx, subject, purpose);
    if (!actor.sessionValid || actor.deleting || actor.suspended || !actor.staffAuthorized) throw new ServiceDenied("NO_ACCESS");
-   const rows = purpose === "support" ? await tx.supportCase.findMany({ where: { customerId: { not: null } }, orderBy: { createdAt: "asc" }, take: 50, include: { conversation: true } }) : await tx.vehicleHistoryRequest.findMany({ where: { customerId: { not: null } }, orderBy: { createdAt: "asc" }, take: 50, include: { conversation: true } });
+   let rows: ({ id: string; assigneeId: string | null; assignmentVersion: number; createdAt: Date; conversation: { id: string; erasedAt: Date | null } | null })[];
+   if (purpose === "support") {
+    const ordered = await tx.$queryRaw<{ id: string }[]>`SELECT s.id FROM support_cases s JOIN service_conversations c ON c."supportCaseId"=s.id WHERE s."customerId" IS NOT NULL AND c."erasedAt" IS NULL ORDER BY CASE s.priority WHEN 'exposure' THEN 0 WHEN 'account' THEN 1 ELSE 2 END, s."unansweredSince" ASC NULLS LAST, s."createdAt", s.id LIMIT 50`;
+    const found = await tx.supportCase.findMany({ where: { id: { in: ordered.map(row => row.id) } }, include: { conversation: true } });
+    rows = ordered.flatMap(item => { const row = found.find(row => row.id === item.id); return row ? [row] : []; });
+   } else rows = await tx.vehicleHistoryRequest.findMany({ where: { customerId: { not: null } }, orderBy: { createdAt: "asc" }, take: 50, include: { conversation: true } });
    return rows.flatMap(row => row.conversation && !row.conversation.erasedAt ? [{ id: row.conversation.id, resourceId: row.id, assigned: row.assigneeId !== null, assignmentVersion: row.assignmentVersion, createdAt: row.createdAt.toISOString() }] : []);
   });
  }
