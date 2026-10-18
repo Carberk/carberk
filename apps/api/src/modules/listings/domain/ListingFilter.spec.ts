@@ -3,6 +3,10 @@ import { ListingFilter } from "./ListingFilter";
 import { LISTING_ERROR_CODES } from "./types";
 
 describe("ListingFilter", () => {
+  it("treats business seller choice as an applied filter and rejects unknown seller types", () => {
+    expect(ListingFilter.create({ sellerType: "business" }).isEmpty()).toBe(false);
+    expect(() => ListingFilter.create({ sellerType: "promoted" as "business" })).toThrowError(LISTING_ERROR_CODES.INVALID_FILTER_RANGE);
+  });
   it("accepts empty criteria", () => {
     const filter = ListingFilter.create({});
     expect(filter.isEmpty()).toBe(true);
