@@ -28,6 +28,7 @@ describe("Listing video preparation handoff", () => {
     { fps: 60 }, { width: 1920, height: 1080 }, { videoCodec: "hevc" },
     { colour: "hlg" }, { uri: selection.sourceUri }, { audioCodec: "opus" },
     { sizeBytes: 0 }, { durationMs: 4000 }, { width: Number.NaN },
+    { sha256: "invalid" }, { sha256: undefined },
   ])("discards unsafe or incomplete native output %j", async (invalid) => {
     const native = new FakeVideoPreparation();
     Object.assign(native.output, invalid);
