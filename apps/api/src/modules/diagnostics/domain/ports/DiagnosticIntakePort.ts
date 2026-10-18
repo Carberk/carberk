@@ -5,6 +5,8 @@ export const DIAGNOSTIC_RUNTIME = "DIAGNOSTIC_RUNTIME";
 export interface DiagnosticSubject { userId: string; sessionId: string }
 export interface DiagnosticRuntime { now(): Date; id(): string; syntheticAllowed(subject: DiagnosticSubject): boolean }
 export interface DiagnosticIntakePort {
+  assigned(subject: DiagnosticSubject): Promise<DiagnosticSchemas.DiagnosticOrder[]>;
+  workspace(subject: DiagnosticSubject, id: string): Promise<DiagnosticSchemas.DiagnosticWorkspace>;
   create(subject: DiagnosticSubject, input: DiagnosticSchemas.DiagnosticCreate): Promise<DiagnosticSchemas.DiagnosticOrder>;
   read(subject: DiagnosticSubject, id: string): Promise<DiagnosticSchemas.DiagnosticOrder>;
   mine(subject: DiagnosticSubject): Promise<DiagnosticSchemas.DiagnosticOrder[]>;

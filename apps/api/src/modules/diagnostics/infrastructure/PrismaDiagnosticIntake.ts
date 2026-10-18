@@ -79,6 +79,51 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
       return this.dto(tx, row, false);
     });
   }
+  private async staffScope(tx: Tx, subject: DiagnosticSubject, id: string) {
+    for (const capability of DiagnosticSchemas.DiagnosticCapabilitySchema.options) {
+      try { return await this.scope(tx, subject, id, capability); }
+      catch (error) { if (!(error instanceof DiagnosticRuleError)) throw error; }
+    }
+    throw denial();
+  }
+  async assigned(subject: DiagnosticSubject): Promise<DiagnosticSchemas.DiagnosticOrder[]> {
+    return this.db.$transaction(async tx => {
+      await this.current(tx, subject);
+      const rows = await tx.inspectionOrder.findMany({ where: { synthetic: true, erasedAt: null, assignments: { some: { userId: subject.userId, revokedAt: null } } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 50 });
+      const result: DiagnosticSchemas.DiagnosticOrder[] = [];
+      for (const row of rows) {
+        try { const scope = await this.staffScope(tx, subject, row.id); if (scope.staff) result.push(await this.dto(tx, scope.row, true)); }
+        catch (error) { if (!(error instanceof DiagnosticRuleError)) throw error; }
+      }
+      return result;
+    });
+  }
+  async workspace(subject: DiagnosticSubject, id: string): Promise<DiagnosticSchemas.DiagnosticWorkspace> {
+    return this.db.$transaction(async tx => {
+      const scope = await this.staffScope(tx, subject, id);
+      if (!scope.staff) throw denial();
+      const assignments = await tx.diagnosticOrderAssignment.findMany({ where: { orderId: id, revokedAt: null }, orderBy: [{ userId: "asc" }, { capability: "asc" }] });
+      const capabilities: DiagnosticSchemas.DiagnosticCapability[] = [];
+      for (const assignment of assignments.filter(item => item.userId === subject.userId)) {
+        const parsed = DiagnosticSchemas.DiagnosticCapabilitySchema.safeParse(assignment.capability);
+        if (!parsed.success) continue;
+        try { await this.centerAuthority(tx, subject, scope.row.centerId, parsed.data); capabilities.push(parsed.data); }
+        catch (error) { if (!(error instanceof DiagnosticRuleError)) throw error; }
+      }
+      const template = await tx.diagnosticTemplateVersion.findUnique({ where: { id: scope.row.templateVersionId } });
+      if (!template || template.centerId !== scope.row.centerId) throw denial();
+      const staffChoices: DiagnosticSchemas.DiagnosticWorkspace["staffChoices"] = [];
+      if (capabilities.includes("diagnostics.reception")) {
+        const candidates = await tx.diagnosticCenterAssignment.findMany({ where: { centerId: scope.row.centerId, revokedAt: null, qualifiedUntil: { gt: this.runtime.now() }, user: { suspendedAt: null, deletionScheduledAt: null } }, include: { user: { select: { displayName: true, staffGrants: { where: { revokedAt: null } } } } }, orderBy: [{ userId: "asc" }, { capability: "asc" }], take: 100 });
+        for (const candidate of candidates) {
+          const parsed = DiagnosticSchemas.DiagnosticCapabilitySchema.safeParse(candidate.capability);
+          if (parsed.success && candidate.user.staffGrants.some(grant => grant.capability === candidate.capability) && this.runtime.syntheticAllowed({ userId: candidate.userId, sessionId: "" })) staffChoices.push({ userId: candidate.userId, capability: parsed.data, label: candidate.user.displayName ?? candidate.userId });
+        }
+      }
+      return DiagnosticSchemas.DiagnosticWorkspaceSchema.parse({ order: await this.dto(tx, scope.row, true), template: this.template(template), capabilities,
+        assignments: assignments.flatMap(item => { const parsed = DiagnosticSchemas.DiagnosticCapabilitySchema.safeParse(item.capability); return parsed.success ? [{ userId: item.userId, capability: parsed.data }] : []; }), staffChoices });
+    });
+  }
   async read(subject: DiagnosticSubject, id: string): Promise<DiagnosticSchemas.DiagnosticOrder> {
     return this.db.$transaction(async tx => { const scope = await this.scope(tx, subject, id); return this.dto(tx, scope.row, scope.staff); });
   }

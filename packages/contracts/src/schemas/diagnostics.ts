@@ -73,3 +73,11 @@ export const DiagnosticReleasedSnapshotSchema = z.object({
   synthetic: z.boolean(),
 }).strict();
 export type DiagnosticReleasedSnapshot = z.infer<typeof DiagnosticReleasedSnapshotSchema>;
+
+export const DiagnosticWorkspaceSchema = z.object({
+  order: DiagnosticOrderSchema, template: DiagnosticTemplateSchema,
+  capabilities: z.array(DiagnosticCapabilitySchema),
+  assignments: z.array(z.object({ userId: z.string().uuid(), capability: DiagnosticCapabilitySchema })),
+  staffChoices: z.array(z.object({ userId: z.string().uuid(), label: z.string(), capability: DiagnosticCapabilitySchema })),
+});
+export type DiagnosticWorkspace = z.infer<typeof DiagnosticWorkspaceSchema>;

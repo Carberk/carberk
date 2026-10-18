@@ -35,6 +35,8 @@ export class DiagnosticIntakeController {
     if (!this.intake || !(body && typeof body === "object" && "synthetic" in body && body.synthetic === true)) throw new ForbiddenException({ code: "DIAGNOSTIC_SERVICE_UNAVAILABLE", message: "Inspection service is unavailable" });
     return this.run(intake => intake.create(this.subject(req), parse(DiagnosticSchemas.DiagnosticCreateSchema, body)));
   }
+  @Get("assigned") @Header("Cache-Control", "no-store, private") assigned(@Req() req: Request) { return this.run(intake => intake.assigned(this.subject(req))); }
+  @Get("orders/:id/workspace") @Header("Cache-Control", "no-store, private") workspace(@Req() req: Request, @Param("id") id: string) { return this.run(intake => intake.workspace(this.subject(req), parse(uuid, id))); }
   @Get("orders") @Header("Cache-Control", "no-store, private") mine(@Req() req: Request) { return this.run(intake => intake.mine(this.subject(req))); }
   @Get("orders/:id") @Header("Cache-Control", "no-store, private") read(@Req() req: Request, @Param("id") id: string) { return this.run(intake => intake.read(this.subject(req), parse(uuid, id))); }
   @Get("centers/:id/queue") @Header("Cache-Control", "no-store, private") queue(@Req() req: Request, @Param("id") id: string) { return this.run(intake => intake.queue(this.subject(req), parse(uuid, id))); }
