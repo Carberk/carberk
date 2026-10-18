@@ -38,6 +38,7 @@ beforeEach(async () => {
   http.post(`${base}/${sessionId}/part-credentials`, () => HttpResponse.json({ version: 1, sessionId, parts: [{ partNumber: 1, url: "https://video.test/task-part", expiresAt: "2099-01-01T00:00:00Z", sizeBytes: 4 }] })),
   http.put("https://video.test/task-part", async ({ request }) => { expect([...new Uint8Array(await request.arrayBuffer())]).toEqual([1, 2, 3, 4]); uploads++; complete = true; return new HttpResponse(null); }),
   http.post(`${base}/${sessionId}/complete`, () => { state = "PROCESSING"; return HttpResponse.json(snapshot()); }),
+  http.post(`${base}/${sessionId}/resume`, () => { state = "UPLOADING"; return HttpResponse.json(snapshot()); }),
   http.post(`${base}/${sessionId}/pause`, () => { state = "PAUSED"; return HttpResponse.json(snapshot()); }),
   http.delete(`${base}/${sessionId}`, () => { state = "CLEANUP_PENDING"; return HttpResponse.json(snapshot(), { status: 202 }); }),
  );
