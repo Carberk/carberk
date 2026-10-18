@@ -11,7 +11,7 @@ import { JwtModule, JwtService } from "@nestjs/jwt";
 import { Reflector } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import { PrismaService } from "@auto-tm/db";
-import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import supertest from "supertest";
 
 import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
@@ -39,6 +39,7 @@ beforeAll(async () => {
  }
  await db.staffGrant.createMany({ data: [oldStaff, nextStaff].map(userId => ({ userId, capability: "support.operations" })) });
 });
+afterEach(() => { vi.restoreAllMocks(); });
 beforeEach(async () => {
  for (const id of ids) {
   const session = await db.session.create({ data: { userId: id, refreshTokenHash: randomUUID(), expiresAt: new Date(Date.now()+3600000), adminTotpExpiresAt: new Date(Date.now()+3600000) } });
@@ -219,7 +220,9 @@ it("holds one exact History quote atomically and never treats a screenshot or ex
  const opened = await request.post("/api/v1/services/conversations").set("Authorization", auth(stranger)).send({ purpose: "history", synthetic: true }).expect(201);
  const id = opened.body.id as string;
  await request.post(`/api/v1/services/conversations/${id}/assignment`).set("Authorization", auth(oldStaff)).send({ expectedVersion: 0 }).expect(201);
- const now = new Date(); const tomorrow = new Date(now.getTime() + 86400000 + 5 * 3600000).toISOString().slice(0, 10);
+ const now = new Date(`${new Date().toISOString().slice(0,10)}T04:10:00.000Z`);
+ vi.spyOn(app.get<{ now: () => Date }>(SERVICE_RUNTIME), "now").mockReturnValue(now);
+ const tomorrow = new Date(now.getTime() + 86400000 + 5 * 3600000).toISOString().slice(0, 10);
  const windowStart = `${tomorrow}T04:00:00.000Z`, windowEnd = `${tomorrow}T05:00:00.000Z`;
  const command = (user: string, data: object) => request.post(`/api/v1/services/conversations/${id}/history`).set("Authorization", auth(user)).send(data);
  await command(oldStaff, { kind: "capacity", expectedAssignmentVersion: 1, day: tomorrow, slotLimit: 1, morningLimit: 1, evidence: "Synthetic measured one slot", providers: [{ provider: "carfax", allowance: 1, consumed: 0, resetAt: `${tomorrow}T03:00:00.000Z`, evidence: "Synthetic account allowance" }] }).expect(201);
@@ -240,6 +243,13 @@ it("holds one exact History quote atomically and never treats a screenshot or ex
  await command(oldStaff, { kind: "verify", expectedAssignmentVersion: 1, expectedVersion: 0, orderId: order.id, paymentId: payment.id, verifiedFunds: true, amount: 100, receivedAt: now.toISOString(), evidence: "Actual synthetic reconciliation" }).expect(201);
  expect((await db.historyOrder.findUniqueOrThrow({ where: { id: order.id } })).state).toBe("review");
  expect(await db.historyPurchaseIntent.count({ where: { orderId: order.id } })).toBe(0);
+ const newQuoteId = randomUUID(); await command(oldStaff, { ...quote, quoteId: newQuoteId }).expect(201);
+ await command(stranger, { ...acceptance, quoteId: newQuoteId }).expect(201);
+ const rebooked = await db.historyOrder.findUniqueOrThrow({ where: { id: order.id } }); expect(rebooked.state).toBe("paid"); expect(rebooked.quoteId).toBe(quoteId);
+ expect(await db.historyBooking.count({ where: { orderId: order.id } })).toBe(1);
+ await command(stranger, { ...acceptance, quoteId: newQuoteId }).expect(201);
+ expect(await db.historyBooking.count({ where: { orderId: order.id } })).toBe(1);
+
 });
 
 it("delivers original PDFs only through the purchased order and reuses licensed archives without earlier purchaser context", async () => {
