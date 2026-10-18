@@ -1,5 +1,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
+
 import { renderMobile, fireEvent, act } from "../../test/render";
+
 import { PrivateDocumentAction } from "./PrivateDocumentAction";
 const native = vi.hoisted(() => ({ files: [] as { deleted: boolean; bytes: Uint8Array | null }[], shared: [] as string[], available: true }));
 vi.mock("expo-file-system", () => ({ Paths: { cache: "file:///cache" }, File: class { uri = "file:///cache/synthetic.pdf"; private record = { deleted: false, bytes: null as Uint8Array | null }; constructor() { native.files.push(this.record); } create() {} write(value: Uint8Array) { this.record.bytes = value; } delete() { this.record.deleted = true; } } }));
