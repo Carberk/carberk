@@ -585,6 +585,7 @@ model MediaUpload {
   // only additional constraints. AVAILABLE, PREPARING, ADOPTED, RETIRED, DELETED.
   state           String    @default("AVAILABLE")
   claimToken      String?
+  /// SQL guard permits video_session only while PREPARING under video-v1 with its matching session token.
   claimTargetType String?
   claimTargetId   String?
   claimDeadline   DateTime?
