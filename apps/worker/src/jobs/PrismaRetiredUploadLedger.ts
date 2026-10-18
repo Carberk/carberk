@@ -28,6 +28,7 @@ export class PrismaRetiredUploadLedger implements RetiredUploadLedger {
           )) AS publish
         FROM media_uploads AS upload
         WHERE upload."state" = 'PREPARING' AND upload."claimDeadline" < ${now}
+          AND upload."writeProtocol" <> 'video-v1'
           AND NOT EXISTS (
             SELECT 1 FROM listing_media WHERE "uploadId" = upload.id
               OR starts_with("key", regexp_replace(upload."key", '[^/]+$', ''))
