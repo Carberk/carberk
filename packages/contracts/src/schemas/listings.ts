@@ -1,3 +1,4 @@
+import { PublicBusinessSchema } from "./public-marketplace";
 import { z } from "zod";
 
 /** Publication floor, guidance target and hard cap shared by API and clients. */
@@ -111,6 +112,7 @@ export const ListingSummaryBaseSchema = z.object({
   id: z.string().uuid(),
   sellerId: z.string().uuid(),
   businessId: z.string().uuid().optional(),
+  business: PublicBusinessSchema.omit({ contactPhone: true }).optional(),
   status: ListingStatusSchema,
   brandId: z.string().uuid(),
   modelId: z.string().uuid(),
@@ -245,6 +247,7 @@ export const ListingDetailSchema = z.object({
   publicNumber: z.number().int().positive(),
   sellerId: z.string().uuid(),
   businessId: z.string().uuid().optional(),
+  business: PublicBusinessSchema.omit({ contactPhone: true }).optional(),
   seller: PublicIdentitySchema.extend({
     memberSince: z.string().datetime(),
   }),
@@ -335,6 +338,7 @@ export type ListingDraftPayload = z.infer<typeof ListingDraftPayloadSchema>;
 
 export const ListingDraftSchema = z.object({
   businessId: z.string().uuid().optional(),
+  business: PublicBusinessSchema.omit({ contactPhone: true }).optional(),
   id: z.string().uuid(),
   userId: z.string().uuid(),
   payload: ListingDraftPayloadSchema,
@@ -348,6 +352,7 @@ export type ListingDraft = z.infer<typeof ListingDraftSchema>;
 export const CreateDraftRequestSchema = z
   .object({
     businessId: z.string().uuid().optional(),
+  business: PublicBusinessSchema.omit({ contactPhone: true }).optional(),
     initialPayload: ListingDraftPayloadSchema.optional(),
   })
   .optional();

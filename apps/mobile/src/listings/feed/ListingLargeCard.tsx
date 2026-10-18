@@ -5,6 +5,7 @@ import { memo, type ReactNode } from "react";
 import { Pressable, View, useWindowDimensions } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { BusinessIdentityLink } from "../../business/BusinessIdentityLink";
 import { useAuthIntentStore, type AuthHref } from "../../auth/intentStore";
 import { useOpenListingConversation } from "../../conversations/useOpenListingConversation";
 import { useDisplayName } from "../../identity/useDisplayName";
@@ -153,7 +154,7 @@ export const ListingLargeCard = memo(function ListingLargeCard(props: ListingLar
         </View> : null}
         {error ? <ErrorState compact error={error} onRetry={retry} /> : null}
         <View className="flex-row items-center gap-3">
-          <SellerLine seller={feed.seller} cityName={cityName} date={formatListingDate(listing.publishedAt, i18n.language, t)} />
+          {listing.business ? <BusinessIdentityLink business={listing.business} /> : listing.businessId ? <Text>{t("sellerTypeBusiness")}</Text> : <SellerLine seller={feed.seller} cityName={cityName} date={formatListingDate(listing.publishedAt, i18n.language, t)} />}
           {canCall || canMessage ? null : favorite}
         </View>
       </View>

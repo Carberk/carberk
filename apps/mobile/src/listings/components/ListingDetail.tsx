@@ -214,6 +214,7 @@ export function ListingDetailView({
           <View className="gap-3">
             <Separator />
             <SellerBlock
+              business={listing.business}
               seller={listing.seller}
               cityName={maps.cityName(listing.cityId)}
               locationText={listing.locationText}

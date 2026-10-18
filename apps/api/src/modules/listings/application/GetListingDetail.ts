@@ -1,3 +1,4 @@
+import { PUBLIC_MARKETPLACE_READ_PORT, type PublicMarketplaceReadPort } from "../domain/ports/PublicMarketplaceReadPort";
 import { Optional , Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { ListingOwnership } from "./ListingOwnership";
 import { BUSINESS_INVENTORY_REPOSITORY, type BusinessInventoryRepository } from "../domain/ports/BusinessInventoryRepository";
@@ -70,6 +71,7 @@ export class GetListingDetail {
     @Inject(IDENTITY_CLOCK_PORT) private readonly clock: ClockPort,
     @Optional() @Inject(BUSINESS_INVENTORY_REPOSITORY) private readonly inventory?: BusinessInventoryRepository,
     @Optional() @Inject(ListingOwnership) private readonly ownership?: ListingOwnership,
+    @Optional() @Inject(PUBLIC_MARKETPLACE_READ_PORT) private readonly publicMarketplace?: PublicMarketplaceReadPort,
   ) {}
 
   async execute(input: GetListingDetailInput): Promise<ListingDetailDto> {
@@ -89,6 +91,7 @@ export class GetListingDetail {
     const seller = business ? { displayName: business.name, nameNumber: 1000, avatarIndex: 0, avatarKey: null, deleted: false, memberSince: business.createdAt } : await this.sellerProfiles.getSellerProfile(listing.sellerId);
     if (!seller) throw new NotFoundException("Seller not found");
 
+    const publicBusiness = listing.businessId ? (await this.publicMarketplace?.businessIdentities([listing.businessId]))?.get(listing.businessId) : undefined;
     const media = await this.mediaRepo.findByListingId(input.listingId);
     const displayPriceTmt = await this.computeDisplayPriceTmt(
       listing.priceAmount,
@@ -106,6 +109,7 @@ export class GetListingDetail {
       publicNumber: listing.publicNumber,
       sellerId: listing.sellerId,
       ...(listing.businessId ? { businessId: listing.businessId } : {}),
+      ...(publicBusiness ? { business: { id: publicBusiness.id, slug: publicBusiness.slug, name: publicBusiness.name, logoUrl: publicBusiness.logoUrl, city: publicBusiness.city, identityChecked: publicBusiness.identityChecked } } : {}),
       seller: {
         displayName: seller.displayName,
         nameNumber: seller.nameNumber,
