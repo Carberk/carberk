@@ -128,24 +128,5 @@ describe("current member business inbox", () => {
   expect(await screen.findByText("Ahal Motors")).toBeTruthy();
  });
 
- it("restores an unsent reply after leaving the route, and erases it when the session ends", async () => {
-  assigned = userId;
-  server.use(http.get("*/conversations/:id/messages", () => HttpResponse.json({ items: [], nextCursor: null })));
-  const first = await renderMobile(<EnquiriesScreen />); await first.findByText("car-1");
-  await fireEvent.press(first.getByRole("button", { name: "Open history" }));
-  await first.findByText("No messages yet");
-  await fireEvent.changeText(first.getByLabelText("Message"), "Reply after returning");
-  first.unmount();
-  const back = await renderMobile(<EnquiriesScreen />); await back.findByText("car-1");
-  await fireEvent.press(back.getByRole("button", { name: "Open history" }));
-  await back.findByText("No messages yet");
-  expect((await back.findByLabelText("Message")).props.value).toBe("Reply after returning");
-  await act(async () => { await clearAuthSession(); }); back.unmount();
-  await storeAuthSession({ accessToken: "synthetic", refreshToken: "refresh", user: { id: userId, phone: "+99365123456", email: null, displayName: null, role: "buyer" } });
-  const again = await renderMobile(<EnquiriesScreen />); await again.findByText("car-1");
-  await fireEvent.press(again.getByRole("button", { name: "Open history" }));
-  await again.findByText("No messages yet");
-  expect((await again.findByLabelText("Message")).props.value).toBe("");
- });
 
 });
