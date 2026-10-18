@@ -1,3 +1,4 @@
+import { waitFor } from "@testing-library/react-native";
 import { ListingsSchemas } from "@auto-tm/contracts";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -48,7 +49,7 @@ describe("Search parameters: exact price filters", () => {
           pathname: "/(tabs)/(search)/results",
           params: expect.objectContaining({ [key]: expectedPrice }),
         });
-        expect(requests.some(query => query[key] === expectedPrice)).toBe(true);
+        await waitFor(() => expect(requests.some(query => query[key] === expectedPrice)).toBe(true));
         for (const query of requests) {
           expect(ListingsSchemas.ListingCountQuerySchema.safeParse(query).success).toBe(true);
         }
