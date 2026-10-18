@@ -7,6 +7,7 @@ import { PublicMarketplaceSchemas } from "@auto-tm/contracts";
 
 import { apiClient } from "../api/client";
 
+import { MarketplaceShareActions } from "./MarketplaceShareActions";
 import { marketplaceCopy, readerLocale } from "./showroomCopy";
 
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ export function ShowroomScreen({ businessId }: { businessId: string }) {
    <Text className="font-heading text-title-1 font-semibold">{business.name}</Text>
    {business.logoUrl && /^https:\/\//.test(business.logoUrl) ? <Image source={{ uri: business.logoUrl }} className="h-16 w-16 rounded-lg" accessibilityIgnoresInvertColors /> : null}
    {business.city ? <Text>{business.city[locale]}</Text> : null}<Text>{business.identityChecked ? c.checked : c.synthetic}</Text>{business.identityChecked ? <Text className="text-muted-foreground">{c.checkedHelp}</Text> : null}{business.address ? <Text>{business.address}</Text> : null}
+   <MarketplaceShareActions kind="showrooms" id={business.id} />
    <Text className="mt-4 font-heading text-title-2 font-semibold">{c.available}</Text><Text className="text-muted-foreground">{c.inventory}</Text>
    {page?.listings.length === 0 ? <Text>{c.empty}</Text> : null}
    {query.data?.pages.flatMap(item => item.listings).map(car => { const title = `${car.brand[locale]} ${car.model[locale]} ${car.year ?? ""}`.trim(); return <PressableScale key={car.id} accessibilityRole="button" accessibilityLabel={title} className="gap-3 rounded-2xl bg-card p-3" onPress={() => router.push({ pathname: "/listings/[id]", params: { id: car.id } })}>
