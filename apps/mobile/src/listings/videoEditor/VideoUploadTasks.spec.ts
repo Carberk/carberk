@@ -99,4 +99,15 @@ describe("native seller task uses actual preparation and transfer boundaries", (
   expect(videoNativeStorage.files.size).toBe(0);
  });
 
+ it("pauses actual upload bytes after preparation instead of cancelling the finished native export", async () => {
+  let enter!: () => void, release!: () => void;
+  const entered = new Promise<void>(resolve => { enter = resolve; }), held = new Promise<void>(resolve => { release = resolve; });
+  server.use(http.put("https://video.test/task-part", async () => { enter(); await held; complete = true; return new HttpResponse(null); }));
+  const task = new VideoUploadTask(ownerId, target);
+  const running = task.start({ sourceUri: "file:///library/selected.mov", startMs: 0, endMs: 3000 }, 0);
+  await entered; await task.pause(); release(); await running;
+  expect(task.snapshot().phase).toBe("PAUSED");
+  expect(state).toBe("PAUSED");
+ });
+
 });
