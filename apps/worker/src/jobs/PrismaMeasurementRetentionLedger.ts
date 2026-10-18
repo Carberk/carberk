@@ -3,7 +3,7 @@ import { PrismaService } from "@auto-tm/db";
 
 import type { MeasurementRetentionLedger } from "./measurementRetention";
 
-/** Personal measurement tables only. Qualified anonymous market datasets are separately owned. */
+/** Bounded personal, ordinary aggregate and investigative expiry. Qualified anonymous knowledge has a separate source-rights lifecycle. */
 @Injectable()
 export class PrismaMeasurementRetentionLedger implements MeasurementRetentionLedger {
  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
@@ -20,7 +20,11 @@ export class PrismaMeasurementRetentionLedger implements MeasurementRetentionLed
    const visitCutoff = new Date(now.getTime() - 90 * 86400000);
    const visits = await tx.$executeRaw`WITH due AS (SELECT "id" FROM "measurement_visits" WHERE "foregroundAt" <= ${visitCutoff} ORDER BY "foregroundAt", "id" LIMIT ${limit} FOR UPDATE SKIP LOCKED)
     DELETE FROM "measurement_visits" AS item USING due WHERE item."id" = due."id"`;
-   return raw + outbox + guests + visits;
+   const rollups=await tx.$executeRaw`WITH due AS (SELECT "key" FROM "measurement_rollups" WHERE "expiresAt" <= ${now} ORDER BY "expiresAt", "key" LIMIT ${limit} FOR UPDATE SKIP LOCKED)
+    DELETE FROM "measurement_rollups" AS item USING due WHERE item."key" = due."key"`;
+   const artifacts=await tx.$executeRaw`WITH due AS (SELECT "id" FROM "measurement_investigation_exports" WHERE "expiresAt" <= ${now} ORDER BY "expiresAt", "id" LIMIT ${limit} FOR UPDATE SKIP LOCKED)
+    DELETE FROM "measurement_investigation_exports" AS item USING due WHERE item."id" = due."id"`;
+   return raw + outbox + guests + visits + rollups + artifacts;
   }, { timeout: 10000, maxWait: 1000 });
  }
  async oldestExpired(now: Date): Promise<Date | null> {
@@ -28,6 +32,8 @@ export class PrismaMeasurementRetentionLedger implements MeasurementRetentionLed
    await tx.$executeRaw`SET LOCAL statement_timeout = '2000ms'`;
    const rows = await tx.$queryRaw<{ oldest: Date | null }[]>`SELECT MIN(expiry) AS oldest FROM (
     SELECT "expiresAt" AS expiry FROM "measurement_records" WHERE "expiresAt" <= ${now}
+    UNION ALL SELECT "expiresAt" FROM "measurement_rollups" WHERE "expiresAt" <= ${now}
+    UNION ALL SELECT "expiresAt" FROM "measurement_investigation_exports" WHERE "expiresAt" <= ${now}
     UNION ALL SELECT "expiresAt" FROM "measurement_outbox" WHERE "expiresAt" <= ${now}
     UNION ALL SELECT "expiresAt" FROM "measurement_principals" WHERE "expiresAt" <= ${now}
     UNION ALL SELECT "foregroundAt" + INTERVAL '90 days' FROM "measurement_visits" WHERE "foregroundAt" + INTERVAL '90 days' <= ${now}

@@ -88,6 +88,10 @@ const messages: Record<string, [string, string]> = {
     "Diagnostika",
     "Diagnostics"
   ],
+  "Открыть показатели улучшений": [
+    "Gowulandyrma görkezijilerini aç",
+    "Open Improvement scorecard"
+  ],
   "Улучшения": [
     "Gowulandyrmalar",
     "Improvement"

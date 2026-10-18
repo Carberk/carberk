@@ -48,8 +48,8 @@ COPY . .
 # Runtime-shared packages export dist/, so build them before the app.
 # Prisma 7 loads packages/db/prisma.config.ts during generate and requires a
 # datasource URL even though no connection is made.
-RUN DATABASE_URL=postgresql://build:build@localhost:5432/build pnpm --filter @auto-tm/db build
 RUN pnpm --filter @auto-tm/contracts build
+RUN DATABASE_URL=postgresql://build:build@localhost:5432/build pnpm --filter @auto-tm/db build
 RUN pnpm --filter @auto-tm/worker build
 
 FROM base AS runtime
@@ -64,6 +64,7 @@ RUN ffmpeg -version && ffprobe -version
 COPY --from=build /app/node_modules /app/node_modules
 COPY --from=build /app/apps/worker/node_modules /app/apps/worker/node_modules
 COPY --from=build /app/apps/worker/dist /app/apps/worker/dist
+COPY --from=build /app/apps/worker/assets/fonts /app/apps/worker/assets/fonts
 COPY --from=build /app/apps/worker/package.json /app/apps/worker/package.json
 COPY --from=build /app/packages /app/packages
 RUN groupadd -r auto-tm && useradd -r -g auto-tm -s /bin/false auto-tm && chown -R auto-tm:auto-tm /app

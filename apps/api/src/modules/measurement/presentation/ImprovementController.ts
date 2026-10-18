@@ -42,6 +42,12 @@ export class ImprovementController {
   return this.authorized(()=>this.reads.artifact(this.subject(request),id));
  }
  @Header("Cache-Control","no-store")
+ @Post("research/derivations")
+ researchAdmission(@Body() body:unknown,@Req() request:StaffRequest) {return this.authorized(()=>this.knowledge.admitSynthetic(this.subject(request),body));}
+ @Header("Cache-Control","no-store")
+ @Get("research")
+ researchList(@Req() request:StaffRequest) {return this.authorized(()=>this.knowledge.list(this.subject(request)));}
+ @Header("Cache-Control","no-store")
  @Get("research/:id")
  research(@Param("id") id:string,@Req() request:StaffRequest) {
   if(!/^[A-Za-z0-9_-]{1,100}$/.test(id)) throw new BadRequestException({code:"VALIDATION_FAILED"});

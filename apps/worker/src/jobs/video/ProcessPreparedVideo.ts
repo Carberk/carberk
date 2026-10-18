@@ -16,22 +16,30 @@ export class ProcessPreparedVideo {
   ) {}
 
   async execute(generationId: string): Promise<"unavailable" | "adopted" | "superseded" | "failed"> {
-    const lease = await this.ledger.claim(generationId, this.now(), this.randomToken());
+    const startedAt = this.now().getTime();
+    const lease = await this.ledger.claim(generationId, new Date(startedAt), this.randomToken());
     if (!lease) return "unavailable";
+    // Leave four minutes of the durable twenty-minute lease for the longest
+    // bounded storage operation, transaction completion and cleanup grace.
+    const checkBudget = () => { if (this.now().getTime() - startedAt >= 16 * 60_000) throw new Error("VIDEO_PROCESSING_TIMEOUT"); };
     let source: Awaited<ReturnType<VideoProcessingObjects["download"]>> | undefined;
     let output: Awaited<ReturnType<VideoMediaProcessor["process"]>> | undefined;
     try {
       source = await this.objects.download(lease);
+      checkBudget();
       output = await this.codec.process({ path: source.path, sha256: lease.sha256, posterMs: lease.posterMs });
+      checkBudget();
       const assets = output.assets.map(asset => ({ ...asset, key: `video/v1/${lease.uploadId}/${lease.generationId}/${asset.path}` }));
       await this.validateManifests(output.directory, assets);
       // Persist every exact key before the first write, so cancellation and
       // process death cannot leave an unrecorded generation directory.
       if (!await this.ledger.plan(lease, assets, this.now())) return "superseded";
-      for (const asset of assets) await this.objects.publish(output.directory, asset);
+      for (const asset of assets) { checkBudget(); await this.objects.publish(output.directory, asset); }
       for (const asset of assets) {
+        checkBudget();
         if (!await this.objects.verify(asset)) throw new Error("VIDEO_READBACK_FAILED");
       }
+      checkBudget();
       const adopted = await this.ledger.adopt(lease, {
         durationMs: output.durationMs, width: output.width, height: output.height,
         sourceSha256: output.sourceSha256, assets,

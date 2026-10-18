@@ -35,3 +35,14 @@ export const ImprovementTimelineSchema=z.object({
  events:z.array(z.object({at:z.string().datetime(),subject:z.string().regex(/^person_[1-9][0-9]{0,2}$/),eventName:z.string().regex(/^[a-z_]{1,64}$/),platform:z.enum(["android","ios","web","admin","server"]),release:z.string().max(64),result:z.enum(["success","expected_rejection","technical_failure","cancelled"]).optional()}).strict()).max(100),
 }).strict();
 export type ImprovementTimeline=z.infer<typeof ImprovementTimelineSchema>;
+
+export const AnonymousMarketCellSchema=z.object({
+ market:z.literal("TM"),period:z.string().regex(/^20[0-9]{2}-(0[1-9]|1[0-2])$/),vehicleClass:z.enum(["passenger","commercial","other"]),observations:z.number().int().min(5),
+ priceBand:z.enum(["under_5000","5000_14999","15000_29999","30000_plus","unknown"]),ageBand:z.enum(["18_24","25_34","35_44","45_54","55_plus","unknown"]).default("unknown"),
+ residence:z.enum(["TM-A","TM-B","TM-D","TM-L","TM-M","TM-S","unknown"]).default("unknown"),demographicSource:z.enum(["self_reported_synthetic","unknown"]).default("unknown"),
+}).strict();
+export const MarketKnowledgeViewSchema=z.union([
+ z.object({state:z.literal("qualified"),commercialDisclosure:z.literal(false),retention:z.literal("qualified_source_policy"),dataset:z.object({id:z.string(),version:z.number().int(),derivationVersion:z.string(),retentionClass:z.enum(["qualified_indefinite","qualified_expiring"]),expiresAt:z.string().datetime().nullable(),sources:z.array(z.object({id:z.string(),version:z.number().int().positive(),provenance:z.string(),retentionBasis:z.string()}).strict()).min(1).max(20),cells:z.array(AnonymousMarketCellSchema).max(1000)}).strict()}).strict(),
+ z.object({state:z.enum(["quarantined","invalidated","unavailable"]),reason:z.string().optional()}).strict(),
+]);
+export type MarketKnowledgeView=z.infer<typeof MarketKnowledgeViewSchema>;

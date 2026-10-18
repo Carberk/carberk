@@ -2,12 +2,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { CreateBucketCommand, DeleteObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { PrismaService, type Prisma } from "@auto-tm/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { S3RetiredObjectStore } from "../S3RetiredObjectStore";
-
+import { S3DiagnosticArtifactObjects } from "./S3DiagnosticArtifactObjects";
 import { DiagnosticArtifactWorker, type DiagnosticArtifactObjects } from "./DiagnosticArtifactWorker";
 
 const endpoint = process.env["MINIO_ENDPOINT"] ?? "";
@@ -25,16 +24,7 @@ describe.skipIf(!hosted)("diagnostic artifacts on disposable PostgreSQL and priv
   let clock = new Date("2000-01-01T00:00:00.000Z");
   const runtime = { now: () => clock, id: randomUUID, enabled: () => true };
   const fonts = async () => ({ regular: await readFile(join(__dirname, "../../../assets/fonts/NotoSans-Regular.ttf")), bold: await readFile(join(__dirname, "../../../assets/fonts/NotoSans-Bold.ttf")) });
-  const storage: DiagnosticArtifactObjects = {
-    async put(key, bytes, mime) { await s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: bytes, ContentType: mime, IfNoneMatch: "*" })); },
-    async read(key, size, digest) {
-      const object = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-      const bytes = await object.Body?.transformToByteArray();
-      if (!bytes || bytes.length !== size || sha(bytes) !== digest) throw new Error("Synthetic exact readback mismatch");
-      return bytes;
-    },
-    deleteAndVerify: keys => new S3RetiredObjectStore(s3, bucket).deleteAndVerify(keys),
-  };
+  const storage: DiagnosticArtifactObjects = new S3DiagnosticArtifactObjects(s3, bucket);
   beforeAll(async () => {
     await db.$connect();
     try { await s3.send(new CreateBucketCommand({ Bucket: bucket })); }
@@ -81,7 +71,7 @@ describe.skipIf(!hosted)("diagnostic artifacts on disposable PostgreSQL and priv
   });
   it("recovers the same bytes after a lost write reply without a second report revision", async () => {
     const row = await fixture(); let lost = true;
-    const flaky = { ...storage, async put(key: string, bytes: Uint8Array, mime: "application/pdf") { await storage.put(key, bytes, mime); if (lost) { lost = false; throw new Error("Synthetic lost reply"); } } };
+    const flaky: DiagnosticArtifactObjects = { read: storage.read.bind(storage), deleteAndVerify: storage.deleteAndVerify.bind(storage), async put(key: string, bytes: Uint8Array, mime: "application/pdf") { await storage.put(key, bytes, mime); if (lost) { lost = false; throw new Error("Synthetic lost reply"); } } };
     const worker = new DiagnosticArtifactWorker(db, flaky, await fonts(), runtime);
     await expect(worker.generate(row.id)).rejects.toThrow("DIAGNOSTIC_ARTIFACT_RETRY");
     const failed = await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: row.id } });
@@ -93,9 +83,25 @@ describe.skipIf(!hosted)("diagnostic artifacts on disposable PostgreSQL and priv
     expect(ready.sha256).toBe(failed.sha256); expect(ready.sizeBytes).toBe(failed.sizeBytes);
     expect(await db.diagnosticReportRecord.count({ where: { orderId: (await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: row.reportId } })).orderId } })).toBe(1);
   });
+  it("removes expired verified upload bytes only when no report revision references them", async () => {
+    const row = await fixture();
+    const bytes = new Uint8Array([1, 2, 3]); const hash = sha(bytes); const id = randomUUID();
+    const key = `diagnostic-evidence/${id}/${hash}`; keys.push(key);
+    // The fixture crosses the storage boundary directly; production evidence upload
+    // sanitization has its own HTTP contract.
+    await s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: bytes, ContentType: "image/webp" }));
+    await db.diagnosticEvidence.create({ data: { id, reportId: row.reportId, findingId: randomUUID(), objectKey: key, sha256: hash, sizeBytes: bytes.length, mime: "image/webp", state: "verified", createdAt: clock, verifiedAt: clock } });
+    const worker = new DiagnosticArtifactWorker(db, storage, await fonts(), runtime);
+    await worker.cleanup();
+    expect((await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }))).ContentLength).toBe(3);
+    clock = new Date(clock.getTime() + 2 * 86400_000);
+    await worker.cleanup();
+    await expect(s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }))).rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
+    expect((await db.diagnosticEvidence.findUniqueOrThrow({ where: { id } })).state).toBe("removed");
+  });
   it("fences erasure during storage and reconciles a resumed late write after cleanup", async () => {
     const row = await fixture(); let original: Uint8Array | undefined;
-    const erasing = { ...storage, async put(key: string, bytes: Uint8Array, mime: "application/pdf") { original = bytes; await storage.put(key, bytes, mime); await db.diagnosticReportRecord.update({ where: { id: row.reportId }, data: { erasedAt: clock } }); } };
+    const erasing: DiagnosticArtifactObjects = { read: storage.read.bind(storage), deleteAndVerify: storage.deleteAndVerify.bind(storage), async put(key: string, bytes: Uint8Array, mime: "application/pdf") { original = bytes; await storage.put(key, bytes, mime); await db.diagnosticReportRecord.update({ where: { id: row.reportId }, data: { erasedAt: clock } }); } };
     const worker = new DiagnosticArtifactWorker(db, erasing, await fonts(), runtime);
     expect(await worker.generate(row.id)).toBe(false);
     const artifact = await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: row.id } });

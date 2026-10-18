@@ -57,7 +57,7 @@ export class PrismaMeasurementStore implements MeasurementLedgerPort, Measuremen
    if (!principal) {
     guestCapability = input.authenticatedUserId ? undefined : `mg_${randomBytes(32).toString("base64url")}`;
     principal = await tx.measurementPrincipal.create({ data: { id: randomUUID(), pseudonym: randomBytes(32).toString("hex"), generation: randomUUID(), epoch: this.config.epoch,
-     kind: input.authenticatedUserId ? "account" : "guest", userId: input.authenticatedUserId ?? null,
+     createdAt:now,kind: input.authenticatedUserId ? "account" : "guest", userId: input.authenticatedUserId ?? null,
      capabilityHash: guestCapability ? hash(guestCapability) : null,
      expiresAt: input.authenticatedUserId ? null : new Date(now.getTime() + MeasurementSchemas.MEASUREMENT_LIMITS.guestContinuityMs),
     } });

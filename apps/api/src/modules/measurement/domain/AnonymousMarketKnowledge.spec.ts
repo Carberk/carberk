@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { qualifyAnonymousDataset, type KnowledgeSource, type AnonymousDataset } from "./AnonymousMarketKnowledge";
+import { deriveSyntheticMarketCells, qualifyAnonymousDataset, type KnowledgeSource, type AnonymousDataset } from "./AnonymousMarketKnowledge";
 
 const source: KnowledgeSource = {
  id: "synthetic-market", version: 1, epoch: "current", status: "permitted", provenance: "generated independent synthetic fixtures",
  purpose: "synthetic_research", reuse: "permitted", redistribution: "unresolved", retentionBasis: "independent synthetic observations",
  expiresAt: null, deletedAt: null, review: { singlingOut: "passed", linkage: "passed", rareVehicles: "passed", combinations: "passed", repeatedQueries: "passed" },
+ restrictions:{syntheticOnly:true,retention:"indefinite",deletion:"invalidate_derivatives",export:"internal_synthetic_only",demographics:"synthetic_self_reported"},
  destinations: ["internal_synthetic_research"],
 };
 const dataset: AnonymousDataset = {
@@ -25,10 +26,28 @@ describe("rights-qualified synthetic anonymous market knowledge", () => {
   }
   expect(qualifyAnonymousDataset(dataset,[source],{epoch:"restored",now})).toMatchObject({state:"invalidated",reason:"epoch"});
  });
+ it("fails closed on unresolved retention, deletion, export and demographic restrictions",()=>{
+  for(const restrictions of [null,{}, {...source.restrictions,retention:"unresolved"},{...source.restrictions,deletion:"ignore"},{...source.restrictions,export:"public"},{...source.restrictions,retention:"until_source_expiry"}]) {
+   expect(qualifyAnonymousDataset(dataset,[{...source,restrictions} as KnowledgeSource],{epoch:"current",now})).toMatchObject({state:"quarantined",reason:"rights"});
+  }
+  const demographic={...dataset,cells:[{...dataset.cells[0],ageBand:"25_34",demographicSource:"self_reported_synthetic"}]};
+  expect(qualifyAnonymousDataset(demographic,[{...source,restrictions:{...source.restrictions,demographics:"prohibited"}} as KnowledgeSource],{epoch:"current",now})).toMatchObject({state:"quarantined",reason:"rights"});
+ });
  it("refuses rare groups, linkage gaps, arbitrary extra identifiers and live demographics", () => {
   expect(qualifyAnonymousDataset({...dataset,cells:[{...dataset.cells[0],observations:4}]},[source],{epoch:"current",now})).toMatchObject({state:"quarantined",reason:"anonymity"});
   expect(qualifyAnonymousDataset({...dataset,review:{...dataset.review,linkage:"unresolved"}},[source],{epoch:"current",now})).toMatchObject({state:"quarantined",reason:"anonymity"});
   expect(qualifyAnonymousDataset({...dataset,cells:[{...dataset.cells[0],hashedVin:"secret"}]},[source],{epoch:"current",now})).toMatchObject({state:"quarantined",reason:"schema"});
   expect(qualifyAnonymousDataset({...dataset,synthetic:false},[source],{epoch:"current",now})).toMatchObject({state:"quarantined",reason:"live_collection"});
+ });
+});
+
+describe("fixed synthetic monthly releases",()=>{
+ it("suppresses small cells and releases coarsened counts without identifiers or totals",()=>{
+  expect(deriveSyntheticMarketCells([{...dataset.cells[0],observations:9},{...dataset.cells[0],vehicleClass:"commercial",observations:17}])).toEqual({state:"ready",period:"2026-10",suppressedCells:1,cells:[{market:"TM",period:"2026-10",vehicleClass:"commercial",observations:15,priceBand:"15000_29999",ageBand:"unknown",residence:"unknown",demographicSource:"unknown"}]});
+ });
+ it("refuses overlapping duplicate cells, extra identifiers and mixed monthly releases",()=>{
+  expect(deriveSyntheticMarketCells([dataset.cells[0],dataset.cells[0]])).toEqual({state:"quarantined"});
+  expect(deriveSyntheticMarketCells([{...dataset.cells[0],hashedVin:"forbidden"}])).toEqual({state:"quarantined"});
+  expect(deriveSyntheticMarketCells([dataset.cells[0],{...dataset.cells[0],period:"2026-11"}])).toEqual({state:"quarantined"});
  });
 });

@@ -3,6 +3,8 @@ import type { ImprovementSchemas, MeasurementSchemas } from "@auto-tm/contracts"
 export interface ScorecardFact {
   subject: string;
   kind: "account" | "guest";
+  /** Durable first admitted foreground, retained independently of raw events. */
+  firstObservedAt?:Date;
   /** Trusted source classification. This is never accepted from an event payload. */
   conversionEligible: boolean;
   event: MeasurementSchemas.MeasurementEvent;
@@ -123,7 +125,7 @@ export function compileScorecard(input: ScorecardInput): ImprovementSchemas.Impr
     const firstVisit = new Map<string, number>(), activeDays = new Map<string, Set<number>>();
     for (const fact of eligible) {
       if (fact.kind !== kind || !["visit_started", "foreground_activity"].includes(fact.event.eventName)) continue;
-      if (!firstVisit.has(fact.subject)) firstVisit.set(fact.subject, at(fact));
+      if (!firstVisit.has(fact.subject)) firstVisit.set(fact.subject, fact.firstObservedAt?.getTime()??at(fact));
       const active = activeDays.get(fact.subject) ?? new Set<number>();
       active.add(utcDay(at(fact))); activeDays.set(fact.subject, active);
     }

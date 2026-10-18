@@ -19,6 +19,7 @@ import { RetiredUploadCleanupScheduler } from "./queues/retired-upload-cleanup.s
 import { PushModule } from "./push/push.module";
 import { EmailModule } from "./email/email.module";
 import { MeasurementRetentionModule } from "./measurement-retention.module";
+import { DiagnosticArtifactsModule } from "./diagnostic-artifacts.module";
 import { ServiceLifecycleModule } from "./service-lifecycle.module";
 import { MeasurementOutboxModule } from "./jobs/measurement-outbox.module";
 import { ServicePushModule } from "./service-push.module";
@@ -66,6 +67,7 @@ import { LISTING_VIEW_RETENTION_QUEUE, ListingViewRetentionScheduler } from "./q
     ServiceLifecycleModule,
     MeasurementOutboxModule,
     ServicePushModule,
+    DiagnosticArtifactsModule,
   ],
   providers: [
     PrismaListingViewRetentionLedger,

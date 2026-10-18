@@ -17,7 +17,7 @@ import { IDENTITY_CLOCK_PORT } from "../../identity/identity.public";
 import { DiagnosticsModule } from "../diagnostics.module";
 import { DIAGNOSTIC_RUNTIME } from "../domain/ports/DiagnosticIntakePort";
 import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
-import { cleanSuiteFixtures, defineE2eSuite } from "../../../../test/helpers/e2eSuite";
+import { cleanSuiteFixtures, defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
 
 const suite = defineE2eSuite("diagnostic-report-authority");
 const people = ["buyer", "other", "reception", "technician", "reviewer", "admin"] as const;
@@ -57,6 +57,7 @@ describe("diagnostic authoring and immutable audience release", () => {
     await db.diagnosticTemplateVersion.deleteMany({ where: { centerId } });
     await db.diagnosticCenterAssignment.deleteMany({ where: { centerId } });
     await db.diagnosticCenter.deleteMany({ where: { id: centerId } });
+    await db.listing.deleteMany({ where: { sellerId: suite.id("buyer") } });
     await cleanSuiteFixtures(db, suite, { userAliases: people });
   }
   beforeAll(async () => {
@@ -84,14 +85,19 @@ describe("diagnostic authoring and immutable audience release", () => {
     await db.diagnosticCenter.create({ data: { id: centerId, code: suite.slugFor("center"), names: localized } });
     for (const who of ["reception", "technician", "reviewer"] as const) await db.diagnosticCenterAssignment.create({ data: { centerId, userId: suite.id(who), capability: capability[who]!, qualifiedUntil: future } });
   });
-  async function draft() {
+  async function draft(audience: "buyer_private" | "listing_public" = "buyer_private") {
+    if (audience === "listing_public") {
+      await seedSuiteCatalog(db, suite);
+      await db.listing.create({ data: { id: suite.id("public-car"), sellerId: suite.id("buyer"), brandId: suite.catalog.brandId, modelId: suite.catalog.modelId, cityId: suite.catalog.cityId, status: "active", priceAmount: 100000, priceTmt: 100000, priceCurrency: "TMT" } });
+    }
     // The template publisher has distinct current authority; it does not inherit report access.
     await db.staffGrant.create({ data: { userId: suite.id("reception"), capability: "diagnostics.templates" } });
     await db.diagnosticCenterAssignment.create({ data: { centerId, userId: suite.id("reception"), capability: "diagnostics.templates", qualifiedUntil: future } });
     const { body: template } = await post("reception", `centers/${centerId}/templates`, { expectedVersion: 0, definition, synthetic: true }).expect(201);
-    let { body: order } = await post("buyer", "orders", { requestKey: randomUUID(), centerId, templateVersionId: template.id, audience: "buyer_private", synthetic: true }).expect(201);
+    let { body: order } = await post("buyer", "orders", { requestKey: randomUUID(), centerId, templateVersionId: template.id, audience, ...(audience === "listing_public" ? { listingId: suite.id("public-car") } : {}), synthetic: true }).expect(201);
     for (const who of ["technician", "reviewer"] as const) ({ body: order } = await post("reception", `orders/${order.id}/assignments`, { expectedVersion: order.version, userId: suite.id(who), capability: capability[who], active: true }).expect(201));
     ({ body: order } = await post("reception", `orders/${order.id}/authorization`, { expectedVersion: order.version, kind: "physical", authorityReference: "Synthetic customer authorization" }).expect(201));
+    if (audience === "listing_public") ({ body: order } = await post("reception", `orders/${order.id}/authorization`, { expectedVersion: order.version, kind: "publication", authorityReference: "Synthetic separate public consent" }).expect(201));
     for (const state of ["confirmed", "arrived"]) ({ body: order } = await post("reception", `orders/${order.id}/appointment`, { expectedVersion: order.version, state }).expect(201));
     ({ body: order } = await post("technician", `orders/${order.id}/vehicle`, { expectedVersion: order.version, observedAt: now.toISOString(), mileageKm: 123000, method: "manual", manualReference: "Synthetic vehicle", vin: null }).expect(201));
     const { body: report } = await post("technician", `orders/${order.id}/reports`, { reportId: randomUUID(), expectedOrderVersion: order.version }).expect(201);
@@ -142,6 +148,59 @@ describe("diagnostic authoring and immutable audience release", () => {
     const after = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: report.id } });
     expect(after.snapshot).toEqual(before.snapshot); expect(after.snapshotHash).toBe(before.snapshotHash);
     expect((await get("buyer", `reports/${report.id}`).expect(200)).body.status).toBe("withdrawn");
+  });
+  it("reports pending PDF honestly and denies known document requests to other audiences", async () => {
+    const { report } = await draft();
+    await post("technician", `reports/${report.id}/findings`, { expectedVersion: 0, finding: normal() }).expect(201);
+    await post("technician", `reports/${report.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
+    await post("reviewer", `reports/${report.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    const pending = await get("buyer", `reports/${report.id}/documents`).expect(200);
+    expect(pending.body.map((item: { locale: string; state: string }) => [item.locale, item.state])).toEqual([["en", "pending"], ["ru", "pending"], ["tk", "pending"]]);
+    expect(JSON.stringify(pending.body)).not.toMatch(/objectKey|sha256|diagnostic-pdf\//);
+    const download = await get("buyer", `reports/${report.id}/documents/tk`).expect(409);
+    expect(download.body.code).toBe("DIAGNOSTIC_PDF_NOT_READY");
+    expect(download.headers["cache-control"]).toContain("no-store");
+    for (const who of ["other", "admin"] as const) {
+      await get(who, `reports/${report.id}/documents`).expect(403);
+      await get(who, `reports/${report.id}/documents/tk`).expect(403);
+    }
+    await db.session.delete({ where: { id: suite.id("reviewer-session") } });
+    await get("reviewer", `reports/${report.id}/documents/tk`).expect(403);
+  });
+  it("projects complete public findings only while the exact vehicle association remains eligible", async () => {
+    const { report } = await draft("listing_public"); const finding = normal();
+    const publicGet = (path: string) => request.get(`/api/v1/public-diagnostics/${path}`);
+    await publicGet(`reports/${report.id}`).expect(404);
+    await publicGet(`listings/${suite.id("public-car")}`).expect(404);
+    await post("technician", `reports/${report.id}/findings`, { expectedVersion: 0, finding }).expect(201);
+    await post("technician", `reports/${report.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
+    await post("reviewer", `reports/${report.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    const availability = await publicGet(`listings/${suite.id("public-car")}`).expect(200);
+    expect(availability.body).toEqual({ listingId: suite.id("public-car"), reportId: report.id, observedAt: now.toISOString(), mileageKm: 123000, synthetic: true });
+    expect(availability.headers["cache-control"]).toContain("no-store");
+    const reader = await publicGet(`reports/${report.id}`).expect(200);
+    expect(reader.body).toMatchObject({ id: report.id, findings: [finding], authorId: null, reviewerId: null, status: "finalized" });
+    expect(JSON.stringify(reader.body)).not.toMatch(/authorityReference|commissionerId|recordedBy|observedVehicle/);
+    await db.listing.update({ where: { id: suite.id("public-car") }, data: { year: 2020 } });
+    await publicGet(`listings/${suite.id("public-car")}`).expect(404);
+    await publicGet(`reports/${report.id}`).expect(404);
+    await db.listing.update({ where: { id: suite.id("public-car") }, data: { year: null } });
+    await publicGet(`reports/${report.id}`).expect(200);
+    await post("reviewer", `reports/${report.id}/transition`, { expectedVersion: 3, action: "withdraw", reason: "Synthetic consent dispute" }).expect(201);
+    await publicGet(`listings/${suite.id("public-car")}`).expect(404);
+    await publicGet(`reports/${report.id}`).expect(404);
+    expect((await get("buyer", `reports/${report.id}`).expect(200)).body.status).toBe("withdrawn");
+  });
+  it("does not disclose private reports through anonymous known IDs or artifacts", async () => {
+    const { report } = await draft();
+    await post("technician", `reports/${report.id}/findings`, { expectedVersion: 0, finding: normal() }).expect(201);
+    await post("technician", `reports/${report.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
+    await post("reviewer", `reports/${report.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    for (const path of [`reports/${report.id}`, `reports/${report.id}/documents`, `reports/${report.id}/documents/tk`]) {
+      const denied = await request.get(`/api/v1/public-diagnostics/${path}`).expect(404);
+      expect(JSON.stringify(denied.body)).not.toContain(report.id);
+      expect(denied.headers["cache-control"]).toContain("no-store");
+    }
   });
   it("allows an authorized author to discard an upload that failed before creating an intent without leaking another report", async () => {
     const { report } = await draft();

@@ -34,13 +34,13 @@ describe("authorized Improvement HTTP and real worker/PostgreSQL snapshots",()=>
  const get=(path:string,who="investigator")=>request.get(`/api/v1/improvement/${path}`).set("Authorization",`Bearer ${token(who)}`);
  async function cleanup() {
   if(!prisma)return;
-  await prisma.marketKnowledgeDataset.deleteMany({where:{id:suite.slugFor("market-dataset")}});
+  await prisma.marketKnowledgeDataset.deleteMany({where:{id:"synthetic-tm-2001-10"}});
   await prisma.marketKnowledgeSource.deleteMany({where:{id:suite.slugFor("market-source")}});
   await prisma.measurementInvestigationExport.deleteMany({where:{actorId:{in:users.map(user=>suite.id(user))}}});
   await prisma.measurementRollup.deleteMany({where:{epoch}});
   await prisma.measurementPrincipal.deleteMany({where:{epoch}});
   await prisma.auditLog.deleteMany({where:{actorId:{in:users.map(user=>suite.id(user))}}});
-  await prisma.measurementState.deleteMany({where:{key:{in:["collector",`inventory_baseline:${epoch}`]}}});
+  await prisma.measurementState.deleteMany({where:{key:{in:["collector",`inventory_baseline:${epoch}`,"market_release:TM:2001-10"]}}});
   await cleanSuiteFixtures(prisma,suite,{userAliases:users});
  }
  beforeAll(async()=>{
@@ -117,18 +117,36 @@ describe("authorized Improvement HTTP and real worker/PostgreSQL snapshots",()=>
   }
  });
  it("requalifies synthetic source rights on dataset and known export reads, including revocation and restored epochs",async()=>{
-  const sourceId=suite.slugFor("market-source"),datasetId=suite.slugFor("market-dataset");
+  const sourceId=suite.slugFor("market-source"),datasetId="synthetic-tm-2001-10";
   const review={singlingOut:"passed",linkage:"passed",rareVehicles:"passed",combinations:"passed",repeatedQueries:"passed"};
-  await prisma.marketKnowledgeSource.create({data:{id:sourceId,version:1,epoch,status:"permitted",provenance:{summary:"Independent synthetic market fixture"},purposes:["synthetic_research"],reuseRights:{status:"permitted"},redistributionRights:{status:"unresolved"},restrictions:{syntheticOnly:true},identifiabilityReview:review,destinations:["internal_synthetic_research"],accessPolicy:{audience:"analytics.aggregate"},retentionBasis:"Independent synthetic observations"}});
-  await prisma.marketKnowledgeDataset.create({data:{id:datasetId,version:1,epoch,derivationVersion:"tm-market-v1",status:"qualified",review,data:{synthetic:true,destination:"internal_synthetic_research",cells:[{market:"TM",period:"2026-10",vehicleClass:"passenger",observations:30,priceBand:"15000_29999",ageBand:"unknown",residence:"unknown"}]},sources:{create:{sourceId,sourceVersion:1,sourceEpoch:epoch}}}});
+  await prisma.marketKnowledgeSource.create({data:{id:sourceId,version:1,epoch,status:"permitted",provenance:{summary:"Independent synthetic market fixture"},purposes:["synthetic_research"],reuseRights:{status:"permitted"},redistributionRights:{status:"unresolved"},restrictions:{syntheticOnly:true,retention:"indefinite",deletion:"invalidate_derivatives",export:"internal_synthetic_only",demographics:"synthetic_self_reported"},identifiabilityReview:review,destinations:["internal_synthetic_research"],accessPolicy:{audience:"analytics.aggregate"},retentionBasis:"Independent synthetic observations"}});
+  const admission={expectedEpoch:epoch,sourceFences:[{id:sourceId,version:1,epoch}],review,reason:"Synthetic fixed monthly verification",cells:[{market:"TM",period:"2001-10",vehicleClass:"passenger",observations:32,priceBand:"15000_29999",ageBand:"unknown",residence:"unknown"},{market:"TM",period:"2001-10",vehicleClass:"commercial",observations:4,priceBand:"15000_29999"}]};
+  const admit=(body:object,who="investigator")=>request.post("/api/v1/improvement/research/derivations").set("Authorization",`Bearer ${token(who)}`).send(body);
+  await admit(admission,"viewer").expect(403);
+  await prisma.marketKnowledgeSource.update({where:{id:sourceId},data:{restrictions:{syntheticOnly:true}}});
+  await admit(admission).expect(403);
+  expect(await prisma.marketKnowledgeDataset.findUnique({where:{id:datasetId}})).toBeNull();
+  await prisma.marketKnowledgeSource.update({where:{id:sourceId},data:{restrictions:{syntheticOnly:true,retention:"indefinite",deletion:"invalidate_derivatives",export:"internal_synthetic_only",demographics:"synthetic_self_reported"}}});
+  await admit({...admission,expectedEpoch:"stale-job"}).expect(403);
+  const released=(await admit(admission).expect(201)).body;
+  expect(released.dataset.cells).toEqual([{market:"TM",period:"2001-10",vehicleClass:"passenger",observations:30,priceBand:"15000_29999",ageBand:"unknown",residence:"unknown",demographicSource:"unknown"}]);
+  expect((await admit(admission).expect(201)).body).toEqual(released);
+  await admit({...admission,cells:[{...admission.cells[0],observations:37}]}).expect(403);
+  // Combined filters and repeated requests cannot obtain totals or a second overlapping partition.
+  expect((await get(`research/${datasetId}?ageBand=25_34&residence=TM-A`).expect(200)).body).toEqual(released);
+  expect((await get(`research/${datasetId}?total=true`).expect(200)).body).toEqual(released);
   expect((await get(`research/${datasetId}`).expect(200)).body).toMatchObject({state:"qualified",commercialDisclosure:false});
   const artifact=(await request.post(`/api/v1/improvement/research/${datasetId}/exports`).set("Authorization",`Bearer ${token("investigator")}`).send({reason:"Synthetic rights verification"}).expect(201)).body;
   await get(`research-artifacts/${artifact.id}`).expect(200);
   await prisma.marketKnowledgeSource.update({where:{id:sourceId},data:{version:{increment:1},status:"revoked",revokedAt:now}});
   expect((await get(`research/${datasetId}`).expect(200)).body.state).toBe("invalidated");
   await get(`research-artifacts/${artifact.id}`).expect(403);
+  await admit(admission).expect(403);
+  await prisma.marketKnowledgeSource.update({where:{id:sourceId},data:{status:"permitted",revokedAt:null}});
+  await admit({...admission,sourceFences:[{id:sourceId,version:2,epoch}]}).expect(403);
   await prisma.measurementState.update({where:{key:"collector"},data:{epoch:suite.id("restored-epoch")}});
   expect((await get(`research/${datasetId}`).expect(200)).body).toMatchObject({state:"invalidated",reason:"epoch"});
+  await admit(admission).expect(403);
  });
 
 });

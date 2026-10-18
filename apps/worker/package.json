@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "nest build",
-    "predev": "pnpm --filter @auto-tm/db build && pnpm --filter @auto-tm/contracts build",
+    "predev": "pnpm --filter @auto-tm/contracts build && pnpm --filter @auto-tm/db build",
     "dev": "nest start --watch",
     "start": "node dist/main",
     "lint": "eslint . --max-warnings 0",

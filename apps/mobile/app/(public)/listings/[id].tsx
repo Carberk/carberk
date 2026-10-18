@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 
 import { HistoryEntry } from "../../../src/services/HistoryEntry";
+import { useMeasurementScreen } from "../../../src/measurement/useMeasurementScreen";
 import { useListingViewSignal } from "../../../src/listings/detail/useListingViewSignal";
 import { useListingDetail } from "../../../src/api/listings/useListingDetail";
 import { useListingPreview } from "../../../src/api/listings/useListingPreview";
@@ -84,6 +85,7 @@ export default function ListingDetailScreen() {
   const isOwner =
     viewer != null && data != null && !data.businessId && viewer.userId === data.sellerId;
 
+  useMeasurementScreen("listing_detail",data&&!isPending&&!error?{eventName:"listing_detail_opened",purpose:"product_improvement",payload:{listingId:data.id}}:null,data?.id);
   useListingViewSignal(data?.id, !isPending && !error && data?.status === "active" && !isOwner && viewer !== undefined);
 
   // Reporting while signed out parks a pending action; returning from

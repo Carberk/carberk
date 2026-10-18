@@ -21,6 +21,16 @@ const BaseSchema = z.object({
     try { return z.array(z.string().uuid()).max(50).parse(JSON.parse(value)); }
     catch { ctx.addIssue({ code: "custom", message: "Service synthetic IDs must be a JSON UUID array" }); return z.NEVER; }
   }),
+  VIDEO_PROCESSING_ENABLED: z.enum(["true", "false"]).default("false").transform(value => value === "true"),
+  VIDEO_CLEANUP_ENABLED: z.enum(["true", "false"]).default("false").transform(value => value === "true"),
+  VIDEO_ROLLOUT_ENABLED: z.enum(["true", "false"]).default("false").transform(value => value === "true"),
+  VIDEO_PRIVATE_BUCKET: z.string().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+    .refine(value => !["listing-photos", "listing-videos", "chat-attachments", "catalog-assets"].includes(value), "Video requires a separate private bucket").default("listing-video-private"),
+  VIDEO_TESTER_USER_IDS: z.string().default("").transform((value, ctx) => {
+    const parsed = z.array(z.string().uuid()).max(50).safeParse(value.split(",").map(id => id.trim()).filter(Boolean));
+    if (parsed.success) return [...new Set(parsed.data)];
+    ctx.addIssue({ code: "custom", message: "Expected at most 50 tester User UUIDs" }); return z.NEVER;
+  }),
   LOG_LEVEL: z.enum(["error", "warn", "info", "debug"]).default("info"),
 
   DATABASE_URL: z.string().url(),

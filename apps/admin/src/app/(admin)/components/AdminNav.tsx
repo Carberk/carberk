@@ -5,6 +5,7 @@ import { AdminText } from "@/lib/i18n";
 
 export function AdminNav({capabilities=[], marketplaceAdmin=false}: {capabilities?: StaffSchemas.StaffCapability[]; marketplaceAdmin?: boolean}) {
   const links=[{href:"/workspace",label:"Рабочее пространство"},
+    ...(capabilities.some(c=>c==="analytics.aggregate"||c==="analytics.investigate")?[{href:"/improvement",label:"Улучшения"}]:[]),
     ...(marketplaceAdmin?[{href:"/reports",label:"Жалобы"},{href:"/reports/inspection-interests",label:"Интерес к проверкам"},{href:"/catalog/brands",label:"Бренды"},{href:"/audit",label:"Аудит"}]:[]),
     ...(marketplaceAdmin?[{href:"/listings",label:"Объявления"},{href:"/users",label:"Пользователи"}]:[]),
     ...(capabilities.some(c=>c.startsWith("diagnostics."))?[{href:"/diagnostics",label:"Диагностика"}]:[]),
