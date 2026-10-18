@@ -36,6 +36,7 @@ describe("reserved staging fixtures on disposable application schema", () => {
   let postgres: StartedPostgreSqlContainer;
   let redis: StartedTestContainer;
   let redisUrl: string;
+  let connection: { host: string; port: number };
   let queue: DeliveryQueue;
   let pool: Pool;
   let databaseUrl: string;
@@ -44,7 +45,8 @@ describe("reserved staging fixtures on disposable application schema", () => {
     databaseUrl = postgres.getConnectionUri();
     redis = await new GenericContainer("redis:7-alpine").withExposedPorts(6379).start();
     redisUrl = `redis://${redis.getHost()}:${redis.getMappedPort(6379)}`;
-    queue = new Queue("email-code", { connection: { url: redisUrl } });
+    connection = { host: redis.getHost(), port: redis.getMappedPort(6379) };
+    queue = new Queue("email-code", { connection });
     execFileSync("pnpm", ["prisma", "migrate", "deploy"], { cwd: packageRoot, env: { ...process.env, DATABASE_URL: databaseUrl }, stdio: "pipe" });
     pool = new Pool({ connectionString: databaseUrl });
     await pool.query(`INSERT INTO brands(id,slug,"nameRu","nameTk","nameEn","updatedAt") VALUES('fixture-catalog-brand','fixture-catalog-brand','Test','Test','Test',now());
@@ -304,7 +306,7 @@ describe("reserved staging fixtures on disposable application schema", () => {
     let started!: () => void;
     const running = new Promise<void>(resolve => { started = resolve; });
     const hold = new Promise<void>(resolve => { release = resolve; });
-    const worker = new Worker("email-code", async () => { started(); await hold; }, { connection: { url: redisUrl }, concurrency: 1 });
+    const worker = new Worker("email-code", async () => { started(); await hold; }, { connection, concurrency: 1 });
     try {
       await job.promote(); await running;
       expect(await job.getState()).toBe("active");
