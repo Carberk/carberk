@@ -49,4 +49,17 @@ export function qualifyAnonymousDataset(dataset:AnonymousDataset,sources:readonl
  return {state:"qualified",commercialDisclosure:false,retention:"qualified_source_policy"};
 }
 
-export function deriveSyntheticMarketCells(_input:unknown):unknown {return {state:"quarantined"};}
+/** One fixed monthly partition. No totals, arbitrary filters or exact small counts are released. */
+export function deriveSyntheticMarketCells(input:unknown) {
+ const parsed=z.array(cellSchema.extend({observations:z.number().int().nonnegative().max(1_000_000)})).min(1).max(1000).safeParse(input);
+ if(!parsed.success) return {state:"quarantined" as const};
+ const keys=new Set<string>(),period=parsed.data[0]?.period;
+ if(!period)return {state:"quarantined" as const};
+ for(const cell of parsed.data) {
+  const key=JSON.stringify([cell.market,cell.period,cell.vehicleClass,cell.priceBand,cell.ageBand,cell.residence]);
+  if(cell.period!==period || keys.has(key) || ((cell.ageBand!=="unknown" || cell.residence!=="unknown") && cell.demographicSource!=="self_reported_synthetic")) return {state:"quarantined" as const};
+  keys.add(key);
+ }
+ const cells=parsed.data.filter(cell=>cell.observations>=10).map(cell=>({...cell,observations:Math.floor(cell.observations/5)*5})).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
+ return {state:"ready" as const,period,suppressedCells:parsed.data.length-cells.length,cells};
+}
