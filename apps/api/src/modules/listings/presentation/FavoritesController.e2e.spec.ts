@@ -816,11 +816,18 @@ describe("FavoritesController e2e", () => {
       it("rejects an activeOnly value other than true or false", async () => {
         const buyerToken = await createUser("buyer-1");
 
-        await request
+        const res = await request
           .get("/api/v1/favorites")
           .set("Authorization", `Bearer ${buyerToken}`)
           .query({ activeOnly: "yes" })
           .expect(400);
+
+        expect(res.body.code).toBe("VALIDATION_FAILED");
+        expect(res.body.message).toBe("Request validation failed");
+        expect(res.body.details).toMatchObject({
+          formErrors: [],
+          fieldErrors: { activeOnly: expect.any(Array) },
+        });
       });
     });
   });

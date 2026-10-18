@@ -16,7 +16,7 @@ import {
 } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
 import type { ZodType, ZodTypeDef } from "zod";
-import { ListingsSchemas, WizardSchemas, AdminSchemas } from "@auto-tm/contracts";
+import { ErrorCode, ListingsSchemas, WizardSchemas, AdminSchemas } from "@auto-tm/contracts";
 
 import { IDENTITY_CHECK_PORT, type IdentityCheckPort } from "../../identity/identity.public";
 import { CreateDraft } from "../application/CreateDraft";
@@ -59,7 +59,7 @@ export class DraftsController {
     // eslint-disable-next-line no-console
     console.error("[Zod validation failed]", Object.keys(result.error.flatten().fieldErrors));
     throw new BadRequestException({
-      code: "VALIDATION_ERROR",
+      code: ErrorCode.ValidationFailed,
       message: "Request validation failed",
       details: result.error.flatten(),
     });

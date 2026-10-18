@@ -296,7 +296,14 @@ describe("ListFeed", () => {
     await expect(uc.execute({ sort: "price_desc", cursor })).rejects.toThrow(
       BadRequestException,
     );
-    await expect(uc.execute({ cursor })).rejects.toThrow(BadRequestException);
+    await expect(uc.execute({ cursor })).rejects.toMatchObject({
+      status: 400,
+      response: {
+        code: "VALIDATION_FAILED",
+        message: 'Cursor for "price_asc" cannot page "newest"',
+        details: { reason: "INVALID_FEED_CURSOR" },
+      },
+    });
     expect(ranking.lastSort).toBeUndefined();
   });
 
@@ -307,8 +314,16 @@ describe("ListFeed", () => {
     ).toString("base64url");
 
     const uc = makeUseCase(ranking, exchangeRates);
-    await expect(uc.execute({ cursor: "not-a-cursor" })).rejects.toThrow(BadRequestException);
-    await expect(uc.execute({ cursor: legacy })).rejects.toThrow(BadRequestException);
+    for (const cursor of ["not-a-cursor", legacy]) {
+      await expect(uc.execute({ cursor })).rejects.toMatchObject({
+        status: 400,
+        response: {
+          code: "VALIDATION_FAILED",
+          message: "Invalid feed cursor",
+          details: { reason: "INVALID_FEED_CURSOR" },
+        },
+      });
+    }
   });
 
   it("does not return a per-Listing seller trust signal on summaries", async () => {

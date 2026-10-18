@@ -1,7 +1,7 @@
 import { PUBLIC_MARKETPLACE_READ_PORT, type PublicMarketplaceReadPort } from "../domain/ports/PublicMarketplaceReadPort";
 import { BadRequestException, Optional, Inject, Injectable } from "@nestjs/common";
 
-import { ListingsSchemas } from "@auto-tm/contracts";
+import { ErrorCode, ListingsSchemas } from "@auto-tm/contracts";
 import type { z } from "zod";
 
 import {
@@ -208,7 +208,7 @@ function decodeCursorFor(sort: FeedSort, token: string): FeedCursor {
 
 function invalidCursor(message: string): BadRequestException {
   return new BadRequestException({
-    code: "VALIDATION_ERROR",
+    code: ErrorCode.ValidationFailed,
     message,
     details: { reason: LISTING_ERROR_CODES.INVALID_FEED_CURSOR },
   });
