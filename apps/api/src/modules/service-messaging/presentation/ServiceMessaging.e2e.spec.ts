@@ -298,7 +298,7 @@ it("delivers original PDFs only through the purchased order and reuses licensed 
  await request.get(`/api/v1/services/conversations/${second.id}/history/artifacts/${artifactId}`).set("Authorization", auth(reportBuyer)).expect(403);
  await command(second.id, { kind: "archive", expectedAssignmentVersion: 1, expectedVersion: 0, orderId: second.order.id, artifactId }).expect(201);
  const selected = await request.get(`/api/v1/services/conversations/${second.id}/history/reports`).set("Authorization", auth(nextStaff)).expect(200);
- expect(selected.body.staged[0].mileage).toEqual(facts.mileage); expect(selected.body.staged[0].sourceObservations).toEqual(facts.sourceObservations);
+ expect(selected.body.staged[0].mileage).toEqual({ ...facts.mileage, observedAt: new Date(facts.mileage.observedAt).toISOString() }); expect(selected.body.staged[0].sourceObservations).toEqual(facts.sourceObservations);
  expect(JSON.stringify(selected.body)).not.toContain("Synthetic prior purchaser private operator note");
  await request.get(`/api/v1/services/conversations/${second.id}/history/artifacts/${artifactId}`).set("Authorization", auth(nextStaff)).expect(200);
  const previousFirst = await request.get("/api/v1/services/history/previous?vin=1HGCM82633A004352").set("Authorization", auth(stranger)).expect(200);

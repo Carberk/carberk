@@ -108,7 +108,7 @@ export async function historyCommand(context: Context, command: ServiceMessaging
      if (order.purchase) return;
      if (order.state !== "paid" || !order.paidAt || !order.quote.vin) deny();
      // A shared advisory lock fences the global paid FIFO across independent requests.
-     await tx.$queryRaw`SELECT pg_advisory_xact_lock(897912)`;
+     await tx.$executeRaw`SELECT pg_advisory_xact_lock(897912)`;
      const first = await tx.historyOrder.findFirst({ where: { state: "paid" }, orderBy: [{ paidAt: "asc" }, { id: "asc" }] });
      if (first?.id !== order.id) deny();
      for (const provider of ServiceMessagingSchemas.HistoryCommandSchema.options[1].shape.providers.parse(order.quote.providers).sort()) {
