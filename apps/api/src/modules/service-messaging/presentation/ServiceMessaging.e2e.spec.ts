@@ -195,3 +195,31 @@ it("orders the actual Support queue by incident/account category then oldest una
  const ids = (queue.body as { id: string }[]).map(row => row.id);
  expect(ids.indexOf(b.body.id)).toBeLessThan(ids.indexOf(a.body.id)); expect(ids.indexOf(a.body.id)).toBeLessThan(ids.indexOf(c.body.id));
 });
+
+it("holds one exact History quote atomically and never treats a screenshot or expired receipt as funds", async () => {
+ await db.staffGrant.createMany({ data: [{ userId: oldStaff, capability: "history.fulfilment" }, { userId: oldStaff, capability: "history.payment.verify" }] , skipDuplicates: true });
+ const opened = await request.post("/api/v1/services/conversations").set("Authorization", auth(stranger)).send({ purpose: "history", synthetic: true }).expect(201);
+ const id = opened.body.id as string;
+ await request.post(`/api/v1/services/conversations/${id}/assignment`).set("Authorization", auth(oldStaff)).send({ expectedVersion: 0 }).expect(201);
+ const now = new Date(); const tomorrow = new Date(now.getTime() + 86400000 + 5 * 3600000).toISOString().slice(0, 10);
+ const windowStart = `${tomorrow}T04:00:00.000Z`, windowEnd = `${tomorrow}T05:00:00.000Z`;
+ const command = (user: string, data: unknown) => request.post(`/api/v1/services/conversations/${id}/history`).set("Authorization", auth(user)).send(data);
+ await command(oldStaff, { kind: "capacity", expectedAssignmentVersion: 1, day: tomorrow, slotLimit: 1, morningLimit: 1, evidence: "Synthetic measured one slot", providers: [{ provider: "carfax", allowance: 1, consumed: 0, resetAt: `${tomorrow}T03:00:00.000Z`, evidence: "Synthetic account allowance" }] }).expect(201);
+ const quoteId = randomUUID(), vin = "1HGCM82633A004352";
+ const quote = { kind: "quote", expectedAssignmentVersion: 1, quoteId, vin, providers: ["carfax"], preflightOutcome: "available", preflightEvidence: "Synthetic licensed preflight", refundRule: "Founder decision if unusable", windowStart, windowEnd, feasible: true };
+ await command(oldStaff, quote).expect(201);
+ const acceptance = { kind: "accept", quoteId, vin, providers: ["carfax"], amount: 100, refundRule: quote.refundRule, windowStart, windowEnd, rights: { category: "payment_evidence", purpose: "Synthetic order", basis: "Owned test records", provenance: "Test", identifiability: "personal", use: ["service"], schedule: { kind: "until", until: new Date(now.getTime()+86400000*30).toISOString(), reason: "Synthetic schedule" }, supplierRestrictions: "", hold: null } };
+ await command(stranger, { ...acceptance, vin: "1HGCM82633A004353" }).expect(409);
+ const accepted = await Promise.all([command(stranger, acceptance), command(stranger, acceptance)]);
+ expect(accepted.map(result => result.status)).toEqual([201, 201]);
+ const orders = await db.historyOrder.findMany({ where: { requestId: opened.body.resourceId } }); expect(orders).toHaveLength(1);
+ const order = orders[0]!;
+ const paymentId = randomUUID(); await command(stranger, { kind: "payment", orderId: order.id, clientPaymentId: paymentId, claim: "Screenshot only" }).expect(201);
+ expect((await db.historyOrder.findUniqueOrThrow({ where: { id: order.id } })).state).toBe("held");
+ const payment = await db.historyPayment.findUniqueOrThrow({ where: { orderId_clientPaymentId: { orderId: order.id, clientPaymentId: paymentId } } });
+ await command(stranger, { kind: "verify", expectedAssignmentVersion: 1, expectedVersion: 0, orderId: order.id, paymentId: payment.id, verifiedFunds: true, amount: 100, receivedAt: now.toISOString(), evidence: "Untrusted customer claim" }).expect(403);
+ await db.historyOrder.update({ where: { id: order.id }, data: { holdExpiresAt: new Date(now.getTime()-1) } });
+ await command(oldStaff, { kind: "verify", expectedAssignmentVersion: 1, expectedVersion: 0, orderId: order.id, paymentId: payment.id, verifiedFunds: true, amount: 100, receivedAt: now.toISOString(), evidence: "Actual synthetic reconciliation" }).expect(201);
+ expect((await db.historyOrder.findUniqueOrThrow({ where: { id: order.id } })).state).toBe("review");
+ expect(await db.historyPurchaseIntent.count({ where: { orderId: order.id } })).toBe(0);
+});
