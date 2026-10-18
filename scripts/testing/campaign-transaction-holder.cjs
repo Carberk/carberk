@@ -8,9 +8,15 @@ const namespace = process.env.CAMPAIGN_NAMESPACE;
 let holding = false;
 let unexpectedError = false;
 let backendTerminated = false;
+let connectionEnded = false;
+const phase = value => process.send?.({ holderPhase: value });
+client.on("end", () => { connectionEnded = true; phase("connection-ended"); });
 client.on("error", error => {
-  if (holding && error.code === "57P01") backendTerminated = true;
-  else unexpectedError = true;
+  if (holding && error.code === "57P01") {
+    backendTerminated = true; phase("backend-57P01");
+  } else if (backendTerminated && error.name === "Error" && error.code === undefined && error.message === "Connection terminated unexpectedly") {
+    phase("socket-end-after-57P01");
+  } else { unexpectedError = true; phase("unexpected-client-error"); }
 });
 (async () => {
   try {
@@ -19,10 +25,15 @@ client.on("error", error => {
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [namespace]);
     const rows = await client.query("SELECT pg_backend_pid() AS pid");
     holding = true;
+    phase("advisory-held");
     process.send?.({ backendPid: Number(rows.rows[0].pid) });
     await new Promise(resolve => process.once("message", message => message?.finish ? resolve() : undefined));
+    if (!backendTerminated) { unexpectedError = true; phase("missing-57P01"); }
     if (!backendTerminated) await client.query("ROLLBACK");
   } catch (error) {
-    if (!(holding && error.code === "57P01")) unexpectedError = true;
-  } finally { await client.end().catch(() => { unexpectedError = true; }); }
+    if (!(holding && error.code === "57P01")) { unexpectedError = true; phase("unexpected-operation-error"); }
+    else { backendTerminated = true; phase("backend-57P01"); }
+  } finally { await client.end().catch(() => { unexpectedError = true; phase("unexpected-end-error"); }); }
+  if (!connectionEnded) unexpectedError = true;
+  phase(!unexpectedError && backendTerminated ? "terminated-cleanly" : "holder-failed");
 })().then(() => process.exit(unexpectedError ? 1 : 0)).catch(() => process.exit(1));
