@@ -5,6 +5,7 @@ import { randomUUID } from "expo-crypto";
 import { localeTag } from "../i18n/resources";
 
 import { useHistoryCommand, useHistoryOrder } from "./api";
+import { HistoryReports } from "./HistoryReports";
 import { historyCopy } from "./historyCopy";
 
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ export function HistoryOrder({ id, locale }: { id: string; locale: string }) {
    {order.state === "held" ? <Text>{c.held} {date(order.holdExpiresAt)}</Text> : null}
    {["held", "expired", "review"].includes(order.state) ? <><Text>{c.unverified}</Text><Text>{c.afterHours}</Text>{order.state === "expired" ? <Text>{c.expired}</Text> : null}<Input accessibilityLabel={c.claim} value={claim} onChangeText={setClaim} maxLength={1000} multiline/>{button(c.submit, () => { void submit(); }, !claim.trim())}</> : null}
    {order.paidAt ? <Text>{c.noCancel}</Text> : null}
+   {order.state === "delivered" ? <HistoryReports id={id} locale={locale}/> : null}
    {order.recoveryDeadline ? <Text>{c.recovery}: {date(order.recoveryDeadline)}</Text> : null}
    {order.refundState ? <Text>{c.refund}: {order.refundState === "executed" ? c.delivered : c.waiting}</Text> : null}
    {data?.payments.map(payment => <View key={payment.id}><Text>{payment.claim}</Text><Text>{payment.state === "confirmed" ? c.paid : c.review}</Text></View>)}

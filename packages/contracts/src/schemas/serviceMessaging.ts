@@ -75,6 +75,6 @@ export const HistoryArtifactCommandSchema = z.discriminatedUnion("kind", [
  z.object({ kind: z.literal("archive"), expectedAssignmentVersion: z.number().int().nonnegative(), expectedVersion: z.number().int().nonnegative(), orderId: z.string().uuid(), artifactId: z.string().uuid() }).strict(),
 ]);
 export type HistoryArtifactCommand = z.infer<typeof HistoryArtifactCommandSchema>;
-export const HistoryReportSchema = z.object({ id: z.string().uuid(), provider: historyProvider, vin: z.string(), originalDate: z.string().datetime(), sizeBytes: z.number().int().positive(), expectedPages: z.number().int().positive(), sharedLink: z.string().url().nullable(), deliveredAt: z.string().datetime().nullable(), state: z.string() });
+export const HistoryReportSchema = z.object({ canShare: z.boolean().default(false), id: z.string().uuid(), provider: historyProvider, vin: z.string(), originalDate: z.string().datetime(), sizeBytes: z.number().int().positive(), expectedPages: z.number().int().positive(), sharedLink: z.string().url().nullable(), deliveredAt: z.string().datetime().nullable(), state: z.string() });
 export const HistoryReportsSchema = z.object({ delivered: z.array(HistoryReportSchema), archive: z.array(HistoryReportSchema), staged: z.array(HistoryReportSchema) });
 export type HistoryReports = z.infer<typeof HistoryReportsSchema>;
