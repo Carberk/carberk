@@ -36,18 +36,21 @@ describe("reserved staging fixtures on disposable application schema", () => {
   }, 120000);
   afterAll(async () => { await pool?.end(); await postgres?.stop(); });
 
-  function execute(kind: string, id: string, profile?: string, candidate = "a".repeat(40)): { code: number; receipt?: { listingId: string; sellerId: string; fixtures: string; profile: string; state: string; identities: number; retainedAudits: number; tombstone: boolean } } {
+  function execute(kind: string, id: string, profile?: string, candidate = "a".repeat(40), beforeQuery?: (query: string) => void): { code: number; receipt?: { listingId: string; sellerId: string; fixtures: string; profile: string; state: string; identities: number; retainedAudits: number; tombstone: boolean } } {
     let receipt; let code = 0;
     const identity = { projectId: "test-project", environmentId: "test-staging", services: { api: "test-api" },
       origins: { database: "postgresql://postgres.railway.internal:5432/railway", media: "http://minio.railway.internal:9000", publicMedia: "https://media.example" } };
-    const process = { env: { RAILWAY_PROJECT_ID: "test-project", RAILWAY_ENVIRONMENT_ID: "test-staging", RAILWAY_SERVICE_ID: "test-api", RAILWAY_ENVIRONMENT_NAME: "staging", APP_ENV: "staging", SMS_DRIVER: "mock", AUTOTM_COMMIT_SHA: "a".repeat(40), DATABASE_URL: "postgresql://u:secret@postgres.railway.internal:5432/railway", MINIO_ENDPOINT: "http://minio.railway.internal:9000", MINIO_PUBLIC_URL: "https://media.example" }, exitCode: 0 };
+    const process = { env: { STAGING_CAMPAIGN_PROFILE_ENABLED: "campaign897-identities-v1", RAILWAY_PROJECT_ID: "test-project", RAILWAY_ENVIRONMENT_ID: "test-staging", RAILWAY_SERVICE_ID: "test-api", RAILWAY_ENVIRONMENT_NAME: "staging", APP_ENV: "staging", SMS_DRIVER: "mock", AUTOTM_COMMIT_SHA: "a".repeat(40), DATABASE_URL: "postgresql://u:secret@postgres.railway.internal:5432/railway", MINIO_ENDPOINT: "http://minio.railway.internal:9000", MINIO_PUBLIC_URL: "https://media.example" }, exitCode: 0 };
     const payload = { kind, id, namespace: `cf_${id}`, target: "a".repeat(40), identity, profile, candidate };
     const program = runInNewContext(`${source}; remoteProgram(payload)`, { payload });
     runInNewContext(program, { URL, process, require: (name: string) => name === "node:child_process" ? {
-      spawnSync: (_program: string, _args: string[], options: { input: string }) => spawnSync(globalThis.process.execPath, [`${root}/scripts/testing/query-disposable-postgres.cjs`], {
+      spawnSync: (_program: string, _args: string[], options: { input: string }) => {
+        beforeQuery?.(options.input);
+        return spawnSync(globalThis.process.execPath, [`${root}/scripts/testing/query-disposable-postgres.cjs`], {
         input: options.input, encoding: "utf8", timeout: 30000,
         env: { ...globalThis.process.env, STAGING_CONTROL_TEST_DATABASE_URL: databaseUrl, STAGING_TEST_DB_PACKAGE: `${packageRoot}/package.json` },
-      }),
+      });
+      },
     } : localRequire(name), console: { log: (value: string) => { receipt = JSON.parse(value); }, error: () => { code = 1; } } });
     return { code: code || process.exitCode, receipt };
   }
@@ -195,6 +198,26 @@ describe("reserved staging fixtures on disposable application schema", () => {
     // Removing the row externally cannot masquerade as delivery cleanup.
     await pool.query(`DELETE FROM otp_requests WHERE id='campaign-otp'`);
     expect(execute("reset", id, profile).code).toBe(1);
+  });
+
+
+  it("an OTP inserted between reset preflight and its locked transaction prevents a false cleanup receipt", async () => {
+    const id = "a".repeat(32), namespace = `cf_${id}`, profile = "campaign897-identities-v1";
+    expect(execute("fixture", id, profile).code).toBe(0);
+    const email = (await pool.query(`SELECT email FROM "${namespace}".campaign_entities WHERE alias='buyer-a'`)).rows[0]?.email;
+    let inserted = false;
+    const result = execute("reset", id, profile, "a".repeat(40), (query) => {
+      if (inserted || !query.includes("SET state='cleaning'")) return;
+      const insertion = spawnSync(globalThis.process.execPath, [`${root}/scripts/testing/query-disposable-postgres.cjs`], {
+        input: `INSERT INTO otp_requests(id,purpose,channel,destination,"codeHash","expiresAt",ip,"updatedAt") VALUES('campaign-racing-otp','sign_in','email','${email}','synthetic-race-hash',now()+interval '5 minutes','127.0.0.1',now());`,
+        encoding: "utf8", timeout: 30000,
+        env: { ...globalThis.process.env, STAGING_CONTROL_TEST_DATABASE_URL: databaseUrl, STAGING_TEST_DB_PACKAGE: `${packageRoot}/package.json` },
+      });
+      expect(insertion.status).toBe(0); inserted = true;
+    });
+    expect(inserted).toBe(true); expect(result.code).toBe(1);
+    expect((await pool.query(`SELECT state FROM "${namespace}".campaign_manifest`)).rows[0]).toEqual({ state: "identities" });
+    expect((await pool.query(`SELECT count(*)::int AS count FROM otp_requests WHERE id='campaign-racing-otp'`)).rows[0]).toEqual({ count: 1 });
   });
 
 });
