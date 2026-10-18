@@ -84,6 +84,10 @@ export async function historyCommand(context: Context, command: ServiceMessaging
     if (command.attachmentId) {
      const file = await tx.serviceAttachment.findUnique({ where: { id: command.attachmentId } });
      if (!file || file.conversationId !== scope.conversationId || file.uploaderId !== subject.userId || file.lifecycleEpoch !== scope.lifecycleEpoch || file.category !== "payment_evidence" || file.removedAt || !["staged","adopted"].includes(file.state) || !file.objectKey) deny();
+     if (file.visibility !== "customer" || (file.state === "staged" && file.expiresAt <= now)) deny();
+     const rights = ServiceMessagingSchemas.ServiceRightsSchema.parse(file.rights);
+     assertServiceRights("history", { category: "payment_evidence", visibility: "customer", contentType: ServiceMessagingSchemas.ServiceStageAttachmentSchema.shape.contentType.parse(file.contentType), sizeBytes: file.sizeBytes ?? 0, filename: file.filename, rights }, now);
+     if (file.state === "staged") await tx.serviceAttachment.update({ where: { id: file.id }, data: { state: "adopted", adoptedAt: now } });
     }
     await tx.historyPayment.create({ data: { id: runtime.id(), orderId: order.id, clientPaymentId: command.clientPaymentId, claim: command.claim, attachmentId: command.attachmentId ?? null } });
    } else {
@@ -139,10 +143,13 @@ export async function historyCommand(context: Context, command: ServiceMessaging
      if (result === "refund_pending") await tx.historyRefund.upsert({ where: { orderId: order.id }, create: { orderId: order.id, reason: "Recovery declined or exhausted" }, update: {} });
     } else if (command.kind === "refund_request") {
      if (order.refund) return;
-     if (!["review", "expired"].includes(order.state) || order.paidAt || order.purchase) deny();
-     const verified = await tx.historyPayment.findFirst({ where: { orderId: order.id, verifiedFunds: true, amount: 100, receivedAt: { not: null }, confirmedAt: { not: null } } });
-     if (!verified) deny();
-     await tx.historyRefund.create({ data: { orderId: order.id, reason: command.reason } });
+     const cause = command.cause ?? "late_funds";
+     if (cause === "late_funds") {
+      if (!["review", "expired"].includes(order.state) || order.paidAt || order.purchase) deny();
+      const verified = await tx.historyPayment.findFirst({ where: { orderId: order.id, verifiedFunds: true, amount: 100, receivedAt: { not: null }, confirmedAt: { not: null } } });
+      if (!verified) deny();
+     } else if (!order.paidAt || ["delivered", "refunded", "refund_pending"].includes(order.state)) deny();
+     await tx.historyRefund.create({ data: { orderId: order.id, reason: `${cause}: ${command.reason}` } });
      await tx.historyOrder.update({ where: { id: order.id }, data: { state: "refund_pending", version: { increment: 1 } } });
     } else if (command.kind === "refund_approve" || command.kind === "refund_execute") {
      await staff.authorize({ ...subject, capability: "founder.refund.approve" }, tx);
@@ -160,7 +167,7 @@ export async function historyCommand(context: Context, command: ServiceMessaging
     } else deny();
    }
   }
-  await tx.serviceAudit.create({ data: { actorId: subject.userId, purpose: "history", resourceId: scope.resourceId, action: `HISTORY_${command.kind.toUpperCase()}`, assignmentVersion: scope.assignmentVersion } });
+  await tx.serviceAudit.create({ data: { actorId: subject.userId, purpose: "history", resourceId: scope.resourceId, action: `HISTORY_${command.kind.toUpperCase()}`, ...("reason" in command ? { reason: command.kind === "refund_request" ? `${command.cause ?? "late_funds"}: ${command.reason}` : command.reason } : {}), assignmentVersion: scope.assignmentVersion } });
  } catch (error) {
   if (error instanceof StaffAuthorityDenied) throw new ServiceDenied("NO_ACCESS");
   if (error instanceof HistoryDenied) throw new ServiceDenied("INVALID_MESSAGE");
