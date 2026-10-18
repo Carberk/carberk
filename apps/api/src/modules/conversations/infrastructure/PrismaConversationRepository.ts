@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto";
+import type { MeasurementSchemas } from "@auto-tm/contracts";
+import { MEASUREMENT_COMMIT_PORT, type MeasurementCommitPort } from "../../measurement/measurement.public";
 import { BusinessEnquiryAccess } from "../application/BusinessEnquiryAccess";
 import type { ConversationActor } from "../domain/ports/BusinessEnquiryRepository";
 import { toDomainConversation } from "./ConversationMapper";
@@ -31,6 +34,7 @@ export class PrismaConversationRepository
     @Inject(PrismaService)
     private readonly prisma: PrismaService,
     @Optional() @Inject(BusinessEnquiryAccess) private readonly businessAccess?: BusinessEnquiryAccess,
+    @Optional() @Inject(MEASUREMENT_COMMIT_PORT) private readonly measurement?:MeasurementCommitPort,
   ) {}
 
   async findById(id: string): Promise<Conversation | null> {
@@ -53,38 +57,13 @@ export class PrismaConversationRepository
   }
 
   async save(conversation: Conversation, actor?: ConversationActor): Promise<void> {
-    if (conversation.businessId) {
-      await this.prisma.$transaction(async tx => {
-        await this.authorizeBusinessWrite(tx, conversation, actor, false);
-        await tx.conversation.create({ data: { id: conversation.id, listingId: conversation.listingId, buyerId: conversation.buyerId, sellerId: conversation.sellerId, businessId: conversation.businessId, createdAt: conversation.createdAt, updatedAt: conversation.updatedAt } });
-        await tx.conversationParticipant.create({ data: { conversationId: conversation.id, userId: conversation.buyerId } });
-      });
-      return;
-    }
-    await this.prisma.$transaction([
-      this.prisma.conversation.create({
-        data: {
-          id: conversation.id,
-          listingId: conversation.listingId,
-          buyerId: conversation.buyerId,
-          sellerId: conversation.sellerId,
-          createdAt: conversation.createdAt,
-          updatedAt: conversation.updatedAt,
-        },
-      }),
-      this.prisma.conversationParticipant.create({
-        data: {
-          conversationId: conversation.id,
-          userId: conversation.buyerId,
-        },
-      }),
-      this.prisma.conversationParticipant.create({
-        data: {
-          conversationId: conversation.id,
-          userId: conversation.sellerId,
-        },
-      }),
-    ]);
+    await this.prisma.$transaction(async tx=>{
+      if(conversation.businessId) await this.authorizeBusinessWrite(tx,conversation,actor,false);
+      await tx.conversation.create({data:{id:conversation.id,listingId:conversation.listingId,buyerId:conversation.buyerId,sellerId:conversation.sellerId,businessId:conversation.businessId,createdAt:conversation.createdAt,updatedAt:conversation.updatedAt}});
+      await tx.conversationParticipant.create({data:{conversationId:conversation.id,userId:conversation.buyerId}});
+      if(!conversation.businessId) await tx.conversationParticipant.create({data:{conversationId:conversation.id,userId:conversation.sellerId}});
+      await this.measure(tx,conversation.buyerId,{version:1,eventId:randomUUID(),occurredAt:conversation.createdAt.toISOString(),purpose:"product_improvement",eventName:"conversation_created",context:{platform:"server",release:"server",build:"server",locale:"ru"},payload:{conversationId:conversation.id,listingId:conversation.listingId}});
+    });
   }
 
   async listForUser(
@@ -200,36 +179,13 @@ export class PrismaConversationRepository
     const now = new Date();
     try {
       const conversation = await this.prisma.conversation.findUnique({ where: { id: message.conversationId } });
-      if (conversation?.businessId) {
-        await this.prisma.$transaction(async tx => {
-          await this.authorizeBusinessWrite(tx, toDomainConversation(conversation), actor, true);
-          await tx.message.create({ data: { id: message.id, conversationId: message.conversationId, senderId: message.senderId, kind: message.kind, body: message.body, metadata: toRawMetadata(message.metadata) as Prisma.InputJsonValue, createdAt: message.createdAt, clientMessageId: message.clientMessageId ?? null } });
-          await tx.conversation.update({ where: { id: message.conversationId }, data: { updatedAt: now, lastMessageAt: message.createdAt, lastMessageId: message.id } });
-        });
-        return;
-      }
-      await this.prisma.$transaction([
-        this.prisma.message.create({
-          data: {
-            id: message.id,
-            conversationId: message.conversationId,
-            senderId: message.senderId,
-            kind: message.kind,
-            body: message.body,
-            metadata: toRawMetadata(message.metadata) as Prisma.InputJsonValue,
-            createdAt: message.createdAt,
-            clientMessageId: message.clientMessageId ?? null,
-          },
-        }),
-        this.prisma.conversation.update({
-          where: { id: message.conversationId },
-          data: {
-            updatedAt: now,
-            lastMessageAt: message.createdAt,
-            lastMessageId: message.id,
-          },
-        }),
-      ]);
+      await this.prisma.$transaction(async tx=>{
+        if(conversation?.businessId) await this.authorizeBusinessWrite(tx,toDomainConversation(conversation),actor,true);
+        else await tx.$queryRaw`SELECT id FROM conversations WHERE id=${message.conversationId} FOR UPDATE`;
+        await tx.message.create({data:{id:message.id,conversationId:message.conversationId,senderId:message.senderId,kind:message.kind,body:message.body,metadata:toRawMetadata(message.metadata) as Prisma.InputJsonValue,createdAt:message.createdAt,clientMessageId:message.clientMessageId??null}});
+        await tx.conversation.update({where:{id:message.conversationId},data:{updatedAt:now,lastMessageAt:message.createdAt,lastMessageId:message.id}});
+        if(conversation && this.measurement) await this.measureAcceptedMessage(tx,conversation,message);
+      });
     } catch (error) {
       if (
         message.clientMessageId &&
@@ -541,6 +497,31 @@ export class PrismaConversationRepository
       },
     });
     return participant != null;
+  }
+
+  private async measure(tx:Prisma.TransactionClient,userId:string,event:MeasurementSchemas.MeasurementEvent) {
+    try {await this.measurement?.capture(tx,userId,event);} catch { /* Source success survives telemetry outage. */ }
+  }
+
+  private async measureAcceptedMessage(tx:Prisma.TransactionClient,conversation:{id:string;listingId:string;buyerId:string},message:Message) {
+    let savepoint=false;
+    try {
+      await tx.$executeRaw`SAVEPOINT measurement_message_outcomes`;savepoint=true;
+      const previous=await tx.$queryRaw<{statement:string;lock:string}[]>`SELECT current_setting('statement_timeout') AS statement,current_setting('lock_timeout') AS lock`;
+      await tx.$queryRaw`SELECT set_config('statement_timeout','50ms',true),set_config('lock_timeout','10ms',true)`;
+      const first=await tx.message.findFirst({where:{conversationId:conversation.id,senderId:conversation.buyerId,kind:{not:"system"}},orderBy:[{createdAt:"asc"},{id:"asc"}],select:{id:true,createdAt:true}});
+      const envelope={version:1 as const,eventId:randomUUID(),occurredAt:message.createdAt.toISOString(),purpose:"product_improvement" as const,context:{platform:"server" as const,release:"server",build:"server",locale:"ru" as const}};
+      if(first?.id===message.id) await this.measure(tx,message.senderId,{...envelope,eventName:"first_buyer_message_accepted",payload:{conversationId:conversation.id,listingId:conversation.listingId,messageId:message.id}});
+      else if(first && message.senderId!==conversation.buyerId && message.kind!=="system") {
+        const reply=await tx.message.findFirst({where:{conversationId:conversation.id,senderId:{not:conversation.buyerId},kind:{not:"system"},createdAt:{gte:first.createdAt}},orderBy:[{createdAt:"asc"},{id:"asc"}],select:{id:true}});
+        const elapsedMs=message.createdAt.getTime()-first.createdAt.getTime();
+        if(reply?.id===message.id && elapsedMs>=0 && elapsedMs<=90*86_400_000) await this.measure(tx,message.senderId,{...envelope,eventName:"seller_first_reply",payload:{conversationId:conversation.id,listingId:conversation.listingId,firstBuyerMessageId:first.id,replyMessageId:message.id,elapsedMs}});
+      }
+      await tx.$queryRaw`SELECT set_config('statement_timeout',${previous[0]?.statement??"0"},true),set_config('lock_timeout',${previous[0]?.lock??"0"},true)`;
+      await tx.$executeRaw`RELEASE SAVEPOINT measurement_message_outcomes`;
+    } catch {
+      if(savepoint) {try {await tx.$executeRaw`ROLLBACK TO SAVEPOINT measurement_message_outcomes`;await tx.$executeRaw`RELEASE SAVEPOINT measurement_message_outcomes`;} catch { /* Core owner handles an unusable transaction. */ }}
+    }
   }
 
   private async authorizeBusinessWrite(tx: Prisma.TransactionClient, initial: Conversation, actor: ConversationActor | undefined, sending: boolean) {

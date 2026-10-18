@@ -29,5 +29,10 @@ export const MEASUREMENT_COMMIT_PORT = Symbol("MeasurementCommitPort");
 /** Infrastructure passes its existing source transaction as an opaque context.
  * Domain/application callers do not inspect collector persistence or await transport. */
 export interface MeasurementCommitPort {
- capture(transaction: object, userId: string, event: MeasurementSchemas.MeasurementEvent): Promise<"captured" | "disabled" | "unavailable">;
+ capture(transaction: object, userId: string, event: MeasurementSchemas.MeasurementEvent, classification?: { conversionEligible: boolean }): Promise<"captured" | "disabled" | "unavailable">;
+}
+
+export const MEASUREMENT_CONVERSION_PORT=Symbol("MeasurementConversionPort");
+export interface MeasurementConversionPort {
+ eligible(transaction:object,input:{userId:string|null;event:MeasurementSchemas.MeasurementEvent}):Promise<boolean>;
 }

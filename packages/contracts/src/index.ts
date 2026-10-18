@@ -49,3 +49,4 @@ export * as ServiceMessagingSchemas from "./schemas/serviceMessaging";
 export * as DiagnosticSchemas from "./schemas/diagnostics";
 export * as PublicMarketplaceSchemas from "./schemas/public-marketplace";
 export * as VideoUploadSchemas from "./schemas/video-upload";
+export * as ImprovementSchemas from "./schemas/improvement";
