@@ -1611,6 +1611,7 @@ model HistoryArtifact {
   vin String?
   originalDate DateTime
   mileageObservedAt DateTime?
+  /// SQL couples a present mileage value to a nonnull unit and source date.
   mileageValue Int?
   mileageUnit String?
   vehicleIdentity String?
