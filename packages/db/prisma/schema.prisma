@@ -1139,6 +1139,7 @@ model MeasurementRecord {
   origin      String
   environment String
   population  String
+  conversionEligible Boolean @default(false)
   occurredAt  DateTime
   receivedAt  DateTime
   expiresAt   DateTime
@@ -1156,6 +1157,7 @@ model MeasurementOutbox {
   epoch       String
   environment String
   population  String
+  conversionEligible Boolean @default(false)
   event       Json
   createdAt   DateTime @default(now())
   expiresAt   DateTime
@@ -1384,6 +1386,7 @@ model DiagnosticTemplateVersion {
   publishedBy User? @relation("DiagnosticTemplatePublisher", fields: [publishedById], references: [id], onDelete: SetNull)
   publishedAt DateTime @default(now())
   orders InspectionOrder[]
+  reports DiagnosticReportRecord[]
   @@unique([centerId, version])
   @@map("diagnostic_template_versions")
 }
@@ -1413,6 +1416,7 @@ model InspectionOrder {
   updatedAt DateTime @updatedAt
   erasedAt DateTime?
   assignments DiagnosticOrderAssignment[]
+  reports DiagnosticReportRecord[]
   audits DiagnosticAudit[]
   @@unique([commissionerId, requestKey])
   @@index([commissionerId, createdAt(sort: Desc)])
@@ -1497,6 +1501,11 @@ model HistoryProviderAllowance {
   @@map("history_provider_allowances")
 }
 model HistoryOrder {
+  recoveryOfferedAt DateTime?
+  recoveryOfferedDeadline DateTime?
+  recoveryOfferExpiresAt DateTime?
+  bookings HistoryBooking[]
+  deliveries HistoryDelivery[]
   version Int @default(0)
   id String @id @default(uuid())
   requestId String @unique
@@ -1527,6 +1536,7 @@ model HistoryOrder {
   @@map("history_orders")
 }
 model HistoryPayment {
+  verifiedFunds Boolean @default(false)
   id String @id @default(uuid())
   orderId String
   order HistoryOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
@@ -1545,6 +1555,8 @@ model HistoryPayment {
   @@map("history_payments")
 }
 model HistoryPurchaseIntent {
+  sourceArtifactId String?
+  deliveries HistoryDelivery[]
   id String @id @default(uuid())
   orderId String @unique
   order HistoryOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
@@ -1570,4 +1582,243 @@ model HistoryRefund {
   executionReference String?
   createdAt DateTime @default(now())
   @@map("history_refunds")
+}
+
+/// Explicit renewed booking acceptance never rewrites the original accepted offer.
+model HistoryBooking {
+  id String @id @default(uuid())
+  orderId String
+  order HistoryOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  clientBookingId String
+  vin String?
+  providers Json
+  amount Int
+  refundRule String
+  windowStart DateTime
+  windowEnd DateTime
+  acceptedAt DateTime
+  erasedAt DateTime?
+  @@unique([orderId, clientBookingId])
+  @@map("history_bookings")
+}
+/// Original provider bytes are independent of a purchaser's communication attachment.
+model HistoryArtifact {
+  id String @id @default(uuid())
+  provider String
+  vin String?
+  originalDate DateTime
+  mileageObservedAt DateTime?
+  sourceListingId String?
+  acquiredForOrderId String?
+  objectKey String @unique
+  sha256 String
+  sizeBytes Int
+  expectedPages Int
+  verifiedPages Int?
+  rights Json
+  provenance String?
+  state String @default("staged")
+  verifiedById String?
+  verifiedAt DateTime?
+  createdAt DateTime @default(now())
+  restrictedAt DateTime?
+  removedAt DateTime?
+  deliveries HistoryDelivery[]
+  @@index([vin, provider, state])
+  @@map("history_artifacts")
+}
+model HistoryDelivery {
+  id String @id @default(uuid())
+  orderId String
+  order HistoryOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  artifactId String
+  artifact HistoryArtifact @relation(fields: [artifactId], references: [id], onDelete: Restrict)
+  purchaseIntentId String
+  purchaseIntent HistoryPurchaseIntent @relation(fields: [purchaseIntentId], references: [id], onDelete: Restrict)
+  sharedLink String?
+  linkApprovedAt DateTime?
+  deliveredById String?
+  deliveredAt DateTime
+  erasedAt DateTime?
+  @@unique([orderId, artifactId])
+  @@map("history_deliveries")
+}
+/// Independent durable byte cleanup survives private linkage erasure and retries.
+model HistoryArtifactCleanup {
+  artifactId String @id
+  objectKey String
+  sha256 String
+  epoch Int @default(1)
+  requestedAt DateTime @default(now())
+  completedAt DateTime?
+  @@map("history_artifact_cleanup")
+}
+
+/// Pinned authoring revision. The released snapshot never changes after finalization.
+model DiagnosticReportRecord {
+  id String @id
+  orderId String
+  order InspectionOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  templateVersionId String
+  templateVersion DiagnosticTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  predecessorId String? @unique
+  predecessor DiagnosticReportRecord? @relation("DiagnosticCorrections", fields: [predecessorId], references: [id], onDelete: Restrict)
+  successor DiagnosticReportRecord? @relation("DiagnosticCorrections")
+  audience String
+  status String @default("draft")
+  version Int @default(0)
+  state Json
+  snapshot Json?
+  snapshotHash String?
+  finalizedAt DateTime?
+  withdrawnAt DateTime?
+  withdrawalReason String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  erasedAt DateTime?
+  evidence DiagnosticEvidence[]
+  artifacts DiagnosticPdfArtifact[]
+  @@index([orderId, createdAt])
+  @@map("diagnostic_reports")
+}
+
+/// Object identity is exact and immutable. Storage never exposes a public URL.
+model DiagnosticEvidence {
+  writeLeaseUntil DateTime?
+  cleanupLeaseUntil DateTime?
+  cleanupAttempts Int @default(0)
+  cleanupFailureCode String?
+  id String @id
+  reportId String
+  report DiagnosticReportRecord @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  findingId String
+  objectKey String @unique
+  sha256 String
+  sizeBytes Int
+  mime String
+  state String @default("staged")
+  epoch String @default(uuid())
+  createdById String?
+  createdAt DateTime @default(now())
+  verifiedAt DateTime?
+  cleanupRequestedAt DateTime?
+  cleanupCompletedAt DateTime?
+  @@index([reportId, findingId, state])
+  @@map("diagnostic_evidence")
+}
+
+/// Durable per-locale artifact intent. Reader release is independent of generation.
+model DiagnosticPdfArtifact {
+  id String @id
+  reportId String
+  report DiagnosticReportRecord @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  snapshotHash String
+  locale String
+  rendererVersion String
+  generation Int @default(1)
+  epoch String @default(uuid())
+  state String @default("pending")
+  objectKey String @unique
+  sha256 String?
+  sizeBytes Int?
+  attempts Int @default(0)
+  retryAt DateTime?
+  failureCode String?
+  leaseUntil DateTime?
+  createdAt DateTime @default(now())
+  verifiedAt DateTime?
+  cleanupRequestedAt DateTime?
+  cleanupCompletedAt DateTime?
+  @@unique([reportId, locale, rendererVersion, generation])
+  @@index([state, retryAt])
+  @@map("diagnostic_pdf_artifacts")
+}
+
+/// Anonymous snapshots contain permitted aggregates only, never event or actor maps.
+model MeasurementRollup {
+  key String @id
+  version Int
+  epoch String
+  environment String
+  population String
+  windowFrom DateTime
+  windowTo DateTime
+  completeThrough DateTime
+  inputDigest String
+  lateRecords Int @default(0)
+  metrics Json
+  generatedAt DateTime
+  expiresAt DateTime
+  @@index([expiresAt])
+  @@index([environment, population, windowFrom, windowTo])
+  @@map("measurement_rollups")
+}
+
+/// Short-lived investigative artifacts require current session authority on every read.
+model MeasurementInvestigationExport {
+  id String @id
+  actorId String
+  sessionId String
+  epoch String
+  reason String
+  auditId String
+  scope Json
+  evidence Json
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  @@index([expiresAt])
+  @@index([actorId, sessionId])
+  @@map("measurement_investigation_exports")
+}
+
+/// Rights are versioned independently of measurement retention. Unresolved rights quarantine sources.
+model MarketKnowledgeSource {
+  id String @id
+  version Int @default(1)
+  epoch String
+  status String @default("quarantined")
+  provenance Json
+  purposes Json
+  reuseRights Json
+  redistributionRights Json
+  restrictions Json
+  identifiabilityReview Json
+  destinations Json
+  accessPolicy Json
+  retentionBasis String
+  expiresAt DateTime?
+  revokedAt DateTime?
+  updatedAt DateTime @updatedAt
+  derivatives MarketKnowledgeDatasetSource[]
+  @@map("market_knowledge_sources")
+}
+
+/// Anonymous derivatives are withheld unless every current source fence still matches.
+model MarketKnowledgeDataset {
+  id String @id
+  version Int
+  epoch String
+  derivationVersion String
+  status String @default("quarantined")
+  review Json
+  data Json
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+  invalidatedAt DateTime?
+  sources MarketKnowledgeDatasetSource[]
+  @@index([status])
+  @@map("market_knowledge_datasets")
+}
+
+model MarketKnowledgeDatasetSource {
+  datasetId String
+  dataset MarketKnowledgeDataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  sourceId String
+  source MarketKnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  sourceVersion Int
+  sourceEpoch String
+  @@id([datasetId, sourceId])
+  @@index([sourceId])
+  @@map("market_knowledge_dataset_sources")
 }
