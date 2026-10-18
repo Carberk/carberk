@@ -13,6 +13,7 @@ import { localeTag } from "../i18n/resources";
 import { pickServiceImage, uploadServiceImage, type ServiceImage } from "./serviceImage";
 import { useServicePush } from "./useServicePush";
 import { useServiceRealtime } from "./useServiceRealtime";
+import { HistoryOrder } from "./HistoryOrder";
 import { ServiceAttachment } from "./ServiceAttachment";
 import { serviceCopy } from "./copy";
 import { useServiceConversation, useServiceList, useServiceOpen, useServiceSend } from "./api";
@@ -77,6 +78,7 @@ export function ServiceScreen() {
     {button(c.back, () => { setSelected(null); setBody(""); setError(null); setImage(null); setAttachmentId(null); })}
     {conversation.isPending ? <Text accessibilityRole="progressbar">{c.loading}</Text> : conversation.isError ? <><Text accessibilityRole="alert">{conversation.error instanceof ApiError && conversation.error.status === 403 ? c.permission : c.error}</Text>{button(c.refresh, () => { setError(null); void conversation.refetch(); })}</> : detail ? <>
      <Text className="font-heading text-title-3 font-semibold">{c[detail.purpose]}</Text>{detail.purpose === "support" ? button(c.contacts, () => router.push(HELP_HREF)) : null}{detail.purpose === "support" ? <Text className="text-muted-foreground">{c.schedule}</Text> : null}<Text>{detail.operatorName ?? c.carberk}</Text>
+     {detail.purpose === "history" ? <HistoryOrder key={`${userId}:${detail.id}`} id={detail.id} locale={i18n.language}/> : null}
      {detail.messages.length === 0 ? <Text>{c.emptyMessages}</Text> : detail.messages.filter(message => message.visibility === "customer").map(message => <View key={message.id} className="gap-2 rounded-xl border border-border p-4"><Text className="font-semibold">{message.operatorName ?? c[message.sender]}</Text><Text>{message.body}</Text>{message.attachment ? <ServiceAttachment key={`${userId}:${detail.id}:${message.attachment.id}`} conversationId={detail.id} attachment={message.attachment} locale={i18n.language}/> : null}<Text className="text-muted-foreground text-caption">{message.sender === "customer" ? message.sequence <= (detail.peerReadThrough ?? 0) ? c.seen : c.saved : ""}</Text><Text className="text-muted-foreground text-caption">{new Date(message.createdAt).toLocaleString(localeTag(i18n.language))}</Text></View>)}
      {uploadFailed ? <Text accessibilityRole="alert">{c.uploadFailed}</Text> : null}
      {uploading ? <View accessibilityRole="progressbar"><Text>{c.uploading}</Text></View> : null}
