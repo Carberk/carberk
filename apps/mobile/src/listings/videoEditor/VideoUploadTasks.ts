@@ -48,6 +48,7 @@ export class VideoUploadTask {
       if (!record || intent !== this.intent) return;
       if (record.businessId !== this.businessId) throw new Error("VIDEO_TRANSFER_SESSION_CHANGED");
       this.set({ phase: record.state, record });
+      if (record.state === "CANCELLED") { await this.transfer.run(); await this.discardPrepared(record); return; }
       if (record.state === "UPLOADING") await this.run();
       if (record.state === "PROCESSING" && record.sessionId) {
         const status = await apiClient.get(`/listing-video-upload-sessions/${record.sessionId}`, VideoUploadSchemas.SessionSnapshot, { assertSession: () => this.owner(), ...(this.businessId ? { headers: { "x-business-id": this.businessId } } : {}) });
@@ -72,6 +73,7 @@ export class VideoUploadTask {
       const prepared = await this.preparation.prepare({ ...selection, jobId, maxBytes: 15 * 1024 * 1024 });
       await this.owner();
       if (intent !== this.intent) { this.mediaResult("media_preparation_result", attemptId, started, "cancelled"); await native.discard(jobId); return; }
+      this.preparingJob = undefined; this.preparation = undefined;
       this.mediaResult("media_preparation_result", attemptId, started, "success");
       const record: VideoTransferRecord = { version: 1, ownerId: this.ownerId, idempotencyKey: jobId, target: this.target, prepared, posterMs: posterMs - selection.startMs, state: "UPLOADING", confirmedBytes: 0, ...(this.businessId ? { businessId: this.businessId } : {}) };
       await this.saveRecord(record);
