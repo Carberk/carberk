@@ -27,3 +27,11 @@ Registry metadata reviewed: `@sentry/react-native` 8.31.0 was published 2026-10-
 5. Prove exact-release native symbolication in the real controlled candidate, with a real separately deployed collector and protected artifact retention. A Sentry-compatible endpoint is not evidence of GlitchTip native-format/symbolication support.
 
 These are concrete technical acceptance gaps. They do not call for reopening settled product scope or enabling a collector before evidence exists. Independent default-closed monitoring/recovery software can proceed while the native adapter remains closed.
+
+## Exact SDK prewrite inspection (2026-10-18)
+
+The recovered package candidate is React Native 8.29.0, Cocoa 9.30.0 and Android 8.59.0. The Cocoa 9.30.0 source (`SentryCrashMonitor_NSException.m` and `SentryCrashReport.c`) copies `NSException.userInfo` and `reason` into the crash context and writes them in `writeError` while creating the crash report. The report is persisted by `SentryCrashC.c` before normal event processing. The public `beforeSend`/`beforeSendWithHint` callbacks run in the later event pipeline; they are not a prewrite filter for this crash file.
+
+The public Cocoa options expose `beforeSend`, `onCrashedLastRun`, disabled memory introspection, and switches for breadcrumbs/automatic collection. The crash writer callback can append fields but has no supported redaction hook for the already-written native error fields. Android 8.59.0 exposes NDK, tombstone and raw-tombstone switches, but the inspected options do not establish a prewrite allowlist or deletion guarantee for native crash artifacts. These are source findings, not native acceptance proof.
+
+Decision: keep native capture disabled. Options requiring a material decision are (a) qualify a future supported SDK/adapter with executable prewrite and cache-erasure proof, or (b) change the privacy contract after review. Maintaining an SDK fork is out of scope.
