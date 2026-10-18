@@ -21,10 +21,20 @@ it("keeps evidence/partial/late/expired/after-hours receipts in reconciliation w
  for (const receipt of [{ ...verified, verifiedFunds: false }, { ...verified, amount: 50 }, { ...verified, receivedAt: hold.expiresAt }, { ...verified, verifiedAt: hold.expiresAt }, { ...verified, verifiedAt: d("2026-10-15T16:00:00Z") }]) expect(receiptOutcome(hold, receipt)).toBe("review");
  expect(receiptOutcome({ ...hold, active: false }, verified)).toBe("review");
 });
-it("permits exactly one explicit further staffed hour and routes refusal or a second miss to founder refund", () => {
- expect(addStaffedHour(d("2026-10-15T14:30:00Z"))).toEqual(d("2026-10-16T04:30:00Z"));
+it("accepts the displayed fixed recovery deadline after a bounded human response, without rolling an extra hour", () => {
+ const offeredAt = d("2026-10-15T14:30:00Z"), offeredDeadline = d("2026-10-16T04:30:00Z"), offerExpiresAt = d("2026-10-15T14:31:00Z");
+ const offer = { recoveryUsed: false, customerAgreed: true, offeredAt, offeredDeadline, offerExpiresAt, deadline: offeredDeadline };
+ expect(addStaffedHour(offeredAt)).toEqual(offeredDeadline);
  expect(addStaffedHour(d("2026-10-15T16:00:00Z"))).toEqual(d("2026-10-16T05:00:00Z"));
- expect(recoveryOutcome({ recoveryUsed: false, customerAgreed: true, deadline: d("2026-10-16T04:30:00Z") }, d("2026-10-15T14:30:00Z"))).toBe("agreed");
- expect(recoveryOutcome({ recoveryUsed: false, customerAgreed: false, deadline: null }, d("2026-10-15T14:30:00Z"))).toBe("refund_pending");
- expect(recoveryOutcome({ recoveryUsed: true, customerAgreed: true, deadline: null }, d("2026-10-15T14:30:00Z"))).toBe("refund_pending");
+ expect(recoveryOutcome(offer, d("2026-10-15T14:30:42Z"))).toBe("agreed");
+ for (const invalid of [
+  { ...offer, deadline: d("2026-10-16T04:30:42Z") },
+  { ...offer, offeredAt: null },
+  { ...offer, offeredDeadline: d("2026-10-16T04:31:00Z") },
+  { ...offer, offerExpiresAt: d("2026-10-15T14:31:01Z") },
+ ]) expect(() => recoveryOutcome(invalid, d("2026-10-15T14:30:42Z"))).toThrow("RECOVERY_DEADLINE_INVALID");
+ expect(() => recoveryOutcome(offer, offerExpiresAt)).toThrow("RECOVERY_DEADLINE_INVALID");
+ expect(() => recoveryOutcome(offer, d("2026-10-15T14:29:59Z"))).toThrow("RECOVERY_DEADLINE_INVALID");
+ expect(recoveryOutcome({ ...offer, customerAgreed: false }, offeredAt)).toBe("refund_pending");
+ expect(recoveryOutcome({ ...offer, recoveryUsed: true }, offeredAt)).toBe("refund_pending");
 });
