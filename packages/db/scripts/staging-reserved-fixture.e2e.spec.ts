@@ -275,6 +275,14 @@ describe("reserved staging fixtures on disposable application schema", () => {
       encoding: "utf8", timeout: 30000, env: { ...globalThis.process.env, DATABASE_URL: databaseUrl },
     });
     expect(send.status).toBe(0);
+    const foreignId = "0".repeat(32);
+    expect(execute("fixture", foreignId, "campaign897-identities-v1").code).toBe(0);
+    const foreignEmail = (await pool.query(`SELECT email FROM "cf_${foreignId}".campaign_entities WHERE alias='buyer-a'`)).rows[0]?.email as string;
+    // A matching destination namespace must also own the request ID.
+    const collision = spawnSync(globalThis.process.execPath, [`${root}/scripts/testing/send-campaign-mock-email.cjs`, JSON.stringify({ requestId, email: foreignEmail })], {
+      encoding: "utf8", timeout: 30000, env: { ...globalThis.process.env, DATABASE_URL: databaseUrl },
+    });
+    expect(collision.status).toBe(1);
     // A missing persisted sink is an unmet storage outcome, not an import/setup failure.
     expect((await pool.query(`SELECT to_regclass('"cf_${id}".campaign_delivery_sink')::text AS name`)).rows[0])
       .toEqual({ name: `cf_${id}.campaign_delivery_sink` });
@@ -286,6 +294,11 @@ describe("reserved staging fixtures on disposable application schema", () => {
       encoding: "utf8", timeout: 30000, env: { ...globalThis.process.env, DATABASE_URL: databaseUrl },
     });
     expect(late.status).toBe(1);
+    const enqueue = spawnSync(globalThis.process.execPath, [`${root}/scripts/testing/enqueue-campaign-email.cjs`, JSON.stringify({ requestId, email })], {
+      encoding: "utf8", timeout: 30000, env: { ...globalThis.process.env, DATABASE_URL: databaseUrl, REDIS_URL: redisUrl },
+    });
+    expect(enqueue.status).toBe(1);
+    expect(await queue.getJob(requestId)).toBeUndefined();
     expect((await pool.query(`SELECT count(*)::int AS count FROM "cf_${id}".campaign_delivery_sink`)).rows[0]).toEqual({ count: 0 });
   });
 
