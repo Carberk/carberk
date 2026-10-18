@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ServiceMessagingSchemas as S } from "@auto-tm/contracts";
 
-import { historyCommand, historyRead } from "./actions";
+import { historyCommand, historyRead, historyPayments } from "./actions";
 import { HistoryReportsWorkspace } from "./HistoryReportsWorkspace";
 import { historyCopy } from "./historyCopy";
 
@@ -19,6 +19,15 @@ export function HistoryWorkspace({ conversation, locale, denied }: { conversatio
   else { setData(null); setError(true); if (result.error === "permission" || result.error === "conflict") denied(); }
  }
  useEffect(() => { void refresh(); return () => { generation.current++; }; }, [conversation.id, conversation.assignmentVersion]);
+ async function readPayments() {
+  if (busy || !reason.trim()) return;
+  const epoch = generation.current; setBusy(true);
+  const result = await historyPayments(conversation.id, reason);
+  if (epoch !== generation.current) return;
+  setBusy(false);
+  if (result.ok) { setData(result.data); setError(false); }
+  else { setError(true); if (result.error === "permission" || result.error === "conflict") { setData(null); denied(); } }
+ }
  async function command(value: S.HistoryCommand) {
   if (busy) return; const epoch = generation.current; setBusy(true); setError(false);
   const result = await historyCommand(conversation.id, value); if (epoch !== generation.current) return; setBusy(false);
@@ -42,7 +51,7 @@ export function HistoryWorkspace({ conversation, locale, denied }: { conversatio
   {order ? <><p>{c.state}: {order.state}</p><p>{order.day} / {order.promiseAt}</p>
   <label>{c.select}<select aria-label={c.select} value={paymentId} onChange={event => setPaymentId(event.target.value)}><option value="">{c.select}</option>{data?.payments.map(payment => <option key={payment.id} value={payment.id}>{payment.claim} / {payment.state === "confirmed" ? c.verified : c.review}</option>)}</select></label>
   {input(c.amount, amount, setAmount, "number")}{input(c.received, received, setReceived)}{input(c.receiptEvidence, receiptEvidence, setReceiptEvidence)}<label><input aria-label={c.funds} type="checkbox" checked={funds} onChange={event => setFunds(event.target.checked)}/>{c.funds}</label>{button(c.verify, () => { void command({ kind: "verify", expectedAssignmentVersion: conversation.assignmentVersion, expectedVersion: order.version, orderId: order.id, paymentId, amount: Number(amount), receivedAt: received, verifiedFunds: funds, evidence: receiptEvidence }); }, !paymentId || !amount || !received || !receiptEvidence)}
-  {input(c.reason, reason, setReason)}{input(c.reference, reference, setReference)}
+  {input(c.reason, reason, setReason)}{["delivered", "refunded"].includes(order.state) ? button(c.historyPayments, () => { void readPayments(); }, !reason.trim()) : null}{input(c.reference, reference, setReference)}
   {(["purchase", "purchase_uncertain", "purchase_completed", "purchase_no_data", "missed", "recovery_offer", "refund_request", "refund_approve", "refund_execute"] as const).map(kind => <span key={kind}>{button(c[kind], () => { void command({ kind, expectedAssignmentVersion: conversation.assignmentVersion, expectedVersion: order.version, orderId: order.id, reason, ...(reference ? { reference } : {}) }); }, !reason || ((kind === "purchase_completed" || kind === "refund_execute") && !reference))}</span>)}
   <HistoryReportsWorkspace id={conversation.id} order={order} assignmentVersion={conversation.assignmentVersion} locale={locale} denied={denied} changed={() => { void refresh(); }}/>
   </> : null}

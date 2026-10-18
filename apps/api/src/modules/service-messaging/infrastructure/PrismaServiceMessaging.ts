@@ -119,14 +119,18 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
  async historyCommand(subject: ServiceSubject, id: string, command: ServiceMessagingSchemas.HistoryCommand): Promise<void> {
   await this.locked(subject, id, "send", (tx, _row, scope, _actor, audience) => historyCommand({ tx, scope, subject, audience, staff: this.staff, runtime: this.runtime }, command));
  }
- async historySnapshot(subject: ServiceSubject, id: string): Promise<ServiceMessagingSchemas.HistorySnapshot> {
+ async historySnapshot(subject: ServiceSubject, id: string, paymentHistoryReason?: string): Promise<ServiceMessagingSchemas.HistorySnapshot> {
   return this.locked(subject, id, "read", async (tx, _row, scope, _actor, audience) => {
    if (scope.purpose !== "history") throw new ServiceDenied("NO_ACCESS");
    const quotes = await tx.historyQuote.findMany({ where: { requestId: scope.resourceId, erasedAt: null }, orderBy: { createdAt: "desc" }, take: 20 });
    const order = await tx.historyOrder.findUnique({ where: { requestId: scope.resourceId }, include: { refund: true } });
    let paymentAccess = audience === "customer";
-   if (!paymentAccess) {
-    try { await this.staff.authorize({ ...subject, capability: order && ["delivered", "refunded"].includes(order.state) ? "history.payment.history" : "history.payment.verify" }, tx); paymentAccess = true; }
+   const historical = order && ["delivered", "refunded"].includes(order.state);
+   if (!paymentAccess && historical && paymentHistoryReason !== undefined) {
+    await this.historicalPaymentAccess(tx, subject, scope, paymentHistoryReason);
+    paymentAccess = true;
+   } else if (!paymentAccess && !historical) {
+    try { await this.staff.authorize({ ...subject, capability: "history.payment.verify" }, tx); paymentAccess = true; }
     catch (error) { if (!(error instanceof StaffAuthorityDenied)) throw error; }
    }
    const payments = order && paymentAccess ? await tx.historyPayment.findMany({ where: { orderId: order.id }, orderBy: { createdAt: "asc" }, take: 50 }) : [];
@@ -281,11 +285,25 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
    await tx.serviceAttachment.update({ where: { id: attachmentId }, data: { sizeBytes: prepared.cleaned.length } });
   });
  }
- async file(subject: ServiceSubject, id: string, attachmentId: string) {
-  return this.locked(subject, id, "file", async (tx, _row, scope, actor) => {
+ private async historicalPaymentAccess(tx: Prisma.TransactionClient, subject: ServiceSubject, scope: ServiceScope, reason?: string) {
+  if (!reason?.trim() || reason.trim().length > 1000) throw new ServiceDenied("NO_ACCESS");
+  try { await this.staff.authorize({ ...subject, capability: "history.payment.history" }, tx); }
+  catch (error) { if (error instanceof StaffAuthorityDenied) throw new ServiceDenied("NO_ACCESS"); throw error; }
+  await tx.serviceAudit.create({ data: { actorId: subject.userId, purpose: "history", resourceId: scope.resourceId, action: "HISTORY_PAYMENT_HISTORY_READ", reason: reason.trim(), assignmentVersion: scope.assignmentVersion } });
+ }
+ async file(subject: ServiceSubject, id: string, attachmentId: string, paymentHistoryReason?: string) {
+  return this.locked(subject, id, "file", async (tx, _row, scope, actor, audience) => {
    const file = await tx.serviceAttachment.findUnique({ where: { id: attachmentId } });
    if (!file || !file.objectKey) throw new ServiceDenied("NO_ACCESS");
    assertServiceAccess(scope, actor, "file", { conversationId: file.conversationId, lifecycleEpoch: file.lifecycleEpoch, adopted: file.state === "adopted", removed: !!file.removedAt, visibility: file.visibility === "staff" ? "staff" : "customer" });
+   if (audience === "staff" && file.category === "payment_evidence") {
+    const order = scope.purpose === "history" ? await tx.historyOrder.findUnique({ where: { requestId: scope.resourceId } }) : null;
+    if (order && ["delivered", "refunded"].includes(order.state)) await this.historicalPaymentAccess(tx, subject, scope, paymentHistoryReason);
+    else {
+     try { await this.staff.authorize({ ...subject, capability: "history.payment.verify" }, tx); }
+     catch (error) { if (error instanceof StaffAuthorityDenied) throw new ServiceDenied("NO_ACCESS"); throw error; }
+    }
+   }
    const bytes = await this.store.get(file.objectKey, file.sizeBytes ?? 0);
    if (digest(bytes) !== file.sha256) throw new ServiceDenied("INVALID_ATTACHMENT");
    return { bytes, filename: file.filename, contentType: file.contentType };
