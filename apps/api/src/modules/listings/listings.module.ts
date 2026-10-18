@@ -37,9 +37,7 @@ import { OWNED_VIDEO_UPLOAD_PROTOCOL, OwnedVideoUploadProtocol } from "./applica
 import { PrismaOwnedVideoSessionLedger, VIDEO_ID_FACTORY } from "./infrastructure/PrismaOwnedVideoSessionLedger";
 import { VIDEO_OBJECT_STORAGE } from "./domain/ports/VideoObjectStorage";
 import { S3VideoObjectStorage } from "./infrastructure/S3VideoObjectStorage";
-import { VideoUploadSessionService } from "./application/VideoUploadSession";
 import { VideoEligibility } from "./application/VideoEligibility";
-import { PrismaVideoUploadSessionRepository } from "./infrastructure/PrismaVideoUploadSessionRepository";
 import { NullVinDecoder } from "./infrastructure/NullVinDecoder";
 import { NullContentClassifier } from "./infrastructure/NullContentClassifier";
 import { SortedFeedRankingAdapter } from "./infrastructure/SortedFeedRankingAdapter";
@@ -289,7 +287,6 @@ import { LISTING_VIEWS_PORT } from "./domain/ports/ListingViewsPort";
     RequestContactPhoneCode,
     ConfirmContactPhone,
     ListMyContactPhones,
-    VideoUploadSessionService,
     VideoEligibility,
     PrismaOwnedVideoSessionLedger,
     { provide: VIDEO_ID_FACTORY, useValue: randomUUID },
@@ -303,7 +300,6 @@ import { LISTING_VIEWS_PORT } from "./domain/ports/ListingViewsPort";
       inject: [PrismaOwnedVideoSessionLedger, VIDEO_OBJECT_STORAGE],
       useFactory: (ledger: PrismaOwnedVideoSessionLedger, storage: S3VideoObjectStorage) => new OwnedVideoUploadProtocol(ledger, storage),
     },
-    PrismaVideoUploadSessionRepository,
     PrismaVideoPlayback,
     { provide: VIDEO_GRANT_SECRET_FACTORY, useValue: () => randomBytes(32).toString("base64url") },
     { provide: VIDEO_PLAYBACK_ELIGIBILITY, useExisting: VideoEligibility },
