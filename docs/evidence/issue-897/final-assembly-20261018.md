@@ -1,5 +1,7 @@
 # Final assembly verification checkpoint, 18 October 2026
 
+Subsequent independent reviews requested three bounded service corrections. [The final review fix record](review-round2-service-isolation-20261018.md) records RED `89e91747`, source GREEN `feed53d1` and the resulting candidate verification. This earlier assembly record remains a historical receipt; it does not certify source changes after `729f01ed`.
+
 The assembly writer incorporated the two accepted History UI fixes after the SMTP and bounded fixture additions. Runtime source checkpoint `6140d0f52d6403270d4dd32beef9212c16f34c65` is the subject of the local checks below. The final review pin adds documentation only after that checkpoint. Exact hosted checks must run on the pushed review pin, and their final results belong in PR904's Execution state before review finalization. This is an incomplete campaign candidate, not a merge or activation approval.
 
 ## Ordered changes and earlier hosted evidence
