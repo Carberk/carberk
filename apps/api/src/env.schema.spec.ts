@@ -533,3 +533,13 @@ describe("service synthetic fixture admission", () => {
   expect(EnvSchema.safeParse({ ...baseEnv, APP_ENV: "production", SERVICE_SYNTHETIC_ENABLED: "true", SERVICE_SYNTHETIC_USER_IDS: "[]" }).success).toBe(false);
  });
 });
+
+describe("video tester configuration", () => {
+ it("rejects malformed or oversized tester lists", () => {
+  expect(EnvSchema.safeParse({ ...baseEnv, VIDEO_TESTER_USER_IDS: "arbitrary-name" }).success).toBe(false);
+  expect(EnvSchema.safeParse({ ...baseEnv, VIDEO_TESTER_USER_IDS: Array.from({ length: 51 }, () => "11111111-1111-4111-8111-111111111111").join(",") }).success).toBe(false);
+ });
+ it("normalizes the explicit UUID tester list", () => {
+  expect(EnvSchema.parse({ ...baseEnv, VIDEO_TESTER_USER_IDS: "11111111-1111-4111-8111-111111111111, 22222222-2222-4222-8222-222222222222" }).VIDEO_TESTER_USER_IDS).toEqual(["11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"]);
+ });
+});
