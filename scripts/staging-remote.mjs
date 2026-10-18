@@ -1,15 +1,15 @@
-import { campaignMain, campaignQueueMain } from './staging-campaign.mjs';
+import { campaignMain, businessMain, campaignQueueMain } from './staging-campaign.mjs';
 
 /** Serialized into one fixed remote Node process. There is no arbitrary shell/SQL input. */
 export function remoteProgram(payload) {
-  return `(${remoteMain.toString()})(${JSON.stringify(payload)}, ${campaignMain.toString()}, ${campaignQueueMain.toString()})`;
+  return `(${remoteMain.toString()})(${JSON.stringify(payload)}, ${campaignMain.toString()}, ${businessMain.toString()}, ${campaignQueueMain.toString()})`;
 }
-function remoteMain(input, campaign, queueMain) {
+function remoteMain(input, campaign, businessMain, queueMain) {
   try {
     const { spawnSync } = require('node:child_process');
     const p = input.identity; const e = process.env;
     if (input.profile === 'campaign897-identities-v1' && input.kind === 'fixture' && e.STAGING_CAMPAIGN_PROFILE_ENABLED !== 'campaign897-identities-v1') throw new Error();
-    if (input.profile !== undefined && !['listing-v1', 'campaign897-identities-v1'].includes(input.profile)) throw new Error();
+    if (input.profile !== undefined && !['listing-v1', 'campaign897-identities-v1', 'campaign897-business-v2'].includes(input.profile)) throw new Error();
     if (!['fixture', 'reset', 'probe'].includes(input.kind) || !/^[a-f0-9]{32}$/.test(input.id) ||
         input.namespace !== `cf_${input.id}` || !/^[a-f0-9]{40}$/.test(input.target)) throw new Error();
     if (e.RAILWAY_PROJECT_ID !== p.projectId || e.RAILWAY_ENVIRONMENT_ID !== p.environmentId || e.RAILWAY_SERVICE_ID !== p.services.api ||
@@ -34,6 +34,7 @@ function remoteMain(input, campaign, queueMain) {
       const hex = createHash('sha256').update(`${input.id}:${label}`).digest('hex').slice(0,32);
       return `${hex.slice(0,8)}-${hex.slice(8,12)}-4${hex.slice(13,16)}-a${hex.slice(17,20)}-${hex.slice(20)}`;
     };
+    if (input.profile === 'campaign897-business-v2') return businessMain(input, { sql, uuid, exists });
     if (input.profile === 'campaign897-identities-v1') return campaign(input, { sql, uuid, exists, disposeDeliveries: (deliveries, observeOnly = false) => {
       const redis = new URL(e.REDIS_URL);
       if (!['redis:', 'rediss:'].includes(redis.protocol) || redis.hostname !== 'redis.railway.internal' || redis.search || redis.hash) throw new Error();
