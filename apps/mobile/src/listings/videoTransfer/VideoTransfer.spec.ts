@@ -47,6 +47,15 @@ describe("prepared video resumable foreground transfer", () => {
     expect(device.record?.state).toBe("PAUSED"); expect(puts).toEqual([]); expect(completed).toBe(false);
     await new VideoTransfer(device).resume(); expect(completed).toBe(true);
   });
+  it("cancels a processing optional video after upload has finished", async () => {
+    if (!device.record) throw new Error("Fixture missing");
+    device.record = { ...device.record, sessionId, state: "PROCESSING", confirmedBytes: 5242882 };
+    state = "PROCESSING";
+    await new VideoTransfer(device).cancel();
+    expect(device.record.state).toBe("CANCELLED");
+    expect(state).toBe("CLEANUP_PENDING");
+    expect(puts).toEqual([]);
+  });
   it("keeps cancellation authoritative over a late successful part response", async () => {
     if (!device.record) throw new Error("Fixture missing");
     device.record.sessionId = sessionId;
