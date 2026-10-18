@@ -81,10 +81,16 @@ it("preserves restricted-user appeals, separate identities, exact assignment and
  const customerView = await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(customer)).expect(200);
  expect(JSON.stringify(customerView.body)).not.toContain("Internal note");
  expect(customerView.body.messages).toHaveLength(1);
+ expect(customerView.body.operatorName).toBeNull();
+ await request.post(`/api/v1/services/conversations/${id}/read`).set("Authorization", auth(oldStaff)).send({ throughSequence: 1 }).expect(201);
+ const oldView = await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(oldStaff)).expect(200);
+ expect(oldView.body.messages.find((message: { body: string }) => message.body === "Internal note").operatorName).toEqual(expect.any(String));
+ const readCustomer = await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(customer)).expect(200); expect(readCustomer.body.peerReadThrough).toBe(1);
  const oldSocket = await watchSocket(oldStaff, id);
  const denied = new Promise<void>(resolve => oldSocket.once("service:denied", () => resolve()));
  await request.post(`/api/v1/services/conversations/${id}/assignment`).set("Authorization", auth(oldStaff)).send({ expectedVersion: 1, targetUserId: nextStaff }).expect(201);
  await denied; oldSocket.disconnect();
+ const afterHandover = await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(customer)).expect(200); expect(afterHandover.body.peerReadThrough).toBe(0);
  await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(oldStaff)).expect(403);
  await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(nextStaff)).expect(200);
  await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(customer)).expect(200);
