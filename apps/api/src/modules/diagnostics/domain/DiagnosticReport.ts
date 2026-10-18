@@ -9,6 +9,14 @@ export interface ReportFinding {
   assessment: FindingAssessment;
   explanation: string | null;
   evidenceIds: string[];
+  kind?: "observed_damage" | "observed_repair" | "source_history" | null;
+  source?: string | null;
+  measurement?: { value: number; unit: string; method: string; uncertainty: string } | null;
+  location?: { panelId: string; view: "front" | "rear" | "left" | "right" | "top"; x: number; y: number } | null;
+}
+export interface PinnedReportScope {
+  checks: { id: string; required: boolean; evidenceRequired: boolean; measurement: { unit: string } | null }[];
+  panels: { id: string; evidenceRequired: boolean; views?: string[] }[];
 }
 export interface DiagnosticReportState {
   id: string; orderId: string; audience: ReportAudience; status: ReportStatus; templateVersionId: string;
@@ -31,10 +39,14 @@ export interface PublicReportAssociation {
 /** A correction preserves observed facts. A new physical inspection owns new observations. */
 export class DiagnosticReport {
   private readonly value: DiagnosticReportState;
-  constructor(state: DiagnosticReportState) { this.value = structuredClone(state); }
+  private readonly scope: PinnedReportScope | undefined;
+  constructor(state: DiagnosticReportState, scope?: PinnedReportScope) {
+    this.value = structuredClone(state);
+    this.scope = scope ? structuredClone(scope) : undefined;
+  }
   get state(): DiagnosticReportState { return structuredClone(this.value); }
   private copy(patch: Partial<DiagnosticReportState>): DiagnosticReport {
-    return new DiagnosticReport({ ...this.value, ...patch });
+    return new DiagnosticReport({ ...this.value, ...patch }, this.scope);
   }
 
   upsertFinding(actorId: string, finding: ReportFinding): DiagnosticReport {
@@ -42,15 +54,38 @@ export class DiagnosticReport {
     if (!actorId || actorId !== this.value.authorId) throw new DiagnosticRuleError("REPORT_AUTHOR_REQUIRED");
     if (!finding.explanation?.trim() && finding.assessment !== "normal") throw new DiagnosticRuleError("REPORT_EXPLANATION_REQUIRED");
     if ((finding.assessment === "note" || finding.assessment === "fault") && !finding.evidenceIds.length) throw new DiagnosticRuleError("REPORT_EVIDENCE_REQUIRED");
+    this.validateFinding(finding);
+    if (this.value.findings.some(item => item.checkId === finding.checkId && item.id !== finding.id)) throw new DiagnosticRuleError("REPORT_DUPLICATE_CHECK");
     const prior = this.value.findings.find(item => item.id === finding.id);
     if (prior && prior.checkId !== finding.checkId) throw new DiagnosticRuleError("REPORT_FINDING_IDENTITY_IMMUTABLE");
     const findings = this.value.findings.filter(item => item.id !== finding.id);
     return this.copy({ findings: [...findings, finding] });
   }
 
+  private validateFinding(finding: ReportFinding): void {
+    if (finding.kind === "source_history" && !finding.source?.trim()) throw new DiagnosticRuleError("REPORT_SOURCE_REQUIRED");
+    if (new Set(finding.evidenceIds).size !== finding.evidenceIds.length) throw new DiagnosticRuleError("REPORT_EVIDENCE_INVALID");
+    if (!this.scope) return;
+    const check = this.scope.checks.find(item => item.id === finding.checkId);
+    const panel = this.scope.panels.find(item => item.id === finding.checkId);
+    if (!check && !panel) throw new DiagnosticRuleError("REPORT_UNKNOWN_CHECK");
+    const assessed = !["not_checked", "not_applicable"].includes(finding.assessment);
+    if ((check?.evidenceRequired || panel?.evidenceRequired) && assessed && !finding.evidenceIds.length) throw new DiagnosticRuleError("REPORT_EVIDENCE_REQUIRED");
+    if (check?.measurement && assessed && !finding.measurement) throw new DiagnosticRuleError("REPORT_MEASUREMENT_REQUIRED");
+    if (finding.measurement && (!check?.measurement || finding.measurement.unit !== check.measurement.unit ||
+      !Number.isFinite(finding.measurement.value) || !finding.measurement.method.trim() || !finding.measurement.uncertainty.trim())) throw new DiagnosticRuleError("REPORT_MEASUREMENT_INVALID");
+    if (finding.location && (!panel || panel.id !== finding.location.panelId ||
+      (panel.views && !panel.views.includes(finding.location.view)) || !Number.isFinite(finding.location.x) || !Number.isFinite(finding.location.y) ||
+      finding.location.x < 0 || finding.location.x > 1 || finding.location.y < 0 || finding.location.y > 1)) throw new DiagnosticRuleError("REPORT_LOCATION_INVALID");
+  }
+
   submit(actorId: string, requiredCheckIds: string[]): DiagnosticReport {
     if (!["draft", "returned"].includes(this.value.status)) throw new DiagnosticRuleError("REPORT_SUBMIT_DENIED");
     if (actorId !== this.value.authorId) throw new DiagnosticRuleError("REPORT_AUTHOR_REQUIRED");
+    if (this.scope) {
+      this.value.findings.forEach(finding => this.validateFinding(finding));
+      requiredCheckIds = [...this.scope.checks.filter(check => check.required).map(check => check.id), ...this.scope.panels.map(panel => panel.id)];
+    }
     if (requiredCheckIds.some(id => !this.value.findings.some(finding => finding.checkId === id))) throw new DiagnosticRuleError("REPORT_UNASSESSED_REQUIRED");
     if (this.value.findings.some(finding => requiredCheckIds.includes(finding.checkId) && finding.assessment === "not_checked")) throw new DiagnosticRuleError("REPORT_INCOMPLETE");
     return this.copy({ status: "submitted", returnReason: null });

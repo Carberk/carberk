@@ -1384,6 +1384,7 @@ model DiagnosticTemplateVersion {
   publishedBy User? @relation("DiagnosticTemplatePublisher", fields: [publishedById], references: [id], onDelete: SetNull)
   publishedAt DateTime @default(now())
   orders InspectionOrder[]
+  reports DiagnosticReportRecord[]
   @@unique([centerId, version])
   @@map("diagnostic_template_versions")
 }
@@ -1413,6 +1414,7 @@ model InspectionOrder {
   updatedAt DateTime @updatedAt
   erasedAt DateTime?
   assignments DiagnosticOrderAssignment[]
+  reports DiagnosticReportRecord[]
   audits DiagnosticAudit[]
   @@unique([commissionerId, requestKey])
   @@index([commissionerId, createdAt(sort: Desc)])
@@ -1645,4 +1647,80 @@ model HistoryArtifactCleanup {
   requestedAt DateTime @default(now())
   completedAt DateTime?
   @@map("history_artifact_cleanup")
+}
+
+/// Pinned authoring revision. The released snapshot never changes after finalization.
+model DiagnosticReportRecord {
+  id String @id
+  orderId String
+  order InspectionOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  templateVersionId String
+  templateVersion DiagnosticTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  predecessorId String? @unique
+  predecessor DiagnosticReportRecord? @relation("DiagnosticCorrections", fields: [predecessorId], references: [id], onDelete: Restrict)
+  successor DiagnosticReportRecord? @relation("DiagnosticCorrections")
+  audience String
+  status String @default("draft")
+  version Int @default(0)
+  state Json
+  snapshot Json?
+  snapshotHash String?
+  finalizedAt DateTime?
+  withdrawnAt DateTime?
+  withdrawalReason String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  erasedAt DateTime?
+  evidence DiagnosticEvidence[]
+  artifacts DiagnosticPdfArtifact[]
+  @@index([orderId, createdAt])
+  @@map("diagnostic_reports")
+}
+
+/// Object identity is exact and immutable. Storage never exposes a public URL.
+model DiagnosticEvidence {
+  id String @id
+  reportId String
+  report DiagnosticReportRecord @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  findingId String
+  objectKey String @unique
+  sha256 String
+  sizeBytes Int
+  mime String
+  state String @default("staged")
+  epoch String @default(uuid())
+  createdById String?
+  createdAt DateTime @default(now())
+  verifiedAt DateTime?
+  cleanupRequestedAt DateTime?
+  cleanupCompletedAt DateTime?
+  @@index([reportId, findingId, state])
+  @@map("diagnostic_evidence")
+}
+
+/// Durable per-locale artifact intent. Reader release is independent of generation.
+model DiagnosticPdfArtifact {
+  id String @id
+  reportId String
+  report DiagnosticReportRecord @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  snapshotHash String
+  locale String
+  rendererVersion String
+  generation Int @default(1)
+  epoch String @default(uuid())
+  state String @default("pending")
+  objectKey String @unique
+  sha256 String?
+  sizeBytes Int?
+  attempts Int @default(0)
+  retryAt DateTime?
+  failureCode String?
+  leaseUntil DateTime?
+  createdAt DateTime @default(now())
+  verifiedAt DateTime?
+  cleanupRequestedAt DateTime?
+  cleanupCompletedAt DateTime?
+  @@unique([reportId, locale, rendererVersion, generation])
+  @@index([state, retryAt])
+  @@map("diagnostic_pdf_artifacts")
 }

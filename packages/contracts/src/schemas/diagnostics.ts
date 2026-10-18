@@ -37,3 +37,31 @@ export type DiagnosticObservedVehicle = z.infer<typeof DiagnosticObservedVehicle
 export type DiagnosticTemplate = z.infer<typeof DiagnosticTemplateSchema>;
 export type DiagnosticOrder = z.infer<typeof DiagnosticOrderSchema>;
 export type DiagnosticCapability = z.infer<typeof DiagnosticCapabilitySchema>;
+
+export const DiagnosticAssessmentSchema = z.enum(["normal", "note", "fault", "not_checked", "not_applicable"]);
+export const DiagnosticFindingSchema = z.object({
+  id: z.string().uuid(), checkId: stableId, assessment: DiagnosticAssessmentSchema,
+  explanation: z.string().trim().max(5000).nullable(), evidenceIds: z.array(z.string().uuid()).max(20),
+  kind: z.enum(["observed_damage", "observed_repair", "source_history"]).nullable(), source: z.string().trim().max(1000).nullable(),
+  measurement: z.object({ value: z.number().finite(), unit: z.string().trim().min(1).max(30), method: z.string().trim().min(1).max(1000), uncertainty: z.string().trim().min(1).max(1000) }).strict().nullable(),
+  location: z.object({ panelId: stableId, view: z.enum(["front", "rear", "left", "right", "top"]), x: z.number().min(0).max(1), y: z.number().min(0).max(1) }).strict().nullable(),
+}).strict();
+export const DiagnosticDraftCreateSchema = z.object({ reportId: z.string().uuid(), expectedOrderVersion: z.number().int().nonnegative() }).strict();
+export const DiagnosticFindingSaveSchema = z.object({ expectedVersion: z.number().int().nonnegative(), finding: DiagnosticFindingSchema }).strict();
+export const DiagnosticReportTransitionSchema = z.object({ expectedVersion: z.number().int().nonnegative(), action: z.enum(["submit", "return", "finalize", "withdraw"]), reason: z.string().trim().min(1).max(1000).optional(), privateSelfReview: z.boolean().optional() }).strict();
+export const DiagnosticCorrectionSchema = z.object({ expectedVersion: z.number().int().nonnegative(), successorId: z.string().uuid(), reason: z.string().trim().min(1).max(1000) }).strict();
+export const DiagnosticReportSchema = z.object({
+  id: z.string().uuid(), orderId: z.string().uuid(), audience: DiagnosticAudienceSchema,
+  status: z.enum(["draft", "submitted", "returned", "finalized", "withdrawn"]), templateVersionId: z.string().uuid(),
+  observedAt: z.string().datetime(), mileageKm: z.number().int().nonnegative(), findings: z.array(DiagnosticFindingSchema),
+  authorId: z.string().nullable(), reviewerId: z.string().nullable(), successorOf: z.string().uuid().nullable(),
+  correctionReason: z.string().nullable(), returnReason: z.string().nullable(), finalizedAt: z.string().datetime().nullable(),
+  withdrawnAt: z.string().datetime().nullable(), withdrawalReason: z.string().nullable(), version: z.number().int().nonnegative(),
+  template: DiagnosticTemplateDefinitionSchema, synthetic: z.boolean(),
+});
+export type DiagnosticFinding = z.infer<typeof DiagnosticFindingSchema>;
+export type DiagnosticDraftCreate = z.infer<typeof DiagnosticDraftCreateSchema>;
+export type DiagnosticFindingSave = z.infer<typeof DiagnosticFindingSaveSchema>;
+export type DiagnosticReportTransition = z.infer<typeof DiagnosticReportTransitionSchema>;
+export type DiagnosticCorrection = z.infer<typeof DiagnosticCorrectionSchema>;
+export type DiagnosticReportRecord = z.infer<typeof DiagnosticReportSchema>;

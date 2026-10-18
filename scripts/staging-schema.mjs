@@ -2,6 +2,7 @@
 export const retainedSchemaProfile = {
   baseline: '7af49d4c1474b2c3d841b14736c4ef59ce155a4e',
   schemaHashes: [
+    '31aca7775701a7a2becd81a5c631799fb7dcdfb191bf47978555a784b13c01ad',
     '7af571b5c19409d7b0c4ebf759a13910759db60682208e297146f70d3a67d40c',
     '2fdbb5ee35e6ad1c826ae110da7a2862f3c529fc7dad06d77ebc7b0fc84f7ec3',
     '1ffcfa54048e486563cc400bd6646d74b591b7d122614aa0e8658f10b3cb67dc',
@@ -21,6 +22,7 @@ export const retainedSchemaProfile = {
     'e601862966c5b8ed74b11f8fb2dacac3f358fdc4a0ad7d06a9908d6e09dcefc0',
   ],
   schemaMigrations: {
+    '31aca7775701a7a2becd81a5c631799fb7dcdfb191bf47978555a784b13c01ad': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities', '20261015020000_business_membership', '20261015030000_business_inventory', '20261015040000_first_party_measurement', '20261015050000_service_foundations', '20261015060000_business_enquiries', '20261015070000_diagnostic_intake', '20261015080000_service_push_subscriptions', '20261015120000_listing_video_foundation', '20261015130000_support_operations', '20261015140000_video_playback_authority', '20261015150000_history_orders', '20261015160000_showroom_public_fields', '20261015170000_video_processing_fences', '20261015180000_history_delivery', '20261015190000_diagnostic_reports'],
     '7af571b5c19409d7b0c4ebf759a13910759db60682208e297146f70d3a67d40c': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities', '20261015020000_business_membership', '20261015030000_business_inventory', '20261015040000_first_party_measurement', '20261015050000_service_foundations', '20261015060000_business_enquiries', '20261015070000_diagnostic_intake', '20261015080000_service_push_subscriptions', '20261015120000_listing_video_foundation', '20261015130000_support_operations', '20261015140000_video_playback_authority', '20261015150000_history_orders', '20261015160000_showroom_public_fields', '20261015170000_video_processing_fences', '20261015180000_history_delivery'],
     '2fdbb5ee35e6ad1c826ae110da7a2862f3c529fc7dad06d77ebc7b0fc84f7ec3': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities', '20261015020000_business_membership', '20261015030000_business_inventory', '20261015040000_first_party_measurement', '20261015050000_service_foundations', '20261015060000_business_enquiries', '20261015070000_diagnostic_intake', '20261015080000_service_push_subscriptions', '20261015120000_listing_video_foundation', '20261015130000_support_operations', '20261015140000_video_playback_authority', '20261015150000_history_orders', '20261015160000_showroom_public_fields', '20261015170000_video_processing_fences'],
     '1ffcfa54048e486563cc400bd6646d74b591b7d122614aa0e8658f10b3cb67dc': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities', '20261015020000_business_membership', '20261015030000_business_inventory', '20261015040000_first_party_measurement', '20261015050000_service_foundations', '20261015060000_business_enquiries', '20261015070000_diagnostic_intake', '20261015080000_service_push_subscriptions', '20261015120000_listing_video_foundation', '20261015130000_support_operations', '20261015140000_video_playback_authority', '20261015150000_history_orders', '20261015160000_showroom_public_fields'],
@@ -40,6 +42,7 @@ export const retainedSchemaProfile = {
     'e601862966c5b8ed74b11f8fb2dacac3f358fdc4a0ad7d06a9908d6e09dcefc0': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities', '20261015020000_business_membership', '20261015030000_business_inventory', '20261015040000_first_party_measurement', '20261015050000_service_foundations', '20261015060000_business_enquiries', '20261015070000_diagnostic_intake', '20261015080000_service_push_subscriptions'],
   },
   additions: [
+    { name: '20261015190000_diagnostic_reports', checksum: '4be9efc71ddd57f2b6b32efef199576d81d432d193580d8db41dcc44155ff3fd' },
     { name: '20261015180000_history_delivery', checksum: '2d08ccc88142214fe0f22c29a1dd5ecf84239bc730f6076cab2e1104e724248d' },
     { name: '20261015170000_video_processing_fences', checksum: 'ff8a5579df352a389385aeb47f78caed985301995c569c3a5b21db2e022f779b' },
     { name: '20261015160000_showroom_public_fields', checksum: '2d38d6d7960fc66078dcf46444ffbbd85b6deedb9f51145e21304d7dff52c02b' },
