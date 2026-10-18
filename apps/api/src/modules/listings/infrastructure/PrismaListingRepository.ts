@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto";
+import type { MeasurementSchemas } from "@auto-tm/contracts";
+import { MEASUREMENT_COMMIT_PORT,type MeasurementCommitPort } from "../../measurement/measurement.public";
 import { ContactPhonePolicy } from "../domain/ContactPhonePolicy";
 import { contactPhoneRejection } from "../application/contactPhoneRejection";
 import { IDENTITY_CLOCK_PORT, type ClockPort } from "../../identity/identity.public";
@@ -17,7 +20,8 @@ function n<T>(v: T | undefined): T | null {
 export class PrismaListingRepository implements ListingRepository {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService, @Optional() @Inject(ListingOwnership) private readonly ownership?: ListingOwnership,
     @Optional() @Inject(ContactPhonePolicy) private readonly contactPhones?: ContactPhonePolicy,
-    @Optional() @Inject(IDENTITY_CLOCK_PORT) private readonly clock?: ClockPort) {}
+    @Optional() @Inject(IDENTITY_CLOCK_PORT) private readonly clock?: ClockPort,
+    @Optional() @Inject(MEASUREMENT_COMMIT_PORT) private readonly measurement?:MeasurementCommitPort) {}
 
   async save(listing: Listing): Promise<Listing> {
     const row = await this.prisma.listing.create({
@@ -112,7 +116,9 @@ export class PrismaListingRepository implements ListingRepository {
           if (rejection) throw rejection;
         }
       }
-      return tx.listing.update({
+      if(this.measurement) await tx.$queryRaw`SELECT id FROM listings WHERE id=${listing.id} FOR UPDATE`;
+      const previous=this.measurement?await tx.listing.findUnique({where:{id:listing.id},select:{status:true,deletedAt:true}}):null;
+      const saved=await tx.listing.update({
       where: { id: listing.id },
       data: {
         ...(actor && listing.businessId ? { lastEditedById: actor.userId } : {}),
@@ -149,6 +155,10 @@ export class PrismaListingRepository implements ListingRepository {
         knownIssuesText: n(listing.conditionDisclosure?.knownIssuesText),
       },
     });
+      const wasPublic=previous?.status==="active" && !previous.deletedAt;
+      const isPublic=saved.status==="active" && !saved.deletedAt;
+      if(previous && wasPublic!==isPublic) await this.visibility(tx,saved.sellerId,saved.id,isPublic,saved.deletedAt?"deleted":saved.status==="sold"?"sold":saved.status==="archived"?"archived":saved.status==="banned"?"moderated":"restored");
+      return saved;
     });
     return this.toDomain(row);
   }
@@ -165,7 +175,12 @@ export class PrismaListingRepository implements ListingRepository {
         await assertListingOwnership(this.ownership, actor, { sellerId: row.sellerId, businessId: row.businessId }, tx);
       }
       await tx.listing.update({ where: { id }, data: { deletedAt: at } });
+      if(row && !row.deletedAt && row.status==="active") await this.visibility(tx,row.sellerId,id,false,"deleted",at);
     });
+  }
+
+  private async visibility(tx:object,userId:string,listingId:string,visible:boolean,reason:Extract<MeasurementSchemas.MeasurementEvent,{eventName:"listing_visibility_changed"}>["payload"]["reason"],at=this.clock?.now()??new Date()) {
+    try {await this.measurement?.capture(tx,userId,{version:1,eventId:randomUUID(),occurredAt:at.toISOString(),purpose:"product_improvement",eventName:"listing_visibility_changed",context:{platform:"server",release:"server",build:"server",locale:"ru"},payload:{listingId,visibility:visible?"public":"hidden",reason}});} catch { /* Core outcome survives collector outage. */ }
   }
 
   private toDomain(row: {

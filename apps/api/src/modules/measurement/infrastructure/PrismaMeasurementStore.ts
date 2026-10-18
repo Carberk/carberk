@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { PrismaService } from "@auto-tm/db";
 import { MeasurementSchemas } from "@auto-tm/contracts";
 import type { MeasurementSubjectPort } from "../application/AcceptClientMeasurementBatch";
-import type { MeasurementAuthority, MeasurementLedgerPort } from "../measurement.public";
+import type { MeasurementAuthority, MeasurementLedgerPort, MeasurementConversionPort } from "../measurement.public";
 import { MeasurementVisit } from "../domain/MeasurementVisit";
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -19,7 +19,7 @@ export interface MeasurementStoreConfig {
 
 /** Atomic principal/visit eligibility and event-ID dedupe share the deletion lock. */
 export class PrismaMeasurementStore implements MeasurementLedgerPort, MeasurementSubjectPort {
- constructor(private readonly prisma: PrismaService, private readonly config: MeasurementStoreConfig, private readonly now: () => Date = () => new Date()) {}
+ constructor(private readonly prisma: PrismaService, private readonly config: MeasurementStoreConfig, private readonly now: () => Date = () => new Date(),private readonly conversion?:MeasurementConversionPort) {}
  private admitted(): boolean {
   return !this.config.expiresAt || Date.parse(this.config.expiresAt) > this.now().getTime();
  }
@@ -92,8 +92,9 @@ export class PrismaMeasurementStore implements MeasurementLedgerPort, Measuremen
     const visit = await tx.measurementVisit.findUnique({ where: { id: record.event.visitId } });
     if (!visit || !MeasurementVisit.permits(visit, principal.id, new Date(record.event.occurredAt))) return "revoked";
    }
+   const conversionEligible=this.conversion?await this.conversion.eligible(tx,{userId:principal.userId,event:record.event}):false;
    const inserted = await tx.measurementRecord.createMany({ data: [{ id: record.event.eventId, principalId: principal.id, visitId: record.event.visitId ?? null,
-    event: JSON.parse(JSON.stringify(record.event)), origin: record.authority.origin, environment: record.authority.environment, population: record.authority.population,
+    event: JSON.parse(JSON.stringify(record.event)), origin: record.authority.origin, environment: record.authority.environment, population: record.authority.population, conversionEligible,
     occurredAt: new Date(record.event.occurredAt), receivedAt: record.receivedAt, expiresAt: record.expiresAt }], skipDuplicates: true });
    return inserted.count ? "accepted" : "duplicate";
   }, { maxWait: 250, timeout: 1000 });
@@ -101,7 +102,13 @@ export class PrismaMeasurementStore implements MeasurementLedgerPort, Measuremen
  /** Guest-safe erasure requires its scoped secret. No account or other app privileges. */
  async eraseGuest(capability: string): Promise<void> {
   if (!/^mg_[A-Za-z0-9_-]{43}$/.test(capability)) return;
-  await this.prisma.measurementPrincipal.deleteMany({ where: { kind: "guest", capabilityHash: hash(capability) } });
+  await this.prisma.$transaction(async tx=>{
+   await tx.$queryRaw`SELECT "epoch" FROM "measurement_state" WHERE "key"='collector' FOR UPDATE`;
+   const guest=await tx.measurementPrincipal.findUnique({where:{capabilityHash:hash(capability)}});
+   if(guest?.kind!=="guest") return;
+   await tx.measurementInvestigationExport.deleteMany();
+   await tx.measurementPrincipal.delete({where:{id:guest.id}});
+  });
  }
  /** Operator supplies a NEW external epoch before restored data can be served. Deletes all old actor maps. */
  async rotateRestoreEpoch(nextEpoch: string): Promise<void> {
@@ -109,6 +116,7 @@ export class PrismaMeasurementStore implements MeasurementLedgerPort, Measuremen
   await this.prisma.$transaction(async (tx) => {
    const state = await tx.$queryRaw<{ epoch: string }[]>`SELECT "epoch" FROM "measurement_state" WHERE "key" = 'collector' FOR UPDATE`;
    if (state[0]?.epoch === nextEpoch) throw new Error("Fresh collector epoch required");
+   await tx.measurementInvestigationExport.deleteMany();
    await tx.measurementPrincipal.deleteMany();
    await tx.measurementState.upsert({ where: { key: "collector" }, create: { key: "collector", epoch: nextEpoch }, update: { epoch: nextEpoch } });
   });
