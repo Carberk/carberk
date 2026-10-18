@@ -11,7 +11,7 @@ import { JwtModule, JwtService } from "@nestjs/jwt";
 import { Reflector } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import { PrismaService } from "@auto-tm/db";
-import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import supertest from "supertest";
 
 import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
@@ -36,10 +36,14 @@ beforeAll(async () => {
  try { await storage.send(new CreateBucketCommand({ Bucket: "service-private" })); } catch (error) { if (!(error instanceof Error) || !["BucketAlreadyExists", "BucketAlreadyOwnedByYou"].includes(error.name)) throw error; } finally { storage.destroy(); }
  for (const id of ids) {
   await db.user.create({ data: { id, phone: suite.phone(id), phoneVerifiedAt: new Date(), role: id === stranger ? "admin" : "buyer", ...(id === customer ? { suspendedAt: new Date() } : {}) } });
-  const session = await db.session.create({ data: { userId: id, refreshTokenHash: randomUUID(), expiresAt: new Date(Date.now() + 3600000), adminTotpExpiresAt: new Date(Date.now() + 3600000) } });
-  tokens.set(id, jwt.sign({ sub: id, sid: session.id }));
  }
  await db.staffGrant.createMany({ data: [oldStaff, nextStaff].map(userId => ({ userId, capability: "support.operations" })) });
+});
+beforeEach(async () => {
+ for (const id of ids) {
+  const session = await db.session.create({ data: { userId: id, refreshTokenHash: randomUUID(), expiresAt: new Date(Date.now()+3600000), adminTotpExpiresAt: new Date(Date.now()+3600000) } });
+  tokens.set(id, jwt.sign({ sub: id, sid: session.id }));
+ }
 });
 afterAll(async () => {
  if (db) {
