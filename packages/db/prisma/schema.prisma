@@ -8,10 +8,8 @@ generator client {
   moduleFormat = "cjs"
 }
 
-/// ============================================================
-/// IDENTITY
-/// ============================================================
-
+/// =====================================================/// IDENTITY
+/// =====================================================
 enum UserRole {
   buyer
   seller
@@ -81,6 +79,7 @@ model User {
   serviceAuditEntries ServiceAudit[] @relation("ServiceAuditActor")
   otpRequests                  OtpRequest[]
   sessions                     Session[]
+  videoGrants                  VideoGrant[] @relation("VideoGrantOwner")
   dealershipMemberships        DealershipMember[]
   ownedVehicles                OwnedVehicle[]
   blockedUsers                 BlockedUser[]             @relation("Blocker")
@@ -138,6 +137,7 @@ model OtpRequest {
 }
 
 model Session {
+  videoGrants VideoGrant[] @relation("VideoGrantSession")
   id                 String    @id @default(uuid())
   userId             String
   user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -267,10 +267,8 @@ model TotpBackupCode {
   @@map("totp_backup_codes")
 }
 
-/// ============================================================
-/// CATALOG
-/// ============================================================
-
+/// =====================================================/// CATALOG
+/// =====================================================
 model Brand {
   id        String   @id @default(uuid())
   slug      String   @unique
@@ -416,10 +414,8 @@ model City {
   @@map("cities")
 }
 
-/// ============================================================
-/// LISTINGS
-/// ============================================================
-
+/// =====================================================/// LISTINGS
+/// =====================================================
 enum ListingStatus {
   draft
   pending_review
@@ -443,6 +439,9 @@ enum Currency {
 
 model Listing {
   diagnosticOrders InspectionOrder[]
+  activeVideoGenerationId String?
+  activeVideoRevision Int @default(0)
+  activeVideoGeneration VideoGeneration? @relation("ActiveListingVideo", fields: [activeVideoGenerationId], references: [id], onDelete: SetNull)
   availabilityConfirmedAt DateTime?
   lastEditedById String?
   businessId String?
@@ -624,6 +623,7 @@ model VideoUploadSession {
 }
 
 model VideoGeneration {
+  activeForListings Listing[] @relation("ActiveListingVideo")
   id String @id @default(uuid())
   listingId String
   uploadId String
@@ -639,6 +639,10 @@ model VideoGeneration {
 }
 
 model VideoGrant {
+  ownerUserId String?
+  ownerSessionId String?
+  owner User? @relation("VideoGrantOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  session Session? @relation("VideoGrantSession", fields: [ownerSessionId], references: [id], onDelete: Cascade)
   id String @id @default(uuid())
   secretHash String @unique
   listingId String
@@ -648,6 +652,7 @@ model VideoGrant {
   revokedAt DateTime?
   createdAt DateTime @default(now())
   @@index([listingId, generationId, expiresAt])
+  @@index([ownerUserId, ownerSessionId, expiresAt])
   @@map("video_grants")
 }
 
@@ -706,10 +711,8 @@ model ExchangeRate {
   @@map("exchange_rates")
 }
 
-/// ============================================================
-/// SUBSCRIPTIONS
-/// ============================================================
-
+/// =====================================================/// SUBSCRIPTIONS
+/// =====================================================
 model SavedSearch {
   id           String    @id @default(uuid())
   userId       String
@@ -724,10 +727,8 @@ model SavedSearch {
   @@map("saved_searches")
 }
 
-/// ============================================================
-/// CONVERSATIONS
-/// ============================================================
-
+/// =====================================================/// CONVERSATIONS
+/// =====================================================
 enum MessageKind {
   text
   image
@@ -815,10 +816,8 @@ model Message {
   @@map("messages")
 }
 
-/// ============================================================
-/// NOTIFICATIONS
-/// ============================================================
-
+/// =====================================================/// NOTIFICATIONS
+/// =====================================================
 enum PushPlatform {
   android
   ios
@@ -885,10 +884,8 @@ model NotificationPreference {
   @@map("notification_preferences")
 }
 
-/// ============================================================
-/// CONTENT
-/// ============================================================
-
+/// =====================================================/// CONTENT
+/// =====================================================
 model BlogPost {
   id          String    @id @default(uuid())
   slug        String    @unique
@@ -906,10 +903,8 @@ model BlogPost {
   @@map("blog_posts")
 }
 
-/// ============================================================
-/// ADMIN
-/// ============================================================
-
+/// =====================================================/// ADMIN
+/// =====================================================
 model AuditLog {
   id         String   @id @default(uuid())
   actorId    String?
@@ -949,10 +944,8 @@ model ContentReport {
   @@map("content_reports")
 }
 
-/// ============================================================
-/// REPORTS
-/// ============================================================
-
+/// =====================================================/// REPORTS
+/// =====================================================
 model InspectionInterest {
   id                  String   @id @default(uuid())
   listingId           String   @map("listing_id")
