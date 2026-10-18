@@ -33,6 +33,10 @@ import { ExchangeRatesController } from "./presentation/ExchangeRatesController"
 import { FavoritesController } from "./presentation/FavoritesController";
 import { ContactPhonesController } from "./presentation/ContactPhonesController";
 import { VideoUploadController } from "./presentation/VideoUploadController";
+import { OWNED_VIDEO_UPLOAD_PROTOCOL, OwnedVideoUploadProtocol } from "./application/OwnedVideoUploadProtocol";
+import { PrismaOwnedVideoSessionLedger, VIDEO_ID_FACTORY } from "./infrastructure/PrismaOwnedVideoSessionLedger";
+import { VIDEO_OBJECT_STORAGE } from "./domain/ports/VideoObjectStorage";
+import { S3VideoObjectStorage } from "./infrastructure/S3VideoObjectStorage";
 import { VideoUploadSessionService } from "./application/VideoUploadSession";
 import { VideoEligibility } from "./application/VideoEligibility";
 import { PrismaVideoUploadSessionRepository } from "./infrastructure/PrismaVideoUploadSessionRepository";
@@ -287,6 +291,18 @@ import { LISTING_VIEWS_PORT } from "./domain/ports/ListingViewsPort";
     ListMyContactPhones,
     VideoUploadSessionService,
     VideoEligibility,
+    PrismaOwnedVideoSessionLedger,
+    { provide: VIDEO_ID_FACTORY, useValue: () => randomBytes(16).toString("hex") },
+    {
+      provide: VIDEO_OBJECT_STORAGE,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<Env, true>) => new S3VideoObjectStorage(new S3Client({ endpoint: config.get("MINIO_ENDPOINT", { infer: true }), region: config.get("MINIO_REGION", { infer: true }), forcePathStyle: true, credentials: { accessKeyId: config.get("MINIO_ACCESS_KEY", { infer: true }), secretAccessKey: config.get("MINIO_SECRET_KEY", { infer: true }) } }), config.get("VIDEO_PRIVATE_BUCKET", { infer: true }), () => new Date()),
+    },
+    {
+      provide: OWNED_VIDEO_UPLOAD_PROTOCOL,
+      inject: [PrismaOwnedVideoSessionLedger, VIDEO_OBJECT_STORAGE],
+      useFactory: (ledger: PrismaOwnedVideoSessionLedger, storage: S3VideoObjectStorage) => new OwnedVideoUploadProtocol(ledger, storage),
+    },
     PrismaVideoUploadSessionRepository,
     PrismaVideoPlayback,
     { provide: VIDEO_GRANT_SECRET_FACTORY, useValue: () => randomBytes(32).toString("base64url") },
