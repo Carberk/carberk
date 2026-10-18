@@ -279,7 +279,7 @@ describe("reserved staging fixtures on disposable application schema", () => {
   });
 
   it("does not resurrect an OTP when its producer transaction dies before the Redis enqueue", async () => {
-    const id = "9".repeat(32), requestId = "campaign-cleanup-delayed-producer";
+    const id = "b9".repeat(16), requestId = "campaign-cleanup-delayed-producer";
     const email = await queuedOtp(id, requestId);
     await (await queue.getJob(requestId))?.remove();
 
