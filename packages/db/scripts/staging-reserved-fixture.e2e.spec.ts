@@ -1,4 +1,4 @@
-import { spawnSync, execFileSync, fork } from "node:child_process";
+import { spawnSync, execFileSync, fork, type ChildProcess } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
@@ -296,8 +296,25 @@ describe("reserved staging fixtures on disposable application schema", () => {
       env: { ...process.env, REDIS_URL: redisUrl, CAMPAIGN_REQUEST_ID: requestId, CAMPAIGN_EMAIL: email, CAMPAIGN_NAMESPACE: `cf_${id}` },
       stdio: ["ignore", "pipe", "pipe", "ipc"],
     });
+    const timers = new Set<ReturnType<typeof setTimeout>>();
+    const exitOf = (child: ChildProcess) => new Promise<{ code: number | null; signal: string | null }>(resolve => {
+      child.once("exit", (code, signal) => resolve({ code, signal }));
+      child.once("error", () => resolve({ code: null, signal: "spawn-error" }));
+      child.stdout?.resume(); child.stderr?.resume();
+    });
+    const holderExit = exitOf(holder);
+    const producerExit = exitOf(producer);
+    const bounded = async <T,>(promise: Promise<T>, label: string): Promise<T> => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        return await Promise.race([promise, new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error(label)), 30000); timers.add(timer);
+        })]);
+      } finally { if (timer) { clearTimeout(timer); timers.delete(timer); } }
+    };
     const holderPid = new Promise<number>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error("transaction holder did not reach the advisory barrier")), 30000);
+      timers.add(timer);
       holder.on("message", message => {
         if (message && typeof message === "object" && "backendPid" in message) {
           clearTimeout(timer); resolve(Number((message as { backendPid: number }).backendPid));
@@ -307,37 +324,50 @@ describe("reserved staging fixtures on disposable application schema", () => {
     });
     const producerAdmitted = new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error("delayed producer did not reach the Redis barrier")), 30000);
+      timers.add(timer);
       producer.on("message", message => {
         if (message && typeof message === "object" && "admitted" in message) { clearTimeout(timer); resolve(); }
       });
       producer.once("error", reject);
     });
-    const holderExit = new Promise<number>(resolve => holder.once("exit", code => resolve(code ?? 0)));
-    const backendPid = await holderPid;
-    await producerAdmitted;
-    const terminated = await pool.query("SELECT pg_terminate_backend($1) AS terminated", [backendPid]);
-    expect(terminated.rows[0]).toEqual({ terminated: true });
-    // pg_terminate_backend is asynchronous from the caller's perspective. Do
-    // not let reset race the backend's actual disappearance and turn the
-    // intended late-producer assertion into a lock-release/setup failure.
-    for (let attempt = 0; attempt < 100; attempt += 1) {
-      const active = await pool.query("SELECT 1 FROM pg_stat_activity WHERE pid=$1 OR application_name=$2", [backendPid, applicationName]);
-      if (active.rowCount === 0) break;
-      await new Promise(resolve => setTimeout(resolve, 50));
-      if (attempt === 99) throw new Error("terminated producer backend remained active");
-    }
+    try {
+      const [backendPid] = await Promise.all([holderPid, producerAdmitted]);
+      const terminated = await pool.query("SELECT pg_terminate_backend($1) AS terminated", [backendPid]);
+      expect(terminated.rows[0]).toEqual({ terminated: true });
+      // pg_terminate_backend is asynchronous from the caller's perspective. Do
+      // not let reset race the backend's actual disappearance and turn the
+      // intended late-producer assertion into a lock-release/setup failure.
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        const active = await pool.query("SELECT 1 FROM pg_stat_activity WHERE pid=$1 OR application_name=$2", [backendPid, applicationName]);
+        if (active.rowCount === 0) break;
+        await new Promise(resolve => setTimeout(resolve, 50));
+        if (attempt === 99) throw new Error("terminated producer backend remained active");
+      }
 
-    // The cleanup commits the durable disposed state while the producer still
-    // holds its post-admission IPC barrier. The old implementation has no
-    // Redis-side fence, so releasing the producer recreates the exact job.
-    const reset = execute("reset", id, "campaign897-identities-v1");
-    expect(reset.code, reset.failure).toBe(0);
-    if (holder.connected) holder.send({ finish: true });
-    producer.send({ continue: true });
-    await holderExit;
-    const producerExit = await new Promise<number>(resolve => producer.once("exit", code => resolve(code ?? 0)));
-    expect(producerExit).toBe(0);
-    expect(await queue.getJob(requestId)).toBeUndefined();
+      // The cleanup commits the durable disposed state while the producer still
+      // holds its post-admission IPC barrier. The old implementation has no
+      // Redis-side fence, so releasing the producer recreates the exact job.
+      const reset = execute("reset", id, "campaign897-identities-v1");
+      expect(reset.code, reset.failure).toBe(0);
+      if (holder.connected) holder.send({ finish: true });
+      producer.send({ continue: true });
+      const holderResult = await bounded(holderExit, "transaction holder did not exit");
+      expect(holderResult).toEqual({ code: 0, signal: null });
+      const producerResult = await bounded(producerExit, "delayed producer did not exit");
+      expect(producerResult).toEqual({ code: 0, signal: null });
+      expect(await queue.getJob(requestId)).toBeUndefined();
+    } finally {
+      for (const timer of timers) clearTimeout(timer);
+      await Promise.all([{ child: holder, exited: holderExit }, { child: producer, exited: producerExit }].map(async ({ child, exited }) => {
+        if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([exited, new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error("child cleanup did not reap")), 5000);
+          })]);
+        } finally { if (timer) clearTimeout(timer); }
+      }));
+    }
   });
 
   it("persists mock delivery only in its owned namespace and erases message content during disposal", async () => {

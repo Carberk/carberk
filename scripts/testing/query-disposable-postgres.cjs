@@ -2,9 +2,14 @@
 const { createRequire } = require('node:module');
 const { readFileSync } = require('node:fs');
 const localRequire = createRequire(process.env.STAGING_TEST_DB_PACKAGE);
-const { Client } = localRequire('pg');
+const { Client, types } = localRequire('pg');
 (async () => {
-  const client = new Client({ connectionString: process.env.STAGING_CONTROL_TEST_DATABASE_URL });
+  const client = new Client({ connectionString: process.env.STAGING_CONTROL_TEST_DATABASE_URL,
+    types: { getTypeParser(oid, format) {
+      if ((format === undefined || format === 'text') && (oid === 114 || oid === 3802)) return value => value;
+      return types.getTypeParser(oid, format);
+    } },
+  });
   await client.connect();
   try {
     const result = await client.query(readFileSync(0, 'utf8'));
