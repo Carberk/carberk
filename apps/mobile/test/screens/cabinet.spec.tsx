@@ -129,11 +129,13 @@ describe("Cabinet signed in", () => {
     expect(view.queryByRole("button", { name: /Delete account/ })).toBeNull();
   });
 
-  it("lists Notifications, Business workspace and My listings before preferences", async () => {
+  it("opens inspection reports alongside Notifications, Business workspace and My listings before preferences", async () => {
     signedIn({ displayName: "Aman" });
     const view = await renderMobile(<CabinetScreen />);
     const names = view.getAllByRole("button").map((row) => row.props.accessibilityLabel);
-    expect(names.slice(0, 5)).toEqual([`Aman, ${maskTmPhone(PHONE)}`, "Notifications", "Business workspace", "My listings", "Language, English"]);
+    expect(names.slice(0, 6)).toEqual([`Aman, ${maskTmPhone(PHONE)}`, "Notifications", "Your inspection reports", "Business workspace", "My listings", "Language, English"]);
+    await fireEvent.press(view.getByRole("button", { name: "Your inspection reports" }));
+    expect(routerMock.push).toHaveBeenCalledWith("/diagnostics");
     await fireEvent.press(view.getByRole("button", { name: "Business workspace" }));
     expect(routerMock.push).toHaveBeenLastCalledWith("/business");
   });
