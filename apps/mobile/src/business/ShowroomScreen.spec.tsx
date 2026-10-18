@@ -1,12 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
+
 import { renderMobile, fireEvent, routerMock } from "../../test/render";
 import { server } from "../../test/msw";
+
 import { ShowroomScreen } from "./ShowroomScreen";
 const id = "00000000-0000-4000-8000-000000000001";
 const listingId = "00000000-0000-4000-8000-000000000002";
 const business = { id, name: "Ahal Motors", slug: "ahal", logoUrl: null, city: null, identityChecked: false, contactPhone: null };
-it.each([["en", "Available cars"], ["ru", "Автомобили в продаже"], ["tk", "Satuwdaky awtoulaglar"]])("renders an anonymous empty showroom in %s without inventing inventory", async (locale, heading) => {
+it.each([["en", "Available cars"], ["ru", "Автомобили в продаже"], ["tk", "Satuwdaky ulaglar"]])("renders an anonymous empty showroom in %s without inventing inventory", async (locale, heading) => {
  server.use(http.get("*/public-marketplace/showrooms/:id", () => HttpResponse.json({ business, listings: [], nextCursor: null })));
  const screen = await renderMobile(<ShowroomScreen businessId={id} />, { locale });
  expect(await screen.findByText("Ahal Motors")).toBeTruthy(); expect(screen.getByText(heading ?? "")).toBeTruthy();
@@ -17,4 +19,14 @@ it("opens a real active car without replacing the listing-scoped enquiry flow", 
  await fireEvent.press(screen.getByRole("button", { name: "Toyota Camry 2020" }));
  expect(routerMock.push).toHaveBeenCalledWith({ pathname: "/listings/[id]", params: { id: listingId } });
  expect(screen.queryByText("Message")).toBeNull();
+});
+
+it("hides previously visible inventory after a current unavailable response and offers recovery", async () => {
+ server.use(http.get("*/public-marketplace/showrooms/:id", () => HttpResponse.json({ business, listings: [], nextCursor: null })));
+ const screen = await renderMobile(<ShowroomScreen businessId={id} />); await screen.findByText("Ahal Motors");
+ // Foreground refresh is owned by the screen and query client. Remounting the
+ // same public target must fetch current authority instead of trusting cache.
+ server.use(http.get("*/public-marketplace/showrooms/:id", () => HttpResponse.json({ code: "NOT_FOUND" }, { status: 404 })));
+ screen.unmount(); const next = await renderMobile(<ShowroomScreen businessId={id} />);
+ expect(await next.findByRole("button", { name: "Try again" })).toBeTruthy(); expect(next.queryByText("Ahal Motors")).toBeNull();
 });
