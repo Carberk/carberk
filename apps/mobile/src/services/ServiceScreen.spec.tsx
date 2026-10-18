@@ -105,3 +105,13 @@ it.each([["en", "Open, save or share PDF"], ["ru", "Открыть, сохран
  expect(reads).toBe(1); expect(sent).toEqual([]);
  await act(async () => { await clearAuthSession(); }); expect(screen.queryByRole("button", { name: label })).toBeNull();
 });
+
+it("requires explicit acceptance of the displayed recovery deadline and sends that deadline unchanged", async () => {
+ const deadline = new Date(Date.now()+3600000).toISOString(), expires = new Date(Date.now()+60000).toISOString();
+ const commands: Record<string, unknown>[] = [];
+ server.use(http.get("*/services/conversations", () => HttpResponse.json([{ id, purpose: "history", createdAt: "2026-10-15T10:00:00Z" }])), http.get("*/services/conversations/:id", () => HttpResponse.json({ id, resourceId: id, purpose: "history", status: "enquiry", assignmentVersion: 1, assigned: true, operatorName: "Synthetic operator", sourceListingId: null, canSend: true, messages: [], lastSequence: 0, readThrough: 0, unread: 0, hasMore: false })), http.get("*/services/conversations/:id/history", () => HttpResponse.json({ synthetic: true, quotes: [], order: { id, quoteId: id, state: "fulfilling", version: 7, day: "2026-10-15", holdExpiresAt: "2026-10-15T10:00:00Z", promiseAt: "2026-10-15T12:00:00Z", paidAt: "2026-10-15T11:00:00Z", escalatedAt: "2026-10-15T12:00:01Z", recoveryDeadline: null, recoveryOfferedDeadline: deadline, recoveryOfferExpiresAt: expires, recoveryUsed: false, refundState: null }, payments: [] })), http.post("*/services/conversations/:id/history", async ({ request }) => { commands.push(await request.json() as Record<string, unknown>); return HttpResponse.json({ ok: true }); }));
+ const screen = await renderMobile(<ServiceScreen/>); await fireEvent.press(await screen.findByRole("button", { name: "Vehicle History" }));
+ await screen.findByRole("button", { name: "Accept this exact recovery deadline" }); expect(commands).toHaveLength(0);
+ await fireEvent.press(screen.getByRole("button", { name: "Accept this exact recovery deadline" }));
+ expect(commands).toEqual([{ kind: "recovery", orderId: id, expectedVersion: 7, agree: true, deadline }]);
+});
