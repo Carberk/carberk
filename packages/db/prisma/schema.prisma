@@ -162,6 +162,10 @@ enum DealershipMemberRole {
 }
 
 model Dealership {
+  address String?
+  description String?
+  hours String?
+  services String?
   /// Checked business identity is never a claim about vehicle condition.
   status String @default("recovery")
   admissionMode String @default("synthetic")
