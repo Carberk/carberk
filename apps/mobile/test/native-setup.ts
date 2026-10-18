@@ -295,6 +295,7 @@ vi.mock("react-native-svg", async () => {
     Svg: host("Svg"),
     Path: host("Path"),
     Circle: host("Circle"),
+    Text: host("Text"),
     Defs: host("Defs"),
     LinearGradient: host("LinearGradient"),
     Stop: host("Stop"),

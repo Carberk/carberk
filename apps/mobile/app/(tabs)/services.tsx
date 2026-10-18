@@ -12,6 +12,7 @@ import * as Linking from "expo-linking";
 import { ScrollView, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { diagnosticCopy } from "../../src/diagnostics/copy";
 import { businessCopy } from "../../src/business/copy";
 import { LargeTitle } from "../../components/navigation/ScreenHeader";
 import { TabScreen } from "../../components/navigation/TabScreen";
@@ -183,6 +184,7 @@ export default function CabinetScreen() {
               onPress={() => router.push("/notifications")}
             />
             <MenuDivider />
+          <MenuRow label={diagnosticCopy(i18n.language).privateTitle} chevron onPress={() => router.push("/diagnostics")} />
           <MenuRow label={businessCopy(i18n.language).title} chevron onPress={() => router.push("/business")} />
 
             <MyListingsRow />
