@@ -77,11 +77,12 @@ it("delivers only allowlisted transitions over authenticated TLS and deduplicate
   const create = () => new SmtpAlertSink(config(), receipts, server.boundary);
   try {
     const state = snapshot();
-    Object.assign(state.incident!, { private: "private-identity-token" });
+    if (!state.incident) throw new Error("Missing fixture incident");
+    Object.assign(state.incident, { private: "private-identity-token" });
     Object.assign(state, { private: "private-user-content" });
     expect(await create().publish(state, now)).toBe(true);
     expect(await create().publish(state, now + 30_000)).toBe(false);
-    state.incident!.resolvedAt = state.observedAt;
+    state.incident.resolvedAt = state.observedAt;
     expect(await create().publish(state, now + 60_000)).toBe(true);
     expect(await create().publish(state, now + 90_000)).toBe(false);
     expect(server.messages).toHaveLength(2);
@@ -106,7 +107,9 @@ it("persists bounded retries across restart, redacts recipient errors, and admit
     expect(await create().publish(state, now + 300_000)).toBe(false);
     expect(server.commands.filter(line => line.startsWith("RCPT TO"))).toHaveLength(3);
     expect(logs).not.toHaveBeenCalled();
-    server.reject(false); state.incident!.resolvedAt = state.observedAt;
+    server.reject(false);
+    if (!state.incident) throw new Error("Missing fixture incident");
+    state.incident.resolvedAt = state.observedAt;
     expect(await create().publish(state, now + 330_000)).toBe(true);
     expect(server.messages).toHaveLength(1);
   } finally { logs.mockRestore(); await server.close(); }
@@ -115,7 +118,8 @@ it("persists bounded retries across restart, redacts recipient errors, and admit
 it("never authenticates before verified TLS and bounds a silent SMTP server", async () => {
   const server = await smtp(), receipts = receiptStore();
   try {
-    const untrusted = { ...server.boundary, ca: undefined };
+    const { ca: _ca, ...untrusted } = server.boundary;
+    expect(_ca).toBeDefined();
     expect(await new SmtpAlertSink(config(), receipts, untrusted).publish(snapshot(), now)).toBe(false);
     const wrongHost = { ...server.boundary, servername: "wrong.example" };
     expect(await new SmtpAlertSink(config(), receiptStore(), wrongHost).publish(snapshot(), now)).toBe(false);
