@@ -928,6 +928,9 @@ importers:
       nestjs-pino:
         specifier: 'catalog:'
         version: 4.6.1(@nestjs/common@11.1.20(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(pino-http@10.5.0)(pino@10.3.1)(rxjs@7.8.2)
+      nodemailer:
+        specifier: 10.1.2
+        version: 10.1.2
       pdf-lib:
         specifier: 1.17.1
         version: 1.17.1
@@ -9126,6 +9129,10 @@ packages:
   node-releases@2.0.50:
     resolution: {integrity: sha512-J6l92tKHX6w8Jy5nO1Vuc01NoIiRGi/d6qBKVxh+IQ8Cr3b6HbVNfKiF8ZpFKufTwpwxMmce2W3iQZ861ZRyTg==}
     engines: {node: '>=18'}
+
+  nodemailer@10.1.2:
+    resolution: {integrity: sha512-rnQn9Rzh8RAwcp42MVsIvxbsv6YZ2a2/av+uyJ/LPU1+2QSlrRgFsWWZTKenyRUqkIl8urOI0c4+CEcmFdsvQw==}
+    engines: {node: '>=20.0.0'}
 
   normalize-path@3.0.0:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}
@@ -20924,6 +20931,8 @@ snapshots:
   node-releases@2.0.44: {}
 
   node-releases@2.0.50: {}
+
+  nodemailer@10.1.2: {}
 
   normalize-path@3.0.0: {}
 

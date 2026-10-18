@@ -28,6 +28,7 @@
     "firebase-admin": "^14.3.0",
     "ioredis": "catalog:",
     "nestjs-pino": "catalog:",
+    "nodemailer": "10.1.2",
     "pdf-lib": "1.17.1",
     "reflect-metadata": "catalog:",
     "resend": "^6.28.1",

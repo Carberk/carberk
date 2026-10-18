@@ -3,6 +3,7 @@ import { Queue } from "bullmq";
 import { OperationsSchemas } from "@auto-tm/contracts";
 
 import { AlertSink, restoreIncident } from "./AlertSink";
+import { SmtpAlertSink } from "./SmtpAlertSink";
 import { operationsConfig } from "./OperationsConfig";
 import { Watchdog } from "./Watchdog";
 import { DiskProbe, tlsExpiryProbe } from "./hostProbes";
@@ -22,6 +23,10 @@ async function main(): Promise<void> {
   redis.on("error", () => undefined);
   const queues = QUEUES.map(name => new Queue(name, { connection: redis }));
   const disk = new DiskProbe(config.diskPath);
+  const smtpAlerts = config.smtp ? new SmtpAlertSink(config.smtp, {
+    read: () => redis.get(`${config.prefix}:smtp-alert-receipt`),
+    save: async receipt => { await redis.set(`${config.prefix}:smtp-alert-receipt`, receipt, "EX", 30 * 86_400); },
+  }) : undefined;
   const alerts = new AlertSink(config.alertSinkUrl, config.alertSinkSecret, fetch, {
     read: () => redis.get(`${config.prefix}:alert-receipt`),
     save: async transition => { await redis.set(`${config.prefix}:alert-receipt`, transition, "EX", 30 * 86_400); },
@@ -45,7 +50,8 @@ async function main(): Promise<void> {
     publish: async snapshot => {
       if (snapshot.incident) await redis.set(`${config.prefix}:incident`, JSON.stringify(snapshot.incident), "EX", 30 * 86_400);
       await redis.set(`${config.prefix}:snapshot`, JSON.stringify(snapshot), "PX", 90_000);
-      await alerts.publish(snapshot);
+      if (smtpAlerts) await smtpAlerts.publish(snapshot);
+      else await alerts.publish(snapshot);
     },
   });
   let pending = false;
