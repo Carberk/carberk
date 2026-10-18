@@ -96,7 +96,7 @@ describe.skipIf(!hosted)("private service lifecycle on disposable PostgreSQL and
    const id = randomUUID(), sha256 = "a".repeat(64), key = `history-artifacts/${id}/${sha256}`;
    artifactIds.push(id); keys.push(key);
    await s3.send(new PutObjectCommand({ Bucket: "service-private", Key: key, Body: "synthetic original PDF" }));
-   await db.historyArtifact.create({ data: { id, provider: "carfax", vin: "1HGCM82633A004352", originalDate: new Date("1999-01-01T00:00:00Z"), objectKey: key, sha256, sizeBytes: 22, expectedPages: 1, provenance: "Synthetic source license", state: "verified", rights: { category: "provider_artifact", identifiability: "anonymous", use: ["service", "archive"], schedule: { kind: "until", until: "2000-05-31T00:00:00Z" }, hold: held ? { until: "2000-06-02T00:00:00Z" } : null } } });
+   await db.historyArtifact.create({ data: { id, provider: "carfax", vin: "1HGCM82633A004352", originalDate: new Date("1999-01-01T00:00:00Z"), objectKey: key, sha256, sizeBytes: 22, expectedPages: 1, provenance: "Synthetic source license", state: "verified", verifiedPages: 1, verifiedAt: now, rights: { category: "provider_artifact", identifiability: "anonymous", use: ["service", "archive"], schedule: { kind: "until", until: "2000-05-31T00:00:00Z" }, hold: held ? { until: "2000-06-02T00:00:00Z" } : null } } });
    return { id, key };
   };
   const due = await create(false), held = await create(true);
