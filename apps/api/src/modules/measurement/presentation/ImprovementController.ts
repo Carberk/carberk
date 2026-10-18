@@ -42,6 +42,9 @@ export class ImprovementController {
   return this.authorized(()=>this.reads.artifact(this.subject(request),id));
  }
  @Header("Cache-Control","no-store")
+ @Post("research/derivations")
+ researchAdmission(@Body() body:unknown,@Req() request:StaffRequest) {return this.authorized(()=>this.knowledge.admitSynthetic(this.subject(request),body));}
+ @Header("Cache-Control","no-store")
  @Get("research")
  researchList(@Req() request:StaffRequest) {return this.authorized(()=>this.knowledge.list(this.subject(request)));}
  @Header("Cache-Control","no-store")
