@@ -5,6 +5,9 @@ import { join } from "node:path";
 import { CreateBucketCommand, DeleteObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { PrismaService, type Prisma } from "@auto-tm/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import sharp from "sharp";
+
+import { PurgeExpiredAccounts } from "../PurgeExpiredAccounts";
 
 import { S3DiagnosticArtifactObjects } from "./S3DiagnosticArtifactObjects";
 import { DiagnosticArtifactWorker, type DiagnosticArtifactObjects } from "./DiagnosticArtifactWorker";
@@ -43,7 +46,7 @@ describe.skipIf(!hosted)("diagnostic artifacts on disposable PostgreSQL and priv
     await db.user.deleteMany({ where: { id: { in: users } } });
     await db.$disconnect(); s3.destroy();
   });
-  async function fixture() {
+  async function fixture(evidenceId?: string) {
     const userId = randomUUID(), centerId = randomUUID(), templateId = randomUUID(), orderId = randomUUID(), reportId = randomUUID(), id = randomUUID();
     users.push(userId); centers.push(centerId);
     await db.user.create({ data: { id: userId } });
@@ -51,12 +54,13 @@ describe.skipIf(!hosted)("diagnostic artifacts on disposable PostgreSQL and priv
     const template = { title: localized, limitations: localized, syntheticNotice: localized, checks: [{ id: "brakes", label: localized, required: true, evidenceRequired: false, measurement: null }], panels: [] };
     await db.diagnosticTemplateVersion.create({ data: { id: templateId, centerId, version: 1, definition: template } });
     await db.inspectionOrder.create({ data: { id: orderId, centerId, templateVersionId: templateId, commissionerId: userId, requestKey: randomUUID(), audience: "buyer_private", synthetic: true } });
-    const report = { id: reportId, orderId, templateVersionId: templateId, audience: "buyer_private", status: "finalized", observedAt: clock.toISOString(), mileageKm: 123456, findings: [{ id: randomUUID(), checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: [], kind: null, source: null, measurement: null, location: null }], authorId: userId, reviewerId: randomUUID(), successorOf: null, correctionReason: null, returnReason: null, finalizedAt: clock.toISOString(), withdrawnAt: null, withdrawalReason: null };
+    const findingId = randomUUID();
+    const report = { id: reportId, orderId, templateVersionId: templateId, audience: "buyer_private", status: "finalized", observedAt: clock.toISOString(), mileageKm: 123456, findings: [{ id: findingId, checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: evidenceId ? [evidenceId] : [], kind: null, source: null, measurement: null, location: null }], authorId: userId, reviewerId: randomUUID(), successorOf: null, correctionReason: null, returnReason: null, finalizedAt: clock.toISOString(), withdrawnAt: null, withdrawalReason: null };
     const snapshot = { report, template, synthetic: true }, hash = sha(canonical(snapshot));
     await db.diagnosticReportRecord.create({ data: { id: reportId, orderId, templateVersionId: templateId, audience: "buyer_private", state: json(report), status: "finalized", snapshot: json(snapshot), snapshotHash: hash, finalizedAt: clock } });
     const key = `diagnostic-pdf/${reportId}/${id}.pdf`; keys.push(key);
     await db.diagnosticPdfArtifact.create({ data: { id, reportId, snapshotHash: hash, locale: "tk", rendererVersion: "v1", objectKey: key, createdAt: clock } });
-    return { id, reportId, key };
+    return { id, reportId, key, orderId, userId, findingId, snapshot, hash };
   }
   it("claims one renderer and adopts only actual verified immutable PDF bytes", async () => {
     const row = await fixture(), worker = new DiagnosticArtifactWorker(db, storage, await fonts(), runtime);
@@ -113,5 +117,41 @@ describe.skipIf(!hosted)("diagnostic artifacts on disposable PostgreSQL and priv
     await worker.cleanup();
     await expect(s3.send(new HeadObjectCommand({ Bucket: bucket, Key: row.key }))).rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
     expect((await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: row.id } })).state).not.toBe("ready");
+  });
+  it("account purge fences diagnostic revisions and late writers before erasing intake, preserves immutable observations and cleans exact private objects", async () => {
+    const evidenceId = randomUUID(), row = await fixture(evidenceId), control = await fixture();
+    const bytes = await sharp({ create: { width: 2, height: 2, channels: 3, background: "#ffffff" } }).webp().toBuffer();
+    const hash = sha(bytes), evidenceKey = `diagnostic-evidence/${evidenceId}/${hash}`;
+    keys.push(evidenceKey);
+    await s3.send(new PutObjectCommand({ Bucket: bucket, Key: evidenceKey, Body: bytes, ContentType: "image/webp" }));
+    await db.diagnosticEvidence.create({ data: { id: evidenceId, reportId: row.reportId, findingId: row.findingId, objectKey: evidenceKey,
+      sha256: hash, sizeBytes: bytes.length, mime: "image/webp", state: "verified", verifiedAt: clock, createdById: row.userId } });
+    const worker = new DiagnosticArtifactWorker(db, storage, await fonts(), runtime);
+    expect(await worker.generate(row.id)).toBe(true);
+    const artifact = await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: row.id } });
+    const evidence = await db.diagnosticEvidence.findUniqueOrThrow({ where: { id: evidenceId } });
+    await db.user.update({ where: { id: row.userId }, data: { deletionScheduledAt: new Date(clock.getTime() - 1) } });
+    await new PurgeExpiredAccounts(db).execute({ now: clock });
+    const order = await db.inspectionOrder.findUniqueOrThrow({ where: { id: row.orderId } });
+    const report = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: row.reportId } });
+    expect(order.commissionerId).toBeNull(); expect(order.erasedAt).not.toBeNull();
+    expect(order.physicalAuthorization).toBeNull(); expect(order.publicationAuthorization).toBeNull(); expect(order.observedVehicle).toBeNull();
+    expect(report.erasedAt).not.toBeNull(); expect(report.snapshot).toEqual(row.snapshot); expect(report.snapshotHash).toBe(row.hash);
+    const retiredPdf = await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: row.id } });
+    const retiredEvidence = await db.diagnosticEvidence.findUniqueOrThrow({ where: { id: evidenceId } });
+    expect(retiredPdf.cleanupRequestedAt).not.toBeNull(); expect(retiredPdf.epoch).not.toBe(artifact.epoch);
+    expect(retiredEvidence.cleanupRequestedAt).not.toBeNull(); expect(retiredEvidence.epoch).not.toBe(evidence.epoch);
+    expect(retiredEvidence.createdById).toBeNull();
+    expect((await db.diagnosticPdfArtifact.updateMany({ where: { id: row.id, epoch: artifact.epoch, cleanupRequestedAt: null }, data: { state: "ready" } })).count).toBe(0);
+    expect((await db.diagnosticEvidence.updateMany({ where: { id: evidenceId, epoch: evidence.epoch, cleanupRequestedAt: null }, data: { state: "verified" } })).count).toBe(0);
+    expect(await worker.generate(row.id)).toBe(false);
+    expect((await db.inspectionOrder.findUniqueOrThrow({ where: { id: control.orderId } })).commissionerId).toBe(control.userId);
+    expect((await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: control.reportId } })).snapshot).toEqual(control.snapshot);
+    expect((await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: control.id } })).cleanupRequestedAt).toBeNull();
+    await worker.cleanup();
+    for (const key of [row.key, evidenceKey]) await expect(s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }))).rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
+    expect((await db.diagnosticEvidence.findUniqueOrThrow({ where: { id: evidenceId } })).cleanupCompletedAt).not.toBeNull();
+    await db.user.update({ where: { id: row.userId }, data: { deletionScheduledAt: new Date(clock.getTime() - 1) } });
+    await expect(new PurgeExpiredAccounts(db).execute({ now: clock })).resolves.toMatchObject({ purgedCount: expect.any(Number) });
   });
 });
