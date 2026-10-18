@@ -1,9 +1,12 @@
 import { useRef, useState } from "react";
 import { View } from "react-native";
 import { randomUUID } from "expo-crypto";
+
+import { localeTag } from "../i18n/resources";
+
 import { useHistoryCommand, useHistoryOrder } from "./api";
 import { historyCopy } from "./historyCopy";
-import { localeTag } from "../i18n/resources";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
