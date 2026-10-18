@@ -1093,11 +1093,17 @@ model SupportCase {
   sourceListing Listing? @relation(fields: [sourceListingId], references: [id], onDelete: SetNull)
   status String @default("open")
   closedAt DateTime?
+  unansweredSince DateTime?
+  awaitingCustomerSince DateTime?
+  priority String @default("ordinary")
+  investigationState String @default("none")
+  escalatedAt DateTime?
   mode String @default("synthetic")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   conversation ServiceConversation?
   @@index([assigneeId, status, createdAt])
+  @@index([priority, unansweredSince])
   @@map("support_cases")
 }
 model VehicleHistoryRequest {
@@ -1218,6 +1224,7 @@ model ServiceAudit {
   purpose String
   resourceId String
   action String
+  reason String?
   targetStaffId String?
   assignmentVersion Int?
   createdAt DateTime @default(now())

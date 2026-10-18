@@ -35,7 +35,8 @@ export function serviceAccountErasureWrites(db: PrismaService, userId: string, n
   db.$executeRaw`DELETE FROM service_read_states WHERE "userId"=${userId} OR "conversationId" IN (SELECT c.id FROM service_conversations c LEFT JOIN support_cases s ON s.id=c."supportCaseId" LEFT JOIN vehicle_history_requests h ON h.id=c."historyRequestId" WHERE s."customerId"=${userId} OR h."customerId"=${userId})`,
   db.$executeRaw`UPDATE service_attachments SET "uploaderId"=NULL WHERE "uploaderId"=${userId}`,
   db.$executeRaw`UPDATE service_messages SET "senderId"=NULL WHERE "senderId"=${userId}`,
-  db.$executeRaw`UPDATE service_audits SET "actorId"=NULL WHERE "actorId"=${userId}`,
+  db.$executeRaw`UPDATE service_audits SET reason=NULL WHERE "resourceId" IN (SELECT id FROM support_cases WHERE "customerId"=${userId} UNION SELECT id FROM vehicle_history_requests WHERE "customerId"=${userId})`,
+  db.$executeRaw`UPDATE service_audits SET "actorId"=NULL, reason=NULL WHERE "actorId"=${userId}`,
   db.$executeRaw`UPDATE support_cases SET "customerId"=NULL, "assigneeId"=NULL, "sourceListingId"=NULL WHERE "customerId"=${userId}`,
   db.$executeRaw`UPDATE vehicle_history_requests SET "customerId"=NULL, "assigneeId"=NULL, "sourceListingId"=NULL, "proposedVin"=NULL WHERE "customerId"=${userId}`,
  ];
