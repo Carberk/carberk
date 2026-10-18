@@ -10,7 +10,6 @@ import type { UseListingFiltersReturn } from "./useListingFilters";
 import { CatalogPickerSheet } from "@/components/listings/wizard/CatalogPickerSheet";
 import { PickerRow } from "@/components/listings/wizard/PickerRow";
 import { Button } from "@/components/ui/button";
-import { FilterLabel } from "./FilterSection";
 import { GroupedList } from "@/components/ui/grouped-list";
 import { Text } from "@/components/ui/text";
 
@@ -135,7 +134,6 @@ export function CityFilterControl({ draft, setField }: CityFilterControlProps) {
 
   return (
     <View className="gap-2">
-      <FilterLabel>{t("city")}</FilterLabel>
       <GroupedList inset="text" className="mx-0">
         <PickerRow
           grouped

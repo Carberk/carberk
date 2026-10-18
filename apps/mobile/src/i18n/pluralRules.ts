@@ -64,7 +64,6 @@ class AppPluralRules {
  * implementation in place.
  */
 export function ensurePluralRules(): void {
-  return;
   if (typeof Intl.PluralRules === "function") return;
   Object.defineProperty(Intl, "PluralRules", { value: AppPluralRules, configurable: true, writable: true });
 }
