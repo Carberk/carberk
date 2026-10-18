@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { PrismaService } from "@auto-tm/db";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { PrismaRetiredUploadLedger } from "../PrismaRetiredUploadLedger";
 import { PrismaVideoCleanupLedger } from "./PrismaVideoCleanupLedger";
 const databaseUrl = process.env["DATABASE_URL"] ?? "";
 const hosted = process.env["GITHUB_ACTIONS"] === "true" && /^postgres(?:ql)?:\/\/[^/]+@(localhost|127\.0\.0\.1):\d+\//.test(databaseUrl);
@@ -15,6 +16,7 @@ describe.skipIf(!hosted)("durable video cleanup authority on disposable PostgreS
     await db.videoCleanupWork.deleteMany({ where: { id: { in: ids.map(id => `session:${id}`) } } });
     await db.videoProcessWork.deleteMany({ where: { generationId: { in: ids } } });
     await db.videoGeneration.deleteMany({ where: { id: { in: ids } } });
+    await db.mediaUploadCleanup.deleteMany({ where: { uploadId: { in: uploads } } });
     await db.mediaUpload.deleteMany({ where: { id: { in: uploads } } });
   }
   beforeEach(clear);
@@ -53,6 +55,13 @@ describe.skipIf(!hosted)("durable video cleanup authority on disposable PostgreS
     await db.videoCleanupWork.update({ where: { id: row.cleanupId }, data: { state: "PENDING" } });
     await db.videoProcessWork.create({ data: { generationId: row.id, uploadId: row.uploadId, sessionId: row.id, completionFence: randomUUID(), targetRevision: 1, processingVersion: "ffmpeg-debian-5.1.9-v1", state: "CANCELLED", leaseExpiresAt: new Date("2000-01-02T00:20:00Z") } });
     expect(await ledger.claim(now, randomUUID())).toBeNull();
+  });
+  it("leaves video expiry to its dedicated lifecycle rather than image cleanup", async () => {
+    const row = await retired();
+    await db.mediaUpload.update({ where: { id: row.uploadId }, data: { state: "PREPARING", retiredAt: null, claimToken: row.id, claimTargetType: "video_session", claimTargetId: row.id, claimDeadline: new Date("2000-01-01T00:00:00Z") } });
+    await new PrismaRetiredUploadLedger(db).retireExpiredPreparations(now, 100);
+    expect((await db.mediaUpload.findUniqueOrThrow({ where: { id: row.uploadId } })).state).toBe("PREPARING");
+    expect(await db.mediaUploadCleanup.findUnique({ where: { uploadId: row.uploadId } })).toBeNull();
   });
   it("keeps exact durable authority when source records disappear and ignores stale workers", async () => {
     const row = await retired();
