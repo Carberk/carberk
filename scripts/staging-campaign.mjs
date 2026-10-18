@@ -259,7 +259,7 @@ export function businessMain(input, { sql, uuid, exists }) {
       RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
     END $fn$;
     ${tables.map(table => `CREATE TRIGGER "${n}_${table}_business" AFTER INSERT OR UPDATE OR DELETE ON public.${table} FOR EACH ROW EXECUTE FUNCTION "${n}".track_business();`).join('\n')}`;
-  const audit = `INSERT INTO public.users(id,email,"displayName",role,"updatedAt") VALUES ${identities.map(identity => `('${identity.id}','${identity.email}','Campaign ${identity.alias}','buyer',now())`).join(',')};
+  const audit = `INSERT INTO public.users(id,email,"emailVerifiedAt","displayName",role,"updatedAt") VALUES ${identities.map(identity => `('${identity.id}','${identity.email}',now(),'Campaign ${identity.alias}','buyer',now())`).join(',')};
     INSERT INTO public.dealerships(id,slug,name,status,"admissionMode","contactPhone","updatedAt") VALUES('${rootId}','${rootSlug}','Campaign 897 synthetic business','recovery','synthetic','${rootContact}',now());
     INSERT INTO public.dealership_members(id,"dealershipId","userId",role) VALUES('${uuid(`campaign897-business:${input.id}:membership:owner`)}','${rootId}','${owner.id}','owner');
     INSERT INTO public.staff_grants("userId",capability) VALUES('${coordinator.id}','staff.manage'),('${coordinator.id}','founder.control');`;
