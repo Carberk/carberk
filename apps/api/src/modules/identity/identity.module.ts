@@ -1,3 +1,4 @@
+import { MeasurementModule } from "../measurement/measurement.module";
 import { AdmitBusiness } from "./application/AdmitBusiness";
 import { InviteBusinessMember } from "./application/InviteBusinessMember";
 import { RedeemBusinessInvitation } from "./application/RedeemBusinessInvitation";
@@ -92,6 +93,7 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
 
 @Module({
   imports: [
+    MeasurementModule,
     EventEmitterModule,
     PrismaModule,
     BullModule.registerQueue({ name: AuthSchemas.EMAIL_CODE_QUEUE }),
