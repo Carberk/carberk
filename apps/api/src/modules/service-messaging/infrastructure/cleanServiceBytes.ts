@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import { PDFDocument } from "pdf-lib";
 
 import { ServiceDenied } from "../domain/serviceAccess";
 
@@ -19,6 +20,11 @@ export async function cleanServiceBytes(
       !input.subarray(0, 8).toString("ascii").startsWith("%PDF-") ||
       !input.subarray(-1024).toString("ascii").includes("%%EOF")
     ) throw new ServiceDenied("INVALID_ATTACHMENT");
+    try {
+      const document = await PDFDocument.load(input, { updateMetadata: false, throwOnInvalidObject: true });
+      if (document.isEncrypted || document.getPageCount() < 1 || document.getPageCount() > 1000) throw new Error("INVALID_PDF");
+      for (const page of document.getPages()) if (page.getWidth() <= 0 || page.getHeight() <= 0) throw new Error("INVALID_PDF");
+    } catch { throw new ServiceDenied("INVALID_ATTACHMENT"); }
     return input;
   }
   const format = contentType === "image/jpeg" ? "jpeg" : contentType === "image/webp" ? "webp" : null;

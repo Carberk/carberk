@@ -1,5 +1,6 @@
 import "reflect-metadata";
 import sharp from "sharp";
+import { PDFDocument } from "pdf-lib";
 import { S3Client, CreateBucketCommand } from "@aws-sdk/client-s3";
 import { randomUUID } from "node:crypto";
 
@@ -59,8 +60,14 @@ afterAll(async () => {
   const historyIds = (await db.vehicleHistoryRequest.findMany({ where: { customerId: { in: ids } }, select: { id: true } })).map(row => row.id);
   const historyOrderIds = (await db.historyOrder.findMany({ where: { requestId: { in: historyIds } }, select: { id: true } })).map(row => row.id);
   await db.historyPayment.deleteMany({ where: { orderId: { in: historyOrderIds } } });
-  await db.historyPurchaseIntent.deleteMany({ where: { orderId: { in: historyOrderIds } } });
   await db.historyRefund.deleteMany({ where: { orderId: { in: historyOrderIds } } });
+  const artifacts = await db.historyArtifact.findMany({ where: { acquiredForOrderId: { in: historyOrderIds } } });
+  for (const artifact of artifacts) await app.get<ServicePrivateStore>(SERVICE_PRIVATE_STORE).remove(artifact.objectKey);
+  await db.historyDelivery.deleteMany({ where: { orderId: { in: historyOrderIds } } });
+  await db.historyArtifactCleanup.deleteMany({ where: { artifactId: { in: artifacts.map(row => row.id) } } });
+  await db.historyArtifact.deleteMany({ where: { id: { in: artifacts.map(row => row.id) } } });
+  await db.historyBooking.deleteMany({ where: { orderId: { in: historyOrderIds } } });
+  await db.historyPurchaseIntent.deleteMany({ where: { orderId: { in: historyOrderIds } } });
   await db.historyOrder.deleteMany({ where: { id: { in: historyOrderIds } } });
   await db.historyQuote.deleteMany({ where: { requestId: { in: historyIds } } });
   await db.vehicleHistoryRequest.deleteMany({ where: { customerId: { in: ids } } });
@@ -246,7 +253,7 @@ it("delivers original PDFs only through the purchased order and reuses licensed 
  await db.historyPurchaseIntent.create({ data: { orderId: first.order.id, vin: "1HGCM82633A004352", providers: ["carfax"], state: "completed" } });
  await db.historyOrder.update({ where: { id: first.order.id }, data: { state: "fulfilling" } });
  const artifactId = randomUUID();
- const pdf = Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 100 100]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n");
+ const document = await PDFDocument.create(); document.addPage([100,100]); const pdf = Buffer.from(await document.save());
  const hash = (await import("node:crypto")).createHash("sha256").update(pdf).digest("hex");
  const rights = { category: "provider_artifact", purpose: "Synthetic licensed archive", basis: "Owned synthetic report", provenance: "Test-generated original PDF", identifiability: "anonymous", use: ["service", "archive", "redistribute"], schedule: { kind: "until", until: "2027-01-01T00:00:00Z", reason: "Synthetic source license" }, supplierRestrictions: "Synthetic reuse and customer PDF/link permitted", hold: null };
  const command = (id: string, data: object) => request.post(`/api/v1/services/conversations/${id}/history/artifacts`).set("Authorization", auth(nextStaff)).send(data);

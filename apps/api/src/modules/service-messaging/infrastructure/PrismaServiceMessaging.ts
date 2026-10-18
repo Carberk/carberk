@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { PDFDocument } from "pdf-lib";
 
 import { Inject, Injectable } from "@nestjs/common";
 import { type Prisma, PrismaService } from "@auto-tm/db";
@@ -9,6 +10,7 @@ import { assertServiceAccess, serviceCapability, ServiceDenied, type ServiceActi
 import { staffedMilliseconds, transitionSupport, type SupportState, type SupportAction } from "../domain/SupportOperations";
 import { assertServiceRights } from "../domain/ServiceRights";
 import { SERVICE_PRIVATE_STORE, SERVICE_RUNTIME, type ServiceMessagingPort, type ServicePrivateStore, type ServiceRuntime, type ServiceSubject } from "../domain/ports/ServiceMessagingPort";
+import { artifactRights, historyArtifactCommand } from "./history/PrismaHistoryArtifacts";
 import { historyCommand } from "./history/PrismaHistoryOperations";
 import { cleanServiceBytes } from "./cleanServiceBytes";
 
@@ -54,6 +56,65 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
    if (audience === "staff") await tx.serviceAudit.create({ data: { actorId: subject.userId, purpose: row.purpose, resourceId: owner.id, action: `SERVICE_${action.toUpperCase()}`, assignmentVersion: owner.assignmentVersion } });
    return work(tx, row, scope, actor, audience);
   }, { timeout: 20000 });
+ }
+ async historyArtifactCommand(subject: ServiceSubject, id: string, command: ServiceMessagingSchemas.HistoryArtifactCommand): Promise<void> {
+  await this.locked(subject, id, "send", async (tx, _row, scope, _actor, audience) => {
+   if (command.kind === "verify") {
+    const artifact = await tx.historyArtifact.findUnique({ where: { id: command.artifactId } });
+    if (!artifact || artifact.acquiredForOrderId !== command.orderId) throw new ServiceDenied("INVALID_ATTACHMENT");
+    const order = await tx.historyOrder.findUnique({ where: { id: command.orderId } });
+    if (!order || order.requestId !== scope.resourceId || audience !== "staff") throw new ServiceDenied("NO_ACCESS");
+    const bytes = await this.store.get(artifact.objectKey, artifact.sizeBytes);
+    await cleanServiceBytes(bytes, "application/pdf", "history");
+    if ((await PDFDocument.load(bytes, { updateMetadata: false })).getPageCount() !== artifact.expectedPages) throw new ServiceDenied("INVALID_ATTACHMENT");
+    if (digest(bytes) !== artifact.sha256) throw new ServiceDenied("INVALID_ATTACHMENT");
+   }
+   await historyArtifactCommand({ tx, scope, subject, audience, runtime: this.runtime }, command);
+  });
+ }
+ async historyArtifactUpload(subject: ServiceSubject, id: string, artifactId: string, bytes: Uint8Array): Promise<void> {
+  await this.locked(subject, id, "send", async (tx, _row, scope, _actor, audience) => {
+   if (scope.purpose !== "history" || audience !== "staff") throw new ServiceDenied("NO_ACCESS");
+   await tx.$queryRaw`SELECT id FROM history_artifacts WHERE id=${artifactId} FOR UPDATE`;
+   const artifact = await tx.historyArtifact.findUnique({ where: { id: artifactId } });
+   if (!artifact || !artifact.acquiredForOrderId || artifact.state !== "staged" || artifact.removedAt || artifact.restrictedAt || bytes.length !== artifact.sizeBytes || digest(bytes) !== artifact.sha256) throw new ServiceDenied("INVALID_ATTACHMENT");
+   const order = await tx.historyOrder.findUnique({ where: { id: artifact.acquiredForOrderId } });
+   if (!order || order.requestId !== scope.resourceId || order.erasedAt) throw new ServiceDenied("NO_ACCESS");
+   artifactRights(artifact.rights, this.runtime.now());
+   const original = await cleanServiceBytes(bytes, "application/pdf", "history");
+   await this.store.putImmutable(artifact.objectKey, original, "application/pdf");
+  });
+ }
+ async historyReports(subject: ServiceSubject, id: string): Promise<ServiceMessagingSchemas.HistoryReports> {
+  return this.locked(subject, id, "read", async (tx, _row, scope, _actor, audience) => {
+   if (scope.purpose !== "history") throw new ServiceDenied("NO_ACCESS");
+   const order = await tx.historyOrder.findUnique({ where: { requestId: scope.resourceId }, include: { quote: true } });
+   if (!order || order.erasedAt) return { delivered: [], archive: [], staged: [] };
+   const rows = await tx.historyDelivery.findMany({ where: { orderId: order.id, erasedAt: null }, include: { artifact: true } });
+   const now = this.runtime.now();
+   const permitted = (artifact: Prisma.HistoryArtifactGetPayload<object>, reuse = false) => { if (artifact.removedAt || artifact.restrictedAt) return false; try { artifactRights(artifact.rights, now, reuse); return true; } catch { return false; } };
+   const dto = (artifact: Prisma.HistoryArtifactGetPayload<object>, delivery?: Prisma.HistoryDeliveryGetPayload<object>) => ({ id: artifact.id, provider: artifact.provider, vin: artifact.vin ?? "", originalDate: artifact.originalDate.toISOString(), sizeBytes: artifact.sizeBytes, expectedPages: artifact.expectedPages, sharedLink: delivery?.sharedLink ?? null, deliveredAt: delivery?.deliveredAt.toISOString() ?? null, state: artifact.state });
+   // Contextual archive selection requires a paid matching-VIN order. No universal browser.
+   const archive = audience === "staff" && order.paidAt && order.quote.vin ? await tx.historyArtifact.findMany({ where: { vin: order.quote.vin, state: "verified", removedAt: null, restrictedAt: null }, take: 20 }) : [];
+   const staged = audience === "staff" ? await tx.historyArtifact.findMany({ where: { acquiredForOrderId: order.id, removedAt: null, restrictedAt: null }, take: 20 }) : [];
+   return ServiceMessagingSchemas.HistoryReportsSchema.parse({ delivered: rows.filter(row => permitted(row.artifact)).map(row => dto(row.artifact, row)), archive: archive.filter(row => permitted(row, true)).map(row => dto(row)), staged: staged.filter(row => permitted(row)).map(row => dto(row)) });
+  });
+ }
+ async historyReportFile(subject: ServiceSubject, id: string, artifactId: string) {
+  return this.locked(subject, id, "read", async (tx, _row, scope, _actor, audience) => {
+   if (scope.purpose !== "history") throw new ServiceDenied("NO_ACCESS");
+   const order = await tx.historyOrder.findUnique({ where: { requestId: scope.resourceId } });
+   if (!order || order.erasedAt) throw new ServiceDenied("NO_ACCESS");
+   await tx.$queryRaw`SELECT id FROM history_artifacts WHERE id=${artifactId} FOR UPDATE`;
+   const artifact = await tx.historyArtifact.findUnique({ where: { id: artifactId } });
+   const delivery = await tx.historyDelivery.findUnique({ where: { orderId_artifactId: { orderId: order.id, artifactId } } });
+   const ownStaged = audience === "staff" && artifact?.acquiredForOrderId === order.id;
+   if (!artifact || artifact.removedAt || artifact.restrictedAt || (!ownStaged && (!delivery || delivery.erasedAt))) throw new ServiceDenied("NO_ACCESS");
+   artifactRights(artifact.rights, this.runtime.now(), artifact.acquiredForOrderId !== order.id);
+   const bytes = await this.store.get(artifact.objectKey, artifact.sizeBytes);
+   if (digest(bytes) !== artifact.sha256) throw new ServiceDenied("INVALID_ATTACHMENT");
+   return { bytes, contentType: "application/pdf", filename: `${artifact.provider}-${artifact.vin}.pdf` };
+  });
  }
  async historyCommand(subject: ServiceSubject, id: string, command: ServiceMessagingSchemas.HistoryCommand): Promise<void> {
   await this.locked(subject, id, "send", (tx, _row, scope, _actor, audience) => historyCommand({ tx, scope, subject, audience, staff: this.staff, runtime: this.runtime }, command));
