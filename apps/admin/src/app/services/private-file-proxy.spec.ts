@@ -1,8 +1,10 @@
 import { afterEach, expect, it, vi } from "vitest";
+
+import { proxyPrivateFile } from "./private-file-proxy";
+
 vi.mock("@/lib/cookies", () => ({ getAccessToken: async () => "current-session" }));
 vi.mock("@/lib/api-config", () => ({ getApiBaseUrl: () => "https://api.example.invalid" }));
 vi.mock("@/lib/validators", () => ({ validateOrigin: () => true }));
-import { proxyPrivateFile } from "./private-file-proxy";
 const id = "11111111-1111-4111-8111-111111111111";
 const context = { params: Promise.resolve({ id, file: id }) };
 afterEach(() => { vi.unstubAllGlobals(); });

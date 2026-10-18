@@ -1,3 +1,4 @@
+import { ImprovementModule } from "./modules/measurement/improvement.module";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { APP_FILTER, APP_GUARD } from "@nestjs/core";
@@ -30,6 +31,7 @@ import { DiagnosticsModule } from "./modules/diagnostics/diagnostics.module";
 
 @Module({
   imports: [
+    ImprovementModule,
     ConfigModule.forRoot({
       isGlobal: true,
       validate: parseEnv,

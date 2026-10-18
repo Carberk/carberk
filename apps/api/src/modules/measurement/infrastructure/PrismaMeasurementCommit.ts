@@ -6,7 +6,7 @@ import type { MeasurementActivation } from "../application/AcceptMeasurement";
 /** Source transaction stores original authority. Delivery can never resolve a newer actor. */
 export class PrismaMeasurementCommit implements MeasurementCommitPort {
  constructor(private readonly activation: MeasurementActivation, private readonly epoch: string, private readonly now: () => Date = () => new Date(), private readonly expiresAt?: string) {}
- async capture(transaction: object, userId: string, event: MeasurementSchemas.MeasurementEvent): Promise<"captured" | "disabled" | "unavailable"> {
+ async capture(transaction: object, userId: string, event: MeasurementSchemas.MeasurementEvent, classification: { conversionEligible: boolean } = { conversionEligible: true }): Promise<"captured" | "disabled" | "unavailable"> {
   const now = this.now();
   if (!this.activation.enabled || !this.epoch || !this.activation.evidenceRef || (this.expiresAt && Date.parse(this.expiresAt) <= now.getTime())) return "disabled";
   const parsed = MeasurementSchemas.MeasurementEventSchema.safeParse(event);
@@ -23,7 +23,7 @@ export class PrismaMeasurementCommit implements MeasurementCommitPort {
     WHERE p."userId" = ${userId} AND p."epoch" = ${this.epoch} FOR KEY SHARE OF p, s`;
    const principal = rows[0];
    if (principal) await tx.measurementOutbox.createMany({ data: [{ id: parsed.data.eventId, principalId: principal.id, generation: principal.generation, epoch: this.epoch,
-    environment: this.activation.environment, population: "synthetic", event: JSON.parse(JSON.stringify(parsed.data)), expiresAt: new Date(now.getTime() + MeasurementSchemas.MEASUREMENT_LIMITS.queueAgeMs) }], skipDuplicates: true });
+    environment: this.activation.environment, population: "synthetic", conversionEligible:classification.conversionEligible, event: JSON.parse(JSON.stringify(parsed.data)), expiresAt: new Date(now.getTime() + MeasurementSchemas.MEASUREMENT_LIMITS.queueAgeMs) }], skipDuplicates: true });
    await tx.$queryRaw`SELECT set_config('statement_timeout', ${previous[0]?.statement ?? "0"}, true), set_config('lock_timeout', ${previous[0]?.lock ?? "0"}, true)`;
    await tx.$executeRaw`RELEASE SAVEPOINT measurement_capture`;
    return principal ? "captured" : "disabled";

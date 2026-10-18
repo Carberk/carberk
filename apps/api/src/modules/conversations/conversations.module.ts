@@ -1,3 +1,4 @@
+import { MeasurementModule } from "../measurement/measurement.module";
 import { Module } from "@nestjs/common";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 
@@ -39,7 +40,7 @@ import { PrismaBusinessEnquiryRepository } from "./infrastructure/PrismaBusiness
 import { BUSINESS_ENQUIRY_REPOSITORY } from "./domain/ports/BusinessEnquiryRepository";
 
 @Module({
-  imports: [EventEmitterModule, ListingsModule, IdentityModule, RealtimeModule],
+  imports: [MeasurementModule,EventEmitterModule, ListingsModule, IdentityModule, RealtimeModule],
   controllers: [ConversationsController],
   providers: [
     PrismaConversationRepository,

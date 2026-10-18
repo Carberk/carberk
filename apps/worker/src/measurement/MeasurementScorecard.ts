@@ -1,4 +1,4 @@
-import type { MeasurementSchemas } from "@auto-tm/contracts";
+import type { ImprovementSchemas, MeasurementSchemas } from "@auto-tm/contracts";
 
 export interface ScorecardFact {
   subject: string;
@@ -32,7 +32,7 @@ function rate(numerator: number, denominator: number, state?: "immature" | "dela
 }
 
 /** Deterministic internal calculation. Public readers apply disclosure protection separately. */
-export function compileScorecard(input: ScorecardInput) {
+export function compileScorecard(input: ScorecardInput): ImprovementSchemas.ImprovementScorecard {
   const from = input.from.getTime(), to = input.to.getTime(), asOf = input.asOf.getTime();
   const through = input.completeThrough.getTime();
   if (![from, to, asOf, through].every(Number.isFinite) || from >= to || to > asOf) {

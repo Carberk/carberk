@@ -1,3 +1,5 @@
+import { ListingMeasurementModule } from "../listings/listing-measurement.module";
+import { MEASUREMENT_CONVERSION_PORT,type MeasurementConversionPort } from "./measurement.public";
 import { MEASUREMENT_COMMIT_PORT } from "./measurement.public";
 import { PrismaMeasurementCommit } from "./infrastructure/PrismaMeasurementCommit";
 import { Module } from "@nestjs/common";
@@ -15,7 +17,7 @@ import { MEASUREMENT_RATE_LIMITER, RedisMeasurementRateLimiter } from "./infrast
 
 const ACTIVATION = Symbol("MeasurementActivation");
 @Module({
- imports: [PrismaModule], controllers: [MeasurementController],
+ imports: [PrismaModule,ListingMeasurementModule], controllers: [MeasurementController],
  providers: [
   { provide: MEASUREMENT_COMMIT_PORT, inject: [ACTIVATION, ConfigService], useFactory: (activation: MeasurementActivation, config: ConfigService<Env, true>) => new PrismaMeasurementCommit(activation,
    config.get("MEASUREMENT_COLLECTOR_EPOCH", { infer: true }) ?? "", () => new Date(),
@@ -27,10 +29,10 @@ const ACTIVATION = Symbol("MeasurementActivation");
    purposes: ["product_improvement", "product_reliability"], evidenceRef: config.get("MEASUREMENT_EVIDENCE_REF", { infer: true }) ?? "",
    realCollectionApproved: false,
   }) },
-  { provide: PrismaMeasurementStore, inject: [PrismaService, ConfigService, ACTIVATION], useFactory: (db: PrismaService, config: ConfigService<Env, true>, activation: MeasurementActivation) => new PrismaMeasurementStore(db, {
+  { provide: PrismaMeasurementStore, inject: [PrismaService, ConfigService, ACTIVATION,MEASUREMENT_CONVERSION_PORT], useFactory: (db: PrismaService, config: ConfigService<Env, true>, activation: MeasurementActivation,conversion:MeasurementConversionPort) => new PrismaMeasurementStore(db, {
    ...(config.get("APP_ENV", { infer: true }) === "staging" ? { expiresAt: config.get("MEASUREMENT_SYNTHETIC_CAPABILITY_EXPIRES_AT", { infer: true }) ?? "invalid" } : {}),
    epoch: config.get("MEASUREMENT_COLLECTOR_EPOCH", { infer: true }) ?? "unprovisioned", environment: activation.environment, population: "synthetic",
-  }) },
+  },()=>new Date(),conversion) },
   { provide: AcceptMeasurement, inject: [PrismaMeasurementStore, ACTIVATION], useFactory: (store: PrismaMeasurementStore, activation: MeasurementActivation) => new AcceptMeasurement(store, () => new Date(), activation) },
   RedisMeasurementRateLimiter,
   { provide: MEASUREMENT_RATE_LIMITER, useExisting: RedisMeasurementRateLimiter },

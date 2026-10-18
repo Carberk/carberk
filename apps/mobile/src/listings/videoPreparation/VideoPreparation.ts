@@ -10,6 +10,7 @@ export interface PreparedVideo {
   uri: string;
   durationMs: number;
   sizeBytes: number;
+  sha256: string;
   width: number;
   height: number;
   fps: number;
@@ -48,7 +49,7 @@ export class VideoPreparation {
       const maximumHeight = width >= height ? 720 : 1280;
       if (![width, height, durationMs, fps, sizeBytes].every((value) => Number.isFinite(value) && value > 0) ||
         width > maximumWidth || height > maximumHeight || fps > 30 || sizeBytes > maxBytes ||
-        durationMs > 90_000 || Math.abs(durationMs - (endMs - startMs)) > 100 ||
+        !/^[a-f0-9]{64}$/.test(output.sha256) || durationMs > 90_000 || Math.abs(durationMs - (endMs - startMs)) > 100 ||
         output.videoCodec !== "h264" || (output.audioCodec !== null && output.audioCodec !== "aac") ||
         output.colour !== "bt709" || output.uri === selection.sourceUri || !output.uri.endsWith("/prepared.mp4")) {
         throw new Error("INVALID_OUTPUT");

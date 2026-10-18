@@ -1,5 +1,7 @@
 package tm.auto.video
 
+import java.security.MessageDigest
+
 import android.content.Context
 import android.media.MediaCodecInfo
 import android.media.MediaExtractor
@@ -114,13 +116,23 @@ class VideoPreparationEngine(private val context: Context) {
                   require((facts["fps"] as Double) <= 30) { "Frame rate exceeds normalization" }
                   require((facts["width"] as Int) <= outputWidth && (facts["height"] as Int) <= outputHeight) { "Encoder changed output dimensions" }
                   require(facts["colour"] == "bt709") { "Unproven SDR colour output" }
+                  val digest = MessageDigest.getInstance("SHA-256")
+                  partial.inputStream().use { stream ->
+                    val buffer = ByteArray(65_536)
+                    while (true) {
+                      val count = stream.read(buffer)
+                      if (count < 0) break
+                      digest.update(buffer, 0, count)
+                    }
+                  }
+                  val sha256 = digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
                   main.post {
                     if (running !== active) { partial.delete(); return@post }
                     try {
                       val destination = File(directory, "prepared.mp4")
                       check(partial.renameTo(destination)) { "Atomic output move failed" }
                       val value = facts + mapOf("uri" to Uri.fromFile(destination).toString(),
-                        "sizeBytes" to destination.length())
+                        "sizeBytes" to destination.length(), "sha256" to sha256)
                       val journal = File(directory, "prepared.json.partial")
                       journal.writeText(JSONObject(value).toString())
                       check(journal.renameTo(File(directory, "prepared.json")))
