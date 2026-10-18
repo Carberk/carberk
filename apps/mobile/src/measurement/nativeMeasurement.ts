@@ -40,14 +40,22 @@ export function startNativeMeasurement(): () => void {
  return () => { clearInterval(timer); unsubscribe(); appState.remove(); measurementHost.invalidate(); };
 }
 
-type Fact = { [K in MeasurementSchemas.MeasurementEventName]: Omit<Extract<MeasurementSchemas.MeasurementEvent, { eventName: K }>, "version" | "eventId" | "occurredAt" | "visitId" | "context"> }[MeasurementSchemas.MeasurementEventName];
+export type MeasurementFact = { [K in MeasurementSchemas.MeasurementEventName]: Omit<Extract<MeasurementSchemas.MeasurementEvent, { eventName: K }>, "version" | "eventId" | "occurredAt" | "visitId" | "context"> }[MeasurementSchemas.MeasurementEventName];
 /** Synchronous best-effort enqueue only; source UI never awaits bootstrap or transport. */
-export function emitMeasurement(fact: Fact): void {
+function enqueue(fact:MeasurementFact,eventId?:string): void {
  const visitId = measurementHost.currentVisit();
  if (!visitId) return;
  try {
-  measurementHost.emit({ ...fact, version: 1, eventId: Crypto.randomUUID(), occurredAt: new Date().toISOString(), visitId,
+  measurementHost.emit({ ...fact, version: 1, eventId:eventId??Crypto.randomUUID(), occurredAt: new Date().toISOString(), visitId,
    context: { platform: Platform.OS === "android" ? "android" : Platform.OS === "ios" ? "ios" : "web", release: Constants.expoConfig?.version ?? "unknown", build: Constants.nativeBuildVersion ?? "unknown", locale: localeStore.getState().locale ?? "ru" },
   } as MeasurementSchemas.MeasurementEvent);
  } catch { /* Metrics cannot prevent the requested core action. */ }
+}
+
+export function emitMeasurement(fact:MeasurementFact):void {enqueue(fact);}
+/** The visit UUID is also its start fact ID, so resumed sessions cannot create a second visit start. */
+export function recordMeasurementForeground(screen:Extract<MeasurementSchemas.MeasurementEvent,{eventName:"visit_started"}>["payload"]["screen"]):void {
+ const visitId=measurementHost.currentVisit();if(!visitId)return;
+ enqueue({eventName:"visit_started",purpose:"product_improvement",payload:{screen}},visitId);
+ enqueue({eventName:"foreground_activity",purpose:"product_improvement",payload:{screen,action:"open"}});
 }

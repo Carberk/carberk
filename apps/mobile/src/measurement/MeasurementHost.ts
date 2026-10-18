@@ -17,6 +17,9 @@ export class MeasurementHost {
  readonly queue: MeasurementQueue;
  private session: Session | null = null;
  private epoch = 0;
+ private readonly listeners=new Set<()=>void>();
+ subscribe(listener:()=>void):()=>void {this.listeners.add(listener);return()=>{this.listeners.delete(listener);};}
+ private changed():void {for(const listener of this.listeners)listener();}
  private guestAssociation: Session | null = null;
  constructor(private readonly apiUrl: string, private readonly ports: MeasurementHostPorts, private readonly enabled = false) {
   const sender = new MeasurementHttpSender(apiUrl, async () => {
@@ -28,7 +31,7 @@ export class MeasurementHost {
  /** Called synchronously on auth changes before any new actor event can enqueue. */
  invalidate(): void {
   if (this.session?.actorKey === "guest") this.guestAssociation = this.session;
-  this.epoch++; this.session = null; this.queue.setEligibility(null);
+  this.epoch++; this.session = null; this.queue.setEligibility(null);this.changed();
   // Late old-generation writes remain ineligible even if native storage ignores cancellation.
   void this.ports.writeIdentity(null).catch(() => undefined);
   void this.ports.writeQueue(null).catch(() => undefined);
@@ -76,7 +79,7 @@ export class MeasurementHost {
     const queueGeneration = sameActor && stored?.generation === parsed.data.generation ? stored.queueGeneration : this.ports.newId();
     this.session = { ...parsed.data, actorKey: identity.actorKey, queueGeneration };
     this.guestAssociation = null;
-    this.queue.setEligibility({ generation: queueGeneration, purposes: parsed.data.purposes });
+    this.queue.setEligibility({ generation: queueGeneration, purposes: parsed.data.purposes });this.changed();
     await this.ports.writeIdentity(JSON.stringify(this.session));
     if (epoch !== this.epoch) return;
     await this.queue.flush();

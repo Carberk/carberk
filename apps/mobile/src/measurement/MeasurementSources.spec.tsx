@@ -23,10 +23,10 @@ beforeEach(async()=>{
   http.get("*/api/v1/*",({request})=>{
    const path=new URL(request.url).pathname;
    if(path.endsWith("/config"))return HttpResponse.json({signupsEnabled:true,inspectionInterestEnabled:false,reportEntryEnabled:true});
-   if(path.endsWith("/listings/count"))return HttpResponse.json({totalMatching:0});
+   if(path.endsWith("/listings/count"))return HttpResponse.json({totalMatching:0,priceMinTmt:null,priceMaxTmt:null});
    if(path.endsWith("/listings/filter-options/brands"))return HttpResponse.json({items:[]});
    if(path.endsWith("/listings"))return HttpResponse.json({items:[],nextCursor:null});
-   if(path.includes("/listings/"))return HttpResponse.json(fixture());
+   if(path.includes("/listings/"))return HttpResponse.json(fixture({brandId:visitId,modelId:visitId,cityId:visitId,regionId:visitId,generationId:undefined}));
    return HttpResponse.json({items:[],results:[],nextCursor:null,hasMore:false});
   }));
  await measurementHost.foreground();
@@ -44,6 +44,21 @@ describe("actual native discovery and detail source facts",()=>{
   await view.rerender(<ResultsScreen/>);await act(async()=>{await measurementHost.queue.flush();});
   expect(events.filter(event=>event.eventName==="search_completed")).toHaveLength(1);
   expect(events.find(event=>event.eventName==="search_completed")?.payload).toEqual({resultCount:"zero",filters:{}});
+ });
+ it("waits for an admitted visit while Search remains usable",async()=>{
+  measurementHost.invalidate();
+  const view=await renderMobile(<SearchScreen/>);
+  expect(view.getByLabelText("Search brand or model")).toBeTruthy();
+  await act(async()=>{await measurementHost.foreground();});
+  await waitFor(async()=>{await act(async()=>{await measurementHost.queue.flush();});expect(events.some(event=>event.eventName==="discovery_opened")).toBe(true);});
+ });
+ it("never attaches an old count to changed applied filters",async()=>{
+  server.use(http.get("*/api/v1/listings/count",({request})=>HttpResponse.json({totalMatching:new URL(request.url).searchParams.has("brandId")?12:0,priceMinTmt:null,priceMaxTmt:null})));
+  const view=await renderMobile(<ResultsScreen/>);
+  await waitFor(async()=>{await act(async()=>{await measurementHost.queue.flush();});expect(events.filter(event=>event.eventName==="search_completed")).toHaveLength(1);});
+  routeParams.brandId=visitId;await view.rerender(<ResultsScreen/>);
+  await waitFor(async()=>{await act(async()=>{await measurementHost.queue.flush();});expect(events.filter(event=>event.eventName==="search_completed")).toHaveLength(2);});
+  expect(events.filter(event=>event.eventName==="search_completed").map(event=>event.payload)).toEqual([{resultCount:"zero",filters:{}},{resultCount:"6_20",filters:{brandId:visitId}}]);
  });
  it("emits the actual successfully loaded Listing detail ID",async()=>{
   routeParams.id=fixture().id;await renderMobile(<ListingDetailScreen/>);

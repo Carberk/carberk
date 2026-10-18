@@ -18,14 +18,14 @@ export class RecomputeImprovement {
    const states=await tx.$queryRaw<{epoch:string}[]>`SELECT "epoch" FROM "measurement_state" WHERE "key"='collector' FOR SHARE`;
    if(states[0]?.epoch!==this.scope.epoch) return;
    const baseline=await tx.measurementState.findUnique({where:{key:`inventory_baseline:${this.scope.epoch}`}});
-   const rows=await tx.measurementRecord.findMany({where:{environment:this.scope.environment,population:this.scope.population,receivedAt:{lte:now},expiresAt:{gt:now}},include:{principal:{select:{pseudonym:true,kind:true,epoch:true}}},orderBy:[{occurredAt:"asc"},{id:"asc"}],take:50001});
+   const rows=await tx.measurementRecord.findMany({where:{environment:this.scope.environment,population:this.scope.population,receivedAt:{lte:now},expiresAt:{gt:now}},include:{principal:{select:{pseudonym:true,kind:true,epoch:true,createdAt:true}}},orderBy:[{occurredAt:"asc"},{id:"asc"}],take:50001});
    if(rows.length>50000) throw new Error("Improvement recomputation capacity exceeded");
    const pending=await tx.measurementOutbox.findFirst({where:{epoch:this.scope.epoch,environment:this.scope.environment,population:this.scope.population},orderBy:{createdAt:"asc"},select:{createdAt:true}});
    const completeThrough=pending?.createdAt && pending.createdAt<now?pending.createdAt:now;
    const facts:ScorecardFact[]=[];
    for(const row of rows) {
     const event=MeasurementSchemas.MeasurementEventSchema.safeParse(row.event);
-    if(event.success && row.principal.epoch===this.scope.epoch && (row.principal.kind==="account" || row.principal.kind==="guest")) facts.push({subject:row.principal.pseudonym,kind:row.principal.kind,conversionEligible:row.conversionEligible,event:event.data});
+    if(event.success && row.principal.epoch===this.scope.epoch && (row.principal.kind==="account" || row.principal.kind==="guest")) facts.push({subject:row.principal.pseudonym,kind:row.principal.kind,firstObservedAt:row.principal.createdAt,conversionEligible:row.conversionEligible,event:event.data});
    }
    for(const period of ["completed_week","previous_week","today"] as const) {
     const from=new Date(period==="today"?midnight:midnight-(period==="previous_week"?14:7)*DAY);
