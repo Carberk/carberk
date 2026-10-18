@@ -278,3 +278,55 @@ test('a fresh controller restores from persisted exact campaign disposal after r
   await recoveredController.release(claim);
   assert.equal((await ledger.read()).state.reservation, null);
 });
+
+test('explicit reset continues only its persisted exact campaign cleanup operation after interruption', async t => {
+  const { control, ledger, platform, claim } = await campaignDisposalSetup(t);
+  platform.fail = true;
+  await assert.rejects(control.operate(claim, 'reset'), /blocked/);
+  const interrupted = (await ledger.read()).state.reservation.operation;
+  platform.fail = false;
+  const continued = await new StagingControl({ ...control }).operate(claim, 'reset');
+  assert.equal(continued.operation, interrupted.id);
+  const state = (await ledger.read()).state;
+  assert.equal(state.reservation.operation, null);
+  assert.equal(state.reservation.evidence.at(-1).operationId, interrupted.id);
+  assert.equal(state.reservation.evidence.at(-1).deliveryCleanup, 'disposed');
+  assert.equal(platform.operations.at(-1).kind, 'reset');
+  await control.restore(claim);
+});
+
+test('explicit reset refuses incomplete or changed in-flight identity, runtime authority and other operation kinds', async t => {
+  for (const fault of ['legacy', 'owner', 'namespace', 'candidate', 'profile', 'deploy', 'restore', 'target', 'attestation', 'changed-during-attestation']) {
+    await t.test(fault, async t => {
+      const { control, ledger, platform, claim } = await campaignDisposalSetup(t);
+      platform.fail = true;
+      await assert.rejects(control.operate(claim, 'reset'), /blocked/);
+      platform.fail = false;
+      const before = await ledger.read();
+      const op = before.state.reservation.operation;
+      if (fault === 'legacy') delete op.namespace;
+      if (fault === 'owner') op.owner = 'bob';
+      if (fault === 'namespace') op.namespace = `cf_${'f'.repeat(32)}`;
+      if (fault === 'candidate') op.candidate = 'b'.repeat(40);
+      if (fault === 'profile') op.profile = 'listing-v1';
+      if (fault === 'deploy' || fault === 'restore') op.kind = fault;
+      if (fault === 'target') op.target = 'b'.repeat(40);
+      assert.equal(await ledger.compareAndSwap(before.revision, before.state), true);
+      if (fault === 'attestation') platform.policy.services.api = 'wrong-api';
+      if (fault === 'changed-during-attestation') {
+        const attest = platform.attest.bind(platform);
+        platform.attest = async (...args) => {
+          const changing = await ledger.read(); changing.state.reservation.operation.id = 'f'.repeat(32);
+          await ledger.compareAndSwap(changing.revision, changing.state);
+          return attest(...args);
+        };
+      }
+      const operations = platform.operations.length;
+      await assert.rejects(control.operate(claim, 'reset'));
+      assert.equal(platform.operations.length, operations);
+      assert.ok((await ledger.read()).state.reservation.operation);
+      await assert.rejects(control.operate(claim, 'deploy'));
+      await assert.rejects(control.restore(claim));
+    });
+  }
+});
