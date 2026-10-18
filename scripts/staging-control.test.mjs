@@ -216,3 +216,65 @@ test('a completed narrow fixture cannot silently become campaign identities', as
   await control.operate(lease, 'fixture');
   await assert.rejects(control.operate(lease, 'fixture', 'campaign897-identities-v1'), /profile/);
 });
+
+async function campaignDisposalSetup(t) {
+  const context = await setup(t);
+  const { control, platform } = context;
+  const claim = await context.claim();
+  const execute = platform.execute.bind(platform);
+  platform.execute = async (kind, lease, target, record) => ({
+    ...await execute(kind, lease, target, record),
+    ...(kind === 'fixture' || kind === 'reset' ? {
+      reservationId: lease.id, candidate: lease.candidate, profile: 'campaign897-identities-v1',
+      namespace: lease.namespace, protectedReceipt: `${lease.namespace}.campaign_entities`,
+      state: kind === 'fixture' ? 'identities' : 'disposed', fixtures: kind === 'fixture' ? 'present' : 'absent',
+      identities: kind === 'fixture' ? 4 : 0, tombstone: kind === 'reset',
+      ...(kind === 'reset' ? { cleanupVersion: 1, deliveryCleanup: 'disposed', queueJobs: 0, sinkRecords: 0 } : {}),
+    } : {}),
+  });
+  await control.operate(claim, 'fixture', 'campaign897-identities-v1');
+  return { ...context, claim };
+}
+
+test('campaign restoration refuses before deploy without current durable complete disposal evidence', async t => {
+  for (const fault of ['missing', 'caller-boolean', 'foreign-reservation', 'candidate', 'profile', 'partial-queue', 'partial-sink', 'cleaning', 'no-tombstone', 'stale-before-fixture']) {
+    await t.test(fault, async t => {
+      const { control, ledger, platform, claim } = await campaignDisposalSetup(t);
+      if (!['missing', 'caller-boolean'].includes(fault)) await control.operate(claim, 'reset');
+      const persisted = await ledger.read();
+      const lease = persisted.state.reservation;
+      const proof = lease.evidence.at(-1);
+      if (fault === 'caller-boolean') claim.disposed = true;
+      if (fault === 'foreign-reservation') proof.reservationId = 'f'.repeat(32);
+      if (fault === 'candidate') proof.candidate = 'b'.repeat(40);
+      if (fault === 'profile') proof.profile = 'listing-v1';
+      if (fault === 'partial-queue') proof.queueJobs = 1;
+      if (fault === 'partial-sink') proof.sinkRecords = 1;
+      if (fault === 'cleaning') proof.state = 'cleaning';
+      if (fault === 'no-tombstone') proof.tombstone = false;
+      if (fault === 'stale-before-fixture') lease.evidence.push({ ...lease.evidence.find(e => e.kind === 'fixture') });
+      assert.equal(await ledger.compareAndSwap(persisted.revision, persisted.state), true);
+      const before = platform.operations.length;
+      await assert.rejects(control.restore(claim), /dispos|reset|cleanup/i);
+      assert.equal(platform.operations.length, before);
+      const retained = (await ledger.read()).state.reservation;
+      assert.equal(retained.id, claim.id);
+      assert.equal(retained.candidate, claim.candidate);
+      assert.match(retained.recovery.action, /reset|dispos|cleanup/i);
+    });
+  }
+});
+
+test('a fresh controller restores from persisted exact campaign disposal after repeated reset', async t => {
+  const { control, ledger, platform, claim } = await campaignDisposalSetup(t);
+  await control.operate(claim, 'reset'); await control.operate(claim, 'reset');
+  const proof = (await ledger.read()).state.reservation.evidence.at(-1);
+  assert.equal(proof.reservationId, claim.id); assert.equal(proof.candidate, claim.candidate);
+  assert.equal(proof.cleanupVersion, 1); assert.equal(proof.deliveryCleanup, 'disposed');
+  assert.equal(proof.queueJobs, 0); assert.equal(proof.sinkRecords, 0); assert.equal(proof.tombstone, true);
+  const recoveredController = new StagingControl({ ...control });
+  await recoveredController.restore(claim);
+  assert.equal(platform.operations.at(-1).kind, 'restore');
+  await recoveredController.release(claim);
+  assert.equal((await ledger.read()).state.reservation, null);
+});
