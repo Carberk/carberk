@@ -174,8 +174,11 @@ export class PrismaListingRepository implements ListingRepository {
         if (!actor) throw new Error("Business Listing requires current actor");
         await assertListingOwnership(this.ownership, actor, { sellerId: row.sellerId, businessId: row.businessId }, tx);
       }
+      // Business authority locks precede Listing locks. Refetch after the lock so a concurrent status change cannot emit a stale transition.
+      if(this.measurement)await tx.$queryRaw`SELECT id FROM listings WHERE id=${id} FOR UPDATE`;
+      const current=this.measurement?await tx.listing.findUnique({where:{id}}):row;
       await tx.listing.update({ where: { id }, data: { deletedAt: at } });
-      if(row && !row.deletedAt && row.status==="active") await this.visibility(tx,row.sellerId,id,false,"deleted",at);
+      if(current && !current.deletedAt && current.status==="active") await this.visibility(tx,current.sellerId,id,false,"deleted",at);
     });
   }
 
