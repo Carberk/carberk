@@ -38,6 +38,16 @@ describe("real prepared bytes through processing publication", () => {
     expect(f.ledger.ready).toBeNull(); expect(f.ledger.failure).toBe("VIDEO_READBACK_FAILED");
     expect(f.ledger.planned.length).toBeGreaterThan(0);
   });
+  it("stops publishing when the total processing budget expires", async () => {
+    const f = fixture();
+    let time = new Date("2026-10-17T00:00:00Z");
+    const service = new ProcessPreparedVideo(f.ledger, f.objects, new FFmpegVideoProcessor(), () => time, () => "lease");
+    f.objects.afterPublish = () => { time = new Date("2026-10-17T00:18:00Z"); };
+    expect(await service.execute("generation")).toBe("failed");
+    expect(f.objects.bytes.size).toBe(1);
+    expect(f.ledger.ready).toBeNull();
+    expect(f.ledger.failure).toBe("VIDEO_PROCESSING_TIMEOUT");
+  });
   it("lets cancellation win after object publication while retaining every cleanup key", async () => {
     const f = fixture(); f.objects.afterPublish = () => { f.ledger.cancelled = true; };
     expect(await f.service.execute("generation")).toBe("superseded");
