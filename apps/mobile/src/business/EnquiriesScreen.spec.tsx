@@ -138,11 +138,13 @@ describe("current member business inbox", () => {
   first.unmount();
   const back = await renderMobile(<EnquiriesScreen />); await back.findByText("car-1");
   await fireEvent.press(back.getByRole("button", { name: "Open history" }));
+  await back.findByText("No messages yet");
   expect((await back.findByLabelText("Message")).props.value).toBe("Reply after returning");
   await act(async () => { await clearAuthSession(); }); back.unmount();
   await storeAuthSession({ accessToken: "synthetic", refreshToken: "refresh", user: { id: userId, phone: "+99365123456", email: null, displayName: null, role: "buyer" } });
   const again = await renderMobile(<EnquiriesScreen />); await again.findByText("car-1");
   await fireEvent.press(again.getByRole("button", { name: "Open history" }));
+  await again.findByText("No messages yet");
   expect((await again.findByLabelText("Message")).props.value).toBe("");
  });
 

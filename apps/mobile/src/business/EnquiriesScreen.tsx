@@ -14,6 +14,7 @@ import { useAuth } from "../auth/useAuth";
 import { useBusinessWorkspace } from "./api";
 import { useInventoryRequestOptions } from "./useInventoryRequestOptions";
 import { enquiryCopy } from "./enquiryCopy";
+import { clearEnquiryDraftsForUser, readEnquiryDraft, writeEnquiryDraft } from "./enquiryDraftStore";
 
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
@@ -32,9 +33,10 @@ export function EnquiriesScreen() {
  const key = ["business", userId, businessId, "enquiries"];
  const [filter, setFilter] = useState<"all" | "mine" | "unassigned" | "open" | "closed">("all");
  const [selected, setSelected] = useState<string | null>(null); const [notice, setNotice] = useState(""); const [drafts, setDrafts] = useState<Record<string, string>>({});
- const draft = selected ? drafts[selected] ?? "" : "";
- const setDraft = (value: string) => { if (selected) setDrafts(previous => ({ ...previous, [selected]: value })); };
- useEffect(() => { setSelected(null); setDrafts({}); setNotice(""); setFilter("all"); }, [userId, businessId]);
+ const draft = selected ? drafts[selected] ?? readEnquiryDraft(userId, businessId, selected) : "";
+ const setDraft = (value: string) => { if (selected) { writeEnquiryDraft(userId, businessId, selected, value); setDrafts(previous => ({ ...previous, [selected]: value })); } };
+ useEffect(() => { clearEnquiryDraftsForUser(userId); setDrafts({}); }, [userId]);
+ useEffect(() => { setSelected(null); setNotice(""); setFilter("all"); }, [businessId]);
  const inbox = useInfiniteQuery({ queryKey: key, initialPageParam: undefined as string | undefined, queryFn: ({ pageParam }) => apiClient.get(`/conversations/business/${businessId}${pageParam ? `?cursor=${encodeURIComponent(pageParam)}` : ""}`, pageSchema, options), getNextPageParam: page => page.nextCursor ?? undefined, enabled: isAuthenticated === true && !!businessId, staleTime: 0, gcTime: 0 });
  const messages = useInfiniteQuery({ queryKey: [...key, selected, "messages"], initialPageParam: undefined as string | undefined, queryFn: ({ pageParam }) => apiClient.get(`/conversations/${selected}/messages${pageParam ? `?cursor=${encodeURIComponent(pageParam)}` : ""}`, ConversationsSchemas.ListMessagesResponseSchema, options), getNextPageParam: page => page.nextCursor ?? undefined, enabled: isAuthenticated === true && !!businessId && !!selected && !inbox.isError, staleTime: 0, gcTime: 0 });
  const refresh = () => { void workspace.refetch(); if (businessId) void inbox.refetch(); if (selected && businessId) void messages.refetch(); };
