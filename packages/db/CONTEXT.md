@@ -1,6 +1,6 @@
 # Database
 
-The schema, migration history, generated-client boundary, and seed inputs live here. Inspect `schema.prisma` for fields and relations instead of copying them into documentation. Runtime consumers load the compiled package.
+The schema, migration history, generated-client boundary, and seed inputs live here. Inspect `schema.prisma` for fields and relations instead of copying them into documentation. Runtime consumers load the compiled package. [The source capture adapter](src/measurement-capture.ts) is shared by API and worker source transactions, preserving collector authority, savepoint isolation and latency budgets without importing either application.
 
 `Listing.publicNumber` is a unique, database-assigned integer for the public detail footer. Its migration numbers existing Listings; subsequent inserts take the next sequence value. UUIDs remain the internal identity and route key.
 
