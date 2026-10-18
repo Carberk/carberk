@@ -160,7 +160,7 @@ describe("video upload current authority and retirement", () => {
     await db.listing.update({ where: { id: suite.id("owner-listing") }, data: { businessId } });
     await create("owner", body()).expect(404);
     const { body: session } = await create("owner", body(), true).expect(201);
-    await db.dealershipMember.update({ where: { userId: suite.id("owner") }, data: { status: "revoked" } });
+    await db.dealershipMember.update({ where: { userId: suite.id("owner") }, data: { status: "suspended" } });
     await action(session.sessionId, "pause", true).expect(404);
   });
 });
