@@ -73,3 +73,7 @@ export function beginSignInMeasurement(method:"email"|"phone"):{headers:Record<s
   }};
  }catch{return fallback;}
 }
+
+export function recordWizardStepResult(draftId:string,step:Extract<MeasurementSchemas.MeasurementEvent,{eventName:"wizard_step_result"}>["payload"]["step"],result:"success"|"expected_rejection"):void {
+ try {emitMeasurement({eventName:"wizard_step_result",purpose:"product_improvement",payload:{draftId,step,attemptId:Crypto.randomUUID(),result,durationMs:0,...(result==="expected_rejection"?{category:"validation" as const}:{})}});}catch{/* Validation never waits for telemetry. */}
+}
