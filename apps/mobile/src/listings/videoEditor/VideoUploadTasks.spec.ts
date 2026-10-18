@@ -21,7 +21,7 @@ vi.mock("expo", async () => ({ requireOptionalNativeModule: () => boundary.unava
   const bytes = new Uint8Array([1, 2, 3, 4]), uri = `file:///documents/listing-video-preparation/${selection.jobId}/prepared.mp4`;
   storage.files.set(uri, bytes);
   return { uri, durationMs: selection.endMs - selection.startMs, sizeBytes: 4, sha256: createHash("sha256").update(bytes).digest("hex"), width: 640, height: 360, fps: 30, videoCodec: "h264", audioCodec: "aac", colour: "bt709" };
- }, cancel: async () => {}, discard: async () => {},
+ }, cancel: async () => {}, discard: async (jobId: string) => { videoNativeStorage.files.delete(`file:///documents/listing-video-preparation/${jobId}/prepared.mp4`); },
 } }));
 const ownerId = "00000000-0000-4000-8000-000000000030", target = { kind: "draft" as const, id: "00000000-0000-4000-8000-000000000031" }, sessionId = "00000000-0000-4000-8000-000000000032";
 const base = "http://localhost:3006/api/v1/listing-video-upload-sessions";
@@ -55,6 +55,7 @@ describe("native seller task uses actual preparation and transfer boundaries", (
   const reopened = new VideoUploadTask(ownerId, target);
   await reopened.recover();
   expect(reopened.snapshot().phase).toBe("READY");
+  expect(videoNativeStorage.files.size).toBe(0);
  });
  it("keeps cancellation authoritative over a late ready status response", async () => {
   const task = new VideoUploadTask(ownerId, target);
