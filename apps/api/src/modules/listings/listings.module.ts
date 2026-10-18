@@ -22,6 +22,7 @@ import { FavoritesController } from "./presentation/FavoritesController";
 import { ContactPhonesController } from "./presentation/ContactPhonesController";
 import { VideoUploadController } from "./presentation/VideoUploadController";
 import { VideoUploadSessionService } from "./application/VideoUploadSession";
+import { VideoEligibility } from "./application/VideoEligibility";
 import { PrismaVideoUploadSessionRepository } from "./infrastructure/PrismaVideoUploadSessionRepository";
 import { NullVinDecoder } from "./infrastructure/NullVinDecoder";
 import { NullContentClassifier } from "./infrastructure/NullContentClassifier";
@@ -272,6 +273,7 @@ import { LISTING_VIEWS_PORT } from "./domain/ports/ListingViewsPort";
     ConfirmContactPhone,
     ListMyContactPhones,
     VideoUploadSessionService,
+    VideoEligibility,
     PrismaVideoUploadSessionRepository,
   ],
   exports: [

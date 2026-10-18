@@ -43,6 +43,9 @@ const BaseSchema = z.object({
   REVIEW_DEMO_ACCOUNT_ENABLED: booleanFlag,
   REVIEW_DEMO_ACCOUNTS_JSON: z.string().default("[]"),
   TESTER_ACCOUNTS_JSON: z.string().default("[]"),
+  /** Video is an explicitly gated tester experiment; both switches are required. */
+  VIDEO_ROLLOUT_ENABLED: booleanFlag,
+  VIDEO_TESTER_USER_IDS: z.string().default(""),
 
   RATE_LIMIT_GENERAL: z.coerce.number().int().positive().default(60),
   RATE_LIMIT_OTP_PHONE_DAILY: z.coerce.number().int().positive().default(5),

@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 export type VideoSessionState = "UPLOADING" | "PAUSED" | "COMPLETING" | "PROCESSING" | "FAILED" | "CANCELLED" | "CLEANUP_PENDING" | "DELETED";
-export interface VideoSessionRecord { id: string; uploadId: string; userId: string; listingId?: string; state: VideoSessionState; expiresAt: Date; claimToken: string; }
+export interface VideoSessionRecord { id: string; uploadId: string; userId: string; listingId?: string; sourceKey: string; state: VideoSessionState; expiresAt: Date; claimToken: string; }
 @Injectable()
 export class VideoUploadSessionService {
   constructor(private readonly now: () => Date = () => new Date()) {}
