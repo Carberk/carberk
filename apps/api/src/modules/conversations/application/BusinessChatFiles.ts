@@ -25,6 +25,8 @@ export class BusinessChatFiles {
  }
  async download(actor: ConversationActor, conversationId: string, attachmentId: string) {
   const key = await this.authorize(actor, conversationId, attachmentId, false);
-  return this.store.get(key);
+  const bytes = await this.store.get(key);
+  await this.authorize(actor, conversationId, attachmentId, false);
+  return bytes;
  }
 }
