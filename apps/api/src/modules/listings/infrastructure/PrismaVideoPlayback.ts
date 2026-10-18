@@ -3,7 +3,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService, type Prisma } from "@auto-tm/db";
 import { z } from "zod";
 import { BUSINESS_AUTHORITY_PORT, IDENTITY_CLOCK_PORT, type BusinessAuthorityPort, type ClockPort } from "../../identity/identity.public";
-import type { VideoPlaybackAuthority, VideoGrantIssuer } from "../application/VideoPlaybackPorts";
+import type { VideoPlaybackAuthority, VideoGrantIssuer, VideoDescriptorReader } from "../application/VideoPlaybackPorts";
 import { VideoManifestGateway } from "./VideoManifestGateway";
 
 export const VIDEO_GRANT_SECRET_FACTORY = Symbol("VideoGrantSecretFactory");
@@ -13,8 +13,19 @@ const manifestSchema = z.object({ assets: z.array(z.object({ path: z.string().ma
 
 /** Legacy unbound grants deny. This never selects a newest generation or public URL. */
 @Injectable()
-export class PrismaVideoPlayback implements VideoPlaybackAuthority, VideoGrantIssuer {
+export class PrismaVideoPlayback implements VideoPlaybackAuthority, VideoGrantIssuer, VideoDescriptorReader {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService, @Inject(BUSINESS_AUTHORITY_PORT) private readonly identity: BusinessAuthorityPort, @Inject(VIDEO_PLAYBACK_ELIGIBILITY) private readonly eligibility: VideoPlaybackEligibility, @Inject(IDENTITY_CLOCK_PORT) private readonly clock: ClockPort, @Inject(VIDEO_GRANT_SECRET_FACTORY) private readonly newSecret: () => string) {}
+  async describe(input: Parameters<VideoDescriptorReader["describe"]>[0]): ReturnType<VideoDescriptorReader["describe"]> {
+    try {
+      return await this.prisma.$transaction(async tx => {
+        await tx.$executeRaw`SET LOCAL statement_timeout = '500ms'`;
+        const current = await this.current(tx, input, input.listingId);
+        if (!current || !current.durationMs || !Number.isSafeInteger(current.durationMs) || current.durationMs > 90000 || !current.assets.some(asset => asset.path === "poster.jpg" && asset.purpose === "poster")) return null;
+        const renditions = [240, 360, 720].filter(height => current.assets.some(asset => asset.path === `${height}/index.m3u8` && asset.purpose === "playback"));
+        return renditions.length ? { generationId: current.generationId, durationMs: current.durationMs, renditions } : null;
+      }, { maxWait: 250, timeout: 1500 });
+    } catch { return null; }
+  }
   async authorize(secret: string): ReturnType<VideoPlaybackAuthority["authorize"]> {
     if (!/^[A-Za-z0-9_-]{43}$/.test(secret)) return null;
     const secretHash = createHash("sha256").update(secret).digest("hex");
@@ -65,7 +76,7 @@ export class PrismaVideoPlayback implements VideoPlaybackAuthority, VideoGrantIs
     const prefix = `video/v1/${generation.uploadId}/${generation.id}/`;
     if (parsed.data.assets.some((asset) => asset.key !== prefix + asset.path || asset.path === "source.mp4")) return null;
     new VideoManifestGateway(parsed.data.assets);
-    return { generationId: generation.id, assets: parsed.data.assets };
+    return { generationId: generation.id, durationMs: generation.durationMs, assets: parsed.data.assets };
   }
 
 }

@@ -1,6 +1,10 @@
 import type { Readable } from "node:stream";
 export const VIDEO_PLAYBACK_AUTHORITY = Symbol("VideoPlaybackAuthority");
 export const VIDEO_PLAYBACK_OBJECTS = Symbol("VideoPlaybackObjects");
+export const VIDEO_DESCRIPTOR_READER = Symbol("VideoDescriptorReader");
+export interface VideoDescriptorReader {
+  describe(input: { userId: string; sessionId: string; listingId: string }): Promise<{ generationId: string; durationMs: number; renditions: number[] } | null>;
+}
 export const VIDEO_GRANT_ISSUER = Symbol("VideoGrantIssuer");
 export interface VideoGrantIssuer {
   issue(input: { userId: string; sessionId: string; listingId: string; purpose: "poster" | "playback" }): Promise<{ url: string; generationId: string; expiresAt: Date } | null>;
