@@ -543,3 +543,14 @@ describe("video tester configuration", () => {
   expect(EnvSchema.parse({ ...baseEnv, VIDEO_TESTER_USER_IDS: "11111111-1111-4111-8111-111111111111, 22222222-2222-4222-8222-222222222222" }).VIDEO_TESTER_USER_IDS).toEqual(["11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"]);
  });
 });
+
+describe("private video serving configuration", () => {
+ it("rejects a bucket managed by the public media bootstrap", () => {
+  for (const bucket of ["listing-photos", "listing-videos", "chat-attachments", "catalog-assets"]) {
+   expect(EnvSchema.safeParse({ ...baseEnv, VIDEO_PRIVATE_BUCKET: bucket }).success).toBe(false);
+  }
+ });
+ it("defaults new uploads closed independently from existing playback", () => {
+  expect(EnvSchema.parse({ ...baseEnv, VIDEO_ROLLOUT_ENABLED: "true" }).VIDEO_UPLOADS_ENABLED).toBe(false);
+ });
+});
