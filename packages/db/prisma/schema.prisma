@@ -1609,6 +1609,10 @@ model HistoryArtifact {
   vin String?
   originalDate DateTime
   mileageObservedAt DateTime?
+  mileageValue Int?
+  mileageUnit String?
+  vehicleIdentity String?
+  sourceObservations Json @default("[]")
   sourceListingId String?
   acquiredForOrderId String?
   objectKey String @unique
