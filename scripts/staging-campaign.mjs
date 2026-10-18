@@ -310,24 +310,24 @@ export function businessMain(input, { sql, uuid, exists }) {
     CREATE TABLE "${n}".campaign_records(table_name text NOT NULL,row_key jsonb NOT NULL,row_hash text NOT NULL,version bigint NOT NULL DEFAULT 1,deleted boolean NOT NULL DEFAULT false,PRIMARY KEY(table_name,row_key));
     CREATE TABLE "${n}".campaign_events(sequence bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,table_name text NOT NULL,row_key jsonb NOT NULL,mutation text NOT NULL CHECK(mutation IN ('INSERT','UPDATE','DELETE')),row_hash text NOT NULL);
     CREATE FUNCTION "${n}".track_business() RETURNS trigger LANGUAGE plpgsql AS $fn$
-    DECLARE value jsonb; prior jsonb; rowkey jsonb; oldkey jsonb; edge record; parent_table text; lifecycle text; owned boolean; fingerprint text;
+    DECLARE v_row jsonb; prior jsonb; rowkey jsonb; oldkey jsonb; edge record; parent_table text; lifecycle text; owned boolean; fingerprint text;
     BEGIN
-      value := CASE WHEN TG_OP='DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END;
+      v_row := CASE WHEN TG_OP='DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END;
       prior := CASE WHEN TG_OP='INSERT' THEN NULL ELSE to_jsonb(OLD) END;
-      rowkey := CASE WHEN TG_TABLE_NAME='staff_grants' THEN ${key('value','staff_grants')} ELSE ${key('value','users')} END;
+      rowkey := CASE WHEN TG_TABLE_NAME='staff_grants' THEN ${key('v_row','staff_grants')} ELSE ${key('v_row','users')} END;
       oldkey := CASE WHEN TG_TABLE_NAME='staff_grants' THEN ${key('prior','staff_grants')} ELSE ${key('prior','users')} END;
       SELECT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=TG_TABLE_NAME AND row_key IN (rowkey,oldkey)) INTO owned;
       IF TG_TABLE_NAME='users' THEN
-        owned := owned OR EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id IN (value->>'id',prior->>'id') OR email IN (value->>'email',prior->>'email'));
+        owned := owned OR EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id IN (v_row->>'id',prior->>'id') OR email IN (v_row->>'email',prior->>'email'));
       ELSIF TG_TABLE_NAME='dealerships' THEN
-        owned := owned OR value->>'id'='${rootId}' OR prior->>'id'='${rootId}' OR value->>'slug'='${rootSlug}' OR prior->>'slug'='${rootSlug}' OR value->>'contactPhone'='${rootContact}' OR prior->>'contactPhone'='${rootContact}';
+        owned := owned OR v_row->>'id'='${rootId}' OR prior->>'id'='${rootId}' OR v_row->>'slug'='${rootSlug}' OR prior->>'slug'='${rootSlug}' OR v_row->>'contactPhone'='${rootContact}' OR prior->>'contactPhone'='${rootContact}';
       ELSE
         FOR edge IN SELECT * FROM jsonb_each_text('${JSON.stringify(parents)}'::jsonb) LOOP
           -- Foreign reporters targeting an owned listing remain foreign. Reset
           -- detects and refuses them before touching the owned graph.
-          IF EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=edge.value AND row_key->>'id' IN (value->>edge.key,prior->>edge.key)) THEN owned := true; END IF;
+          IF EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=edge.value AND row_key->>'id' IN (v_row->>edge.key,prior->>edge.key)) THEN owned := true; END IF;
         END LOOP;
-        IF TG_TABLE_NAME='audit_logs' AND value->>'targetType'='User' AND EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=value->>'targetId') THEN owned := true; END IF;
+        IF TG_TABLE_NAME='audit_logs' AND v_row->>'targetType'='User' AND EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'targetId') THEN owned := true; END IF;
       END IF;
       IF NOT coalesce(owned,false) THEN RETURN NULL; END IF;
       PERFORM pg_advisory_xact_lock(hashtextextended('${n}',0));
@@ -335,39 +335,39 @@ export function businessMain(input, { sql, uuid, exists }) {
       IF NOT EXISTS(SELECT 1 FROM "${n}".campaign_manifest WHERE journal_hash=${journalHash} AND event_hash=${eventHash}) THEN RAISE EXCEPTION 'Campaign journal changed'; END IF;
       IF TG_OP<>'INSERT' AND NOT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=TG_TABLE_NAME AND row_key=oldkey AND NOT deleted AND row_hash=md5(prior::text)) THEN RAISE EXCEPTION 'Untracked campaign mutation'; END IF;
       IF lifecycle='identities' AND TG_OP='INSERT' AND EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=TG_TABLE_NAME AND row_key=rowkey) THEN RAISE EXCEPTION 'Campaign key reuse'; END IF;
-      IF lifecycle='identities' AND TG_OP='DELETE' AND (TG_TABLE_NAME IN ('users','dealerships') OR (TG_TABLE_NAME='dealership_members' AND value->>'userId'='${owner.id}')) THEN RAISE EXCEPTION 'Campaign roots retained until disposal'; END IF;
+      IF lifecycle='identities' AND TG_OP='DELETE' AND (TG_TABLE_NAME IN ('users','dealerships') OR (TG_TABLE_NAME='dealership_members' AND v_row->>'userId'='${owner.id}')) THEN RAISE EXCEPTION 'Campaign roots retained until disposal'; END IF;
       IF lifecycle='disposed' THEN RAISE EXCEPTION 'Campaign graph disposed'; END IF;
-      IF lifecycle='cleaning' AND NOT ((TG_OP='DELETE' OR (TG_TABLE_NAME='audit_logs' AND TG_OP='UPDATE' AND value->>'actorId' IS NULL AND
-        value->>'targetType'='SyntheticCampaign' AND value->>'targetId'='${input.id}' AND value->'details'=jsonb_build_object('profile','${profile}','disposition','redacted-synthetic-audit'))) AND
+      IF lifecycle='cleaning' AND NOT ((TG_OP='DELETE' OR (TG_TABLE_NAME='audit_logs' AND TG_OP='UPDATE' AND v_row->>'actorId' IS NULL AND
+        v_row->>'targetType'='SyntheticCampaign' AND v_row->>'targetId'='${input.id}' AND v_row->'details'=jsonb_build_object('profile','${profile}','disposition','redacted-synthetic-audit'))) AND
         (SELECT count(DISTINCT relation) FROM pg_locks WHERE pid=pg_backend_pid() AND locktype='relation' AND mode='ShareRowExclusiveLock' AND granted AND relation IN (${relationIds}))=${tables.length})
         THEN RAISE EXCEPTION 'Campaign graph cleaning'; END IF;
-      IF lifecycle='identities' AND TG_OP='UPDATE' AND (rowkey IS DISTINCT FROM oldkey OR EXISTS(SELECT 1 FROM jsonb_each_text(value) e WHERE e.key IN (${immutable.map(x => `'${x}'`).join(',')}) AND value->e.key IS DISTINCT FROM prior->e.key)) THEN RAISE EXCEPTION 'Campaign parent or key transfer'; END IF;
+      IF lifecycle='identities' AND TG_OP='UPDATE' AND (rowkey IS DISTINCT FROM oldkey OR EXISTS(SELECT 1 FROM jsonb_each_text(v_row) e WHERE e.key IN (${immutable.map(x => `'${x}'`).join(',')}) AND v_row->e.key IS DISTINCT FROM prior->e.key)) THEN RAISE EXCEPTION 'Campaign parent or key transfer'; END IF;
       IF lifecycle='identities' AND TG_OP<>'DELETE' THEN
-        FOR edge IN SELECT * FROM jsonb_each_text(value) LOOP
+        FOR edge IN SELECT * FROM jsonb_each_text(v_row) LOOP
           parent_table := '${JSON.stringify(parents)}'::jsonb->>edge.key;
           IF parent_table IS NOT NULL AND edge.value IS NOT NULL AND NOT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=parent_table AND row_key=jsonb_build_object('id',edge.value) AND NOT deleted) THEN RAISE EXCEPTION 'Foreign campaign graph reference'; END IF;
         END LOOP;
-        IF TG_TABLE_NAME='users' AND (NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=value->>'id' AND email=value->>'email') OR
-          value->>'role'<>'buyer' OR value->>'emailVerifiedAt' IS NULL OR value->>'phone' IS NOT NULL OR value->>'avatarKey' IS NOT NULL OR value->>'avatarUploadId' IS NOT NULL OR value->>'avatarUrl' IS NOT NULL OR value->>'suspendedAt' IS NOT NULL OR value->>'suspendedById' IS NOT NULL OR value->>'deletionScheduledAt' IS NOT NULL) THEN RAISE EXCEPTION 'Synthetic identity changed'; END IF;
-        IF TG_TABLE_NAME='dealerships' AND (value->>'id'<>'${rootId}' OR value->>'slug'<>'${rootSlug}' OR value->>'contactPhone' IS DISTINCT FROM '${rootContact}' OR value->>'status'<>'recovery' OR value->>'admissionMode'<>'synthetic' OR value->>'admittedAt' IS NOT NULL OR value->>'checkedEvidence' IS NOT NULL OR value->>'contactConfirmedAt' IS NOT NULL OR value->>'logoUrl' IS NOT NULL) THEN RAISE EXCEPTION 'Synthetic root identity changed'; END IF;
-        IF TG_TABLE_NAME IN ('listings','listing_drafts','conversations') AND value->>'businessId' IS DISTINCT FROM '${rootId}' THEN RAISE EXCEPTION 'Campaign business required'; END IF;
-        IF TG_TABLE_NAME='dealership_members' AND value->>'userId'='${owner.id}' AND value->>'role'<>'owner' THEN RAISE EXCEPTION 'Synthetic owner changed'; END IF;
-        IF TG_TABLE_NAME='conversations' AND NOT EXISTS(SELECT 1 FROM public.listings l WHERE l.id=value->>'listingId' AND l."sellerId"=value->>'sellerId' AND l."businessId"=value->>'businessId') THEN RAISE EXCEPTION 'Campaign conversation parents disagree'; END IF;
-        IF TG_TABLE_NAME IN ('messages','conversation_participants') AND NOT EXISTS(SELECT 1 FROM public.conversations c WHERE c.id=value->>'conversationId' AND coalesce(value->>'senderId',value->>'userId') IN (c."buyerId",c."sellerId")) THEN RAISE EXCEPTION 'Campaign participant mismatch'; END IF;
-        IF TG_TABLE_NAME='conversations' AND EXISTS(SELECT 1 FROM jsonb_each_text(value) e WHERE e.key IN ('lastMessageId','firstBuyerMessageId','firstSellerReplyId') AND e.value IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.messages m WHERE m.id=e.value AND m."conversationId"=value->>'id')) THEN RAISE EXCEPTION 'Campaign message pointer mismatch'; END IF;
-        IF TG_TABLE_NAME='verified_contact_phones' AND (value->>'phone' IS DISTINCT FROM '${rootContact}' OR EXISTS(SELECT 1 FROM public.verified_contact_phones WHERE phone=value->>'phone' AND id<>value->>'id')) THEN RAISE EXCEPTION 'Campaign contact proof collision'; END IF;
-        IF TG_TABLE_NAME='staff_grants' AND (value->>'userId'<>'${coordinator.id}' OR value->>'capability' NOT IN ('staff.manage','founder.control')) THEN RAISE EXCEPTION 'Unsupported campaign grant'; END IF;
-        IF TG_TABLE_NAME='audit_logs' AND (value->>'targetType'<>'User' OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=value->>'targetId') OR value->>'action'<>'STAFF_CAPABILITY_BOOTSTRAP' OR value->>'targetId'<>'${coordinator.id}' OR value->>'actorId' IS NOT NULL OR NOT (
-          ${['staff.manage','founder.control'].map(c => `(value->>'id'='${uuid(`campaign897-business:${input.id}:audit:${c}`)}' AND value->'details'=jsonb_build_object('capability','${c}','reason','Synthetic storage-only reservation ${input.id}'))`).join(' OR ')})) THEN RAISE EXCEPTION 'Unsupported campaign audit'; END IF;
-        IF TG_TABLE_NAME='content_reports' AND (NOT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=CASE value->>'targetType' WHEN 'listing' THEN 'listings' WHEN 'user' THEN 'users' WHEN 'message' THEN 'messages' ELSE '' END AND NOT deleted AND row_key=jsonb_build_object('id',value->>'targetId')) OR value->>'messageContext' IS NOT NULL) THEN RAISE EXCEPTION 'Unsupported report target'; END IF;
-        IF TG_TABLE_NAME='messages' AND (value->>'kind'<>'text' OR coalesce(value->'metadata','null'::jsonb) NOT IN ('null'::jsonb,'{}'::jsonb)) THEN RAISE EXCEPTION 'Unsupported message media'; END IF;
-        IF TG_TABLE_NAME='listing_drafts' AND (jsonb_typeof(value->'payload')<>'object' OR EXISTS(SELECT 1 FROM jsonb_each(value->'payload') e WHERE e.key NOT IN ('description','media') OR (e.key='description' AND jsonb_typeof(e.value)<>'string') OR (e.key='media' AND e.value<>'[]'::jsonb))) THEN RAISE EXCEPTION 'Unsupported draft payload'; END IF;
-        IF TG_TABLE_NAME='notification_preferences' AND (jsonb_typeof(value->'optOuts')<>'object' OR EXISTS(SELECT 1 FROM jsonb_each(value->'optOuts') e WHERE jsonb_typeof(e.value)<>'boolean')) THEN RAISE EXCEPTION 'Unsupported notification preferences'; END IF;
-        IF TG_TABLE_NAME='listings' AND (value->>'pendingVideoGenerationId' IS NOT NULL OR value->>'activeVideoGenerationId' IS NOT NULL) THEN RAISE EXCEPTION 'Unsupported listing video'; END IF;
+        IF TG_TABLE_NAME='users' AND (NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'id' AND email=v_row->>'email') OR
+          v_row->>'role'<>'buyer' OR v_row->>'emailVerifiedAt' IS NULL OR v_row->>'phone' IS NOT NULL OR v_row->>'avatarKey' IS NOT NULL OR v_row->>'avatarUploadId' IS NOT NULL OR v_row->>'avatarUrl' IS NOT NULL OR v_row->>'suspendedAt' IS NOT NULL OR v_row->>'suspendedById' IS NOT NULL OR v_row->>'deletionScheduledAt' IS NOT NULL) THEN RAISE EXCEPTION 'Synthetic identity changed'; END IF;
+        IF TG_TABLE_NAME='dealerships' AND (v_row->>'id'<>'${rootId}' OR v_row->>'slug'<>'${rootSlug}' OR v_row->>'contactPhone' IS DISTINCT FROM '${rootContact}' OR v_row->>'status'<>'recovery' OR v_row->>'admissionMode'<>'synthetic' OR v_row->>'admittedAt' IS NOT NULL OR v_row->>'checkedEvidence' IS NOT NULL OR v_row->>'contactConfirmedAt' IS NOT NULL OR v_row->>'logoUrl' IS NOT NULL) THEN RAISE EXCEPTION 'Synthetic root identity changed'; END IF;
+        IF TG_TABLE_NAME IN ('listings','listing_drafts','conversations') AND v_row->>'businessId' IS DISTINCT FROM '${rootId}' THEN RAISE EXCEPTION 'Campaign business required'; END IF;
+        IF TG_TABLE_NAME='dealership_members' AND v_row->>'userId'='${owner.id}' AND v_row->>'role'<>'owner' THEN RAISE EXCEPTION 'Synthetic owner changed'; END IF;
+        IF TG_TABLE_NAME='conversations' AND NOT EXISTS(SELECT 1 FROM public.listings l WHERE l.id=v_row->>'listingId' AND l."sellerId"=v_row->>'sellerId' AND l."businessId"=v_row->>'businessId') THEN RAISE EXCEPTION 'Campaign conversation parents disagree'; END IF;
+        IF TG_TABLE_NAME IN ('messages','conversation_participants') AND NOT EXISTS(SELECT 1 FROM public.conversations c WHERE c.id=v_row->>'conversationId' AND coalesce(v_row->>'senderId',v_row->>'userId') IN (c."buyerId",c."sellerId")) THEN RAISE EXCEPTION 'Campaign participant mismatch'; END IF;
+        IF TG_TABLE_NAME='conversations' AND EXISTS(SELECT 1 FROM jsonb_each_text(v_row) e WHERE e.key IN ('lastMessageId','firstBuyerMessageId','firstSellerReplyId') AND e.value IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.messages m WHERE m.id=e.value AND m."conversationId"=v_row->>'id')) THEN RAISE EXCEPTION 'Campaign message pointer mismatch'; END IF;
+        IF TG_TABLE_NAME='verified_contact_phones' AND (v_row->>'phone' IS DISTINCT FROM '${rootContact}' OR EXISTS(SELECT 1 FROM public.verified_contact_phones WHERE phone=v_row->>'phone' AND id<>v_row->>'id')) THEN RAISE EXCEPTION 'Campaign contact proof collision'; END IF;
+        IF TG_TABLE_NAME='staff_grants' AND (v_row->>'userId'<>'${coordinator.id}' OR v_row->>'capability' NOT IN ('staff.manage','founder.control')) THEN RAISE EXCEPTION 'Unsupported campaign grant'; END IF;
+        IF TG_TABLE_NAME='audit_logs' AND (v_row->>'targetType'<>'User' OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'targetId') OR v_row->>'action'<>'STAFF_CAPABILITY_BOOTSTRAP' OR v_row->>'targetId'<>'${coordinator.id}' OR v_row->>'actorId' IS NOT NULL OR NOT (
+          ${['staff.manage','founder.control'].map(c => `(v_row->>'id'='${uuid(`campaign897-business:${input.id}:audit:${c}`)}' AND v_row->'details'=jsonb_build_object('capability','${c}','reason','Synthetic storage-only reservation ${input.id}'))`).join(' OR ')})) THEN RAISE EXCEPTION 'Unsupported campaign audit'; END IF;
+        IF TG_TABLE_NAME='content_reports' AND (NOT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=CASE v_row->>'targetType' WHEN 'listing' THEN 'listings' WHEN 'user' THEN 'users' WHEN 'message' THEN 'messages' ELSE '' END AND NOT deleted AND row_key=jsonb_build_object('id',v_row->>'targetId')) OR v_row->>'messageContext' IS NOT NULL) THEN RAISE EXCEPTION 'Unsupported report target'; END IF;
+        IF TG_TABLE_NAME='messages' AND (v_row->>'kind'<>'text' OR coalesce(v_row->'metadata','null'::jsonb) NOT IN ('null'::jsonb,'{}'::jsonb)) THEN RAISE EXCEPTION 'Unsupported message media'; END IF;
+        IF TG_TABLE_NAME='listing_drafts' AND (jsonb_typeof(v_row->'payload')<>'object' OR EXISTS(SELECT 1 FROM jsonb_each(v_row->'payload') e WHERE e.key NOT IN ('description','media') OR (e.key='description' AND jsonb_typeof(e.value)<>'string') OR (e.key='media' AND e.value<>'[]'::jsonb))) THEN RAISE EXCEPTION 'Unsupported draft payload'; END IF;
+        IF TG_TABLE_NAME='notification_preferences' AND (jsonb_typeof(v_row->'optOuts')<>'object' OR EXISTS(SELECT 1 FROM jsonb_each(v_row->'optOuts') e WHERE jsonb_typeof(e.value)<>'boolean')) THEN RAISE EXCEPTION 'Unsupported notification preferences'; END IF;
+        IF TG_TABLE_NAME='listings' AND (v_row->>'pendingVideoGenerationId' IS NOT NULL OR v_row->>'activeVideoGenerationId' IS NOT NULL) THEN RAISE EXCEPTION 'Unsupported listing video'; END IF;
       END IF;
       IF ((SELECT count(*) FROM "${n}".campaign_records)>=128 AND NOT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=TG_TABLE_NAME AND row_key=rowkey)) OR (SELECT count(*) FROM "${n}".campaign_events)>=2048 OR (lifecycle='identities' AND
         (SELECT count(*) FROM "${n}".campaign_events)+(SELECT count(*) FROM "${n}".campaign_records WHERE NOT deleted)+4>=2048) THEN RAISE EXCEPTION 'Campaign graph limit'; END IF;
-      fingerprint := md5(value::text);
+      fingerprint := md5(v_row::text);
       INSERT INTO "${n}".campaign_records(table_name,row_key,row_hash,deleted) VALUES(TG_TABLE_NAME,rowkey,fingerprint,TG_OP='DELETE') ON CONFLICT(table_name,row_key) DO UPDATE SET row_hash=excluded.row_hash,version="${n}".campaign_records.version+1,deleted=excluded.deleted;
       INSERT INTO "${n}".campaign_events(table_name,row_key,mutation,row_hash) VALUES(TG_TABLE_NAME,rowkey,TG_OP,fingerprint);
       UPDATE "${n}".campaign_manifest SET journal_hash=${journalHash},event_hash=${eventHash};
