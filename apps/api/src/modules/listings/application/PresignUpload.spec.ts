@@ -67,17 +67,9 @@ describe("PresignUpload", () => {
     expect(result.maxSizeBytes).toBe(5 * 1024 * 1024);
   });
 
-  it("returns presigned URL for a valid video request", async () => {
+  it("refuses legacy video writes that bypass private preparation and tester authority", async () => {
     const uc = makeUseCase(storage);
-    const result = await uc.execute({
-      userId: "user-1",
-      kind: "video",
-      contentType: "video/mp4",
-      sizeBytes: 1024,
-    });
-
-    expect(result.key).toMatch(/original\.mp4$/);
-    expect(result.maxSizeBytes).toBe(10 * 1024 * 1024);
+    await expect(uc.execute({ userId: "user-1", kind: "video", contentType: "video/mp4", sizeBytes: 1024 })).rejects.toMatchObject({ response: { code: "VIDEO_PREPARED_PROTOCOL_REQUIRED" } });
   });
 
   it("returns webp extension for image/webp", async () => {
