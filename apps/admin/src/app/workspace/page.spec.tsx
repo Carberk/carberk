@@ -3,8 +3,9 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { cleanup, render, waitFor } from "@testing-library/react";
 import type { StaffSchemas } from "@auto-tm/contracts";
 
-import WorkspacePage from "./page";
 import ServicePage from "../(admin)/services/page";
+
+import WorkspacePage from "./page";
 
 import { AdminLocaleProvider } from "@/lib/i18n";
 
