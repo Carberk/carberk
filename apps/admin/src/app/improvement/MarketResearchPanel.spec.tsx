@@ -44,3 +44,9 @@ it("hides cells when current authority is denied",async()=>{
  await waitFor(()=>expect(view.getByRole("alert").textContent).toContain(improvementCopy.en.denied));
  expect(view.queryByRole("table")).toBeNull();
 });
+it("removes a prepared research export link exactly when its receipt expires",async()=>{
+ const expiresAt=new Date(Date.now()+600).toISOString();
+ vi.stubGlobal("fetch",async(url:string)=>String(url).endsWith("/exports")?Response.json({id:"11111111-1111-4111-8111-111111111111",expiresAt}):Response.json([dataset]));
+ const view=render(<AdminLocaleProvider initialLocale="en"><MarketResearchPanel canInvestigate/></AdminLocaleProvider>);
+ await waitFor(()=>expect(view.getByRole("textbox")).toBeTruthy());fireEvent.change(view.getByRole("textbox"),{target:{value:"Review synthetic expiry verification"}});fireEvent.click(view.getByRole("button",{name:improvementCopy.en.prepareExport}));await waitFor(()=>expect(view.getByRole("link",{name:improvementCopy.en.export})).toBeTruthy());await waitFor(()=>expect(view.queryByRole("link",{name:improvementCopy.en.export})).toBeNull(),{timeout:1500});
+});
