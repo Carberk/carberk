@@ -1,9 +1,22 @@
 import { randomUUID } from "node:crypto";
 
 import type { MeasurementSchemas } from "@auto-tm/contracts";
+import { ConfigService } from "@nestjs/config";
+import type { S3Client } from "@aws-sdk/client-s3";
+import { Queue, Worker } from "bullmq";
 import { PrismaService } from "@auto-tm/db";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { EnvSchema, type Env } from "../../env.schema";
+import { VideoTranscodeProcessor } from "../../queues/video-transcode.processor";
+
+import { ProcessPreparedVideo } from "./ProcessPreparedVideo";
+import { CleanVideo } from "./CleanVideo";
+import { PrismaVideoCleanupLedger } from "./PrismaVideoCleanupLedger";
+import { S3VideoProcessingObjects } from "./S3VideoProcessingObjects";
+import { S3VideoCleanupObjects } from "./S3VideoCleanupObjects";
+import { FFmpegVideoProcessor } from "./FFmpegVideoProcessor";
+import { InMemoryS3VideoTransport } from "./testing/InMemoryS3VideoTransport";
 import { PrismaVideoProcessingLedger } from "./PrismaVideoProcessingLedger";
 import type { VideoProcessingFacts, VideoPublishedAsset } from "./VideoProcessingPorts";
 
@@ -90,6 +103,29 @@ describe.skipIf(!hosted)("video processing durable fences on disposable PostgreS
     const cleanup = await db.videoCleanupWork.findUniqueOrThrow({ where: { id: `session:${row.id}` } });
     expect(cleanup.objectKeys.sort()).toEqual(row.assets.map(asset => asset.key).sort());
   });
+  it("dispatches a real Redis generation job through current durable authority and records storage failure for retry", async () => {
+    const row = await prepared(), redisUrl = process.env["REDIS_URL"];
+    if (!redisUrl) throw new Error("Hosted video dispatch requires disposable Redis");
+    const options = { connection: { url: redisUrl }, prefix: `test-video-dispatch-${randomUUID()}` };
+    const queue = new Queue("video-transcode", options);
+    const transport = new InMemoryS3VideoTransport() as unknown as S3Client;
+    const processing = new ProcessPreparedVideo(ledger, new S3VideoProcessingObjects(transport, "private-video"), new FFmpegVideoProcessor(), () => now, randomUUID);
+    const cleanup = new CleanVideo(new PrismaVideoCleanupLedger(db), new S3VideoCleanupObjects(transport, "private-video"), () => now, randomUUID);
+    const config = new ConfigService<Env, true>(EnvSchema.parse({ DATABASE_URL: databaseUrl, REDIS_URL: redisUrl, MINIO_ENDPOINT: "http://localhost:9000", MINIO_ACCESS_KEY: "synthetic", MINIO_SECRET_KEY: "synthetic", VIDEO_PROCESSING_ENABLED: "true" }));
+    const processor = new VideoTranscodeProcessor(processing, cleanup, db, config, queue);
+    const worker = new Worker("video-transcode", job => processor.process(job), options);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const completed = new Promise<void>((resolve, reject) => {
+      timer = setTimeout(() => reject(new Error("Video dispatch did not finish")), 10_000);
+      worker.once("completed", () => resolve()); worker.once("failed", (_job, error) => reject(error));
+    });
+    completed.catch(() => undefined);
+    try {
+      await worker.waitUntilReady(); await queue.add("process-generation", { generationId: row.id }); await completed;
+      expect(await db.videoProcessWork.findUniqueOrThrow({ where: { generationId: row.id } })).toMatchObject({ state: "PENDING", attempts: 1, lastError: "VIDEO_PROCESSING_FAILED", nextAttemptAt: new Date("2000-01-02T00:01:00Z") });
+      expect((await db.listing.findUniqueOrThrow({ where: { id: listingId } })).activeVideoGenerationId).toBeNull();
+    } finally { if (timer) clearTimeout(timer); await worker.close(); await queue.obliterate({ force: true }); await queue.close(); }
+  }, 15_000);
   it("records only committed processing outcomes without media or credential content", async () => {
     const row = await prepared(), lease = await ledger.claim(row.id, now, randomUUID()); expect(lease).not.toBeNull(); if (!lease) return;
     expect(outcomes).toEqual([]);

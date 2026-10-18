@@ -22,7 +22,7 @@ import { MeasurementRetentionModule } from "./measurement-retention.module";
 import { ServiceLifecycleModule } from "./service-lifecycle.module";
 import { MeasurementOutboxModule } from "./jobs/measurement-outbox.module";
 import { ServicePushModule } from "./service-push.module";
-import { VideoTranscodeProcessor } from "./queues/video-transcode.processor";
+import { VideoModule } from "./video.module";
 import { NotificationFanoutProcessor } from "./queues/notification-fanout.processor";
 import { EmailCodeProcessor } from "./queues/email-code.processor";
 import { OrphanCleanupProcessor } from "./queues/orphan-cleanup.processor";
@@ -54,7 +54,6 @@ import { LISTING_VIEW_RETENTION_QUEUE, ListingViewRetentionScheduler } from "./q
       },
     }),
     BullModule.registerQueue(
-      { name: "video-transcode" },
       { name: "notification-fanout" },
       { name: "orphan-cleanup" },
       { name: "account-purge" },
@@ -66,6 +65,7 @@ import { LISTING_VIEW_RETENTION_QUEUE, ListingViewRetentionScheduler } from "./q
     ServiceLifecycleModule,
     MeasurementOutboxModule,
     ServicePushModule,
+    VideoModule,
   ],
   providers: [
     PrismaListingViewRetentionLedger,
@@ -92,7 +92,6 @@ import { LISTING_VIEW_RETENTION_QUEUE, ListingViewRetentionScheduler } from "./q
           forcePathStyle: true,
         })),
     },
-    VideoTranscodeProcessor,
     NotificationFanoutProcessor,
     EmailCodeProcessor,
     OrphanCleanupProcessor,
