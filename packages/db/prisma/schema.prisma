@@ -576,6 +576,7 @@ model MediaUpload {
   // Null for rows backfilled from media that existed before the table.
   sizeBytes   Int?
   writeProtocol String @default("legacy")
+  /// SQL guard keeps V1 video source inventory a bounded exact singleton in its server namespace.
   objectKeys String[] @default([])
   createdAt   DateTime      @default(now())
   media       ListingMedia?
