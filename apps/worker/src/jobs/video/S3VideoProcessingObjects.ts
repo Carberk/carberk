@@ -19,8 +19,34 @@ export class S3VideoProcessingObjects implements VideoProcessingObjects {
   constructor(private readonly client: S3Client, private readonly bucket: string, private readonly scratchRoot = tmpdir()) {
     if (!bucket) throw new Error("VIDEO_PRIVATE_BUCKET_REQUIRED");
   }
-  async download(_lease: VideoProcessingLease): Promise<{path:string;dispose():Promise<void>}> { throw new Error("VIDEO_STORAGE_INACTIVE"); }
-  async publish(_directory:string, _asset:VideoPublishedAsset): Promise<void> { throw new Error("VIDEO_STORAGE_INACTIVE"); }
+  async download(lease: VideoProcessingLease) {
+    if (!sourcePattern.test(lease.sourceKey) || lease.sourceKey !== `video/v1/${lease.uploadId}/${lease.sessionId}/source.mp4` || !Number.isInteger(lease.sizeBytes) || lease.sizeBytes < 1 || lease.sizeBytes > 15 * 1024 * 1024 || !/^[a-f0-9]{64}$/.test(lease.sha256)) throw new Error("VIDEO_SOURCE_INVALID");
+    const root = await mkdtemp(join(this.scratchRoot, "carberk-video-source-"));
+    try {
+      const result = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: lease.sourceKey }), { abortSignal: AbortSignal.timeout(60_000) });
+      if (!(result.Body instanceof Readable)) throw new Error("VIDEO_SOURCE_INVALID");
+      if (result.ContentLength !== lease.sizeBytes) { result.Body.destroy(); throw new Error("VIDEO_SOURCE_INVALID"); }
+      let size = 0; const hash = createHash("sha256");
+      const bounded = new Transform({ transform(bytes: Buffer, _encoding, done) {
+        size += bytes.length;
+        if (size > lease.sizeBytes) done(new Error("VIDEO_SOURCE_INVALID"));
+        else { hash.update(bytes); done(null, bytes); }
+      } });
+      const path = join(root, "source.mp4");
+      await pipeline(result.Body, bounded, createWriteStream(path, { flags: "wx", mode: 0o600 }), { signal: AbortSignal.timeout(60_000) });
+      if (size !== lease.sizeBytes || hash.digest("hex") !== lease.sha256) throw new Error("VIDEO_HASH_MISMATCH");
+      return { path, dispose: () => rm(root, { recursive: true, force: true }) };
+    } catch (error) { await rm(root, { recursive: true, force: true }); throw error; }
+  }
+  async publish(directory: string, asset: VideoPublishedAsset): Promise<void> {
+    this.validate(asset);
+    const body = createReadStream(join(directory, asset.path));
+    try {
+      await this.client.send(new PutObjectCommand({ Bucket: this.bucket, Key: asset.key, Body: body, ContentLength: asset.sizeBytes, ContentType: asset.contentType, CacheControl: "private, no-store", ChecksumSHA256: Buffer.from(asset.sha256, "hex").toString("base64"), IfNoneMatch: "*" }), { abortSignal: AbortSignal.timeout(60_000) });
+    } catch (error) {
+      if ((error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode !== 412 || !await this.verify(asset)) throw new Error("VIDEO_OBJECT_WRITE_FAILED");
+    } finally { body.destroy(); }
+  }
   async verify(asset: VideoPublishedAsset): Promise<boolean> {
     this.validate(asset);
     const result = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: asset.key }), { abortSignal: AbortSignal.timeout(60_000) });
