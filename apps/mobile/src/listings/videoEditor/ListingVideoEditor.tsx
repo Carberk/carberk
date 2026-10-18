@@ -29,7 +29,12 @@ const copy = {
 };
 
 /** Photos remain independent. Every mount asks the server for current admission. */
-export function ListingVideoEditor({ ownerId, target, businessId, disabled }: ListingVideoEditorProps) {
+export function ListingVideoEditor(props: ListingVideoEditorProps) {
+  const ids = [props.ownerId, props.target.id, ...(props.businessId ? [props.businessId] : [])];
+  if (ids.some(id => !z.string().uuid().safeParse(id).success)) return null;
+  return <AdmittedListingVideoEditor {...props} />;
+}
+function AdmittedListingVideoEditor({ ownerId, target, businessId, disabled }: ListingVideoEditorProps) {
   const { i18n } = useTranslation();
   const c = copy[i18n.language === "ru" ? "ru" : i18n.language === "tk" ? "tk" : "en"];
   const capability = useQuery({ queryKey: ["listing-video-capabilities", ownerId, businessId ?? null], queryFn: () => apiClient.get("/listing-video/capabilities", capabilities), staleTime: 0 });
