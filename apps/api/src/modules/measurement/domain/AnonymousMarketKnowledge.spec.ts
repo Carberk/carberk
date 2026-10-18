@@ -58,7 +58,7 @@ it("requires a separate documented synthetic demographic purpose, basis, notice 
  const policy={purpose:"synthetic_demographic_research",basis:"synthetic_fixture",notice:"synthetic_fixture_documented",personalLifecycle:"no_personal_records"};
  expect(qualifyAnonymousDataset(demographic,[{...source,restrictions:{...source.restrictions,demographicPolicy:policy}}],{epoch:"current",now})).toMatchObject({state:"qualified"});
  for(const field of Object.keys(policy)){
-  const incomplete={...policy};delete incomplete[field as keyof typeof policy];
+  const incomplete=Object.fromEntries(Object.entries(policy).filter(([key])=>key!==field));
   expect(qualifyAnonymousDataset(demographic,[{...source,restrictions:{...source.restrictions,demographicPolicy:incomplete}}],{epoch:"current",now})).toMatchObject({state:"quarantined",reason:"rights"});
  }
 });

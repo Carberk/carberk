@@ -15,6 +15,7 @@ export const KnowledgeSourceRestrictionsSchema=z.object({
  syntheticOnly:z.literal(true),retention:z.enum(["indefinite","until_source_expiry"]),
  deletion:z.literal("invalidate_derivatives"),export:z.literal("internal_synthetic_only"),
  demographics:z.enum(["synthetic_self_reported","prohibited"]),
+ demographicPolicy:z.object({purpose:z.literal("synthetic_demographic_research"),basis:z.literal("synthetic_fixture"),notice:z.literal("synthetic_fixture_documented"),personalLifecycle:z.literal("no_personal_records")}).strict().optional(),
 }).strict();
 const cellSchema=ImprovementSchemas.AnonymousMarketCellSchema;
 const reviews = ["singlingOut","linkage","rareVehicles","combinations","repeatedQueries"] as const;
@@ -34,6 +35,8 @@ export function qualifyAnonymousDataset(dataset:AnonymousDataset,sources:readonl
   if(!source.provenance.trim() || !source.retentionBasis.trim() || source.purpose!=="synthetic_research" || source.reuse!=="permitted" || !source.destinations.includes(dataset.destination)) return {state:"quarantined",reason:"rights"};
   const restrictions=KnowledgeSourceRestrictionsSchema.safeParse(source.restrictions);
   if(!restrictions.success || (restrictions.data.retention==="until_source_expiry" && !source.expiresAt)) return {state:"quarantined",reason:"rights"};
+  const knownDemographics=dataset.cells.some(cell=>(cell["ageBand"]??"unknown")!=="unknown" || (cell["residence"]??"unknown")!=="unknown");
+  if(knownDemographics && !restrictions.data.demographicPolicy)return {state:"quarantined",reason:"rights"};
   if(restrictions.data.demographics==="prohibited" && dataset.cells.some(cell=>(cell["ageBand"]??"unknown")!=="unknown" || (cell["residence"]??"unknown")!=="unknown")) return {state:"quarantined",reason:"rights"};
   if(reviews.some(key=>source.review[key]!=="passed")) return {state:"quarantined",reason:"anonymity"};
  }
