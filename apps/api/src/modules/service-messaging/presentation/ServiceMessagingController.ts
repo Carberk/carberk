@@ -57,7 +57,7 @@ export class ServiceMessagingController {
   return this.run(async () => { await this.services.subscribePush(this.subject(req), parse(uuid, id), data.deviceToken); return { ok: true }; });
  }
  @Post("conversations/:id/read") @Header("Cache-Control", "no-store, private")
- markRead(@Req() req: ServiceRequest, @Param("id") id: string, @Body() body: unknown) { return this.run(async () => { await this.services.markRead(this.subject(req), parse(uuid, id), parse(ServiceMessagingSchemas.ServiceReadSchema, body).throughSequence); return { ok: true }; }); }
+ markRead(@Req() req: ServiceRequest, @Param("id") id: string, @Body() body: unknown) { return this.run(async () => { await this.services.markRead(this.subject(req), parse(uuid, id), parse(ServiceMessagingSchemas.ServiceReadSchema, body).throughSequence); this.events.emit("service.changed", id); return { ok: true }; }); }
  @Post("conversations/:id/attachments") @Header("Cache-Control", "no-store, private")
  stage(@Req() req: ServiceRequest, @Param("id") id: string, @Body() body: unknown) { return this.run(() => this.services.stage(this.subject(req), parse(uuid, id), parse(ServiceMessagingSchemas.ServiceStageAttachmentSchema, body))); }
  @Post("conversations/:id/attachments/:attachmentId/bytes") @Header("Cache-Control", "no-store, private")
