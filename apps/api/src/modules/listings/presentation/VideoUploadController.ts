@@ -1,45 +1,90 @@
-import { Body, Controller, Inject, Param, Patch, Post, Req, UnauthorizedException, BadRequestException } from "@nestjs/common";
-import { randomUUID } from "node:crypto";
+import { BadRequestException, Body, Controller, Delete, Get, Header, HttpCode, HttpException, Inject, Param, Post, Req, UnauthorizedException, UseFilters } from "@nestjs/common";
+
+import { VideoUploadSchemas } from "@auto-tm/contracts";
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
+
+import { OWNED_VIDEO_UPLOAD_PROTOCOL, type OwnedVideoUploadProtocol } from "../application/OwnedVideoUploadProtocol";
 import { VideoEligibility } from "../application/VideoEligibility";
-import { PrismaVideoUploadSessionRepository } from "../infrastructure/PrismaVideoUploadSessionRepository";
+import { VideoUploadErrorFilter } from "./VideoUploadErrorFilter";
 import { inventoryActor } from "./inventoryActor";
 
-const createBody = z.object({ uploadId: z.string().uuid(), listingId: z.string().uuid().optional() }).strict();
-const actions = z.enum(["pause", "resume", "cancel"]);
-
-@Controller("api/v1/listings/video")
+@UseFilters(VideoUploadErrorFilter)
+@Controller("api/v1/listing-video-upload-sessions")
 export class VideoUploadController {
   constructor(
-    @Inject(PrismaVideoUploadSessionRepository) private readonly repo: PrismaVideoUploadSessionRepository,
+    @Inject(OWNED_VIDEO_UPLOAD_PROTOCOL) private readonly protocol: OwnedVideoUploadProtocol,
     @Inject(VideoEligibility) private readonly eligibility: VideoEligibility,
   ) {}
-
-  private actor(req: FastifyRequest) {
+  @Post()
+  @Header("Cache-Control", "private, no-store")
+  async create(@Req() req: FastifyRequest, @Body() body: unknown) {
+    const actor = this.actor(req, true);
+    const parsed = VideoUploadSchemas.CreateSessionInput.safeParse(body);
+    if (!parsed.success) throw new BadRequestException({ code: "VIDEO_UPLOAD_INVALID" });
+    return this.perform(() => this.protocol.create(actor, parsed.data));
+  }
+  @Get(":id")
+  @Header("Cache-Control", "private, no-store")
+  async status(@Req() req: FastifyRequest, @Param("id") id: string) {
+    const actor = this.actor(req); this.id(id);
+    return this.perform(() => this.protocol.get(actor, id));
+  }
+  @Post(":id/part-credentials")
+  @HttpCode(200)
+  @Header("Cache-Control", "private, no-store")
+  async credentials(@Req() req: FastifyRequest, @Param("id") id: string, @Body() body: unknown) {
+    const actor = this.actor(req, true); this.id(id);
+    const parsed = VideoUploadSchemas.PartCredentialsInput.safeParse(body);
+    if (!parsed.success) throw new BadRequestException({ code: "VIDEO_PART_INVALID" });
+    return this.perform(() => this.protocol.credentials(actor, id, parsed.data.partNumbers));
+  }
+  @Post(":id/pause")
+  @HttpCode(200)
+  @Header("Cache-Control", "private, no-store")
+  async pause(@Req() req: FastifyRequest, @Param("id") id: string, @Body() body: unknown) {
+    const actor = this.actor(req); this.id(id); this.empty(body);
+    return this.perform(() => this.protocol.change(actor, id, "pause"));
+  }
+  @Post(":id/resume")
+  @HttpCode(200)
+  @Header("Cache-Control", "private, no-store")
+  async resume(@Req() req: FastifyRequest, @Param("id") id: string, @Body() body: unknown) {
+    const actor = this.actor(req, true); this.id(id); this.empty(body);
+    return this.perform(() => this.protocol.change(actor, id, "resume"));
+  }
+  @Post(":id/complete")
+  @HttpCode(200)
+  @Header("Cache-Control", "private, no-store")
+  async complete(@Req() req: FastifyRequest, @Param("id") id: string, @Body() body: unknown) {
+    const actor = this.actor(req, true); this.id(id); this.empty(body);
+    return this.perform(() => this.protocol.complete(actor, id));
+  }
+  @Delete(":id")
+  @HttpCode(202)
+  @Header("Cache-Control", "private, no-store")
+  async cancel(@Req() req: FastifyRequest, @Param("id") id: string) {
+    const actor = this.actor(req); this.id(id);
+    return this.perform(() => this.protocol.change(actor, id, "cancel"));
+  }
+  private actor(req: FastifyRequest, uploading = false) {
     const actor = inventoryActor(req);
     if (!actor.userId || !actor.sessionId) throw new UnauthorizedException();
-    this.eligibility.assertEligible(actor.userId);
+    if (uploading) this.eligibility.assertUploadEligible(actor.userId);
+    else this.eligibility.assertEligible(actor.userId);
     return actor;
   }
-
-  @Post("sessions")
-  async create(@Req() req: FastifyRequest, @Body() body: unknown) {
-    const actor = this.actor(req);
-    this.eligibility.assertUploadEligible(actor.userId);
-    const parsed = createBody.safeParse(body);
-    if (!parsed.success) throw new BadRequestException({ code: "VIDEO_UPLOAD_INVALID" });
-    return this.repo.create({ id: randomUUID(), actor, uploadId: parsed.data.uploadId, ...(parsed.data.listingId ? { listingId: parsed.data.listingId } : {}) });
-  }
-
-  @Patch("sessions/:id/:action")
-  async transition(@Req() req: FastifyRequest, @Param("id") id: string, @Param("action") action: string) {
-    const actor = this.actor(req);
-    const parsed = actions.safeParse(action);
-    if (!z.string().uuid().safeParse(id).success || !parsed.success) throw new BadRequestException({ code: "VIDEO_ACTION_INVALID" });
-    const session = await this.repo.find(id);
-    if (!session || session.userId !== actor.userId) throw new BadRequestException({ code: "VIDEO_SESSION_NOT_FOUND" });
-    const next = await this.repo.transition(id, actor, session.state, parsed.data);
-    return { id, state: next.state };
+  private id(id: string) { if (!z.string().uuid().safeParse(id).success) throw new BadRequestException({ code: "VIDEO_SESSION_INVALID" }); }
+  private empty(body: unknown) { if (!VideoUploadSchemas.EmptyInput.safeParse(body ?? {}).success) throw new BadRequestException({ code: "VIDEO_UPLOAD_INVALID" }); }
+  private async perform<T>(run: () => Promise<T>): Promise<T> {
+    try { return await run(); }
+    catch (error) {
+      if (error instanceof HttpException) throw error;
+      const code = error instanceof Error ? error.message : "";
+      if (code === "VIDEO_IDEMPOTENCY_CONFLICT") throw new HttpException({ code }, 409);
+      if (code === "VIDEO_PART_INVALID") throw new BadRequestException({ code });
+      if (["VIDEO_SESSION_INITIALIZING", "VIDEO_COMPLETION_UNCERTAIN", "VIDEO_STORAGE_UNAVAILABLE"].includes(code)) throw new HttpException({ code }, 503);
+      throw new HttpException({ code: "VIDEO_SESSION_UNAVAILABLE" }, 404);
+    }
   }
 }

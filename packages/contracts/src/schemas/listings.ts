@@ -1,15 +1,16 @@
-import { PublicBusinessSchema } from "./public-marketplace";
 import { z } from "zod";
+
+import { Currency, ListingCondition, ListingStatus } from "../enums";
+
+import { PhoneTm } from "./auth";
+import { PublicIdentitySchema } from "./identity";
+import { PublicBusinessSchema } from "./public-marketplace";
 
 /** Publication floor, guidance target and hard cap shared by API and clients. */
 export const MIN_LISTING_PHOTOS = 3;
 export const RECOMMENDED_LISTING_PHOTOS = 8;
 export const MAX_LISTING_PHOTOS = 20;
 
-import { Currency, ListingCondition, ListingStatus } from "../enums";
-
-import { PhoneTm } from "./auth";
-import { PublicIdentitySchema } from "./identity";
 
 // ── Shared enums as Zod schemas ──
 

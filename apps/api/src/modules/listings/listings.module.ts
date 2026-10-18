@@ -11,7 +11,7 @@ import { MeasurementModule } from "../measurement/measurement.module";
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { S3Client } from "@aws-sdk/client-s3";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import type { Env } from "../../env.schema";
 import { VideoGrantController } from "./presentation/VideoGrantController";
 import { VideoPlaybackController } from "./presentation/VideoPlaybackController";
@@ -22,7 +22,7 @@ import { EventEmitterModule } from "@nestjs/event-emitter";
 
 import { PrismaModule } from "../../common/prisma.module";
 import { IdentityModule } from "../identity/identity.module";
-import { IDENTITY_CHECK_PORT, PROFILE_PHOTO_PORT } from "../identity/identity.public";
+import { IDENTITY_CHECK_PORT, PROFILE_PHOTO_PORT, IDENTITY_CLOCK_PORT, type ClockPort } from "../identity/identity.public";
 
 import { ListingViewsController } from "./presentation/ListingViewsController";
 import { ListingsController } from "./presentation/listings.controller";
@@ -33,9 +33,11 @@ import { ExchangeRatesController } from "./presentation/ExchangeRatesController"
 import { FavoritesController } from "./presentation/FavoritesController";
 import { ContactPhonesController } from "./presentation/ContactPhonesController";
 import { VideoUploadController } from "./presentation/VideoUploadController";
-import { VideoUploadSessionService } from "./application/VideoUploadSession";
+import { OWNED_VIDEO_UPLOAD_PROTOCOL, OwnedVideoUploadProtocol } from "./application/OwnedVideoUploadProtocol";
+import { PrismaOwnedVideoSessionLedger, VIDEO_ID_FACTORY } from "./infrastructure/PrismaOwnedVideoSessionLedger";
+import { VIDEO_OBJECT_STORAGE } from "./domain/ports/VideoObjectStorage";
+import { S3VideoObjectStorage } from "./infrastructure/S3VideoObjectStorage";
 import { VideoEligibility } from "./application/VideoEligibility";
-import { PrismaVideoUploadSessionRepository } from "./infrastructure/PrismaVideoUploadSessionRepository";
 import { NullVinDecoder } from "./infrastructure/NullVinDecoder";
 import { NullContentClassifier } from "./infrastructure/NullContentClassifier";
 import { SortedFeedRankingAdapter } from "./infrastructure/SortedFeedRankingAdapter";
@@ -285,9 +287,19 @@ import { LISTING_VIEWS_PORT } from "./domain/ports/ListingViewsPort";
     RequestContactPhoneCode,
     ConfirmContactPhone,
     ListMyContactPhones,
-    VideoUploadSessionService,
     VideoEligibility,
-    PrismaVideoUploadSessionRepository,
+    PrismaOwnedVideoSessionLedger,
+    { provide: VIDEO_ID_FACTORY, useValue: randomUUID },
+    {
+      provide: VIDEO_OBJECT_STORAGE,
+      inject: [ConfigService, IDENTITY_CLOCK_PORT],
+      useFactory: (config: ConfigService<Env, true>, clock: ClockPort) => new S3VideoObjectStorage(new S3Client({ endpoint: config.get("MINIO_ENDPOINT", { infer: true }), region: config.get("MINIO_REGION", { infer: true }), forcePathStyle: true, credentials: { accessKeyId: config.get("MINIO_ACCESS_KEY", { infer: true }), secretAccessKey: config.get("MINIO_SECRET_KEY", { infer: true }) } }), config.get("VIDEO_PRIVATE_BUCKET", { infer: true }), () => clock.now()),
+    },
+    {
+      provide: OWNED_VIDEO_UPLOAD_PROTOCOL,
+      inject: [PrismaOwnedVideoSessionLedger, VIDEO_OBJECT_STORAGE],
+      useFactory: (ledger: PrismaOwnedVideoSessionLedger, storage: S3VideoObjectStorage) => new OwnedVideoUploadProtocol(ledger, storage),
+    },
     PrismaVideoPlayback,
     { provide: VIDEO_GRANT_SECRET_FACTORY, useValue: () => randomBytes(32).toString("base64url") },
     { provide: VIDEO_PLAYBACK_ELIGIBILITY, useExisting: VideoEligibility },

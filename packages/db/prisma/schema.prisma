@@ -585,6 +585,7 @@ model MediaUpload {
   // only additional constraints. AVAILABLE, PREPARING, ADOPTED, RETIRED, DELETED.
   state           String    @default("AVAILABLE")
   claimToken      String?
+  /// SQL guard permits video_session only while PREPARING under video-v1 with its matching session token.
   claimTargetType String?
   claimTargetId   String?
   claimDeadline   DateTime?
@@ -1684,6 +1685,10 @@ model DiagnosticReportRecord {
 
 /// Object identity is exact and immutable. Storage never exposes a public URL.
 model DiagnosticEvidence {
+  writeLeaseUntil DateTime?
+  cleanupLeaseUntil DateTime?
+  cleanupAttempts Int @default(0)
+  cleanupFailureCode String?
   id String @id
   reportId String
   report DiagnosticReportRecord @relation(fields: [reportId], references: [id], onDelete: Restrict)

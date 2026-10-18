@@ -34,12 +34,20 @@ export class PrismaDiagnosticEvidence implements DiagnosticEvidencePort {
       if (prior) {
         if (prior.reportId !== input.reportId) throw denied();
         if (prior.findingId !== input.findingId || prior.sha256 !== hash || prior.sizeBytes !== clean.bytes.byteLength || prior.cleanupRequestedAt || !["staged", "verified"].includes(prior.state)) throw new DiagnosticRuleError("DIAGNOSTIC_EVIDENCE_CONFLICT");
-        return prior;
+        if (prior.state === "verified") return prior;
+        if (prior.writeLeaseUntil && prior.writeLeaseUntil > this.runtime.now()) throw new DiagnosticRuleError("DIAGNOSTIC_EVIDENCE_BUSY");
+        return tx.diagnosticEvidence.update({ where: { id: prior.id }, data: { epoch: this.runtime.id(), writeLeaseUntil: new Date(this.runtime.now().getTime() + 120_000) } });
       }
       if (await tx.diagnosticEvidence.count({ where: { reportId: input.reportId } }) >= 100) throw new DiagnosticRuleError("REPORT_EVIDENCE_LIMIT");
       // Commit this exact immutable intent before any object write can occur.
       return tx.diagnosticEvidence.create({ data: { id: input.evidenceId, reportId: input.reportId, findingId: input.findingId,
-        objectKey: `diagnostic-evidence/${input.evidenceId}/${hash}`, sha256: hash, sizeBytes: clean.bytes.byteLength, mime: clean.mime, createdById: subject.userId } });
+        objectKey: `diagnostic-evidence/${input.evidenceId}/${hash}`, sha256: hash, sizeBytes: clean.bytes.byteLength, mime: clean.mime, createdById: subject.userId, writeLeaseUntil: new Date(this.runtime.now().getTime() + 120_000) } });
+    });
+    if (intent.state === "verified") return { id: intent.id, findingId: intent.findingId, mime: intent.mime, sizeBytes: intent.sizeBytes };
+    await this.db.$transaction(async tx => {
+      await this.author(tx, subject, input.reportId, input.expectedVersion);
+      const current = await tx.diagnosticEvidence.findUnique({ where: { id: intent.id } });
+      if (!current || current.epoch !== intent.epoch || current.cleanupRequestedAt || !current.writeLeaseUntil || current.writeLeaseUntil <= this.runtime.now()) throw denied();
     });
     await this.objects.put(intent.objectKey, clean.bytes, clean.mime);
     await this.objects.read(intent.objectKey, intent.sizeBytes, intent.sha256);
@@ -48,8 +56,8 @@ export class PrismaDiagnosticEvidence implements DiagnosticEvidencePort {
         await this.author(tx, subject, input.reportId, input.expectedVersion);
         await tx.$queryRaw`SELECT id FROM diagnostic_evidence WHERE id=${intent.id} FOR UPDATE`;
         const current = await tx.diagnosticEvidence.findUnique({ where: { id: intent.id } });
-        if (!current || current.epoch !== intent.epoch || current.cleanupRequestedAt || !["staged", "verified"].includes(current.state)) throw denied();
-        await tx.diagnosticEvidence.update({ where: { id: intent.id }, data: { state: "verified", verifiedAt: this.runtime.now() } });
+        if (!current || current.epoch !== intent.epoch || current.cleanupRequestedAt || !current.writeLeaseUntil || current.writeLeaseUntil <= this.runtime.now() || !["staged", "verified"].includes(current.state)) throw denied();
+        await tx.diagnosticEvidence.update({ where: { id: intent.id }, data: { state: "verified", verifiedAt: this.runtime.now(), writeLeaseUntil: null } });
         return { id: current.id, findingId: current.findingId, mime: current.mime, sizeBytes: current.sizeBytes };
       });
     } catch (error) {
