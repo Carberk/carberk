@@ -1,6 +1,7 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bullmq";
 import type { Queue } from "bullmq";
+import { PrismaService, withCampaignEmailDelivery } from "@auto-tm/db";
 import { AuthSchemas } from "@auto-tm/contracts";
 
 import type { EmailCodeSenderPort } from "../domain/ports/EmailCodeSenderPort";
@@ -17,6 +18,7 @@ export class BullMqEmailCodeSenderAdapter implements EmailCodeSenderPort {
   constructor(
     @InjectQueue(AuthSchemas.EMAIL_CODE_QUEUE)
     private readonly queue: Queue,
+    @Inject(PrismaService) private readonly db: PrismaService,
   ) {}
 
   async enqueue(input: {
@@ -26,15 +28,17 @@ export class BullMqEmailCodeSenderAdapter implements EmailCodeSenderPort {
     locale: "ru" | "tk" | "en";
     purpose: "sign-in" | "sign-in-method" | "account-deletion";
   }): Promise<void> {
-    await this.queue.add(
-      AuthSchemas.EMAIL_CODE_JOB_NAME,
-      {
-        to: input.email,
-        code: input.code,
-        locale: input.locale,
-        purpose: input.purpose,
-      },
-      { ...EMAIL_CODE_JOB_OPTIONS, jobId: input.requestId },
-    );
+    await withCampaignEmailDelivery(this.db, input.requestId, input.email, async () => {
+      await this.queue.add(
+        AuthSchemas.EMAIL_CODE_JOB_NAME,
+        {
+          to: input.email,
+          code: input.code,
+          locale: input.locale,
+          purpose: input.purpose,
+        },
+        { ...EMAIL_CODE_JOB_OPTIONS, jobId: input.requestId },
+      );
+    });
   }
 }

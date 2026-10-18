@@ -1,10 +1,10 @@
-import { campaignMain } from './staging-campaign.mjs';
+import { campaignMain, campaignQueueMain } from './staging-campaign.mjs';
 
 /** Serialized into one fixed remote Node process. There is no arbitrary shell/SQL input. */
 export function remoteProgram(payload) {
-  return `(${remoteMain.toString()})(${JSON.stringify(payload)}, ${campaignMain.toString()})`;
+  return `(${remoteMain.toString()})(${JSON.stringify(payload)}, ${campaignMain.toString()}, ${campaignQueueMain.toString()})`;
 }
-function remoteMain(input, campaign) {
+function remoteMain(input, campaign, queueMain) {
   try {
     const { spawnSync } = require('node:child_process');
     const p = input.identity; const e = process.env;
@@ -34,7 +34,16 @@ function remoteMain(input, campaign) {
       const hex = createHash('sha256').update(`${input.id}:${label}`).digest('hex').slice(0,32);
       return `${hex.slice(0,8)}-${hex.slice(8,12)}-4${hex.slice(13,16)}-a${hex.slice(17,20)}-${hex.slice(20)}`;
     };
-    if (input.profile === 'campaign897-identities-v1') return campaign(input, { sql, uuid, exists });
+    if (input.profile === 'campaign897-identities-v1') return campaign(input, { sql, uuid, exists, disposeDeliveries: (deliveries, observeOnly = false) => {
+      const redis = new URL(e.REDIS_URL);
+      if (!['redis:', 'rediss:'].includes(redis.protocol) || redis.hostname !== 'redis.railway.internal' || redis.search || redis.hash) throw new Error();
+      redis.username = ''; redis.password = '';
+      if (redis.toString() !== input.redisOrigin) throw new Error();
+      const result = spawnSync(process.execPath, ['-e', `(${queueMain.toString()})(${JSON.stringify(deliveries)},${JSON.stringify(observeOnly)})`], {
+        encoding: 'utf8', timeout: 30000, maxBuffer: 1024 * 1024, env: e,
+      });
+      if (result.status !== 0 || result.error || result.stdout.trim() !== '{"queueJobs":0}') throw new Error();
+    }});
     if (exists && sql(`SELECT reservation_id FROM "${namespace}".manifest;`) !== input.id) throw new Error();
     const user = uuid('seller'); const listing = uuid('listing');
     const unchanged = `DO $guard$ BEGIN

@@ -1,7 +1,7 @@
 /** Fixed reservation-owned auth prerequisite graph. Serialized with the remote program.
  * No caller SQL, token minting, fixed OTP codes, media or scenario state imports.
  */
-export function campaignMain(input, { sql, uuid, exists }) {
+export function campaignMain(input, { sql, uuid, exists, disposeDeliveries }) {
   const profile = 'campaign897-identities-v1';
   if (input.profile !== profile || !/^[a-f0-9]{40}$/.test(input.candidate ?? '')) throw new Error();
   const n = input.namespace;
@@ -15,12 +15,19 @@ export function campaignMain(input, { sql, uuid, exists }) {
     LOCK TABLE ${tables.map(t => `public.${t}`).join(',')} IN SHARE ROW EXCLUSIVE MODE;
     SELECT pg_advisory_xact_lock(hashtextextended('${n}',0));`;
   const binding = `DO $guard$ BEGIN
-    IF (SELECT count(*) FROM "${n}".campaign_manifest) <> 1 OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_manifest WHERE reservation_id='${input.id}' AND candidate='${input.candidate}' AND profile='${profile}')
+    IF (SELECT count(*) FROM "${n}".campaign_manifest) <> 1 OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_manifest WHERE reservation_id='${input.id}' AND candidate='${input.candidate}' AND profile='${profile}' AND delivery_version=1)
     THEN RAISE EXCEPTION 'Campaign binding changed'; END IF;
     IF (SELECT count(*) FROM "${n}".campaign_entities) <> 4 OR EXISTS(
       SELECT 1 FROM "${n}".campaign_entities WHERE (alias,user_id,email) NOT IN
       (${identities.map(u => `('${u.alias}','${u.id}','${u.email}')`).join(',')}))
     THEN RAISE EXCEPTION 'Campaign identities changed'; END IF;
+    IF (SELECT delivery_hash FROM "${n}".campaign_manifest) IS DISTINCT FROM
+       (SELECT md5(coalesce(jsonb_agg(to_jsonb(d) ORDER BY request_id),'[]'::jsonb)::text) FROM "${n}".campaign_delivery_ledger d) OR
+       EXISTS(SELECT 1 FROM "${n}".campaign_delivery_ledger d WHERE NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities e WHERE e.email=d.email) OR
+         NOT EXISTS(SELECT 1 FROM "${n}".campaign_records r WHERE r.table_name='otp_requests' AND r.row_key=jsonb_build_object('id',d.request_id))) OR
+       EXISTS(SELECT 1 FROM "${n}".campaign_records r WHERE r.table_name='otp_requests' AND NOT EXISTS(
+         SELECT 1 FROM "${n}".campaign_delivery_ledger d WHERE r.row_key=jsonb_build_object('id',d.request_id)))
+    THEN RAISE EXCEPTION 'Campaign delivery journal changed'; END IF;
   END $guard$;`;
   // Every actual row is hashed by the tracking trigger. Never copy auth secrets into receipts.
   const guard = `${binding}
@@ -58,10 +65,13 @@ export function campaignMain(input, { sql, uuid, exists }) {
   if (!exists && input.kind === 'fixture') {
     sql(`BEGIN; ${lock}
       CREATE SCHEMA "${n}";
-      CREATE TABLE "${n}".campaign_manifest(reservation_id text PRIMARY KEY, candidate text NOT NULL, profile text NOT NULL, state text NOT NULL CHECK(state IN ('identities','cleaning','disposed')));
-      INSERT INTO "${n}".campaign_manifest VALUES('${input.id}','${input.candidate}','${profile}','identities');
+      CREATE TABLE "${n}".campaign_manifest(reservation_id text PRIMARY KEY, candidate text NOT NULL, profile text NOT NULL, state text NOT NULL CHECK(state IN ('identities','cleaning','disposed')), delivery_version integer NOT NULL DEFAULT 1, delivery_hash text NOT NULL DEFAULT md5('[]'));
+      INSERT INTO "${n}".campaign_manifest(reservation_id,candidate,profile,state) VALUES('${input.id}','${input.candidate}','${profile}','identities');
       CREATE TABLE "${n}".campaign_entities(alias text PRIMARY KEY,user_id text UNIQUE NOT NULL,email text UNIQUE NOT NULL);
       INSERT INTO "${n}".campaign_entities VALUES ${identities.map(u => `('${u.alias}','${u.id}','${u.email}')`).join(',')};
+      CREATE TABLE "${n}".campaign_delivery_ledger(request_id text PRIMARY KEY,email text NOT NULL,UNIQUE(request_id,email));
+      CREATE TABLE "${n}".campaign_delivery_sink(request_id text PRIMARY KEY,email text NOT NULL,message jsonb NOT NULL,
+        FOREIGN KEY(request_id,email) REFERENCES "${n}".campaign_delivery_ledger(request_id,email));
       CREATE TABLE "${n}".campaign_records(table_name text NOT NULL,row_key jsonb NOT NULL,row_hash text NOT NULL,version bigint NOT NULL DEFAULT 1,deleted boolean NOT NULL DEFAULT false, PRIMARY KEY(table_name,row_key));
       CREATE TABLE "${n}".campaign_events(sequence bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,table_name text NOT NULL,row_key jsonb NOT NULL,mutation text NOT NULL,row_hash text NOT NULL,observed_at timestamptz NOT NULL DEFAULT now());
       DO $guard$ BEGIN
@@ -98,6 +108,10 @@ export function campaignMain(input, { sql, uuid, exists }) {
         PERFORM pg_advisory_xact_lock(hashtextextended('${n}',0));
         SELECT state INTO lifecycle FROM "${n}".campaign_manifest;
         IF lifecycle='disposed' THEN RAISE EXCEPTION 'Disposed campaign cannot be resurrected'; END IF;
+        IF lifecycle='cleaning' AND TG_OP<>'DELETE' AND NOT (TG_TABLE_NAME='audit_logs' AND TG_OP='UPDATE' AND
+          value->>'actorId' IS NULL AND value->>'targetType'='SyntheticCampaign' AND value->>'targetId'='${input.id}' AND
+          value->'details'=jsonb_build_object('profile','${profile}','disposition','redacted-synthetic-audit'))
+          THEN RAISE EXCEPTION 'Cleaning campaign cannot accept auth writes'; END IF;
         IF lifecycle='identities' AND TG_OP='UPDATE' AND (subject IS DISTINCT FROM previous_subject OR value->>'id' IS DISTINCT FROM prior->>'id' OR (TG_TABLE_NAME='staff_grants' AND value->>'capability' IS DISTINCT FROM prior->>'capability'))
           THEN RAISE EXCEPTION 'Campaign reference transfer refused'; END IF;
         IF lifecycle='identities' THEN
@@ -118,6 +132,12 @@ export function campaignMain(input, { sql, uuid, exists }) {
         END IF;
         IF lifecycle='identities' AND ((SELECT count(*) FROM "${n}".campaign_records) >= 128 AND NOT tracked OR
           (SELECT count(*) FROM "${n}".campaign_events) >= 2048) THEN RAISE EXCEPTION 'Campaign auth graph limit'; END IF;
+        IF TG_TABLE_NAME='otp_requests' AND lifecycle='identities' THEN
+          INSERT INTO "${n}".campaign_delivery_ledger(request_id,email) VALUES(value->>'id',value->>'destination') ON CONFLICT DO NOTHING;
+          IF NOT EXISTS(SELECT 1 FROM "${n}".campaign_delivery_ledger WHERE request_id=value->>'id' AND email=value->>'destination')
+            THEN RAISE EXCEPTION 'Campaign delivery collision'; END IF;
+          UPDATE "${n}".campaign_manifest SET delivery_hash=(SELECT md5(coalesce(jsonb_agg(to_jsonb(d) ORDER BY request_id),'[]'::jsonb)::text) FROM "${n}".campaign_delivery_ledger d);
+        END IF;
         fingerprint := md5(value::text);
         INSERT INTO "${n}".campaign_records(table_name,row_key,row_hash,deleted) VALUES(TG_TABLE_NAME,key,fingerprint,TG_OP='DELETE')
           ON CONFLICT(table_name,row_key) DO UPDATE SET row_hash=excluded.row_hash,version="${n}".campaign_records.version+1,deleted=excluded.deleted;
@@ -135,17 +155,20 @@ export function campaignMain(input, { sql, uuid, exists }) {
     sql(`BEGIN; ${lock} ${guard} COMMIT;`);
     const state = sql(`SELECT state FROM "${n}".campaign_manifest;`);
     if (input.kind === 'fixture' && state !== 'identities') throw new Error();
-    if (state === 'identities' && sql(`SELECT count(*) FROM public.users u JOIN "${n}".campaign_entities e ON u.id=e.user_id AND u.email=e.email;`) !== '4') throw new Error();
-    if (input.kind === 'reset' && state !== 'disposed') {
-      // Delivery jobs and sink records are separate authorities. This bounded profile
-      // has no reviewed cleanup adapter for them, so even an expired/deleted OTP
-      // requires explicit disposition rather than a false database-only success.
-      if (sql(`SELECT count(*) FROM "${n}".campaign_records WHERE table_name='otp_requests';`) !== '0') throw new Error();
+    if (['identities', 'cleaning'].includes(state) && sql(`SELECT count(*) FROM public.users u JOIN "${n}".campaign_entities e ON u.id=e.user_id AND u.email=e.email;`) !== '4') throw new Error();
+    if (input.kind === 'reset') {
+      if (state !== 'disposed') {
+        // Commit the fence before touching Redis. Interrupted disposal stays cleaning;
+        // normal enqueue and mock send share this exact advisory lock and state check.
+        sql(`BEGIN; ${lock} ${guard} UPDATE "${n}".campaign_manifest SET state='cleaning'; COMMIT;`);
+      }
+      const deliveries = JSON.parse(sql(`SELECT coalesce(json_agg(json_build_object('requestId',request_id,'email',email) ORDER BY request_id),'[]') FROM "${n}".campaign_delivery_ledger;`));
+      disposeDeliveries(deliveries, state === 'disposed');
+      if (state !== 'disposed') {
       // Locks fence all allowed auth writers. FK inventory above refuses every untracked child,
       // including ON DELETE CASCADE/SET NULL references. No cascade is used for disposal.
       sql(`BEGIN; ${lock} ${guard}
-        DO $guard$ BEGIN IF EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name='otp_requests') THEN RAISE EXCEPTION 'Owned OTP delivery requires disposition'; END IF; END $guard$;
-        UPDATE "${n}".campaign_manifest SET state='cleaning';
+        DELETE FROM "${n}".campaign_delivery_sink;
         ${['totp_backup_codes', 'sessions', 'otp_requests', 'totp_enrollments', 'staff_grants'].map(t => `DELETE FROM public.${t} t USING "${n}".campaign_records r WHERE r.table_name='${t}' AND NOT r.deleted AND
           ${t === 'staff_grants' ? `r.row_key=jsonb_build_object('userId',t."userId",'capability',t.capability)` : `r.row_key=jsonb_build_object('id',t.id)`};`).join('\n')}
         UPDATE public.audit_logs a SET "actorId"=NULL, "targetType"='SyntheticCampaign', "targetId"='${input.id}', details='{"profile":"${profile}","disposition":"redacted-synthetic-audit"}'
@@ -155,16 +178,24 @@ export function campaignMain(input, { sql, uuid, exists }) {
         ${guard}
         DO $guard$ BEGIN IF EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE NOT deleted AND table_name<>'audit_logs') THEN RAISE EXCEPTION 'Incomplete campaign disposal'; END IF; END $guard$;
         COMMIT;`);
+      }
+      if (sql(`SELECT count(*) FROM "${n}".campaign_delivery_sink;`) !== '0') throw new Error();
     }
   } else {
     // An unknown/lost namespace is never proof of absence: check deterministic identities/methods.
     if (sql(`SELECT (SELECT count(*) FROM public.users WHERE id IN (${identities.map(u => `'${u.id}'`).join(',')}) OR email IN (${identities.map(u => `'${u.email}'`).join(',')})) + (SELECT count(*) FROM public.otp_requests WHERE destination IN (${identities.map(u => `'${u.email}'`).join(',')}));`) !== '0') throw new Error();
   }
   const state = exists ? sql(`SELECT state FROM "${n}".campaign_manifest;`) : 'disposed';
+  if (exists && state === 'disposed' && input.kind !== 'reset') {
+    disposeDeliveries(JSON.parse(sql(`SELECT coalesce(json_agg(json_build_object('requestId',request_id,'email',email) ORDER BY request_id),'[]') FROM "${n}".campaign_delivery_ledger;`)), true);
+    if (sql(`SELECT count(*) FROM "${n}".campaign_delivery_sink;`) !== '0') throw new Error();
+  }
   const retainedAudits = exists ? Number(sql(`SELECT count(*) FROM "${n}".campaign_records WHERE table_name='audit_logs' AND NOT deleted;`)) : 0;
   const receipt = { fixtures: state === 'disposed' ? 'absent' : 'present', namespace: n, profile, candidate: input.candidate,
     state, identities: state === 'disposed' ? 0 : 4, protectedReceipt: `${n}.campaign_entities`, retainedAudits,
-    auth: 'normal-endpoints-required', deliveryCleanup: 'unsupported-after-otp', tombstone: exists && state === 'disposed' };
+    auth: 'normal-endpoints-required', reservationId: input.id, cleanupVersion: 1,
+    deliveryCleanup: state === 'disposed' && exists ? 'disposed' : 'pending',
+    ...(state === 'disposed' && exists ? { queueJobs: 0, sinkRecords: 0 } : {}), tombstone: exists && state === 'disposed' };
   if (input.kind === 'probe') {
     if (sql('SELECT count(*) FROM public._prisma_migrations WHERE finished_at IS NULL AND rolled_back_at IS NULL;') !== '0') throw new Error();
     const migrations = JSON.parse(sql(`SELECT coalesce(json_agg(json_build_object('name',migration_name,'checksum',checksum) ORDER BY migration_name),'[]') FROM public._prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL;`));
@@ -172,4 +203,48 @@ export function campaignMain(input, { sql, uuid, exists }) {
     Object.assign(receipt, { sha: input.target, schema: input.schemaDisposition, migrations });
   }
   console.log(JSON.stringify(receipt));
+}
+
+
+/** Runs only inside the API service process. No scan, drain, obliterate or caller queue name. */
+export async function campaignQueueMain(deliveries, observeOnly = false) {
+  let queue;
+  try {
+    const { Queue } = require('bullmq');
+    const { AuthSchemas } = require('@auto-tm/contracts');
+    if (!Array.isArray(deliveries) || deliveries.length > 128) throw new Error();
+    const redis = new URL(process.env.REDIS_URL);
+    if (!['redis:', 'rediss:'].includes(redis.protocol) || redis.search || redis.hash || !/^\/\d*$/.test(redis.pathname || '/')) throw new Error();
+    queue = new Queue(AuthSchemas.EMAIL_CODE_QUEUE, { connection: {
+      host: redis.hostname, port: Number(redis.port || 6379), db: Number(redis.pathname.slice(1) || 0),
+      username: redis.username ? decodeURIComponent(redis.username) : undefined,
+      password: redis.password ? decodeURIComponent(redis.password) : undefined,
+      ...(redis.protocol === 'rediss:' ? { tls: {} } : {}),
+      maxRetriesPerRequest: 1, retryStrategy: () => null, connectTimeout: 8000, commandTimeout: 8000,
+    }});
+    queue.on('error', () => {});
+    await queue.waitUntilReady();
+    const owned = [];
+    for (const delivery of deliveries) {
+      if (!/^[a-zA-Z0-9_-]{1,128}$/.test(delivery.requestId ?? '') || typeof delivery.email !== 'string') throw new Error();
+      const job = await queue.getJob(delivery.requestId);
+      if (!job) continue;
+      const parsed = AuthSchemas.EmailCodeJobSchema.safeParse(job.data);
+      if (observeOnly || job.name !== AuthSchemas.EMAIL_CODE_JOB_NAME || !parsed.success || parsed.data.to !== delivery.email ||
+          parsed.data.purpose !== 'sign-in' || job.opts.parent || job.parentKey || job.repeatJobKey || job.opts.repeat ||
+          !['waiting','delayed','completed','failed','paused','prioritized'].includes(await job.getState())) throw new Error();
+      const counts = await job.getDependenciesCount();
+      if (Object.values(counts).some(count => count !== 0)) throw new Error();
+      owned.push(job);
+    }
+    // Validate the complete bounded inventory before removing any job. BullMQ also
+    // refuses a job that becomes locked between getState and removal.
+    for (const job of owned) await job.remove({ removeChildren: false });
+    for (const delivery of deliveries) if (await queue.getJob(delivery.requestId)) throw new Error();
+    console.log(JSON.stringify({ queueJobs: 0 }));
+  } catch {
+    process.exitCode = 1;
+  } finally {
+    if (queue) await queue.close().catch(() => { process.exitCode = 1; });
+  }
 }

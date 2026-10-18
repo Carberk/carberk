@@ -8,7 +8,7 @@ import {
 describe("BullMqEmailCodeSenderAdapter", () => {
   it("enqueues the worker contract with the request UUID as job id", async () => {
     const add = vi.fn().mockResolvedValue(undefined);
-    const adapter = new BullMqEmailCodeSenderAdapter({ add } as never);
+    const adapter = new BullMqEmailCodeSenderAdapter({ add } as never, {} as never);
 
     await adapter.enqueue({
       requestId: "550e8400-e29b-41d4-a716-446655440000",
