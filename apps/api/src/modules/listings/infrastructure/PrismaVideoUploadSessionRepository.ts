@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import type { PrismaService } from "@auto-tm/db";
 import type { VideoSessionRecord, VideoSessionState } from "../application/VideoUploadSession";
 
 @Injectable()

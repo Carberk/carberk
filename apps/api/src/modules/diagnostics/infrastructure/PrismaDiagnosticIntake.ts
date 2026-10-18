@@ -179,9 +179,10 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
   }
   async observeVehicle(subject: DiagnosticSubject, id: string, input: DiagnosticSchemas.DiagnosticObservedVehicle): Promise<DiagnosticSchemas.DiagnosticOrder> {
     return this.db.$transaction(async tx => {
-      const { row } = await this.scope(tx, subject, id, "diagnostics.technician"); this.version(row, input.expectedVersion);
+      const { row } = await this.scope(tx, subject, id, "diagnostics.technician");
+      const { expectedVersion, ...observed } = input;
+      this.version(row, expectedVersion);
       if (row.status !== "arrived" || new Date(input.observedAt) > this.runtime.now()) throw new DiagnosticRuleError("DIAGNOSTIC_OBSERVATION_DENIED");
-      const { expectedVersion: _version, ...observed } = input;
       let identityDigest: string | null = null;
       if (row.audience === "listing_public") {
         if (!row.listingId || !row.publicationAuthorization || !row.physicalAuthorization) throw new DiagnosticRuleError("PUBLICATION_AUTHORIZATION_REQUIRED");

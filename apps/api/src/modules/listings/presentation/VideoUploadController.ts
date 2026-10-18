@@ -1,6 +1,6 @@
 import { Body, Controller, Inject, Param, Patch, Post, Req, UnauthorizedException, ForbiddenException, BadRequestException } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
-import { VideoUploadSessionService } from "../application/VideoUploadSession";
+import { type VideoUploadSessionService } from "../application/VideoUploadSession";
 import { PrismaVideoUploadSessionRepository } from "../infrastructure/PrismaVideoUploadSessionRepository";
 @Controller("api/v1/listings/video")
 export class VideoUploadController {
