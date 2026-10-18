@@ -55,4 +55,23 @@ describe("independent operational probes", () => {
     state = "healthy";
     expect((await watchdog.check(now)).incident?.resolvedAt).toBe(now.toISOString());
   });
+
+  it("opens incidents for measured technical thresholds but rejects stale metrics", async () => {
+    let now = new Date("2026-10-18T00:00:00Z");
+    const snapshot = { version: 1 as const, observedAt: now.toISOString(),
+      errors: { windowMs: 300_000 as const, requests: 100, technicalErrors: 6, rate: .06 as number | null },
+      latency: { windowMs: 600_000 as const, requests: 100, p95UpperMs: 100 as number | null } };
+    const watchdog = new Watchdog({ heartbeat: async () => String(now.getTime()), http: async () => "healthy", queueDepths: async () => [],
+      technical: async () => snapshot, publish: async () => undefined });
+    expect((await watchdog.check(now)).incident?.resolvedAt).toBeNull();
+    snapshot.errors.rate = 0;
+    snapshot.latency.p95UpperMs = 5_000;
+    expect((await watchdog.check(now)).technical?.latency.p95UpperMs).toBe(5_000);
+    now = new Date(now.getTime() + 46_000);
+    const stale = await watchdog.check(now);
+    expect(stale.technical).toBeNull();
+    expect(stale.incident?.resolvedAt).toBeNull();
+    snapshot.observedAt = now.toISOString(); snapshot.latency.p95UpperMs = 1_000;
+    expect((await watchdog.check(now)).incident?.resolvedAt).toBe(now.toISOString());
+  });
 });

@@ -28,7 +28,7 @@ describe("actual operational workspace and server action", () => {
   it.each(["en", "ru", "tk"] as const)("shows measured states and honest missing budget evidence in %s", async locale => {
     const c = operationsCopy[locale], view = setup(locale);
     await view.findByText(c.healthy);
-    expect(view.getByText(c.unknown)).toBeTruthy();
+    expect(view.getAllByText(c.unknown)).toHaveLength(3);
     expect(view.getByText(c.failing)).toBeTruthy();
     expect(view.getByText(c.budgetScope)).toBeTruthy();
     expect(view.getByText(c.readinessScope)).toBeTruthy();

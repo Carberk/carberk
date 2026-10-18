@@ -1,5 +1,6 @@
 import Redis from "ioredis";
 import { Queue } from "bullmq";
+import { OperationsSchemas } from "@auto-tm/contracts";
 
 import { operationsConfig } from "./OperationsConfig";
 import { Watchdog } from "./Watchdog";
@@ -21,6 +22,12 @@ async function main(): Promise<void> {
   const watchdog = new Watchdog({
     heartbeat: () => redis.get(`${config.prefix}:worker`),
     http: target => httpProbe(target === "api" ? config.apiHealthUrl : config.collectorHealthUrl, target),
+    technical: async () => {
+      const raw = await redis.get(`${config.prefix}:technical`);
+      if (!raw || Buffer.byteLength(raw) > 4_096) return null;
+      const parsed = OperationsSchemas.TechnicalSnapshotSchema.safeParse(JSON.parse(raw));
+      return parsed.success ? parsed.data : null;
+    },
     queueDepths: () => Promise.all(queues.map(async queue => {
       const counts = await queue.getJobCounts("wait", "prioritized", "active");
       return { name: queue.name, waiting: (counts["wait"] ?? 0) + (counts["prioritized"] ?? 0) + (counts["active"] ?? 0) };
