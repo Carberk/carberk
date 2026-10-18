@@ -52,7 +52,10 @@ export class RecomputeImprovement {
      snapshot.scorecard.inventory={listingHours:null,averageActive:null,currentActive:null};
      snapshot.scorecard.contacts.perActiveListing=null;
     }
-    if(released && old.success && old.data.scorecard && snapshot.scorecard)snapshot.scorecard=freezeImprovementRelease(snapshot.scorecard,old.data.scorecard);
+    if(released && old.success && old.data.scorecard && snapshot.scorecard){
+     snapshot.scorecard=freezeImprovementRelease(snapshot.scorecard,old.data.scorecard);
+     snapshot.inventoryAvailable=old.data.inventoryAvailable;
+    }
     const metrics=JSON.parse(JSON.stringify(snapshot));
     const inputDigest=createHash("sha256").update(JSON.stringify(rows.map(row=>[row.id,row.receivedAt.toISOString(),row.conversionEligible]))).digest("hex");
     const expiresAt=new Date(now);expiresAt.setUTCMonth(expiresAt.getUTCMonth()+24);

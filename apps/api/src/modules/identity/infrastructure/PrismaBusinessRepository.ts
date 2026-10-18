@@ -15,6 +15,10 @@ export class PrismaBusinessRepository implements BusinessRepository {
   await tx.$queryRaw`SELECT "id" FROM "users" WHERE "id" IN (${subject.userId}, ${otherUserId ?? subject.userId}) ORDER BY "id" FOR UPDATE`;
   if (businessId) await tx.$queryRaw`SELECT "id" FROM "dealerships" WHERE "id" = ${businessId} FOR UPDATE`;
  }
+ private async invalidateInventory(tx:Tx){
+  const collector=await tx.$queryRaw<{epoch:string}[]>`SELECT "epoch" FROM "measurement_state" WHERE "key"='collector' FOR UPDATE`;
+  if(collector[0])await tx.measurementState.deleteMany({where:{key:`inventory_baseline:${collector[0].epoch}`}});
+ }
  private async person(tx: Tx, subject: BusinessSubject, now: Date) {
   const session = await tx.session.findUnique({ where: { id: subject.sessionId }, include: { user: true } });
   if (!session || session.userId !== subject.userId || session.expiresAt <= now) throw new BusinessAuthorityDenied("SESSION_REQUIRED");
@@ -88,7 +92,7 @@ export class PrismaBusinessRepository implements BusinessRepository {
    const consumed = await tx.dealershipInvitation.updateMany({ where: { id: invite.id, redeemedAt: null, revokedAt: null }, data: { redeemedAt: now } });
    if (consumed.count !== 1) throw new BusinessAuthorityDenied("INVITATION_INVALID");
    await tx.dealershipMember.create({ data: { userId: input.userId, dealershipId: invite.dealershipId, role: invite.role, status: "active" } });
-   if (invite.role === "owner") await tx.dealership.update({ where: { id: invite.dealershipId }, data: { status: "active" } });
+   if (invite.role === "owner") {await tx.dealership.update({ where: { id: invite.dealershipId }, data: { status: "active" } });await this.invalidateInventory(tx);}
    await this.audit(tx, input.userId, invite.dealershipId, "BUSINESS_INVITATION_REDEEMED", { invitationId: invite.id, role: invite.role });
    return { businessId: invite.dealershipId };
   });
@@ -131,6 +135,7 @@ export class PrismaBusinessRepository implements BusinessRepository {
    if (owner) await tx.dealershipMember.delete({ where: { id: owner.id } });
    await this.recipient(tx, input.ownerUserId, input.businessId);
    await tx.dealership.update({ where: { id: input.businessId }, data: { status: "recovery" } });
+   await this.invalidateInventory(tx);
    await tx.dealershipInvitation.updateMany({ where: { dealershipId: input.businessId, role: "owner", redeemedAt: null, revokedAt: null }, data: { revokedAt: now } });
    const invite = await tx.dealershipInvitation.create({ data: { dealershipId: input.businessId, recipientUserId: input.ownerUserId, role: "owner", tokenHash: input.tokenHash, expiresAt: input.expiresAt } });
    await this.audit(tx, input.userId, input.businessId, "BUSINESS_OWNER_RECOVERY", { evidence: input.evidence, reason: input.reason, invitationId: invite.id });
