@@ -28,7 +28,7 @@ export class PrismaVideoPlayback implements VideoPlaybackAuthority {
         await this.identity.resolve(subject, tx);
         await tx.$queryRaw`SELECT "id" FROM "listings" WHERE "id" = ${grant.listingId} FOR SHARE`;
         const listing = await tx.listing.findUnique({ where: { id: grant.listingId }, include: { business: true } });
-        if (!listing || listing.activeVideoGenerationId !== grant.generationId) return null;
+        if (!listing || listing.deletedAt || listing.activeVideoGenerationId !== grant.generationId) return null;
         let member = false;
         if (listing.businessId && ((listing.business?.status !== "active") || listing.status === "banned")) {
           try { await this.identity.authorize({ ...subject, businessId: listing.businessId, history: true }, tx); member = true; } catch { return null; }
