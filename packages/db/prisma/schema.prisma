@@ -838,6 +838,9 @@ model Conversation {
   updatedAt     DateTime  @updatedAt
   lastMessageAt DateTime?
   lastMessageId String?
+  /// Canonical accepted cohort references. Never reconstructed from historical timestamps.
+  firstBuyerMessageId String?
+  firstSellerReplyId String?
 
   participants ConversationParticipant[]
   messages     Message[]
