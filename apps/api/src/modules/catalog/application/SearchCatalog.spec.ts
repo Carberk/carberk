@@ -211,11 +211,24 @@ describe("SearchCatalog", () => {
       expect(brand.results[0]).toMatchObject({
         kind: "brand", brandId: "international-harvester", label: "International Harvester",
       });
-      const tractor = await uc.execute({ query: "844", locale });
-      expect(tractor.results).toContainEqual(expect.objectContaining({
-        kind: "model", brandId: "international-harvester",
-        modelId: "international-harvester/844", label: "844",
-        brandLabel: "International Harvester",
+      for (const [query, slug, label] of [
+        ["584", "584", "584"],
+        ["744", "744", "744"],
+        ["844", "844", "844"],
+        ["955", "955", "955"],
+        ["Farmall DED 3", "farmall-ded-3", "Farmall DED 3"],
+      ] as const) {
+        const tractor = await uc.execute({ query, locale });
+        expect(tractor.results).toContainEqual(expect.objectContaining({
+          kind: "model", brandId: "international-harvester",
+          modelId: `international-harvester/${slug}`, label,
+          brandLabel: "International Harvester",
+        }));
+      }
+      // Standalone four-digit tokens are reserved for years by the existing search contract.
+      // The complete brand query must still expose the 1055 alongside its other machinery.
+      expect(brand.results).toContainEqual(expect.objectContaining({
+        kind: "model", modelId: "international-harvester/1055", label: "1055",
       }));
       const navistar = await uc.execute({ query: "ProStar", locale });
       expect(navistar.results[0]).toMatchObject({
