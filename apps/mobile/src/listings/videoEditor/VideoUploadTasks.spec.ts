@@ -52,10 +52,19 @@ describe("native seller task uses actual preparation and transfer boundaries", (
   const task = new VideoUploadTask(ownerId, target);
   await task.start({ sourceUri: "file:///library/selected.mov", startMs: 0, endMs: 3000 }, 0);
   state = "READY";
-  await new VideoUploadTask(ownerId, target).recover();
   const reopened = new VideoUploadTask(ownerId, target);
   await reopened.recover();
   expect(reopened.snapshot().phase).toBe("READY");
+ });
+ it("keeps cancellation authoritative over a late ready status response", async () => {
+  const task = new VideoUploadTask(ownerId, target);
+  await task.start({ sourceUri: "file:///library/selected.mov", startMs: 0, endMs: 3000 }, 0);
+  let enter!: () => void, release!: () => void;
+  const entered = new Promise<void>(resolve => { enter = resolve; }), held = new Promise<void>(resolve => { release = resolve; });
+  server.use(http.get(`${base}/${sessionId}`, async () => { enter(); await held; return HttpResponse.json({ ...snapshot(), state: "READY" }); }));
+  const recovering = task.recover(); await entered;
+  await task.cancel(); release(); await recovering;
+  expect(task.snapshot().phase).toBe("CANCELLED");
  });
  it("reports an unavailable native preparation module without sending an original", async () => {
   boundary.unavailable = true;
