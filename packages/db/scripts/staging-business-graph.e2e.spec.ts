@@ -376,11 +376,16 @@ describe("reservation-owned synthetic business v2 storage graph, without admissi
     let lateWrite: Promise<unknown> | undefined;
     try {
       await client.query("BEGIN");
+      const holderPid = (await client.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]?.pid;
+      if (holderPid === undefined) throw new Error("Fence holder backend unavailable");
       await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`cf_${id}`]);
       lateWrite = db.listing.update({ where: { id: owned.car.id }, data: { description: "Held writer must not commit" } }).then(value => ({ value }), error => ({ error }));
       let waiting = false;
       for (let attempt = 0; attempt < 100; attempt++) {
-        const result = await client.query("SELECT count(*)::int AS count FROM pg_stat_activity WHERE wait_event='advisory' AND query LIKE '%listings%'");
+        // Activity snapshots are cached within this holder transaction. Refresh
+        // each observation and attribute the wait to this exact lock holder.
+        await client.query("SELECT pg_stat_clear_snapshot()");
+        const result = await client.query("SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=current_database() AND pid<>$1 AND wait_event_type='Lock' AND wait_event='advisory' AND $1=ANY(pg_blocking_pids(pid)) AND query LIKE '%listings%'", [holderPid]);
         if (result.rows[0]?.count > 0) { waiting = true; break; }
         await new Promise(resolve => setTimeout(resolve, 10));
       }
