@@ -136,7 +136,15 @@ Search analytics are allowed for product planning and admin dashboard reporting,
 
 - Tap ♡ on a Listing to save it; tap the filled ♥ to remove it.
 - The Favorites tab lists saved Listings only. Its card and the Hide sold switch are specified in [32 — Listings](32-listings.md#cards).
-- The Favorites empty state is still being designed ([#352](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/352)).
+- Tapping the filled ♥ on a Favorites card removes the card at once and shows a toast with **Undo**. The removal itself is delayed until the toast ends, so Undo cancels it and the card returns to its place; Undo never re-adds the Listing.
+- Approved states ([#352](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/352), prototype `prototype/favorites-conversations`):
+  - **Signed out:** "Sign in to see your Favorites" with a Sign in button and a line telling the User to tap ♡ on a Listing to save it.
+  - **Loading:** skeleton cards with the same shape as the large card.
+  - **Empty:** "No favorites yet", a line on saving Listings to find them later, and a **Browse listings** button that opens Home.
+  - **Error:** "Could not load", a line on checking the connection, and a **Retry** button.
+  - **"No active listings":** when Hide sold hides every saved Listing, the screen says "No active listings", says that sold Listings are hidden and that turning off Hide sold shows them, and offers **Browse listings**.
+  - **List:** the Hide sold switch at the top with the hidden count, then the large cards.
+- There is no "Need help?" link and no support entry on Favorites; support is Cabinet → Help ([34 — Conversations](34-conversations.md#support)).
 
 ### Rejected for the release
 

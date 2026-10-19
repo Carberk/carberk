@@ -4,7 +4,7 @@
 
 Maral wants to buy her first car. In the MLP beta, the journey is deliberately small: browse, filter, inspect a listing, contact the seller, and meet offline.
 
-S8a adds saved-listing Favorites to this loop. Saved-search notifications, rich chat, dealer showrooms, public Garage trust signals, and post-purchase surveys remain post-MLP bets.
+S8a adds saved-listing Favorites to this loop. Saved-search notifications, dealer showrooms, public Garage trust signals, and post-purchase surveys remain post-MLP bets. The Conversation itself is specified in [34 — Conversations](../features/34-conversations.md).
 
 ## Goal
 
@@ -34,20 +34,20 @@ S8a adds saved-listing Favorites to this loop. Saved-search notifications, rich 
 
 - She taps **Message**
 - If anonymous, OTP auth opens and then resumes the same action
-- A simple per-listing text thread opens
+- A per-listing Conversation opens
 - She sends: "Is it still available?"
 
 ### Step 4 — Seller replies
 
-- Aman opens his conversation list
+- Aman opens his Messages list
 - He sees the listing-scoped thread
 - He replies in text
-- No typing indicator, read receipt, image message, post-card, or push delivery is required for the MLP beta
+- He gets a push notification, and sees read state, typing and presence as in [34 — Conversations](../features/34-conversations.md)
 
 ### Step 5 — Negotiate
 
 - Back-and-forth text conversation
-- If they need extra photos or voice calls, they can exchange that manually for beta learning
+- If they need extra photos, they can send an image in the Conversation; voice calls happen outside the app
 - The goal is to learn whether AutoTM creates enough buyer-seller contact, not to solve every negotiation workflow immediately
 
 ### Step 6 — Meet
@@ -55,7 +55,7 @@ S8a adds saved-listing Favorites to this loop. Saved-search notifications, rich 
 - Off-platform — they meet at a public location
 - Maral inspects the car, decides whether to buy
 - Transaction stays off-platform; no in-app payment, escrow, or scheduling
-- Aman marks the listing as sold if the deal completes
+- Aman marks the listing as sold if the deal completes. An existing Conversation stays open, with a Sold badge and a link to other cars of the same model
 
 ## Trust building moments
 
@@ -71,7 +71,7 @@ Post-MLP trust candidates: PRO dealer badge, public Garage, response-time stats,
 ## Failure modes (and mitigations)
 
 - **Maral can't find the right car** → Capture the repeated-search pain; shape saved searches only if this repeats.
-- **Seller doesn't reply** → Capture response-delay data; shape direct-message push only if this blocks conversion.
+- **Seller doesn't reply** → Capture response-delay data; push already notifies the seller of new Messages.
 - **Seller is rude / scammer** → Report → admin moderation.
 - **Listing was misrepresented** → Report → admin review; inspection tier is a later trust bet.
 

@@ -2,11 +2,11 @@
 
 ## Summary
 
-Buyer-to-seller contact scoped to a listing. The MLP beta ships a simple text thread so the market loop is observable. Report-from-thread is not part of S6 unless that sprint is explicitly reshaped; otherwise message reports ship with a later rich-chat/moderation bet. Rich chat — image messages, post-card messages, read receipts, typing, presence, Socket.IO realtime, quick replies, and push delivery — is a post-MLP bet.
+Buyer-to-seller contact scoped to a Listing. The release ships the Messages tab and the Conversation screen approved on 2026-10-02 for the Google Play review build ([#352](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/352), prototype `prototype/favorites-conversations` at `b1cbd61`, Support entry B). The app already carries text and image Messages, listing-reference Messages, read state, typing, presence, Socket.IO realtime and push delivery; this document states the behaviour those surfaces are held to. Support chat is not part of the release (see [Support](#support)).
 
 ## Why it exists
 
-Phone calls don't leave a trail. Telegram conversations get lost across channels. Scams are easier when there's no audit. A native, listing-scoped chat:
+Phone calls don't leave a trail. Telegram conversations get lost across channels. Scams are easier when there's no audit. A native, Listing-scoped chat:
 
 - Keeps the conversation about the car (pinned listing card at top)
 - Surfaces seller credibility (response time, tenure, PRO badge)
@@ -22,18 +22,109 @@ Phone calls don't leave a trail. Telegram conversations get lost across channels
 2. (If not authed) Login modal triggers; resume after OTP
 3. Buyer enters first message OR taps a quick-reply chip
 4. Conversation created in DB; `ConversationStarted` event fires
-5. Both buyer and seller now see this thread in their Chat tab
+5. Both buyer and seller now see this thread in their Messages tab
+
+Starting a **new** Conversation about a sold Listing stays closed (see [Closed and sold Listings](#closed-and-sold-listings)).
+
+### Messages list
+
+- **Row:** thumbnail of the Listing, the other participant's name, the Listing title and price, a preview of the last Message, the time and a tick for the last own Message.
+- **Marks:** an unread badge, a Sold label when the Listing is sold, and muted and blocked marks.
+- **Order:** by `lastMessageAt`, newest first. Muted Conversations are dimmed.
+- **Not on the list:** no Support row and no ads (D8).
+- **Messages tab badge:** the tab shows the unread count (founder answer Q1 on #352).
+- **States:** loading, empty, error with Retry, signed out (see [Screens / states](#screens--states)).
 
 ### Inside a chat thread
 
-- **Pinned listing card** at the top of the thread (Brand Model, Year, Price, thumb) — tapping it opens the listing
+- **Pinned listing card** at the top of the thread (Brand Model, Year, Price, thumb) — tapping it opens the listing. A sold Listing shows a Sold badge on it.
+- **Header:** the other participant's name and presence, the Conversation menu (⋯), and **Call**. Call is for buyers only, while the Listing is active and allows calls; a buyer's phone number is never shown (Q2).
 - Message list scrolls (newest at bottom)
 - Composer at bottom: text input, attach (image), send button
-- Quick-reply chips appear above the composer if the thread has 0 messages
+- **Quick replies** appear above the composer (see below)
 - Typing indicator: "Илья is typing…" below messages
-- Read receipt: small checkmarks under your own sent messages (sent / delivered / read)
+- **Read state (D6):** ticks under your own sent Messages (sent / delivered / read), and a "Read" label under the last own Message once it is read.
 - Last-seen: "был(а) в 14:32" under seller's name in header
 - "Seller usually responds within 1 hour" hint shown if the seller has 5+ past conversations
+- **Back (D9):** from a Conversation opened by a push notification, Back goes to the Messages list, not out of the app or to a previous tab.
+
+### Conversation menu (⋯)
+
+- **Mute** (and Unmute) notifications for this Conversation.
+- **Report** the other participant (a User report; the existing report path for Users).
+- **Block** (and Unblock) the other participant.
+- There is **no Delete conversation** (D2).
+- There is **no Contact support** item (see [Support](#support)).
+
+### Block and report
+
+- **Block:** no further Messages can be sent in either direction; existing history is preserved for moderation. The blocking participant sees the blocked banner in place of the composer (D3): "User blocked", a line saying they cannot send Messages to this User, and an Unblock button.
+- **Report (User):** from the Conversation menu. Goes to the admin queue; original Messages stay; admin can act.
+- **Report (Message):** long-press another participant's Message and choose **Report** (D4); see [Long-press a Message](#long-press-a-message). A reported Message shows "Reported" for the reporter.
+- Conversations owns Message and report context, deleted-message behavior and surrounding-Message excerpts; Admin owns queue display, resolution and audit.
+
+### Long-press a Message
+
+Long-press opens a sheet (D4):
+
+- On another participant's Message: **Copy** and **Report**.
+- On your own Message: **Copy**, and **Delete** while it is within 5 minutes of sending.
+
+Copy takes the Message text only. Listing Share and Copy link stay removed.
+
+### Delete a message
+
+- Long-press own message → "Delete" in the same sheet
+- Only allowed within 5 min of sending
+- Renders as "Message deleted" placeholder (not silently removed)
+
+### Failed Message
+
+A Message that could not be sent stays on its bubble with "Failed to send" and an inline **Retry** (D5). No sheet is needed to retry.
+
+### Quick replies
+
+Four system-defined intents, localized, shared with Ask the seller on Listing detail:
+
+- Is it still available?
+- Can I see it? (when can I see the car)
+- What is the final price?
+- What is the condition of the car?
+
+Behaviour (D7, Q4):
+
+- Shown to the **buyer** above the composer until the seller replies. Once the seller has sent a Message, they disappear.
+- Tapping a chip fills the composer; the buyer edits it and presses Send. It is never sent by the tap alone.
+
+### Closed and sold Listings
+
+The Conversation stays readable in every case. What changes is whether the composer is on.
+
+| Case | Conversation screen |
+|---|---|
+| Listing **sold** (D1) | Sold badge on the Listing card and an inline banner: the car is sold, the Conversation can continue, and the Listing is no longer available. The banner links to other cars of the same model (Results filtered by brand and model; a plain filter, not a recommendation). The composer stays on and both participants can keep sending. |
+| Listing **removed from sale** (`archived`) | The same as sold: Removed from sale badge, the banner and link, composer on (Q3). |
+| Listing **banned** or **deleted** | A one-line notice replaces the composer (Q3). |
+| **Chat switched off** on the Listing | A one-line notice replaces the composer (Q3). |
+| **Blocked by the other participant** | A one-line notice replaces the composer (Q3). The blocker's own view is the blocked banner with Unblock (D3). |
+| A participant is **suspended** | A generic unavailable notice replaces the composer, as for the cases above. |
+
+Rules:
+
+- **New contact stays closed:** a Listing that is sold, removed from sale, banned or deleted accepts no new Conversation. The Message button and Ask the seller are hidden or disabled on those Listings ([32 — Listings](32-listings.md#listing-states)).
+- **Existing Conversations** are the only place a sold or removed Listing keeps accepting Messages. A Listing status of `sold` or `archived` no longer refuses a Message; blocking, suspension, the chat switch and a banned or deleted Listing still do.
+- **Notice wording:** one short line per case, set with the implementing slice and localized in RU, EN and TK. Turkmen drafts ship and are corrected during the device proof (Q5).
+- **A sold or removed Listing never produces a notice on its own.** Only the cases in the table above replace the composer.
+
+### Support
+
+For the release there is no support entry in Messages or in a Conversation:
+
+- no Support row in the Messages list;
+- no "Need help?" link in the empty or error states of Messages (or Favorites);
+- no Contact support item in the Conversation menu.
+
+Support is reached from **Cabinet → Help**, which shows the AutoTM email address and phone number (Cabinet is specified in [#353](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/353)). An in-app support chat with an AutoTM admin account ([#500](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/500)) comes after the release and store review. This follows the founder decision recorded on #352 that replaced D10.
 
 ### Cache + offline behavior
 
@@ -49,50 +140,35 @@ Phone calls don't leave a trail. Telegram conversations get lost across channels
 - **Text** — up to 1000 chars, auto-link URLs
 - **Image** — single image per message, ≤5 MB, client-compressed
 - **Post-card** — embeds a Listing reference; tapping opens that listing. Auto-created when user shares a listing into the chat.
-- **System** — auto-generated server messages ("Listing marked sold", "User blocked the conversation")
-
-### Quick replies (auto.ru-style)
-
-System-defined snippets, localized:
-- "Здравствуйте"
-- "Здравствуйте, ещё продаётся?" / "Is it still available?"
-- "Когда могу посмотреть?" / "When can I see it?"
-- "Возможен торг?" / "Open to negotiation?"
-- "Будем на связи" / "Let's stay in touch"
-
-Tap → fills the composer (editable before send).
-
-### Block / report
-
-- From the chat header menu (⋯): Block user, Report message
-- Block → no further messages can be sent in either direction; existing history preserved for moderation
-- Report → admin queue; original messages stay; admin can act
-- MLP placement: report-from-thread is not part of S6/S7 unless S6 is explicitly reshaped. When shaped, Conversations owns message/report context, deleted-message behavior, and surrounding-message excerpts; Admin owns queue display, resolution, and audit.
-
-### Delete a message
-
-- Long-press own message → "Delete"
-- Only allowed within 5 min of sending
-- Renders as "Message deleted" placeholder (not silently removed)
+- **System** — server-generated Messages. The sold state of a Listing is shown by the badge and banner, not by a system Message.
 
 ## Screens / states
 
 | Screen | State | Notes |
 |---|---|---|
-| Chat list | Empty | "Start by messaging a seller" |
-| Chat list | Has threads | Sorted by `lastMessageAt` desc; unread bold; muted threads dimmed |
-| Chat thread | New (0 messages) | Show quick-reply chips above composer |
+| Messages list | Loading | Skeleton rows of the same shape |
+| Messages list | Empty | "No conversations yet"; Browse listings button |
+| Messages list | Has threads | Sorted by `lastMessageAt` desc; unread badge; muted threads dimmed; Sold label on rows for sold Listings |
+| Messages list | Error | "Could not load" with Retry; no support link |
+| Messages list | Signed out | Sign in prompt; no support contact block |
+| Chat thread | New (0 messages) | Quick-reply chips above composer |
+| Chat thread | Buyer, seller not yet replied | Quick-reply chips stay above the composer |
 | Chat thread | Many messages | Infinite scroll up to load history |
 | Chat thread | Other side typing | Dots animation under last message |
 | Chat thread | Network offline | Yellow banner; new sends disabled; already-pending outbox items retry on reconnect |
-| Chat thread | Listing sold | System message: "This listing was marked sold by the seller." Existing history remains readable; new contact/messages disabled in the MLP. |
-| Chat thread | Listing banned | Banner: "This listing is no longer available." Existing history remains readable; new contact/messages disabled. |
-| Chat thread | Participant suspended | Generic unavailable/account-restricted banner. Existing history remains readable; new contact/messages disabled. |
-| Chat thread | Blocked | Banner: "You blocked this user." + Unblock button |
-| Chat thread | Reported | Owner side: "Reported. We'll review." Banner. |
+| Chat thread | Loading, error, signed out | Skeleton; error with Retry; Sign in prompt |
+| Chat thread | Listing sold or removed from sale | Badge on the Listing card and inline banner linking to other cars of the same model; composer on |
+| Chat thread | Listing banned or deleted | One-line notice replaces the composer. Existing history remains readable. |
+| Chat thread | Chat switched off | One-line notice replaces the composer |
+| Chat thread | Participant suspended | Generic unavailable/account-restricted notice replaces the composer. Existing history remains readable. |
+| Chat thread | Blocked by the other participant | One-line notice replaces the composer |
+| Chat thread | You blocked this user | Banner replaces the composer: "User blocked" + Unblock button |
+| Chat thread | Reported | Owner side: "Reported" under the reported Message |
+| Message | Long-press | Sheet: Copy / Report (peer Message); Copy / Delete within 5 min (own Message) |
+| Message | Read | Ticks, plus "Read" under the last own Message |
 | Composer | Image attached | Preview thumbnail + remove × |
 | Composer | Sending | Spinner on send button; disabled |
-| Composer | Send failed | Red × with retry option |
+| Composer | Send failed | "Failed to send" with inline Retry on the bubble |
 
 ## Data references
 
@@ -107,12 +183,14 @@ Tap → fills the composer (editable before send).
 - [ADR-0002](../../adr/0002-stack.md) — Socket.IO via NestJS Gateway
 - [ADR-0009](../../adr/0009-notifications.md) — Offline → FCM/APNS push
 - [ADR-0027](../../adr/0027-mlp-beta-scope.md) — MLP beta scope; simple text contact first
-- MLP moderation decision: S7 listing bans and user suspensions do not auto-close conversations. They make the affected listing/thread read-only for contact/message sends while preserving existing conversation history. Send/contact checks are synchronous against current listing status and user suspension state. S7 moderation events are not consumed by conversations, and S7 emits no conversation system messages from moderation; future system messages or thread policy changes require a shaped rich-chat/moderation sprint.
-- Deferred report decision: message reports belong to the rich-chat/moderation bet. They should not be implemented by adding a generic S7 `message` report target until Conversations has a clear message deletion policy, context excerpt contract, and admin-visible privacy boundary.
+- [#352](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/352) — founder approval of the Favorites and Conversations prototype (D1–D9, Q1–Q5, Support entry B), 2026-10-02
+- Moderation decision: S7 listing bans and user suspensions do not auto-close conversations. They make the affected listing/thread read-only for contact/message sends while preserving existing conversation history. Send/contact checks are synchronous against current listing status and user suspension state. S7 moderation events are not consumed by conversations, and S7 emits no conversation system messages from moderation.
+- Sold and removed Listings are different from banned and deleted ones: a sold or removed Listing keeps an existing Conversation open for Messages (D1, Q3), while a banned or deleted Listing closes the composer. Only a Listing status check differs; blocking, suspension and the chat switch apply to all of them.
+- Message reports use the generic `ContentReport` with a `message` target, owned by `admin/`. Conversations owns the Message context and deleted-message behavior.
 
 ## Phase
 
-**Phase 1 MLP beta for simple text contact.** Rich realtime chat remains the target capability for a later bet.
+**Phase 1, Google Play review build.** The Messages list, Conversation screen, realtime, read state, typing, presence, image Messages, Message and User reports, block, mute and push delivery ship. The support chat is a post-release bet.
 
 ## Out of scope
 
@@ -124,9 +202,11 @@ Tap → fills the composer (editable before send).
 - Auto-translate between locales — Phase 3 if ever
 - Pinning specific messages within a thread — defer
 - Voice / video calls — out of scope, never planned
+- Delete conversation — rejected (D2)
+- Support row, support links and in-app support chat in the release (see [Support](#support))
+- Ads and promoted rows in the Messages list (D8)
 
 ## Open questions
 
-- Post-MLP sold-listing follow-up: whether to allow messages after a sold event remains a rich-chat decision. MLP keeps sold listing threads readable but disables new contact/messages.
 - Listing-card preview rendering in the WhatsApp share — handled via OG meta in public web (Feature 38)
 - Response time SLA shown on seller profile — what threshold gets the "fast responder" badge?

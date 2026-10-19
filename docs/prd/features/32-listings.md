@@ -110,10 +110,11 @@ That is the whole screen. Video is added below the photos only when the video me
   - A status card with views and saves. Only owners see these counts; buyers never see view counts.
   - The original currency under the price.
   - Edit and Mark sold in the bottom bar; Archive and Delete in ⋯ (Republish for archived Listings). Share is hidden, as above.
-- **Sold / Removed from sale (`sold`, `archived`):** closed for contact.
+- **Sold / Removed from sale (`sold`, `archived`):** closed for new contact.
   - A banner on the photo and a greyed price.
   - ♡, the contact bar, Ask the seller and Report listing are hidden.
   - A "See other Brand Model" link opens Results filtered by that brand and model. It is a plain filter, not a recommendation.
+  - An **existing** Conversation about the Listing stays open for Messages: the Conversation shows a Sold (or Removed from sale) badge and a banner linking to other cars of the same model, and the composer stays on ([34 — Conversations](34-conversations.md#closed-and-sold-listings)).
 - **Deleted / banned for a buyer (404):** "This listing is no longer available", with Go to Home and Back.
 - **Loading:** the photo, title, price, spec line, city and date come straight from the tapped card's cache. The rest loads behind skeletons, and the contact bar is disabled until it does. Deep links use a plain skeleton.
 
@@ -148,9 +149,12 @@ That is the whole screen. Video is added below the photos only when the video me
 |---|---|---|
 | `draft` | Owner only | Continue / discard |
 | `active` | Public | Favorite, Message, owner-edit |
-| `sold` | Detail and Favorites only, labelled Sold; never in Home or Results | Closed for contact: no Call, Message, Ask the seller, ♡ or Report; existing Conversations stay readable |
-| `archived` | Owner + admin; a buyer reaching it from Favorites or a link sees it closed, labelled Removed from sale; never in Home or Results | Closed for contact, as `sold`; owner can republish |
-| `banned` | Owner sees a generic ban notice; not in feed/search/favorites or non-owner detail | New contact and Messages disabled; existing Conversations stay readable; owner edit/mark-sold/archive/republish/delete blocked until admin unban |
+| `sold` | Detail and Favorites only, labelled Sold; never in Home or Results | Closed for new contact: no Call, Message, Ask the seller, ♡ or Report, and no new Conversation. An existing Conversation stays open for Messages, with a Sold badge and a banner linking to other cars of the same model |
+| `archived` | Owner + admin; a buyer reaching it from Favorites or a link sees it closed, labelled Removed from sale; never in Home or Results | Closed for new contact, as `sold`; an existing Conversation behaves as for `sold` (badge, banner, composer on); owner can republish |
+| `banned` | Owner sees a generic ban notice; not in feed/search/favorites or non-owner detail | New contact and Messages disabled; existing Conversations stay readable, with a one-line notice in place of the composer; owner edit/mark-sold/archive/republish/delete blocked until admin unban |
+| deleted (soft-deleted) | Not shown on any buyer surface; a buyer reaching it gets "This listing is no longer available" | No contact; existing Conversations stay readable, with a one-line notice in place of the composer |
+
+Chat switched off on a Listing (`allowChat` off) also leaves an existing Conversation readable with a one-line notice in place of the composer. Conversation-side rules are in [34 — Conversations](34-conversations.md#closed-and-sold-listings).
 
 ## Screens / states
 
@@ -167,6 +171,8 @@ That is the whole screen. Video is added below the photos only when the video me
 | Listing detail | Signed out | Call works; ♡, Message, Ask the seller and Report listing lead to sign-in, then finish the action here |
 | Listing detail | Owner viewing own | No contact bar; status card with views and saves; Edit / Mark sold in the bar; Archive / Delete in ⋯ |
 | Listing detail | Sold / Removed from sale | Banner on the photo, greyed price; contact, ♡, Ask and Report hidden; "See other Brand Model" link |
+| Conversation | Listing sold / Removed from sale | Badge on the Listing card and an inline banner linking to other cars of the same model; composer on ([34](34-conversations.md#closed-and-sold-listings)) |
+| Conversation | Listing banned or deleted, or chat switched off | One-line notice in place of the composer; history readable |
 | Listing detail | Deleted, or banned for a buyer | "This listing is no longer available", with Go to Home and Back |
 | Listing detail | Banned, owner | Generic ban notice; admin reasons stay internal |
 | Listing detail | Opened from a report (admin view) | All actions + moderation toolbar |
