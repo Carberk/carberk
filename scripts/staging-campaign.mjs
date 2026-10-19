@@ -214,6 +214,20 @@ export function businessMain(input, { sql, uuid, exists }) {
   const profile = 'campaign897-business-v2';
   if (input.profile !== profile || !/^[a-f0-9]{40}$/.test(input.candidate ?? '')) throw new Error();
   if (input.kind === 'fixture' && input.candidate !== input.target) throw new Error('Campaign runtime candidate mismatch');
+  let observation;
+  if (input.kind === 'probe') {
+    // The remote wrapper attests this runtime independently of the original
+    // candidate binding. A restored main observes C; it must not rebind C to M.
+    const sha = process.env.AUTOTM_COMMIT_SHA;
+    if (sha !== input.target || !/^[a-f0-9]{40}$/.test(sha ?? '') ||
+        !Array.isArray(input.expectedMigrations) || input.expectedMigrations.length === 0 ||
+        !['unchanged', 'retained-additive'].includes(input.schemaDisposition)) throw new Error();
+    if (sql('SELECT count(*) FROM public._prisma_migrations WHERE finished_at IS NULL AND rolled_back_at IS NULL;') !== '0') throw new Error();
+    const migrations = JSON.parse(sql(`SELECT coalesce(json_agg(json_build_object('name',migration_name,'checksum',checksum) ORDER BY migration_name),'[]') FROM public._prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL;`));
+    if (JSON.stringify(migrations) !== JSON.stringify(input.expectedMigrations)) throw new Error();
+    // The graph's integrity check below also verifies the captured schema hash.
+    observation = { sha, migrations, schema: input.schemaDisposition };
+  }
   const n = input.namespace;
   const aliases = ['buyer-a', 'buyer-b', 'owner', 'sales-a', 'sales-b', 'coordinator', 'support', 'history-fulfiller', 'payment-verifier', 'reception-steward', 'technician', 'independent-reviewer', 'private-reviewer', 'aggregate-viewer', 'investigator'];
   const identities = aliases.map(alias => ({ alias, id: uuid(`campaign897-business:${input.candidate}:${profile}:${input.id}:${alias}`), email: `${alias}.${input.id}.${input.candidate.slice(0, 12)}@campaign897.invalid` }));
@@ -414,8 +428,20 @@ export function businessMain(input, { sql, uuid, exists }) {
     DO $guard$ BEGIN
       IF EXISTS(SELECT 1 FROM public.audit_logs a JOIN "${n}".campaign_records r ON r.table_name='audit_logs' AND r.row_key=jsonb_build_object('id',a.id) WHERE a."actorId" IS NOT NULL OR a."targetType"<>'SyntheticCampaign' OR a."targetId"<>'${input.id}' OR a.details IS DISTINCT FROM '{"profile":"${profile}","disposition":"redacted-synthetic-audit"}'::jsonb) THEN RAISE EXCEPTION 'Campaign audit disposition changed'; END IF;
       IF EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE NOT deleted AND table_name<>'audit_logs') THEN RAISE EXCEPTION 'Campaign terminal rows present'; END IF; END $guard$; COMMIT;`);
-  console.log(JSON.stringify({ profile, candidate: input.candidate, namespace: n, reservationId: input.id, protectedReceipt: `${n}.campaign_entities`, state,
-    identities: state === 'disposed' ? 0 : identities.length, fixtures: state === 'disposed' ? 'absent' : 'present', tombstone: state === 'disposed' }));
+  const receipt = { profile, candidate: input.candidate, namespace: n, reservationId: input.id, protectedReceipt: `${n}.campaign_entities`, state,
+    identities: state === 'disposed' ? 0 : identities.length, fixtures: state === 'disposed' ? 'absent' : 'present', tombstone: state === 'disposed' };
+  if (observation) {
+    Object.assign(receipt, observation);
+    if (state === 'disposed') {
+      // Integrity and terminal preflight have verified exact journal rows,
+      // absence of disposed data and redaction of the retained bootstrap audits.
+      const retainedAudits = Number(sql(`SELECT count(*) FROM "${n}".campaign_records WHERE table_name='audit_logs' AND NOT deleted;`));
+      if (retainedAudits !== 2) throw new Error('Campaign retained audit authority changed');
+      Object.assign(receipt, { storageDisposal: { version: 1, scope: 'business-v2-storage', state: 'disposed',
+        rows: 'absent', retainedAudits, auditDisposition: 'redacted-synthetic-audit', tombstone: 'retained' } });
+    }
+  }
+  console.log(JSON.stringify(receipt));
 }
 
 export async function campaignQueueMain(deliveries, observeOnly = false, binding) {
