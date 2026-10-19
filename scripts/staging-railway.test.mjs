@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { RailwayPlatform } from './staging-railway.mjs';
+import { StagingControl } from './staging-control.mjs';
+import { GitLedger } from './staging-ledger.mjs';
+import { retainedSchemaProfile } from './staging-schema.mjs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
 const policy = { projectId:'project', environmentId:'stage', environmentName:'staging', services:{api:'api',worker:'worker'}, credentialScope:'project:project:stage',
   origins:{database:'postgresql://postgres.railway.internal:5432/railway',media:'http://minio.railway.internal:9000',publicMedia:'https://media.example',api:'https://api.example'} };
 function boundary(overrides = {}) {
@@ -274,11 +281,211 @@ test('business storage fixture refuses missing or wrong preparation enables befo
   }
 });
 
-test('business profile cannot bypass the closed controller through the Railway adapter', async () => {
+test('business adapter requires reviewed authorization before provider effects', async () => {
   let touched = false;
-  const platform = new RailwayPlatform({ token: 'SECRET', fetch: async () => { touched = true; throw new Error(); }, command: async () => { touched = true; throw new Error(); } });
-  const lease = { fixtureProfile: 'campaign897-business-v2' };
-  for (const kind of ['fixture', 'reset', 'deploy', 'restore']) await assert.rejects(platform.execute(kind, lease, 'a'.repeat(40)), /operational receipts/);
-  await assert.rejects(platform.remote('probe', lease, 'a'.repeat(40)), /operational receipts/);
+  const platform = new RailwayPlatform({ token: 'SECRET', fetch: async () => { touched = true; throw new Error(); } });
+  await assert.rejects(platform.execute('reset', { fixtureProfile: 'campaign897-business-v2' }, 'a'.repeat(40)), /authorization/);
   assert.equal(touched, false);
+});
+
+// Real controller, Railway adapter and Git CAS ledger. Only Railway HTTP/SSH,
+// clock and IDs are faked. Git objects/remotes are isolated temporary storage.
+async function businessLifecycle(t) {
+  const root = await mkdtemp(join(tmpdir(), 'business-lifecycle-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const remote = join(root, 'shared.git');
+  execFileSync('git', ['init', '--bare', remote], { stdio: 'ignore' });
+  const ledger = new GitLedger({ directory: join(root, 'objects'), remote });
+  await ledger.initialize();
+  const candidate = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  for (const ref of [candidate, retainedSchemaProfile.baseline]) await ledger.git(['fetch', process.cwd(), ref]);
+  const tree = await ledger.git(['rev-parse', `${candidate}^{tree}`]);
+  let main = await ledger.git(['commit-tree', tree, '-p', candidate, '-m', 'Test main runtime']);
+  await ledger.git(['push', remote, `${main}:refs/heads/main`, `${candidate}:refs/heads/candidate`, `${retainedSchemaProfile.baseline}:refs/heads/baseline`]);
+  const migrations = await ledger.migrationsAt(candidate);
+  const network = { runtime: candidate, state: 'identities', fault: null, remoteKinds: [], deploys: [], probes: [], lostReset: false };
+  let seq = 0, tick = 0;
+  const base = boundary();
+  const fetch = async (url, options) => {
+    if (url === `${policy.origins.api}/readyz`) return { ok: true, json: async () => ({ status: network.fault === 'readiness' ? 'starting' : 'ready', environment: 'staging', commitSha: network.runtime, checks: { postgres: 'ok', redis: 'ok', minio: 'ok' } }) };
+    const { query, variables } = JSON.parse(options.body);
+    let data;
+    if (query.includes('mutation deploy')) {
+      network.deploys.push(variables.commitSha); network.runtime = variables.commitSha;
+      data = { serviceInstanceDeployV2: `deployment-${variables.serviceId}` };
+    } else if (query.includes('deployment(id:')) data = { deployment: { id: variables.id, status: 'SUCCESS', meta: { commitHash: network.fault === 'deployment' ? 'b'.repeat(40) : network.runtime } } };
+    else if (query.includes('latestDeployment')) data = { serviceInstance: { latestDeployment: { id: network.fault === 'active' ? 'old' : `deployment-${variables.serviceId}`, status: 'SUCCESS' } } };
+    else if (query.includes('deploymentLogs')) data = { deploymentLogs: [{ message: 'Worker started (BullMQ consumer)' }] };
+    else return base(url, options);
+    return { ok: true, json: async () => ({ data }) };
+  };
+  let claim;
+  const command = async (_program, args) => {
+    const program = Buffer.from(args.at(-1).match(/Buffer\.from\('([^']+)'/)[1], 'base64').toString();
+    // The serialized input is the final argument of remoteMain, after its body.
+    const payload = JSON.parse(program.match(/\)\((\{"kind":.*?\}), function campaignMain/s)[1]);
+    network.remoteKinds.push(payload.kind);
+    if (payload.kind === 'fixture') network.state = 'identities';
+    if (payload.kind === 'reset') {
+      network.state = 'disposed';
+      if (network.lostReset) { network.lostReset = false; throw new Error('Lost SSH reset response'); }
+    }
+    const disposed = network.state === 'disposed';
+    const receipt = { profile: 'campaign897-business-v2', candidate, reservationId: claim.id, namespace: `cf_${claim.id}`,
+      protectedReceipt: `cf_${claim.id}.campaign_entities`, state: network.state, identities: disposed ? 0 : 15,
+      fixtures: disposed ? 'absent' : 'present', tombstone: disposed };
+    if (payload.kind === 'probe') {
+      network.probes.push(payload);
+      Object.assign(receipt, { sha: network.runtime, migrations, schema: payload.schemaDisposition });
+      if (disposed) receipt.storageDisposal = { version: 1, scope: 'business-v2-storage', state: 'disposed', rows: 'absent', retainedAudits: 2, auditDisposition: 'redacted-synthetic-audit', tombstone: 'retained' };
+      const fault = network.fault;
+      if (fault === 'missing') delete receipt.storageDisposal;
+      if (fault === 'partial' && disposed) receipt.storageDisposal.rows = 'unknown';
+      if (fault === 'version' && disposed) receipt.storageDisposal.version = 2;
+      if (fault === 'audits' && disposed) receipt.storageDisposal.retainedAudits = 1;
+      if (fault === 'mixed') receipt.queueJobs = 0;
+      if (fault === 'candidate') receipt.candidate = main;
+      if (fault === 'reservation') receipt.reservationId = 'f'.repeat(32);
+      if (fault === 'namespace') receipt.namespace = `cf_${'f'.repeat(32)}`;
+      if (fault === 'profile') receipt.profile = 'campaign897-identities-v1';
+      if (fault === 'protected') receipt.protectedReceipt = 'public.campaign_entities';
+      if (fault === 'sha') receipt.sha = 'b'.repeat(40);
+      if (fault === 'inventory') receipt.migrations = [];
+      if (fault === 'schema') receipt.schema = 'discarded';
+    }
+    return JSON.stringify(receipt);
+  };
+  const platform = new RailwayPlatform({ token: 'SECRET', fetch, command });
+  const dependencies = { ledger, platform, policy, actor: 'alice', now: () => new Date(Date.UTC(2026, 9, 19, 0, 0, tick++)).toISOString(), id: () => (++seq).toString(16).padStart(32, '0') };
+  const restart = () => new StagingControl(dependencies);
+  const control = restart();
+  const id = await control.enqueue({ parent: 897, pr: 904, candidate, priority: 1, priorityEvidence: 'https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/897' });
+  claim = { id, candidate }; await control.acquire(id);
+  platform.authorization = `${id}:${candidate}`;
+  const edit = async change => { const snapshot = await ledger.read(); change(snapshot.state.reservation); assert.equal(await ledger.compareAndSwap(snapshot.revision, snapshot.state), true); };
+  // Input is an already-reserved v2 storage fixture on a proven candidate.
+  await edit(lease => Object.assign(lease, { fixtureProfile: 'campaign897-business-v2', deployments: { api: 'deployment-api', worker: 'deployment-worker' }, expectedMigrations: migrations, schemaDisposition: 'unchanged' }));
+  const moveMain = async () => {
+    main = await ledger.git(['commit-tree', tree, '-p', main, '-m', 'Moved test main']);
+    await ledger.git(['push', remote, `${main}:refs/heads/main`]);
+    return main;
+  };
+  return { control, restart, ledger, platform, claim, network, edit, moveMain, main, migrations };
+}
+
+test('business reset persists independently probed storage disposal before restoration and release', async t => {
+  const { control, claim, network, main } = await businessLifecycle(t);
+  const result = await control.operate(claim, 'reset');
+  assert.equal(result.storageDisposal.scope, 'business-v2-storage');
+  const lease = (await control.inspect()).reservation;
+  const evidence = lease.evidence.at(-1);
+  assert.equal(lease.operation, null);
+  assert.equal(evidence.operationId, result.operation);
+  assert.equal(evidence.owner, 'alice');
+  assert.ok(Date.parse(evidence.observedAt) >= Date.parse(evidence.startedAt));
+  assert.deepEqual(evidence.storageDisposal, { version: 1, scope: 'business-v2-storage', state: 'disposed', rows: 'absent', retainedAudits: 2, auditDisposition: 'redacted-synthetic-audit', tombstone: 'retained' });
+  for (const key of ['queueJobs', 'sinkRecords', 'deliveryCleanup', 'authenticated', 'admission']) assert.equal(Object.hasOwn(evidence, key), false);
+  const afterReset = network.remoteKinds.length;
+  await control.restore(claim);
+  assert.equal((await control.inspect()).reservation.restoration.restoredSha, main);
+  assert.ok(network.remoteKinds.slice(afterReset).every(kind => kind === 'probe'));
+  assert.ok(network.probes.some(p => p.target === main && p.candidate === claim.candidate));
+  await control.release(claim);
+  const state = await control.inspect();
+  assert.equal(state.reservation, null);
+  assert.deepEqual(state.history.at(-1).storageDisposal, evidence.storageDisposal);
+});
+
+for (const fault of ['missing', 'partial', 'version', 'audits', 'mixed', 'candidate', 'reservation', 'namespace', 'profile', 'protected', 'sha', 'inventory', 'schema']) {
+  test(`business reset refuses ${fault} probe and retains the exact operation`, async t => {
+    const { control, claim, network } = await businessLifecycle(t);
+    network.state = 'disposed'; network.fault = fault;
+    await assert.rejects(control.operate(claim, 'reset'), /blocked/);
+    const lease = (await control.inspect()).reservation;
+    assert.equal(lease.operation.kind, 'reset');
+    assert.equal(lease.owner, 'alice');
+    assert.equal(lease.evidence.length, 0);
+    assert.ok(lease.recovery.action);
+    assert.deepEqual(network.deploys, []);
+  });
+}
+
+for (const fault of ['missing', 'owner', 'binding', 'stale', 'latest-fixture', 'latest-reset', 'deployment', 'schema', 'inventory', 'operation']) {
+  test(`business restoration refuses ${fault} durable disposal before any main deployment`, async t => {
+    const { control, claim, network, edit } = await businessLifecycle(t);
+    await control.operate(claim, 'reset');
+    await edit(lease => {
+      const e = lease.evidence.at(-1);
+      if (fault === 'missing') delete e.storageDisposal;
+      if (fault === 'owner') e.owner = 'bob';
+      if (fault === 'binding') e.reservationId = 'f'.repeat(32);
+      if (fault === 'stale') e.observedAt = '2020-01-01T00:00:00.000Z';
+      if (fault === 'latest-fixture' || fault === 'latest-reset') lease.evidence.push({ kind: fault.slice(7), observedAt: '2026-10-19T00:10:00.000Z' });
+      if (fault === 'deployment') lease.deployments.api = 'replacement-api';
+      if (fault === 'schema') lease.schemaDisposition = 'retained-additive';
+      if (fault === 'inventory') lease.expectedMigrations = [];
+      if (fault === 'operation') e.operationId = 'unknown';
+    });
+    await assert.rejects(control.restore(claim), /storage disposal/i);
+    assert.deepEqual(network.deploys, []);
+    assert.equal((await control.inspect()).reservation.owner, 'alice');
+  });
+}
+
+test('business same reset survives restart and lost response with its original journal ID; recover only observes', async t => {
+  const { control, restart, claim, network } = await businessLifecycle(t);
+  network.lostReset = true;
+  await assert.rejects(control.operate(claim, 'reset'), /blocked/);
+  const operation = (await control.inspect()).reservation.operation;
+  network.state = 'cleaning';
+  const before = network.remoteKinds.length;
+  await assert.rejects(restart().recover(claim));
+  assert.ok(network.remoteKinds.slice(before).every(kind => kind === 'probe'));
+  assert.equal((await control.inspect()).reservation.operation.id, operation.id);
+  const result = await restart().operate(claim, 'reset');
+  assert.equal(result.operation, operation.id);
+  assert.equal((await control.inspect()).reservation.evidence.at(-1).operationId, operation.id);
+  assert.deepEqual(network.deploys, []);
+});
+
+for (const fault of ['owner', 'id', 'reservationId', 'namespace', 'candidate', 'profile', 'target', 'deploy', 'restore', 'readiness', 'deployment', 'active']) {
+  test(`business continuation refuses changed ${fault} without reset or deploy replay`, async t => {
+    const { control, restart, claim, network, edit } = await businessLifecycle(t);
+    network.lostReset = true;
+    await assert.rejects(control.operate(claim, 'reset'), /blocked/);
+    await edit(lease => {
+      const op = lease.operation;
+      if (fault === 'owner') op.owner = 'bob';
+      if (fault === 'id') op.id = 'unknown';
+      if (fault === 'reservationId') op.reservationId = 'f'.repeat(32);
+      if (fault === 'namespace') op.namespace = 'public';
+      if (fault === 'candidate' || fault === 'target') op[fault] = 'b'.repeat(40);
+      if (fault === 'profile') op.profile = 'campaign897-identities-v1';
+      if (fault === 'deploy' || fault === 'restore') op.kind = fault;
+    });
+    if (['readiness', 'deployment', 'active'].includes(fault)) network.fault = fault;
+    const resets = network.remoteKinds.filter(k => k === 'reset').length;
+    await assert.rejects(restart().operate(claim, 'reset'));
+    assert.equal(network.remoteKinds.filter(k => k === 'reset').length, resets);
+    assert.deepEqual(network.deploys, []);
+    assert.ok((await control.inspect()).reservation.operation);
+  });
+}
+
+test('business recovery observes disposed reset then restoration; release refuses moved main and stale runtime', async t => {
+  const { control, claim, network, moveMain } = await businessLifecycle(t);
+  network.lostReset = true;
+  await assert.rejects(control.operate(claim, 'reset'), /blocked/);
+  const before = network.remoteKinds.length;
+  await control.recover(claim);
+  assert.ok(network.remoteKinds.slice(before).every(k => k === 'probe'));
+  await control.restore(claim);
+  network.fault = 'readiness';
+  await assert.rejects(control.release(claim));
+  network.fault = null;
+  await moveMain();
+  await assert.rejects(control.release(claim), /main changed/i);
+  assert.ok((await control.inspect()).reservation);
+  await control.restore(claim);
+  await control.release(claim);
 });
