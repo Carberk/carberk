@@ -108,6 +108,7 @@ This directory contains architecture decisions for AutoTM. ADRs are **immutable 
 | [0096](0096-webp-only-photos.md) | WebP-only photos, supersedes ADR-0008 photo formats and ADR-0088 image manifest count only | Accepted; Listing detail gallery framing sentence superseded by ADR-0097 | 2026-10-11 |
 | [0096](0096-agents-look-up-official-documentation-only-past-their-training-cutoff.md) | Agents look up official documentation only past their training cutoff (supersedes ADR-0017 and ADR-0068; amends ADR-0059's Context7 access requirement) | Accepted | 2026-10-12 |
 | [0097](0097-listing-detail-photos-use-an-inset-4-3-cover-strip.md) | Listing detail photos use an inset 4:3 cover strip, supersedes ADR-0096's gallery framing sentence only | Accepted | 2026-10-14 |
+| [0098](0098-integration-delivery-with-shared-staging-and-concise-agent-guidance.md) | Integration delivery with shared staging and concise agent guidance | Proposed | 2026-10-14 |
 
 ## Per-app ADRs
 

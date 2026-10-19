@@ -26,13 +26,6 @@ For mobile discovery (Home, the brand and model pickers, Search, Results, Sort, 
 
 After identifying the governing design, inventory its required states before implementation and follow [Acceptance evidence](VERIFICATION.md#acceptance-evidence) for behaviour tests and visual proof. Keep state-to-spec evidence in the [PR record](EXECUTION-STATE.md#acceptance-evidence-record); [Spec review](FINALIZATION.md#spec-evidence-checklist) owns the comparison.
 
-## Implementation grouping
+## Implementation ownership
 
-The main session remains the owner. Use [SUBAGENT-MODE.md](SUBAGENT-MODE.md) when the work has separable groups. Whenever subagents are used:
-
-- group work by non-overlapping files and coherent acceptance criteria;
-- give each implementer the issue, exact scope, relevant design specs, and verification target;
-- inspect and test each integrated group; request an intermediate review for a named risk under SUBAGENT-MODE.md;
-- integrate centrally and run the full cross-workspace verification gate after all groups.
-
-Do not let a subagent invent product behavior, modify locked documents, or claim a host-only gate it did not run.
+Chief of Staff dispatches isolated writers by coherent criteria and non-overlapping scope under [coding workflow](../../../docs/agents/coding-workflow.md). Issue writers return verified checkpoints; one assembly writer inspects and tests the integrated candidate. Required product/design choices return to the founder.

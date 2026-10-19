@@ -1,6 +1,6 @@
 # Verification
 
-Verification is evidence collection, not a ceremonial command list. Map each issue acceptance criterion to a test, inspection, or manual proof.
+Verification is evidence collection, not a ceremonial command list. Map every integration criterion to a test, inspection or manual proof. [Coding standards](../../../docs/agents/coding-standards.md) owns test quality; [testing guide](../../../docs/agents/testing.md) supplies examples.
 
 ## Acceptance evidence
 
@@ -12,7 +12,7 @@ Verification is evidence collection, not a ceremonial command list. Map each iss
 4. Prove UI behaviour with tests that render the component or screen, covering the relevant rendered content, taps, disabled states, errors, empty states, and loading states. Source-text searches do not count as behaviour evidence.
 5. Prove UI look with simulator or emulator screenshots of every state listed by the governing design spec. Attach them to the PR, identify each state and spec reference, and give them to the Spec reviewer for comparison. Screenshot or snapshot matching is not required.
 
-Missing render infrastructure or simulator/emulator access is missing evidence. Record the gate, reason, and where it must run; do not substitute source-text checks. #457 owns mobile renderer setup and conversion of existing source-reading specs. Its presence in a dependency list or a renderer package in `package.json` does not prove a working render harness. Inspect current configuration and tests before deciding that the capability exists.
+Missing render infrastructure or device access is missing evidence. Record the gate, reason and owner; inspect current test configuration before deciding capability exists.
 
 ## Authority and scope
 
@@ -33,7 +33,7 @@ Missing render infrastructure or simulator/emulator access is missing evidence. 
 - For mobile UI, also read `docs/agents/nativewind-v4.md` and the current UI sources named by the design spec.
 - For external libraries, record the `Docs:` line from `docs/agents/documentation-lookups.md`: why no lookup was needed, or the official URLs read and what each verified. Dependency upgrades also record the `peerDependencies` and `engines` checked.
 
-Under [ADR-0075](../../../docs/adr/0075-railway-pr-backends-for-agent-native-sessions.md), the hosted required `pr` check supplies the full repository container-backed test gate. Run `pnpm test:unit`, focused non-container checks and repository typecheck locally; native sessions use the Railway PR backend. Do not start local Docker to repeat hosted container gates. Run all other relevant host-capable tests. If Testcontainers, CI, credentials, hardware, or a simulator is genuinely unavailable, name the skipped gate, why it is unavailable, and where it must run; never report it as passed.
+The hosted required `pr` check supplies repository container-backed evidence on disposable services. Run local `pnpm test:unit`, repository typecheck and applicable non-container checks. Shared staging supplies deployed acceptance only; never point destructive repository suites at it. Native sessions follow [mobile checks](../../../docs/agents/mobile-expo.md) and [staging reservation](../../../docs/agents/shared-staging.md). Do not start local Docker to repeat hosted container gates during native proof. If CI, credentials, hardware or a simulator is unavailable, name the missing gate and where it must run; never report it as passed.
 
 ## Documentation gate
 

@@ -19,7 +19,7 @@ After the user reviews the diff:
 5. Receive separate merge approval, or explicit permission to enable auto-merge when green.
 6. Never self-approve. If auto-merge cannot be enabled, preserve the open PR; do not fall back to immediate merge.
 
-After merge, verify the merge independently, follow [the worktree lifecycle](../../../docs/agents/worktree-lifecycle.md), sync safely, and report `/run-issue <N>` as the next action.
+After merge, verify the merge independently, follow [the worktree lifecycle](../../../docs/agents/worktree-lifecycle.md), sync safely, and report the bounded parent handoff to [Chief of Staff](../run-queue/SKILL.md) as the next action.
 
 ## Bail state
 
