@@ -1,0 +1,33 @@
+APP NAME (24/30)
+AutoTM – Car Marketplace
+
+SHORT DESCRIPTION (75/80)
+Buy and sell cars in Turkmenistan. Message sellers and save your favorites.
+
+FULL DESCRIPTION (1531/4000)
+AutoTM is a marketplace for cars in Turkmenistan. Browse cars for sale, contact sellers, and keep the cars you like in Favorites.
+
+Find a car
+• Search by brand and model. Russian, Turkmen and English spellings work, and so does a model year.
+• Filter by city, price, year and condition, and sort the results.
+• Open a listing to see its photos, price in TMT, mileage, gearbox, fuel, city and the seller's description.
+
+Contact the seller
+• Call the seller or send a message in the app.
+• Send photos in a chat. If you allow notifications, AutoTM tells you when a new message arrives.
+• Report a listing, a message or a user, and block anyone you don't want to hear from.
+
+Sell your car
+• Create a listing with up to 20 photos, taken with the camera or picked from your gallery.
+• Publishing needs a Turkmenistan (+993) contact phone, confirmed with an SMS code. Buyers see that number on your listing.
+• Edit your listings, mark a car as sold, archive it and publish it again.
+
+Your account
+• Sign in with a code sent to your phone or email. There is no password.
+• You can browse without an account.
+• You can delete your account in the app or on our website.
+
+AutoTM is in Russian, Turkmen and English. AutoTM does not sell cars and does not take payments. Buyers and sellers agree on the deal themselves.
+
+Türkmençe
+AutoTM — Türkmenistanda awtoulag satmak we satyn almak üçin bazar. Bildirişleri görüň, satyjy bilen jaň ýa-da çat arkaly habarlaşyň, halan maşynlaryňyzy saklaň. Programma türkmen, rus we iňlis dillerinde işleýär.
