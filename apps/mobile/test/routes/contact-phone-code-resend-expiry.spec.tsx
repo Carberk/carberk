@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
+import type * as ReactNative from "react-native";
 
 import { ToastProvider } from "../../components/ui/toast";
 import ContactPhoneCodeScreen from "../../app/listings/contact-phone-code";
@@ -16,7 +17,7 @@ vi.mock("react-native-safe-area-context", async () => ({
 }));
 // OtpCells remains real; only the native animation driver is inert in Node.
 vi.mock("react-native", async (importOriginal) => {
-  const native = await importOriginal<typeof import("react-native")>();
+  const native = await importOriginal<typeof ReactNative>();
   return {
     ...native,
     Animated: {
@@ -99,10 +100,10 @@ describe("contact-phone-code resend expiry", () => {
     ["OTP_EXPIRED", "Code expired. Request a new one.", true],
     ["OTP_LOCKED", "Too many attempts. Request a new code.", true],
   ])("keeps a late %s verification error after an overlapping resend backoff expires", async (code, message, needsNewCode) => {
-    const verificationStarted = barrier<void>();
+    const verificationStarted = barrier<boolean>();
     const verificationResponse = barrier<Response>();
     server.use(http.post("*/me/contact-phones/verify", () => {
-      verificationStarted.resolve();
+      verificationStarted.resolve(true);
       return verificationResponse.promise;
     }));
     const rendered = await renderMobile(
