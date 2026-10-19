@@ -1,0 +1,200 @@
+
+> @auto-tm/mobile@0.1.0 test /Users/bagtyyar/.codex/queue-worktrees/autotm-ui718-20261007/apps/mobile
+> vitest run "test/screens/tab-bar-haptics.spec.tsx" "test/screens/tab-bar-blur.spec.tsx"
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /Users/bagtyyar/.codex/queue-worktrees/autotm-ui718-20261007/apps/mobile
+
+stderr | test/screens/tab-bar-blur.spec.tsx > samples the focused screen with readable content in dark=false
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | test/screens/tab-bar-blur.spec.tsx > samples the focused screen with readable content in dark=true
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | test/screens/tab-bar-blur.spec.tsx > uses the opaque surface when Reduce Transparency is on
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | test/screens/tab-bar-blur.spec.tsx > keeps the tuned fallback without an Android blur target
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+ ❯ test/screens/tab-bar-blur.spec.tsx (4 tests | 2 failed) 11ms
+   × samples the focused screen with readable content in dark=false 8ms
+     → Unable to find an element with testID: native-blur
+
+[36m<View[39m
+  [33maccessibilityLabel[39m=[32m"Tab material"[39m
+[36m>[39m
+  [36m<Text>[39m
+    [0mFavorites[0m
+  [36m</Text>[39m
+[36m</View>[39m
+   × samples the focused screen with readable content in dark=true 1ms
+     → Unable to find an element with testID: native-blur
+
+[36m<View[39m
+  [33maccessibilityLabel[39m=[32m"Tab material"[39m
+[36m>[39m
+  [36m<Text>[39m
+    [0mFavorites[0m
+  [36m</Text>[39m
+[36m</View>[39m
+stderr | test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > ticks once when a tap opens Favorites
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+An update to AutoTmTabBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > does not tick when the open tab is tapped
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+An update to AutoTmTabBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > does not tick when tab selection is prevented
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+An update to AutoTmTabBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > uses Android's clock tick for a tab tap
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+An update to AutoTmTabBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > ticks once per crossed tab and does not add a tick on slide release
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+An update to AutoTmTabBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ❯ test/screens/tab-bar-haptics.spec.tsx (5 tests | 3 failed) 42ms
+   × Tab bar selection feedback > ticks once when a tap opens Favorites 17ms
+     → expected "spy" to be called 1 times, but got 0 times
+   × Tab bar selection feedback > uses Android's clock tick for a tab tap 5ms
+     → expected "spy" to be called 1 times, but got 0 times
+   × Tab bar selection feedback > ticks once per crossed tab and does not add a tick on slide release 7ms
+     → expected "spy" to be called 2 times, but got 0 times
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/screens/tab-bar-blur.spec.tsx > samples the focused screen with readable content in dark=false
+Error: Unable to find an element with testID: native-blur
+
+[36m<View[39m
+  [33maccessibilityLabel[39m=[32m"Tab material"[39m
+[36m>[39m
+  [36m<Text>[39m
+    [0mFavorites[0m
+  [36m</Text>[39m
+[36m</View>[39m
+ ❯ test/screens/tab-bar-blur.spec.tsx:28:15
+     26|   const view = surface();
+     27|   expect(view.getByText("Favorites")).toBeTruthy();
+     28|   expect(view.getByTestId("native-blur").props).toMatchObject({ blurTa…
+       |               ^
+     29| });
+     30| it("uses the opaque surface when Reduce Transparency is on", () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  test/screens/tab-bar-blur.spec.tsx > samples the focused screen with readable content in dark=true
+Error: Unable to find an element with testID: native-blur
+
+[36m<View[39m
+  [33maccessibilityLabel[39m=[32m"Tab material"[39m
+[36m>[39m
+  [36m<Text>[39m
+    [0mFavorites[0m
+  [36m</Text>[39m
+[36m</View>[39m
+ ❯ test/screens/tab-bar-blur.spec.tsx:28:15
+     26|   const view = surface();
+     27|   expect(view.getByText("Favorites")).toBeTruthy();
+     28|   expect(view.getByTestId("native-blur").props).toMatchObject({ blurTa…
+       |               ^
+     29| });
+     30| it("uses the opaque surface when Reduce Transparency is on", () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > ticks once when a tap opens Favorites
+AssertionError: expected "spy" to be called 1 times, but got 0 times
+ ❯ test/screens/tab-bar-haptics.spec.tsx:44:36
+     42|     const { view, navigation } = renderBar();
+     43|     fireEvent.press(view.getByRole("tab", { name: "Favorites" }));
+     44|     expect(Haptics.selectionAsync).toHaveBeenCalledTimes(1);
+       |                                    ^
+     45|     expect(navigation.dispatch).toHaveBeenCalledTimes(1);
+     46|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > uses Android's clock tick for a tab tap
+AssertionError: expected "spy" to be called 1 times, but got 0 times
+ ❯ test/screens/tab-bar-haptics.spec.tsx:62:48
+     60|     const { view } = renderBar();
+     61|     fireEvent.press(view.getByRole("tab", { name: "Favorites" }));
+     62|     expect(Haptics.performAndroidHapticsAsync).toHaveBeenCalledTimes(1…
+       |                                                ^
+     63|     expect(Haptics.performAndroidHapticsAsync).toHaveBeenCalledWith("c…
+     64|     expect(Haptics.selectionAsync).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > ticks once per crossed tab and does not add a tick on slide release
+AssertionError: expected "spy" to be called 2 times, but got 0 times
+ ❯ test/screens/tab-bar-haptics.spec.tsx:77:36
+     75|       gestures.handlers.onEnd!({ x: 185 });
+     76|     });
+     77|     expect(Haptics.selectionAsync).toHaveBeenCalledTimes(2);
+       |                                    ^
+     78|     expect(navigation.dispatch).toHaveBeenCalledTimes(1);
+     79|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+ Test Files  2 failed (2)
+      Tests  5 failed | 4 passed (9)
+   Start at  14:50:12
+   Duration  370ms (transform 101ms, setup 104ms, collect 246ms, tests 53ms, environment 0ms, prepare 75ms)
+
+/Users/bagtyyar/.codex/queue-worktrees/autotm-ui718-20261007/apps/mobile:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @auto-tm/mobile@0.1.0 test: `vitest run "test/screens/tab-bar-haptics.spec.tsx" "test/screens/tab-bar-blur.spec.tsx"`
+Exit status 1

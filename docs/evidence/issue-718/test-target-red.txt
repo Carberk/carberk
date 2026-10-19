@@ -1,0 +1,59 @@
+
+> @auto-tm/mobile@0.1.0 test /Users/bagtyyar/.codex/queue-worktrees/autotm-ui718-20261007/apps/mobile
+> vitest run "test/screens/tab-blur-targets.spec.tsx"
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /Users/bagtyyar/.codex/queue-worktrees/autotm-ui718-20261007/apps/mobile
+
+stderr | test/screens/tab-blur-targets.spec.tsx > provides the focused target after its first mount and removes it on unmount
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+ ❯ test/screens/tab-blur-targets.spec.tsx (1 test | 1 failed) 10ms
+   × provides the focused target after its first mount and removes it on unmount 9ms
+     → Unable to find an element with testID: focused-blur
+
+[
+  [36m<View>[39m
+    [36m<Text>[39m
+      [0mSearch[0m
+    [36m</Text>[39m
+  [36m</View>[39m,
+  [36m<View>[39m
+    [36m<View />[39m
+  [36m</View>[39m,
+]
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/screens/tab-blur-targets.spec.tsx > provides the focused target after its first mount and removes it on unmount
+Error: Unable to find an element with testID: focused-blur
+
+[
+  [36m<View>[39m
+    [36m<Text>[39m
+      [0mSearch[0m
+    [36m</Text>[39m
+  [36m</View>[39m,
+  [36m<View>[39m
+    [36m<View />[39m
+  [36m</View>[39m,
+]
+ ❯ test/screens/tab-blur-targets.spec.tsx:24:15
+     22|   }
+     23|   const view = renderMobile(<Screen mounted />);
+     24|   expect(view.getByTestId("focused-blur").props.blurTarget).toBeDefine…
+       |               ^
+     25|   view.rerender(<Screen mounted={false} />);
+     26|   expect(view.queryByTestId("focused-blur")).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  14:51:55
+   Duration  320ms (transform 68ms, setup 55ms, collect 115ms, tests 10ms, environment 0ms, prepare 34ms)
+
+/Users/bagtyyar/.codex/queue-worktrees/autotm-ui718-20261007/apps/mobile:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @auto-tm/mobile@0.1.0 test: `vitest run "test/screens/tab-blur-targets.spec.tsx"`
+Exit status 1

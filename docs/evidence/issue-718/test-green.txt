@@ -1,0 +1,165 @@
+
+> @auto-tm/mobile@0.1.0 test /Users/bagtyyar/.codex/queue-worktrees/autotm-ui718-20261007/apps/mobile
+> vitest run "test/screens/tab-bar-haptics.spec.tsx" "test/screens/tab-bar-blur.spec.tsx" "test/screens/tab-blur-targets.spec.tsx" "test/screens/tab-bar-ios-glass.spec.tsx"
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /Users/bagtyyar/.codex/queue-worktrees/autotm-ui718-20261007/apps/mobile
+
+stderr | test/screens/tab-bar-ios-glass.spec.tsx > keeps iOS system glass in dark=false
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | test/screens/tab-bar-blur.spec.tsx > samples the focused screen with readable content in dark=false
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | test/screens/tab-bar-ios-glass.spec.tsx > keeps iOS system glass in dark=true
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | test/screens/tab-bar-blur.spec.tsx > samples the focused screen with readable content in dark=true
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | test/screens/tab-bar-ios-glass.spec.tsx > uses the opaque material when iOS Reduce Transparency is on
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+ ✓ test/screens/tab-bar-ios-glass.spec.tsx (3 tests) 13ms
+stderr | test/screens/tab-bar-blur.spec.tsx > uses the opaque surface when Reduce Transparency is on
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | test/screens/tab-bar-blur.spec.tsx > keeps the tuned fallback without an Android blur target
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+ ✓ test/screens/tab-bar-blur.spec.tsx (4 tests) 13ms
+stderr | test/screens/tab-blur-targets.spec.tsx > provides the focused target after its first mount and removes it on unmount
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | test/screens/tab-blur-targets.spec.tsx > keeps Android API30 screen content without a blur target
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | test/screens/tab-blur-targets.spec.tsx > keeps Android API29 screen content without a blur target
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+ ✓ test/screens/tab-blur-targets.spec.tsx (3 tests) 30ms
+stderr | test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > keeps a labeled tab action in en
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+An update to AutoTmTabBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > keeps a labeled tab action in ru
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+An update to AutoTmTabBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > keeps a labeled tab action in tk
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+An update to AutoTmTabBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > ticks once when a tap opens Favorites
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+An update to AutoTmTabBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > does not repeat feedback before an accepted tap updates focus
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+An update to AutoTmTabBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > does not tick when the open tab is tapped
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+An update to AutoTmTabBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > does not tick when tab selection is prevented
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+An update to AutoTmTabBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > uses Android's clock tick for a tab tap
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+An update to AutoTmTabBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > ticks once per crossed tab and does not add a tick on slide release
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+An update to AutoTmTabBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ test/screens/tab-bar-haptics.spec.tsx (9 tests) 66ms
+
+ Test Files  4 passed (4)
+      Tests  19 passed (19)
+   Start at  14:55:32
+   Duration  588ms (transform 197ms, setup 354ms, collect 776ms, tests 122ms, environment 0ms, prepare 202ms)
+

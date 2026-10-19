@@ -1,0 +1,146 @@
+
+> @auto-tm/mobile@0.1.0 test /Users/bagtyyar/.codex/queue-worktrees/autotm-ui718-20261007/apps/mobile
+> vitest run "test/screens/tab-bar-haptics.spec.tsx"
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /Users/bagtyyar/.codex/queue-worktrees/autotm-ui718-20261007/apps/mobile
+
+stderr | test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > ticks once when a tap opens Favorites
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+An update to AutoTmTabBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > does not repeat feedback before an accepted tap updates focus
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+An update to AutoTmTabBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > does not tick when the open tab is tapped
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+An update to AutoTmTabBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > does not tick when tab selection is prevented
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+An update to AutoTmTabBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > uses Android's clock tick for a tab tap
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+An update to AutoTmTabBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > ticks once per crossed tab and does not add a tick on slide release
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+An update to AutoTmTabBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ❯ test/screens/tab-bar-haptics.spec.tsx (6 tests | 2 failed) 43ms
+   × Tab bar selection feedback > does not repeat feedback before an accepted tap updates focus 7ms
+     → expected "spy" to be called 1 times, but got 2 times
+   × Tab bar selection feedback > does not tick when tab selection is prevented 5ms
+     → expected "spy" to not be called at all, but actually been called 1 times
+
+Received: 
+
+  1st spy call:
+
+    Array []
+
+
+Number of calls: 1
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > does not repeat feedback before an accepted tap updates focus
+AssertionError: expected "spy" to be called 1 times, but got 2 times
+ ❯ test/screens/tab-bar-haptics.spec.tsx:52:36
+     50|     fireEvent.press(favorites);
+     51|     fireEvent.press(favorites);
+     52|     expect(Haptics.selectionAsync).toHaveBeenCalledTimes(1);
+       |                                    ^
+     53|   });
+     54|   it("does not tick when the open tab is tapped", () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/screens/tab-bar-haptics.spec.tsx > Tab bar selection feedback > does not tick when tab selection is prevented
+AssertionError: expected "spy" to not be called at all, but actually been called 1 times
+
+Received: 
+
+  1st spy call:
+
+    Array []
+
+
+Number of calls: 1
+
+ ❯ test/screens/tab-bar-haptics.spec.tsx:62:40
+     60|     const { view, navigation } = renderBar(true);
+     61|     fireEvent.press(view.getByRole("tab", { name: "Favorites" }));
+     62|     expect(Haptics.selectionAsync).not.toHaveBeenCalled();
+       |                                        ^
+     63|     expect(navigation.dispatch).not.toHaveBeenCalled();
+     64|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 4 passed (6)
+   Start at  14:51:35
+   Duration  350ms (transform 83ms, setup 41ms, collect 138ms, tests 43ms, environment 0ms, prepare 38ms)
+
+/Users/bagtyyar/.codex/queue-worktrees/autotm-ui718-20261007/apps/mobile:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @auto-tm/mobile@0.1.0 test: `vitest run "test/screens/tab-bar-haptics.spec.tsx"`
+Exit status 1

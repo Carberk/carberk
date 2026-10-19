@@ -1,0 +1,68 @@
+
+> @auto-tm/mobile@0.1.0 test /Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a5a9309ed457c457e/apps/mobile
+> vitest run "test/screens/tab-blur-targets.spec.tsx"
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a5a9309ed457c457e/apps/mobile
+
+stderr | test/screens/tab-blur-targets.spec.tsx > provides the focused target after its first mount and removes it on unmount
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | test/screens/tab-blur-targets.spec.tsx > keeps the bar's blur and its children mounted while a lazily mounted tab registers
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | test/screens/tab-blur-targets.spec.tsx > keeps Android API30 screen content without a blur target
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+stderr | test/screens/tab-blur-targets.spec.tsx > keeps Android API29 screen content without a blur target
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+ ❯ test/screens/tab-blur-targets.spec.tsx (4 tests | 1 failed) 22ms
+   × keeps the bar's blur and its children mounted while a lazily mounted tab registers 5ms
+     → Unable to find an element with testID: focused-blur
+
+[
+  [36m<View>[39m
+    [36m<Text>[39m
+      [0mTabs[0m
+    [36m</Text>[39m
+  [36m</View>[39m,
+  [36m<View>[39m
+    [36m<View />[39m
+  [36m</View>[39m,
+]
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/screens/tab-blur-targets.spec.tsx > keeps the bar's blur and its children mounted while a lazily mounted tab registers
+Error: Unable to find an element with testID: focused-blur
+
+[
+  [36m<View>[39m
+    [36m<Text>[39m
+      [0mTabs[0m
+    [36m</Text>[39m
+  [36m</View>[39m,
+  [36m<View>[39m
+    [36m<View />[39m
+  [36m</View>[39m,
+]
+ ❯ test/screens/tab-blur-targets.spec.tsx:62:15
+     60| 
+     61|   view.rerender(<Screen focused="favorites" favoritesMounted={false} /…
+     62|   expect(view.getByTestId("focused-blur").props.blurTarget).toBe(searc…
+       |               ^
+     63|   expect(mounts).toBe(mountsWithBlur);
+     64| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  18:40:05
+   Duration  385ms (transform 81ms, setup 57ms, collect 116ms, tests 22ms, environment 0ms, prepare 37ms)
+
+/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a5a9309ed457c457e/apps/mobile:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @auto-tm/mobile@0.1.0 test: `vitest run "test/screens/tab-blur-targets.spec.tsx"`
+Exit status 1
