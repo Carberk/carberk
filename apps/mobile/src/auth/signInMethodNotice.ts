@@ -1,11 +1,16 @@
 import { create } from "zustand";
 
-/** What Profile says after a Sign-in Method was added or changed. */
-export interface SignInMethodNotice {
-  kind: "added" | "changed";
-  /** The new value, masked as Profile shows it. */
-  value: string;
-}
+/**
+ * What Profile's notice line says after a Sign-in Method was added or changed,
+ * or after the name editor saved a name.
+ */
+export type SignInMethodNotice =
+  | {
+      kind: "added" | "changed";
+      /** The new value, masked as Profile shows it. */
+      value: string;
+    }
+  | { kind: "nameSaved" };
 
 interface SignInMethodNoticeStore {
   notice: SignInMethodNotice | null;
@@ -14,8 +19,9 @@ interface SignInMethodNoticeStore {
 }
 
 /**
- * Hands the result of the code screen to Profile, which shows it in the page
- * for a few seconds. Kept outside the route so it survives the dismissal.
+ * Hands the result of the code screen or the name editor to Profile, which
+ * shows it in the page for a few seconds. Kept outside the route so it
+ * survives the dismissal.
  */
 export const signInMethodNoticeStore = create<SignInMethodNoticeStore>()((set) => ({
   notice: null,

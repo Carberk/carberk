@@ -93,7 +93,8 @@ type View = ReturnType<typeof renderMobile>;
 
 async function openEditor(options?: { locale?: string }) {
   const view = render(<DisplayNameScreen />, options);
-  await view.findByDisplayValue(api.displayName ?? (options?.locale === "ru" ? "Водитель 4821" : "Driver 4821"));
+  const generated = { en: "Driver 4821", ru: "Водитель 4821", tk: "Sürüji 4821" };
+  await view.findByDisplayValue(api.displayName ?? generated[(options?.locale ?? "en") as keyof typeof generated]);
   return view;
 }
 

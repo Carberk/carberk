@@ -1,4 +1,21 @@
+import { ErrorCode, IdentitySchemas } from "@auto-tm/contracts";
+
 import { ApiError } from "./client";
+
+/**
+ * Why the server refused a Display Name, when `error` is INVALID_DISPLAY_NAME
+ * with a reason this app knows. The name editor shows the matching rule error
+ * instead of a generic failure.
+ */
+export function getDisplayNameRefusal(
+  error: unknown,
+): IdentitySchemas.DisplayNameProblem | undefined {
+  if (!(error instanceof ApiError) || error.code !== ErrorCode.InvalidDisplayName) {
+    return undefined;
+  }
+  const parsed = IdentitySchemas.InvalidDisplayNameDetailsSchema.safeParse(error.details);
+  return parsed.success ? parsed.data.reason : undefined;
+}
 
 export interface ErrorCopy {
   title: string;
