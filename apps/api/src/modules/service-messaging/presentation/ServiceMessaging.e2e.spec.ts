@@ -217,37 +217,51 @@ it("orders the actual Support queue by incident/account category then oldest una
  expect(ids.indexOf(b.body.id)).toBeLessThan(ids.indexOf(a.body.id)); expect(ids.indexOf(a.body.id)).toBeLessThan(ids.indexOf(c.body.id));
 });
 
+it("denies History capacity when the assigned staff session expires under service time and accepts it after only expiry is extended", async () => {
+ await db.staffGrant.createMany({ data: [{ userId: oldStaff, capability: "history.fulfilment" }], skipDuplicates: true });
+ const wallNow = new Date();
+ const serviceNow = new Date(wallNow.getTime() + 2 * 3600000);
+ const session = await db.session.create({ data: { userId: oldStaff, refreshTokenHash: randomUUID(), expiresAt: new Date(wallNow.getTime() + 3600000), adminTotpExpiresAt: new Date(wallNow.getTime() + 3 * 3600000) } });
+ const bearer = `Bearer ${jwt.sign({ sub: oldStaff, sid: session.id })}`;
+ const opened = await request.post("/api/v1/services/conversations").set("Authorization", auth(stranger)).send({ purpose: "history", synthetic: true }).expect(201);
+ const id = opened.body.id as string;
+ await request.post(`/api/v1/services/conversations/${id}/assignment`).set("Authorization", bearer).send({ expectedVersion: 0 }).expect(201);
+ vi.spyOn(app.get<{ now: () => Date }>(SERVICE_RUNTIME), "now").mockReturnValue(serviceNow);
+ const day = new Date(serviceNow.getTime() + 86400000).toISOString().slice(0, 10);
+ const capacity = { kind: "capacity", expectedAssignmentVersion: 1, day, slotLimit: 1, morningLimit: 1, evidence: "Synthetic session expiry capacity", providers: [{ provider: "carfax", allowance: 1, consumed: 0, resetAt: `${day}T03:00:00.000Z`, evidence: "Synthetic session expiry allowance" }] };
+ const command = () => request.post(`/api/v1/services/conversations/${id}/history`).set("Authorization", bearer).send(capacity);
+ expect(session.expiresAt > new Date()).toBe(true);
+ expect(session.expiresAt <= serviceNow).toBe(true);
+ expect(session.adminTotpExpiresAt !== null && session.adminTotpExpiresAt > serviceNow).toBe(true);
+ try {
+  const denied = await command().expect(403);
+  expect(denied.body.code).toBe("NO_ACCESS");
+  // Keep the bearer, capability, assignment, elevation, command and service clock identical.
+  await db.session.update({ where: { id: session.id }, data: { expiresAt: new Date(serviceNow.getTime() + 3600000) } });
+  await command().expect(201);
+ } finally {
+  await db.historyProviderAllowance.deleteMany({ where: { provider: "carfax", day, evidence: "Synthetic session expiry allowance" } });
+  await db.historyCapacityDay.deleteMany({ where: { day, evidence: "Synthetic session expiry capacity" } });
+ }
+});
+
 it("holds one exact History quote atomically and never treats a screenshot or expired receipt as funds", async () => {
  await db.staffGrant.createMany({ data: [{ userId: oldStaff, capability: "history.fulfilment" }, { userId: oldStaff, capability: "history.payment.verify" }] , skipDuplicates: true });
  const opened = await request.post("/api/v1/services/conversations").set("Authorization", auth(stranger)).send({ purpose: "history", synthetic: true }).expect(201);
  const id = opened.body.id as string;
  await request.post(`/api/v1/services/conversations/${id}/assignment`).set("Authorization", auth(oldStaff)).send({ expectedVersion: 0 }).expect(201);
  const now = new Date(`${new Date().toISOString().slice(0,10)}T04:10:00.000Z`);
+ // Both participants must remain valid under wall time and the scenario's service timeline.
+ const sessionUntil = new Date(Math.max(Date.now(), now.getTime() + 86400000) + 3600000);
+ for (const userId of [oldStaff, stranger]) {
+  const session = await db.session.create({ data: { userId, refreshTokenHash: randomUUID(), expiresAt: sessionUntil, adminTotpExpiresAt: sessionUntil } });
+  tokens.set(userId, jwt.sign({ sub: userId, sid: session.id }));
+ }
  vi.spyOn(app.get<{ now: () => Date }>(SERVICE_RUNTIME), "now").mockReturnValue(now);
  const tomorrow = new Date(now.getTime() + 86400000 + 5 * 3600000).toISOString().slice(0, 10);
  const windowStart = `${tomorrow}T04:00:00.000Z`, windowEnd = `${tomorrow}T05:00:00.000Z`;
  const command = (user: string, data: object) => request.post(`/api/v1/services/conversations/${id}/history`).set("Authorization", auth(user)).send(data);
- const capacityResponse = await command(oldStaff, { kind: "capacity", expectedAssignmentVersion: 1, day: tomorrow, slotLimit: 1, morningLimit: 1, evidence: "Synthetic measured one slot", providers: [{ provider: "carfax", allowance: 1, consumed: 0, resetAt: `${tomorrow}T03:00:00.000Z`, evidence: "Synthetic account allowance" }] });
- if (capacityResponse.status !== 201) {
-  const fixtureToken = tokens.get(oldStaff);
-  if (!fixtureToken) throw new Error("History fixture session unavailable");
-  const { sid } = jwt.decode<{ sid: string }>(fixtureToken);
-  const session = await db.session.findUnique({ where: { id: sid }, select: { expiresAt: true, adminTotpExpiresAt: true } });
-  const wallNow = new Date();
-  const serviceNow = app.get<{ now: () => Date }>(SERVICE_RUNTIME).now();
-  const responseCode: unknown = capacityResponse.body?.code;
-  const allowedCodes = ["NO_ACCESS", "HISTORY_REMOVED", "STALE_ASSIGNMENT", "INVALID_MESSAGE", "UNAUTHORIZED", "HTTP_ERROR", "INTERNAL_SERVER_ERROR"];
-  console.info("[DEBUG-history-capacity403]", JSON.stringify({
-   status: capacityResponse.status,
-   code: typeof responseCode === "string" && allowedCodes.includes(responseCode) ? responseCode : "OTHER",
-   sessionExists: session !== null,
-   wallSessionValid: session !== null && session.expiresAt > wallNow,
-   serviceSessionValid: session !== null && session.expiresAt > serviceNow,
-   wallElevated: session?.adminTotpExpiresAt != null && session.adminTotpExpiresAt > wallNow,
-   serviceElevated: session?.adminTotpExpiresAt != null && session.adminTotpExpiresAt > serviceNow,
-  }));
- }
- expect(capacityResponse.status).toBe(201);
+ await command(oldStaff, { kind: "capacity", expectedAssignmentVersion: 1, day: tomorrow, slotLimit: 1, morningLimit: 1, evidence: "Synthetic measured one slot", providers: [{ provider: "carfax", allowance: 1, consumed: 0, resetAt: `${tomorrow}T03:00:00.000Z`, evidence: "Synthetic account allowance" }] }).expect(201);
  const quoteId = randomUUID(), vin = "1HGCM82633A004352";
  const quote = { kind: "quote", expectedAssignmentVersion: 1, quoteId, vin, providers: ["carfax"], preflightOutcome: "available", preflightEvidence: "Synthetic licensed preflight", refundRule: "Founder decision if unusable", windowStart, windowEnd, feasible: true };
  await command(oldStaff, quote).expect(201);
