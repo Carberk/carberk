@@ -56,3 +56,40 @@ describe("PrismaIdentityCheckAdapter.holdsSignInPhone", () => {
     expect(await adapter.holdsSignInPhone("missing", "+99361234567")).toBe(false);
   });
 });
+
+// Query-aware external database fixture: a lookup of another id cannot borrow
+// the administrator's role. The production adapter makes the decision.
+describe("current administrator check", () => {
+  function roles() {
+    const users = new Map([
+      ["administrator", "admin"], ["buyer", "buyer"],
+      ["seller", "seller"], ["moderator", "moderator"],
+    ]);
+    const database = { user: { findUnique: async ({ where }: { where: { id: string } }) => {
+      const role = users.get(where.id);
+      return role === undefined ? null : { role };
+    } } };
+    return { users, check: new PrismaIdentityCheckAdapter(database as unknown as PrismaService) };
+  }
+
+  it("admits the administrator", async () => {
+    expect(await roles().check.isAdmin("administrator")).toBe(true);
+  });
+  it.each(["buyer", "seller", "moderator", "missing"])("refuses %s even when another User is an administrator", async (id) => {
+    expect(await roles().check.isAdmin(id)).toBe(false);
+  });
+  it("uses the supplied id on each lookup", async () => {
+    const { check } = roles();
+    expect(await check.isAdmin("administrator")).toBe(true);
+    expect(await check.isAdmin("someone-else")).toBe(false);
+    expect(await check.isAdmin("buyer")).toBe(false);
+  });
+  it("reads the current role again after it changes", async () => {
+    const { users, check } = roles();
+    expect(await check.isAdmin("administrator")).toBe(true);
+    users.set("administrator", "buyer");
+    expect(await check.isAdmin("administrator")).toBe(false);
+    users.set("administrator", "admin");
+    expect(await check.isAdmin("administrator")).toBe(true);
+  });
+});
