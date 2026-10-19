@@ -8,10 +8,16 @@
   PROTOTYPE — throwaway. Answers issue #353 "Prototype Cabinet, Profile, Settings, and sign-in method screens"
   (map #320 "Google Play reviewer-only Android release readiness").
   Question: what do Cabinet, Profile, Settings, Delete account and the phone-or-email sign-in screens look like in every state?
-  Respects: #344 (five tabs, sign in by phone or email code, selling needs a verified phone), #348 / ADR-0054
-  (Sign-in Methods optional, unique, always verified; add/change by code; can change but not remove; a taken value
-  is refused after the code is confirmed, never merged), ADR-0055 (email codes, 10-minute expiry), ADR-0032 (30-day
-  grace deletion, recoverable by signing in), #496 (legal/deletion links on autotm.bagtyyar.dev).
+  Respects: #344 (five tabs; Cabinet → Profile, My listings, Settings; Settings holds language, theme, legal, Log out,
+  Delete account), #348 / ADR-0054 (Sign-in Methods optional, unique, always verified; add/change by code; can change
+  but not remove; a taken value is refused after the code is confirmed, never merged; DELETE /me unchanged; neutral
+  web deletion copy), ADR-0056 (supersedes ADR-0054's "Add a phone" sell step and PHONE_REQUIRED: every Listing's
+  contact phone is verified in the Sell wizard, email-only Users sell without an account phone), ADR-0055 (email
+  codes, 10-minute expiry), ADR-0032 (30-day grace deletion, recoverable by signing in), #322/#496 (legal and
+  deletion pages on autotm.bagtyyar.dev), #352 D10 + #500 (Contact support screen: phone and email, chat after
+  release), #326 (no dead actions).
+  RECONCILED 2026-10-02: founder approved D2 = A (Phone | Email tabs). Options that conflicted with approved
+  decisions were removed; see the "Conflicts resolved" panel.
   No share affordances (#495). No real phone numbers, emails, codes or secrets: every value here is made up.
   Colours are AutoTM tokens from apps/mobile/global.css (light and dark). Not Auto.ru's look; Auto.ru/Kolesa are structure references only.
   RU/TK strings marked "draft" in the state list are new and need a native-speaker review.
@@ -127,25 +133,21 @@ const TX={
  listCar:["List a car","Разместить объявление","Bildiriş goý"],
  active:["Active","Активные","Işjeň"], drafts:["Drafts","Черновики","Garalamalar"], sold:["Sold","Проданные","Satylan"], archived:["Archived","В архиве","Arhiwde"],
  loading:["Please wait...","Подождите...","Garaşyň..."], wrong:["Something went wrong","Что-то пошло не так","Bir zat ýalňyş boldy"], retry:["Retry","Повторить","Täzeden synanyş"],
- cabAddPhoneT:["Add a phone to sell cars","Добавьте телефон, чтобы продавать","Satmak üçin telefon goşuň"], /* new, draft */
- cabAddPhoneD:["Publishing a listing needs a verified phone.","Для публикации объявления нужен подтверждённый телефон.","Bildiriş goýmak üçin tassyklanan telefon gerek."], /* new, draft */
  add:["Add","Добавить","Goş"], change:["Change","Изменить","Üýtget"], notAdded:["Not added","Не добавлено","Goşulmadyk"], verified:["Verified","Подтверждено","Tassyklandy"],
  phone:["Phone","Телефон","Telefon"], email:["Email","Эл. почта","E-poçta"],
- notifs:["Notifications","Уведомления","Habarnamalar"], /* new, draft */
+ help:["Help","Помощь","Kömek"], contactSupport:["Contact support","Связаться с поддержкой","Goldaw bilen habarlaş"], supRowSub:["Email and phone","Почта и телефон","E-poçta we telefon"], /* from #352 D10, draft */
+ supTitle:["AutoTM Support","Поддержка AutoTM","AutoTM goldawy"], official:["Official","Официальный","Resmi"], emailUs:["Email us","Написать на почту","E-poçta ýaz"], callUs:["Call us","Позвонить нам","Bize jaň et"],
+ includeT:["What to include","Что указать в обращении","Habarda nämeleri ýazmaly"], includeV:["The Listing number (for example, No. 123456) and what happened.","Номер объявления (например, № 123456) и что произошло.","Bildiriş belgisi (mysal üçin, № 123456) we näme bolandygy."],
+ appVersion:["Version","Версия","Wersiýa"],
  language:["Language","Язык","Dil"], theme:["Theme","Тема","Tema"], light:["Light","Светлая","Ýagty"], dark:["Dark","Тёмная","Garaňky"], system:["System","Системная","Ulgam"],
  about:["About","О приложении","Programma hakda"], privacy:["Privacy Policy","Политика конфиденциальности","Gizlinlik syýasaty"], terms:["Terms of Service","Условия использования","Ulanyş şertleri"], posting:["Posting rules","Правила размещения","Ýerleşdirme düzgünleri"],
  deleteAcc:["Delete account","Удалить аккаунт","Hasaby poz"], logout:["Log out","Выйти","Çyk"],
  logoutT:["Log out?","Выйти из аккаунта?","Hasabyndan çyk?"], logoutD:["You can sign back in at any time.","Вы сможете войти снова в любой момент.","Islän wagtyňyz gaýtadan girip bilersiňiz."], cancel:["Cancel","Отмена","Ýatyr"],
  /* sign-in */
- welcomeT:["Sign in to AutoTM","Вход в AutoTM","AutoTM-e giriş"], /* new, draft */
- contPhone:["Continue with phone","Продолжить с телефоном","Telefon bilen dowam et"], contEmail:["Continue with email","Продолжить с почтой","E-poçta bilen dowam et"], /* new, draft */
- noPassword:["No password. We send a code.","Без пароля. Мы отправим код.","Parol ýok. Kody ibereris."], /* new, draft */
  phoneTitle:["Enter your phone number","Введите номер телефона","Telefon belgiňizi giriziň"], phoneHelper:["We'll send a code by SMS.","Мы отправим код по SMS.","Kody SMS bilen ibereris."],
  phoneLabel:["Phone number","Номер телефона","Telefon belgisi"], phoneFmt:["Enter a number in the format +993 6X XX-XX-XX.","Введите номер в формате +993 6X XX-XX-XX.","Belgini +993 6X XX-XX-XX görnüşinde giriziň."],
  emailTitle:["Enter your email","Введите электронную почту","E-poçtaňyzy giriziň"], emailHelper:["We'll email you a code. No password needed.","Мы отправим код на электронную почту. Пароль не нужен.","Kody e-poçta ibereris. Parol gerek däl."],
  emailLabel:["Email","Электронная почта","E-poçta"], emailFmt:["Enter a valid email address.","Введите корректный адрес электронной почты.","Dogry e-poçta salgysyny giriziň."],
- anyTitle:["Phone or email","Телефон или почта","Telefon ýa-da e-poçta"], anyHelper:["We'll send a code. No password.","Мы отправим код. Пароль не нужен.","Kody ibereris. Parol ýok."], /* new, draft */
- anyFmt:["Enter a +993 phone number or an email address.","Введите номер +993 или адрес эл. почты.","+993 belgisini ýa-da e-poçta salgysyny giriziň."], /* new, draft */
  getCode:["Get code","Получить код","Kody almak"], legalPre:["By continuing, you agree to the","Продолжая, вы соглашаетесь с","Dowam etmek bilen siz"], and:["and","и","we"],
  offline:["No internet connection. Try again when you are online.","Нет подключения к интернету. Попробуйте позже.","Internet baglanyşygy ýok. Soňrak synanyşyň."],
  rate:["Too many requests. Please wait a moment.","Слишком много запросов. Подождите немного.","Sorag köp. Biraz garaşyň."],
@@ -162,13 +164,11 @@ const TX={
  phoneTaken:["This number is used by another account. Sign in with it instead, or use a different number.","Этот номер уже используется другим аккаунтом. Войдите с ним или укажите другой номер.","Bu belgi başga hasapda ulanylýar. Onuň bilen giriň ýa-da başga belgi giriziň."],
  emailTaken:["This email is used by another account. Sign in with it instead, or use a different email.","Эта почта уже используется другим аккаунтом. Войдите с ней или укажите другую почту.","Bu e-poçta başga hasapda ulanylýar. Onuň bilen giriň ýa-da başga e-poçta giriziň."],
  diffNum:["Use a different number","Указать другой номер","Başga belgi giriz"], diffMail:["Use a different email","Указать другую почту","Başga e-poçta giriz"], /* new, draft */
- signOutUse:["Sign out and use that account","Выйти и войти в тот аккаунт","Çyk we şol hasaba gir"], /* new, draft */
  noMerge:["Accounts are never merged.","Аккаунты не объединяются.","Hasaplar birleşdirilmeýär."], /* new, draft */
  signedIn:["Signed in","Вы вошли","Giriş edildi"],
  /* profile */
  methods:["Sign-in methods","Способы входа","Giriş usullary"], methodsHelp:["Both open this same account. A method can be changed, not removed.","Оба способа открывают этот же аккаунт. Способ можно изменить, но не удалить.","Iki usul hem şu bir hasaby açýar. Usuly üýtgedip bolýar, pozup bolmaýar."], /* helper extended */
- sellNeedsPhone:["Selling needs a verified phone.","Для продажи нужен подтверждённый телефон.","Satmak üçin tassyklanan telefon gerek."], /* new, draft */
- phoneVer:["Phone verified","Телефон подтверждён","Telefon tassyklandy"], memberSince:["Member since","Участник с","Agza şundan bäri"], memberDate:["12 September 2026","12 сентября 2026","12 sentýabr 2026"],
+ memberSince:["Member since","Участник с","Agza şundan bäri"], memberDate:["12 September 2026","12 сентября 2026","12 sentýabr 2026"],
  addPhoneT:["Add phone","Добавить телефон","Telefon goş"], chgPhoneT:["Change phone","Изменить телефон","Telefony üýtget"], addMailT:["Add email","Добавить почту","E-poçta goş"], chgMailT:["Change email","Изменить почту","E-poçtany üýtget"],
  addPhoneH:["We'll text a code to confirm the number.","Мы отправим код по SMS, чтобы подтвердить номер.","Belgini tassyklamak üçin SMS bilen kod ibereris."],
  chgPhoneH:["We'll text a code to the new number. Once it's confirmed, the old number no longer opens this account.","Мы отправим код по SMS на новый номер. После подтверждения прежний номер перестанет открывать этот аккаунт.","Täze belgä SMS bilen kod ibereris. Tassyklanandan soň öňki belgi bu hasaby açmaz."],
