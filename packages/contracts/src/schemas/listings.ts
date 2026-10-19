@@ -62,12 +62,6 @@ export const ListingSummarySchema = z.object({
   coverMediaKey: z.string().optional(),
   /** Keys of the first two photos by `sortOrder`; empty when the Listing has no photos. */
   photoKeys: z.array(z.string()).max(2),
-  /**
-   * Keys of the first eight photos by `sortOrder` for the Results photo strip;
-   * empty when the Listing has no photos. Sent by the public feed only; absent
-   * from older APIs, so a client falls back to `photoKeys`.
-   */
-  galleryKeys: z.array(z.string()).max(8).optional(),
   photoCount: z.number().int().nonnegative(),
   mileageKm: z.number().int().nonnegative().optional(),
   condition: ListingConditionSchema.optional(),
@@ -77,21 +71,34 @@ export const ListingSummarySchema = z.object({
   publishedAt: z.string().datetime(),
   /** Present only when the request carries a signed-in viewer. */
   isFavorited: z.boolean().optional(),
+});
+export type ListingSummary = z.infer<typeof ListingSummarySchema>;
+
+// ── Feed item (ListingSummary + what the Results card needs) ──
+
+/**
+ * A public feed item (`GET /api/v1/listings`, Home and Results). The added
+ * fields are optional so a client tolerates an older API that sends none.
+ * The contact phone is never in a feed item: a caller reads it from Listing
+ * detail.
+ */
+export const FeedListingSummarySchema = ListingSummarySchema.extend({
   /**
-   * Whether the seller takes calls and chat messages. Always sent by the
-   * public feed; optional so a client tolerates an older API. The contact
-   * phone itself is never in a summary: a caller reads it from Listing detail.
+   * Keys of the first eight photos by `sortOrder` for the Results photo strip;
+   * empty when the Listing has no photos. Absent from older APIs, so a client
+   * falls back to `photoKeys`.
    */
+  galleryKeys: z.array(z.string()).max(8).optional(),
+  /** Whether the seller takes calls and chat messages. */
   allowCalls: z.boolean().optional(),
   allowChat: z.boolean().optional(),
   /**
    * What the card needs to name the seller: compose it with
-   * `formatDisplayName`; a `deleted` seller has no name. Sent by the public
-   * feed only, without avatar fields.
+   * `formatDisplayName`; a `deleted` seller has no name. No avatar fields.
    */
   seller: PublicIdentitySchema.pick({ displayName: true, nameNumber: true, deleted: true }).optional(),
 });
-export type ListingSummary = z.infer<typeof ListingSummarySchema>;
+export type FeedListingSummary = z.infer<typeof FeedListingSummarySchema>;
 
 // ── Favorites item (ListingSummary + contact preferences) ──
 
@@ -462,7 +469,7 @@ export const FeedQuerySchema = refineListingFilter(
 export type FeedQuery = z.infer<typeof FeedQuerySchema>;
 
 export const FeedResponseSchema = z.object({
-  items: z.array(ListingSummarySchema),
+  items: z.array(FeedListingSummarySchema),
   nextCursor: z.string().nullable(),
 });
 export type FeedResponse = z.infer<typeof FeedResponseSchema>;

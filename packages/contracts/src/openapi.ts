@@ -63,6 +63,7 @@ import {
 } from "./schemas/catalog";
 import {
   ListingSummarySchema,
+  FeedListingSummarySchema,
   ListingDetailSchema,
   ListingMediaSchema,
   ListingDraftSchema,
@@ -215,6 +216,7 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
 
   // Listings schemas
   registry.register("ListingSummary", ListingSummarySchema);
+  registry.register("FeedListingSummary", FeedListingSummarySchema);
   registry.register("ListingDetail", ListingDetailSchema);
   registry.register("ListingMedia", ListingMediaSchema);
   registry.register("ListingDraft", ListingDraftSchema);

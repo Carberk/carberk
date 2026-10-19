@@ -4,9 +4,10 @@ import {
   decodeCursor,
   encodeCursor,
   FavoriteListingSummarySchema,
+  FeedListingSummarySchema,
   FeedResponseSchema,
   ListingDetailSchema,
-  ListingSummarySchema,
+  MyListingsResponseSchema,
 } from "./listings";
 
 describe("decodeCursor", () => {
@@ -113,7 +114,7 @@ describe("ListingDetailSchema seller", () => {
   });
 });
 
-describe("ListingSummarySchema for the Results card", () => {
+describe("FeedListingSummarySchema for the Results card", () => {
   // What an API from before the Results card sends: no gallery, contact
   // preferences or seller.
   const olderSummary = {
@@ -139,7 +140,7 @@ describe("ListingSummarySchema for the Results card", () => {
   };
 
   it("still parses a summary from an API that sends none of the card fields", () => {
-    const parsed = ListingSummarySchema.parse(olderSummary);
+    const parsed = FeedListingSummarySchema.parse(olderSummary);
 
     expect(parsed).not.toHaveProperty("galleryKeys");
     expect(parsed).not.toHaveProperty("allowCalls");
@@ -149,7 +150,7 @@ describe("ListingSummarySchema for the Results card", () => {
   });
 
   it("carries up to eight gallery keys, the contact preferences and the seller's name", () => {
-    expect(ListingSummarySchema.parse(cardSummary)).toMatchObject({
+    expect(FeedListingSummarySchema.parse(cardSummary)).toMatchObject({
       galleryKeys: ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"],
       allowCalls: true,
       allowChat: false,
@@ -160,17 +161,17 @@ describe("ListingSummarySchema for the Results card", () => {
   it("refuses a ninth gallery key", () => {
     const nine = [...cardSummary.galleryKeys, "p9"];
 
-    expect(ListingSummarySchema.safeParse({ ...cardSummary, galleryKeys: nine }).success).toBe(false);
+    expect(FeedListingSummarySchema.safeParse({ ...cardSummary, galleryKeys: nine }).success).toBe(false);
   });
 
   it("keeps photoKeys at two keys for installed builds", () => {
     expect(
-      ListingSummarySchema.safeParse({ ...cardSummary, photoKeys: ["p1", "p2", "p3"] }).success,
+      FeedListingSummarySchema.safeParse({ ...cardSummary, photoKeys: ["p1", "p2", "p3"] }).success,
     ).toBe(false);
   });
 
   it("names a seller with no name set by number, and marks a deleted seller", () => {
-    const parsed = ListingSummarySchema.parse({
+    const parsed = FeedListingSummarySchema.parse({
       ...cardSummary,
       seller: { displayName: null, nameNumber: 2057, deleted: true },
     });
@@ -181,7 +182,7 @@ describe("ListingSummarySchema for the Results card", () => {
   it("requires the seller's name number and deleted flag", () => {
     for (const field of ["displayName", "nameNumber", "deleted"]) {
       expect(
-        ListingSummarySchema.safeParse({
+        FeedListingSummarySchema.safeParse({
           ...cardSummary,
           seller: { ...cardSummary.seller, [field]: undefined },
         }).success,
@@ -191,7 +192,7 @@ describe("ListingSummarySchema for the Results card", () => {
   });
 
   it("drops avatar fields and contact data from the seller and the summary", () => {
-    const parsed = ListingSummarySchema.parse({
+    const parsed = FeedListingSummarySchema.parse({
       ...cardSummary,
       contactPhone: "+99365000000",
       seller: {
@@ -211,5 +212,26 @@ describe("ListingSummarySchema for the Results card", () => {
     expect(
       FavoriteListingSummarySchema.parse({ ...olderSummary, allowCalls: false, allowChat: true }),
     ).toMatchObject({ allowCalls: false, allowChat: true });
+  });
+
+  it("keeps the card fields off favorites and My listings items", () => {
+    const favorite = FavoriteListingSummarySchema.parse(cardSummary);
+    const own = MyListingsResponseSchema.parse({ items: [cardSummary], nextCursor: null }).items[0];
+
+    for (const parsed of [favorite, own]) {
+      expect(parsed).not.toHaveProperty("galleryKeys");
+      expect(parsed).not.toHaveProperty("seller");
+    }
+    expect(own).not.toHaveProperty("allowCalls");
+    expect(own).not.toHaveProperty("allowChat");
+  });
+
+  it("sends the card fields through the feed response", () => {
+    expect(FeedResponseSchema.parse({ items: [cardSummary], nextCursor: null }).items[0]).toMatchObject({
+      galleryKeys: cardSummary.galleryKeys,
+      allowCalls: true,
+      allowChat: false,
+      seller: { displayName: "Aman", nameNumber: 4821, deleted: false },
+    });
   });
 });
