@@ -24,7 +24,7 @@ test('business storage profile remains closed at the operator CLI pending its di
 
 // Exercise the executable CLI with a real isolated Git coordination remote.
 // Only GitHub actor discovery is faked; no Railway credential is supplied.
-async function operatorLease(t, profile) {
+async function operatorLease(t, profile, auditCleanup = false) {
   const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
@@ -49,10 +49,33 @@ async function operatorLease(t, profile) {
   await writeFile(join(directory, 'gh'), `#!${process.execPath}
 process.stdout.write(${JSON.stringify('alice\n')});
 `, { mode: 0o755 });
+  // Observe the real filesystem boundary without replacing the ledger or Git.
+  // mkdir completes asynchronously, so an early finally is observed even if
+  // Git initialization later recreates the directory and masks the race.
+  const observer = join(directory, 'observe-cleanup.mjs');
+  await writeFile(observer, `
+import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+const mkdir = fs.promises.mkdir;
+const rm = fs.promises.rm;
+const cleaning = new Set();
+fs.promises.mkdir = async function (path, ...args) {
+  const result = await mkdir.call(this, path, ...args);
+  if (cleaning.has(path)) console.error('Scratch cleanup started before ledger directory creation completed');
+  return result;
+};
+fs.promises.rm = async function (path, ...args) {
+  cleaning.add(path);
+  const result = await rm.call(this, path, ...args);
+  if (!fs.existsSync(path)) console.error('Scratch cleanup completed');
+  return result;
+};
+syncBuiltinESMExports();
+`);
   const run = promisify(execFile);
   const invoke = async (command, ...args) => {
     try {
-      return { code: 0, ...(await run(process.execPath, ['scripts/staging.mjs', command,
+      return { code: 0, ...(await run(process.execPath, [...(auditCleanup ? ['--import', observer] : []), 'scripts/staging.mjs', command,
         ...(command === 'inspect' ? [] : [join(directory, 'policy.json'), join(directory, 'claim.json')]), ...args], {
         env: { ...process.env, PATH: `${directory}:${process.env.PATH}`, STAGING_RAILWAY_PROJECT_TOKEN: '', STAGING_MUTATIONS_AUTHORIZATION: '',
           GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: `url.${remote}.insteadOf`, GIT_CONFIG_VALUE_0: 'https://github.com/bagtyyarkovusov/auto.tm-rewrite.git' },
@@ -80,6 +103,16 @@ test('operator CLI can inspect a durable business v2 lease without credentials',
   assert.deepEqual(await ledger.read(), before);
 });
 for (const profile of ['listing-v1', 'campaign897-identities-v1']) {
+  test(`operator CLI keeps ${profile} scratch alive until recovery refuses and then cleans it`, async t => {
+    const { invoke, ledger, before } = await operatorLease(t, profile, true);
+    const result = await invoke('recover');
+    assert.doesNotMatch(result.stderr, /Scratch cleanup started before ledger directory creation completed/);
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /Known durable operation required for recovery/);
+    assert.match(result.stderr, /Scratch cleanup completed/);
+    assert.doesNotMatch(result.stderr, /ENOTEMPTY|Coordination Git operation failed/);
+    assert.deepEqual(await ledger.read(), before, 'Recovery refusal preserves the durable lease');
+  });
   test(`operator CLI preserves existing ${profile} admission and recovery guards`, async t => {
     const { invoke, ledger, before } = await operatorLease(t, profile);
     const result = await invoke('recover');
