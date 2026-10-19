@@ -17,6 +17,7 @@ import { PrismaService } from "@auto-tm/db";
 
 import { CatalogModule } from "../catalog.module";
 import { IdentityModule } from "../../identity/identity.module";
+import { IDENTITY_CLOCK_PORT } from "../../identity/identity.public";
 import { GlobalErrorFilter } from "../../../common/error.filter";
 import { EnvSchema } from "../../../env.schema";
 import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
@@ -27,6 +28,7 @@ describe("AdminCatalogController e2e", () => {
   let app: NestFastifyApplication;
   let request: ReturnType<typeof supertest>;
   let prisma: PrismaService;
+  let now = new Date();
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -44,7 +46,10 @@ describe("AdminCatalogController e2e", () => {
           signOptions: { expiresIn: "1h" },
         }),
       ],
-    }).compile();
+    })
+      .overrideProvider(IDENTITY_CLOCK_PORT)
+      .useValue({ now: () => now })
+      .compile();
 
     app = moduleFixture.createNestApplication<NestFastifyApplication>(
       new FastifyAdapter(),
@@ -63,6 +68,7 @@ describe("AdminCatalogController e2e", () => {
   });
 
   beforeEach(async () => {
+    now = new Date();
     await prisma.auditLog.deleteMany();
     await prisma.totpBackupCode.deleteMany();
     await prisma.totpEnrollment.deleteMany();
@@ -74,7 +80,7 @@ describe("AdminCatalogController e2e", () => {
     await prisma.user.deleteMany();
   });
 
-  async function createAdminUser(): Promise<{ userId: string; token: string }> {
+  async function createAdminUser(): Promise<{ userId: string; sessionId: string; token: string }> {
     const user = await prisma.user.create({
       data: {
         id: `admin-${Date.now()}`,
@@ -91,7 +97,7 @@ describe("AdminCatalogController e2e", () => {
         adminTotpExpiresAt: new Date(Date.now() + 12 * 60 * 60 * 1000),
       },
     });
-    return { userId: user.id, token: mintAdminJwt(user.id, session.id) };
+    return { userId: user.id, sessionId: session.id, token: mintAdminJwt(user.id, session.id) };
   }
 
   async function createNonAdminUser(): Promise<{ userId: string; token: string }> {
@@ -148,6 +154,117 @@ describe("AdminCatalogController e2e", () => {
     expect(auditLog).not.toBeNull();
     return auditLog as T;
   }
+
+  describe("admin session elevation through Identity composition", () => {
+    function createRequest(token?: string) {
+      const pending = request.post("/api/v1/admin/catalog/brands");
+      if (token) pending.set("Authorization", `Bearer ${token}`);
+      return pending.send({ slug: `elevation-${randomUUID()}`, nameRu: "Тест", nameTk: "Test", nameEn: "Test" });
+    }
+
+    function expectError(body: unknown, statusCode: number, code: string, message: string) {
+      expect(body).toEqual({
+        statusCode,
+        code,
+        message,
+        timestamp: expect.any(String),
+        requestId: "unknown",
+      });
+    }
+
+    it("preserves the missing-bearer and missing-sub 401 envelopes", async () => {
+      const missingBearer = await createRequest().expect(401);
+      expectError(missingBearer.body, 401, "UNAUTHORIZED", "Missing or malformed Authorization header");
+
+      const token = app.get(JwtService).sign({ role: "admin" });
+      const missingSubject = await createRequest(token).expect(401);
+      expectError(missingSubject.body, 401, "HTTP_ERROR", "Authentication required");
+    });
+
+    it("reloads the current role before session admission despite an unchanged admin JWT", async () => {
+      const { userId, sessionId, token } = await createAdminUser();
+      await createRequest(token).expect(201);
+      await prisma.user.update({ where: { id: userId }, data: { role: "buyer" } });
+      await prisma.session.delete({ where: { id: sessionId } });
+
+      const denied = await createRequest(token).expect(403);
+      expectError(denied.body, 403, "FORBIDDEN", "Admin role required");
+      const withoutSessionClaim = await createRequest(mintAdminJwt(userId)).expect(403);
+      expectError(withoutSessionClaim.body, 403, "FORBIDDEN", "Admin role required");
+    });
+
+    it("admits a current admin even when the JWT role says buyer", async () => {
+      const { userId, sessionId } = await createAdminUser();
+      const token = app.get(JwtService).sign({ sub: userId, sid: sessionId, role: "buyer" });
+      await createRequest(token).expect(201);
+    });
+
+    it("does not distinguish missing, absent or foreign sessions", async () => {
+      const { userId, sessionId } = await createAdminUser();
+      for (const token of [mintAdminJwt(userId), mintAdminJwt(userId, randomUUID())]) {
+        const denied = await createRequest(token).expect(403);
+        expectError(denied.body, 403, "FORBIDDEN", "Admin TOTP elevation required");
+      }
+
+      const other = await prisma.user.create({ data: { id: randomUUID(), role: "admin" } });
+      await prisma.session.update({
+        where: { id: sessionId },
+        data: { userId: other.id, expiresAt: now, adminTotpExpiresAt: null },
+      });
+      const foreign = await createRequest(mintAdminJwt(userId, sessionId)).expect(403);
+      expectError(foreign.body, 403, "FORBIDDEN", "Admin TOTP elevation required");
+    });
+
+    it.each([
+      ["session expiry equality", "2026-05-14T12:00:00Z", "2026-05-14T12:01:00Z", "Admin session expired"],
+      ["both deadlines expired", "2026-05-14T11:59:00Z", "2026-05-14T11:59:00Z", "Admin session expired"],
+      ["expired session without elevation", "2026-05-14T11:59:00Z", null, "Admin session expired"],
+      ["elevation expiry equality", "2026-05-14T12:01:00Z", "2026-05-14T12:00:00Z", "Admin TOTP elevation expired"],
+      ["elevation already expired", "2026-05-14T12:01:00Z", "2026-05-14T11:59:00Z", "Admin TOTP elevation expired"],
+      ["no elevation", "2026-05-14T12:01:00Z", null, "Admin TOTP elevation expired"],
+    ] as const)("preserves refusal precedence for %s", async (_case, sessionExpiry, elevationExpiry, message) => {
+      const { sessionId, token } = await createAdminUser();
+      now = new Date("2026-05-14T12:00:00Z");
+      await prisma.session.update({
+        where: { id: sessionId },
+        data: {
+          expiresAt: new Date(sessionExpiry),
+          adminTotpExpiresAt: elevationExpiry ? new Date(elevationExpiry) : null,
+        },
+      });
+      const denied = await createRequest(token).expect(403);
+      expectError(denied.body, 403, "FORBIDDEN", message);
+    });
+
+    it("rechecks stored elevation and deletion on every request with the same bearer sid", async () => {
+      const { sessionId, token } = await createAdminUser();
+      now = new Date("2026-05-14T12:00:00Z");
+      await prisma.session.update({
+        where: { id: sessionId },
+        data: {
+          expiresAt: new Date("2026-05-15T12:00:00Z"),
+          adminTotpExpiresAt: new Date("2026-05-14T12:01:00Z"),
+        },
+      });
+      await createRequest(token).expect(201);
+      now = new Date("2026-05-14T12:01:00Z");
+      const expired = await createRequest(token).expect(403);
+      expectError(expired.body, 403, "FORBIDDEN", "Admin TOTP elevation expired");
+
+      await prisma.session.update({
+        where: { id: sessionId },
+        data: { adminTotpExpiresAt: new Date("2026-05-14T12:02:00Z") },
+      });
+      await createRequest(token).expect(201);
+      await prisma.session.update({ where: { id: sessionId }, data: { adminTotpExpiresAt: null } });
+      const revoked = await createRequest(token).expect(403);
+      expectError(revoked.body, 403, "FORBIDDEN", "Admin TOTP elevation expired");
+
+      await prisma.session.delete({ where: { id: sessionId } });
+      const deleted = await createRequest(token).expect(403);
+      expectError(deleted.body, 403, "FORBIDDEN", "Admin TOTP elevation required");
+    });
+  });
 
   describe("POST /api/v1/admin/catalog/brands", () => {
     it("returns 401 without bearer token", async () => {
