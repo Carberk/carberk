@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockState = vi.hoisted(() => ({
@@ -180,7 +180,9 @@ describe("ReportDetailPage profile photo", () => {
     fireEvent.click(screen.getByRole("button", { name: "Подтвердить удаление" }));
     await waitFor(() => expect(mockState.refresh).toHaveBeenCalled());
     mockDetail(userReport({ status: "actioned", target: { ...userReport().target, avatarKey: null } }));
-    view.rerender(await ReportDetailPage({ params: Promise.resolve({ id: "r1" }) }));
+    await act(async () => {
+      view.rerender(await ReportDetailPage({ params: Promise.resolve({ id: "r1" }) }));
+    });
     expect(screen.getByText("Обработана")).toBeDefined();
     expect(screen.getByRole("img", { name: "Назначенный аватар" }).getAttribute("src")).toBe("/assigned-avatars/3.svg");
     expect(screen.queryByRole("img", { name: "Фото профиля" })).toBeNull();
