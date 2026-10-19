@@ -4,7 +4,7 @@ import { RailwayPlatform } from './staging-railway.mjs';
 import { StagingControl } from './staging-control.mjs';
 import { GitLedger } from './staging-ledger.mjs';
 import { retainedSchemaProfile } from './staging-schema.mjs';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -312,11 +312,15 @@ async function businessLifecycle(t) {
     let data;
     if (query.includes('mutation deploy')) {
       network.deploys.push(variables.commitSha); network.runtime = variables.commitSha;
+      if (network.postMainState) network.state = network.postMainState;
       data = { serviceInstanceDeployV2: `deployment-${variables.serviceId}` };
     } else if (query.includes('deployment(id:')) data = { deployment: { id: variables.id, status: 'SUCCESS', meta: { commitHash: network.fault === 'deployment' ? 'b'.repeat(40) : network.runtime } } };
     else if (query.includes('latestDeployment')) data = { serviceInstance: { latestDeployment: { id: network.fault === 'active' ? 'old' : `deployment-${variables.serviceId}`, status: 'SUCCESS' } } };
     else if (query.includes('deploymentLogs')) data = { deploymentLogs: [{ message: 'Worker started (BullMQ consumer)' }] };
-    else return base(url, options);
+    else {
+      if (network.onAttestation && query.includes('projectToken')) { const run = network.onAttestation; network.onAttestation = null; await run(); }
+      return base(url, options);
+    }
     return { ok: true, json: async () => ({ data }) };
   };
   let claim;
@@ -336,6 +340,7 @@ async function businessLifecycle(t) {
       fixtures: disposed ? 'absent' : 'present', tombstone: disposed };
     if (payload.kind === 'probe') {
       network.probes.push(payload);
+      if (network.failMainProbe && payload.target !== candidate) { network.failMainProbe = false; throw new Error('Lost main probe response'); }
       Object.assign(receipt, { sha: network.runtime, migrations, schema: payload.schemaDisposition });
       if (disposed) receipt.storageDisposal = { version: 1, scope: 'business-v2-storage', state: 'disposed', rows: 'absent', retainedAudits: 2, auditDisposition: 'redacted-synthetic-audit', tombstone: 'retained' };
       const fault = network.fault;
@@ -370,7 +375,19 @@ async function businessLifecycle(t) {
     await ledger.git(['push', remote, `${main}:refs/heads/main`]);
     return main;
   };
-  return { control, restart, ledger, platform, claim, network, edit, moveMain, main, migrations };
+  const refuseCompletion = async () => {
+    const hook = join(remote, 'hooks', 'pre-receive');
+    await writeFile(hook, `#!/usr/bin/env node
+const { execFileSync } = require('node:child_process');
+let input = ''; process.stdin.on('data', value => input += value); process.stdin.on('end', () => {
+  const revision = input.trim().split(/\\s+/)[1];
+  const state = JSON.parse(execFileSync('git', ['show', revision + ':reservation.json'], { encoding: 'utf8' }));
+  if (state.reservation && !state.reservation.operation && state.reservation.evidence.some(e => e.storageDisposal)) process.exitCode = 1;
+});
+`, { mode: 0o755 });
+    return () => rm(hook);
+  };
+  return { control, restart, ledger, platform, claim, network, edit, moveMain, main, migrations, refuseCompletion };
 }
 
 test('business reset persists independently probed storage disposal before restoration and release', async t => {
@@ -488,4 +505,114 @@ test('business recovery observes disposed reset then restoration; release refuse
   assert.ok((await control.inspect()).reservation);
   await control.restore(claim);
   await control.release(claim);
+});
+
+for (const fault of ['active', 'readiness', 'inventory', 'partial']) {
+  test(`business restoration freshly refuses ${fault} before first main deployment`, async t => {
+    const { control, claim, network } = await businessLifecycle(t);
+    await control.operate(claim, 'reset');
+    network.fault = fault;
+    await assert.rejects(control.restore(claim), /blocked/);
+    assert.deepEqual(network.deploys, []);
+    assert.equal((await control.inspect()).reservation.operation.kind, 'restore');
+  });
+}
+
+test('business post-main active namespace is only probed and cannot be reset or released', async t => {
+  const { control, claim, network } = await businessLifecycle(t);
+  await control.operate(claim, 'reset');
+  const before = network.remoteKinds.length;
+  network.postMainState = 'identities';
+  await assert.rejects(control.restore(claim), /blocked/);
+  await assert.rejects(control.recover(claim));
+  await assert.rejects(control.release(claim));
+  assert.ok(network.remoteKinds.slice(before).every(k => k === 'probe'));
+  assert.equal((await control.inspect()).reservation.owner, 'alice');
+});
+
+test('business interrupted restoration recovers by observation with complete journal; moved main refuses recovery', async t => {
+  for (const moved of [false, true]) await t.test(String(moved), async t => {
+    const { control, restart, claim, network, moveMain } = await businessLifecycle(t);
+    await control.operate(claim, 'reset');
+    network.failMainProbe = true;
+    await assert.rejects(control.restore(claim), /blocked/);
+    const operation = (await control.inspect()).reservation.operation;
+    assert.deepEqual(Object.keys(operation.deployments).sort(), ['api', 'worker']);
+    const deploys = network.deploys.length, before = network.remoteKinds.length;
+    if (moved) {
+      await moveMain();
+      await assert.rejects(restart().recover(claim), /main moved/i);
+      assert.equal((await control.inspect()).reservation.operation.id, operation.id);
+    } else {
+      await restart().recover(claim);
+      await restart().release(claim);
+      assert.equal((await control.inspect()).reservation, null);
+    }
+    assert.equal(network.deploys.length, deploys);
+    assert.ok(network.remoteKinds.slice(before).every(k => k === 'probe'));
+  });
+});
+
+test('business release retains the exact reset audit binding and terminal storage disposition', async t => {
+  const { control, claim } = await businessLifecycle(t);
+  const reset = await control.operate(claim, 'reset');
+  await control.restore(claim);
+  await control.release(claim);
+  const audit = (await control.inspect()).history.at(-1).disposalEvidence;
+  assert.equal(audit.operationId, reset.operation);
+  assert.equal(audit.candidate, claim.candidate);
+  assert.equal(audit.reservationId, claim.id);
+  assert.equal(audit.owner, 'alice');
+  assert.equal(audit.storageDisposal.tombstone, 'retained');
+  assert.ok(Date.parse(audit.observedAt) >= Date.parse(audit.startedAt));
+});
+
+test('business reset CAS refusal never clears intent or invents durable disposal; explicit retry keeps ID', async t => {
+  const { control, restart, claim, network, refuseCompletion } = await businessLifecycle(t);
+  const allowCompletion = await refuseCompletion();
+  await assert.rejects(control.operate(claim, 'reset'), /blocked/);
+  const lease = (await control.inspect()).reservation;
+  assert.equal(network.state, 'disposed');
+  assert.equal(lease.operation.kind, 'reset');
+  assert.equal(lease.evidence.length, 0);
+  await allowCompletion();
+  const result = await restart().operate(claim, 'reset');
+  assert.equal(result.operation, lease.operation.id);
+  assert.equal((await control.inspect()).reservation.evidence.at(-1).operationId, lease.operation.id);
+});
+
+test('business same reset refuses a CAS change during fresh attestation', async t => {
+  const { control, restart, claim, network, edit } = await businessLifecycle(t);
+  network.lostReset = true;
+  await assert.rejects(control.operate(claim, 'reset'), /blocked/);
+  network.onAttestation = () => edit(lease => { lease.operation.id = 'f'.repeat(32); });
+  const before = network.remoteKinds.length;
+  await assert.rejects(restart().operate(claim, 'reset'), /changed during attestation/);
+  assert.equal(network.remoteKinds.length, before);
+  assert.ok((await control.inspect()).reservation.operation);
+});
+
+test('business fixture uses storage proof and cannot switch an existing profile', async t => {
+  const { control, claim, edit, network } = await businessLifecycle(t);
+  await edit(lease => { delete lease.fixtureProfile; });
+  const fixture = await control.operate(claim, 'fixture', 'campaign897-business-v2');
+  assert.equal(fixture.identities, 15);
+  assert.equal(fixture.state, 'identities');
+  assert.equal(fixture.storageDisposal, undefined);
+  await assert.rejects(control.operate(claim, 'fixture', 'campaign897-identities-v1'), /profile/);
+  await assert.rejects(control.restore(claim), /storage disposal/i);
+  assert.deepEqual(network.deploys, []);
+});
+
+
+test('business initial reset refuses operation binding changed during final attestation before remote mutation', async t => {
+  const { control, claim, network, ledger, edit } = await businessLifecycle(t);
+  const changeAfterIntent = async () => {
+    if (!(await ledger.read()).state.reservation.operation) { network.onAttestation = changeAfterIntent; return; }
+    await edit(lease => { lease.operation.namespace = 'public'; });
+  };
+  network.onAttestation = changeAfterIntent;
+  await assert.rejects(control.operate(claim, 'reset'), /blocked/);
+  assert.deepEqual(network.remoteKinds, []);
+  assert.equal((await control.inspect()).reservation.operation.namespace, 'public');
 });

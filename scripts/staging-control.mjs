@@ -3,6 +3,60 @@ import { createHash } from 'node:crypto';
 const sha = (value) => /^[a-f0-9]{40}$/.test(value ?? '');
 const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const empty = () => ({ version: 1, queue: [], reservation: null, history: [] });
+const business = 'campaign897-business-v2';
+const campaign = profile => ['campaign897-identities-v1', business].includes(profile);
+
+/** Shared controller/adapter contract for the independent storage probe, never auth or delivery proof. */
+export function businessReceipt(lease, result, target, { observed = true, disposed = false } = {}) {
+  const terminal = result?.state === 'disposed';
+  if (lease.fixtureProfile !== business || lease.namespace !== `cf_${lease.id}` ||
+      result?.profile !== business || result.reservationId !== lease.id || result.candidate !== lease.candidate ||
+      result.namespace !== lease.namespace || result.protectedReceipt !== `${lease.namespace}.campaign_entities` ||
+      !['identities', 'cleaning', 'disposed'].includes(result.state) ||
+      result.identities !== (terminal ? 0 : 15) || result.fixtures !== (terminal ? 'absent' : 'present') ||
+      result.tombstone !== terminal || (disposed && !terminal) ||
+      ['queueJobs', 'sinkRecords', 'cleanupVersion', 'deliveryCleanup', 'authenticated', 'admission', 'entities', 'emails'].some(key => Object.hasOwn(result, key)))
+    throw new Error('Business storage receipt binding or disposition incomplete');
+  if (observed) {
+    const inventory = lease.operation?.expectedMigrations ?? lease.expectedMigrations;
+    const schema = lease.operation?.schemaDisposition ?? lease.schemaDisposition;
+    if (result.sha !== target || !Array.isArray(inventory) || inventory.length === 0 ||
+        inventory.some((entry, index) => !/^\d+_[a-zA-Z0-9_]+$/.test(entry?.name ?? '') || !/^[a-f0-9]{64}$/.test(entry?.checksum ?? '') ||
+          (index > 0 && inventory[index - 1].name >= entry.name)) ||
+        digest(result.migrations) !== digest(inventory) || !['unchanged', 'retained-additive'].includes(schema) || result.schema !== schema)
+      throw new Error('Business storage receipt runtime/schema inventory incomplete');
+    if (terminal) {
+      const disposal = result.storageDisposal;
+      if (!disposal || Object.keys(disposal).sort().join(',') !== 'auditDisposition,retainedAudits,rows,scope,state,tombstone,version' ||
+          disposal.version !== 1 || disposal.scope !== 'business-v2-storage' || disposal.state !== 'disposed' ||
+          disposal.rows !== 'absent' || disposal.retainedAudits !== 2 ||
+          disposal.auditDisposition !== 'redacted-synthetic-audit' || disposal.tombstone !== 'retained')
+        throw new Error('Complete versioned business storage disposal receipt required');
+    } else if (Object.hasOwn(result, 'storageDisposal')) throw new Error('Partial business storage disposal receipt refused');
+  }
+  return { profile: business, reservationId: lease.id, candidate: lease.candidate, namespace: lease.namespace,
+    protectedReceipt: result.protectedReceipt, state: result.state, identities: result.identities, fixtures: result.fixtures,
+    tombstone: result.tombstone, ...(observed ? { sha: result.sha, migrations: result.migrations, schema: result.schema,
+      ...(terminal ? { storageDisposal: structuredClone(result.storageDisposal) } : {}) } : {}) };
+}
+
+/** Durable reset history, including the original candidate deployment authority after downgrade. */
+export function businessDisposalEvidence(lease, now) {
+  const evidence = lease.evidence?.findLast(e => ['fixture', 'reset', 'deploy'].includes(e.kind) ||
+    (e.kind === 'recovery' && ['fixture', 'reset', 'deploy'].includes(e.recoveredOperation?.kind)));
+  if (!evidence || (evidence.kind !== 'reset' && evidence.recoveredOperation?.kind !== 'reset') ||
+      evidence.owner !== lease.owner || !/^[a-f0-9]{32}$/.test(evidence.operationId ?? '') ||
+      !Number.isFinite(Date.parse(evidence.startedAt)) || !Number.isFinite(Date.parse(evidence.observedAt)) ||
+      Date.parse(evidence.observedAt) < Date.parse(evidence.startedAt) || (now && Date.parse(evidence.observedAt) > Date.parse(now)) ||
+      !evidence.deployments || Object.keys(evidence.deployments).sort().join(',') !== Object.keys(lease.identity.services).sort().join(',') ||
+      Object.values(evidence.deployments).some(id => typeof id !== 'string' || !/^[a-zA-Z0-9-]{1,100}$/.test(id)) ||
+      digest(evidence.deployments) !== digest(lease.operation?.disposalDeployments ?? lease.restoration?.candidateDeployments ?? lease.deployments))
+    throw new Error('Complete current durable business storage disposal required');
+  businessReceipt({ ...lease, operation: null,
+    schemaDisposition: lease.operation?.disposalSchema ?? lease.restoration?.candidateSchema ?? lease.schemaDisposition },
+  evidence, lease.candidate, { disposed: true });
+  return evidence;
+}
 function validPolicy(p) {
   if (!p || Object.keys(p).sort().join(',') !== 'credentialScope,environmentId,environmentName,origins,projectId,services' ||
       Object.keys(p.origins ?? {}).sort().join(',') !== 'api,database,media,publicMedia') throw new Error('Explicit staging identity schema required');
@@ -61,7 +115,6 @@ export class StagingControl {
   async owned(claim, recovering = false) {
     const snapshot = await this.ledger.read(); const lease = snapshot.state?.reservation;
     if (!lease || lease.id !== claim.id || lease.owner !== this.actor) throw new Error('Current reservation owner required');
-    if (lease.fixtureProfile === 'campaign897-business-v2') throw new Error('Business profile controller disposal/continuation/restore receipts unavailable; retain reservation');
     if (lease.candidate !== claim.candidate) throw new Error('Exact reservation candidate required');
     if (digest(lease.identity) !== digest(this.policy)) throw new Error('Reservation identity changed');
     if (lease.operation && !recovering) throw new Error('Durable in-flight operation requires recovery; inspect before mutation');
@@ -75,6 +128,9 @@ export class StagingControl {
       ...(restoring ? { fixtures: 'absent', schema: receipt.schema } : {}) };
   }
   campaignDisposed(lease) {
+    if (lease.fixtureProfile === business) {
+      try { businessDisposalEvidence(lease, this.now()); return true; } catch { return false; }
+    }
     const evidence = lease.evidence.findLast(e => ['fixture', 'reset'].includes(e.kind) ||
       (e.kind === 'recovery' && ['fixture', 'reset'].includes(e.recoveredOperation?.kind)));
     return evidence && (evidence.kind === 'reset' || evidence.recoveredOperation?.kind === 'reset') &&
@@ -86,7 +142,12 @@ export class StagingControl {
   }
   async requireCampaignDisposal(snapshot) {
     const lease = snapshot.state.reservation;
-    if (lease.fixtureProfile !== 'campaign897-identities-v1' || this.campaignDisposed(lease)) return;
+    if (!campaign(lease.fixtureProfile) || this.campaignDisposed(lease)) return;
+    if (lease.fixtureProfile === business) {
+      lease.recovery = { owner: this.actor, action: 'Keep candidate deployed. Complete the exact current business storage reset and persist its independent versioned probe before restoring main. Storage disposal proves no auth or delivery cleanup.' };
+      await this.write(snapshot, snapshot.state);
+      throw new Error('Complete current durable business storage disposal required before restoration');
+    }
     lease.recovery = { owner: this.actor,
       action: 'Keep candidate enqueue/send fences deployed. Complete the current reservation campaign reset and persist exact disposed queue/sink proof before restoring latest main. Unknown or partial cleanup retains ownership.' };
     await this.write(snapshot, snapshot.state);
@@ -95,7 +156,7 @@ export class StagingControl {
   async perform(claim, kind, restoring = false, profile) {
     let snapshot = await this.owned(claim);
     const selectedProfile = snapshot.state.reservation.fixtureProfile ?? 'listing-v1';
-    if (profile !== undefined && (!['listing-v1', 'campaign897-identities-v1'].includes(profile) || kind !== 'fixture' || restoring)) throw new Error('Unsupported fixture profile');
+    if (profile !== undefined && (!['listing-v1', 'campaign897-identities-v1', business].includes(profile) || kind !== 'fixture' || restoring)) throw new Error('Unsupported fixture profile');
     if (profile && profile !== selectedProfile && (snapshot.state.reservation.fixtureProfile || snapshot.state.reservation.evidence.some(e => e.kind === 'fixture'))) throw new Error('Fixture profile cannot change within a reservation');
     await this.platform.authorize(claim);
     await this.attest();
@@ -111,6 +172,12 @@ export class StagingControl {
     const operation = { id: this.id(), reservationId: lease.id, owner: lease.owner, namespace: lease.namespace, candidate: lease.candidate, kind: restoring ? 'restore' : kind, target, startedAt: this.now(), expectedMigrations: schemaPlan?.migrations ?? lease.expectedMigrations ?? await this.ledger.migrationsAt(target), schemaDisposition: schemaPlan?.disposition ?? lease.schemaDisposition ?? 'unchanged' };
     if (kind === 'fixture') lease.fixtureProfile = profile ?? selectedProfile;
     operation.profile = lease.fixtureProfile ?? selectedProfile;
+    if (restoring && operation.profile === business) {
+      if (digest(operation.expectedMigrations) !== digest(lease.expectedMigrations)) throw new Error('Business storage disposal inventory differs from restoration plan');
+      operation.disposalDeployments = structuredClone(lease.restoration?.candidateDeployments ?? lease.deployments);
+      operation.disposalSchema = lease.restoration?.candidateSchema ?? lease.schemaDisposition;
+      operation.runtimeBeforeRestore = lease.restoration?.restoredSha ?? lease.candidate;
+    }
     lease.operation = operation; lease.lifecycle = restoring ? 'restoring' : 'active';
     lease.restoration = null;
     await this.write(snapshot, snapshot.state);
@@ -120,6 +187,12 @@ export class StagingControl {
       if (current.state?.reservation?.operation?.id !== operation.id || current.state.reservation.owner !== this.actor ||
           current.state.reservation.candidate !== claim.candidate) throw new Error('Operation authority changed');
       await this.attest();
+      if (restoring && operation.profile === business && await this.ledger.latestMain() !== target) throw new Error('Latest main moved before restoration');
+      if (operation.profile === business) {
+        const attested = await this.owned(claim, true);
+        if (attested.revision !== current.revision || digest(attested.state.reservation.operation) !== digest(operation))
+          throw new Error('Business operation changed during final attestation');
+      }
       const result = await this.platform.execute(restoring ? 'restore' : kind, current.state.reservation, target, async (role, deploymentId) => {
         if (!(role in lease.identity.services) || typeof deploymentId !== 'string' || !/^[a-zA-Z0-9-]{1,100}$/.test(deploymentId)) throw new Error('Invalid deployment receipt');
         const progress = await this.ledger.read();
@@ -134,16 +207,22 @@ export class StagingControl {
       const done = await this.ledger.read();
       if (done.state?.reservation?.operation?.id !== operation.id) throw new Error('Operation record changed');
       const owned = done.state.reservation;
+      if (operation.profile === business && (owned.fixtureProfile !== business || owned.namespace !== operation.namespace ||
+          owned.owner !== operation.owner || owned.candidate !== operation.candidate ||
+          digest({ ...owned.operation, deployments: undefined }) !== digest({ ...operation, deployments: undefined })))
+        throw new Error('Business completion authority changed');
       if (receipt) {
         owned.deployments = result.deployments;
         owned.expectedMigrations = operation.expectedMigrations;
         owned.schemaDisposition = operation.schemaDisposition;
-        owned.evidence.push({ ...receipt, observedAt: this.now(), deployments: result.deployments, migrations: operation.expectedMigrations });
+        owned.evidence.push({ ...receipt, ...(operation.profile === business && !restoring ? { kind: 'deploy' } : {}), observedAt: this.now(), deployments: result.deployments, migrations: operation.expectedMigrations });
       }
-      const campaignReceipt = operation.profile === 'campaign897-identities-v1' && ['fixture', 'reset'].includes(kind) ? this.campaignReceipt(result, owned, kind) : {};
+      const campaignReceipt = campaign(operation.profile) && ['fixture', 'reset'].includes(kind) ? this.campaignReceipt(result, owned, kind) : {};
       if (['fixture', 'reset'].includes(kind)) owned.evidence.push({ kind, operationId: operation.id, namespace: owned.namespace, observedAt: this.now(), ...campaignReceipt,
+        ...(operation.profile === business ? { owner: owned.owner, startedAt: operation.startedAt, deployments: structuredClone(owned.deployments) } : {}),
         ...(kind === 'fixture' ? { listingId: result.listingId, sellerId: result.sellerId } : {}) });
-      if (restoring) owned.restoration = { ...receipt, restoredSha: target };
+      if (restoring) owned.restoration = { ...receipt, restoredSha: target,
+        ...(operation.profile === business ? { candidateDeployments: operation.disposalDeployments, candidateSchema: operation.disposalSchema } : {}) };
       owned.operation = null; owned.lifecycle = restoring ? 'restored' : 'active';
       await this.write(done, done.state);
       return { operation: operation.id, target, ...(receipt ?? {}), ...campaignReceipt,
@@ -160,6 +239,11 @@ export class StagingControl {
     }
   }
   campaignReceipt(result, lease, kind) {
+    if (lease.fixtureProfile === business) {
+      const receipt = businessReceipt(lease, result, lease.candidate, { disposed: kind === 'reset' });
+      if (kind === 'fixture' && result.state !== 'identities') throw new Error('Business fixture identities proof incomplete');
+      return receipt;
+    }
     if (result?.profile !== 'campaign897-identities-v1' || result.candidate !== lease.candidate ||
         result.protectedReceipt !== `${lease.namespace}.campaign_entities` ||
         result.fixtures !== (kind === 'fixture' ? 'present' : 'absent') ||
@@ -173,7 +257,7 @@ export class StagingControl {
   }
   async continueCampaignReset(claim, snapshot) {
     const lease = snapshot.state.reservation; const operation = lease.operation;
-    if (lease.fixtureProfile !== 'campaign897-identities-v1' || operation.kind !== 'reset' ||
+    if (!campaign(lease.fixtureProfile) || operation.kind !== 'reset' ||
         operation.profile !== lease.fixtureProfile || operation.reservationId !== lease.id || operation.owner !== this.actor ||
         operation.namespace !== lease.namespace || operation.candidate !== lease.candidate || operation.target !== lease.candidate ||
         !/^[a-f0-9]{32}$/.test(operation.id ?? '') || !Array.isArray(operation.expectedMigrations))
@@ -184,7 +268,9 @@ export class StagingControl {
       throw new Error('Campaign reset changed during attestation; retain recovery state');
     // A CAS attempt journal excludes stale contenders without replacing the cleanup operation ID.
     operation.continuation = { id: this.id(), requestedAt: this.now() };
-    lease.recovery = { owner: this.actor, action: 'Continue only this explicit campaign reset while candidate fences remain deployed; retain the operation until exact queue/sink disposal is durably recorded' };
+    lease.recovery = { owner: this.actor, action: lease.fixtureProfile === business
+      ? 'Continue only this exact business storage reset on the candidate; retain its ID until independent versioned storage disposal is durable. Auth and delivery are unproven.'
+      : 'Continue only this explicit campaign reset while candidate fences remain deployed; retain the operation until exact queue/sink disposal is durably recorded' };
     await this.write(snapshot, snapshot.state);
     try {
       const current = await this.owned(claim, true);
@@ -196,7 +282,8 @@ export class StagingControl {
       const done = await this.owned(claim, true);
       if (digest(done.state.reservation.operation) !== digest(operation)) throw new Error('Reset completion authority changed');
       const completed = done.state.reservation;
-      completed.evidence.push({ ...proof, kind: 'reset', operationId: operation.id, observedAt: this.now() });
+      completed.evidence.push({ ...proof, kind: 'reset', operationId: operation.id, observedAt: this.now(),
+        ...(lease.fixtureProfile === business ? { owner: lease.owner, startedAt: operation.startedAt, deployments: structuredClone(lease.deployments) } : {}) });
       completed.operation = null; completed.lifecycle = 'active';
       completed.recovery = { owner: this.actor, action: 'Restore latest fetched main and verify before release' };
       await this.write(done, done.state);
@@ -220,6 +307,12 @@ export class StagingControl {
     const snapshot = await this.owned(claim, true); const lease = snapshot.state.reservation; const operation = lease.operation;
     if (!operation || !['deploy', 'restore', 'fixture', 'reset'].includes(operation.kind) || !sha(operation.target) ||
         !Array.isArray(operation.expectedMigrations)) throw new Error('Known durable operation required for recovery');
+    if (lease.fixtureProfile === business && (operation.profile !== business || operation.reservationId !== lease.id ||
+        operation.owner !== lease.owner || operation.candidate !== lease.candidate || operation.namespace !== lease.namespace ||
+        !/^[a-f0-9]{32}$/.test(operation.id ?? '') || !Number.isFinite(Date.parse(operation.startedAt)) ||
+        (operation.kind !== 'restore' && operation.target !== lease.candidate))) throw new Error('Exact bound business recovery operation required');
+    if (lease.fixtureProfile === business && operation.kind === 'restore' && await this.ledger.latestMain() !== operation.target)
+      throw new Error('Latest main moved; interrupted restoration cannot recover');
     await this.platform.authorize(claim); await this.attest();
     const deployments = ['deploy', 'restore'].includes(operation.kind) ? operation.deployments : lease.deployments;
     if (!deployments || Object.keys(deployments).sort().join(',') !== Object.keys(lease.identity.services).sort().join(',')) throw new Error('Complete deployment journal required for recovery; partial state retains reservation');
@@ -228,7 +321,7 @@ export class StagingControl {
     const result = await this.platform.recover(lease, operation.target, { deployments });
     const restoring = operation.kind === 'restore';
     const receipt = this.proof(result, operation.target, restoring);
-    if (lease.fixtureProfile === 'campaign897-identities-v1' && ['fixture', 'reset'].includes(operation.kind)) Object.assign(receipt, this.campaignReceipt(result, lease, operation.kind));
+    if (campaign(lease.fixtureProfile) && ['fixture', 'reset'].includes(operation.kind)) Object.assign(receipt, this.campaignReceipt(result, lease, operation.kind));
     if ((operation.kind === 'fixture' && result.fixtures !== 'present') ||
         (operation.kind === 'reset' && result.fixtures !== 'absent')) throw new Error('Recovery fixture disposition incomplete');
     if (restoring && await this.ledger.latestMain() !== operation.target) throw new Error('Latest main moved; interrupted restoration cannot recover');
@@ -238,8 +331,10 @@ export class StagingControl {
     owned.deployments = deployments; owned.expectedMigrations = operation.expectedMigrations;
     owned.schemaDisposition = operation.schemaDisposition;
     owned.evidence.push({ ...receipt, kind: 'recovery', operationId: operation.id, namespace: owned.namespace, recoveredOperation: structuredClone(operation),
+      ...(lease.fixtureProfile === business ? { owner: lease.owner, startedAt: operation.startedAt } : {}),
       deployments, migrations: operation.expectedMigrations, fixtures: result.fixtures, observedAt: this.now() });
-    if (restoring) owned.restoration = { ...receipt, restoredSha: operation.target };
+    if (restoring) owned.restoration = { ...receipt, restoredSha: operation.target,
+      ...(lease.fixtureProfile === business ? { candidateDeployments: operation.disposalDeployments, candidateSchema: operation.disposalSchema } : {}) };
     owned.operation = null; owned.lifecycle = restoring ? 'restored' : 'active';
     owned.recovery = { owner: this.actor, action: 'Restore latest fetched main and verify before release' };
     await this.write(current, current.state);
@@ -257,7 +352,10 @@ export class StagingControl {
     if (snapshot.state.reservation.restoration?.restoredSha !== restored.restoredSha) throw new Error('Restoration changed');
     if (restored.restoredSha !== await this.ledger.latestMain()) throw new Error('Latest main changed; restore again');
     snapshot.state.history.push({ id: claim.id, owner: this.actor, restoredSha: restored.restoredSha, releasedAt: this.now(),
-      migrations: snapshot.state.reservation.expectedMigrations, schemaDisposition: snapshot.state.reservation.schemaDisposition });
+      migrations: snapshot.state.reservation.expectedMigrations, schemaDisposition: snapshot.state.reservation.schemaDisposition,
+      ...(snapshot.state.reservation.fixtureProfile === business ? {
+        storageDisposal: businessDisposalEvidence(snapshot.state.reservation, this.now()).storageDisposal,
+        disposalEvidence: businessDisposalEvidence(snapshot.state.reservation, this.now()) } : {}) });
     snapshot.state.reservation = null;
     await this.write(snapshot, snapshot.state);
     return { released: true, restoredSha: restored.restoredSha };

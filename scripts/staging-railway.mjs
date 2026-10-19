@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { remoteProgram } from './staging-remote.mjs';
+import { businessReceipt, businessDisposalEvidence } from './staging-control.mjs';
 
 const run = promisify(execFile);
 const endpoint = 'https://backboard.railway.com/graphql/v2';
@@ -80,7 +81,6 @@ export class RailwayPlatform {
     return structuredClone(policy);
   }
   async remote(kind, lease, target) {
-    if (lease.fixtureProfile === 'campaign897-business-v2') throw new Error('Business profile operational receipts unavailable');
     const payload = { kind, redisOrigin: this.redisOrigin, candidate: lease.candidate, profile: lease.fixtureProfile, id: lease.id, namespace: lease.namespace, target, identity: lease.identity,
       expectedMigrations: lease.operation?.expectedMigrations ?? lease.expectedMigrations,
       schemaDisposition: lease.operation?.schemaDisposition ?? lease.schemaDisposition ?? 'unchanged' };
@@ -94,6 +94,7 @@ export class RailwayPlatform {
     let result; try { result = JSON.parse(lines[0]); } catch { throw new Error('Remote receipt invalid'); }
     if (!['present', 'absent'].includes(result.fixtures) || (kind !== 'probe' && result.namespace !== lease.namespace)) throw new Error('Remote namespace proof unavailable');
     if (lease.fixtureProfile === 'campaign897-identities-v1') this.campaignReceipt(lease, result, kind === 'probe' && lease.operation?.kind === 'reset');
+    if (lease.fixtureProfile === 'campaign897-business-v2') businessReceipt(lease, result, target, { observed: kind === 'probe' });
     return result;
   }
   campaignReceipt(lease, result, allowCleaning = false) {
@@ -109,10 +110,23 @@ export class RailwayPlatform {
     return deployment;
   }
   async execute(kind, lease, target, recordDeployment) {
-    if (lease.fixtureProfile === 'campaign897-business-v2') throw new Error('Business profile operational receipts unavailable');
     await this.authorize(lease);
     await this.attest(lease.identity);
+    const business = lease.fixtureProfile === 'campaign897-business-v2';
     if (['fixture', 'reset'].includes(kind)) {
+      if (business) {
+        if (target !== lease.candidate) throw new Error('Business mutation requires original candidate runtime');
+        // A new fixture has no namespace to probe yet. Runtime identity,
+        // deployment journal and readiness are checked before its first write.
+        if (kind === 'fixture') await this.runtime(lease, target, { deployments: lease.deployments });
+        else await this.verify(lease, target, { deployments: lease.deployments });
+        await this.remote(kind, lease, target);
+        // Only the independent probe emits the versioned disposal/inventory.
+        const receipt = await this.verify(lease, target, { deployments: lease.deployments });
+        businessReceipt(lease, receipt, target, { disposed: kind === 'reset' });
+        if (kind === 'fixture' && receipt.state !== 'identities') throw new Error('Business fixture identities required');
+        return receipt;
+      }
       if (lease.fixtureProfile === 'campaign897-identities-v1') await this.verify(lease, target, { deployments: lease.deployments });
       const receipt = await this.remote(kind, lease, target);
       if (kind === 'fixture' && lease.fixtureProfile !== 'campaign897-identities-v1') {
@@ -121,6 +135,11 @@ export class RailwayPlatform {
       return receipt;
     }
     if (!['deploy', 'restore'].includes(kind)) throw new Error('Unsupported Railway operation');
+    if (business && kind === 'restore') {
+      businessDisposalEvidence(lease);
+      await this.verify(lease, lease.operation?.runtimeBeforeRestore ?? lease.restoration?.restoredSha ?? lease.candidate,
+        { deployments: lease.deployments });
+    }
     const deployments = {};
     for (const [role, serviceId] of Object.entries(lease.identity.services)) {
       const data = await this.query(`mutation deploy($serviceId: String!, $environmentId: String!, $commitSha: String!) {
@@ -142,7 +161,9 @@ export class RailwayPlatform {
       }
     }
     if (kind === 'restore') {
-      if (lease.fixtureProfile === 'campaign897-identities-v1') {
+      if (business) {
+        businessReceipt(lease, await this.remote('probe', lease, target), target, { disposed: true });
+      } else if (lease.fixtureProfile === 'campaign897-identities-v1') {
         const proof = await this.remote('probe', lease, target);
         if (proof.state !== 'disposed' || proof.deliveryCleanup !== 'disposed') throw new Error('Established campaign disposal required after main restoration; retain ownership');
       } else await this.remote('reset', lease, target);
@@ -157,10 +178,10 @@ export class RailwayPlatform {
   }
   async recover(lease, target, result) {
     const receipt = await this.verify(lease, target, result);
-    if (lease.operation.kind === 'fixture' && lease.fixtureProfile !== 'campaign897-identities-v1') await this.fixtureVisible(lease, receipt);
+    if (lease.operation.kind === 'fixture' && !['campaign897-identities-v1', 'campaign897-business-v2'].includes(lease.fixtureProfile)) await this.fixtureVisible(lease, receipt);
     return receipt;
   }
-  async verify(lease, target, result) {
+  async runtime(lease, target, result) {
     await this.attest(lease.identity);
     if (!result?.deployments || Object.keys(result.deployments).length !== Object.keys(lease.identity.services).length) throw new Error('Exact deployment IDs required');
     for (const [role, serviceId] of Object.entries(lease.identity.services)) {
@@ -176,10 +197,16 @@ export class RailwayPlatform {
     const { deploymentLogs } = await this.query(`query logs($deploymentId: String!, $limit: Int) {
       deploymentLogs(deploymentId: $deploymentId, limit: $limit) { message } }`, { deploymentId: result.deployments.worker, limit: 500 });
     if (!deploymentLogs.some(x => x.message.includes('Worker started (BullMQ consumer)'))) throw new Error('Current worker boot evidence unavailable');
+  }
+  async verify(lease, target, result) {
+    await this.runtime(lease, target, result);
     const probe = await this.remote('probe', lease, target);
     if (probe.sha !== target || probe.schema !== (lease.operation?.schemaDisposition ?? lease.schemaDisposition ?? 'unchanged') ||
         !equal(probe.migrations, lease.operation?.expectedMigrations ?? lease.expectedMigrations)) throw new Error('Runtime schema proof unavailable');
-    return { ...(lease.fixtureProfile === 'campaign897-identities-v1' ? { profile: probe.profile, candidate: probe.candidate, namespace: probe.namespace, state: probe.state, identities: probe.identities, protectedReceipt: probe.protectedReceipt, retainedAudits: probe.retainedAudits, tombstone: probe.tombstone, reservationId: probe.reservationId, cleanupVersion: probe.cleanupVersion, deliveryCleanup: probe.deliveryCleanup, queueJobs: probe.queueJobs, sinkRecords: probe.sinkRecords } : {}), sha: target, readyz: true, worker: true, media: true, mock: true, fixtures: probe.fixtures, schema: probe.schema, migrations: probe.migrations, listingId: probe.listingId, sellerId: probe.sellerId };
+    const storage = lease.fixtureProfile === 'campaign897-business-v2' ? businessReceipt(lease, probe, target) : {};
+    if (lease.fixtureProfile === 'campaign897-business-v2' && (lease.operation?.kind === 'restore' || lease.restoration))
+      businessReceipt(lease, probe, target, { disposed: true });
+    return { ...storage, ...(lease.fixtureProfile === 'campaign897-identities-v1' ? { profile: probe.profile, candidate: probe.candidate, namespace: probe.namespace, state: probe.state, identities: probe.identities, protectedReceipt: probe.protectedReceipt, retainedAudits: probe.retainedAudits, tombstone: probe.tombstone, reservationId: probe.reservationId, cleanupVersion: probe.cleanupVersion, deliveryCleanup: probe.deliveryCleanup, queueJobs: probe.queueJobs, sinkRecords: probe.sinkRecords } : {}), sha: target, readyz: true, worker: true, media: true, mock: true, fixtures: probe.fixtures, schema: probe.schema, migrations: probe.migrations, listingId: probe.listingId, sellerId: probe.sellerId };
   }
 
 }
