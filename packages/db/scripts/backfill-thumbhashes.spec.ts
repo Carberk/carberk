@@ -7,9 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { main } from "./backfill-thumbhashes";
 
-// The disposable store and database the operator script sees: storage keyed
-// `bucket/key`, rows per table. Only the boundary is fake; the script's own
-// selection, gate, hashing and conditional updates run as written.
+// Unit orchestration and hashing only. The pg substitute interprets SQL into
+// arrays and cannot establish real SQL predicates. The migrated PostgreSQL
+// tests in tests/backfill-thumbhashes.e2e.spec.ts own persisted-write evidence.
 type MediaRow = { id: string; listingId: string; kind: string; key: string; posterKey: string | null; thumbHash: string | null };
 type MessageRow = { id: string; kind: string; metadata: Record<string, unknown> | null; deletedAt: Date | null };
 const state = vi.hoisted(() => ({
