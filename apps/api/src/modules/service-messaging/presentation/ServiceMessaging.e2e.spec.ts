@@ -227,7 +227,27 @@ it("holds one exact History quote atomically and never treats a screenshot or ex
  const tomorrow = new Date(now.getTime() + 86400000 + 5 * 3600000).toISOString().slice(0, 10);
  const windowStart = `${tomorrow}T04:00:00.000Z`, windowEnd = `${tomorrow}T05:00:00.000Z`;
  const command = (user: string, data: object) => request.post(`/api/v1/services/conversations/${id}/history`).set("Authorization", auth(user)).send(data);
- await command(oldStaff, { kind: "capacity", expectedAssignmentVersion: 1, day: tomorrow, slotLimit: 1, morningLimit: 1, evidence: "Synthetic measured one slot", providers: [{ provider: "carfax", allowance: 1, consumed: 0, resetAt: `${tomorrow}T03:00:00.000Z`, evidence: "Synthetic account allowance" }] }).expect(201);
+ const capacityResponse = await command(oldStaff, { kind: "capacity", expectedAssignmentVersion: 1, day: tomorrow, slotLimit: 1, morningLimit: 1, evidence: "Synthetic measured one slot", providers: [{ provider: "carfax", allowance: 1, consumed: 0, resetAt: `${tomorrow}T03:00:00.000Z`, evidence: "Synthetic account allowance" }] });
+ if (capacityResponse.status !== 201) {
+  const fixtureToken = tokens.get(oldStaff);
+  if (!fixtureToken) throw new Error("History fixture session unavailable");
+  const { sid } = jwt.decode<{ sid: string }>(fixtureToken);
+  const session = await db.session.findUnique({ where: { id: sid }, select: { expiresAt: true, adminTotpExpiresAt: true } });
+  const wallNow = new Date();
+  const serviceNow = app.get<{ now: () => Date }>(SERVICE_RUNTIME).now();
+  const responseCode: unknown = capacityResponse.body?.code;
+  const allowedCodes = ["NO_ACCESS", "HISTORY_REMOVED", "STALE_ASSIGNMENT", "INVALID_MESSAGE", "UNAUTHORIZED", "HTTP_ERROR", "INTERNAL_SERVER_ERROR"];
+  console.info("[DEBUG-history-capacity403]", JSON.stringify({
+   status: capacityResponse.status,
+   code: typeof responseCode === "string" && allowedCodes.includes(responseCode) ? responseCode : "OTHER",
+   sessionExists: session !== null,
+   wallSessionValid: session !== null && session.expiresAt > wallNow,
+   serviceSessionValid: session !== null && session.expiresAt > serviceNow,
+   wallElevated: session?.adminTotpExpiresAt != null && session.adminTotpExpiresAt > wallNow,
+   serviceElevated: session?.adminTotpExpiresAt != null && session.adminTotpExpiresAt > serviceNow,
+  }));
+ }
+ expect(capacityResponse.status).toBe(201);
  const quoteId = randomUUID(), vin = "1HGCM82633A004352";
  const quote = { kind: "quote", expectedAssignmentVersion: 1, quoteId, vin, providers: ["carfax"], preflightOutcome: "available", preflightEvidence: "Synthetic licensed preflight", refundRule: "Founder decision if unusable", windowStart, windowEnd, feasible: true };
  await command(oldStaff, quote).expect(201);
