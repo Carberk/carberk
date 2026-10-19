@@ -72,7 +72,7 @@ The Seller card shows the seller's avatar at 44 points (`PublicUserAvatar`: the 
 
 Picker URIs are copied into persistent temporary storage before compression because iOS may reclaim picker cache files under memory pressure. Picked photos compress one at a time and upload two at a time, each taking the waiting photo that comes first in the grid, so the cover finishes first and a reorder changes what goes next (#819); the library picker returns photos in tap order (`orderedSelection`). The compressor copies its result into staging, verifies the destination, and cleans temporary files best-effort. Preserve copy rather than cross-directory move; earlier iOS failures motivated that choice. Overlapping compression/upload operations use reference counters, since a boolean can clear while another operation is still active.
 
-The compressor currently uses the contextual ImageManipulator chain. Consult current Expo docs before an SDK change; historical API notes cannot establish present library support. Staging cleanup is local-device cleanup, distinct from the worker's broad orphan-cleanup queue.
+Listing photos encode WebP before presign/PUT within the 2400 px long-side and 5 MB caps. On app upgrade, a known `listing-staging/<draft>/<photo>.jpg` file is recompressed into its WebP staging path before uploading, preserving photo ID/order and recording the new dimensions/size. Missing or corrupt files keep publishing blocked. Remote draft aliases are canonicalized by the server only against the saved photo or owned available upload provenance; do not rewrite arbitrary keys locally. The compressor currently uses the contextual ImageManipulator chain. Consult current Expo docs before an SDK change; historical API notes cannot establish present library support. Staging cleanup is local-device cleanup, distinct from the worker's broad orphan-cleanup queue.
 
 Search/filter UI separates editing state from applied query state. Check the stores, serializers, query keys, and API ranking adapter together when changing filters or result counts. Approved discovery requirements are in the Search specification, not old planned-refactor notes.
 
@@ -86,7 +86,7 @@ Search parameters (`parameters`, `SearchParametersForm`) is a full-screen form f
 
 The native Listing upload queue requests optional `conditional-v1` image presign and forwards the returned required headers unchanged, including the quoted `if-match` ETag. A response without headers uses the installed legacy PUT shape, allowing older API builds to ignore the opt-in. Do not retry an issued conditional URL without its header or recreate missing objects; queue retries obtain a new presign. Chat has its own upload path. Real deployed native upload/provider proof remains part of release verification.
 
-The shared `compressPhoto` helper accepts a target long side and source dimensions for Profile Photos. Omitting that target preserves the Listing default of 2400 points wide; Profile uses 512 on the long side and does not use the Listing queue.
+The shared `compressPhoto` helper accepts a target long side and source dimensions for Profile Photos. Omitting that target preserves the Listing default of 2400 px on the long side; Profile uses 512 on the long side and does not use the Listing queue.
 
 ## Start here
 

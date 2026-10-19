@@ -48,3 +48,5 @@ Feed price sort and price-range counts read the stored `Listing.priceTmt` ([ADR-
 - [Schema](../../../../../packages/db/prisma/schema.prisma)
 
 Photos use one WebP original and four WebP derivatives under [ADR-0096](../../../../../docs/adr/0096-webp-only-photos.md). Thumbnail/list retain cover framing; detail/fullscreen resize inside their bounds without enlargement or canvas padding. API variants serve `.webp` URLs. The [operator converter](../../../../../packages/db/scripts/convert-photos-webp.md) preserves existing identities and rewrites scalar, snapshot and upload-manifest references before conditional JPEG deletion.
+
+After stored-photo conversion, UpdateDraft resolves old JPEG autosave aliases only against the same saved photo’s canonical WebP key or an owned AVAILABLE WebP upload in the strict pending-original namespace. Unknown, foreign, retired and already adopted new aliases are refused; normal publication still performs the existing ownership/adoption checks.
