@@ -298,7 +298,12 @@ async function businessLifecycle(t) {
   const ledger = new GitLedger({ directory: join(root, 'objects'), remote });
   await ledger.initialize();
   const candidate = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-  for (const ref of [candidate, retainedSchemaProfile.baseline]) await ledger.git(['fetch', process.cwd(), ref]);
+  // A shallow CI checkout cannot supply the baseline or the candidate's
+  // complete parents for the fixture push. Fetch both exact objects directly
+  // into scratch storage from its configured origin instead.
+  const shallow = execFileSync('git', ['rev-parse', '--is-shallow-repository'], { encoding: 'utf8' }).trim() === 'true';
+  const source = shallow ? execFileSync('git', ['remote', 'get-url', 'origin'], { encoding: 'utf8' }).trim() : process.cwd();
+  for (const ref of [candidate, retainedSchemaProfile.baseline]) await ledger.git(['fetch', '--no-tags', source, ref]);
   const tree = await ledger.git(['rev-parse', `${candidate}^{tree}`]);
   let main = await ledger.git(['commit-tree', tree, '-p', candidate, '-m', 'Test main runtime']);
   await ledger.git(['push', remote, `${main}:refs/heads/main`, `${candidate}:refs/heads/candidate`, `${retainedSchemaProfile.baseline}:refs/heads/baseline`]);
