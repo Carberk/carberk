@@ -12,8 +12,11 @@ import { queryKeys } from "../queryKeys";
 export function listingDetailQueryOptions(id: string) {
   return {
     queryKey: queryKeys.listings.detail(id),
-    queryFn: () =>
-      apiClient.get(`/listings/${id}`, ListingsSchemas.ListingDetailSchema),
+    // EVIDENCE HARNESS #864/#867: never commit. Holds detail back so the preview shows.
+    queryFn: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+      return apiClient.get(`/listings/${id}`, ListingsSchemas.ListingDetailSchema);
+    },
   };
 }
 
