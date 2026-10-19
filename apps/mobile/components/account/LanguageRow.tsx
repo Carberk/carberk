@@ -21,7 +21,7 @@ export function LanguageRow() {
 
   return (
     <>
-      <MenuRow icon={Globe} label={t("language")} value={localeNames[locale]} onPress={() => setOpen(true)} />
+      <MenuRow icon={Globe} label={t("language")} value={localeNames[locale]} chevron onPress={() => setOpen(true)} />
       <OptionPickerSheet
         open={open}
         onOpenChange={setOpen}

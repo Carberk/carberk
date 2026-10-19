@@ -24,7 +24,7 @@ import { useDisplayName } from "../../src/identity/useDisplayName";
 import { legalPageUrl } from "../../src/config/publicWebUrl";
 
 import { LanguageRow } from "@/components/account/LanguageRow";
-import { MenuDivider, MenuGap, MenuGroup, MenuRow } from "@/components/account/MenuRow";
+import { MenuDivider, MenuGroup, MenuRow } from "@/components/account/MenuRow";
 import { MyListingsRow } from "@/components/account/MyListingsRow";
 import { ThemeRow } from "@/components/account/ThemeRow";
 import { UserAvatar } from "@/components/identity/UserAvatar";
@@ -71,12 +71,12 @@ function ProfileRowSkeleton() {
     <View
       accessible
       accessibilityLabel={t("loading")}
-      className="min-h-20 flex-row items-center gap-3 px-4 py-2.5"
+      className="min-h-20 flex-row items-center gap-3 px-4 py-3"
     >
       <Skeleton className="size-12 rounded-full" />
       <View className="flex-1 gap-2">
-        <Skeleton className="h-4 w-40 rounded" />
-        <Skeleton className="h-3 w-28 rounded" />
+        <Skeleton className="h-4 w-40 rounded-full" />
+        <Skeleton className="h-3 w-28 rounded-full" />
       </View>
     </View>
   );
@@ -97,14 +97,14 @@ function ProfileRow() {
     return (
       <View
         accessibilityRole="alert"
-        className="min-h-20 flex-row items-center gap-3 px-4 py-2.5"
+        className="min-h-20 flex-row items-center gap-3 px-4 py-3"
       >
         <PersonAvatar />
         <Text className="flex-1 text-body text-muted-foreground">
           {t("somethingWentWrong")}
         </Text>
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
           className="min-h-11"
           onPress={() => void refetch()}
@@ -159,7 +159,7 @@ export default function CabinetScreen() {
 
       <ScrollView
         className="flex-1"
-        contentContainerClassName="pt-1"
+        contentContainerClassName="gap-6 pt-1"
         contentContainerStyle={{ paddingBottom: tabBarSpace + 16 }}
         showsVerticalScrollIndicator={false}
       >
@@ -174,59 +174,61 @@ export default function CabinetScreen() {
         </MenuGroup>
 
         {isAuthenticated ? (
-          <>
-            <MenuGap />
-            <MenuGroup>
-              <MenuRow
-                icon={Bell}
-                label={t("account:notifications")}
-                chevron
-                onPress={() => router.push("/notifications")}
-              />
-              <MenuDivider />
-              <MyListingsRow />
-            </MenuGroup>
-          </>
+          <MenuGroup>
+            <MenuRow
+              icon={Bell}
+              label={t("account:notifications")}
+              chevron
+              onPress={() => router.push("/notifications")}
+            />
+            <MenuDivider />
+            <MyListingsRow />
+          </MenuGroup>
         ) : null}
 
-        <MenuGap />
         <MenuGroup>
           <LanguageRow />
           <MenuDivider />
           <ThemeRow />
         </MenuGroup>
 
-        <MenuGap />
+        {/* Help and About open screens in the app and take a chevron; the
+            legal pages open in the browser and take an outward arrow. */}
         <MenuGroup>
-        <MenuRow
-          icon={CircleHelp}
-          label={t("support:help")}
-          onPress={() => router.push("/help")}
-        />
-        <MenuDivider />
-        <MenuRow
-          icon={ShieldCheck}
-          label={t("account:termsOfService")}
-          onPress={() => openLegalPage(i18n.language, "terms")}
-        />
-        <MenuDivider />
-        <MenuRow
-          icon={FileText}
-          label={t("account:privacyPolicy")}
-          onPress={() => openLegalPage(i18n.language, "privacy")}
-        />
-        <MenuDivider />
-        <MenuRow
-          icon={ScrollText}
-          label={t("account:postingRules")}
-          onPress={() => openLegalPage(i18n.language, "posting-rules")}
-        />
-        <MenuDivider />
-        <MenuRow
-          icon={Info}
-          label={t("support:about")}
-          onPress={() => router.push("/about")}
-        />
+          <MenuRow
+            icon={CircleHelp}
+            label={t("support:help")}
+            chevron
+            onPress={() => router.push("/help")}
+          />
+          <MenuDivider />
+          <MenuRow
+            icon={ShieldCheck}
+            label={t("account:termsOfService")}
+            external
+            onPress={() => openLegalPage(i18n.language, "terms")}
+          />
+          <MenuDivider />
+          <MenuRow
+            icon={FileText}
+            label={t("account:privacyPolicy")}
+            external
+            onPress={() => openLegalPage(i18n.language, "privacy")}
+          />
+          <MenuDivider />
+          <MenuRow
+            icon={ScrollText}
+            label={t("account:postingRules")}
+            external
+            onPress={() => openLegalPage(i18n.language, "posting-rules")}
+          />
+          <MenuDivider />
+          <MenuRow
+            icon={Info}
+            label={t("support:about")}
+            chevron
+            onPress={() => router.push("/about")}
+          />
         </MenuGroup>
       </ScrollView>
     </TabScreen>

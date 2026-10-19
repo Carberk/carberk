@@ -24,7 +24,7 @@ export function ThemeRow() {
 
   return (
     <>
-      <MenuRow icon={Contrast} label={t("theme")} value={t(labelKeys[theme])} onPress={() => setOpen(true)} />
+      <MenuRow icon={Contrast} label={t("theme")} value={t(labelKeys[theme])} chevron onPress={() => setOpen(true)} />
       <OptionPickerSheet
         open={open}
         onOpenChange={setOpen}
