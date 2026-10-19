@@ -75,8 +75,10 @@ export default function ContactPhoneCodeScreen() {
   const [secondsRemaining, setSecondsRemaining] = useState(() =>
     parseInitialSeconds(firstParam(params.resendInSeconds)),
   );
-  const [error, setError] = useState<string | null>(null);
-  const [isBackoffError, setIsBackoffError] = useState(false);
+  const [error, setError] = useState<{
+    message: string;
+    kind: "backoff" | "other";
+  } | null>(null);
   const [needsNewCode, setNeedsNewCode] = useState(false);
   const [dailyLimit, setDailyLimit] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -96,10 +98,10 @@ export default function ContactPhoneCodeScreen() {
   }, [secondsRemaining]);
 
   useEffect(() => {
-    if (secondsRemaining !== 0 || !isBackoffError) return;
-    setError(null);
-    setIsBackoffError(false);
-  }, [isBackoffError, secondsRemaining]);
+    if (secondsRemaining === 0 && error?.kind === "backoff") {
+      setError(null);
+    }
+  }, [error, secondsRemaining]);
 
   useEffect(() => {
     if (phone) return;
@@ -140,7 +142,6 @@ export default function ContactPhoneCodeScreen() {
     if (!phone || nextCode.length !== OTP_LENGTH || isVerifying) return;
 
     setError(null);
-    setIsBackoffError(false);
     setIsVerifying(true);
     try {
       await confirm.mutateAsync({ phone, code: nextCode });
@@ -150,7 +151,7 @@ export default function ContactPhoneCodeScreen() {
       setCode("");
       lastSubmittedCode.current = null;
       const copy = getContactPhoneVerifyErrorCopy(verifyError, t);
-      setError(copy.message);
+      setError({ message: copy.message, kind: "other" });
       setNeedsNewCode(copy.needsNewCode);
       if (copy.needsNewCode) {
         // The code is dead, so what was left of its resend wait no longer
@@ -179,7 +180,6 @@ export default function ContactPhoneCodeScreen() {
   function handleCodeChange(value: string) {
     if (dailyLimit) return;
     setError(null);
-    setIsBackoffError(false);
     setCode(value);
   }
 
@@ -187,7 +187,6 @@ export default function ContactPhoneCodeScreen() {
     if (!phone || dailyLimit || isResending || secondsRemaining > 0) return;
 
     setError(null);
-    setIsBackoffError(false);
     setCode("");
     lastSubmittedCode.current = null;
     setIsResending(true);
@@ -207,16 +206,15 @@ export default function ContactPhoneCodeScreen() {
       // A backoff refusal carries the wait: the message says it and the
       // countdown holds the button, also for "Send a new code".
       if (copy.retryInSeconds != null) {
-        setIsBackoffError(true);
-        setError(
-          t("contactPhoneRateWait", {
+        setError({
+          message: t("contactPhoneRateWait", {
             time: formatResendWait(copy.retryInSeconds),
           }),
-        );
+          kind: "backoff",
+        });
         setSecondsRemaining(copy.retryInSeconds);
       } else {
-        setIsBackoffError(false);
-        setError(copy.message);
+        setError({ message: copy.message, kind: "other" });
       }
     } finally {
       setIsResending(false);
@@ -297,7 +295,7 @@ export default function ContactPhoneCodeScreen() {
                 accessibilityLiveRegion="polite"
                 className="flex-1 text-callout leading-snug text-destructive"
               >
-                {error}
+                {error.message}
               </Text>
             </View>
           ) : null}
