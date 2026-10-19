@@ -171,3 +171,10 @@ Each major surface has an explicit empty state — see [`ui/75-illustration-styl
 - My listings: "List your first car" + Sell CTA
 - Garage: "Add a car to your garage" + benefits explainer (post-MLP)
 - Notifications feed: "All caught up" (post-MLP)
+
+
+## Proposed dealer and center extension, 2026-10-14
+
+Target only, pending ADR and screen approval. The current native tab source uses Search, Favorites, Sell, Messages and Cabinet, with internal route names `(search)`, `favorites`, `sell`, `chat`, `services`. Cabinet opens a dealer workspace; there is no sixth main tab or separate dealer app. Business publishing uses the existing wizard, and ordinary detail keeps its Back/contact navigation. See [38](features/38-showroom.md) and [flow 67](flows/67-dealer-workspace-and-sharing.md).
+
+The worker portal is a responsive internal web experience with scoped inspection permissions, not a grant of full admin access. Cars come to centers; first launch has one center in Aşgabat. [50](features/50-reports-tier.md) and [flow 66](flows/66-diagnostic-inspection.md) define private buyer and public listing report journeys. Canonical public hostname, locale routes and HTTPS app associations remain decisions; older route tables illustrate target navigation and do not evidence shipped routes or reserve a new domain.

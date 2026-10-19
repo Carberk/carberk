@@ -8,7 +8,7 @@ Internal-only Next.js dashboard at `admin.auto.tm`. The MLP beta ships minimal m
 
 Bagtyýar (the admin persona) needs to:
 - Find and act on reported listings before they harm users
-- Verify dealerships so the PRO badge means something
+- Review dealership identity evidence for a truthful business indicator under [38](38-showroom.md), separate from vehicle inspection
 - Send announcements to users about new features or outages
 - Confirm the SMS gateway is healthy (5 phones humming = OTPs flowing)
 - Maintain catalog data (new car models, regions, colors)
@@ -216,3 +216,10 @@ A mobile admin UI would be cramped. Desktop web with shadcn/ui gives the room an
 | Reporter-facing status, edit/retract, appeals, support inbox | New trust/support PRD when shaped; this PRD only owns the admin side |
 | Per-reporter quotas, trust scores, reporting-rate analytics | [85 — Launch analytics](../ops/85-launch-analytics-plan.md) plus this PRD after beta evidence |
 | Admin role hierarchy, deprovision, read-only support accounts | [Feature 30 — Identity](./30-identity.md) plus this PRD; not S7 moderation |
+
+
+## Proposed dealer and center operations, 2026-10-14
+
+[38](38-showroom.md) proposes manual dealer application/invitation approval, separately from staff membership. [50](50-reports-tier.md) proposes center report preparation, review and authorized release. These capabilities are not implemented or activated by this document revision; material ADR decisions and scoped access contracts must precede execution.
+
+An inspection technician/reviewer is not a full marketplace admin. Reusing this app's UI infrastructure requires a separately authorized layout/API boundary; the current admin layout requires Marketplace Role admin and TOTP. Keep moderation authority, dealer business membership and inspection capabilities distinct. A business owner cannot read buyer-private reports. Define whether review needs a different human, staff elevation, support access/audit and retention before live use.

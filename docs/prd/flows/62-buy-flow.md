@@ -66,14 +66,14 @@ S8a adds saved-listing Favorites to this loop. Saved-search notifications, deale
 | Contact | Conversation is scoped to the listing |
 | Safety | Report listing/user is visible once minimal admin ships |
 
-Post-MLP trust candidates: PRO dealer badge, public Garage, response-time stats, inspection tier, richer moderation, seller history.
+Post-MLP candidates include public Garage, response-time stats, richer moderation and seller history. Proposed dealer identity and factual diagnostic reports are specified below; the earlier inspection-tier proposal is being reconciled.
 
 ## Failure modes (and mitigations)
 
 - **Maral can't find the right car** → Capture the repeated-search pain; shape saved searches only if this repeats.
 - **Seller doesn't reply** → Capture response-delay data; push already notifies the seller of new Messages.
 - **Seller is rude / scammer** → Report → admin moderation.
-- **Listing was misrepresented** → Report → admin review; inspection tier is a later trust bet.
+- **Listing was misrepresented** → Report → admin review; optional diagnostic reports are a separately gated service proposal.
 
 ## References
 
@@ -87,3 +87,17 @@ Post-MLP trust candidates: PRO dealer badge, public Garage, response-time stats,
 
 - Should the seller be able to hide their phone number until the buyer messages? (Post-MLP trust/UX decision)
 - Which beta metric is the strongest contact-quality signal: message sent, seller reply, or meeting confirmed?
+
+
+## Proposed dealer and diagnostic journey, 2026-10-14
+
+Target revision, pending ADR formalization and approved UI. Current release behavior above is not evidence these features exist.
+
+- Mixed results show private/dealer seller identity using existing cards. A dealer name opens its public showroom; seller-type filtering is explicit. See [38](../features/38-showroom.md).
+- Listing and showroom links allow public browser reading without installation or sign-in, once their real pages and native associations work. Sold/unavailable states remain truthful. See [flow 67](67-dealer-workspace-and-sharing.md).
+- A dated **public** diagnostic report is free for interested buyers to read. It describes observations at the recorded mileage/time, not a condition guarantee or accident-history certification. It does not boost ranking.
+- A buyer can instead request a private inspection with vehicle-owner authorization. The car comes to a center, initially the own Aşgabat center. Report access is limited to the commissioning buyer and authorized staff. The seller or another buyer does not gain access through Listing ownership or payment by someone else.
+- If buyer A receives a private report and declines the car, buyer B cannot unlock that document. B may request a new inspection. Declining the car alone does not undo the completed service; refunds, complaints and failed-service handling require an explicit policy before live bookings.
+- Seller-authorized public Listing inspections use the same inspection workflow with a different audience. All findings are released together; seller/dealer cannot select favorable results. Private-to-public conversion is excluded from the proposed first launch.
+
+[50 — Diagnostic reports](../features/50-reports-tier.md) and [flow 66](66-diagnostic-inspection.md) own consent, report state and service-readiness details. Buying the car remains an off-platform decision; diagnostic payment at the center is distinct from vehicle purchase, dealer access and any online payment system.

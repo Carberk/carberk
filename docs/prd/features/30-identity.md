@@ -62,10 +62,16 @@ Post-MLP profile additions: public Garage entries, blog posts, richer trust stat
 
 ### Dealership (post-MLP bet)
 
-- A user can apply to create a Dealership (form: name, city, logo upload, description, working hours)
-- Admin reviews and verifies → sets `verifiedAt` → PRO badge appears
-- Dealership owner can invite other users as members (role: `sales`)
-- A dealership has a public showroom page (see Feature 38)
+Proposed revision, 2026-10-14, pending material-decision ADR formalization. [38 — Dealer workspace and showroom](38-showroom.md) owns the capability and unresolved policies; [flow 67](../flows/67-dealer-workspace-and-sharing.md) owns the journeys.
+
+- A person keeps their personal sign-in and enters a business workspace from Cabinet. There is one Carberk app; no shared business login or separate dealer app.
+- Application/invitation requires manual approval before business access. It is not self-activation. Exact identity evidence, invitation lifecycle and last-owner recovery remain open.
+- Dealership Member owner/sales permissions stay separate from Marketplace Role. Owner manages membership/settings; sales members can manage business cars and claim enquiries.
+- Business inventory and shared enquiries belong to the business, with actual staff attribution. Joining never transfers personal inventory; leaving must not delete business inventory.
+- Dealer access is free. A checked business identity does not certify vehicle condition or buy a ranking advantage. Exact public verification wording remains to approve.
+- Current membership schema allows one Dealership per User. Multiple memberships, business-owned Listing deletion/retention, owner recovery and business contact-phone proof require explicit decisions and migrations before execution.
+
+Inspection staff permissions are a separate capability defined in [50](50-reports-tier.md). Dealership ownership never grants access to private buyer reports or the internal inspection portal. Existing admin TOTP guards are not a substitute for scoped technician/reviewer authorization.
 
 ### Account deletion (App Store hard requirement)
 

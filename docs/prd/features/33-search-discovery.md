@@ -212,3 +212,10 @@ Each needs its own decision and evidence from the release:
 ## Open questions
 
 - None open for the release journey. Brand logo sourcing is settled in [#350](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/350): brands without a cleared logo file get the letter fallback.
+
+
+## Proposed dealer and report extensions, 2026-10-14
+
+Pending material-decision ADR and approved screen reconciliation. [38](38-showroom.md) owns mixed private/dealer results, compact truthful dealer identity and an explicit seller-type filter. Use existing card components and filter draft/apply behavior. Dealer status, business availability confirmation and platform ownership do not boost ranking.
+
+[50](50-reports-tier.md) proposes factual dated public-report availability and an optional public-report filter. A private buyer inspection is absent from public cards, filters, counts and metadata. No tier/score or ranking advantage is activated. Existing visible sort behavior remains truthful; any future quality-ranking experiment needs a separate decision under the vision and [ADR-0021](../../adr/0021-feed-ranking-port.md).
