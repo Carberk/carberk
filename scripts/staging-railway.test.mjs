@@ -196,7 +196,8 @@ test('campaign receipts bind profile and candidate and never masquerade as publi
     const receipt = { ...good, ...(fault === 'candidate' ? { candidate: 'b'.repeat(40) } : {}), ...(fault === 'profile' ? { profile: 'listing-v1' } : {}), ...(fault === 'count' ? { identities: 20 } : {}) };
     const base = boundary();
     const fetch = async (url, options) => {
-      if (url === `${policy.origins.api}/readyz`) return { ok: true, json: async () => ({ status: 'ready', commitSha: candidate, environment: 'staging', checks: { postgres: 'ok', redis: 'ok', minio: 'ok' } }) };
+      if (url === `${policy.origins.api}/readyz` && network.onReadiness) { const run = network.onReadiness; network.onReadiness = null; await run(); }
+    if (url === `${policy.origins.api}/readyz`) return { ok: true, json: async () => ({ status: 'ready', commitSha: candidate, environment: 'staging', checks: { postgres: 'ok', redis: 'ok', minio: 'ok' } }) };
       const { query, variables } = JSON.parse(options.body);
       if (query.includes('deployment(id:')) return { ok: true, json: async () => ({ data: { deployment: { id: variables.id, status: 'SUCCESS', meta: { commitHash: candidate } } } }) };
       if (query.includes('latestDeployment')) return { ok: true, json: async () => ({ data: { serviceInstance: { latestDeployment: { id: `deployment-${variables.serviceId}`, status: 'SUCCESS' } } } }) };
@@ -312,6 +313,7 @@ async function businessLifecycle(t) {
   let seq = 0, tick = 0;
   const base = boundary();
   const fetch = async (url, options) => {
+    if (url === `${policy.origins.api}/readyz` && network.onReadiness) { const run = network.onReadiness; network.onReadiness = null; await run(); }
     if (url === `${policy.origins.api}/readyz`) return { ok: true, json: async () => ({ status: network.fault === 'readiness' ? 'starting' : 'ready', environment: 'staging', commitSha: network.runtime, checks: { postgres: 'ok', redis: 'ok', minio: 'ok' } }) };
     const { query, variables } = JSON.parse(options.body);
     let data;
@@ -620,4 +622,59 @@ test('business initial reset refuses operation binding changed during final atte
   await assert.rejects(control.operate(claim, 'reset'), /blocked/);
   assert.deepEqual(network.remoteKinds, []);
   assert.equal((await control.inspect()).reservation.operation.namespace, 'public');
+});
+
+
+for (const path of ['continuation', 'reset', 'fixture', 'restore', 'deploy']) {
+  for (const change of ['owner', 'namespace']) {
+    test(`business ${path} refuses changed ${change} during provider preflight before mutation`, async t => {
+      const { control, restart, claim, network, edit, ledger } = await businessLifecycle(t);
+      if (path === 'continuation') {
+        network.lostReset = true;
+        await assert.rejects(control.operate(claim, 'reset'), /blocked/);
+      }
+      if (path === 'restore') await control.operate(claim, 'reset');
+      const originalOperation = (await control.inspect()).reservation.operation?.id;
+      const mutate = () => edit(lease => {
+        if (change === 'owner') lease.owner = 'bob';
+        else lease.operation.namespace = 'public';
+      });
+      // Controller checks finish first. Change the remote ledger from inside
+      // the adapter's actual provider attestation, after durable intent exists.
+      const duringProvider = async () => {
+        const operation = (await ledger.read()).state.reservation.operation;
+        if (!operation || (path !== 'continuation' && !network.controllerAttested)) {
+          if (operation) network.controllerAttested = true;
+          network.onAttestation = duringProvider;
+          return;
+        }
+        // Continuation also has one controller attestation before the adapter.
+        if (path === 'continuation' && !network.controllerAttested) {
+          network.controllerAttested = true; network.onAttestation = duringProvider; return;
+        }
+        await mutate();
+      };
+      network.onAttestation = duringProvider;
+      const resets = network.remoteKinds.filter(kind => kind === 'reset').length;
+      const fixtures = network.remoteKinds.filter(kind => kind === 'fixture').length;
+      const deployments = network.deploys.length;
+      const invoke = () => path === 'restore' ? restart().restore(claim)
+        : restart().operate(claim, path === 'continuation' ? 'reset' : path);
+      await assert.rejects(invoke());
+      assert.equal(network.remoteKinds.filter(kind => kind === 'reset').length, resets, 'no stale reset');
+      assert.equal(network.remoteKinds.filter(kind => kind === 'fixture').length, fixtures, 'no stale fixture');
+      assert.equal(network.deploys.length, deployments, 'no stale deployment');
+      const lease = (await control.inspect()).reservation;
+      assert.ok(lease.operation, 'durable intent retained');
+      if (originalOperation) assert.equal(lease.operation.id, originalOperation, 'original reset ID retained');
+      assert.equal(change === 'owner' ? lease.owner : lease.operation.namespace, change === 'owner' ? 'bob' : 'public');
+    });
+  }
+}
+
+test('business reset refuses owner changed during final runtime readiness before remote mutation', async t => {
+  const { control, claim, network, edit } = await businessLifecycle(t);
+  network.onReadiness = () => edit(lease => { lease.owner = 'bob'; });
+  await assert.rejects(control.operate(claim, 'reset'));
+  assert.equal(network.remoteKinds.filter(kind => kind === 'reset').length, 0);
 });
