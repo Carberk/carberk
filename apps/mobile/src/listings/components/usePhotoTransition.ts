@@ -36,12 +36,14 @@ export function usePhotoTransition({ origin, getReturnGeometry, onTileHidden, on
   const measure = useCallback(() => {
     root.current?.measureInWindow((x, y) => {
       rootOrigin.current = { x, y };
+      debugFlight("[DEBUG-869-flight] root-measure", JSON.stringify({ x, y }));
       pager.current?.measureInWindow((px, py, width, height) => {
+        debugFlight("[DEBUG-869-flight] page-measure", JSON.stringify({ px, py, width, height }));
         if (width > 0 && height > 0) setPage({ x: px - x, y: py - y, width, height });
       });
     });
   }, []);
-  useEffect(() => { showRef.current = () => { initialOrigin.current = origin; setShown(true); measure(); }; }, [showRef, measure, origin]);
+  useEffect(() => { showRef.current = () => { debugFlight("[DEBUG-869-flight] onShow", JSON.stringify({ originAvailable: !!origin, reduced })); initialOrigin.current = origin; setShown(true); measure(); }; }, [showRef, measure, origin]);
   useEffect(() => {
     if (!shown || !page || reduced || !initialOrigin.current) return;
     setGeometry(convert(initialOrigin.current));
@@ -57,6 +59,7 @@ export function usePhotoTransition({ origin, getReturnGeometry, onTileHidden, on
     chrome.value = withTiming(1, timing("fast", "enter"));
   }, [onTileHidden, chrome]);
   useEffect(() => {
+    debugFlight("[DEBUG-869-flight] open-effect", JSON.stringify({ shown, displayed, hasPage: !!page, reduced, hasOrigin: !!initialOrigin.current }));
     if (!shown || closing.current) return;
     if (reduced || !initialOrigin.current) {
       opacity.value = withTiming(1, { duration: duration.fast, reduceMotion: ReduceMotion.Never });
@@ -106,7 +109,13 @@ export function usePhotoTransition({ origin, getReturnGeometry, onTileHidden, on
     transform: [{ translateX: drag.value.x }, { translateY: drag.value.y }, { scale: 1 - 0.25 * Math.min(Math.abs(drag.value.y) / (page?.height ?? 1), 1) }],
   }));
   const cancelDrag = useCallback(() => { drag.value = reduced ? { x: 0, y: 0 } : withSpring({ x: 0, y: 0 }, spring.snappy); }, [drag, reduced]);
-  const onPageDisplay = useCallback(() => { pageDisplayed.current = true; if (flightEnded.current) finishOpen(); }, [finishOpen]);
+  const onPageDisplay = useCallback(() => { debugFlight("[DEBUG-869-flight] page-display"); pageDisplayed.current = true; if (flightEnded.current) finishOpen(); }, [finishOpen]);
   const onError = useCallback(() => { if (closing.current) return; opacity.value = 1; pageDisplayed.current = true; finishOpen(); }, [opacity, finishOpen]);
-  return { onPageDisplay, onError, root, pager, measure, page, geometry, overlay, progress, drag, close, cancelDrag, backdropStyle, contentStyle, chromeStyle, pagerStyle, onDisplay: useCallback(() => setDisplayed(true), []) };
+  return { onPageDisplay, onError, root, pager, measure, page, geometry, overlay, progress, drag, close, cancelDrag, backdropStyle, contentStyle, chromeStyle, pagerStyle, onDisplay: useCallback(() => { debugFlight("[DEBUG-869-flight] overlay-display"); setDisplayed(true); }, []) };
+}
+
+function debugFlight(...args: unknown[]) {
+  const message = args.map(String).join(" ");
+  console.log(message);
+  fetch(`http://127.0.0.1:8891/log?m=${encodeURIComponent(message)}`).catch(() => {});
 }

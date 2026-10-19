@@ -102,12 +102,14 @@ export function DetailPhotoStrip({ photos, banner, onPressPhoto, ref, hiddenInde
   const measurePhoto = useCallback((index: number, callback: (geometry: PhotoGeometry | null) => void) => {
     const photo = photos[index];
     const node = tiles.current.get(index);
+    debugFlight("[DEBUG-869-flight] strip-entry", JSON.stringify({ index, hasTileRef: !!node, hasContainerRef: !!container.current, loadedRatio: ratios.current.get(index) }));
     if (!photo || photo.pending || !node || !container.current) { callback(null); return; }
     container.current.measureInWindow((sx, sy, sw, sh) => {
       node.measureInWindow((x, y, width, height) => {
         if (width <= 0 || height <= 0) { callback(null); return; }
         const full = { x, y, width, height };
         const visible = intersectRect(full, intersectRect({ x: sx, y: sy, width: sw, height: sh }, { x: 0, y: visibleTop, width: viewport, height: Math.max(0, windowHeight - visibleTop) }));
+        debugFlight("[DEBUG-869-flight] strip-callback", JSON.stringify({ tile: full, visible, ratioKnown: !!(photo.width && photo.height) || ratios.current.has(index), ratio: photo.width && photo.height ? photo.width / photo.height : ratios.current.get(index) }));
         const ends: PhotoGeometry["radii"] = [index === 0 ? 12 : 0, index === photos.length - 1 ? 12 : 0, index === photos.length - 1 ? 12 : 0, index === 0 ? 12 : 0];
         callback({ tile: full, visible, radii: clippedRadii(full, visible, ends), ratioKnown: !!(photo.width && photo.height) || ratios.current.has(index), uri: uris.current.get(index) ?? listingPhotoUrl(photo, "detail"), ratio: photo.width && photo.height ? photo.width / photo.height : ratios.current.get(index) ?? 4 / 3 });
       });
@@ -251,4 +253,10 @@ const STRIP_SEAM = { width: DETAIL_STRIP_SEAM };
 
 function StripSeam() {
   return <View style={STRIP_SEAM} />;
+}
+
+function debugFlight(...args: unknown[]) {
+  const message = args.map(String).join(" ");
+  console.log(message);
+  fetch(`http://127.0.0.1:8891/log?m=${encodeURIComponent(message)}`).catch(() => {});
 }

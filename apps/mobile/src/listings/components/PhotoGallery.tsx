@@ -39,10 +39,10 @@ export function PhotoGallery({
 
   const prepareReturn = useCallback((index: number) => {
     stripRef.current?.scrollToPhoto(index);
-    requestAnimationFrame(() => stripRef.current?.measurePhoto(index, (geometry) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => stripRef.current?.measurePhoto(index, (geometry) => {
       if (geometry) returns.current.set(index, geometry);
       else returns.current.delete(index);
-    }));
+    })));
   }, []);
   const openViewer = useCallback((index: number) => {
     setOrigin(null);
@@ -50,11 +50,13 @@ export function PhotoGallery({
     const request = ++openingRequest.current;
     let presented = false;
     const present = () => {
+      debugFlight("[DEBUG-869-flight] present", JSON.stringify({ presented }));
       if (presented || request !== openingRequest.current) return;
       presented = true;
       setViewerIndex(index);
     };
     stripRef.current?.measurePhoto(index, (geometry) => {
+      debugFlight("[DEBUG-869-flight] source-callback", JSON.stringify({ presented, geometryAvailable: !!geometry, ratioKnown: geometry?.ratioKnown }));
       if (presented || request !== openingRequest.current) return;
       if (geometry) returns.current.set(index, geometry);
       setOrigin(geometry?.ratioKnown === false ? null : geometry);
@@ -90,4 +92,10 @@ export function PhotoGallery({
       )}
     </>
   );
+}
+
+function debugFlight(...args: unknown[]) {
+  const message = args.map(String).join(" ");
+  console.log(message);
+  fetch(`http://127.0.0.1:8891/log?m=${encodeURIComponent(message)}`).catch(() => {});
 }
