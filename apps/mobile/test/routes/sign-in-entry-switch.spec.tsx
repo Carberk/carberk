@@ -129,3 +129,25 @@ it("preserves completed sign-in replay when the entry unmounts", () => {
   expect(cancel).not.toHaveBeenCalled();
   expect(useAuthIntentStore.getState().replayAction).toEqual({ kind: "favorite", listingId: "listing" });
 });
+
+it("does not reopen Code when a pending request finishes after the entry is closed", async () => {
+  let finish!: () => void;
+  const waiting = new Promise<void>((resolve) => { finish = resolve; });
+  let requested = false;
+  server.use(http.post("http://localhost:3006/api/v1/auth/otp/request", async () => {
+    requested = true;
+    await waiting;
+    return HttpResponse.json({ requestId: "00000000-0000-4000-8000-000000000001", resendInSeconds: 60 });
+  }));
+  pendingIntent();
+  routeParams.phone = "+99361234567";
+  const view = renderMobile(<PhoneScreen />);
+  await act(async () => { fireEvent.press(view.getByRole("button", { name: "Get code" })); });
+  await vi.waitFor(() => expect(requested).toBe(true));
+  fireEvent.press(view.getByRole("button", { name: "Close" }));
+  view.unmount();
+  await act(async () => { finish(); });
+  await vi.waitFor(() => expect(view.queryClient.getMutationCache().getAll()[0]?.state.status).toBe("success"));
+  expect(routerMock.push).not.toHaveBeenCalled();
+  expect(useAuthIntentStore.getState().intent).toBeNull();
+});
