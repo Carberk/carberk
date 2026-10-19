@@ -196,8 +196,7 @@ test('campaign receipts bind profile and candidate and never masquerade as publi
     const receipt = { ...good, ...(fault === 'candidate' ? { candidate: 'b'.repeat(40) } : {}), ...(fault === 'profile' ? { profile: 'listing-v1' } : {}), ...(fault === 'count' ? { identities: 20 } : {}) };
     const base = boundary();
     const fetch = async (url, options) => {
-      if (url === `${policy.origins.api}/readyz` && network.onReadiness) { const run = network.onReadiness; network.onReadiness = null; await run(); }
-    if (url === `${policy.origins.api}/readyz`) return { ok: true, json: async () => ({ status: 'ready', commitSha: candidate, environment: 'staging', checks: { postgres: 'ok', redis: 'ok', minio: 'ok' } }) };
+      if (url === `${policy.origins.api}/readyz`) return { ok: true, json: async () => ({ status: 'ready', commitSha: candidate, environment: 'staging', checks: { postgres: 'ok', redis: 'ok', minio: 'ok' } }) };
       const { query, variables } = JSON.parse(options.body);
       if (query.includes('deployment(id:')) return { ok: true, json: async () => ({ data: { deployment: { id: variables.id, status: 'SUCCESS', meta: { commitHash: candidate } } } }) };
       if (query.includes('latestDeployment')) return { ok: true, json: async () => ({ data: { serviceInstance: { latestDeployment: { id: `deployment-${variables.serviceId}`, status: 'SUCCESS' } } } }) };
