@@ -3,12 +3,12 @@
 Usage: python3 prove.py /tmp/owner-only-config.json /tmp/sanitized-evidence.json
 Requires explicit coordinator ready/seed confirmation. Never reseeds an environment.
 """
-import hashlib, json, os, pathlib, sys, urllib.request, urllib.error, urllib.parse, uuid, time
+import hashlib, json, os, pathlib, re, sys, threading, urllib.request, urllib.error, urllib.parse, uuid, time
 from datetime import datetime, timezone
 
 API = 'https://api-autotm-rewrite-pr-546.up.railway.app/api/v1'
 MEDIA = 'https://minio-autotm-rewrite-pr-546.up.railway.app'
-SHA = '152befd62451d11ad9dee7c620107f15e48a7351'
+SHA = 'b7ce7568b9a447cb9b109e6bf5b0063dfbf303b2'
 DIR = pathlib.Path(__file__).resolve().parent
 ROWS = []
 OUT = pathlib.Path(sys.argv[2])
@@ -18,13 +18,17 @@ assert CONF['commitSha'] == SHA
 assert CONF['environmentId'] == '6f951120-4ee3-4b03-8520-b64e12e8b354'
 assert pathlib.Path(sys.argv[1]).stat().st_mode & 0o077 == 0
 assert CONF['ownerToken'] != CONF['foreignToken']
+assert CONF['apiDeploymentId'] == '1f81f0df-8a3d-4307-90b6-ca2dea1129f3'
+assert CONF['workerDeploymentId'] == '3d763955-afaa-4d4e-a5a6-f56019de3472'
 IMAGE = (DIR / 'proof.jpg').read_bytes()
 EVIDENCE = {'appCommit': SHA, 'api': API, 'media': MEDIA,
  'environmentId': CONF['environmentId'], 'apiDeploymentId': CONF['apiDeploymentId'],
  'workerDeploymentId': CONF.get('workerDeploymentId'),
  'startedAt': datetime.now(timezone.utc).isoformat(),
  'fixture': {'bytes': len(IMAGE), 'sha256': hashlib.sha256(IMAGE).hexdigest(), 'contentType': 'image/jpeg'},
- 'states': ROWS, 'result': 'running'}
+ 'states': ROWS, 'notExercised': [], 'result': 'running'}
+
+PENDING_KEY=re.compile(r'^pending/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/original\.(jpg|webp|mp4)$')
 
 def save():
     OUT.write_text(json.dumps(EVIDENCE, indent=2)+'\n')
@@ -34,8 +38,8 @@ def check(state, ok, **facts):
     save()
     if not ok: raise AssertionError(state)
 
-def http(url, method='GET', body=None, token=None, content_type=None):
-    time.sleep(1.3)  # Below 50/min, leaving headroom in the shared 60/min gate.
+def http(url, method='GET', body=None, token=None, content_type=None, pace=True):
+    if pace: time.sleep(1.3)  # Below 50/min, leaving headroom in the shared 60/min gate.
     headers={'User-Agent': 'autotm-536-private-storage-proof'}
     if token: headers['Authorization']='Bearer '+token
     if body is not None:
@@ -113,6 +117,7 @@ def attach(label,token,listing,key,expected=201,error=None):
 
 try:
     status,ready,_=http(API.removesuffix('/api/v1')+'/readyz')
+    EVIDENCE['readyzBefore']={'at':datetime.now(timezone.utc).isoformat(),'status':status,'body':ready}
     check('exact PR readyz',status==200 and ready.get('commitSha')==SHA and ready.get('environment')=='auto.tm-rewrite-pr-546' and ready.get('status')=='ready',status=status,readyz=ready)
     # Catalog reads select real seeded IDs without reading private database credentials.
     brands=api('catalog brands','/catalog/brands?limit=100')['items']
@@ -157,12 +162,76 @@ try:
     for name in ('thumbnail','list','detail','fullscreen'): head('removed variant '+name,key.rsplit('/',1)[0]+'/'+name+'.jpg',404)
     head('foreign original survives owner removal',foreign_key,original=True)
     head('fresh published original survives owner removal',fresh,original=True)
+    # Cleanup authority (ADR-0079, second fix round): only exact pending/<UUIDv4>/original.(jpg|webp|mp4).
+    check('proof keys have the exact cleanup shape',all(PENDING_KEY.match(k) for k in (key,bootstrap,fresh,foreign_key)),
+          keys=[key,bootstrap,fresh,foreign_key])
+    check('removed original and bootstrap original are in different directories',key.rsplit('/',1)[0]!=bootstrap.rsplit('/',1)[0],
+          removedDirectory=key.rsplit('/',1)[0],bootstrapDirectory=bootstrap.rsplit('/',1)[0])
+    head('same Listing sibling original survives owner removal',bootstrap,original=True)
+    for name in ('thumbnail','list','detail','fullscreen'): head('sibling variant survives owner removal '+name,bootstrap.rsplit('/',1)[0]+'/'+name+'.jpg')
     api('cleanup own rejected draft','/listings/drafts/'+bad_draft,foreign,'DELETE',expected=200)
+    # Concurrent publish versus attach of the same upload. The attach start is staggered
+    # by a fixed delay per round so it can land inside publication's variant-generation window.
+    race_cleanup=[]
+    for round_no,delay in enumerate((0.0,0.25,0.6),1):
+        label='race %d'%round_no
+        rk=upload(label,owner)
+        rd=draft(label,owner,rk)
+        results={}
+        barrier=threading.Barrier(2)
+        def fire(name,path,body,wait):
+            try:
+                barrier.wait(timeout=30)
+                if wait: time.sleep(wait)
+                s,d,_=http(API+path,'POST',body,owner,pace=False)
+                c=d.get('code') if isinstance(d,dict) else None
+                results[name]={'status':s,'code':c,'id':d.get('id') if isinstance(d,dict) else None}
+            except Exception as failure:
+                results[name]={'status':None,'code':None,'error':type(failure).__name__}
+        threads=[threading.Thread(target=fire,args=('publish','/listings/drafts/'+rd+'/publish',{},0.0)),
+                 threading.Thread(target=fire,args=('attach','/listings/'+first+'/media/attach',{'key':rk,'kind':'image','sortOrder':2},delay))]
+        for t in threads: t.start()
+        for t in threads: t.join(timeout=120)
+        pub=results.get('publish',{}); att=results.get('attach',{})
+        statuses=[pub.get('status'),att.get('status')]
+        winner=('publish' if pub.get('status')==201 else 'attach' if att.get('status')==201 else None)
+        loser={'publish':att,'attach':pub}.get(winner)
+        check(label+' exactly one adopts and the loser gets the mapped conflict, not a 5xx',
+              sorted(statuses,key=lambda x:(x is None,x))==[201,409] and loser.get('code')=='UPLOAD_ALREADY_ATTACHED'
+              and all(isinstance(x,int) and x<500 for x in statuses),
+              key=rk,attachDelaySeconds=delay,publishStatus=pub.get('status'),publishCode=pub.get('code'),
+              attachStatus=att.get('status'),attachCode=att.get('code'),winner=winner,loserCode=loser.get('code') if loser else None)
+        if winner=='attach':
+            race_cleanup.append((att['id'],rk))
+            api(label+' loser draft cleanup','/listings/drafts/'+rd,owner,'DELETE',expected=200)
+        else:
+            pd=api(label+' publish winner readback','/listings/'+pub['id'],owner)
+            check(label+' publish winner owns exactly one media row for the key',sum(m['key']==rk for m in pd['media'])==1,listingId=pub['id'],key=rk)
+    for media_id,rk in race_cleanup:
+        api('race attach winner removal','/listings/'+first+'/media/'+media_id,owner,'DELETE',expected=200)
+        head('race attach winner original deleted',rk,404)
+    head('bootstrap original survives race cleanup',bootstrap,original=True)
+    EVIDENCE['notExercised']=[
+      {'state':'legacy chat-namespace cleanup','reason':'Needs a legacy ListingMedia row whose key is chat-attachments/<conversation>/<upload>/original.mp4 with a backfilled upload. Attach now requires Listing presign provenance (forged keys return UPLOAD_NOT_AVAILABLE above), so plain HTTP cannot create it without a database fixture mutation. Covered by hosted pr run 37017439151 (MediaOwnership.e2e.spec.ts and mediaCleanupPrefix.spec.ts).'},
+      {'state':'which branch the publish loser took','reason':'Publication pre-checks adoption and also maps a PrismaPg P2002 constraint at commit; both return 409 UPLOAD_ALREADY_ATTACHED, so HTTP cannot tell the branches apart. The deterministic real-Postgres race that reaches the P2002 branch is in hosted pr run 37017439151.'},
+      {'state':'mp4 original cleanup','reason':'Video attach needs a real video fixture and poster; not uploaded to avoid fabricating video bytes. Exact-key mp4 matching is covered by mediaCleanupPrefix.spec.ts in the hosted run.'}]
     EVIDENCE['result']='pass'
 except Exception as failure:
     # Avoid exception text, which can include signed URLs or auth-containing network data.
     EVIDENCE['result']='fail'; EVIDENCE['failureType']=type(failure).__name__
 finally:
-    EVIDENCE['finishedAt']=datetime.now(timezone.utc).isoformat(); save()
+    try:
+        status,ready,_=http(API.removesuffix('/api/v1')+'/readyz')
+        EVIDENCE['readyzAfter']={'at':datetime.now(timezone.utc).isoformat(),'status':status,'body':ready}
+        same=(status==200 and ready.get('commitSha')==SHA and ready.get('environment')=='auto.tm-rewrite-pr-546' and ready.get('status')=='ready')
+        ROWS.append({'state':'exact PR readyz after run','result':'pass' if same else 'fail','status':status,'readyz':ready})
+        if not same: EVIDENCE['result']='fail'
+    except Exception as failure:
+        ROWS.append({'state':'exact PR readyz after run','result':'fail','failureType':type(failure).__name__})
+        EVIDENCE['result']='fail'
+    EVIDENCE['finishedAt']=datetime.now(timezone.utc).isoformat()
+    EVIDENCE['counts']={'passed':sum(r['result']=='pass' for r in ROWS),'failed':sum(r['result']=='fail' for r in ROWS),
+                        'notExercised':len(EVIDENCE['notExercised'])}
+    save()
 print(json.dumps({'result':EVIDENCE['result'],'states':len(ROWS),'evidence':str(OUT)}))
 sys.exit(0 if EVIDENCE['result']=='pass' else 1)
