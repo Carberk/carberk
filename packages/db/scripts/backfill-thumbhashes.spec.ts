@@ -1,6 +1,8 @@
 import { GetObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import type * as S3Sdk from "@aws-sdk/client-s3";
+import { ListingsSchemas } from "@auto-tm/contracts";
 import sharp from "sharp";
+import { thumbHashToAverageRGBA } from "thumbhash";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { main } from "./backfill-thumbhashes";
@@ -72,7 +74,9 @@ vi.mock("pg", () => ({ Pool: class {
   }
 } }));
 
-const BLUE_HASH = "2yMBBYCIh4iHiHeAiId4dXh3f4f4";
+/** A hash already stored on a fixture row; the script must leave it as it is. */
+const EXISTING_COVER = "2yMBBYCIh4iHiHeAiId4dXh3f4f4";
+const BLUE = { r: 10, g: 120, b: 200 };
 const EXISTING = "1fsDBYCIiIiHiIdweIeHh4d4cIgH";
 const CHAT_KEY = "chat-attachments/7d0c1a52-3b64-4e8f-9a17-5c2e8f1b6d90/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.webp";
 
@@ -94,9 +98,22 @@ async function seedConvertedEnvironment() {
     { id: "g3", kind: "post_ref", metadata: { listingId: "l1", coverMediaKey: "pending/a/original.webp" }, deletedAt: null },
     { id: "g4", kind: "image", metadata: { key: CHAT_KEY }, deletedAt: new Date("2026-10-01T00:00:00Z") },
     { id: "g6", kind: "post_ref", metadata: { listingId: "l3", coverMediaKey: "pending/v/video.mp4" }, deletedAt: null },
-    { id: "g7", kind: "post_ref", metadata: { listingId: "l2", coverMediaKey: "pending/b/original.webp", coverThumbHash: BLUE_HASH }, deletedAt: null },
+    { id: "g7", kind: "post_ref", metadata: { listingId: "l2", coverMediaKey: "pending/b/original.webp", coverThumbHash: EXISTING_COVER }, deletedAt: null },
   ];
   state.users = [{ avatarKey: "profile/u1/original.webp", avatarUrl: null }];
+}
+
+/**
+ * What a ThumbHash of a solid-colour fixture must show on every platform:
+ * the contract's encoding and the fixture's colour. Exact bytes differ with
+ * libvips' resize on each platform, so they are not pinned.
+ */
+function expectPreviewOf(value: unknown, colour: { r: number; g: number; b: number }) {
+  expect(ListingsSchemas.ThumbHashSchema.safeParse(value).success).toBe(true);
+  const average = thumbHashToAverageRGBA(Buffer.from(String(value), "base64"));
+  expect(average.r).toBeCloseTo(colour.r / 255, 1);
+  expect(average.g).toBeCloseTo(colour.g / 255, 1);
+  expect(average.b).toBeCloseTo(colour.b / 255, 1);
 }
 
 const snapshot = () => structuredClone({ media: state.media, messages: state.messages });
@@ -114,11 +131,14 @@ describe("ThumbHash backfill operator script", () => {
 
     await main(["apply"]);
 
-    expect(state.media.map((row) => [row.id, row.thumbHash])).toEqual([["m1", BLUE_HASH], ["m2", EXISTING], ["m3", null]]);
+    // m1 and g1 hold the same stored bytes, so they get the same hash on any platform.
+    const filled = state.media.find((row) => row.id === "m1")?.thumbHash;
+    expectPreviewOf(filled, BLUE);
+    expect(state.media.map((row) => [row.id, row.thumbHash])).toEqual([["m1", filled], ["m2", EXISTING], ["m3", null]]);
     expect(state.messages.map((row) => [row.id, row.metadata?.["thumbHash"]])).toEqual([
-      ["g1", BLUE_HASH], ["g2", EXISTING], ["g3", undefined], ["g4", undefined], ["g6", undefined], ["g7", undefined],
+      ["g1", filled], ["g2", EXISTING], ["g3", undefined], ["g4", undefined], ["g6", undefined], ["g7", undefined],
     ]);
-    expect(state.messages[0]?.metadata).toEqual({ key: CHAT_KEY, width: 300, height: 200, thumbHash: BLUE_HASH });
+    expect(state.messages[0]?.metadata).toEqual({ key: CHAT_KEY, width: 300, height: 200, thumbHash: filled });
   });
 
   it("changes nothing when applied again, and verify then passes", async () => {
@@ -166,7 +186,7 @@ describe("ThumbHash backfill operator script", () => {
 
     await expect(main(["apply"])).rejects.toThrow("pending/a/original.webp");
 
-    expect(state.messages[0]?.metadata?.["thumbHash"]).toBe(BLUE_HASH);
+    expectPreviewOf(state.messages[0]?.metadata?.["thumbHash"], BLUE);
     await expect(main(["verify"])).rejects.toThrow(/1 Listing photos, 0 image Messages and 1 Listing-reference Messages still lack a ThumbHash/);
   });
 
@@ -175,8 +195,10 @@ describe("ThumbHash backfill operator script", () => {
 
     await main(["apply"]);
 
+    const cover = state.media.find((row) => row.id === "m1")?.thumbHash;
+    expectPreviewOf(cover, BLUE);
     expect(state.messages.map((row) => [row.id, row.metadata?.["coverThumbHash"]])).toEqual([
-      ["g1", undefined], ["g2", undefined], ["g3", BLUE_HASH], ["g4", undefined], ["g6", undefined], ["g7", BLUE_HASH],
+      ["g1", undefined], ["g2", undefined], ["g3", cover], ["g4", undefined], ["g6", undefined], ["g7", EXISTING_COVER],
     ]);
     await expect(main(["verify"])).resolves.toBeUndefined();
   });
