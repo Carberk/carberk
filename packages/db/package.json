@@ -29,23 +29,27 @@
     "test:unit": "vitest run --exclude '**/*.e2e.spec.ts' --exclude '**/tests/**' --passWithNoTests"
   },
   "dependencies": {
-    "@prisma/client": "^7.6.0",
     "@prisma/adapter-pg": "^7.6.0",
+    "@prisma/client": "^7.6.0",
     "pg": "^8.13.1"
   },
   "peerDependencies": {
     "@nestjs/common": "^11.1.0"
   },
   "devDependencies": {
-    "@auto-tm/tsconfig": "workspace:*",
     "@auto-tm/eslint-config": "workspace:*",
-    "prisma": "^7.6.0",
-    "tsx": "^4.19.2",
-    "vitest": "^2.1.8",
+    "@auto-tm/tsconfig": "workspace:*",
+    "@aws-sdk/client-s3": "^3.1048.0",
     "@testcontainers/postgresql": "^10.16.0",
-    "@types/pg": "^8.11.10",
     "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
+    "eslint": "^9.18.0",
+    "prisma": "^7.6.0",
+    "sharp": "^0.34.1",
+    "simple-icons": "16.33.0",
+    "testcontainers": "^10.16.0",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.3",
-    "eslint": "^9.18.0"
+    "vitest": "^2.1.8"
   }
 }
