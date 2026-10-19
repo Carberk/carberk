@@ -8,7 +8,7 @@ import { useViewer } from "../../src/auth/useViewer";
 import { useAuthIntentStore } from "../../src/auth/intentStore";
 import { useEngineTypes } from "../../src/api/catalog/useEngineTypes";
 import { useTransmissions } from "../../src/api/catalog/useTransmissions";
-import { ListingLargeCard, ListingLargeCardSkeleton } from "../../src/listings/feed/ListingLargeCard";
+import { FavoriteListingCard, FavoriteListingCardSkeleton } from "../../src/listings/favorites/FavoriteListingCard";
 import { useFeedCatalogMaps } from "../../src/listings/feed/useFeedCatalogMaps";
 import { HideSoldToggle } from "../../src/listings/favorites/HideSoldToggle";
 import { useFavoritesView } from "../../src/listings/favorites/useFavoritesView";
@@ -96,7 +96,7 @@ function FavoritesContent({ view }: { view: ReturnType<typeof useFavoritesView> 
       <>
         {toggle}
         <View accessibilityLabel={t("loading")} className="gap-2">
-          {[0, 1, 2].map((id) => <ListingLargeCardSkeleton key={id} withActions />)}
+          {[0, 1, 2].map((id) => <FavoriteListingCardSkeleton key={id} />)}
         </View>
       </>
     );
@@ -125,7 +125,7 @@ function FavoritesContent({ view }: { view: ReturnType<typeof useFavoritesView> 
       data={items}
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => (
-        <ListingLargeCard
+        <FavoriteListingCard
           listing={item}
           onPress={handlePress}
           brandName={catalogMaps.brandName(item.brandId)}

@@ -5,11 +5,17 @@ import { useTranslation } from "react-i18next";
 
 import { formatPriceRange } from "../formatPrice";
 
-import { BackButton, StackHeader } from "@/components/navigation/StackHeader";
-import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
+import { BackButton, HeaderButton, StackHeader } from "@/components/navigation/StackHeader";
 import { Text } from "@/components/ui/text";
+import { tabularFigures } from "@/lib/font";
 
+/**
+ * The Results header: the circular back button, the matching count as the
+ * title, and under it two quiet lines, the price range of the matches and the
+ * chosen sort (one line cannot hold both in Turkmen or Russian without
+ * cutting the sort). Sort is a circular button on the trailing edge, like
+ * back; Results has no other header action.
+ */
 export function ResultsHeader({ count, sort, onSort, onBack }: {
   count?: ListingsSchemas.ListingCountResponse; sort: ListingsSchemas.FeedSort; onSort: () => void; onBack: () => void;
 }) {
@@ -19,17 +25,13 @@ export function ResultsHeader({ count, sort, onSort, onBack }: {
   return (
     <StackHeader
       leading={<BackButton onPress={onBack} accessibilityLabel={t("back")} />}
-      trailing={
-        // Sort names itself, so it is a tonal capsule of the header buttons' height, not a bare glyph.
-        <Button variant="secondary" className="h-11 gap-1.5 rounded-full px-4" onPress={onSort} accessibilityLabel={t("resultsSort")}>
-          <Icon as={ArrowDownUp} className="size-4 text-foreground" />
-          <Text className="text-callout">{t("resultsSort")}</Text>
-        </Button>
-      }
+      trailing={<HeaderButton icon={ArrowDownUp} onPress={onSort} accessibilityLabel={t("resultsSort")} />}
     >
       <View className="min-w-0 flex-1">
-        <Text className="font-heading text-headline font-semibold text-foreground" numberOfLines={1}>{count ? t("listingsCount", { total: count.totalMatching }) : t("carsBrowseTitle")}</Text>
-        {range ? <Text className="text-caption text-muted-foreground" numberOfLines={1}>{range}</Text> : null}
+        <Text className="font-heading text-subhead font-semibold text-foreground" style={tabularFigures} numberOfLines={1}>
+          {count ? t("listingsCount", { total: count.totalMatching }) : t("carsBrowseTitle")}
+        </Text>
+        {range ? <Text className="text-caption text-muted-foreground" style={tabularFigures} numberOfLines={1}>{range}</Text> : null}
         <Text className="text-caption text-muted-foreground" numberOfLines={1}>{t(`resultsSort_${sort}`)}</Text>
       </View>
     </StackHeader>

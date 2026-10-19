@@ -32,10 +32,11 @@ interface ListingGridCardProps {
 }
 
 /**
- * Home "New listings" card (32 — Listings, Cards; Auto.ru AR-01-002): one
- * raised object. A 3:2 photo fills its top edge to edge with ♡ on it and the
- * photo count when there is more than one; below, the price is the loudest
- * line, "Brand Model" a step quieter, and "year, km" or "year, New" quietest.
+ * Home "New listings" card (32 — Listings, Cards; Auto.ru AR-01-002). The
+ * photo is the card: a 3:2 picture rounded on all four corners, with ♡ on it
+ * and the photo count when there is more than one, and no raised box around
+ * it. The text sits on the page under it: the price loudest in bold tabular
+ * figures, "Brand Model" regular, and "year, km" or "year, New" quietest.
  * Two sit side by side. The whole card gives under a finger; the heart is a
  * control of its own beside the pressable area.
  */
@@ -70,10 +71,7 @@ export const ListingGridCard = memo(function ListingGridCard({
 
   return (
     <EnterOnce order={enterOrder} className="min-w-0 flex-1">
-      <MotionView
-        style={press.style}
-        className="flex-1 overflow-hidden rounded-2xl bg-card"
-      >
+      <MotionView style={press.style} className="flex-1">
         <Pressable
           className="flex-1"
           onPress={() => onPress(listing.id)}
@@ -83,7 +81,7 @@ export const ListingGridCard = memo(function ListingGridCard({
             .filter(Boolean)
             .join(", ")}
         >
-          <View className="aspect-photo w-full bg-secondary">
+          <View className="aspect-photo w-full overflow-hidden rounded-2xl bg-secondary">
             <ListingPhoto mediaKey={coverKey} emptyLabel={t("noPhoto")} />
             {listing.photoCount > 1 ? (
               <PhotoChip
@@ -94,7 +92,7 @@ export const ListingGridCard = memo(function ListingGridCard({
             ) : null}
           </View>
 
-          <View className="gap-0.5 px-3 pb-3 pt-2.5">
+          <View className="px-1 pb-2 pt-2">
             <Text
               className="font-heading text-subhead font-bold text-foreground"
               style={tabularFigures}
@@ -105,7 +103,7 @@ export const ListingGridCard = memo(function ListingGridCard({
               {text.price}
             </Text>
             {text.title ? (
-              <Text className="text-callout font-medium text-foreground" numberOfLines={1}>
+              <Text className="text-callout text-foreground" numberOfLines={1}>
                 {text.title}
               </Text>
             ) : titlePending ? (
@@ -134,15 +132,15 @@ export const ListingGridCard = memo(function ListingGridCard({
 /** Same shape as `ListingGridCard`, for the first load. */
 export function ListingGridCardSkeleton() {
   return (
-    <View className="min-w-0 flex-1 overflow-hidden rounded-2xl bg-card">
+    <View className="min-w-0 flex-1">
       {/* aspect-ratio does not reach the animated Skeleton, so a plain View
           owns the 3:2 frame. */}
-      <View className="aspect-photo w-full">
+      <View className="aspect-photo w-full overflow-hidden rounded-2xl">
         <Skeleton className="h-full w-full rounded-none" />
       </View>
       {/* Each bar fills its text line (24, 20 and 18 dp), so the grid does not
           jump when the first page replaces the skeletons. */}
-      <View className="gap-0.5 px-3 pb-3 pt-2.5">
+      <View className="px-1 pb-2 pt-2">
         <Skeleton className="my-1 h-4 w-3/5" />
         <Skeleton className="my-1 h-3 w-4/5" />
         <Skeleton className="my-1 h-2.5 w-2/5" />

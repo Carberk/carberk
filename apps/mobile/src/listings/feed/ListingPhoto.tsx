@@ -5,6 +5,7 @@ import { View, type PressableProps, type ViewProps } from "react-native";
 
 import { buildOriginalUrl, buildVariantUrl } from "../detail/buildVariantUrl";
 
+import { GlassSurface } from "@/components/ui/glass-surface";
 import { Icon } from "@/components/ui/icon";
 import { Pop } from "@/components/ui/motion";
 import { PressableScale } from "@/components/ui/pressable-scale";
@@ -26,6 +27,11 @@ interface ListingPhotoProps {
   emptyLabel: string;
   /** `compact` fits a thumbnail: a smaller mark and no line of text. */
   compact?: boolean;
+  /**
+   * The stored size to load: `list` (600 x 400) fills a grid or row card;
+   * `detail` (1200 x 800) stays sharp in the tall frames of the Results strip.
+   */
+  variant?: "list" | "detail";
 }
 
 /**
@@ -33,14 +39,14 @@ interface ListingPhotoProps {
  * the original upload replaces it when the variant is missing. The frame owns
  * the size, the radius and the tonal tone that shows while the picture loads.
  */
-export function ListingPhoto({ mediaKey, emptyLabel, compact = false }: ListingPhotoProps) {
+export function ListingPhoto({ mediaKey, emptyLabel, compact = false, variant = "list" }: ListingPhotoProps) {
   const [original, setOriginal] = useState(false);
 
   if (!mediaKey) return <NoPhoto label={emptyLabel} compact={compact} />;
 
   return (
     <Image
-      source={{ uri: original ? buildOriginalUrl(mediaKey) : buildVariantUrl(mediaKey, "list") }}
+      source={{ uri: original ? buildOriginalUrl(mediaKey) : buildVariantUrl(mediaKey, variant) }}
       className="h-full w-full"
       contentFit="cover"
       cachePolicy="memory-disk"
@@ -90,11 +96,13 @@ type PhotoFavoriteButtonProps = Omit<PressableProps, "children"> & {
 
 /**
  * The heart on a Listing photo. The target is 48 dp square in the photo's top
- * trailing corner; the mark inside is a 36 dp disc, which puts it concentric
- * with a card's 24 dp corner. Off, it is a white outline on the photo scrim;
- * saved, the disc turns white and the heart fills with the brand red, so the
- * state shows on a light photo and on a dark one. Saving swells the heart
- * once (`Pop`); Reduce Motion makes that an instant change.
+ * trailing corner; the mark inside is a 36 dp disc of glass, which puts it
+ * concentric with a 24 dp photo corner. The glass is the system Liquid Glass
+ * on iOS 26 and the tuned translucent surface elsewhere, so the control reads
+ * as floating above the picture on a light photo and on a dark one; the
+ * outline heart takes the text colour of that glass. Saved, the heart fills
+ * with the brand red. Saving swells the heart once (`Pop`); Reduce Motion
+ * makes that an instant change.
  *
  * The caller passes the label, the handler and the accessibility state.
  */
@@ -105,24 +113,19 @@ export function PhotoFavoriteButton({ favorited, className, ...props }: PhotoFav
       className={cn("absolute right-0 top-0 h-12 w-12 items-center justify-center", className)}
       {...props}
     >
-      <View
-        className={cn(
-          "size-9 items-center justify-center rounded-full",
-          favorited ? "bg-media-foreground shadow-raised" : "bg-media-scrim/on-photo",
-        )}
-      >
+      <GlassSurface interactive className="size-9 items-center justify-center rounded-full">
         <Pop active={favorited}>
           <Icon
             as={Heart}
             className={
               favorited
                 ? "size-5 text-brand-500 fill-brand-500"
-                : "size-5 text-media-foreground"
+                : "size-5 text-foreground"
             }
             strokeWidth={2}
           />
         </Pop>
-      </View>
+      </GlassSurface>
     </PressableScale>
   );
 }

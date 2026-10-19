@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderMobile, fireEvent, act, within } from "../../../test/render";
 
-import { ListingLargeCard, ListingLargeCardSkeleton } from "./ListingLargeCard";
+import { FavoriteListingCard, FavoriteListingCardSkeleton } from "./FavoriteListingCard";
 
 const conversation = vi.hoisted(() => ({ open: vi.fn(), retry: vi.fn(), isPending: false, error: null as unknown }));
 vi.mock("../../conversations/useOpenListingConversation", () => ({
@@ -23,7 +23,7 @@ function renderCard(listing: Partial<ListingsSchemas.FavoriteListingSummary> = {
   const onPress = vi.fn();
   const onRemove = vi.fn();
   const view = renderMobile(
-    <ListingLargeCard listing={{ ...favorite, ...listing }} brandName="Toyota" modelName="Camry" cityName="Ashgabat"
+    <FavoriteListingCard listing={{ ...favorite, ...listing }} brandName="Toyota" modelName="Camry" cityName="Ashgabat"
       onPress={onPress} isOwn={isOwn} onRemoveFavorite={onRemove} />,
     { locale },
   );
@@ -131,15 +131,8 @@ describe("Favorites large card", () => {
     expect(onPress).toHaveBeenCalledWith("listing");
   });
 
-  it("keeps the Results card without contact buttons", () => {
-    const view = renderMobile(<ListingLargeCard listing={favorite} isAuthenticated returnTo="/(tabs)/(search)/results" onPress={vi.fn()} />);
-    expect(view.queryByRole("button", { name: "Call" })).toBeNull();
-    expect(view.queryByRole("button", { name: "Message" })).toBeNull();
-    expect(view.getByRole("button", { name: "Favorite" })).toBeTruthy();
-  });
-
   it("has a skeleton with the shape of the card and its buttons", () => {
-    const view = renderMobile(<ListingLargeCardSkeleton withActions />);
+    const view = renderMobile(<FavoriteListingCardSkeleton />);
     expect(view.getAllByTestId("listing-photo-skeleton")).toHaveLength(1);
     expect(within(view.getByTestId("listing-actions-skeleton")).getAllByTestId("skeleton-button")).toHaveLength(2);
   });

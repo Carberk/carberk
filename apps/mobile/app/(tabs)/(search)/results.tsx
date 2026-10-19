@@ -19,6 +19,7 @@ import { FeedError } from "../../../src/listings/feed/FeedError";
 import { FilteredEmpty } from "../../../src/listings/feed/FilteredEmpty";
 import { useFeedCatalogMaps } from "../../../src/listings/feed/useFeedCatalogMaps";
 import { useFeedFavoriteReplay } from "../../../src/listings/feed/useFeedFavoriteReplay";
+import { FeedMessageReplay } from "../../../src/listings/feed/FeedMessageReplay";
 import { ResultsHeader } from "../../../src/listings/search/ResultsHeader";
 import { SortSheet } from "../../../src/listings/search/SortSheet";
 import { ConditionSwitch } from "../../../src/listings/search/ConditionSwitch";
@@ -113,11 +114,12 @@ export default function ResultsScreen() {
         brandName={catalog.brandName(item.brandId)} modelName={catalog.modelName(item.modelId)} cityName={catalog.cityName(item.cityId)}
         transmissionName={transmissions.data?.items.find((entry) => entry.id === item.transmissionId)?.name}
         engineTypeName={engineTypes.data?.items.find((entry) => entry.id === item.engineTypeId)?.name}
-        isAuthenticated={viewer === undefined ? null : viewer !== null} returnTo={returnTo} />}
+        isAuthenticated={viewer === undefined ? null : viewer !== null} viewerId={viewer?.userId ?? null} returnTo={returnTo} />}
       ItemSeparatorComponent={() => <View className="h-3" />}
       refreshControl={<RefreshControl refreshing={feed.isRefetching} onRefresh={() => void feed.refetch()} />}
       onEndReached={() => { if (feed.hasNextPage && !feed.isFetchingNextPage && !feed.isRefetching) void feed.fetchNextPage(); }} onEndReachedThreshold={0.5}
       ListFooterComponent={items.length && !feed.isPending && !feed.isError ? <View className="items-center pb-2 pt-5">{feed.isFetchingNextPage ? <ActivityIndicator /> : !feed.hasNextPage ? <Text className="text-footnote text-muted-foreground">{t("noMore")}</Text> : null}</View> : null} />
+    <FeedMessageReplay returnTo={returnTo} />
     <SortSheet open={sortOpen} onOpenChange={setSortOpen} value={sort} onChange={(value) => commit({ sort: value })} />
   </TabScreen>;
 }
