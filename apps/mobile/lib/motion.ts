@@ -38,6 +38,7 @@ export const glassOpacity = mobileGlassOpacity;
 export const spring = {
   snappy: { ...mobileSpring.snappy, reduceMotion: ReduceMotion.System },
   settle: { ...mobileSpring.settle, reduceMotion: ReduceMotion.System },
+  glide: { ...mobileSpring.glide, reduceMotion: ReduceMotion.System },
   pop: { ...mobileSpring.pop, reduceMotion: ReduceMotion.System },
 } as const;
 

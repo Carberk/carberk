@@ -62,7 +62,8 @@ Mobile reads its motion from `packages/ui/tokens/mobile.ts` through `apps/mobile
 |---|---|---|
 | `snappy` | 180 ms, damping ratio 1 | Press feedback, small state changes |
 | `settle` | 320 ms, damping ratio 0.9 | The tab indicator, sheets settling, sticky bars |
-| `pop` | 360 ms, damping ratio 0.55 | The favorite heart and other one-shot confirmations |
+| `glide` | 220 ms, damping ratio 1 | The leading edge of the tab capsule; the trailing edge follows on `settle` |
+| `pop` | 360 ms, damping ratio 0.55 | The favorite heart, the one spring allowed a visible overshoot |
 
 | Easing | Curve | Use |
 |---|---|---|
@@ -70,16 +71,17 @@ Mobile reads its motion from `packages/ui/tokens/mobile.ts` through `apps/mobile
 | `enter` | `cubic-bezier(0, 0, 0.2, 1)` | Arriving |
 | `exit` | `cubic-bezier(0.4, 0, 1, 1)` | Leaving |
 
-Press scale: 0.96 for buttons, chips and icon buttons; 0.985 for cards and rows.
+Press scale: 0.96 for buttons, chips and icon buttons; 0.985 for cards and rows; a tab of the floating tab bar grows instead, to 1.08 (`lift`).
 
 ### Where mobile uses motion
 
 | Surface | Motion |
 |---|---|
 | Any tappable control | Scales to the press scale on press-in (`press`), springs back on release (`snappy`) |
-| Tab change | The selected capsule slides to the new tab (`settle`); the icon fills |
+| Tab press | The tab, and its capsule when selected, grows to 1.08 (`snappy`) and returns on release or cancel |
+| Tab change | The selected capsule stretches toward the new tab (leading edge `glide`, trailing edge `settle`) and settles into it; the icon cross-fades to filled and the label to semibold |
 | Favorite heart | Scales up and settles (`pop`) as it fills |
-| List and card entrance | A short fade and 8 dp rise on first mount of a screen's content, not per card on scroll |
+| List and card entrance | A screen's content: a short fade and 8 dp rise on first mount. The first cards of a list replacing their skeletons: a fade with a 4 dp settle, 24 ms apart. Never per card on scroll |
 | Skeleton to content | The skeleton pulses in opacity (`pulse`); content fades in (`base`) |
 | Sheet and dialog | Slide or scale in with the scrim fading (`slow`, `enter`); leave faster (`base`, `exit`) |
 | Sticky header and bottom bar | Background and title fade with scroll position, driven by the scroll offset |

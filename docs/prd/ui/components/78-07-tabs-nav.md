@@ -145,14 +145,15 @@ The mobile navigation chrome is four parts. Their geometry lives in `apps/mobile
 ### Tab bar (`AutoTmTabBar`)
 
 - A full capsule on the glass surface: 64 dp high (`mobileControl.tabBar`), full radius, 12 dp from the side edges, 4 dp of inner padding. Content scrolls underneath it.
-- The selected tab's icon sits on a tonal pill, 56 by 32 dp, full radius, `bg-foreground/10`: the same shape as Sell's red pill. The label sits free below it, so no label has to fit inside a container in any language. The pill slides between tabs with the `settle` spring. On Sell it fades out, because Sell carries its own red pill; when another tab is chosen it fades back in already in place.
-- Icons are 24 dp in a 28 dp row, with the label 2 dp below, so all five labels share one baseline. The selected icon cross-fades from outline to filled (heavier stroke for the magnifier, which has no inside) and swells once (`pop` spring). Unselected icons and labels use the secondary text colour.
-- Labels are `micro` (11/14), medium, and semibold when selected. A label keeps 6 dp from the edge of its slot and shrinks to 80% before it is cut, so "Halanlarym", "Избранное" and "Сообщения" stay whole on a 360 dp phone. Labels stop growing at 1.3 times the system font size, because the bar's height is fixed.
+- The selected tab sits in one lighter capsule that encloses its icon and its label: the full width of the tab's slot (about 74 dp on a 402 dp phone) and 56 dp high, 4 dp inside the bar on every side, so its 28 dp radius is concentric with the bar's 32 dp ends. It is opaque: `bg-secondary` in light (a step darker than the white glass), `bg-accent` in dark (a step lighter than the charcoal glass).
+- When the selection moves, the capsule travels like a drop of liquid: the edge on the side it is heading to leads on the `glide` spring (220 ms, critically damped) and the other edge follows on `settle`, so the capsule stretches along its path and then settles into the new slot, with no bounce. It is drawn as two round ends and a straight middle, so the stretch is transforms only; no width is laid out on any frame. On Sell it fades out where it stands, because Sell carries its own red pill; when another tab is chosen it fades back in already in place.
+- Icons are 22 dp in a 32 dp row, with the label 4 dp below, so all five labels share one baseline. The selected icon cross-fades from outline to filled (heavier stroke for the magnifier, which has no inside), and the label cross-fades from medium in the secondary text colour to semibold in the text colour. There is no swell. Unselected icons and labels use the secondary text colour.
+- Labels are `micro` (11/14). A label's box is its slot less 8 dp on each side, measured in its semibold face: a label that would outgrow it shrinks (to 80% at most) before it is cut, so no label touches the capsule. Measured on an iPhone 17: "Сообщения" and "Halanlarym" selected keep about 8.5 dp each side after shrinking slightly; "Кабинет" keeps 14 dp. Labels stop growing at 1.3 times the system font size, because the bar's height is fixed.
 - Sell is a 56 by 32 dp brand-red pill with a white plus, in the same 32 dp icon row as its neighbours.
 - On iOS 26 the system glass carries a tone inside it (`bg-glass/glass-tint`, 64%), so labels stay readable over a photo. Below and behind the bar the content fades into the page tone (`ScrollEdgeFade`), so no line of list text shows through or under the bar.
 - The unread badge on Messages is a 20 dp brand-red disc at the top right of the icon; it never changes the tab's size.
-- Every tab gives under a finger (scale 0.96, `press` duration) and is at least 64 dp tall and 65 dp wide.
-- Reduce Motion: the pill, the icon and the press change at once, with no slide, fade or swell.
+- Under a finger a tab grows to 1.08 (`mobilePressScale.lift`) on the `snappy` spring, with no overshoot, and returns the same way on release or when the finger slides off. The selected tab's capsule grows with it, about its own centre. Every tab is at least 64 dp tall and 65 dp wide.
+- Reduce Motion: the capsule, the icon, the label and the press change at once, with no travel, stretch or fade. Reduce Transparency: the bar is the opaque raised surface; the capsule is opaque already.
 
 ### Bottom position and safe areas
 
@@ -170,7 +171,7 @@ A tab screen keeps `useTabBarSpace()` clear at its bottom: either its root is pa
 - One header for every pushed screen: a row at least 44 dp high with 16 dp side padding, on the page surface, with no divider under it.
 - Leading: `BackButton`, a 44 dp tonal circle (`bg-secondary`, pressed `bg-accent`). The chevron is 24 dp and sits 1 dp left of centre so it looks centred. `kind="close"` draws a 20 dp cross for a flow or a sheet.
 - Title: inline, `headline` (22/28) in the heading face, semibold, one line, with an optional `caption` second line. A screen that is a destination (Help, About, Notifications, Profile, My listings, Messages list, Brand and Model pickers) uses `large`: the title moves under the button row at `title` size (28/34), bold, up to two lines. Tab roots keep `LargeTitle` at `display` size, so a tab root is always the loudest title.
-- Trailing: `HeaderButton` (the same 44 dp tonal circle with a 20 dp glyph) or one `HeaderTextAction` in the brand colour (Reset, Change brand). Results keeps its named Sort capsule, 44 dp high.
+- Trailing: `HeaderButton` (the same 44 dp tonal circle with a 20 dp glyph) or one `HeaderTextAction`, medium weight in the text colour (Reset, Change brand); brand red stays with the screen's primary action. Results keeps its named Sort capsule, 44 dp high.
 - The middle can hold something else: the Search field, or the peer's avatar, name and presence in a Conversation.
 - Buttons over a photo (Listing detail) are the same circles on `bg-background/90`.
 
