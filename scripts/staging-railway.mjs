@@ -109,10 +109,11 @@ export class RailwayPlatform {
     const { deployment } = await this.query(`query deployment($id: String!) { deployment(id: $id) { id status meta } }`, { id });
     return deployment;
   }
-  async execute(kind, lease, target, recordDeployment) {
+  async execute(kind, lease, target, recordDeployment, beforeMutation) {
     await this.authorize(lease);
     await this.attest(lease.identity);
     const business = lease.fixtureProfile === 'campaign897-business-v2';
+    if (business && typeof beforeMutation !== 'function') throw new Error('Durable business mutation authority required');
     if (['fixture', 'reset'].includes(kind)) {
       if (business) {
         if (target !== lease.candidate) throw new Error('Business mutation requires original candidate runtime');
@@ -120,6 +121,7 @@ export class RailwayPlatform {
         // deployment journal and readiness are checked before its first write.
         if (kind === 'fixture') await this.runtime(lease, target, { deployments: lease.deployments });
         else await this.verify(lease, target, { deployments: lease.deployments });
+        await beforeMutation();
         await this.remote(kind, lease, target);
         // Only the independent probe emits the versioned disposal/inventory.
         const receipt = await this.verify(lease, target, { deployments: lease.deployments });
@@ -142,6 +144,7 @@ export class RailwayPlatform {
     }
     const deployments = {};
     for (const [role, serviceId] of Object.entries(lease.identity.services)) {
+      if (business) await beforeMutation();
       const data = await this.query(`mutation deploy($serviceId: String!, $environmentId: String!, $commitSha: String!) {
         serviceInstanceDeployV2(serviceId: $serviceId, environmentId: $environmentId, commitSha: $commitSha) }`,
       { serviceId, environmentId: lease.identity.environmentId, commitSha: target });

@@ -50,6 +50,11 @@ export async function runStagingCommand(args) {
   try {
     const ledger = new GitLedger({ directory, remote, authenticateWithGh: true });
     if (command === 'inspect') return (await ledger.read()).state ?? { reservation: null, queue: [] };
+    // Explicit arguments cannot reopen a profile already selected durably.
+    // Inspect remains available for recovery planning without mutation.
+    if (['operate', 'recover', 'restore', 'release'].includes(command) &&
+        (await ledger.read()).state?.reservation?.fixtureProfile === 'campaign897-business-v2')
+      throw new Error('Business storage profile remains closed at the operator CLI');
     const policy = await json(values[0]);
     if (policy.projectId !== projectId || policy.environmentId !== '652abc79-fdb0-48b0-9f6c-ad0ff572d7b2' ||
         policy.services?.api !== '6db6f1b1-5c7a-4033-88d0-53f5f315bfc0' || policy.services?.worker !== '24aa02e0-25a9-4e80-9cc2-c1795ef82091' ||

@@ -153,6 +153,16 @@ export class StagingControl {
     await this.write(snapshot, snapshot.state);
     throw new Error('Complete durable campaign disposal required before restoration; reset while candidate fences remain deployed');
   }
+  async mutationAuthority(claim, expected) {
+    // Provider preflight awaits external state. Its earlier lease copy grants
+    // no mutation authority until the current durable owner and journal agree.
+    if (this.actorIdentity && await this.actorIdentity() !== this.actor) throw new Error('Authenticated coordination owner changed');
+    if (expected.operation.kind === 'restore' && await this.ledger.latestMain() !== expected.operation.target)
+      throw new Error('Latest main moved before restoration');
+    const current = await this.owned(claim, true);
+    if (digest(current.state.reservation) !== digest(expected)) throw new Error('Durable mutation authority changed');
+    return current;
+  }
   async perform(claim, kind, restoring = false, profile) {
     let snapshot = await this.owned(claim);
     const selectedProfile = snapshot.state.reservation.fixtureProfile ?? 'listing-v1';
@@ -193,14 +203,17 @@ export class StagingControl {
         if (attested.revision !== current.revision || digest(attested.state.reservation.operation) !== digest(operation))
           throw new Error('Business operation changed during final attestation');
       }
+      const expected = structuredClone(current.state.reservation);
+      const beforeMutation = operation.profile === business ? () => this.mutationAuthority(claim, expected) : undefined;
       const result = await this.platform.execute(restoring ? 'restore' : kind, current.state.reservation, target, async (role, deploymentId) => {
         if (!(role in lease.identity.services) || typeof deploymentId !== 'string' || !/^[a-zA-Z0-9-]{1,100}$/.test(deploymentId)) throw new Error('Invalid deployment receipt');
-        const progress = await this.ledger.read();
+        const progress = beforeMutation ? await beforeMutation() : await this.ledger.read();
         if (progress.state?.reservation?.operation?.id !== operation.id) throw new Error('Operation authority changed');
         progress.state.reservation.operation.deployments ??= {};
         progress.state.reservation.operation.deployments[role] = deploymentId;
         await this.write(progress, progress.state);
-      });
+        expected.operation.deployments = structuredClone(progress.state.reservation.operation.deployments);
+      }, beforeMutation);
       let receipt;
       if (kind === 'deploy') receipt = this.proof(await this.platform.verify(current.state.reservation, target, result), target, restoring);
       if (restoring && await this.ledger.latestMain() !== target) throw new Error('Latest main moved during restoration; retain recovery state');
@@ -277,7 +290,9 @@ export class StagingControl {
       if (digest(current.state.reservation.operation) !== digest(operation)) throw new Error('Reset continuation authority changed');
       // The platform reattests identity, current candidate deployment IDs and readiness.
       // Remote cleaning/disposal idempotency is the authority, never a caller success flag.
-      const result = await this.platform.execute('reset', current.state.reservation, operation.target);
+      const expected = structuredClone(current.state.reservation);
+      const result = await this.platform.execute('reset', current.state.reservation, operation.target, undefined,
+        lease.fixtureProfile === business ? () => this.mutationAuthority(claim, expected) : undefined);
       const proof = this.campaignReceipt(result, current.state.reservation, 'reset');
       const done = await this.owned(claim, true);
       if (digest(done.state.reservation.operation) !== digest(operation)) throw new Error('Reset completion authority changed');
