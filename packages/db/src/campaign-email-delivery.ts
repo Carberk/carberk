@@ -18,22 +18,51 @@ export async function withCampaignEmailDelivery<T>(
 ): Promise<T> {
   if (!email.toLowerCase().endsWith("@campaign897.invalid")) return action();
   const match = /^(buyer-a|owner|sales-a|coordinator)\.([a-f0-9]{32})\.([a-f0-9]{12})@campaign897\.invalid$/.exec(email);
-  if (!match) throw new Error("Campaign delivery identity refused");
-  const reservationId = match[2];
-  const candidatePrefix = match[3];
+  const v3Match = /^(buyer-a|buyer-b|owner|sales-a|sales-b|coordinator|support|history-fulfiller|payment-verifier|reception-steward|technician|independent-reviewer|private-reviewer|aggregate-viewer|investigator)\.([a-f0-9]{32})\.([a-f0-9]{12})@campaign897\.invalid$/.exec(email);
+  const selected = match ?? v3Match;
+  if (!selected) throw new Error("Campaign delivery identity refused");
+  const reservationId = selected[2];
+  const candidatePrefix = selected[3];
   if (!reservationId || !candidatePrefix) throw new Error("Campaign delivery identity refused");
   const namespace = `cf_${reservationId}`;
   return db.$transaction(async transaction => {
     await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${namespace}, 0))::text`;
     // Namespace is derived only from the fixed hex grammar above; values remain parameters.
-    const rows = await transaction.$queryRawUnsafe<{ request_id: string }[]>(`
+    let rows = match ? await transaction.$queryRawUnsafe<{ request_id: string }[]>(`
       SELECT d.request_id FROM "${namespace}".campaign_manifest m
       JOIN "${namespace}".campaign_entities e ON e.email=$1
       JOIN "${namespace}".campaign_delivery_ledger d ON d.email=e.email AND d.request_id=$2
       JOIN "${namespace}".campaign_records r ON r.table_name='otp_requests'
         AND r.row_key=jsonb_build_object('id',d.request_id) AND NOT r.deleted
       WHERE m.reservation_id=$3 AND left(m.candidate,12)=$4 AND m.profile='campaign897-identities-v1'
-        AND m.state='identities' AND m.delivery_version=1`, email, requestId, reservationId, candidatePrefix);
+        AND m.state='identities' AND m.delivery_version=1`, email, requestId, reservationId, candidatePrefix) : [];
+    if (rows.length === 0) {
+      // V3 is a separate fixed contract. The v1 alias/profile/version path above
+      // remains unchanged; neither path admits business-v2 or unknown profiles.
+      rows = await transaction.$queryRawUnsafe<{ request_id: string }[]>(`
+        SELECT d.request_id FROM "${namespace}".campaign_manifest m
+        JOIN "${namespace}".campaign_entities e ON e.email=$1
+        JOIN "${namespace}".campaign_delivery_ledger d ON d.email=e.email AND d.request_id=$2
+        JOIN "${namespace}".campaign_records r ON r.table_name='otp_requests'
+          AND r.row_key=jsonb_build_object('id',d.request_id) AND NOT r.deleted
+        JOIN public.otp_requests o ON o.id=d.request_id AND o.destination=d.email
+          AND r.row_hash=md5(to_jsonb(o)::text)
+        WHERE m.reservation_id=$3 AND m.candidate ~ '^[a-f0-9]{40}$' AND left(m.candidate,12)=$4
+          AND m.profile='campaign897-full-v3' AND m.delivery_version=3 AND m.state='identities'
+          AND (SELECT count(*) FROM "${namespace}".campaign_manifest)=1
+          AND (SELECT count(*) FROM "${namespace}".campaign_entities)=15
+          AND NOT EXISTS(SELECT 1 FROM "${namespace}".campaign_entities entity
+            WHERE entity.alias NOT IN ('buyer-a','buyer-b','owner','sales-a','sales-b','coordinator','support','history-fulfiller','payment-verifier','reception-steward','technician','independent-reviewer','private-reviewer','aggregate-viewer','investigator')
+              OR entity.email<>entity.alias||'.'||m.reservation_id||'.'||left(m.candidate,12)||'@campaign897.invalid')
+          AND o.purpose='sign_in' AND o.channel='email' AND o.phone IS NULL AND o."businessId" IS NULL
+          AND (o."userId" IS NULL OR o."userId"=e.user_id)
+          AND m.delivery_hash=(SELECT md5(coalesce(jsonb_agg(to_jsonb(delivery) ORDER BY request_id),'[]'::jsonb)::text)
+            FROM "${namespace}".campaign_delivery_ledger delivery)
+          AND m.journal_hash=(SELECT md5(coalesce(jsonb_agg(to_jsonb(record) ORDER BY table_name,row_key),'[]'::jsonb)::text)
+            FROM "${namespace}".campaign_records record)
+          AND m.event_hash=(SELECT md5(coalesce(jsonb_agg(to_jsonb(event) ORDER BY sequence),'[]'::jsonb)::text)
+            FROM "${namespace}".campaign_events event)`, email, requestId, reservationId, candidatePrefix);
+    }
     if (rows.length !== 1) throw new Error("Campaign delivery is unavailable or disposed");
     return action({ namespace, transaction });
   }, { timeout: 30000, maxWait: 5000 });
