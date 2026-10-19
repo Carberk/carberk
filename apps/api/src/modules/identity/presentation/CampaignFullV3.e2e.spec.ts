@@ -244,7 +244,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     const id = "a5".repeat(16), controlId = "b5".repeat(16), foreignId = randomUUID();
     await seed(controlId);
     // Collision fixture only. This is never used as admission or authentication proof.
-    const foreign = await db.user.create({ data: { id: foreignId, email: email(id, "buyer-a"), displayName: "Foreign collision must survive" } });
+    const foreign = await db.user.create({ data: { id: foreignId, email: email(id, "buyer-a"), emailVerifiedAt: new Date(), displayName: "Foreign collision must survive" } });
     expect(execute("fixture", id).code).toBe(1);
     expect(await db.user.findUnique({ where: { id: foreignId } })).toEqual(foreign);
     expect(await rows(`SELECT schema_name FROM information_schema.schemata WHERE schema_name=$1`, `cf_${id}`)).toEqual([]);
@@ -284,13 +284,13 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
   it("rolls back row and event budget overflow while retaining room for exact cleanup", async () => {
     const id = "a9".repeat(16), roster = await seed(id);
     const original = await digest(id);
+    const business = await db.dealership.findUniqueOrThrow({ where: { slug: `campaign897-${id}-${candidate.slice(0, 12)}` } });
     // Storage-boundary fault probes, separate from the ordinary HTTP content proof.
     // A single failed transaction must leave the entire tracked inventory unchanged.
     await expect(db.$transaction(Array.from({ length: 129 }, () => db.listingDraft.create({ data: {
-      userId: actor(roster, "buyer-a").user_id, payload: { description: "Synthetic row budget probe", media: [] },
+      userId: actor(roster, "owner").user_id, businessId: business.id, payload: { description: "Synthetic row budget probe", media: [] },
     } })))).rejects.toThrow(/Campaign.*limit/);
     expect(await digest(id)).toBe(original);
-    const business = await db.dealership.findUniqueOrThrow({ where: { slug: `campaign897-${id}-${candidate.slice(0, 12)}` } });
     // No authority/active-status write. Repeat a permitted storage content edit.
     await expect(db.$executeRawUnsafe(`DO $probe$ BEGIN FOR i IN 1..2049 LOOP UPDATE public.dealerships SET name='Synthetic event budget probe' WHERE id='${business.id}'; END LOOP; END $probe$`)).rejects.toThrow(/Campaign.*(limit|budget)/);
     expect(await digest(id)).toBe(original);
