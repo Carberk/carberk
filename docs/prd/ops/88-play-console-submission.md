@@ -1,5 +1,15 @@
 # 88 — Google Play Console submission pack
 
+## Next release scope (founder direction, 2026-10-19)
+
+The founder confirms that the app has already been released on Google Play. This work updates the existing app `com.auto_tm.ynamly`; it is not the first Android release. The exact live version and artifact are not established by this scope record.
+
+The next release must preserve and verify sign-in, vehicle search/Listings, selling and Photos, chat/push, account controls, moderation, legal pages and backend reliability. It must also complete the full [#897 campaign](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/897): dealerships/showrooms, Listing video/views, Vehicle History, Support, diagnostic reports, analytics and operational tooling. Keep the campaign's approved tester restrictions, audiences, rights and service-activation requirements. Missing implementation or acceptance must remain explicit; a smaller marketplace-only release does not satisfy this scope.
+
+Complete and verify this release before the broader review and disposition of remaining issues, PRs and documentation. Work outside the release moves ahead of it only when required to remove a release blocker. The signed Android artifact, deployed environment, applicable CI, native acceptance and store disclosures must agree before readiness is claimed. A GitHub release alone does not establish readiness.
+
+The dated setup receipts and first-submission sequence below are historical. Recheck current signing, versionCode, track and disclosure state for the next artifact; do not treat an old pending step as a current failure or an old pass as current evidence. [#329](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/329) owns the signed-candidate gate. Production promotion, submission and live service activation remain separate release actions.
+
 ## Founder decisions (2026-10-06)
 
 **The store release updates the existing Play app `com.auto_tm.ynamly`** (founder decision, 2026-10-06, [#697](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/697)). That app, the Flutter build from a year ago, has completed its closed-test requirements and can apply for production; a new app would have to repeat 12 testers for 14 days. The EAS `production` profile therefore builds package `com.auto_tm.ynamly`. The build refuses to start if the `production` profile has any other package, or if another profile sets one (`validate:eas-env`). This also settles checklist steps 10 and 11: the testing requirement is already met on this app, and the track is its existing closed track. **Before the first `production` build (checklist step 2)** the founder:
