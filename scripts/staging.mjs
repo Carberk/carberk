@@ -66,14 +66,14 @@ export async function runStagingCommand(args) {
     const control = new StagingControl({ ledger, platform, policy, actor,
       actorIdentity: async () => (await execute('gh', ['api', 'user', '--jq', '.login'])).trim(),
       now: () => new Date().toISOString(), id: () => randomUUID().replaceAll('-', '') });
-    if (command === 'identity') return control.attest();
+    if (command === 'identity') return await control.attest();
     if (command === 'enqueue') return { requestId: await control.enqueue(await json(values[1])) };
-    if (command === 'acquire') return control.acquire(values[1]);
+    if (command === 'acquire') return await control.acquire(values[1]);
     const claim = await json(values[1]);
-    if (command === 'operate') return control.operate(claim, values[2], values[3]);
-    if (command === 'recover') return control.recover(claim);
-    if (command === 'restore') return control.restore(claim);
-    return control.release(claim);
+    if (command === 'operate') return await control.operate(claim, values[2], values[3]);
+    if (command === 'recover') return await control.recover(claim);
+    if (command === 'restore') return await control.restore(claim);
+    return await control.release(claim);
   } finally { await rm(directory, { recursive: true, force: true }); }
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
