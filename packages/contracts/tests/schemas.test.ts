@@ -20,6 +20,7 @@ import {
   FeedQuerySchema,
   FeedResponseSchema,
   FavoriteListingSummarySchema,
+  MyFavoritesQuerySchema,
   MyFavoritesResponseSchema,
   ListingFilterSchema,
   encodeCursor,
@@ -329,8 +330,54 @@ describe("FavoriteListingSummarySchema", () => {
     });
     expect(result.success).toBe(false);
     expect(
-      MyFavoritesResponseSchema.safeParse({ items: [validFavorite], nextCursor: null }).success,
+      MyFavoritesResponseSchema.safeParse({
+        items: [validFavorite],
+        nextCursor: null,
+        counts: { total: 1, inactive: 0 },
+      }).success,
     ).toBe(true);
+  });
+
+  it("requires counts with non-negative whole numbers", () => {
+    const page = { items: [validFavorite], nextCursor: null };
+    expect(MyFavoritesResponseSchema.safeParse(page).success).toBe(false);
+    expect(
+      MyFavoritesResponseSchema.safeParse({ ...page, counts: { total: 3 } }).success,
+    ).toBe(false);
+    expect(
+      MyFavoritesResponseSchema.safeParse({ ...page, counts: { total: 3, inactive: -1 } })
+        .success,
+    ).toBe(false);
+    expect(
+      MyFavoritesResponseSchema.safeParse({ ...page, counts: { total: 2.5, inactive: 1 } })
+        .success,
+    ).toBe(false);
+  });
+});
+
+describe("MyFavoritesQuerySchema", () => {
+  it("defaults to all visible Favorites, 20 per page", () => {
+    expect(MyFavoritesQuerySchema.parse({})).toEqual({ limit: 20, activeOnly: false });
+  });
+
+  it("reads activeOnly from the query strings true and false", () => {
+    expect(MyFavoritesQuerySchema.parse({ activeOnly: "true" }).activeOnly).toBe(true);
+    expect(MyFavoritesQuerySchema.parse({ activeOnly: "false" }).activeOnly).toBe(false);
+  });
+
+  it("rejects other activeOnly values instead of coercing them", () => {
+    expect(MyFavoritesQuerySchema.safeParse({ activeOnly: "yes" }).success).toBe(false);
+    expect(MyFavoritesQuerySchema.safeParse({ activeOnly: "1" }).success).toBe(false);
+    expect(MyFavoritesQuerySchema.safeParse({ activeOnly: "" }).success).toBe(false);
+  });
+
+  it("keeps the cursor and the 1 to 50 limit", () => {
+    expect(MyFavoritesQuerySchema.parse({ cursor: "abc", limit: "5" })).toMatchObject({
+      cursor: "abc",
+      limit: 5,
+    });
+    expect(MyFavoritesQuerySchema.safeParse({ limit: "51" }).success).toBe(false);
+    expect(MyFavoritesQuerySchema.safeParse({ limit: "0" }).success).toBe(false);
   });
 });
 
