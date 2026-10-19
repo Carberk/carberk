@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <title>PROTOTYPE — Cabinet, Profile and Settings, Auto.ru-style minimal (throwaway)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
 <!--
   PROTOTYPE — throwaway. Issue #353 "Prototype Cabinet, Profile, Settings, and sign-in method screens", third version.
   The founder rejected the version at a051faf (2026-10-02, second round): Profile and Settings should follow Auto.ru and be
@@ -17,6 +18,11 @@
   Account values and codes are made up. Support contacts are the founder-approved public contacts (#352 D10).
   Colours are AutoTM tokens from apps/mobile/global.css. Auto.ru is a structure reference, not a visual template (ADR-0051).
   New RU/TK wording needs founder review.
+  Profile identity update (2026-10-02, on top of 8402d60): the founder approved D1–D8 and then asked for an editable,
+  randomly assigned display name, a profile photo, and a small car-themed avatar library AutoTM assigns until a photo is
+  set (#353 comment 5947334041, #344 amendment 5947347989). D1–D8 stay at their approved options. Decisions N1–N8 are new
+  proposals; ★ marks a recommendation, never an approval. The twelve avatars are inline SVG drawn for this file.
+  Notes: cabinet-profile.identity.md.
 -->
 <style>
   *{box-sizing:border-box}
@@ -128,6 +134,32 @@
   .logo{font-weight:800;font-size:28px;letter-spacing:-.5px}.logo b{color:var(--primary)}
   .br{position:absolute;top:24px;left:0;right:0;bottom:0;background:#fff;color:#222;z-index:30;overflow-y:auto}
   .br .bar{display:flex;align-items:center;gap:8px;padding:8px;background:#eee;border-bottom:1px solid #ccc;position:sticky;top:0}
+  /* profile identity update */
+  .avw{position:relative;flex:none;border:0;padding:0;background:none;cursor:pointer;border-radius:50%;color:inherit}
+  .avw .cam{position:absolute;right:-2px;bottom:-2px;width:30px;height:30px;border-radius:50%;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--fg)}
+  .avw .upl{position:absolute;inset:0;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+  .avw .upl.err{background:rgba(160,20,20,.72)}
+  .spin{width:22px;height:22px;border-radius:50%;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;animation:sp .8s linear infinite}
+  .spin.dk{border-color:var(--muted);border-top-color:var(--fg)}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .nmbtn{display:inline-flex;align-items:center;gap:6px;border:0;background:none;color:var(--fg);font:inherit;font-size:20px;font-weight:600;cursor:pointer;padding:6px 8px;border-radius:10px;margin-top:6px;max-width:100%}
+  .nmbtn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .nmbtn:active{background:var(--secondary)}
+  .pill{display:inline-block;font-size:11.5px;border-radius:999px;padding:1px 8px;background:var(--muted);color:var(--fg);margin-top:4px}
+  .agrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 8px;padding:6px 16px 110px}
+  .agrid button{border:0;background:none;padding:6px 0;border-radius:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--fg);font:inherit;font-size:11.5px}
+  .agrid button .ring{border-radius:50%;padding:3px;border:2.5px solid transparent}
+  .agrid button.on .ring{border-color:var(--primary)}
+  .bottombar{position:absolute;left:0;right:0;bottom:0;padding:10px 16px 14px;background:var(--bg);border-top:1px solid var(--border)}
+  .crop{position:absolute;inset:0;background:#000;color:#fff;display:flex;flex-direction:column}
+  .crop .stage{flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+  .crop .mask{position:absolute;left:50%;top:50%;width:270px;height:270px;margin:-135px 0 0 -135px;border-radius:50%;box-shadow:0 0 0 999px rgba(0,0,0,.62);border:2px solid rgba(255,255,255,.85);pointer-events:none}
+  .crop .bar2{display:flex;align-items:center;padding:4px 6px}
+  .crop .ctrl{padding:10px 16px 16px;display:grid;gap:10px}
+  .crop .ib{color:#fff}
+  .sect{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mfg);padding:14px 16px 6px}
+  .card{margin:0 16px;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--bg)}
+  .ncount{font-size:12px;color:var(--mfg);text-align:right;margin-top:4px}
   .br .url{flex:1;background:#fff;border-radius:999px;padding:6px 12px;font-size:11.5px;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 </style>
 </head>
@@ -235,6 +267,56 @@ const TX={
  protoFillNum:["prototype: fill a made-up number","прототип: подставить выдуманный номер","prototip: toslama belgi goý"], protoFillMail:["prototype: fill a made-up address","прототип: подставить выдуманный адрес","prototip: toslama salgy goý"], /* prototype only */
  webNote:["Opens in the system browser.","Открывается в браузере.","Brauzerde açylýar."], /* prototype only */
  tabStubNote:["Not part of this prototype.","Не входит в этот прототип.","Bu prototipe girmeýär."], /* prototype only */
+ /* ── profile identity update (2026-10-02). All new drafts unless marked "existing" ── */
+ nameLbl:["Name","Имя","Ady"], /* existing: profile displayName */
+ editName:["Edit name","Изменить имя","Ady üýtget"],
+ nameHelp:["Shown to buyers and sellers on your Listings and in chats.","Видно покупателям и продавцам в ваших объявлениях и переписках.","Bildirişleriňizde we ýazyşmalarda alyjylara we satyjylara görünýär."],
+ nameHelpPrivate:["Shown to you. On your Listings others see “Private seller”.","Видно только вам. В объявлениях другие видят «Частный продавец».","Diňe size görünýär. Bildirişlerde beýlekiler «Şahsy satyjy» görýär."],
+ nameAssigned:["We picked this name for you. You can change it.","Это имя мы выбрали за вас. Его можно изменить.","Bu ady siz üçin saýladyk. Ony üýtgedip bilersiňiz."],
+ save:["Save","Сохранить","Ýatda sakla"], saving:["Saving…","Сохраняем…","Ýatda saklanýar…"],
+ nameSaved:["Name saved","Имя сохранено","Ady ýatda saklandy"], saveFail:["Couldn't save. Try again.","Не удалось сохранить. Попробуйте ещё раз.","Ýatda saklap bolmady. Täzeden synanyşyň."],
+ nmEmpty:["Enter a name.","Введите имя.","Ady giriziň."], nmShort:["Use at least 2 characters.","Минимум 2 символа.","Iň az 2 simwol bolmaly."],
+ nmLong:["Use no more than 30 characters.","Не больше 30 символов.","30 simwoldan köp bolmaly däl."],
+ nmChars:["Use only letters, numbers, spaces, hyphens, dots and apostrophes.","Используйте только буквы, цифры, пробелы, дефисы, точки и апострофы.","Diňe harplary, sanlary, boşlugy, defisi, nokady we apostrofy ulanyň."],
+ nmDigits:["A name can't hold a phone number. Use no more than 4 digits.","Имя не может содержать номер телефона. Не больше 4 цифр.","Atda telefon belgisi bolup bilmez. 4 sandan köp ulanmaň."],
+ nmReserved:["This name is reserved for AutoTM. Choose another one.","Это имя зарезервировано за AutoTM. Выберите другое.","Bu at AutoTM üçin bellenen. Başga at saýlaň."],
+ nmLimit:["You can change your name once every 30 days.","Имя можно менять раз в 30 дней.","Ady 30 günde bir gezek üýtgedip bolýar."],
+ nmLocked:["You can change your name again on {d}.","Имя можно будет снова изменить {d}.","Ady {d} gaýtadan üýtgedip bilersiňiz."],
+ underReview:["Under review","На проверке","Barlanýar"],
+ nameReviewNote:["Others see your previous name until a moderator approves the new one.","Пока модератор не одобрит новое имя, другие видят прежнее.","Moderator täze ady tassyklaýança, beýlekiler öňki ady görýär."],
+ photoReviewNote:["Others see your AutoTM avatar until a moderator approves the photo.","Пока модератор не одобрит фото, другие видят аватар AutoTM.","Moderator suraty tassyklaýança, beýlekiler AutoTM awataryny görýär."],
+ profilePhoto:["Profile photo","Фото профиля","Profil suraty"], changePhoto:["Change photo","Изменить фото","Suraty üýtget"],
+ takePhoto:["Take photo","Сделать фото","Surat düş"], fromGallery:["Choose from gallery","Выбрать из галереи","Galereýadan saýla"],
+ fromLibrary:["Choose an AutoTM avatar","Выбрать аватар AutoTM","AutoTM awataryny saýla"],
+ removePhoto:["Remove photo","Удалить фото","Suraty aýyr"], removePhotoSub:["Your AutoTM avatar comes back","Вернётся аватар AutoTM","AutoTM awatary gaýdyp geler"],
+ useAssigned:["Use my first avatar","Вернуть первый аватар","Ilkinji awatary gaýtar"], useAssignedSub:["The one AutoTM gave you","Тот, что выдал AutoTM","AutoTM-iň size beren awatary"],
+ cropT:["Move and scale","Переместите и измените масштаб","Süýşüriň we ululygyny sazlaň"], cropHint:["Others see only the circle.","Другим виден только круг.","Beýlekilere diňe tegelek görünýär."],
+ usePhoto:["Use photo","Использовать фото","Suraty ulan"], retake:["Retake","Переснять","Täzeden düş"], chooseOther:["Choose another","Выбрать другое","Başgasyny saýla"],
+ zoom:["Zoom","Масштаб","Ulaltmak"],
+ compressing:["Preparing photo…","Готовим фото…","Surat taýýarlanýar…"], uploading:["Uploading {p}%","Загрузка {p}%","Ýüklenýär {p}%"],
+ photoUpdated:["Photo updated","Фото обновлено","Surat täzelendi"], photoRemoved:["Photo removed","Фото удалено","Surat aýryldy"],
+ uploadFail:["Photo not uploaded.","Фото не загрузилось.","Surat ýüklenmedi."], photoBad:["This photo can't be used. Choose another one.","Это фото не подходит. Выберите другое.","Bu surat ýaramaýar. Başgasyny saýlaň."],
+ camDeniedT:["Allow camera access","Разрешите доступ к камере","Kamera rugsat beriň"],
+ camDeniedD:["AutoTM needs the camera to take your profile photo. You can allow it in Android settings.","Камера нужна, чтобы сделать фото профиля. Доступ можно разрешить в настройках Android.","Profil suratyny düşmek üçin kamera gerek. Rugsady Android sazlamalarynda berip bilersiňiz."],
+ galDeniedT:["Allow photo access","Разрешите доступ к фото","Suratlara rugsat beriň"],
+ galDeniedD:["AutoTM needs your photos to set a profile photo. You can allow it in Android settings.","Доступ к фото нужен, чтобы выбрать фото профиля. Его можно разрешить в настройках Android.","Profil suratyny saýlamak üçin suratlaryňyza rugsat gerek. Ony Android sazlamalarynda berip bilersiňiz."],
+ openSettings:["Open settings","Открыть настройки","Sazlamalary aç"],
+ appSetToast:["Android app settings would open","Откроются настройки приложения в Android","Android-da programmanyň sazlamalary açylar"], /* prototype only */
+ libT:["AutoTM avatars","Аватары AutoTM","AutoTM awatarlary"], libHint:["Pick one, or keep the one we gave you.","Выберите любой или оставьте выданный.","Birini saýlaň ýa-da size berlenini galdyryň."],
+ nowTag:["Current","Сейчас","Häzirki"], useAvatar:["Use this avatar","Выбрать этот аватар","Şu awatary ulan"], avatarUpdated:["Avatar updated","Аватар обновлён","Awatar täzelendi"],
+ userN:["User {n}","Пользователь {n}","Ulanyjy {n}"], /* N1 option B, rendered per viewer */
+ seller:["Seller","Продавец","Satyjy"], privateSeller:["Private seller","Частный продавец","Şahsy satyjy"], sellerSince:["On AutoTM since {d}","На AutoTM с {d}","AutoTM-de {d} bäri"], /* existing */
+ sinceDate:["September 2026","сентября 2026","sentýabr 2026"],
+ roleSeller:["Seller","Продавец","Satyjy"], deletedUser:["Deleted user","Удалённый пользователь","Pozulan ulanyjy"],
+ lastSeen:["last seen today 16:59","был(а) сегодня в 16:59","şu gün 16:59 göründi"], /* #352 prototype string */
+ msgPre:["Is it still for sale?","Ещё продаётся?","Henizem satylýarmy?"],
+ seenT:["How others see you","Как вас видят другие","Beýlekiler sizi nähili görýär"], /* prototype only */
+ seenListing:["Listing detail, seller block","Объявление, блок продавца","Bildiriş, satyjy bölegi"], seenChat:["Conversation header","Заголовок переписки","Ýazyşmanyň başy"],
+ seenMsgs:["Messages list row","Строка в списке сообщений","Habarlar sanawyndaky setir"], seenDeleted:["After the account is deleted","После удаления аккаунта","Hasap pozulandan soň"],
+ seenNote:["Prototype preview. Listing detail and Messages are owned by #351 and #352; only the name and avatar are shown here.","Превью прототипа. Объявление и сообщения проектируются в #351 и #352; здесь только имя и аватар.","Prototip görnüşi. Bildiriş we Habarlar #351 we #352-de taýýarlanýar; bu ýerde diňe at we awatar görkezilýär."], /* prototype only */
+ protoSeen:["prototype: how others see you","прототип: как вас видят другие","prototip: beýlekiler sizi nähili görýär"], /* prototype only */
+ av1:["Sedan","Седан","Sedan"], av2:["SUV","Внедорожник","Ýolsuzlyk ulagy"], av3:["Pickup","Пикап","Pikap"], av4:["Wheel","Колесо","Teker"], av5:["Steering wheel","Руль","Rul"], av6:["Car key","Ключ","Açar"],
+ av7:["Gear stick","Рычаг КПП","Tizlik guty"], av8:["Speedometer","Спидометр","Spidometr"], av9:["Helmet","Шлем","Şlem"], av10:["Fuel pump","Заправка","Ýangyç guýujy"], av11:["Finish flag","Финишный флаг","Finiş baýdagy"], av12:["Road","Дорога","Ýol"],
 };
 const t=(k,v)=>{const a=TX[k];if(!a)throw new Error("Missing translation: "+k);let s=a[LANGS.indexOf(S.lang)];if(s==null)throw new Error("Missing translation: "+k+" ("+S.lang+")");if(v)for(const x in v)s=s.split("{"+x+"}").join(v[x]);return s;};
 const LANGNAME={en:"English",ru:"Русский",tk:"Türkmençe"};
@@ -244,14 +326,23 @@ const S={
   webProfile:"production", acct:"out", phone:"+993 61 00-00-00", email:"name@example.com",   // all fake
   lang:"en", theme:"light", os:false,
   stack:[{id:"cabinet"}], tab:"cabinet",
-  v:{set:"A",list:"A",groups:"A",sellbtn:"A",pick:"A",acct:"A",chg:"B",taken:"A"},
+  v:{set:"A",list:"A",groups:"A",sellbtn:"A",pick:"A",acct:"A",chg:"B",taken:"A",   // D1–D8: approved 2026-10-02
+     n1:"A",n2:"A",n3:"A",n4:"A",n5:"A",n6:"A",n7:"A",n8:"A"},                         // N1–N8: identity proposals
   dec:"set", data:"ok", outcome:"ok", req:"ok", delOut:"ok",
   flow:null, ret:null, toast:null, sheet:null, dlg:null, web:null, delChecked:false,
-  notif:{os:"granted"}, picker:null, name:null, inv:"some", blocked:false, ltab:null,
+  notif:{os:"granted"}, picker:null, inv:"some", blocked:false, ltab:null,
+  /* identity: one mock User. num = the 4-digit part of the assigned name; seed = id-derived avatar index */
+  uid:"7c41e2d0", num:"4821", signupLang:"en", customName:null, pendingName:null, nameLocked:false,
+  photo:false, photoPending:false, libPick:null, rndAv:7, up:null, ne:null, libSel:null, crop:null,
+  saveOut:"ok", upOut:"ok", perm:"granted",
 };
 const hasPhone=()=>S.acct==="phone"||S.acct==="both", hasEmail=()=>S.acct==="email"||S.acct==="both", signed=()=>S.acct!=="out";
 
-const mockAccount=()=>({acct:S.acct,phone:hasPhone()?S.phone:null,email:hasEmail()?S.email:null});
+const ID_KEYS=["uid","num","signupLang","customName","pendingName","nameLocked","photo","photoPending","libPick","rndAv"];
+const idSnapshot=()=>{const o={};ID_KEYS.forEach(k=>o[k]=S[k]);return o;};
+const mockAccount=()=>({acct:S.acct,phone:hasPhone()?S.phone:null,email:hasEmail()?S.email:null,...idSnapshot()});
+let idSeq=0;
+function freshIdentity(){idSeq++;const n=String(1000+((idSeq*7919+4821)%9000));return {uid:(0x7c41e2d0+idSeq*2654435761>>>0).toString(16).padStart(8,"0"),num:n,signupLang:S.lang,customName:null,pendingName:null,nameLocked:false,photo:false,photoPending:false,libPick:null,rndAv:(idSeq*5+3)%12};}
 const matchesAccount=(a,f)=>a&&(a.acct===f.type||a.acct==="both")&&(f.type==="phone"?a.phone?.replace(/\D/g,"")===('993'+f.val.replace(/\D/g,"")):a.email===f.val);
 const maskPhoneDisp=p=>{const raw=p.replace(/\D/g,"");const d=raw.startsWith("993")?raw.slice(3):raw;return "+993 "+d[0]+"• ••-••-"+d.slice(-2);};
 const maskEmail=e=>{const [a,b]=e.split("@");return a[0]+"•••@"+b;};
@@ -321,7 +412,7 @@ function success(grace){
     const previous=S.savedAccount;
     if(grace&&matchesAccount(previous,f)&&!S.deletionPending){S.deletedAccount={...previous};S.deletionPending=true;}
     const recovering=S.deletionPending&&matchesAccount(S.deletedAccount,f);
-    const account=recovering?S.deletedAccount:matchesAccount(previous,f)?previous:{acct:f.type,phone:f.type==="phone"?"+993 "+f.val:null,email:f.type==="email"?f.val:null};
+    const account=recovering?S.deletedAccount:matchesAccount(previous,f)?previous:{acct:f.type,phone:f.type==="phone"?"+993 "+f.val:null,email:f.type==="email"?f.val:null,...freshIdentity()}; /* a new User gets an assigned name and avatar at creation (N1, N4) */
     S.stack=S.ret;S.flow=null;S.restoreAccount=null;S.dlg=null;S.histories={};
     if(recovering){S.restoreAccount={...account};S.acct="out";S.dlg="restore";render();}
     else{Object.assign(S,account);S.savedAccount=mockAccount();toast(t("signedIn"));}
@@ -374,6 +465,10 @@ const IC={
  heart:'<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
  chat:'<path d="M4 5h16v11H9l-5 4z"/>',
  warn:'<path d="M12 4l9 16H3z"/><path d="M12 10v5M12 17.5h.01"/>',
+ camera:'<path d="M4 8h3.5l1.6-2.5h5.8L16.5 8H20a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/>',
+ pencil:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+ image:'<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M20.5 16l-5-5-9 8.5"/>',
+ grid:'<rect x="4" y="4" width="6.5" height="6.5" rx="3.2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="3.2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="3.2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="3.2"/>',
  cal:'<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
 };
 function icon(n,sz=22){if(!IC[n])throw new Error("Missing icon: "+n);return `<svg viewBox="0 0 24 24" width="${sz}" height="${sz}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n]}</svg>`;}
@@ -392,6 +487,168 @@ function btn(label,fn,cls="brand",dis=false,k=""){return `<button class="btn ${c
 function skeletonLines(){return `<div class="pad" style="padding-top:14px">${[0,1,2,3,4].map(i=>`<div style="display:flex;gap:14px;align-items:center;height:56px"><div class="skel" style="height:24px;width:24px;border-radius:50%"></div><div class="skel" style="height:14px;width:${[55,40,62,35,48][i]}%"></div></div>`).join("")}</div>`;}
 function errState(){return `<div class="pad" style="text-align:center;padding-top:90px"><div class="mute" style="display:flex;justify-content:center">${icon("warn",34)}</div><div class="b" style="font-size:17px;margin:10px 0 4px">${t("wrong")}</div><div class="mute s13" style="margin-bottom:18px">${t("offline")}</div><div style="max-width:180px;margin:auto">${btn(t("retry"),"S.data='ok';render()","out",false,"retry")}</div></div>`;}
 function avatar(sz,nm){return `<div class="av" style="width:${sz}px;height:${sz}px;font-size:${Math.round(sz/2.3)}px">${nm?nm[0].toUpperCase():icon("user",Math.round(sz*0.5))}</div>`;}
+
+/* ───────────── identity: assigned name, avatar library, photo (profile identity update) ───────────── */
+/* Twelve car-themed avatars, drawn here as inline SVG (48×48). Colours: brand red plus five calm tints, light and dark. */
+const AV_PAL=[["#fde7e7","#c81414","#3b1517","#ff8080"],["#fdf0d9","#b45309","#3a2a10","#f6b25a"],["#e8eaee","#334155","#23272e","#cbd5e1"],["#dcf3ef","#0f766e","#12302b","#5eead4"],["#e3ecfd","#1d4ed8","#172340","#93b4ff"],["#f1ede4","#6b5b3e","#2e2a22","#d6c8a8"]];
+const AV_G=[
+ '<path d="M6 31v-5l5-2 6-7h13l6 7 6 1v6"/><path d="M17 17v7M11 24h26"/><circle cx="15" cy="31" r="3.6"/><circle cx="33" cy="31" r="3.6"/>',
+ '<path d="M6 31v-9l3-6h21l4 6h8v9"/><path d="M9 22h25M20 16v6"/><circle cx="14" cy="31" r="4"/><circle cx="34" cy="31" r="4"/><path d="M42 24h-3"/>',
+ '<path d="M4 31v-6h18v-9h9l5 9h8v6"/><path d="M26 16v9"/><circle cx="12" cy="31" r="3.8"/><circle cx="35" cy="31" r="3.8"/>',
+ '<circle cx="24" cy="24" r="15"/><circle cx="24" cy="24" r="4"/><path d="M24 20V10M27.8 22.8l9.5-3.1M26.4 27.2l5.9 8.1M21.6 27.2l-5.9 8.1M20.2 22.8l-9.5-3.1"/>',
+ '<circle cx="24" cy="24" r="15"/><circle cx="24" cy="25" r="3.5"/><path d="M9.5 21c5 1.5 9 1.5 11 3M38.5 21c-5 1.5-9 1.5-11 3M24 28.5V39"/>',
+ '<circle cx="15" cy="24" r="7"/><circle cx="15" cy="24" r="2"/><path d="M22 24h20M36 24v6M41 24v4"/>',
+ '<path d="M14 13v22M24 13v22M34 13v11M14 24h20"/><circle cx="14" cy="11" r="2.6"/><circle cx="24" cy="11" r="2.6"/><circle cx="34" cy="11" r="2.6"/><circle cx="14" cy="37" r="2.6"/><circle cx="24" cy="37" r="2.6"/>',
+ '<path d="M8 33a16 16 0 1 1 32 0"/><path d="M24 33l8-10"/><circle cx="24" cy="33" r="2.4"/><path d="M12 25l2.5 1.5M24 17v3M36 25l-2.5 1.5"/>',
+ '<path d="M8 32c0-11 7-18 17-18 8 0 15 6 15 14v6H8z"/><path d="M23 22h17v6H25a2 2 0 0 1-2-2z"/>',
+ '<rect x="10" y="11" width="15" height="27" rx="2"/><path d="M13 17h9M25 19h4l4 4v10a2.5 2.5 0 0 0 5 0V21l-4-5"/><path d="M8 38h19"/>',
+ '<path d="M12 41V8"/><path d="M12 9h26v17H12"/><path d="M12 9h6.5v5.7H12zM25 9h6.5v5.7H25zM18.5 14.7H25v5.6h-6.5zM31.5 14.7H38v5.6h-6.5zM12 20.3h6.5V26H12zM25 20.3h6.5V26H25z" fill="currentColor" stroke="none"/>',
+ '<path d="M17 41l5-34M31 41l-5-34"/><path d="M24 11v4M24 20v5M24 31v6"/>',
+];
+const AV_N=AV_G.length;
+const isDark=()=>S.theme==="dark"||(S.theme==="system"&&S.os);
+function libAvatar(i,sz){const p=AV_PAL[i%AV_PAL.length],d=isDark();return `<svg viewBox="0 0 48 48" width="${sz}" height="${sz}" role="img" aria-label="${t("av"+(i+1))}" style="display:block;border-radius:50%;background:${d?p[2]:p[0]};color:${d?p[3]:p[1]};flex:none"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" transform="translate(5.3 5.3) scale(.78)">${AV_G[i]}</g></svg>`;}
+/* the uploaded photo is faked as a gradient "photo" with a car in it; no external image */
+function photoAvatar(sz){return `<div role="img" aria-label="${t("profilePhoto")}" style="width:${sz}px;height:${sz}px;border-radius:50%;flex:none;overflow:hidden;background:linear-gradient(180deg,#8ec5ff 0%,#cfe6ff 55%,#6b6f76 56%,#3d4148 100%);display:flex;align-items:flex-end;justify-content:center"><svg viewBox="0 0 48 30" width="${Math.round(sz*.8)}" style="display:block;margin-bottom:${Math.round(sz*.12)}px"><path d="M3 22v-5l6-2 7-8h15l7 8 7 1v6z" fill="#c81414"/><path d="M17 9h13l5 6H12z" fill="#dff1ff"/><circle cx="13" cy="23" r="4.2" fill="#111"/><circle cx="36" cy="23" r="4.2" fill="#111"/><circle cx="13" cy="23" r="1.6" fill="#bbb"/><circle cx="36" cy="23" r="1.6" fill="#bbb"/></svg></div>`;}
+function deletedAvatar(sz){return `<div class="av" role="img" aria-label="${t("deletedUser")}" style="width:${sz}px;height:${sz}px">${icon("user",Math.round(sz*.5))}</div>`;}
+/* N4: A derives the assigned avatar from the user id (no DB write); B and C store a random one at sign-up */
+function assignedAv(){if(S.v.n4==="A"){let h=0;for(const c of S.uid)h=(h*31+c.charCodeAt(0))>>>0;return h%AV_N;}return S.rndAv%AV_N;}
+function currentAv(){return S.libPick!=null&&S.v.n6==="A"?S.libPick:assignedAv();}
+/* who = "self" or "public". N5 B: a photo awaiting review is visible to its owner only */
+function avatarOf(sz,who="self"){if(S.photo&&!(who==="public"&&S.photoPending&&S.v.n5==="B"))return photoAvatar(sz);return libAvatar(currentAv(),sz);}
+/* N1: the assigned name */
+const N1_C={en:"Swift Piston",ru:"Быстрый Поршень",tk:"Çalt Porşen"};
+const N1_WORDS=["Turbo","Rally","Piston","Motor","Drift","Sedan","Kardan","Diesel"];
+function assignedName(){
+  const v=S.v.n1;
+  if(v==="B")return t("userN",{n:S.num});            // rendered per viewer language; nothing stored but the number
+  if(v==="C")return N1_C[S.signupLang]+" "+S.num.slice(0,2); // stored once, in the language used at sign-up
+  if(v==="D")return "Niva-"+S.num;
+  return N1_WORDS[Number(S.num)%N1_WORDS.length]+" "+S.num; // A: brand-free car word, Latin script, stored once
+}
+const ownName=()=>S.pendingName&&S.v.n3==="C"?S.pendingName:(S.customName||assignedName());
+const isAssigned=()=>!S.customName&&!(S.pendingName&&S.v.n3==="C");
+/* N2: what other people see as the name */
+function publicName(ctx){
+  const v=S.v.n2,nm=S.customName||assignedName();
+  if(v==="C"||(v==="B"&&!S.customName))return ctx==="listing"?t("privateSeller"):t("roleSeller");
+  return nm;
+}
+/* N3 name rules */
+const RESERVED=["autotm","support","admin","administrator","moderator","official","поддержка","админ","администратор","модератор","официальный","goldaw","dolandyryjy","resmi","автотм"];
+function nameError(raw){
+  const v=raw.replace(/\s+/g," ").trim();
+  if(!v)return "nmEmpty";
+  if([...v].length<2)return "nmShort";
+  if([...v].length>30)return "nmLong";
+  if(!/^[\p{L}\p{M}0-9 .'’-]+$/u.test(v))return "nmChars";
+  if((v.match(/[0-9]/g)||[]).length>4)return "nmDigits";
+  const flat=v.toLowerCase().replace(/[\s.'’-]/g,"");
+  if(RESERVED.some(r=>flat.includes(r)))return "nmReserved";
+  return null;
+}
+/* name editor */
+function openNameEditor(){S.ne={val:ownName(),err:null,busy:false};if(S.v.n7==="A"){S.sheet={t:"name"};render();}else push("nameEdit");}
+function closeNameEditor(){S.ne=null;if(S.sheet&&S.sheet.t==="name")S.sheet=null;if(topScreen().id==="nameEdit")S.stack.pop();render();}
+function neInput(el){S.ne.val=el.value;S.ne.err=null;const c=document.getElementById("ncount");if(c)c.textContent=[...el.value.trim()].length+"/30";const e=document.getElementById("nerr");if(e)e.remove();const b=document.querySelector('[data-k="namesave"]');if(b)b.disabled=el.value.replace(/\s+/g," ").trim()===ownName();}
+function saveName(){
+  const ne=S.ne;if(!ne||ne.busy||(S.nameLocked&&S.v.n3==="B"))return;
+  const err=nameError(ne.val);if(err){ne.err=err;render();return;}
+  ne.busy=true;ne.err=null;render();
+  setTimeout(()=>{
+    if(S.ne!==ne)return;
+    ne.busy=false;const o=S.saveOut;S.saveOut="ok";
+    if(o==="fail"){ne.err="saveFail";render();return;}
+    if(o==="offline"){ne.err="offline";render();return;}
+    const v=ne.val.replace(/\s+/g," ").trim();
+    if(S.v.n3==="C")S.pendingName=v;else S.customName=v;
+    if(S.v.n3==="B")S.nameLocked=true;
+    S.savedAccount=mockAccount();
+    S.ne=null;if(S.sheet&&S.sheet.t==="name")S.sheet=null;if(topScreen().id==="nameEdit")S.stack.pop();
+    toast(t("nameSaved"));
+  },600);
+}
+function nameEditorBody(inSheet){
+  const ne=S.ne;const locked=S.nameLocked&&S.v.n3==="B";
+  const unchanged=ne.val.replace(/\s+/g," ").trim()===ownName();
+  const help=S.v.n2==="C"?t("nameHelpPrivate"):t("nameHelp");
+  return `<div class="pad" style="padding-top:${inSheet?4:10}px">
+   <div class="field ${ne.err&&ne.err.startsWith("nm")?"err":""}"><input id="nmInp" data-k="nameinput" aria-label="${t("nameLbl")}" value="${ne.val.replace(/"/g,"&quot;")}" ${ne.busy||locked?"disabled":""} autocomplete="off" oninput="neInput(this)" onkeydown="if(event.key==='Enter')saveName()"></div>
+   <div class="ncount" id="ncount">${[...ne.val.trim()].length}/30</div>
+   ${ne.err?`<div class="errtx" id="nerr" role="alert">${t(ne.err)}</div>`:""}
+   <div class="mute s13" style="margin-top:8px">${locked?t("nmLocked",{d:t("delDate")}):help}${S.v.n3==="B"&&!locked?" "+t("nmLimit"):""}${S.v.n3==="C"?" "+t("nameReviewNote"):""}</div>
+   <div style="margin-top:14px">${btn(ne.busy?`<span class="spin" style="border-color:rgba(255,255,255,.35);border-top-color:#fff;width:18px;height:18px"></span>${t("saving")}`:t("save"),"saveName()","brand",ne.busy||locked||unchanged,"namesave")}</div></div>`;
+}
+function nameEditScreen(){if(!S.ne)S.ne={val:ownName(),err:null,busy:false};return appbar(t("editName"),{back:"closeNameEditor()"})+nameEditorBody(false);}
+/* photo */
+function openPhotoSheet(){if(S.up&&S.up.stage!=="fail")return;S.sheet={t:"photo"};render();}
+function pickSource(src){S.sheet=null;if(S.perm==="denied"){S.dlg=src==="camera"?"permCam":"permGal";render();return;}S.crop={src,z:1.25};push("crop");}
+let upTimer=null,upToken=0;
+function runUpload(){
+  const tok=++upToken;S.up={stage:"compress",p:0,src:S.up?.src||"gallery"};render();
+  const step=()=>{
+    if(tok!==upToken||!S.up)return;
+    const u=S.up;
+    if(u.stage==="compress"){u.stage="upload";u.p=0;render();upTimer=setTimeout(step,260);return;}
+    if(u.stage==="upload"&&u.p<100){
+      const o=S.upOut;
+      if(u.p>=50&&(o==="fail"||o==="offline")){S.upOut="ok";u.stage="fail";u.err=o==="offline"?"offline":"uploadFail";render();return;}
+      if(u.p>=75&&o==="bad"){S.upOut="ok";u.stage="fail";u.err="photoBad";render();return;}
+      u.p+=25;render();upTimer=setTimeout(step,260);return;
+    }
+    S.upOut="ok";S.up=null;S.photo=true;S.photoPending=S.v.n5==="B";S.savedAccount=mockAccount();toast(t("photoUpdated"));
+  };
+  upTimer=setTimeout(step,650);
+}
+function usePhoto(){const src=S.crop?S.crop.src:"gallery";S.crop=null;if(topScreen().id==="crop")S.stack.pop();S.up={stage:"compress",p:0,src};runUpload();}
+function cancelUpload(){upToken++;clearTimeout(upTimer);S.up=null;render();}
+function removePhoto(){S.sheet=null;const o=S.saveOut;S.saveOut="ok";if(o!=="ok"){toast(t(o==="offline"?"offline":"saveFail"));return;}S.photo=false;S.photoPending=false;S.savedAccount=mockAccount();toast(t("photoRemoved"));}
+function useAssigned(){S.sheet=null;const o=S.saveOut;S.saveOut="ok";if(o!=="ok"){toast(t(o==="offline"?"offline":"saveFail"));return;}S.libPick=null;S.savedAccount=mockAccount();toast(t("avatarUpdated"));}
+function openLibrary(){S.sheet=null;S.libSel=currentAv();S.libBusy=false;push("library");}
+function saveLibrary(){
+  if(S.libBusy)return;S.libBusy=true;render();
+  setTimeout(()=>{if(!S.libBusy)return;S.libBusy=false;const o=S.saveOut;S.saveOut="ok";
+    if(o!=="ok"){toast(t(o==="offline"?"offline":"saveFail"));return;}
+    S.libPick=S.libSel;S.photo=false;S.photoPending=false;S.savedAccount=mockAccount();if(topScreen().id==="library")S.stack.pop();toast(t("avatarUpdated"));},600);
+}
+function avatarButton(sz){
+  const u=S.up;let ov="";
+  if(u&&u.stage==="compress")ov=`<span class="upl"><span class="spin"></span></span>`;
+  else if(u&&u.stage==="upload")ov=`<span class="upl">${u.p}%</span>`;
+  else if(u&&u.stage==="fail")ov=`<span class="upl err">${icon("warn",26)}</span>`;
+  return `<button class="avw" data-k="avatar" aria-label="${t("changePhoto")}" onclick="openPhotoSheet()">${avatarOf(sz)}${ov}<span class="cam">${icon("camera",17)}</span></button>`;
+}
+function uploadLine(){
+  const u=S.up;if(!u)return "";
+  if(u.stage==="compress")return `<div class="mute s13" data-k="upstate" style="margin-top:8px">${t("compressing")}</div>`;
+  if(u.stage==="upload")return `<div class="mute s13" data-k="upstate" style="margin-top:8px">${t("uploading",{p:u.p})}</div>`;
+  return `<div style="margin-top:8px;text-align:center"><div class="errtx" role="alert" data-k="upstate" style="margin:0">${t(u.err)}</div><div style="display:flex;gap:18px;justify-content:center">${u.err==="photoBad"?`<button class="btn link" data-k="upchoose" onclick="S.up=null;openPhotoSheet()">${t("chooseOther")}</button>`:`<button class="btn link" data-k="upretry" onclick="runUpload()">${t("retry")}</button>`}<button class="btn link" data-k="upcancel" style="color:var(--mfg)" onclick="cancelUpload()">${t("cancel")}</button></div></div>`;
+}
+function cropScreen(){
+  const c=S.crop||{src:"gallery",z:1.25};const big=Math.round(300*c.z);
+  return `<div class="crop"><div class="bar2"><button class="ib" aria-label="${t("cancel")}" data-k="cropcancel" onclick="S.crop=null;pop()">${icon("x")}</button><div style="flex:1;text-align:center;font-weight:600">${t("cropT")}</div><span class="sp" style="width:44px"></span></div>
+  <div class="stage"><div style="transform:scale(1)">${photoAvatar(big).replace("border-radius:50%","border-radius:0")}</div><div class="mask"></div></div>
+  <div class="ctrl"><div class="xs" style="text-align:center;opacity:.8">${t("cropHint")}</div><label class="xs" style="display:flex;gap:10px;align-items:center">${t("zoom")}<input type="range" data-k="zoom" min="1" max="2" step="0.05" value="${c.z}" style="flex:1" oninput="S.crop.z=Number(this.value);renderPhone()"></label>
+  ${btn(t("usePhoto"),"usePhoto()","brand",false,"usephoto")}${btn(t(c.src==="camera"?"retake":"chooseOther"),"S.crop.z=1.25;render()","out",false,"cropagain")}</div></div>`;
+}
+function libraryScreen(){
+  const cur=currentAv();if(S.libSel==null)S.libSel=cur;
+  let h=appbar(t("libT"))+`<div class="mute s13" style="padding:0 16px 10px">${t("libHint")}</div><div class="agrid">`;
+  for(let i=0;i<AV_N;i++)h+=`<button class="${S.libSel===i?"on":""}" data-k="av-${i}" aria-pressed="${S.libSel===i}" onclick="S.libSel=${i};render()"><span class="ring">${libAvatar(i,78)}</span><span class="${i===cur&&!S.photo?"":"mute"}">${i===cur&&!S.photo?t("nowTag"):t("av"+(i+1))}</span></button>`;
+  h+=`</div><div class="bottombar">${btn(S.libBusy?t("saving"):t("useAvatar"),"saveLibrary()","brand",S.libBusy||(S.libSel===cur&&!S.photo),"useavatar")}</div>`;
+  return h;
+}
+/* prototype-only preview: how other people see this User */
+function seenScreen(){
+  const pn=publicName("listing"),pc=publicName("chat");
+  let h=appbar(t("seenT"))+`<div class="stub">${t("seenNote")}</div>`;
+  h+=`<div class="sect">${t("seenListing")}</div><div class="card" data-k="seen-listing" style="padding:14px"><div class="b" style="font-size:17px;margin-bottom:10px">${t("seller")}</div><div style="display:flex;gap:12px;align-items:center">${avatarOf(44,"public")}<div style="min-width:0;flex:1"><div class="b" data-k="seen-name" style="font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pn}</div>${pn!==t("privateSeller")?`<div class="mute s13">${t("privateSeller")}</div>`:""}<div class="mute s13">${t("sellerSince",{d:t("sinceDate")})}</div></div></div></div>`;
+  h+=`<div class="sect">${t("seenChat")}</div><div class="card" data-k="seen-chat"><div style="display:flex;align-items:center;gap:8px;padding:8px 10px"><span class="mute">${icon("back")}</span>${avatarOf(36,"public")}<div style="flex:1;min-width:0"><div class="b">${pc}</div><div class="xs mute">${t("lastSeen")}</div></div></div></div>`;
+  const thumb=`<div style="position:relative;width:64px;height:64px;flex:none"><div style="width:64px;height:64px;border-radius:12px;background:var(--muted);display:flex;align-items:center;justify-content:center;color:var(--mfg)"><svg viewBox="0 0 48 30" width="46"><path d="M3 22v-5l6-2 7-8h15l7 8 7 1v6z" fill="currentColor"/><circle cx="13" cy="23" r="4" fill="var(--bg)"/><circle cx="36" cy="23" r="4" fill="var(--bg)"/></svg></div>${S.v.n8==="B"?`<span style="position:absolute;right:-4px;bottom:-4px;border:2px solid var(--bg);border-radius:50%">${avatarOf(24,"public")}</span>`:""}</div>`;
+  h+=`<div class="sect">${t("seenMsgs")}</div><div class="card" data-k="seen-msgs"><div style="display:flex;gap:12px;padding:10px 12px">${thumb}<div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;gap:6px"><b>${pc}</b><span class="xs mute">16:05</span></div><div class="s13 mute">2018 Toyota Camry · 285 000 TMT</div><div class="s13" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t("msgPre")}</div></div></div></div>`;
+  h+=`<div class="sect">${t("seenDeleted")}</div><div class="card" data-k="seen-deleted"><div style="display:flex;align-items:center;gap:8px;padding:8px 10px"><span class="mute">${icon("back")}</span>${deletedAvatar(36)}<div class="b" style="flex:1">${t("deletedUser")}</div></div></div><div style="height:24px"></div>`;
+  return h;
+}
 function idLabel(){return hasPhone()?maskPhoneDisp(S.phone):maskEmail(S.email);}
 function legalLinks(){return `<div class="xs mute" style="padding:0 16px 14px">${t("legalPre")} <a style="color:var(--info);text-decoration:underline;cursor:pointer" onclick="openLegal('terms')">${t("terms")}</a> ${t("and")} <a style="color:var(--info);text-decoration:underline;cursor:pointer" onclick="openLegal('privacy')">${t("privacy")}</a>.</div>`;}
 function langSwitch(){return `<div style="display:flex;gap:2px;padding-right:8px">${LANGS.map(l=>`<button data-k="lang-${l}" style="border:0;background:none;font:inherit;font-size:13px;padding:6px 8px;border-radius:8px;cursor:pointer;color:${S.lang===l?"var(--fg)":"var(--mfg)"};font-weight:${S.lang===l?600:400}" onclick="S.lang='${l}';render()">${l.toUpperCase()}</button>`).join("")}</div>`;}
@@ -412,7 +669,8 @@ function groups(){
 /* ───────────── screens ───────────── */
 function profileRow(){
   if(!signed())return row({k:"signin",cls:"big",lead:avatar(48),label:t("signIn"),sub:t("signInSub"),fn:"startSignIn()",chev:true});
-  return row({k:"profile",cls:"big",lead:avatar(48,S.name),label:S.name||idLabel(),sub:S.name?idLabel():"",fn:"push('profile')",chev:true});
+  /* every signed-in User now has a name (assigned or edited) and an avatar (library or photo) */
+  return row({k:"profile",cls:"big",lead:avatarOf(48),label:ownName(),sub:idLabel(),fn:"push('profile')",chev:true});
 }
 function sellRows(){
   if(!signed())return "";
@@ -459,7 +717,13 @@ function profileScreen(){
     const fn=has&&S.v.chg==="B"?`S.sheet={t:'chg',type:'${type}'};render()`:`startMethod('${has?"change":"add"}','${type}')`;
     return row({k:"m-"+type,icon:type==="phone"?"phone":"mail",label:t(type),value:has?(type==="phone"?maskPhoneDisp(S.phone):maskEmail(S.email)):t("add"),accent:!has,fn,chev:true});
   };
-  h+=`<div style="display:flex;flex-direction:column;align-items:center;padding:8px 16px 18px">${avatar(72,S.name)}${S.name?`<div class="b" style="font-size:20px;margin-top:10px">${S.name}</div>`:""}</div>`;
+  const pend=S.pendingName&&S.v.n3==="C",phPend=S.photo&&S.photoPending&&S.v.n5==="B";
+  h+=`<div style="display:flex;flex-direction:column;align-items:center;padding:8px 16px 16px;text-align:center">${avatarButton(88)}${uploadLine()}${phPend&&!S.up?`<span class="pill" data-k="photopending">${t("underReview")}</span>`:""}
+    <button class="nmbtn" data-k="editname" aria-label="${t("editName")}" onclick="openNameEditor()"><span data-k="ownname">${ownName()}</span><span class="mute" style="display:flex">${icon("pencil",18)}</span></button>
+    ${pend?`<span class="pill" data-k="namepending">${t("underReview")}</span>`:""}
+    ${isAssigned()?`<div class="mute s13" data-k="assignedhint" style="margin-top:2px">${t("nameAssigned")}</div>`:""}
+    ${pend?`<div class="mute xs" style="margin-top:4px">${t("nameReviewNote")}</div>`:""}${phPend?`<div class="mute xs" style="margin-top:4px">${t("photoReviewNote")}</div>`:""}
+    <a class="xs mute" data-k="protoseen" style="text-decoration:underline;cursor:pointer;margin-top:8px" onclick="push('seen')">${t("protoSeen")}</a></div>`;
   h+=`<div class="foot" style="padding-bottom:2px">${t("methods")}</div>`+list(m("phone")+m("email"));
   if(S.v.acct==="A")h+=gap()+list(acctRows());
   return h;
@@ -582,7 +846,15 @@ function overlays(){
     const url=`${webBase()}/${S.lang}/legal/${S.web.kind}`;
     o+=`<div class="br"><div class="bar"><button class="ib" style="color:#222" data-k="webclose" onclick="S.web=null;render()">${icon("x")}</button><div class="url">${url}</div></div><div style="padding:16px"><div style="font-size:20px;font-weight:700;margin-bottom:8px">${S.web.kind==="privacy"?t("privacy"):t("terms")}</div><div class="skel" style="height:12px;background:#ddd;margin:8px 0"></div><div class="skel" style="height:12px;background:#ddd;margin:8px 0;width:90%"></div><div class="skel" style="height:12px;background:#ddd;margin:8px 0;width:80%"></div><div style="color:#666;font-size:12px;margin-top:14px">${t("webNote")}</div><a data-k="webdelete" style="display:block;margin-top:14px;color:#2563eb;text-decoration:underline;cursor:pointer" onclick="S.web=null;S.flow={kind:'webdelete',type:'phone',val:'',err:null,step:'entry'};S.stack.push({id:'webDelete'});render()">${t("deleteAcc")}: ${webBase()}/${S.lang}/account/delete</a></div></div>`;
   }
-  if(S.sheet){
+  if(S.sheet&&S.sheet.t==="name"){
+    o+=`<div class="dim" onclick="if(!S.ne||!S.ne.busy)closeNameEditor()"></div><div class="sheet" data-sheet="name"><div class="hd"><div class="tt">${t("editName")}</div><button class="ib" aria-label="${t("cancel")}" data-k="nameclose" onclick="if(!S.ne.busy)closeNameEditor()">${icon("x")}</button></div>${nameEditorBody(true)}</div>`;
+  }else if(S.sheet&&S.sheet.t==="photo"){
+    let r=row({k:"ph-camera",icon:"camera",label:t("takePhoto"),fn:"pickSource('camera')"})+row({k:"ph-gallery",icon:"image",label:t("fromGallery"),fn:"pickSource('gallery')"});
+    if(S.v.n6==="A")r+=row({k:"ph-library",icon:"grid",label:t("fromLibrary"),fn:"openLibrary()"});
+    if(S.photo)r+=row({k:"ph-remove",icon:"trash",cls:"danger",label:t("removePhoto"),sub:t("removePhotoSub"),fn:"removePhoto()"});
+    else if(S.libPick!=null&&S.libPick!==assignedAv()&&S.v.n6==="A")r+=row({k:"ph-assigned",icon:"user",label:t("useAssigned"),sub:t("useAssignedSub"),fn:"useAssigned()"});
+    o+=`<div class="dim" onclick="S.sheet=null;render()"></div><div class="sheet" data-sheet="photo"><div class="hd"><div class="tt">${t("profilePhoto")}</div><button class="ib" aria-label="${t("cancel")}" data-k="photoclose" onclick="S.sheet=null;render()">${icon("x")}</button></div>${list(r)}</div>`;
+  }else if(S.sheet){
     const s=S.sheet;
     o+=`<div class="dim" onclick="S.sheet=null;render()"></div><div class="sheet" style="padding:20px 16px"><div class="b" style="font-size:19px;margin-bottom:6px">${t("chgWarnT",{x:t(s.type==="phone"?"chgWarnX":"chgWarnY")})}</div><div class="mute" style="margin-bottom:16px">${t("chgWarnD")}</div><div style="display:grid;gap:8px">${btn(t("contin"),`S.sheet=null;startMethod('change','${s.type}')`,"brand",false,"sheetcontinue")}${btn(t("cancel"),"S.sheet=null;render()","out",false,"sheetcancel")}</div></div>`;
   }
@@ -596,6 +868,7 @@ function overlays(){
     if(d==="logout")c=`<div class="b" style="font-size:18px">${t("logoutT")}</div><div class="mute" style="margin:6px 0 16px">${t("logoutD")}</div>`+two(btn(t("cancel"),"S.dlg=null;render()","out",false,"dlgcancel"),btn(t("logout"),"doLogout()","brand",false,"dlgok"));
     if(d==="delete")c=`<div class="b" style="font-size:18px">${t("delConfT")}</div><div class="mute" style="margin:6px 0 16px">${t("delConfD",{d:t("delDate")})}</div>`+two(btn(t("cancel"),"S.dlg=null;render()","out",false,"dlgcancel"),btn(t("delDo"),"doDelete()","dest",false,"dlgok"));
     if(d==="restore")c=`<div class="b" style="font-size:18px">${t("restT")}</div><div class="mute" style="margin:6px 0 16px">${t("restD",{d:t("delDate")})}</div>`+two(btn(t("cancel"),"restoreCancel()","out",false,"dlgcancel"),btn(t("restDo"),"restore()","brand",false,"dlgok"));
+    if(d==="permCam"||d==="permGal")c=`<div class="b" style="font-size:18px">${t(d==="permCam"?"camDeniedT":"galDeniedT")}</div><div class="mute" style="margin:6px 0 16px">${t(d==="permCam"?"camDeniedD":"galDeniedD")}</div>`+two(btn(t("cancel"),"S.dlg=null;render()","out",false,"dlgcancel"),btn(t("openSettings"),"S.dlg=null;toast(t('appSetToast'))","brand",false,"dlgok"));
     o+=`<div class="dim"></div><div class="dlg" data-dlg="${d}">${c}</div>`;
   }
   if(S.toast)o+=`<div class="toast">${S.toast}</div>`;
@@ -607,7 +880,7 @@ function tabbar(){
 }
 
 /* ───────────── render ───────────── */
-const SCREENS={cabinet:cabinetScreen,sell:sellScreen,settings:settingsScreen,notifs:notifsScreen,profile:profileScreen,pick:pickScreen,about:aboutScreen,signin:signinScreen,code:codeScreen,methodEntry:methodEntryScreen,taken:takenScreen,delete:deleteScreen,scheduled:scheduledScreen,webDelete:webDeleteScreen,listings:listingsScreen,support:supportScreen};
+const SCREENS={cabinet:cabinetScreen,sell:sellScreen,settings:settingsScreen,notifs:notifsScreen,profile:profileScreen,pick:pickScreen,about:aboutScreen,signin:signinScreen,code:codeScreen,methodEntry:methodEntryScreen,taken:takenScreen,delete:deleteScreen,scheduled:scheduledScreen,webDelete:webDeleteScreen,listings:listingsScreen,support:supportScreen,nameEdit:nameEditScreen,crop:cropScreen,library:libraryScreen,seen:seenScreen};
 function currentScreen(){const id=topScreen().id;return (SCREENS[id]||(()=>tabStub(id)))();}
 function renderPhone(){
   const id=topScreen().id;const tabs=isTab(id);
@@ -660,20 +933,63 @@ const DEC={
   why:"A second button can read as a merge path and drops the current session.",
   opts:{A:["Refuse and offer another value","Plain explanation and one button. States that accounts are never merged."],
         B:["Also: sign out and use that account","Adds a second button that signs out and opens sign-in."]}},
+ /* ── profile identity update: proposals N1–N8 ── */
+ n1:{id:"N1",name:"Assigned name format",ref:"Founder 2026-10-02 (#353 comment 5947334041); AR-37-002, AR-11-010 (Auto.ru shows a first name); KZ-31-002 (Kolesa “Имя на Kolesa.kz”)",rec:"A",go:()=>{openAs("both","profile");},
+  why:"A brand-free car word reads the same in EN, RU and TK, is friendlier than “User 4821”, and cannot be mistaken for a dealer or a brand. It is stored once, so the seller's name does not change with the viewer's language and the backfill is one write per User.",
+  opts:{A:["Car word + number, stored once","“Turbo 4821”, “Piston 2265”. Words from a short brand-free list in Latin script, plus 4 digits. Written to User.displayName at sign-up; existing Users get one by backfill. Not unique."],
+        B:["“User 4821”, per viewer language","Only the number is stored. Others see “User 4821”, “Пользователь 4821” or “Ulanyjy 4821” in their own language. displayName stays null until the User types a name. Reads like a placeholder, close to the admin “User 7c41e2d0” label."],
+        C:["Adjective + car word, sign-up language","“Swift Piston”, “Быстрый Поршень”, “Çalt Porşen”, stored once in the language used at sign-up. Friendlier, but needs three word lists, Russian gender agreement, and a reviewer for odd pairs."],
+        D:["Model name + number","“Niva-4821”, the founder's example. Clear car theme, but a seller called “Toyota-1234” or “Niva-4821” on a car marketplace can read as a dealer or the car on sale."]}},
+ n2:{id:"N2",name:"Is the assigned name public?",ref:"apps/mobile/src/listings/components/SellerBlock.tsx (name, else “Private seller”); #504 (peer.displayName); #352 D8 and Conversation header",rec:"A",go:()=>{openAs("both","profile");push("seen");},
+  why:"The name exists so chats and Listings have a human label; “Private seller” stays as the second line, as SellerBlock already does when a name exists. No Sign-in Method is ever shown.",
+  opts:{A:["Yes, everywhere","Listing seller block shows the name with “Private seller” under it; the Conversation header and Messages row show the name. Dealers: a Listing has no dealership link today, so there is nothing to show yet."],
+        B:["Only after the User edits it","An assigned name is shown to its owner only. Others see “Private seller” on Listings and “Seller” in chats until the User types a name. Needs a flag for “assigned”."],
+        C:["Never public","Names are for the owner only. Listings keep “Private seller”, chats show “Seller” or “Buyer”, as today's app does."]}},
+ n3:{id:"N3",name:"Name rules and moderation",ref:"apps/api/src/modules/admin/domain/ContentReport.ts (user reports exist); ADR-0056 (contact phones are verified, so a name must not carry one)",rec:"A",go:()=>{openAs("both","profile");openNameEditor();},
+  why:"2 to 30 characters, any script, no phone numbers, no “AutoTM”/“Support” look-alikes, not unique. The User report and admin review already exist, so report-only costs nothing new. A 30-day lock punishes typos; pre-review needs a queue nobody staffs yet.",
+  opts:{A:["Rules, no limit, report-only","2–30 characters after trimming; letters of any script, digits, space, hyphen, dot, apostrophe; at most 4 digits; reserved words refused. Change any time. Others can report the User; an admin can reset the name to a new assigned one."],
+        B:["Same, plus once per 30 days","As A, and after a change the editor is locked until a date. Reduces impersonation churn; punishes typos."],
+        C:["Same, plus pre-review","A changed name shows “Under review” to its owner; others keep seeing the old name until a moderator approves it. Needs an admin queue."]}},
+ n4:{id:"N4",name:"Avatar library: where it lives and how it is assigned",ref:"Founder 2026-10-02; AR-37-002 (Auto.ru default avatar: a drawn racing helmet in a pale circle); packages/db/prisma/schema.prisma (User.avatarUrl only)",rec:"A",go:()=>{openAs("both","profile");},
+  why:"Twelve small drawings are a few kilobytes in the app, work offline and need no storage objects. Deriving the index from the user id needs no backfill or migration for the default, and every screen that knows the user id draws the same avatar.",
+  opts:{A:["Bundled in the app, derived from the user id","The app ships 12 avatars. Default = hash(user id) mod 12, computed by the API and returned as an id, so no write at sign-up. A picked avatar is stored as a small id. Changing the set needs an app release; ids must stay stable."],
+        B:["Bundled in the app, random at sign-up","Same assets; a random id is written at sign-up and by a backfill for existing Users."],
+        C:["Served from storage, random at sign-up","The library is a set of image URLs in object storage; the id or URL is stored per User. The set can change without a release; costs requests and a cache."]}},
+ n5:{id:"N5",name:"Uploaded photo: crop, size and moderation",ref:"apps/mobile/src/listings/uploadStaging/compressor.ts (2400 px, JPEG 0.8, 5 MB); apps/api/src/modules/listings/application/PresignUpload.ts (5 MB image cap); NullContentClassifier.ts",rec:"A",go:()=>{openAs("both","profile");S.photo=true;render();},
+  why:"Square crop in the app, resized to 512×512 JPEG, reusing the compressor and the 5 MB presign cap. Report-only matches name moderation; the content classifier is a stub today, so pre-review would be manual.",
+  opts:{A:["Square crop, 512 px, report-only","Shown at once to everyone. Others can report the User; an admin can remove the photo, which brings the AutoTM avatar back."],
+        B:["Square crop, 512 px, pre-review","The owner sees the photo with “Under review”; others see the AutoTM avatar until a moderator approves it. Needs an admin queue."]}},
+ n6:{id:"N6",name:"Can the User pick from the library?",ref:"Founder 2026-10-02 (“a library which we assign ourselves till they add one”)",rec:"A",go:()=>{openAs("both","profile");openPhotoSheet();},
+  why:"Picking is cheap once the library exists, and gives a User who does not want a face photo a choice.",
+  opts:{A:["Yes","The photo sheet has “Choose an AutoTM avatar”, a grid of 12 with the current one marked."],
+        B:["No","Only the assigned avatar or an uploaded photo. The sheet has camera, gallery and Remove."]}},
+ n7:{id:"N7",name:"Name editor form",ref:"KZ-31-002 (Kolesa: bottom sheet with one field and Save over the keyboard); D5 (pickers are sheets)",rec:"A",go:()=>{openAs("both","profile");openNameEditor();},
+  why:"One field fits a sheet and keeps Profile in view, matching the approved pickers.",
+  opts:{A:["Bottom sheet","Title, one field with a counter, a helper line and Save."],
+        B:["Full screen","A plain screen with a back arrow, the same field and Save."]}},
+ n8:{id:"N8",name:"Avatar in the Messages list row",ref:"#352 D8 (approved: Auto.ru row with the Listing photo); AR-37-002 (avatar in the Conversation header)",rec:"A",go:()=>{openAs("both","profile");push("seen");},
+  why:"#352 D8 approved a row led by the Listing photo; the avatar adds little there. It appears in the Conversation header and on Listing detail.",
+  opts:{A:["Listing photo only (as #352 D8)","No avatar in the row; the avatar shows in the Conversation header."],
+        B:["Small avatar on the Listing photo","A 24 px avatar on the corner of the Listing photo. Changes the approved #352 row."]}},
 };
 const DKEYS=Object.keys(DEC);
+DKEYS.forEach((k,i)=>{if(!DEC[k].id){DEC[k].id="D"+(i+1);DEC[k].ap=true;}});
 function setV(k,o){if(!DEC[k].opts[o])return;S.v[k]=o;S.dec=k;DEC[k].go();}
 function cycle(d){const k=S.dec,ks=Object.keys(DEC[k].opts),i=(ks.indexOf(S.v[k])+d+ks.length)%ks.length;setV(k,ks[i]);}
 function nextDec(){const i=(DKEYS.indexOf(S.dec)+1)%DKEYS.length;S.dec=DKEYS[i];DEC[S.dec].go();}
 document.addEventListener("keydown",e=>{if(e.target.closest&&e.target.closest("input,textarea"))return;if(e.key==="ArrowLeft")cycle(-1);if(e.key==="ArrowRight")cycle(1);});
 function switcher(){
   const d=DEC[S.dec],o=d.opts[S.v[S.dec]];
-  document.getElementById("switcher").innerHTML=`<button onclick="cycle(-1)">←</button><span class="lbl">D${DKEYS.indexOf(S.dec)+1} ${d.name}: ${S.v[S.dec]} — ${o[0]}${d.rec===S.v[S.dec]?" ★ recommended":""}</span><button onclick="cycle(1)">→</button><button onclick="nextDec()">next decision ▸</button>`;
+  document.getElementById("switcher").innerHTML=`<button onclick="cycle(-1)">←</button><span class="lbl">${d.id} ${d.name}: ${S.v[S.dec]} — ${o[0]}${d.rec===S.v[S.dec]?(d.ap?" ✓ approved":" ★ recommended"):""}</span><button onclick="cycle(1)">→</button><button onclick="nextDec()">next decision ▸</button>`;
 }
 
 /* ───────────── jumps (every state is one click) ───────────── */
 const J=[];const grp=n=>J.push({g:n});const jp=(l,f)=>J.push({l,f});
-const openAs=(acct,id)=>{S.toast=null;S.phone=S.phone||"+993 61 00-00-00";S.email=S.email||"name@example.com";S.acct=acct;S.savedAccount=acct==="out"?null:mockAccount();S.deletedAccount=S.restoreAccount=null;S.data="ok";S.flow=null;S.outcome=S.req=S.delOut="ok";S.delChecked=S.delFailed=S.deletionPending=false;S.sheet=S.dlg=S.web=S.picker=null;S.histories={};reset("cabinet");if(id&&id!=="cabinet")push(id);};
+const openAs=(acct,id)=>{S.toast=null;S.phone=S.phone||"+993 61 00-00-00";S.email=S.email||"name@example.com";S.acct=acct;S.savedAccount=acct==="out"?null:mockAccount();S.deletedAccount=S.restoreAccount=null;S.data="ok";S.flow=null;S.outcome=S.req=S.delOut="ok";S.delChecked=S.delFailed=S.deletionPending=false;S.sheet=S.dlg=S.web=S.picker=null;S.histories={};
+  upToken++;clearTimeout(upTimer);const iv=S.idv||"new";
+  Object.assign(S,{uid:"7c41e2d0",num:"4821",signupLang:S.lang,customName:iv==="edited"||iv==="photo"?"Aman":null,pendingName:null,nameLocked:false,photo:iv==="photo",photoPending:false,libPick:iv==="lib"?2:null,rndAv:7,up:null,ne:null,libSel:null,libBusy:false,crop:null,saveOut:"ok",upOut:"ok"});
+  if(acct!=="out")S.savedAccount=mockAccount();
+  reset("cabinet");if(id&&id!=="cabinet")push(id);};
 const codeFlow=(kind,type,extra={})=>{S.flow=Object.assign({kind,type,val:type==="phone"?"60 00-00-00":"name@example.com",err:null,code:"",cerr:null,sec:15,resends:0,step:"code",back:[{id:"cabinet"},{id:"profile"}]},extra);};
 grp("Cabinet");
 jp("Signed out",()=>openAs("out"));jp("Phone only",()=>openAs("phone"));jp("Email only",()=>openAs("email"));jp("Phone + email",()=>openAs("both"));
@@ -726,6 +1042,43 @@ jp("Delete: scheduled",()=>{openAs("out");push("scheduled");});
 jp("Web deletion page",()=>{openAs("out");S.flow={kind:"webdelete",type:"phone",val:"",err:null,step:"entry"};push("webDelete");});
 jp("Web: code sent",()=>{openAs("out");codeFlow("webdelete","email");S.stack.push({id:"webDelete"});render();});
 jp("Web: done",()=>{openAs("out");S.flow={kind:"webdelete",type:"email",val:"name@example.com",step:"done"};push("webDelete");});
+grp("Profile identity (2026-10-02 update)");
+const neJump=(val,err)=>{openAs("both","profile");openNameEditor();S.ne.val=val;S.ne.err=err;render();};
+jp("Cabinet: new account",()=>openAs("both"));
+jp("Profile: new account",()=>openAs("both","profile"));
+jp("Profile: email-only new account",()=>openAs("email","profile"));
+jp("Profile: edited name + photo",()=>{S.idv="photo";openAs("both","profile");S.idv="new";});
+jp("Profile: picked library avatar",()=>{S.idv="lib";openAs("both","profile");S.idv="new";});
+jp("Edit name: open",()=>{openAs("both","profile");openNameEditor();});
+jp("Edit name: empty",()=>neJump("","nmEmpty"));
+jp("Edit name: too short",()=>neJump("A","nmShort"));
+jp("Edit name: too long",()=>neJump("Aman the very careful Camry owner","nmLong"));
+jp("Edit name: disallowed characters",()=>neJump("Aman 🚗 <3","nmChars"));
+jp("Edit name: phone number",()=>neJump("Aman 63989404","nmDigits"));
+jp("Edit name: reserved word",()=>neJump("AutoTM Support","nmReserved"));
+jp("Edit name: saving",()=>{neJump("Aman",null);S.ne.busy=true;render();});
+jp("Edit name: save failed",()=>neJump("Aman","saveFail"));
+jp("Edit name: offline",()=>neJump("Aman","offline"));
+jp("Edit name: locked (N3 B)",()=>{S.v.n3="B";S.dec="n3";openAs("both","profile");S.customName="Aman";S.nameLocked=true;openNameEditor();});
+jp("Name under review (N3 C)",()=>{S.v.n3="C";S.dec="n3";openAs("both","profile");S.pendingName="Aman";render();});
+jp("Photo sheet: no photo",()=>{openAs("both","profile");openPhotoSheet();});
+jp("Photo sheet: with photo",()=>{S.idv="photo";openAs("both","profile");S.idv="new";openPhotoSheet();});
+jp("Photo sheet: library avatar picked",()=>{S.idv="lib";openAs("both","profile");S.idv="new";openPhotoSheet();});
+jp("Camera permission denied",()=>{openAs("both","profile");S.dlg="permCam";render();});
+jp("Photos permission denied",()=>{openAs("both","profile");S.dlg="permGal";render();});
+jp("Crop: camera",()=>{openAs("both","profile");S.crop={src:"camera",z:1.25};push("crop");});
+jp("Crop: gallery",()=>{openAs("both","profile");S.crop={src:"gallery",z:1.6};push("crop");});
+jp("Upload: compressing",()=>{openAs("both","profile");S.up={stage:"compress",p:0,src:"gallery"};render();});
+jp("Upload: uploading 50%",()=>{openAs("both","profile");S.up={stage:"upload",p:50,src:"gallery"};render();});
+jp("Upload: failed",()=>{openAs("both","profile");S.up={stage:"fail",p:50,src:"gallery",err:"uploadFail"};render();});
+jp("Upload: offline",()=>{openAs("both","profile");S.up={stage:"fail",p:50,src:"camera",err:"offline"};render();});
+jp("Upload: unreadable photo",()=>{openAs("both","profile");S.up={stage:"fail",p:75,src:"gallery",err:"photoBad"};render();});
+jp("Photo under review (N5 B)",()=>{S.v.n5="B";S.dec="n5";S.idv="photo";openAs("both","profile");S.idv="new";S.photoPending=true;render();});
+jp("Library picker",()=>{openAs("both","profile");openLibrary();});
+jp("Library: another selected",()=>{openAs("both","profile");openLibrary();S.libSel=(currentAv()+4)%AV_N;render();});
+jp("Library: saving",()=>{openAs("both","profile");openLibrary();S.libSel=(currentAv()+4)%AV_N;S.libBusy=true;render();});
+jp("Seen by others: new account",()=>openAs("both","seen"));
+jp("Seen by others: name + photo",()=>{S.idv="photo";openAs("both","seen");S.idv="new";});
 grp("Other tabs");
 jp("Search stub",()=>{openAs("both");switchTab("search");});jp("Favorites stub",()=>{openAs("both");switchTab("favorites");});jp("Messages stub",()=>{openAs("both");switchTab("messages");});
 
@@ -767,33 +1120,47 @@ const STATES=[
  ["Add / change a method, value taken","Profile jumps","app/account/add-phone.tsx, add-email.tsx, verify-sign-in-method.tsx","exists; warning sheet is a proposal"],
  ["Log out, Delete account, scheduled","Account jumps","settings.tsx, app/account/delete.tsx","exists; placement is a proposal; “what happens” list and checkbox are proposals"],
  ["Web deletion page","Account jumps","apps/web/src/app/[locale]/account/delete/page.tsx","exists locally; deployment is #496"],
+ ["Assigned name and avatar on Cabinet and Profile","Profile identity jumps","services.tsx, profile.tsx (initial letter, else a masked Sign-in Method)","new: nothing sets displayName or avatarUrl today"],
+ ["Edit name: sheet or screen, validation, saving, failed, offline, locked, under review","Profile identity jumps","none (no PATCH /me)","new"],
+ ["Photo sheet, permission denied, crop, compressing, uploading, failed, unreadable, under review","Profile identity jumps","none for avatars; Listing photos use uploadStaging/compressor.ts and POST /uploads/presign","new"],
+ ["AutoTM avatar library picker","Profile identity jumps","none","new"],
+ ["How others see the name and avatar","Profile identity jumps (prototype preview)","SellerBlock.tsx; Conversation header and Messages row are #352/#507/#508","new; Listing detail today shows a generic person icon"],
 ];
 
 /* ───────────── panel ───────────── */
 function seg(items,cur,fn){return `<div class="seg">${items.map(([k,n])=>`<button class="${cur===k?"on":""}" onclick="${fn}('${k}')">${n}</button>`).join("")}</div>`;}
 window.pWeb=k=>{S.webProfile=k;render();};
 window.pAcct=k=>openAs(k);
-window.pName=k=>{S.name=k==="yes"?"Aman":null;render();};
+window.pId=k=>{S.idv=k;openAs(signed()?S.acct:"both","profile");};
+window.pSave=k=>{S.saveOut=k;render();};window.pUp=k=>{S.upOut=k;render();};window.pPerm=k=>{S.perm=k;render();};
 window.pInv=k=>{S.inv=k;render();};window.pBlocked=k=>{S.blocked=k==="yes";render();};
 window.pLang=k=>{S.lang=k;render();};window.pTheme=k=>{S.theme=k;render();};window.pOs=k=>{S.os=k==="dark";render();};
 window.pOut=k=>{S.outcome=k;render();};window.pReq=k=>{S.req=k;render();};window.pDel=k=>{S.delOut=k;render();};window.pData=k=>{S.data=k;render();};
 window.pDec=(k,o)=>setV(k,o);
 function panel(){
-  let h=`<h1>PROTOTYPE — Cabinet, Profile and Settings, Auto.ru-style</h1><div class="s13" style="color:#555">Throwaway (issue #353, third version). Everything in the phone is clickable; jump buttons set up any state in one click; ← → flip the option of the highlighted decision. Account values are made up; type any six digits as a code. Resend countdown is 15 s here (60 s in the product). Nothing below is approved except the “Locked” list. New RU and TK wording needs founder review.</div>
-  <h2>Account state</h2>${seg([["out","Signed out"],["phone","Phone only"],["email","Email only"],["both","Phone + email"]],S.acct,"pAcct")} &nbsp; Display name ${seg([["no","none"],["yes","“Aman”"]],S.name?"yes":"no","pName")}
-  <div class="s13" style="color:#555;margin-top:4px"><code>User.displayName</code> exists in the schema but nothing sets it (there is no <code>PATCH /me</code>), so most Users have none. The prototype adds no name editor.</div>
+  let h=`<h1>PROTOTYPE — Cabinet, Profile and Settings, Auto.ru-style + profile identity update</h1><div class="s13" style="color:#555">Throwaway (issue #353, third version plus the 2026-10-02 identity update: assigned name, name editor, profile photo, AutoTM avatar library). D1–D8 are approved and stay at their approved options; N1–N8 are new proposals. Everything in the phone is clickable; jump buttons set up any state in one click; ← → flip the option of the highlighted decision. Account values are made up; type any six digits as a code. Resend countdown is 15 s here (60 s in the product). Nothing below is approved except the “Locked” list. New RU and TK wording needs founder review.</div>
+  <h2>Account state</h2>${seg([["out","Signed out"],["phone","Phone only"],["email","Email only"],["both","Phone + email"]],S.acct,"pAcct")}
+  <div style="margin-top:6px">Identity ${seg([["new","New account: assigned name + avatar"],["edited","Edited name “Aman”"],["lib","Picked library avatar"],["photo","“Aman” + uploaded photo"]],S.idv||"new","pId")}</div>
+  <div class="s13" style="color:#555;margin-top:4px">Today <code>User.displayName</code> and <code>User.avatarUrl</code> exist but nothing sets them (no <code>PATCH /me</code>, no avatar upload), and Listing detail falls back to “Private seller”. This update gives every account an assigned name and avatar; see N1–N8 and <code>cabinet-profile.identity.md</code>.</div>
   <h2>Seller inventory (mock)</h2>${seg([["some","2 active, 1 draft, 1 sold, 1 archived"],["none","No listings"]],S.inv,"pInv")} &nbsp; Blocked Listing ${seg([["no","no"],["yes","yes"]],S.blocked?"yes":"no","pBlocked")}
   <h2>Language / theme</h2>${seg([["en","EN"],["ru","RU"],["tk","TK"]],S.lang,"pLang")} ${seg([["light","Light"],["dark","Dark"],["system","System"]],S.theme,"pTheme")} <span class="s13">device is</span> ${seg([["light","light"],["dark","dark"]],S.os?"dark":"light","pOs")}
   <h2>Next result (one-shot, then back to OK)</h2>
   <div class="q">Code check ${seg([["ok","Accept"],["wrong","Wrong"],["expired","Expired"],["locked","Locked"],["offline","Offline"],["taken","Value taken (add/change)"],["grace","Grace period (sign-in)"]],S.outcome,"pOut")}</div>
   <div class="q">Get code / resend ${seg([["ok","Sent"],["rate","Rate limited"],["rateDay","Daily limit"],["offline","Offline"]],S.req,"pReq")}</div>
+  <div class="q">Name / avatar save ${seg([["ok","Saves"],["fail","Fails"],["offline","Offline"]],S.saveOut,"pSave")} &nbsp; Photo upload ${seg([["ok","Uploads"],["fail","Fails"],["offline","Offline"],["bad","Unreadable"]],S.upOut,"pUp")} &nbsp; Camera / photos permission ${seg([["granted","Allowed"],["denied","Denied"]],S.perm,"pPerm")}</div>
   <div class="q">Delete account ${seg([["ok","Succeeds"],["fail","Fails"]],S.delOut,"pDel")} &nbsp; Data load ${seg([["ok","OK"],["loading","Loading"],["error","Error"]],S.data,"pData")} &nbsp; Web ${seg([["production","Production"],["staging","Staging"]],S.webProfile,"pWeb")}</div>
   <h2>Jump to a state</h2>`;
   J.forEach((j,i)=>{h+=j.g?`<div class="grp">${j.g}</div>`:`<span class="jump" onclick="J[${i}].f()">${j.l}</span>`;});
-  h+=`<h2>Decisions for the founder (all proposals)</h2>`;
-  DKEYS.forEach((k,i)=>{const d=DEC[k],cur=S.v[k];
-    h+=`<div class="dec ${S.dec===k?"cur":""}"><div class="ttl">D${i+1}. ${d.name}</div>${Object.entries(d.opts).map(([o,x])=>`<div class="opt ${cur===o?"on":""}"><b>${o}. ${x[0]}</b>${d.rec===o?'<span class="tag rec">recommended</span>':""}${d.conflict===o?'<span class="tag conf">conflicts with an approved decision</span>':""}<br>${x[1]}</div>`).join("")}<div class="why" style="margin:6px 0"><b>Why ${d.rec}:</b> ${d.why}</div>${seg(Object.entries(d.opts).map(([o,x])=>[o,o+" "+x[0]]),cur,`(o=>pDec('${k}',o))`)}<div class="xs" style="color:#777;margin-top:5px">Reference: ${d.ref}</div></div>`;});
-  h+=`<h2>Conflicts with approved decisions (founder must resolve)</h2><div class="q">
+  const decHtml=k=>{const d=DEC[k],cur=S.v[k];
+    return `<div class="dec ${S.dec===k?"cur":""}" data-dec="${d.id}"><div class="ttl">${d.id}. ${d.name}${d.ap?'<span class="tag lock">approved 2026-10-02: '+d.rec+'</span>':""}</div>${Object.entries(d.opts).map(([o,x])=>`<div class="opt ${cur===o?"on":""}"><b>${o}. ${x[0]}</b>${d.rec===o?(d.ap?'<span class="tag lock">approved</span>':'<span class="tag rec">★ recommended</span>'):""}${d.conflict===o&&!d.ap?'<span class="tag conf">conflicts with an approved decision</span>':""}<br>${x[1]}</div>`).join("")}<div class="why" style="margin:6px 0"><b>Why ${d.rec}:</b> ${d.why}</div>${seg(Object.entries(d.opts).map(([o,x])=>[o,o+" "+x[0]]),cur,`(o=>pDec('${k}',o))`)}<div class="xs" style="color:#777;margin-top:5px">Reference: ${d.ref}</div></div>`;};
+  h+=`<h2>Profile identity decisions N1–N8 (proposals; ★ = recommendation)</h2>`+DKEYS.filter(k=>!DEC[k].ap).map(decHtml).join("");
+  h+=`<details ${S.o3?"open":""} ontoggle="S.o3=this.open"><summary>Approved decisions D1–D8 (founder, 2026-10-02; switches kept for comparison only)</summary>`+DKEYS.filter(k=>DEC[k].ap).map(decHtml).join("")+`</details>`;
+  h+=`<h2>Identity update: conflicts and ticket impact</h2><div class="q">
+  <p><b>None of N1–N8 at ★ changes D1–D8.</b> Cabinet stays the menu, Profile stays minimal (avatar, name, two methods, Log out, Delete). The avatar gains a camera badge and the name a pencil; both open editors.</p>
+  <p><b>N8 option B changes approved #352 D8</b> (Messages row). Not recommended.</p>
+  <p><b>N2 options B and C</b> keep “Private seller”/“Seller” for others, which narrows what #504's <code>peer.displayName</code> is for.</p>
+  <p><b>#504</b> lists avatars as out of scope; the Conversation header needs <code>peer.avatar</code> in a follow-up. <b>#520</b>: the profile row always shows a name and an avatar. <b>#521</b>: the header becomes avatar button + name button; the “saving” state returns (#344 amendment).</p></div>`;
+  h+=`<h2>Earlier conflicts (resolved by the founder on 2026-10-02 and the #344 amendment)</h2><div class="q">
   <p><b>D1 option A against #344.</b> The <a href="https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/344#issuecomment-5759595278">#344 resolution</a> lists Cabinet, Profile and Settings as three screens. Auto.ru has no Settings screen, so following it removes one. Option B keeps #344 unchanged.</p>
   <p><b>D6 option A against #344.</b> The earlier map puts Log out and Delete account under Settings. Option A moves them to Profile. Option B keeps them at the end of the menu.</p>
   <p><b>D2 option C against #344 and #354.</b> Putting My listings on the Sell tab, as Auto.ru does, moves a screen #344 placed under Cabinet and redesigns the tab #354 owns. Not recommended; shown because it is what the Auto.ru captures actually do.</p>
@@ -812,6 +1179,10 @@ function panel(){
   <p><b>AR-44-001..003 (first login).</b> Splash, the system notification permission prompt, then Home. Nothing taken.</p>
   <p><b>AR-50-002, -003, -004, -053..056 (selling).</b> The Sell tab is titled “Объявления” and holds the seller's own listings: a profile icon top right, “+ Добавить”, and per Listing the views, calls, saves, “60 дней до снятия”, Edit and Remove from sale, then paid promotion blocks. No drafts list, status tabs or archive are visible in the captures viewed. AR-50-005..052 (the wizard steps) were not opened.</p>
   <p><b>KZ-27-003, KZ-51-002, KZ-51-005 (Kolesa, for contrast).</b> Cabinet shows “Мои объявления” with “На сайте” and, once non-empty, “В архиве”, each with a count. Remove from sale asks a reason and moves the Listing to the archive, so sold folds into archive. Taken for D3 option C and the fold in option A.</p>
+  <p><b>Identity update. AR-37-002 (Conversation header).</b> The seller “Александр” has no photo: the header shows a drawn racing helmet with a visor in a pale blue circle. This is Auto.ru's default avatar, the model for the AutoTM library. Taken: a drawn, car-world avatar until a photo exists.</p>
+  <p><b>AR-11-010 (Listing detail, seller card).</b> First name “Денис” in bold, “Частное лицо” under it, a round avatar on the right, then the city. Taken: name with “Private seller” as the second line, as SellerBlock already does when a name exists.</p>
+  <p><b>AR-43-004, AR-43-005 (own profile).</b> Large round photo with a gradient ring, the name in the banner, gear and ⋯; the captures do not show how the photo or name is edited. Taken: the round avatar as the Profile anchor.</p>
+  <p><b>KZ-31-002 (Kolesa edit name).</b> From Cabinet settings, “Имя” opens a bottom sheet “Напишите имя” with one field (placeholder “Имя на Kolesa.kz”), a close cross and a full-width Save above the keyboard. Taken for N7 option A.</p>
   <p><b>Not in the archive:</b> an Auto.ru screen for drafts, an archive or status tabs for own listings, the settings behind the profile gear, Log out, or account deletion.</p></div></details>`;
   document.getElementById("panel").innerHTML=h;
 }
