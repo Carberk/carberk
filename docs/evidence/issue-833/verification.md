@@ -37,3 +37,15 @@ Context7 `/expo/expo` verified font errors and splash release; `/software-mansio
 ## Handoff at c8638a52
 
 49 launch/onboarding rendered tests, mobile typecheck and mobile lint pass after the status-bar fix. The newest hosted required `pr` is running. Earlier code `7d80c9e4` and documentation `2e6dad1c` required checks passed. Repository unit/typecheck and export must rerun after #827/main integration and color changes. Queue root owns the single fixed-commit review round and merge. This issue remains incomplete until shared colors, final gates and Android standalone handoff evidence pass.
+
+## Main integration and functional blue
+
+Main `a64e60a0757ad11b15ab4f9b7116c58ae25dbecc` was merged in `510ce160` before continuation. This includes Batch 5's current native `Gesture.Pan` photo reorder. Previous launch screenshots/recordings were captured before this integration and are not proof of current photo-drag behavior. No native helper was reintroduced, and this continuation started no native build, Metro or device session.
+
+At code `07178be9dc70948f4bfc69e49549314164899d02`, `text-link` maps to the existing `--message-read` CSS variable, so links and read indicators literally share one theme-aware blue source. More/link buttons, account action values, auth legal links, closed-listing navigation arrow, wizard Change/Another number/Posting rules use it. Existing read-indicator blue600 light / blue400 dark values, primary #E60000 light / #F31616 dark and logo SVG stay intact. Informational badges/toasts and decorative info icons retain their separate palette role.
+
+Red checkpoint `07db3690` produced three rendered failures for More, Another number and Change not using the functional role. `pnpm --filter @auto-tm/mobile test:unit test/functional-link-colors.spec.tsx src/listings/wizard/Step7DescContact.spec.tsx src/listings/wizard/CheckAndPublish.spec.tsx components/ui/button.spec.tsx src/conversations/components/MessageBubble.tint.spec.tsx src/conversations/components/ConversationListItem.spec.tsx src/launch/LaunchEntrance.render.spec.tsx test/routes/onboarding-back.spec.tsx` passes 138 tests. The blue token contrast is at least 4.5:1 against both page and card surfaces in both themes.
+
+Integrated local gates pass: `pnpm test:unit` (306 mobile files, 3348 mobile tests; all repository tasks), `pnpm typecheck` (11 tasks), mobile lint, docs tests, glossary check, Expo dependency alignment, and iOS export with `--clear`. Logs are `/tmp/issue-833-integrated-*.log`. Hosted code `pr` result will be recorded in the PR Execution state. Native palette look and Android standalone no-blank acceptance still await root's coordinated proof from the fully integrated source; the latter remains UNKNOWN.
+
+Installed NativeWind 4.2.3 and mobile Tailwind 3.4.19 were inspected. Context7 resolution and narrower retry returned monthly quota reached. Official [NativeWind v4 themes guidance](https://www.nativewind.dev/docs/guides/themes), together with the incumbent `themed` helper already used by glass/media semantic colors, supplied fallback. No dependency, configuration format or architecture migration was introduced.

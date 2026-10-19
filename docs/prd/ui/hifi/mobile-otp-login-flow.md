@@ -120,7 +120,7 @@ All classes below are NativeWind v4 utility names. Semantic tokens (`bg-backgrou
 - OTP digit: Menlo `font-mono text-2xl leading-tight font-semibold text-foreground`.
 - Inline error text: Inter `text-sm leading-snug text-destructive`.
 - Legal disclaimer: Inter `text-xs leading-normal text-muted-foreground`.
-- Legal links: Inter `text-xs leading-normal font-medium text-info-500 underline`.
+- Legal links: Inter `text-xs leading-normal font-medium text-link underline`.
 - Button label: handled by RNR `Button` + RNR `<Text>` (`text-primary-foreground` for `variant="default"`, `text-foreground` for `variant="ghost"`).
 - Language switcher chip: Inter `text-sm leading-tight font-medium`; active `text-foreground`, inactive `text-muted-foreground`.
 
@@ -258,7 +258,7 @@ import { Text } from "@/components/ui/text";
     <Text className="mt-auto pb-6 text-xs leading-normal text-muted-foreground">
       {t("auth.legal.prefix")}{" "}
       <Text
-        className="font-medium text-info-500 underline"
+        className="font-medium text-link underline"
         onPress={() => openLegalPage("terms")}
         accessibilityRole="link"
       >
@@ -266,7 +266,7 @@ import { Text } from "@/components/ui/text";
       </Text>{" "}
       {t("auth.legal.and")}{" "}
       <Text
-        className="font-medium text-info-500 underline"
+        className="font-medium text-link underline"
         onPress={() => openLegalPage("privacy")}
         accessibilityRole="link"
       >
@@ -323,7 +323,7 @@ const otpRef = useRef<OtpCellsHandle>(null);
           {t("auth.otp.sent", { phone: maskedPhone })}
         </Text>
         <Button variant="link" size="sm" onPress={backToPhone} className="self-start px-0">
-          <Text className="text-sm font-medium text-info-500">{t("auth.otp.changeNumber")}</Text>
+          <Text className="text-sm font-medium text-link">{t("auth.otp.changeNumber")}</Text>
         </Button>
       </View>
 
@@ -340,7 +340,7 @@ const otpRef = useRef<OtpCellsHandle>(null);
         disabled={secondsRemaining > 0 || isResending}
         className="self-start px-0"
       >
-        <Text className={secondsRemaining > 0 ? "text-sm font-medium text-muted-foreground" : "text-sm font-medium text-info-500"}>
+        <Text className={secondsRemaining > 0 ? "text-sm font-medium text-muted-foreground" : "text-sm font-medium text-link"}>
           {secondsRemaining > 0 ? t("auth.otp.resendIn", { seconds: secondsRemaining }) : t("auth.otp.resend")}
         </Text>
       </Button>
@@ -559,7 +559,7 @@ Draft Turkmen copy is provisional and should be reviewed by a translator before 
 ## Implementation notes for the engineer
 
 - **UI stack:** NativeWind v4 + React Native Reusables per `docs/agents/nativewind-v4.md`. RNR components needed for this flow: `button`, `input`, `icon`, `text`, `sheet`, `badge`. Install via `pnpm --filter @auto-tm/mobile exec npx @react-native-reusables/cli@latest add button input icon text sheet badge`. Bottom-sheet flow requires `<PortalHost />` mounted in `app/_layout.tsx` (§2.8 of the guide).
-- **Token vocabulary:** Use semantic tokens for chrome (`bg-background`, `bg-card`, `bg-popover`, `text-foreground`, `text-muted-foreground`, `border-border`, `border-input`, `bg-primary`, `text-primary-foreground`, `bg-destructive`, `border-destructive`, `text-destructive`). Use raw status hues (`text-info-500`, `bg-warning-500/10`, `text-success-500`) for non-swapping status signals. Use `bg-brand-500` only when intentionally calling out brand identity outside an RNR primitive (e.g., the logo lockup).
+- **Token vocabulary:** Use semantic tokens for chrome (`bg-background`, `bg-card`, `bg-popover`, `text-foreground`, `text-muted-foreground`, `border-border`, `border-input`, `bg-primary`, `text-primary-foreground`, `bg-destructive`, `border-destructive`, `text-destructive`). Use raw status hues (`text-link`, `bg-warning-500/10`, `text-success-500`) for non-swapping status signals. Use `bg-brand-500` only when intentionally calling out brand identity outside an RNR primitive (e.g., the logo lockup).
 - Routes: implement `apps/mobile/app/(auth)/phone.tsx` and `apps/mobile/app/(auth)/otp.tsx`. (Shipped in S2 with raw RN; migrate to RNR per §7.3 of the guide in a follow-up sprint.)
 - Navigation: bottom sheet opens `(auth)/phone`; phone route pushes `(auth)/otp`; OTP success returns to deferred action or tab app.
 - Contracts: use `@auto-tm/contracts` schemas for `OtpRequestRequest`, `OtpRequestResponse`, `OtpVerifyRequest`, and `OtpVerifyResponse`.
