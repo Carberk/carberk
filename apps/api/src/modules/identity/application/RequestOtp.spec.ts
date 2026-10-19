@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 import type {
   OtpRequest,
   SignInCodeChannel,
@@ -16,6 +17,7 @@ import type { User } from "../domain/User";
 import { RequestAccountDeletion } from "./RequestAccountDeletion";
 import { RequestOtp } from "./RequestOtp";
 import { RequestSignInMethodChange } from "./RequestSignInMethodChange";
+import { parseReviewerOtpBypassConfig } from "../infrastructure/ReviewerOtpBypassConfigFactory";
 
 const START = new Date("2026-09-23T12:00:00Z");
 
@@ -354,6 +356,45 @@ describe("RequestOtp", () => {
       await useCase.execute({ phone: "+99365000001", ip: "10.0.0.1" });
     }
     expect(repo.records).toHaveLength(0);
+    expect(sms.sent).toHaveLength(0);
+    expect(email.jobs).toHaveLength(0);
+  });
+
+  it("keeps a tester phone issuance-free with the reviewer flag off and sends no SMS (ADR-0086)", async () => {
+    const testerConfig = parseReviewerOtpBypassConfig({
+      REVIEW_DEMO_ACCOUNT_ENABLED: false,
+      TESTER_ACCOUNTS_JSON: JSON.stringify([
+        { phone: "+99370000001", email: "tester1@example.com", code: "765432" },
+      ]),
+    });
+    const { useCase, repo, sms, email } = harness({ reviewerConfig: testerConfig });
+
+    for (let index = 0; index < 12; index++) {
+      await useCase.execute({ phone: "+99370000001", ip: "10.0.0.1" });
+    }
+
+    expect(repo.records).toHaveLength(0);
+    expect(sms.sent).toHaveLength(0);
+    expect(email.jobs).toHaveLength(0);
+  });
+
+  it("stores a tester email request with its fixed code and enqueues no email", async () => {
+    const testerConfig = parseReviewerOtpBypassConfig({
+      REVIEW_DEMO_ACCOUNT_ENABLED: false,
+      TESTER_ACCOUNTS_JSON: JSON.stringify([
+        { phone: "+99370000001", email: "tester1@example.com", code: "765432" },
+      ]),
+    });
+    const { useCase, repo, sms, email } = harness({ reviewerConfig: testerConfig });
+
+    await useCase.execute({ email: "tester1@example.com", ip: "10.0.0.1" });
+
+    expect(repo.records).toHaveLength(1);
+    expect(repo.records[0]).toMatchObject({
+      channel: "email",
+      destination: "tester1@example.com",
+      codeHash: createHash("sha256").update("765432").digest("hex"),
+    });
     expect(sms.sent).toHaveLength(0);
     expect(email.jobs).toHaveLength(0);
   });

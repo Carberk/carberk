@@ -24,6 +24,7 @@ import type {
 } from "../domain/ports/ReviewerOtpBypassConfig";
 import { VerifyOtp } from "./VerifyOtp";
 import { VerifySignInCode } from "./VerifySignInCode";
+import { parseReviewerOtpBypassConfig } from "../infrastructure/ReviewerOtpBypassConfigFactory";
 
 const NOW = new Date("2026-05-14T12:00:00Z");
 
@@ -1255,6 +1256,90 @@ describe("VerifyOtp", () => {
         uc.execute({ phone: account1.phone, code: account1.code }),
       ).rejects.toThrow("No Sign-in Code request found");
       expect(sessionRepo.sessions).toHaveLength(0);
+    });
+  });
+
+  describe("tester OTP bypass (ADR-0086)", () => {
+    const tester = { phone: "+99370000001", email: "tester1@example.com", code: "765432" };
+    const reviewer = reviewerDemoAccount(1);
+    const testerConfig = parseReviewerOtpBypassConfig({
+      REVIEW_DEMO_ACCOUNT_ENABLED: false,
+      REVIEW_DEMO_ACCOUNTS_JSON: JSON.stringify([reviewer]),
+      TESTER_ACCOUNTS_JSON: JSON.stringify([tester]),
+    });
+
+    it("signs in a tester with its fixed code while the reviewer flag is off", async () => {
+      const existingUser = makeUser({ phone: tester.phone, role: "buyer" });
+      userRepo.users.push(existingUser);
+
+      const uc = makeUseCase({
+        otpRepo,
+        userRepo,
+        sessionRepo,
+        eventBus,
+        reviewerBypassConfig: testerConfig,
+        constantTimeComparator,
+      });
+
+      const result = await uc.execute({ phone: tester.phone, code: tester.code });
+
+      expect(result.user.id).toBe(existingUser.id);
+      expect(otpRepo.records).toHaveLength(0);
+      expect(sessionRepo.sessions).toHaveLength(1);
+      expect(eventBus.emit).toHaveBeenCalledWith(
+        "ReviewerOtpBypassAuthenticated",
+        expect.objectContaining({
+          userId: existingUser.id,
+          role: "buyer",
+          occurredAt: NOW.toISOString(),
+        }),
+      );
+    });
+
+    it("fails a tester phone with the wrong code", async () => {
+      const existingUser = makeUser({ phone: tester.phone, role: "buyer" });
+      userRepo.users.push(existingUser);
+
+      const uc = makeUseCase({
+        otpRepo,
+        userRepo,
+        sessionRepo,
+        eventBus,
+        reviewerBypassConfig: testerConfig,
+        constantTimeComparator,
+      });
+
+      await expect(
+        uc.execute({ phone: tester.phone, code: "000000" }),
+      ).rejects.toThrow("No Sign-in Code request found");
+      expect(sessionRepo.sessions).toHaveLength(0);
+      expect(eventBus.emit).not.toHaveBeenCalledWith(
+        "ReviewerOtpBypassAuthenticated",
+        expect.anything(),
+      );
+    });
+
+    it("still refuses a reviewer entry while the reviewer flag is off", async () => {
+      const reviewerUser = makeUser({ phone: reviewer.phone, role: "buyer" });
+      userRepo.users.push(reviewerUser);
+
+      const uc = makeUseCase({
+        otpRepo,
+        userRepo,
+        sessionRepo,
+        eventBus,
+        reviewerBypassConfig: testerConfig,
+        constantTimeComparator,
+      });
+
+      await expect(
+        uc.execute({ phone: reviewer.phone, code: reviewer.code }),
+      ).rejects.toThrow("No Sign-in Code request found");
+      expect(sessionRepo.sessions).toHaveLength(0);
+      expect(eventBus.emit).not.toHaveBeenCalledWith(
+        "ReviewerOtpBypassAuthenticated",
+        expect.anything(),
+      );
     });
   });
 });
