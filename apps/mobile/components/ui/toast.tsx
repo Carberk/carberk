@@ -1,3 +1,4 @@
+import { mobileDuration } from '@auto-tm/ui/tokens';
 import { Portal } from '@rn-primitives/portal';
 import * as React from 'react';
 import { AccessibilityInfo, Pressable, View } from 'react-native';
@@ -135,14 +136,14 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
 
   return (
     <Animated.View
-      entering={(fromBottom ? FadeInDown : FadeInUp).duration(200)}
-      exiting={(fromBottom ? FadeOutDown : FadeOutUp).duration(150)}
+      entering={(fromBottom ? FadeInDown : FadeInUp).duration(mobileDuration.base)}
+      exiting={(fromBottom ? FadeOutDown : FadeOutUp).duration(mobileDuration.fast)}
       className="pointer-events-auto w-full max-w-sm">
       {/* An accessible parent groups its children on iOS, which would hide the action from VoiceOver. */}
       <Pressable onPress={onDismiss} accessible={!toast.action}>
         <View
           className={cn(
-            'flex-row items-center gap-3 rounded-lg border bg-card px-4 py-3 shadow-lg shadow-black/5',
+            'flex-row items-center gap-3 rounded-2xl border bg-card px-4 py-3.5 shadow-floating',
             toast.variant === 'destructive' &&
               'border-destructive/20',
             toast.variant === 'success' && 'border-success-500/20',
@@ -155,7 +156,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
           <View className="flex-1">
             <Text
               className={cn(
-                'text-sm font-medium',
+                'text-callout font-medium',
                 toast.variant === 'destructive' && 'text-destructive',
                 toast.variant === 'success' && 'text-success-500',
                 toast.variant === 'warning' && 'text-warning-500',
@@ -167,7 +168,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
             {toast.description ? (
               <Text
                 className={cn(
-                  'text-sm mt-1',
+                  'text-footnote mt-0.5',
                   toast.variant === 'destructive'
                     ? 'text-destructive'
                     : 'text-muted-foreground'
@@ -184,8 +185,8 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
                 toast.action?.onPress();
                 onDismiss();
               }}
-              className="min-h-11 min-w-11 items-center justify-center rounded-md px-2 active:bg-muted">
-              <Text className="text-sm font-semibold text-primary">{toast.action.label}</Text>
+              className="min-h-11 min-w-11 items-center justify-center rounded-md px-2 active:bg-secondary">
+              <Text className="text-callout font-semibold text-primary">{toast.action.label}</Text>
             </Pressable>
           ) : null}
         </View>

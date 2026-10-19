@@ -309,6 +309,6 @@ describe("Accessibility", () => {
   it("gives the back button and Save at least 44 points", async () => {
     const view = await openEditor();
     expect(classOf(view.getByRole("button", { name: "Back" }))).toContain("h-11 w-11");
-    expect(classOf(save(view))).toContain("h-[52px]");
+    expect(classOf(save(view))).toMatch(/\bh-control-(md|lg)\b/);
   });
 });

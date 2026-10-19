@@ -207,7 +207,7 @@ export default function FavoritesScreen() {
   const { t } = useTranslation();
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]}>
+    <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]} style={{ paddingBottom: tabBarSpace }}>
       {isAuthenticated === true ? (
         <SignedInFavorites />
       ) : (

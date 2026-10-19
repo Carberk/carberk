@@ -1,3 +1,4 @@
+import { mobileDuration } from '@auto-tm/ui/tokens';
 import * as DialogPrimitive from '@rn-primitives/dialog';
 import * as React from 'react';
 import { Platform, Pressable, View, type ViewProps } from 'react-native';
@@ -30,7 +31,7 @@ function SheetOverlay({
     <FullWindowOverlay>
       <DialogPrimitive.Overlay
         className={cn(
-          'absolute bottom-0 left-0 right-0 top-0 items-stretch justify-end bg-black/50',
+          'absolute bottom-0 left-0 right-0 top-0 items-stretch justify-end bg-scrim/50',
           Platform.select({
             web: 'animate-in fade-in-0 fixed cursor-default [&>*]:cursor-auto',
           }),
@@ -78,7 +79,7 @@ function SheetContent({
       <SheetOverlay closeOnBackdropPress={closeOnBackdropPress}>
         <DialogPrimitive.Content
           className={cn(
-            'z-50 w-full max-w-none self-stretch flex-col gap-4 overflow-hidden rounded-t-xl border border-x-0 border-b-0 border-border bg-card p-5 shadow-lg shadow-black/5',
+            'z-50 w-full max-w-none self-stretch flex-col gap-4 overflow-hidden rounded-t-3xl bg-popover p-5 shadow-overlay',
             compact ? 'max-h-[70%]' : 'max-h-[85%]',
             Platform.select({
               web: 'animate-in fade-in-0 slide-in-from-bottom-10 duration-300',
@@ -88,11 +89,11 @@ function SheetContent({
           onStartShouldSetResponder={() => false}
           {...props}>
           <NativeOnlyAnimatedView
-            entering={SlideInDown.duration(250)}
-            exiting={SlideOutDown.duration(200)}
+            entering={SlideInDown.duration(mobileDuration.slow)}
+            exiting={SlideOutDown.duration(mobileDuration.base)}
             className={cn("min-h-0 w-full", compact ? "" : "flex-1")}>
             <View className={cn("min-h-0 w-full flex-col gap-4", compact ? "" : "flex-1")}>
-              <View className="mx-auto h-1 w-10 rounded-full bg-border" />
+              <View className="mx-auto h-1 w-9 rounded-full bg-accent" />
               <>{children}</>
             </View>
           </NativeOnlyAnimatedView>
@@ -123,7 +124,7 @@ function SheetTitle({
 }: React.ComponentProps<typeof DialogPrimitive.Title>) {
   return (
     <DialogPrimitive.Title
-      className={cn('font-heading text-lg font-semibold leading-snug text-foreground', className)}
+      className={cn('font-heading text-headline font-semibold text-foreground', className)}
       {...props}
     />
   );
@@ -135,7 +136,7 @@ function SheetDescription({
 }: React.ComponentProps<typeof DialogPrimitive.Description>) {
   return (
     <DialogPrimitive.Description
-      className={cn('text-muted-foreground text-sm', className)}
+      className={cn('text-muted-foreground text-callout', className)}
       {...props}
     />
   );

@@ -170,6 +170,31 @@ vi.mock("react-native-reanimated", async () => {
     ),
   };
 });
+// The app's motion modules are the only callers of the newer Reanimated APIs.
+// They are replaced whole, so a spec that brings its own narrow Reanimated
+// stub (a sheet or a results screen) still renders buttons and cards. The
+// stand-ins keep every prop, role and handler and run no animation.
+vi.mock("@/lib/motion", async () => {
+  const tokens = await import("@auto-tm/ui/tokens");
+  return {
+    duration: tokens.mobileDuration,
+    pressScale: tokens.mobilePressScale,
+    glassOpacity: tokens.mobileGlassOpacity,
+    spring: tokens.mobileSpring,
+    easing: {},
+    timing: (token: keyof typeof tokens.mobileDuration) => ({ duration: tokens.mobileDuration[token] }),
+    useReduceMotion: () => false,
+    useReduceTransparency: () => false,
+  };
+});
+vi.mock("@/components/ui/motion", async () => {
+  const React = await import("react");
+  const { View } = await import("react-native");
+  const Plain = ({ children, className, style, testID }: {
+    children?: React.ReactNode; className?: string; style?: unknown; testID?: string;
+  }) => React.createElement(View, { className, style, testID } as never, children);
+  return { Enter: Plain, Pop: Plain, Pulse: Plain, SlideIndicator: Plain };
+});
 // expo-glass-effect ships JSX in its build output, which Node cannot load, and
 // draws through a native view. Off iOS 26 it is a plain View; that is what a
 // spec renders.

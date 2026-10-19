@@ -34,7 +34,7 @@ export default function ModelPickerScreen() {
   if (!brandId) return <Redirect href={BRANDS_PATH} />;
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]}>
+    <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]} style={{ paddingBottom: tabBarSpace }}>
       <ModelPicker
         key={brandId}
         actions={actions}

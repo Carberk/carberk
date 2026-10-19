@@ -1,8 +1,10 @@
 import {
   mobileControl,
+  mobileDuration,
   mobileElevation,
   mobileFontFaces,
   mobileGlassOpacity,
+  mobilePressScale,
   mobileRadius,
   mobileType,
   palette,
@@ -72,6 +74,14 @@ export const mobileTailwindTheme = {
   boxShadow: { ...mobileElevation },
   // `bg-glass/glass`: the glass tone where no blur is drawn behind it.
   opacity: { glass: String(mobileGlassOpacity.fallback) },
+  // `active:scale-press-control`, `active:scale-press-surface`.
+  scale: Object.fromEntries(
+    Object.entries(mobilePressScale).map(([k, v]) => [`press-${k}`, String(v)]),
+  ),
+  // `duration-press`, `duration-fast`, `duration-base`, `duration-slow`.
+  transitionDuration: Object.fromEntries(
+    Object.entries(mobileDuration).map(([k, v]) => [k, `${v}ms`]),
+  ),
   height: Object.fromEntries(
     Object.entries(mobileControl).map(([k, v]) => [`control-${k}`, `${v}px`]),
   ),

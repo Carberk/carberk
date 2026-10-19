@@ -111,7 +111,7 @@ export function SearchParametersForm({ initial, returnToResults, onBack }: Searc
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]}>
+    <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]} style={{ paddingBottom: tabBarSpace }}>
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <View className="flex-row items-center gap-1 px-1 pt-2 pb-2">
           <Button variant="ghost" size="icon" className="h-11 w-11" onPress={onBack} accessibilityLabel={t("back")}>

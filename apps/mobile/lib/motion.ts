@@ -6,7 +6,19 @@ import {
 } from "@auto-tm/ui/tokens";
 import { useEffect, useState } from "react";
 import { AccessibilityInfo, Platform } from "react-native";
-import { Easing, ReduceMotion, useReducedMotion } from "react-native-reanimated";
+import {
+  configureReanimatedLogger,
+  Easing,
+  ReanimatedLogLevel,
+  ReduceMotion,
+  useReducedMotion,
+} from "react-native-reanimated";
+
+// NativeWind runs `transition-*` and `animate-*` classes through Reanimated and
+// reads its shared values while rendering. Reanimated's strict mode reports
+// every such read in development, which buries real warnings; the transitions
+// themselves are correct. Strict mode is a development-only check.
+configureReanimatedLogger({ level: ReanimatedLogLevel.warn, strict: false });
 
 /**
  * Motion for the mobile app, from the tokens in packages/ui/tokens/mobile.ts

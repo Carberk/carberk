@@ -748,7 +748,7 @@ export default function SellScreen() {
 
   // ── Entry screen ──
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]}>
+    <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]} style={{ paddingBottom: tabBarSpace }}>
       <View className="px-5 pt-3">
         <Text className="text-3xl font-heading leading-tight tracking-tight text-foreground">
           {t("sell")}

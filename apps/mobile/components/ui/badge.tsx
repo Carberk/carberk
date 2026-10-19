@@ -7,7 +7,7 @@ import { TextClassContext } from '@/components/ui/text';
 
 const badgeVariants = cva(
   cn(
-    'group shrink-0 flex-row items-center justify-center gap-1 overflow-hidden rounded-full border px-2 py-0.5',
+    'group shrink-0 flex-row items-center justify-center gap-1 overflow-hidden rounded-full border px-2.5 py-1',
     Platform.select({
       web: 'focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive w-fit whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[3px] [&>svg]:pointer-events-none [&>svg]:size-3',
     })
@@ -16,7 +16,7 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default: cn(
-          'border-transparent bg-muted',
+          'border-transparent bg-secondary',
           Platform.select({ web: '[a&]:hover:bg-muted/80' })
         ),
         brand: cn(
@@ -43,7 +43,7 @@ const badgeVariants = cva(
   }
 );
 
-const badgeTextVariants = cva('text-xs font-medium', {
+const badgeTextVariants = cva('text-caption font-medium', {
   variants: {
     variant: {
       default: 'text-foreground',

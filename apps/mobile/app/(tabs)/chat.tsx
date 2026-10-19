@@ -64,7 +64,7 @@ export default function ChatScreen() {
   const { t } = useTranslation();
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]}>
+    <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]} style={{ paddingBottom: tabBarSpace }}>
       <View className="px-4 pt-6 pb-3">
         <Text className="text-2xl font-heading text-foreground">{t("messages")}</Text>
       </View>

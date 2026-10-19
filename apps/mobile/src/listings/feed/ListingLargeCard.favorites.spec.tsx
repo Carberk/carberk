@@ -54,7 +54,7 @@ describe("Favorites large card", () => {
   it("gives Call, Message and ♥ targets of at least 44 pt", () => {
     const { view } = renderCard();
     for (const name of ["Call", "Message", "Remove from Favorites"]) {
-      expect(view.getByRole("button", { name }).props.className).toMatch(/\bh-11\b|\bmin-h-11\b|h-\[52px\]|\bh-12\b/);
+      expect(view.getByRole("button", { name }).props.className).toMatch(/\bh-11\b|\bmin-h-11\b|\bh-control-(md|lg)\b|\bh-12\b/);
     }
   });
 

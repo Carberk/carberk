@@ -85,6 +85,8 @@ module.exports = {
       fontFamily: mobileTailwindTheme.fontFamily,
       boxShadow: mobileTailwindTheme.boxShadow,
       opacity: mobileTailwindTheme.opacity,
+      scale: mobileTailwindTheme.scale,
+      transitionDuration: mobileTailwindTheme.transitionDuration,
       height: mobileTailwindTheme.height,
       minHeight: mobileTailwindTheme.height,
       borderWidth: {

@@ -21,7 +21,7 @@ function Checkbox({
   return (
     <CheckboxPrimitive.Root
       className={cn(
-        "h-6 w-6 rounded-md border border-input bg-card items-center justify-center active:bg-muted disabled:opacity-50",
+        "h-6 w-6 rounded-sm border-2 border-accent bg-card items-center justify-center active:bg-secondary disabled:opacity-50",
         props.checked && "bg-primary border-primary",
         className,
       )}

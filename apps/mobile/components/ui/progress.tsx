@@ -1,3 +1,4 @@
+import { mobileSpring } from '@auto-tm/ui/tokens';
 import * as ProgressPrimitive from '@rn-primitives/progress';
 import { Platform, View } from 'react-native';
 import Animated, {
@@ -20,7 +21,7 @@ function Progress({
 }) {
   return (
     <ProgressPrimitive.Root
-      className={cn('relative h-1.5 w-full overflow-hidden rounded-full bg-muted', className)}
+      className={cn('relative h-1.5 w-full overflow-hidden rounded-full bg-accent', className)}
       {...props}>
       <Indicator value={value} className={indicatorClassName} />
     </ProgressPrimitive.Root>
@@ -57,12 +58,18 @@ function WebIndicator({ value, className }: IndicatorProps) {
 function NativeIndicator({ value, className }: IndicatorProps) {
   const progress = useDerivedValue(() => value ?? 0);
 
+  // The fill is as wide as the track and slides in from the left, so progress
+  // animates a transform on the UI thread instead of a width (which is layout).
+  const filled = useDerivedValue(() =>
+    withSpring(interpolate(progress.value, [0, 100], [1, 100], Extrapolation.CLAMP), {
+      ...mobileSpring.settle,
+      overshootClamping: true,
+    })
+  );
+
   const indicator = useAnimatedStyle(() => {
     return {
-      width: withSpring(
-        `${interpolate(progress.value, [0, 100], [1, 100], Extrapolation.CLAMP)}%`,
-        { overshootClamping: true }
-      ),
+      transform: [{ translateX: `${filled.value - 100}%` }],
     };
   }, [value]);
 
@@ -72,7 +79,10 @@ function NativeIndicator({ value, className }: IndicatorProps) {
 
   return (
     <ProgressPrimitive.Indicator asChild>
-      <Animated.View style={indicator} className={cn('bg-foreground h-full', className)} />
+      <Animated.View
+        style={indicator}
+        className={cn('bg-foreground h-full w-full rounded-full', className)}
+      />
     </ProgressPrimitive.Indicator>
   );
 }

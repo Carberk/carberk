@@ -2,11 +2,17 @@ import { Platform, TextInput } from 'react-native';
 
 import { cn } from '@/lib/utils';
 
+/**
+ * A filled field on the tonal surface: it reads as a control on the page and
+ * on a card without a box drawn around it. Focus draws an edge in the foreground
+ * colour; an error state is the caller's `border-destructive`.
+ * See docs/prd/ui/components/78-02-input.md.
+ */
 function Input({ className, ...props }: React.ComponentProps<typeof TextInput> & React.RefAttributes<TextInput>) {
   return (
     <TextInput
       className={cn(
-        'h-12 w-full rounded-lg border border-input bg-card px-3.5 text-base leading-5 text-foreground shadow-none dark:bg-input/20',
+        'h-control-md w-full rounded-lg border border-transparent bg-secondary px-4 font-sans text-body leading-5 text-foreground shadow-none focus:border-foreground',
         props.editable === false &&
         cn(
           'opacity-50',
@@ -18,7 +24,7 @@ function Input({ className, ...props }: React.ComponentProps<typeof TextInput> &
             'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
             'aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive'
           ),
-          native: 'placeholder:text-muted-foreground/70',
+          native: 'placeholder:text-muted-foreground',
         }),
         className
       )}

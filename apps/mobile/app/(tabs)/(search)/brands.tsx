@@ -24,7 +24,7 @@ export default function BrandPickerScreen() {
   const params = useLocalSearchParams<{ returnToResults?: string; resultsState?: string }>();
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]}>
+    <SafeAreaView className="flex-1 bg-background" edges={["top", "left", "right"]} style={{ paddingBottom: tabBarSpace }}>
       <BrandPicker
         actions={actions}
         filters={readPickerResultsFilters(params)}

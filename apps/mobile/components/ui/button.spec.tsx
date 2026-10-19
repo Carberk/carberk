@@ -10,8 +10,8 @@ const textVariantsStart = source.indexOf("const buttonTextVariants");
 const textVariantsSource = source.slice(textVariantsStart);
 
 describe("buttonVariants", () => {
-  it("has pill size with h-[52px] rounded-full px-5 py-3", () => {
-    expect(source).toContain("pill: 'h-[52px] rounded-full px-5 py-3'");
+  it("has pill size with h-control-lg rounded-full px-6", () => {
+    expect(source).toContain("pill: 'h-control-lg rounded-full px-6'");
   });
 
   it.each([
