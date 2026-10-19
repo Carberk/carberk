@@ -173,6 +173,11 @@ describe("ConversationSummarySchema", () => {
     sellerId: "550e8400-e29b-41d4-a716-4466554400b2",
     myRole: "buyer" as const,
     updatedAt: "2026-07-01T10:00:00.000Z",
+    peer: {
+      id: "550e8400-e29b-41d4-a716-4466554400b2",
+      displayName: "Aman",
+    },
+    blockedByMe: false,
   };
 
   it("accepts a summary without mutedAt (pre-#246 servers)", () => {
@@ -192,5 +197,51 @@ describe("ConversationSummarySchema", () => {
         mutedAt: "2026-07-10T08:00:00.000Z",
       }).mutedAt,
     ).toBe("2026-07-10T08:00:00.000Z");
+  });
+
+  it("keeps the other participant's id and display name", () => {
+    const parsed = ConversationSummarySchema.parse(baseSummary);
+
+    expect(parsed.peer).toEqual({
+      id: "550e8400-e29b-41d4-a716-4466554400b2",
+      displayName: "Aman",
+    });
+  });
+
+  it("accepts a null display name for the other participant", () => {
+    const parsed = ConversationSummarySchema.parse({
+      ...baseSummary,
+      peer: { ...baseSummary.peer, displayName: null },
+    });
+
+    expect(parsed.peer.displayName).toBeNull();
+  });
+
+  it("requires the peer and the viewer's block state", () => {
+    const { peer: _peer, ...withoutPeer } = baseSummary;
+    const { blockedByMe: _blocked, ...withoutBlock } = baseSummary;
+
+    expect(ConversationSummarySchema.safeParse(withoutPeer).success).toBe(false);
+    expect(ConversationSummarySchema.safeParse(withoutBlock).success).toBe(false);
+  });
+
+  it("keeps contact data off the peer even when a server sends it", () => {
+    const parsed = ConversationSummarySchema.parse({
+      ...baseSummary,
+      peer: { ...baseSummary.peer, phone: "+99365000000", email: "a@b.tm" },
+    });
+
+    expect(parsed.peer).toEqual(baseSummary.peer);
+  });
+
+  it("carries blockedByMe as a boolean", () => {
+    expect(
+      ConversationSummarySchema.parse({ ...baseSummary, blockedByMe: true })
+        .blockedByMe,
+    ).toBe(true);
+    expect(
+      ConversationSummarySchema.safeParse({ ...baseSummary, blockedByMe: "yes" })
+        .success,
+    ).toBe(false);
   });
 });

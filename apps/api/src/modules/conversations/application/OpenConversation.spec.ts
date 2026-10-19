@@ -5,7 +5,11 @@ import { Conversation } from "../domain/Conversation";
 import { Message } from "../domain/Message";
 import type { ConversationRepository } from "../domain/ports/ConversationRepository";
 import type { ListingsReadPort } from "../../listings/domain/ports/ListingsReadPort";
-import type { IdentityCheckPort, IdentityReadPort } from "../../identity/identity.public";
+import type {
+  IdentityCheckPort,
+  IdentityReadPort,
+  IdentityUserSummary,
+} from "../../identity/identity.public";
 
 import { OpenConversation } from "./OpenConversation";
 
@@ -155,13 +159,42 @@ class FakeIdentityCheckPort implements IdentityCheckPort {
 
 class FakeIdentityReadPort implements IdentityReadPort {
   blockedPairs = new Set<string>();
+  displayNames = new Map<string, string | null>();
+  calls = {
+    findUsersByIds: [] as string[][],
+    findBlockedUserIds: [] as Array<{ blockerId: string; blockedIds: string[] }>,
+  };
 
   async findUserById(): Promise<null> {
     return null;
   }
 
-  async findUsersByIds(): Promise<[]> {
-    return [];
+  async findUsersByIds(ids: string[]): Promise<IdentityUserSummary[]> {
+    this.calls.findUsersByIds.push(ids);
+    return ids.flatMap((id) =>
+      this.displayNames.has(id)
+        ? [
+            {
+              id,
+              displayName: this.displayNames.get(id) ?? null,
+              role: "user",
+              suspendedAt: null,
+              suspendedById: null,
+              suspensionReason: null,
+            },
+          ]
+        : [],
+    );
+  }
+
+  async findBlockedUserIds(
+    blockerId: string,
+    blockedIds: string[],
+  ): Promise<string[]> {
+    this.calls.findBlockedUserIds.push({ blockerId, blockedIds });
+    return blockedIds.filter((id) =>
+      this.blockedPairs.has(`${blockerId}:${id}`),
+    );
   }
 
   async isUserBlockedBy(blockerId: string, blockedId: string): Promise<boolean> {
@@ -368,5 +401,99 @@ describe("OpenConversation", () => {
     await expect(
       uc.execute({ buyerId: "buyer-1", listingId: "listing-1" }),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  describe("other participant and block state", () => {
+    it("returns the seller as the peer of a newly opened conversation", async () => {
+      seedListing(listings);
+      const identityRead = new FakeIdentityReadPort();
+      identityRead.displayNames.set("seller-1", "Seller One");
+      const uc = makeUseCase(repo, listings, undefined, identityRead);
+
+      const result = await uc.execute({
+        buyerId: "buyer-1",
+        listingId: "listing-1",
+      });
+
+      expect(result.peer).toEqual({ id: "seller-1", displayName: "Seller One" });
+      expect(result.blockedByMe).toBe(false);
+    });
+
+    it("returns a null display name when the seller has none", async () => {
+      seedListing(listings);
+      const identityRead = new FakeIdentityReadPort();
+      identityRead.displayNames.set("seller-1", null);
+      const uc = makeUseCase(repo, listings, undefined, identityRead);
+
+      const result = await uc.execute({
+        buyerId: "buyer-1",
+        listingId: "listing-1",
+      });
+
+      expect(result.peer).toEqual({ id: "seller-1", displayName: null });
+    });
+
+    it("still returns the conversation when the seller no longer exists", async () => {
+      seedListing(listings);
+      const uc = makeUseCase(repo, listings);
+
+      const result = await uc.execute({
+        buyerId: "buyer-1",
+        listingId: "listing-1",
+      });
+
+      expect(result.peer).toEqual({ id: "seller-1", displayName: null });
+    });
+
+    it("reports blockedByMe on an existing conversation the buyer later blocked", async () => {
+      seedListing(listings);
+      const identityRead = new FakeIdentityReadPort();
+      identityRead.displayNames.set("seller-1", "Seller One");
+      const uc = makeUseCase(repo, listings, undefined, identityRead);
+      const first = await uc.execute({
+        buyerId: "buyer-1",
+        listingId: "listing-1",
+      });
+
+      identityRead.block("buyer-1", "seller-1");
+      const second = await uc.execute({
+        buyerId: "buyer-1",
+        listingId: "listing-1",
+      });
+
+      expect(second.conversation.id).toBe(first.conversation.id);
+      expect(second.blockedByMe).toBe(true);
+    });
+
+    it("does not expose that the seller blocked the buyer", async () => {
+      seedListing(listings);
+      const identityRead = new FakeIdentityReadPort();
+      const uc = makeUseCase(repo, listings, undefined, identityRead);
+      await uc.execute({ buyerId: "buyer-1", listingId: "listing-1" });
+
+      identityRead.block("seller-1", "buyer-1");
+      const again = await uc.execute({
+        buyerId: "buyer-1",
+        listingId: "listing-1",
+      });
+
+      expect(again.blockedByMe).toBe(false);
+    });
+
+    it("reads the peer and block state with one batched call each", async () => {
+      seedListing(listings);
+      const identityRead = new FakeIdentityReadPort();
+      const uc = makeUseCase(repo, listings, undefined, identityRead);
+      await uc.execute({ buyerId: "buyer-1", listingId: "listing-1" });
+      identityRead.calls.findUsersByIds.length = 0;
+      identityRead.calls.findBlockedUserIds.length = 0;
+
+      await uc.execute({ buyerId: "buyer-1", listingId: "listing-1" });
+
+      expect(identityRead.calls.findUsersByIds).toEqual([["seller-1"]]);
+      expect(identityRead.calls.findBlockedUserIds).toEqual([
+        { blockerId: "buyer-1", blockedIds: ["seller-1"] },
+      ]);
+    });
   });
 });

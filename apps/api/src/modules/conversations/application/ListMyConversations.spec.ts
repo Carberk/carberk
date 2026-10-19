@@ -4,6 +4,10 @@ import { Conversation } from "../domain/Conversation";
 import { Message } from "../domain/Message";
 import type { ConversationRepository } from "../domain/ports/ConversationRepository";
 import type { ListingsReadPort } from "../../listings/domain/ports/ListingsReadPort";
+import type {
+  IdentityReadPort,
+  IdentityUserSummary,
+} from "../../identity/identity.public";
 
 import { ListMyConversations } from "./ListMyConversations";
 
@@ -192,23 +196,79 @@ class FakeListingsReadPort implements ListingsReadPort {
   }
 }
 
+class FakeIdentityReadPort implements IdentityReadPort {
+  users = new Map<string, IdentityUserSummary>();
+  blocks = new Set<string>();
+  calls = {
+    findUserById: 0,
+    findUsersByIds: [] as string[][],
+    findBlockedUserIds: [] as Array<{ blockerId: string; blockedIds: string[] }>,
+    isUserBlockedBy: 0,
+  };
+
+  addUser(id: string, displayName: string | null) {
+    this.users.set(id, {
+      id,
+      displayName,
+      role: "user",
+      suspendedAt: null,
+      suspendedById: null,
+      suspensionReason: null,
+    });
+  }
+
+  block(blockerId: string, blockedId: string) {
+    this.blocks.add(`${blockerId}:${blockedId}`);
+  }
+
+  async findUserById(id: string): Promise<IdentityUserSummary | null> {
+    this.calls.findUserById += 1;
+    return this.users.get(id) ?? null;
+  }
+
+  async findUsersByIds(ids: string[]): Promise<IdentityUserSummary[]> {
+    this.calls.findUsersByIds.push(ids);
+    return ids.flatMap((id) => {
+      const user = this.users.get(id);
+      return user ? [user] : [];
+    });
+  }
+
+  async findBlockedUserIds(
+    blockerId: string,
+    blockedIds: string[],
+  ): Promise<string[]> {
+    this.calls.findBlockedUserIds.push({ blockerId, blockedIds });
+    return blockedIds.filter((id) => this.blocks.has(`${blockerId}:${id}`));
+  }
+
+  async isUserBlockedBy(blockerId: string, blockedId: string): Promise<boolean> {
+    this.calls.isUserBlockedBy += 1;
+    return this.blocks.has(`${blockerId}:${blockedId}`);
+  }
+}
+
 function makeUseCase(
   repo?: FakeConversationRepository,
   listings?: FakeListingsReadPort,
+  identityRead?: FakeIdentityReadPort,
 ) {
   return new ListMyConversations(
     repo ?? new FakeConversationRepository(),
     listings ?? new FakeListingsReadPort(),
+    identityRead ?? new FakeIdentityReadPort(),
   );
 }
 
 describe("ListMyConversations", () => {
   let repo: FakeConversationRepository;
   let listings: FakeListingsReadPort;
+  let identity: FakeIdentityReadPort;
 
   beforeEach(() => {
     repo = new FakeConversationRepository();
     listings = new FakeListingsReadPort();
+    identity = new FakeIdentityReadPort();
   });
 
   function seedConversation(overrides?: Partial<Conversation>) {
@@ -430,5 +490,182 @@ describe("ListMyConversations", () => {
     const result = await uc.execute({ userId: "buyer-1" });
 
     expect(result.items[0]!.mutedAt).toBeNull();
+  });
+
+  describe("other participant and block state", () => {
+    it("shows the seller as the peer to a buyer", async () => {
+      seedListing();
+      seedConversation({ buyerId: "buyer-1", sellerId: "seller-1" });
+      identity.addUser("buyer-1", "Buyer One");
+      identity.addUser("seller-1", "Seller One");
+
+      const result = await makeUseCase(repo, listings, identity).execute({
+        userId: "buyer-1",
+      });
+
+      expect(result.items[0]!.peer).toEqual({
+        id: "seller-1",
+        displayName: "Seller One",
+      });
+    });
+
+    it("shows the buyer as the peer to a seller", async () => {
+      seedListing();
+      seedConversation({ buyerId: "buyer-1", sellerId: "seller-1" });
+      identity.addUser("buyer-1", "Buyer One");
+      identity.addUser("seller-1", "Seller One");
+
+      const result = await makeUseCase(repo, listings, identity).execute({
+        userId: "seller-1",
+      });
+
+      expect(result.items[0]!.peer).toEqual({
+        id: "buyer-1",
+        displayName: "Buyer One",
+      });
+    });
+
+    it("returns only the id and display name, no other identity data", async () => {
+      seedListing();
+      seedConversation();
+      identity.addUser("seller-1", "Seller One");
+
+      const result = await makeUseCase(repo, listings, identity).execute({
+        userId: "buyer-1",
+      });
+
+      expect(Object.keys(result.items[0]!.peer).sort()).toEqual([
+        "displayName",
+        "id",
+      ]);
+    });
+
+    it("keeps a null display name when the peer has none", async () => {
+      seedListing();
+      seedConversation();
+      identity.addUser("seller-1", null);
+
+      const result = await makeUseCase(repo, listings, identity).execute({
+        userId: "buyer-1",
+      });
+
+      expect(result.items[0]!.peer).toEqual({
+        id: "seller-1",
+        displayName: null,
+      });
+    });
+
+    it("still returns a summary whose peer no longer exists", async () => {
+      seedListing();
+      seedConversation();
+
+      const result = await makeUseCase(repo, listings, identity).execute({
+        userId: "buyer-1",
+      });
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]!.peer).toEqual({
+        id: "seller-1",
+        displayName: null,
+      });
+      expect(result.items[0]!.blockedByMe).toBe(false);
+    });
+
+    it("marks blockedByMe when the viewer blocked the peer", async () => {
+      seedListing();
+      seedConversation();
+      identity.addUser("seller-1", "Seller One");
+      identity.block("buyer-1", "seller-1");
+
+      const result = await makeUseCase(repo, listings, identity).execute({
+        userId: "buyer-1",
+      });
+
+      expect(result.items[0]!.blockedByMe).toBe(true);
+    });
+
+    it("leaves blockedByMe false for an unblocked peer", async () => {
+      seedListing();
+      seedConversation();
+      identity.addUser("seller-1", "Seller One");
+
+      const result = await makeUseCase(repo, listings, identity).execute({
+        userId: "buyer-1",
+      });
+
+      expect(result.items[0]!.blockedByMe).toBe(false);
+    });
+
+    it("does not expose that the peer blocked the viewer", async () => {
+      seedListing();
+      seedConversation();
+      identity.addUser("seller-1", "Seller One");
+      identity.block("seller-1", "buyer-1");
+
+      const result = await makeUseCase(repo, listings, identity).execute({
+        userId: "buyer-1",
+      });
+
+      expect(result.items[0]!.blockedByMe).toBe(false);
+    });
+
+    it("reads names and block states for a whole page in one call each", async () => {
+      seedListing();
+      for (let i = 1; i <= 3; i++) {
+        seedConversation({
+          id: `conv-${i}`,
+          buyerId: "buyer-1",
+          sellerId: `seller-${i}`,
+        });
+        identity.addUser(`seller-${i}`, `Seller ${i}`);
+      }
+      identity.block("buyer-1", "seller-2");
+
+      const result = await makeUseCase(repo, listings, identity).execute({
+        userId: "buyer-1",
+      });
+
+      expect(result.items.map((i) => i.blockedByMe).sort()).toEqual([
+        false,
+        false,
+        true,
+      ]);
+      expect(identity.calls.findUsersByIds).toHaveLength(1);
+      expect([...identity.calls.findUsersByIds[0]!].sort()).toEqual([
+        "seller-1",
+        "seller-2",
+        "seller-3",
+      ]);
+      expect(identity.calls.findBlockedUserIds).toHaveLength(1);
+      expect(identity.calls.findBlockedUserIds[0]!.blockerId).toBe("buyer-1");
+      expect(identity.calls.findUserById).toBe(0);
+      expect(identity.calls.isUserBlockedBy).toBe(0);
+    });
+
+    it("asks identity once for a peer shared by several conversations", async () => {
+      seedListing();
+      seedConversation({ id: "conv-1", buyerId: "buyer-1", sellerId: "seller-1" });
+      seedConversation({ id: "conv-2", buyerId: "buyer-2", sellerId: "seller-1" });
+      identity.addUser("buyer-1", "Buyer One");
+      identity.addUser("buyer-2", "Buyer Two");
+
+      const result = await makeUseCase(repo, listings, identity).execute({
+        userId: "seller-1",
+      });
+
+      expect(result.items).toHaveLength(2);
+      expect(identity.calls.findUsersByIds).toHaveLength(1);
+      expect([...identity.calls.findUsersByIds[0]!].sort()).toEqual([
+        "buyer-1",
+        "buyer-2",
+      ]);
+    });
+
+    it("makes no identity call for an empty page", async () => {
+      await makeUseCase(repo, listings, identity).execute({ userId: "nobody" });
+
+      expect(identity.calls.findUsersByIds).toHaveLength(0);
+      expect(identity.calls.findBlockedUserIds).toHaveLength(0);
+    });
   });
 });
