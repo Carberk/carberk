@@ -33,10 +33,25 @@ export interface RetiredObjectStore {
 export const RETIRED_UPLOAD_LEDGER = Symbol("RetiredUploadLedger");
 export const RETIRED_OBJECT_STORE = Symbol("RetiredObjectStore");
 
+const OWNED_ORIGINAL =
+  /^(pending\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/)original\.(jpg|webp)$/;
+const VARIANTS = ["thumbnail", "list", "detail", "fullscreen"].flatMap((name) => [`${name}.jpg`, `${name}.webp`]);
+
 /**
  * The one directory this work may delete, or null when it carries no deletion
- * authority. Scaffold for #721: authority is not implemented yet.
+ * authority. Authority needs all of: the fenced write protocol, an original in
+ * image presign's own `pending/<UUID v4>/` directory, and a manifest that is
+ * exactly that original and its eight variants. Legacy uploads, chat and
+ * made-up prefixes, and any manifest reaching elsewhere authorize nothing. The
+ * rule is repeated here, away from the API that wrote the record, on purpose.
  */
-export function deletionDirectory(_work: CleanupWork): string | null {
-  return null;
+export function deletionDirectory(work: CleanupWork): string | null {
+  if (work.writeProtocol !== "conditional-v1") return null;
+  const directory = OWNED_ORIGINAL.exec(work.key)?.[1];
+  if (!directory) return null;
+  const expected = new Set([work.key, ...VARIANTS.map((name) => `${directory}${name}`)]);
+  const exact = work.objectKeys.length === expected.size &&
+    new Set(work.objectKeys).size === expected.size &&
+    work.objectKeys.every((key) => expected.has(key));
+  return exact ? directory : null;
 }

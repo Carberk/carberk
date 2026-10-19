@@ -22,6 +22,8 @@ const BaseSchema = z.object({
   MINIO_ENDPOINT: z.string().url(),
   MINIO_ACCESS_KEY: z.string().min(1),
   MINIO_SECRET_KEY: z.string().min(1),
+  /** Same default as the API. Retired upload cleanup signs its storage requests with it. */
+  MINIO_REGION: z.string().default("us-east-1"),
 
   PUSH_TRANSPORT: z
     .enum(["test", "fcm", "fcm-apns", "ntfy"])
