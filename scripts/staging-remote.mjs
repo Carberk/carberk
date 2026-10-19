@@ -8,8 +8,8 @@ function remoteMain(input, campaign, businessMain, queueMain) {
   try {
     const { spawnSync } = require('node:child_process');
     const p = input.identity; const e = process.env;
-    if (['campaign897-identities-v1', 'campaign897-business-v2'].includes(input.profile) && input.kind === 'fixture' && e.STAGING_CAMPAIGN_PROFILE_ENABLED !== input.profile) throw new Error();
-    if (input.profile !== undefined && !['listing-v1', 'campaign897-identities-v1', 'campaign897-business-v2'].includes(input.profile)) throw new Error();
+    if (['campaign897-identities-v1', 'campaign897-business-v2', 'campaign897-full-v3'].includes(input.profile) && input.kind === 'fixture' && e.STAGING_CAMPAIGN_PROFILE_ENABLED !== input.profile) throw new Error();
+    if (input.profile !== undefined && !['listing-v1', 'campaign897-identities-v1', 'campaign897-business-v2', 'campaign897-full-v3'].includes(input.profile)) throw new Error();
     if (!['fixture', 'reset', 'probe'].includes(input.kind) || !/^[a-f0-9]{32}$/.test(input.id) ||
         input.namespace !== `cf_${input.id}` || !/^[a-f0-9]{40}$/.test(input.target)) throw new Error();
     if (e.RAILWAY_PROJECT_ID !== p.projectId || e.RAILWAY_ENVIRONMENT_ID !== p.environmentId || e.RAILWAY_SERVICE_ID !== p.services.api ||
@@ -34,7 +34,7 @@ function remoteMain(input, campaign, businessMain, queueMain) {
       const hex = createHash('sha256').update(`${input.id}:${label}`).digest('hex').slice(0,32);
       return `${hex.slice(0,8)}-${hex.slice(8,12)}-4${hex.slice(13,16)}-a${hex.slice(17,20)}-${hex.slice(20)}`;
     };
-    if (input.profile === 'campaign897-business-v2') return businessMain(input, { sql, uuid, exists });
+    if (['campaign897-business-v2', 'campaign897-full-v3'].includes(input.profile)) return businessMain(input, { sql, uuid, exists });
     if (input.profile === 'campaign897-identities-v1') return campaign(input, { sql, uuid, exists, disposeDeliveries: (deliveries, observeOnly = false) => {
       const redis = new URL(e.REDIS_URL);
       if (!['redis:', 'rediss:'].includes(redis.protocol) || redis.hostname !== 'redis.railway.internal' || redis.search || redis.hash) throw new Error();

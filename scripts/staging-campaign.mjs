@@ -208,10 +208,14 @@ export function campaignMain(input, { sql, uuid, exists, disposeDeliveries }) {
 
 /** Runs only inside the API service process. No scan, drain, obliterate or caller queue name. */
 
-/** Fixed media-free business graph profile. It shares the reservation manifest,
- * trigger journal and reset fence with the identity profile but has no auth path. */
+/** Fixed media-free storage profiles. V3 reuses the bounded business bootstrap
+ * and disposal engine; its ordinary authentication path remains closed. */
 export function businessMain(input, { sql, uuid, exists }) {
-  const profile = 'campaign897-business-v2';
+  const bootstrapV3 = input.profile === 'campaign897-full-v3';
+  const profile = bootstrapV3 ? 'campaign897-full-v3' : 'campaign897-business-v2';
+  const version = bootstrapV3 ? 3 : 2;
+  if (bootstrapV3 && (!/^[a-f0-9]{32}$/.test(input.id ?? '') || input.namespace !== `cf_${input.id}` ||
+      !['fixture', 'reset'].includes(input.kind))) throw new Error('Campaign bootstrap scope refused');
   if (input.profile !== profile || !/^[a-f0-9]{40}$/.test(input.candidate ?? '')) throw new Error();
   if (input.kind === 'fixture' && input.candidate !== input.target) throw new Error('Campaign runtime candidate mismatch');
   let observation;
@@ -237,8 +241,22 @@ export function businessMain(input, { sql, uuid, exists }) {
   const rootSlug = `campaign897-${input.id}-${input.candidate.slice(0, 12)}`;
   const rootContact = `+999${(BigInt(`0x${require('node:crypto').createHash('sha256').update(`${input.id}:${input.candidate}:business-contact`).digest('hex').slice(0, 12)}`) % 1000000000000n).toString().padStart(12, '0')}`;
   const tables = ['users', 'dealerships', 'dealership_members', 'dealership_invitations', 'listings', 'listing_drafts', 'conversations', 'conversation_participants', 'messages', 'business_enquiry_audits', 'favorites', 'verified_contact_phones', 'owned_vehicles', 'blocked_users', 'notification_preferences', 'content_reports', 'staff_grants', 'audit_logs'];
+  // These relations are fenced, not admitted or journaled as auth support. An
+  // OTP destination has no User FK, so merely checking incoming FKs at reset
+  // would otherwise miss a failed sign-in's untracked code row.
+  const closedAuthTables = bootstrapV3 ? ['sessions', 'otp_requests', 'totp_enrollments', 'totp_backup_codes'] : [];
+  tables.push(...closedAuthTables);
+  const closedDeliveryInventory = bootstrapV3 ? `
+    IF EXISTS(SELECT 1 FROM "${n}".campaign_delivery_ledger) OR EXISTS(SELECT 1 FROM "${n}".campaign_delivery_sink)
+    THEN RAISE EXCEPTION 'Campaign delivery slice unavailable'; END IF;` : '';
+  const closedAuthInventory = bootstrapV3 ? `
+    IF EXISTS(SELECT 1 FROM public.otp_requests o JOIN "${n}".campaign_entities e ON o.destination=e.email OR o."userId"=e.user_id) OR
+      EXISTS(SELECT 1 FROM public.sessions s JOIN "${n}".campaign_entities e ON s."userId"=e.user_id) OR
+      EXISTS(SELECT 1 FROM public.totp_enrollments t JOIN "${n}".campaign_entities e ON t."userId"=e.user_id)
+    THEN RAISE EXCEPTION 'Campaign authentication slice unavailable'; END IF;` : '';
   // Only these columns convey graph ownership. Catalog references never do.
   const parents = { businessId: 'dealerships', dealershipId: 'dealerships', sellerId: 'users', userId: 'users', buyerId: 'users', recipientUserId: 'users', senderId: 'users', blockerId: 'users', blockedId: 'users', conversationId: 'conversations', listingId: 'listings', reporterUserId: 'users', reviewedById: 'users', actorId: 'users', assigneeId: 'users', previousAssigneeId: 'users', lastEditedById: 'users', suspendedById: 'users', lastMessageId: 'messages', firstBuyerMessageId: 'messages', firstSellerReplyId: 'messages' };
+  if (bootstrapV3) parents.totpEnrollmentId = 'totp_enrollments';
   const immutable = ['id', 'userId', 'sellerId', 'buyerId', 'recipientUserId', 'senderId', 'blockerId', 'blockedId', 'conversationId', 'listingId', 'businessId', 'dealershipId', 'reporterUserId', 'capability', 'targetId', 'targetType', 'phone', 'tokenHash'];
   const identityValues = identities.map(identity => `('${identity.alias}','${identity.id}','${identity.email}')`).join(',');
   const tableNames = tables.map(t => `'${t}'`).join(',');
@@ -260,7 +278,7 @@ export function businessMain(input, { sql, uuid, exists }) {
   const journalHash = `(SELECT md5(coalesce(jsonb_agg(to_jsonb(journal_row) ORDER BY table_name,row_key),'[]'::jsonb)::text) FROM "${n}".campaign_records journal_row)`;
   const eventHash = `(SELECT md5(coalesce(jsonb_agg(to_jsonb(event_row) ORDER BY sequence),'[]'::jsonb)::text) FROM "${n}".campaign_events event_row)`;
   const binding = `DO $guard$ BEGIN
-    IF (SELECT count(*) FROM "${n}".campaign_manifest) <> 1 OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_manifest WHERE reservation_id='${input.id}' AND candidate='${input.candidate}' AND profile='${profile}' AND delivery_version=2) THEN RAISE EXCEPTION 'Campaign binding changed'; END IF;
+    IF (SELECT count(*) FROM "${n}".campaign_manifest) <> 1 OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_manifest WHERE reservation_id='${input.id}' AND candidate='${input.candidate}' AND profile='${profile}' AND delivery_version=${version}) THEN RAISE EXCEPTION 'Campaign binding changed'; END IF;
     IF (SELECT count(*) FROM "${n}".campaign_entities) <> 15 OR EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE (alias,user_id,email) NOT IN (${identityValues})) THEN RAISE EXCEPTION 'Campaign roster changed'; END IF;
   END $guard$;`;
   const integrity = `${binding} DO $guard$ DECLARE entry record; actual jsonb; BEGIN
@@ -283,7 +301,7 @@ export function businessMain(input, { sql, uuid, exists }) {
     IF EXISTS(SELECT 1 FROM public.users u JOIN "${n}".campaign_entities e ON u.id=e.user_id OR u.email=e.email WHERE NOT EXISTS(
       SELECT 1 FROM "${n}".campaign_records r WHERE r.table_name='users' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',u.id))) OR
       EXISTS(SELECT 1 FROM public.dealerships d WHERE (id='${rootId}' OR slug='${rootSlug}' OR "contactPhone"='${rootContact}') AND NOT EXISTS(
-      SELECT 1 FROM "${n}".campaign_records r WHERE r.table_name='dealerships' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',d.id))) THEN RAISE EXCEPTION 'Untracked campaign root'; END IF;
+      SELECT 1 FROM "${n}".campaign_records r WHERE r.table_name='dealerships' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',d.id))) THEN RAISE EXCEPTION 'Untracked campaign root'; END IF;${closedAuthInventory}${closedDeliveryInventory}
   END $guard$;`;
   // Inventory every incoming FK using OIDs and catalog column names, including
   // non-public sources and composite/non-ID targets. No cascade grants ownership.
@@ -317,13 +335,16 @@ export function businessMain(input, { sql, uuid, exists }) {
       SELECT 1 FROM "${n}".campaign_records owned WHERE owned.table_name='${t}' AND NOT owned.deleted AND owned.row_key=jsonb_build_object('id',x.id))) THEN RAISE EXCEPTION 'Foreign JSON graph reference'; END IF;`).join('\n')}
   END $guard$;`;
   const setup = `CREATE SCHEMA "${n}";
-    CREATE TABLE "${n}".campaign_manifest(reservation_id text PRIMARY KEY,candidate text NOT NULL,profile text NOT NULL,state text NOT NULL CHECK(state IN ('identities','cleaning','disposed')),delivery_version integer NOT NULL DEFAULT 2,schema_hash text NOT NULL,journal_hash text NOT NULL DEFAULT md5('[]'),event_hash text NOT NULL DEFAULT md5('[]'),tracking_hash text);
-    INSERT INTO "${n}".campaign_manifest(reservation_id,candidate,profile,state,delivery_version,schema_hash) VALUES('${input.id}','${input.candidate}','${profile}','identities',2,${schemaHash});
+    CREATE TABLE "${n}".campaign_manifest(reservation_id text PRIMARY KEY,candidate text NOT NULL,profile text NOT NULL,state text NOT NULL CHECK(state IN ('identities','cleaning','disposed')),delivery_version integer NOT NULL DEFAULT ${version},schema_hash text NOT NULL,journal_hash text NOT NULL DEFAULT md5('[]'),event_hash text NOT NULL DEFAULT md5('[]'),tracking_hash text);
+    INSERT INTO "${n}".campaign_manifest(reservation_id,candidate,profile,state,delivery_version,schema_hash) VALUES('${input.id}','${input.candidate}','${profile}','identities',${version},${schemaHash});
     CREATE TABLE "${n}".campaign_entities(alias text PRIMARY KEY,user_id text UNIQUE NOT NULL,email text UNIQUE NOT NULL);
     INSERT INTO "${n}".campaign_entities VALUES ${identityValues};
     CREATE TABLE "${n}".campaign_records(table_name text NOT NULL,row_key jsonb NOT NULL,row_hash text NOT NULL,version bigint NOT NULL DEFAULT 1,deleted boolean NOT NULL DEFAULT false,PRIMARY KEY(table_name,row_key));
     CREATE TABLE "${n}".campaign_events(sequence bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,table_name text NOT NULL,row_key jsonb NOT NULL,mutation text NOT NULL CHECK(mutation IN ('INSERT','UPDATE','DELETE')),row_hash text NOT NULL);
-    CREATE FUNCTION "${n}".track_business() RETURNS trigger LANGUAGE plpgsql AS $fn$
+    ${bootstrapV3 ? `CREATE TABLE "${n}".campaign_delivery_ledger(request_id text PRIMARY KEY,email text NOT NULL,UNIQUE(request_id,email));
+    CREATE TABLE "${n}".campaign_delivery_sink(request_id text PRIMARY KEY,email text NOT NULL,message jsonb NOT NULL,
+      FOREIGN KEY(request_id,email) REFERENCES "${n}".campaign_delivery_ledger(request_id,email));
+    ` : ''}CREATE FUNCTION "${n}".track_business() RETURNS trigger LANGUAGE plpgsql AS $fn$
     DECLARE v_row jsonb; prior jsonb; rowkey jsonb; oldkey jsonb; edge record; parent_table text; lifecycle text; owned boolean; fingerprint text;
     BEGIN
       v_row := CASE WHEN TG_OP='DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END;
@@ -335,7 +356,9 @@ export function businessMain(input, { sql, uuid, exists }) {
         owned := owned OR EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id IN (v_row->>'id',prior->>'id') OR email IN (v_row->>'email',prior->>'email'));
       ELSIF TG_TABLE_NAME='dealerships' THEN
         owned := owned OR v_row->>'id'='${rootId}' OR prior->>'id'='${rootId}' OR v_row->>'slug'='${rootSlug}' OR prior->>'slug'='${rootSlug}' OR v_row->>'contactPhone'='${rootContact}' OR prior->>'contactPhone'='${rootContact}';
-      ELSE
+      ${bootstrapV3 ? `ELSIF TG_TABLE_NAME='otp_requests' THEN
+        owned := owned OR EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE email IN (v_row->>'destination',prior->>'destination') OR user_id IN (v_row->>'userId',prior->>'userId'));
+      ` : ''}ELSE
         FOR edge IN SELECT * FROM jsonb_each_text('${JSON.stringify(parents)}'::jsonb) LOOP
           -- Foreign reporters targeting an owned listing remain foreign. Reset
           -- detects and refuses them before touching the owned graph.
@@ -345,7 +368,8 @@ export function businessMain(input, { sql, uuid, exists }) {
       END IF;
       IF NOT coalesce(owned,false) THEN RETURN NULL; END IF;
       PERFORM pg_advisory_xact_lock(hashtextextended('${n}',0));
-      SELECT state INTO lifecycle FROM "${n}".campaign_manifest;
+      SELECT state INTO lifecycle FROM "${n}".campaign_manifest;${bootstrapV3 ? `
+      IF TG_TABLE_NAME IN (${closedAuthTables.map(t => `'${t}'`).join(',')}) THEN RAISE EXCEPTION 'Campaign authentication slice unavailable'; END IF;` : ''}
       IF NOT EXISTS(SELECT 1 FROM "${n}".campaign_manifest WHERE journal_hash=${journalHash} AND event_hash=${eventHash}) THEN RAISE EXCEPTION 'Campaign journal changed'; END IF;
       IF TG_OP<>'INSERT' AND NOT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=TG_TABLE_NAME AND row_key=oldkey AND NOT deleted AND row_hash=md5(prior::text)) THEN RAISE EXCEPTION 'Untracked campaign mutation'; END IF;
       IF lifecycle='identities' AND TG_OP='INSERT' AND EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=TG_TABLE_NAME AND row_key=rowkey) THEN RAISE EXCEPTION 'Campaign key reuse'; END IF;
@@ -393,7 +417,7 @@ export function businessMain(input, { sql, uuid, exists }) {
     IF EXISTS(SELECT 1 FROM public.verified_contact_phones WHERE phone='${rootContact}') OR EXISTS(SELECT 1 FROM public.users WHERE phone='${rootContact}') OR EXISTS(SELECT 1 FROM public.dealerships WHERE id='${rootId}' OR slug='${rootSlug}' OR "contactPhone"='${rootContact}') OR
       EXISTS(SELECT 1 FROM public.users u JOIN "${n}".campaign_entities e ON u.id=e.user_id OR u.email=e.email) OR
       EXISTS(SELECT 1 FROM public.dealership_members WHERE id='${uuid(`campaign897-business:${input.id}:membership:owner`)}') OR
-      EXISTS(SELECT 1 FROM public.audit_logs WHERE id IN (${['staff.manage','founder.control'].map(c => `'${uuid(`campaign897-business:${input.id}:audit:${c}`)}'`).join(',')})) THEN RAISE EXCEPTION 'Campaign identity collision'; END IF;
+      EXISTS(SELECT 1 FROM public.audit_logs WHERE id IN (${['staff.manage','founder.control'].map(c => `'${uuid(`campaign897-business:${input.id}:audit:${c}`)}'`).join(',')})) THEN RAISE EXCEPTION 'Campaign identity collision'; END IF;${closedAuthInventory}
   END $guard$;`;
   const audit = `INSERT INTO public.users(id,email,"emailVerifiedAt","displayName",role,"updatedAt") VALUES ${identities.map(identity => `('${identity.id}','${identity.email}',now(),'Campaign ${identity.alias}','buyer',now())`).join(',')};
     INSERT INTO public.dealerships(id,slug,name,status,"admissionMode","contactPhone","updatedAt") VALUES('${rootId}','${rootSlug}','Campaign 897 synthetic business','recovery','synthetic','${rootContact}',now());
