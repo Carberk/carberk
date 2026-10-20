@@ -269,6 +269,49 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
           (v_row->'details'->>'capability' NOT IN (${founderControlled}) OR EXISTS(SELECT 1 FROM public.staff_grants g WHERE g."userId"=v_row->>'actorId' AND g.capability='founder.control' AND g."revokedAt" IS NULL)) AND
           EXISTS(SELECT 1 FROM public.sessions s JOIN "${n}".campaign_records r ON r.table_name='sessions' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',s.id)
             WHERE s."userId"=v_row->>'actorId' AND s."expiresAt">(now() AT TIME ZONE 'UTC') AND s."adminTotpExpiresAt">(now() AT TIME ZONE 'UTC')),false)` : '';
+  // V3 synthetic admission (PrismaBusinessRepository.admit): one Dealership INSERT, its owner invitation and
+  // BUSINESS_ADMITTED in one transaction. A non-owned Dealership INSERT records only its ID in this namespace's
+  // transaction-local slot (one value, never persisted, reverted on rollback); UPDATE never writes it. The owned
+  // owner invitation adopts exactly that Dealership. This defends ordinary code paths and concurrent traffic only:
+  // same-role SQL can set the slot, as it can disable these triggers. Redemption, settings and recovery stay closed.
+  const createdSlot = `'${n}.created_dealership'`;
+  const admissionColumns = ['id', 'slug', 'name', 'status', 'admissionMode', 'admittedAt', 'checkedEvidence', 'createdAt', 'updatedAt'].map(c => `'${c}'`).join(',');
+  const admissionSlot = bootstrapV3 ? `
+      IF TG_TABLE_NAME='dealerships' AND TG_OP='INSERT' AND NOT coalesce(owned,false) THEN PERFORM set_config(${createdSlot},v_row->>'id',true); END IF;` : '';
+  const admissionAdoption = bootstrapV3 ? `IF lifecycle='identities' AND TG_TABLE_NAME='dealership_invitations' AND TG_OP='INSERT' AND v_row->>'dealershipId'<>'${rootId}' AND
+        current_setting(${createdSlot},true)=v_row->>'dealershipId' AND NOT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name='dealerships' AND row_key=jsonb_build_object('id',v_row->>'dealershipId')) THEN
+        SELECT to_jsonb(d) INTO adopted FROM public.dealerships d WHERE d.id=v_row->>'dealershipId';
+        IF adopted IS NULL OR adopted->>'status'<>'recovery' OR adopted->>'admissionMode'<>'synthetic' OR adopted->>'admittedAt' IS NOT NULL OR adopted->>'slug'='${rootSlug}' OR
+          char_length(adopted->>'name') NOT BETWEEN 2 AND 120 OR jsonb_typeof(adopted->'checkedEvidence')<>'string' OR char_length(adopted->>'checkedEvidence') NOT BETWEEN 3 AND 2000 OR
+          EXISTS(SELECT 1 FROM jsonb_each(adopted) e WHERE e.key NOT IN (${admissionColumns}) AND e.value<>'null'::jsonb) OR
+          v_row->>'role'<>'owner' OR v_row->>'redeemedAt' IS NOT NULL OR v_row->>'revokedAt' IS NOT NULL OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'recipientUserId') OR
+          (SELECT count(*) FROM public.dealership_invitations WHERE "dealershipId"=v_row->>'dealershipId')<>1 OR EXISTS(SELECT 1 FROM public.dealership_members WHERE "dealershipId"=v_row->>'dealershipId')
+          THEN RAISE EXCEPTION 'Unsupported campaign admission'; END IF;
+        PERFORM set_config(${createdSlot},'',true);
+        INSERT INTO "${n}".campaign_records(table_name,row_key,row_hash) VALUES('dealerships',jsonb_build_object('id',adopted->>'id'),md5(adopted::text));
+        INSERT INTO "${n}".campaign_events(table_name,row_key,mutation,row_hash) VALUES('dealerships',jsonb_build_object('id',adopted->>'id'),'INSERT',md5(adopted::text));
+        admitting := true;
+      END IF;
+      ` : '';
+  // Admission only: an admitted Dealership's invitation and membership rows stay closed after adoption.
+  const admissionClosed = bootstrapV3 ? `
+        IF TG_TABLE_NAME='dealership_invitations' AND v_row->>'dealershipId'<>'${rootId}' AND NOT coalesce(admitting,false) OR
+          TG_TABLE_NAME='dealership_members' AND v_row->>'dealershipId'<>'${rootId}' THEN RAISE EXCEPTION 'Unsupported campaign business'; END IF;` : '';
+  // The audit follows the adopted Dealership and owner invitation. Its actor is a different, currently elevated
+  // roster holder of founder.admission; details are exactly the contract-bounded synthetic shape, never a token.
+  const admittedAudit = bootstrapV3 ? ` AND NOT coalesce(TG_OP='INSERT' AND v_row->>'action'='BUSINESS_ADMITTED' AND v_row->>'targetType'='Dealership' AND v_row->>'targetId'<>'${rootId}' AND
+          EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name='dealerships' AND NOT deleted AND row_key=jsonb_build_object('id',v_row->>'targetId')) AND
+          EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'actorId') AND jsonb_typeof(v_row->'details')='object' AND
+          (SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(v_row->'details') k)=ARRAY['evidence','mode','reason','verifiedScope'] AND
+          v_row->'details'->>'mode'='synthetic' AND v_row->'details'->>'verifiedScope'='Synthetic fixture; no real business verified' AND
+          jsonb_typeof(v_row->'details'->'evidence')='string' AND jsonb_typeof(v_row->'details'->'reason')='string' AND char_length(v_row->'details'->>'reason') BETWEEN 3 AND 1000 AND
+          EXISTS(SELECT 1 FROM public.dealerships d WHERE d.id=v_row->>'targetId' AND d."checkedEvidence"=v_row->'details'->>'evidence') AND
+          EXISTS(SELECT 1 FROM public.dealership_invitations i JOIN "${n}".campaign_records r ON r.table_name='dealership_invitations' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',i.id)
+            WHERE i."dealershipId"=v_row->>'targetId' AND i.role='owner' AND i."recipientUserId"<>v_row->>'actorId') AND
+          (SELECT count(*) FROM public.audit_logs a WHERE a."targetType"='Dealership' AND a."targetId"=v_row->>'targetId' AND a.action='BUSINESS_ADMITTED')=1 AND
+          EXISTS(SELECT 1 FROM public.staff_grants g WHERE g."userId"=v_row->>'actorId' AND g.capability='founder.admission' AND g."revokedAt" IS NULL) AND
+          EXISTS(SELECT 1 FROM public.sessions s JOIN "${n}".campaign_records r ON r.table_name='sessions' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',s.id)
+            WHERE s."userId"=v_row->>'actorId' AND s."expiresAt">(now() AT TIME ZONE 'UTC') AND s."adminTotpExpiresAt">(now() AT TIME ZONE 'UTC')),false)` : '';
   const deliveryInventory = bootstrapV3 ? `
     IF (SELECT delivery_hash FROM "${n}".campaign_manifest) IS DISTINCT FROM
       (SELECT md5(coalesce(jsonb_agg(to_jsonb(d) ORDER BY request_id),'[]'::jsonb)::text) FROM "${n}".campaign_delivery_ledger d) OR
@@ -287,7 +330,11 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
     IF (SELECT state FROM "${n}".campaign_manifest)='identities' AND EXISTS(SELECT 1 FROM "${n}".campaign_records g WHERE g.table_name='staff_grants' AND NOT g.deleted AND
       g.version IS DISTINCT FROM (CASE WHEN ${bootstrapGrant('g.row_key')} THEN 1 ELSE (SELECT count(*) FROM public.audit_logs a JOIN "${n}".campaign_records r ON r.table_name='audit_logs' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',a.id)
         WHERE a.action IN ('STAFF_CAPABILITY_GRANTED','STAFF_CAPABILITY_REVOKED') AND a."targetId"=g.row_key->>'userId' AND a.details->>'capability'=g.row_key->>'capability') END))
-    THEN RAISE EXCEPTION 'Campaign grant audit mismatch'; END IF;` : '';
+    THEN RAISE EXCEPTION 'Campaign grant audit mismatch'; END IF;
+    IF (SELECT state FROM "${n}".campaign_manifest)='identities' AND EXISTS(SELECT 1 FROM "${n}".campaign_records d WHERE d.table_name='dealerships' AND NOT d.deleted AND d.row_key<>jsonb_build_object('id','${rootId}') AND (d.version<>1 OR
+      (SELECT count(*) FROM public.dealership_invitations i JOIN "${n}".campaign_records r ON r.table_name='dealership_invitations' AND NOT r.deleted AND r.version=1 AND r.row_key=jsonb_build_object('id',i.id) WHERE i."dealershipId"=d.row_key->>'id' AND i.role='owner')<>1 OR
+      (SELECT count(*) FROM public.audit_logs a JOIN "${n}".campaign_records r ON r.table_name='audit_logs' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',a.id) WHERE a."targetType"='Dealership' AND a."targetId"=d.row_key->>'id' AND a.action='BUSINESS_ADMITTED')<>1))
+    THEN RAISE EXCEPTION 'Campaign admission audit mismatch'; END IF;` : '';
   // Only these columns convey graph ownership. Catalog references never do.
   const parents = { businessId: 'dealerships', dealershipId: 'dealerships', sellerId: 'users', userId: 'users', buyerId: 'users', recipientUserId: 'users', senderId: 'users', blockerId: 'users', blockedId: 'users', conversationId: 'conversations', listingId: 'listings', reporterUserId: 'users', reviewedById: 'users', actorId: 'users', assigneeId: 'users', previousAssigneeId: 'users', lastEditedById: 'users', suspendedById: 'users', lastMessageId: 'messages', firstBuyerMessageId: 'messages', firstSellerReplyId: 'messages' };
   if (bootstrapV3) parents.totpEnrollmentId = 'totp_enrollments';
@@ -382,7 +429,7 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
     CREATE TABLE "${n}".campaign_delivery_sink(request_id text PRIMARY KEY,email text NOT NULL,message jsonb NOT NULL,
       FOREIGN KEY(request_id,email) REFERENCES "${n}".campaign_delivery_ledger(request_id,email));
     ` : ''}CREATE FUNCTION "${n}".track_business() RETURNS trigger LANGUAGE plpgsql AS $fn$
-    DECLARE v_row jsonb; prior jsonb; rowkey jsonb; oldkey jsonb; edge record; parent_table text; lifecycle text; owned boolean; fingerprint text;
+    DECLARE v_row jsonb; prior jsonb; rowkey jsonb; oldkey jsonb; edge record; parent_table text; lifecycle text; owned boolean; fingerprint text;${bootstrapV3 ? ' adopted jsonb; admitting boolean := false;' : ''}
     BEGIN
       v_row := CASE WHEN TG_OP='DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END;
       prior := CASE WHEN TG_OP='INSERT' THEN NULL ELSE to_jsonb(OLD) END;
@@ -402,7 +449,7 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
           IF EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=edge.value AND row_key->>'id' IN (v_row->>edge.key,prior->>edge.key)) THEN owned := true; END IF;
         END LOOP;
         IF TG_TABLE_NAME='audit_logs' AND v_row->>'targetType'='User' AND EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'targetId') THEN owned := true; END IF;
-      END IF;
+      END IF;${admissionSlot}
       IF NOT coalesce(owned,false) THEN RETURN NULL; END IF;
       PERFORM pg_advisory_xact_lock(hashtextextended('${n}',0));
       SELECT state INTO lifecycle FROM "${n}".campaign_manifest;${bootstrapV3 ? `
@@ -436,11 +483,11 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
         (SELECT count(DISTINCT relation) FROM pg_locks WHERE pid=pg_backend_pid() AND locktype='relation' AND mode='ShareRowExclusiveLock' AND granted AND relation IN (${relationIds}))=${tables.length})
         THEN RAISE EXCEPTION 'Campaign graph cleaning'; END IF;
       IF lifecycle='identities' AND TG_OP='UPDATE' AND (rowkey IS DISTINCT FROM oldkey OR EXISTS(SELECT 1 FROM jsonb_each_text(v_row) e WHERE e.key IN (${immutable.map(x => `'${x}'`).join(',')}) AND v_row->e.key IS DISTINCT FROM prior->e.key${otpBinding})) THEN RAISE EXCEPTION 'Campaign parent or key transfer'; END IF;
-      IF lifecycle='identities' AND TG_OP<>'DELETE' THEN
+      ${admissionAdoption}IF lifecycle='identities' AND TG_OP<>'DELETE' THEN
         FOR edge IN SELECT * FROM jsonb_each_text(v_row) LOOP
           parent_table := '${JSON.stringify(parents)}'::jsonb->>edge.key;
           IF parent_table IS NOT NULL AND edge.value IS NOT NULL AND NOT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=parent_table AND row_key=jsonb_build_object('id',edge.value) AND NOT deleted) THEN RAISE EXCEPTION 'Foreign campaign graph reference'; END IF;
-        END LOOP;
+        END LOOP;${admissionClosed}
         IF TG_TABLE_NAME='users' AND (NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'id' AND email=v_row->>'email') OR
           v_row->>'role'<>'buyer' OR v_row->>'emailVerifiedAt' IS NULL OR v_row->>'phone' IS NOT NULL OR v_row->>'avatarKey' IS NOT NULL OR v_row->>'avatarUploadId' IS NOT NULL OR v_row->>'avatarUrl' IS NOT NULL OR v_row->>'suspendedAt' IS NOT NULL OR v_row->>'suspendedById' IS NOT NULL OR v_row->>'deletionScheduledAt' IS NOT NULL) THEN RAISE EXCEPTION 'Synthetic identity changed'; END IF;
         IF TG_TABLE_NAME='dealerships' AND (v_row->>'id'<>'${rootId}' OR v_row->>'slug'<>'${rootSlug}' OR v_row->>'contactPhone' IS DISTINCT FROM '${rootContact}' OR v_row->>'status'<>'recovery' OR v_row->>'admissionMode'<>'synthetic' OR v_row->>'admittedAt' IS NOT NULL OR v_row->>'checkedEvidence' IS NOT NULL OR v_row->>'contactConfirmedAt' IS NOT NULL OR v_row->>'logoUrl' IS NOT NULL) THEN RAISE EXCEPTION 'Synthetic root identity changed'; END IF;
@@ -452,7 +499,7 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
         IF TG_TABLE_NAME='verified_contact_phones' AND (v_row->>'phone' IS DISTINCT FROM '${rootContact}' OR EXISTS(SELECT 1 FROM public.verified_contact_phones WHERE phone=v_row->>'phone' AND id<>v_row->>'id')) THEN RAISE EXCEPTION 'Campaign contact proof collision'; END IF;
         ${grantGuard}
         IF TG_TABLE_NAME='audit_logs' AND (v_row->>'targetType'<>'User' OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'targetId') OR v_row->>'action'<>'STAFF_CAPABILITY_BOOTSTRAP' OR v_row->>'targetId'<>'${coordinator.id}' OR v_row->>'actorId' IS NOT NULL OR NOT (
-          ${['staff.manage','founder.control'].map(c => `(v_row->>'id'='${uuid(`campaign897-business:${input.id}:audit:${c}`)}' AND v_row->'details'=jsonb_build_object('capability','${c}','reason','Synthetic storage-only reservation ${input.id}'))`).join(' OR ')}))${grantAudit} THEN RAISE EXCEPTION 'Unsupported campaign audit'; END IF;
+          ${['staff.manage','founder.control'].map(c => `(v_row->>'id'='${uuid(`campaign897-business:${input.id}:audit:${c}`)}' AND v_row->'details'=jsonb_build_object('capability','${c}','reason','Synthetic storage-only reservation ${input.id}'))`).join(' OR ')}))${grantAudit}${admittedAudit} THEN RAISE EXCEPTION 'Unsupported campaign audit'; END IF;
         IF TG_TABLE_NAME='content_reports' AND (NOT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=CASE v_row->>'targetType' WHEN 'listing' THEN 'listings' WHEN 'user' THEN 'users' WHEN 'message' THEN 'messages' ELSE '' END AND NOT deleted AND row_key=jsonb_build_object('id',v_row->>'targetId')) OR v_row->>'messageContext' IS NOT NULL) THEN RAISE EXCEPTION 'Unsupported report target'; END IF;
         IF TG_TABLE_NAME='messages' AND (v_row->>'kind'<>'text' OR coalesce(v_row->'metadata','null'::jsonb) NOT IN ('null'::jsonb,'{}'::jsonb)) THEN RAISE EXCEPTION 'Unsupported message media'; END IF;
         IF TG_TABLE_NAME='listing_drafts' AND (jsonb_typeof(v_row->'payload')<>'object' OR EXISTS(SELECT 1 FROM jsonb_each(v_row->'payload') e WHERE e.key NOT IN ('description','media') OR (e.key='description' AND jsonb_typeof(e.value)<>'string') OR (e.key='media' AND e.value<>'[]'::jsonb))) THEN RAISE EXCEPTION 'Unsupported draft payload'; END IF;
