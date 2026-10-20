@@ -5,6 +5,8 @@ import { createHash } from 'node:crypto';
 import { evaluateSchemaPlan, retainedSchemaProfile } from './staging-schema.mjs';
 
 const run = promisify(execFile);
+const gitOperations = new Set(['ls-remote', 'fetch', 'show', 'ls-tree', 'hash-object', 'mktree', 'commit-tree', 'push', 'rev-parse']);
+const gitSignals = new Set(['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGHUP', 'SIGQUIT', 'SIGABRT', 'SIGSEGV', 'SIGPIPE', 'SIGBUS']);
 
 /** Each caller owns its scratch object directory; the shared remote ref is the lock. */
 export class GitLedger {
@@ -19,7 +21,15 @@ export class GitLedger {
         encoding: 'utf8', timeout: 60000, maxBuffer: 1024 * 1024,
         env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_AUTHOR_NAME: 'Staging controls',
           GIT_AUTHOR_EMAIL: 'staging-controls@invalid', GIT_COMMITTER_NAME: 'Staging controls', GIT_COMMITTER_EMAIL: 'staging-controls@invalid' },
-      }, (error, stdout) => error ? reject(new Error('Coordination Git operation failed')) : resolve(raw ? stdout : stdout.trim()));
+      }, (error, stdout) => {
+        if (!error) return resolve(raw ? stdout : stdout.trim());
+        // Child errors include command arguments and output. Copy only fixed labels
+        // and bounded status values; never attach the original error as a cause.
+        const operation = gitOperations.has(args[0]) ? args[0] : 'unknown';
+        const exit = Number.isInteger(error.code) && error.code >= 0 && error.code <= 255 ? error.code : 'unknown';
+        const signal = error.signal == null ? 'none' : gitSignals.has(error.signal) ? error.signal : 'unknown';
+        reject(new Error(`Coordination Git operation failed: operation=${operation} exit=${exit} signal=${signal} killed=${error.killed === true}`));
+      });
       child.stdin.end(input);
     });
   }
