@@ -35,6 +35,8 @@ These ran offline, with no database, Redis, services or staging.
 - `node /tmp/issue901-v3-session-source-check.mjs`: PASS. Compared with `93f158c3`, v1 functions and the four v2 SQL paths are identical. The v3 lock/trigger set is unchanged, the new guards are present, and the disposal refusal comes before `cleaning`. It uses a fake transport; no SQL ran.
 - The spec-style source concatenation compiles in a VM: PASS.
 - `git diff --check`: PASS.
+- `node --test scripts/staging.test.mjs scripts/staging-control.test.mjs scripts/staging-ledger.test.mjs scripts/staging-railway.test.mjs`: PASS, 153/153 with 0 failed or cancelled; log `/tmp/issue901-v3-session-controls.log`. It uses the fake provider harness, with no real provider action.
+- The API spec's Vitest collection was not run. The worktree had no package builds, and the spec reads this script only as text, which the VM compile check above already covers.
 
 The SQL and HTTP behavior is not executed locally and remains unknown.
 
