@@ -1447,4 +1447,139 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     });
   }));
 
+  // B2 text-only contexts. Per reservation, count BEFORE writing: primary 68 records / 91 events
+  // before reset, 159 events after reset; foreign control 24 / 26, then 50 events after its reset.
+  // Fixed guards remain 128 records / 2048 events. No catalog, contact, media or publish setup.
+  // First predicted RED at abfd51f9: personal INSERT -> `Campaign business required` (null businessId).
+  // After context admission, PATCH also needs the real generated validatedSteps: [] payload allowed.
+  it("keeps personal and admitted-business drafts separate, preserves suspended sales work and disposes only its reservation on retry", () => withKnownJobs(known => {
+    const id = "d1".repeat(16), foreignId = "d2".repeat(16);
+    const cleanupIds = [id];
+    return resetAfter(cleanupIds, async () => {
+      const roster = await seed(id);
+      const { coordinator, staff } = await elevatedStaff(id, roster, known, ["founder.admission"]);
+      const owner = await signIn(id, actor(roster, "buyer-a"), known);
+      const sales = await signIn(id, actor(roster, "sales-a"), known);
+      const outsider = await signIn(id, actor(roster, "buyer-b"), known);
+      const admitted = (await post("/api/v1/business/admission", staff, admissionFor(id, owner.user.id)).expect(201)).body as { businessId: string; token: string };
+      const businessId = admitted.businessId;
+      await post("/api/v1/business/invitations/redeem", owner, { token: admitted.token }).expect(201);
+      const invitation = (await post(`/api/v1/business/${businessId}/invitations`, owner, { recipientUserId: sales.user.id }).expect(201)).body as { token: string };
+      await post("/api/v1/business/invitations/redeem", sales, { token: invitation.token }).expect(201);
+      const rootBusiness = await db.dealership.findUniqueOrThrow({ where: { slug: `campaign897-${id}-${candidate.slice(0, 12)}` } });
+      const rootState = await businessState(rootBusiness.id);
+      const draftsPath = "/api/v1/listings/drafts";
+      const inventoryPath = `/api/v1/businesses/${businessId}/inventory`;
+      const patch = (draftId: string, login: Login, description: string, context?: string) => {
+        const attempt = request.patch(`${draftsPath}/${draftId}`).set("authorization", `Bearer ${login.accessToken}`);
+        if (context) attempt.set("x-business-id", context);
+        return attempt.send({ description });
+      };
+      const personal = (await post(draftsPath, owner, { initialPayload: { description: "Synthetic personal draft before workspace switch" } }).expect(201)).body as { id: string };
+      const business = (await post(draftsPath, sales, { businessId, initialPayload: { description: "Synthetic business draft by sales" } }).expect(201)).body as { id: string };
+      const savedDrafts = () => db.listingDraft.findMany({ where: { id: { in: [personal.id, business.id] } }, orderBy: { id: "asc" } });
+      const assertContexts = async (personalDescription: string, businessDescription: string, updated: boolean) => {
+        expect((await get("/api/v1/me/drafts", owner).expect(200)).body.items).toEqual([
+          expect.objectContaining({ id: personal.id, userId: owner.user.id, payload: { description: personalDescription, ...(updated ? { validatedSteps: [] } : {}) } }),
+        ]);
+        expect((await get("/api/v1/me/drafts", sales).expect(200)).body.items).toEqual([]);
+        for (const login of [owner, sales]) {
+          const inventory = (await get(inventoryPath, login).expect(200)).body;
+          expect(inventory).toMatchObject({ businessId, listings: [], counts: { drafts: 1, active: 0 } });
+          expect(inventory.drafts).toEqual([expect.objectContaining({ id: business.id, userId: sales.user.id, businessId,
+            payload: { description: businessDescription, ...(updated ? { validatedSteps: [] } : {}) } })]);
+        }
+        expect(await db.listingDraft.findUniqueOrThrow({ where: { id: personal.id } })).toMatchObject({ userId: owner.user.id, businessId: null,
+          payload: { description: personalDescription, ...(updated ? { validatedSteps: [] } : {}) } });
+        expect(await db.listingDraft.findUniqueOrThrow({ where: { id: business.id } })).toMatchObject({ userId: sales.user.id, businessId,
+          payload: { description: businessDescription, ...(updated ? { validatedSteps: [] } : {}) } });
+      };
+      await assertContexts("Synthetic personal draft before workspace switch", "Synthetic business draft by sales", false);
+      expect((await patch(personal.id, owner, "Synthetic personal draft resumed").expect(200)).body).not.toHaveProperty("businessId");
+      expect((await patch(business.id, sales, "Synthetic business draft resumed by sales", businessId).expect(200)).body).toMatchObject({ id: business.id, userId: sales.user.id, businessId,
+        payload: { description: "Synthetic business draft resumed by sales", validatedSteps: [] } });
+      await assertContexts("Synthetic personal draft resumed", "Synthetic business draft resumed by sales", true);
+
+      cleanupIds.push(foreignId);
+      const foreignRoster = await seed(foreignId);
+      const foreignBuyer = await signIn(foreignId, actor(foreignRoster, "buyer-b"), known);
+      const foreignDraft = (await post(draftsPath, foreignBuyer, { initialPayload: { description: "Foreign reservation personal draft must survive" } }).expect(201)).body as { id: string };
+      const foreignState = await db.listingDraft.findUniqueOrThrow({ where: { id: foreignDraft.id } });
+      const foreignDigest = await digest(foreignId);
+      const refused = async (attempt: () => Promise<unknown>) => {
+        const unchanged = await digest(id), drafts = await savedDrafts();
+        await attempt();
+        expect(await digest(id), "draft refusal writes no graph or event").toBe(unchanged);
+        expect(await savedDrafts()).toEqual(drafts);
+        expect(await digest(foreignId)).toBe(foreignDigest);
+        expect(await db.listingDraft.findUniqueOrThrow({ where: { id: foreignDraft.id } })).toEqual(foreignState);
+      };
+      await refused(async () => {
+        expect((await patch(business.id, owner, "Missing explicit context").expect(403)).body.details).toEqual({ reason: "BUSINESS_CONTEXT_CHANGED" });
+        expect((await patch(personal.id, owner, "Do not transfer personal work", businessId).expect(403)).body.details).toEqual({ reason: "OWNER_REQUIRED" });
+        expect((await post(draftsPath, owner, { businessId, initialPayload: { description: "Mismatched context" } }).set("x-business-id", rootBusiness.id).expect(400)).body.details).toEqual({ reason: "BUSINESS_CONTEXT_CHANGED" });
+        for (const login of [outsider, foreignBuyer]) {
+          expect((await get(inventoryPath, login).expect(403)).body.details).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+          expect((await patch(business.id, login, "Cannot adopt business work", businessId).expect(403)).body.details).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+          await patch(personal.id, login, "Cannot adopt personal work").expect(404);
+          expect((await post(draftsPath, login, { businessId, initialPayload: { description: "Cannot create business work" } }).expect(403)).body.details).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+        }
+        await patch(foreignDraft.id, owner, "Cannot adopt another reservation's work").expect(404);
+        expect(execute("reset", id, { candidate: "b".repeat(40) })).toMatchObject({ code: 1, receipt: undefined });
+      });
+
+      await post(`/api/v1/business/${businessId}/members`, owner, { targetUserId: sales.user.id, action: "suspend" }).expect(201);
+      await refused(async () => {
+        expect((await get(inventoryPath, sales).expect(403)).body.details).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+        expect((await patch(business.id, sales, "Suspended sales must not overwrite saved work", businessId).expect(403)).body.details).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+        expect((await post(draftsPath, sales, { businessId, initialPayload: { description: "Suspended sales must not create" } }).expect(403)).body.details).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+      });
+      expect((await get(inventoryPath, owner).expect(200)).body.drafts).toEqual([expect.objectContaining({ id: business.id, userId: sales.user.id, businessId,
+        payload: { description: "Synthetic business draft resumed by sales", validatedSteps: [] } })]);
+      expect((await get("/api/v1/me/drafts", owner).expect(200)).body.items).toEqual([expect.objectContaining({ id: personal.id,
+        payload: { description: "Synthetic personal draft resumed", validatedSteps: [] } })]);
+      expect((await patch(business.id, owner, "Synthetic business work preserved by owner", businessId).expect(200)).body).toMatchObject({ id: business.id, userId: sales.user.id, businessId,
+        payload: { description: "Synthetic business work preserved by owner", validatedSteps: [] } });
+      await post(`/api/v1/business/${businessId}/members`, owner, { targetUserId: sales.user.id, action: "restore" }).expect(201);
+      expect((await get(inventoryPath, sales).expect(200)).body.drafts).toEqual([expect.objectContaining({ id: business.id,
+        payload: { description: "Synthetic business work preserved by owner", validatedSteps: [] } })]);
+      await patch(business.id, sales, "Synthetic business work resumed after restoration", businessId).expect(200);
+      await assertContexts("Synthetic personal draft resumed", "Synthetic business work resumed after restoration", true);
+      expect(await businessState(rootBusiness.id)).toEqual(rootState);
+      expect(await digest(foreignId)).toBe(foreignDigest);
+
+      // Literal accounting includes bootstrap, ordinary sign-ins, TOTP, admission and membership.
+      const journal = async (reservation: string, records: number, events: number) => {
+        expect(await rows(`SELECT (SELECT count(*)::int FROM "cf_${reservation}".campaign_records) AS records,(SELECT count(*)::int FROM "cf_${reservation}".campaign_events) AS events`)).toEqual([{ records, events }]);
+      };
+      const before = await owned(id), foreignBefore = await owned(foreignId);
+      const perTable: Record<string, number> = {};
+      for (const row of before) perTable[row.table_name] = (perTable[row.table_name] ?? 0) + 1;
+      expect(perTable).toEqual({ users: 15, sessions: 5, otp_requests: 5, totp_enrollments: 2, totp_backup_codes: 20, staff_grants: 3,
+        audit_logs: 9, dealerships: 2, dealership_members: 3, dealership_invitations: 2, listing_drafts: 2 });
+      for (const draftId of [personal.id, business.id]) expect(before).toContainEqual({ table_name: "listing_drafts", row_key: { id: draftId } });
+      expect(before).not.toContainEqual({ table_name: "listing_drafts", row_key: { id: foreignDraft.id } });
+      await journal(id, 68, 91);
+      await journal(foreignId, 24, 26);
+      expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_ledger ORDER BY request_id`)).toEqual(
+        [coordinator.requestId, staff.requestId, owner.requestId, sales.requestId, outsider.requestId].sort().map(request_id => ({ request_id })));
+      // Publish is deferred to valid contact/media proof. Suspension here is not D3 creator removal.
+      expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+      await assertDisposed(id, before);
+      await journal(id, 68, 159);
+      const terminal = await digest(id);
+      expect(execute("reset", id)).toMatchObject({ code: 0, receipt: { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 } });
+      expect(await digest(id)).toBe(terminal);
+      await assertDisposed(id, before);
+      expect(await savedDrafts()).toEqual([]);
+      expect(await digest(foreignId)).toBe(foreignDigest);
+      expect(await db.listingDraft.findUniqueOrThrow({ where: { id: foreignDraft.id } })).toEqual(foreignState);
+      expect((await get("/api/v1/me/drafts", foreignBuyer).expect(200)).body.items).toEqual([expect.objectContaining({ id: foreignDraft.id, userId: foreignBuyer.user.id,
+        payload: { description: "Foreign reservation personal draft must survive" } })]);
+      expect(execute("reset", foreignId).code).toBe(0);
+      await assertDisposed(foreignId, foreignBefore);
+      await journal(foreignId, 24, 50);
+    });
+  }));
+
 });
