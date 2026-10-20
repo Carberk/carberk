@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { execFile, spawnSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
@@ -9,6 +9,8 @@ import { promisify } from "node:util";
 import { PrismaService } from "@auto-tm/db";
 import { AuthSchemas } from "@auto-tm/contracts";
 import { getQueueToken } from "@nestjs/bullmq";
+import { ConfigModule } from "@nestjs/config";
+import { EventEmitterModule } from "@nestjs/event-emitter";
 import { Reflector } from "@nestjs/core";
 import { JwtModule, JwtService } from "@nestjs/jwt";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
@@ -17,6 +19,8 @@ import { Worker, type Queue } from "bullmq";
 import { generateSync } from "otplib";
 import supertest from "supertest";
 import { afterAll, beforeAll, describe, expect, inject, it, vi } from "vitest";
+// eslint-disable-next-line no-restricted-imports -- HTTP integration composition needs the real contact controller and production providers.
+import { ListingsModule } from "../../listings/listings.module";
 import { IdentityModule } from "../identity.module";
 import { BullMqEmailCodeSenderAdapter } from "../infrastructure/BullMqEmailCodeSenderAdapter";
 import { AdminController } from "../../admin/presentation/admin.controller";
@@ -49,7 +53,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
   beforeAll(async () => {
     if (!inject("apiTestDatabases")) throw new Error("Requires configured migrated disposable API PostgreSQL and Redis lane");
     delete process.env["OTP_TEST_MODE"];
-    const module = await NestTest.createTestingModule({ imports: [bullTestRoot(), IdentityModule,
+    const module = await NestTest.createTestingModule({ imports: [ConfigModule.forRoot({ isGlobal: true }), EventEmitterModule.forRoot(), bullTestRoot(), IdentityModule, ListingsModule,
       JwtModule.register({ global: true, secret: "synthetic-full-v3-http-contract-901" })],
       controllers: [AdminController] }).compile();
     app = module.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
@@ -1122,5 +1126,134 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
       await promotionAccounting(id, [], false, false, true);
     });
   });
+
+
+  it("confirms only the admitted Owner's generated contact code and disposes its exact protected SMS evidence", () => withKnownJobs(known => {
+    const id = "e1".repeat(16), foreignId = randomUUID(), reuseId = randomUUID();
+    const phone = "+99367752052";
+    // Literal design vector, independently checked against the selected derivation.
+    expect(`+9936${(BigInt(`0x${createHash("sha256").update(`campaign897-contact-phone-v1:${id}:${candidate}`, "ascii").digest("hex")}`) % 10000000n).toString().padStart(7, "0")}`).toBe(phone);
+    const smsIds = new Set<string>();
+    return resetAfter([id], async () => {
+      const roster = await seed(id);
+      await db.dealership.create({ data: { id: foreignId, slug: `contact-control-${foreignId}`, name: "Foreign contact control" } });
+      try {
+        const foreign = await businessState(foreignId);
+        const { staff } = await elevatedStaff(id, roster, known, ["founder.admission"]);
+        const owner = await signIn(id, actor(roster, "buyer-a"), known);
+        const admitted = (await post("/api/v1/business/admission", staff, admissionFor(id, owner.user.id)).expect(201)).body as { businessId: string; token: string };
+        await post("/api/v1/business/invitations/redeem", owner, { token: admitted.token }).expect(201);
+        expect((await get("/api/v1/business/current", owner).expect(200)).body.workspace).toMatchObject({
+          business: { id: admitted.businessId, status: "active" }, membership: { role: "owner" },
+        });
+        const contact = (action: "request" | "verify", login: Login, body: object, businessId = admitted.businessId) =>
+          post(`/api/v1/me/contact-phones/${action}`, login, body).set("x-business-id", businessId);
+        const measurement = () => db.measurementState.findMany({ orderBy: { key: "asc" } });
+        const unchanged = async () => ({
+          users: await db.user.findMany({ where: { id: { in: roster.map(person => person.user_id) } }, orderBy: { id: "asc" } }),
+          sessions: await db.session.findMany({ where: { userId: { in: roster.map(person => person.user_id) } }, orderBy: { id: "asc" } }),
+          proofs: await db.verifiedContactPhone.findMany({ orderBy: { id: "asc" } }),
+          audits: await db.auditLog.findMany({ orderBy: { id: "asc" } }), global: await measurement(),
+        });
+        const initial = await unchanged(), business = await businessState(admitted.businessId);
+        const before = await owned(id), journal = await digest(id);
+        const [eventsBefore] = await rows<{ count: number }>(`SELECT count(*)::int AS count FROM "cf_${id}".campaign_events`);
+        // On d397c8b7 this real route reaches track_business's Unsupported campaign OTP.
+        // A 404, failed admission/redemption or an auth failure is setup failure, never that behavioral RED.
+        const issued = await contact("request", owner, { phone });
+        if (typeof issued.body.requestId === "string") smsIds.add(issued.body.requestId);
+        if (issued.status >= 400) {
+          expect(await digest(id)).toBe(journal);
+          expect(await unchanged()).toEqual(initial);
+          expect(await db.otpRequest.count({ where: { destination: phone } })).toBe(0);
+        }
+        expect(issued.status, "ordinary contact request must pass Unsupported campaign OTP barrier").toBe(200);
+        expect(issued.body).toMatchObject({ status: "code_sent", requestId: expect.any(String), resendInSeconds: expect.any(Number) });
+        expect(issued.body.testCode).toBeUndefined();
+        const requestId = issued.body.requestId as string;
+        expect(requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+        expect(issued.body.resendInSeconds).toBeGreaterThan(0);
+        const smsLedger = () => rows<{ value: Record<string, unknown> }>(`SELECT to_jsonb(l) AS value FROM "cf_${id}".campaign_sms_ledger l WHERE request_id=$1`, requestId);
+        const binding = () => rows<{ value: Record<string, unknown> }>(`SELECT to_jsonb(b) AS value FROM "cf_${id}".campaign_sms_binding b`);
+        const sink = () => rows<{ message: string }>(`SELECT message FROM "cf_${id}".campaign_sms_sink WHERE request_id=$1`, requestId);
+        const retainedBinding = await binding(), retainedLedger = await smsLedger();
+        expect(retainedBinding).toHaveLength(1);
+        expect(retainedBinding[0]?.value).toMatchObject({ reservation_id: id, candidate, destination: phone });
+        expect(retainedLedger).toHaveLength(1);
+        for (const entry of [...retainedBinding, ...retainedLedger]) {
+          expect(entry.value).not.toHaveProperty("message");
+          expect(entry.value).not.toHaveProperty("code");
+        }
+        const pending = await db.otpRequest.findUniqueOrThrow({ where: { id: requestId } });
+        expect(pending).toMatchObject({ purpose: "listing_contact_phone", channel: "phone", destination: phone, phone, userId: owner.user.id, businessId: admitted.businessId, verifiedAt: null, attempts: 0 });
+        expect(retainedLedger[0]?.value).toMatchObject({ request_id: requestId, destination: phone, code_hash: pending.codeHash, issue_row_hash: expect.stringMatching(/^[0-9a-f]+$/) });
+        const delivered = await sink();
+        expect(delivered).toHaveLength(1);
+        // The sole code read is the exact namespace/full-request protected SMS sink.
+        const code = delivered[0]?.message.match(/\b\d{6}\b/)?.[0];
+        expect(code).toBeDefined();
+        expect(createHash("sha256").update(code!).digest("hex")).toBe(pending.codeHash);
+        expect(await queue.getJob(requestId)).toBeUndefined();
+        expect(await unchanged()).toEqual(initial);
+        expect(await businessState(admitted.businessId)).toEqual(business);
+        const sent = await digest(id);
+        expect(sent).not.toBe(journal);
+        await contact("request", staff, { phone }).expect(403);
+        await contact("verify", owner, { phone, code }, foreignId).expect(403);
+        expect(await digest(id)).toBe(sent);
+        const wrong = `${code![0] === "0" ? "1" : "0"}${code!.slice(1)}`;
+        expect((await contact("verify", owner, { phone, code: wrong }).expect(400)).body).toMatchObject({ code: "INVALID_OTP", details: { attemptsLeft: 4 } });
+        expect(await db.otpRequest.findUniqueOrThrow({ where: { id: requestId } })).toMatchObject({ attempts: 1, verifiedAt: null });
+        const verified = await contact("verify", owner, { phone, code }).expect(200);
+        expect(verified.body.contactPhone).toMatchObject({ phone, source: "confirmed" });
+        const { confirmedAt, reusableUntil } = verified.body.contactPhone as { confirmedAt: string; reusableUntil: string };
+        expect(Date.parse(reusableUntil) - Date.parse(confirmedAt)).toBe(7 * 24 * 60 * 60 * 1000);
+        expect(await db.otpRequest.findUniqueOrThrow({ where: { id: requestId } })).toMatchObject({ attempts: 1, verifiedAt: expect.any(Date) });
+        const confirmed = await businessState(admitted.businessId);
+        expect(confirmed).toEqual({ ...business, business: { ...business.business, contactPhone: phone, contactConfirmedAt: new Date(confirmedAt), updatedAt: expect.any(Date) } });
+        const confirmedDigest = await digest(id);
+        // Foreign scalar use must refuse without adoption or a change to the control.
+        await expect(db.dealership.update({ where: { id: foreignId }, data: { contactPhone: phone } })).rejects.toThrow();
+        expect(await businessState(foreignId)).toEqual(foreign);
+        expect((await contact("verify", owner, { phone, code }).expect(400)).body.code).toBe("OTP_ALREADY_USED");
+        expect((await contact("request", owner, { phone }).expect(200)).body).toEqual({ status: "confirmed", contactPhone: verified.body.contactPhone });
+        expect(await digest(id)).toBe(confirmedDigest);
+        expect(await smsLedger()).toEqual(retainedLedger);
+        expect(await sink()).toEqual(delivered);
+        expect(await unchanged()).toEqual(initial);
+        expect((await owned(id)).length).toBe(before.length + 1);
+        const [eventsAfter] = await rows<{ count: number }>(`SELECT count(*)::int AS count FROM "cf_${id}".campaign_events`);
+        expect(eventsAfter?.count).toBe(eventsBefore!.count + 4); // INSERT, wrong attempt, consume, Dealership UPDATE.
+        const disposable = await owned(id);
+        expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+        await assertDisposed(id, disposable);
+        expect(await sink()).toEqual([]);
+        expect(await smsLedger()).toEqual(retainedLedger);
+        expect(await binding()).toEqual(retainedBinding);
+        expect(await db.otpRequest.findUnique({ where: { id: requestId } })).toBeNull();
+        expect(await measurement()).toEqual(initial.global);
+        expect(await businessState(foreignId)).toEqual(foreign);
+        const terminal = await digest(id);
+        // Fresh unrelated graph IDs may reuse the phone after disposal. No auth or proof is seeded.
+        const reused = await db.dealership.create({ data: { id: reuseId, slug: `terminal-reuse-${reuseId}`, name: "Unrelated later phone reuse", contactPhone: phone } });
+        expect(execute("reset", id)).toMatchObject({ code: 0, receipt: { state: "disposed", queueJobs: 0, sinkRecords: 0 } });
+        expect(await digest(id)).toBe(terminal);
+        expect(await db.dealership.findUnique({ where: { id: reuseId } })).toEqual(reused);
+        expect(await smsLedger()).toEqual(retainedLedger);
+        expect(await binding()).toEqual(retainedBinding);
+        expect(await sink()).toEqual([]);
+        expect(await businessState(foreignId)).toEqual(foreign);
+      } finally {
+        // Recover exact authority even if the HTTP response was lost after reserve committed.
+        const [contract] = await rows<{ present: boolean }>(`SELECT to_regclass('"cf_${id}".campaign_sms_ledger') IS NOT NULL AS present`);
+        if (contract?.present) {
+          for (const entry of await rows<{ request_id: string }>(`SELECT request_id FROM "cf_${id}".campaign_sms_ledger`)) smsIds.add(entry.request_id);
+        }
+        for (const requestId of smsIds) expect.soft(await queue.getJob(requestId), "synchronous SMS has no email job").toBeUndefined();
+        await db.dealership.deleteMany({ where: { id: reuseId } });
+        await db.dealership.delete({ where: { id: foreignId } });
+      }
+    });
+  }));
 
 });
