@@ -14,6 +14,82 @@ Invalidating a pre-existing shared inventory baseline is **not authorized**. A b
 
 Next: retain the reached main assertion, add bounded test-only ownership/refusal cases, then implement only the supported fixture rules after their hosted result. No cap, lock, timeout, concurrency or operational gate change is authorized by this disposition.
 
+## Follow-up: baseline race and bounded provenance (design only, base `9f8b83cf`)
+
+This section supersedes the earlier "observe and halt" baseline recommendation and the multi-ID "created set" below. No source is authorized.
+
+**Threat model and privilege limits.** The storage program runs `psql` with the API's own `DATABASE_URL` (`scripts/staging-remote.mjs:17-25`). The namespace triggers and functions are therefore created by, and writable by, the application role. Any SQL running as that role can disable a trigger, write `cf_*` tables or set a custom setting. Any role can set a dotted placeholder GUC in its own session; another session cannot. So no trigger mechanism is a security boundary against arbitrary same-role SQL.
+
+These guards defend only against:
+- ordinary application code paths;
+- concurrent unrelated traffic;
+- rollback;
+- bugs.
+
+Application code sets no custom settings: it uses only `SET LOCAL` timeouts (grep of `apps/api/src`, `apps/worker/src`, `packages/db/src`).
+
+### Creation provenance: a single transaction-local slot
+
+- **On INSERT.** On a non-owned `dealerships` INSERT, each v3 namespace trigger does `set_config('cf_<id>.created_dealership', NEW.id, true)`, then returns as it does today.
+  - The slot holds one value, overwritten by each insert, so it stays O(1) per namespace per transaction even for bulk imports.
+  - It is never persisted and never read by unrelated rows.
+  - UPDATE never writes it.
+- **On adoption.** An owned owner-role `dealership_invitations` INSERT adopts only if all of these hold:
+  - `current_setting('cf_<id>.created_dealership', true)` equals `NEW."dealershipId"`;
+  - the row is still synthetic, `recovery`, has no `admittedAt` and no `contactPhone`.
+
+  The trigger then journals the Dealership INSERT, clears the slot, and journals the invitation.
+- **Foreign UPDATE exclusion: `recover()` is the real counterexample.** `PrismaBusinessRepository.ts:125-141` UPDATEs an existing Dealership and then INSERTs an owner invitation for a recipient who may be on the roster. An xmin or "visible in this transaction" proof would adopt that foreign Dealership. The slot does not, because UPDATE never sets it. The invitation then refuses `Foreign campaign graph reference`, and the whole recovery rolls back, including its baseline deletion.
+- **Rollback.** A local GUC set inside a transaction, or a released subtransaction, ends with it. A rolled-back subtransaction reverts it together with the journal writes it made. Business paths use no savepoints; the only one is `PrismaConversationRepository.ts:507-533`.
+- **Cross-reservation.** Each namespace has its own slot, but only the namespace whose disjoint roster contains `recipientUserId` treats the invitation as owned. A Dealership created in an uncommitted transaction cannot already be journaled elsewhere. After commit, the existing edge rules refuse every cross-namespace member or invitation from either side, so scanning other namespaces' journals is unnecessary.
+- **Limit.** Code in the same transaction could set the slot to a foreign ID. Ordinary code never does.
+
+### Atomic baseline preservation (refuse the reserved transaction)
+
+- **Trigger.** `CREATE TRIGGER "cf_<id>_baseline" AFTER DELETE ON public.measurement_state FOR EACH ROW WHEN (OLD.key LIKE 'inventory_baseline:%')`. It calls a first branch in the same `track_business()` function, so `tracking_hash` covers it.
+- **Predicate.** It raises `Campaign shared baseline preserved` only if this backend holds the namespace's transaction advisory lock:
+  - `pg_locks`, `locktype='advisory'`, own `pid`, `granted`, `objsubid=1`;
+  - the key reassembled from `classid`/`objid` equals `hashtextextended('<ns>',0)`.
+
+  That is the pattern the cleaning rule already uses at `staging-campaign.mjs:436`. The predicate takes no lock and writes nothing.
+- **Why the predicate is "this transaction wrote owned rows".** Every owned write takes that lock before journaling (`:407`). Redemption makes owned writes before `invalidateInventory` (`:92-95`): the invitation UPDATE, the member INSERT and the Dealership UPDATE. Unrelated transactions never take a namespace's lock, so their baseline deletions (other businesses, account deletion or restore) are unchanged.
+- **Tamper direction.**
+  - A transaction advisory lock cannot be released early; `pg_advisory_unlock` does not release xact locks.
+  - Taking the lock spuriously only adds refusals.
+  - A subtransaction abort that released the lock would also discard the owned writes.
+
+  So the direction is fail-safe either way. The exact behavior on subtransaction abort is to be verified, not assumed.
+- **Race with concurrent baseline creation.** `deleteMany` is a single READ COMMITTED `DELETE … WHERE key = …`.
+  - A baseline committed before that statement is seen; deleting it fires the trigger; the whole redemption rolls back. Nothing is redeemed, there is no member, the Dealership stays `recovery`, the journal is unchanged and the baseline is preserved.
+  - A baseline inserted but uncommitted, or committed after the statement's snapshot, is not deleted, so it is preserved.
+  - With no baseline, 0 rows are deleted, the trigger does not fire, and `collector` is only row-locked (`FOR UPDATE`), never written.
+
+  No preflight dependence remains, so a baseline created between preflight and redemption is covered.
+- **Surface.** The application returns 500, like other fixture refusals. Reset never deletes baselines, so reset is unaffected.
+
+### Boundary: a bounded decision is needed (not a workaround)
+
+This trigger sits on a global table **outside** the fixed 22-table set. Reset's lock set and order, and ordinary owned writes, are unchanged. The fixture transaction, however, would take `ShareRowExclusive` on `measurement_state` for `CREATE TRIGGER`. That has two consequences:
+
+- baseline and collector *writes* block for up to the fixture's 20s;
+- a deadlock is possible against a concurrent account deletion that holds `measurement_state` and then wants `users`. PostgreSQL aborts one side; the fixture can be retried and leaves no partial state.
+
+Integrity must also verify this trigger's exact definition. It has a `WHEN` clause, so it cannot pass the existing `tgqual IS NULL` count.
+
+**Root decides:**
+1. May the fixture add this trigger and lock on `measurement_state`, and where in the fixture lock order?
+2. Is a 500 acceptable as the refusal surface?
+
+If the answer to (1) is no, keep owner redemption closed. No safe atomic alternative exists inside the fixed set, because the only write is to an unjournaled global table.
+
+### RED cases for the test writer (expected behavior, labelled prediction)
+
+- **Baseline present.** Owner redemption returns 500. The baseline row is unchanged, the invitation is unredeemed, there is no membership, the Dealership stays `recovery`, and the journal digest is unchanged.
+- **Baseline absent.** Redemption returns 201, and the `collector` row is unchanged.
+- **Unrelated deletion.** An unrelated reservation-less transaction still deletes a baseline normally.
+- **Foreign recovery.** A roster recipient in a foreign `recover()` is refused, the foreign Dealership is unchanged, and the baseline is preserved.
+- **Rollback.** A rolled-back admission leaves no journal rows and no adopted ID.
+
 ## Ordinary write trace (`PrismaBusinessRepository.ts`)
 
 | Step (spec line) | Transaction writes, in order | Owned by today's v3 trigger? |
