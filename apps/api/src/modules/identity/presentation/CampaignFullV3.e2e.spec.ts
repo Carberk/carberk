@@ -682,7 +682,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
   }));
 
   // Time is the controlled boundary: only this process's Date moves back 12 h + 2 min for support's ordinary
-  // sign-in and first elevation. PostgreSQL, Redis, timers and the worker child keep real time; no Session is written.
+  // sign-in and first elevation. PostgreSQL, Redis, timers and the worker child keep real time; no Session is seeded or edited directly.
   it("refuses an elevation that expired by the API clock, keeps it through refresh, and re-elevates the same and a fresh Session", () => withKnownJobs(known => {
     const id = "b2".repeat(16), shift = 12 * 60 * 60 * 1000 + 2 * 60 * 1000;
     return resetAfter([id], async () => {
