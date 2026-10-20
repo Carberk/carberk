@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { RailwayPlatform } from './staging-railway.mjs';
 import { StagingControl } from './staging-control.mjs';
@@ -290,13 +290,32 @@ test('business adapter requires reviewed authorization before provider effects',
 
 // Real controller, Railway adapter and Git CAS ledger. Only Railway HTTP/SSH,
 // clock and IDs are faked. Git objects/remotes are isolated temporary storage.
+const businessObjectDirectories = [];
+after(async () => {
+  for (const directory of businessObjectDirectories) await rm(directory, { recursive: true, force: true });
+});
 function businessObjectSource(checkout = process.cwd()) {
-  return async () => {
+  // Memoize acquisition, including failure: no retries and no shared lease state.
+  let acquisition;
+  return () => acquisition ??= (async () => {
     const git = (...args) => execFileSync('git', args, { cwd: checkout, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
     const candidate = git('rev-parse', 'HEAD');
+    const revisions = [candidate, retainedSchemaProfile.baseline];
+    if (revisions.some(revision => !/^[a-f0-9]{40}$/.test(revision))) throw new Error('Invalid business fixture revision');
     const shallow = git('rev-parse', '--is-shallow-repository') === 'true';
-    return { candidate, source: shallow ? git('remote', 'get-url', 'origin') : checkout };
-  };
+    if (!shallow) return { candidate, source: checkout };
+    const root = await mkdtemp(join(tmpdir(), 'business-immutable-source-'));
+    // The object source outlives individual cases, but never this test file.
+    businessObjectDirectories.push(root);
+    const objects = new GitLedger({ directory: join(root, 'objects.git'), remote: git('remote', 'get-url', 'origin') });
+    await objects.initialize();
+    await objects.git(['fetch', '--no-tags', objects.remote,
+      `${candidate}:refs/heads/candidate`, `${retainedSchemaProfile.baseline}:refs/heads/baseline`]);
+    for (const revision of revisions) {
+      if (await objects.git(['rev-parse', `${revision}^{commit}`]) !== revision) throw new Error('Business fixture object identity mismatch');
+    }
+    return { candidate, source: objects.directory };
+  })();
 }
 const businessSource = businessObjectSource();
 
@@ -308,9 +327,8 @@ async function businessLifecycle(t, objectSource = businessSource) {
   const ledger = new GitLedger({ directory: join(root, 'objects'), remote });
   await ledger.initialize();
   const { candidate, source } = await objectSource();
-  // A shallow CI checkout cannot supply the baseline or the candidate's
-  // complete parents for the fixture push. Fetch both exact objects directly
-  // into scratch storage from its configured origin instead.
+  // Each fresh ledger still fetches both exact objects. Shallow checkouts use
+  // the file-scoped immutable source; full checkouts keep their local source.
   for (const ref of [candidate, retainedSchemaProfile.baseline]) await ledger.git(['fetch', '--no-tags', source, ref]);
   const tree = await ledger.git(['rev-parse', `${candidate}^{tree}`]);
   let main = await ledger.git(['commit-tree', tree, '-p', candidate, '-m', 'Test main runtime']);
@@ -409,9 +427,9 @@ test('business lifecycle reuses immutable shallow origin objects after first acq
   t.after(() => rm(root, { recursive: true, force: true }));
   const origin = join(root, 'origin.git');
   execFileSync('git', ['init', '--bare', origin], { stdio: 'ignore' });
-  const candidate = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  const { candidate, source: availableObjects } = await businessSource();
   for (const revision of [candidate, retainedSchemaProfile.baseline]) {
-    execFileSync('git', ['--git-dir', origin, 'fetch', '--no-tags', process.cwd(), revision], { stdio: 'ignore' });
+    execFileSync('git', ['--git-dir', origin, 'fetch', '--no-tags', availableObjects, revision], { stdio: 'ignore' });
     execFileSync('git', ['--git-dir', origin, 'update-ref', `refs/heads/${revision === candidate ? 'candidate' : 'baseline'}`, revision], { stdio: 'ignore' });
   }
   const checkout = join(root, 'shallow');
