@@ -244,6 +244,31 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
   const tables = ['users', 'dealerships', 'dealership_members', 'dealership_invitations', 'listings', 'listing_drafts', 'conversations', 'conversation_participants', 'messages', 'business_enquiry_audits', 'favorites', 'verified_contact_phones', 'owned_vehicles', 'blocked_users', 'notification_preferences', 'content_reports', 'staff_grants', 'audit_logs'];
   // OTP requests, ordinary Sessions and owned staff TOTP join the bounded journal.
   if (bootstrapV3) tables.push('sessions', 'totp_enrollments', 'totp_backup_codes', 'otp_requests');
+  // V3 ordinary staff grant/revoke (PrismaStaffAuthority.change): one composite grant transition
+  // and one audit from a distinct current roster manager. Bootstrap rows stay fixed. The set is
+  // packages/contracts StaffCapabilitySchema less founder.control, which is never grantable.
+  const grantable = ['support.operations', 'history.fulfilment', 'history.payment.verify', 'history.payment.history', 'history.export', 'founder.refund.approve', 'staff.manage', 'founder.admission', 'founder.recovery', 'diagnostics.reception', 'diagnostics.technician', 'diagnostics.reviewer', 'diagnostics.templates', 'analytics.aggregate', 'analytics.investigate'].map(c => `'${c}'`).join(',');
+  const founderControlled = ['history.export', 'history.payment.history', 'founder.refund.approve', 'founder.admission', 'founder.recovery', 'analytics.aggregate', 'analytics.investigate', 'staff.manage'].map(c => `'${c}'`).join(',');
+  const bootstrapGrant = row => `(${row}->>'userId'='${coordinator.id}' AND ${row}->>'capability' IN ('staff.manage','founder.control'))`;
+  const grantGuard = bootstrapV3 ? `IF TG_TABLE_NAME='staff_grants' AND (NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'userId') OR CASE WHEN ${bootstrapGrant('v_row')}
+          THEN TG_OP<>'INSERT' OR v_row->>'revokedAt' IS NOT NULL
+          ELSE v_row->>'capability' NOT IN (${grantable}) OR (TG_OP='INSERT' AND v_row->>'revokedAt' IS NOT NULL) OR (TG_OP='UPDATE' AND NOT coalesce(
+            (prior->>'revokedAt' IS NULL AND v_row->>'revokedAt' IS NOT NULL AND v_row-'revokedAt'=prior-'revokedAt') OR
+            (prior->>'revokedAt' IS NOT NULL AND v_row->>'revokedAt' IS NULL AND v_row-'revokedAt'-'grantedAt'=prior-'revokedAt'-'grantedAt'),false)) END) THEN RAISE EXCEPTION 'Unsupported campaign grant'; END IF;`
+    : `IF TG_TABLE_NAME='staff_grants' AND (v_row->>'userId'<>'${coordinator.id}' OR v_row->>'capability' NOT IN ('staff.manage','founder.control')) THEN RAISE EXCEPTION 'Unsupported campaign grant'; END IF;`;
+  // The audit follows its grant write in the same transaction, so the row already shows the
+  // transition. Its actor must be a different roster User currently elevated with staff.manage,
+  // and with founder.control for founder-controlled capabilities (UTC timestamp(3) columns).
+  const grantAudit = bootstrapV3 ? ` AND NOT coalesce(TG_OP='INSERT' AND v_row->>'action' IN ('STAFF_CAPABILITY_GRANTED','STAFF_CAPABILITY_REVOKED') AND v_row->>'targetType'='User' AND
+          EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'targetId') AND EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'actorId') AND v_row->>'actorId'<>v_row->>'targetId' AND
+          jsonb_typeof(v_row->'details')='object' AND (SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(v_row->'details') k)=ARRAY['capability','previouslyActive','reason'] AND
+          v_row->'details'->>'capability' IN (${grantable}) AND jsonb_typeof(v_row->'details'->'reason')='string' AND char_length(v_row->'details'->>'reason') BETWEEN 1 AND 1000 AND
+          v_row->'details'->'previouslyActive'=to_jsonb(v_row->>'action'='STAFF_CAPABILITY_REVOKED') AND
+          EXISTS(SELECT 1 FROM public.staff_grants g WHERE g."userId"=v_row->>'targetId' AND g.capability=v_row->'details'->>'capability' AND (g."revokedAt" IS NULL)=(v_row->>'action'='STAFF_CAPABILITY_GRANTED')) AND
+          EXISTS(SELECT 1 FROM public.staff_grants g WHERE g."userId"=v_row->>'actorId' AND g.capability='staff.manage' AND g."revokedAt" IS NULL) AND
+          (v_row->'details'->>'capability' NOT IN (${founderControlled}) OR EXISTS(SELECT 1 FROM public.staff_grants g WHERE g."userId"=v_row->>'actorId' AND g.capability='founder.control' AND g."revokedAt" IS NULL)) AND
+          EXISTS(SELECT 1 FROM public.sessions s JOIN "${n}".campaign_records r ON r.table_name='sessions' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',s.id)
+            WHERE s."userId"=v_row->>'actorId' AND s."expiresAt">(now() AT TIME ZONE 'UTC') AND s."adminTotpExpiresAt">(now() AT TIME ZONE 'UTC')),false)` : '';
   const deliveryInventory = bootstrapV3 ? `
     IF (SELECT delivery_hash FROM "${n}".campaign_manifest) IS DISTINCT FROM
       (SELECT md5(coalesce(jsonb_agg(to_jsonb(d) ORDER BY request_id),'[]'::jsonb)::text) FROM "${n}".campaign_delivery_ledger d) OR
@@ -258,7 +283,11 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
       EXISTS(SELECT 1 FROM public.totp_backup_codes b JOIN public.totp_enrollments t ON b."totpEnrollmentId"=t.id JOIN "${n}".campaign_entities e ON t."userId"=e.user_id WHERE NOT EXISTS(SELECT 1 FROM "${n}".campaign_records r WHERE r.table_name='totp_backup_codes' AND r.row_key=jsonb_build_object('id',b.id) AND NOT r.deleted))
     THEN RAISE EXCEPTION 'Untracked campaign TOTP'; END IF;
     IF EXISTS(SELECT 1 FROM public.sessions s JOIN "${n}".campaign_entities e ON s."userId"=e.user_id WHERE NOT EXISTS(SELECT 1 FROM "${n}".campaign_records r WHERE r.table_name='sessions' AND r.row_key=jsonb_build_object('id',s.id) AND NOT r.deleted))
-    THEN RAISE EXCEPTION 'Untracked campaign session'; END IF;` : '';
+    THEN RAISE EXCEPTION 'Untracked campaign session'; END IF;
+    IF (SELECT state FROM "${n}".campaign_manifest)='identities' AND EXISTS(SELECT 1 FROM "${n}".campaign_records g WHERE g.table_name='staff_grants' AND NOT g.deleted AND
+      g.version IS DISTINCT FROM (CASE WHEN ${bootstrapGrant('g.row_key')} THEN 1 ELSE (SELECT count(*) FROM public.audit_logs a JOIN "${n}".campaign_records r ON r.table_name='audit_logs' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',a.id)
+        WHERE a.action IN ('STAFF_CAPABILITY_GRANTED','STAFF_CAPABILITY_REVOKED') AND a."targetId"=g.row_key->>'userId' AND a.details->>'capability'=g.row_key->>'capability') END))
+    THEN RAISE EXCEPTION 'Campaign grant audit mismatch'; END IF;` : '';
   // Only these columns convey graph ownership. Catalog references never do.
   const parents = { businessId: 'dealerships', dealershipId: 'dealerships', sellerId: 'users', userId: 'users', buyerId: 'users', recipientUserId: 'users', senderId: 'users', blockerId: 'users', blockedId: 'users', conversationId: 'conversations', listingId: 'listings', reporterUserId: 'users', reviewedById: 'users', actorId: 'users', assigneeId: 'users', previousAssigneeId: 'users', lastEditedById: 'users', suspendedById: 'users', lastMessageId: 'messages', firstBuyerMessageId: 'messages', firstSellerReplyId: 'messages' };
   if (bootstrapV3) parents.totpEnrollmentId = 'totp_enrollments';
@@ -421,9 +450,9 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
         IF TG_TABLE_NAME IN ('messages','conversation_participants') AND NOT EXISTS(SELECT 1 FROM public.conversations c WHERE c.id=v_row->>'conversationId' AND coalesce(v_row->>'senderId',v_row->>'userId') IN (c."buyerId",c."sellerId")) THEN RAISE EXCEPTION 'Campaign participant mismatch'; END IF;
         IF TG_TABLE_NAME='conversations' AND EXISTS(SELECT 1 FROM jsonb_each_text(v_row) e WHERE e.key IN ('lastMessageId','firstBuyerMessageId','firstSellerReplyId') AND e.value IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.messages m WHERE m.id=e.value AND m."conversationId"=v_row->>'id')) THEN RAISE EXCEPTION 'Campaign message pointer mismatch'; END IF;
         IF TG_TABLE_NAME='verified_contact_phones' AND (v_row->>'phone' IS DISTINCT FROM '${rootContact}' OR EXISTS(SELECT 1 FROM public.verified_contact_phones WHERE phone=v_row->>'phone' AND id<>v_row->>'id')) THEN RAISE EXCEPTION 'Campaign contact proof collision'; END IF;
-        IF TG_TABLE_NAME='staff_grants' AND (v_row->>'userId'<>'${coordinator.id}' OR v_row->>'capability' NOT IN ('staff.manage','founder.control')) THEN RAISE EXCEPTION 'Unsupported campaign grant'; END IF;
+        ${grantGuard}
         IF TG_TABLE_NAME='audit_logs' AND (v_row->>'targetType'<>'User' OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'targetId') OR v_row->>'action'<>'STAFF_CAPABILITY_BOOTSTRAP' OR v_row->>'targetId'<>'${coordinator.id}' OR v_row->>'actorId' IS NOT NULL OR NOT (
-          ${['staff.manage','founder.control'].map(c => `(v_row->>'id'='${uuid(`campaign897-business:${input.id}:audit:${c}`)}' AND v_row->'details'=jsonb_build_object('capability','${c}','reason','Synthetic storage-only reservation ${input.id}'))`).join(' OR ')})) THEN RAISE EXCEPTION 'Unsupported campaign audit'; END IF;
+          ${['staff.manage','founder.control'].map(c => `(v_row->>'id'='${uuid(`campaign897-business:${input.id}:audit:${c}`)}' AND v_row->'details'=jsonb_build_object('capability','${c}','reason','Synthetic storage-only reservation ${input.id}'))`).join(' OR ')}))${grantAudit} THEN RAISE EXCEPTION 'Unsupported campaign audit'; END IF;
         IF TG_TABLE_NAME='content_reports' AND (NOT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=CASE v_row->>'targetType' WHEN 'listing' THEN 'listings' WHEN 'user' THEN 'users' WHEN 'message' THEN 'messages' ELSE '' END AND NOT deleted AND row_key=jsonb_build_object('id',v_row->>'targetId')) OR v_row->>'messageContext' IS NOT NULL) THEN RAISE EXCEPTION 'Unsupported report target'; END IF;
         IF TG_TABLE_NAME='messages' AND (v_row->>'kind'<>'text' OR coalesce(v_row->'metadata','null'::jsonb) NOT IN ('null'::jsonb,'{}'::jsonb)) THEN RAISE EXCEPTION 'Unsupported message media'; END IF;
         IF TG_TABLE_NAME='listing_drafts' AND (jsonb_typeof(v_row->'payload')<>'object' OR EXISTS(SELECT 1 FROM jsonb_each(v_row->'payload') e WHERE e.key NOT IN ('description','media') OR (e.key='description' AND jsonb_typeof(e.value)<>'string') OR (e.key='media' AND e.value<>'[]'::jsonb))) THEN RAISE EXCEPTION 'Unsupported draft payload'; END IF;
