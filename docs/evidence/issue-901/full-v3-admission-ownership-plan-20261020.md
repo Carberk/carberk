@@ -18,6 +18,14 @@ Next: retain the reached main assertion, add bounded test-only ownership/refusal
 
 This section supersedes the earlier "observe and halt" baseline recommendation and the multi-ID "created set" below. No source is authorized.
 
+### Root disposition of this follow-up
+
+The proposed baseline guard is eligible for the next fixture implementation after the test-only preservation cases have a hosted result. This is a bounded extension of the existing trigger mechanism to protect shared state during the selected synthetic journey, not permission to mutate or own that shared state. A fixture refusal may return 500, with complete transaction rollback and unchanged unrelated rows. Live operational entry points remain closed.
+
+The permitted extra table interaction is a v3-only `measurement_state` trigger installation with explicit setup lock ordering and exact trigger-definition integrity verification. Do not change existing lock modes, timeouts, reset lock targets, record/event/delivery budgets, v1/v2 behavior or ordinary application semantics. Preserve the canonical ordering of existing setup targets; the added DDL target must have a documented position, bounded failure and rollback evidence. Do not claim deadlock freedom. If that limited change cannot enforce preservation, return the conflict instead of broadening locks or suppressing the refusal.
+
+Use the single bounded creation slot only within the documented ordinary-code/concurrent-traffic threat model. The same-role SQL limitation must remain explicit. Require negative evidence for pre-existing-row updates, rolled-back creation and cross-reservation references. Neither prefix matching nor observing an updated row's transaction ID establishes creation.
+
 **Threat model and privilege limits.** The storage program runs `psql` with the API's own `DATABASE_URL` (`scripts/staging-remote.mjs:17-25`). The namespace triggers and functions are therefore created by, and writable by, the application role. Any SQL running as that role can disable a trigger, write `cf_*` tables or set a custom setting. Any role can set a dotted placeholder GUC in its own session; another session cannot. So no trigger mechanism is a security boundary against arbitrary same-role SQL.
 
 These guards defend only against:
