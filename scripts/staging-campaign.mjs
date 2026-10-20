@@ -273,7 +273,8 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
   // BUSINESS_ADMITTED in one transaction. A non-owned Dealership INSERT records only its ID in this namespace's
   // transaction-local slot (one value, never persisted, reverted on rollback); UPDATE never writes it. The owned
   // owner invitation adopts exactly that Dealership. This defends ordinary code paths and concurrent traffic only:
-  // same-role SQL can set the slot, as it can disable these triggers. Only owner redemption and name/cityId settings follow adoption; recovery stays closed.
+  // same-role SQL can set the slot, as it can disable these triggers. Owner redemption, settings and ordinary
+  // sales invitations/membership follow adoption; recovery stays closed.
   const createdSlot = `'${n}.created_dealership'`;
   const admissionColumns = ['id', 'slug', 'name', 'status', 'admissionMode', 'admittedAt', 'checkedEvidence', 'createdAt', 'updatedAt'].map(c => `'${c}'`).join(',');
   const admissionSlot = bootstrapV3 ? `
@@ -294,22 +295,42 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
       END IF;
       ` : '';
   // Admitted businesses have one owner invitation and one immutable owner membership.
-  // The root's original rules remain separate. No sales or recovery transition is admitted.
+  // The root's original rules remain separate. Sales membership never changes the owner or business status.
   const ownerMember = (business, user) => `EXISTS(SELECT 1 FROM public.dealership_members om JOIN "${n}".campaign_records omr ON omr.table_name='dealership_members' AND NOT omr.deleted AND omr.version=1 AND omr.row_key=jsonb_build_object('id',om.id)
           WHERE om."dealershipId"=${business} AND om."userId"=${user} AND om.role='owner' AND om.status='active')`;
   const redeemedInvitation = (business, user) => `EXISTS(SELECT 1 FROM public.dealership_invitations i JOIN "${n}".campaign_records ir ON ir.table_name='dealership_invitations' AND NOT ir.deleted AND ir.version=2 AND ir.row_key=jsonb_build_object('id',i.id)
           WHERE i."dealershipId"=${business} AND i."recipientUserId"=${user} AND i.role='owner' AND i."redeemedAt" IS NOT NULL AND i."revokedAt" IS NULL)`;
+  const redeemedSalesInvitation = (business, user) => `EXISTS(SELECT 1 FROM public.dealership_invitations i JOIN "${n}".campaign_records ir ON ir.table_name='dealership_invitations' AND NOT ir.deleted AND ir.version=2 AND ir.row_key=jsonb_build_object('id',i.id)
+          WHERE i."dealershipId"=${business} AND i."recipientUserId"=${user} AND i.role='sales' AND i."redeemedAt" IS NOT NULL AND i."revokedAt" IS NULL)`;
+  const activeOwner = (business) => `EXISTS(SELECT 1 FROM public.dealership_members m WHERE m."dealershipId"=${business} AND m.role='owner' AND m.status='active' AND ${ownerMember(business, 'm."userId"')})`;
   const admissionClosed = bootstrapV3 ? `
         IF TG_TABLE_NAME='dealership_invitations' AND v_row->>'dealershipId'<>'${rootId}' AND NOT coalesce(admitting,false) AND NOT coalesce(
           TG_OP='UPDATE' AND prior->>'role'='owner' AND prior->>'redeemedAt' IS NULL AND prior->>'revokedAt' IS NULL AND v_row->>'redeemedAt' IS NOT NULL AND
           (prior->>'expiresAt')::timestamp>(now() AT TIME ZONE 'UTC') AND v_row-'redeemedAt' IS NOT DISTINCT FROM prior-'redeemedAt' AND
           EXISTS(SELECT 1 FROM public.dealerships d WHERE d.id=v_row->>'dealershipId' AND d.status='recovery') AND
-          NOT EXISTS(SELECT 1 FROM public.dealership_members m WHERE m."dealershipId"=v_row->>'dealershipId'),false)
+          NOT EXISTS(SELECT 1 FROM public.dealership_members m WHERE m."dealershipId"=v_row->>'dealershipId'),false) AND
+          NOT coalesce(TG_OP='INSERT' AND v_row->>'role'='sales' AND v_row->>'redeemedAt' IS NULL AND v_row->>'revokedAt' IS NULL AND
+            v_row->>'tokenHash' ~ '^[a-f0-9]{64}$' AND (v_row->>'expiresAt')::timestamp>(now() AT TIME ZONE 'UTC') AND
+            EXISTS(SELECT 1 FROM public.dealerships d WHERE d.id=v_row->>'dealershipId' AND d.status='active') AND
+            NOT EXISTS(SELECT 1 FROM public.dealership_members m WHERE m."userId"=v_row->>'recipientUserId') AND
+            (SELECT count(*) FROM public.dealership_invitations i WHERE i."dealershipId"=v_row->>'dealershipId' AND i."recipientUserId"=v_row->>'recipientUserId' AND i."revokedAt" IS NULL AND i."redeemedAt" IS NULL)=1 AND
+            ${activeOwner("v_row->>'dealershipId'")} AND EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'recipientUserId'),false) AND
+          NOT coalesce(TG_OP='UPDATE' AND prior->>'role'='sales' AND prior->>'redeemedAt' IS NULL AND prior->>'revokedAt' IS NULL AND v_row->>'revokedAt' IS NOT NULL AND
+            v_row-'revokedAt' IS NOT DISTINCT FROM prior-'revokedAt' AND ${activeOwner("v_row->>'dealershipId'")},false) AND
+          NOT coalesce(TG_OP='UPDATE' AND prior->>'role'='sales' AND prior->>'redeemedAt' IS NULL AND prior->>'revokedAt' IS NULL AND v_row->>'redeemedAt' IS NOT NULL AND
+            (prior->>'expiresAt')::timestamp>(now() AT TIME ZONE 'UTC') AND v_row-'redeemedAt' IS NOT DISTINCT FROM prior-'redeemedAt' AND
+            EXISTS(SELECT 1 FROM public.dealerships d WHERE d.id=v_row->>'dealershipId' AND d.status='active') AND ${activeOwner("v_row->>'dealershipId'")} AND
+            NOT EXISTS(SELECT 1 FROM public.dealership_members m WHERE m."userId"=v_row->>'recipientUserId'),false)
           THEN RAISE EXCEPTION 'Unsupported campaign business'; END IF;
         IF TG_TABLE_NAME='dealership_members' AND v_row->>'dealershipId'<>'${rootId}' AND NOT coalesce(TG_OP='INSERT' AND v_row->>'role'='owner' AND v_row->>'status'='active' AND
           ${redeemedInvitation("v_row->>'dealershipId'", "v_row->>'userId'")} AND
           (SELECT count(*) FROM public.dealership_members m WHERE m."dealershipId"=v_row->>'dealershipId')=1 AND
-          EXISTS(SELECT 1 FROM public.dealerships d WHERE d.id=v_row->>'dealershipId' AND d.status='recovery'),false)
+          EXISTS(SELECT 1 FROM public.dealerships d WHERE d.id=v_row->>'dealershipId' AND d.status='recovery'),false) AND NOT coalesce(
+            TG_OP='INSERT' AND v_row->>'role'='sales' AND v_row->>'status'='active' AND ${redeemedSalesInvitation("v_row->>'dealershipId'", "v_row->>'userId'")} AND
+            ${activeOwner("v_row->>'dealershipId'")} AND
+            EXISTS(SELECT 1 FROM public.dealerships d WHERE d.id=v_row->>'dealershipId' AND d.status='active'),false) AND NOT coalesce(
+            TG_OP='UPDATE' AND prior->>'role'='sales' AND prior->>'status' IN ('active','suspended') AND v_row->>'role'='sales' AND
+            v_row->>'status' IN ('active','suspended') AND v_row-'status' IS NOT DISTINCT FROM prior-'status' AND ${activeOwner("v_row->>'dealershipId'")},false)
           THEN RAISE EXCEPTION 'Unsupported campaign business'; END IF;` : '';
   const admittedBusiness = bootstrapV3 ? `
         IF TG_TABLE_NAME='dealerships' AND v_row->>'id'<>'${rootId}' AND NOT coalesce(TG_OP='UPDATE' AND v_row->>'admissionMode'='synthetic' AND
@@ -325,8 +346,32 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
           EXISTS(SELECT 1 FROM public.dealerships d WHERE d.id=v_row->>'targetId' AND d.status='active') AND (
           (v_row->>'action'='BUSINESS_INVITATION_REDEEMED' AND v_row->'details'=jsonb_build_object('invitationId',(
             SELECT i.id FROM public.dealership_invitations i WHERE i."dealershipId"=v_row->>'targetId' AND i."recipientUserId"=v_row->>'actorId' AND i.role='owner'),'role','owner') AND
-            (SELECT count(*) FROM public.audit_logs a WHERE a."targetType"='Dealership' AND a."targetId"=v_row->>'targetId' AND a.action='BUSINESS_INVITATION_REDEEMED')=1) OR
+            (SELECT count(*) FROM public.audit_logs a WHERE a."targetType"='Dealership' AND a."targetId"=v_row->>'targetId' AND a.action='BUSINESS_INVITATION_REDEEMED' AND a.details->>'role'='owner')=1) OR
           (v_row->>'action'='BUSINESS_SETTINGS_CHANGED' AND v_row->'details' IN ('{"fields":["name"]}'::jsonb,'{"fields":["name","cityId"]}'::jsonb))),false)` : '';
+  // Exact sales audit details identify one journal-owned row. Replacement revokes the old invitation
+  // without its own audit; only an explicit revoke emits BUSINESS_INVITATION_REVOKED.
+  const salesAudit = bootstrapV3 ? ` AND NOT coalesce(TG_OP='INSERT' AND v_row->>'targetType'='Dealership' AND v_row->>'targetId'<>'${rootId}' AND
+          EXISTS(SELECT 1 FROM public.dealerships d JOIN "${n}".campaign_records r ON r.table_name='dealerships' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',d.id)
+            WHERE d.id=v_row->>'targetId' AND d.status='active' AND d."admissionMode"='synthetic') AND (
+          (v_row->>'action' IN ('BUSINESS_INVITATION_CREATED','BUSINESS_INVITATION_REVOKED','BUSINESS_INVITATION_REDEEMED') AND
+            EXISTS(SELECT 1 FROM public.dealership_invitations i JOIN "${n}".campaign_records r ON r.table_name='dealership_invitations' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',i.id)
+              WHERE i.id=v_row->'details'->>'invitationId' AND i."dealershipId"=v_row->>'targetId' AND i.role='sales' AND
+              (SELECT count(*) FROM public.audit_logs a WHERE a."targetType"='Dealership' AND a."targetId"=i."dealershipId" AND a.action=v_row->>'action' AND a.details->>'invitationId'=i.id)=1 AND (
+              (v_row->>'action'='BUSINESS_INVITATION_CREATED' AND r.version=1 AND i."revokedAt" IS NULL AND i."redeemedAt" IS NULL AND
+                ${ownerMember('i."dealershipId"', "v_row->>'actorId'")} AND ${redeemedInvitation("v_row->>'targetId'", "v_row->>'actorId'")} AND
+                v_row->'details'=jsonb_build_object('invitationId',i.id,'role','sales')) OR
+              (v_row->>'action'='BUSINESS_INVITATION_REVOKED' AND r.version=2 AND i."revokedAt" IS NOT NULL AND i."redeemedAt" IS NULL AND
+                ${ownerMember('i."dealershipId"', "v_row->>'actorId'")} AND ${redeemedInvitation("v_row->>'targetId'", "v_row->>'actorId'")} AND
+                v_row->'details'=jsonb_build_object('invitationId',i.id)) OR
+              (v_row->>'action'='BUSINESS_INVITATION_REDEEMED' AND r.version=2 AND i."redeemedAt" IS NOT NULL AND i."revokedAt" IS NULL AND
+                i."recipientUserId"=v_row->>'actorId' AND v_row->'details'=jsonb_build_object('invitationId',i.id,'role','sales') AND
+                EXISTS(SELECT 1 FROM public.dealership_members m JOIN "${n}".campaign_records mr ON mr.table_name='dealership_members' AND NOT mr.deleted AND mr.version=1 AND mr.row_key=jsonb_build_object('id',m.id)
+                  WHERE m."dealershipId"=i."dealershipId" AND m."userId"=i."recipientUserId" AND m.role='sales' AND m.status='active'))))) OR
+          (v_row->>'action'='BUSINESS_MEMBERSHIP_CHANGED' AND ${ownerMember("v_row->>'targetId'", "v_row->>'actorId'")} AND ${redeemedInvitation("v_row->>'targetId'", "v_row->>'actorId'")} AND
+            EXISTS(SELECT 1 FROM public.dealership_members m JOIN "${n}".campaign_records r ON r.table_name='dealership_members' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',m.id)
+              WHERE m."dealershipId"=v_row->>'targetId' AND m."userId"=v_row->'details'->>'targetUserId' AND m.role='sales' AND
+                v_row->'details'=jsonb_build_object('targetUserId',m."userId",'action',CASE m.status WHEN 'active' THEN 'restore' WHEN 'suspended' THEN 'suspend' END) AND
+                r.version=1+(SELECT count(*) FROM public.audit_logs a WHERE a."targetType"='Dealership' AND a."targetId"=m."dealershipId" AND a.action='BUSINESS_MEMBERSHIP_CHANGED' AND a.details->>'targetUserId'=m."userId")))),false)` : '';
   // The audit follows the adopted Dealership and owner invitation. Its actor is a different, currently elevated
   // roster holder of founder.admission; details are exactly the contract-bounded synthetic shape, never a token.
   const admittedAudit = bootstrapV3 ? ` AND NOT coalesce(TG_OP='INSERT' AND v_row->>'action'='BUSINESS_ADMITTED' AND v_row->>'targetType'='Dealership' AND v_row->>'targetId'<>'${rootId}' AND
@@ -349,6 +394,26 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
       EXISTS(SELECT 1 FROM "${n}".campaign_records r WHERE r.table_name='otp_requests' AND ((r.deleted AND (SELECT state FROM "${n}".campaign_manifest)='identities') OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_delivery_ledger d WHERE r.row_key=jsonb_build_object('id',d.request_id)))) OR
       EXISTS(SELECT 1 FROM "${n}".campaign_delivery_sink s WHERE NOT EXISTS(SELECT 1 FROM "${n}".campaign_delivery_ledger d WHERE d.request_id=s.request_id AND d.email=s.email))
       THEN RAISE EXCEPTION 'Campaign delivery journal changed'; END IF;` : '';
+  const salesInventory = bootstrapV3 ? `
+    IF (SELECT state FROM "${n}".campaign_manifest)='identities' AND (
+      EXISTS(SELECT 1 FROM public.dealership_invitations i JOIN "${n}".campaign_records r ON r.table_name='dealership_invitations' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',i.id)
+        WHERE i.role='sales' AND i."dealershipId"<>'${rootId}' AND (
+          r.version<>(CASE WHEN i."revokedAt" IS NULL AND i."redeemedAt" IS NULL THEN 1 ELSE 2 END) OR (i."revokedAt" IS NOT NULL AND i."redeemedAt" IS NOT NULL) OR
+          (SELECT count(*) FROM public.audit_logs a JOIN "${n}".campaign_records ar ON ar.table_name='audit_logs' AND NOT ar.deleted AND ar.version=1 AND ar.row_key=jsonb_build_object('id',a.id)
+            WHERE a."targetType"='Dealership' AND a."targetId"=i."dealershipId" AND a.action='BUSINESS_INVITATION_CREATED' AND a.details=jsonb_build_object('invitationId',i.id,'role','sales'))<>1 OR
+          (SELECT count(*) FROM public.audit_logs a JOIN "${n}".campaign_records ar ON ar.table_name='audit_logs' AND NOT ar.deleted AND ar.version=1 AND ar.row_key=jsonb_build_object('id',a.id)
+            WHERE a."targetType"='Dealership' AND a."targetId"=i."dealershipId" AND a.action='BUSINESS_INVITATION_REDEEMED' AND a."actorId"=i."recipientUserId" AND a.details=jsonb_build_object('invitationId',i.id,'role','sales'))<>(CASE WHEN i."redeemedAt" IS NULL THEN 0 ELSE 1 END) OR
+          (i."revokedAt" IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.audit_logs a JOIN "${n}".campaign_records ar ON ar.table_name='audit_logs' AND NOT ar.deleted AND ar.version=1 AND ar.row_key=jsonb_build_object('id',a.id)
+            WHERE a."targetType"='Dealership' AND a."targetId"=i."dealershipId" AND a.action='BUSINESS_INVITATION_REVOKED' AND a.details=jsonb_build_object('invitationId',i.id)) AND
+            NOT EXISTS(SELECT 1 FROM public.dealership_invitations successor JOIN "${n}".campaign_records sr ON sr.table_name='dealership_invitations' AND NOT sr.deleted AND sr.row_key=jsonb_build_object('id',successor.id)
+              WHERE successor."dealershipId"=i."dealershipId" AND successor."recipientUserId"=i."recipientUserId" AND successor.role='sales' AND
+                (SELECT min(sequence) FROM "${n}".campaign_events WHERE table_name='dealership_invitations' AND row_key=sr.row_key AND mutation='INSERT')>
+                (SELECT max(sequence) FROM "${n}".campaign_events WHERE table_name='dealership_invitations' AND row_key=r.row_key AND mutation='UPDATE'))))) OR
+      EXISTS(SELECT 1 FROM public.dealership_members m JOIN "${n}".campaign_records r ON r.table_name='dealership_members' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',m.id)
+        WHERE m.role='sales' AND m."dealershipId"<>'${rootId}' AND (NOT ${redeemedSalesInvitation('m."dealershipId"', 'm."userId"')} OR
+          r.version<>1+(SELECT count(*) FROM public.audit_logs a JOIN "${n}".campaign_records ar ON ar.table_name='audit_logs' AND NOT ar.deleted AND ar.version=1 AND ar.row_key=jsonb_build_object('id',a.id)
+            WHERE a."targetType"='Dealership' AND a."targetId"=m."dealershipId" AND a.action='BUSINESS_MEMBERSHIP_CHANGED' AND a.details->>'targetUserId'=m."userId"))))
+      THEN RAISE EXCEPTION 'Campaign sales audit mismatch'; END IF;` : '';
   const authInventory = bootstrapV3 ? `
     IF EXISTS(SELECT 1 FROM public.otp_requests o JOIN "${n}".campaign_entities e ON (o.destination=e.email OR o."userId"=e.user_id) WHERE NOT EXISTS(SELECT 1 FROM "${n}".campaign_records r WHERE r.table_name='otp_requests' AND r.row_key=jsonb_build_object('id',o.id) AND NOT r.deleted))
     THEN RAISE EXCEPTION 'Campaign authentication slice unavailable'; END IF;
@@ -361,13 +426,13 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
       g.version IS DISTINCT FROM (CASE WHEN ${bootstrapGrant('g.row_key')} THEN 1 ELSE (SELECT count(*) FROM public.audit_logs a JOIN "${n}".campaign_records r ON r.table_name='audit_logs' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',a.id)
         WHERE a.action IN ('STAFF_CAPABILITY_GRANTED','STAFF_CAPABILITY_REVOKED') AND a."targetId"=g.row_key->>'userId' AND a.details->>'capability'=g.row_key->>'capability') END))
     THEN RAISE EXCEPTION 'Campaign grant audit mismatch'; END IF;
-    IF (SELECT state FROM "${n}".campaign_manifest)='identities' AND EXISTS(SELECT 1 FROM "${n}".campaign_records d WHERE d.table_name='dealerships' AND NOT d.deleted AND d.row_key<>jsonb_build_object('id','${rootId}') AND (d.version<>1+(SELECT count(*) FROM public.audit_logs a JOIN "${n}".campaign_records r ON r.table_name='audit_logs' AND NOT r.deleted AND r.version=1 AND r.row_key=jsonb_build_object('id',a.id) WHERE a."targetType"='Dealership' AND a."targetId"=d.row_key->>'id' AND a.action IN ('BUSINESS_INVITATION_REDEEMED','BUSINESS_SETTINGS_CHANGED')) OR
+    IF (SELECT state FROM "${n}".campaign_manifest)='identities' AND EXISTS(SELECT 1 FROM "${n}".campaign_records d WHERE d.table_name='dealerships' AND NOT d.deleted AND d.row_key<>jsonb_build_object('id','${rootId}') AND (d.version<>1+(SELECT count(*) FROM public.audit_logs a JOIN "${n}".campaign_records r ON r.table_name='audit_logs' AND NOT r.deleted AND r.version=1 AND r.row_key=jsonb_build_object('id',a.id) WHERE a."targetType"='Dealership' AND a."targetId"=d.row_key->>'id' AND (a.action='BUSINESS_SETTINGS_CHANGED' OR (a.action='BUSINESS_INVITATION_REDEEMED' AND a.details->>'role'='owner'))) OR
       (SELECT count(*) FROM public.dealership_invitations i JOIN "${n}".campaign_records r ON r.table_name='dealership_invitations' AND NOT r.deleted AND r.version=CASE WHEN i."redeemedAt" IS NULL THEN 1 ELSE 2 END AND r.row_key=jsonb_build_object('id',i.id) WHERE i."dealershipId"=d.row_key->>'id' AND i.role='owner' AND i."revokedAt" IS NULL AND
         ((i."redeemedAt" IS NULL AND NOT EXISTS(SELECT 1 FROM public.dealership_members m WHERE m."dealershipId"=i."dealershipId")) OR
          (i."redeemedAt" IS NOT NULL AND ${ownerMember('i."dealershipId"', 'i."recipientUserId"')} AND
-          (SELECT count(*) FROM public.audit_logs a JOIN "${n}".campaign_records ar ON ar.table_name='audit_logs' AND NOT ar.deleted AND ar.version=1 AND ar.row_key=jsonb_build_object('id',a.id) WHERE a."targetType"='Dealership' AND a."targetId"=i."dealershipId" AND a.action='BUSINESS_INVITATION_REDEEMED')=1)))<>1 OR
+          (SELECT count(*) FROM public.audit_logs a JOIN "${n}".campaign_records ar ON ar.table_name='audit_logs' AND NOT ar.deleted AND ar.version=1 AND ar.row_key=jsonb_build_object('id',a.id) WHERE a."targetType"='Dealership' AND a."targetId"=i."dealershipId" AND a.action='BUSINESS_INVITATION_REDEEMED' AND a.details->>'role'='owner')=1)))<>1 OR
       (SELECT count(*) FROM public.audit_logs a JOIN "${n}".campaign_records r ON r.table_name='audit_logs' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',a.id) WHERE a."targetType"='Dealership' AND a."targetId"=d.row_key->>'id' AND a.action='BUSINESS_ADMITTED')<>1))
-    THEN RAISE EXCEPTION 'Campaign admission audit mismatch'; END IF;` : '';
+    THEN RAISE EXCEPTION 'Campaign admission audit mismatch'; END IF;${salesInventory}` : '';
   // Only these columns convey graph ownership. Catalog references never do.
   const parents = { businessId: 'dealerships', dealershipId: 'dealerships', sellerId: 'users', userId: 'users', buyerId: 'users', recipientUserId: 'users', senderId: 'users', blockerId: 'users', blockedId: 'users', conversationId: 'conversations', listingId: 'listings', reporterUserId: 'users', reviewedById: 'users', actorId: 'users', assigneeId: 'users', previousAssigneeId: 'users', lastEditedById: 'users', suspendedById: 'users', lastMessageId: 'messages', firstBuyerMessageId: 'messages', firstSellerReplyId: 'messages' };
   if (bootstrapV3) parents.totpEnrollmentId = 'totp_enrollments';
@@ -545,7 +610,7 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
         IF TG_TABLE_NAME='verified_contact_phones' AND (v_row->>'phone' IS DISTINCT FROM '${rootContact}' OR EXISTS(SELECT 1 FROM public.verified_contact_phones WHERE phone=v_row->>'phone' AND id<>v_row->>'id')) THEN RAISE EXCEPTION 'Campaign contact proof collision'; END IF;
         ${grantGuard}
         IF TG_TABLE_NAME='audit_logs' AND (v_row->>'targetType'<>'User' OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'targetId') OR v_row->>'action'<>'STAFF_CAPABILITY_BOOTSTRAP' OR v_row->>'targetId'<>'${coordinator.id}' OR v_row->>'actorId' IS NOT NULL OR NOT (
-          ${['staff.manage','founder.control'].map(c => `(v_row->>'id'='${uuid(`campaign897-business:${input.id}:audit:${c}`)}' AND v_row->'details'=jsonb_build_object('capability','${c}','reason','Synthetic storage-only reservation ${input.id}'))`).join(' OR ')}))${grantAudit}${admittedAudit}${ownerAudit} THEN RAISE EXCEPTION 'Unsupported campaign audit'; END IF;
+          ${['staff.manage','founder.control'].map(c => `(v_row->>'id'='${uuid(`campaign897-business:${input.id}:audit:${c}`)}' AND v_row->'details'=jsonb_build_object('capability','${c}','reason','Synthetic storage-only reservation ${input.id}'))`).join(' OR ')}))${grantAudit}${admittedAudit}${ownerAudit}${salesAudit} THEN RAISE EXCEPTION 'Unsupported campaign audit'; END IF;
         IF TG_TABLE_NAME='content_reports' AND (NOT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=CASE v_row->>'targetType' WHEN 'listing' THEN 'listings' WHEN 'user' THEN 'users' WHEN 'message' THEN 'messages' ELSE '' END AND NOT deleted AND row_key=jsonb_build_object('id',v_row->>'targetId')) OR v_row->>'messageContext' IS NOT NULL) THEN RAISE EXCEPTION 'Unsupported report target'; END IF;
         IF TG_TABLE_NAME='messages' AND (v_row->>'kind'<>'text' OR coalesce(v_row->'metadata','null'::jsonb) NOT IN ('null'::jsonb,'{}'::jsonb)) THEN RAISE EXCEPTION 'Unsupported message media'; END IF;
         IF TG_TABLE_NAME='listing_drafts' AND (jsonb_typeof(v_row->'payload')<>'object' OR EXISTS(SELECT 1 FROM jsonb_each(v_row->'payload') e WHERE e.key NOT IN ('description','media') OR (e.key='description' AND jsonb_typeof(e.value)<>'string') OR (e.key='media' AND e.value<>'[]'::jsonb))) THEN RAISE EXCEPTION 'Unsupported draft payload'; END IF;
