@@ -123,11 +123,17 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
       }
     }
   }
+  // Records a returned request ID before any response assertion, so cleanup knows an unexpected successful enqueue.
+  function learn(known: Set<string>, response: { body?: { requestId?: unknown } }) {
+    const requestId = response.body?.requestId;
+    if (typeof requestId === "string" && requestId.length > 0) known.add(requestId);
+  }
   async function signIn(id: string, person: Actor, known: Set<string>): Promise<Login> {
-    const issued = await request.post("/api/v1/auth/otp/request").send({ email: person.email }).expect(201);
+    const issued = await request.post("/api/v1/auth/otp/request").send({ email: person.email });
+    learn(known, issued);
+    expect(issued.status).toBe(201);
     expect(issued.body.testCode).toBeUndefined();
     const requestId = issued.body.requestId as string;
-    known.add(requestId);
     expect((await queue.getJob(requestId))?.data.to).toBe(person.email);
     expect(processEmail(requestId), "production worker must persist ordinary generated OTP in protected mock sink").toBe(0);
     const [sink] = await rows<{ message: { subject: string } }>(`SELECT message FROM "cf_${id}".campaign_delivery_sink WHERE request_id=$1 AND email=$2`, requestId, person.email);
@@ -271,9 +277,10 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     const roster = await seed(id);
     await seed(otherId);
     const other = await digest(otherId);
-    const issued = await request.post("/api/v1/auth/otp/request").send({ email: actor(roster, "sales-b").email }).expect(201);
+    const issued = await request.post("/api/v1/auth/otp/request").send({ email: actor(roster, "sales-b").email });
+    learn(known, issued);
+    expect(issued.status).toBe(201);
     const requestId = issued.body.requestId as string;
-    known.add(requestId);
     const pending = await queue.getJob(requestId);
     expect(pending).toBeDefined();
     const data = pending!.data as { to: string; code: string; locale: "ru"; purpose: "sign-in" };
@@ -289,7 +296,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     await expect(app.get(BullMqEmailCodeSenderAdapter).enqueue({ requestId, email: data.to, code: data.code, locale: data.locale, purpose: data.purpose })).rejects.toThrow();
     expect(processEmail(requestId, { ...data, to: data.to })).toBe(1);
     const lateRequest = await request.post("/api/v1/auth/otp/request").send({ email: data.to });
-    if (lateRequest.body?.requestId) known.add(lateRequest.body.requestId as string);
+    learn(known, lateRequest);
     expect(lateRequest.status).toBe(500);
     await request.post("/api/v1/auth/otp/verify").send({ email: data.to, code: data.code }).expect(400);
     expect(await db.session.count({ where: { userId: actor(roster, "sales-b").user_id } })).toBe(0);
@@ -319,24 +326,27 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
 
   it("keeps cleaning ownership after an active exact delivery, then resumes the same reset", () => withKnownJobs(async known => {
     const id = "aa".repeat(16), roster = await seed(id);
-    const issued = await request.post("/api/v1/auth/otp/request").send({ email: actor(roster, "buyer-a").email }).expect(201);
+    const issued = await request.post("/api/v1/auth/otp/request").send({ email: actor(roster, "buyer-a").email });
+    learn(known, issued);
+    expect(issued.status).toBe(201);
     const requestId = issued.body.requestId as string;
-    known.add(requestId);
     const before = await owned(id);
     // A real BullMQ lock provides an explicit barrier. Never enumerate queue jobs.
     const worker = new Worker(AuthSchemas.EMAIL_CODE_QUEUE, async () => {}, {
       connection: { url: process.env["REDIS_URL"]! }, autorun: false,
     });
     const token = randomUUID();
-    const job = await worker.getNextJob(token, { block: false });
+    let job: Awaited<ReturnType<typeof worker.getNextJob>> | undefined;
     try {
+      // Acquisition sits inside the lifecycle so Worker.close runs even when the claim attempt throws.
+      job = await worker.getNextJob(token, { block: false });
       expect(job?.id, "exact disposable delivery claim required before reset proof").toBe(requestId);
       expect(await job!.getState()).toBe("active");
       expect(execute("reset", id).code).toBe(1);
       expect(await rows(`SELECT state FROM "cf_${id}".campaign_manifest`)).toEqual([{ state: "cleaning" }]);
       expect((await queue.getJob(requestId))?.data.to).toBe(actor(roster, "buyer-a").email);
       const refused = await request.post("/api/v1/auth/otp/request").send({ email: actor(roster, "sales-b").email });
-      if (refused.body?.requestId) known.add(refused.body.requestId as string);
+      learn(known, refused);
       expect(refused.status).toBe(500);
     } finally {
       // Releases whichever job this token claimed, own or not, before exact known-ID removal; unknown jobs are never removed.
