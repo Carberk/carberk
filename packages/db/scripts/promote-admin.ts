@@ -63,26 +63,49 @@ async function main(): Promise<number> {
       {
         // Lock before reading the role, including across phone/email invocations.
         // A waiter sees admin after commit, so it cannot overwrite before.role or audit twice.
-        transaction: (work) => prisma.$transaction(async (tx) => work({
-          findUserByPhone: async (phone) => {
-            const users = await tx.$queryRaw<PromoteAdminUser[]>`
-              SELECT "id", "role", "emailVerifiedAt" FROM "users"
-              WHERE "phone" = ${phone} FOR UPDATE`;
-            return users[0] ?? null;
-          },
-          findUsersByEmail: (email) => tx.$queryRaw<PromoteAdminUser[]>`
-            SELECT "id", "role", "emailVerifiedAt" FROM "users"
-            WHERE lower(btrim("email", ${EMAIL_TRIM_CHARACTERS})) = ${email}
-            ORDER BY "id" LIMIT 2 FOR UPDATE`,
-          updateUserRole: async (userId) => {
-            await tx.user.update({ where: { id: userId }, data: { role: "admin" } });
-          },
-          createAuditLog: async (data) => {
-            await tx.auditLog.create({
-              data: { ...data, details: data.details as Prisma.InputJsonValue },
-            });
-          },
-        })),
+        transaction: (work) => prisma.$transaction(async (tx) => {
+          // Local to this transaction. Ordinary Users need no campaign candidate;
+          // reservation tracking requires the exact runtime SHA for promotion.
+          await tx.$queryRaw`SELECT set_config('autotm.admin_promote_candidate', ${process.env["AUTOTM_COMMIT_SHA"] ?? ""}, true)`;
+          const checkReservation = async (user: (PromoteAdminUser & { email: string | null }) | undefined) => {
+            // Fixed synthetic address grammar yields one namespace, never a schema scan.
+            const reservation = user?.email?.match(/^[a-z-]+\.([a-f0-9]{32})\.[a-f0-9]{12}@campaign897\.invalid$/);
+            if (user && reservation) {
+              const namespace = `cf_${reservation[1]}`;
+              const [binding] = await tx.$queryRawUnsafe<{ valid: boolean }[]>(`
+                SELECT EXISTS(SELECT 1 FROM "${namespace}".campaign_manifest m
+                  JOIN "${namespace}".campaign_entities e ON e.user_id=$1 AND e.email=$2
+                  WHERE m.delivery_version<>3 OR (m.profile='campaign897-full-v3' AND m.state='identities' AND m.candidate=$3)) AS valid`,
+              user.id, user.email, process.env["AUTOTM_COMMIT_SHA"] ?? "");
+              if (!binding?.valid) throw new Error("Campaign promotion binding refused");
+            }
+            return user ?? null;
+          };
+          return work({
+            findUserByPhone: async (phone) => {
+              const users = await tx.$queryRaw<(PromoteAdminUser & { email: string | null })[]>`
+                SELECT "id", "role", "emailVerifiedAt", "email" FROM "users"
+                WHERE "phone" = ${phone} FOR UPDATE`;
+              return checkReservation(users[0]);
+            },
+            findUsersByEmail: async (email) => {
+              const users = await tx.$queryRaw<(PromoteAdminUser & { email: string | null })[]>`
+                SELECT "id", "role", "emailVerifiedAt", "email" FROM "users"
+                WHERE lower(btrim("email", ${EMAIL_TRIM_CHARACTERS})) = ${email}
+                ORDER BY "id" LIMIT 2 FOR UPDATE`;
+              for (const user of users) await checkReservation(user);
+              return users;
+            },
+            updateUserRole: async (userId) => {
+              await tx.user.update({ where: { id: userId }, data: { role: "admin" } });
+            },
+            createAuditLog: async (data) => {
+              await tx.auditLog.create({
+                data: { ...data, details: data.details as Prisma.InputJsonValue },
+              });
+            },
+          });
+        }),
       },
       { phone: args.phone, email: args.email, reason: args.reason, dryRun: args.dryRun },
     );

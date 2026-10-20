@@ -96,4 +96,8 @@ being able to state that public signup was never enabled. Locked in
 
 ## Full-v3 acceptance limitation
 
-Email selection does not authorize operational promotion or modify the v3 fixture guard. The coordinator transition, retained-audit disposal, reservation and exact-candidate guards, normal sign-in/TOTP, and deployed moderation acceptance remain separate gates under the [moderation actor decision](../../evidence/issue-901/full-v3-moderation-actor-decision-20261020.md).
+The full-v3 fixture guard admits only the reservation coordinator's buyer-to-admin transition through this command. The command carries `AUTOTM_COMMIT_SHA` into its transaction and requires the exact current reservation candidate and identities lifecycle during synthetic lookup, including dry-run and already-admin retry. Other aliases and reverse role transitions refuse. Ordinary phone/email Users outside the fixed campaign address grammar need no campaign candidate.
+
+The role update and exact null-actor, lowercase `user` promotion audit are journaled together. A deferred constraint rejects an unpaired role or audit at commit. Reset redacts the retained promotion audit through the existing synthetic audit disposition; a lost-response retry writes no second promotion audit. Promotion creates no Sessions, TOTP enrollment, tokens or staff grants. Normal sign-in, TOTP elevation and explicit capability checks still apply.
+
+This source support authorizes no operational promotion. Hosted command, disposal and normal sign-in/TOTP evidence and deployed moderation acceptance remain gates under the [moderation actor decision](../../evidence/issue-901/full-v3-moderation-actor-decision-20261020.md).
