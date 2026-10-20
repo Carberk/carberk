@@ -15,7 +15,7 @@ import { Test as NestTest } from "@nestjs/testing";
 import { Worker, type Queue } from "bullmq";
 import { generateSync } from "otplib";
 import supertest from "supertest";
-import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, inject, it, vi } from "vitest";
 import { IdentityModule } from "../identity.module";
 import { BullMqEmailCodeSenderAdapter } from "../infrastructure/BullMqEmailCodeSenderAdapter";
 import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
@@ -678,6 +678,86 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
         await db.otpRequest.deleteMany({ where: { destination: unrelatedEmail } });
         if (unrelatedUserId) await db.user.delete({ where: { id: unrelatedUserId } });
       }
+    });
+  }));
+
+  // Time is the controlled boundary: only this process's Date moves back 12 h + 2 min for support's ordinary
+  // sign-in and first elevation. PostgreSQL, Redis, timers and the worker child keep real time; no Session is written.
+  it("refuses an elevation that expired by the API clock, keeps it through refresh, and re-elevates the same and a fresh Session", () => withKnownJobs(known => {
+    const id = "b2".repeat(16), shift = 12 * 60 * 60 * 1000 + 2 * 60 * 1000;
+    return resetAfter([id], async () => {
+      const roster = await seed(id);
+      const staffId = actor(roster, "support").user_id;
+      const coordinator = await signIn(id, actor(roster, "coordinator"), known);
+      await elevate(coordinator);
+      await grant(coordinator, staffId, "founder.recovery").expect(204);
+      const recover = (login: Login) => post(`/api/v1/business/${randomUUID()}/recovery`, login, recoveryFor(actor(roster, "owner").user_id));
+      const capabilities = async (login: Login) => (await get("/api/v1/staff/capabilities", login).expect(200)).body as { capabilities: string[]; elevated: boolean; adminTotpExpiresAt?: string };
+      const verify = (login: Login, code: string) => post("/api/v1/auth/staff/totp/verify", login, { code });
+
+      let staff: Login, secret: string, first: { adminTotpExpiresAt: string; backupCodes: string[] };
+      try {
+        vi.useFakeTimers({ toFake: ["Date"], now: Date.now() - shift });
+        staff = await signIn(id, actor(roster, "support"), known);
+        secret = (await post("/api/v1/auth/staff/totp/enroll", staff, {}).expect(201)).body.secret as string;
+        // The authenticator derives the code from the enrolled secret at the window's own time.
+        first = (await verify(staff, generateSync({ secret, strategy: "totp", period: 30 })).expect(201)).body;
+        expect(first.backupCodes).toHaveLength(10);
+        expect(await capabilities(staff), "elevation is valid inside the window").toEqual({ capabilities: ["founder.recovery"], elevated: true, adminTotpExpiresAt: first.adminTotpExpiresAt });
+      } finally {
+        vi.useRealTimers();
+      }
+
+      // At real time the server-issued deadline is an ordinary 12-hour deadline that has already passed.
+      const deadline = Date.parse(first.adminTotpExpiresAt);
+      expect(deadline).toBeLessThan(Date.now());
+      expect(deadline).toBeGreaterThan(Date.now() - 10 * 60 * 1000);
+      expect((await recover(staff).expect(403)).body.details).toEqual({ reason: "ELEVATION_REQUIRED" });
+      const stale = { capabilities: ["founder.recovery"], elevated: false, adminTotpExpiresAt: first.adminTotpExpiresAt };
+      expect(await capabilities(staff)).toEqual(stale);
+      const refreshed = await request.post("/api/v1/auth/refresh").send({ refreshToken: staff.refreshToken }).expect(201);
+      staff = { ...staff, accessToken: refreshed.body.accessToken, refreshToken: refreshed.body.refreshToken };
+      expect(await capabilities(staff), "refresh neither extends nor restores elevation").toEqual(stale);
+      expect((await recover(staff).expect(403)).body.details).toEqual({ reason: "ELEVATION_REQUIRED" });
+
+      const same = (await verify(staff, generateSync({ secret, strategy: "totp", period: 30 })).expect(201)).body as { adminTotpExpiresAt: string };
+      expect(Object.keys(same)).toEqual(["adminTotpExpiresAt"]);
+      expect(Date.parse(same.adminTotpExpiresAt)).toBeGreaterThan(Date.now());
+      expect(await capabilities(staff)).toEqual({ capabilities: ["founder.recovery"], elevated: true, adminTotpExpiresAt: same.adminTotpExpiresAt });
+      expect((await recover(staff).expect(409)).body.details).toEqual({ reason: "RECOVERY_REQUIRED" });
+
+      await request.post("/api/v1/auth/logout").send({ refreshToken: staff.refreshToken }).expect(204);
+      expect((await get("/api/v1/staff/capabilities", staff).expect(403)).body.details).toEqual({ reason: "SESSION_REQUIRED" });
+      expect((await recover(staff).expect(403)).body.details).toEqual({ reason: "SESSION_REQUIRED" });
+      await request.post("/api/v1/auth/refresh").send({ refreshToken: staff.refreshToken }).expect(401);
+      // The window's request is 12 h old, so the ordinary 60 s resend backoff no longer applies.
+      const fresh = await signIn(id, actor(roster, "support"), known);
+      expect(fresh.requestId).not.toBe(staff.requestId);
+      expect(await capabilities(fresh), "a fresh Session inherits no elevation").toEqual({ capabilities: ["founder.recovery"], elevated: false });
+      expect((await recover(fresh).expect(403)).body.details).toEqual({ reason: "ELEVATION_REQUIRED" });
+      const backupCode = first.backupCodes[0]!;
+      const byBackup = (await verify(fresh, backupCode).expect(201)).body as { adminTotpExpiresAt: string };
+      expect(Object.keys(byBackup)).toEqual(["adminTotpExpiresAt"]);
+      expect(Date.parse(byBackup.adminTotpExpiresAt)).toBeGreaterThan(Date.now());
+      expect((await verify(fresh, backupCode).expect(400)).body.code).toBe("INVALID_TOTP");
+      expect(await capabilities(fresh)).toEqual({ capabilities: ["founder.recovery"], elevated: true, adminTotpExpiresAt: byBackup.adminTotpExpiresAt });
+      expect((await recover(fresh).expect(409)).body.details).toEqual({ reason: "RECOVERY_REQUIRED" });
+
+      const before = await owned(id);
+      const perTable: Record<string, number> = {};
+      for (const row of before) perTable[row.table_name] = (perTable[row.table_name] ?? 0) + 1;
+      expect(perTable).toEqual({ users: 15, sessions: 2, otp_requests: 3, totp_enrollments: 2, totp_backup_codes: 20, staff_grants: 3, audit_logs: 3, dealerships: 1, dealership_members: 1 });
+      expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_ledger ORDER BY request_id`)).toEqual(
+        [coordinator.requestId, staff.requestId, fresh.requestId].sort().map(request_id => ({ request_id })));
+      expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+      await assertDisposed(id, before);
+      const terminal = await digest(id);
+      expect(execute("reset", id)).toMatchObject({ code: 0, receipt: { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 } });
+      expect(await digest(id)).toBe(terminal);
+      await assertDisposed(id, before);
+      expect((await get("/api/v1/staff/capabilities", fresh).expect(403)).body.details).toEqual({ reason: "SESSION_REQUIRED" });
+      await request.post("/api/v1/auth/refresh").send({ refreshToken: fresh.refreshToken }).expect(401);
+      await request.post("/api/v1/auth/refresh").send({ refreshToken: coordinator.refreshToken }).expect(401);
     });
   }));
 });
