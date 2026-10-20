@@ -24,6 +24,12 @@ describe("HttpOtpSenderAdapter", () => {
     else process.env["SMS_DRIVER"] = driver;
   });
 
+  it("refuses missing internal delivery metadata without logging", async () => {
+    const log = vi.spyOn(Logger.prototype, "log").mockImplementation(() => {});
+    await expect(new HttpOtpSenderAdapter().send(sms)).rejects.toThrow("SMS delivery metadata refused");
+    expect(log).not.toHaveBeenCalled();
+  });
+
   it("builds the sms-gateway body { phone, body, requestId } with the rendered text", () => {
     expect(new HttpOtpSenderAdapter().gatewayRequest(sms)).toEqual({
       phone: "+99365123456",
