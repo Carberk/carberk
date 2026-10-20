@@ -34,8 +34,8 @@ function remoteMain(input, campaign, businessMain, queueMain) {
       const hex = createHash('sha256').update(`${input.id}:${label}`).digest('hex').slice(0,32);
       return `${hex.slice(0,8)}-${hex.slice(8,12)}-4${hex.slice(13,16)}-a${hex.slice(17,20)}-${hex.slice(20)}`;
     };
-    if (['campaign897-business-v2', 'campaign897-full-v3'].includes(input.profile)) return businessMain(input, { sql, uuid, exists });
-    if (input.profile === 'campaign897-identities-v1') return campaign(input, { sql, uuid, exists, disposeDeliveries: (deliveries, observeOnly = false) => {
+    // One exact queue disposer for v1 and v3. V2 storage has no delivery ledger and gets none.
+    const disposeDeliveries = (deliveries, observeOnly = false) => {
       const redis = new URL(e.REDIS_URL);
       if (!['redis:', 'rediss:'].includes(redis.protocol) || redis.hostname !== 'redis.railway.internal' || redis.search || redis.hash) throw new Error();
       redis.username = ''; redis.password = '';
@@ -45,7 +45,10 @@ function remoteMain(input, campaign, businessMain, queueMain) {
         encoding: 'utf8', timeout: 30000, maxBuffer: 1024 * 1024, env: e,
       });
       if (result.status !== 0 || result.error || result.stdout.trim() !== '{"queueJobs":0}') throw new Error();
-    }});
+    };
+    if (input.profile === 'campaign897-business-v2') return businessMain(input, { sql, uuid, exists });
+    if (input.profile === 'campaign897-full-v3') return businessMain(input, { sql, uuid, exists, disposeDeliveries });
+    if (input.profile === 'campaign897-identities-v1') return campaign(input, { sql, uuid, exists, disposeDeliveries });
     if (exists && sql(`SELECT reservation_id FROM "${namespace}".manifest;`) !== input.id) throw new Error();
     const user = uuid('seller'); const listing = uuid('listing');
     const unchanged = `DO $guard$ BEGIN
