@@ -388,7 +388,8 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
           (TG_OP='UPDATE' AND (prior->>'usedAt' IS NOT NULL OR v_row->>'usedAt' IS NULL OR v_row-'usedAt' IS DISTINCT FROM prior-'usedAt'))))) THEN RAISE EXCEPTION 'Unsupported campaign TOTP'; END IF;
       IF TG_TABLE_NAME='otp_requests' AND ((TG_OP='DELETE' AND lifecycle='identities') OR v_row->>'businessId' IS NOT NULL OR v_row->>'phone' IS NOT NULL OR v_row->>'purpose'<>'sign_in' OR v_row->>'channel'<>'email' OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE email=v_row->>'destination') OR (v_row->>'userId' IS NOT NULL AND NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'userId' AND email=v_row->>'destination')) OR (TG_OP='UPDATE' AND v_row->>'destination' IS DISTINCT FROM prior->>'destination')) THEN RAISE EXCEPTION 'Unsupported campaign OTP'; END IF;
       -- No Session is created elevated. Elevation changes only a live roster Session whose User holds an active
-      -- grant and an owned verified enrollment, for at most the normal twelve hours (UTC timestamp(3) columns).
+      -- grant and an owned verified enrollment. The database-clock bound allows five minutes of skew
+      -- beyond the application's twelve-hour TTL (UTC timestamp(3) columns).
       IF TG_TABLE_NAME='sessions' AND TG_OP<>'DELETE' AND (NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'userId') OR
         (v_row->>'adminTotpExpiresAt' IS NOT NULL AND (TG_OP='INSERT' OR (v_row->'adminTotpExpiresAt' IS DISTINCT FROM prior->'adminTotpExpiresAt' AND NOT (
           (v_row->>'expiresAt')::timestamp>(now() AT TIME ZONE 'UTC') AND (v_row->>'adminTotpExpiresAt')::timestamp<=(now() AT TIME ZONE 'UTC')+interval '12 hours 5 minutes' AND
