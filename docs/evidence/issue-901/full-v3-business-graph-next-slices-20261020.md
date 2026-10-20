@@ -2,6 +2,12 @@
 
 Planning evidence for #901 under #897 and PR #904. Base `763b411e`; `main` `9fde309c`. Documentation only; no source, test, cap, lock, timeout, concurrency, auth or architecture change is approved. Admission provenance and the baseline guard stay as decided in [the admission ownership plan](full-v3-admission-ownership-plan-20261020.md) and are not rederived. Criteria: matrix rows B1–B4, B6 ([D1–D4, D7](../issue-897/release-acceptance-matrix-20261020.md)) and Engineering gap 2. Counts follow the [capacity inventory](full-v3-capacity-inventory-20261020.md) accounting rules; the main journey's 60 records are still an unmeasured estimate.
 
+## Root disposition at 794ac50a
+
+Use buyer-a as the admitted owner, sales-a/sales-b for sales membership, and buyer-b for later customer enquiries. Bootstrap alias owner remains bound to the root business. These aliases identify synthetic actors, not exclusions from any role or account-switch criterion.
+
+Prepare membership proof as a separate case with its own reservation, preserving all fifteen existing cases and their assertions. Batch it with the next eligible source checkpoint. At794ac50a the admission-only guard refuses further admitted-business invitation writes before their audit; the unsupported-audit prediction below applies only after that earlier guard is extended. No deeper behavior is established until setup reaches its assertions. Phone contact proof and enquiry-audit disposition remain separate decisions. No media, worker or capacity change is authorized here.
+
 ## Source facts that bound every slice
 
 | Fact | Source | Consequence |
