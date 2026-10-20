@@ -4,6 +4,14 @@ Planning evidence for #901 under #897 and PR #904. Base `68b9b7f4`, which has th
 
 The criteria come from [release-acceptance-matrix-20261020.md](../issue-897/release-acceptance-matrix-20261020.md) (rows S/M/V/B/C/X/A) and Engineering gap 2 in [criterion-evidence-index-20261018.md](../issue-897/criterion-evidence-index-20261018.md).
 
+## Root disposition
+
+Independent acceptance groups may use separate reservations. This is an execution choice, not removal of any selected capability or required joined journey. Preserve cross-role refusal, account switching, foreign-reservation preservation and every criterion from the governing specifications. The matrix summarizes those specifications; a capability missing from its rows is not excluded from the release.
+
+The earlier 189 calculation assumes all fourteen non-bootstrap capabilities; the 183 calculation below assumes eleven. Neither is an established minimum for every permitted acceptance arrangement. Per-group authentication figures are lower bounds with unresolved capability assignments and content, not approved quotas. The 60-record main journey is a source-derived estimate pending hosted reach and readback. No cap change is approved. Derive each family's remaining operations and disposal obligations before implementing it.
+
+Root assigned a separate test-only staff lifecycle case from `9fb10b28`. It must preserve existing assertions and use ordinary HTTP, known-job cleanup and legitimate clock boundaries. Its hosted result is UNKNOWN. The admitted-business ownership rule, shared global-state disposition, synthetic diagnostics bootstrap, phone/auth-change support and private-object/general-worker disposal remain explicit design and verification work within the full selected scope.
+
 ## Accounting rules (source at base)
 
 | Quantity | Rule | Source |
