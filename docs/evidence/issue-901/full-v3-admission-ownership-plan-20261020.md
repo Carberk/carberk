@@ -2,6 +2,18 @@
 
 Planning evidence for #901 under #897 and PR #904. Base `07be7658`. This brief edits no source or test and approves nothing. Root authorizes source only after the hosted run reaches admission. Hosted reach is still UNKNOWN: at `67733dbd` the main journey stopped at the grant, and the result for the grants candidate is pending.
 
+## Root disposition after hosted reach
+
+API job `118661971095` at `9fb10b28` now passes the grant, support's pre-elevation refusal and support TOTP, then fails admission at line 235 with `Foreign campaign graph reference`. Later redemption, settings and cleanup remain unreached. This establishes admission RED, not the proposed mechanism's correctness.
+
+The same-transaction creation proof is an implementation candidate for the fixture only, subject to test-first collision, foreign-adoption, cross-reservation and rollback evidence. It must be bounded, cannot persist observations of unrelated rows, and must not treat an ID/slug prefix or an update of a pre-existing row as creation. No application auth shortcut or fixture-only business endpoint is authorized. Independent review is still required.
+
+Only synthetic admission is allowed. `checked` mode stays refused. Use the existing contract's evidence/reason bounds and synthetic test values; retained audits must redact them. No real provider or business facts are introduced.
+
+Invalidating a pre-existing shared inventory baseline is **not authorized**. A before/after observation alone cannot protect against a concurrent baseline write. The next design/test slice must either prove atomic refusal of the reserved transaction while preserving the baseline and all business state, or keep redemption closed and record the unresolved mechanism. Do not claim ownership of global rows, restore a stale baseline or change ordinary production business behavior. Baseline-absent behavior must preserve unrelated collector state; concurrency and rollback remain required evidence. This supersedes the observational recommendation below.
+
+Next: retain the reached main assertion, add bounded test-only ownership/refusal cases, then implement only the supported fixture rules after their hosted result. No cap, lock, timeout, concurrency or operational gate change is authorized by this disposition.
+
 ## Ordinary write trace (`PrismaBusinessRepository.ts`)
 
 | Step (spec line) | Transaction writes, in order | Owned by today's v3 trigger? |
