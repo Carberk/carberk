@@ -273,7 +273,7 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
   // BUSINESS_ADMITTED in one transaction. A non-owned Dealership INSERT records only its ID in this namespace's
   // transaction-local slot (one value, never persisted, reverted on rollback); UPDATE never writes it. The owned
   // owner invitation adopts exactly that Dealership. This defends ordinary code paths and concurrent traffic only:
-  // same-role SQL can set the slot, as it can disable these triggers. Redemption, settings and recovery stay closed.
+  // same-role SQL can set the slot, as it can disable these triggers. Only owner redemption and name/cityId settings follow adoption; recovery stays closed.
   const createdSlot = `'${n}.created_dealership'`;
   const admissionColumns = ['id', 'slug', 'name', 'status', 'admissionMode', 'admittedAt', 'checkedEvidence', 'createdAt', 'updatedAt'].map(c => `'${c}'`).join(',');
   const admissionSlot = bootstrapV3 ? `
@@ -293,10 +293,40 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
         admitting := true;
       END IF;
       ` : '';
-  // Admission only: an admitted Dealership's invitation and membership rows stay closed after adoption.
+  // Admitted businesses have one owner invitation and one immutable owner membership.
+  // The root's original rules remain separate. No sales or recovery transition is admitted.
+  const ownerMember = (business, user) => `EXISTS(SELECT 1 FROM public.dealership_members om JOIN "${n}".campaign_records omr ON omr.table_name='dealership_members' AND NOT omr.deleted AND omr.version=1 AND omr.row_key=jsonb_build_object('id',om.id)
+          WHERE om."dealershipId"=${business} AND om."userId"=${user} AND om.role='owner' AND om.status='active')`;
+  const redeemedInvitation = (business, user) => `EXISTS(SELECT 1 FROM public.dealership_invitations i JOIN "${n}".campaign_records ir ON ir.table_name='dealership_invitations' AND NOT ir.deleted AND ir.version=2 AND ir.row_key=jsonb_build_object('id',i.id)
+          WHERE i."dealershipId"=${business} AND i."recipientUserId"=${user} AND i.role='owner' AND i."redeemedAt" IS NOT NULL AND i."revokedAt" IS NULL)`;
   const admissionClosed = bootstrapV3 ? `
-        IF TG_TABLE_NAME='dealership_invitations' AND v_row->>'dealershipId'<>'${rootId}' AND NOT coalesce(admitting,false) OR
-          TG_TABLE_NAME='dealership_members' AND v_row->>'dealershipId'<>'${rootId}' THEN RAISE EXCEPTION 'Unsupported campaign business'; END IF;` : '';
+        IF TG_TABLE_NAME='dealership_invitations' AND v_row->>'dealershipId'<>'${rootId}' AND NOT coalesce(admitting,false) AND NOT coalesce(
+          TG_OP='UPDATE' AND prior->>'role'='owner' AND prior->>'redeemedAt' IS NULL AND prior->>'revokedAt' IS NULL AND v_row->>'redeemedAt' IS NOT NULL AND
+          (prior->>'expiresAt')::timestamp>(now() AT TIME ZONE 'UTC') AND v_row-'redeemedAt' IS NOT DISTINCT FROM prior-'redeemedAt' AND
+          EXISTS(SELECT 1 FROM public.dealerships d WHERE d.id=v_row->>'dealershipId' AND d.status='recovery') AND
+          NOT EXISTS(SELECT 1 FROM public.dealership_members m WHERE m."dealershipId"=v_row->>'dealershipId'),false)
+          THEN RAISE EXCEPTION 'Unsupported campaign business'; END IF;
+        IF TG_TABLE_NAME='dealership_members' AND v_row->>'dealershipId'<>'${rootId}' AND NOT coalesce(TG_OP='INSERT' AND v_row->>'role'='owner' AND v_row->>'status'='active' AND
+          ${redeemedInvitation("v_row->>'dealershipId'", "v_row->>'userId'")} AND
+          (SELECT count(*) FROM public.dealership_members m WHERE m."dealershipId"=v_row->>'dealershipId')=1 AND
+          EXISTS(SELECT 1 FROM public.dealerships d WHERE d.id=v_row->>'dealershipId' AND d.status='recovery'),false)
+          THEN RAISE EXCEPTION 'Unsupported campaign business'; END IF;` : '';
+  const admittedBusiness = bootstrapV3 ? `
+        IF TG_TABLE_NAME='dealerships' AND v_row->>'id'<>'${rootId}' AND NOT coalesce(TG_OP='UPDATE' AND v_row->>'admissionMode'='synthetic' AND
+          v_row->>'admittedAt' IS NULL AND char_length(v_row->>'name') BETWEEN 2 AND 120 AND (
+          (prior->>'status'='recovery' AND v_row->>'status'='active' AND v_row-'status'-'updatedAt' IS NOT DISTINCT FROM prior-'status'-'updatedAt' AND
+            EXISTS(SELECT 1 FROM public.dealership_members m WHERE m."dealershipId"=v_row->>'id' AND ${ownerMember("v_row->>'id'", 'm."userId"')} AND ${redeemedInvitation("v_row->>'id'", 'm."userId"')})) OR
+          (prior->>'status'='active' AND v_row->>'status'='active' AND v_row-'name'-'cityId'-'updatedAt' IS NOT DISTINCT FROM prior-'name'-'cityId'-'updatedAt' AND
+            EXISTS(SELECT 1 FROM public.dealership_members m WHERE m."dealershipId"=v_row->>'id' AND ${ownerMember("v_row->>'id'", 'm."userId"')}))),false)
+          THEN RAISE EXCEPTION 'Unsupported campaign business'; END IF;` : '';
+  const ownerAudit = bootstrapV3 ? ` AND NOT coalesce(TG_OP='INSERT' AND v_row->>'targetType'='Dealership' AND v_row->>'targetId'<>'${rootId}' AND
+          EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name='dealerships' AND NOT deleted AND row_key=jsonb_build_object('id',v_row->>'targetId')) AND
+          ${ownerMember("v_row->>'targetId'", "v_row->>'actorId'")} AND ${redeemedInvitation("v_row->>'targetId'", "v_row->>'actorId'")} AND
+          EXISTS(SELECT 1 FROM public.dealerships d WHERE d.id=v_row->>'targetId' AND d.status='active') AND (
+          (v_row->>'action'='BUSINESS_INVITATION_REDEEMED' AND v_row->'details'=jsonb_build_object('invitationId',(
+            SELECT i.id FROM public.dealership_invitations i WHERE i."dealershipId"=v_row->>'targetId' AND i."recipientUserId"=v_row->>'actorId' AND i.role='owner'),'role','owner') AND
+            (SELECT count(*) FROM public.audit_logs a WHERE a."targetType"='Dealership' AND a."targetId"=v_row->>'targetId' AND a.action='BUSINESS_INVITATION_REDEEMED')=1) OR
+          (v_row->>'action'='BUSINESS_SETTINGS_CHANGED' AND v_row->'details' IN ('{"fields":["name"]}'::jsonb,'{"fields":["name","cityId"]}'::jsonb))),false)` : '';
   // The audit follows the adopted Dealership and owner invitation. Its actor is a different, currently elevated
   // roster holder of founder.admission; details are exactly the contract-bounded synthetic shape, never a token.
   const admittedAudit = bootstrapV3 ? ` AND NOT coalesce(TG_OP='INSERT' AND v_row->>'action'='BUSINESS_ADMITTED' AND v_row->>'targetType'='Dealership' AND v_row->>'targetId'<>'${rootId}' AND
@@ -331,8 +361,11 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
       g.version IS DISTINCT FROM (CASE WHEN ${bootstrapGrant('g.row_key')} THEN 1 ELSE (SELECT count(*) FROM public.audit_logs a JOIN "${n}".campaign_records r ON r.table_name='audit_logs' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',a.id)
         WHERE a.action IN ('STAFF_CAPABILITY_GRANTED','STAFF_CAPABILITY_REVOKED') AND a."targetId"=g.row_key->>'userId' AND a.details->>'capability'=g.row_key->>'capability') END))
     THEN RAISE EXCEPTION 'Campaign grant audit mismatch'; END IF;
-    IF (SELECT state FROM "${n}".campaign_manifest)='identities' AND EXISTS(SELECT 1 FROM "${n}".campaign_records d WHERE d.table_name='dealerships' AND NOT d.deleted AND d.row_key<>jsonb_build_object('id','${rootId}') AND (d.version<>1 OR
-      (SELECT count(*) FROM public.dealership_invitations i JOIN "${n}".campaign_records r ON r.table_name='dealership_invitations' AND NOT r.deleted AND r.version=1 AND r.row_key=jsonb_build_object('id',i.id) WHERE i."dealershipId"=d.row_key->>'id' AND i.role='owner')<>1 OR
+    IF (SELECT state FROM "${n}".campaign_manifest)='identities' AND EXISTS(SELECT 1 FROM "${n}".campaign_records d WHERE d.table_name='dealerships' AND NOT d.deleted AND d.row_key<>jsonb_build_object('id','${rootId}') AND (d.version<>1+(SELECT count(*) FROM public.audit_logs a JOIN "${n}".campaign_records r ON r.table_name='audit_logs' AND NOT r.deleted AND r.version=1 AND r.row_key=jsonb_build_object('id',a.id) WHERE a."targetType"='Dealership' AND a."targetId"=d.row_key->>'id' AND a.action IN ('BUSINESS_INVITATION_REDEEMED','BUSINESS_SETTINGS_CHANGED')) OR
+      (SELECT count(*) FROM public.dealership_invitations i JOIN "${n}".campaign_records r ON r.table_name='dealership_invitations' AND NOT r.deleted AND r.version=CASE WHEN i."redeemedAt" IS NULL THEN 1 ELSE 2 END AND r.row_key=jsonb_build_object('id',i.id) WHERE i."dealershipId"=d.row_key->>'id' AND i.role='owner' AND i."revokedAt" IS NULL AND
+        ((i."redeemedAt" IS NULL AND NOT EXISTS(SELECT 1 FROM public.dealership_members m WHERE m."dealershipId"=i."dealershipId")) OR
+         (i."redeemedAt" IS NOT NULL AND ${ownerMember('i."dealershipId"', 'i."recipientUserId"')} AND
+          (SELECT count(*) FROM public.audit_logs a JOIN "${n}".campaign_records ar ON ar.table_name='audit_logs' AND NOT ar.deleted AND ar.version=1 AND ar.row_key=jsonb_build_object('id',a.id) WHERE a."targetType"='Dealership' AND a."targetId"=i."dealershipId" AND a.action='BUSINESS_INVITATION_REDEEMED')=1)))<>1 OR
       (SELECT count(*) FROM public.audit_logs a JOIN "${n}".campaign_records r ON r.table_name='audit_logs' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',a.id) WHERE a."targetType"='Dealership' AND a."targetId"=d.row_key->>'id' AND a.action='BUSINESS_ADMITTED')<>1))
     THEN RAISE EXCEPTION 'Campaign admission audit mismatch'; END IF;` : '';
   // Only these columns convey graph ownership. Catalog references never do.
@@ -356,6 +389,9 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
       END LOOP;
     END $locks$;
     SELECT pg_advisory_xact_lock(hashtextextended('${n}',0));`;
+  // Setup DDL alone adds this lock, after the existing table locks and before the namespace fence.
+  // Concurrent application writes can deadlock here; PostgreSQL rolls back, with no retry.
+  const setupLock = bootstrapV3 ? lock.replace('SELECT pg_advisory_xact_lock', 'LOCK TABLE public.measurement_state IN SHARE ROW EXCLUSIVE MODE;\n    SELECT pg_advisory_xact_lock') : lock;
   const key = (row, table) => table === 'staff_grants' ? `jsonb_build_object('userId',${row}->>'userId','capability',${row}->>'capability')` : `jsonb_build_object('id',${row}->>'id')`;
   const schemaHash = `(SELECT md5(coalesce(jsonb_agg(to_jsonb(a) ORDER BY a.attrelid,a.attnum)::text,'')) FROM
     (SELECT attrelid,attnum,attname,atttypid,attnotnull,attgenerated FROM pg_attribute WHERE attrelid IN (${relationIds}) AND attnum>0 AND NOT attisdropped) a)`;
@@ -371,7 +407,11 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
     IF (SELECT count(*) FROM "${n}".campaign_records)>128 OR (SELECT count(*) FROM "${n}".campaign_events)>2048 THEN RAISE EXCEPTION 'Campaign journal limit'; END IF;
     IF (SELECT count(*) FROM pg_trigger t JOIN pg_proc p ON p.oid=t.tgfoid JOIN pg_namespace ns ON ns.oid=p.pronamespace
       WHERE t.tgname='${n}_business' AND t.tgenabled='O' AND t.tgtype=29 AND t.tgqual IS NULL AND t.tgnargs=0 AND t.tgattr=''::int2vector AND t.tgconstraint=0 AND NOT t.tgdeferrable AND NOT t.tgisinternal AND ns.nspname='${n}' AND p.proname='track_business' AND t.tgrelid IN (${relationIds}))<>${tables.length}
-      THEN RAISE EXCEPTION 'Missing campaign tracking'; END IF;
+      THEN RAISE EXCEPTION 'Missing campaign tracking'; END IF;${bootstrapV3 ? `
+    IF (SELECT count(*) FROM pg_trigger t JOIN pg_proc p ON p.oid=t.tgfoid JOIN pg_namespace ns ON ns.oid=p.pronamespace
+      WHERE t.tgname='${n}_baseline' AND t.tgrelid='public.measurement_state'::regclass AND t.tgenabled='O' AND t.tgtype=9 AND t.tgqual IS NOT NULL AND
+        t.tgnargs=0 AND t.tgattr=''::int2vector AND t.tgconstraint=0 AND NOT t.tgdeferrable AND NOT t.tgisinternal AND ns.nspname='${n}' AND p.proname='track_business' AND
+        md5(pg_get_triggerdef(t.oid))=(SELECT baseline_trigger_hash FROM "${n}".campaign_manifest))<>1 THEN RAISE EXCEPTION 'Campaign baseline tracking changed'; END IF;` : ''}
     FOR entry IN SELECT * FROM "${n}".campaign_records LOOP
       IF entry.table_name NOT IN (${tableNames}) OR entry.row_key IS DISTINCT FROM (CASE WHEN entry.table_name='staff_grants' THEN jsonb_build_object('userId',entry.row_key->>'userId','capability',entry.row_key->>'capability') ELSE jsonb_build_object('id',entry.row_key->>'id') END) OR
         EXISTS(SELECT 1 FROM jsonb_each(entry.row_key) e WHERE e.value='null'::jsonb) THEN RAISE EXCEPTION 'Unknown campaign row key'; END IF;
@@ -419,7 +459,7 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
       SELECT 1 FROM "${n}".campaign_records owned WHERE owned.table_name='${t}' AND NOT owned.deleted AND owned.row_key=jsonb_build_object('id',x.id))) THEN RAISE EXCEPTION 'Foreign JSON graph reference'; END IF;`).join('\n')}
   END $guard$;`;
   const setup = `CREATE SCHEMA "${n}";
-    CREATE TABLE "${n}".campaign_manifest(reservation_id text PRIMARY KEY,candidate text NOT NULL,profile text NOT NULL,state text NOT NULL CHECK(state IN ('identities','cleaning','disposed')),delivery_version integer NOT NULL DEFAULT ${version},${bootstrapV3 ? "delivery_hash text NOT NULL DEFAULT md5('[]')," : ''}schema_hash text NOT NULL,journal_hash text NOT NULL DEFAULT md5('[]'),event_hash text NOT NULL DEFAULT md5('[]'),tracking_hash text);
+    CREATE TABLE "${n}".campaign_manifest(reservation_id text PRIMARY KEY,candidate text NOT NULL,profile text NOT NULL,state text NOT NULL CHECK(state IN ('identities','cleaning','disposed')),delivery_version integer NOT NULL DEFAULT ${version},${bootstrapV3 ? "delivery_hash text NOT NULL DEFAULT md5('[]'),baseline_trigger_hash text," : ''}schema_hash text NOT NULL,journal_hash text NOT NULL DEFAULT md5('[]'),event_hash text NOT NULL DEFAULT md5('[]'),tracking_hash text);
     INSERT INTO "${n}".campaign_manifest(reservation_id,candidate,profile,state,delivery_version,schema_hash) VALUES('${input.id}','${input.candidate}','${profile}','identities',${version},${schemaHash});
     CREATE TABLE "${n}".campaign_entities(alias text PRIMARY KEY,user_id text UNIQUE NOT NULL,email text UNIQUE NOT NULL);
     INSERT INTO "${n}".campaign_entities VALUES ${identityValues};
@@ -430,7 +470,12 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
       FOREIGN KEY(request_id,email) REFERENCES "${n}".campaign_delivery_ledger(request_id,email));
     ` : ''}CREATE FUNCTION "${n}".track_business() RETURNS trigger LANGUAGE plpgsql AS $fn$
     DECLARE v_row jsonb; prior jsonb; rowkey jsonb; oldkey jsonb; edge record; parent_table text; lifecycle text; owned boolean; fingerprint text;${bootstrapV3 ? ' adopted jsonb; admitting boolean := false;' : ''}
-    BEGIN
+    BEGIN${bootstrapV3 ? `
+      IF TG_TABLE_NAME='measurement_state' THEN
+        IF EXISTS(SELECT 1 FROM pg_locks WHERE pid=pg_backend_pid() AND locktype='advisory' AND granted AND objsubid=1 AND
+          ((classid::bigint<<32)|objid::bigint)=hashtextextended('${n}',0)) THEN RAISE EXCEPTION 'Campaign shared baseline preserved'; END IF;
+        RETURN NULL;
+      END IF;` : ''}
       v_row := CASE WHEN TG_OP='DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END;
       prior := CASE WHEN TG_OP='INSERT' THEN NULL ELSE to_jsonb(OLD) END;
       rowkey := CASE WHEN TG_TABLE_NAME='staff_grants' THEN ${key('v_row','staff_grants')} ELSE ${key('v_row','users')} END;
@@ -477,7 +522,8 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
       IF TG_OP<>'INSERT' AND NOT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=TG_TABLE_NAME AND row_key=oldkey AND NOT deleted AND row_hash=md5(prior::text)) THEN RAISE EXCEPTION 'Untracked campaign mutation'; END IF;
       IF lifecycle='identities' AND TG_OP='INSERT' AND EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=TG_TABLE_NAME AND row_key=rowkey) THEN RAISE EXCEPTION 'Campaign key reuse'; END IF;
       IF lifecycle='identities' AND TG_OP='DELETE' AND (TG_TABLE_NAME IN ('users','dealerships') OR (TG_TABLE_NAME='dealership_members' AND v_row->>'userId'='${owner.id}')) THEN RAISE EXCEPTION 'Campaign roots retained until disposal'; END IF;
-      IF lifecycle='disposed' THEN RAISE EXCEPTION 'Campaign graph disposed'; END IF;
+      ${bootstrapV3 ? `IF lifecycle='identities' AND TG_OP='DELETE' AND TG_TABLE_NAME IN ('dealership_invitations','dealership_members') AND v_row->>'dealershipId'<>'${rootId}' THEN RAISE EXCEPTION 'Unsupported campaign business'; END IF;
+      ` : ''}IF lifecycle='disposed' THEN RAISE EXCEPTION 'Campaign graph disposed'; END IF;
       IF lifecycle='cleaning' AND NOT ((TG_OP='DELETE' OR (TG_TABLE_NAME='audit_logs' AND TG_OP='UPDATE' AND v_row->>'actorId' IS NULL AND
         v_row->>'targetType'='SyntheticCampaign' AND v_row->>'targetId'='${input.id}' AND v_row->'details'=jsonb_build_object('profile','${profile}','disposition','redacted-synthetic-audit'))) AND
         (SELECT count(DISTINCT relation) FROM pg_locks WHERE pid=pg_backend_pid() AND locktype='relation' AND mode='ShareRowExclusiveLock' AND granted AND relation IN (${relationIds}))=${tables.length})
@@ -487,10 +533,10 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
         FOR edge IN SELECT * FROM jsonb_each_text(v_row) LOOP
           parent_table := '${JSON.stringify(parents)}'::jsonb->>edge.key;
           IF parent_table IS NOT NULL AND edge.value IS NOT NULL AND NOT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=parent_table AND row_key=jsonb_build_object('id',edge.value) AND NOT deleted) THEN RAISE EXCEPTION 'Foreign campaign graph reference'; END IF;
-        END LOOP;${admissionClosed}
+        END LOOP;${admissionClosed}${admittedBusiness}
         IF TG_TABLE_NAME='users' AND (NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'id' AND email=v_row->>'email') OR
           v_row->>'role'<>'buyer' OR v_row->>'emailVerifiedAt' IS NULL OR v_row->>'phone' IS NOT NULL OR v_row->>'avatarKey' IS NOT NULL OR v_row->>'avatarUploadId' IS NOT NULL OR v_row->>'avatarUrl' IS NOT NULL OR v_row->>'suspendedAt' IS NOT NULL OR v_row->>'suspendedById' IS NOT NULL OR v_row->>'deletionScheduledAt' IS NOT NULL) THEN RAISE EXCEPTION 'Synthetic identity changed'; END IF;
-        IF TG_TABLE_NAME='dealerships' AND (v_row->>'id'<>'${rootId}' OR v_row->>'slug'<>'${rootSlug}' OR v_row->>'contactPhone' IS DISTINCT FROM '${rootContact}' OR v_row->>'status'<>'recovery' OR v_row->>'admissionMode'<>'synthetic' OR v_row->>'admittedAt' IS NOT NULL OR v_row->>'checkedEvidence' IS NOT NULL OR v_row->>'contactConfirmedAt' IS NOT NULL OR v_row->>'logoUrl' IS NOT NULL) THEN RAISE EXCEPTION 'Synthetic root identity changed'; END IF;
+        IF TG_TABLE_NAME='dealerships'${bootstrapV3 ? ` AND v_row->>'id'='${rootId}'` : ''} AND (v_row->>'id'<>'${rootId}' OR v_row->>'slug'<>'${rootSlug}' OR v_row->>'contactPhone' IS DISTINCT FROM '${rootContact}' OR v_row->>'status'<>'recovery' OR v_row->>'admissionMode'<>'synthetic' OR v_row->>'admittedAt' IS NOT NULL OR v_row->>'checkedEvidence' IS NOT NULL OR v_row->>'contactConfirmedAt' IS NOT NULL OR v_row->>'logoUrl' IS NOT NULL) THEN RAISE EXCEPTION 'Synthetic root identity changed'; END IF;
         IF TG_TABLE_NAME IN ('listings','listing_drafts','conversations') AND v_row->>'businessId' IS DISTINCT FROM '${rootId}' THEN RAISE EXCEPTION 'Campaign business required'; END IF;
         IF TG_TABLE_NAME='dealership_members' AND v_row->>'userId'='${owner.id}' AND v_row->>'role'<>'owner' THEN RAISE EXCEPTION 'Synthetic owner changed'; END IF;
         IF TG_TABLE_NAME='conversations' AND NOT EXISTS(SELECT 1 FROM public.listings l WHERE l.id=v_row->>'listingId' AND l."sellerId"=v_row->>'sellerId' AND l."businessId"=v_row->>'businessId') THEN RAISE EXCEPTION 'Campaign conversation parents disagree'; END IF;
@@ -499,7 +545,7 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
         IF TG_TABLE_NAME='verified_contact_phones' AND (v_row->>'phone' IS DISTINCT FROM '${rootContact}' OR EXISTS(SELECT 1 FROM public.verified_contact_phones WHERE phone=v_row->>'phone' AND id<>v_row->>'id')) THEN RAISE EXCEPTION 'Campaign contact proof collision'; END IF;
         ${grantGuard}
         IF TG_TABLE_NAME='audit_logs' AND (v_row->>'targetType'<>'User' OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'targetId') OR v_row->>'action'<>'STAFF_CAPABILITY_BOOTSTRAP' OR v_row->>'targetId'<>'${coordinator.id}' OR v_row->>'actorId' IS NOT NULL OR NOT (
-          ${['staff.manage','founder.control'].map(c => `(v_row->>'id'='${uuid(`campaign897-business:${input.id}:audit:${c}`)}' AND v_row->'details'=jsonb_build_object('capability','${c}','reason','Synthetic storage-only reservation ${input.id}'))`).join(' OR ')}))${grantAudit}${admittedAudit} THEN RAISE EXCEPTION 'Unsupported campaign audit'; END IF;
+          ${['staff.manage','founder.control'].map(c => `(v_row->>'id'='${uuid(`campaign897-business:${input.id}:audit:${c}`)}' AND v_row->'details'=jsonb_build_object('capability','${c}','reason','Synthetic storage-only reservation ${input.id}'))`).join(' OR ')}))${grantAudit}${admittedAudit}${ownerAudit} THEN RAISE EXCEPTION 'Unsupported campaign audit'; END IF;
         IF TG_TABLE_NAME='content_reports' AND (NOT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=CASE v_row->>'targetType' WHEN 'listing' THEN 'listings' WHEN 'user' THEN 'users' WHEN 'message' THEN 'messages' ELSE '' END AND NOT deleted AND row_key=jsonb_build_object('id',v_row->>'targetId')) OR v_row->>'messageContext' IS NOT NULL) THEN RAISE EXCEPTION 'Unsupported report target'; END IF;
         IF TG_TABLE_NAME='messages' AND (v_row->>'kind'<>'text' OR coalesce(v_row->'metadata','null'::jsonb) NOT IN ('null'::jsonb,'{}'::jsonb)) THEN RAISE EXCEPTION 'Unsupported message media'; END IF;
         IF TG_TABLE_NAME='listing_drafts' AND (jsonb_typeof(v_row->'payload')<>'object' OR EXISTS(SELECT 1 FROM jsonb_each(v_row->'payload') e WHERE e.key NOT IN ('description','media') OR (e.key='description' AND jsonb_typeof(e.value)<>'string') OR (e.key='media' AND e.value<>'[]'::jsonb))) THEN RAISE EXCEPTION 'Unsupported draft payload'; END IF;
@@ -519,7 +565,9 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
       RETURN NULL;
     END $fn$;
     UPDATE "${n}".campaign_manifest SET tracking_hash=md5(pg_get_functiondef('"${n}".track_business()'::regprocedure));
-    ${tables.map(table => `CREATE TRIGGER "${n}_business" AFTER INSERT OR UPDATE OR DELETE ON public.${table} FOR EACH ROW EXECUTE FUNCTION "${n}".track_business();`).join('\n')}`;
+    ${tables.map(table => `CREATE TRIGGER "${n}_business" AFTER INSERT OR UPDATE OR DELETE ON public.${table} FOR EACH ROW EXECUTE FUNCTION "${n}".track_business();`).join('\n')}${bootstrapV3 ? `
+    CREATE TRIGGER "${n}_baseline" AFTER DELETE ON public.measurement_state FOR EACH ROW WHEN (OLD.key LIKE 'inventory_baseline:%') EXECUTE FUNCTION "${n}".track_business();
+    UPDATE "${n}".campaign_manifest SET baseline_trigger_hash=(SELECT md5(pg_get_triggerdef(oid)) FROM pg_trigger WHERE tgname='${n}_baseline' AND tgrelid='public.measurement_state'::regclass);` : ''}`;
   const collision = `DO $guard$ BEGIN
     IF EXISTS(SELECT 1 FROM public.verified_contact_phones WHERE phone='${rootContact}') OR EXISTS(SELECT 1 FROM public.users WHERE phone='${rootContact}') OR EXISTS(SELECT 1 FROM public.dealerships WHERE id='${rootId}' OR slug='${rootSlug}' OR "contactPhone"='${rootContact}') OR
       EXISTS(SELECT 1 FROM public.users u JOIN "${n}".campaign_entities e ON u.id=e.user_id OR u.email=e.email) OR
@@ -536,7 +584,7 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
   // from missing metadata, even when deterministic roots happen to be absent.
   if (!exists && input.kind !== 'fixture') throw new Error('Campaign journal unavailable');
   if (!exists) {
-    sql(`BEGIN; ${lock} ${setup} ${collision} ${audit} ${integrity} COMMIT;`);
+    sql(`BEGIN; ${setupLock} ${setup} ${collision} ${audit} ${integrity} COMMIT;`);
   } else {
     sql(`BEGIN; ${lock} ${integrity} COMMIT;`);
   }
