@@ -30,8 +30,9 @@
     "logos:import": "tsx scripts/import-brand-logos.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
-    "test": "vitest run",
-    "test:unit": "vitest run --exclude '**/*.e2e.spec.ts' --exclude '**/tests/**' --passWithNoTests",
+    "test": "pnpm test:offline && vitest run",
+    "test:unit": "pnpm test:offline && vitest run --exclude '**/*.e2e.spec.ts' --exclude '**/tests/**' --passWithNoTests",
+    "test:offline": "node --test tests/demo-inventory-lifetime.offline.mjs",
     "tester:accounts": "tsx scripts/tester-accounts.ts",
     "staff:bootstrap": "tsx scripts/bootstrap-staff.ts"
   },
