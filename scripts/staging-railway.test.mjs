@@ -408,12 +408,11 @@ test('business lifecycle reuses immutable shallow origin objects after first acq
   const root = await mkdtemp(join(tmpdir(), 'business-source-regression-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   const origin = join(root, 'origin.git');
-  const seed = new GitLedger({ directory: origin, remote: process.cwd() });
-  await seed.initialize();
+  execFileSync('git', ['init', '--bare', origin], { stdio: 'ignore' });
   const candidate = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   for (const revision of [candidate, retainedSchemaProfile.baseline]) {
-    await seed.git(['fetch', '--no-tags', process.cwd(), revision]);
-    await seed.git(['update-ref', `refs/heads/${revision === candidate ? 'candidate' : 'baseline'}`, revision]);
+    execFileSync('git', ['--git-dir', origin, 'fetch', '--no-tags', process.cwd(), revision], { stdio: 'ignore' });
+    execFileSync('git', ['--git-dir', origin, 'update-ref', `refs/heads/${revision === candidate ? 'candidate' : 'baseline'}`, revision], { stdio: 'ignore' });
   }
   const checkout = join(root, 'shallow');
   execFileSync('git', ['clone', '--quiet', '--depth=1', '--branch=candidate', `file://${origin}`, checkout], { stdio: 'ignore' });
