@@ -100,3 +100,56 @@ Test-first evidence on Node v24.13.0 and Apple Git 2.54.0:
 - `git diff --check` and `node scripts/check-agent-docs.mjs` passed.
 
 No forced timeout or signal test was run; the local regression exercises ordinary exit failures and redaction. The signal/unknown-code classifications were inspected in source. No services, real network, staging mutation, CI run, broad suite or duplicate agents. Root owns later batch assembly and any hosted diagnostic run. The new metadata cannot recover information discarded by job `118683953732` and makes no claim about that job's underlying failure.
+
+## Bounded immutable-object test cache checkpoint
+
+Sole writer reserved and pushed `agent/issue-901-staging-git-cache-fix-20261020` before edits. The host scaffold `t3/24b58ac4` began at `960bf2c3`, which contains the supplied root `2a09bb80`, published `d397c8b7` candidate and diagnostic `f39ef45b`. No PR or children. Root owns assembly with membership source, coordinator and contact work. Only `scripts/staging-railway.test.mjs` and this append change in this delivery.
+
+### Updated hosted evidence and uncertainty
+
+Read the existing local receipt `/tmp/carberk-next-release-20261020/d397/frontend.plain.log` for frontend job `118701135688` on `d397c8b7`. No hosted job was started. Exact receipt lines are:
+
+| Test | Declaration | Receipt lines | Duration in ms |
+| --- | --- | --- | --- |
+| business reset refuses partial probe and retains the exact operation | 423:3 | 15968–15981 | 60082.265476 |
+| business reset refuses audits probe and retains the exact operation | 423:3 | 15990–16003 | 60070.416174 |
+| business restoration refuses missing durable disposal before any main deployment | 437:3 | 16060–16073 | 60029.919996 |
+| business initial reset refuses operation binding changed during final attestation before remote mutation | 614:1 | 16287–16300 | 60056.079199 |
+
+The error at lines 15975, 15997, 16067 and 16294 is exactly:
+
+```text
+Coordination Git operation failed: operation=fetch exit=unknown signal=SIGTERM killed=true
+```
+
+Summary lines 17102–17109 report 424 tests, 419 pass, 4 fail, zero cancelled, 1 skipped, 624179.999053 ms. The metadata proves a fetch was SIGTERM-killed around 60 seconds. It does **not** identify the remote or which fetch site failed. There are immutable-source and mutable-ledger fetch sites. None of the four failures is proven to be an origin fetch. The separate API membership-source RED remains outside this writer's scope.
+
+### Reproduction and regression
+
+The new named case `business lifecycle reuses immutable shallow origin objects after first acquisition with isolated ledgers` uses actual Git and the actual `businessLifecycle`. It seeds a local bare origin with the real candidate and retained baseline, clones a depth-one checkout, completes the first lifecycle, renames that origin away, and creates a second lifecycle. It verifies exact candidate and baseline commit identities and equal tree identities, distinct ledger directories/remotes, and independent reservation ownership after mutating the first reservation. Its seed uses the normal object source so the regression also works when the outer test file itself runs from shallow CI.
+
+RED checkpoint `f6c085ac` ran the named regression against the prior per-case source behavior: 1 failure, safe `operation=fetch exit=128 signal=none killed=false`, 5781.478083 ms total. Follow-up test setup checkpoint `7da5dd6d` also ran RED, 1 failure, 6160.243542 ms total. The first lifecycle returned before origin removal; the second could not fetch. Both checkpoints were pushed before implementing caching. This deterministically reproduces the repeated immutable-origin availability dependency. It does not reproduce a SIGTERM, a 60-second stall, or the hosted cause.
+
+### Cache invariants
+
+- One lazy acquisition promise per checkout source pins HEAD and the retained baseline. Both must be lowercase 40-character SHAs. Shallow acquisition performs one `fetch --no-tags` from configured origin with both exact SHA refspecs into a fresh bare object source. Each fetched object must resolve as exactly the requested commit. Explicit refs retain both objects and their complete ancestry.
+- Every business lifecycle still initializes its own scratch ledger and bare lease remote and fetches both exact SHAs. Only the immutable source is shared. Mutable reservation refs, synthetic main commits, ledgers and remotes remain isolated. No production ledger code or safe diagnostic behavior changes.
+- Full checkouts keep the checkout directory as their object source. Shallow checkouts use the cached local bare source after acquisition. No fetch is skipped in the business lifecycle; no timeout, retry, concurrency, assertion, service or runtime policy changes.
+- Temporary cache roots use `mkdtemp` under the platform temp directory, with no fixed shared filesystem location. One module-scope `node:test` after hook removes them at test-file completion, including failed acquisition. A rejected acquisition promise stays rejected, with no retry. Cleanup must be registered at module scope: an imported `after()` called inside a test attaches to that active case. A small Node runtime probe confirmed that behavior before final verification.
+- Cache Git failures use the existing safe `GitLedger.git` boundary. No remote URL, raw stderr, arguments, environment or error cause is added to errors. SIGKILL/process crash cleanup is outside the guarantees of test lifecycle hooks.
+
+### Final checks and limits
+
+On Node v24.13.0, Apple Git 2.54.0, ran this bounded command with the final code:
+
+```sh
+node --test --test-name-pattern='business lifecycle reuses immutable|business reset refuses (partial|audits) probe|business restoration refuses missing durable disposal|business initial reset refuses operation binding' scripts/staging-railway.test.mjs
+```
+
+- Full checkout: 5/5 pass, zero failures/cancellations/skips, 26805.856292 ms total.
+- Real depth-one local checkout at `/tmp/issue-901-cache-final-shallow`, with the final test file copied into it: 5/5 pass, zero failures/cancellations/skips, 27226.945458 ms total. Its origin was this writer's full local checkout. The regression adds its own shallow checkout and temporary local origin.
+- Local-only Trace2 receipt `/tmp/issue-901-cache-shallow-final-trace.json` identifies actual sources: 1 fetch from configured checkout origin, 1 acquisition from the regression's local origin, 14 fetches from local immutable caches, 62 from isolated lease remotes, zero other fetch sources. The 14 include the regression's two seed fetches from the outer cache and 12 immutable fetches into six real lifecycle ledgers. Both cache directories were absent after file completion. All observed source locations were local; no external Git/network calls occurred during these tests.
+- `node --test scripts/staging-ledger.test.mjs`: 6/6 pass, zero failures/cancellations, 859.369833 ms. This includes safe diagnostic redaction, contention, restart and committed SQL byte identity.
+- `pnpm check:agent-docs` and `git diff --check` passed. Diff inspection confirms all prior business assertions and staging-ledger files are unchanged. No overview ownership or module boundary changed. Docs: not applicable, internal test-infrastructure change with existing Node/Git APIs.
+
+Hosted Ubuntu/Node 22, real external-origin acquisition, full root suite, API membership repair and hosted acceptance were not run. The new regression retains real application object history to exercise the existing lifecycle, rather than substituting miniature schema objects. It takes roughly 11–12 seconds locally; only the unavailable-origin dependency is deterministic. The first external acquisition may still stall or fail, and local ledger fetches may still fail. This cache removes an independently proven repeated immutable origin-fetch dependency and is **not a proven cure of the hosted timeout**. No services, Docker, DB, Railway or staging operations, broad suites, timeout repair or assertion weakening were performed.
