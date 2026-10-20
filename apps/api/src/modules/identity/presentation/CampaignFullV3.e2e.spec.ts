@@ -602,6 +602,8 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     const id = "b1".repeat(16), epoch = randomUUID(), baselineKey = `inventory_baseline:${epoch}`, unrelatedKey = `inventory_baseline:${randomUUID()}`;
     const baselineValue = "2026-10-01T00:00:00.000Z", created: string[] = [], unrelatedEmail = `unrelated.${randomUUID()}@example.invalid`;
     let unrelatedUserId: string | undefined;
+    // Known-request lifetime, like known jobs: the racing redemption is settled before any cleanup, on every path.
+    let racing: Promise<{ status: number } | { error: unknown }> | undefined;
     return resetAfter([id], async () => {
       // Global rows are created only when absent and removed in finally by exact key; a foreign collector stops the case.
       expect(await db.measurementState.findMany({ where: { key: { in: ["collector", baselineKey, unrelatedKey] } } })).toEqual([]);
@@ -627,11 +629,11 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
 
         // Race at the legitimate row-lock boundary: the baseline commits while redemption waits on the collector lock.
         await db.measurementState.delete({ where: { key: baselineKey } });
-        let racing: Promise<{ status: number }> | undefined;
         await db.$transaction(async tx => {
           await tx.$queryRaw`SELECT "key" FROM "measurement_state" WHERE "key" = 'collector' FOR UPDATE`;
           await tx.measurementState.create({ data: { key: baselineKey, epoch: baselineValue } });
-          racing = redeem().then(response => ({ status: response.status }));
+          // Rejection is observed at creation, so it cannot surface unhandled while this transaction waits.
+          racing = redeem().then(response => ({ status: response.status }), (error: unknown) => ({ error }));
           for (let attempt = 0; ; attempt += 1) {
             const [waiting] = await db.$queryRaw<{ count: number }[]>`SELECT count(*)::int AS count FROM pg_stat_activity
               WHERE datname = current_database() AND pid <> pg_backend_pid() AND wait_event_type = 'Lock' AND query LIKE '%measurement_state%'`;
@@ -640,7 +642,9 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
             await new Promise(done => setTimeout(done, 50));
           }
         }, { timeout: 15_000 });
-        await assertRefusedAtomically((await racing!).status);
+        const raced = await racing!;
+        if ("error" in raced) throw raced.error;
+        await assertRefusedAtomically(raced.status);
 
         // With no baseline for the current epoch, ordinary redemption succeeds and leaves other global rows untouched.
         await db.measurementState.delete({ where: { key: baselineKey } }); created.pop();
@@ -667,6 +671,8 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
         await assertDisposed(id, before);
         expect(await measurement()).toEqual(withoutBaseline);
       } finally {
+        // Never rejects; awaited after the row-lock transaction has unwound, so the original failure stays primary.
+        await racing;
         await db.measurementState.deleteMany({ where: { key: { in: created } } });
         // Exact removal of the unrelated ordinary User this case created, and its own sign-in code.
         await db.otpRequest.deleteMany({ where: { destination: unrelatedEmail } });
