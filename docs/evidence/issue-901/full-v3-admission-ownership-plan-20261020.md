@@ -36,6 +36,14 @@ These guards defend only against:
 
 Application code sets no custom settings: it uses only `SET LOCAL` timeouts (grep of `apps/api/src`, `apps/worker/src`, `packages/db/src`).
 
+### Root implementation disposition after 794ac50a
+
+Hosted API118683953780 now passes admission and cross-reservation admitted disposal, then reaches owner-redemption refusal and the blocked collector-lock race. The baseline behavior remains unproven. Implement the bounded owner-redemption/name-or-city settings/audit/reset rules and planned atomic baseline refusal against the unchanged fifteen tests. Sales membership, recovery, contact/media and operational entry points remain later slices.
+
+Place the extra v3 setup-only `measurement_state` ShareRowExclusive lock after the existing fixed-table locks and before the namespace advisory lock. Preserve the canonical existing target order and all reset targets/modes/timeouts. The extra target can contend or deadlock with ordinary traffic; PostgreSQL must abort and roll back completely. No retry or deadlock-freedom claim is authorized. Exact trigger-definition integrity, present/absent baseline behavior, the collector-lock race and unrelated ordinary deletion remain required hosted evidence.
+
+The stale-candidate case also reaches a distinct no-SQL violation in the wrapper: namespace existence is read before the fixture candidate/target mismatch is refused. A v3-only early wrapper check may repair that boundary without weakening the assertion or altering v1/v2 behavior.
+
 ### Creation provenance: a single transaction-local slot
 
 - **On INSERT.** On a non-owned `dealerships` INSERT, each v3 namespace trigger does `set_config('cf_<id>.created_dealership', NEW.id, true)`, then returns as it does today.

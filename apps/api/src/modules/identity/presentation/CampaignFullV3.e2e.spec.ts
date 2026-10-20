@@ -763,7 +763,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
 
   // B1/B2 membership on the admitted business. Setup (admission, owner redemption, settings) must pass before any
   // membership assertion counts. On 794ac50a the expected reached failure is owner redemption: `admissionClosed`
-  // refuses the admitted Dealership's member INSERT ('Unsupported campaign business'), so this case is RED there.
+  // first refuses the admitted Dealership's invitation UPDATE ('Unsupported campaign business'), before the member INSERT.
   // Invitation expiry (48 h) is not exercised; see the #901 business membership handoff.
   it("invites, replaces, revokes, redeems and suspends sales membership on the admitted business with exact audits and disposal", () => withKnownJobs(known => {
     const id = "b3".repeat(16), foreignUserId = randomUUID();

@@ -32,7 +32,7 @@ Every refused step asserts that the full journal digest and `businessState` are 
 
 ## Expected result on `794ac50a` (prediction; not run)
 
-- **`b3`: RED at its setup gate, owner redemption (expects 201, receives 500).** The cause is `admissionClosed` (`staging-campaign.mjs:297-299`): every non-root `dealership_members` write raises `Unsupported campaign business`. Nothing after redemption has been reached. This supersedes my plan's earlier prediction of `Unsupported campaign audit`. Root must still treat the main journey's and `b1`'s redemption expectations under its own disposition.
+- **`b3`: predicted RED at its setup gate, owner redemption (expects 201, receives 500).** `admissionClosed` (`staging-campaign.mjs:297-299`) first refuses the admitted invitation's UPDATE, before the independently refused non-root membership INSERT. Nothing after redemption has been reached in this new case. This supersedes the plan's earlier unsupported-audit prediction. The existing main journey at794ac50a reaches the owner-redemption refusal, while b1 stops before its collector lock.
 - **`b4`: expected GREEN.** The `recipientUserId` edge makes the invitation owned, and its foreign `dealershipId` raises `Foreign campaign graph reference` before any audit.
 - **Source that must later change for `b3` to pass.** All of it is in the v3 trigger:
   - admitted-Dealership member INSERT/UPDATE for owner and sales;
