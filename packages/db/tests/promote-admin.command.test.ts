@@ -252,4 +252,112 @@ describe("admin:promote command — disposable migrated PostgreSQL", () => {
       expect(await snapshot()).toEqual(before);
     });
   });
+
+  it("serializes real phone and email promotions of the same buyer with one original-role receipt", async () => {
+    const user = await db.user.create({ data: {
+      phone: PHONE, phoneVerifiedAt: VERIFIED_AT,
+      email: COORDINATOR_EMAIL, emailVerifiedAt: VERIFIED_AT,
+      role: "buyer", updatedAt: UPDATED_AT,
+    } });
+    await db.session.create({ data: { userId: user.id, refreshTokenHash: "fixture-hash:race", expiresAt: FUTURE } });
+    await db.staffGrant.create({ data: { userId: user.id, capability: "staff.manage" } });
+    const before = await snapshot();
+    // Full rows also catch credential changes that the shared summary would omit.
+    const authState = () => Promise.all([
+      "sessions", "otp_requests", "totp_enrollments", "totp_backup_codes", "staff_grants",
+    ].map(async (table) => (await pool.query<{ state: unknown }>(
+      `SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text), '[]'::jsonb) AS state FROM "${table}" t`,
+    )).rows[0]?.state));
+    const authBefore = await authState();
+    const names = ["promote-race-phone", "promote-race-email"];
+    const commands: { child: ReturnType<typeof execFile>; result: Promise<{ code: number | null; output: string }> }[] = [];
+    function startCommand(name: string, ...args: string[]) {
+      const url = new URL(databaseUrl);
+      url.searchParams.set("application_name", name);
+      let child: ReturnType<typeof execFile> | undefined;
+      const result = new Promise<{ code: number | null; output: string }>((resolve) => {
+        // Load the actual command through tsx in one Node process, so failure
+        // cleanup owns the process rather than leaving a tsx CLI descendant.
+        child = execFile(process.execPath, ["--import", "tsx", "scripts/promote-admin.ts", ...args], {
+          cwd: packageDir, env: { ...process.env, DATABASE_URL: url.toString() },
+        }, (error, stdout, stderr) => resolve({
+          code: error ? (typeof error.code === "number" ? error.code : null) : 0,
+          output: `${stdout}${stderr}`,
+        }));
+      });
+      const command = { child: must(child), result };
+      commands.push(command);
+      return result;
+    }
+
+    // These are bounded observations of actual PostgreSQL blockers, not elapsed-time
+    // ordering. Three seconds leaves the command's existing transaction limit intact.
+    async function blockedBackend(name: string, blocker: number): Promise<number> {
+      const deadline = performance.now() + 3000;
+      while (performance.now() < deadline) {
+        const { rows } = await pool.query<{ pid: number }>(`
+          SELECT pid FROM pg_stat_activity
+          WHERE datname = current_database() AND application_name = $1
+            AND state = 'active' AND wait_event_type = 'Lock'
+            AND $2 = ANY(pg_blocking_pids(pid))`, [name, blocker]);
+        if (rows[0]) return rows[0].pid;
+        // Fresh autocommit queries avoid cached activity snapshots and yield to PostgreSQL.
+      }
+      throw new Error(`${name} did not wait on backend ${blocker}`);
+    }
+
+    const barrier = await pool.connect();
+    try {
+      await barrier.query("BEGIN");
+      const holderPid = must((await barrier.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]).pid;
+      await barrier.query("SELECT pg_advisory_xact_lock(901, 904)");
+      await pool.query(`CREATE FUNCTION pause_promotion_race() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN PERFORM pg_advisory_xact_lock(901, 904); RETURN NEW; END $$`);
+      await pool.query(`CREATE TRIGGER pause_promotion_race BEFORE UPDATE OF "role" ON "users"
+        FOR EACH ROW WHEN (OLD."role" = 'buyer' AND NEW."role" = 'admin')
+        EXECUTE FUNCTION pause_promotion_race()`);
+
+      const phone = startCommand(must(names[0]), "--phone", PHONE, "--reason", REASON);
+      // The BEFORE UPDATE trigger is reached with the first command holding the User lock.
+      const phonePid = await blockedBackend(must(names[0]), holderPid);
+      const email = startCommand(must(names[1]), "--email", COORDINATOR_EMAIL, "--reason", REASON);
+      await blockedBackend(must(names[1]), phonePid);
+      // Reconfirm the first command is still held at the storage barrier before release.
+      expect(await blockedBackend(must(names[0]), holderPid)).toBe(phonePid);
+      await barrier.query("ROLLBACK");
+
+      const results = await Promise.all([phone, email]);
+      expect(results.map((result) => result.code)).toEqual([0, 0]);
+      for (const result of results) expect(result.output).toContain(user.id);
+      const after = await snapshot();
+      expect(after.users).toEqual([{ ...must(before.users[0]), role: "admin", updatedAt: expect.any(Date) as Date }]);
+      expect(after.audits).toHaveLength(1);
+      const audit = must(after.audits[0]);
+      expect(audit).toMatchObject({ actorId: null, action: "ADMIN_BOOTSTRAP_PROMOTE", targetType: "user", targetId: user.id });
+      expect(audit.details).toEqual({ reason: REASON, before: { role: "buyer" }, after: { role: "admin" } });
+      expect(await authState()).toEqual(authBefore);
+    } finally {
+      // Always release the barrier, including failed setup/observation/assertions.
+      try { await barrier.query("ROLLBACK"); }
+      finally {
+        barrier.release(true);
+        try {
+          // On a failure, terminate only these test command backends and children;
+          // this releases their row locks before DDL cleanup and settles both callbacks.
+          try {
+            await pool.query(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+              WHERE datname = current_database() AND application_name = ANY($1::text[])`, [names]);
+          } finally {
+            for (const { child } of commands) {
+              if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+            }
+            await Promise.allSettled(commands.map((command) => command.result));
+          }
+        } finally {
+          try { await pool.query('DROP TRIGGER IF EXISTS pause_promotion_race ON "users"'); }
+          finally { await pool.query("DROP FUNCTION IF EXISTS pause_promotion_race()"); }
+        }
+      }
+    }
+  });
 });
