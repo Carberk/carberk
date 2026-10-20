@@ -52,7 +52,7 @@ Each batch row gives its preconditions, a trigger with its observable result, th
 | M6 | admin `(admin)/listings`, `reports`, `users`, `audit` | moderate a reported Listing and a profile photo ([65](../../prd/flows/65-admin-moderation.md), [runbook](../../prd/ops/80-deployment-runbook.md#reported-profile-photo-moderation)); action audited | screenshots plus audit row | **unavailable actor**, see U2 |
 | M7 | web `[locale]/legal/*`, `trust`, `account/delete`; mobile `about`, `help` | each page renders in TK/RU/EN; legal links open from the app | screenshots **Lc** | none beyond S0 |
 | M8 | carried [#758](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/758); Android release build; buyer-b | D5: fail profile upload on a throttled network → Log out → Cancel → restore → one Retry succeeds without restart; also font/display-size recreation. D14: progress is measured or indeterminate, never 0→100 ([758 evidence](../issue-758/verification.md), [pass-2](../release-emulator-pass-2/report.md)) | logcat excerpt plus screenshots | Android launcher; v3+ |
-| M9 | carried [#486](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/486)/draft PR557; Hermes release bundle; RU | parameters count copy at 0, 5 and 21 matches; invalid→valid filter shows no stale count; City copy | screenshots | PR557 must be reconciled into the candidate, or #486 deferred by the founder |
+| M9 | carried [#486](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/486); Hermes release bundle; RU | parameters count copy at 0, 5 and 21 matches; invalid→valid filter shows no stale count; City copy | screenshots | source reconciled from closed PR557; native release proof outstanding ([record](search486-release-reconciliation-20261020.md)) |
 
 ### V. Views and native video (#874, #899, #886, #888–896) — IX rows and #886 table
 
@@ -136,7 +136,7 @@ These never pass through synthetic runs. Record each fact as present, absent or 
 - **U3.** The scoped staging token was refused, and the authoritative origins are unverified.
 - **U4.** Android emulator boot is unproven. iOS needs an app session before snapshots.
 - **U5.** The private bucket and the remediation of historical public objects (#909) are not provisioned.
-- **U6.** The PR557/#486 reconciliation is undecided.
+- **U6 resolved in source.** PR557 is closed and its required changes are present in the candidate. [Reconciliation](search486-release-reconciliation-20261020.md) establishes source presence only; M9 native release proof remains required.
 
 ## Staging sequence
 

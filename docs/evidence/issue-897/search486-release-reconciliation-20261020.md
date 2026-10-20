@@ -42,7 +42,7 @@ Nothing from PR557 is missing from the candidate. Nothing is superseded in a way
 
 ## Remaining release-blocking gaps (not source)
 
-1. Native Hermes release-bundle capture in Russian of Search parameters Show N at counts 0, 5 and 21. Per PR557, this should be a Hermes build. Release bundle per M9. Also capture the City field showing Region and City labelled once each. Screenshots or recording should note the build SHA, and a release bundle is preferable to a dev build.
+1. Native Hermes release-bundle capture in Russian of Search parameters Show N at counts 0, 5 and 21, as required by M9. Also capture the City field showing Region and City labelled once each. Screenshots or recording must identify the exact release build SHA.
 2. Current-candidate hosted GREEN and paired reviews covering these files at the final #904 pin. Historical counts belong to their own pins only.
 3. Minor test-only note, which the root may optionally take into #904 and which is not required by criteria text: no rendered test asserts RU 0 or 21 through the #760 helper, and `ModelPicker` Show N has no rendered count test. The native capture covers the release requirement either way.
 
