@@ -1,10 +1,11 @@
 import "reflect-metadata";
-import { spawnSync } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
+import { promisify } from "node:util";
 import { PrismaService } from "@auto-tm/db";
 import { AuthSchemas } from "@auto-tm/contracts";
 import { getQueueToken } from "@nestjs/bullmq";
@@ -18,6 +19,7 @@ import supertest from "supertest";
 import { afterAll, beforeAll, describe, expect, inject, it, vi } from "vitest";
 import { IdentityModule } from "../identity.module";
 import { BullMqEmailCodeSenderAdapter } from "../infrastructure/BullMqEmailCodeSenderAdapter";
+import { AdminController } from "../../admin/presentation/admin.controller";
 import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
 import { GlobalErrorFilter } from "../../../common/error.filter";
 import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
@@ -48,7 +50,8 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     if (!inject("apiTestDatabases")) throw new Error("Requires configured migrated disposable API PostgreSQL and Redis lane");
     delete process.env["OTP_TEST_MODE"];
     const module = await NestTest.createTestingModule({ imports: [bullTestRoot(), IdentityModule,
-      JwtModule.register({ global: true, secret: "synthetic-full-v3-http-contract-901" })] }).compile();
+      JwtModule.register({ global: true, secret: "synthetic-full-v3-http-contract-901" })],
+      controllers: [AdminController] }).compile();
     app = module.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
     db = app.get(PrismaService);
     queue = app.get<Queue>(getQueueToken(AuthSchemas.EMAIL_CODE_QUEUE));
@@ -940,4 +943,184 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
       }
     });
   }));
+  // This is the checked-in operator command, in its own Node/tsx process and transaction.
+  // One Node process avoids an unowned tsx CLI descendant. execFile's callback settles
+  // after exit, including its bounded SIGKILL timeout; no child survives an assertion.
+  async function promote(person: Actor, options: { runtimeCandidate?: string; dryRun?: boolean; loseResponse?: boolean } = {}) {
+    const run = promisify(execFile);
+    const args = ["--import", "tsx", "scripts/promote-admin.ts", "--email", person.email,
+      "--reason", "  Reservation-owned coordinator moderation proof  "];
+    if (options.dryRun) args.push("--dry-run");
+    try {
+      const result = await run(process.execPath, args, { cwd: packageRoot, timeout: 30000, killSignal: "SIGKILL",
+        env: { ...process.env, AUTOTM_COMMIT_SHA: options.runtimeCandidate ?? candidate } });
+      return { code: 0, output: options.loseResponse ? undefined : `${result.stdout}${result.stderr}` };
+    } catch (error) {
+      const failed = error as { code?: unknown; stdout?: string; stderr?: string };
+      // Spawn/timeout signal errors throw. Each refusal case first proves command
+      // loading and database lookup with a successful write-free dry-run.
+      if (typeof failed.code !== "number") throw error;
+      return { code: failed.code, output: `${failed.stdout ?? ""}${failed.stderr ?? ""}` };
+    }
+  }
+  async function promotionState(roster: Actor[]) {
+    const ids = roster.map(person => person.user_id);
+    return {
+      users: await db.user.findMany({ where: { id: { in: ids } }, orderBy: { id: "asc" } }),
+      grants: await db.staffGrant.findMany({ where: { userId: { in: ids } }, orderBy: [{ userId: "asc" }, { capability: "asc" }] }),
+      sessions: await db.session.findMany({ where: { userId: { in: ids } }, orderBy: { id: "asc" } }),
+      enrollments: await db.totpEnrollment.findMany({ where: { userId: { in: ids } }, orderBy: { id: "asc" } }),
+      codes: await db.totpBackupCode.findMany({ where: { totpEnrollment: { userId: { in: ids } } }, orderBy: { id: "asc" } }),
+      otps: await db.otpRequest.findMany({ where: { destination: { in: roster.map(person => person.email) } }, orderBy: { id: "asc" } }),
+      audits: await db.auditLog.findMany({ where: { targetId: { in: ids } }, orderBy: { id: "asc" } }),
+    };
+  }
+  async function promotionAccounting(id: string, requestIds: string[], promoted: boolean, elevated: boolean, disposed = false) {
+    const expected = { users: 15, dealerships: 1, dealership_members: 1, staff_grants: 2,
+      audit_logs: promoted ? 3 : 2,
+      ...(requestIds.length ? { otp_requests: requestIds.length, sessions: requestIds.length } : {}),
+      ...(elevated ? { totp_enrollments: 1, totp_backup_codes: 10 } : {}) };
+    expect(await rows(`SELECT table_name,count(*)::int AS count FROM "cf_${id}".campaign_records GROUP BY table_name ORDER BY table_name`)).toEqual(
+      Object.entries(expected).sort(([a], [b]) => a.localeCompare(b)).map(([table_name, count]) => ({ table_name, count })));
+    const [budget] = await rows<{ records: number; events: number }>(`SELECT
+      (SELECT count(*)::int FROM "cf_${id}".campaign_records) AS records,
+      (SELECT count(*)::int FROM "cf_${id}".campaign_events) AS events`);
+    expect(budget?.records).toBe(21 + requestIds.length * 2 + (promoted ? 1 : 0) + (elevated ? 11 : 0));
+    expect(budget!.records).toBeLessThanOrEqual(128);
+    // Source-derived exact write count: OTP INSERT + two UPDATEs + Session INSERT;
+    // first TOTP adds enrollment INSERT/UPDATE, ten code INSERTs and Session UPDATE.
+    expect(budget?.events).toBe(21 + requestIds.length * 4 + (promoted ? 2 : 0) + (elevated ? 13 : 0) +
+      (disposed ? 21 + requestIds.length * 2 + (promoted ? 1 : 0) + (elevated ? 11 : 0) : 0));
+    expect(budget!.events).toBeLessThan(2048);
+    expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_ledger ORDER BY request_id`)).toEqual(
+      [...requestIds].sort().map(request_id => ({ request_id })));
+    expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_sink ORDER BY request_id`)).toEqual(
+      (disposed ? [] : [...requestIds].sort().map(request_id => ({ request_id }))));
+  }
+
+  it("keeps an ordinarily signed-in and elevated buyer coordinator outside the marketplace admin role", () => withKnownJobs(known => {
+    const id = "b5".repeat(16);
+    return resetAfter([id], async () => {
+      const roster = await seed(id), coordinator = await signIn(id, actor(roster, "coordinator"), known);
+      expect(coordinator.user.role).toBe("buyer");
+      const denied = async () => expect((await get("/api/v1/admin/authority", coordinator).expect(403)).body).toMatchObject({ code: "FORBIDDEN", message: "Admin role required" });
+      let unchanged = await digest(id);
+      await denied();
+      expect(await digest(id)).toBe(unchanged);
+      await elevate(coordinator);
+      unchanged = await digest(id);
+      await denied();
+      expect(await digest(id)).toBe(unchanged);
+      expect(await db.auditLog.count({ where: { targetId: coordinator.user.id, action: "ADMIN_BOOTSTRAP_PROMOTE" } })).toBe(0);
+      await promotionAccounting(id, [coordinator.requestId], false, true);
+      const before = await owned(id);
+      expect(execute("reset", id).code).toBe(0);
+      await assertDisposed(id, before);
+      await promotionAccounting(id, [coordinator.requestId], false, true, true);
+    });
+  }));
+
+  it("promotes only the coordinator through the real command, requires ordinary TOTP, and redacts the exact audit on retryable reset", () => withKnownJobs(known => {
+    const id = "b6".repeat(16);
+    return resetAfter([id], async () => {
+      const roster = await seed(id), person = actor(roster, "coordinator");
+      const coordinator = await signIn(id, person, known);
+      const initial = await promotionState(roster), unchanged = await digest(id);
+      expect(initial.users.every(user => user.role === "buyer")).toBe(true);
+      expect(await promote(person, { dryRun: true })).toMatchObject({ code: 0 });
+      expect(await promotionState(roster)).toEqual(initial);
+      expect(await digest(id)).toBe(unchanged);
+      // First intended new RED: current track_business refuses users.role='admin'
+      // with "Synthetic identity changed", before the command's audit INSERT.
+      // A fixture, OTP or import failure above is setup failure, not this RED.
+      expect(await promote(person, { loseResponse: true }), "actual coordinator command must commit despite lost response").toEqual({ code: 0, output: undefined });
+      const promoted = await promotionState(roster);
+      expect(promoted.users).toEqual(initial.users.map(user => user.id === person.user_id ? { ...user, role: "admin", updatedAt: expect.any(Date) } : user));
+      for (const key of ["grants", "sessions", "enrollments", "codes", "otps"] as const) expect(promoted[key], key).toEqual(initial[key]);
+      const audits = promoted.audits.filter(audit => audit.action === "ADMIN_BOOTSTRAP_PROMOTE");
+      expect(audits).toHaveLength(1);
+      expect(audits[0]).toMatchObject({ actorId: null, targetType: "user", targetId: person.user_id,
+        details: { reason: "Reservation-owned coordinator moderation proof", before: { role: "buyer" }, after: { role: "admin" } } });
+      expect(audits[0]!.details).toEqual({ reason: "Reservation-owned coordinator moderation proof", before: { role: "buyer" }, after: { role: "admin" } });
+      expect(promoted.audits.filter(audit => audit.action !== "ADMIN_BOOTSTRAP_PROMOTE")).toEqual(initial.audits);
+      const committed = await digest(id);
+      const retry = await promote(person);
+      expect(retry).toMatchObject({ code: 0 });
+      expect(retry.output).toContain(person.user_id);
+      expect(retry.output).not.toContain(person.email);
+      expect(await promotionState(roster)).toEqual(promoted);
+      expect(await digest(id)).toBe(committed);
+      // The existing JWT still says buyer. AdminGuard checks the current database role,
+      // then finds the live Session with no elevation deadline: elevation-expired.
+      expect((await get("/api/v1/admin/authority", coordinator).expect(403)).body).toMatchObject({ code: "FORBIDDEN", message: "Admin TOTP elevation expired" });
+      expect(await digest(id)).toBe(committed);
+      await elevate(coordinator);
+      const elevated = await digest(id);
+      expect((await get("/api/v1/admin/authority", coordinator).expect(200)).body).toEqual({ marketplaceAdmin: true });
+      expect((await post("/api/v1/business/admission", coordinator, admissionFor(id, actor(roster, "buyer-a").user_id)).expect(403)).body.details).toEqual({ reason: "CAPABILITY_REQUIRED" });
+      expect(await digest(id)).toBe(elevated);
+      await promotionAccounting(id, [coordinator.requestId], true, true);
+      const before = await owned(id);
+      expect(before).toContainEqual({ table_name: "audit_logs", row_key: { id: audits[0]!.id } });
+      expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+      await assertDisposed(id, before);
+      expect(await db.auditLog.findUnique({ where: { id: audits[0]!.id }, select: { actorId: true, targetType: true, targetId: true, details: true } })).toEqual({
+        actorId: null, targetType: "SyntheticCampaign", targetId: id, details: { profile, disposition: "redacted-synthetic-audit" } });
+      const terminal = await digest(id);
+      expect(execute("reset", id)).toMatchObject({ code: 0, receipt: { state: "disposed", candidate, profile, fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 } });
+      expect(await digest(id)).toBe(terminal);
+      expect(await promote(person)).toEqual({ code: 1, output: "No user found for the selected contact\n" });
+      expect(await digest(id)).toBe(terminal);
+      await assertDisposed(id, before);
+      await promotionAccounting(id, [coordinator.requestId], true, true, true);
+      await request.post("/api/v1/auth/refresh").send({ refreshToken: coordinator.refreshToken }).expect(401);
+    });
+  }));
+
+  it("refuses real command promotion for every other alias and for a stale runtime candidate without writes", async () => {
+    const id = "b7".repeat(16), foreignId = "b8".repeat(16);
+    await resetAfter([id, foreignId], async () => {
+      const roster = await seed(id), foreignRoster = await seed(foreignId);
+      const initial = await promotionState(roster), foreign = await promotionState(foreignRoster);
+      const unchanged = await digest(id), foreignDigest = await digest(foreignId);
+      expect(await promote(actor(roster, "coordinator"), { dryRun: true })).toMatchObject({ code: 0 });
+      for (const person of roster.filter(person => person.alias !== "coordinator")) {
+        const refused = await promote(person);
+        expect(refused, `other alias ${person.alias}`).toMatchObject({ code: 1 });
+        expect(await promotionState(roster)).toEqual(initial);
+        expect(await digest(id)).toBe(unchanged);
+      }
+      expect(await promote(actor(roster, "coordinator"), { runtimeCandidate: "b".repeat(40) })).toMatchObject({ code: 1 });
+      expect(await promotionState(roster)).toEqual(initial);
+      expect(await digest(id)).toBe(unchanged);
+      expect(await promotionState(foreignRoster)).toEqual(foreign);
+      expect(await digest(foreignId)).toBe(foreignDigest);
+      await promotionAccounting(id, [], false, false);
+      await promotionAccounting(foreignId, [], false, false);
+    });
+  });
+
+  it("refuses the real coordinator command during cleaning and after disposal without recreating identities", async () => {
+    const id = "b9".repeat(16);
+    await resetAfter([id], async () => {
+      const roster = await seed(id), person = actor(roster, "coordinator");
+      expect(await promote(person, { dryRun: true })).toMatchObject({ code: 0 });
+      // Fixture lifecycle fault injection only. No auth, role, receipt or journal is seeded.
+      await db.$executeRawUnsafe(`UPDATE "cf_${id}".campaign_manifest SET state='cleaning'`);
+      const initial = await promotionState(roster), unchanged = await digest(id);
+      expect(await promote(person)).toMatchObject({ code: 1 });
+      expect(await promotionState(roster)).toEqual(initial);
+      expect(await digest(id)).toBe(unchanged);
+      await promotionAccounting(id, [], false, false);
+      const before = await owned(id);
+      expect(execute("reset", id).code).toBe(0);
+      await assertDisposed(id, before);
+      const terminal = await digest(id);
+      expect(await promote(person)).toEqual({ code: 1, output: "No user found for the selected contact\n" });
+      expect(await digest(id)).toBe(terminal);
+      await assertDisposed(id, before);
+      await promotionAccounting(id, [], false, false, true);
+    });
+  });
+
 });
