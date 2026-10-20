@@ -1004,7 +1004,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
   }
 
   it("keeps an ordinarily signed-in and elevated buyer coordinator outside the marketplace admin role", () => withKnownJobs(known => {
-    const id = "b5".repeat(16);
+    const id = "c5".repeat(16);
     return resetAfter([id], async () => {
       const roster = await seed(id), coordinator = await signIn(id, actor(roster, "coordinator"), known);
       expect(coordinator.user.role).toBe("buyer");
