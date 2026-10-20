@@ -760,4 +760,184 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
       await request.post("/api/v1/auth/refresh").send({ refreshToken: coordinator.refreshToken }).expect(401);
     });
   }));
+
+  // B1/B2 membership on the admitted business. Setup (admission, owner redemption, settings) must pass before any
+  // membership assertion counts. On 794ac50a the expected reached failure is owner redemption: `admissionClosed`
+  // refuses the admitted Dealership's member INSERT ('Unsupported campaign business'), so this case is RED there.
+  // Invitation expiry (48 h) is not exercised; see the #901 business membership handoff.
+  it("invites, replaces, revokes, redeems and suspends sales membership on the admitted business with exact audits and disposal", () => withKnownJobs(known => {
+    const id = "b3".repeat(16), foreignUserId = randomUUID();
+    return resetAfter([id], async () => {
+      const roster = await seed(id);
+      const { coordinator, staff } = await elevatedStaff(id, roster, known, ["founder.admission"]);
+      const owner = await signIn(id, actor(roster, "buyer-a"), known);
+      const salesA = await signIn(id, actor(roster, "sales-a"), known);
+      const salesB = await signIn(id, actor(roster, "sales-b"), known);
+      const rootBusiness = await db.dealership.findUniqueOrThrow({ where: { slug: `campaign897-${id}-${candidate.slice(0, 12)}` } });
+      const rootState = await businessState(rootBusiness.id);
+      // Foreign recipient fixture only: an ordinary User outside every reservation, never signed in or adopted.
+      const foreignUser = await db.user.create({ data: { id: foreignUserId, email: `foreign.${foreignUserId}@example.invalid`, emailVerifiedAt: new Date(), displayName: "Foreign recipient must survive" } });
+      try {
+        const admitted = (await post("/api/v1/business/admission", staff, admissionFor(id, owner.user.id)).expect(201)).body as { businessId: string; invitationId: string; token: string };
+        const businessId = admitted.businessId;
+        await post("/api/v1/business/invitations/redeem", owner, { token: admitted.token }).expect(201);
+        await post(`/api/v1/business/${businessId}/settings`, owner, { name: "Synthetic membership business" }).expect(201);
+        const ownerMember = await db.dealershipMember.findUniqueOrThrow({ where: { userId: owner.user.id } });
+        expect(ownerMember).toMatchObject({ dealershipId: businessId, role: "owner", status: "active" });
+
+        const invite = async (recipient: string) => {
+          const body = (await post(`/api/v1/business/${businessId}/invitations`, owner, { recipientUserId: recipient }).expect(201)).body as { businessId: string; invitationId: string; token: string; expiresAt: string };
+          expect(body).toMatchObject({ businessId });
+          expect(body.token).toMatch(/^[a-f0-9]{64}$/);
+          expect(await db.dealershipInvitation.findUniqueOrThrow({ where: { id: body.invitationId } })).toMatchObject({ dealershipId: businessId, recipientUserId: recipient, role: "sales", redeemedAt: null, revokedAt: null, expiresAt: new Date(body.expiresAt) });
+          expect(await owned(id)).toContainEqual({ table_name: "dealership_invitations", row_key: { id: body.invitationId } });
+          return body;
+        };
+        const redeem = (login: Login, token: string) => post("/api/v1/business/invitations/redeem", login, { token });
+        const reason = (response: { body: { details?: unknown } }) => response.body.details;
+        let unchanged: string | undefined;
+        const refusedWithoutWrites = async (label: string, attempt: () => Promise<unknown>) => {
+          unchanged = await digest(id);
+          const state = await businessState(businessId);
+          await attempt();
+          expect(await digest(id), `${label} writes nothing`).toBe(unchanged);
+          expect(await businessState(businessId), `${label} leaves the business unchanged`).toEqual(state);
+        };
+        const salesAId = actor(roster, "sales-a").user_id, salesBId = actor(roster, "sales-b").user_id;
+
+        // Invite, wrong-account redemption and duplicate replacement.
+        const first = await invite(salesAId);
+        await refusedWithoutWrites("wrong-account redemption", async () => expect(reason(await redeem(salesB, first.token).expect(409))).toEqual({ reason: "INVITATION_INVALID" }));
+        const second = await invite(salesAId);
+        expect((await db.dealershipInvitation.findUniqueOrThrow({ where: { id: first.invitationId } })).revokedAt).not.toBeNull();
+        await refusedWithoutWrites("replaced-token redemption", async () => expect(reason(await redeem(salesA, first.token).expect(409))).toEqual({ reason: "INVITATION_INVALID" }));
+
+        // Revoke, revoked-token refusal and a no-op repeated revoke without an audit.
+        const third = await invite(salesBId);
+        expect((await post(`/api/v1/business/${businessId}/invitations/revoke`, owner, { invitationId: third.invitationId }).expect(201)).body).toEqual({ ok: true });
+        await refusedWithoutWrites("revoked-token redemption", async () => expect(reason(await redeem(salesB, third.token).expect(409))).toEqual({ reason: "INVITATION_INVALID" }));
+        await refusedWithoutWrites("repeated revoke", async () => expect((await post(`/api/v1/business/${businessId}/invitations/revoke`, owner, { invitationId: third.invitationId }).expect(201)).body).toEqual({ ok: true }));
+
+        // Sales redemption has no shared inventory-baseline path; global measurement rows are only observed.
+        const measurement = await db.measurementState.findMany({ orderBy: { key: "asc" } });
+        expect((await redeem(salesA, second.token).expect(201)).body).toEqual({ businessId });
+        expect(await db.measurementState.findMany({ orderBy: { key: "asc" } })).toEqual(measurement);
+        const salesMember = await db.dealershipMember.findUniqueOrThrow({ where: { userId: salesAId } });
+        expect(salesMember).toMatchObject({ dealershipId: businessId, role: "sales", status: "active" });
+        expect((await get("/api/v1/business/current", salesA).expect(200)).body.workspace).toMatchObject({ business: { id: businessId, status: "active" }, membership: { role: "sales", status: "active" }, members: [], invitations: [] });
+        await refusedWithoutWrites("repeated redemption", async () => expect(reason(await redeem(salesA, second.token).expect(409))).toEqual({ reason: "INVITATION_INVALID" }));
+        await refusedWithoutWrites("sales owner actions", async () => {
+          expect(reason(await post(`/api/v1/business/${businessId}/invitations`, salesA, { recipientUserId: salesBId }).expect(403))).toEqual({ reason: "OWNER_REQUIRED" });
+          expect(reason(await post(`/api/v1/business/${businessId}/invitations/revoke`, salesA, { invitationId: third.invitationId }).expect(403))).toEqual({ reason: "OWNER_REQUIRED" });
+          expect(reason(await post(`/api/v1/business/${businessId}/settings`, salesA, { name: "Sales edit refused" }).expect(403))).toEqual({ reason: "OWNER_REQUIRED" });
+          expect(reason(await post(`/api/v1/business/${businessId}/members`, salesA, { targetUserId: owner.user.id, action: "suspend" }).expect(403))).toEqual({ reason: "OWNER_REQUIRED" });
+        });
+
+        // Suspend and restore; the sole owner and a non-member are refused.
+        expect((await post(`/api/v1/business/${businessId}/members`, owner, { targetUserId: salesAId, action: "suspend" }).expect(201)).body).toEqual({ ok: true });
+        expect(reason(await get("/api/v1/business/current", salesA).expect(403))).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+        expect((await post(`/api/v1/business/${businessId}/members`, owner, { targetUserId: salesAId, action: "restore" }).expect(201)).body).toEqual({ ok: true });
+        expect((await get("/api/v1/business/current", salesA).expect(200)).body.workspace).toMatchObject({ membership: { role: "sales", status: "active" } });
+        await refusedWithoutWrites("sole-owner removal and non-member change", async () => {
+          expect(reason(await post(`/api/v1/business/${businessId}/members`, owner, { targetUserId: owner.user.id, action: "remove" }).expect(409))).toEqual({ reason: "SOLE_OWNER" });
+          expect(reason(await post(`/api/v1/business/${businessId}/members`, owner, { targetUserId: salesBId, action: "suspend" }).expect(403))).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+        });
+
+        // An owned invitation naming a foreign recipient is a foreign roster reference: whole-transaction refusal.
+        await refusedWithoutWrites("foreign-recipient invitation", async () => {
+          expect((await post(`/api/v1/business/${businessId}/invitations`, owner, { recipientUserId: foreignUserId })).status, "fixture refusal").toBe(500);
+        });
+        expect(await db.dealershipInvitation.count({ where: { recipientUserId: foreignUserId } })).toBe(0);
+        expect(await db.user.findUnique({ where: { id: foreignUserId } })).toEqual(foreignUser);
+
+        // Exact per-operation audits, none carrying a raw invitation token.
+        const audits = await db.auditLog.findMany({ where: { targetType: "Dealership", targetId: businessId }, orderBy: { createdAt: "asc" }, select: { id: true, actorId: true, action: true, details: true } });
+        expect(audits.map(({ actorId, action, details }) => ({ actorId, action, details }))).toEqual([
+          { actorId: staff.user.id, action: "BUSINESS_ADMITTED", details: { mode: "synthetic", evidence: "Fictional reservation-owned business only", reason: "Disposable full-v3 ordinary HTTP proof", verifiedScope: "Synthetic fixture; no real business verified" } },
+          { actorId: owner.user.id, action: "BUSINESS_INVITATION_REDEEMED", details: { invitationId: admitted.invitationId, role: "owner" } },
+          { actorId: owner.user.id, action: "BUSINESS_SETTINGS_CHANGED", details: { fields: ["name"] } },
+          { actorId: owner.user.id, action: "BUSINESS_INVITATION_CREATED", details: { invitationId: first.invitationId, role: "sales" } },
+          { actorId: owner.user.id, action: "BUSINESS_INVITATION_CREATED", details: { invitationId: second.invitationId, role: "sales" } },
+          { actorId: owner.user.id, action: "BUSINESS_INVITATION_CREATED", details: { invitationId: third.invitationId, role: "sales" } },
+          { actorId: owner.user.id, action: "BUSINESS_INVITATION_REVOKED", details: { invitationId: third.invitationId } },
+          { actorId: salesAId, action: "BUSINESS_INVITATION_REDEEMED", details: { invitationId: second.invitationId, role: "sales" } },
+          { actorId: owner.user.id, action: "BUSINESS_MEMBERSHIP_CHANGED", details: { targetUserId: salesAId, action: "suspend" } },
+          { actorId: owner.user.id, action: "BUSINESS_MEMBERSHIP_CHANGED", details: { targetUserId: salesAId, action: "restore" } },
+        ]);
+        for (const token of [admitted.token, first.token, second.token, third.token]) expect(JSON.stringify(audits).includes(token)).toBe(false);
+
+        // Changed candidate at the operator boundary (the runtime path has no candidate input) changes nothing.
+        await refusedWithoutWrites("changed-candidate reset", async () => expect(execute("reset", id, { candidate: "b".repeat(40) })).toMatchObject({ code: 1, receipt: undefined }));
+
+        // The bootstrap owner and root Dealership are untouched by the admitted business's membership.
+        expect(await businessState(rootBusiness.id)).toEqual(rootState);
+
+        // Exact ownership: nothing was deleted, so every record ever written is live.
+        const before = await owned(id);
+        const perTable: Record<string, number> = {};
+        for (const row of before) perTable[row.table_name] = (perTable[row.table_name] ?? 0) + 1;
+        expect(perTable).toEqual({ users: 15, sessions: 5, otp_requests: 5, totp_enrollments: 2, totp_backup_codes: 20, staff_grants: 3, audit_logs: 13, dealerships: 2, dealership_members: 3, dealership_invitations: 4 });
+        expect((await rows<{ count: number }>(`SELECT count(*)::int AS count FROM "cf_${id}".campaign_records`))[0]?.count).toBe(72);
+        for (const row of [{ table_name: "dealerships", row_key: { id: businessId } }, { table_name: "dealership_members", row_key: { id: ownerMember.id } }, { table_name: "dealership_members", row_key: { id: salesMember.id } },
+          ...[admitted, first, second, third].map(i => ({ table_name: "dealership_invitations", row_key: { id: i.invitationId } })), ...audits.map(a => ({ table_name: "audit_logs", row_key: { id: a.id } }))]) expect(before, `owned ${row.table_name}`).toContainEqual(row);
+        expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_ledger ORDER BY request_id`)).toEqual(
+          [coordinator.requestId, staff.requestId, owner.requestId, salesA.requestId, salesB.requestId].sort().map(request_id => ({ request_id })));
+
+        // Exact disposal with a lost receipt, redacted audit retention and an identical retry.
+        expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+        await assertDisposed(id, before);
+        expect(await businessState(businessId)).toEqual({ business: null, invitations: [], members: [], audits: [] });
+        expect(await db.auditLog.findMany({ where: { id: { in: audits.map(a => a.id) } }, select: { actorId: true, targetType: true, targetId: true, details: true } })).toEqual(
+          audits.map(() => ({ actorId: null, targetType: "SyntheticCampaign", targetId: id, details: { profile, disposition: "redacted-synthetic-audit" } })));
+        const terminal = await digest(id);
+        expect(execute("reset", id)).toMatchObject({ code: 0, receipt: { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 } });
+        expect(await digest(id)).toBe(terminal);
+        await assertDisposed(id, before);
+        expect(reason(await get("/api/v1/business/current", salesA).expect(403))).toEqual({ reason: "SESSION_REQUIRED" });
+        await request.post("/api/v1/auth/refresh").send({ refreshToken: owner.refreshToken }).expect(401);
+        expect(await db.user.findUnique({ where: { id: foreignUserId } })).toEqual(foreignUser);
+      } finally {
+        await db.user.deleteMany({ where: { id: foreignUserId } });
+      }
+    });
+  }));
+
+  // A foreign active business (legitimate setup outside every reservation) inviting a roster User must refuse
+  // atomically. Reachable on 794ac50a: no admission or redemption precedes it.
+  it("refuses a foreign business invitation naming a roster User and preserves the foreign business exactly", () => withKnownJobs(known => {
+    const id = "b4".repeat(16), foreignBusinessId = randomUUID(), foreignEmail = `foreign-owner.${randomUUID()}@example.invalid`;
+    let foreignOwnerId: string | undefined;
+    return resetAfter([id], async () => {
+      const roster = await seed(id);
+      try {
+        // Ordinary sign-in of a non-reserved User; its code is read from its own ordinary job, as in the baseline case.
+        const issued = await request.post("/api/v1/auth/otp/request").send({ email: foreignEmail });
+        learn(known, issued);
+        expect(issued.status).toBe(201);
+        const code = (await queue.getJob(issued.body.requestId as string))?.data.code as string;
+        const signedIn = await request.post("/api/v1/auth/otp/verify").send({ email: foreignEmail, code }).expect(201);
+        foreignOwnerId = signedIn.body.user.id as string;
+        await db.dealership.create({ data: { id: foreignBusinessId, slug: `foreign-membership-${foreignBusinessId}`, name: "Foreign membership business must survive", status: "active" } });
+        await db.dealershipMember.create({ data: { dealershipId: foreignBusinessId, userId: foreignOwnerId, role: "owner", status: "active" } });
+        const foreign = await businessState(foreignBusinessId), unchanged = await digest(id);
+        const salesB = actor(roster, "sales-b").user_id;
+        const refused = await request.post(`/api/v1/business/${foreignBusinessId}/invitations`).set("authorization", `Bearer ${signedIn.body.accessToken}`).send({ recipientUserId: salesB });
+        expect(refused.status, "foreign invitation of a roster User is a fixture refusal").toBe(500);
+        expect(await businessState(foreignBusinessId)).toEqual(foreign);
+        expect(await db.dealershipInvitation.count({ where: { recipientUserId: salesB } })).toBe(0);
+        expect(await digest(id)).toBe(unchanged);
+        const before = await owned(id);
+        expect(before.some(row => [foreignBusinessId, foreignOwnerId].includes(row.row_key["id"]!))).toBe(false);
+        expect(execute("reset", id).code).toBe(0);
+        await assertDisposed(id, before);
+        expect(await businessState(foreignBusinessId)).toEqual(foreign);
+      } finally {
+        // Exact removal of only the foreign rows this case created.
+        await db.dealershipMember.deleteMany({ where: { dealershipId: foreignBusinessId } });
+        await db.dealership.deleteMany({ where: { id: foreignBusinessId } });
+        await db.otpRequest.deleteMany({ where: { destination: foreignEmail } });
+        if (foreignOwnerId) await db.user.delete({ where: { id: foreignOwnerId } });
+      }
+    });
+  }));
 });
