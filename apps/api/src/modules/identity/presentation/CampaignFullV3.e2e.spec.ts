@@ -21,6 +21,7 @@ import supertest from "supertest";
 import { afterAll, beforeAll, describe, expect, inject, it, vi } from "vitest";
 // eslint-disable-next-line no-restricted-imports -- HTTP integration composition needs the real contact controller and production providers.
 import { ListingsModule } from "../../listings/listings.module";
+import { ServiceMessagingModule } from "../../service-messaging/service-messaging.module";
 import { IdentityModule } from "../identity.module";
 import { BullMqEmailCodeSenderAdapter } from "../infrastructure/BullMqEmailCodeSenderAdapter";
 import { AdminController } from "../../admin/presentation/admin.controller";
@@ -53,7 +54,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
   beforeAll(async () => {
     if (!inject("apiTestDatabases")) throw new Error("Requires configured migrated disposable API PostgreSQL and Redis lane");
     delete process.env["OTP_TEST_MODE"];
-    const module = await NestTest.createTestingModule({ imports: [ConfigModule.forRoot({ isGlobal: true }), EventEmitterModule.forRoot(), bullTestRoot(), IdentityModule, ListingsModule,
+    const module = await NestTest.createTestingModule({ imports: [ConfigModule.forRoot({ isGlobal: true }), EventEmitterModule.forRoot(), bullTestRoot(), IdentityModule, ListingsModule, ServiceMessagingModule,
       JwtModule.register({ global: true, secret: "synthetic-full-v3-http-contract-901" })],
       controllers: [AdminController] }).compile();
     app = module.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
@@ -1253,6 +1254,196 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
         await db.dealership.deleteMany({ where: { id: reuseId } });
         await db.dealership.delete({ where: { id: foreignId } });
       }
+    });
+  }));
+
+  // Literal pre-edit budget and reset arithmetic live in full-v3-support-text-test-handoff-20261020.md.
+  // No runtime gate override: the first open requires campaign-aware synthetic admission from source.
+  const serviceTables = ["support_cases", "service_conversations", "service_messages", "service_outbox", "service_read_states", "service_audits"];
+  async function supportJournal(id: string, expectedRecords: number, expectedEvents: number) {
+    const records = await rows<RecordKey & { row_hash: string; version: bigint; deleted: boolean }>(`SELECT * FROM "cf_${id}".campaign_records ORDER BY table_name,row_key::text`);
+    const events = await rows<{ table_name: string; row_key: Record<string, string>; mutation: string; row_hash: string }>(`SELECT table_name,row_key,mutation,row_hash FROM "cf_${id}".campaign_events ORDER BY sequence`);
+    expect(records).toHaveLength(expectedRecords);
+    expect(events).toHaveLength(expectedEvents);
+    expect(expectedRecords).toBeLessThanOrEqual(128);
+    expect(expectedEvents).toBeLessThanOrEqual(2048);
+    for (const record of records) {
+      expect([...tables, ...serviceTables]).toContain(record.table_name);
+      const history = events.filter(event => event.table_name === record.table_name && JSON.stringify(event.row_key) === JSON.stringify(record.row_key));
+      expect(Number(record.version)).toBe(history.length);
+      expect(history[0]?.mutation).toBe("INSERT");
+      expect(history.slice(1).map(event => event.mutation)).toEqual(Array.from({ length: history.length - 1 }, (_, index) => record.deleted && index === history.length - 2 ? "DELETE" : "UPDATE"));
+      expect(history.at(-1)?.row_hash).toBe(record.row_hash);
+      const actual = await rows<{ hash: string }>(`SELECT md5(to_jsonb(t)::text) AS hash FROM public.${record.table_name} t WHERE to_jsonb(t) @> $1::jsonb`, JSON.stringify(record.row_key));
+      expect(actual).toEqual(record.deleted ? [] : [{ hash: record.row_hash }]);
+    }
+    expect(events.every(event => records.some(record => event.table_name === record.table_name && JSON.stringify(event.row_key) === JSON.stringify(record.row_key)))).toBe(true);
+    return { records, events };
+  }
+  async function supportSnapshot(id: string) {
+    const records = await owned(id);
+    const content = [];
+    for (const record of records) {
+      expect([...tables, ...serviceTables]).toContain(record.table_name);
+      content.push({ ...record, rows: await rows(`SELECT to_jsonb(t) AS value FROM public.${record.table_name} t WHERE to_jsonb(t) @> $1::jsonb`, JSON.stringify(record.row_key)) });
+    }
+    return { journal: await digest(id), content };
+  }
+  async function supportDisposed(id: string, before: RecordKey[], auditRows: Awaited<ReturnType<typeof db.serviceAudit.findMany>>, requestIds: string[]) {
+    expect(await rows(`SELECT state FROM "cf_${id}".campaign_manifest`)).toEqual([{ state: "disposed" }]);
+    expect(await owned(id)).toEqual(before.filter(row => row.table_name === "audit_logs" || row.table_name === "service_audits"));
+    for (const record of before) {
+      expect([...tables, ...serviceTables]).toContain(record.table_name);
+      const actual = await rows<{ value: Record<string, unknown> }>(`SELECT to_jsonb(t) AS value FROM public.${record.table_name} t WHERE to_jsonb(t) @> $1::jsonb`, JSON.stringify(record.row_key));
+      if (record.table_name === "audit_logs") {
+        expect(actual).toHaveLength(1);
+        expect(actual[0]?.value).toMatchObject({ actorId: null, targetType: "SyntheticCampaign", targetId: id, details: { profile, disposition: "redacted-synthetic-audit" } });
+        expect(actual[0]?.value["details"]).toEqual({ profile, disposition: "redacted-synthetic-audit" });
+      } else if (record.table_name === "service_audits") {
+        const original = auditRows.find(audit => audit.id === record.row_key["id"]);
+        expect(original).toBeDefined();
+        // Non-null scalar resourceId cannot be nulled. Keep exact ID, action, purpose, version and timestamp.
+        expect(actual).toHaveLength(1);
+        expect(await db.serviceAudit.findUnique({ where: { id: original!.id } })).toEqual({ ...original, actorId: null, reason: null, targetStaffId: null, resourceId: "redacted-synthetic-service" });
+      } else expect(actual, `owned ${record.table_name} ${JSON.stringify(record.row_key)} disposed`).toEqual([]);
+    }
+    expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_ledger ORDER BY request_id`)).toEqual([...requestIds].sort().map(request_id => ({ request_id })));
+    expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_sink`)).toEqual([]);
+    const redis = await queue.client;
+    for (const requestId of requestIds) {
+      expect(await queue.getJob(requestId)).toBeUndefined();
+      const key = queue.toKey(`de:campaign-cf_${id}-${requestId}`);
+      expect(await redis.get(key)).toBe(`disposed:cf_${id}:${candidate}:${requestId}`);
+      expect(await redis.pttl(key)).toBe(-1);
+    }
+  }
+
+  it("keeps Support text, private notes and read state in one reservation, retains redacted audit IDs and preserves foreign cases on repeatable reset", () => withKnownJobs(known => {
+    const id = "f1".repeat(16), foreignId = "f2".repeat(16);
+    const cleanupIds = [id];
+    return resetAfter(cleanupIds, async () => {
+      const roster = await seed(id);
+      const { staff } = await elevatedStaff(id, roster, known, ["support.operations"]);
+      const buyerA = await signIn(id, actor(roster, "buyer-a"), known);
+      const buyerB = await signIn(id, actor(roster, "buyer-b"), known);
+      const requestIds = [...known];
+      await supportJournal(id, 53, 65);
+      // FIRST NEW BEHAVIORAL BARRIER: source runtime currently returns COLLECTION_DISABLED/503.
+      const opened = await post("/api/v1/services/conversations", buyerA, { purpose: "support", synthetic: true }).expect(201);
+      const conversationId = opened.body.id as string, resourceId = opened.body.resourceId as string;
+      expect(conversationId).toMatch(/^[a-f0-9-]{36}$/);
+      expect(resourceId).toMatch(/^[a-f0-9-]{36}$/);
+      const path = `/api/v1/services/conversations/${conversationId}`;
+      expect((await owned(id)).filter(row => serviceTables.includes(row.table_name))).toEqual([
+        { table_name: "service_conversations", row_key: { id: conversationId } }, { table_name: "support_cases", row_key: { id: resourceId } },
+      ]);
+      await supportJournal(id, 55, 67);
+      let unchanged = await supportSnapshot(id);
+      expect((await post("/api/v1/services/conversations", buyerA, { purpose: "support", synthetic: true }).expect(201)).body).toEqual(opened.body);
+      expect(await supportSnapshot(id)).toEqual(unchanged);
+      const customerMessage = { clientMessageId: randomUUID(), body: "Synthetic buyer A Support request", visibility: "customer" };
+      const customerSent = await post(`${path}/messages`, buyerA, customerMessage).expect(201);
+      expect(customerSent.body).toMatchObject({ clientMessageId: customerMessage.clientMessageId, sequence: 1, sender: "customer", visibility: "customer", body: customerMessage.body, attachment: null });
+      const debt = (await get(path, buyerA).expect(200)).body.support.unansweredSince;
+      expect(debt).not.toBeNull();
+      await post(`${path}/assignment`, staff, { expectedVersion: 0 }).expect(201);
+      const note = { clientMessageId: randomUUID(), body: "Synthetic private Support note", visibility: "staff" };
+      const noteSent = await post(`${path}/messages`, staff, note).expect(201);
+      expect(noteSent.body).toMatchObject({ sequence: 3, sender: "carberk", visibility: "staff", body: note.body });
+      expect((await get(path, buyerA).expect(200)).body.support.unansweredSince).toBe(debt);
+      const notice = { clientMessageId: randomUUID(), body: "Synthetic Support notice", visibility: "customer", supportKind: "notice", reason: "Synthetic customer-specific notice reason to erase" };
+      const noticeSent = await post(`${path}/messages`, staff, notice).expect(201);
+      expect(noticeSent.body).toMatchObject({ sequence: 4, sender: "carberk", visibility: "customer", body: notice.body });
+      expect((await get(path, buyerA).expect(200)).body.support.unansweredSince).toBe(debt);
+      const reply = { clientMessageId: randomUUID(), body: "Synthetic customer-visible Support reply", visibility: "customer", supportKind: "reply" };
+      const replySent = await post(`${path}/messages`, staff, reply).expect(201);
+      expect(replySent.body).toMatchObject({ sequence: 5, sender: "carberk", visibility: "customer", body: reply.body });
+      const staffRead = await get(path, staff).expect(200);
+      expect(staffRead.body.messages.map((message: { id: string }) => message.id)).toEqual([customerSent.body.id, noteSent.body.id, noticeSent.body.id, replySent.body.id]);
+      expect(staffRead.body).toMatchObject({ assignmentVersion: 1, assigned: true, lastSequence: 5, support: { unansweredSince: null } });
+      const customerRead = await get(path, buyerA).expect(200);
+      expect(customerRead.headers["cache-control"]).toBe("no-store, private");
+      expect(customerRead.body.messages.map((message: { id: string }) => message.id)).toEqual([customerSent.body.id, noticeSent.body.id, replySent.body.id]);
+      expect(customerRead.body.messages.every((message: { operatorName: unknown }) => message.operatorName === null)).toBe(true);
+      expect(customerRead.body).toMatchObject({ lastSequence: 5, readThrough: 0, unread: 2, operatorName: null });
+      await post(`${path}/read`, buyerA, { throughSequence: 5 }).expect(201);
+      expect((await get(path, buyerA).expect(200)).body).toMatchObject({ readThrough: 5, unread: 0 });
+      expect(await db.serviceReadState.findMany({ where: { conversationId }, select: { conversationId: true, userId: true, lastSequence: true } })).toEqual([{ conversationId, userId: buyerA.user.id, lastSequence: 5 }]);
+      unchanged = await supportSnapshot(id);
+      expect((await post(`${path}/messages`, buyerA, customerMessage).expect(201)).body).toEqual(customerSent.body);
+      expect(await supportSnapshot(id)).toEqual(unchanged);
+      // Staff exact retry still creates the ordinary locked SERVICE_SEND access audit, but no content/outbox/sequence write.
+      expect((await post(`${path}/messages`, staff, reply).expect(201)).body).toEqual(replySent.body);
+      const other = await post("/api/v1/services/conversations", buyerB, { purpose: "support", synthetic: true }).expect(201);
+      expect(other.body.id).not.toBe(conversationId);
+      expect((await get("/api/v1/services/conversations", buyerB).expect(200)).body).toEqual([{ id: other.body.id, purpose: "support", createdAt: expect.any(String) }]);
+      expect((await get("/api/v1/services/conversations", buyerA).expect(200)).body).toEqual([{ id: conversationId, purpose: "support", createdAt: expect.any(String) }]);
+      unchanged = await supportSnapshot(id);
+      expect((await get(path, buyerB).expect(403)).body.code).toBe("NO_ACCESS");
+      expect((await post(`${path}/messages`, buyerB, { clientMessageId: randomUUID(), visibility: "customer", body: "Synthetic cross-account refusal" }).expect(403)).body.code).toBe("NO_ACCESS");
+      expect((await post(`${path}/read`, buyerB, { throughSequence: 5 }).expect(403)).body.code).toBe("NO_ACCESS");
+      expect((await post(`${path}/messages`, buyerA, { ...customerMessage, body: "Changed idempotency payload" }).expect(409)).body.code).toBe("IDEMPOTENCY_CONFLICT");
+      // Runtime HTTP has no client candidate field. Exercise the actual operator binding, not an invented HTTP header.
+      expect(execute("fixture", id, { candidate: "b".repeat(40) })).toMatchObject({ code: 1, sqlCalls: 0, receipt: undefined });
+      expect(execute("reset", id, { candidate: "b".repeat(40) })).toMatchObject({ code: 1, receipt: undefined });
+      expect(await supportSnapshot(id)).toEqual(unchanged);
+
+      cleanupIds.push(foreignId);
+      const foreignRoster = await seed(foreignId), foreignBuyer = await signIn(foreignId, actor(foreignRoster, "buyer-a"), known);
+      const foreign = await post("/api/v1/services/conversations", foreignBuyer, { purpose: "support", synthetic: true }).expect(201);
+      const foreignBefore = await supportSnapshot(foreignId);
+      // A valid current support grant cannot adopt a case from another reservation through assignment.
+      await post(`/api/v1/services/conversations/${foreign.body.id}/assignment`, staff, { expectedVersion: 0 }).expect(403);
+      expect(await supportSnapshot(id)).toEqual(unchanged);
+      expect(await supportSnapshot(foreignId)).toEqual(foreignBefore);
+      await supportJournal(foreignId, 25, 27);
+
+      const audits = await db.serviceAudit.findMany({ where: { resourceId }, orderBy: { id: "asc" } });
+      expect(audits.map(({ action }) => action).sort()).toEqual(["SERVICE_ASSIGN", "SERVICE_HANDOVER", "SERVICE_NOTE", "SERVICE_READ", "SERVICE_SEND", "SERVICE_SEND", "SERVICE_SEND", "SUPPORT_CUSTOMER_MESSAGE", "SUPPORT_NOTICE", "SUPPORT_PRIVATE_NOTE", "SUPPORT_REPLY"]);
+      for (const audit of audits) expect(audit).toMatchObject({ purpose: "support", resourceId, actorId: audit.action === "SUPPORT_CUSTOMER_MESSAGE" ? buyerA.user.id : staff.user.id,
+        assignmentVersion: audit.action === "SERVICE_ASSIGN" || audit.action === "SUPPORT_CUSTOMER_MESSAGE" ? 0 : 1, reason: audit.action === "SUPPORT_NOTICE" ? notice.reason : null, targetStaffId: audit.action === "SERVICE_HANDOVER" ? staff.user.id : null });
+      const outbox = await db.serviceOutbox.findMany({ where: { conversationId }, orderBy: { sequence: "asc" } });
+      expect(outbox.map(({ eventType, sequence, visibility, lifecycleEpoch }) => ({ eventType, sequence, visibility, lifecycleEpoch }))).toEqual([
+        { eventType: "message", sequence: 1, visibility: "customer", lifecycleEpoch: 0 }, { eventType: "handover", sequence: 2, visibility: "customer", lifecycleEpoch: 0 },
+        { eventType: "message", sequence: 3, visibility: "staff", lifecycleEpoch: 0 }, { eventType: "message", sequence: 4, visibility: "customer", lifecycleEpoch: 0 },
+        { eventType: "message", sequence: 5, visibility: "customer", lifecycleEpoch: 0 },
+      ]);
+      const before = await owned(id);
+      const expectedServiceKeys = [
+        { table_name: "support_cases", row_key: { id: resourceId } }, { table_name: "support_cases", row_key: { id: other.body.resourceId } },
+        { table_name: "service_conversations", row_key: { id: conversationId } }, { table_name: "service_conversations", row_key: { id: other.body.id } },
+        ...[customerSent.body.id, noteSent.body.id, noticeSent.body.id, replySent.body.id].map(id => ({ table_name: "service_messages", row_key: { id } })),
+        ...outbox.map(({ id }) => ({ table_name: "service_outbox", row_key: { id } })),
+        ...audits.map(({ id }) => ({ table_name: "service_audits", row_key: { id } })),
+        { table_name: "service_read_states", row_key: { conversationId, userId: buyerA.user.id } },
+      ];
+      expect(before.filter(row => serviceTables.includes(row.table_name))).toHaveLength(25);
+      expect(before.filter(row => serviceTables.includes(row.table_name))).toEqual(expect.arrayContaining(expectedServiceKeys));
+      const live = await supportJournal(id, 78, 100);
+      expect(await rows(`SELECT table_name,count(*)::int AS count FROM "cf_${id}".campaign_records GROUP BY table_name ORDER BY table_name`)).toEqual(
+        Object.entries({ audit_logs: 3, dealership_members: 1, dealerships: 1, otp_requests: 4, service_audits: 11, service_conversations: 2, service_messages: 4, service_outbox: 5, service_read_states: 1, sessions: 4, staff_grants: 3, support_cases: 2, totp_backup_codes: 20, totp_enrollments: 2, users: 15 }).sort(([a], [b]) => a.localeCompare(b)).map(([table_name, count]) => ({ table_name, count })));
+      expect(await rows(`SELECT table_name,mutation,count(*)::int AS count FROM "cf_${id}".campaign_events WHERE mutation<>'INSERT' GROUP BY table_name,mutation ORDER BY table_name`)).toEqual([
+        { table_name: "otp_requests", mutation: "UPDATE", count: 8 }, { table_name: "service_conversations", mutation: "UPDATE", count: 5 },
+        { table_name: "sessions", mutation: "UPDATE", count: 2 }, { table_name: "support_cases", mutation: "UPDATE", count: 5 }, { table_name: "totp_enrollments", mutation: "UPDATE", count: 2 },
+      ]);
+      const terminalReceipt = { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 };
+      expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+      await supportDisposed(id, before, audits, requestIds);
+      const terminal = await supportJournal(id, 78, 178);
+      expect(terminal.events.slice(0, 100)).toEqual(live.events);
+      for (const record of terminal.records) {
+        const prior = live.records.find(row => row.table_name === record.table_name && JSON.stringify(row.row_key) === JSON.stringify(record.row_key));
+        expect(Number(record.version)).toBe(Number(prior!.version) + 1);
+        expect(terminal.events.filter(event => event.table_name === record.table_name && JSON.stringify(event.row_key) === JSON.stringify(record.row_key)).at(-1)?.mutation).toBe(["audit_logs", "service_audits"].includes(record.table_name) ? "UPDATE" : "DELETE");
+      }
+      const terminalSnapshot = await supportSnapshot(id);
+      expect(execute("reset", id)).toMatchObject({ code: 0, receipt: terminalReceipt });
+      expect(await supportSnapshot(id)).toEqual(terminalSnapshot);
+      expect(await supportSnapshot(foreignId)).toEqual(foreignBefore);
+      const foreignKeys = await owned(foreignId);
+      expect(execute("reset", foreignId)).toMatchObject({ code: 0, receipt: terminalReceipt });
+      await supportDisposed(foreignId, foreignKeys, [], [foreignBuyer.requestId]);
+      await supportJournal(foreignId, 25, 52);
     });
   }));
 
