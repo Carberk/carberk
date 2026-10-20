@@ -439,6 +439,30 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
   // V3 verification binds a consumed destination-only code once to its roster User.
   // The OTP guard requires that User to own the destination.
   const otpBinding = bootstrapV3 ? ` AND NOT (TG_TABLE_NAME='otp_requests' AND e.key='userId' AND prior->>'userId' IS NULL AND prior->>'verifiedAt' IS NOT NULL)` : '';
+  // The ordinary command updates role before inserting its audit. Check their
+  // final pairing at commit, without manufacturing a receipt or another event.
+  const promotionAuditShape = row => `${row}->>'action'='ADMIN_BOOTSTRAP_PROMOTE' AND ${row}->>'targetType'='user' AND
+          ${row}->>'targetId'='${coordinator.id}' AND ${row}->>'actorId' IS NULL AND
+          jsonb_typeof(${row}->'details'->'reason')='string' AND char_length(${row}->'details'->>'reason') BETWEEN 1 AND 1000 AND
+          ${row}->'details'=jsonb_build_object('reason',${row}->'details'->>'reason','before',jsonb_build_object('role','buyer'),'after',jsonb_build_object('role','admin'))`;
+  const promotionInventory = bootstrapV3 ? `
+    IF (SELECT state FROM "${n}".campaign_manifest)='identities' AND (
+      EXISTS(SELECT 1 FROM public.users u JOIN "${n}".campaign_entities e ON e.user_id=u.id
+        WHERE u.role<>'buyer' AND (u.id<>'${coordinator.id}' OR u.role<>'admin')) OR
+      (SELECT count(*) FROM public.users WHERE id='${coordinator.id}' AND role='admin')<>
+      (SELECT count(*) FROM public.audit_logs a JOIN "${n}".campaign_records r ON r.table_name='audit_logs' AND NOT r.deleted AND r.version=1 AND r.row_key=jsonb_build_object('id',a.id)
+        WHERE ${promotionAuditShape('to_jsonb(a)')})) THEN RAISE EXCEPTION 'Campaign promotion audit required'; END IF;` : '';
+  const promotionAudit = bootstrapV3 ? ` AND NOT coalesce(TG_OP='INSERT' AND ${promotionAuditShape('v_row')} AND
+          current_setting('autotm.admin_promote_candidate',true)='${input.candidate}' AND
+          EXISTS(SELECT 1 FROM public.users u JOIN "${n}".campaign_records r ON r.table_name='users' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',u.id) AND r.row_hash=md5(to_jsonb(u)::text) WHERE u.id='${coordinator.id}' AND u.role='admin') AND
+          (SELECT count(*) FROM public.audit_logs a WHERE a.action='ADMIN_BOOTSTRAP_PROMOTE' AND a."targetId"='${coordinator.id}')=1,false)` : '';
+  const promotionRole = bootstrapV3 ? `
+        IF TG_TABLE_NAME='users' AND TG_OP='UPDATE' AND v_row->'role' IS DISTINCT FROM prior->'role' AND NOT coalesce(
+          v_row->>'id'='${coordinator.id}' AND prior->>'role'='buyer' AND v_row->>'role'='admin' AND
+          current_setting('autotm.admin_promote_candidate',true)='${input.candidate}' AND
+          v_row-'role'-'updatedAt' IS NOT DISTINCT FROM prior-'role'-'updatedAt' AND
+          NOT EXISTS(SELECT 1 FROM public.audit_logs a WHERE a.action='ADMIN_BOOTSTRAP_PROMOTE' AND a."targetId"='${coordinator.id}'),false)
+          THEN RAISE EXCEPTION 'Unsupported campaign promotion'; END IF;` : '';
   const immutable = ['id', 'userId', 'sellerId', 'buyerId', 'recipientUserId', 'senderId', 'blockerId', 'blockedId', 'conversationId', 'listingId', 'businessId', 'dealershipId', 'reporterUserId', 'capability', 'targetId', 'targetType', 'phone', 'tokenHash'];
   const identityValues = identities.map(identity => `('${identity.alias}','${identity.id}','${identity.email}')`).join(',');
   const tableNames = tables.map(t => `'${t}'`).join(',');
@@ -477,7 +501,11 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
       WHERE t.tgname='${n}_baseline' AND t.tgrelid='public.measurement_state'::regclass AND t.tgenabled='O' AND t.tgtype=9 AND t.tgqual IS NOT NULL AND
         t.tgnargs=0 AND t.tgattr=''::int2vector AND t.tgconstraint=0 AND NOT t.tgdeferrable AND NOT t.tgisinternal AND ns.nspname='${n}' AND p.proname='track_business' AND
         md5(pg_get_triggerdef(t.oid))=(SELECT baseline_trigger_hash FROM "${n}".campaign_manifest))<>1 THEN RAISE EXCEPTION 'Campaign baseline tracking changed'; END IF;` : ''}
-    FOR entry IN SELECT * FROM "${n}".campaign_records LOOP
+${bootstrapV3 ? `    IF (SELECT count(*) FROM pg_trigger t WHERE t.tgname='${n}_promotion' AND t.tgrelid IN ('public.users'::regclass,'public.audit_logs'::regclass) AND
+      t.tgfoid='"${n}".track_business()'::regprocedure AND t.tgenabled='O' AND t.tgtype=CASE WHEN t.tgrelid='public.users'::regclass THEN 17 ELSE 29 END AND t.tgqual IS NULL AND t.tgnargs=1 AND
+      t.tgargs=decode('70726f6d6f74696f6e00','hex') AND t.tgattr=''::int2vector AND t.tgconstraint<>0 AND t.tgdeferrable AND t.tginitdeferred AND NOT t.tgisinternal)<>2
+      THEN RAISE EXCEPTION 'Campaign promotion tracking changed'; END IF;${promotionInventory}
+` : ''}    FOR entry IN SELECT * FROM "${n}".campaign_records LOOP
       IF entry.table_name NOT IN (${tableNames}) OR entry.row_key IS DISTINCT FROM (CASE WHEN entry.table_name='staff_grants' THEN jsonb_build_object('userId',entry.row_key->>'userId','capability',entry.row_key->>'capability') ELSE jsonb_build_object('id',entry.row_key->>'id') END) OR
         EXISTS(SELECT 1 FROM jsonb_each(entry.row_key) e WHERE e.value='null'::jsonb) THEN RAISE EXCEPTION 'Unknown campaign row key'; END IF;
       EXECUTE format('SELECT to_jsonb(t) FROM public.%I t WHERE to_jsonb(t) @> $1',entry.table_name) INTO actual USING entry.row_key;
@@ -498,7 +526,7 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
     IF EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace ns ON ns.oid=c.relnamespace WHERE c.relkind IN ('r','p','f') AND ns.nspname NOT IN ('public','information_schema') AND ns.nspname NOT LIKE 'pg_%' AND ns.nspname !~ '^cf_[a-f0-9]{32}$') THEN RAISE EXCEPTION 'Unknown application schema'; END IF;
     -- Budget cleanup events before the first deletion. A cap cannot interrupt
     -- disposal after a prefix of rows has already been removed.
-    IF (SELECT state FROM "${n}".campaign_manifest)<>'disposed' AND (SELECT count(*) FROM "${n}".campaign_events)+(SELECT count(*) FROM "${n}".campaign_records WHERE NOT deleted AND table_name<>'audit_logs')+2>2048 THEN RAISE EXCEPTION 'Campaign cleanup event budget'; END IF;
+    IF (SELECT state FROM "${n}".campaign_manifest)<>'disposed' AND (SELECT count(*) FROM "${n}".campaign_events)+(SELECT count(*) FROM "${n}".campaign_records WHERE NOT deleted${bootstrapV3 ? '' : " AND table_name<>'audit_logs'"})${bootstrapV3 ? '' : '+2'}>2048 THEN RAISE EXCEPTION 'Campaign cleanup event budget'; END IF;
     FOR entry IN SELECT * FROM "${n}".campaign_records WHERE NOT deleted LOOP
       FOR fk IN SELECT c.*,ns.nspname source_schema,cl.relname source_table FROM pg_constraint c
         JOIN pg_class cl ON cl.oid=c.conrelid JOIN pg_namespace ns ON ns.oid=cl.relnamespace
@@ -536,6 +564,10 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
     ` : ''}CREATE FUNCTION "${n}".track_business() RETURNS trigger LANGUAGE plpgsql AS $fn$
     DECLARE v_row jsonb; prior jsonb; rowkey jsonb; oldkey jsonb; edge record; parent_table text; lifecycle text; owned boolean; fingerprint text;${bootstrapV3 ? ' adopted jsonb; admitting boolean := false;' : ''}
     BEGIN${bootstrapV3 ? `
+      IF TG_NARGS=1 AND TG_ARGV[0]='promotion' THEN
+        ${promotionInventory}
+        RETURN NULL;
+      END IF;
       IF TG_TABLE_NAME='measurement_state' THEN
         IF EXISTS(SELECT 1 FROM pg_locks WHERE pid=pg_backend_pid() AND locktype='advisory' AND granted AND objsubid=1 AND
           ((classid::bigint<<32)|objid::bigint)=hashtextextended('${n}',0)) THEN RAISE EXCEPTION 'Campaign shared baseline preserved'; END IF;
@@ -558,7 +590,7 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
           -- detects and refuses them before touching the owned graph.
           IF EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=edge.value AND row_key->>'id' IN (v_row->>edge.key,prior->>edge.key)) THEN owned := true; END IF;
         END LOOP;
-        IF TG_TABLE_NAME='audit_logs' AND v_row->>'targetType'='User' AND EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'targetId') THEN owned := true; END IF;
+        IF TG_TABLE_NAME='audit_logs' AND v_row->>'targetType'${bootstrapV3 ? " IN ('User','user')" : "='User'"} AND EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'targetId') THEN owned := true; END IF;
       END IF;${admissionSlot}
       IF NOT coalesce(owned,false) THEN RETURN NULL; END IF;
       PERFORM pg_advisory_xact_lock(hashtextextended('${n}',0));
@@ -598,9 +630,9 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
         FOR edge IN SELECT * FROM jsonb_each_text(v_row) LOOP
           parent_table := '${JSON.stringify(parents)}'::jsonb->>edge.key;
           IF parent_table IS NOT NULL AND edge.value IS NOT NULL AND NOT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=parent_table AND row_key=jsonb_build_object('id',edge.value) AND NOT deleted) THEN RAISE EXCEPTION 'Foreign campaign graph reference'; END IF;
-        END LOOP;${admissionClosed}${admittedBusiness}
+        END LOOP;${admissionClosed}${admittedBusiness}${promotionRole}
         IF TG_TABLE_NAME='users' AND (NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'id' AND email=v_row->>'email') OR
-          v_row->>'role'<>'buyer' OR v_row->>'emailVerifiedAt' IS NULL OR v_row->>'phone' IS NOT NULL OR v_row->>'avatarKey' IS NOT NULL OR v_row->>'avatarUploadId' IS NOT NULL OR v_row->>'avatarUrl' IS NOT NULL OR v_row->>'suspendedAt' IS NOT NULL OR v_row->>'suspendedById' IS NOT NULL OR v_row->>'deletionScheduledAt' IS NOT NULL) THEN RAISE EXCEPTION 'Synthetic identity changed'; END IF;
+          ${bootstrapV3 ? `(v_row->>'role'<>'buyer' AND NOT (v_row->>'id'='${coordinator.id}' AND v_row->>'role'='admin' AND TG_OP='UPDATE'))` : "v_row->>'role'<>'buyer'"} OR v_row->>'emailVerifiedAt' IS NULL OR v_row->>'phone' IS NOT NULL OR v_row->>'avatarKey' IS NOT NULL OR v_row->>'avatarUploadId' IS NOT NULL OR v_row->>'avatarUrl' IS NOT NULL OR v_row->>'suspendedAt' IS NOT NULL OR v_row->>'suspendedById' IS NOT NULL OR v_row->>'deletionScheduledAt' IS NOT NULL) THEN RAISE EXCEPTION 'Synthetic identity changed'; END IF;
         IF TG_TABLE_NAME='dealerships'${bootstrapV3 ? ` AND v_row->>'id'='${rootId}'` : ''} AND (v_row->>'id'<>'${rootId}' OR v_row->>'slug'<>'${rootSlug}' OR v_row->>'contactPhone' IS DISTINCT FROM '${rootContact}' OR v_row->>'status'<>'recovery' OR v_row->>'admissionMode'<>'synthetic' OR v_row->>'admittedAt' IS NOT NULL OR v_row->>'checkedEvidence' IS NOT NULL OR v_row->>'contactConfirmedAt' IS NOT NULL OR v_row->>'logoUrl' IS NOT NULL) THEN RAISE EXCEPTION 'Synthetic root identity changed'; END IF;
         IF TG_TABLE_NAME IN ('listings','listing_drafts','conversations') AND v_row->>'businessId' IS DISTINCT FROM '${rootId}' THEN RAISE EXCEPTION 'Campaign business required'; END IF;
         IF TG_TABLE_NAME='dealership_members' AND v_row->>'userId'='${owner.id}' AND v_row->>'role'<>'owner' THEN RAISE EXCEPTION 'Synthetic owner changed'; END IF;
@@ -610,7 +642,7 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
         IF TG_TABLE_NAME='verified_contact_phones' AND (v_row->>'phone' IS DISTINCT FROM '${rootContact}' OR EXISTS(SELECT 1 FROM public.verified_contact_phones WHERE phone=v_row->>'phone' AND id<>v_row->>'id')) THEN RAISE EXCEPTION 'Campaign contact proof collision'; END IF;
         ${grantGuard}
         IF TG_TABLE_NAME='audit_logs' AND (v_row->>'targetType'<>'User' OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'targetId') OR v_row->>'action'<>'STAFF_CAPABILITY_BOOTSTRAP' OR v_row->>'targetId'<>'${coordinator.id}' OR v_row->>'actorId' IS NOT NULL OR NOT (
-          ${['staff.manage','founder.control'].map(c => `(v_row->>'id'='${uuid(`campaign897-business:${input.id}:audit:${c}`)}' AND v_row->'details'=jsonb_build_object('capability','${c}','reason','Synthetic storage-only reservation ${input.id}'))`).join(' OR ')}))${grantAudit}${admittedAudit}${ownerAudit}${salesAudit} THEN RAISE EXCEPTION 'Unsupported campaign audit'; END IF;
+          ${['staff.manage','founder.control'].map(c => `(v_row->>'id'='${uuid(`campaign897-business:${input.id}:audit:${c}`)}' AND v_row->'details'=jsonb_build_object('capability','${c}','reason','Synthetic storage-only reservation ${input.id}'))`).join(' OR ')}))${grantAudit}${admittedAudit}${ownerAudit}${salesAudit}${promotionAudit} THEN RAISE EXCEPTION 'Unsupported campaign audit'; END IF;
         IF TG_TABLE_NAME='content_reports' AND (NOT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=CASE v_row->>'targetType' WHEN 'listing' THEN 'listings' WHEN 'user' THEN 'users' WHEN 'message' THEN 'messages' ELSE '' END AND NOT deleted AND row_key=jsonb_build_object('id',v_row->>'targetId')) OR v_row->>'messageContext' IS NOT NULL) THEN RAISE EXCEPTION 'Unsupported report target'; END IF;
         IF TG_TABLE_NAME='messages' AND (v_row->>'kind'<>'text' OR coalesce(v_row->'metadata','null'::jsonb) NOT IN ('null'::jsonb,'{}'::jsonb)) THEN RAISE EXCEPTION 'Unsupported message media'; END IF;
         IF TG_TABLE_NAME='listing_drafts' AND (jsonb_typeof(v_row->'payload')<>'object' OR EXISTS(SELECT 1 FROM jsonb_each(v_row->'payload') e WHERE e.key NOT IN ('description','media') OR (e.key='description' AND jsonb_typeof(e.value)<>'string') OR (e.key='media' AND e.value<>'[]'::jsonb))) THEN RAISE EXCEPTION 'Unsupported draft payload'; END IF;
@@ -631,6 +663,8 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
     END $fn$;
     UPDATE "${n}".campaign_manifest SET tracking_hash=md5(pg_get_functiondef('"${n}".track_business()'::regprocedure));
     ${tables.map(table => `CREATE TRIGGER "${n}_business" AFTER INSERT OR UPDATE OR DELETE ON public.${table} FOR EACH ROW EXECUTE FUNCTION "${n}".track_business();`).join('\n')}${bootstrapV3 ? `
+    CREATE CONSTRAINT TRIGGER "${n}_promotion" AFTER UPDATE ON public.users DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION "${n}".track_business('promotion');
+    CREATE CONSTRAINT TRIGGER "${n}_promotion" AFTER INSERT OR UPDATE OR DELETE ON public.audit_logs DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION "${n}".track_business('promotion');
     CREATE TRIGGER "${n}_baseline" AFTER DELETE ON public.measurement_state FOR EACH ROW WHEN (OLD.key LIKE 'inventory_baseline:%') EXECUTE FUNCTION "${n}".track_business();
     UPDATE "${n}".campaign_manifest SET baseline_trigger_hash=(SELECT md5(pg_get_triggerdef(oid)) FROM pg_trigger WHERE tgname='${n}_baseline' AND tgrelid='public.measurement_state'::regclass);` : ''}`;
   const collision = `DO $guard$ BEGIN
