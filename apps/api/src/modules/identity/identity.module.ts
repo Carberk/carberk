@@ -20,6 +20,8 @@ import { StaffController } from "./presentation/StaffController";
 import { PrismaStaffAuthority } from "./infrastructure/PrismaStaffAuthority";
 import { STAFF_AUTHORITY_PORT } from "./domain/ports/StaffAuthorityPort";
 import { STAFF_AUTHORITY_REPOSITORY } from "./domain/ports/StaffAuthorityRepository";
+import { CheckAdminSessionElevation } from "./application/CheckAdminSessionElevation";
+import { ADMIN_SESSION_ELEVATION_PORT } from "./domain/ports/AdminSessionElevationPort";
 import { Module } from "@nestjs/common";
 import { BullModule } from "@nestjs/bullmq";
 import { EventEmitterModule } from "@nestjs/event-emitter";
@@ -106,6 +108,8 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     AccountDeletionController,
   ],
   providers: [
+    CheckAdminSessionElevation,
+    { provide: ADMIN_SESSION_ELEVATION_PORT, useExisting: CheckAdminSessionElevation },
     AdmitBusiness, InviteBusinessMember, RedeemBusinessInvitation, RevokeBusinessInvitation, ChangeBusinessMembership, UpdateBusinessSettings, RecoverBusinessOwner,
     { provide: BUSINESS_REPOSITORY, useClass: PrismaBusinessRepository },
     { provide: BUSINESS_INVITATION_TOKENS, useClass: NodeBusinessInvitationTokens },
@@ -275,7 +279,7 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     IDENTITY_TOKENS.IdentityCheckPort,
     IDENTITY_TOKENS.ContactPhoneCodePort,
     IDENTITY_READ_PORT,
-    IDENTITY_TOKENS.SessionRepository,
+    ADMIN_SESSION_ELEVATION_PORT,
     IDENTITY_TOKENS.ClockPort,
     IDENTITY_ADMIN_PORT,
     // For ProfilePhotoModule, identity's own composition above Listings. Other
