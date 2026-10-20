@@ -31,7 +31,7 @@ import { removeDemoInventory } from "../scripts/demo-inventory/remove";
 import { DEMO_UPLOAD_CONCURRENCY, seedDemoInventory } from "../scripts/demo-inventory/seed";
 import { createS3ObjectStore, type ObjectStore } from "../scripts/demo-inventory/storage";
 
-import { observeDemoDatabaseLifecycle } from "./helpers/observe-demo-database-lifecycle";
+import { trackPoolClientEnds } from "./helpers/track-pool-client-ends";
 
 // Every stub photo is the same buffer, so the real preparation runs once and each seed reuses its
 // files. Preparing about 300 photos per seed, four seeds a run, cost minutes of CPU on a CI runner
@@ -85,7 +85,7 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
   let postgres: StartedPostgreSqlContainer;
   let minio: StartedTestContainer;
   let pool: Pool;
-  let observeDatabaseLifecycle: ReturnType<typeof observeDemoDatabaseLifecycle> | undefined;
+  let waitForClientEnds: ReturnType<typeof trackPoolClientEnds> | undefined;
   let db: PrismaClient;
   let s3: S3Client;
   let storage: ObjectStore;
@@ -126,7 +126,7 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
     ]);
 
     pool = new Pool({ connectionString: postgres.getConnectionUri() });
-    observeDatabaseLifecycle = observeDemoDatabaseLifecycle(pool);
+    waitForClientEnds = trackPoolClientEnds(pool);
     db = new PrismaClient({ adapter: new PrismaPg(pool) });
 
     const endpoint = `http://${minio.getHost()}:${minio.getMappedPort(9000)}`;
@@ -180,12 +180,10 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
   afterAll(async () => {
     await db?.$disconnect();
     await pool?.end();
-    if (pool) observeDatabaseLifecycle?.("pool.end.resolved");
+    await waitForClientEnds?.();
     s3?.destroy();
     storage?.close();
-    if (postgres) observeDatabaseLifecycle?.("postgres.stop.enter");
     await postgres?.stop();
-    if (postgres) observeDatabaseLifecycle?.("postgres.stop.exit");
     await minio?.stop();
   });
 

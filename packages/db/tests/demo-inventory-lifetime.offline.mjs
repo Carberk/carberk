@@ -48,7 +48,7 @@ function deferred() {
   return { promise, resolve };
 }
 
-function fixture({ initialize = true, disconnectError, endError } = {}) {
+function fixture({ initialize = true, initializePrisma = true, disconnectError, endError } = {}) {
   const connections = [];
   const clients = [];
   let stops = 0;
@@ -89,7 +89,7 @@ function fixture({ initialize = true, disconnectError, endError } = {}) {
   const program = `(() => {
     ${declarations}
     ({ postgres, minio, s3, storage } = fixtures);
-    ${initialize ? registration : ""}
+    ${initialize ? initializePrisma ? registration : setup.slice(start, end).map(statement => statement.getText(ast)).join("\n") : ""}
     return { pool, db, teardown: ${hook("afterAll").getText(ast)} };
   })()`;
   const js = ts.transpileModule(program, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
@@ -132,6 +132,14 @@ test("owning teardown with setup absent does not wait for nonexistent clients", 
   const f = fixture({ initialize: false });
   await f.teardown();
   assert.equal(f.stops(), 0);
+});
+
+test("owning teardown handles pool registration before Prisma initialization without waiting", async () => {
+  const f = fixture({ initializePrisma: false });
+  assert.equal(f.db, undefined);
+  assert.equal(f.pool.totalCount, 0);
+  await f.teardown();
+  assert.equal(f.stops(), 1);
 });
 
 for (const operation of ["disconnect", "end"]) {
