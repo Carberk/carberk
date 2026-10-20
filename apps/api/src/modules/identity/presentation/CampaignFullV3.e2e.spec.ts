@@ -157,6 +157,29 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
   }
   const grant = (login: Login, targetUserId: string, capability: string, enabled = true) => post("/api/v1/staff/grants", login,
     { targetUserId, capability, grant: enabled, reason: "Reservation-owned synthetic full-v3 acceptance" });
+  // Admission-slice setup: the coordinator grants support the named capabilities and both elevate normally.
+  async function elevatedStaff(id: string, roster: Actor[], known: Set<string>, capabilities: string[]) {
+    const coordinator = await signIn(id, actor(roster, "coordinator"), known);
+    const staff = await signIn(id, actor(roster, "support"), known);
+    await elevate(coordinator);
+    for (const capability of capabilities) await grant(coordinator, actor(roster, "support").user_id, capability).expect(204);
+    await elevate(staff);
+    return { coordinator, staff };
+  }
+  const admissionFor = (id: string, ownerUserId: string, slug = `campaign897-${id}-${candidate.slice(0, 12)}-admitted`) => ({ name: "Synthetic v3 admitted business", slug, ownerUserId,
+    mode: "synthetic", evidence: "Fictional reservation-owned business only", reason: "Disposable full-v3 ordinary HTTP proof" });
+  const recoveryFor = (ownerUserId: string) => ({ ownerUserId, evidence: "Synthetic foreign recovery probe", reason: "Disposable full-v3 adoption refusal proof" });
+  // Resets each named reservation after the case, including a failed one, so its sign-in codes stop counting
+  // against the shared loopback issuance budget. A refused reset is recorded beside the original failure.
+  async function resetAfter(ids: string[], body: () => Promise<void>) {
+    try { await body(); } finally { for (const id of ids) expect.soft(execute("reset", id).code, `exact reset ${id}`).toBe(0); }
+  }
+  async function businessState(businessId: string) {
+    return { business: await db.dealership.findUnique({ where: { id: businessId } }),
+      invitations: await db.dealershipInvitation.findMany({ where: { dealershipId: businessId }, orderBy: { id: "asc" } }),
+      members: await db.dealershipMember.findMany({ where: { dealershipId: businessId }, orderBy: { id: "asc" } }),
+      audits: await db.auditLog.findMany({ where: { targetType: "Dealership", targetId: businessId }, orderBy: { id: "asc" } }) };
+  }
   async function digest(id: string) {
     const [snapshot] = await rows<{ hash: string }>(`SELECT md5(jsonb_build_object('manifest',(SELECT jsonb_agg(to_jsonb(m)) FROM "cf_${id}".campaign_manifest m),'records',(SELECT jsonb_agg(to_jsonb(r) ORDER BY table_name,row_key::text) FROM "cf_${id}".campaign_records r),'events',(SELECT jsonb_agg(to_jsonb(e) ORDER BY sequence) FROM "cf_${id}".campaign_events e))::text) AS hash`);
     return snapshot?.hash;
@@ -230,27 +253,56 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     await grant(coordinator, target, "founder.admission").expect(204);
     const admission = { name: "Synthetic v3 admitted business", slug: `campaign897-${id}-${candidate.slice(0, 12)}-admitted`, ownerUserId: owner.user.id,
       mode: "synthetic", evidence: "Fictional reservation-owned business only", reason: "Disposable full-v3 ordinary HTTP proof" };
+    // Each refused step below must leave the whole reservation journal untouched.
+    let unchanged = await digest(id);
     await post("/api/v1/business/admission", admissionStaff, admission).expect(403);
+    expect(await digest(id), "pre-elevation admission refusal writes nothing").toBe(unchanged);
     await elevate(admissionStaff);
     const admitted = (await post("/api/v1/business/admission", admissionStaff, admission).expect(201)).body as { businessId: string; invitationId: string; token: string };
     expect(await db.dealership.findUnique({ where: { id: admitted.businessId }, select: { status: true, admissionMode: true } })).toEqual({ status: "recovery", admissionMode: "synthetic" });
+    expect(await owned(id)).toEqual(expect.arrayContaining([{ table_name: "dealerships", row_key: { id: admitted.businessId } },
+      { table_name: "dealership_invitations", row_key: { id: admitted.invitationId } }]));
+    unchanged = await digest(id);
     await post(`/api/v1/business/${admitted.businessId}/settings`, owner, { name: "Before redemption refused" }).expect(403);
     await post("/api/v1/business/invitations/redeem", outsider, { token: admitted.token }).expect(409);
+    expect(await digest(id), "pre-redemption settings and outsider redemption refusals write nothing").toBe(unchanged);
     await post("/api/v1/business/invitations/redeem", owner, { token: admitted.token }).expect(201);
+    const member = await db.dealershipMember.findFirstOrThrow({ where: { dealershipId: admitted.businessId, userId: owner.user.id }, select: { id: true, role: true, status: true } });
+    expect(member).toMatchObject({ role: "owner", status: "active" });
+    unchanged = await digest(id);
     await post("/api/v1/business/invitations/redeem", owner, { token: admitted.token }).expect(409);
+    expect(await digest(id), "repeated redemption refusal writes nothing").toBe(unchanged);
     await post(`/api/v1/business/${admitted.businessId}/settings`, owner, { name: "Ordinary owner saved synthetic content" }).expect(201);
     expect((await get("/api/v1/business/current", owner).expect(200)).body.workspace).toMatchObject({ business: { id: admitted.businessId, status: "active", admissionMode: "synthetic", name: "Ordinary owner saved synthetic content" }, membership: { role: "owner" } });
+    unchanged = await digest(id);
     await post(`/api/v1/business/${admitted.businessId}/settings`, outsider, { name: "Foreign edit refused" }).expect(403);
+    expect(await digest(id), "foreign settings refusal writes nothing").toBe(unchanged);
     await grant(coordinator, target, "founder.admission", false).expect(204);
+    unchanged = await digest(id);
     await post("/api/v1/business/admission", admissionStaff, { ...admission, slug: `${admission.slug}-revoked` }).expect(403);
+    expect(await digest(id), "revoked admission refusal writes nothing").toBe(unchanged);
     const audit = await db.auditLog.findFirstOrThrow({ where: { targetId: admitted.businessId, action: "BUSINESS_ADMITTED" } });
     expect(audit.actorId).toBe(target);
     expect(audit.details).toMatchObject({ mode: "synthetic", verifiedScope: "Synthetic fixture; no real business verified" });
     expect(JSON.stringify(audit.details).includes(admitted.token)).toBe(false);
+    const businessAudits = await db.auditLog.findMany({ where: { targetType: "Dealership", targetId: admitted.businessId }, orderBy: { createdAt: "asc" }, select: { id: true, actorId: true, action: true, details: true } });
+    expect(businessAudits.map(({ actorId, action, details }) => ({ actorId, action, details }))).toEqual([
+      { actorId: target, action: "BUSINESS_ADMITTED", details: { mode: "synthetic", evidence: "Fictional reservation-owned business only", reason: "Disposable full-v3 ordinary HTTP proof", verifiedScope: "Synthetic fixture; no real business verified" } },
+      { actorId: owner.user.id, action: "BUSINESS_INVITATION_REDEEMED", details: { invitationId: admitted.invitationId, role: "owner" } },
+      { actorId: owner.user.id, action: "BUSINESS_SETTINGS_CHANGED", details: { fields: ["name"] } },
+    ]);
     const before = await owned(id);
     for (const table of ["users", "sessions", "otp_requests", "totp_enrollments", "totp_backup_codes", "staff_grants", "dealerships", "dealership_members", "dealership_invitations", "audit_logs"]) expect(before.some(row => row.table_name === table), table).toBe(true);
+    for (const row of [{ table_name: "dealerships", row_key: { id: admitted.businessId } }, { table_name: "dealership_invitations", row_key: { id: admitted.invitationId } },
+      { table_name: "dealership_members", row_key: { id: member.id } }, ...businessAudits.map(row => ({ table_name: "audit_logs", row_key: { id: row.id } }))]) expect(before, `owned ${row.table_name}`).toContainEqual(row);
     expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
     await assertDisposed(id, before);
+    expect(await db.dealership.findUnique({ where: { id: admitted.businessId } })).toBeNull();
+    expect(await db.dealershipInvitation.findUnique({ where: { id: admitted.invitationId } })).toBeNull();
+    expect(await db.dealershipMember.findUnique({ where: { id: member.id } })).toBeNull();
+    // Retained business audits keep no evidence, reason, token or settings text.
+    expect(await db.auditLog.findMany({ where: { id: { in: businessAudits.map(row => row.id) } }, select: { actorId: true, targetType: true, targetId: true, details: true } })).toEqual(
+      businessAudits.map(() => ({ actorId: null, targetType: "SyntheticCampaign", targetId: id, details: { profile, disposition: "redacted-synthetic-audit" } })));
     const terminal = await digest(id);
     expect(execute("reset", id)).toMatchObject({ code: 0, receipt: { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 } });
     expect(await digest(id)).toBe(terminal);
@@ -438,5 +490,188 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     await request.post("/api/v1/auth/refresh").send({ refreshToken: staff.refreshToken }).expect(401);
     await request.post("/api/v1/auth/refresh").send({ refreshToken: coordinator.refreshToken }).expect(401);
     expect(execute("fixture", id).code).toBe(1);
+  }));
+
+  it("refuses an admission slug owned by a foreign or root Dealership and leaves both unchanged", () => withKnownJobs(known => {
+    const id = "ac".repeat(16), foreignId = randomUUID();
+    return resetAfter([id], async () => {
+      const roster = await seed(id);
+      // Collision fixture only: a pre-existing Dealership outside every reservation, never adopted or authenticated.
+      const slug = `campaign897-${id}-${candidate.slice(0, 12)}-admitted`;
+      await db.dealership.create({ data: { id: foreignId, slug, name: "Foreign collision Dealership must survive" } });
+      try {
+        const foreign = await businessState(foreignId);
+        const root = await db.dealership.findUniqueOrThrow({ where: { slug: `campaign897-${id}-${candidate.slice(0, 12)}` } });
+        const rootState = await businessState(root.id);
+        const { staff } = await elevatedStaff(id, roster, known, ["founder.admission"]);
+        const unchanged = await digest(id);
+        expect((await post("/api/v1/business/admission", staff, admissionFor(id, actor(roster, "buyer-a").user_id, slug)).expect(409)).body.code).toBe("CONFLICT");
+        expect((await post("/api/v1/business/admission", staff, admissionFor(id, actor(roster, "buyer-a").user_id, root.slug)).expect(409)).body.code).toBe("CONFLICT");
+        expect(await businessState(foreignId)).toEqual(foreign);
+        expect(await businessState(root.id)).toEqual(rootState);
+        expect(await db.auditLog.count({ where: { action: "BUSINESS_ADMITTED", actorId: actor(roster, "support").user_id } })).toBe(0);
+        expect(await digest(id)).toBe(unchanged);
+        const before = await owned(id);
+        expect(before.filter(row => row.table_name === "dealerships")).toEqual([{ table_name: "dealerships", row_key: { id: root.id } }]);
+        expect(execute("reset", id).code).toBe(0);
+        await assertDisposed(id, before);
+        expect(await businessState(foreignId)).toEqual(foreign);
+      } finally {
+        await db.dealership.delete({ where: { id: foreignId } });
+      }
+    });
+  }));
+
+  it("refuses to adopt a pre-existing foreign Dealership through owner recovery and rolls back every write", () => withKnownJobs(known => {
+    const id = "ad".repeat(16), foreignId = randomUUID();
+    return resetAfter([id], async () => {
+      const roster = await seed(id);
+      // Ownerless foreign Dealership in recovery: ordinary recovery would invite a roster User into it.
+      await db.dealership.create({ data: { id: foreignId, slug: `foreign-adoption-${foreignId}`, name: "Foreign recovery Dealership must survive" } });
+      try {
+        const foreign = await businessState(foreignId);
+        const measurement = await db.measurementState.findMany({ orderBy: { key: "asc" } });
+        const { staff } = await elevatedStaff(id, roster, known, ["founder.recovery"]);
+        const unchanged = await digest(id);
+        const refused = await post(`/api/v1/business/${foreignId}/recovery`, staff, recoveryFor(actor(roster, "buyer-b").user_id));
+        expect(refused.status, "foreign Dealership adoption must refuse").toBeGreaterThanOrEqual(400);
+        expect(await businessState(foreignId)).toEqual(foreign);
+        expect(await db.dealershipInvitation.count({ where: { recipientUserId: actor(roster, "buyer-b").user_id } })).toBe(0);
+        expect(await db.measurementState.findMany({ orderBy: { key: "asc" } })).toEqual(measurement);
+        expect(await digest(id)).toBe(unchanged);
+        const before = await owned(id);
+        expect(before.some(row => row.row_key["id"] === foreignId)).toBe(false);
+        expect(execute("reset", id).code).toBe(0);
+        await assertDisposed(id, before);
+        expect(await businessState(foreignId)).toEqual(foreign);
+      } finally {
+        await db.dealership.delete({ where: { id: foreignId } });
+      }
+    });
+  }));
+
+  it("keeps a second reservation's admitted Dealership out of the first and preserves it through the first reset", () => withKnownJobs(known => {
+    const id = "ae".repeat(16), otherId = "af".repeat(16);
+    return resetAfter([id, otherId], async () => {
+      const roster = await seed(id), otherRoster = await seed(otherId);
+      const other = await elevatedStaff(otherId, otherRoster, known, ["founder.admission"]);
+      const admitted = (await post("/api/v1/business/admission", other.staff, admissionFor(otherId, actor(otherRoster, "buyer-a").user_id)).expect(201)).body as { businessId: string; invitationId: string };
+      const otherBefore = await owned(otherId);
+      expect(otherBefore).toEqual(expect.arrayContaining([{ table_name: "dealerships", row_key: { id: admitted.businessId } },
+        { table_name: "dealership_invitations", row_key: { id: admitted.invitationId } }]));
+      const otherDigest = await digest(otherId), otherState = await businessState(admitted.businessId);
+      const { staff } = await elevatedStaff(id, roster, known, ["founder.recovery"]);
+      const unchanged = await digest(id);
+      const refused = await post(`/api/v1/business/${admitted.businessId}/recovery`, staff, recoveryFor(actor(roster, "buyer-b").user_id));
+      expect(refused.status, "another reservation's Dealership must not be adopted").toBeGreaterThanOrEqual(400);
+      expect(await businessState(admitted.businessId)).toEqual(otherState);
+      expect(await digest(id)).toBe(unchanged);
+      expect(await digest(otherId)).toBe(otherDigest);
+      const before = await owned(id);
+      expect(before.some(row => row.row_key["id"] === admitted.businessId)).toBe(false);
+      expect(execute("reset", id).code).toBe(0);
+      await assertDisposed(id, before);
+      expect(await digest(otherId)).toBe(otherDigest);
+      expect(await businessState(admitted.businessId)).toEqual(otherState);
+      expect(execute("reset", otherId).code).toBe(0);
+      await assertDisposed(otherId, otherBefore);
+      expect(await db.dealership.findUnique({ where: { id: admitted.businessId } })).toBeNull();
+    });
+  }));
+
+  it("refuses a stale candidate at the operator boundary without altering an admitted Dealership", () => withKnownJobs(known => {
+    const id = "b0".repeat(16), stale = "b".repeat(40);
+    return resetAfter([id], async () => {
+      const roster = await seed(id);
+      const { staff } = await elevatedStaff(id, roster, known, ["founder.admission"]);
+      const admitted = (await post("/api/v1/business/admission", staff, admissionFor(id, actor(roster, "buyer-a").user_id)).expect(201)).body as { businessId: string };
+      const unchanged = await digest(id), state = await businessState(admitted.businessId);
+      // The runtime admission path has no candidate input; the supported binding is the operator fixture/reset command.
+      expect(execute("reset", id, { candidate: stale })).toMatchObject({ code: 1, receipt: undefined });
+      expect(execute("fixture", id, { candidate: stale })).toMatchObject({ code: 1, sqlCalls: 0, receipt: undefined });
+      expect(await digest(id)).toBe(unchanged);
+      expect(await businessState(admitted.businessId)).toEqual(state);
+      const before = await owned(id);
+      expect(execute("reset", id).code).toBe(0);
+      await assertDisposed(id, before);
+      expect(await db.dealership.findUnique({ where: { id: admitted.businessId } })).toBeNull();
+    });
+  }));
+
+  it("atomically refuses reserved redemption that would delete a pre-existing inventory baseline, then succeeds without one", () => withKnownJobs(known => {
+    const id = "b1".repeat(16), epoch = randomUUID(), baselineKey = `inventory_baseline:${epoch}`, unrelatedKey = `inventory_baseline:${randomUUID()}`;
+    const baselineValue = "2026-10-01T00:00:00.000Z", created: string[] = [], unrelatedEmail = `unrelated.${randomUUID()}@example.invalid`;
+    let unrelatedUserId: string | undefined;
+    return resetAfter([id], async () => {
+      // Global rows are created only when absent and removed in finally by exact key; a foreign collector stops the case.
+      expect(await db.measurementState.findMany({ where: { key: { in: ["collector", baselineKey, unrelatedKey] } } })).toEqual([]);
+      try {
+        await db.measurementState.create({ data: { key: "collector", epoch } }); created.push("collector");
+        await db.measurementState.create({ data: { key: unrelatedKey, epoch: baselineValue } }); created.push(unrelatedKey);
+        await db.measurementState.create({ data: { key: baselineKey, epoch: baselineValue } }); created.push(baselineKey);
+        const roster = await seed(id);
+        const { staff } = await elevatedStaff(id, roster, known, ["founder.admission"]);
+        const owner = await signIn(id, actor(roster, "buyer-a"), known);
+        const admitted = (await post("/api/v1/business/admission", staff, admissionFor(id, owner.user.id)).expect(201)).body as { businessId: string; invitationId: string; token: string };
+        const redeem = () => post("/api/v1/business/invitations/redeem", owner, { token: admitted.token });
+        const measurement = () => db.measurementState.findMany({ orderBy: { key: "asc" } });
+        const withBaseline = await measurement(), state = await businessState(admitted.businessId), unchanged = await digest(id);
+        // Proposed contract: refused like other fixture storage refusals (500), with the whole transaction rolled back.
+        const assertRefusedAtomically = async (status: number) => {
+          expect(status, "reserved redemption must refuse rather than delete a shared baseline").toBe(500);
+          expect(await businessState(admitted.businessId)).toEqual(state);
+          expect(await digest(id)).toBe(unchanged);
+          expect(await measurement()).toEqual(withBaseline);
+        };
+        await assertRefusedAtomically((await redeem()).status);
+
+        // Race at the legitimate row-lock boundary: the baseline commits while redemption waits on the collector lock.
+        await db.measurementState.delete({ where: { key: baselineKey } });
+        let racing: Promise<{ status: number }> | undefined;
+        await db.$transaction(async tx => {
+          await tx.$queryRaw`SELECT "key" FROM "measurement_state" WHERE "key" = 'collector' FOR UPDATE`;
+          await tx.measurementState.create({ data: { key: baselineKey, epoch: baselineValue } });
+          racing = redeem().then(response => ({ status: response.status }));
+          for (let attempt = 0; ; attempt += 1) {
+            const [waiting] = await db.$queryRaw<{ count: number }[]>`SELECT count(*)::int AS count FROM pg_stat_activity
+              WHERE datname = current_database() AND pid <> pg_backend_pid() AND wait_event_type = 'Lock' AND query LIKE '%measurement_state%'`;
+            if (waiting?.count === 1) break;
+            if (attempt >= 100) throw new Error("Reserved redemption never waited on the collector row lock");
+            await new Promise(done => setTimeout(done, 50));
+          }
+        }, { timeout: 15_000 });
+        await assertRefusedAtomically((await racing!).status);
+
+        // With no baseline for the current epoch, ordinary redemption succeeds and leaves other global rows untouched.
+        await db.measurementState.delete({ where: { key: baselineKey } }); created.pop();
+        const withoutBaseline = await measurement();
+        await redeem().expect(201);
+        expect(await measurement()).toEqual(withoutBaseline);
+        expect((await get("/api/v1/business/current", owner).expect(200)).body.workspace).toMatchObject({ business: { id: admitted.businessId, status: "active" }, membership: { role: "owner" } });
+
+        // A non-reserved ordinary deletion of the same baseline stays normal while this namespace is live.
+        await db.measurementState.create({ data: { key: baselineKey, epoch: baselineValue } }); created.push(baselineKey);
+        const reserved = await digest(id);
+        const issued = await request.post("/api/v1/auth/otp/request").send({ email: unrelatedEmail });
+        learn(known, issued);
+        expect(issued.status).toBe(201);
+        const code = (await queue.getJob(issued.body.requestId as string))?.data.code as string;
+        const unrelated = await request.post("/api/v1/auth/otp/verify").send({ email: unrelatedEmail, code }).expect(201);
+        unrelatedUserId = unrelated.body.user.id as string;
+        await request.delete("/api/v1/me").set("authorization", `Bearer ${unrelated.body.accessToken}`).expect(204);
+        expect(await measurement()).toEqual(withoutBaseline);
+        expect(await digest(id)).toBe(reserved);
+        const before = await owned(id);
+        expect(before.some(row => row.row_key["id"] === unrelatedUserId)).toBe(false);
+        expect(execute("reset", id).code).toBe(0);
+        await assertDisposed(id, before);
+        expect(await measurement()).toEqual(withoutBaseline);
+      } finally {
+        await db.measurementState.deleteMany({ where: { key: { in: created } } });
+        // Exact removal of the unrelated ordinary User this case created, and its own sign-in code.
+        await db.otpRequest.deleteMany({ where: { destination: unrelatedEmail } });
+        if (unrelatedUserId) await db.user.delete({ where: { id: unrelatedUserId } });
+      }
+    });
   }));
 });
