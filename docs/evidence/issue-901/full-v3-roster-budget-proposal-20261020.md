@@ -2,6 +2,12 @@
 
 Design and evidence note for #901 under #897 and PR #904. Base `5d4aaa4b`. **This is a proposal; root decides and nothing here is approved.** No runtime or test file changed, nothing was executed, and no acceptance is claimed.
 
+## Root disposition
+
+The demonstrated capacity mismatch is accepted as a full-scope engineering gap. The proposed 269-record cap and per-family allocation are **not approved for implementation**: the extra sign-in/grant allowances and eight content records need criterion-level derivation. A larger v3 capacity must follow a test-only full-roster RED and explicit graph inventory, preserve v1/v2 limits, retain overflow refusal and prove exact cleanup within unchanged timeouts. Retaining a cap that prevents the selected release scope is not a delivery alternative.
+
+The split examples below establish authentication costs only. They do not prove that either group's complete graph exceeds 128; those content counts are still missing. Separate reservations may isolate independent acceptance groups, but cannot substitute for any required joined ownership/lifecycle test. The main journey's admission/grant assertions were still unreached when this proposal was written. No numeric limit, test or runtime rule changes in this note.
+
 ## Inputs
 
 These come from the source at `5d4aaa4b`:
@@ -39,23 +45,23 @@ Each reservation (`cf_<id>`) has its own deterministic 15 Users, its own journal
 - **Must be joined in one reservation:**
   - **S1/S2.** The matrix asks for auth and grants once, with "each alias reaches only its own area" checked across all aliases ("grant each capability to its matching alias"; "S0 → S1 → S2 … reused by every lane"). That needs the 189-record floor.
   - **Batches within a group.** Business B1–B4 share one admitted business. History C2/C3 share a purchase and its artifact. Diagnostics X1–X4 share one order, its report versions and its readers.
-- **Could be split into separate reservations:** the groups B, C, X and A, each with the coordinator plus that group's staff. Splitting still does not fit:
+- **Could be split into separate reservations:** the groups B, C, X and A, each with the coordinator plus that group's staff. Their authentication costs are:
   - **X (diagnostics):** coordinator plus 4 diagnostics staff (reception, technician, two reviewers; `diagnostics.templates` must also be held by one of them). Customers buyer-a, buyer-b and owner. 21 + 13 + 4 × 15 + 6 = 100 records before any center, template, order, evidence or report row.
   - **C (support/history):** coordinator plus 3 staff. 21 + 13 + 45 + 4 = 83 records before content.
   - Splitting also multiplies staging cycles, and it cannot satisfy S2 as the matrix defines it.
 
-Splitting is therefore not a fix. It only lowers the staff share while leaving each group's content graph unbudgeted.
+Splitting lowers the staff share while leaving each group's content graph unbudgeted. It does not resolve the joined full-roster capacity mismatch; whether each independent group fits still requires its content inventory.
 
 ## Proposed smallest bounded design (v3 only)
 
 The design rests on one principle: replace the single shared 128 limit with **per-family v3 quotas whose sum is the v3 cap**. Each quota is derived from code-fixed counts. v1 stays at 128/2048/128 and v2 at 128/2048, unchanged.
 
-1. **Authentication family quota: 261 records.** These are exact upper bounds, not estimates:
+1. **Proposed authentication family quota: 261 records.** These are proposed allowances; the non-bootstrap headroom still needs criterion-level justification:
    - **Bootstrap: 21, fixed.**
    - **TOTP: at most 110.** Enrollment is admitted only for the 10 staff aliases. That is a tightening: today any roster User may enroll. Each enrollment has at most 10 codes, a guard that already exists.
    - **Grants: at most 32 non-bootstrap `staff_grants` rows**, keyed by unique `(userId, capability)`, and **at most 48 non-bootstrap grant audits**. That covers 14 grants plus S2 revoke and restore.
    - **Sign-ins: at most 25 OTP and 25 Session records.** This covers the 15 first sign-ins plus 10 extra sign-ins (second device, account switch C5, A3 sign-out). It stays within the retained 128-delivery cap.
-2. **Content family quota.** It is set per graph slice from that slice's reached hosted evidence, never as a guess. The first content increment covers only the reached main spec: admission, invitation, redemption membership and the admission/revocation audits. That is at most 8 records, giving **v3 cap = 261 + 8 = 269**. Each later slice must add its own measured quota with the same arithmetic. No unbounded graph.
+2. **Proposed content family quota.** It must be derived per graph slice and verified by hosted evidence. The suggested first increment is 8 records for admission, invitation, redemption membership and associated audits, giving **proposed v3 cap = 261 + 8 = 269**. These assertions have not yet been reached, and the eight-record bound is unverified. Each later slice needs its own measured inventory. No unbounded graph.
 3. **Events stay at 2048**, as do the existing identities headroom (events + live + 4) and the cleanup budget formula. At 269 records, insert, update and delete events total about 269 + ~150 + 269, well within 2048. The headroom formula still reserves every deletion event.
 4. **Unchanged:** lock order, `lock_timeout` 5s and `statement_timeout` 20s; the namespace fence; current-candidate binding; collision, foreign-reference and polymorphic/JSON refusal; the late-worker fence (`cleaning` before Redis, permanent tombstones); private-sink disposal; and the observe-only terminal retry.
 
@@ -83,9 +89,4 @@ TOTP reset and re-enrollment stay refused in `identities`. If S2 or another batc
 
 ## Decision requested from root (not approved)
 
-Choose between two options:
-
-- **(a)** Adopt per-family v3 quotas with an initial cap of 269 and the RED set above. Later graph slices each add measured content quotas.
-- **(b)** Keep the cap at 128 and record that the selected full-roster scope cannot be accepted under v3.
-
-The split-reservation option is shown above to be insufficient, and is not recommended.
+Derive and test a v3 capacity that supports the selected full scope, using the proposal above as an unapproved starting point. Keep the current limits until that test-first design is ready; do not describe the resulting inability to exercise the full roster as release completion. Independent groups may use separate reservations where their ownership requirements allow it. The root disposition above governs the next assignment.
