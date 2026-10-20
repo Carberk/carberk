@@ -110,10 +110,24 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
       cwd: `${root}/apps/worker`, env: process.env,
     }).status;
   }
-  async function signIn(id: string, person: Actor): Promise<Login> {
+  // Runs after the case's acceptance assertions, including failed ones, and removes only job IDs the case created or learned.
+  // A failed removal is recorded beside the original failure, never in its place. Queues are never enumerated or drained.
+  async function withKnownJobs(body: (known: Set<string>) => Promise<void>) {
+    const known = new Set<string>();
+    try {
+      await body(known);
+    } finally {
+      for (const jobId of known) {
+        const failure = await queue.getJob(jobId).then(job => job?.remove()).then(() => undefined, (error: unknown) => error);
+        expect.soft(failure, `exact known queue job cleanup ${jobId}`).toBeUndefined();
+      }
+    }
+  }
+  async function signIn(id: string, person: Actor, known: Set<string>): Promise<Login> {
     const issued = await request.post("/api/v1/auth/otp/request").send({ email: person.email }).expect(201);
     expect(issued.body.testCode).toBeUndefined();
     const requestId = issued.body.requestId as string;
+    known.add(requestId);
     expect((await queue.getJob(requestId))?.data.to).toBe(person.email);
     expect(processEmail(requestId), "production worker must persist ordinary generated OTP in protected mock sink").toBe(0);
     const [sink] = await rows<{ message: { subject: string } }>(`SELECT message FROM "cf_${id}".campaign_delivery_sink WHERE request_id=$1 AND email=$2`, requestId, person.email);
@@ -197,12 +211,12 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     expect(await db.user.count()).toBe(before);
   });
 
-  it("signs in normally, elevates distinct staff, admits and redeems ownership, edits content and exactly disposes with lost-response retry", async () => {
+  it("signs in normally, elevates distinct staff, admits and redeems ownership, edits content and exactly disposes with lost-response retry", () => withKnownJobs(async known => {
     const id = "a4".repeat(16), roster = await seed(id);
-    const coordinator = await signIn(id, actor(roster, "coordinator"));
-    const admissionStaff = await signIn(id, actor(roster, "support"));
-    const owner = await signIn(id, actor(roster, "buyer-a"));
-    const outsider = await signIn(id, actor(roster, "sales-b"));
+    const coordinator = await signIn(id, actor(roster, "coordinator"), known);
+    const admissionStaff = await signIn(id, actor(roster, "support"), known);
+    const owner = await signIn(id, actor(roster, "buyer-a"), known);
+    const outsider = await signIn(id, actor(roster, "sales-b"), known);
     const target = actor(roster, "support").user_id;
     await grant(coordinator, target, "founder.admission").expect(403);
     await elevate(coordinator);
@@ -238,7 +252,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     await get("/api/v1/business/current", owner).expect(403);
     await request.post("/api/v1/auth/refresh").send({ refreshToken: owner.refreshToken }).expect(401);
     expect(execute("fixture", id).code).toBe(1);
-  });
+  }));
 
   it("refuses foreign alias collision atomically and preserves the foreign identity", async () => {
     const id = "a5".repeat(16), controlId = "b5".repeat(16), foreignId = randomUUID();
@@ -252,18 +266,20 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     expect(execute("reset", controlId).code).toBe(0);
   });
 
-  it("preserves another reservation and exact foreign queue content while blocking late enqueue and mock delivery", async () => {
+  it("preserves another reservation and exact foreign queue content while blocking late enqueue and mock delivery", () => withKnownJobs(async known => {
     const id = "a6".repeat(16), otherId = "a7".repeat(16);
     const roster = await seed(id);
     await seed(otherId);
     const other = await digest(otherId);
     const issued = await request.post("/api/v1/auth/otp/request").send({ email: actor(roster, "sales-b").email }).expect(201);
     const requestId = issued.body.requestId as string;
+    known.add(requestId);
     const pending = await queue.getJob(requestId);
     expect(pending).toBeDefined();
     const data = pending!.data as { to: string; code: string; locale: "ru"; purpose: "sign-in" };
     const foreignId = randomUUID();
     const foreignData = { to: "foreign@example.invalid", code: "654321", locale: "en", purpose: "sign-in" };
+    known.add(foreignId);
     await queue.add(AuthSchemas.EMAIL_CODE_JOB_NAME, foreignData, { jobId: foreignId });
     const before = await owned(id);
     expect(execute("reset", id).code).toBe(0);
@@ -272,14 +288,16 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     expect((await queue.getJob(foreignId))?.data).toEqual(foreignData);
     await expect(app.get(BullMqEmailCodeSenderAdapter).enqueue({ requestId, email: data.to, code: data.code, locale: data.locale, purpose: data.purpose })).rejects.toThrow();
     expect(processEmail(requestId, { ...data, to: data.to })).toBe(1);
-    await request.post("/api/v1/auth/otp/request").send({ email: data.to }).expect(500);
+    const lateRequest = await request.post("/api/v1/auth/otp/request").send({ email: data.to });
+    if (lateRequest.body?.requestId) known.add(lateRequest.body.requestId as string);
+    expect(lateRequest.status).toBe(500);
     await request.post("/api/v1/auth/otp/verify").send({ email: data.to, code: data.code }).expect(400);
     expect(await db.session.count({ where: { userId: actor(roster, "sales-b").user_id } })).toBe(0);
     await assertDisposed(id, before);
     expect(await digest(otherId)).toBe(other);
     await (await queue.getJob(foreignId))?.remove();
     expect(execute("reset", otherId).code).toBe(0);
-  });
+  }));
 
   it("rolls back row and event budget overflow while retaining room for exact cleanup", async () => {
     const id = "a9".repeat(16), roster = await seed(id);
@@ -299,10 +317,11 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     await assertDisposed(id, before);
   });
 
-  it("keeps cleaning ownership after an active exact delivery, then resumes the same reset", async () => {
+  it("keeps cleaning ownership after an active exact delivery, then resumes the same reset", () => withKnownJobs(async known => {
     const id = "aa".repeat(16), roster = await seed(id);
     const issued = await request.post("/api/v1/auth/otp/request").send({ email: actor(roster, "buyer-a").email }).expect(201);
     const requestId = issued.body.requestId as string;
+    known.add(requestId);
     const before = await owned(id);
     // A real BullMQ lock provides an explicit barrier. Never enumerate queue jobs.
     const worker = new Worker(AuthSchemas.EMAIL_CODE_QUEUE, async () => {}, {
@@ -316,23 +335,26 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
       expect(execute("reset", id).code).toBe(1);
       expect(await rows(`SELECT state FROM "cf_${id}".campaign_manifest`)).toEqual([{ state: "cleaning" }]);
       expect((await queue.getJob(requestId))?.data.to).toBe(actor(roster, "buyer-a").email);
-      await request.post("/api/v1/auth/otp/request").send({ email: actor(roster, "sales-b").email }).expect(500);
+      const refused = await request.post("/api/v1/auth/otp/request").send({ email: actor(roster, "sales-b").email });
+      if (refused.body?.requestId) known.add(refused.body.requestId as string);
+      expect(refused.status).toBe(500);
     } finally {
+      // Releases whichever job this token claimed, own or not, before exact known-ID removal; unknown jobs are never removed.
       try { await job?.moveToWait(token); } finally { await worker.close(); }
     }
     expect(execute("reset", id).code).toBe(0);
     await assertDisposed(id, before);
     expect(execute("reset", id).code).toBe(0);
     await assertDisposed(id, before);
-  });
+  }));
 
-  it("refuses a changed candidate without altering live ownership or ordinary sessions", async () => {
+  it("refuses a changed candidate without altering live ownership or ordinary sessions", () => withKnownJobs(async known => {
     const id = "a8".repeat(16), roster = await seed(id);
-    const login = await signIn(id, actor(roster, "buyer-a"));
+    const login = await signIn(id, actor(roster, "buyer-a"), known);
     const before = await digest(id);
     expect(execute("reset", id, { candidate: "b".repeat(40) })).toMatchObject({ code: 1, receipt: undefined });
     expect(await digest(id)).toBe(before);
     await get("/api/v1/business/current", login).expect(200);
     expect(execute("reset", id).code).toBe(0);
-  });
+  }));
 });
