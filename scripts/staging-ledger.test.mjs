@@ -8,6 +8,29 @@ import { createHash } from 'node:crypto';
 import { GitLedger } from './staging-ledger.mjs';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+test('Git failures identify safe operations and exit status without exposing secret-like inputs', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'staging-git-diagnostics-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const secret = 'PRIVATE_TOKEN_901_DO_NOT_DISCLOSE';
+  const remote = join(root, secret, 'missing.git');
+  const ledger = new GitLedger({ directory: join(root, 'objects'), remote });
+  await ledger.initialize();
+  for (const { args, expected } of [
+    { args: ['fetch', '--no-tags', remote, 'a'.repeat(40)],
+      expected: 'Coordination Git operation failed: operation=fetch exit=128 signal=none killed=false' },
+    { args: [`unknown-command-${secret}`],
+      expected: 'Coordination Git operation failed: operation=unknown exit=1 signal=none killed=false' },
+  ]) {
+    await assert.rejects(ledger.git(args), error => {
+      assert.equal(error.message, expected);
+      assert.equal(error.stack.includes(secret), false);
+      assert.equal(error.stack.includes(root), false);
+      assert.deepEqual(Object.getOwnPropertyNames(error).sort(), ['message', 'stack']);
+      return true;
+    });
+  }
+});
+
 test('one remote owner survives simultaneous contenders from independent repositories and process restart', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'staging-ledger-'));
   t.after(() => rm(root, { recursive: true, force: true }));

@@ -77,3 +77,26 @@ No repair is justified from this evidence alone. In particular, the offline unav
 Next diagnostic evidence, if separately authorized, should preserve a fixed operation label and safe exit/signal/killed metadata at the Git boundary, or capture a restricted Git command trace on the hosted candidate. Do not dump raw command arguments, URLs, environment, stderr or an unsanitized `Error.cause`, which may carry credentials. A trace of these local fixture repositories is safe; that does not make arbitrary production Git traces safe. No hosted rerun, timeout increase, network retry or operational mutation is requested by this checkpoint.
 
 Only this handoff document changes. Repository-wide checks and hosted acceptance were not rerun for a diagnosis-only artifact. The root integration owner retains review, assembly and any later hosted diagnostic decision.
+
+## Authorized diagnostic source checkpoint
+
+Root accepted diagnosis commit `288c494f5b70de4a80ad5e5086cd5a8d571fd570` and then authorized one separate diagnostic source checkpoint on the same branch/worktree. Hosted cause remains **UNKNOWN**. This change improves future failure evidence; it is not a timeout repair or proof of a hosted cause.
+
+`GitLedger.git` now retains the existing error prefix and adds only an allowlisted operation, bounded numeric exit status, allowlisted signal and boolean killed status. Example from an actual failed local fetch:
+
+```text
+Coordination Git operation failed: operation=fetch exit=128 signal=none killed=false
+```
+
+Operation labels are `ls-remote`, `fetch`, `show`, `ls-tree`, `hash-object`, `mktree`, `commit-tree`, `push` and `rev-parse`; all other command names become `unknown`. Exit status is an integer from 0 through 255 or `unknown`, including for every string-valued error code. Signals are `SIGTERM`, `SIGKILL`, `SIGINT`, `SIGHUP`, `SIGQUIT`, `SIGABRT`, `SIGSEGV`, `SIGPIPE` or `SIGBUS`; absent signals become `none`, all others `unknown`. Killed status is true only for the boolean `true`.
+
+No arguments, URLs, output, environment or original error/cause are attached. Success results and rejection behavior remain unchanged; compare-and-swap still returns false on push failure and retains uncertainty about remote completion. No retries, timeout, buffer limit, concurrency or guard changes. `scripts/staging-railway.test.mjs`, `staging-campaign.mjs` and `staging-remote.mjs` are unchanged.
+
+Test-first evidence on Node v24.13.0 and Apple Git 2.54.0:
+
+- RED before source edits: `node --test --test-name-pattern='Git failures identify safe operations' scripts/staging-ledger.test.mjs` exited 1, one failed, zero cancelled, 60.342709 ms. The actual message was the old generic prefix; expected safe fetch metadata was absent.
+- GREEN after source edits: `node --test scripts/staging-ledger.test.mjs` exited 0, 6/6 passed, zero cancelled, 766.089125 ms. The five existing tests remain unchanged. The new test executes actual Git against an unavailable local path containing a secret-like sentinel, then executes an unknown command containing that sentinel. It asserts literal messages, no sentinel or temporary root in the stack, and only `message`/`stack` own properties. The unknown command reports `operation=unknown exit=1 signal=none killed=false`.
+- The unchanged two named cases, using the exact named-case command above, exited 0, 2/2 passed, zero cancelled, 7765.978625 ms. Case durations were 4326.130833 and 3402.069416 ms.
+- `git diff --check` and `node scripts/check-agent-docs.mjs` passed.
+
+No forced timeout or signal test was run; the local regression exercises ordinary exit failures and redaction. The signal/unknown-code classifications were inspected in source. No services, real network, staging mutation, CI run, broad suite or duplicate agents. Root owns later batch assembly and any hosted diagnostic run. The new metadata cannot recover information discarded by job `118683953732` and makes no claim about that job's underlying failure.
