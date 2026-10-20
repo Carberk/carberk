@@ -367,4 +367,76 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     await get("/api/v1/business/current", login).expect(200);
     expect(execute("reset", id).code).toBe(0);
   }));
+
+  // Elevation expiry is not exercised: identity composes the concrete SystemClockAdapter with no
+  // configuration seam, and this spec forbids provider overrides and Session writes. See the #901 handoff.
+  it("re-elevates a granted staff alias, consumes one backup code once, refuses a revoked grant on the next request and disposes exactly", () => withKnownJobs(async known => {
+    const id = "ab".repeat(16), roster = await seed(id);
+    const coordinator = await signIn(id, actor(roster, "coordinator"), known);
+    let staff = await signIn(id, actor(roster, "support"), known);
+    const staffId = actor(roster, "support").user_id;
+    // Authorized recovery of an absent business is refused after the authority check, before any write.
+    const recover = (login: Login) => post(`/api/v1/business/${randomUUID()}/recovery`, login,
+      { ownerUserId: actor(roster, "owner").user_id, evidence: "Synthetic lifecycle probe only", reason: "Disposable full-v3 grant lifecycle proof" });
+    const capabilities = async (login: Login) => (await get("/api/v1/staff/capabilities", login).expect(200)).body as { capabilities: string[]; elevated: boolean; adminTotpExpiresAt?: string };
+    const verify = (code: string) => post("/api/v1/auth/staff/totp/verify", staff, { code });
+
+    expect((await get("/api/v1/staff/capabilities", staff).expect(403)).body.details).toEqual({ reason: "CAPABILITY_REQUIRED" });
+    await elevate(coordinator);
+    await grant(coordinator, staffId, "founder.recovery").expect(204);
+    const enrollment = await post("/api/v1/auth/staff/totp/enroll", staff, {}).expect(201);
+    const first = (await verify(generateSync({ secret: enrollment.body.secret, strategy: "totp", period: 30 })).expect(201)).body as { adminTotpExpiresAt: string; backupCodes: string[] };
+    expect(first.backupCodes).toHaveLength(10);
+    expect((await recover(staff).expect(409)).body.details).toEqual({ reason: "RECOVERY_REQUIRED" });
+
+    // Ordinary refresh keeps the deadline; a later TOTP code re-elevates the same Session to a later one.
+    const refreshed = await request.post("/api/v1/auth/refresh").send({ refreshToken: staff.refreshToken }).expect(201);
+    staff = { ...staff, accessToken: refreshed.body.accessToken, refreshToken: refreshed.body.refreshToken };
+    expect(await capabilities(staff)).toEqual({ capabilities: ["founder.recovery"], elevated: true, adminTotpExpiresAt: first.adminTotpExpiresAt });
+    const reElevated = (await verify(generateSync({ secret: enrollment.body.secret, strategy: "totp", period: 30 })).expect(201)).body as { adminTotpExpiresAt: string };
+    expect(Object.keys(reElevated)).toEqual(["adminTotpExpiresAt"]);
+    expect(Date.parse(reElevated.adminTotpExpiresAt)).toBeGreaterThan(Date.parse(first.adminTotpExpiresAt));
+    expect((await capabilities(staff)).adminTotpExpiresAt).toBe(reElevated.adminTotpExpiresAt);
+
+    const backupCode = first.backupCodes[0]!;
+    const byBackup = (await verify(backupCode).expect(201)).body as { adminTotpExpiresAt: string };
+    expect(Object.keys(byBackup)).toEqual(["adminTotpExpiresAt"]);
+    expect(Date.parse(byBackup.adminTotpExpiresAt)).toBeGreaterThan(Date.parse(reElevated.adminTotpExpiresAt));
+    expect((await verify(backupCode).expect(400)).body.code).toBe("INVALID_TOTP");
+    expect((await capabilities(staff)).adminTotpExpiresAt).toBe(byBackup.adminTotpExpiresAt);
+    // No route reports remaining backup codes, so exact single consumption is read from storage.
+    expect(await db.totpBackupCode.count({ where: { totpEnrollment: { userId: staffId }, usedAt: { not: null } } })).toBe(1);
+    expect(await db.totpBackupCode.count({ where: { totpEnrollment: { userId: staffId }, usedAt: null } })).toBe(9);
+
+    await grant(coordinator, staffId, "founder.recovery", false).expect(204);
+    expect((await recover(staff).expect(403)).body.details).toEqual({ reason: "CAPABILITY_REQUIRED" });
+    expect((await get("/api/v1/staff/capabilities", staff).expect(403)).body.details).toEqual({ reason: "CAPABILITY_REQUIRED" });
+    expect((await verify(generateSync({ secret: enrollment.body.secret, strategy: "totp", period: 30 })).expect(403)).body.details).toEqual({ reason: "CAPABILITY_REQUIRED" });
+    expect(await db.session.count({ where: { userId: staffId } })).toBe(1);
+    await grant(coordinator, staffId, "founder.recovery").expect(204);
+    expect(await capabilities(staff)).toEqual({ capabilities: ["founder.recovery"], elevated: true, adminTotpExpiresAt: byBackup.adminTotpExpiresAt });
+    expect((await recover(staff).expect(409)).body.details).toEqual({ reason: "RECOVERY_REQUIRED" });
+    expect(await db.auditLog.findMany({ where: { targetType: "User", targetId: staffId }, orderBy: { createdAt: "asc" }, select: { actorId: true, action: true, details: true } })).toEqual([
+      { actorId: coordinator.user.id, action: "STAFF_CAPABILITY_GRANTED", details: { capability: "founder.recovery", reason: "Reservation-owned synthetic full-v3 acceptance", previouslyActive: false } },
+      { actorId: coordinator.user.id, action: "STAFF_CAPABILITY_REVOKED", details: { capability: "founder.recovery", reason: "Reservation-owned synthetic full-v3 acceptance", previouslyActive: true } },
+      { actorId: coordinator.user.id, action: "STAFF_CAPABILITY_GRANTED", details: { capability: "founder.recovery", reason: "Reservation-owned synthetic full-v3 acceptance", previouslyActive: false } },
+    ]);
+
+    const before = await owned(id);
+    const perTable: Record<string, number> = {};
+    for (const row of before) perTable[row.table_name] = (perTable[row.table_name] ?? 0) + 1;
+    expect(perTable).toEqual({ users: 15, sessions: 2, otp_requests: 2, totp_enrollments: 2, totp_backup_codes: 20, staff_grants: 3, audit_logs: 5, dealerships: 1, dealership_members: 1 });
+    expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_ledger ORDER BY request_id`)).toEqual(
+      [coordinator.requestId, staff.requestId].sort().map(request_id => ({ request_id })));
+    expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+    await assertDisposed(id, before);
+    const terminal = await digest(id);
+    expect(execute("reset", id)).toMatchObject({ code: 0, receipt: { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 } });
+    expect(await digest(id)).toBe(terminal);
+    await assertDisposed(id, before);
+    expect((await get("/api/v1/staff/capabilities", staff).expect(403)).body.details).toEqual({ reason: "SESSION_REQUIRED" });
+    await request.post("/api/v1/auth/refresh").send({ refreshToken: staff.refreshToken }).expect(401);
+    await request.post("/api/v1/auth/refresh").send({ refreshToken: coordinator.refreshToken }).expect(401);
+    expect(execute("fixture", id).code).toBe(1);
+  }));
 });
