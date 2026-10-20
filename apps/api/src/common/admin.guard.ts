@@ -9,11 +9,9 @@ import type { FastifyRequest } from "fastify";
 
 import {
   IDENTITY_CHECK_PORT,
-  IDENTITY_CLOCK_PORT,
-  IDENTITY_SESSION_REPOSITORY,
-  type ClockPort,
+  ADMIN_SESSION_ELEVATION_PORT,
+  type AdminSessionElevationPort,
   type IdentityCheckPort,
-  type SessionRepository,
 } from "../modules/identity/identity.public";
 
 interface JwtPayload {
@@ -27,10 +25,8 @@ export class AdminGuard implements CanActivate {
   constructor(
     @Inject(IDENTITY_CHECK_PORT)
     private readonly identityCheck: IdentityCheckPort,
-    @Inject(IDENTITY_SESSION_REPOSITORY)
-    private readonly sessionRepo: SessionRepository,
-    @Inject(IDENTITY_CLOCK_PORT)
-    private readonly clock: ClockPort,
+    @Inject(ADMIN_SESSION_ELEVATION_PORT)
+    private readonly elevation: AdminSessionElevationPort,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -58,23 +54,25 @@ export class AdminGuard implements CanActivate {
       });
     }
 
-    const session = await this.sessionRepo.findById(user.sid);
-    if (!session || session.userId !== user.sub) {
+    const result = await this.elevation.check({
+      userId: user.sub,
+      sessionId: user.sid,
+    });
+    if (result === "session-required") {
       throw new ForbiddenException({
         code: "FORBIDDEN",
         message: "Admin TOTP elevation required",
       });
     }
 
-    const now = this.clock.now();
-    if (session.expiresAt <= now) {
+    if (result === "session-expired") {
       throw new ForbiddenException({
         code: "FORBIDDEN",
         message: "Admin session expired",
       });
     }
 
-    if (!session.adminTotpExpiresAt || session.adminTotpExpiresAt <= now) {
+    if (result === "elevation-expired") {
       throw new ForbiddenException({
         code: "FORBIDDEN",
         message: "Admin TOTP elevation expired",

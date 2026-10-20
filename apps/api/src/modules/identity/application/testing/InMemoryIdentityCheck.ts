@@ -1,7 +1,14 @@
 import type { IdentityCheckPort } from "../../domain/ports/IdentityCheckPort";
 
-/** `IdentityCheckPort` with suspension held in memory; other checks answer no. */
+/** `IdentityCheckPort` with admin and suspension state held in memory. */
 export class InMemoryIdentityCheck implements IdentityCheckPort {
+  private readonly admins = new Set<string>();
+
+  setAdmin(userId: string, isAdmin: boolean): void {
+    if (isAdmin) this.admins.add(userId);
+    else this.admins.delete(userId);
+  }
+
   private readonly suspended = new Set<string>();
 
   suspend(userId: string): void {
@@ -12,8 +19,8 @@ export class InMemoryIdentityCheck implements IdentityCheckPort {
     this.suspended.delete(userId);
   }
 
-  async isAdmin(_userId: string): Promise<boolean> {
-    return false;
+  async isAdmin(userId: string): Promise<boolean> {
+    return this.admins.has(userId);
   }
 
   async isInDealership(_userId: string, _dealershipId: string): Promise<boolean> {
