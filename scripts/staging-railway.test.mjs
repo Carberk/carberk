@@ -4,7 +4,7 @@ import { RailwayPlatform } from './staging-railway.mjs';
 import { StagingControl } from './staging-control.mjs';
 import { GitLedger } from './staging-ledger.mjs';
 import { retainedSchemaProfile } from './staging-schema.mjs';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -290,19 +290,27 @@ test('business adapter requires reviewed authorization before provider effects',
 
 // Real controller, Railway adapter and Git CAS ledger. Only Railway HTTP/SSH,
 // clock and IDs are faked. Git objects/remotes are isolated temporary storage.
-async function businessLifecycle(t) {
+function businessObjectSource(checkout = process.cwd()) {
+  return async () => {
+    const git = (...args) => execFileSync('git', args, { cwd: checkout, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    const candidate = git('rev-parse', 'HEAD');
+    const shallow = git('rev-parse', '--is-shallow-repository') === 'true';
+    return { candidate, source: shallow ? git('remote', 'get-url', 'origin') : checkout };
+  };
+}
+const businessSource = businessObjectSource();
+
+async function businessLifecycle(t, objectSource = businessSource) {
   const root = await mkdtemp(join(tmpdir(), 'business-lifecycle-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   const remote = join(root, 'shared.git');
   execFileSync('git', ['init', '--bare', remote], { stdio: 'ignore' });
   const ledger = new GitLedger({ directory: join(root, 'objects'), remote });
   await ledger.initialize();
-  const candidate = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  const { candidate, source } = await objectSource();
   // A shallow CI checkout cannot supply the baseline or the candidate's
   // complete parents for the fixture push. Fetch both exact objects directly
   // into scratch storage from its configured origin instead.
-  const shallow = execFileSync('git', ['rev-parse', '--is-shallow-repository'], { encoding: 'utf8' }).trim() === 'true';
-  const source = shallow ? execFileSync('git', ['remote', 'get-url', 'origin'], { encoding: 'utf8' }).trim() : process.cwd();
   for (const ref of [candidate, retainedSchemaProfile.baseline]) await ledger.git(['fetch', '--no-tags', source, ref]);
   const tree = await ledger.git(['rev-parse', `${candidate}^{tree}`]);
   let main = await ledger.git(['commit-tree', tree, '-p', candidate, '-m', 'Test main runtime']);
@@ -395,6 +403,36 @@ let input = ''; process.stdin.on('data', value => input += value); process.stdin
   };
   return { control, restart, ledger, platform, claim, network, edit, moveMain, main, migrations, refuseCompletion };
 }
+
+test('business lifecycle reuses immutable shallow origin objects after first acquisition with isolated ledgers', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'business-source-regression-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const origin = join(root, 'origin.git');
+  const seed = new GitLedger({ directory: origin, remote: process.cwd() });
+  await seed.initialize();
+  const candidate = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  for (const revision of [candidate, retainedSchemaProfile.baseline]) {
+    await seed.git(['fetch', '--no-tags', process.cwd(), revision]);
+    await seed.git(['update-ref', `refs/heads/${revision === candidate ? 'candidate' : 'baseline'}`, revision]);
+  }
+  const checkout = join(root, 'shallow');
+  execFileSync('git', ['clone', '--quiet', '--depth=1', '--branch=candidate', `file://${origin}`, checkout], { stdio: 'ignore' });
+  assert.equal(execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: checkout, encoding: 'utf8' }).trim(), 'true');
+  const source = businessObjectSource(checkout);
+  const first = await businessLifecycle(t, source);
+  await rename(origin, join(root, 'unavailable-origin.git'));
+  const second = await businessLifecycle(t, source);
+  assert.equal(first.claim.candidate, candidate);
+  assert.equal(second.claim.candidate, candidate);
+  for (const revision of [candidate, retainedSchemaProfile.baseline]) {
+    assert.equal(await second.ledger.git(['rev-parse', `${revision}^{commit}`]), revision);
+    assert.equal(await second.ledger.git(['rev-parse', `${revision}^{tree}`]), await first.ledger.git(['rev-parse', `${revision}^{tree}`]));
+  }
+  assert.notEqual(first.ledger.directory, second.ledger.directory);
+  assert.notEqual(first.ledger.remote, second.ledger.remote);
+  await first.edit(lease => { lease.owner = 'bob'; });
+  assert.equal((await second.control.inspect()).reservation.owner, 'alice');
+});
 
 test('business reset persists independently probed storage disposal before restoration and release', async t => {
   const { control, claim, network, main } = await businessLifecycle(t);
