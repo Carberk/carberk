@@ -287,6 +287,99 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
     };
   }
 
+  /**
+   * The real client, observed. Every command goes to MinIO unchanged, with its
+   * own signal, and gets MinIO's own answer. Each one is recorded when issued
+   * and marked once answered, and `issued` resolves when that exact command
+   * has been sent, so a test waits on the product's own request, not on time.
+   */
+  function observedS3() {
+    const calls: { command: string; Key: string | undefined; answered: boolean }[] = [];
+    const waiters: { command: string; Key: string; resolve: () => void }[] = [];
+    const forward = s3.send.bind(s3) as (command: unknown, options?: unknown) => Promise<unknown>;
+    const send = (command: { constructor: { name: string }; input: { Key?: string } }, options?: unknown) => {
+      const call = { command: command.constructor.name, Key: command.input.Key, answered: false };
+      calls.push(call);
+      for (const waiter of waiters) if (waiter.command === call.command && waiter.Key === call.Key) waiter.resolve();
+      return forward(command, options).finally(() => { call.answered = true; });
+    };
+    return {
+      client: { send } as unknown as Pick<S3Client, "send">,
+      calls,
+      issued: (command: string, Key: string) => new Promise<void>((resolve) => {
+        if (calls.some((call) => call.command === command && call.Key === Key)) resolve();
+        else waiters.push({ command, Key, resolve });
+      }),
+    };
+  }
+
+  /**
+   * NP-4 ordering on the real store. MinIO serializes requests on one key, so a
+   * request for the key a conditional PUT is still writing waits for that PUT
+   * (hosted run d70406b0: a HEAD of the held key answered only once the PUT
+   * aborted at its 10 s budget). This runs the product sweep on an observed
+   * client until it has issued the DELETE of exactly that key. While the PUT is
+   * still held it proves cleanup is pending there: work leased and RETIRED, the
+   * keys before it gone, the keys after it untouched, and that DELETE still
+   * unanswered after later requests to the same store were answered. Only
+   * then is the PUT released. No sleep: every step waits on a real answer.
+   */
+  async function sweepAgainstHeldPut(uploadId: string, heldKey: string, held: ReturnType<typeof heldGeneratorPut>) {
+    const keys = [...(await workOf(uploadId)).objectKeys];
+    const index = keys.indexOf(heldKey);
+    const observed = observedS3();
+    const sweep = new CleanRetiredUploads(ledger, new S3RetiredObjectStore(observed.client))
+      .execute({ now: SWEEP, limit: 10 });
+    try {
+      expect(index).toBeGreaterThanOrEqual(0);
+      await Promise.race([observed.issued("DeleteObjectCommand", heldKey), sweep.then((result) => {
+        throw new Error(`Cleanup settled before it deleted the held key: ${JSON.stringify(result)}`);
+      })]);
+
+      expect(await workOf(uploadId)).toMatchObject({ status: "PENDING", attempts: 1, completedAt: null });
+      expect(await stateOf(uploadId)).toBe("RETIRED");
+      expect(await presentInBudget(keys.slice(0, index))).toBe(0);
+      expect(await presentInBudget(keys.slice(index + 1))).toBe(keys.length - index - 1);
+      expect(observed.calls).toEqual([
+        { command: "GetBucketVersioningCommand", Key: undefined, answered: true },
+        ...keys.slice(0, index).map((Key) => ({ command: "DeleteObjectCommand", Key, answered: true })),
+        { command: "DeleteObjectCommand", Key: heldKey, answered: false },
+      ]);
+      expect(held.inFlight()).toBe(true);
+    } finally {
+      held.release();
+    }
+    const put = await held.outcome;
+    return { put, sweep: await sweep, keys, calls: observed.calls };
+  }
+
+  /** The rest of NP-4, after the held PUT and the sweep both answered. */
+  async function expectWrittenThenDeleted(
+    uploadId: string,
+    { put, sweep, keys, calls }: Awaited<ReturnType<typeof sweepAgainstHeldPut>>,
+    foreign: Awaited<ReturnType<typeof foreignStock>>,
+  ) {
+    // Written, not aborted or refused: the PUT matched the kept bytes' ETag before the DELETE took the key.
+    expect(put).toBe("written");
+    expect(sweep).toEqual({ cancelledPreparations: 0, deleted: 1, waiting: 0 });
+    expect(calls).toEqual([
+      { command: "GetBucketVersioningCommand", Key: undefined, answered: true },
+      ...keys.map((Key) => ({ command: "DeleteObjectCommand", Key, answered: true })),
+      ...keys.map((Key) => ({ command: "HeadObjectCommand", Key, answered: true })),
+    ]);
+    expect(await workOf(uploadId)).toMatchObject({ status: "DONE", attempts: 1, lastError: null });
+    expect(await stateOf(uploadId)).toBe("DELETED");
+    // The DELETE came after the write, so nothing it wrote survives.
+    expect(await present(keys)).toBe(0);
+    await foreign.expectIntact();
+
+    // A late sweep finds no work and touches storage not at all.
+    const late = observedS3();
+    expect(await new CleanRetiredUploads(ledger, new S3RetiredObjectStore(late.client)).execute({ now: SWEEP, limit: 10 }))
+      .toEqual({ cancelledPreparations: 0, deleted: 0, waiting: 0 });
+    expect(late.calls).toEqual([]);
+  }
+
   it("cleans an expired historical nine-object placeholder through the existing fenced ledger", async () => {
     const upload = await retiredUpload({ historicalPlaceholder: true });
     const result = await new CleanRetiredUploads(new PrismaRetiredUploadLedger(prisma), new S3RetiredObjectStore(s3)).execute({ now: SWEEP, limit: 10 });
@@ -366,7 +459,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
       .toMatchObject({ claimToken: null, claimDeadline: null });
   });
 
-  it("NP-4 publish: a generator PUT held across claim recovery, ordinary retirement and cleanup resurrects nothing", async () => {
+  it("NP-4 publish: cleanup waits for a generator PUT held across claim recovery and ordinary retirement, then nothing survives", async () => {
     const foreign = await foreignStock();
     // retiredUpload's claim target is a Listing id that does not exist yet: a publish claim.
     const upload = await retiredUpload({ preparing: true });
@@ -383,7 +476,8 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
         state: "AVAILABLE", claimToken: null, claimDeadline: null, claimTargetType: null, claimTargetId: null, retiredAt: null,
       });
       expect(await prisma.mediaUploadCleanup.count({ where: { uploadId: upload.id } })).toBe(0);
-      expect(await presentInBudget(upload.keys)).toBe(5);
+      // The held key is not read here: MinIO would queue the read behind the PUT. Its kept bytes are proven by the PUT's If-Match.
+      expect(await presentInBudget(upload.keys.filter((Key) => Key !== thumbnail))).toBe(4);
       expect(held.inFlight()).toBe(true);
 
       // Only a retirement of the unclaimed upload records deletion work; the fixture prepares it.
@@ -391,24 +485,16 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
       const work = await workOf(upload.id);
       expect(work).toMatchObject({ status: "PENDING", attempts: 0, key: upload.key, writeProtocol: "conditional-v1" });
       expect([...work.objectKeys].sort()).toEqual([...upload.keys].sort());
-
-      expect(await job.execute({ now: SWEEP, limit: 10 })).toEqual({ cancelledPreparations: 0, deleted: 1, waiting: 0 });
-      expect(await workOf(upload.id)).toMatchObject({ status: "DONE" });
-      expect(await stateOf(upload.id)).toBe("DELETED");
-      expect(await presentInBudget(upload.keys)).toBe(0);
       expect(held.inFlight()).toBe(true);
 
-      held.release();
-      expect([404, 409, 412]).toContain(await held.outcome);
-      expect(await present(upload.keys)).toBe(0);
-      await foreign.expectIntact();
+      await expectWrittenThenDeleted(upload.id, await sweepAgainstHeldPut(upload.id, thumbnail, held), foreign);
     } finally {
       held.release();
       await held.outcome;
     }
   }, 4 * REQUEST_BUDGET_MS);
 
-  it("NP-4 attach: a generator PUT held across claim recovery and cleanup resurrects nothing", async () => {
+  it("NP-4 attach: cleanup waits for a generator PUT held across claim recovery, then nothing survives", async () => {
     const foreign = await foreignStock();
     const upload = await retiredUpload({ preparing: true });
     const target = await listing();
@@ -429,19 +515,11 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
       const work = await workOf(upload.id);
       expect(work).toMatchObject({ status: "PENDING", attempts: 0, key: upload.key, writeProtocol: "conditional-v1" });
       expect([...work.objectKeys].sort()).toEqual([...upload.keys].sort());
-      expect(await presentInBudget(upload.keys)).toBe(5);
+      // As in publish, the held key is proven by the PUT's If-Match rather than read behind it.
+      expect(await presentInBudget(upload.keys.filter((Key) => Key !== thumbnail))).toBe(4);
       expect(held.inFlight()).toBe(true);
 
-      expect(await job.execute({ now: SWEEP, limit: 10 })).toEqual({ cancelledPreparations: 0, deleted: 1, waiting: 0 });
-      expect(await workOf(upload.id)).toMatchObject({ status: "DONE", attempts: 1 });
-      expect(await stateOf(upload.id)).toBe("DELETED");
-      expect(await presentInBudget(upload.keys)).toBe(0);
-      expect(held.inFlight()).toBe(true);
-
-      held.release();
-      expect([404, 409, 412]).toContain(await held.outcome);
-      expect(await present(upload.keys)).toBe(0);
-      await foreign.expectIntact();
+      await expectWrittenThenDeleted(upload.id, await sweepAgainstHeldPut(upload.id, thumbnail, held), foreign);
     } finally {
       held.release();
       await held.outcome;
