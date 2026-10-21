@@ -37,7 +37,8 @@ const retained = ["public._prisma_migrations", "public.body_types", "public.bran
 const migrations = readdirSync(join(packageRoot, "prisma", "migrations"))
   .filter(name => statSync(join(packageRoot, "prisma", "migrations", name)).isDirectory()).sort();
 
-type Outcome = { code: number; failure: string; receipt?: Record<string, unknown>; queries: number };
+type SqlSubprocess = { status: number | null; signal: NodeJS.Signals | null; error: string | undefined; markers: number; sqlDiagnostic: string | undefined };
+type Outcome = { code: number; failure: string; receipt?: Record<string, unknown>; queries: number; subprocesses?: SqlSubprocess[] };
 type Digest = { schema: string; retained: string; disposable: string };
 const blindDigest: Digest = { schema: "0".repeat(64), retained: "0".repeat(64), disposable: "0".repeat(64) };
 const digestShape = { schema: expect.stringMatching(hex64), retained: expect.stringMatching(hex64), disposable: expect.stringMatching(hex64) };
@@ -100,6 +101,7 @@ describe("staging clean-reset remote operation on disposable application schema"
 
   function execute(payload: unknown, env = containerEnv()): Outcome {
     let receipt: Record<string, unknown> | undefined; let code = 0; let failure = ""; let queries = 0;
+    const subprocesses: SqlSubprocess[] = [];
     const process = { execPath: globalThis.process.execPath, env, exitCode: 0 };
     let program: string;
     try { program = cleanResetProgram(payload); } catch (error) { return { code: 1, failure: error instanceof Error ? error.message : String(error), queries }; }
@@ -107,16 +109,23 @@ describe("staging clean-reset remote operation on disposable application schema"
       spawnSync: (command: string, _args: string[], options: { input: string }) => {
         if (command !== "psql") return { status: 1, stdout: "", stderr: "", error: new Error("Unsupported remote subprocess") };
         queries++;
-        return spawnSync(globalThis.process.execPath, [`${root}/scripts/testing/query-disposable-postgres.cjs`], {
+        const result = spawnSync(globalThis.process.execPath, [`${root}/scripts/testing/query-disposable-postgres.cjs`], {
           input: options.input, encoding: "utf8", timeout: 30000,
-          env: { ...globalThis.process.env, STAGING_CONTROL_TEST_DATABASE_URL: databaseUrl, STAGING_TEST_DB_PACKAGE: `${packageRoot}/package.json` },
+          env: { ...globalThis.process.env, STAGING_CONTROL_TEST_DATABASE_URL: databaseUrl, STAGING_TEST_DB_PACKAGE: `${packageRoot}/package.json`, STAGING_TEST_SQL_DIAGNOSTICS: "1" },
         });
+        // Retain status and bounded SQLSTATE metadata only, never SQL, rows, stderr or error messages.
+        const errorCode = (result.error as NodeJS.ErrnoException | undefined)?.code;
+        subprocesses.push({ status: result.status, signal: result.signal,
+          error: result.error ? errorCode && ["ETIMEDOUT", "ENOBUFS", "ENOENT", "EACCES", "EINTR", "EINVAL"].includes(errorCode) ? errorCode : "other" : undefined,
+          markers: result.stdout?.split("\n").filter(line => line.startsWith("clean-reset:")).length ?? 0,
+          sqlDiagnostic: result.stderr?.slice(0, 8192).split(/\r?\n/).find(line => /^Disposable database SQL diagnostic: SQLSTATE=[A-Z0-9]{5}(?: position=[0-9]{1,10})?(?: internalPosition=[0-9]{1,10})?$/.test(line)) });
+        return result;
       },
     } : localRequire(name), console: {
       log: (value: string) => { receipt = JSON.parse(value) as Record<string, unknown>; },
       error: (...values: unknown[]) => { code = 1; failure = values.map(String).join(" "); },
     } });
-    return { code: code || process.exitCode, failure, receipt, queries };
+    return { code: code || process.exitCode, failure, receipt, queries, subprocesses };
   }
   async function run(payload: unknown, env = containerEnv()): Promise<Outcome> { await settle(); return execute(payload, env); }
 
@@ -331,7 +340,10 @@ describe("staging clean-reset remote operation on disposable application schema"
     const refusals = ["Clean reset refused: Inventory changed since observation", "Clean reset refused: Clean-reset operation identity changed"];
     for (const [label, input, environment] of mismatches) {
       const outcome = await run(input, environment);
-      expect({ label, code: outcome.code, receipt: outcome.receipt, refused: refusals.includes(outcome.failure) }).toEqual({ label, code: 1, receipt: undefined, refused: true });
+      // The remote program sanitizes failure; Vitest emits this context only when the original assertion fails.
+      expect({ label, code: outcome.code, receipt: outcome.receipt, refused: refusals.includes(outcome.failure) },
+        JSON.stringify({ label, failure: outcome.failure, queries: outcome.queries, subprocesses: outcome.subprocesses }))
+        .toEqual({ label, code: 1, receipt: undefined, refused: true });
       expect(await files()).toEqual(stored);
       expect(await snapshot()).toEqual(current);
     }
