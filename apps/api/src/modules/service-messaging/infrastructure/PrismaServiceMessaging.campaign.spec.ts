@@ -17,7 +17,7 @@ function harness(options: { ordinary?: boolean; enabled?: boolean; begin?: Campa
   "user.findUnique": { id: subject.userId, deletionScheduledAt: null, suspendedAt: null },
   "session.findUnique": { id: subject.sessionId, userId: subject.userId, expiresAt: new Date(Date.now() + 3600000) },
   "serviceConversation.findUnique": conversation, "serviceConversation.findUniqueOrThrow": conversation,
-  "supportCase.findUnique": null,
+  "supportCase.findUnique": null, "serviceConversation.findMany": [],
   "supportCase.create": { id: caseId }, "serviceConversation.create": { id: conversationId },
  };
  const model = (name: string) => new Proxy({}, { get: (_target, method: string) => async () => {
@@ -47,6 +47,13 @@ describe("campaign Support text admission at the service boundary", () => {
   expect(await service.open(subject, "support")).toEqual({ id: conversationId, resourceId: caseId });
   expect(campaign).toEqual(["begin", "principal"]);
   expect(writes).toEqual(["supportCase.create", "serviceConversation.create"]);
+ });
+ it("lists only the admitted principal's own conversations without graph admission", async () => {
+  const { service, writes, campaign } = harness();
+  expect(await service.mine(subject)).toEqual([]);
+  expect(campaign).toEqual(["begin", "principal"]);
+  expect(writes).toEqual([]);
+  expect(await code(harness({ admitted: [false] }).service.mine(subject))).toBe("COLLECTION_DISABLED");
  });
  it("refuses Support open without writes when the principal is not admitted or not a reservation principal", async () => {
   for (const options of [{ admitted: [false] }, { begin: null }]) {
