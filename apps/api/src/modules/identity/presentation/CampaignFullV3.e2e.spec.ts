@@ -1806,6 +1806,407 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     });
   }));
 
+  // Additive owned-resource proofs. Literal accounting: full-v3-support-owned-worker-race-tests-20261021.md.
+  type SupportRaceSql = { connect(): Promise<void>; end(): Promise<void>; query<T>(sql: string, values?: unknown[]): Promise<{ rows: T[] }> };
+  async function supportRaceSql() {
+    const { Client } = createRequire(`${packageRoot}/package.json`)("pg") as { Client: new (options: { connectionString: string | undefined }) => SupportRaceSql };
+    const client = new Client({ connectionString: process.env["DATABASE_URL"] });
+    await client.connect();
+    return client;
+  }
+  async function supportRaceSnapshot(id: string) {
+    const content = [];
+    for (const record of await owned(id)) {
+      expect([...tables, ...serviceTables, "service_erasure_fences"]).toContain(record.table_name);
+      content.push({ ...record, rows: await rows(`SELECT to_jsonb(t) AS value FROM public.${record.table_name} t WHERE to_jsonb(t) @> $1::jsonb`, JSON.stringify(record.row_key)) });
+    }
+    return { journal: await digest(id), content };
+  }
+  async function supportRaceJournal(id: string, recordCount: number, eventCount: number) {
+    const records = await rows<RecordKey & { version: bigint; deleted: boolean; row_hash: string }>(`SELECT * FROM "cf_${id}".campaign_records ORDER BY table_name,row_key::text`);
+    const events = await rows<{ table_name: string; row_key: Record<string, string>; mutation: string; row_hash: string }>(`SELECT table_name,row_key,mutation,row_hash FROM "cf_${id}".campaign_events ORDER BY sequence`);
+    expect(records).toHaveLength(recordCount);
+    expect(events).toHaveLength(eventCount);
+    expect(recordCount).toBeLessThanOrEqual(128);
+    expect(eventCount).toBeLessThanOrEqual(2048);
+    for (const record of records) {
+      expect([...tables, ...serviceTables, "service_erasure_fences"]).toContain(record.table_name);
+      const history = events.filter(event => event.table_name === record.table_name && JSON.stringify(event.row_key) === JSON.stringify(record.row_key));
+      expect(Number(record.version)).toBe(history.length);
+      expect(history.map(event => event.mutation)).toEqual(["INSERT", ...Array<string>(history.length - 1 - Number(record.deleted)).fill("UPDATE"), ...(record.deleted ? ["DELETE"] : [])]);
+      expect(history.at(-1)?.row_hash).toBe(record.row_hash);
+      expect(await rows(`SELECT md5(to_jsonb(t)::text) AS hash FROM public.${record.table_name} t WHERE to_jsonb(t) @> $1::jsonb`, JSON.stringify(record.row_key))).toEqual(record.deleted ? [] : [{ hash: record.row_hash }]);
+    }
+    expect(events.every(event => records.some(record => record.table_name === event.table_name && JSON.stringify(record.row_key) === JSON.stringify(event.row_key)))).toBe(true);
+    return { records, events };
+  }
+  async function supportRaceGraph(id: string, known: Set<string>) {
+    const prior = new Set(known), roster = await seed(id);
+    const { staff } = await elevatedStaff(id, roster, known, ["support.operations"]);
+    const customer = await signIn(id, actor(roster, "buyer-a"), known);
+    await supportRaceJournal(id, 51, 61);
+    const opened = await post("/api/v1/services/conversations", customer, { purpose: "support", synthetic: true }).expect(201);
+    const conversationId = opened.body.id as string, resourceId = opened.body.resourceId as string;
+    const path = `/api/v1/services/conversations/${conversationId}`;
+    const first = await post(`${path}/messages`, customer, { clientMessageId: randomUUID(), body: "Synthetic owned worker request", visibility: "customer" }).expect(201);
+    await post(`${path}/assignment`, staff, { expectedVersion: 0 }).expect(201);
+    const reply = await post(`${path}/messages`, staff, { clientMessageId: randomUUID(), body: "Synthetic owned worker resolution", visibility: "customer", supportKind: "reply" }).expect(201);
+    await post(`${path}/support`, staff, { kind: "close_resolved" }).expect(201);
+    const closed = await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } });
+    expect(closed).toMatchObject({ status: "closed", closedAt: expect.any(Date), unansweredSince: null, assignmentVersion: 1 });
+    const audits = await db.serviceAudit.findMany({ where: { resourceId }, orderBy: { id: "asc" } });
+    expect(audits.map(audit => audit.action).sort()).toEqual(["SERVICE_ASSIGN", "SERVICE_HANDOVER", "SERVICE_NOTE", "SERVICE_SEND", "SUPPORT_CLOSE_RESOLVED", "SUPPORT_CUSTOMER_MESSAGE", "SUPPORT_REPLY"]);
+    const outbox = await db.serviceOutbox.findMany({ where: { conversationId }, orderBy: { sequence: "asc" } });
+    expect(outbox.map(row => ({ eventType: row.eventType, sequence: row.sequence, lifecycleEpoch: row.lifecycleEpoch }))).toEqual([
+      { eventType: "message", sequence: 1, lifecycleEpoch: 0 }, { eventType: "handover", sequence: 2, lifecycleEpoch: 0 }, { eventType: "message", sequence: 3, lifecycleEpoch: 0 },
+    ]);
+    await supportRaceJournal(id, 65, 82);
+    return { id, customer, path, conversationId, resourceId, closed, audits, outbox, messageIds: [first.body.id as string, reply.body.id as string], requestIds: [...known].filter(requestId => !prior.has(requestId)) };
+  }
+  type SupportRaceGraph = Awaited<ReturnType<typeof supportRaceGraph>>;
+  const supportRaceEmpty = { supportPurged: 0, attachmentsRetired: 0, cleanupsCompleted: 0 };
+  const supportRaceReceipt = { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 };
+  async function supportRaceReopen(graph: SupportRaceGraph) {
+    const sent = await post(`${graph.path}/messages`, graph.customer, { clientMessageId: randomUUID(), body: "Synthetic owned worker reopening", visibility: "customer" }).expect(201);
+    expect(await db.supportCase.findUniqueOrThrow({ where: { id: graph.resourceId } })).toMatchObject({ status: "open", closedAt: null, unansweredSince: expect.any(Date), assignmentVersion: 1 });
+    await supportRaceJournal(graph.id, 68, 87);
+    return sent;
+  }
+  async function supportRaceStorage() {
+    const http = localRequire("node:http") as typeof import("node:http");
+    const endpoint = new URL(process.env["MINIO_ENDPOINT"]!);
+    expect(endpoint.protocol).toBe("http:");
+    const { CreateBucketCommand } = localRequire("@aws-sdk/client-s3") as typeof import("@aws-sdk/client-s3");
+    const s3 = new S3Client({ endpoint: endpoint.origin, region: process.env["MINIO_REGION"] ?? "us-east-1", forcePathStyle: true,
+      credentials: { accessKeyId: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin", secretAccessKey: process.env["MINIO_SECRET_KEY"] ?? "minioadmin" } });
+    try { await s3.send(new CreateBucketCommand({ Bucket: "service-private" })); }
+    catch (error) { if (!(error instanceof Error) || !["BucketAlreadyExists", "BucketAlreadyOwnedByYou"].includes(error.name)) throw error; }
+    finally { s3.destroy(); }
+    let requests = 0, forwardingFailures = 0;
+    const server = http.createServer((incoming, outgoing) => {
+      requests++;
+      // Forward original request headers and streaming bytes; retain only sanitized counters.
+      const upstream = http.request({ hostname: endpoint.hostname, port: endpoint.port, method: incoming.method, path: incoming.url, headers: incoming.rawHeaders }, response => {
+        outgoing.writeHead(response.statusCode!, response.rawHeaders);
+        response.pipe(outgoing);
+      });
+      upstream.on("error", () => { forwardingFailures++; outgoing.destroy(); });
+      incoming.on("error", () => upstream.destroy());
+      incoming.pipe(upstream);
+    });
+    await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Worker storage recorder unavailable");
+    return { endpoint: `http://127.0.0.1:${address.port}`, counts: () => ({ requests, forwardingFailures }), close: async () => {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    } };
+  }
+  function supportRaceWorker(now: Date, endpoint: string) {
+    const tag = `support-race-${randomUUID()}`;
+    const database = new URL(process.env["DATABASE_URL"]!);
+    database.searchParams.set("application_name", tag);
+    let child: ReturnType<typeof execFile>;
+    const result = new Promise<{ supportPurged: number; attachmentsRetired: number; cleanupsCompleted: number }>((resolve, reject) => {
+      child = execFile(process.execPath, ["-e", `
+        require('reflect-metadata'); require('tsx/cjs');
+        const { PrismaService } = require('@auto-tm/db');
+        const { S3Client } = require('@aws-sdk/client-s3');
+        const { ExpireServiceContent } = require('./src/jobs/ExpireServiceContent.ts');
+        const { S3RetiredObjectStore } = require('./src/jobs/S3RetiredObjectStore.ts');
+        (async () => {
+          const db = new PrismaService();
+          const s3 = new S3Client({ endpoint: process.env.MINIO_ENDPOINT, region: process.env.MINIO_REGION ?? 'us-east-1', forcePathStyle: true,
+            credentials: { accessKeyId: process.env.MINIO_ACCESS_KEY ?? 'minioadmin', secretAccessKey: process.env.MINIO_SECRET_KEY ?? 'minioadmin' } });
+          try { console.log(JSON.stringify(await new ExpireServiceContent(db, new S3RetiredObjectStore(s3, 'service-private')).execute(new Date(process.argv[1])))); }
+          finally { s3.destroy(); await db.onModuleDestroy(); }
+        })().catch(() => { console.error('Owned Support worker refused'); process.exitCode = 1; });
+      `, now.toISOString()], { timeout: 30000, cwd: `${root}/apps/worker`, env: { ...process.env, DATABASE_URL: database.toString(), MINIO_ENDPOINT: endpoint, TSX_TSCONFIG_PATH: `${root}/apps/worker/tsconfig.json` } }, (error, stdout) => {
+        if (error) reject(new Error("Owned Support worker failed before result"));
+        else { try { resolve(JSON.parse(stdout.trim())); } catch { reject(new Error("Owned Support worker result invalid")); } }
+      });
+    });
+    // Attach immediately so a failed barrier never leaves an unhandled child rejection.
+    const settled = result.then(value => ({ value, error: undefined }), (error: unknown) => ({ value: undefined, error }));
+    return { tag, result, settle: async () => {
+      if (child!.exitCode === null) child!.kill("SIGTERM");
+      return settled;
+    } };
+  }
+  function supportRaceReset(id: string) {
+    const tag = `support-reset-${randomUUID()}`;
+    const database = new URL(process.env["DATABASE_URL"]!);
+    database.searchParams.set("application_name", tag);
+    // Add only a thread-local PostgreSQL observation tag to the existing operator transport.
+    // Run the identical existing operator/transport harness away from this event loop.
+    // Every SQL/Redis child retains execute's existing 30s bound. Do not terminate
+    // this worker before its synchronous children settle; wait for its natural exit.
+    const worker = new NodeWorker(`
+      const { parentPort, workerData } = require('node:worker_threads');
+      const { spawnSync } = require('node:child_process');
+      const { createRequire } = require('node:module');
+      const { runInNewContext } = require('node:vm');
+      const { root, packageRoot, profile, candidate, source, id } = workerData;
+      const localRequire = createRequire(root + '/apps/api/package.json');
+      const remoteProcess = { execPath: process.execPath, exitCode: 0, env: {
+        STAGING_CAMPAIGN_PROFILE_ENABLED: profile,
+        RAILWAY_PROJECT_ID: 'v3-project', RAILWAY_ENVIRONMENT_ID: 'v3-staging', RAILWAY_SERVICE_ID: 'v3-api', RAILWAY_ENVIRONMENT_NAME: 'staging',
+        APP_ENV: 'staging', SMS_DRIVER: 'mock', AUTOTM_COMMIT_SHA: candidate,
+        DATABASE_URL: 'postgresql://fixture:synthetic@postgres.railway.internal:5432/railway', REDIS_URL: 'redis://fixture:synthetic@redis.railway.internal:6379/0',
+        MINIO_ENDPOINT: 'http://minio.railway.internal:9000', MINIO_PUBLIC_URL: 'https://media.example',
+      } };
+      const payload = { kind: 'reset', id, namespace: 'cf_' + id, profile, candidate, target: candidate,
+        redisOrigin: 'redis://redis.railway.internal:6379/0', identity: { projectId: 'v3-project', environmentId: 'v3-staging', services: { api: 'v3-api' },
+          origins: { database: 'postgresql://postgres.railway.internal:5432/railway', media: 'http://minio.railway.internal:9000', publicMedia: 'https://media.example' } } };
+      let code = 0, receipt, sqlCalls = 0;
+      const program = runInNewContext(source + '; remoteProgram(payload)', { payload });
+      runInNewContext(program, { URL, process: remoteProcess, require: name => name === 'node:child_process' ? {
+        spawnSync: (binary, args, spawnOptions) => {
+          if (binary === process.execPath) return spawnSync(binary, args, { ...spawnOptions, encoding: 'utf8', timeout: 30000, cwd: root + '/apps/api', env: { ...process.env,
+            ...(process.env.APP_ENV === 'test' && ['localhost', '127.0.0.1'].includes(new URL(process.env.MINIO_ENDPOINT ?? 'http://invalid').hostname)
+              ? { MINIO_ACCESS_KEY: process.env.MINIO_ACCESS_KEY ?? 'minioadmin', MINIO_SECRET_KEY: process.env.MINIO_SECRET_KEY ?? 'minioadmin' } : {}) } });
+          sqlCalls += 1;
+          return spawnSync(process.execPath, [root + '/scripts/testing/query-disposable-postgres.cjs'], {
+            input: spawnOptions.input, encoding: 'utf8', timeout: 30000,
+            env: { ...process.env, STAGING_CONTROL_TEST_DATABASE_URL: process.env.DATABASE_URL, STAGING_TEST_DB_PACKAGE: packageRoot + '/package.json' },
+          });
+        },
+      } : localRequire(name), console: { log: value => { receipt = JSON.parse(value); }, error: () => { code = 1; } } });
+      parentPort.postMessage({ code: code || remoteProcess.exitCode, receipt, sqlCalls });
+    `, { eval: true, env: { ...process.env, DATABASE_URL: database.toString() }, workerData: { root, packageRoot, profile, candidate, source, id } });
+    const result = new Promise<ReturnType<typeof execute>>((resolve, reject) => {
+      let result: ReturnType<typeof execute> | undefined, failure: Error | undefined;
+      worker.on("message", (value: ReturnType<typeof execute>) => { result = value; });
+      worker.on("error", (error: Error) => { failure = error; });
+      worker.on("exit", code => {
+        if (failure) reject(failure);
+        else if (code !== 0 || !result) reject(new Error("Reset transport worker failed before receipt"));
+        else resolve(result);
+      });
+    });
+    return { tag, result };
+  }
+  async function supportRaceWait(client: SupportRaceSql, until: number, sql: string, values: unknown[]) {
+    while (Date.now() < until) {
+      const { rows: matches } = await client.query<{ pid: number }>(sql, values);
+      if (matches.length > 1) throw new Error("Support barrier waiter identity ambiguous");
+      if (matches[0]) return matches[0].pid;
+    }
+    throw new Error("Support barrier not observed within existing lock budget; no ordering evidence");
+  }
+  async function supportRacePurged(graph: SupportRaceGraph, now: Date) {
+    expect(await db.serviceConversation.findUniqueOrThrow({ where: { id: graph.conversationId } })).toMatchObject({ erasedAt: now, lifecycleEpoch: 1, lastSequence: 3 });
+    expect(await db.supportCase.findUniqueOrThrow({ where: { id: graph.resourceId } })).toMatchObject({ status: "closed", closedAt: graph.closed.closedAt, customerId: null, assigneeId: null, assignmentVersion: 2 });
+    expect(await db.serviceMessage.findMany({ where: { conversationId: graph.conversationId } })).toEqual([]);
+    expect(await db.serviceOutbox.findMany({ where: { conversationId: graph.conversationId } })).toEqual([]);
+    expect(await db.serviceErasureFence.findUniqueOrThrow({ where: { conversationId: graph.conversationId } })).toEqual({ conversationId: graph.conversationId, epoch: 1, objectKeys: [], erasedAt: now, cleanupCompletedAt: now });
+    const audits = await db.serviceAudit.findMany({ where: { resourceId: graph.resourceId }, orderBy: { id: "asc" } });
+    expect(audits).toHaveLength(8);
+    for (const audit of graph.audits) expect(audits.find(row => row.id === audit.id)).toEqual({ ...audit, reason: null });
+    expect(audits.filter(audit => !graph.audits.some(original => original.id === audit.id))).toEqual([
+      expect.objectContaining({ id: expect.any(String), action: "SERVICE_CONTENT_PURGED", purpose: "support", resourceId: graph.resourceId, actorId: null, targetStaffId: null, reason: null, assignmentVersion: 1 }),
+    ]);
+    const journal = await supportRaceJournal(graph.id, 67, 99);
+    expect(journal.records.filter(row => row.deleted).map(({ table_name, row_key }) => ({ table_name, row_key }))).toEqual(expect.arrayContaining([
+      ...graph.messageIds.map(id => ({ table_name: "service_messages", row_key: { id } })), ...graph.outbox.map(({ id }) => ({ table_name: "service_outbox", row_key: { id } })),
+    ]));
+    expect(journal.records.filter(row => row.deleted)).toHaveLength(5);
+    expect(journal.records.find(row => row.table_name === "service_erasure_fences")).toMatchObject({ row_key: { conversationId: graph.conversationId }, version: 2n, deleted: false });
+    return audits;
+  }
+  async function supportRaceDisposed(graph: SupportRaceGraph, before: RecordKey[], audits: Awaited<ReturnType<typeof db.serviceAudit.findMany>>, records: number, events: number) {
+    await supportDisposed(graph.id, before.filter(row => row.table_name !== "service_erasure_fences"), audits, graph.requestIds);
+    expect(await db.serviceErasureFence.findUnique({ where: { conversationId: graph.conversationId } })).toBeNull();
+    expect(await db.serviceConversation.findUnique({ where: { id: graph.conversationId } })).toBeNull();
+    const terminal = await supportRaceJournal(graph.id, records, events);
+    const snapshot = await supportRaceSnapshot(graph.id);
+    expect(execute("reset", graph.id)).toMatchObject({ code: 0, receipt: supportRaceReceipt });
+    expect(await supportRaceSnapshot(graph.id)).toEqual(snapshot);
+    return terminal;
+  }
+
+  it("purges two due current-candidate Support namespaces under their own exact authority and preserves foreign disposal proof", () => withKnownJobs(known => {
+    const ids = ["f7".repeat(16)], foreignId = "f8".repeat(16);
+    return resetAfter(ids, async () => {
+      const first = await supportRaceGraph(ids[0]!, known);
+      ids.push(foreignId);
+      const foreign = await supportRaceGraph(foreignId, known);
+      const now = new Date(Math.max(first.closed.closedAt!.getTime(), foreign.closed.closedAt!.getTime()) + 90 * 86400000);
+      const storage = await supportRaceStorage();
+      const children: ReturnType<typeof supportRaceWorker>[] = [];
+      try {
+        const run = supportRaceWorker(now, storage.endpoint); children.push(run);
+        expect(await run.result).toEqual({ supportPurged: 2, attachmentsRetired: 0, cleanupsCompleted: 2 });
+        expect(storage.counts()).toEqual({ requests: 2, forwardingFailures: 0 });
+        const firstAudits = await supportRacePurged(first, now), foreignAudits = await supportRacePurged(foreign, now);
+        const firstLive = await supportRaceJournal(first.id, 67, 99), foreignLive = await supportRaceJournal(foreign.id, 67, 99);
+        expect(firstLive.records.some(row => foreignLive.records.some(other => row.table_name === other.table_name && JSON.stringify(row.row_key) === JSON.stringify(other.row_key)))).toBe(false);
+        const firstBefore = await owned(first.id), foreignBefore = await owned(foreign.id), foreignSnapshot = await supportRaceSnapshot(foreign.id);
+        expect(execute("reset", first.id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+        const firstTerminal = await supportRaceDisposed(first, firstBefore, firstAudits, 67, 161);
+        expect(firstTerminal.events.slice(0, 99)).toEqual(firstLive.events);
+        const fenceDelete = firstTerminal.events.findIndex(event => event.table_name === "service_erasure_fences" && event.mutation === "DELETE");
+        expect(fenceDelete).toBeGreaterThanOrEqual(99);
+        expect(firstTerminal.events.findIndex(event => event.table_name === "service_conversations" && event.mutation === "DELETE")).toBeGreaterThan(fenceDelete);
+        expect(await supportRaceSnapshot(foreign.id)).toEqual(foreignSnapshot);
+        const terminalSnapshot = await supportRaceSnapshot(first.id);
+        const late = supportRaceWorker(now, storage.endpoint); children.push(late);
+        expect(await late.result).toEqual(supportRaceEmpty);
+        expect(storage.counts()).toEqual({ requests: 2, forwardingFailures: 0 });
+        expect(await supportRaceSnapshot(first.id)).toEqual(terminalSnapshot);
+        expect(await supportRaceSnapshot(foreign.id)).toEqual(foreignSnapshot);
+        expect(execute("reset", foreign.id)).toMatchObject({ code: 0, receipt: supportRaceReceipt });
+        const foreignTerminal = await supportRaceDisposed(foreign, foreignBefore, foreignAudits, 67, 161);
+        expect(foreignTerminal.events.slice(0, 99)).toEqual(foreignLive.events);
+      } finally { for (const child of children) await child.settle(); await storage.close(); }
+    });
+  }));
+
+  it("rereads an ordinary reopened Support case after a selected worker waits behind the exact HTTP transaction", () => withKnownJobs(known => {
+    const ids = ["f9".repeat(16)], foreignId = "fa".repeat(16);
+    return resetAfter(ids, async () => {
+      const primary = await supportRaceGraph(ids[0]!, known);
+      ids.push(foreignId);
+      const foreign = await supportRaceGraph(foreignId, known);
+      await supportRaceReopen(foreign);
+      const foreignBefore = await supportRaceSnapshot(foreignId), storage = await supportRaceStorage();
+      const holder = await supportRaceSql(), observer = await supportRaceSql();
+      const children: ReturnType<typeof supportRaceWorker>[] = [];
+      let reopen: Promise<{ value: { status: number } | undefined; error: unknown }> | undefined;
+      try {
+        await holder.query("BEGIN");
+        const { rows: held } = await holder.query<{ pid: number }>("SELECT pg_backend_pid() AS pid,pg_advisory_xact_lock(hashtextextended($1,0))", [`cf_${primary.id}`]);
+        const until = Date.now() + 3500;
+        reopen = post(`${primary.path}/messages`, primary.customer, { clientMessageId: randomUUID(), body: "Synthetic selected-worker reopening", visibility: "customer" }).then(value => ({ value, error: undefined }), (error: unknown) => ({ value: undefined, error }));
+        const httpPid = await supportRaceWait(observer, until, `SELECT a.pid FROM pg_stat_activity a WHERE $1::int=ANY(pg_blocking_pids(a.pid))
+          AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.locktype='advisory' AND NOT l.granted)
+          AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.relation='public.service_audits'::regclass AND l.mode='RowExclusiveLock' AND l.granted)`, [held[0]!.pid]);
+        const now = new Date(primary.closed.closedAt!.getTime() + 90 * 86400000);
+        const run = supportRaceWorker(now, storage.endpoint); children.push(run);
+        await supportRaceWait(observer, until, `SELECT a.pid FROM pg_stat_activity a WHERE a.application_name=$1 AND $2::int=ANY(pg_blocking_pids(a.pid))
+          AND a.query LIKE 'LOCK TABLE public.service_audits,%' AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.relation='public.service_audits'::regclass AND l.mode='ShareRowExclusiveLock' AND NOT l.granted)`, [run.tag, httpPid]);
+        await holder.query("COMMIT");
+        const response = await reopen!;
+        expect(response.error).toBeUndefined(); expect(response.value?.status).toBe(201);
+        expect(await run.result).toEqual(supportRaceEmpty);
+        expect(storage.counts()).toEqual({ requests: 0, forwardingFailures: 0 });
+        const open = await db.supportCase.findUniqueOrThrow({ where: { id: primary.resourceId } });
+        expect(open).toMatchObject({ status: "open", closedAt: null, unansweredSince: expect.any(Date), assigneeId: primary.closed.assigneeId, assignmentVersion: 1 });
+        expect(await db.serviceConversation.findUniqueOrThrow({ where: { id: primary.conversationId } })).toMatchObject({ erasedAt: null, lifecycleEpoch: 0, lastSequence: 4 });
+        expect(await db.serviceErasureFence.findUnique({ where: { conversationId: primary.conversationId } })).toBeNull();
+        const audits = await db.serviceAudit.findMany({ where: { resourceId: primary.resourceId }, orderBy: { id: "asc" } });
+        expect(audits).toHaveLength(8);
+        for (const audit of primary.audits) expect(audits.find(row => row.id === audit.id)).toEqual(audit);
+        expect(audits.filter(audit => !primary.audits.some(original => original.id === audit.id))).toEqual([expect.objectContaining({ action: "SUPPORT_CUSTOMER_MESSAGE", actorId: primary.customer.user.id, assignmentVersion: 1 })]);
+        expect((await get(primary.path, primary.customer).expect(200)).body.messages.map((message: { id: string }) => message.id)).toEqual([...primary.messageIds, expect.any(String)]);
+        expect(await db.serviceOutbox.count({ where: { conversationId: primary.conversationId } })).toBe(4);
+        await supportRaceJournal(primary.id, 68, 87);
+        const openSnapshot = await supportRaceSnapshot(primary.id);
+        const late = supportRaceWorker(now, storage.endpoint); children.push(late);
+        expect(await late.result).toEqual(supportRaceEmpty);
+        expect(storage.counts()).toEqual({ requests: 0, forwardingFailures: 0 });
+        expect(await supportRaceSnapshot(primary.id)).toEqual(openSnapshot);
+        expect(await supportRaceSnapshot(foreignId)).toEqual(foreignBefore);
+        const keys = await owned(primary.id);
+        expect(execute("reset", primary.id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+        await supportRaceDisposed(primary, keys, audits, 68, 155);
+        const terminalSnapshot = await supportRaceSnapshot(primary.id);
+        const disposedWorker = supportRaceWorker(now, storage.endpoint); children.push(disposedWorker);
+        expect(await disposedWorker.result).toEqual(supportRaceEmpty);
+        expect(storage.counts()).toEqual({ requests: 0, forwardingFailures: 0 });
+        expect(await supportRaceSnapshot(primary.id)).toEqual(terminalSnapshot);
+        expect(await supportRaceSnapshot(foreignId)).toEqual(foreignBefore);
+        const foreignKeys = await owned(foreignId), foreignAudits = await db.serviceAudit.findMany({ where: { resourceId: foreign.resourceId }, orderBy: { id: "asc" } });
+        expect(execute("reset", foreignId)).toMatchObject({ code: 0, receipt: supportRaceReceipt });
+        await supportRaceDisposed(foreign, foreignKeys, foreignAudits, 68, 155);
+      } finally {
+        try { await holder.query("ROLLBACK"); } finally {
+          await reopen;
+          try { for (const child of children) await child.settle(); }
+          finally { await Promise.all([holder.end(), observer.end(), storage.close()]); }
+        }
+      }
+    });
+  }));
+
+  it("skips a selected Support worker after an earlier exact reset disposes its durable namespace claim", () => withKnownJobs(known => {
+    const ids = ["fb".repeat(16)], foreignId = "fc".repeat(16);
+    return resetAfter(ids, async () => {
+      const primary = await supportRaceGraph(ids[0]!, known);
+      ids.push(foreignId);
+      const foreign = await supportRaceGraph(foreignId, known);
+      await supportRaceReopen(foreign);
+      const foreignBefore = await supportRaceSnapshot(foreignId), keys = await owned(primary.id), live = await supportRaceJournal(primary.id, 65, 82);
+      const storage = await supportRaceStorage(), holder = await supportRaceSql(), observer = await supportRaceSql(), tombstoneGate = await supportRaceSql();
+      const children: ReturnType<typeof supportRaceWorker>[] = [];
+      let resetting: Promise<{ value: ReturnType<typeof execute> | undefined; error: unknown }> | undefined;
+      let gateAcquisition: Promise<unknown> | undefined;
+      try {
+        await holder.query("BEGIN");
+        await holder.query("LOCK TABLE public.service_audits IN ROW EXCLUSIVE MODE");
+        // Session-level advisory holder survives COMMIT of the relation barrier.
+        await holder.query("SELECT pg_advisory_lock(hashtextextended($1,0))", [`cf_${primary.id}`]);
+        const { rows: held } = await holder.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
+        const until = Date.now() + 3500;
+        const resetRun = supportRaceReset(primary.id);
+        resetting = resetRun.result.then(value => ({ value, error: undefined }), (error: unknown) => ({ value: undefined, error }));
+        const resetPid = await supportRaceWait(observer, until, `SELECT a.pid FROM pg_stat_activity a WHERE $1::int=ANY(pg_blocking_pids(a.pid)) AND a.application_name=$2
+          AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.relation='public.service_audits'::regclass AND l.mode='ShareRowExclusiveLock' AND NOT l.granted)`, [held[0]!.pid, resetRun.tag]);
+        const now = new Date(primary.closed.closedAt!.getTime() + 90 * 86400000);
+        const run = supportRaceWorker(now, storage.endpoint); children.push(run);
+        await supportRaceWait(observer, until, `SELECT a.pid FROM pg_stat_activity a WHERE a.application_name=$1 AND $2::int=ANY(pg_blocking_pids(a.pid))
+          AND a.query LIKE 'LOCK TABLE public.service_audits,%' AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.relation='public.service_audits'::regclass AND l.mode='ShareRowExclusiveLock' AND NOT l.granted)`, [run.tag, resetPid]);
+        await holder.query("COMMIT");
+        await supportRaceWait(observer, until, `SELECT a.pid FROM pg_stat_activity a WHERE a.pid=$1 AND $2::int=ANY(pg_blocking_pids(a.pid))
+          AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.locktype='advisory' AND NOT l.granted)`, [resetPid, held[0]!.pid]);
+        await tombstoneGate.query("BEGIN");
+        const { rows: gatePid } = await tombstoneGate.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
+        gateAcquisition = tombstoneGate.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`cf_${primary.id}`]).then(() => undefined, (error: unknown) => ({ error }));
+        await supportRaceWait(observer, until, `SELECT a.pid FROM pg_stat_activity a WHERE a.pid=$1 AND $2::int=ANY(pg_blocking_pids(a.pid))
+          AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.locktype='advisory' AND NOT l.granted)`, [gatePid[0]!.pid, resetPid]);
+        await holder.query("SELECT pg_advisory_unlock(hashtextextended($1,0))", [`cf_${primary.id}`]);
+        const reset = await resetting!;
+        expect(await gateAcquisition).toBeUndefined();
+        // A tombstoned resource must still enter campaign authority, not ordinary fallback.
+        // The gate queued behind reset owns the namespace before the worker can acquire it.
+        await supportRaceWait(observer, until, `SELECT a.pid FROM pg_stat_activity a WHERE a.application_name=$1 AND $2::int=ANY(pg_blocking_pids(a.pid))
+          AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.locktype='advisory' AND NOT l.granted)
+          AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.relation='public.service_audits'::regclass AND l.mode='ShareRowExclusiveLock' AND l.granted)`, [run.tag, gatePid[0]!.pid]);
+        await tombstoneGate.query("COMMIT");
+        expect(reset.error).toBeUndefined(); expect(reset.value?.code).toBe(0);
+        // Discard first receipt as lost; use only the same-reset retry for subsequent recovery.
+        const terminal = await supportRaceDisposed(primary, keys, primary.audits, 65, 147);
+        expect(terminal.events.slice(0, 82)).toEqual(live.events);
+        const terminalSnapshot = await supportRaceSnapshot(primary.id);
+        expect(await run.result).toEqual(supportRaceEmpty);
+        expect(storage.counts()).toEqual({ requests: 0, forwardingFailures: 0 });
+        expect(await supportRaceSnapshot(primary.id)).toEqual(terminalSnapshot);
+        expect(await supportRaceSnapshot(foreignId)).toEqual(foreignBefore);
+        const late = supportRaceWorker(now, storage.endpoint); children.push(late);
+        expect(await late.result).toEqual(supportRaceEmpty);
+        expect(storage.counts()).toEqual({ requests: 0, forwardingFailures: 0 });
+        expect(await supportRaceSnapshot(primary.id)).toEqual(terminalSnapshot);
+        expect(execute("reset", primary.id)).toMatchObject({ code: 0, receipt: supportRaceReceipt });
+        expect(await supportRaceSnapshot(primary.id)).toEqual(terminalSnapshot);
+        expect(await supportRaceSnapshot(foreignId)).toEqual(foreignBefore);
+        const foreignKeys = await owned(foreignId), audits = await db.serviceAudit.findMany({ where: { resourceId: foreign.resourceId }, orderBy: { id: "asc" } });
+        expect(execute("reset", foreignId)).toMatchObject({ code: 0, receipt: supportRaceReceipt });
+        await supportRaceDisposed(foreign, foreignKeys, audits, 68, 155);
+      } finally {
+        try {
+          await holder.query("ROLLBACK");
+          await holder.query("SELECT pg_advisory_unlock(hashtextextended($1,0))", [`cf_${primary.id}`]);
+        } finally {
+          await resetting;
+          await gateAcquisition;
+          await tombstoneGate.query("ROLLBACK");
+          try { for (const child of children) await child.settle(); }
+          finally { await Promise.all([holder.end(), observer.end(), tombstoneGate.end(), storage.close()]); }
+        }
+      }
+    });
+  }));
+
   // B2 text-only contexts. Per reservation, count BEFORE writing: primary 68 records / 91 events
   // before reset, 159 events after reset; foreign control 24 / 26, then 50 events after its reset.
   // Fixed guards remain 128 records / 2048 events. No catalog, contact, media or publish setup.
