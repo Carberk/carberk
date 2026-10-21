@@ -387,6 +387,68 @@ describe("real interrupted Redis intent and lost Lua reply on disposable transpo
     expect(immutable(row)).toEqual(immutable(setup.originalRow));
     const completed = await completedMarker(setup, pending);
     await preserved(before);
+    const markerBytes = await redis.getBuffer(markerKey);
+    if (markerBytes === null) throw new Error("Actual completed marker bytes missing");
+
+    // Every negative fixture starts from real pending PG + real completed Lua proof.
+    // Restore only captured actual proof, never manufacture positive authority.
+    const invalidRequests = [
+      { ...setup.command, binding: { ...binding, owner: "other-owner" } },
+      { ...setup.command, binding: { ...binding, leaseCommit: "b".repeat(40) } },
+      { ...setup.command, binding: { ...binding, window: { ...binding.window, closedAt: "2026-10-21T00:01:00.000Z",
+        observedAt: "2026-10-21T00:16:00.000Z" } } },
+      { ...setup.command, binding: { ...binding, deployments: { ...binding.deployments,
+        worker: [{ id: "other-deployment", status: "SUCCESS", sha: candidate }] } } },
+      { ...setup.command, reservationId: "d".repeat(32) }, { ...setup.command, operationId: "d".repeat(32) },
+      { ...setup.command, expectedInventory: { ...setup.command.expectedInventory, rowsReceiptDigest: "0".repeat(64) } },
+      { ...setup.command, expectedInventory: { ...setup.command.expectedInventory, digest: "0".repeat(64) } },
+      { ...setup.command, identity: { ...identity, services: { ...identity.services, worker: "other-worker" } } },
+    ];
+    for (const command of invalidRequests) await refuses(command);
+    await refuses(setup.command, { ...environment(), APP_ENV: "production" });
+    const originalResult = setup.originalRow["result"];
+    await query("UPDATE staging_clean_reset.receipts SET result=$1::jsonb WHERE operation_id=$2",
+      [JSON.stringify({ ...(originalResult as RecordValue), disposable: "0".repeat(64) }), operationId]);
+    try { await refuses(setup.command); } finally {
+      await query("UPDATE staging_clean_reset.receipts SET result=$1::jsonb WHERE operation_id=$2", [JSON.stringify(originalResult), operationId]);
+    }
+    for (const invalidState of [{ ...pending, version: 2 }, { ...pending, extra: true },
+      { ...pending, preState: { ...(pending["preState"] as RecordValue), entryCount: setup.entryCount + 1 } },
+      { ...pending, intentAt: "2026-10-21T00:00:00.000Z" }]) {
+      await query("UPDATE staging_clean_reset.receipts SET redis_state=$1::jsonb WHERE operation_id=$2", [JSON.stringify(invalidState), operationId]);
+      try { await refuses(setup.command); } finally {
+        await query("UPDATE staging_clean_reset.receipts SET redis_state=$1::jsonb WHERE operation_id=$2", [JSON.stringify(pending), operationId]);
+      }
+    }
+    const invalidMarkers = ["not-json", JSON.stringify(completed, null, 2), canonical(pending),
+      canonical({ ...completed, version: 2 }), canonical({ ...completed, extra: true }),
+      canonical({ ...completed, operationId: "d".repeat(32) }),
+      canonical({ ...completed, rowsReceiptDigest: "0".repeat(64) }),
+      canonical({ ...completed, binding: { ...binding, owner: "other-owner" } }),
+      canonical({ ...completed, preState: { ...(completed["preState"] as RecordValue), entryCount: setup.entryCount + 1 } }),
+      canonical({ ...completed, intentAt: "2026-10-21T00:00:00.000Z" }),
+      canonical({ ...completed, completedAt: "2026-10-21T00:00:00.000Z" }),
+      canonical({ ...completed, completedAt: "invalid" }),
+      canonical({ ...completed, postState: { digest: "0".repeat(64), entryCount: 0 } })];
+    for (const marker of invalidMarkers) {
+      await redis.set(markerKey, marker);
+      try { await refuses(setup.command); } finally { await redis.set(markerKey, markerBytes); }
+    }
+    await redis.pexpire(markerKey, 86_400_000);
+    try { await refuses(setup.command); } finally { await redis.set(markerKey, markerBytes); }
+    await redis.del(markerKey);
+    try { await refuses(setup.command); } finally { await redis.set(markerKey, markerBytes); }
+    const reservedKey = `staging-clean-reset:receipt:${"d".repeat(32)}`;
+    await redis.set(reservedKey, "unknown-control");
+    try { await refuses(setup.command); } finally { await redis.del(reservedKey); }
+    const restoredQueue = new bull.Queue("email-code", { connection });
+    try { await restoredQueue.add("restored", { privateValue }, { jobId: "restored-before-recovery" }); } finally { await restoredQueue.close(); }
+    try { await refuses(setup.command); } finally {
+      // Exact independently observed fixture keys only; retain the captured proof and foreign state.
+      for (const key of await redis.keys("*")) if (![...preservedKeys, markerKey].includes(key)) await redis.del(key);
+    }
+    expect(await redis.getBuffer(markerKey)).toEqual(markerBytes);
+    expect(await storedRow()).toEqual(row);
     const beforeRecovery = await snapshot();
 
     // First target RED assertion. All setup above must pass on actual effects.

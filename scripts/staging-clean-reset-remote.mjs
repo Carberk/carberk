@@ -1,7 +1,7 @@
 // Fixed prelaunch clean-reset program (#901). PostgreSQL rows and bounded Redis
 // deletion retain immutable rows authority plus operation-local recovery state.
 // Redis inventory is read-only; initial deletion records PG intent before Lua.
-// Completed replay is read-only. Interrupted pending continuation stays closed.
+// Completed replay is read-only. Pending recovery requires exact completed-marker proof.
 // No object/platform calls; the operator CLI/controller remain default closed.
 import { readFileSync } from 'node:fs';
 
@@ -513,14 +513,37 @@ return { 'ok', entries, indexes }`;
       identity: p, binding: input.binding, rowsReceiptDigest: input.expectedInventory.rowsReceiptDigest };
     const receipt = stateName => console.log(JSON.stringify({ ...bound, state: stateName,
       rowsReceiptDigest: context.rowsReceiptDigest, ...empty }));
-    // Pending continuation and Lua/PG-gap recovery require the next real interruption oracle.
-    // Neither an empty queue nor a marker upgrades an existing pending PG record here.
+    const pendingKeys = [...Object.keys(context), 'state', 'preState', 'intentAt'];
+    const completedKeys = [...Object.keys(context), 'state', 'preState', 'postState', 'intentAt', 'completedAt'];
+    const sameContext = value => Object.keys(context).every(key => canonical(value[key]) === canonical(context[key]));
+    const validPreState = value => exact(value, ['digest', 'entryCount']) && value.digest === input.expectedInventory.digest &&
+      Number.isSafeInteger(value.entryCount) && value.entryCount >= 0;
+    const readCompletedMarker = () => {
+      if (!Buffer.isBuffer(before.control)) refused('Redis completion authority changed or pending');
+      let marker;
+      try { marker = JSON.parse(before.control.toString('utf8')); } catch { refused('Redis completion authority changed or pending'); }
+      if (!exact(marker, completedKeys) || marker.state !== 'completed' || !sameContext(marker) || !validPreState(marker.preState) ||
+          !exact(marker.postState, ['digest', 'entryCount']) || canonical(marker.postState) !== canonical(empty) ||
+          !date(marker.intentAt) || !date(marker.completedAt) || Date.parse(marker.completedAt) < Date.parse(marker.intentAt) ||
+          before.entries.length !== 0 || before.digest !== empty.digest || !before.control.equals(Buffer.from(canonical(marker), 'utf8')))
+        refused('Redis completion authority changed or pending');
+      return marker;
+    };
     if (canonical(state) !== '{}') {
-      if (!exact(state, [...Object.keys(context), 'state', 'preState', 'postState', 'intentAt', 'completedAt']) || state.state !== 'completed' ||
-          !Object.keys(context).every(key => canonical(state[key]) === canonical(context[key])) ||
-          !exact(state.preState, ['digest', 'entryCount']) || state.preState.digest !== input.expectedInventory.digest ||
-          !Number.isSafeInteger(state.preState.entryCount) || state.preState.entryCount < 0 ||
-          canonical(state.postState) !== canonical(empty) || !date(state.intentAt) || !date(state.completedAt) || Date.parse(state.completedAt) < Date.parse(state.intentAt) ||
+      if (state.state === 'pending') {
+        if (!exact(state, pendingKeys) || !sameContext(state) || !validPreState(state.preState) || !date(state.intentAt))
+          refused('Redis completion authority changed or pending');
+        const completed = readCompletedMarker();
+        if (canonical(completed.preState) !== canonical(state.preState) || completed.intentAt !== state.intentAt)
+          refused('Redis completion authority changed or pending');
+        // Redis remains read-only: only the exact pending PG state advances once.
+        store(state, completed);
+        receipt('completed');
+        return;
+      }
+      if (!exact(state, completedKeys) || state.state !== 'completed' || !sameContext(state) || !validPreState(state.preState) ||
+          !exact(state.postState, ['digest', 'entryCount']) || canonical(state.postState) !== canonical(empty) ||
+          !date(state.intentAt) || !date(state.completedAt) || Date.parse(state.completedAt) < Date.parse(state.intentAt) ||
           before.entries.length !== 0 || before.digest !== empty.digest ||
           (before.control !== undefined && (!Buffer.isBuffer(before.control) || !before.control.equals(Buffer.from(canonical(state), 'utf8')))))
         refused('Redis completion authority changed or pending');
