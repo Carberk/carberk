@@ -82,6 +82,7 @@ describe("RequestSignInMethodChange", () => {
       userId: "user-1",
     });
     expect(sms).toEqual([{
+        smsDelivery: { kind: "ordinary" },
       phone: "+99361234567",
       code: result.testCode,
       purpose: "sign-in-method",

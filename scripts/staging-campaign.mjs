@@ -241,6 +241,8 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
   const rootId = uuid(`campaign897-business:${input.candidate}:${profile}:${input.id}:root`);
   const rootSlug = `campaign897-${input.id}-${input.candidate.slice(0, 12)}`;
   const rootContact = `+999${(BigInt(`0x${require('node:crypto').createHash('sha256').update(`${input.id}:${input.candidate}:business-contact`).digest('hex').slice(0, 12)}`) % 1000000000000n).toString().padStart(12, '0')}`;
+  const contactPhone = bootstrapV3 ? `+9936${(BigInt(`0x${require('node:crypto').createHash('sha256').update(`campaign897-contact-phone-v1:${input.id}:${input.candidate}`, 'ascii').digest('hex')}`) % 10000000n).toString().padStart(7, '0')}` : null;
+  const contactOwner = identities.find(identity => identity.alias === 'buyer-a');
   const tables = ['users', 'dealerships', 'dealership_members', 'dealership_invitations', 'listings', 'listing_drafts', 'conversations', 'conversation_participants', 'messages', 'business_enquiry_audits', 'favorites', 'verified_contact_phones', 'owned_vehicles', 'blocked_users', 'notification_preferences', 'content_reports', 'staff_grants', 'audit_logs'];
   // OTP requests, ordinary Sessions and owned staff TOTP join the bounded journal.
   if (bootstrapV3) tables.push('sessions', 'totp_enrollments', 'totp_backup_codes', 'otp_requests');
@@ -332,11 +334,59 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
             TG_OP='UPDATE' AND prior->>'role'='sales' AND prior->>'status' IN ('active','suspended') AND v_row->>'role'='sales' AND
             v_row->>'status' IN ('active','suspended') AND v_row-'status' IS NOT DISTINCT FROM prior-'status' AND ${activeOwner("v_row->>'dealershipId'")},false)
           THEN RAISE EXCEPTION 'Unsupported campaign business'; END IF;` : '';
+  const smsHash = `(SELECT md5(jsonb_build_object('binding',(SELECT coalesce(jsonb_agg(to_jsonb(b) ORDER BY reservation_id),'[]'::jsonb) FROM "${n}".campaign_sms_binding b),'ledger',(SELECT coalesce(jsonb_agg(to_jsonb(l) ORDER BY request_id),'[]'::jsonb) FROM "${n}".campaign_sms_ledger l))::text))`;
+  const contactBusiness = business => `EXISTS(SELECT 1 FROM public.dealerships d JOIN "${n}".campaign_records r ON r.table_name='dealerships' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',d.id)
+    WHERE d.id=${business} AND d.id<>'${rootId}' AND d.status='active' AND d."admissionMode"='synthetic' AND d."admittedAt" IS NULL AND
+    ${ownerMember('d.id', `'${contactOwner.id}'`)} AND ${redeemedInvitation('d.id', `'${contactOwner.id}'`)})`;
+  const contactOtp = row => `${row}->>'purpose'='listing_contact_phone' AND ${row}->>'channel'='phone' AND
+    ${row}->>'destination'='${contactPhone}' AND ${row}->>'phone'='${contactPhone}' AND ${row}->>'userId'='${contactOwner.id}' AND
+    ${contactBusiness(`${row}->>'businessId'`)} AND EXISTS(SELECT 1 FROM "${n}".campaign_sms_binding b WHERE
+      b.reservation_id='${input.id}' AND b.candidate='${input.candidate}' AND b.destination='${contactPhone}' AND
+      (b.business_id IS NULL OR (b.business_id=${row}->>'businessId' AND b.owner_id=${row}->>'userId')))`;
+  // Match OLD and NEW scalar references before the foreign-row early return. No second fence.
+  const phoneGuard = bootstrapV3 ? `
+      IF (SELECT state FROM "${n}".campaign_manifest)<>'disposed' AND (
+        (TG_TABLE_NAME IN ('users','verified_contact_phones','otp_requests') AND
+          ('${contactPhone}' IN (v_row->>'phone',prior->>'phone') OR (TG_TABLE_NAME='otp_requests' AND '${contactPhone}' IN (v_row->>'destination',prior->>'destination')))) OR
+        (TG_TABLE_NAME IN ('dealerships','listings') AND '${contactPhone}' IN (v_row->>'contactPhone',prior->>'contactPhone'))) AND NOT coalesce(
+          owned AND (((SELECT state FROM "${n}".campaign_manifest)='cleaning' AND TG_OP='DELETE') OR (TG_TABLE_NAME='otp_requests' AND ${contactOtp('v_row')}) OR
+            (TG_TABLE_NAME='dealerships' AND EXISTS(SELECT 1 FROM "${n}".campaign_sms_binding b WHERE b.business_id=v_row->>'id' AND b.owner_id='${contactOwner.id}'))),false)
+        THEN RAISE EXCEPTION 'Campaign phone collision'; END IF;` : '';
+  const smsSchemaHash = `(SELECT md5(jsonb_build_object('columns',(SELECT jsonb_agg(to_jsonb(a) ORDER BY attrelid,attnum) FROM
+    (SELECT attrelid,attnum,attname,atttypid,attnotnull,attgenerated FROM pg_attribute WHERE attrelid IN ('"${n}".campaign_sms_binding'::regclass,'"${n}".campaign_sms_ledger'::regclass,'"${n}".campaign_sms_sink'::regclass) AND attnum>0 AND NOT attisdropped) a),
+    'constraints',(SELECT jsonb_agg(jsonb_build_object('table',conrelid,'definition',pg_get_constraintdef(oid)) ORDER BY conrelid,conname) FROM pg_constraint WHERE conrelid IN ('"${n}".campaign_sms_binding'::regclass,'"${n}".campaign_sms_ledger'::regclass,'"${n}".campaign_sms_sink'::regclass)))::text))`;
+  const smsInventory = (pendingOtp = '') => bootstrapV3 ? `
+    IF (SELECT sms_hash FROM "${n}".campaign_manifest) IS DISTINCT FROM ${smsHash} OR
+      (SELECT sms_schema_hash FROM "${n}".campaign_manifest) IS DISTINCT FROM ${smsSchemaHash} OR
+      (SELECT sms_contract_hash FROM "${n}".campaign_manifest) IS DISTINCT FROM md5(pg_get_functiondef('"${n}".campaign_sms_authority(text,text,text,text)'::regprocedure)) OR
+      (SELECT count(*) FROM "${n}".campaign_sms_binding)<>1 OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_sms_binding WHERE reservation_id='${input.id}' AND candidate='${input.candidate}' AND destination='${contactPhone}' AND
+        ((business_id IS NULL AND owner_id IS NULL) OR (business_id IS NOT NULL AND owner_id='${contactOwner.id}'))) OR
+      EXISTS(SELECT 1 FROM "${n}".campaign_sms_ledger l WHERE NOT EXISTS(SELECT 1 FROM "${n}".campaign_sms_binding b WHERE l.reservation_id=b.reservation_id AND l.candidate=b.candidate AND l.destination=b.destination AND l.business_id=b.business_id AND l.owner_id=b.owner_id) OR
+        l.purpose<>'listing_contact_phone' OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_events e WHERE e.table_name='otp_requests' AND e.row_key=jsonb_build_object('id',l.request_id) AND e.mutation='INSERT' AND e.row_hash=l.issue_row_hash) OR
+        NOT EXISTS(SELECT 1 FROM "${n}".campaign_records r WHERE r.table_name='otp_requests' AND r.row_key=jsonb_build_object('id',l.request_id))) OR
+      EXISTS(SELECT 1 FROM "${n}".campaign_sms_sink s WHERE NOT EXISTS(SELECT 1 FROM "${n}".campaign_sms_ledger l WHERE l.request_id=s.request_id))
+      THEN RAISE EXCEPTION 'Campaign SMS contract changed'; END IF;
+    IF (SELECT state FROM "${n}".campaign_manifest)<>'disposed' AND (
+      EXISTS(SELECT 1 FROM public.users WHERE phone='${contactPhone}') OR
+      EXISTS(SELECT 1 FROM public.verified_contact_phones WHERE phone='${contactPhone}') OR
+      EXISTS(SELECT 1 FROM public.listings WHERE "contactPhone"='${contactPhone}') OR
+      EXISTS(SELECT 1 FROM public.dealerships d WHERE d."contactPhone"='${contactPhone}' AND NOT EXISTS(
+        SELECT 1 FROM "${n}".campaign_sms_binding b JOIN "${n}".campaign_records r ON r.table_name='dealerships' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',b.business_id) WHERE b.business_id=d.id AND b.owner_id='${contactOwner.id}')) OR
+      EXISTS(SELECT 1 FROM public.otp_requests o WHERE ${pendingOtp}(o.phone='${contactPhone}' OR o.destination='${contactPhone}') AND NOT EXISTS(
+        SELECT 1 FROM "${n}".campaign_sms_ledger l JOIN "${n}".campaign_records r ON r.table_name='otp_requests' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',l.request_id)
+          WHERE l.request_id=o.id AND l.destination=o.destination AND o.phone=l.destination AND l.code_hash=o."codeHash" AND l.business_id=o."businessId" AND l.owner_id=o."userId" AND o.purpose='listing_contact_phone' AND o.channel='phone')))
+      THEN RAISE EXCEPTION 'Campaign phone collision'; END IF;` : '';
   const admittedBusiness = bootstrapV3 ? `
         IF TG_TABLE_NAME='dealerships' AND v_row->>'id'<>'${rootId}' AND NOT coalesce(TG_OP='UPDATE' AND v_row->>'admissionMode'='synthetic' AND
           v_row->>'admittedAt' IS NULL AND char_length(v_row->>'name') BETWEEN 2 AND 120 AND (
           (prior->>'status'='recovery' AND v_row->>'status'='active' AND v_row-'status'-'updatedAt' IS NOT DISTINCT FROM prior-'status'-'updatedAt' AND
             EXISTS(SELECT 1 FROM public.dealership_members m WHERE m."dealershipId"=v_row->>'id' AND ${ownerMember("v_row->>'id'", 'm."userId"')} AND ${redeemedInvitation("v_row->>'id'", 'm."userId"')})) OR
+          (prior->>'status'='active' AND v_row->>'status'='active' AND v_row-'contactPhone'-'contactConfirmedAt'-'updatedAt' IS NOT DISTINCT FROM prior-'contactPhone'-'contactConfirmedAt'-'updatedAt' AND
+            v_row->>'contactPhone'='${contactPhone}' AND v_row->>'contactConfirmedAt' IS NOT NULL AND
+            EXISTS(SELECT 1 FROM "${n}".campaign_sms_binding b JOIN "${n}".campaign_sms_ledger l ON l.business_id=b.business_id AND l.owner_id=b.owner_id
+              JOIN public.otp_requests o ON o.id=l.request_id JOIN "${n}".campaign_records r ON r.table_name='otp_requests' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',o.id) AND r.row_hash=md5(to_jsonb(o)::text)
+              WHERE b.business_id=v_row->>'id' AND b.owner_id='${contactOwner.id}' AND o."verifiedAt" IS NOT NULL AND o."codeHash"=l.code_hash AND o.destination=b.destination AND o."businessId"=b.business_id AND o."userId"=b.owner_id) AND
+            ${contactBusiness("v_row->>'id'")}) OR
           (prior->>'status'='active' AND v_row->>'status'='active' AND v_row-'name'-'cityId'-'updatedAt' IS NOT DISTINCT FROM prior-'name'-'cityId'-'updatedAt' AND
             EXISTS(SELECT 1 FROM public.dealership_members m WHERE m."dealershipId"=v_row->>'id' AND ${ownerMember("v_row->>'id'", 'm."userId"')}))),false)
           THEN RAISE EXCEPTION 'Unsupported campaign business'; END IF;` : '';
@@ -387,13 +437,13 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
           EXISTS(SELECT 1 FROM public.staff_grants g WHERE g."userId"=v_row->>'actorId' AND g.capability='founder.admission' AND g."revokedAt" IS NULL) AND
           EXISTS(SELECT 1 FROM public.sessions s JOIN "${n}".campaign_records r ON r.table_name='sessions' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',s.id)
             WHERE s."userId"=v_row->>'actorId' AND s."expiresAt">(now() AT TIME ZONE 'UTC') AND s."adminTotpExpiresAt">(now() AT TIME ZONE 'UTC')),false)` : '';
-  const deliveryInventory = bootstrapV3 ? `
+  const deliveryInventory = (pendingOtp = '') => bootstrapV3 ? `
     IF (SELECT delivery_hash FROM "${n}".campaign_manifest) IS DISTINCT FROM
       (SELECT md5(coalesce(jsonb_agg(to_jsonb(d) ORDER BY request_id),'[]'::jsonb)::text) FROM "${n}".campaign_delivery_ledger d) OR
       EXISTS(SELECT 1 FROM "${n}".campaign_delivery_ledger d WHERE NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities e WHERE e.email=d.email) OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_records r WHERE r.table_name='otp_requests' AND r.row_key=jsonb_build_object('id',d.request_id) AND (NOT r.deleted OR (SELECT state FROM "${n}".campaign_manifest)<>'identities'))) OR
-      EXISTS(SELECT 1 FROM "${n}".campaign_records r WHERE r.table_name='otp_requests' AND ((r.deleted AND (SELECT state FROM "${n}".campaign_manifest)='identities') OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_delivery_ledger d WHERE r.row_key=jsonb_build_object('id',d.request_id)))) OR
+      EXISTS(SELECT 1 FROM "${n}".campaign_records r WHERE r.table_name='otp_requests' AND ((r.deleted AND (SELECT state FROM "${n}".campaign_manifest)='identities') OR (NOT EXISTS(SELECT 1 FROM "${n}".campaign_delivery_ledger d WHERE r.row_key=jsonb_build_object('id',d.request_id)) AND NOT EXISTS(SELECT 1 FROM "${n}".campaign_sms_ledger d WHERE r.row_key=jsonb_build_object('id',d.request_id))))) OR
       EXISTS(SELECT 1 FROM "${n}".campaign_delivery_sink s WHERE NOT EXISTS(SELECT 1 FROM "${n}".campaign_delivery_ledger d WHERE d.request_id=s.request_id AND d.email=s.email))
-      THEN RAISE EXCEPTION 'Campaign delivery journal changed'; END IF;` : '';
+      THEN RAISE EXCEPTION 'Campaign delivery journal changed'; END IF;${smsInventory(pendingOtp)}` : '';
   const salesInventory = bootstrapV3 ? `
     IF (SELECT state FROM "${n}".campaign_manifest)='identities' AND (
       EXISTS(SELECT 1 FROM public.dealership_invitations i JOIN "${n}".campaign_records r ON r.table_name='dealership_invitations' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',i.id)
@@ -426,7 +476,7 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries }) {
       g.version IS DISTINCT FROM (CASE WHEN ${bootstrapGrant('g.row_key')} THEN 1 ELSE (SELECT count(*) FROM public.audit_logs a JOIN "${n}".campaign_records r ON r.table_name='audit_logs' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',a.id)
         WHERE a.action IN ('STAFF_CAPABILITY_GRANTED','STAFF_CAPABILITY_REVOKED') AND a."targetId"=g.row_key->>'userId' AND a.details->>'capability'=g.row_key->>'capability') END))
     THEN RAISE EXCEPTION 'Campaign grant audit mismatch'; END IF;
-    IF (SELECT state FROM "${n}".campaign_manifest)='identities' AND EXISTS(SELECT 1 FROM "${n}".campaign_records d WHERE d.table_name='dealerships' AND NOT d.deleted AND d.row_key<>jsonb_build_object('id','${rootId}') AND (d.version<>1+(SELECT count(*) FROM public.audit_logs a JOIN "${n}".campaign_records r ON r.table_name='audit_logs' AND NOT r.deleted AND r.version=1 AND r.row_key=jsonb_build_object('id',a.id) WHERE a."targetType"='Dealership' AND a."targetId"=d.row_key->>'id' AND (a.action='BUSINESS_SETTINGS_CHANGED' OR (a.action='BUSINESS_INVITATION_REDEEMED' AND a.details->>'role'='owner'))) OR
+    IF (SELECT state FROM "${n}".campaign_manifest)='identities' AND EXISTS(SELECT 1 FROM "${n}".campaign_records d WHERE d.table_name='dealerships' AND NOT d.deleted AND d.row_key<>jsonb_build_object('id','${rootId}') AND (d.version<>1+(SELECT count(*) FROM "${n}".campaign_events ce WHERE ce.table_name='dealerships' AND ce.row_key=d.row_key AND ce.contact_phone)+(SELECT count(*) FROM public.audit_logs a JOIN "${n}".campaign_records r ON r.table_name='audit_logs' AND NOT r.deleted AND r.version=1 AND r.row_key=jsonb_build_object('id',a.id) WHERE a."targetType"='Dealership' AND a."targetId"=d.row_key->>'id' AND (a.action='BUSINESS_SETTINGS_CHANGED' OR (a.action='BUSINESS_INVITATION_REDEEMED' AND a.details->>'role'='owner'))) OR
       (SELECT count(*) FROM public.dealership_invitations i JOIN "${n}".campaign_records r ON r.table_name='dealership_invitations' AND NOT r.deleted AND r.version=CASE WHEN i."redeemedAt" IS NULL THEN 1 ELSE 2 END AND r.row_key=jsonb_build_object('id',i.id) WHERE i."dealershipId"=d.row_key->>'id' AND i.role='owner' AND i."revokedAt" IS NULL AND
         ((i."redeemedAt" IS NULL AND NOT EXISTS(SELECT 1 FROM public.dealership_members m WHERE m."dealershipId"=i."dealershipId")) OR
          (i."redeemedAt" IS NOT NULL AND ${ownerMember('i."dealershipId"', 'i."recipientUserId"')} AND
@@ -518,7 +568,7 @@ ${bootstrapV3 ? `    IF (SELECT count(*) FROM pg_trigger t WHERE t.tgname='${n}_
     IF EXISTS(SELECT 1 FROM public.users u JOIN "${n}".campaign_entities e ON u.id=e.user_id OR u.email=e.email WHERE NOT EXISTS(
       SELECT 1 FROM "${n}".campaign_records r WHERE r.table_name='users' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',u.id))) OR
       EXISTS(SELECT 1 FROM public.dealerships d WHERE (id='${rootId}' OR slug='${rootSlug}' OR "contactPhone"='${rootContact}') AND NOT EXISTS(
-      SELECT 1 FROM "${n}".campaign_records r WHERE r.table_name='dealerships' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',d.id))) THEN RAISE EXCEPTION 'Untracked campaign root'; END IF;${authInventory}${deliveryInventory}
+      SELECT 1 FROM "${n}".campaign_records r WHERE r.table_name='dealerships' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',d.id))) THEN RAISE EXCEPTION 'Untracked campaign root'; END IF;${authInventory}${deliveryInventory()}
   END $guard$;`;
   // Inventory every incoming FK using OIDs and catalog column names, including
   // non-public sources and composite/non-ID targets. No cascade grants ownership.
@@ -552,15 +602,40 @@ ${bootstrapV3 ? `    IF (SELECT count(*) FROM pg_trigger t WHERE t.tgname='${n}_
       SELECT 1 FROM "${n}".campaign_records owned WHERE owned.table_name='${t}' AND NOT owned.deleted AND owned.row_key=jsonb_build_object('id',x.id))) THEN RAISE EXCEPTION 'Foreign JSON graph reference'; END IF;`).join('\n')}
   END $guard$;`;
   const setup = `CREATE SCHEMA "${n}";
-    CREATE TABLE "${n}".campaign_manifest(reservation_id text PRIMARY KEY,candidate text NOT NULL,profile text NOT NULL,state text NOT NULL CHECK(state IN ('identities','cleaning','disposed')),delivery_version integer NOT NULL DEFAULT ${version},${bootstrapV3 ? "delivery_hash text NOT NULL DEFAULT md5('[]'),baseline_trigger_hash text," : ''}schema_hash text NOT NULL,journal_hash text NOT NULL DEFAULT md5('[]'),event_hash text NOT NULL DEFAULT md5('[]'),tracking_hash text);
+    CREATE TABLE "${n}".campaign_manifest(reservation_id text PRIMARY KEY,candidate text NOT NULL,profile text NOT NULL,state text NOT NULL CHECK(state IN ('identities','cleaning','disposed')),delivery_version integer NOT NULL DEFAULT ${version},${bootstrapV3 ? "sms_hash text,sms_schema_hash text,sms_contract_hash text,delivery_hash text NOT NULL DEFAULT md5('[]'),baseline_trigger_hash text," : ''}schema_hash text NOT NULL,journal_hash text NOT NULL DEFAULT md5('[]'),event_hash text NOT NULL DEFAULT md5('[]'),tracking_hash text);
     INSERT INTO "${n}".campaign_manifest(reservation_id,candidate,profile,state,delivery_version,schema_hash) VALUES('${input.id}','${input.candidate}','${profile}','identities',${version},${schemaHash});
     CREATE TABLE "${n}".campaign_entities(alias text PRIMARY KEY,user_id text UNIQUE NOT NULL,email text UNIQUE NOT NULL);
     INSERT INTO "${n}".campaign_entities VALUES ${identityValues};
     CREATE TABLE "${n}".campaign_records(table_name text NOT NULL,row_key jsonb NOT NULL,row_hash text NOT NULL,version bigint NOT NULL DEFAULT 1,deleted boolean NOT NULL DEFAULT false,PRIMARY KEY(table_name,row_key));
-    CREATE TABLE "${n}".campaign_events(sequence bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,table_name text NOT NULL,row_key jsonb NOT NULL,mutation text NOT NULL CHECK(mutation IN ('INSERT','UPDATE','DELETE')),row_hash text NOT NULL);
+    CREATE TABLE "${n}".campaign_events(sequence bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,table_name text NOT NULL,row_key jsonb NOT NULL,mutation text NOT NULL CHECK(mutation IN ('INSERT','UPDATE','DELETE')),row_hash text NOT NULL${bootstrapV3 ? ',contact_phone boolean NOT NULL DEFAULT false' : ''});
     ${bootstrapV3 ? `CREATE TABLE "${n}".campaign_delivery_ledger(request_id text PRIMARY KEY,email text NOT NULL,UNIQUE(request_id,email));
     CREATE TABLE "${n}".campaign_delivery_sink(request_id text PRIMARY KEY,email text NOT NULL,message jsonb NOT NULL,
       FOREIGN KEY(request_id,email) REFERENCES "${n}".campaign_delivery_ledger(request_id,email));
+    CREATE TABLE "${n}".campaign_sms_binding(reservation_id text PRIMARY KEY,candidate text NOT NULL,destination text NOT NULL,business_id text,owner_id text);
+    INSERT INTO "${n}".campaign_sms_binding VALUES('${input.id}','${input.candidate}','${contactPhone}',NULL,NULL);
+    CREATE TABLE "${n}".campaign_sms_ledger(request_id text PRIMARY KEY,reservation_id text NOT NULL REFERENCES "${n}".campaign_sms_binding(reservation_id),candidate text NOT NULL,destination text NOT NULL,business_id text NOT NULL,owner_id text NOT NULL,purpose text NOT NULL,code_hash text NOT NULL,issue_row_hash text NOT NULL);
+    CREATE TABLE "${n}".campaign_sms_sink(request_id text PRIMARY KEY REFERENCES "${n}".campaign_sms_ledger(request_id),message text NOT NULL);
+    CREATE FUNCTION "${n}".campaign_sms_authority(request text,destination text,code_hash text,candidate text) RETURNS boolean LANGUAGE sql AS $sms$
+      SELECT count(*)=1 FROM "${n}".campaign_manifest m
+      JOIN "${n}".campaign_sms_binding b ON b.reservation_id=m.reservation_id AND b.candidate=m.candidate
+      JOIN "${n}".campaign_sms_ledger l ON l.reservation_id=b.reservation_id AND l.candidate=b.candidate AND l.destination=b.destination AND l.business_id=b.business_id AND l.owner_id=b.owner_id
+      JOIN public.otp_requests o ON o.id=l.request_id AND o.destination=l.destination AND o.phone=l.destination AND o."codeHash"=l.code_hash AND o."userId"=l.owner_id AND o."businessId"=l.business_id AND o.purpose='listing_contact_phone' AND o.channel='phone'
+      JOIN "${n}".campaign_records r ON r.table_name='otp_requests' AND r.row_key=jsonb_build_object('id',o.id) AND NOT r.deleted AND r.row_hash=md5(to_jsonb(o)::text)
+      JOIN "${n}".campaign_events e ON e.table_name='otp_requests' AND e.row_key=r.row_key AND e.mutation='INSERT' AND e.row_hash=l.issue_row_hash
+      JOIN public.users u ON u.id=b.owner_id AND u.phone IS NULL AND u."suspendedAt" IS NULL AND u."deletionScheduledAt" IS NULL
+      JOIN "${n}".campaign_records ur ON ur.table_name='users' AND ur.row_key=jsonb_build_object('id',u.id) AND NOT ur.deleted AND ur.row_hash=md5(to_jsonb(u)::text)
+      WHERE (SELECT count(*) FROM "${n}".campaign_manifest)=1 AND (SELECT count(*) FROM "${n}".campaign_sms_binding)=1 AND
+        (SELECT count(*) FROM "${n}".campaign_entities)=15 AND EXISTS(SELECT 1 FROM "${n}".campaign_entities ce WHERE ce.alias='buyer-a' AND ce.user_id=b.owner_id AND ce.email='${contactOwner.email}') AND
+        m.state='identities' AND m.profile='campaign897-full-v3' AND m.delivery_version=3 AND m.reservation_id='${input.id}' AND m.candidate='${input.candidate}' AND m.candidate=$4 AND
+        b.destination='${contactPhone}' AND b.owner_id='${contactOwner.id}' AND l.request_id=$1 AND l.destination=$2 AND l.code_hash=$3 AND l.purpose='listing_contact_phone' AND
+        o."verifiedAt" IS NULL AND o."expiresAt">(now() AT TIME ZONE 'UTC') AND o.attempts<5 AND ${contactBusiness('b.business_id')} AND
+        EXISTS(SELECT 1 FROM public.dealerships d JOIN "${n}".campaign_records dr ON dr.table_name='dealerships' AND NOT dr.deleted AND dr.row_key=jsonb_build_object('id',d.id) AND dr.row_hash=md5(to_jsonb(d)::text) WHERE d.id=b.business_id) AND
+        NOT EXISTS(SELECT 1 FROM public.dealership_members cm JOIN "${n}".campaign_records cr ON cr.table_name='dealership_members' AND cr.row_key=jsonb_build_object('id',cm.id) WHERE cm."dealershipId"=b.business_id AND cm."userId"=b.owner_id AND (cr.deleted OR cr.row_hash<>md5(to_jsonb(cm)::text))) AND
+        m.sms_hash=${smsHash} AND m.sms_schema_hash=${smsSchemaHash} AND m.journal_hash=${journalHash} AND m.event_hash=${eventHash} AND
+        m.tracking_hash=md5(pg_get_functiondef(to_regprocedure('"${n}".track_business()'))) AND
+        m.sms_contract_hash=md5(pg_get_functiondef(to_regprocedure('"${n}".campaign_sms_authority(text,text,text,text)')))
+    $sms$;
+    UPDATE "${n}".campaign_manifest SET sms_hash=${smsHash},sms_schema_hash=${smsSchemaHash},sms_contract_hash=md5(pg_get_functiondef('"${n}".campaign_sms_authority(text,text,text,text)'::regprocedure));
     ` : ''}CREATE FUNCTION "${n}".track_business() RETURNS trigger LANGUAGE plpgsql AS $fn$
     DECLARE v_row jsonb; prior jsonb; rowkey jsonb; oldkey jsonb; edge record; parent_table text; lifecycle text; owned boolean; fingerprint text;${bootstrapV3 ? ' adopted jsonb; admitting boolean := false;' : ''}
     BEGIN${bootstrapV3 ? `
@@ -591,7 +666,7 @@ ${bootstrapV3 ? `    IF (SELECT count(*) FROM pg_trigger t WHERE t.tgname='${n}_
           IF EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=edge.value AND row_key->>'id' IN (v_row->>edge.key,prior->>edge.key)) THEN owned := true; END IF;
         END LOOP;
         IF TG_TABLE_NAME='audit_logs' AND v_row->>'targetType'${bootstrapV3 ? " IN ('User','user')" : "='User'"} AND EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'targetId') THEN owned := true; END IF;
-      END IF;${admissionSlot}
+      END IF;${phoneGuard}${admissionSlot}
       IF NOT coalesce(owned,false) THEN RETURN NULL; END IF;
       PERFORM pg_advisory_xact_lock(hashtextextended('${n}',0));
       SELECT state INTO lifecycle FROM "${n}".campaign_manifest;${bootstrapV3 ? `
@@ -604,7 +679,12 @@ ${bootstrapV3 ? `    IF (SELECT count(*) FROM pg_trigger t WHERE t.tgname='${n}_
         (TG_TABLE_NAME='totp_backup_codes' AND TG_OP<>'DELETE' AND (NOT EXISTS(SELECT 1 FROM public.totp_enrollments t JOIN "${n}".campaign_entities e ON e.user_id=t."userId" WHERE t.id=v_row->>'totpEnrollmentId' AND t."verifiedAt" IS NOT NULL) OR
           (SELECT count(*) FROM public.totp_backup_codes WHERE "totpEnrollmentId"=v_row->>'totpEnrollmentId')>10 OR (TG_OP='INSERT' AND v_row->>'usedAt' IS NOT NULL) OR
           (TG_OP='UPDATE' AND (prior->>'usedAt' IS NOT NULL OR v_row->>'usedAt' IS NULL OR v_row-'usedAt' IS DISTINCT FROM prior-'usedAt'))))) THEN RAISE EXCEPTION 'Unsupported campaign TOTP'; END IF;
-      IF TG_TABLE_NAME='otp_requests' AND ((TG_OP='DELETE' AND lifecycle='identities') OR v_row->>'businessId' IS NOT NULL OR v_row->>'phone' IS NOT NULL OR v_row->>'purpose'<>'sign_in' OR v_row->>'channel'<>'email' OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE email=v_row->>'destination') OR (v_row->>'userId' IS NOT NULL AND NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'userId' AND email=v_row->>'destination')) OR (TG_OP='UPDATE' AND v_row->>'destination' IS DISTINCT FROM prior->>'destination')) THEN RAISE EXCEPTION 'Unsupported campaign OTP'; END IF;
+      IF TG_TABLE_NAME='otp_requests' AND NOT coalesce((lifecycle='identities' AND TG_OP<>'DELETE' AND ${contactOtp('v_row')}) OR (lifecycle='cleaning' AND TG_OP='DELETE' AND EXISTS(SELECT 1 FROM "${n}".campaign_sms_ledger WHERE request_id=v_row->>'id' AND destination=v_row->>'destination' AND code_hash=v_row->>'codeHash')),false) AND ((TG_OP='DELETE' AND lifecycle='identities') OR v_row->>'businessId' IS NOT NULL OR v_row->>'phone' IS NOT NULL OR v_row->>'purpose'<>'sign_in' OR v_row->>'channel'<>'email' OR NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE email=v_row->>'destination') OR (v_row->>'userId' IS NOT NULL AND NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'userId' AND email=v_row->>'destination')) OR (TG_OP='UPDATE' AND v_row->>'destination' IS DISTINCT FROM prior->>'destination')) THEN RAISE EXCEPTION 'Unsupported campaign OTP'; END IF;
+      IF lifecycle='identities' AND TG_TABLE_NAME='otp_requests' AND v_row->>'channel'='phone' AND (
+        (TG_OP='INSERT' AND (v_row->>'verifiedAt' IS NOT NULL OR (v_row->>'attempts')::int<>0)) OR
+        (TG_OP='UPDATE' AND NOT coalesce(v_row-'attempts'-'verifiedAt'-'updatedAt' IS NOT DISTINCT FROM prior-'attempts'-'verifiedAt'-'updatedAt' AND prior->>'verifiedAt' IS NULL AND
+          (((v_row->>'attempts')::int=(prior->>'attempts')::int+1 AND (v_row->>'attempts')::int<=5 AND v_row->>'verifiedAt' IS NULL) OR
+           (v_row->>'attempts'=prior->>'attempts' AND v_row->>'verifiedAt' IS NOT NULL)),false))) THEN RAISE EXCEPTION 'Unsupported campaign contact OTP mutation'; END IF;
       -- No Session is created elevated. Elevation changes only a live roster Session whose User holds an active
       -- grant and an owned verified enrollment. The database-clock bound allows five minutes of skew
       -- beyond the application's twelve-hour TTL (UTC timestamp(3) columns).
@@ -614,7 +694,7 @@ ${bootstrapV3 ? `    IF (SELECT count(*) FROM pg_trigger t WHERE t.tgname='${n}_
           EXISTS(SELECT 1 FROM public.staff_grants g WHERE g."userId"=v_row->>'userId' AND g."revokedAt" IS NULL) AND
           EXISTS(SELECT 1 FROM public.totp_enrollments t JOIN "${n}".campaign_records r ON r.table_name='totp_enrollments' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',t.id) WHERE t."userId"=v_row->>'userId' AND t."verifiedAt" IS NOT NULL))))))
         THEN RAISE EXCEPTION 'Unsupported campaign session'; END IF;
-      ${deliveryInventory}` : ''}
+      ${deliveryInventory("NOT (TG_TABLE_NAME='otp_requests' AND TG_OP='INSERT' AND o.id=v_row->>'id') AND ")}` : ''}
       IF NOT EXISTS(SELECT 1 FROM "${n}".campaign_manifest WHERE journal_hash=${journalHash} AND event_hash=${eventHash}) THEN RAISE EXCEPTION 'Campaign journal changed'; END IF;
       IF TG_OP<>'INSERT' AND NOT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=TG_TABLE_NAME AND row_key=oldkey AND NOT deleted AND row_hash=md5(prior::text)) THEN RAISE EXCEPTION 'Untracked campaign mutation'; END IF;
       IF lifecycle='identities' AND TG_OP='INSERT' AND EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=TG_TABLE_NAME AND row_key=rowkey) THEN RAISE EXCEPTION 'Campaign key reuse'; END IF;
@@ -651,14 +731,21 @@ ${bootstrapV3 ? `    IF (SELECT count(*) FROM pg_trigger t WHERE t.tgname='${n}_
       END IF;
       IF ((SELECT count(*) FROM "${n}".campaign_records)>=128 AND NOT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=TG_TABLE_NAME AND row_key=rowkey)) OR (SELECT count(*) FROM "${n}".campaign_events)>=2048 OR (lifecycle='identities' AND
         (SELECT count(*) FROM "${n}".campaign_events)+(SELECT count(*) FROM "${n}".campaign_records WHERE NOT deleted)+4>=2048) THEN RAISE EXCEPTION 'Campaign graph limit'; END IF;
-      ${bootstrapV3 ? `IF TG_TABLE_NAME='otp_requests' AND TG_OP='INSERT' THEN
+      ${bootstrapV3 ? `IF TG_TABLE_NAME='otp_requests' AND TG_OP='INSERT' AND v_row->>'channel'='phone' THEN
+        IF coalesce(current_setting('carberk.campaign_sms_binding',true),'')<>'' THEN RAISE EXCEPTION 'Campaign SMS marker conflict'; END IF;
+        UPDATE "${n}".campaign_sms_binding SET business_id=v_row->>'businessId',owner_id=v_row->>'userId' WHERE business_id IS NULL AND owner_id IS NULL;
+        INSERT INTO "${n}".campaign_sms_ledger(request_id,reservation_id,candidate,destination,business_id,owner_id,purpose,code_hash,issue_row_hash)
+          VALUES(v_row->>'id','${input.id}','${input.candidate}','${contactPhone}',v_row->>'businessId',v_row->>'userId',v_row->>'purpose',v_row->>'codeHash',md5(v_row::text));
+        PERFORM set_config('carberk.campaign_sms_binding',jsonb_build_object('kind','campaign','namespace','${n}','reservationId','${input.id}','candidate','${input.candidate}','requestId',v_row->>'id')::text,true);
+      END IF;
+      IF TG_TABLE_NAME='otp_requests' AND TG_OP='INSERT' AND v_row->>'channel'='email' THEN
         INSERT INTO "${n}".campaign_delivery_ledger(request_id,email) VALUES(v_row->>'id',v_row->>'destination') ON CONFLICT DO NOTHING;
         IF NOT EXISTS(SELECT 1 FROM "${n}".campaign_delivery_ledger WHERE request_id=v_row->>'id' AND email=v_row->>'destination') THEN RAISE EXCEPTION 'Campaign delivery collision'; END IF;
       END IF;
       ` : ''}fingerprint := md5(v_row::text);
       INSERT INTO "${n}".campaign_records(table_name,row_key,row_hash,deleted) VALUES(TG_TABLE_NAME,rowkey,fingerprint,TG_OP='DELETE') ON CONFLICT(table_name,row_key) DO UPDATE SET row_hash=excluded.row_hash,version="${n}".campaign_records.version+1,deleted=excluded.deleted;
-      INSERT INTO "${n}".campaign_events(table_name,row_key,mutation,row_hash) VALUES(TG_TABLE_NAME,rowkey,TG_OP,fingerprint);
-      UPDATE "${n}".campaign_manifest SET journal_hash=${journalHash},event_hash=${eventHash}${bootstrapV3 ? `,delivery_hash=(SELECT md5(coalesce(jsonb_agg(to_jsonb(d) ORDER BY request_id),'[]'::jsonb)::text) FROM "${n}".campaign_delivery_ledger d)` : ''};
+      INSERT INTO "${n}".campaign_events(table_name,row_key,mutation,row_hash${bootstrapV3 ? ',contact_phone' : ''}) VALUES(TG_TABLE_NAME,rowkey,TG_OP,fingerprint${bootstrapV3 ? ",coalesce(TG_TABLE_NAME='dealerships' AND TG_OP='UPDATE' AND (v_row->'contactPhone' IS DISTINCT FROM prior->'contactPhone' OR v_row->'contactConfirmedAt' IS DISTINCT FROM prior->'contactConfirmedAt'),false)" : ''});
+      UPDATE "${n}".campaign_manifest SET journal_hash=${journalHash},event_hash=${eventHash}${bootstrapV3 ? `,sms_hash=${smsHash},delivery_hash=(SELECT md5(coalesce(jsonb_agg(to_jsonb(d) ORDER BY request_id),'[]'::jsonb)::text) FROM "${n}".campaign_delivery_ledger d)` : ''};
       RETURN NULL;
     END $fn$;
     UPDATE "${n}".campaign_manifest SET tracking_hash=md5(pg_get_functiondef('"${n}".track_business()'::regprocedure));
@@ -671,7 +758,8 @@ ${bootstrapV3 ? `    IF (SELECT count(*) FROM pg_trigger t WHERE t.tgname='${n}_
     IF EXISTS(SELECT 1 FROM public.verified_contact_phones WHERE phone='${rootContact}') OR EXISTS(SELECT 1 FROM public.users WHERE phone='${rootContact}') OR EXISTS(SELECT 1 FROM public.dealerships WHERE id='${rootId}' OR slug='${rootSlug}' OR "contactPhone"='${rootContact}') OR
       EXISTS(SELECT 1 FROM public.users u JOIN "${n}".campaign_entities e ON u.id=e.user_id OR u.email=e.email) OR
       EXISTS(SELECT 1 FROM public.dealership_members WHERE id='${uuid(`campaign897-business:${input.id}:membership:owner`)}') OR
-      EXISTS(SELECT 1 FROM public.audit_logs WHERE id IN (${['staff.manage','founder.control'].map(c => `'${uuid(`campaign897-business:${input.id}:audit:${c}`)}'`).join(',')})) THEN RAISE EXCEPTION 'Campaign identity collision'; END IF;${authInventory}
+      EXISTS(SELECT 1 FROM public.audit_logs WHERE id IN (${['staff.manage','founder.control'].map(c => `'${uuid(`campaign897-business:${input.id}:audit:${c}`)}'`).join(',')})) THEN RAISE EXCEPTION 'Campaign identity collision'; END IF;${bootstrapV3 ? `
+    IF EXISTS(SELECT 1 FROM public.users WHERE phone='${contactPhone}') OR EXISTS(SELECT 1 FROM public.otp_requests WHERE phone='${contactPhone}' OR destination='${contactPhone}') OR EXISTS(SELECT 1 FROM public.verified_contact_phones WHERE phone='${contactPhone}') OR EXISTS(SELECT 1 FROM public.dealerships WHERE "contactPhone"='${contactPhone}') OR EXISTS(SELECT 1 FROM public.listings WHERE "contactPhone"='${contactPhone}') THEN RAISE EXCEPTION 'Campaign phone collision'; END IF;` : ''}${authInventory}
   END $guard$;`;
   const audit = `INSERT INTO public.users(id,email,"emailVerifiedAt","displayName",role,"updatedAt") VALUES ${identities.map(identity => `('${identity.id}','${identity.email}',now(),'Campaign ${identity.alias}','buyer',now())`).join(',')};
     INSERT INTO public.dealerships(id,slug,name,status,"admissionMode","contactPhone","updatedAt") VALUES('${rootId}','${rootSlug}','Campaign 897 synthetic business','recovery','synthetic','${rootContact}',now());
@@ -700,6 +788,7 @@ ${bootstrapV3 ? `    IF (SELECT count(*) FROM pg_trigger t WHERE t.tgname='${n}_
     const order = ['content_reports', 'staff_grants', 'favorites', 'business_enquiry_audits', 'conversation_participants', 'messages', 'conversations', 'listing_drafts', 'listings', 'dealership_invitations', 'dealership_members', 'verified_contact_phones', 'owned_vehicles', 'blocked_users', 'notification_preferences', 'dealerships', ...(bootstrapV3 ? ['totp_backup_codes', 'totp_enrollments', 'sessions', 'otp_requests'] : []), 'users'];
     const deletes = order.map(table => `DELETE FROM public.${table} t USING "${n}".campaign_records r WHERE r.table_name='${table}' AND NOT r.deleted AND ${key('to_jsonb(t)',table)}=r.row_key;`).join('\n');
     sql(`BEGIN; ${lock} ${integrity} ${preflight}${bootstrapV3 ? `
+      DELETE FROM "${n}".campaign_sms_sink;
       DELETE FROM "${n}".campaign_delivery_sink;` : ''}
       UPDATE public.audit_logs a SET "actorId"=NULL,"targetType"='SyntheticCampaign',"targetId"='${input.id}',details='{"profile":"${profile}","disposition":"redacted-synthetic-audit"}' FROM "${n}".campaign_records r WHERE r.table_name='audit_logs' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',a.id);
       ${deletes}
@@ -711,7 +800,7 @@ ${bootstrapV3 ? `    IF (SELECT count(*) FROM pg_trigger t WHERE t.tgname='${n}_
     DO $guard$ BEGIN
       IF EXISTS(SELECT 1 FROM public.audit_logs a JOIN "${n}".campaign_records r ON r.table_name='audit_logs' AND r.row_key=jsonb_build_object('id',a.id) WHERE a."actorId" IS NOT NULL OR a."targetType"<>'SyntheticCampaign' OR a."targetId"<>'${input.id}' OR a.details IS DISTINCT FROM '{"profile":"${profile}","disposition":"redacted-synthetic-audit"}'::jsonb) THEN RAISE EXCEPTION 'Campaign audit disposition changed'; END IF;
       IF EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE NOT deleted AND table_name<>'audit_logs') THEN RAISE EXCEPTION 'Campaign terminal rows present'; END IF;${bootstrapV3 ? `
-      IF EXISTS(SELECT 1 FROM "${n}".campaign_delivery_sink) THEN RAISE EXCEPTION 'Campaign delivery sink retained'; END IF;` : ''} END $guard$; COMMIT;`);
+      IF EXISTS(SELECT 1 FROM "${n}".campaign_sms_sink) OR EXISTS(SELECT 1 FROM "${n}".campaign_delivery_sink) THEN RAISE EXCEPTION 'Campaign delivery sink retained'; END IF;` : ''} END $guard$; COMMIT;`);
   // A terminal v3 receipt, including a lost-response retry, observes exact job absence
   // and permanent tombstones for the retained ledger. It never recreates missing proof.
   if (bootstrapV3 && state === 'disposed') disposeDeliveries(JSON.parse(sql(`SELECT coalesce(json_agg(json_build_object('requestId',request_id,'email',email) ORDER BY request_id),'[]') FROM "${n}".campaign_delivery_ledger;`)), true);

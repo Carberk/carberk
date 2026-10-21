@@ -67,7 +67,7 @@ export class RequestOtp {
       : OtpCode.generate();
     const codeHash = createHash("sha256").update(code.value).digest("hex");
 
-    const { record, resendInSeconds } = await this.otpRequestRepo.reserve({
+    const { record, resendInSeconds, smsDelivery } = await this.otpRequestRepo.reserve({
       purpose: Enums.SignInCodePurpose.SignIn,
       destination,
       codeHash,
@@ -77,6 +77,7 @@ export class RequestOtp {
 
     if (destination.channel === SIGN_IN_CODE_CHANNELS.PHONE) {
       await this.otpSender.send({
+        smsDelivery,
         phone: destination.value,
         code: code.value,
         purpose: Enums.SignInCodePurpose.SignIn,

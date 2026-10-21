@@ -1,3 +1,4 @@
+import type { SmsDelivery } from "./OtpSenderPort";
 import type { ClockPort } from "./ClockPort";
 import type { SignInCodeDestination } from "../SignInCodeDestination";
 import type {
@@ -30,7 +31,7 @@ export interface OtpRequestRepository {
       destination: SignInCodeDestination;
     },
     clock: ClockPort,
-  ): Promise<{ record: OtpRequest; resendInSeconds: number }>;
+  ): Promise<{ record: OtpRequest; resendInSeconds: number; smsDelivery: SmsDelivery }>;
 
   create(input: CreateOtpRequest): Promise<OtpRequest>;
 
