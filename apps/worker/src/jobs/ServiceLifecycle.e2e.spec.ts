@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { CreateBucketCommand, PutObjectCommand, HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { PrismaService } from "@auto-tm/db";
+import { PrismaService, type Prisma } from "@auto-tm/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { AdvanceHistoryOrders } from "./AdvanceHistoryOrders";
@@ -71,6 +71,111 @@ describe.skipIf(!hosted)("private service lifecycle on disposable PostgreSQL and
   expect(await db.serviceMessage.count({ where: { conversationId: { in: [reopened.id, history.id] } } })).toBe(2);
   expect((await db.supportCase.findUniqueOrThrow({ where: { id: closed.resourceId } })).customerId).toBeNull();
  });
+ /** Transparent scheduling boundary: the worker's own selection returns unchanged rows,
+  * then pauses after it selected `caseId` and before any per-case transaction begins. */
+ function pauseAfterSelecting(caseId: string) {
+  let selected!: () => void, resume!: () => void;
+  const reached = new Promise<void>(resolve => { selected = resolve; }), released = new Promise<void>(resolve => { resume = resolve; });
+  const findMany = async (args: Prisma.SupportCaseFindManyArgs) => {
+   const rows = await db.supportCase.findMany(args);
+   if (rows.some(row => row.id === caseId)) { selected(); await released; }
+   return rows;
+  };
+  const supportCase = new Proxy(db.supportCase, { get: (target, key) => key === "findMany" ? findMany : Reflect.get(target, key) });
+  const gated = new Proxy(db, { get: (target, key) => { if (key === "supportCase") return supportCase; const value: unknown = Reflect.get(target, key); return typeof value === "function" ? value.bind(target) : value; } });
+  return { db: gated, reached, resume };
+ }
+ async function within<T>(work: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try { return await Promise.race([work, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`${label} exceeded ${ms} ms`)), ms); })]); } finally { clearTimeout(timer); }
+ }
+ async function waitBlockedOnSupportCase(holder: number) {
+  const deadline = Date.now() + 10000;
+  for (;;) {
+   const [row] = await db.$queryRaw<{ waiting: number }[]>`SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE ${holder}::int = ANY(pg_blocking_pids(pid)) AND query LIKE '%support_cases%FOR UPDATE%'`;
+   if (row?.waiting) return;
+   if (Date.now() > deadline) throw new Error("Worker never waited on the reopened Support case lock");
+   await new Promise(resolve => setTimeout(resolve, 25));
+  }
+ }
+ it("keeps a selected due Support case when a reopen commits before the worker obtains its row lock", async () => {
+  const target = await fixture("support", "closed", new Date("2000-01-01T00:00:00Z"));
+  const pause = pauseAfterSelecting(target.resourceId);
+  let commit!: () => void;
+  const commitGate = new Promise<void>(resolve => { commit = resolve; });
+  let holderReady!: (pid: number) => void;
+  const holder = new Promise<number>(resolve => { holderReady = resolve; });
+  const running = new ExpireServiceContent(pause.db, objects).execute(now);
+  running.catch(() => undefined);
+  let reopen: Promise<void> | undefined;
+  try {
+   await within(pause.reached, 10000, "Worker selection of the due Support case");
+   // Mirrors the API reopen: principal, Support case and conversation locks, then the open transition.
+   reopen = db.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM users WHERE id=${target.customerId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM support_cases WHERE id=${target.resourceId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM service_conversations WHERE id=${target.id} FOR UPDATE`;
+    await tx.supportCase.update({ where: { id: target.resourceId }, data: { status: "open", closedAt: null } });
+    await tx.serviceAudit.create({ data: { actorId: target.customerId, purpose: "support", resourceId: target.resourceId, action: "SUPPORT_REOPEN", assignmentVersion: 0 } });
+    const [{ pid }] = await tx.$queryRaw<[{ pid: number }]>`SELECT pg_backend_pid() AS pid`;
+    holderReady(pid);
+    await commitGate;
+   }, { timeout: 20000 });
+   reopen.catch(() => undefined);
+   const pid = await within(holder, 10000, "Reopen lock acquisition");
+   pause.resume();
+   await waitBlockedOnSupportCase(pid);
+   commit();
+   await within(reopen, 10000, "Reopen commit");
+   await within(running, 20000, "Worker completion after reopen");
+  } finally {
+   pause.resume(); commit();
+   await Promise.allSettled([running, ...(reopen ? [reopen] : [])]);
+  }
+  expect(await db.supportCase.findUniqueOrThrow({ where: { id: target.resourceId } })).toMatchObject({ status: "open", closedAt: null, customerId: target.customerId, assignmentVersion: 0 });
+  expect(await db.serviceConversation.findUniqueOrThrow({ where: { id: target.id } })).toMatchObject({ erasedAt: null, lifecycleEpoch: 0 });
+  expect(await db.serviceMessage.count({ where: { conversationId: target.id } })).toBe(1);
+  expect(await db.serviceAttachment.findUniqueOrThrow({ where: { id: target.attachmentId } })).toMatchObject({ state: "adopted", removedAt: null, uploaderId: target.customerId });
+  expect(await db.serviceErasureFence.count({ where: { conversationId: target.id } })).toBe(0);
+  expect(await db.serviceAudit.count({ where: { resourceId: target.resourceId, action: "SERVICE_CONTENT_PURGED" } })).toBe(0);
+  await s3.send(new HeadObjectCommand({ Bucket: "service-private", Key: target.key }));
+ }, 60000);
+ it("lets completed account erasure win over a stale selected Support purge without resurrection or foreign loss", async () => {
+  const target = await fixture("support", "closed", new Date("2000-01-01T00:00:00Z"));
+  const foreignHistory = await fixture("history", "completed");
+  const foreignSupport = await fixture("support", "open");
+  await db.user.update({ where: { id: target.customerId }, data: { deletionScheduledAt: new Date("2000-01-01T00:00:00Z") } });
+  const pause = pauseAfterSelecting(target.resourceId);
+  const running = new ExpireServiceContent(pause.db, objects).execute(now);
+  running.catch(() => undefined);
+  try {
+   await within(pause.reached, 10000, "Worker selection of the due Support case");
+   await within(new PurgeExpiredAccounts(db).execute({ now }), 20000, "Account erasure");
+   expect(await db.serviceConversation.findUniqueOrThrow({ where: { id: target.id } })).toMatchObject({ erasedAt: expect.any(Date), lifecycleEpoch: 1 });
+   expect(await db.serviceErasureFence.findUniqueOrThrow({ where: { conversationId: target.id } })).toMatchObject({ epoch: 1, objectKeys: [target.key], cleanupCompletedAt: null });
+   pause.resume();
+   await within(running, 20000, "Stale worker completion after erasure");
+  } finally {
+   pause.resume();
+   await Promise.allSettled([running]);
+  }
+  await new ExpireServiceContent(db, objects).execute(now);
+  expect(await db.serviceConversation.findUniqueOrThrow({ where: { id: target.id } })).toMatchObject({ erasedAt: expect.any(Date), lifecycleEpoch: 1 });
+  expect(await db.serviceErasureFence.findUniqueOrThrow({ where: { conversationId: target.id } })).toMatchObject({ epoch: 1, objectKeys: [target.key], cleanupCompletedAt: now });
+  expect(await db.supportCase.findUniqueOrThrow({ where: { id: target.resourceId } })).toMatchObject({ status: "closed", customerId: null, assignmentVersion: 0 });
+  expect(await db.serviceAudit.count({ where: { resourceId: target.resourceId, action: "SERVICE_CONTENT_PURGED" } })).toBe(0);
+  expect(await db.serviceMessage.count({ where: { conversationId: target.id } })).toBe(0);
+  expect(await db.serviceAttachment.findUniqueOrThrow({ where: { id: target.attachmentId } })).toMatchObject({ state: "removed", uploaderId: null });
+  await expect(s3.send(new HeadObjectCommand({ Bucket: "service-private", Key: target.key }))).rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
+  for (const foreign of [foreignHistory, foreignSupport]) {
+   expect(await db.serviceConversation.findUniqueOrThrow({ where: { id: foreign.id } })).toMatchObject({ erasedAt: null, lifecycleEpoch: 0 });
+   expect(await db.serviceMessage.count({ where: { conversationId: foreign.id } })).toBe(1);
+   expect(await db.serviceErasureFence.count({ where: { conversationId: foreign.id } })).toBe(0);
+   await s3.send(new HeadObjectCommand({ Bucket: "service-private", Key: foreign.key }));
+  }
+  expect((await db.vehicleHistoryRequest.findUniqueOrThrow({ where: { id: foreignHistory.resourceId } })).customerId).toBe(foreignHistory.customerId);
+  expect((await db.supportCase.findUniqueOrThrow({ where: { id: foreignSupport.resourceId } })).customerId).toBe(foreignSupport.customerId);
+ }, 60000);
  it("expires unpaid holds, escalates missed promises once and erases only due unheld payment claims", async () => {
   const fixtureRow = await fixture("history", "enquiry");
   const day = "2000-06-01";
