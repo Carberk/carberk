@@ -159,7 +159,13 @@ describe.skipIf(!hosted)("private service lifecycle on disposable PostgreSQL and
    pause.resume();
    await Promise.allSettled([running]);
   }
-  await new ExpireServiceContent(db, objects).execute(now);
+  // The stale run's cleanup phase completed the erasure fence; a late sweep must not touch the target's storage again.
+  expect(await db.serviceErasureFence.findUniqueOrThrow({ where: { conversationId: target.id } })).toMatchObject({ epoch: 1, objectKeys: [target.key], cleanupCompletedAt: now });
+  await expect(s3.send(new HeadObjectCommand({ Bucket: "service-private", Key: target.key }))).rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
+  let targetRequests = 0;
+  const counted = { deleteAndVerify: async (manifest: string[]) => { if (manifest.includes(target.key)) targetRequests++; await objects.deleteAndVerify(manifest); } };
+  await new ExpireServiceContent(db, counted).execute(now);
+  expect(targetRequests).toBe(0);
   expect(await db.serviceConversation.findUniqueOrThrow({ where: { id: target.id } })).toMatchObject({ erasedAt: expect.any(Date), lifecycleEpoch: 1 });
   expect(await db.serviceErasureFence.findUniqueOrThrow({ where: { conversationId: target.id } })).toMatchObject({ epoch: 1, objectKeys: [target.key], cleanupCompletedAt: now });
   expect(await db.supportCase.findUniqueOrThrow({ where: { id: target.resourceId } })).toMatchObject({ status: "closed", customerId: null, assignmentVersion: 0 });
