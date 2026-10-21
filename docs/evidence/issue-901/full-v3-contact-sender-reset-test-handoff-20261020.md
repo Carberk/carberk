@@ -33,3 +33,15 @@ Docs: no external lookup needed; this reuses checked-in SQL lock observations, o
 Root reports hosted run `API118967370288`, run `39521844904`, on base `45a5be4c`. Full-v3 reached 21/24, with all four coordinator cases and the original 17 passing. The contact request now commits its reservation, then real `HttpOtpSenderAdapter.send` refuses at initial validation before its namespace fence because the fixture remote process had `AUTOTM_COMMIT_SHA` set to candidate `a` repeated forty times while the real API suite never configured that variable; `SMS_DRIVER` was also not explicitly set to `mock`. The unchanged contact case then fails its digest-preservation branch because the committed reservation correctly remains counted after delivery failure. This is a suite setup mismatch, not a product verdict for the later contact flow. The hosted log is `/tmp/carberk-next-release-20261020/45a5be4c/api.plain.log`, lines 2429-2437.
 
 This checkpoint fixes only that setup mismatch in `beforeAll`/`afterAll`: it saves and restores `AUTOTM_COMMIT_SHA`, `SMS_DRIVER` and `OTP_TEST_MODE`, sets the exact fixture candidate and explicit mock driver before real module construction, and leaves all 24 case bodies unchanged. The two scheduling cases continue to use the real carrier and require the same serving-candidate prerequisite.
+
+## Offline receipts for this checkpoint
+
+- `node /tmp/issue901-sender-reset-compare.cjs`: passed. It found 24 original `it` calls byte-identical, 26 final calls, preserved the 125497-byte original helper/case block (SHA-256 `16069a2c42cec07d24ea8897db7b0393cacb7412700ee5179346a489f8d82b0a`), and parsed the embedded reset worker JavaScript without executing it.
+- `pnpm --filter @auto-tm/api typecheck`: passed (TypeScript 7).
+- `pnpm --filter @auto-tm/api exec tsc6 --noEmit`: passed (TypeScript 6).
+- `pnpm --filter @auto-tm/api exec eslint src/modules/identity/presentation/CampaignFullV3.e2e.spec.ts --max-warnings 0`: passed.
+- `AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/api exec vitest list src/modules/identity/presentation/CampaignFullV3.e2e.spec.ts`: passed static collection, 26 cases listed, no hooks executed.
+- `pnpm check:agent-docs`: passed. `git diff --check`: passed.
+- The first offline DB build attempt ran before the contracts output existed and reported only the pre-existing workspace declaration gap; contracts were built, then the configured API checks above passed. No database or service was contacted.
+
+Final pushed checkpoint after the environment correction: `50057052` (subsequent test-only assertion tightening is pending this final push). Working tree is clean after that push requirement is satisfied by the next commit. Hosted sender/reset ordering, SQL compilation, HTTP contact GREEN and all downstream verification remain UNKNOWN.
