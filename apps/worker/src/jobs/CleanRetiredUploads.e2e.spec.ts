@@ -120,7 +120,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
     const owner = options.owner ?? userId;
     await prisma.user.upsert({
       where: { id: owner }, update: {},
-      create: { id: userId, phone: `+9936${String(Math.floor(Math.random() * 1e7)).padStart(7, "0")}`, phoneVerifiedAt: new Date(), role: "buyer" },
+      create: { id: owner, phone: `+9936${String(Math.floor(Math.random() * 1e7)).padStart(7, "0")}`, phoneVerifiedAt: new Date(), role: "buyer" },
     });
     const key = `pending/${randomUUID()}/original.${options.historicalPlaceholder ? "jpg" : "webp"}`;
     const directory = key.slice(0, key.lastIndexOf("/") + 1);
