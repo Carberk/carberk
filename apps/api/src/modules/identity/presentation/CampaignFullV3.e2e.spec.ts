@@ -1639,6 +1639,173 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     });
   }));
 
+  // Worker-only elapsed time; literal ledger in full-v3-support-retention-test-20261021.md.
+  it("purges closed Support at its inclusive stored deadline while preserving a reopened foreign case and exact reset proof", () => withKnownJobs(known => {
+    const id = "f5".repeat(16), foreignId = "f6".repeat(16);
+    const cleanupIds = [id];
+    return resetAfter(cleanupIds, async () => {
+      const allowed = [...tables, ...serviceTables, "service_erasure_fences"];
+      const snapshot = async (reservation: string) => {
+        const content = [];
+        for (const record of await owned(reservation)) {
+          expect(allowed).toContain(record.table_name);
+          content.push({ ...record, rows: await rows(`SELECT to_jsonb(t) AS value FROM public.${record.table_name} t WHERE to_jsonb(t) @> $1::jsonb`, JSON.stringify(record.row_key)) });
+        }
+        return { journal: await digest(reservation), content };
+      };
+      const journal = async (reservation: string, recordCount: number, eventCount: number) => {
+        const records = await rows<RecordKey & { version: bigint; deleted: boolean; row_hash: string }>(`SELECT * FROM "cf_${reservation}".campaign_records ORDER BY table_name,row_key::text`);
+        const events = await rows<{ table_name: string; row_key: Record<string, string>; mutation: string; row_hash: string }>(`SELECT table_name,row_key,mutation,row_hash FROM "cf_${reservation}".campaign_events ORDER BY sequence`);
+        expect(records).toHaveLength(recordCount);
+        expect(events).toHaveLength(eventCount);
+        expect(recordCount).toBeLessThanOrEqual(128);
+        expect(eventCount).toBeLessThanOrEqual(2048);
+        for (const record of records) {
+          expect(allowed).toContain(record.table_name);
+          const history = events.filter(event => event.table_name === record.table_name && JSON.stringify(event.row_key) === JSON.stringify(record.row_key));
+          expect(Number(record.version)).toBe(history.length);
+          expect(history.map(event => event.mutation)).toEqual(["INSERT", ...Array<string>(history.length - 1 - Number(record.deleted)).fill("UPDATE"), ...(record.deleted ? ["DELETE"] : [])]);
+          expect(history.at(-1)?.row_hash).toBe(record.row_hash);
+          expect(await rows(`SELECT md5(to_jsonb(t)::text) AS hash FROM public.${record.table_name} t WHERE to_jsonb(t) @> $1::jsonb`, JSON.stringify(record.row_key))).toEqual(record.deleted ? [] : [{ hash: record.row_hash }]);
+        }
+        expect(events.every(event => records.some(record => record.table_name === event.table_name && JSON.stringify(record.row_key) === JSON.stringify(event.row_key)))).toBe(true);
+        return { records, events };
+      };
+      const worker = async (now: Date) => {
+        const result = await promisify(execFile)(process.execPath, ["-e", `
+          require('reflect-metadata'); require('tsx/cjs');
+          const { PrismaService } = require('@auto-tm/db');
+          const { S3Client, CreateBucketCommand } = require('@aws-sdk/client-s3');
+          const { ExpireServiceContent } = require('./src/jobs/ExpireServiceContent.ts');
+          const { S3RetiredObjectStore } = require('./src/jobs/S3RetiredObjectStore.ts');
+          (async () => {
+            const db = new PrismaService();
+            const s3 = new S3Client({ endpoint: process.env.MINIO_ENDPOINT, region: process.env.MINIO_REGION ?? 'us-east-1', forcePathStyle: true,
+              credentials: { accessKeyId: process.env.MINIO_ACCESS_KEY ?? 'minioadmin', secretAccessKey: process.env.MINIO_SECRET_KEY ?? 'minioadmin' } });
+            try {
+              // Match ServiceLifecycle's real disposable service bucket setup, including empty-manifest version checks.
+              try { await s3.send(new CreateBucketCommand({ Bucket: 'service-private' })); }
+              catch (error) { if (!['BucketAlreadyExists', 'BucketAlreadyOwnedByYou'].includes(error.name)) throw error; }
+              console.log(JSON.stringify(await new ExpireServiceContent(db, new S3RetiredObjectStore(s3, 'service-private')).execute(new Date(process.argv[1])))); }
+            finally { s3.destroy(); await db.onModuleDestroy(); }
+          })().catch(error => { console.error(error); process.exitCode = 1; });
+        `, now.toISOString()], {
+          timeout: 30000, cwd: `${root}/apps/worker`, env: { ...process.env, TSX_TSCONFIG_PATH: `${root}/apps/worker/tsconfig.json` },
+        });
+        return JSON.parse(result.stdout.trim()) as { supportPurged: number; attachmentsRetired: number; cleanupsCompleted: number };
+      };
+      const closeCase = async (reservation: string) => {
+        const beforeJobs = new Set(known);
+        const roster = await seed(reservation);
+        const { staff } = await elevatedStaff(reservation, roster, known, ["support.operations"]);
+        const customer = await signIn(reservation, actor(roster, "buyer-a"), known);
+        await journal(reservation, 51, 61);
+        const opened = await post("/api/v1/services/conversations", customer, { purpose: "support", synthetic: true }).expect(201);
+        const conversationId = opened.body.id as string, resourceId = opened.body.resourceId as string;
+        const path = `/api/v1/services/conversations/${conversationId}`;
+        const sent = await post(`${path}/messages`, customer, { clientMessageId: randomUUID(), body: "Synthetic retained request", visibility: "customer" }).expect(201);
+        await post(`${path}/assignment`, staff, { expectedVersion: 0 }).expect(201);
+        const replied = await post(`${path}/messages`, staff, { clientMessageId: randomUUID(), body: "Synthetic retained resolution", visibility: "customer", supportKind: "reply" }).expect(201);
+        await post(`${path}/support`, staff, { kind: "close_resolved" }).expect(201);
+        const closed = await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } });
+        expect(closed).toMatchObject({ status: "closed", closedAt: expect.any(Date), unansweredSince: null, assignmentVersion: 1 });
+        const audits = await db.serviceAudit.findMany({ where: { resourceId }, orderBy: { id: "asc" } });
+        expect(audits.map(audit => audit.action).sort()).toEqual(["SERVICE_ASSIGN", "SERVICE_HANDOVER", "SERVICE_NOTE", "SERVICE_SEND", "SUPPORT_CLOSE_RESOLVED", "SUPPORT_CUSTOMER_MESSAGE", "SUPPORT_REPLY"]);
+        const outbox = await db.serviceOutbox.findMany({ where: { conversationId }, orderBy: { sequence: "asc" } });
+        expect(outbox.map(row => ({ sequence: row.sequence, eventType: row.eventType, lifecycleEpoch: row.lifecycleEpoch }))).toEqual([
+          { sequence: 1, eventType: "message", lifecycleEpoch: 0 }, { sequence: 2, eventType: "handover", lifecycleEpoch: 0 }, { sequence: 3, eventType: "message", lifecycleEpoch: 0 },
+        ]);
+        await journal(reservation, 65, 82);
+        return { customer, path, conversationId, resourceId, closedAt: closed.closedAt!, closed, audits, outbox, messageIds: [sent.body.id as string, replied.body.id as string], requestIds: [...known].filter(requestId => !beforeJobs.has(requestId)) };
+      };
+      const primary = await closeCase(id);
+      cleanupIds.push(foreignId);
+      const foreign = await closeCase(foreignId);
+      await post(`${foreign.path}/messages`, foreign.customer, { clientMessageId: randomUUID(), body: "Synthetic foreign reply reopens retained case", visibility: "customer" }).expect(201);
+      expect(await db.supportCase.findUniqueOrThrow({ where: { id: foreign.resourceId } })).toMatchObject({ status: "open", closedAt: null, unansweredSince: expect.any(Date) });
+      await journal(foreignId, 68, 87);
+      const foreignBefore = await snapshot(foreignId), primaryBefore = await snapshot(id);
+      const deadline = new Date(primary.closedAt.getTime() + 90 * 86400000);
+      const noWork = { supportPurged: 0, attachmentsRetired: 0, cleanupsCompleted: 0 };
+      expect(await worker(new Date(deadline.getTime() - 1))).toEqual(noWork);
+      expect(await snapshot(id)).toEqual(primaryBefore);
+      expect(await snapshot(foreignId)).toEqual(foreignBefore);
+      // FIRST NEW RED: existing campaign guard refuses erasedAt/epoch UPDATE atomically.
+      // Preserve the raw worker error and prove rollback; do not label setup/transport failures as this RED.
+      const purge = await worker(deadline).then(result => ({ result, error: undefined }), (error: unknown) => ({ result: undefined, error }));
+      if (purge.error) {
+        expect(await snapshot(id)).toEqual(primaryBefore);
+        expect(await snapshot(foreignId)).toEqual(foreignBefore);
+      }
+      expect(purge.error, "deadline worker must pass Unsupported campaign service on erasedAt/epoch UPDATE").toBeUndefined();
+      expect(purge.result).toEqual({ supportPurged: 1, attachmentsRetired: 0, cleanupsCompleted: 1 });
+      expect(await db.serviceConversation.findUniqueOrThrow({ where: { id: primary.conversationId } })).toMatchObject({ erasedAt: deadline, lifecycleEpoch: 1, lastSequence: 3 });
+      expect(await db.supportCase.findUniqueOrThrow({ where: { id: primary.resourceId } })).toEqual({ ...primary.closed, customerId: null, assigneeId: null, sourceListingId: null, assignmentVersion: 2, updatedAt: expect.any(Date) });
+      expect(await db.serviceMessage.findMany({ where: { conversationId: primary.conversationId } })).toEqual([]);
+      expect(await db.serviceOutbox.findMany({ where: { conversationId: primary.conversationId } })).toEqual([]);
+      const fence = await db.serviceErasureFence.findUniqueOrThrow({ where: { conversationId: primary.conversationId } });
+      expect(fence).toEqual({ conversationId: primary.conversationId, epoch: 1, objectKeys: [], erasedAt: deadline, cleanupCompletedAt: deadline });
+      const audits = await db.serviceAudit.findMany({ where: { resourceId: primary.resourceId }, orderBy: { id: "asc" } });
+      expect(audits).toHaveLength(8);
+      for (const audit of primary.audits) expect(audits.find(row => row.id === audit.id)).toEqual({ ...audit, reason: null });
+      const purgeAudit = audits.find(audit => audit.action === "SERVICE_CONTENT_PURGED");
+      expect(purgeAudit).toMatchObject({ id: expect.any(String), purpose: "support", resourceId: primary.resourceId, actorId: null, reason: null, targetStaffId: null, assignmentVersion: 1 });
+      expect(audits.filter(audit => !primary.audits.some(original => original.id === audit.id))).toEqual([purgeAudit]);
+      const purged = await journal(id, 67, 99);
+      expect(await rows(`SELECT table_name,count(*)::int AS count FROM "cf_${id}".campaign_records GROUP BY table_name ORDER BY table_name`)).toEqual(
+        Object.entries({ audit_logs: 3, dealership_members: 1, dealerships: 1, otp_requests: 3, service_audits: 8, service_conversations: 1, service_erasure_fences: 1, service_messages: 2, service_outbox: 3, sessions: 3, staff_grants: 3, support_cases: 1, totp_backup_codes: 20, totp_enrollments: 2, users: 15 }).sort(([a], [b]) => a.localeCompare(b)).map(([table_name, count]) => ({ table_name, count })));
+      expect(await rows(`SELECT table_name,mutation,count(*)::int AS count FROM "cf_${id}".campaign_events WHERE mutation<>'INSERT' GROUP BY table_name,mutation ORDER BY table_name,mutation`)).toEqual([
+        { table_name: "otp_requests", mutation: "UPDATE", count: 6 }, { table_name: "service_audits", mutation: "UPDATE", count: 7 },
+        { table_name: "service_conversations", mutation: "UPDATE", count: 4 }, { table_name: "service_erasure_fences", mutation: "UPDATE", count: 1 },
+        { table_name: "service_messages", mutation: "DELETE", count: 2 }, { table_name: "service_outbox", mutation: "DELETE", count: 3 },
+        { table_name: "sessions", mutation: "UPDATE", count: 2 }, { table_name: "support_cases", mutation: "UPDATE", count: 5 }, { table_name: "totp_enrollments", mutation: "UPDATE", count: 2 },
+      ]);
+      expect(purged.records.filter(record => record.deleted).map(({ table_name, row_key }) => ({ table_name, row_key }))).toEqual(expect.arrayContaining([
+        ...primary.messageIds.map(id => ({ table_name: "service_messages", row_key: { id } })), ...primary.outbox.map(({ id }) => ({ table_name: "service_outbox", row_key: { id } })),
+      ]));
+      expect(purged.records.filter(record => record.deleted)).toHaveLength(5);
+      expect(purged.records.find(record => record.table_name === "service_erasure_fences")).toMatchObject({ row_key: { conversationId: primary.conversationId }, version: 2n, deleted: false });
+      const purgedSnapshot = await snapshot(id);
+      expect(await worker(deadline)).toEqual(noWork);
+      expect(await snapshot(id)).toEqual(purgedSnapshot);
+      expect(await snapshot(foreignId)).toEqual(foreignBefore);
+      const before = await owned(id);
+      expect(before).toHaveLength(62);
+      const terminalReceipt = { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 };
+      expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+      await supportDisposed(id, before.filter(record => record.table_name !== "service_erasure_fences"), audits, primary.requestIds);
+      expect(await db.serviceErasureFence.findUnique({ where: { conversationId: primary.conversationId } })).toBeNull();
+      expect(await db.serviceConversation.findUnique({ where: { id: primary.conversationId } })).toBeNull();
+      const terminal = await journal(id, 67, 161);
+      expect(terminal.events.slice(0, 99)).toEqual(purged.events);
+      for (const record of terminal.records) {
+        const prior = purged.records.find(row => row.table_name === record.table_name && JSON.stringify(row.row_key) === JSON.stringify(record.row_key))!;
+        expect(Number(record.version)).toBe(Number(prior.version) + Number(!prior.deleted));
+        if (prior.deleted) expect(record).toEqual(prior);
+      }
+      const fenceDelete = terminal.events.findIndex(event => event.table_name === "service_erasure_fences" && event.mutation === "DELETE");
+      const conversationDelete = terminal.events.findIndex(event => event.table_name === "service_conversations" && event.mutation === "DELETE");
+      expect(fenceDelete).toBeGreaterThanOrEqual(99);
+      expect(conversationDelete).toBeGreaterThan(fenceDelete);
+      const terminalSnapshot = await snapshot(id);
+      expect(execute("reset", id)).toMatchObject({ code: 0, receipt: terminalReceipt });
+      expect(await snapshot(id)).toEqual(terminalSnapshot);
+      expect(await worker(deadline)).toEqual(noWork);
+      expect(await snapshot(id)).toEqual(terminalSnapshot);
+      expect(await db.serviceErasureFence.findUnique({ where: { conversationId: primary.conversationId } })).toBeNull();
+      expect(await snapshot(foreignId)).toEqual(foreignBefore);
+      const foreignKeys = await owned(foreignId);
+      const foreignAudits = await db.serviceAudit.findMany({ where: { resourceId: foreign.resourceId }, orderBy: { id: "asc" } });
+      expect(foreignAudits).toHaveLength(8);
+      expect(execute("reset", foreignId)).toMatchObject({ code: 0, receipt: terminalReceipt });
+      await supportDisposed(foreignId, foreignKeys, foreignAudits, foreign.requestIds);
+      await journal(foreignId, 68, 155);
+      const foreignTerminal = await snapshot(foreignId);
+      expect(execute("reset", foreignId)).toMatchObject({ code: 0, receipt: terminalReceipt });
+      expect(await snapshot(foreignId)).toEqual(foreignTerminal);
+    });
+  }));
+
   // B2 text-only contexts. Per reservation, count BEFORE writing: primary 68 records / 91 events
   // before reset, 159 events after reset; foreign control 24 / 26, then 50 events after its reset.
   // Fixed guards remain 128 records / 2048 events. No catalog, contact, media or publish setup.
