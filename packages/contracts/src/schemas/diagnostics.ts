@@ -29,6 +29,43 @@ export const DiagnosticAuthorizationRecordSchema = z.object({ authorityReference
 export const DiagnosticOrderSchema = z.object({ id: z.string().uuid(), centerId: z.string().uuid(), templateVersionId: z.string().uuid(), audience: DiagnosticAudienceSchema, listingId: z.string().uuid().nullable(), status: DiagnosticAppointmentStateSchema, version: z.number().int(), synthetic: z.boolean(), createdAt: z.string().datetime(), physicalAuthorized: z.boolean(), publicationAuthorized: z.boolean(), vehicleMatched: z.boolean(), physicalAuthorization: DiagnosticAuthorizationRecordSchema.nullable(), publicationAuthorization: DiagnosticAuthorizationRecordSchema.nullable(), observedVehicle: DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true }).nullable(), events: z.array(z.object({ state: DiagnosticAppointmentStateSchema, actorId: z.string(), occurredAt: z.string().datetime() })) });
 /** Restricted per-visit identity history in capture order; current assigned staff only. */
 export const DiagnosticIdentityRecordSchema = z.object({ id: z.string().uuid(), orderId: z.string().uuid(), orderVersion: z.number().int().positive(), observationHash: z.string().regex(/^[a-f0-9]{64}$/), observation: DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true }), recordedBy: z.string().nullable(), recordedAt: z.string().datetime() }).strict();
+const restrictedText = (max: number) => z.string().trim().min(1).max(max);
+const sha256 = z.string().regex(/^[a-f0-9]{64}$/);
+/** Strict diagnostic subset of the service rights vocabulary. Service use only, an explicit
+ * authorized end date and no caller-supplied hold; audience is always server-derived staff-only. */
+export const DiagnosticIdentityRightsSchema = z.object({
+  category: z.literal("vehicle_observation"), purpose: restrictedText(300), basis: restrictedText(500), provenance: restrictedText(1000),
+  identifiability: z.enum(["personal", "pseudonymous"]), use: z.tuple([z.literal("service")]),
+  schedule: z.object({ kind: z.literal("until"), until: z.string().datetime(), reason: restrictedText(500) }).strict(),
+  supplierRestrictions: z.string().trim().max(1000), hold: z.null(),
+}).strict();
+export const DiagnosticIdentityProvenanceStageSchema = z.object({ id: z.string().uuid(), expectedOrderVersion: z.number().int().nonnegative(),
+  contentType: z.enum(["image/jpeg", "image/png", "image/webp"]), sizeBytes: z.number().int().positive().max(10 * 1024 * 1024), rights: DiagnosticIdentityRightsSchema }).strict();
+export const DiagnosticIdentityProvenanceStagedSchema = z.object({ id: z.string().uuid(), state: z.enum(["staged", "verified"]) }).strict();
+/** Retained sanitized bytes only; never the original upload, a key or a URL. */
+export const DiagnosticIdentityProvenanceSchema = z.object({ id: z.string().uuid(), state: z.literal("verified"), mime: z.literal("image/webp"), sizeBytes: z.number().int().positive(), sha256 }).strict();
+export const DiagnosticIdentifierSchema = z.object({ kind: z.enum(["vin_stamp", "chassis_stamp", "manufacturer_plate"]), location: restrictedText(300), value: restrictedText(500),
+  provenanceIds: z.array(z.string().uuid()).min(1).max(20).refine(ids => new Set(ids).size === ids.length, "Duplicate provenance reference") }).strict();
+const DiagnosticIdentityCorrectionSchema = z.object({ supersedesId: z.string().uuid(), explanation: restrictedText(1000) }).strict();
+export const DiagnosticIdentityEvidenceCaptureSchema = z.object({ id: z.string().uuid(), expectedOrderVersion: z.number().int().nonnegative(), identityRecordId: z.string().uuid(),
+  identifiers: z.array(DiagnosticIdentifierSchema).min(1).max(20).refine(items => new Set(items.map(item => JSON.stringify([item.kind, item.location]))).size === items.length, "Duplicate identifier location"),
+  rights: DiagnosticIdentityRightsSchema, correction: DiagnosticIdentityCorrectionSchema.nullable() }).strict();
+/** Immutable structured evidence bound to one raw observation; a correction is a complete new record. */
+export const DiagnosticIdentityEvidenceSchema = z.object({ id: z.string().uuid(), orderId: z.string().uuid(), orderVersion: z.number().int().positive(), identityRecordId: z.string().uuid(),
+  observationHash: sha256, observation: DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true }), identifiers: z.array(DiagnosticIdentifierSchema),
+  provenance: z.array(z.object({ id: z.string().uuid(), sha256, mime: z.literal("image/webp"), sizeBytes: z.number().int().positive() }).strict()),
+  rights: DiagnosticIdentityRightsSchema, correction: DiagnosticIdentityCorrectionSchema.nullable(), recordHash: sha256, recordedBy: z.string().nullable(), recordedAt: z.string().datetime() }).strict();
+/** One side of the restricted reinspection comparison: a pinned raw observation, its pinned
+ * structured leaf and only the records reached through explicit correction edges. */
+export const DiagnosticComparisonIdentitySchema = z.object({ observation: DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true }),
+  evidence: DiagnosticIdentityEvidenceSchema.nullable(), corrections: z.array(DiagnosticIdentityEvidenceSchema), evidenceGeneration: z.number().int().nonnegative(), correctionHeadHash: sha256.nullable() }).strict();
+export type DiagnosticIdentityRights = z.infer<typeof DiagnosticIdentityRightsSchema>;
+export type DiagnosticIdentityProvenanceStage = z.infer<typeof DiagnosticIdentityProvenanceStageSchema>;
+export type DiagnosticIdentityProvenanceStaged = z.infer<typeof DiagnosticIdentityProvenanceStagedSchema>;
+export type DiagnosticIdentityProvenance = z.infer<typeof DiagnosticIdentityProvenanceSchema>;
+export type DiagnosticIdentityEvidenceCapture = z.infer<typeof DiagnosticIdentityEvidenceCaptureSchema>;
+export type DiagnosticIdentityEvidence = z.infer<typeof DiagnosticIdentityEvidenceSchema>;
+export type DiagnosticComparisonIdentity = z.infer<typeof DiagnosticComparisonIdentitySchema>;
 export type DiagnosticTemplateDefinition = z.infer<typeof DiagnosticTemplateDefinitionSchema>;
 export type DiagnosticCreate = z.infer<typeof DiagnosticCreateSchema>;
 export type PublishDiagnosticTemplate = z.infer<typeof PublishDiagnosticTemplateSchema>;

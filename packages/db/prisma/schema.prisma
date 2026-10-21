@@ -40,6 +40,8 @@ model User {
   publishedDiagnosticTemplates DiagnosticTemplateVersion[] @relation("DiagnosticTemplatePublisher")
   diagnosticAuditEntries DiagnosticAudit[] @relation("DiagnosticAuditActor")
   diagnosticIdentityRecords DiagnosticIdentityRecord[] @relation("DiagnosticIdentityRecorder")
+  diagnosticIdentityEvidence DiagnosticIdentityEvidence[] @relation("DiagnosticIdentityEvidenceRecorder")
+  diagnosticIdentityProvenance DiagnosticIdentityProvenance[] @relation("DiagnosticIdentityProvenanceCreator")
   id              String    @id @default(uuid())
   /// Sign-in Methods (ADR-0054). Each value is stored only with its verified-at
   /// time; the migration adds `users_phone_verified_check` / `users_email_verified_check`.
@@ -1418,6 +1420,8 @@ model InspectionOrder {
   observedVehicle Json?
   listingIdentityDigest String?
   associationValidatedAt DateTime?
+  /// Monotonic structured identity-evidence generation: appends and erasure/rights invalidation.
+  identityEvidenceGeneration Int @default(0)
   synthetic Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1426,6 +1430,8 @@ model InspectionOrder {
   reports DiagnosticReportRecord[]
   audits DiagnosticAudit[]
   identityRecords DiagnosticIdentityRecord[]
+  identityEvidence DiagnosticIdentityEvidence[]
+  identityProvenance DiagnosticIdentityProvenance[]
   @@unique([commissionerId, requestKey])
   @@index([commissionerId, createdAt(sort: Desc)])
   @@index([centerId, status, createdAt])
@@ -1462,9 +1468,72 @@ model DiagnosticIdentityRecord {
   recordedAt DateTime
   erasedAt DateTime?
   reports DiagnosticReportRecord[]
+  evidence DiagnosticIdentityEvidence[]
   @@unique([orderId, orderVersion])
   @@index([recordedById])
   @@map("diagnostic_identity_records")
+}
+
+/// Classified upload intent recorded before bytes, then one exact sanitized private object.
+/// Shares the report-evidence object namespace; ids are disjoint across both owners.
+model DiagnosticIdentityProvenance {
+  id String @id
+  orderId String
+  order InspectionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  contentType String
+  declaredSizeBytes Int
+  rights Json?
+  rightsUntil DateTime
+  objectKey String? @unique
+  sha256 String?
+  sizeBytes Int?
+  mime String?
+  state String @default("staged")
+  epoch String @default(uuid())
+  writeLeaseUntil DateTime?
+  cleanupLeaseUntil DateTime?
+  cleanupAttempts Int @default(0)
+  cleanupFailureCode String?
+  createdById String?
+  createdBy User? @relation("DiagnosticIdentityProvenanceCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  verifiedAt DateTime?
+  cleanupRequestedAt DateTime?
+  cleanupCompletedAt DateTime?
+  erasedAt DateTime?
+  @@index([orderId, state])
+  @@index([createdById])
+  @@map("diagnostic_identity_provenance")
+}
+
+/// Restricted immutable structured identity evidence. A correction is a complete new record
+/// with one explicit predecessor; erasure clears content in place and nothing rewrites it.
+model DiagnosticIdentityEvidence {
+  id String @id
+  orderId String
+  order InspectionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderVersion Int
+  identityRecordId String
+  identityRecord DiagnosticIdentityRecord @relation(fields: [identityRecordId], references: [id], onDelete: Cascade)
+  observationHash String?
+  identifiers Json?
+  provenance Json?
+  rights Json?
+  rightsUntil DateTime
+  supersedesId String? @unique
+  supersedes DiagnosticIdentityEvidence? @relation("DiagnosticIdentityCorrections", fields: [supersedesId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  successor DiagnosticIdentityEvidence? @relation("DiagnosticIdentityCorrections")
+  explanation String?
+  recordHash String?
+  recordedById String?
+  recordedBy User? @relation("DiagnosticIdentityEvidenceRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+  recordedAt DateTime
+  erasedAt DateTime?
+  reports DiagnosticReportRecord[]
+  @@unique([orderId, orderVersion])
+  @@index([identityRecordId])
+  @@index([recordedById])
+  @@map("diagnostic_identity_evidence")
 }
 
 /// Content-free state transitions. Consent, identifiers and observations stay private.
@@ -1708,6 +1777,10 @@ model DiagnosticReportRecord {
   identityRecordId String?
   identityRecordHash String?
   identityRecord DiagnosticIdentityRecord? @relation(fields: [identityRecordId], references: [id], onDelete: Restrict)
+  /// Restricted structured leaf selected at first draft, absent when none existed; never backfilled.
+  identityEvidenceId String?
+  identityEvidenceHash String?
+  identityEvidence DiagnosticIdentityEvidence? @relation(fields: [identityEvidenceId], references: [id], onDelete: Restrict)
   finalizedAt DateTime?
   withdrawnAt DateTime?
   withdrawalReason String?

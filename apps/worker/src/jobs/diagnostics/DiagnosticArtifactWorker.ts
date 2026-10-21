@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { DiagnosticSchemas as D } from "@auto-tm/contracts";
-import type { PrismaService, Prisma } from "@auto-tm/db";
+import { Prisma, type PrismaService } from "@auto-tm/db";
 
 import { renderDiagnosticPdf, type DiagnosticPdfFonts } from "./DiagnosticPdfRenderer";
 
@@ -153,10 +153,40 @@ export class DiagnosticArtifactWorker {
     });
   }
 
+  /** Structured identity evidence has no reader TTL. Declared rights end its retention: with
+   * no lawful hold representable in this synthetic slice, expiry fences and erases content in
+   * place and bumps the visit's generation. Provenance follows its rights, abandoned intents
+   * and verified items never attached to any evidence record use the upload lifecycle rule. */
+  private async retireIdentity(now: Date): Promise<void> {
+    const cutoff = new Date(now.getTime() - 86400_000);
+    const expired = await this.db.diagnosticIdentityEvidence.findMany({ where: { erasedAt: null, rightsUntil: { lte: now } }, orderBy: [{ rightsUntil: "asc" }, { id: "asc" }], take: 100, select: { id: true, orderId: true } });
+    for (const item of expired) await this.db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${item.orderId} FOR UPDATE`;
+      const erased = await tx.$executeRaw`UPDATE diagnostic_identity_evidence SET "observationHash"=NULL, identifiers=NULL, provenance=NULL, rights=NULL,
+        explanation=NULL, "recordHash"=NULL, "erasedAt"=${now}::timestamp WHERE id=${item.id} AND "erasedAt" IS NULL AND "rightsUntil"<=${now}::timestamp`;
+      if (erased) await tx.$executeRaw`UPDATE inspection_orders SET "identityEvidenceGeneration"="identityEvidenceGeneration"+1 WHERE id=${item.orderId}`;
+    });
+    await this.db.$executeRaw`UPDATE diagnostic_identity_provenance SET state='cleanup_pending', epoch=gen_random_uuid()::text, rights=NULL,
+      "cleanupRequestedAt"=COALESCE("cleanupRequestedAt",${now}::timestamp), "erasedAt"=COALESCE("erasedAt",${now}::timestamp) WHERE "erasedAt" IS NULL AND "rightsUntil"<=${now}::timestamp`;
+    await this.db.diagnosticIdentityProvenance.updateMany({ where: { state: "staged", cleanupRequestedAt: null, createdAt: { lte: cutoff }, OR: [{ writeLeaseUntil: null }, { writeLeaseUntil: { lte: now } }] }, data: { state: "cleanup_pending", cleanupRequestedAt: now } });
+    const attached = Prisma.sql`EXISTS (SELECT 1 FROM diagnostic_identity_evidence e, LATERAL jsonb_array_elements(COALESCE(e.provenance,'[]'::jsonb)) ref
+      WHERE e."orderId"=p."orderId" AND ref->>'id'=p.id)`;
+    const unattached = await this.db.$queryRaw<{ id: string; orderId: string; epoch: string }[]>`
+      SELECT p.id, p."orderId", p.epoch FROM diagnostic_identity_provenance p WHERE p.state='verified' AND p."cleanupRequestedAt" IS NULL
+      AND p."verifiedAt"<=${cutoff}::timestamp AND NOT ${attached} ORDER BY p."verifiedAt", p.id LIMIT 100`;
+    for (const item of unattached) await this.db.$transaction(async tx => {
+      // Capture holds the order lock while binding provenance; recheck under it.
+      await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${item.orderId} FOR UPDATE`;
+      const still = await tx.$queryRaw<{ id: string }[]>`SELECT p.id FROM diagnostic_identity_provenance p WHERE p.id=${item.id} AND NOT ${attached}`;
+      if (still.length) await tx.diagnosticIdentityProvenance.updateMany({ where: { id: item.id, epoch: item.epoch, state: "verified", cleanupRequestedAt: null }, data: { state: "cleanup_pending", cleanupRequestedAt: now } });
+    });
+  }
+
   async cleanup(): Promise<number> {
     if (!this.runtime.enabled()) return 0;
     const now = this.runtime.now(); let completed = 0;
     await this.expireUnattached(now);
+    await this.retireIdentity(now);
     // Erasure fences access before network cleanup. Active reports have no blanket purge.
     const erased = await this.db.diagnosticReportRecord.findMany({ where: { AND: [{ OR: [{ erasedAt: { not: null } }, { order: { erasedAt: { not: null } } }, { audience: "buyer_private", order: { commissionerId: null } }] }, { OR: [{ artifacts: { some: { cleanupRequestedAt: null } } }, { evidence: { some: { cleanupRequestedAt: null } } }] }] }, orderBy: { id: "asc" }, take: 100 });
     for (const report of erased) {
@@ -191,6 +221,21 @@ export class DiagnosticArtifactWorker {
         completed += (await this.db.diagnosticEvidence.updateMany({ where: { id: item.id, epoch, state: "cleanup_pending" }, data: { state: "removed", cleanupCompletedAt: this.runtime.now(), cleanupLeaseUntil: null, cleanupFailureCode: null } })).count;
       } catch {
         await this.db.diagnosticEvidence.updateMany({ where: { id: item.id, epoch }, data: { cleanupFailureCode: "cleanup_storage", cleanupLeaseUntil: new Date(now.getTime() + 60_000) } });
+        throw new Error("DIAGNOSTIC_CLEANUP_RETRY");
+      }
+    }
+    const provenance = await this.db.diagnosticIdentityProvenance.findMany({ where: { cleanupRequestedAt: { not: null }, AND: [{ OR: [{ writeLeaseUntil: null }, { writeLeaseUntil: { lte: now } }] }, { OR: [{ cleanupLeaseUntil: null }, { cleanupLeaseUntil: { lte: now } }] }] }, orderBy: [{ cleanupCompletedAt: { sort: "asc", nulls: "first" } }, { id: "asc" }], take: 100 });
+    for (const item of provenance) {
+      // An intent never bound to bytes has no object; a bound one names exactly one key.
+      if (item.objectKey !== null && item.objectKey !== `diagnostic-evidence/${item.id}/${item.sha256}`) throw new Error("DIAGNOSTIC_CLEANUP_INVALID");
+      const epoch = this.runtime.id();
+      const claim = await this.db.diagnosticIdentityProvenance.updateMany({ where: { id: item.id, epoch: item.epoch, cleanupRequestedAt: { not: null }, AND: [{ OR: [{ writeLeaseUntil: null }, { writeLeaseUntil: { lte: now } }] }, { OR: [{ cleanupLeaseUntil: null }, { cleanupLeaseUntil: { lte: now } }] }] }, data: { epoch, state: "cleanup_pending", cleanupLeaseUntil: leaseEnd(now), cleanupAttempts: { increment: 1 } } });
+      if (!claim.count) continue;
+      try {
+        if (item.objectKey) await this.objects.deleteAndVerify([item.objectKey]);
+        completed += (await this.db.diagnosticIdentityProvenance.updateMany({ where: { id: item.id, epoch, state: "cleanup_pending" }, data: { state: "removed", cleanupCompletedAt: this.runtime.now(), cleanupLeaseUntil: null, cleanupFailureCode: null } })).count;
+      } catch {
+        await this.db.diagnosticIdentityProvenance.updateMany({ where: { id: item.id, epoch }, data: { cleanupFailureCode: "cleanup_storage", cleanupLeaseUntil: new Date(now.getTime() + 60_000) } });
         throw new Error("DIAGNOSTIC_CLEANUP_RETRY");
       }
     }

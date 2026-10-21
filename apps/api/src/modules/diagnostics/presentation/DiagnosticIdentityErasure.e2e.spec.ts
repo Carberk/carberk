@@ -104,11 +104,12 @@ describe("diagnostic identity history after product account deletion and due pur
     // Same bounded single Node/tsx subprocess pattern as CampaignFullV3.
     // No Prisma proxy or fake worker: execute the production job on the worker DB.
     // Refuse BEFORE mutation if its global selection/OTP retention could touch a foreign namespace.
-    const workerPath = resolve(__dirname, "../../../../../worker/src/jobs/PurgeExpiredAccounts.ts");
+    // Run from the worker workspace under its own tsconfig (decorators), as other worker-job suites do.
+    const workerRoot = resolve(__dirname, "../../../../../worker");
     const script = `
-      require('reflect-metadata');
+      require('reflect-metadata'); require('tsx/cjs');
       const { PrismaService } = require('@auto-tm/db');
-      const { PurgeExpiredAccounts } = require(${JSON.stringify(workerPath)});
+      const { PurgeExpiredAccounts } = require('./src/jobs/PurgeExpiredAccounts.ts');
       async function main() {
         const db = new PrismaService();
         try {
@@ -125,8 +126,8 @@ describe("diagnostic identity history after product account deletion and due pur
       }
       void main().catch(error => { console.error(error); process.exitCode = 1; });
     `;
-    await promisify(execFile)(process.execPath, ["--import", "tsx", "-e", script], {
-      cwd: resolve(__dirname, "../../../.."), env: process.env, timeout: 30000, killSignal: "SIGKILL",
+    await promisify(execFile)(process.execPath, ["-e", script], {
+      cwd: workerRoot, env: { ...process.env, TSX_TSCONFIG_PATH: resolve(workerRoot, "tsconfig.json") }, timeout: 30000, killSignal: "SIGKILL",
     });
     expect(await db.user.findUniqueOrThrow({ where: { id: suite.id(who) }, select: { phone: true, deletionScheduledAt: true } }))
       .toEqual({ phone: null, deletionScheduledAt: null });
@@ -183,14 +184,16 @@ describe("diagnostic identity history after product account deletion and due pur
       expect(response.headers["cache-control"]).toContain("private");
       expect(response.headers["cache-control"]).toContain("no-store");
     };
+    // These visits capture no structured evidence; each identity wraps only the pinned raw observation.
+    const unstructured = (observation: object) => ({ observation, evidence: null, corrections: [], evidenceGeneration: 0, correctionHeadHash: null });
     async function compare(candidate: typeof erased, predecessor: typeof erasedReport, priorVisit: typeof erased) {
       const response = await get("reviewer", comparisonPath(candidate.id, predecessor.id)).expect(200);
       privateNoStore(response);
       expect(response.body).toEqual({
         predecessor: { reportId: predecessor.id, reportVersion: 3, snapshotHash: expect.stringMatching(/^[a-f0-9]{64}$/),
-          identityRecordId: priorVisit.history[1].id, identityRecordHash: priorVisit.history[1].observationHash, identity: priorVisit.history[1].observation },
+          identityRecordId: priorVisit.history[1].id, identityRecordHash: priorVisit.history[1].observationHash, identity: unstructured(priorVisit.history[1].observation) },
         candidate: { orderId: candidate.id, orderVersion: candidate.version,
-          identityRecordId: candidate.history[1].id, identityRecordHash: candidate.history[1].observationHash, identity: candidate.history[1].observation },
+          identityRecordId: candidate.history[1].id, identityRecordHash: candidate.history[1].observationHash, identity: unstructured(candidate.history[1].observation) },
       });
       return response.body;
     }

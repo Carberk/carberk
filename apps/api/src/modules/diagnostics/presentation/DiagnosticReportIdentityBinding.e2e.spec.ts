@@ -160,11 +160,12 @@ describe("reports retain the identity selected at first draft creation", () => {
       expect(response.headers["cache-control"]).toContain("no-store");
     };
     privateNoStore(comparison);
-    // This first slice's identity is exactly the retained observation, with no invented provenance.
+    // Each identity is exactly the retained raw observation; no structured evidence was captured, so none is invented.
+    const unstructured = (observation: object) => ({ observation, evidence: null, corrections: [], evidenceGeneration: 0, correctionHeadHash: null });
     expect(comparison.body).toEqual({
       predecessor: { reportId: draft.id, reportVersion: 3, snapshotHash: expect.stringMatching(/^[a-f0-9]{64}$/),
-        identityRecordId: ia.id, identityRecordHash: ia.observationHash, identity: original },
-      candidate: { orderId: b.id, orderVersion: 9, identityRecordId: ib.id, identityRecordHash: ib.observationHash, identity: candidate },
+        identityRecordId: ia.id, identityRecordHash: ia.observationHash, identity: unstructured(original) },
+      candidate: { orderId: b.id, orderVersion: 9, identityRecordId: ib.id, identityRecordHash: ib.observationHash, identity: unstructured(candidate) },
     });
     const expected = comparison.body;
     const technicianComparison = await get("technician", comparisonPath()).expect(200);

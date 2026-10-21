@@ -9,6 +9,7 @@ import { DIAGNOSTIC_REPORTS_PORT, type DiagnosticReportsPort } from "../domain/p
 import { DIAGNOSTIC_EVIDENCE_PORT, type DiagnosticEvidencePort } from "../domain/ports/DiagnosticEvidencePort";
 
 import { DIAGNOSTIC_DOCUMENTS_PORT, type DiagnosticDocumentsPort } from "../domain/ports/DiagnosticDocumentsPort";
+import { DIAGNOSTIC_IDENTITY_EVIDENCE_PORT, type DiagnosticIdentityEvidencePort } from "../domain/ports/DiagnosticIdentityEvidencePort";
 
 type Request = FastifyRequest & { user?: { sub?: string; sid?: string } };
 const uuid = z.string().uuid();
@@ -21,7 +22,8 @@ function parse<S extends z.ZodType>(schema: S, value: unknown): z.output<S> {
 export class DiagnosticReportsController {
   constructor(@Inject(DIAGNOSTIC_REPORTS_PORT) private readonly reports: DiagnosticReportsPort,
     @Inject(DIAGNOSTIC_EVIDENCE_PORT) private readonly evidence: DiagnosticEvidencePort,
-    @Inject(DIAGNOSTIC_DOCUMENTS_PORT) private readonly documents: DiagnosticDocumentsPort) {}
+    @Inject(DIAGNOSTIC_DOCUMENTS_PORT) private readonly documents: DiagnosticDocumentsPort,
+    @Inject(DIAGNOSTIC_IDENTITY_EVIDENCE_PORT) private readonly identity: DiagnosticIdentityEvidencePort) {}
   private subject(req: Request): DiagnosticSubject {
     if (!req.user?.sub || !req.user.sid) throw new ForbiddenException({ code: "DIAGNOSTIC_NO_ACCESS", message: "Inspection access unavailable" });
     return { userId: req.user.sub, sessionId: req.user.sid };
@@ -30,7 +32,7 @@ export class DiagnosticReportsController {
     try { return await work(); }
     catch (error) {
       if (!(error instanceof DiagnosticRuleError)) throw error;
-      const status = error.code.includes("STALE") || error.code.includes("CONFLICT") || error.code.includes("EXISTS") || error.code === "DIAGNOSTIC_PDF_NOT_READY" ? 409 : error.code === "DIAGNOSTIC_NO_ACCESS" ? 403 : error.code === "DIAGNOSTIC_PDF_UNAVAILABLE" ? 503 : 400;
+      const status = error.code.includes("STALE") || error.code.includes("CONFLICT") || error.code.includes("EXISTS") || error.code === "DIAGNOSTIC_PDF_NOT_READY" ? 409 : error.code === "DIAGNOSTIC_NO_ACCESS" ? 403 : ["DIAGNOSTIC_PDF_UNAVAILABLE", "DIAGNOSTIC_EVIDENCE_UNAVAILABLE"].includes(error.code) ? 503 : 400;
       throw new HttpException({ code: error.code, message: "Inspection request could not be completed" }, status);
     }
   }
@@ -44,6 +46,36 @@ export class DiagnosticReportsController {
     // Set before authorization so uniform denials carry the same private cache policy.
     reply.header("Cache-Control", "no-store, private");
     return this.run(() => this.reports.comparison(this.subject(req), parse(uuid, id), parse(z.object({ predecessorId: uuid }).strict(), query).predecessorId));
+  }
+  /** Restricted identity routes set private/no-store before validation so syntax errors and
+   * uniform denials carry the same cache policy as successful responses. */
+  @Post("orders/:id/identity-provenance") stage(@Req() req: Request, @Param("id") id: string, @Body() body: unknown, @Res({ passthrough: true }) reply: FastifyReply) {
+    reply.header("Cache-Control", "no-store, private");
+    return this.run(() => this.identity.stage(this.subject(req), parse(uuid, id), parse(DiagnosticSchemas.DiagnosticIdentityProvenanceStageSchema, body)));
+  }
+  @Put("orders/:id/identity-provenance/:provenanceId") uploadProvenance(@Req() req: Request, @Param("id") id: string, @Param("provenanceId") provenanceId: string, @Query() query: unknown, @Body() body: unknown, @Res({ passthrough: true }) reply: FastifyReply) {
+    reply.header("Cache-Control", "no-store, private");
+    const input = parse(z.object({ expectedOrderVersion: z.coerce.number().int().nonnegative() }).strict(), query);
+    const mime = parse(z.enum(["image/jpeg", "image/png", "image/webp"]), req.headers["x-evidence-type"]);
+    return this.run(() => this.identity.upload(this.subject(req), parse(uuid, id), parse(uuid, provenanceId), { ...input, mime, bytes: Buffer.isBuffer(body) ? body : null }));
+  }
+  @Get("orders/:id/identity-provenance/:provenanceId") async provenance(@Req() req: Request, @Param("id") id: string, @Param("provenanceId") provenanceId: string, @Res() reply: FastifyReply) {
+    reply.header("Cache-Control", "no-store, private");
+    const image = await this.run(() => this.identity.read(this.subject(req), parse(uuid, id), parse(uuid, provenanceId)));
+    reply.header("X-Content-Type-Options", "nosniff").type(image.mime).send(Buffer.from(image.bytes));
+  }
+  @Post("orders/:id/identity-evidence") append(@Req() req: Request, @Param("id") id: string, @Body() body: unknown, @Res({ passthrough: true }) reply: FastifyReply) {
+    reply.header("Cache-Control", "no-store, private");
+    return this.run(() => this.identity.append(this.subject(req), parse(uuid, id), parse(DiagnosticSchemas.DiagnosticIdentityEvidenceCaptureSchema, body)));
+  }
+  @Get("orders/:id/identity-evidence") identityEvidence(@Req() req: Request, @Param("id") id: string, @Res({ passthrough: true }) reply: FastifyReply) {
+    reply.header("Cache-Control", "no-store, private");
+    return this.run(() => this.identity.list(this.subject(req), parse(uuid, id)));
+  }
+  @Get("orders/:id/reinspection-comparison/provenance/:provenanceId") async comparisonProvenance(@Req() req: Request, @Param("id") id: string, @Param("provenanceId") provenanceId: string, @Query() query: unknown, @Res() reply: FastifyReply) {
+    reply.header("Cache-Control", "no-store, private");
+    const image = await this.run(() => this.reports.comparisonProvenance(this.subject(req), parse(uuid, id), parse(z.object({ predecessorId: uuid }).strict(), query).predecessorId, parse(uuid, provenanceId)));
+    reply.header("X-Content-Type-Options", "nosniff").type(image.mime).send(Buffer.from(image.bytes));
   }
   @Get("orders/:id/reports") @Header("Cache-Control", "no-store, private") forOrder(@Req() req: Request, @Param("id") id: string) {
     return this.run(() => this.reports.forOrder(this.subject(req), parse(uuid, id)));
