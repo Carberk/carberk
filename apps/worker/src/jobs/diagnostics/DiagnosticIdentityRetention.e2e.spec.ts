@@ -195,9 +195,11 @@ describe.skipIf(!hosted)("structured identity evidence retirement and exact prov
     const ec = await evidence(c, [pc], far, staff);
     const before = { order: await orderRow(a.orderId), control: await orderRow(c.orderId) };
     for (const id of [a.commissioner, staff]) await db.user.update({ where: { id }, data: { deletionScheduledAt: new Date(clock.getTime() - 1) } });
-    // Refuse BEFORE mutation if the global due-account selection could reach a foreign account.
+    // Refuse BEFORE mutation if the global due-account selection could reach a foreign account,
+    // or the job's global stale code-request retention could delete a foreign row. This suite creates none.
     const due = await db.user.findMany({ where: { deletionScheduledAt: { lte: clock } }, select: { id: true }, orderBy: { id: "asc" } });
     expect(due.map(row => row.id)).toEqual([a.commissioner, staff].sort());
+    expect(await db.otpRequest.count({ where: { createdAt: { lt: new Date(clock.getTime() - 30 * DAY) } } })).toBe(0);
     await expect(new PurgeExpiredAccounts(db).execute({ now: clock })).resolves.toMatchObject({ purgedCount: 2 });
     expect(await evidenceRow(ea.id)).toEqual({ ...ea, observationHash: null, identifiers: null, provenance: null, rights: null, explanation: null, recordHash: null,
       recordedById: null, erasedAt: clock });

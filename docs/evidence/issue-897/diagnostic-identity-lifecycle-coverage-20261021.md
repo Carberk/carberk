@@ -45,6 +45,7 @@ It is tests only. No source changed. The existing suites are byte-unchanged: the
    - each delete names exactly one key;
    - a resumed late writer is removed by the next rotation, with attempts at 3.
 4. Account purge:
+   - before any mutation, the test refuses unless the due accounts are exactly its own two and there is no code request older than 30 days, the job's global retention cutoff (this suite creates none);
    - the commissioner's evidence and raw record are erased before intake, and generation is bumped;
    - an old-epoch restore matches 0 rows;
    - the verified object is deleted at once and the held writer's object after its lease;
