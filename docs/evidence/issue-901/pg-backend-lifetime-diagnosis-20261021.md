@@ -73,3 +73,38 @@ This adds SQL evaluation work, a transaction-local setting and a private result 
 - A Node/TypeScript AST comparison against `96c0c844cdfed5a0e5f1ce658e6788ea65d14f90` proved all six complete `it()` call texts byte-identical, including their bodies/assertions/timeouts. SHA-256 of those call texts joined by LF: `cca5d3be05dd16c0529fda8910077700218a1fc87595f22490c689c1caa9733f`. Full-file byte comparison also passed for all three original reset suites, both CampaignFullV3 specs and production `scripts/staging-clean-reset-remote.mjs`. That production file's SHA-256 is `d280bdda8ae1a93cf82782f2a298306fb35515f565d2a06cc1715bf2e9378869`.
 
 Docs: no dependency change or new external API. Installed pg source was used for its existing BackendKeyData `processID` property; no library behavior is changed. Root must inspect the complete diagnostic diff before assembly and run the focused hosted six-case command above, then the normal full DB gate if the refusal requires its scheduling/load context. No hosted reproduction, PostgreSQL syntax GREEN, selected root cause or repair is claimed here. Remove temporary diagnostics after sufficient evidence is captured. No local services/containers, Railway, credentials, inventory/reset/deploy or quota operations were used.
+
+## Same-observation attribution continuation
+
+This continuation keeps the original numeric count and selection filter as the guard input, then adds test-only metadata for up to 16 of those same rows. The bounded fields are PID plus fixed categories for application (`pg-isready`, `known-fixture`, `sql-child`, `other`), client origin (`loopback`, `other`, `unavailable`) and state (`known`, `unavailable`). No query text, URLs, user names, application strings or row payloads leave the disposable transport. The disposable fixture uses a fixed application name; the child adds its fixed name only with loopback diagnostics enabled. The count and PID diagnostic line remains unchanged; a separate validated attribution line is emitted when every selected row validates. This SQL adds evaluation work and can perturb timing, so it is evidence from an instrumented run rather than an unmodified reproduction.
+
+Offline tests cover the exact serialized inventory transform, fixed-category validation and redaction, malformed rows, sixteen-row bounds, unchanged public rows, loopback/opt-in restrictions and fixture forwarding. No fake result counts as PostgreSQL execution evidence. The hosted root verification remains the unchanged focused command:
+
+`pnpm --filter @auto-tm/db exec vitest run scripts/staging-clean-reset-redis-interrupted.e2e.spec.ts`
+
+A resulting PID attribution still needs correlation with lifecycle and exit timings. It does not by itself establish the owner or cause of PID 467.
+
+
+The private `/tmp/issue-901-pg-backend-467-report-20261021.md` incorrectly excluded container health checks from `client backend` attribution. Root inspected the installed `@testcontainers/postgresql` `start()` implementation: it installs `PGPASSWORD=${this.password} pg_isready --host localhost --username ${this.username} --dbname ${this.database}`, interval 250ms, timeout 1000ms, retries 1000, default database `test`. This ordinary loopback target connection is uninstrumented by the existing fixture/child lifecycle paths. It is a candidate, not an established cause; no health check is changed here.
+
+Root supplied exact31b9 hosted evidence, run `39691115985`, job `119537514301`, 390/391 DB cases. Raw log `/tmp/carberk-resume-20261021/31b9-db-119537514301.raw.log`, SHA-256 `03bcac3f7315112a2a768c592aeb1831e39847e4543c5c59f8224eb8bbbe8de2`. The first five interrupted cases passed; final replay failed before restart. Child 239 PID 460 connected at 414315ms, closed at 414620ms, exited at 414626ms; locked-reset count 1 selected PID 467. Child 238 PID 452 previously closed at 414212ms and exited at 414218ms with count 0. Observer 436 saw 0 at 414627..414629ms. PID 467 remains unattributed. Awaiting local close is established; these facts justify no retry, timeout increase or weaker guard. No UTC timestamps or backend-start correlations are introduced.
+
+
+### Continuation verification and limits
+
+Reserved and pushed `agent/issue-901-pg-health-attribution-20261021` at supplied base `e6d219f836688ac37293490510af423682f98a0f` before edits. Host scaffold `t3/pg-backend-attribution-diagnostics` remains at that base. RED checkpoint `347de5908a07ee1443f0adf65288b5d986f85287` was pushed before implementation: `node --test scripts/testing/query-disposable-postgres.test.cjs` had 8 passes and 4 expected failures for missing classified SQL, attribution output and fixture forwarding. Log `/tmp/issue-901-health-red.log`. This is diagnostic-contract RED, not runtime reproduction.
+
+| Criterion / gate | Evidence | Result |
+| --- | --- | --- |
+| Exact serialized inventory transformation, private categories, malformed metadata, output preservation and opt-in/host restriction | `node --test scripts/testing/query-disposable-postgres.test.cjs` | 12/12 pass |
+| Existing offline reset contracts plus new diagnostic coverage | `node --test scripts/testing/query-disposable-postgres.test.cjs scripts/staging-clean-reset-remote.test.mjs scripts/staging-clean-reset.test.mjs` | 36/36 pass |
+| JavaScript syntax and affected TypeScript lint | `node --check scripts/testing/query-disposable-postgres.cjs`; `pnpm --filter @auto-tm/db exec eslint scripts/staging-clean-reset-redis-interrupted.e2e.spec.ts --max-warnings 0` | pass |
+| Agent docs and glossary | `pnpm test:agent-docs`; `pnpm test:glossary` | 8/8 and 40/40 pass |
+| DB workspace lint, typecheck and unit | `pnpm --filter @auto-tm/db lint`; `pnpm --filter @auto-tm/db typecheck`; `pnpm --filter @auto-tm/db test:unit` | blocked by missing generated Prisma client; typecheck also reports missing contracts output; no changed-fixture diagnostic |
+| Repository typecheck and unit | `pnpm typecheck`; `pnpm test:unit` | blocked in DB build by missing `DATABASE_URL` |
+| Six complete interrupted `it()` calls and protected full files | TypeScript AST comparison and full-file byte comparison against exact supplied base, `/tmp/issue-901-health-preservation.cjs` | pass |
+| Instrumented PostgreSQL SQL acceptance and runtime attribution | root's focused hosted command above, then full hosted DB gate as applicable | pending, no hosted or local DB run by this writer |
+
+The six complete `it()` call texts joined by LF have SHA-256 `cca5d3be05dd16c0529fda8910077700218a1fc87595f22490c689c1caa9733f`. All three original reset suites, both CampaignFullV3 specs and `scripts/staging-clean-reset-remote.mjs` are byte-identical to the supplied base. Exactly four allowed files change. No schema, container configuration, CI, timeout, retry, guard, skip or production behavior is changed. The existing health check is left intact. No additional agent was dispatched and no PR was opened; root alone assembles for #904.
+
+Check logs are private under `/tmp/issue-901-health-{db-lint,db-typecheck,db-unit,docs-glossary,repository-typecheck,repository-unit}.log`. Missing prerequisites were recorded without starting a service or supplying an environment/credential. Docs: not applicable to internal test instrumentation; installed `pg` client configuration declarations and the installed testcontainers health-check implementation were inspected as source evidence. No dependency version or external API contract changes, overview ownership or glossary additions are needed.
