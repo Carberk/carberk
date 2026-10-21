@@ -16,6 +16,11 @@ export function diagnosticListingDigest(listing: { id: string; sellerId: string;
   return createHash("sha256").update(JSON.stringify([listing.id, listing.sellerId, listing.businessId, listing.vin?.trim().toUpperCase() ?? null, listing.brandId, listing.modelId, listing.year])).digest("hex");
 }
 
+/** Stable binding of one recorded observation to its visit and resulting order version. */
+export function diagnosticObservationHash(orderId: string, orderVersion: number, observed: Omit<DiagnosticSchemas.DiagnosticObservedVehicle, "expectedVersion">): string {
+  return createHash("sha256").update(JSON.stringify(["diagnostic-identity-record/v1", orderId, orderVersion, observed.observedAt, observed.mileageKm, observed.method, observed.vin, observed.manualReference])).digest("hex");
+}
+
 /** The intake owner serializes current identity, center assignments and order changes.
  * No Listing owner or global administrator becomes a private report reader. */
 @Injectable()
@@ -225,7 +230,20 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
         identityDigest = diagnosticListingDigest(listing);
       }
       const next = await tx.inspectionOrder.update({ where: { id }, data: { observedVehicle: json(observed), listingIdentityDigest: identityDigest, associationValidatedAt: row.audience === "listing_public" ? this.runtime.now() : null, version: { increment: 1 } } });
+      // Appended under the same order lock and bound to the resulting version; the order keeps only the newest observation.
+      await tx.diagnosticIdentityRecord.create({ data: { id: this.runtime.id(), orderId: id, orderVersion: next.version, observation: json(observed),
+        observationHash: diagnosticObservationHash(id, next.version, observed), recordedById: subject.userId, recordedAt: this.runtime.now() } });
       await this.audit(tx, subject, row, "VEHICLE_OBSERVED", { method: input.method }); return this.dto(tx, next, true);
+    });
+  }
+  /** Single-visit history. Commissioner, marketplace admin and center staff not assigned here receive the uniform denial. */
+  async identityRecords(subject: DiagnosticSubject, id: string): Promise<DiagnosticSchemas.DiagnosticIdentityRecord[]> {
+    return this.db.$transaction(async tx => {
+      const scope = await this.staffScope(tx, subject, id);
+      if (!scope.staff) throw denial();
+      const rows = await tx.diagnosticIdentityRecord.findMany({ where: { orderId: id, erasedAt: null }, orderBy: { orderVersion: "asc" } });
+      return rows.map(row => DiagnosticSchemas.DiagnosticIdentityRecordSchema.parse({ id: row.id, orderId: row.orderId, orderVersion: row.orderVersion,
+        observationHash: row.observationHash, observation: row.observation, recordedBy: row.recordedById, recordedAt: row.recordedAt.toISOString() }));
     });
   }
 }

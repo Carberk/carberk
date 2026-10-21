@@ -27,6 +27,8 @@ export const DiagnosticObservedVehicleSchema = z.object({ expectedVersion: z.num
 export const DiagnosticTemplateSchema = z.object({ id: z.string().uuid(), centerId: z.string().uuid(), version: z.number().int().positive(), definition: DiagnosticTemplateDefinitionSchema, synthetic: z.boolean(), publishedAt: z.string().datetime() });
 export const DiagnosticAuthorizationRecordSchema = z.object({ authorityReference: z.string(), recordedBy: z.string(), recordedAt: z.string().datetime() });
 export const DiagnosticOrderSchema = z.object({ id: z.string().uuid(), centerId: z.string().uuid(), templateVersionId: z.string().uuid(), audience: DiagnosticAudienceSchema, listingId: z.string().uuid().nullable(), status: DiagnosticAppointmentStateSchema, version: z.number().int(), synthetic: z.boolean(), createdAt: z.string().datetime(), physicalAuthorized: z.boolean(), publicationAuthorized: z.boolean(), vehicleMatched: z.boolean(), physicalAuthorization: DiagnosticAuthorizationRecordSchema.nullable(), publicationAuthorization: DiagnosticAuthorizationRecordSchema.nullable(), observedVehicle: DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true }).nullable(), events: z.array(z.object({ state: DiagnosticAppointmentStateSchema, actorId: z.string(), occurredAt: z.string().datetime() })) });
+/** Restricted per-visit identity history in capture order; current assigned staff only. */
+export const DiagnosticIdentityRecordSchema = z.object({ id: z.string().uuid(), orderId: z.string().uuid(), orderVersion: z.number().int().positive(), observationHash: z.string().regex(/^[a-f0-9]{64}$/), observation: DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true }), recordedBy: z.string().nullable(), recordedAt: z.string().datetime() }).strict();
 export type DiagnosticTemplateDefinition = z.infer<typeof DiagnosticTemplateDefinitionSchema>;
 export type DiagnosticCreate = z.infer<typeof DiagnosticCreateSchema>;
 export type PublishDiagnosticTemplate = z.infer<typeof PublishDiagnosticTemplateSchema>;
@@ -34,6 +36,7 @@ export type DiagnosticAuthorization = z.infer<typeof DiagnosticAuthorizationSche
 export type DiagnosticAppointmentChange = z.infer<typeof DiagnosticAppointmentChangeSchema>;
 export type DiagnosticAssignmentChange = z.infer<typeof DiagnosticAssignmentChangeSchema>;
 export type DiagnosticObservedVehicle = z.infer<typeof DiagnosticObservedVehicleSchema>;
+export type DiagnosticIdentityRecord = z.infer<typeof DiagnosticIdentityRecordSchema>;
 export type DiagnosticTemplate = z.infer<typeof DiagnosticTemplateSchema>;
 export type DiagnosticOrder = z.infer<typeof DiagnosticOrderSchema>;
 export type DiagnosticCapability = z.infer<typeof DiagnosticCapabilitySchema>;

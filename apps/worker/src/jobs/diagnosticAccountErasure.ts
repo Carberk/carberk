@@ -43,6 +43,12 @@ export function diagnosticAccountErasureWrites(db: PrismaService, userId: string
   db.$executeRaw`DELETE FROM diagnostic_order_assignments WHERE "userId"=${userId} OR "orderId" IN
    (SELECT id FROM inspection_orders WHERE "commissionerId"=${userId})`,
   db.$executeRaw`DELETE FROM diagnostic_center_assignments WHERE "userId"=${userId}`,
+  // Identity records are append-only: erasure clears restricted content and
+  // recorder linkage in place, before the order itself is erased below.
+  db.$executeRaw`UPDATE diagnostic_identity_records SET observation=NULL, "observationHash"=NULL, "recordedById"=NULL,
+   "erasedAt"=COALESCE("erasedAt",${now}::timestamp) WHERE "orderId" IN
+   (SELECT id FROM inspection_orders WHERE "commissionerId"=${userId} AND "erasedAt" IS NULL)`,
+  db.$executeRaw`UPDATE diagnostic_identity_records SET "recordedById"=NULL WHERE "recordedById"=${userId}`,
   // Last: clearing intake first would make the report trigger reject fencing.
   db.$executeRaw`UPDATE inspection_orders SET "commissionerId"=NULL, "physicalAuthorization"=NULL,
    "publicationAuthorization"=NULL, "observedVehicle"=NULL, "listingId"=NULL, "listingIdentityDigest"=NULL,

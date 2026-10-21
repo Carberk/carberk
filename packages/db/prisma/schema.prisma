@@ -39,6 +39,7 @@ model User {
   diagnosticOrderAssignments DiagnosticOrderAssignment[]
   publishedDiagnosticTemplates DiagnosticTemplateVersion[] @relation("DiagnosticTemplatePublisher")
   diagnosticAuditEntries DiagnosticAudit[] @relation("DiagnosticAuditActor")
+  diagnosticIdentityRecords DiagnosticIdentityRecord[] @relation("DiagnosticIdentityRecorder")
   id              String    @id @default(uuid())
   /// Sign-in Methods (ADR-0054). Each value is stored only with its verified-at
   /// time; the migration adds `users_phone_verified_check` / `users_email_verified_check`.
@@ -1424,6 +1425,7 @@ model InspectionOrder {
   assignments DiagnosticOrderAssignment[]
   reports DiagnosticReportRecord[]
   audits DiagnosticAudit[]
+  identityRecords DiagnosticIdentityRecord[]
   @@unique([commissionerId, requestKey])
   @@index([commissionerId, createdAt(sort: Desc)])
   @@index([centerId, status, createdAt])
@@ -1444,6 +1446,24 @@ model DiagnosticOrderAssignment {
   @@unique([orderId, userId, capability])
   @@index([userId, revokedAt])
   @@map("diagnostic_order_assignments")
+}
+
+/// Restricted, append-only physical identity observation of one visit, bound to
+/// the order version its write produced. Erasure clears content; nothing rewrites it.
+model DiagnosticIdentityRecord {
+  id String @id
+  orderId String
+  order InspectionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderVersion Int
+  observation Json?
+  observationHash String?
+  recordedById String?
+  recordedBy User? @relation("DiagnosticIdentityRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+  recordedAt DateTime
+  erasedAt DateTime?
+  @@unique([orderId, orderVersion])
+  @@index([recordedById])
+  @@map("diagnostic_identity_records")
 }
 
 /// Content-free state transitions. Consent, identifiers and observations stay private.
