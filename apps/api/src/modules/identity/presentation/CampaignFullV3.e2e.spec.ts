@@ -37,8 +37,11 @@ import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
 import { GlobalErrorFilter } from "../../../common/error.filter";
 import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
 import { defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
-import { DeleteObjectCommand, HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import sharp from "sharp";
+import { Readable } from "node:stream";
+// eslint-disable-next-line no-restricted-imports -- Integration composition observes only the real generator's external S3 transport.
+import { IMAGE_VARIANT_GENERATOR } from "../../listings/domain/ports/ImageVariantGenerator";
 
 const root = resolve(__dirname, "../../../../../..");
 const packageRoot = `${root}/packages/db`;
@@ -2267,6 +2270,329 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
         }
       }
       s3?.destroy();
+    }
+  }));
+
+  // Additive boundary tests. The original 28 cases and their helpers stay byte-for-byte unchanged.
+  it.each(["publish", "attach"] as const)("fences a recorded %s generator across recovery and exact reset while foreign stock survives", mode => withKnownJobs(async known => {
+    const id = (mode === "publish" ? "c3" : "c5").repeat(16);
+    const foreignId = (mode === "publish" ? "c4" : "c6").repeat(16);
+    const suite = defineE2eSuite(`campaign897-full-v3-media-races-${mode}-901`);
+    const catalog = suite.catalog;
+    const keys = new Map<string, string[]>([[id, []], [foreignId, []]]);
+    const cleanupIds: string[] = [], smsIds = new Set<string>();
+    let s3: S3Client | undefined, catalogOwned = false;
+    let resume = () => {};
+    let pending: Promise<{ status: number }> | undefined;
+    let generator: { s3: unknown } | undefined, originalTransport: unknown;
+    const journal = async (reservation: string, records: number, events: number) => {
+      expect(await rows(`SELECT (SELECT count(*)::int FROM "cf_${reservation}".campaign_records) AS records,(SELECT count(*)::int FROM "cf_${reservation}".campaign_events) AS events`)).toEqual([{ records, events }]);
+      expect(records).toBeLessThanOrEqual(128);
+      expect(events).toBeLessThan(2048);
+    };
+    // Same tsx/process boundary as processEmail: execute worker production source in its own workspace.
+    const workerCleanup = async (action: "recover" | "clean" | "outage", now: Date, limit: number) => {
+      const result = await promisify(execFile)(process.execPath, ["-e", `
+        require('reflect-metadata');
+        require('tsx/cjs');
+        const { PrismaService } = require('@auto-tm/db');
+        const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+        const { PrismaRetiredUploadLedger } = require('./src/jobs/PrismaRetiredUploadLedger.ts');
+        const { CleanRetiredUploads } = require('./src/jobs/CleanRetiredUploads.ts');
+        const { S3RetiredObjectStore } = require('./src/jobs/S3RetiredObjectStore.ts');
+        (async () => {
+          const [action, timestamp, limit] = process.argv.slice(1);
+          const db = new PrismaService();
+          const s3 = new S3Client({ endpoint: process.env.MINIO_ENDPOINT, region: process.env.MINIO_REGION ?? 'us-east-1',
+            forcePathStyle: true, requestChecksumCalculation: 'WHEN_REQUIRED', credentials: {
+              accessKeyId: process.env.MINIO_ACCESS_KEY ?? 'minioadmin', secretAccessKey: process.env.MINIO_SECRET_KEY ?? 'minioadmin' } });
+          try {
+            const ledger = new PrismaRetiredUploadLedger(db);
+            const boundary = action === 'outage' ? { send: (command, options) => {
+              if (command instanceof DeleteObjectCommand) throw new Error('controlled disposable S3 outage');
+              return s3.send(command, options);
+            } } : s3;
+            const result = action === 'recover'
+              ? await ledger.retireExpiredPreparations(new Date(timestamp), Number(limit))
+              : await new CleanRetiredUploads(ledger, new S3RetiredObjectStore(boundary)).execute({ now: new Date(timestamp), limit: Number(limit) });
+            console.log(JSON.stringify(result));
+          } finally { s3.destroy(); await db.onModuleDestroy(); }
+        })().catch(() => { process.exitCode = 1; });
+      `, action, now.toISOString(), String(limit)], {
+        timeout: 30000, cwd: `${root}/apps/worker`,
+        env: { ...process.env, TSX_TSCONFIG_PATH: `${root}/apps/worker/tsconfig.json` },
+      });
+      return JSON.parse(result.stdout.trim()) as number | { cancelledPreparations: number; deleted: number; waiting: number };
+    };
+    const head = (Key: string) => s3!.send(new HeadObjectCommand({ Bucket: "listing-photos", Key })).then(() => 200,
+      (error: { $metadata?: { httpStatusCode?: number } }) => error.$metadata?.httpStatusCode ?? error);
+    const manifest = (key: string) => ["original", "thumbnail", "list", "detail", "fullscreen"].map(name => key.replace(/original\.webp$/, `${name}.webp`));
+    const business = (attempt: ReturnType<typeof post>, businessId: string) => attempt.set("x-business-id", businessId);
+    const state = async (businessId: string) => ({
+      business: await businessState(businessId),
+      uploads: await db.mediaUpload.findMany({ where: { businessId }, orderBy: { id: "asc" } }),
+      listings: await db.listing.findMany({ where: { businessId }, orderBy: { id: "asc" } }),
+      media: await db.listingMedia.findMany({ where: { listing: { businessId } }, orderBy: { id: "asc" } }),
+      drafts: await db.listingDraft.findMany({ where: { businessId }, orderBy: { id: "asc" } }),
+    });
+    const catalogReferences = async () =>
+      await db.listing.count({ where: { OR: [{ brandId: catalog.brandId }, { modelId: catalog.modelId }, { regionId: catalog.regionId }, { cityId: catalog.cityId }] } }) +
+      await db.dealership.count({ where: { cityId: catalog.cityId } }) + await db.generation.count({ where: { modelId: catalog.modelId } }) +
+      await db.model.count({ where: { brandId: catalog.brandId, id: { not: catalog.modelId } } }) + await db.city.count({ where: { regionId: catalog.regionId, id: { not: catalog.cityId } } });
+    try {
+      const endpoint = process.env["MINIO_ENDPOINT"] ?? "", publicUrl = process.env["MINIO_PUBLIC_URL"] ?? "";
+      const loopback = (value: string) => { try { return ["localhost", "127.0.0.1"].includes(new URL(value).hostname); } catch { return false; } };
+      expect(process.env["GITHUB_ACTIONS"], "SETUP: hosted disposable services only").toBe("true");
+      expect(loopback(endpoint) && loopback(publicUrl), "SETUP: lane-local disposable MinIO required").toBe(true);
+      s3 = new S3Client({ endpoint, region: process.env["MINIO_REGION"] ?? "us-east-1", forcePathStyle: true, requestChecksumCalculation: "WHEN_REQUIRED",
+        credentials: { accessKeyId: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin", secretAccessKey: process.env["MINIO_SECRET_KEY"] ?? "minioadmin" } });
+      expect(await db.brand.findMany({ where: { OR: [{ id: catalog.brandId }, { slug: catalog.brandSlug }] } })).toEqual([]);
+      expect(await db.model.findMany({ where: { OR: [{ id: catalog.modelId }, { slug: catalog.modelSlug }] } })).toEqual([]);
+      expect(await db.region.findMany({ where: { OR: [{ id: catalog.regionId }, { slug: catalog.regionSlug }] } })).toEqual([]);
+      expect(await db.city.findMany({ where: { OR: [{ id: catalog.cityId }, { slug: catalog.citySlug }] } })).toEqual([]);
+      catalogOwned = true;
+      await seedSuiteCatalog(db, suite);
+      const image = await sharp({ create: { width: 80, height: 60, channels: 3, background: "#377080" } }).webp().toBuffer();
+      const payload = (photos: { key: string }[], phone: string) => ({ brandId: catalog.brandId, modelId: catalog.modelId, year: 2020, cityId: catalog.cityId, regionId: catalog.regionId,
+        priceAmount: 100000, priceCurrency: "TMT", condition: "used", mileageKm: 1000, conditionDisclosure: { damaged: false }, description: "Synthetic full-v3 business stock",
+        contactPhone: phone, allowCalls: true, allowChat: true, photos: photos.map(({ key }, sortOrder) => ({ photoId: randomUUID(), key, sortOrder })) });
+      const upload = async (reservation: string, owner: Login, businessId: string) => {
+        const signed = await business(post("/api/v1/uploads/presign", owner, { kind: "image", contentType: "image/webp", sizeBytes: image.length, writeProtocol: "conditional-v1" }), businessId);
+        const key = signed.body?.key as string;
+        if (typeof key === "string" && /original\.webp$/.test(key)) keys.get(reservation)!.push(...manifest(key));
+        expect(signed.status, "ordinary recorded conditional presign").toBe(201);
+        const row = await db.mediaUpload.findUniqueOrThrow({ where: { key } });
+        expect(await owned(reservation)).toContainEqual({ table_name: "media_uploads", row_key: { id: row.id } });
+        expect(row).toMatchObject({ userId: owner.user.id, businessId, state: "AVAILABLE", writeProtocol: "conditional-v1", objectKeys: manifest(key) });
+        expect(signed.body.headers).toMatchObject({ "if-match": expect.any(String), "content-type": "image/webp" });
+        for (const member of manifest(key)) expect(await head(member)).toBe(200);
+        expect((await fetch(signed.body.uploadUrl as string, { method: "PUT", headers: signed.body.headers as Record<string, string>, body: new Uint8Array(image) })).status).toBe(200);
+        return { id: row.id, key };
+      };
+      const prepareBusiness = async (reservation: string, publish: boolean) => {
+        expect(await rows(`SELECT to_regclass('"cf_${reservation}".campaign_manifest') AS present`)).toEqual([{ present: null }]);
+        cleanupIds.push(reservation);
+        const roster = await seed(reservation);
+        await journal(reservation, 21, 21);
+        const staff = await elevatedStaff(reservation, roster, known, ["founder.admission"]);
+        await journal(reservation, 49, 57);
+        const owner = await signIn(reservation, actor(roster, "buyer-a"), known);
+        await journal(reservation, 51, 61);
+        const admitted = (await post("/api/v1/business/admission", staff.staff, admissionFor(reservation, owner.user.id)).expect(201)).body as { businessId: string; token: string };
+        const businessId = admitted.businessId;
+        await journal(reservation, 54, 64);
+        await post("/api/v1/business/invitations/redeem", owner, { token: admitted.token }).expect(201);
+        await journal(reservation, 56, 68);
+        const phone = `+9936${(BigInt(`0x${createHash("sha256").update(`campaign897-contact-phone-v1:${reservation}:${candidate}`, "ascii").digest("hex")}`) % 10000000n).toString().padStart(7, "0")}`;
+        const issued = await business(post("/api/v1/me/contact-phones/request", owner, { phone }), businessId);
+        if (typeof issued.body.requestId === "string") smsIds.add(issued.body.requestId);
+        expect(issued.status, "SETUP: ordinary contact request").toBe(200);
+        await journal(reservation, 57, 69);
+        const [delivered] = await rows<{ message: string }>(`SELECT message FROM "cf_${reservation}".campaign_sms_sink WHERE request_id=$1`, issued.body.requestId);
+        const code = delivered?.message.match(/\b\d{6}\b/)?.[0];
+        expect(code, "SETUP: protected contact sink").toBeDefined();
+        await business(post("/api/v1/me/contact-phones/verify", owner, { phone, code }), businessId).expect(200);
+        await journal(reservation, 57, 71);
+        let listingId: string | undefined;
+        if (publish) {
+          const photos: { id: string; key: string }[] = [];
+          await journal(reservation, 57, 71);
+          photos.push(await upload(reservation, owner, businessId));
+          await journal(reservation, 58, 72);
+          photos.push(await upload(reservation, owner, businessId));
+          await journal(reservation, 59, 73);
+          photos.push(await upload(reservation, owner, businessId));
+          await journal(reservation, 60, 74);
+          const draft = (await post("/api/v1/listings/drafts", owner, { businessId, initialPayload: payload(photos, phone) }).expect(201)).body as { id: string };
+          await journal(reservation, 61, 75);
+          listingId = ((await business(post(`/api/v1/listings/drafts/${draft.id}/publish`, owner, {}), businessId).expect(201)).body as { id: string }).id;
+          await journal(reservation, 66, 87);
+        }
+        return { owner, businessId, phone, listingId, requestIds: [staff.coordinator.requestId, staff.staff.requestId, owner.requestId] };
+      };
+      const primary = await prepareBusiness(id, mode === "attach");
+      const foreign = await prepareBusiness(foreignId, true);
+      const foreignState = await state(foreign.businessId), foreignDigest = await digest(foreignId);
+      const bytesHash = async (Key: string) => {
+        const object = await s3!.send(new GetObjectCommand({ Bucket: "listing-photos", Key }));
+        expect(object.Body, `foreign body ${Key}`).toBeDefined();
+        return createHash("sha256").update(await object.Body!.transformToByteArray()).digest("hex");
+      };
+      const foreignBytes = new Map<string, string>();
+      for (const key of keys.get(foreignId)!) foreignBytes.set(key, await bytesHash(key));
+      const foreignUnchanged = async () => {
+        await journal(foreignId, 66, 87);
+        expect(await state(foreign.businessId)).toEqual(foreignState);
+        expect(await digest(foreignId)).toBe(foreignDigest);
+        for (const key of keys.get(foreignId)!) expect(await bytesHash(key), `foreign bytes unchanged ${key}`).toBe(foreignBytes.get(key));
+        expect((await request.get(`/api/v1/listings/${foreign.listingId}`).expect(200)).body).toMatchObject({ businessId: foreign.businessId, contactPhone: foreign.phone });
+      };
+      const photos: { id: string; key: string }[] = [];
+      if (mode === "publish") {
+        await journal(id, 57, 71);
+        photos.push(await upload(id, primary.owner, primary.businessId));
+        await journal(id, 58, 72);
+        photos.push(await upload(id, primary.owner, primary.businessId));
+        await journal(id, 59, 73);
+        photos.push(await upload(id, primary.owner, primary.businessId));
+        await journal(id, 60, 74);
+      } else {
+        await journal(id, 66, 87);
+        photos.push(await upload(id, primary.owner, primary.businessId));
+        await journal(id, 67, 88);
+      }
+      let draftId: string | undefined;
+      if (mode === "publish") {
+        draftId = ((await post("/api/v1/listings/drafts", primary.owner, { businessId: primary.businessId, initialPayload: payload(photos, primary.phone) }).expect(201)).body as { id: string }).id;
+        await journal(id, 61, 75);
+      }
+      // Only external S3 transport changes. The HTTP caller, claim, generator and recovery stay real.
+      generator = app.get<{ s3: unknown }>(IMAGE_VARIANT_GENERATOR);
+      originalTransport = generator.s3;
+      const held = new Set<string>(), refusals: number[] = [];
+      let allStarted!: () => void, released = false, completedBeforeRelease = false;
+      const started = new Promise<void>(resolve => { allStarted = resolve; });
+      const release = new Promise<void>(resolve => { resume = () => { released = true; resolve(); }; });
+      generator.s3 = { send: async (command: unknown, options?: { abortSignal?: AbortSignal }) => {
+        if (command instanceof PutObjectCommand && photos.some(photo => manifest(photo.key).includes(command.input.Key ?? "")) && !held.has(command.input.Key!)) {
+          const key = command.input.Key!;
+          // The real generator already read the ETag before submitting this conditional PUT.
+          expect(command.input.IfMatch).toEqual(expect.any(String));
+          expect(command.input.CacheControl).toBe("no-store");
+          expect(Buffer.isBuffer(command.input.Body)).toBe(true);
+          const body = command.input.Body as Buffer;
+          const split = Math.max(1, Math.floor(body.length / 2));
+          const streamed = Readable.from((async function* () {
+            yield body.subarray(0, split);
+            held.add(key);
+            if (held.size === photos.length) allStarted();
+            await release;
+            yield body.subarray(split);
+          })());
+          try {
+            return await s3!.send(new PutObjectCommand({ ...command.input, Body: streamed, ContentLength: body.length }), options);
+          } catch (error) {
+            refusals.push((error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode ?? 0);
+            throw error;
+          } finally {
+            if (!released) completedBeforeRelease = true;
+          }
+        }
+        return s3!.send(command as PutObjectCommand, options);
+      } };
+      // New ordinary mutation. PREPARING is produced by publish/attach, never inserted by the test.
+      await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 75 : 88);
+      const attempt = mode === "publish"
+        ? business(post(`/api/v1/listings/drafts/${draftId}/publish`, primary.owner, {}), primary.businessId)
+        : business(post(`/api/v1/listings/${primary.listingId}/media/attach`, primary.owner, { key: photos[0]!.key, kind: "image", sortOrder: 3 }), primary.businessId);
+      pending = attempt.then(response => ({ status: response.status }));
+      await Promise.race([started, pending.then(() => { throw new Error("Request finished before real streamed generator PUT barrier"); })]);
+      await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 78 : 89);
+      const preparing = await db.mediaUpload.findMany({ where: { id: { in: photos.map(photo => photo.id) } }, orderBy: { id: "asc" } });
+      expect(preparing).toHaveLength(mode === "publish" ? 3 : 1);
+      for (const upload of preparing) expect(upload).toMatchObject({ state: "PREPARING", claimTargetType: "listing", claimToken: expect.any(String), claimDeadline: expect.any(Date) });
+      const targetId = preparing[0]!.claimTargetId!;
+      for (const upload of preparing) expect(upload).toMatchObject({ claimTargetId: targetId, claimToken: preparing[0]!.claimToken });
+      if (mode === "publish") expect(await db.listing.findUnique({ where: { id: targetId } })).toBeNull();
+      else expect(targetId).toBe(primary.listingId);
+      const beforeBlockedReset = await digest(id), beforeState = await state(primary.businessId);
+      expect(execute("reset", id)).toMatchObject({ code: 1, receipt: undefined });
+      expect(await digest(id)).toBe(beforeBlockedReset);
+      expect(await state(primary.businessId)).toEqual(beforeState);
+      await foreignUnchanged();
+      // Existing production recovery time input. No fake global clock or database timestamp edits.
+      const now = new Date(Math.max(...preparing.map(upload => upload.claimDeadline!.getTime())) + 1);
+      await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 78 : 89);
+      expect(await workerCleanup("recover", now, 3)).toBe(mode === "publish" ? 3 : 1);
+      await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 81 : 90);
+      for (const photo of photos) {
+        expect(await db.mediaUpload.findUniqueOrThrow({ where: { id: photo.id } })).toMatchObject({
+          state: mode === "publish" ? "AVAILABLE" : "RETIRED", claimToken: null, claimDeadline: null,
+          claimTargetType: mode === "publish" ? null : "listing", claimTargetId: mode === "publish" ? null : primary.listingId, retiredAt: mode === "publish" ? null : now,
+        });
+        if (mode === "publish") expect(await db.mediaUploadCleanup.findUnique({ where: { uploadId: photo.id } })).toBeNull();
+        else expect(await db.mediaUploadCleanup.findUniqueOrThrow({ where: { uploadId: photo.id } })).toMatchObject({ status: "PENDING", attempts: 0, objectKeys: manifest(photo.key), nextAttemptAt: preparing[0]!.claimDeadline });
+      }
+      await foreignUnchanged();
+      expect(keys.get(id)).toHaveLength(mode === "publish" ? 15 : 20);
+      expect(keys.get(foreignId)).toHaveLength(15);
+      const before = await owned(id);
+      expect(before).toHaveLength(mode === "publish" ? 61 : 66);
+      expect(await owned(foreignId)).toHaveLength(65);
+      const receipt = { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 };
+      await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 81 : 90);
+      expect(await asynchronousReset(id)).toMatchObject({ code: 0, receipt });
+      await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 142 : 156);
+      await mediaDisposed(id, before, primary.requestIds);
+      for (const key of keys.get(id)!) expect(await head(key), `absent before generator resumes ${key}`).toBe(404);
+      const terminal = await digest(id);
+      const objectLedger = () => rows(`SELECT object_key,upload_id,bucket,absent FROM "cf_${id}".campaign_object_ledger ORDER BY object_key`);
+      const terminalObjects = await objectLedger();
+      expect(terminalObjects).toEqual([...keys.get(id)!].sort().map(object_key => ({ object_key, upload_id: expect.any(String), bucket: "listing-photos", absent: true })));
+      for (const photo of photos) for (const object_key of manifest(photo.key)) expect(terminalObjects).toContainEqual({ object_key, upload_id: photo.id, bucket: "listing-photos", absent: true });
+      expect(completedBeforeRelease, "PUT must still be suspended after exact reset, not timed out").toBe(false);
+      resume();
+      expect((await pending).status).toBeGreaterThanOrEqual(400);
+      expect(refusals).toHaveLength(mode === "publish" ? 3 : 1);
+      for (const status of refusals) expect([404, 409, 412]).toContain(status);
+      expect(await digest(id)).toBe(terminal);
+      expect(await objectLedger()).toEqual(terminalObjects);
+      for (const key of keys.get(id)!) expect(await head(key), `late generator cannot resurrect ${key}`).toBe(404);
+      await foreignUnchanged();
+      if (mode === "attach") {
+        // Recovery's durable work survives disposal. An S3 outage backs off, then real exact deletion retries.
+        await journal(id, 67, 156);
+        expect(await workerCleanup("outage", now, 1)).toEqual({ cancelledPreparations: 0, deleted: 0, waiting: 1 });
+        const work = await db.mediaUploadCleanup.findUniqueOrThrow({ where: { uploadId: photos[0]!.id } });
+        expect(work).toMatchObject({ status: "PENDING", attempts: 1, lastError: "controlled disposable S3 outage" });
+        expect(work.nextAttemptAt.getTime()).toBe(now.getTime() + 60_000);
+        expect(await digest(id)).toBe(terminal);
+        expect(await objectLedger()).toEqual(terminalObjects);
+        await journal(id, 67, 156);
+        expect(await workerCleanup("clean", new Date(work.nextAttemptAt.getTime() + 1), 1)).toEqual({ cancelledPreparations: 0, deleted: 1, waiting: 0 });
+        expect(await db.mediaUploadCleanup.findUniqueOrThrow({ where: { uploadId: photos[0]!.id } })).toMatchObject({ status: "DONE", attempts: 2, lastError: null });
+        await mediaDisposed(id, before, primary.requestIds);
+        expect(await digest(id)).toBe(terminal);
+        expect(await objectLedger()).toEqual(terminalObjects);
+        for (const key of keys.get(id)!) expect(await head(key)).toBe(404);
+        await foreignUnchanged();
+      }
+      await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 142 : 156);
+      expect(execute("reset", id)).toMatchObject({ code: 0, receipt });
+      expect(await digest(id)).toBe(terminal);
+      expect(await objectLedger()).toEqual(terminalObjects);
+      for (const key of keys.get(id)!) expect(await head(key)).toBe(404);
+      await foreignUnchanged();
+      await journal(foreignId, 66, 87);
+      const foreignBefore = await owned(foreignId);
+      expect(execute("reset", foreignId)).toMatchObject({ code: 0, receipt });
+      await journal(foreignId, 66, 152);
+      await mediaDisposed(foreignId, foreignBefore, foreign.requestIds);
+      for (const key of keys.get(foreignId)!) expect(await head(key)).toBe(404);
+    } finally {
+      resume();
+      try { await pending; } finally {
+        if (generator) generator.s3 = originalTransport;
+        try {
+          for (const reservation of cleanupIds) expect.soft(execute("reset", reservation).code, `exact reset ${reservation}`).toBe(0);
+          for (const requestId of smsIds) expect.soft(await queue.getJob(requestId), "SMS has no email job").toBeUndefined();
+          if (s3) for (const key of [...keys.values()].flat()) {
+            const status = await head(key);
+            const failure = status === 200 ? await s3.send(new DeleteObjectCommand({ Bucket: "listing-photos", Key: key })).then(() => undefined, (error: unknown) => error) : status === 404 ? undefined : status;
+            expect.soft(failure, `exact known key cleanup ${key}`).toBeUndefined();
+          }
+          if (catalogOwned) {
+            const references = await catalogReferences();
+            expect.soft(references, "catalog retained while referenced").toBe(0);
+            if (references === 0) {
+              await db.city.deleteMany({ where: { id: catalog.cityId } });
+              await db.region.deleteMany({ where: { id: catalog.regionId } });
+              await db.model.deleteMany({ where: { id: catalog.modelId } });
+              await db.brand.deleteMany({ where: { id: catalog.brandId } });
+            }
+          }
+        } finally { s3?.destroy(); }
+      }
     }
   }));
 
