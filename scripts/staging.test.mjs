@@ -121,3 +121,24 @@ for (const profile of ['listing-v1', 'campaign897-identities-v1']) {
     assert.deepEqual(await ledger.read(), before);
   });
 }
+
+test('clean-reset is default closed: exact staging policy and claim reach only the unimplemented executor', async t => {
+  const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const directory = await mkdtemp(join(tmpdir(), 'staging-clean-reset-cli-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const policy = { target: 'staging', projectId: '176ddec0-dd65-4087-b82c-798599fc2ebe', environmentId: '652abc79-fdb0-48b0-9f6c-ad0ff572d7b2',
+    services: { api: '6db6f1b1-5c7a-4033-88d0-53f5f315bfc0', worker: '24aa02e0-25a9-4e80-9cc2-c1795ef82091' } };
+  const claim = { id: '1'.repeat(32), candidate: 'a'.repeat(40) };
+  const file = async (name, value) => { const path = join(directory, name); await writeFile(path, JSON.stringify(value)); return path; };
+  const [policyFile, claimFile] = [await file('policy.json', policy), await file('claim.json', claim)];
+  assert.match((await runStagingCommand(['help'])).usage, /clean-reset POLICY\.json CLAIM\.json/);
+  await assert.rejects(runStagingCommand(['clean-reset', policyFile, claimFile]), /Clean reset executor not implemented/);
+  await assert.rejects(runStagingCommand(['clean-reset', policyFile]), /Unsupported command or arguments/);
+  await assert.rejects(runStagingCommand(['clean-reset', policyFile, claimFile, 'rows']), /Unsupported command or arguments/);
+  await assert.rejects(runStagingCommand(['clean-reset', await file('extra.json', { ...policy, workersStopped: true }), claimFile]), /Exact clean-reset policy/);
+  await assert.rejects(runStagingCommand(['clean-reset', policyFile, await file('claim-extra.json', { ...claim, publicLaunch: false })]), /Exact clean-reset claim/);
+  await assert.rejects(runStagingCommand(['clean-reset', await file('wrong.json', { ...policy, environmentId: 'c628b9bf-08ef-45f6-976f-3d646e0ebfbd' }), claimFile]), /Wrong AutoTM staging/);
+  await assert.rejects(runStagingCommand(['clean-reset', await file('prod.json', { ...policy, target: 'production' }), claimFile]), /Production clean reset disabled/);
+});

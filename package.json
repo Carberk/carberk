@@ -48,7 +48,7 @@
     "test:agent-github": "node --test scripts/agent-github.test.mjs",
     "test:native-session": "node --test scripts/native-session*.test.mjs",
     "staging:control": "node scripts/staging.mjs",
-    "test:staging-control": "node --test scripts/staging.test.mjs scripts/staging-control.test.mjs scripts/staging-ledger.test.mjs scripts/staging-railway.test.mjs"
+    "test:staging-control": "node --test scripts/staging-clean-reset.test.mjs scripts/staging.test.mjs scripts/staging-control.test.mjs scripts/staging-ledger.test.mjs scripts/staging-railway.test.mjs"
   },
   "devDependencies": {
     "@typescript/native": "catalog:",
