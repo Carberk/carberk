@@ -2,7 +2,7 @@
 
 Test checkpoint for #914 within #897, integration PR #904. Base `168448d733ac2c6509ee1af11e787250b2b306de`; the source is `988f5ceb`, assembled as `df008555`. Reservation `agent/issue-914-identity-lifecycle-coverage-20261021` was pushed at the base before any edits. This checkpoint covers the gaps listed in the [source handoff](diagnostic-identity-evidence-source-20261021.md) under the [capture contract](diagnostic-identity-evidence-capture-contract-20261021.md) and [ADR-0108](../../adr/0108-pair-bound-diagnostic-reinspection-continuity-proof.md).
 
-It is tests only. No source changed. The existing suites are byte-unchanged: the oracle, erasure, binding and worker artifact suites. The 9 identity evidence HTTP cases still await hosted GREEN.
+It is tests only. No source changed. The existing suites are byte-unchanged: the oracle, erasure, binding and worker artifact suites. The writer did not run the 9 identity evidence HTTP cases; the later parent classification below records their hosted result.
 
 ## New suites
 
@@ -73,9 +73,17 @@ NOT RUN: any HTTP or database suite, Docker, MinIO or CI. RED or GREEN is not cl
 
 ## For parent classification (observed by inspection, unchanged)
 
-- **Oracle harness hazard.** `DiagnosticIdentityEvidence.e2e.spec.ts:468` races `pending.then(() => { throw })`. Once the barrier wins, that derived promise rejects when the request completes, which can be reported as an unhandled rejection in hosted Vitest. The new suite records early completion with a flag instead.
+- **Oracle harness inspection lead.** `DiagnosticIdentityEvidence.e2e.spec.ts:468` races `pending.then(() => { throw })`. The writer identified a possible unhandled rejection after the barrier wins. The new suite records early completion with a flag instead. The later hosted run below passed the unchanged oracle without that failure; this lead does not establish a defect or justify changing the oracle.
 - **Uncovered fences in `upload`.** Fences between intent commit and the pre-put lease check, and `put`/readback failures, throw outside the queuing `try`. Those intents stay `staged` with a bound key until the 24h stale rule, not immediate cleanup. This is not covered by the new tests.
 - **Expiry keeps attribution.** Rights-expiry erasure keeps `recordedById`. The tests leave it unasserted.
 - **Attempts keep counting.** Completed provenance stays in the cleanup rotation and increments `cleanupAttempts` on every pass. The tests assert this current behavior.
 - **First failure ends the pass.** A single storage failure ends the worker pass for the rest of the batch. This is the existing artifact and evidence pattern.
 - The expired evidence report pin remains, as already recorded.
+
+## Parent assembly and hosted predecessor classification
+
+The parent inspected the complete original handoff and the stale-OTP guard, then assembled them as `6a6d5a4c` and `943607e6`. The guard matches the real purge job's strict `createdAt < now - 30 days` cutoff. The four original diagnostic suites and product worker source are unchanged from `efdc38b8`.
+
+On that predecessor, PR Checks run `39646885372`, API job `119384848625`, passed the original identity-evidence oracle 9/9, report binding 1/1, real-worker account erasure 1/1 and identity history 1/1. The worker passed 56/56 files and 369/369 tests. The API passed 320/321 files and 3080/3083 tests; its three failures are the retained Support/publish/attach reset race tails. No unhandled-rejection failure was reported. Raw log SHA-256: `9a26b123a988838ab894ae324abf1795d968b1fc0143ff4d55d3e696fc8673ef`, stored at `/tmp/carberk-resume-20261021/efdc38b8-api-119384848625.raw.log`, with a separate ANSI-free derivative.
+
+Affected combined offline checks on `943607e6` passed: API/worker typecheck, focused lint of both new specs, agent-docs, glossary and diff checks. The first typecheck used a stale generated Prisma client and failed; rebuilding contracts and DB regenerated the current client, after which both typechecks passed. Commands/results and logs are in `/tmp/issue-897-lifecycle-assembled-20261021`. No container suite was run locally, and no broad unit/root checks were repeated. The eight new lifecycle cases still require hosted execution; the predecessor results do not establish their GREEN.
