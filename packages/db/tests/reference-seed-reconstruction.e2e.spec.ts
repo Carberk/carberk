@@ -1,0 +1,109 @@
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
+
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
+import type * as Pg from "pg";
+import { afterAll, describe, expect, it } from "vitest";
+
+import bodyTypes from "../prisma/seed/body-types.json" with { type: "json" };
+import brands from "../prisma/seed/brands.json" with { type: "json" };
+import cities from "../prisma/seed/cities.json" with { type: "json" };
+import colors from "../prisma/seed/colors.json" with { type: "json" };
+import driveTypes from "../prisma/seed/drive-types.json" with { type: "json" };
+import engineTypes from "../prisma/seed/engine-types.json" with { type: "json" };
+import exchangeRates from "../prisma/seed/exchange-rates.json" with { type: "json" };
+import models from "../prisma/seed/models.json" with { type: "json" };
+import regions from "../prisma/seed/regions.json" with { type: "json" };
+import transmissions from "../prisma/seed/transmissions.json" with { type: "json" };
+
+const packageRoot = fileURLToPath(new URL("..", import.meta.url));
+const sourceChecksums = {
+  "brands.json": "0e3ffba94c07a6216260a35fdbaffa2849f4101c6913d706617d333d4096c9e0",
+  "models.json": "622be0c3f632d23b973a3adca0d43455419bc4ea4ade4dc71dd7c42783c2dfec",
+  "regions.json": "2b334d2f56daab08f2112f83e1f895fe2e4616da45d2d8e21716114a5e1da9a3",
+  "cities.json": "b62d3e4370e5879a05b5a096f476065cc54770ccf0c863f0257fa4f11e293d04",
+  "body-types.json": "067aae964ed59b77bafca0e8be70cad5bdffbeeaedd5b0d7a080c367cbc43aca",
+  "colors.json": "d41b5c4172c79981857552d2d3150a69d72a12afd762d51f07a14dfd4e4bf4bc",
+  "engine-types.json": "d6eb5a81d5224859ee06896950b13f168e2bb40dea008f5223c6066b127f2cea",
+  "transmissions.json": "837340321377c71ae41566b8a4b6683f688bb75a3a43809c69c56c7796eb6386",
+  "drive-types.json": "7c4cb184528396ac2951f39966c91dcdd8e2f989cf300b8748ba34da7d309db2",
+  "exchange-rates.json": "113dc658e3df8de126301819cb5d0ad6cbd4c0ed3c5484278ba4bbff84421df4",
+} as const;
+
+const sourceFiles = { "brands.json": brands, "models.json": models, "regions.json": regions, "cities.json": cities, "body-types.json": bodyTypes, "colors.json": colors, "engine-types.json": engineTypes, "transmissions.json": transmissions, "drive-types.json": driveTypes, "exchange-rates.json": exchangeRates };
+const checksum = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+const sorted = <T>(rows: T[], key: (row: T) => string) => [...rows].sort((a, b) => key(a).localeCompare(key(b)));
+
+type Snapshot = {
+  brands: unknown[]; models: unknown[]; regions: unknown[]; cities: unknown[];
+  bodyTypes: unknown[]; colors: unknown[]; engineTypes: unknown[]; transmissions: unknown[]; driveTypes: unknown[];
+  exchangeRates: unknown[]; generations: number; protectedCounts: Record<string, number>;
+};
+
+async function snapshot(pool: Pg.Pool): Promise<Snapshot> {
+  const query = async <T extends Pg.QueryResultRow = Record<string, unknown>>(sql: string): Promise<T[]> => (await pool.query<T>(sql)).rows;
+  return {
+    brands: await query('SELECT slug, "nameRu", "nameTk", "nameEn" FROM brands ORDER BY slug'),
+    models: await query('SELECT b.slug AS "brandSlug", m.slug, m."nameRu", m."nameTk", m."nameEn" FROM models m JOIN brands b ON b.id = m."brandId" ORDER BY b.slug, m.slug'),
+    regions: await query('SELECT slug, "nameRu", "nameTk", "nameEn" FROM regions ORDER BY slug'),
+    cities: await query('SELECT r.slug AS "regionSlug", c.slug, c."nameRu", c."nameTk", c."nameEn" FROM cities c JOIN regions r ON r.id = c."regionId" ORDER BY r.slug, c.slug'),
+    bodyTypes: await query('SELECT "nameRu", "nameTk", "nameEn" FROM body_types ORDER BY "nameEn"'),
+    colors: await query('SELECT "nameRu", "nameTk", "nameEn", hex FROM colors ORDER BY "nameEn"'),
+    engineTypes: await query('SELECT "nameRu", "nameTk", "nameEn" FROM engine_types ORDER BY "nameEn"'),
+    transmissions: await query('SELECT "nameRu", "nameTk", "nameEn" FROM transmissions ORDER BY "nameEn"'),
+    driveTypes: await query('SELECT "nameRu", "nameTk", "nameEn" FROM drive_types ORDER BY "nameEn"'),
+    exchangeRates: await query('SELECT "fromCurrency", "toCurrency", rate::double precision AS rate FROM exchange_rates ORDER BY "fromCurrency", "toCurrency"'),
+    generations: Number((await query<{ count: string }>('SELECT count(*)::text AS count FROM generations'))[0]?.count ?? 0),
+    protectedCounts: Object.fromEntries(await Promise.all([
+      "users", "sessions", "staff_grants", "diagnostic_centers", "diagnostic_center_assignments", "diagnostic_template_versions",
+      "service_conversations", "service_messages", "service_outbox", "history_capacity_days", "history_orders", "market_knowledge_datasets",
+    ].map(async (table) => [table, Number((await query<{ count: string }>(`SELECT count(*)::text AS count FROM "${table}"`))[0]?.count ?? 0)]))),
+  };
+}
+
+function expected(): Snapshot {
+  return {
+    brands: sorted(brands, (x) => x.slug), models: sorted(models, (x) => `${x.brandSlug}\0${x.slug}`),
+    regions: sorted(regions, (x) => x.slug), cities: sorted(cities, (x) => `${x.regionSlug}\0${x.slug}`),
+    bodyTypes: sorted(bodyTypes, (x) => x.nameEn), colors: sorted(colors, (x) => x.nameEn),
+    engineTypes: sorted(engineTypes, (x) => x.nameEn), transmissions: sorted(transmissions, (x) => x.nameEn), driveTypes: sorted(driveTypes, (x) => x.nameEn),
+    exchangeRates: sorted(exchangeRates, (x) => `${x.fromCurrency}\0${x.toCurrency}`),
+    generations: 0, protectedCounts: { users: 0, sessions: 0, staff_grants: 0, diagnostic_centers: 0, diagnostic_center_assignments: 0, diagnostic_template_versions: 0, service_conversations: 0, service_messages: 0, service_outbox: 0, history_capacity_days: 0, history_orders: 0, market_knowledge_datasets: 0 },
+  };
+}
+
+describe("checked-in baseline seed on fresh migrated PostgreSQL", () => {
+  const containers: StartedPostgreSqlContainer[] = [];
+  const pools: Pg.Pool[] = [];
+
+  afterAll(async () => { await Promise.all(pools.map((pool) => pool.end())); await Promise.all(containers.map((container) => container.stop())); });
+
+  it("matches the independent source baseline across two databases and repeats", async () => {
+    for (const [name, data] of Object.entries(sourceFiles)) expect(checksum(data), name).toBe(sourceChecksums[name as keyof typeof sourceChecksums]);
+    expect({ brands: brands.length, models: models.length, regions: regions.length, cities: cities.length, bodyTypes: bodyTypes.length, colors: colors.length, engineTypes: engineTypes.length, transmissions: transmissions.length, driveTypes: driveTypes.length, exchangeRates: exchangeRates.length }).toEqual({ brands: 130, models: 2435, regions: 6, cities: 35, bodyTypes: 10, colors: 15, engineTypes: 6, transmissions: 4, driveTypes: 4, exchangeRates: 2 });
+    expect(exchangeRates).toEqual([{ fromCurrency: "USD", toCurrency: "TMT", rate: 18.2 }, { fromCurrency: "AED", toCurrency: "TMT", rate: 4.96 }]);
+    expect(brands[0]).toEqual({ slug: "toyota", nameRu: "Toyota", nameTk: "Toyota", nameEn: "Toyota" });
+    expect(regions[0]).toEqual({ slug: "ahal", nameRu: "Ахалский велаят", nameTk: "Ahal welaýaty", nameEn: "Ahal Region" });
+    expect(colors[0]).toEqual({ nameRu: "Белый", nameTk: "Ak", nameEn: "White", hex: "#FFFFFF" });
+    const baseline = expected();
+    const snapshots: Snapshot[] = [];
+    const toyotaIds: string[] = [];
+    for (let index = 0; index < 2; index++) {
+      const container = await new PostgreSqlContainer("postgres:16-alpine").start(); containers.push(container);
+      const databaseUrl = container.getConnectionUri();
+      execFileSync("pnpm", ["prisma", "migrate", "deploy"], { cwd: packageRoot, env: { ...process.env, DATABASE_URL: databaseUrl }, stdio: "pipe" });
+      const { Pool } = await import("pg"); const pool = new Pool({ connectionString: databaseUrl }); pools.push(pool);
+      const first = execFileSync("pnpm", ["seed"], { cwd: packageRoot, env: { ...process.env, DATABASE_URL: databaseUrl }, encoding: "utf8" });
+      expect(first).toContain("Seeded 130 brands");
+      const firstSnapshot = await snapshot(pool); expect(firstSnapshot).toEqual(baseline); snapshots.push(firstSnapshot);
+      toyotaIds.push((await pool.query('SELECT id FROM brands WHERE slug = $1', ["toyota"])).rows[0].id as string);
+      execFileSync("pnpm", ["seed"], { cwd: packageRoot, env: { ...process.env, DATABASE_URL: databaseUrl }, stdio: "pipe" });
+      expect(await snapshot(pool)).toEqual(firstSnapshot);
+      expect((await pool.query('SELECT count(*)::int AS count FROM "_prisma_migrations"')).rows[0].count).toBeGreaterThan(0);
+    }
+    expect(snapshots[1]).toEqual(snapshots[0]);
+    expect(toyotaIds[1]).not.toBe(toyotaIds[0]);
+    expect(checksum(snapshots[0])).toBe(checksum(snapshots[1]));
+  });
+});
