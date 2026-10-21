@@ -246,7 +246,7 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries, disp
   const tables = ['users', 'dealerships', 'dealership_members', 'dealership_invitations', 'listings', 'listing_drafts', 'conversations', 'conversation_participants', 'messages', 'business_enquiry_audits', 'favorites', 'verified_contact_phones', 'owned_vehicles', 'blocked_users', 'notification_preferences', 'content_reports', 'staff_grants', 'audit_logs'];
   // OTP requests, ordinary Sessions and owned staff TOTP join the bounded journal.
   if (bootstrapV3) tables.push('sessions', 'totp_enrollments', 'totp_backup_codes', 'otp_requests');
-  // V3 Support text only: no attachments, push subscriptions, erasure fences or History rows.
+  // V3 Support text and exact empty erasure fences only: no attachments, push subscriptions or History rows.
   const serviceTables = ['support_cases', 'service_conversations', 'service_messages', 'service_outbox', 'service_read_states', 'service_audits', 'service_erasure_fences'];
   if (bootstrapV3) tables.push(...serviceTables);
   // V3 ordinary conditional business images only (ADR-0088 conditional-v1 WebP manifests). Personal,
