@@ -9,10 +9,19 @@ import { randomUUID } from 'node:crypto';
 import { GitLedger } from './staging-ledger.mjs';
 import { StagingControl } from './staging-control.mjs';
 import { RailwayPlatform } from './staging-railway.mjs';
+import { guardTarget, parseRequest } from './staging-clean-reset.mjs';
 
 const run = promisify(execFile);
 const remote = 'https://github.com/bagtyyarkovusov/auto.tm-rewrite.git';
 const projectId = '176ddec0-dd65-4087-b82c-798599fc2ebe';
+const stagingIds = { environmentId: '652abc79-fdb0-48b0-9f6c-ad0ff572d7b2', api: '6db6f1b1-5c7a-4033-88d0-53f5f315bfc0',
+  worker: '24aa02e0-25a9-4e80-9cc2-c1795ef82091', admin: '69ba9f86-0000-4460-8165-de69b289b36e', web: 'f3c5888b-d303-44b1-bc6e-3d775dad4639' };
+function pinnedStaging(policy) {
+  if (policy.projectId !== projectId || policy.environmentId !== stagingIds.environmentId ||
+      policy.services?.api !== stagingIds.api || policy.services?.worker !== stagingIds.worker ||
+      (policy.services.admin && policy.services.admin !== stagingIds.admin) ||
+      (policy.services.web && policy.services.web !== stagingIds.web)) throw new Error('Wrong AutoTM staging project/environment/service identity');
+}
 const usage = `pnpm staging:control help | discover | inspect
 pnpm staging:control identity POLICY.json
 pnpm staging:control enqueue POLICY.json REQUEST.json
@@ -21,6 +30,7 @@ pnpm staging:control operate POLICY.json CLAIM.json deploy|fixture|reset [campai
 pnpm staging:control recover POLICY.json CLAIM.json
 pnpm staging:control restore POLICY.json CLAIM.json
 pnpm staging:control release POLICY.json CLAIM.json
+pnpm staging:control clean-reset POLICY.json CLAIM.json (default closed; executor not implemented)
 Live mutations require independent review and explicit reservation authorization. No force-unlock exists.`;
 async function execute(program, args) {
   try { return (await run(program, args, { timeout: 60000, maxBuffer: 4 * 1024 * 1024,
@@ -33,7 +43,7 @@ async function json(file) {
 }
 export async function runStagingCommand(args) {
   const [command = 'help', ...values] = args;
-  const lengths = { help: 0, discover: 0, inspect: 0, identity: 1, enqueue: 2, acquire: 2, operate: 3, restore: 2, recover: 2, release: 2 };
+  const lengths = { help: 0, discover: 0, inspect: 0, identity: 1, enqueue: 2, 'clean-reset': 2, acquire: 2, operate: 3, restore: 2, recover: 2, release: 2 };
   if (!(command in lengths) || (values.length !== lengths[command] && !(command === 'operate' && values.length === 4 && values[2] === 'fixture' && values[3] === 'campaign897-identities-v1'))) throw new Error('Unsupported command or arguments; use help');
   if (command === 'help') return { usage };
   if (command === 'discover') {
@@ -46,6 +56,13 @@ export async function runStagingCommand(args) {
       services: Object.fromEntries(project.services.edges.filter(x => ['api', 'worker', 'admin', 'web'].includes(x.node.name)).map(x => [x.node.name, x.node.id])),
       verified: 'CLI identity discovery only; credential scope and data/media origins remain unverified' };
   }
+  if (command === 'clean-reset') {
+    // S1 shape only: no credentials, ledger, platform or live read.
+    const { policy, claim } = parseRequest(await json(values[0]), await json(values[1]));
+    if (policy.target === 'production') guardTarget({ request: { policy, claim } });
+    pinnedStaging(policy);
+    throw new Error('Clean reset executor not implemented');
+  }
   const directory = await mkdtemp(join(tmpdir(), 'carberk-staging-objects-'));
   try {
     const ledger = new GitLedger({ directory, remote, authenticateWithGh: true });
@@ -56,10 +73,7 @@ export async function runStagingCommand(args) {
         (await ledger.read()).state?.reservation?.fixtureProfile === 'campaign897-business-v2')
       throw new Error('Business storage profile remains closed at the operator CLI');
     const policy = await json(values[0]);
-    if (policy.projectId !== projectId || policy.environmentId !== '652abc79-fdb0-48b0-9f6c-ad0ff572d7b2' ||
-        policy.services?.api !== '6db6f1b1-5c7a-4033-88d0-53f5f315bfc0' || policy.services?.worker !== '24aa02e0-25a9-4e80-9cc2-c1795ef82091' ||
-        (policy.services.admin && policy.services.admin !== '69ba9f86-0000-4460-8165-de69b289b36e') ||
-        (policy.services.web && policy.services.web !== 'f3c5888b-d303-44b1-bc6e-3d775dad4639')) throw new Error('Wrong AutoTM staging project/environment/service identity');
+    pinnedStaging(policy);
     const actor = (await execute('gh', ['api', 'user', '--jq', '.login'])).trim();
     const platform = new RailwayPlatform({ token: process.env.STAGING_RAILWAY_PROJECT_TOKEN,
       authorization: process.env.STAGING_MUTATIONS_AUTHORIZATION });
