@@ -96,6 +96,45 @@ function cleanupFailure(error: unknown) {
   };
 }
 
+// Serialized into the existing reset transport worker too. Inputs are classified,
+// never retained or emitted. One bounded record per reset, including thrown exits.
+function resetPhaseTrace(scope: "support-reset" | "asynchronous-reset") {
+  const origin = process.hrtime.bigint(), maxEntries = 64;
+  const entries: { ordinal: number; sqlOrdinal: number | null; transport: string; phase: string; startMs: number; endMs: number; outcome: string; exitStatus: number | null; sqlState: string }[] = [];
+  let ordinal = 0, sqlOrdinal = 0, dropped = 0;
+  const now = () => Number(process.hrtime.bigint() - origin) / 1e6;
+  return {
+    call<T extends { status: number | null; error?: unknown; stderr?: string | null }>(binary: string, args: string[], input: string | undefined, run: () => T): T {
+      const child = binary === process.execPath;
+      const transport = child ? args[1]?.includes("function campaignObjectMain(") ? "object-child" : args[1]?.includes("function campaignQueueMain(") ? "queue-child" : "unknown-child" : "sql";
+      // Match statements emitted by businessMain, not SQL ordinals or a shared tag.
+      const phase = child ? transport === "unknown-child" ? "unknown" : args[1]?.includes("],true,{") ? "child-verification" : "child-disposal" : input?.includes("SET state='disposed'") ? "disposal"
+        : input?.includes("SET state='cleaning'") ? "cleaning"
+        : input?.includes("Campaign terminal rows present") ? "terminal-verification"
+        : input?.startsWith("BEGIN;") ? "initial-integrity" : "read";
+      const current = ++ordinal, currentSql = child ? null : ++sqlOrdinal, startMs = now();
+      let outcome = "threw", exitStatus: number | null = null, sqlState = "unavailable";
+      try {
+        const result = run();
+        exitStatus = result.status;
+        if (!child && result.status !== 0) {
+          const observed = result.stderr?.slice(0, 8192).match(/SQLSTATE=([A-Z0-9]{5})\b/)?.[1];
+          if (observed && ["P0001", "23503", "23505", "40001", "40P01", "55P03", "57014", "42601", "42703", "42P01", "42501"].includes(observed)) sqlState = observed;
+        }
+        outcome = result.error ? "transport-error" : result.status === 0 ? "ok" : result.status === null ? "no-status" : "nonzero";
+        return result;
+      } finally {
+        if (entries.length < maxEntries) entries.push({ ordinal: current, sqlOrdinal: currentSql, transport, phase, startMs, endMs: now(), outcome, exitStatus, sqlState });
+        else dropped += 1;
+      }
+    },
+    finish(code: number, state: unknown, threw: boolean) {
+      try { console.info(JSON.stringify({ diagnostic: "reset-transport-phases-v1", scope, maxEntries, entries, dropped,
+        outcome: threw ? "threw" : code === 0 ? "ok" : "nonzero", code, receiptState: ["identities", "cleaning", "disposed"].includes(String(state)) ? state : "unavailable" })); } catch { /* Diagnostics never replace the transport result/error. */ }
+    },
+  };
+}
+
 // No application provider overrides, JWT signing, auth inserts or elevated-session writes.
 // The remote process adapter changes only transport to the disposable worker SQL/Redis.
 describe("default-closed full-v3 ordinary authentication joins reservation-owned business disposal", () => {
@@ -2022,19 +2061,24 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
         redisOrigin: 'redis://redis.railway.internal:6379/0', identity: { projectId: 'v3-project', environmentId: 'v3-staging', services: { api: 'v3-api' },
           origins: { database: 'postgresql://postgres.railway.internal:5432/railway', media: 'http://minio.railway.internal:9000', publicMedia: 'https://media.example' } } };
       let code = 0, receipt, sqlCalls = 0;
-      const program = runInNewContext(source + '; remoteProgram(payload)', { payload });
-      runInNewContext(program, { URL, process: remoteProcess, require: name => name === 'node:child_process' ? {
-        spawnSync: (binary, args, spawnOptions) => {
-          if (binary === process.execPath) return spawnSync(binary, args, { ...spawnOptions, encoding: 'utf8', timeout: 30000, cwd: root + '/apps/api', env: { ...process.env,
-            ...(process.env.APP_ENV === 'test' && ['localhost', '127.0.0.1'].includes(new URL(process.env.MINIO_ENDPOINT ?? 'http://invalid').hostname)
-              ? { MINIO_ACCESS_KEY: process.env.MINIO_ACCESS_KEY ?? 'minioadmin', MINIO_SECRET_KEY: process.env.MINIO_SECRET_KEY ?? 'minioadmin' } : {}) } });
-          sqlCalls += 1;
-          return spawnSync(process.execPath, [root + '/scripts/testing/query-disposable-postgres.cjs'], {
-            input: spawnOptions.input, encoding: 'utf8', timeout: 30000,
-            env: { ...process.env, STAGING_CONTROL_TEST_DATABASE_URL: process.env.DATABASE_URL, STAGING_TEST_DB_PACKAGE: packageRoot + '/package.json' },
-          });
-        },
-      } : localRequire(name), console: { log: value => { receipt = JSON.parse(value); }, error: () => { code = 1; } } });
+      const phases = (${resetPhaseTrace.toString()})("support-reset");
+      let transportThrew = true;
+      try {
+        const program = runInNewContext(source + '; remoteProgram(payload)', { payload });
+        runInNewContext(program, { URL, process: remoteProcess, require: name => name === 'node:child_process' ? {
+          spawnSync: (binary, args, spawnOptions) => phases.call(binary, args, spawnOptions.input, () => {
+            if (binary === process.execPath) return spawnSync(binary, args, { ...spawnOptions, encoding: 'utf8', timeout: 30000, cwd: root + '/apps/api', env: { ...process.env,
+              ...(process.env.APP_ENV === 'test' && ['localhost', '127.0.0.1'].includes(new URL(process.env.MINIO_ENDPOINT ?? 'http://invalid').hostname)
+                ? { MINIO_ACCESS_KEY: process.env.MINIO_ACCESS_KEY ?? 'minioadmin', MINIO_SECRET_KEY: process.env.MINIO_SECRET_KEY ?? 'minioadmin' } : {}) } });
+            sqlCalls += 1;
+            return spawnSync(process.execPath, [root + '/scripts/testing/query-disposable-postgres.cjs'], {
+              input: spawnOptions.input, encoding: 'utf8', timeout: 30000,
+              env: { ...process.env, STAGING_CONTROL_TEST_DATABASE_URL: process.env.DATABASE_URL, STAGING_TEST_DB_PACKAGE: packageRoot + '/package.json', STAGING_TEST_SQL_DIAGNOSTICS: '1' },
+            });
+          }),
+        } : localRequire(name), console: { log: value => { receipt = JSON.parse(value); }, error: () => { code = 1; } } });
+      transportThrew = false;
+      } finally { phases.finish(code || remoteProcess.exitCode, receipt?.state, transportThrew); }
       parentPort.postMessage({ code: code || remoteProcess.exitCode, receipt, sqlCalls });
     `, { eval: true, env: { ...process.env, DATABASE_URL: database.toString() }, workerData: { root, packageRoot, profile, candidate, source, id } });
     const result = new Promise<ReturnType<typeof execute>>((resolve, reject) => {
@@ -2049,11 +2093,29 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     });
     return { tag, result };
   }
-  async function supportRaceWait(client: SupportRaceSql, until: number, sql: string, values: unknown[]) {
+  async function supportRaceWait(client: SupportRaceSql, until: number, sql: string, values: unknown[], participants?: { worker: string; reset: string; gate: number }) {
+    const remainingAtEntryMs = until - Date.now();
     while (Date.now() < until) {
       const { rows: matches } = await client.query<{ pid: number }>(sql, values);
       if (matches.length > 1) throw new Error("Support barrier waiter identity ambiguous");
       if (matches[0]) return matches[0].pid;
+    }
+    if (participants) {
+      const remainingAtFailureMs = until - Date.now();
+      try {
+        const { rows: locks } = await client.query<{ participant: string; locktype: string; mode: string; granted: boolean; total: string }>(`
+          SELECT CASE WHEN a.application_name=$1 THEN 'worker' WHEN a.application_name=$2 THEN 'reset' ELSE 'gate' END AS participant,
+            l.locktype, l.mode, l.granted, count(*) OVER()::text AS total
+          FROM pg_locks l JOIN pg_stat_activity a ON a.pid=l.pid
+          WHERE a.application_name IN ($1,$2) OR a.pid=$3 ORDER BY 1,l.locktype,l.mode,l.granted LIMIT 24`, [participants.worker, participants.reset, participants.gate]);
+        const kinds = ["relation", "advisory", "transactionid", "virtualxid", "tuple", "object", "extend", "page", "spectoken"];
+        const modes = ["AccessShareLock", "RowShareLock", "RowExclusiveLock", "ShareUpdateExclusiveLock", "ShareLock", "ShareRowExclusiveLock", "ExclusiveLock", "AccessExclusiveLock", "SIReadLock"];
+        console.info(JSON.stringify({ diagnostic: "support-barrier-budget-v1", remainingAtEntryMs, remainingAtFailureMs, maxEntries: 24,
+          dropped: Math.max(0, Number(locks[0]?.total ?? 0) - locks.length), locks: locks.map(lock => ({
+            participant: ["worker", "reset", "gate"].includes(lock.participant) ? lock.participant : "unknown",
+            kind: kinds.includes(lock.locktype) ? lock.locktype : "unknown", mode: modes.includes(lock.mode) ? lock.mode : "unknown", granted: lock.granted === true,
+          })) }));
+      } catch { console.info(JSON.stringify({ diagnostic: "support-barrier-budget-v1", remainingAtEntryMs, remainingAtFailureMs, outcome: "observation-unavailable" })); }
     }
     throw new Error("Support barrier not observed within existing lock budget; no ordering evidence");
   }
@@ -2204,6 +2266,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
       const children: ReturnType<typeof supportRaceWorker>[] = [];
       let resetting: Promise<{ value: ReturnType<typeof execute> | undefined; error: unknown }> | undefined;
       let gateAcquisition: Promise<unknown> | undefined;
+      const cleanupErrors: unknown[] = [];
       try {
         await holder.query("BEGIN");
         await holder.query("LOCK TABLE public.service_audits IN ROW EXCLUSIVE MODE");
@@ -2230,11 +2293,12 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
         await holder.query("SELECT pg_advisory_unlock(hashtextextended($1,0))", [`cf_${primary.id}`]);
         const reset = await resetting!;
         expect(await gateAcquisition).toBeUndefined();
-        // A tombstoned resource must still enter campaign authority, not ordinary fallback.
-        // The gate queued behind reset owns the namespace before the worker can acquire it.
+        // Intended oracle: a tombstoned resource still enters campaign authority.
+        // This gate follows INITIAL integrity, so disposal remains unproved here.
+        // Preserve the failing orchestration until the separate barrier design is approved.
         await supportRaceWait(observer, until, `SELECT a.pid FROM pg_stat_activity a WHERE a.application_name=$1 AND $2::int=ANY(pg_blocking_pids(a.pid))
           AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.locktype='advisory' AND NOT l.granted)
-          AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.relation='public.service_audits'::regclass AND l.mode='ShareRowExclusiveLock' AND l.granted)`, [run.tag, gatePid[0]!.pid]);
+          AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.relation='public.service_audits'::regclass AND l.mode='ShareRowExclusiveLock' AND l.granted)`, [run.tag, gatePid[0]!.pid], { worker: run.tag, reset: resetRun.tag, gate: gatePid[0]!.pid });
         await tombstoneGate.query("COMMIT");
         expect(reset.error).toBeUndefined(); expect(reset.value?.code).toBe(0);
         // Discard first receipt as lost; use only the same-reset retry for subsequent recovery.
@@ -2256,17 +2320,20 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
         expect(execute("reset", foreignId)).toMatchObject({ code: 0, receipt: supportRaceReceipt });
         await supportRaceDisposed(foreign, foreignKeys, audits, 68, 155);
       } finally {
-        try {
-          await holder.query("ROLLBACK");
-          await holder.query("SELECT pg_advisory_unlock(hashtextextended($1,0))", [`cf_${primary.id}`]);
-        } finally {
-          await resetting;
-          await gateAcquisition;
-          await tombstoneGate.query("ROLLBACK");
-          try { for (const child of children) await child.settle(); }
-          finally { await Promise.all([holder.end(), observer.end(), tombstoneGate.end(), storage.close()]); }
-        }
+        // Release cleanup gates before draining the reset they can obstruct.
+        // Collect every cleanup failure so the original assertion/error survives.
+        const drain = async (tasks: Promise<unknown>[]) => {
+          for (const result of await Promise.allSettled(tasks)) if (result.status === "rejected") cleanupErrors.push(result.reason);
+        };
+        await drain([holder.query("ROLLBACK")]);
+        await drain([holder.query("SELECT pg_advisory_unlock(hashtextextended($1,0))", [`cf_${primary.id}`])]);
+        await drain([Promise.resolve(gateAcquisition)]);
+        await drain([tombstoneGate.query("ROLLBACK")]);
+        await drain([Promise.resolve(resetting)]);
+        for (const child of children) await drain([child.settle()]);
+        await drain([holder.end(), observer.end(), tombstoneGate.end(), storage.close()]);
       }
+      if (cleanupErrors.length) throw cleanupErrors[0];
     });
   }));
 
@@ -2430,19 +2497,24 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
         redisOrigin: 'redis://redis.railway.internal:6379/0', identity: { projectId: 'v3-project', environmentId: 'v3-staging', services: { api: 'v3-api' },
           origins: { database: 'postgresql://postgres.railway.internal:5432/railway', media: 'http://minio.railway.internal:9000', publicMedia: 'https://media.example' } } };
       let code = 0, receipt, sqlCalls = 0;
-      const program = runInNewContext(source + '; remoteProgram(payload)', { payload });
-      runInNewContext(program, { URL, process: remoteProcess, require: name => name === 'node:child_process' ? {
-        spawnSync: (binary, args, spawnOptions) => {
-          if (binary === process.execPath) return spawnSync(binary, args, { ...spawnOptions, encoding: 'utf8', timeout: 30000, cwd: root + '/apps/api', env: { ...process.env,
-            ...(process.env.APP_ENV === 'test' && ['localhost', '127.0.0.1'].includes(new URL(process.env.MINIO_ENDPOINT ?? 'http://invalid').hostname)
-              ? { MINIO_ACCESS_KEY: process.env.MINIO_ACCESS_KEY ?? 'minioadmin', MINIO_SECRET_KEY: process.env.MINIO_SECRET_KEY ?? 'minioadmin' } : {}) } });
-          sqlCalls += 1;
-          return spawnSync(process.execPath, [root + '/scripts/testing/query-disposable-postgres.cjs'], {
-            input: spawnOptions.input, encoding: 'utf8', timeout: 30000,
-            env: { ...process.env, STAGING_CONTROL_TEST_DATABASE_URL: process.env.DATABASE_URL, STAGING_TEST_DB_PACKAGE: packageRoot + '/package.json' },
-          });
-        },
-      } : localRequire(name), console: { log: value => { receipt = JSON.parse(value); }, error: () => { code = 1; } } });
+      const phases = (${resetPhaseTrace.toString()})("asynchronous-reset");
+      let transportThrew = true;
+      try {
+        const program = runInNewContext(source + '; remoteProgram(payload)', { payload });
+        runInNewContext(program, { URL, process: remoteProcess, require: name => name === 'node:child_process' ? {
+          spawnSync: (binary, args, spawnOptions) => phases.call(binary, args, spawnOptions.input, () => {
+            if (binary === process.execPath) return spawnSync(binary, args, { ...spawnOptions, encoding: 'utf8', timeout: 30000, cwd: root + '/apps/api', env: { ...process.env,
+              ...(process.env.APP_ENV === 'test' && ['localhost', '127.0.0.1'].includes(new URL(process.env.MINIO_ENDPOINT ?? 'http://invalid').hostname)
+                ? { MINIO_ACCESS_KEY: process.env.MINIO_ACCESS_KEY ?? 'minioadmin', MINIO_SECRET_KEY: process.env.MINIO_SECRET_KEY ?? 'minioadmin' } : {}) } });
+            sqlCalls += 1;
+            return spawnSync(process.execPath, [root + '/scripts/testing/query-disposable-postgres.cjs'], {
+              input: spawnOptions.input, encoding: 'utf8', timeout: 30000,
+              env: { ...process.env, STAGING_CONTROL_TEST_DATABASE_URL: process.env.DATABASE_URL, STAGING_TEST_DB_PACKAGE: packageRoot + '/package.json', STAGING_TEST_SQL_DIAGNOSTICS: '1' },
+            });
+          }),
+        } : localRequire(name), console: { log: value => { receipt = JSON.parse(value); }, error: () => { code = 1; } } });
+      transportThrew = false;
+      } finally { phases.finish(code || remoteProcess.exitCode, receipt?.state, transportThrew); }
       parentPort.postMessage({ code: code || remoteProcess.exitCode, receipt, sqlCalls });
     `, { eval: true, workerData: { root, packageRoot, profile, candidate, source, id } });
     return new Promise<ReturnType<typeof execute>>((resolve, reject) => {
