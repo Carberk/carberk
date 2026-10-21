@@ -1,4 +1,14 @@
 import "reflect-metadata";
+import { Worker as NodeWorker } from "node:worker_threads";
+import { Logger } from "@nestjs/common";
+import { Enums } from "@auto-tm/contracts";
+import { HttpOtpSenderAdapter } from "../infrastructure/HttpOtpSenderAdapter";
+import { PrismaOtpRequestRepository } from "../infrastructure/PrismaOtpRequestRepository";
+import { SystemClockAdapter } from "../infrastructure/SystemClockAdapter";
+import { OtpCode } from "../domain/OtpCode";
+import { signInCodeDestination } from "../domain/SignInCodeDestination";
+import { renderCodeSms } from "../domain/codeSms";
+import type { OtpSms } from "../domain/ports/OtpSenderPort";
 import { execFile, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -1581,5 +1591,183 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
       await journal(foreignId, 24, 50);
     });
   }));
+
+  // Literal accounting was derived before editing: each reservation is 56/68
+  // after ordinary Owner setup, 57/69 after unused contact reserve, 57/126 terminal.
+  // No confirmation, wrong attempt, resend, extra grant or Session is performed.
+  function asynchronousReset(id: string) {
+    // Run the identical existing operator/transport harness away from this event loop.
+    // Every SQL/Redis child retains execute's existing 30s bound. Do not terminate
+    // this worker before its synchronous children settle; wait for its natural exit.
+    const worker = new NodeWorker(`
+      const { parentPort, workerData } = require('node:worker_threads');
+      const { spawnSync } = require('node:child_process');
+      const { createRequire } = require('node:module');
+      const { runInNewContext } = require('node:vm');
+      const { root, packageRoot, profile, candidate, source, id } = workerData;
+      const localRequire = createRequire(root + '/apps/api/package.json');
+      const execute = (${execute.toString()});
+      parentPort.postMessage(execute('reset', id));
+    `, { eval: true, workerData: { root, packageRoot, profile, candidate, source, id } });
+    return new Promise<ReturnType<typeof execute>>((resolve, reject) => {
+      let result: ReturnType<typeof execute> | undefined, failure: Error | undefined;
+      worker.on("message", (value: ReturnType<typeof execute>) => { result = value; });
+      worker.on("error", (error: Error) => { failure = error; });
+      worker.on("exit", code => {
+        if (failure) reject(failure);
+        else if (code !== 0 || !result) reject(new Error("Reset transport worker failed before receipt"));
+        else resolve(result);
+      });
+    });
+  }
+
+  async function contactOrdering(id: string, phone: string, senderFirst: boolean, known: Set<string>) {
+    const foreignId = randomUUID(), reuseId = randomUUID();
+    type SqlClient = {
+      connect(): Promise<void>; end(): Promise<void>;
+      query<T>(sql: string, values?: unknown[]): Promise<{ rows: T[] }>;
+    };
+    const { Client } = createRequire(`${packageRoot}/package.json`)("pg") as {
+      Client: new (options: { connectionString: string | undefined }) => SqlClient;
+    };
+    let barrier: SqlClient | undefined;
+    let send: Promise<{ error?: unknown }> | undefined;
+    let resetting: Promise<{ result?: ReturnType<typeof execute>; error?: unknown }> | undefined;
+    let requestId: string | undefined;
+    let log: ReturnType<typeof vi.spyOn> | undefined;
+    await resetAfter([id], async () => {
+      try {
+        const roster = await seed(id);
+        await db.dealership.create({ data: { id: foreignId, slug: `sender-control-${foreignId}`, name: "Unrelated sender/reset control" } });
+        const foreign = await businessState(foreignId);
+        const { staff } = await elevatedStaff(id, roster, known, ["founder.admission"]);
+        const owner = await signIn(id, actor(roster, "buyer-a"), known);
+        const admitted = (await post("/api/v1/business/admission", staff, admissionFor(id, owner.user.id)).expect(201)).body as { businessId: string; token: string };
+        await post("/api/v1/business/invitations/redeem", owner, { token: admitted.token }).expect(201);
+        expect((await get("/api/v1/business/current", owner).expect(200)).body.workspace).toMatchObject({
+          business: { id: admitted.businessId, status: "active" }, membership: { role: "owner", status: "active" },
+        });
+        const accounting = () => rows(`SELECT (SELECT count(*)::int FROM "cf_${id}".campaign_records) AS records,
+          (SELECT count(*)::int FROM "cf_${id}".campaign_events) AS events`);
+        expect(await accounting()).toEqual([{ records: 56, events: 68 }]);
+        const measurement = await db.measurementState.findMany({ orderBy: { key: "asc" } });
+        expect(`+9936${(BigInt(`0x${createHash("sha256").update(`campaign897-contact-phone-v1:${id}:${candidate}`, "ascii").digest("hex")}`) % 10000000n).toString().padStart(7, "0")}`).toBe(phone);
+        const code = OtpCode.generate();
+        const reserved = await new PrismaOtpRequestRepository(db).reserve({
+          purpose: Enums.SignInCodePurpose.ListingContactPhone, destination: signInCodeDestination({ phone }),
+          codeHash: createHash("sha256").update(code.value).digest("hex"), userId: owner.user.id,
+          businessId: admitted.businessId, ip: "127.0.0.1",
+        }, new SystemClockAdapter());
+        requestId = reserved.record.id;
+        expect(reserved.smsDelivery).toEqual({ kind: "campaign", reservationId: id, candidate, namespace: `cf_${id}`, requestId });
+        const sms: OtpSms = { phone, code: code.value, purpose: Enums.SignInCodePurpose.ListingContactPhone,
+          locale: "ru", requestId, smsDelivery: reserved.smsDelivery };
+        const sender = app.get(HttpOtpSenderAdapter);
+        // Missing serving attestation is a setup gap. Never enable an operational gate here.
+        expect(process.env["AUTOTM_COMMIT_SHA"], "serving candidate attestation prerequisite, not race RED").toBe(candidate);
+        expect(await accounting()).toEqual([{ records: 57, events: 69 }]);
+        const before = await owned(id);
+        const authority = () => rows(`SELECT to_jsonb(b) AS binding,
+          (SELECT to_jsonb(l) FROM "cf_${id}".campaign_sms_ledger l WHERE request_id=$1) AS ledger,
+          m.sms_hash,m.sms_schema_hash,m.sms_contract_hash,m.tracking_hash,m.schema_hash
+          FROM "cf_${id}".campaign_sms_binding b CROSS JOIN "cf_${id}".campaign_manifest m`, requestId);
+        const retained = await authority();
+        expect(retained).toHaveLength(1);
+        const sink = () => rows<{ message: string }>(`SELECT message FROM "cf_${id}".campaign_sms_sink WHERE request_id=$1`, requestId);
+        expect(await sink()).toEqual([]);
+        log = vi.spyOn(Logger.prototype, "log").mockImplementation(() => {});
+        if (senderFirst) {
+          barrier = new Client({ connectionString: process.env["DATABASE_URL"] });
+          await barrier.connect();
+          await barrier.query("BEGIN");
+          const holder = (await barrier.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]!.pid;
+          // Only the exact private table is locked. The sender's public authority
+          // reads remain MVCC and reset can take its existing public graph locks.
+          await barrier.query(`LOCK TABLE "cf_${id}".campaign_sms_sink IN SHARE MODE`);
+          send = sender.send(sms).then(() => ({}), (error: unknown) => ({ error }));
+          const deadline = performance.now() + 2500;
+          let senderPid: number | undefined;
+          while (performance.now() < deadline) {
+            const waiting = await rows<{ pid: number }>(`SELECT a.pid FROM pg_stat_activity a
+              JOIN pg_locks sink ON sink.pid=a.pid AND sink.locktype='relation' AND NOT sink.granted
+                AND sink.relation='"cf_${id}".campaign_sms_sink'::regclass AND sink.mode='RowExclusiveLock'
+              JOIN pg_locks fence ON fence.pid=a.pid AND fence.locktype='advisory' AND fence.granted AND fence.objsubid=1
+                AND fence.classid=((hashtextextended($1,0)>>32)&4294967295)::oid
+                AND fence.objid=(hashtextextended($1,0)&4294967295)::oid
+              WHERE a.datname=current_database() AND $2::int=ANY(pg_blocking_pids(a.pid))`, `cf_${id}`, holder);
+            if (waiting.length === 1) { senderPid = waiting[0]!.pid; break; }
+          }
+          expect(senderPid, "BARRIER SETUP FAILURE: real sender must hold exact namespace fence at sink INSERT").toBeDefined();
+          resetting = asynchronousReset(id).then(result => ({ result }), (error: unknown) => ({ error }));
+          const resetDeadline = performance.now() + 2500;
+          let resetWaiting = false;
+          while (performance.now() < resetDeadline) {
+            const waiting = await rows(`SELECT a.pid FROM pg_stat_activity a JOIN pg_locks fence ON fence.pid=a.pid
+              WHERE a.datname=current_database() AND a.wait_event_type='Lock'
+                AND fence.locktype='advisory' AND NOT fence.granted AND fence.objsubid=1
+                AND fence.classid=((hashtextextended($1,0)>>32)&4294967295)::oid
+                AND fence.objid=(hashtextextended($1,0)&4294967295)::oid
+                AND $2::int=ANY(pg_blocking_pids(a.pid))`, `cf_${id}`, senderPid);
+            if (waiting.length === 1) { resetWaiting = true; break; }
+          }
+          expect(resetWaiting, "BARRIER SETUP FAILURE: reset must wait on sender's exact namespace fence").toBe(true);
+          await barrier.query("ROLLBACK");
+          const sent = await send;
+          if (sent.error) throw sent.error;
+          const reset = await resetting;
+          if (reset.error) throw reset.error;
+          expect(reset.result).toMatchObject({ code: 0, receipt: { state: "disposed", queueJobs: 0, sinkRecords: 0 } });
+        } else {
+          expect(execute("reset", id)).toMatchObject({ code: 0, receipt: { state: "disposed", queueJobs: 0, sinkRecords: 0 } });
+        }
+        await assertDisposed(id, before);
+        expect(await accounting()).toEqual([{ records: 57, events: 126 }]);
+        expect(await db.otpRequest.findUnique({ where: { id: requestId } })).toBeNull();
+        expect(await db.user.findUnique({ where: { id: owner.user.id } })).toBeNull();
+        expect(await sink()).toEqual([]);
+        expect(await authority()).toEqual(retained);
+        expect(await businessState(foreignId)).toEqual(foreign);
+        const terminal = await digest(id);
+        const reused = await db.dealership.create({ data: { id: reuseId, slug: `sender-reuse-${reuseId}`,
+          name: "Unrelated terminal scalar reuse", contactPhone: phone } });
+        // Reset-first invokes this exact generated reserve result for the first
+        // time only after disposal. Sender-first also checks its delayed retry.
+        await expect(sender.send(sms)).rejects.toThrow("Campaign SMS delivery refused");
+        expect(log).not.toHaveBeenCalled();
+        expect(await sink()).toEqual([]);
+        expect(await queue.getJob(requestId)).toBeUndefined();
+        expect(await authority()).toEqual(retained);
+        expect(await digest(id)).toBe(terminal);
+        expect(execute("reset", id)).toMatchObject({ code: 0, receipt: { state: "disposed", queueJobs: 0, sinkRecords: 0 } });
+        expect(await digest(id)).toBe(terminal);
+        expect(await authority()).toEqual(retained);
+        expect(await sink()).toEqual([]);
+        await assertDisposed(id, before);
+        expect(await db.dealership.findUnique({ where: { id: reuseId } })).toEqual(reused);
+        expect(await businessState(foreignId)).toEqual(foreign);
+        expect(await db.measurementState.findMany({ orderBy: { key: "asc" } })).toEqual(measurement);
+        expect(renderCodeSms(sms)).toContain(code.value);
+      } finally {
+        // Release storage before awaiting either contender. Sender rollback or
+        // commit releases its transaction advisory lock. The reset worker exits
+        // only after every existing bounded SQL/Redis child has settled.
+        try { if (barrier) await barrier.query("ROLLBACK"); } finally {
+          try { await Promise.allSettled([send, resetting]); } finally {
+            try { if (barrier) await barrier.end(); } finally {
+              log?.mockRestore();
+              if (requestId) expect.soft(await queue.getJob(requestId)).toBeUndefined();
+              await db.dealership.deleteMany({ where: { id: { in: [reuseId, foreignId] } } });
+            }
+          }
+        }
+      }
+    });
+  }
+
+  it("finishes a fenced generated contact send before reset disposes its sink and owned graph", () => withKnownJobs(known =>
+    contactOrdering("e2".repeat(16), "+99369944528", true, known)));
+
+  it("refuses the exact delayed contact carrier after reset while unrelated fresh phone reuse survives retry", () => withKnownJobs(known =>
+    contactOrdering("e3".repeat(16), "+99366905843", false, known)));
 
 });
