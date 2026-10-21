@@ -1,10 +1,8 @@
-// S2A remote program for the prelaunch clean reset (#901). It validates the
-// fixed command and in-container identity, then inventories PostgreSQL and,
-// for `rows`, truncates the S1 plan's exact disposable tables in one
-// transaction. `redis-inventoried` is a separate read-only Redis observation
-// before any PostgreSQL access; the `redis` deletion phase always refuses until
-// a durable completion receipt exists. It makes no object or platform call.
-// The operator CLI remains default closed.
+// Fixed prelaunch clean-reset program (#901). PostgreSQL rows and bounded Redis
+// deletion retain immutable rows authority plus operation-local recovery state.
+// Redis inventory is read-only; initial deletion records PG intent before Lua.
+// Completed replay is read-only. Interrupted pending continuation stays closed.
+// No object/platform calls; the operator CLI/controller remain default closed.
 import { readFileSync } from 'node:fs';
 
 import { QUEUES } from './staging-clean-reset.mjs';
@@ -46,14 +44,30 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
     const id = text(/^[a-zA-Z0-9-]{1,80}$/); const hex32 = text(/^[a-f0-9]{32}$/); const hex64 = text(/^[a-f0-9]{64}$/); const sha = text(/^[a-f0-9]{40}$/);
     const base = ['operation', 'phase', 'operationId', 'reservationId', 'candidate', 'identity'];
     // `redis-inventoried` is a remote transport selector, not an S1 ledger phase.
-    const keys = { inventoried: base, rows: [...base, 'expectedInventory'], 'redis-inventoried': base, redis: [...base, 'expectedInventory'] };
+    const keys = { inventoried: base, rows: [...base, 'expectedInventory'], 'redis-inventoried': base, redis: [...base, 'expectedInventory', 'binding'] };
     if (!record(input) || typeof input.phase !== 'string' || !Object.hasOwn(keys, input.phase) || !exact(input, keys[input.phase]) ||
         input.operation !== 'clean-reset' || !hex32(input.operationId) || !hex32(input.reservationId) || !sha(input.candidate)) refuse();
     const redisPhase = input.phase === 'redis-inventoried' || input.phase === 'redis';
     // The digest binds schema definitions (tables, triggers, FKs), retained contents and disposable contents.
     if (input.phase === 'rows' && (!exact(input.expectedInventory, ['schema', 'retained', 'disposable']) ||
         !['schema', 'retained', 'disposable'].every(part => hex64(input.expectedInventory[part])))) refuse();
-    if (input.phase === 'redis' && (!exact(input.expectedInventory, ['digest']) || !hex64(input.expectedInventory.digest))) refuse();
+    if (input.phase === 'redis' && (!exact(input.expectedInventory, ['digest', 'rowsReceiptDigest']) ||
+        !hex64(input.expectedInventory.digest) || !hex64(input.expectedInventory.rowsReceiptDigest))) refuse();
+    const canonical = value => Array.isArray(value) ? `[${value.map(canonical).join(',')}]` : record(value)
+      ? `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}` : JSON.stringify(value);
+    const date = value => typeof value === 'string' && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
+    const validBinding = binding => {
+      if (!exact(binding, ['owner', 'leaseCommit', 'window', 'deployments']) || !text(/^[a-zA-Z0-9][a-zA-Z0-9-]{0,38}$/)(binding.owner) ||
+          !sha(binding.leaseCommit) || !exact(binding.window, ['operationId', 'candidate', 'closedAt', 'observedAt', 'elapsedSeconds']) ||
+          !exact(binding.deployments, ['api', 'worker'])) return false;
+      const w = binding.window;
+      return w.operationId === input.operationId && w.candidate === input.candidate && date(w.closedAt) && date(w.observedAt) &&
+        typeof w.elapsedSeconds === 'number' && Number.isFinite(w.elapsedSeconds) && w.elapsedSeconds >= 900 &&
+        w.elapsedSeconds === (Date.parse(w.observedAt) - Date.parse(w.closedAt)) / 1000 &&
+        ['api', 'worker'].every(service => Array.isArray(binding.deployments[service]) && binding.deployments[service].length === 1 &&
+          binding.deployments[service].every(d => exact(d, ['id', 'status', 'sha']) && id(d.id) && d.status === 'SUCCESS' && d.sha === input.candidate));
+    };
+    if (input.phase === 'redis' && !validBinding(input.binding)) refuse();
     const p = input.identity;
     if (!exact(p, ['projectId', 'environmentId', 'services', 'origins']) || !exact(p.services, ['api', 'worker']) ||
         !exact(p.origins, redisPhase ? ['database', 'redis'] : ['database']) ||
@@ -67,8 +81,17 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
     if (!['postgres:', 'postgresql:'].includes(db.protocol) || db.hostname !== 'postgres.railway.internal' || db.search || db.hash) refuse();
     db.username = ''; db.password = '';
     if (db.toString().replace(/\/$/, '') !== p.origins.database) refuse();
-    // Redis phases never open PostgreSQL or start a subprocess.
-    if (redisPhase) return cleanResetRedis(input, staging, refuse).catch(report);
+    if (redisPhase) {
+      if (p.projectId !== staging.projectId || p.environmentId !== staging.environmentId || p.services.api !== staging.services.api ||
+          p.services.worker !== staging.services.worker || p.origins.redis !== staging.redis) refuse();
+      let redisUrl;
+      try { redisUrl = new URL(e.REDIS_URL); } catch { refuse(); }
+      const database = ['', '/'].includes(redisUrl.pathname) ? '0' : redisUrl.pathname.slice(1);
+      if (redisUrl.protocol !== 'redis:' || redisUrl.search || redisUrl.hash ||
+          `redis://${redisUrl.hostname}:${redisUrl.port || '6379'}/${database}` !== p.origins.redis) refuse();
+    }
+    // Inventory never opens PostgreSQL or starts a subprocess.
+    if (input.phase === 'redis-inventoried') return cleanResetRedis(input, staging, refuse).catch(report);
 
     const refused = message => { throw new Error(`Clean reset refused: ${message}`); };
     const parts = ['schema', 'retained', 'disposable'];
@@ -101,6 +124,9 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
       ...['operation_id text', 'reservation_id text', 'candidate text', 'project_id text', 'environment_id text', 'phase text',
         'expected jsonb', 'result jsonb', 'committed_at timestamp with time zone'].map((column, index) => `col receipts ${index + 1} ${column} true false false`),
       'con receipts receipts_pkey p PRIMARY KEY (operation_id)', 'type receipts c', 'type _receipts b', 'other 0'].sort();
+    const legacyDefinition = [...operatorDefinition];
+    operatorDefinition.push('col receipts 10 redis_state jsonb true false false');
+    operatorDefinition.sort();
     const operatorDefinitionSql = `'${JSON.stringify(operatorDefinition)}'::jsonb`;
     const operatorSql = `(SELECT coalesce(jsonb_agg(d ORDER BY d COLLATE "C"), '[]') FROM (WITH o AS (SELECT oid, nspowner, nspacl FROM pg_namespace WHERE nspname = '${OPERATOR}')
       SELECT format('nsp %s %s', (pg_get_userbyid(o.nspowner) = current_user)::text, (o.nspacl IS NULL)::text) AS d FROM o
@@ -196,7 +222,8 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
     if (inventory.backends !== 0) refused('other database backends present');
     if (inventory.eventTriggers !== 0) refused('Unknown event trigger present');
     const schemas = inventory.schemas.filter(name => name !== OPERATOR);
-    if (!same([...inventory.operator].sort(), schemas.length === inventory.schemas.length ? [] : operatorDefinition)) refused(`Invalid operator schema ${OPERATOR}`);
+    if (!(schemas.length === inventory.schemas.length ? inventory.operator.length === 0 :
+        [operatorDefinition, legacyDefinition].some(definition => same([...inventory.operator].sort(), definition)))) refused(`Invalid operator schema ${OPERATOR}`);
     const cf = schemas.find(name => name.startsWith('cf_'));
     if (cf !== undefined) refused(`cf namespace ${cf} requires separate control disposition`);
     if (inventory.relations.length) refused(`Unknown live relation public.${inventory.relations[0]}`);
@@ -218,10 +245,55 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
       return;
     }
 
+    if (input.phase === 'redis') {
+      const { createHash } = require('node:crypto');
+      const hash = value => createHash('sha256').update(value).digest('hex');
+      if (observed.receipts.length !== 1) refused('Redis rows receipt authority unavailable');
+      const held = observed.receipts[0];
+      const projection = Object.fromEntries(Object.entries(held).filter(([key]) => key !== 'redis_state'));
+      if (!exact(projection, ['operation_id', 'reservation_id', 'candidate', 'project_id', 'environment_id', 'phase', 'expected', 'result']) ||
+          projection.operation_id !== input.operationId || projection.reservation_id !== input.reservationId || projection.candidate !== input.candidate ||
+          projection.project_id !== p.projectId || projection.environment_id !== p.environmentId || projection.phase !== 'rows' ||
+          !sameDigest(digestOf(projection.result), digest) ||
+          hash(canonical(projection)) !== input.expectedInventory.rowsReceiptDigest) refused('Redis rows receipt changed');
+      digestOf(projection.expected);
+      const state = Object.hasOwn(held, 'redis_state') ? held.redis_state : {};
+      if (!record(state)) refused('Invalid Redis state');
+      const jsonSql = value => `convert_from(decode('${Buffer.from(canonical(value), 'utf8').toString('hex')}', 'hex'), 'UTF8')::jsonb`;
+      const projectionSql = jsonSql(projection);
+      // A transaction-local lock/CAS protects intent/completion. Existing rows fields and committed_at never change.
+      const store = (before, after) => {
+        const result = sql(`BEGIN; ${settings}
+          LOCK TABLE ${OPERATOR}.receipts IN ACCESS EXCLUSIVE MODE;
+          DO $redis$ BEGIN
+            IF ${operatorSql} = '${JSON.stringify(legacyDefinition)}'::jsonb THEN
+              ALTER TABLE ${OPERATOR}.receipts ADD COLUMN redis_state jsonb;
+              UPDATE ${OPERATOR}.receipts SET redis_state = '{}'::jsonb;
+              ALTER TABLE ${OPERATOR}.receipts ALTER COLUMN redis_state SET NOT NULL;
+            END IF;
+            IF ${operatorSql} <> ${operatorDefinitionSql} THEN RAISE EXCEPTION 'Invalid operator schema'; END IF;
+            IF EXISTS (SELECT 1 FROM ${OPERATOR}.receipts WHERE operation_id <> ${operationSql} AND redis_state <> '{}'::jsonb) OR
+               (SELECT count(*) FROM ${OPERATOR}.receipts WHERE operation_id = ${operationSql}
+                 AND (to_jsonb(receipts) - 'committed_at' - 'redis_state') = ${projectionSql} AND redis_state = ${jsonSql(before)}) <> 1
+            THEN RAISE EXCEPTION 'Redis authority changed'; END IF;
+            UPDATE ${OPERATOR}.receipts SET redis_state = ${jsonSql(after)} WHERE operation_id = ${operationSql};
+          END $redis$;
+          SELECT '${marker}' || jsonb_build_object('stored', true)::text; COMMIT;`);
+        if (!exact(result, ['stored']) || result.stored !== true) refused('Redis authority changed');
+      };
+      // Inventory reads every operation state so another unresolved operation cannot be bypassed.
+      const others = sql(`BEGIN READ ONLY; ${settings}
+        SELECT '${marker}' || jsonb_build_object('states', coalesce(jsonb_agg(to_jsonb(r)->'redis_state'), '[]'::jsonb))::text
+        FROM ${OPERATOR}.receipts r WHERE operation_id <> ${operationSql}; COMMIT;`);
+      if (!exact(others, ['states']) || !Array.isArray(others.states) || others.states.some(value => value !== null && canonical(value) !== '{}'))
+        refused('Other Redis operation unresolved');
+      return cleanResetRedis(input, staging, refuse, { state, store, canonical, exact, date, hash }).catch(report);
+    }
+
     const expected = input.expectedInventory;
     // Lost-response replay: only the exact recorded operation whose post-state still matches observes completion.
     if (observed.receipts.length > 1) refused('Invalid operator receipt');
-    const [receipt] = observed.receipts;
+    const receipt = observed.receipts[0] === undefined ? undefined : Object.fromEntries(Object.entries(observed.receipts[0]).filter(([key]) => key !== 'redis_state'));
     if (receipt !== undefined) {
       if (!exact(receipt, ['operation_id', 'reservation_id', 'candidate', 'project_id', 'environment_id', 'phase', 'expected', 'result']) ||
           receipt.operation_id !== input.operationId || receipt.reservation_id !== input.reservationId || receipt.candidate !== input.candidate ||
@@ -253,8 +325,13 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
           IF to_regnamespace('${OPERATOR}') IS NULL THEN
             CREATE SCHEMA ${OPERATOR};
             CREATE TABLE ${OPERATOR}.receipts (operation_id text NOT NULL, reservation_id text NOT NULL, candidate text NOT NULL, project_id text NOT NULL,
-              environment_id text NOT NULL, phase text NOT NULL, expected jsonb NOT NULL, result jsonb NOT NULL, committed_at timestamp with time zone NOT NULL,
+              environment_id text NOT NULL, phase text NOT NULL, expected jsonb NOT NULL, result jsonb NOT NULL, committed_at timestamp with time zone NOT NULL, redis_state jsonb NOT NULL,
               CONSTRAINT receipts_pkey PRIMARY KEY (operation_id));
+          END IF;
+          IF ${operatorSql} = '${JSON.stringify(legacyDefinition)}'::jsonb THEN
+            ALTER TABLE ${OPERATOR}.receipts ADD COLUMN redis_state jsonb;
+            UPDATE ${OPERATOR}.receipts SET redis_state = '{}'::jsonb;
+            ALTER TABLE ${OPERATOR}.receipts ALTER COLUMN redis_state SET NOT NULL;
           END IF;
           IF ${operatorSql} <> ${operatorDefinitionSql} THEN RAISE EXCEPTION 'Clean reset operator schema invalid'; END IF;
           IF EXISTS (SELECT 1 FROM ${OPERATOR}.receipts WHERE operation_id = ${operationSql}) THEN verdict := 'changed';
@@ -264,9 +341,9 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
             IF after_reset->'digest'->'schema' <> seen->'digest'->'schema' OR after_reset->'digest'->'retained' <> seen->'digest'->'retained' OR
                EXISTS (SELECT 1 FROM jsonb_each(after_reset->'tables') e WHERE NOT ('public.' || e.key = ANY (${retainSql})) AND e.value <> '0'::jsonb)
             THEN RAISE EXCEPTION 'Clean reset post-state invalid'; END IF;
-            INSERT INTO ${OPERATOR}.receipts (operation_id, reservation_id, candidate, project_id, environment_id, phase, expected, result, committed_at)
+            INSERT INTO ${OPERATOR}.receipts (operation_id, reservation_id, candidate, project_id, environment_id, phase, expected, result, committed_at, redis_state)
               VALUES (${operationSql}, ${literal(input.reservationId)}, ${literal(input.candidate)}, ${literal(p.projectId)}, ${literal(p.environmentId)}, 'rows',
-                ${expectedSql}, after_reset->'digest', now());
+                ${expectedSql}, after_reset->'digest', now(), '{}'::jsonb);
           END IF;
         END IF;
         PERFORM set_config('${OPERATOR}.outcome', jsonb_build_object('verdict', verdict, 'digest', after_reset->'digest')::text, true);
@@ -284,12 +361,13 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
 
 /**
  * `redis-inventoried`: a redacted observation receipt, never a producer-closure attestation.
- * `redis`: refused, because no durable completion receipt can bind a Redis deletion yet.
+ * `redis`: initial bounded deletion and exact completed replay, bound to stored rows authority.
+ * Recorded binding is synthetic controller context, never proof of live producer closure.
  * Recognized state is derived from the application's Redis producers and the pinned
  * BullMQ 5.76.8 key layout (QueueKeys, obliterate and removeJobKeys). Anything else in an
  * application namespace refuses; keys outside those namespaces are foreign and untouched.
  */
-async function cleanResetRedis(input, staging, refuse) {
+async function cleanResetRedis(input, staging, refuse, authority) {
   const refused = message => { throw new Error(`Clean reset refused: ${message}`); };
   const p = input.identity, e = process.env;
   if (p.projectId !== staging.projectId || p.environmentId !== staging.environmentId || p.services.api !== staging.services.api ||
@@ -298,13 +376,16 @@ async function cleanResetRedis(input, staging, refuse) {
   try { url = new URL(e.REDIS_URL); } catch { refuse(); }
   const database = ['', '/'].includes(url.pathname) ? '0' : url.pathname.slice(1);
   if (url.protocol !== 'redis:' || url.search || url.hash || `redis://${url.hostname}:${url.port || '6379'}/${database}` !== p.origins.redis) refuse();
-  if (input.phase === 'redis') refused('Redis completion receipt authority unavailable');
+  const mutation = input.phase === 'redis';
 
   // Read-only, one-atomic-script Redis observation. The script is flagged no-writes, so Redis
   // itself rejects any write; time is frozen inside it, so the snapshot is coherent. It walks
   // every key but reads only the application namespaces; foreign keys are never read.
   const script = `#!lua flags=no-writes
 local maxKeys, maxBytes, maxMembers, owned = tonumber(ARGV[1]), tonumber(ARGV[2]), tonumber(ARGV[3]), tonumber(ARGV[4])
+if maxKeys ~= 50000 or maxBytes ~= 67108864 or maxMembers ~= 100000 or owned ~= 6 then return {'limit'} end
+local indexCount = tonumber(ARGV[5 + owned])
+if indexCount ~= ${staging.queues.length * 9} then return {'limit'} end
 if redis.call('DBSIZE') > maxKeys then return {'limit'} end
 local sizes = { hash = 'HLEN', list = 'LLEN', set = 'SCARD', zset = 'ZCARD', stream = 'XLEN' }
 local bytes, members, entries, indexes = 0, 0, {}, {}
@@ -315,14 +396,15 @@ for _, key in ipairs(redis.call('KEYS', '*')) do
       local count = -1
       if kind == 'string' then count = 1 elseif sizes[kind] then count = redis.call(sizes[kind], key) end
       local dump = redis.call('DUMP', key)
-      bytes = bytes + #key + #dump
+      local control = string.sub(key, 1, 20) == 'staging-clean-reset:' and kind == 'string' and redis.call('GET', key) or ''
+      bytes = bytes + #key + #dump + #control
       if bytes > maxBytes then return {'limit'} end
-      entries[#entries + 1] = { key, kind, count, redis.call('PEXPIRETIME', key), dump }
+      entries[#entries + 1] = { key, kind, count, redis.call('PEXPIRETIME', key), dump, control }
       break
     end
   end
 end
-for i = 5 + owned, #ARGV do
+for i = 6 + owned, 5 + owned + indexCount do
   local kind, items = redis.call('TYPE', ARGV[i])['ok'], {}
   if kind == 'list' or kind == 'zset' then
     members = members + redis.call(sizes[kind], ARGV[i])
@@ -336,7 +418,7 @@ end
 return { 'ok', entries, indexes }`;
 
   const queues = staging.queues;
-  const owned = ['bull:', 'identity:', 'email:', 'measurement:', 'operations:'];
+  const owned = ['bull:', 'identity:', 'email:', 'measurement:', 'operations:', 'staging-clean-reset:'];
   const indexes = { wait: 'list', active: 'list', paused: 'list', delayed: 'zset', prioritized: 'zset', completed: 'zset', failed: 'zset',
     'waiting-children': 'zset', repeat: 'zset' };
   const fixed = { ...indexes, meta: 'hash', id: 'string', events: 'stream', marker: 'zset', stalled: 'set', 'stalled-check': 'string', limiter: 'string',
@@ -351,59 +433,175 @@ return { 'ok', entries, indexes }`;
     enableOfflineQueue: false, retryStrategy: () => null, reconnectOnError: () => false });
   // Client errors can name the endpoint; they are never forwarded.
   redis.on('error', () => undefined);
-  let reply;
+  const markerKey = `staging-clean-reset:receipt:${input.operationId}`;
+  const args = [50000, 64 * 1024 * 1024, 100000, owned.length, ...owned, indexKeys.length, ...indexKeys];
   try {
     await redis.connect();
-    reply = await redis.evalBuffer(script, 0, 50000, 64 * 1024 * 1024, 100000, owned.length, ...owned, ...indexKeys);
-  } catch { refused('Redis observation failed'); } finally { redis.disconnect(); }
-  if (!Array.isArray(reply) || String(reply[0]) !== 'ok') refused(String(reply?.[0]) === 'limit' ? 'Redis inventory bounds exceeded' : 'Redis observation failed');
-  const [, observed, lists] = reply;
-  if (!Array.isArray(observed) || !Array.isArray(lists) || lists.length !== indexKeys.length || !lists.every(Array.isArray)) refused('Redis observation failed');
-  const members = new Map(indexKeys.map((key, index) => [key, lists[index].map(String)]));
-  const jobs = new Map(queues.map(queue => [queue,
-    new Set(Object.keys(indexes).filter(index => index !== 'repeat').flatMap(index => members.get(`bull:${queue}:${index}`)))]));
+    const observe = async () => {
+      const reply = await redis.evalBuffer(script, 0, ...args);
+      if (!Array.isArray(reply) || String(reply[0]) !== 'ok') refused(String(reply?.[0]) === 'limit' ? 'Redis inventory bounds exceeded' : 'Redis observation failed');
+      const [, observed, lists] = reply;
+      if (!Array.isArray(observed) || !Array.isArray(lists) || lists.length !== indexKeys.length || !lists.every(Array.isArray)) refused('Redis observation failed');
+      const members = new Map(indexKeys.map((key, index) => [key, lists[index].map(String)]));
+      const jobs = new Map(queues.map(queue => [queue,
+        new Set(Object.keys(indexes).filter(index => index !== 'repeat').flatMap(index => members.get(`bull:${queue}:${index}`)))]));
 
-  const classify = (key, type) => {
-    const operations = /^operations:[a-z0-9-]{1,48}:([a-z-]+)$/.exec(key);
-    if (operations) return operations[1] === 'worker' ? 'producer' : monitoring.includes(operations[1]) && type === 'string' ? 'monitoring' : 'unknown';
-    const own = (pattern, expected) => pattern.test(key) && type === expected;
-    if (own(/^identity:reserved-phone-attempt:[a-f0-9]{64}$/, 'string') || own(/^email:daily-sends:\d{4}-\d{2}-\d{2}$/, 'set') ||
-        own(/^measurement:cap:v1:\d{1,16}:[A-Za-z0-9_-]{1,128}$/, 'string')) return 'entry';
-    const [, queue, suffix] = /^bull:([^:]+):(.+)$/s.exec(key) ?? [];
-    if (!queues.includes(queue)) return 'unknown';
-    // Campaign deduplication tombstones are retained only against a verified SQL ledger.
-    if (suffix.startsWith('de:')) return queue === 'email-code' && suffix.startsWith('de:campaign-') ? 'control' : 'unknown';
-    if (Object.hasOwn(fixed, suffix)) return fixed[suffix] === type ? 'entry' : 'unknown';
-    const ids = jobs.get(queue);
-    if (ids.has(suffix)) return type === 'hash' ? 'entry' : 'unknown';
-    const cut = suffix.lastIndexOf(':'), part = suffix.slice(cut + 1);
-    if (cut > 0 && ids.has(suffix.slice(0, cut)) && Object.hasOwn(jobParts, part)) return jobParts[part] === type ? 'entry' : 'unknown';
-    if (suffix.startsWith('repeat:') && members.get(`bull:${queue}:repeat`).includes(suffix.slice('repeat:'.length))) return type === 'hash' ? 'entry' : 'unknown';
-    return 'unknown';
-  };
+      const classify = (key, type) => {
+        const operations = /^operations:[a-z0-9-]{1,48}:([a-z-]+)$/.exec(key);
+        if (operations) return operations[1] === 'worker' ? 'producer' : monitoring.includes(operations[1]) && type === 'string' ? 'monitoring' : 'unknown';
+        const own = (pattern, expected) => pattern.test(key) && type === expected;
+        if (own(/^identity:reserved-phone-attempt:[a-f0-9]{64}$/, 'string') || own(/^email:daily-sends:\d{4}-\d{2}-\d{2}$/, 'set') ||
+            own(/^measurement:cap:v1:\d{1,16}:[A-Za-z0-9_-]{1,128}$/, 'string')) return 'entry';
+        const [, queue, suffix] = /^bull:([^:]+):(.+)$/s.exec(key) ?? [];
+        if (!queues.includes(queue)) return 'unknown';
+        // Campaign deduplication tombstones are retained only against a verified SQL ledger.
+        if (suffix.startsWith('de:')) return queue === 'email-code' && suffix.startsWith('de:campaign-') ? 'control' : 'unknown';
+        if (Object.hasOwn(fixed, suffix)) return fixed[suffix] === type ? 'entry' : 'unknown';
+        const ids = jobs.get(queue);
+        if (ids.has(suffix)) return type === 'hash' ? 'entry' : 'unknown';
+        const cut = suffix.lastIndexOf(':'), part = suffix.slice(cut + 1);
+        if (cut > 0 && ids.has(suffix.slice(0, cut)) && Object.hasOwn(jobParts, part)) return jobParts[part] === type ? 'entry' : 'unknown';
+        if (suffix.startsWith('repeat:') && members.get(`bull:${queue}:repeat`).includes(suffix.slice('repeat:'.length))) return type === 'hash' ? 'entry' : 'unknown';
+        return 'unknown';
+      };
 
-  const { createHash } = require('node:crypto');
-  const hash = value => createHash('sha256').update(value).digest('hex');
-  const found = new Set(), entries = [];
-  for (const item of observed) {
-    const [raw, type, count, expiresAt, dump] = Array.isArray(item) ? item : [];
-    if (!Buffer.isBuffer(raw) || !Buffer.isBuffer(dump) || !Number.isSafeInteger(count) || !Number.isSafeInteger(expiresAt) || expiresAt < -1)
-      refused('Redis observation failed');
-    const key = raw.toString('utf8');
-    const kind = Buffer.from(key, 'utf8').equals(raw) ? classify(key, String(type)) : 'unknown';
-    found.add(kind);
-    if (kind === 'entry') entries.push({ keyDigest: hash(raw), type: String(type), count, contentDigest: hash(dump), expiresAt });
-  }
-  if (found.has('unknown')) refused('unknown Redis application state');
-  if (found.has('control')) refused('Redis control disposition unavailable');
-  const size = (queue, index) => members.get(`bull:${queue}:${index}`).length;
-  if (found.has('producer') || queues.some(queue => size(queue, 'active') > 0)) refused('Redis producer or active job present');
+      const { createHash } = require('node:crypto');
+      const hash = value => createHash('sha256').update(value).digest('hex');
+      const found = new Set(), entries = [], snapshot = [];
+      let control;
+      for (const item of observed) {
+        const [raw, type, count, expiresAt, dump] = Array.isArray(item) ? item : [];
+        if (!Buffer.isBuffer(raw) || !Buffer.isBuffer(dump) || !Number.isSafeInteger(count) || !Number.isSafeInteger(expiresAt) || expiresAt < -1)
+          refused('Redis observation failed');
+        const key = raw.toString('utf8');
+        const kind = Buffer.from(key, 'utf8').equals(raw)
+          ? key === markerKey && String(type) === 'string' && expiresAt === -1 ? 'receipt' : classify(key, String(type)) : 'unknown';
+        if (kind === 'receipt') control = item[5];
+        snapshot.push([raw, type, count, expiresAt, dump, kind]);
+        found.add(kind);
+        if (kind === 'entry') entries.push({ keyDigest: hash(raw), type: String(type), count, contentDigest: hash(dump), expiresAt });
+      }
+      if (found.has('unknown')) refused('unknown Redis application state');
+      if (found.has('control')) refused('Redis control disposition unavailable');
+      const size = (queue, index) => members.get(`bull:${queue}:${index}`).length;
+      if (found.has('producer') || queues.some(queue => size(queue, 'active') > 0)) refused('Redis producer or active job present');
 
-  entries.sort((a, b) => a.keyDigest < b.keyDigest ? -1 : 1);
-  console.log(JSON.stringify({ operation: 'clean-reset', phase: 'redis-inventoried', operationId: input.operationId, reservationId: input.reservationId,
-    candidate: input.candidate, identity: p, state: 'observed', digest: hash(JSON.stringify(entries)),
-    queues: queues.map(name => ({ name, counts: { waiting: size(name, 'wait'), delayed: size(name, 'delayed'), completed: size(name, 'completed'),
-      failed: size(name, 'failed'), active: size(name, 'active'), paused: size(name, 'paused'), prioritized: size(name, 'prioritized'),
-      waitingChildren: size(name, 'waiting-children') }, repeatRecords: size(name, 'repeat') })),
-    entries }));
+      entries.sort((a, b) => a.keyDigest < b.keyDigest ? -1 : 1);
+      return { entries, digest: hash(JSON.stringify(entries)), snapshot, control, queues: queues.map(name => ({ name,
+        counts: { waiting: size(name, 'wait'), delayed: size(name, 'delayed'), completed: size(name, 'completed'), failed: size(name, 'failed'),
+          active: size(name, 'active'), paused: size(name, 'paused'), prioritized: size(name, 'prioritized'), waitingChildren: size(name, 'waiting-children') },
+        repeatRecords: size(name, 'repeat') })) };
+    };
+    const before = await observe();
+    const bound = { operation: 'clean-reset', phase: input.phase, operationId: input.operationId, reservationId: input.reservationId,
+      candidate: input.candidate, identity: p };
+    if (!mutation) {
+      if (before.control !== undefined) refused('Redis control disposition unavailable');
+      console.log(JSON.stringify({ ...bound, state: 'observed', digest: before.digest, queues: before.queues, entries: before.entries }));
+      return;
+    }
+    const { state, store, canonical, exact, date, hash } = authority;
+    const empty = { digest: hash('[]'), entryCount: 0 };
+    const context = { version: 1, operationId: input.operationId, reservationId: input.reservationId, candidate: input.candidate,
+      identity: p, binding: input.binding, rowsReceiptDigest: input.expectedInventory.rowsReceiptDigest };
+    const receipt = stateName => console.log(JSON.stringify({ ...bound, state: stateName,
+      rowsReceiptDigest: context.rowsReceiptDigest, ...empty }));
+    // Pending continuation and Lua/PG-gap recovery require the next real interruption oracle.
+    // Neither an empty queue nor a marker upgrades an existing pending PG record here.
+    if (canonical(state) !== '{}') {
+      if (!exact(state, [...Object.keys(context), 'state', 'preState', 'postState', 'intentAt', 'completedAt']) || state.state !== 'completed' ||
+          !Object.keys(context).every(key => canonical(state[key]) === canonical(context[key])) ||
+          !exact(state.preState, ['digest', 'entryCount']) || state.preState.digest !== input.expectedInventory.digest ||
+          !Number.isSafeInteger(state.preState.entryCount) || state.preState.entryCount < 0 ||
+          canonical(state.postState) !== canonical(empty) || !date(state.intentAt) || !date(state.completedAt) || Date.parse(state.completedAt) < Date.parse(state.intentAt) ||
+          before.entries.length !== 0 || before.digest !== empty.digest ||
+          (before.control !== undefined && (!Buffer.isBuffer(before.control) || before.control.toString('utf8') !== canonical(state))))
+        refused('Redis completion authority changed or pending');
+      receipt('observed');
+      return;
+    }
+    if (before.control !== undefined || before.digest !== input.expectedInventory.digest) refused('Redis inventory changed');
+    const pending = { ...context, state: 'pending', preState: { digest: before.digest, entryCount: before.entries.length }, intentAt: new Date().toISOString() };
+    const completed = { ...pending, state: 'completed', postState: empty, completedAt: new Date().toISOString() };
+    const encoded = canonical(completed);
+    if (Buffer.byteLength(encoded) > 16384 || completed.completedAt < pending.intentAt) refused('Invalid Redis completion');
+    // Intent commits before any Redis write. No retry is attempted after uncertainty.
+    store({}, pending);
+    const mutationScript = script.replace('#!lua flags=no-writes\n', '').replace("return { 'ok', entries, indexes }", `
+-- This layout comes from the fixed program, never request-selected prefixes or keys.
+local layout = cjson.decode(${JSON.stringify(JSON.stringify({ queues, indexNames: Object.keys(indexes), fixed, jobParts, monitoring }))})
+local jobs, repeats, queueSet, monitorSet = {}, {}, {}, {}
+for _, name in ipairs(layout.monitoring) do monitorSet[name] = true end
+for q, queue in ipairs(layout.queues) do
+  queueSet[queue], jobs[queue], repeats[queue] = true, {}, {}
+  for j, name in ipairs(layout.indexNames) do
+    local items = indexes[(q - 1) * #layout.indexNames + j]
+    if name == 'active' and #items ~= 0 then return {'changed'} end
+    for _, id in ipairs(items) do
+      if name == 'repeat' then repeats[queue][id] = true else jobs[queue][id] = true end
+    end
+  end
+end
+local function classify(key, kind)
+  local environment, part = string.match(key, '^operations:([a-z0-9-]+):([a-z-]+)$')
+  if environment and #environment <= 48 then
+    if part == 'worker' then return 'producer' end
+    if monitorSet[part] and kind == 'string' then return 'monitoring' end
+    return 'unknown'
+  end
+  local phone = string.match(key, '^identity:reserved%-phone%-attempt:([a-f0-9]+)$')
+  local bucket, subject = string.match(key, '^measurement:cap:v1:(%d+):([A-Za-z0-9_-]+)$')
+  if (phone and #phone == 64 and kind == 'string') or
+     (string.match(key, '^email:daily%-sends:%d%d%d%d%-%d%d%-%d%d$') and kind == 'set') or
+     (bucket and #bucket <= 16 and #subject <= 128 and kind == 'string') then return 'entry' end
+  local queue, suffix = string.match(key, '^bull:([^:]+):(.+)$')
+  if not queue or not queueSet[queue] then return 'unknown' end
+  if string.sub(suffix, 1, 3) == 'de:' then return 'control' end
+  if layout.fixed[suffix] then return layout.fixed[suffix] == kind and 'entry' or 'unknown' end
+  if jobs[queue][suffix] then return kind == 'hash' and 'entry' or 'unknown' end
+  local job, part = string.match(suffix, '^(.+):([^:]+)$')
+  if job and jobs[queue][job] and layout.jobParts[part] then return layout.jobParts[part] == kind and 'entry' or 'unknown' end
+  if string.sub(suffix, 1, 7) == 'repeat:' and repeats[queue][string.sub(suffix, 8)] then return kind == 'hash' and 'entry' or 'unknown' end
+  return 'unknown'
+end
+local cursor = 6 + owned + indexCount
+local expectedCount = tonumber(ARGV[cursor])
+cursor = cursor + 1
+if not expectedCount or expectedCount < 0 or expectedCount > maxKeys or #entries ~= expectedCount or
+   #ARGV ~= cursor - 1 + expectedCount * 6 + 2 then return {'changed'} end
+local expected, deletions = {}, {}
+for i = 1, expectedCount do
+  local key, kind, count, expiry, dump, disposition = ARGV[cursor], ARGV[cursor+1], tonumber(ARGV[cursor+2]), tonumber(ARGV[cursor+3]), ARGV[cursor+4], ARGV[cursor+5]
+  if expected[key] or not count or not expiry or (disposition ~= 'entry' and disposition ~= 'monitoring') then return {'changed'} end
+  expected[key] = { kind, count, expiry, dump, disposition }
+  cursor = cursor + 6
+end
+-- Recompute the full bounded snapshot, then compare every byte, type and absolute expiry.
+-- Independently classify the actual index-derived snapshot inside this same execution.
+for _, entry in ipairs(entries) do
+  local held = expected[entry[1]]
+  if not held or classify(entry[1], entry[2]) ~= held[5] or held[1] ~= entry[2] or held[2] ~= entry[3] or held[3] ~= entry[4] or held[4] ~= entry[5] then return {'changed'} end
+  if held[5] == 'entry' then deletions[#deletions + 1] = entry[1] end
+  expected[entry[1]] = nil
+end
+local marker, completed = ARGV[cursor], ARGV[cursor+1]
+if marker ~= ${JSON.stringify(markerKey)} or #completed > 16384 or redis.call('EXISTS', marker) ~= 0 then return {'changed'} end
+-- All validation precedes writes. Lua isolation cannot roll back a later Redis write error.
+for _, key in ipairs(deletions) do
+  if redis.call('DEL', key) ~= 1 then return redis.error_reply('incomplete') end
+end
+if redis.call('SET', marker, completed, 'NX')['ok'] ~= 'OK' then return redis.error_reply('incomplete') end
+return {'completed'}
+`);
+    const result = await redis.evalBuffer(mutationScript, 0, ...args, before.snapshot.length, ...before.snapshot.flat(), markerKey, encoded);
+    if (!Array.isArray(result) || result.length !== 1 || String(result[0]) !== 'completed') refused('Redis deletion incomplete');
+    const after = await observe();
+    if (after.entries.length !== 0 || after.digest !== empty.digest || !Buffer.isBuffer(after.control) || after.control.toString('utf8') !== encoded)
+      refused('Redis completion proof unavailable');
+    store(pending, completed);
+    receipt('completed');
+  } catch (error) {
+    if (typeof error?.message === 'string' && error.message.startsWith('Clean reset refused:')) throw error;
+    refused('Redis operation incomplete');
+  } finally { redis.disconnect(); }
 }
