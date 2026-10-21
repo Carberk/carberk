@@ -38,7 +38,10 @@ const migrations = readdirSync(join(packageRoot, "prisma", "migrations"))
   .filter(name => statSync(join(packageRoot, "prisma", "migrations", name)).isDirectory()).sort();
 
 type Outcome = { code: number; failure: string; receipt?: Record<string, unknown>; queries: number };
-type Digest = { retained: string; disposable: string };
+type Digest = { schema: string; retained: string; disposable: string };
+const blindDigest: Digest = { schema: "0".repeat(64), retained: "0".repeat(64), disposable: "0".repeat(64) };
+const digestShape = { schema: expect.stringMatching(hex64), retained: expect.stringMatching(hex64), disposable: expect.stringMatching(hex64) };
+const bound = { operation: "clean-reset", operationId, reservationId, candidate, environmentId: identity.environmentId };
 
 describe("staging clean-reset remote operation on disposable application schema", () => {
   let postgres: StartedPostgreSqlContainer;
@@ -65,18 +68,31 @@ describe("staging clean-reset remote operation on disposable application schema"
   async function tables(): Promise<string[]> {
     return (await query<{ name: string }>(`SELECT 'public.'||tablename AS name FROM pg_tables WHERE schemaname='public'`)).map(row => row.name).sort();
   }
-  // Content of every public table plus the non-system catalog shape, read directly from PostgreSQL.
+  // Content of every user table plus public definitions and namespaces, read directly from PostgreSQL.
   async function snapshot(): Promise<Record<string, string>> {
     const result: Record<string, string> = {};
-    for (const name of await tables()) {
+    // Every user-schema table, so a refusal cannot touch an operator receipt either.
+    const every = (await query<{ name: string }>(`SELECT format('%I.%I', schemaname, tablename) AS name FROM pg_tables
+      WHERE schemaname NOT LIKE 'pg\\_%' AND schemaname<>'information_schema'`)).map(row => row.name).sort();
+    for (const name of every) {
       const row = (await query<{ hash: string }>(`SELECT md5(coalesce(string_agg(to_jsonb(t)::text, ',' ORDER BY to_jsonb(t)::text), '')) AS hash FROM ${name} t`))[0];
       result[name] = row?.hash ?? "";
     }
-    result["catalog"] = (await query<{ hash: string }>(`SELECT md5(coalesce(string_agg(x, ',' ORDER BY x), '')) AS hash FROM (
-      SELECT 'n:'||nspname AS x FROM pg_namespace WHERE nspname NOT LIKE 'pg\\_%' AND nspname<>'information_schema'
-      UNION ALL SELECT 't:'||tgrelid::regclass||':'||tgname FROM pg_trigger WHERE NOT tgisinternal
-      UNION ALL SELECT 'c:'||conrelid::regclass||':'||conname FROM pg_constraint WHERE contype='f') s`))[0]?.hash ?? "";
+    // Definitions, not names only: a redefined trigger or an added FK changes this entry.
+    result["public-catalog"] = (await query<{ hash: string }>(`SELECT md5(coalesce(string_agg(x, ',' ORDER BY x), '')) AS hash FROM (
+      SELECT 't:'||pg_get_triggerdef(t.oid) AS x FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid WHERE NOT t.tgisinternal AND c.relnamespace='public'::regnamespace
+      UNION ALL SELECT 'c:'||conrelid::regclass||':'||conname||':'||pg_get_constraintdef(oid) FROM pg_constraint WHERE contype='f'
+      UNION ALL SELECT 'a:'||attrelid::regclass||':'||attname||':'||format_type(atttypid, atttypmod) FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid
+        WHERE c.relnamespace='public'::regnamespace AND c.relkind='r' AND a.attnum>0 AND NOT a.attisdropped) s`))[0]?.hash ?? "";
+    result["namespaces"] = JSON.stringify(await namespaces());
     return result;
+  }
+  async function namespaces(): Promise<string[]> {
+    return (await query<{ name: string }>(`SELECT nspname AS name FROM pg_namespace WHERE nspname NOT LIKE 'pg\\_%' AND nspname<>'information_schema'`))
+      .map(row => row.name).sort();
+  }
+  async function files(): Promise<unknown[]> {
+    return query(`SELECT relname, relfilenode FROM pg_class WHERE relnamespace='public'::regnamespace AND relkind='r' ORDER BY relname`);
   }
   async function count(table: string): Promise<number> {
     return (await query<{ count: number }>(`SELECT count(*)::int AS count FROM ${table}`))[0]?.count ?? -1;
@@ -145,14 +161,24 @@ describe("staging clean-reset remote operation on disposable application schema"
     payload("caller quiescence", value => { value["quiesced"] = true; });
     payload("caller workers stopped", value => { value["workersStopped"] = true; });
     payload("caller completion", value => { value["completed"] = true; });
-    payload("inventory claim on observation", value => { value["expectedInventory"] = { retained: "0".repeat(64), disposable: "0".repeat(64) }; });
-    payload("rows without observation", value => { delete value["expectedInventory"]; }, rows({ retained: "0".repeat(64), disposable: "0".repeat(64) }));
+    payload("inventory claim on observation", value => { value["expectedInventory"] = blindDigest; });
+    payload("rows without observation", value => { delete value["expectedInventory"]; }, rows(blindDigest));
     payload("other operation", value => { value["operation"] = "reset"; });
     payload("unknown phase", value => { value["phase"] = "cf-detached"; });
     payload("operation id", value => { value["operationId"] = "not-hex"; });
     payload("missing reservation", value => { delete value["reservationId"]; });
     payload("missing database origin", value => { (value["identity"] as { origins: Record<string, unknown> }).origins = {}; });
     payload("missing worker", value => { delete (value["identity"] as { services: Record<string, unknown> }).services["worker"]; });
+    // Strict strings, analogous to S1: no number or one-element array may coerce into an identity.
+    payload("numeric operation id", value => { value["operationId"] = 1; });
+    payload("numeric reservation id", value => { value["reservationId"] = 2; });
+    payload("array operation id", value => { value["operationId"] = [operationId]; });
+    payload("array reservation id", value => { value["reservationId"] = [reservationId]; });
+    payload("array candidate", value => { value["candidate"] = [candidate]; });
+    payload("array phase", value => { value["phase"] = ["inventoried"]; });
+    payload("array project", value => { (value["identity"] as Record<string, unknown>)["projectId"] = [identity.projectId]; });
+    payload("two-part digest", value => { value["expectedInventory"] = { retained: "0".repeat(64), disposable: "0".repeat(64) }; }, rows(blindDigest));
+    payload("numeric digest part", value => { value["expectedInventory"] = { ...blindDigest, schema: 0 }; }, rows(blindDigest));
     for (const [label, input, environment] of cases) {
       const outcome = await run(input, environment);
       expect({ label, code: outcome.code, failure: outcome.failure, queries: outcome.queries, receipt: outcome.receipt })
@@ -171,7 +197,7 @@ describe("staging clean-reset remote operation on disposable application schema"
       const before = await snapshot();
       const outcome = await run(inventoried());
       expect([outcome.code, outcome.failure, outcome.receipt]).toEqual([1, `Clean reset refused: cf namespace ${cfNamespace} requires separate control disposition`, undefined]);
-      const blind = await run(rows({ retained: "0".repeat(64), disposable: "0".repeat(64) }));
+      const blind = await run(rows(blindDigest));
       expect([blind.code, blind.failure]).toEqual([1, `Clean reset refused: cf namespace ${cfNamespace} requires separate control disposition`]);
       expect(await snapshot()).toEqual(before);
       expect(await count("users")).toBe(2);
@@ -198,7 +224,7 @@ describe("staging clean-reset remote operation on disposable application schema"
         const before = await snapshot();
         const outcome = await run(inventoried());
         expect({ refusal, code: outcome.code, failure: outcome.failure, receipt: outcome.receipt }).toEqual({ refusal, code: 1, failure: refusal, receipt: undefined });
-        const blind = await run(rows({ retained: "0".repeat(64), disposable: "0".repeat(64) }));
+        const blind = await run(rows(blindDigest));
         expect({ refusal, code: blind.code, failure: blind.failure }).toEqual({ refusal, code: 1, failure: refusal });
         expect(await snapshot()).toEqual(before);
       } finally { await query(restore); }
@@ -214,51 +240,74 @@ describe("staging clean-reset remote operation on disposable application schema"
     try {
       const observed = execute(inventoried());
       expect([observed.code, observed.failure, observed.receipt]).toEqual([1, "Clean reset refused: other database backends present", undefined]);
-      const deleted = execute(rows({ retained: "0".repeat(64), disposable: "0".repeat(64) }));
+      const deleted = execute(rows(blindDigest));
       expect([deleted.code, deleted.failure]).toEqual([1, "Clean reset refused: other database backends present"]);
     } finally { await other.end(); }
     expect(await snapshot()).toEqual(before);
   });
 
-  it("a stale inventory observation refuses deletion and keeps the later row", async () => {
-    const observed = await run(inventoried());
-    expect([observed.code, observed.failure]).toEqual([0, ""]);
-    const digest = observed.receipt?.["digest"] as Digest;
-    expect(digest).toEqual({ retained: expect.stringMatching(hex64), disposable: expect.stringMatching(hex64) });
-    await query(`INSERT INTO users(id,"displayName","updatedAt") VALUES('reset-late','Arrived after observation',now())`);
-    try {
-      const before = await snapshot();
-      const outcome = await run(rows(digest));
-      expect([outcome.code, outcome.failure, outcome.receipt]).toEqual([1, "Clean reset refused: Inventory changed since observation", undefined]);
-      expect(await snapshot()).toEqual(before);
-      expect(await query(`SELECT "displayName" FROM users WHERE id='reset-late'`)).toEqual([{ displayName: "Arrived after observation" }]);
-    } finally { await query(`DELETE FROM users WHERE id='reset-late'`); }
+  it("a stale observation refuses deletion: a later row, an added FK between known tables or a redefined known trigger", async () => {
+    const trigger = (await query<{ def: string; fn: string }>(`SELECT pg_get_triggerdef(t.oid) AS def, t.tgfoid::regprocedure::text AS fn FROM pg_trigger t
+      WHERE t.tgrelid='public.users'::regclass AND t.tgname='business_enquiry_user_revocation'`))[0];
+    expect(trigger?.def).toMatch(/^CREATE TRIGGER business_enquiry_user_revocation /);
+    const changes: [string, string, string, keyof Digest][] = [
+      ["row", `INSERT INTO users(id,"displayName","updatedAt") VALUES('reset-late','Arrived after observation',now())`, `DELETE FROM users WHERE id='reset-late'`, "disposable"],
+      ["foreign key", `ALTER TABLE public.favorites ADD CONSTRAINT favorites_rogue_user_fkey FOREIGN KEY ("userId") REFERENCES public.users(id)`,
+        `ALTER TABLE public.favorites DROP CONSTRAINT favorites_rogue_user_fkey`, "schema"],
+      ["trigger", `DROP TRIGGER business_enquiry_user_revocation ON public.users;
+        CREATE TRIGGER business_enquiry_user_revocation AFTER INSERT ON public.users FOR EACH ROW EXECUTE FUNCTION ${trigger?.fn ?? "missing()"}`,
+      `DROP TRIGGER business_enquiry_user_revocation ON public.users; ${trigger?.def ?? ""}`, "schema"],
+    ];
+    for (const [label, arrange, restore, part] of changes) {
+      const observed = await run(inventoried());
+      expect({ label, code: observed.code, failure: observed.failure }).toEqual({ label, code: 0, failure: "" });
+      const digest = observed.receipt?.["digest"] as Digest;
+      expect(digest).toEqual(digestShape);
+      await query(arrange);
+      try {
+        // The change is known to the planner, so a fresh observation still succeeds; only its digest part moves.
+        const fresh = await run(inventoried());
+        expect({ label, code: fresh.code, moved: (fresh.receipt?.["digest"] as Digest | undefined)?.[part] !== digest[part] }).toEqual({ label, code: 0, moved: true });
+        const before = await snapshot();
+        const outcome = await run(rows(digest));
+        expect({ label, code: outcome.code, failure: outcome.failure, receipt: outcome.receipt })
+          .toEqual({ label, code: 1, failure: "Clean reset refused: Inventory changed since observation", receipt: undefined });
+        expect(await snapshot()).toEqual(before);
+      } finally { await query(restore); }
+    }
+    expect(await query(`SELECT "displayName" FROM users ORDER BY id`)).toEqual([{ displayName: "Disposable buyer" }, { displayName: "Disposable seller" }]);
   });
 
-  it("deletes only the explicit disposable public tables in one transaction and replays a lost response as observation", async () => {
+  it("deletes only the explicit disposable public tables in one transaction and binds completion to the exact operation", async () => {
     const live = await tables();
     expect(live).toEqual(expect.arrayContaining(retained));
+    const namespacesBefore = await namespaces();
     const observed = await run(inventoried());
     expect([observed.code, observed.failure]).toEqual([0, ""]);
     const receipt = observed.receipt ?? {};
-    expect(Object.keys(receipt).sort()).toEqual(["digest", "operation", "operationId", "phase", "plan", "rows", "state"]);
-    expect([receipt["operation"], receipt["phase"], receipt["operationId"], receipt["state"]]).toEqual(["clean-reset", "inventoried", operationId, "observed"]);
+    expect(Object.keys(receipt).sort()).toEqual(["candidate", "digest", "environmentId", "operation", "operationId", "phase", "plan", "reservationId", "rows", "state"]);
+    expect(receipt).toEqual(expect.objectContaining({ ...bound, phase: "inventoried", state: "observed", digest: digestShape }));
     expect(receipt["plan"]).toEqual({ mode: "RESTRICT", retain: retained, truncate: live.filter(name => !retained.includes(name)) });
     expect(receipt["rows"]).toEqual(expect.objectContaining({ "public.users": 2, "public.sessions": 1, "public.listings": 1, "public.favorites": 1,
       "public.audit_logs": 1, "public.brands": 1, "public.exchange_rates": 1, "public.measurement_state": 1, "public._prisma_migrations": migrations.length }));
     const before = receipt["digest"] as Digest;
-    const retainedBefore = Object.fromEntries(Object.entries(await snapshot()).filter(([name]) => retained.includes(name) || name === "catalog"));
+    const kept = (all: Record<string, string>) => Object.fromEntries(Object.entries(all).filter(([name]) => retained.includes(name) || name === "public-catalog"));
+    const retainedBefore = kept(await snapshot());
 
     const completed = await run(rows(before));
     expect([completed.code, completed.failure]).toEqual([0, ""]);
-    expect(completed.receipt).toEqual({ operation: "clean-reset", phase: "rows", operationId, state: "completed",
-      digest: { retained: before.retained, disposable: expect.stringMatching(hex64) } });
-    const after = (completed.receipt?.["digest"] as Digest);
+    expect(completed.receipt).toEqual({ ...bound, phase: "rows", state: "completed",
+      digest: { schema: before.schema, retained: before.retained, disposable: expect.stringMatching(hex64) } });
+    const after = completed.receipt?.["digest"] as Digest;
     expect(after.disposable).not.toBe(before.disposable);
 
     for (const name of live.filter(table => !retained.includes(table))) expect({ name, rows: await count(name) }).toEqual({ name, rows: 0 });
-    const current = await snapshot();
-    expect(Object.fromEntries(Object.entries(current).filter(([name]) => retained.includes(name) || name === "catalog"))).toEqual(retainedBefore);
+    expect(kept(await snapshot())).toEqual(retainedBefore);
+    // At most one operator receipt namespace may appear; no namespace disappears and no cf namespace is created.
+    const namespacesAfter = await namespaces();
+    const added = namespacesAfter.filter(name => !namespacesBefore.includes(name));
+    expect({ kept: namespacesBefore.every(name => namespacesAfter.includes(name)), added: added.length <= 1, cf: added.filter(name => name === "public" || name.startsWith("cf_")) })
+      .toEqual({ kept: true, added: true, cf: [] });
     expect(await query(`SELECT id,slug,"logoKey" FROM brands`)).toEqual([{ id: "reset-brand", slug: "reset-brand", logoKey: "brands/reset-brand/admin-upload-7/logo-60.png" }]);
     expect(await query(`SELECT id,rate,"setByUserId","updatedAt"::text AS "updatedAt" FROM exchange_rates`))
       .toEqual([{ id: "reset-rate", rate: 19.25, setByUserId: "reset-seller", updatedAt: "2026-10-01 00:00:00" }]);
@@ -268,15 +317,34 @@ describe("staging clean-reset remote operation on disposable application schema"
     expect((await query<{ name: string }>(`SELECT migration_name AS name FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`))
       .map(row => row.name).sort()).toEqual(migrations);
 
-    // The first response is treated as lost. A restarted process with the same operation
-    // and the same prior observation observes completion and repeats no side effect.
-    const files = await query(`SELECT relname, relfilenode FROM pg_class WHERE relnamespace='public'::regnamespace AND relkind='r' ORDER BY relname`);
+    // Empty disposable contents alone never certify completion. Another operation, reservation,
+    // candidate or environment holding the original observation refuses and changes nothing,
+    // including any operator receipt.
+    const current = await snapshot(); const stored = await files();
+    const otherCandidate = "d".repeat(40);
+    const mismatches: [string, Record<string, unknown>, Record<string, string | undefined>][] = [
+      ["operation", { ...rows(before), operationId: "a".repeat(32) }, containerEnv()],
+      ["reservation", { ...rows(before), reservationId: "b".repeat(32) }, containerEnv()],
+      ["candidate", { ...rows(before), candidate: otherCandidate }, { ...containerEnv(), AUTOTM_COMMIT_SHA: otherCandidate }],
+      ["environment", { ...rows(before), identity: { ...structuredClone(identity), environmentId: "other-staging" } }, { ...containerEnv(), RAILWAY_ENVIRONMENT_ID: "other-staging" }],
+    ];
+    const refusals = ["Clean reset refused: Inventory changed since observation", "Clean reset refused: Clean-reset operation identity changed"];
+    for (const [label, input, environment] of mismatches) {
+      const outcome = await run(input, environment);
+      expect({ label, code: outcome.code, receipt: outcome.receipt, refused: refusals.includes(outcome.failure) }).toEqual({ label, code: 1, receipt: undefined, refused: true });
+      expect(await files()).toEqual(stored);
+      expect(await snapshot()).toEqual(current);
+    }
+
+    // The first response is treated as lost. A restarted process with the exact operation
+    // and the same prior observation observes its own durable completion and repeats nothing.
     const replay = await run(rows(before));
     expect([replay.code, replay.failure]).toEqual([0, ""]);
-    expect(replay.receipt).toEqual({ operation: "clean-reset", phase: "rows", operationId, state: "observed", digest: after });
-    expect(await query(`SELECT relname, relfilenode FROM pg_class WHERE relnamespace='public'::regnamespace AND relkind='r' ORDER BY relname`)).toEqual(files);
+    expect(replay.receipt).toEqual({ ...bound, phase: "rows", state: "observed", digest: after });
+    expect(await files()).toEqual(stored);
     expect(await snapshot()).toEqual(current);
     const reobserved = await run(inventoried());
     expect([reobserved.code, reobserved.receipt?.["state"], reobserved.receipt?.["digest"]]).toEqual([0, "observed", after]);
+    expect(reobserved.receipt).toEqual(expect.objectContaining(bound));
   });
 });
