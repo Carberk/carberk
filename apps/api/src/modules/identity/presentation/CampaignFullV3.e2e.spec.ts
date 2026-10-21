@@ -2540,7 +2540,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
         return { id: row.id, key };
       };
       const prepareBusiness = async (reservation: string, publish: boolean) => {
-        expect(await rows(`SELECT to_regclass('"cf_${reservation}".campaign_manifest') AS present`)).toEqual([{ present: null }]);
+        expect(await rows(`SELECT to_regclass('"cf_${reservation}".campaign_manifest')::text AS present`)).toEqual([{ present: null }]);
         cleanupIds.push(reservation);
         const roster = await seed(reservation);
         await journal(reservation, 21, 21);
