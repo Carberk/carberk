@@ -34,7 +34,8 @@
     "test:unit": "pnpm test:offline && vitest run --exclude '**/*.e2e.spec.ts' --exclude '**/tests/**' --passWithNoTests",
     "test:offline": "node --test tests/demo-inventory-lifetime.offline.mjs",
     "tester:accounts": "tsx scripts/tester-accounts.ts",
-    "staff:bootstrap": "tsx scripts/bootstrap-staff.ts"
+    "staff:bootstrap": "tsx scripts/bootstrap-staff.ts",
+    "diagnostics:bootstrap-synthetic": "tsx scripts/bootstrap-synthetic-diagnostic-center.ts"
   },
   "dependencies": {
     "@auto-tm/contracts": "workspace:*",
