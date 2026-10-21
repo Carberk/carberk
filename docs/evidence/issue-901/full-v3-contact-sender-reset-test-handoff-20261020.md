@@ -44,4 +44,4 @@ This checkpoint fixes only that setup mismatch in `beforeAll`/`afterAll`: it sav
 - `pnpm check:agent-docs`: passed. `git diff --check`: passed.
 - The first offline DB build attempt ran before the contracts output existed and reported only the pre-existing workspace declaration gap; contracts were built, then the configured API checks above passed. No database or service was contacted.
 
-Final pushed checkpoint after the environment correction: `50057052` (subsequent test-only assertion tightening is pending this final push). Working tree is clean after that push requirement is satisfied by the next commit. Hosted sender/reset ordering, SQL compilation, HTTP contact GREEN and all downstream verification remain UNKNOWN.
+Final pushed checkpoint after the environment correction and terminal assertion tightening: `0abd9b0c8621fa78011c12bde41f2a713da48847`. Working tree is clean. Hosted sender/reset ordering, SQL compilation, HTTP contact GREEN and all downstream verification remain UNKNOWN.
