@@ -12,17 +12,21 @@ function cleanResetMain(input) {
   try {
     const refuse = () => { throw new Error('Clean reset refused: target'); };
     const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
-    const exact = (value, keys) => record(value) && Object.keys(value).sort().join(',') === [...keys].sort().join(',');
-    const id = /^[a-zA-Z0-9-]{1,80}$/; const hex32 = /^[a-f0-9]{32}$/; const hex64 = /^[a-f0-9]{64}$/; const sha = /^[a-f0-9]{40}$/;
+    const exact = (value, keys) => record(value) && Object.getPrototypeOf(value) === Object.prototype &&
+      Object.keys(value).sort().join(',') === [...keys].sort().join(',');
+    // Strict strings only: arrays and numbers must never coerce into an identity.
+    const text = pattern => value => typeof value === 'string' && pattern.test(value);
+    const id = text(/^[a-zA-Z0-9-]{1,80}$/); const hex32 = text(/^[a-f0-9]{32}$/); const hex64 = text(/^[a-f0-9]{64}$/); const sha = text(/^[a-f0-9]{40}$/);
     const keys = { inventoried: ['operation', 'phase', 'operationId', 'reservationId', 'candidate', 'identity'],
       rows: ['operation', 'phase', 'operationId', 'reservationId', 'candidate', 'identity', 'expectedInventory'] };
-    if (!record(input) || !Object.hasOwn(keys, input.phase) || !exact(input, keys[input.phase]) || input.operation !== 'clean-reset' ||
-        !hex32.test(input.operationId) || !hex32.test(input.reservationId) || !sha.test(input.candidate)) refuse();
-    if (input.phase === 'rows' && (!exact(input.expectedInventory, ['retained', 'disposable']) ||
-        !hex64.test(input.expectedInventory.retained) || !hex64.test(input.expectedInventory.disposable))) refuse();
+    if (!record(input) || typeof input.phase !== 'string' || !Object.hasOwn(keys, input.phase) || !exact(input, keys[input.phase]) ||
+        input.operation !== 'clean-reset' || !hex32(input.operationId) || !hex32(input.reservationId) || !sha(input.candidate)) refuse();
+    // The digest binds schema definitions (tables, triggers, FKs), retained contents and disposable contents.
+    if (input.phase === 'rows' && (!exact(input.expectedInventory, ['schema', 'retained', 'disposable']) ||
+        !['schema', 'retained', 'disposable'].every(part => hex64(input.expectedInventory[part])))) refuse();
     const p = input.identity;
     if (!exact(p, ['projectId', 'environmentId', 'services', 'origins']) || !exact(p.services, ['api', 'worker']) || !exact(p.origins, ['database']) ||
-        ![p.projectId, p.environmentId, p.services.api, p.services.worker].every(x => typeof x === 'string' && id.test(x)) ||
+        ![p.projectId, p.environmentId, p.services.api, p.services.worker].every(id) ||
         typeof p.origins.database !== 'string') refuse();
     const e = process.env;
     if (e.RAILWAY_PROJECT_ID !== p.projectId || e.RAILWAY_ENVIRONMENT_ID !== p.environmentId || e.RAILWAY_SERVICE_ID !== p.services.api ||
