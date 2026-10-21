@@ -44,6 +44,9 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
   let store: S3RetiredObjectStore;
   let job: CleanRetiredUploads;
   const userId = randomUUID();
+  /** Another account, a different seller, used only as NP-4's foreign stock. */
+  const foreignUserId = randomUUID();
+  const users = [userId, foreignUserId];
   const uploadIds: string[] = [];
   const objectKeys = new Set<string>();
   const catalog = { brandId: randomUUID(), modelId: randomUUID(), regionId: randomUUID(), cityId: randomUUID() };
@@ -70,10 +73,10 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
 
   afterEach(async () => {
     await prisma.mediaUploadCleanup.deleteMany({ where: { uploadId: { in: uploadIds } } });
-    await prisma.user.updateMany({ where: { id: userId }, data: { avatarUploadId: null, avatarKey: null } });
-    await prisma.listing.deleteMany({ where: { sellerId: userId } });
-    await prisma.mediaUpload.deleteMany({ where: { userId } });
-    await prisma.user.deleteMany({ where: { id: userId } });
+    await prisma.user.updateMany({ where: { id: { in: users } }, data: { avatarUploadId: null, avatarKey: null } });
+    await prisma.listing.deleteMany({ where: { sellerId: { in: users } } });
+    await prisma.mediaUpload.deleteMany({ where: { userId: { in: users } } });
+    await prisma.user.deleteMany({ where: { id: { in: users } } });
     uploadIds.length = 0;
   });
 
@@ -112,9 +115,11 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
   /** A fenced upload with its current five or historical nine stored objects, retired and waiting for cleanup unless told otherwise. */
   async function retiredUpload(options: {
     state?: string; work?: "PENDING" | "LEGACY_PENDING" | "none"; preparing?: boolean; historicalPlaceholder?: boolean;
+    owner?: string;
   } = {}) {
+    const owner = options.owner ?? userId;
     await prisma.user.upsert({
-      where: { id: userId }, update: {},
+      where: { id: owner }, update: {},
       create: { id: userId, phone: `+9936${String(Math.floor(Math.random() * 1e7)).padStart(7, "0")}`, phoneVerifiedAt: new Date(), role: "buyer" },
     });
     const key = `pending/${randomUUID()}/original.${options.historicalPlaceholder ? "jpg" : "webp"}`;
@@ -127,7 +132,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
       }));
     }
     const upload = await prisma.mediaUpload.create({ data: {
-      userId, key, kind: "image", contentType: options.historicalPlaceholder ? "image/jpeg" : "image/webp", sizeBytes: 2048,
+      userId: owner, key, kind: "image", contentType: options.historicalPlaceholder ? "image/jpeg" : "image/webp", sizeBytes: 2048,
       writeProtocol: "conditional-v1", objectKeys: keys,
       ...(options.preparing
         ? { state: "PREPARING", claimToken: randomUUID(), claimTargetType: "listing", claimTargetId: randomUUID(),
@@ -149,9 +154,9 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
   const workOf = (uploadId: string) => prisma.mediaUploadCleanup.findUniqueOrThrow({ where: { uploadId } });
   const stateOf = async (id: string) => (await prisma.mediaUpload.findUnique({ where: { id } }))?.state;
 
-  async function listing() {
+  async function listing(sellerId = userId) {
     return prisma.listing.create({ data: {
-      sellerId: userId, status: "active", brandId: catalog.brandId, modelId: catalog.modelId,
+      sellerId, status: "active", brandId: catalog.brandId, modelId: catalog.modelId,
       cityId: catalog.cityId, priceAmount: 100000, priceCurrency: "TMT", publishedAt: new Date(),
     } });
   }
@@ -163,16 +168,31 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
     return Buffer.from(await object.Body.transformToByteArray());
   }
 
-  /** Another seller's adopted photo in another directory; a race on this suite's upload must leave it byte-identical. */
+  /**
+   * Another account's adopted photo: its own User, its own active Listing and
+   * Listing media, in another directory. A race on this suite's upload must
+   * leave all of it, and its bytes, as they were. Its rows go in `afterEach`
+   * and its objects in `afterAll`, like every other fixture here.
+   */
   async function foreignStock() {
-    const stock = await retiredUpload({ state: "ADOPTED", work: "none" });
-    await prisma.listingMedia.create({ data: {
-      listingId: (await listing()).id, kind: "image", sortOrder: 0, key: stock.key, uploadId: stock.id,
+    const stock = await retiredUpload({ state: "ADOPTED", work: "none", owner: foreignUserId });
+    const shop = await listing(foreignUserId);
+    await prisma.mediaUpload.update({ where: { id: stock.id }, data: { claimTargetId: shop.id } });
+    const media = await prisma.listingMedia.create({ data: {
+      listingId: shop.id, kind: "image", sortOrder: 0, key: stock.key, uploadId: stock.id,
     } });
     const bytes = await Promise.all(stock.keys.map(bytesOf));
     return {
       expectIntact: async () => {
-        expect(await stateOf(stock.id)).toBe("ADOPTED");
+        expect(foreignUserId).not.toBe(userId);
+        expect(await prisma.user.findUnique({ where: { id: foreignUserId } })).not.toBeNull();
+        expect(await prisma.listing.findUniqueOrThrow({ where: { id: shop.id } }))
+          .toMatchObject({ sellerId: foreignUserId, status: "active" });
+        expect(await prisma.listingMedia.findUniqueOrThrow({ where: { id: media.id } }))
+          .toMatchObject({ listingId: shop.id, key: stock.key, uploadId: stock.id });
+        expect(await prisma.mediaUpload.findUniqueOrThrow({ where: { id: stock.id } })).toMatchObject({
+          userId: foreignUserId, state: "ADOPTED", key: stock.key, claimTargetType: "listing", claimTargetId: shop.id,
+        });
         expect(await prisma.mediaUploadCleanup.count({ where: { uploadId: stock.id } })).toBe(0);
         const now = await Promise.all(stock.keys.map(bytesOf));
         expect(now.map((current, index) => current.equals(bytes[index] ?? Buffer.alloc(0)))).toEqual(stock.keys.map(() => true));
@@ -181,29 +201,25 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
   }
 
   /**
-   * The API's retirement of an AVAILABLE upload (PrismaUploadClaims.retireUnclaimed
-   * and retire), repeated because the worker cannot import the API: under the
-   * upload lock, only an unheld upload with no adopter is retired, and its exact
-   * manifest is recorded as PENDING work. `now` is the API clock, in this
-   * suite's year 2000.
+   * Fixture transition, not the API route: it puts an AVAILABLE upload into
+   * the state the API's retirement leaves for the worker (RETIRED, with its
+   * exact manifest as PENDING work due at `now`), so this suite can prove the
+   * worker's cleanup. Who may retire, and that adopted or held uploads are
+   * refused under the lock, is proven against the real
+   * PrismaUploadClaims.retireUnclaimed in apps/api PrismaUploadClaims.e2e.spec.ts:432-475.
    */
-  async function retireUnclaimed(uploadId: string, now: Date): Promise<boolean> {
-    return prisma.$transaction(async (tx) => {
-      const [upload] = await tx.$queryRaw<{ id: string; key: string; objectKeys: string[]; writeProtocol: string; state: string }[]>`
-        SELECT id, "key", "objectKeys", "writeProtocol", "state" FROM media_uploads WHERE id = ${uploadId} FOR UPDATE`;
-      const [adopters] = await tx.$queryRaw<{ total: bigint }[]>`
-        SELECT (SELECT count(*) FROM listing_media WHERE "uploadId" = ${uploadId}) +
-               (SELECT count(*) FROM users WHERE "avatarUploadId" = ${uploadId}) AS total`;
-      if (!upload || upload.state !== "AVAILABLE" || Number(adopters?.total ?? 0) > 0) return false;
-      await tx.$executeRaw`
-        UPDATE media_uploads SET "state" = 'RETIRED', "retiredAt" = ${now}, "claimToken" = NULL, "claimDeadline" = NULL
-        WHERE id = ${uploadId}`;
-      await tx.$executeRaw`
-        INSERT INTO media_upload_cleanups ("uploadId", "key", "objectKeys", "writeProtocol", "status", "nextAttemptAt")
-        VALUES (${upload.id}, ${upload.key}, ${upload.objectKeys}::text[], ${upload.writeProtocol},
-          ${upload.writeProtocol === "conditional-v1" ? "PENDING" : "LEGACY_PENDING"}, ${now})
-        ON CONFLICT ("uploadId") DO NOTHING`;
-      return true;
+  async function prepareRetiredForCleanup(uploadId: string, now: Date): Promise<void> {
+    await prisma.$transaction(async (tx) => {
+      const upload = await tx.mediaUpload.findUniqueOrThrow({ where: { id: uploadId } });
+      const { count } = await tx.mediaUpload.updateMany({
+        where: { id: uploadId, state: "AVAILABLE" },
+        data: { state: "RETIRED", retiredAt: now, claimToken: null, claimDeadline: null },
+      });
+      if (count !== 1) throw new Error(`Upload ${uploadId} was not AVAILABLE`);
+      await tx.mediaUploadCleanup.create({ data: {
+        uploadId, key: upload.key, objectKeys: upload.objectKeys, writeProtocol: upload.writeProtocol,
+        status: "PENDING", nextAttemptAt: now,
+      } });
     });
   }
 
@@ -213,6 +229,11 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
    * are taken by the HTTP request, then the rest waits on a gate, so the PUT is
    * in flight at the S3 boundary while recovery and cleanup run. The answer is
    * MinIO's own; nothing is faked. `release` is idempotent, for `finally`.
+   *
+   * The request carries the product's own 10 s abort budget, as
+   * ConditionalImageStorage does, so started, released and failed paths all
+   * settle within it. An aborted request reports `aborted`, which is never an
+   * accepted refusal.
    */
   function heldGeneratorPut(Key: string, IfMatch: string) {
     const body = Buffer.from(`late variant for ${Key}`);
@@ -231,16 +252,22 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
         if (reads === 1) this.push(body.subarray(0, half));
         if (reads === 2) {
           taken();
-          void gate.then(() => { this.push(body.subarray(half)); this.push(null); });
+          void gate.then(() => {
+            if (this.destroyed) return;
+            this.push(body.subarray(half));
+            this.push(null);
+          });
         }
       },
     });
+    const abortSignal = AbortSignal.timeout(REQUEST_BUDGET_MS);
     const outcome = s3.send(new PutObjectCommand({
       Bucket: RETIRED_UPLOAD_BUCKET, Key, Body: stream, ContentLength: body.length,
       ContentType: "image/webp", IfMatch, CacheControl: "no-store",
-    })).then(
+    }), { abortSignal }).then(
       () => "written" as const,
-      (error: { $metadata?: { httpStatusCode?: number }; name?: string }) => error.$metadata?.httpStatusCode ?? error.name,
+      (error: { $metadata?: { httpStatusCode?: number }; name?: string }) =>
+        abortSignal.aborted ? "aborted" as const : error.$metadata?.httpStatusCode ?? error.name,
     ).finally(() => { settled = true; });
     const started = Promise.race([firstBytesTaken, outcome.then((answer) => {
       throw new Error(`The generator PUT settled before it was held: ${String(answer)}`);
@@ -359,8 +386,8 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
       expect(await presentInBudget(upload.keys)).toBe(5);
       expect(held.inFlight()).toBe(true);
 
-      // Only the ordinary retirement of the unclaimed upload records deletion work.
-      expect(await retireUnclaimed(upload.id, SWEEP)).toBe(true);
+      // Only a retirement of the unclaimed upload records deletion work; the fixture prepares it.
+      await prepareRetiredForCleanup(upload.id, SWEEP);
       const work = await workOf(upload.id);
       expect(work).toMatchObject({ status: "PENDING", attempts: 0, key: upload.key, writeProtocol: "conditional-v1" });
       expect([...work.objectKeys].sort()).toEqual([...upload.keys].sort());
