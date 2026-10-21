@@ -12,9 +12,10 @@ import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fa
 import { Test } from "@nestjs/testing";
 import { PrismaService } from "@auto-tm/db";
 import supertest from "supertest";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, inject, it, vi } from "vitest";
 import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
 import { cleanSuiteFixtures, defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
+import { workerDatabaseName } from "../../../../test/helpers/testDatabases";
 import { GlobalErrorFilter } from "../../../common/error.filter";
 import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
 import { IDENTITY_CLOCK_PORT } from "../../identity/identity.public";
@@ -441,6 +442,109 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
     privateNoStore(readable); expect(readable.body.proofId).toBe(response.body.proofId);
     return response.body.proofId as string;
   }
+
+  it.each(["candidate", "predecessor"] as const)("permanently invalidates an unused proof after ordinary %s assignment revocation and reassignment", async side => {
+    const p = await pair();
+    const proofId = await ordinaryProof(p);
+    const issued = await get("reviewer", `${issuancePath(p)}/${proofId}`).expect(200);
+    const proofBefore = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
+    expect(proofBefore.invalidatedAt).toBeNull();
+    const target = side === "candidate" ? p.b : p.a;
+    const orderBefore = await db.inspectionOrder.findUniqueOrThrow({ where: { id: target.id }, select: { version: true, identityEvidenceGeneration: true } });
+    expect(orderBefore).toEqual({ version: 7, identityEvidenceGeneration: 1 });
+    const reportBefore = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: p.released.id }, select: { version: true } });
+    expect(reportBefore.version).toBe(3);
+
+    await assignment(target, "reviewer", false);
+    const assignmentKey = { orderId_userId_capability: { orderId: target.id, userId: suite.id("reviewer"), capability: "diagnostics.reviewer" } };
+    expect((await db.diagnosticOrderAssignment.findUniqueOrThrow({ where: assignmentKey })).revokedAt).toEqual(initialTime);
+    const revoked = await db.inspectionOrder.findUniqueOrThrow({ where: { id: target.id }, select: { version: true } });
+    expect(revoked.version).toBe(8);
+    const invalidatedAt = (await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId }, select: { invalidatedAt: true } })).invalidatedAt;
+    expect(invalidatedAt).toEqual(expect.any(Date));
+    // The technician retains independent current authority on both visits.
+    const historical = await get("technician", `${issuancePath(p)}/${proofId}`).expect(200);
+    privateNoStore(historical);
+    expect(historical.body).toEqual(issued.body);
+
+    await assignment(target, "reviewer", true);
+    expect((await db.diagnosticOrderAssignment.findUniqueOrThrow({ where: assignmentKey })).revokedAt).toBeNull();
+    const reassigned = await db.inspectionOrder.findUniqueOrThrow({ where: { id: target.id }, select: { version: true } });
+    expect(reassigned.version).toBe(9);
+    expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } }))
+      .toEqual({ ...proofBefore, invalidatedAt });
+    const restored = await get("reviewer", `${issuancePath(p)}/${proofId}`).expect(200);
+    privateNoStore(restored); expect(restored.body).toEqual(historical.body);
+    expect((await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: p.released.id }, select: { version: true } })).version)
+      .toBe(reportBefore.version);
+  });
+
+  it("rolls back a proof when the real PostgreSQL audit INSERT fails for this candidate", async () => {
+    const p = await pair();
+    await ordinaryProof(p);
+    // Refuse DDL outside the run's disposable, exact worker database.
+    const databases = inject("apiTestDatabases");
+    if (!databases) throw new Error("Audit fault requires the hosted per-worker test database");
+    const worker = Number(process.env["VITEST_POOL_ID"]);
+    expect(Number.isInteger(worker) && worker >= 1 && worker <= databases.workers).toBe(true);
+    expect(await db.$queryRaw`SELECT current_database() AS name`).toEqual([{ name: workerDatabaseName(databases.prefix, worker) }]);
+    const proofs = () => db.diagnosticContinuityProof.findMany({ where: { candidateOrderId: p.b.id }, orderBy: { id: "asc" } });
+    const before = { ...await stored(p), proofs: await proofs() };
+    expect(before.proofs).toHaveLength(1);
+    // Only generated UUIDs enter this DDL. No environment values or caller input.
+    for (const id of [p.a.id, p.b.id, p.released.id, centerId, suite.id("reviewer")]) expect(id).toMatch(uuid);
+    const namespace = `proof914_${p.b.id.replaceAll("-", "")}`;
+    const triggerName = `${namespace}_audit`;
+    // Install atomically: failed installation leaves no partial fault behind.
+    await db.$transaction(async tx => {
+      await tx.$executeRawUnsafe(`CREATE SCHEMA "${namespace}"`);
+      await tx.$executeRawUnsafe(`CREATE SEQUENCE "${namespace}".audit_reached`);
+      await tx.$executeRawUnsafe(`CREATE FUNCTION "${namespace}".refuse_audit() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+          IF (SELECT count(*) FROM public.diagnostic_continuity_proofs
+              WHERE "candidateOrderId" = '${p.b.id}' AND "predecessorReportId" = '${p.released.id}') = 2 THEN
+            -- Sequences survive rollback: receipt of the actual audit INSERT with
+            -- the second proof already visible, not a fabricated proof or audit.
+            PERFORM nextval('"${namespace}".audit_reached');
+          END IF;
+          RAISE EXCEPTION 'issue914 exact candidate audit INSERT fault';
+        END $$`);
+      await tx.$executeRawUnsafe(`CREATE TRIGGER "${triggerName}" BEFORE INSERT ON public.diagnostic_audits
+        FOR EACH ROW WHEN (NEW."orderId" = '${p.b.id}' AND NEW."centerId" = '${centerId}'
+          AND NEW."actorId" = '${suite.id("reviewer")}' AND NEW.action = 'CONTINUITY_PROOF_ISSUED')
+        EXECUTE FUNCTION "${namespace}".refuse_audit()`);
+    });
+    try {
+      expect(await db.$queryRawUnsafe(`SELECT is_called FROM "${namespace}".audit_reached`)).toEqual([{ is_called: false }]);
+      const response = await post("reviewer", issuancePath(p), p.body);
+      expect(response.status).toBe(500);
+      expect(response.body).toMatchObject({ statusCode: 500, code: "INTERNAL_SERVER_ERROR" });
+      expect(response.text).not.toContain(namespace);
+      expect(await db.$queryRawUnsafe(`SELECT last_value::int, is_called FROM "${namespace}".audit_reached`))
+        .toEqual([{ last_value: 1, is_called: true }]);
+      // Persistence assertions prove rollback, including hidden drafts/successors,
+      // order versions/generations and audit rows that HTTP readers cannot expose.
+      expect({ ...await stored(p), proofs: await proofs() }).toEqual(before);
+    } finally {
+      await db.$transaction(async tx => {
+        await tx.$executeRawUnsafe(`DROP TRIGGER "${triggerName}" ON public.diagnostic_audits`);
+        await tx.$executeRawUnsafe(`DROP FUNCTION "${namespace}".refuse_audit()`);
+        await tx.$executeRawUnsafe(`DROP SEQUENCE "${namespace}".audit_reached`);
+        await tx.$executeRawUnsafe(`DROP SCHEMA "${namespace}"`);
+      });
+    }
+    expect(await db.$queryRaw`SELECT nspname FROM pg_namespace WHERE nspname = ${namespace}`).toEqual([]);
+    // Same ordinary request succeeds after removing the external fault.
+    const recoveredId = await ordinaryProof(p);
+    expect((await proofs()).map(row => row.id)).toContain(recoveredId);
+    expect(await proofs()).toHaveLength(2);
+    const recovered = await stored(p);
+    expect(recovered.orders).toEqual(before.orders);
+    expect(recovered.reports).toEqual(before.reports);
+    const newAudits = recovered.audits.filter(row => !before.audits.some(prior => prior.id === row.id));
+    expect(newAudits).toHaveLength(1);
+    expect(newAudits[0]).toMatchObject({ orderId: p.b.id, action: "CONTINUITY_PROOF_ISSUED" });
+  });
 
   it("refuses a B-only linking technician without disclosing whether the predecessor exists", async () => {
     const p = await pair();
