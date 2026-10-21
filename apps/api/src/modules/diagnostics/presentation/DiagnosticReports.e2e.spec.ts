@@ -23,14 +23,14 @@ import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
 import { cleanSuiteFixtures, defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
 
 const suite = defineE2eSuite("diagnostic-report-authority");
-const people = ["buyer", "other", "reception", "technician", "reviewer", "admin"] as const;
+const people = ["buyer", "other", "reception", "technician", "reviewer", "admin", "revisitTechnician"] as const;
 type Person = typeof people[number];
 const now = new Date("2026-10-18T00:00:00.000Z");
 const future = new Date("2026-11-18T00:00:00.000Z");
 const localized = { tk: "Synag", ru: "Тест", en: "Synthetic" };
 const definition = { title: localized, limitations: localized, syntheticNotice: localized,
   checks: [{ id: "brakes", label: localized, required: true, evidenceRequired: false, measurement: null }], panels: [] };
-const capability: Partial<Record<Person, string>> = { reception: "diagnostics.reception", technician: "diagnostics.technician", reviewer: "diagnostics.reviewer" };
+const capability: Partial<Record<Person, string>> = { reception: "diagnostics.reception", technician: "diagnostics.technician", reviewer: "diagnostics.reviewer", revisitTechnician: "diagnostics.technician" };
 const centerId = suite.id("center");
 
 /** Full HTTP/Prisma/identity/storage composition against disposable hosted services.
@@ -267,13 +267,13 @@ describe("diagnostic authoring and immutable audience release", () => {
   /** One commissioner, one Listing and one matching VIN across two physical visits.
    * Each visit has its own intake, consent, arrival, observation and template pin. */
   const vin = "SYNTHVIN000000914";
-  async function arrive(templateVersionId: string, audience: "buyer_private" | "listing_public", observedAt: Date, mileageKm: number) {
+  async function arrive(templateVersionId: string, audience: "buyer_private" | "listing_public", observedAt: Date, mileageKm: number, technician: Person = "technician") {
     let { body: order } = await post("buyer", "orders", { requestKey: randomUUID(), centerId, templateVersionId, audience, listingId: suite.id("public-car"), synthetic: true }).expect(201);
-    for (const who of ["technician", "reviewer"] as const) ({ body: order } = await post("reception", `orders/${order.id}/assignments`, { expectedVersion: order.version, userId: suite.id(who), capability: capability[who], active: true }).expect(201));
+    for (const who of [technician, "reviewer"] as const) ({ body: order } = await post("reception", `orders/${order.id}/assignments`, { expectedVersion: order.version, userId: suite.id(who), capability: capability[who], active: true }).expect(201));
     ({ body: order } = await post("reception", `orders/${order.id}/authorization`, { expectedVersion: order.version, kind: "physical", authorityReference: `Synthetic visit authorization ${observedAt.toISOString()}` }).expect(201));
     if (audience === "listing_public") ({ body: order } = await post("reception", `orders/${order.id}/authorization`, { expectedVersion: order.version, kind: "publication", authorityReference: `Synthetic public consent ${observedAt.toISOString()}` }).expect(201));
     for (const state of ["confirmed", "arrived"]) ({ body: order } = await post("reception", `orders/${order.id}/appointment`, { expectedVersion: order.version, state }).expect(201));
-    ({ body: order } = await post("technician", `orders/${order.id}/vehicle`, { expectedVersion: order.version, observedAt: observedAt.toISOString(), mileageKm, method: "vin", vin, manualReference: null }).expect(201));
+    ({ body: order } = await post(technician, `orders/${order.id}/vehicle`, { expectedVersion: order.version, observedAt: observedAt.toISOString(), mileageKm, method: "vin", vin, manualReference: null }).expect(201));
     return order;
   }
   it("releases a public reinspection from a new physical visit without inheriting findings, evidence or the old snapshot", async () => {
@@ -430,6 +430,114 @@ describe("diagnostic authoring and immutable audience release", () => {
       expect(response.body).not.toHaveProperty("successorKind");
     }
     expect((await get("buyer", `reports/${first.id}`).expect(200)).body).toMatchObject({ supersededBy: reinspection.id, successorKind: "reinspection" });
+  });
+  /** One released public visit and a separately arrived later visit on the same Listing, commissioner and VIN. */
+  async function contestedPredecessor(revisitTechnician: Person) {
+    await seedSuiteCatalog(db, suite);
+    await db.listing.create({ data: { id: suite.id("public-car"), sellerId: suite.id("buyer"), brandId: suite.catalog.brandId, modelId: suite.catalog.modelId, cityId: suite.catalog.cityId, status: "active", vin, priceAmount: 100000, priceTmt: 100000, priceCurrency: "TMT" } });
+    await db.staffGrant.create({ data: { userId: suite.id("reception"), capability: "diagnostics.templates" } });
+    await db.diagnosticCenterAssignment.create({ data: { centerId, userId: suite.id("reception"), capability: "diagnostics.templates", qualifiedUntil: future } });
+    if (revisitTechnician !== "technician") await db.diagnosticCenterAssignment.create({ data: { centerId, userId: suite.id(revisitTechnician), capability: "diagnostics.technician", qualifiedUntil: future } });
+    const { body: template } = await post("reception", `centers/${centerId}/templates`, { expectedVersion: 0, definition, synthetic: true }).expect(201);
+    const firstOrder = await arrive(template.id, "listing_public", new Date("2026-09-18T00:00:00.000Z"), 118000);
+    const { body: first } = await post("technician", `orders/${firstOrder.id}/reports`, { reportId: randomUUID(), expectedOrderVersion: firstOrder.version }).expect(201);
+    const finding = normal();
+    await post("technician", `reports/${first.id}/findings`, { expectedVersion: 0, finding }).expect(201);
+    await post("technician", `reports/${first.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
+    await post("reviewer", `reports/${first.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    const secondOrder = await arrive(template.id, "listing_public", new Date("2026-10-01T00:00:00.000Z"), 120000, revisitTechnician);
+    // Released bytes, hash and artifacts of the predecessor; no contender may change them.
+    const released = async () => {
+      const { snapshot, snapshotHash, state, status, version, finalizedAt } = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: first.id } });
+      return { snapshot, snapshotHash, state, status, version, finalizedAt, artifacts: await db.diagnosticPdfArtifact.findMany({ where: { reportId: first.id }, orderBy: { locale: "asc" } }) };
+    };
+    return { template, firstOrder, first, finding, secondOrder, released };
+  }
+  const audits = async () => (await db.diagnosticAudit.findMany({ where: { centerId } })).map(row => ({ id: row.id, orderId: row.orderId, actorId: row.actorId, action: row.action, reportId: (row.details as { reportId?: string }).reportId }));
+  /** Real PostgreSQL barrier, no fixed delay: the test holds both visit rows until every dispatched
+   * request is observed waiting on them (directly or queued behind another contender's identity
+   * lock), then releases them together so the transactions contend inside the product's own locks. */
+  async function contend(orderIds: string[], dispatch: () => ReturnType<typeof post>[]) {
+    let responses!: Promise<Awaited<ReturnType<typeof post>>[]>;
+    await db.$transaction(async tx => {
+      const [holder] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+      for (const id of [...orderIds].sort()) await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${id} FOR UPDATE`;
+      const requests = dispatch(); responses = Promise.all(requests);
+      // pg_stat_activity is snapshotted per transaction, so waiters are observed outside the holder.
+      for (let attempt = 0; ; attempt++) {
+        const [observed] = await db.$queryRaw<{ waiting: number }[]>`WITH direct AS (SELECT activity.pid FROM pg_stat_activity activity WHERE ${holder!.pid}::int = ANY(pg_blocking_pids(activity.pid)))
+          SELECT ((SELECT count(*) FROM direct) + (SELECT count(*) FROM pg_stat_activity activity WHERE activity.pid NOT IN (SELECT pid FROM direct) AND pg_blocking_pids(activity.pid) && ARRAY(SELECT pid FROM direct)))::int AS waiting`;
+        if (observed!.waiting >= requests.length) break;
+        if (attempt === 500) throw new Error(`Only ${observed!.waiting} of ${requests.length} diagnostic requests reached the row-lock barrier`);
+      }
+    });
+    return responses;
+  }
+  it("links one reinspection when identical requests contend for the same visit and predecessor", async () => {
+    const { first, secondOrder, released } = await contestedPredecessor("technician");
+    const before = await released(); const prior = await audits();
+    const link = { reportId: randomUUID(), predecessorId: first.id, expectedOrderVersion: secondOrder.version, reason: "Concurrent follow-up visit" };
+    const responses = await contend([first.orderId, secondOrder.id], () => [post("technician", `orders/${secondOrder.id}/reinspections`, link), post("technician", `orders/${secondOrder.id}/reinspections`, link)]);
+    expect(responses.map(response => response.status)).toEqual([201, 201]);
+    expect(responses[1]!.body).toEqual(responses[0]!.body);
+    expect(responses[0]!.body).toMatchObject({ id: link.reportId, orderId: secondOrder.id, lineageKind: "reinspection", successorOf: first.id, status: "draft", version: 0,
+      observedAt: "2026-10-01T00:00:00.000Z", mileageKm: 120000, findings: [], authorId: suite.id("technician"), correctionReason: link.reason, supersededBy: null });
+
+    // One successor, one report on the new visit and one creation audit; the predecessor is consumed once.
+    expect((await db.diagnosticReportRecord.findMany({ where: { predecessorId: first.id } })).map(row => row.id)).toEqual([link.reportId]);
+    expect((await db.diagnosticReportRecord.findMany({ where: { orderId: secondOrder.id } })).map(row => row.id)).toEqual([link.reportId]);
+    expect((await db.diagnosticReportRecord.findMany({ where: { orderId: first.orderId } })).map(row => row.id)).toEqual([first.id]);
+    const created = (await audits()).filter(row => !prior.some(item => item.id === row.id));
+    expect(created.map(({ id: _, ...row }) => row)).toEqual([{ orderId: secondOrder.id, actorId: suite.id("technician"), action: "REPORT_REINSPECTION_CREATED", reportId: link.reportId }]);
+    expect(await released()).toEqual(before);
+
+    // A matching retry after the race stays read-only.
+    const stored = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: link.reportId } });
+    expect((await post("technician", `orders/${secondOrder.id}/reinspections`, link).expect(201)).body).toEqual(responses[0]!.body);
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: link.reportId } })).toEqual(stored);
+    expect(await audits()).toHaveLength(prior.length + 1);
+    expect(await released()).toEqual(before);
+  });
+  it("admits exactly one successor when a correction and a reinspection race for the same released predecessor", async () => {
+    const { template, first, finding, secondOrder, released } = await contestedPredecessor("revisitTechnician");
+    const before = await released(); const prior = await audits();
+    const correction = { expectedVersion: 3, successorId: randomUUID(), reason: "Concurrent editorial correction" };
+    const link = { reportId: randomUUID(), predecessorId: first.id, expectedOrderVersion: secondOrder.version, reason: "Concurrent follow-up visit" };
+    // Distinct current technicians on each visit, so no shared identity lock serializes the contenders.
+    const [corrected, linked] = await contend([first.orderId, secondOrder.id], () => [post("technician", `reports/${first.id}/corrections`, correction),
+      post("revisitTechnician", `orders/${secondOrder.id}/reinspections`, link)]);
+    expect([corrected!.status, linked!.status].sort()).toEqual([201, 409]);
+    const correctionWon = corrected!.status === 201;
+    const [winner, loser] = correctionWon ? [corrected!, linked!] : [linked!, corrected!];
+    const [winnerId, loserId] = correctionWon ? [correction.successorId, link.reportId] : [link.reportId, correction.successorId];
+    expect(loser.body.code).toBe(correctionWon ? "DIAGNOSTIC_REINSPECTION_CONFLICT" : "DIAGNOSTIC_CORRECTION_CONFLICT");
+    expect(winner.body).toMatchObject(correctionWon
+      ? { id: winnerId, orderId: first.orderId, lineageKind: "correction", successorOf: first.id, status: "draft", observedAt: "2026-09-18T00:00:00.000Z", mileageKm: 118000,
+        findings: [finding], templateVersionId: template.id, authorId: suite.id("technician"), correctionReason: correction.reason }
+      : { id: winnerId, orderId: secondOrder.id, lineageKind: "reinspection", successorOf: first.id, status: "draft", observedAt: "2026-10-01T00:00:00.000Z", mileageKm: 120000,
+        findings: [], templateVersionId: template.id, authorId: suite.id("revisitTechnician"), correctionReason: link.reason });
+
+    // The loser leaves no successor, report or audit; the predecessor's released bytes are untouched.
+    expect((await db.diagnosticReportRecord.findMany({ where: { predecessorId: first.id } })).map(row => row.id)).toEqual([winnerId]);
+    expect(await db.diagnosticReportRecord.findUnique({ where: { id: loserId } })).toBeNull();
+    expect((await db.diagnosticReportRecord.findMany({ where: { orderId: secondOrder.id } })).map(row => row.id)).toEqual(correctionWon ? [] : [winnerId]);
+    expect((await db.diagnosticReportRecord.findMany({ where: { orderId: first.orderId } })).map(row => row.id).sort()).toEqual((correctionWon ? [first.id, winnerId] : [first.id]).sort());
+    const created = (await audits()).filter(row => !prior.some(item => item.id === row.id));
+    expect(created.map(({ id: _, ...row }) => row)).toEqual([correctionWon
+      ? { orderId: first.orderId, actorId: suite.id("technician"), action: "REPORT_CORRECTION_CREATED", reportId: winnerId }
+      : { orderId: secondOrder.id, actorId: suite.id("revisitTechnician"), action: "REPORT_REINSPECTION_CREATED", reportId: winnerId }]);
+    expect(await released()).toEqual(before);
+
+    // After the race, the winner's matching retry is read-only and the loser's retry keeps its conflict.
+    const stored = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: winnerId } });
+    const retry = correctionWon ? post("technician", `reports/${first.id}/corrections`, correction) : post("revisitTechnician", `orders/${secondOrder.id}/reinspections`, link);
+    expect((await retry.expect(201)).body).toEqual(winner.body);
+    const again = correctionWon ? post("revisitTechnician", `orders/${secondOrder.id}/reinspections`, link) : post("technician", `reports/${first.id}/corrections`, correction);
+    expect((await again.expect(409)).body.code).toBe(loser.body.code);
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: winnerId } })).toEqual(stored);
+    expect(await db.diagnosticReportRecord.findUnique({ where: { id: loserId } })).toBeNull();
+    expect(await audits()).toHaveLength(prior.length + 1);
+    expect(await released()).toEqual(before);
   });
   it("does not disclose private reports through anonymous known IDs or artifacts", async () => {
     const { report } = await draft();
