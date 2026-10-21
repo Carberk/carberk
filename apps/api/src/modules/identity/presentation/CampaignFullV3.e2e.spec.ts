@@ -1142,8 +1142,11 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     await resetAfter([id], async () => {
       const roster = await seed(id), person = actor(roster, "coordinator");
       expect(await promote(person, { dryRun: true })).toMatchObject({ code: 0 });
-      // Fixture lifecycle fault injection only. No auth, role, receipt or journal is seeded.
-      await db.$executeRawUnsafe(`UPDATE "cf_${id}".campaign_manifest SET state='cleaning'`);
+      expect(await rows(`SELECT object_key,upload_id,bucket,absent FROM "cf_${id}".campaign_object_ledger`)).toEqual([]);
+      expect(await rows(`SELECT table_name,row_key FROM "cf_${id}".campaign_records WHERE table_name IN ('media_uploads','listing_media')`)).toEqual([]);
+      // Fixture lifecycle metadata only. The empty protected object intent must accompany cleaning.
+      // No auth, role, receipt, application row or journal is seeded.
+      await db.$executeRawUnsafe(`UPDATE "cf_${id}".campaign_manifest SET state='cleaning',object_hash='d751713988987e9331980363e24189ce'`);
       const initial = await promotionState(roster), unchanged = await digest(id);
       expect(await promote(person)).toMatchObject({ code: 1 });
       expect(await promotionState(roster)).toEqual(initial);
