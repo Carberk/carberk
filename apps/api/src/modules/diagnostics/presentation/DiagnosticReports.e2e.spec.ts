@@ -380,6 +380,8 @@ describe("diagnostic authoring and immutable audience release", () => {
     const reason = "Follow-up visit after repair";
     const link = { reportId: randomUUID(), predecessorId: first.id, expectedOrderVersion: secondOrder.version, reason };
     const { body: reinspection } = await post("technician", `orders/${secondOrder.id}/reinspections`, link).expect(201);
+    expect(reinspection).toMatchObject({ lineageKind: "reinspection", supersededBy: null });
+    expect(reinspection).not.toHaveProperty("successorKind");
     expect((await post("technician", `orders/${secondOrder.id}/reinspections`, link).expect(201)).body).toEqual(reinspection);
     expect(await db.diagnosticAudit.count({ where: { orderId: secondOrder.id, action: "REPORT_REINSPECTION_CREATED" } })).toBe(1);
     expect((await post("technician", `orders/${secondOrder.id}/reinspections`, { ...link, reason: "Another reason" }).expect(409)).body.code).toBe("DIAGNOSTIC_REINSPECTION_CONFLICT");
@@ -389,6 +391,10 @@ describe("diagnostic authoring and immutable audience release", () => {
     // A draft successor is never disclosed, and a physical revisit is not an editorial correction.
     expect((await get("technician", `reports/${first.id}`).expect(200)).body.supersededBy).toBeNull();
     expect((await publicGet(`reports/${first.id}`).expect(200)).body.supersededBy).toBeNull();
+    for (const response of [await get("technician", `reports/${first.id}`).expect(200), await publicGet(`reports/${first.id}`).expect(200)]) {
+      expect(response.body).toMatchObject({ lineageKind: "original", supersededBy: null });
+      expect(response.body).not.toHaveProperty("successorKind");
+    }
     expect((await post("technician", `reports/${first.id}/corrections`, { expectedVersion: 3, successorId: reinspection.id, reason }).expect(409)).body.code).toBe("DIAGNOSTIC_CORRECTION_CONFLICT");
     expect((await post("technician", `reports/${first.id}/corrections`, { expectedVersion: 3, successorId: randomUUID(), reason }).expect(409)).body.code).toBe("DIAGNOSTIC_CORRECTION_CONFLICT");
     const thirdOrder = await arrive(template.id, "listing_public", new Date("2026-10-02T00:00:00.000Z"), 120100);
@@ -405,16 +411,25 @@ describe("diagnostic authoring and immutable audience release", () => {
 
     // A correction of the reinspection reuses that visit's evidence and never the earlier visit's.
     const correction = await post("technician", `reports/${reinspection.id}/corrections`, { expectedVersion: 3, successorId: randomUUID(), reason: "Corrected wording" }).expect(201);
+    expect(correction.body.lineageKind).toBe("correction");
+    expect((await publicGet(`reports/${reinspection.id}`).expect(200)).body.lineageKind).toBe("reinspection");
+    expect((await publicGet(`reports/${reinspection.id}`).expect(200)).body).not.toHaveProperty("successorKind");
     expect(correction.body).toMatchObject({ orderId: secondOrder.id, successorOf: reinspection.id, findings: [repaired] });
     expect((await post("technician", `reports/${correction.body.id}/findings`, { expectedVersion: 0, finding: { ...repaired, evidenceIds: worn.evidenceIds } }).expect(400)).body.code).toBe("REPORT_EVIDENCE_UNAVAILABLE");
     await post("technician", `reports/${correction.body.id}/findings`, { expectedVersion: 0, finding: { ...repaired, explanation: "Residual synthetic brake wear, corrected" } }).expect(201);
 
     // Each successor id is disclosed only through its own public availability or its own commissioner.
     expect((await publicGet(`reports/${first.id}`).expect(200)).body.supersededBy).toBe(reinspection.id);
+    expect((await publicGet(`reports/${first.id}`).expect(200)).body).toMatchObject({ lineageKind: "original", supersededBy: reinspection.id, successorKind: "reinspection" });
+    expect((await get("technician", `reports/${first.id}`).expect(200)).body).toMatchObject({ supersededBy: reinspection.id, successorKind: "reinspection" });
     await post("reviewer", `reports/${reinspection.id}/transition`, { expectedVersion: 3, action: "withdraw", reason: "Synthetic revisit dispute" }).expect(201);
     expect((await publicGet(`reports/${first.id}`).expect(200)).body.supersededBy).toBeNull();
     expect((await get("technician", `reports/${first.id}`).expect(200)).body.supersededBy).toBeNull();
     expect((await get("buyer", `reports/${first.id}`).expect(200)).body.supersededBy).toBe(reinspection.id);
+    for (const response of [await publicGet(`reports/${first.id}`).expect(200), await get("technician", `reports/${first.id}`).expect(200)]) {
+      expect(response.body).not.toHaveProperty("successorKind");
+    }
+    expect((await get("buyer", `reports/${first.id}`).expect(200)).body).toMatchObject({ supersededBy: reinspection.id, successorKind: "reinspection" });
   });
   it("does not disclose private reports through anonymous known IDs or artifacts", async () => {
     const { report } = await draft();

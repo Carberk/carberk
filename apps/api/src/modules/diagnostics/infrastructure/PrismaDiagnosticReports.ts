@@ -47,7 +47,8 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
     const state = row.state as unknown as DiagnosticReportState;
     const released = row.snapshot ? DiagnosticSchemas.DiagnosticReleasedSnapshotSchema.parse(row.snapshot).report : state;
     return DiagnosticSchemas.DiagnosticReportSchema.parse({ ...released, status: row.status, withdrawnAt: row.withdrawnAt?.toISOString() ?? null, withdrawalReason: row.withdrawalReason,
-      supersededBy: await this.access.successorId(tx, row, subject.userId), authorId: staff ? state.authorId : null,
+      lineageKind: row.reinspection ? "reinspection" : row.predecessorId ? "correction" : "original",
+      ...await this.access.successor(tx, row, subject.userId), authorId: staff ? state.authorId : null,
       reviewerId: staff ? state.reviewerId : null, version: row.version, template: await this.definition(tx, row), synthetic: true });
   }
   private async audit(tx: Tx, subject: DiagnosticSubject, order: Order, reportId: string, action: string, details: Prisma.InputJsonObject = {}): Promise<void> {

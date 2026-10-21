@@ -45,16 +45,17 @@ export class DiagnosticReportAccess {
     return !(!listing || listing.deletedAt || listing.status !== "active" || (!listing.businessId && (listing.seller.deletionScheduledAt || listing.seller.suspendedAt)) ||
       (listing.businessId && listing.business?.status !== "active") || diagnosticListingDigest(listing) !== order.listingIdentityDigest);
   }
-  /** Released successor id for a reader of `predecessor`. A same-order correction follows the
+  /** Released successor id and kind for a reader of `predecessor`. A same-order correction follows the
    * predecessor's audience. A reinspection lives on another order, so its id is disclosed only to
    * that order's own commissioner or while it is independently publicly available; predecessor
    * staff gain nothing. Drafts are never disclosed. Unlocked: this never grants a read. */
-  async successorId(tx: Prisma.TransactionClient, predecessor: { id: string; orderId: string }, viewerId: string | null): Promise<string | null> {
+  async successor(tx: Prisma.TransactionClient, predecessor: { id: string; orderId: string }, viewerId: string | null): Promise<{ supersededBy: string | null; successorKind?: "correction" | "reinspection" }> {
     const successor = await tx.diagnosticReportRecord.findFirst({ where: { predecessorId: predecessor.id, snapshotHash: { not: null }, erasedAt: null }, include: { order: true } });
-    if (!successor) return null;
-    if (!successor.reinspection && successor.orderId === predecessor.orderId) return successor.id;
-    if (viewerId && !successor.order.erasedAt && successor.order.synthetic && successor.order.commissionerId === viewerId) return successor.id;
-    return await this.publiclyAvailable(tx, successor) ? successor.id : null;
+    if (!successor) return { supersededBy: null };
+    const projection = { supersededBy: successor.id, successorKind: successor.reinspection ? "reinspection" as const : "correction" as const };
+    if (!successor.reinspection && successor.orderId === predecessor.orderId) return projection;
+    if (viewerId && !successor.order.erasedAt && successor.order.synthetic && successor.order.commissionerId === viewerId) return projection;
+    return await this.publiclyAvailable(tx, successor) ? projection : { supersededBy: null };
   }
 
 }
