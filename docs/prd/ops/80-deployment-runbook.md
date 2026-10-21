@@ -15,7 +15,7 @@ The [accepted ADR-0098](../../adr/0098-integration-delivery-with-shared-staging-
 
 The founder declared staging and production application data disposable until public launch ([#897](https://github.com/Carberk/carberk/issues/897#issuecomment-6314266361)). The [clean-acceptance contract](../../evidence/issue-901/prelaunch-clean-acceptance-contract-20261021.md#3-minimal-operator-contract) owns the procedure. Each target needs its own manifest, inventory and reference delta, protected-configuration list, verified quiescence including the signed-upload window, phase receipts, reseed proof and restoration. No reviewed implementation exists yet. Do not reset either environment by hand.
 
-Production keeps the rules in [Production foundation](#production-foundation-what-duplication-taught-us): volume-file deletion is human-run and there is no unscoped flush. It also keeps Play reviewer access working (Step 4 and the reviewer scenario seed). A production reset authorizes no production deployment. The public-launch checklist removes this authority and disables production invocation in code.
+Production keeps the rules in [Production foundation](#production-foundation-what-duplication-taught-us): volume-file deletion is human-run and there is no unscoped flush. It also keeps the currently documented Play App access configuration and recreates only its matching reference actors and data. A production reset authorizes no production deployment. The public-launch checklist removes this authority and disables production invocation in code.
 
 ## Operational monitoring alerts
 
