@@ -64,7 +64,7 @@ export class IssueContactPhoneCode {
     return {
       requestId: record.id,
       resendInSeconds,
-      ...(this.testMode ? { testCode: code.value } : {}),
+      ...(this.testMode && smsDelivery.kind === "ordinary" ? { testCode: code.value } : {}),
     };
   }
 }
