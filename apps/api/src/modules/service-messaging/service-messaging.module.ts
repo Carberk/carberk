@@ -9,10 +9,11 @@ import { ServiceGateway } from "./presentation/ServiceGateway";
 import { ServiceMessagingController } from "./presentation/ServiceMessagingController";
 import { serviceRuntime } from "./infrastructure/serviceRuntime";
 import { ServiceBinaryParser } from "./presentation/ServiceBinaryParser";
+import { CampaignServiceAdmission } from "./infrastructure/campaignServiceAdmission";
 @Module({
  imports: [ConfigModule, PrismaModule, IdentityModule],
  controllers: [ServiceMessagingController],
- providers: [ServiceGateway, ServiceBinaryParser, { provide: SERVICE_MESSAGING_PORT, useClass: PrismaServiceMessaging }, { provide: SERVICE_PRIVATE_STORE, useClass: MinioServicePrivateStore }, { provide: SERVICE_RUNTIME, inject: [ConfigService], useFactory: serviceRuntime }],
+ providers: [ServiceGateway, ServiceBinaryParser, CampaignServiceAdmission, { provide: SERVICE_MESSAGING_PORT, useClass: PrismaServiceMessaging }, { provide: SERVICE_PRIVATE_STORE, useClass: MinioServicePrivateStore }, { provide: SERVICE_RUNTIME, inject: [ConfigService], useFactory: serviceRuntime }],
  exports: [SERVICE_MESSAGING_PORT],
 })
 export class ServiceMessagingModule {}
