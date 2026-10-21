@@ -61,16 +61,17 @@ const tables = ["users", "sessions", "otp_requests", "totp_enrollments", "totp_b
 function cleanupFailure(error: unknown) {
   const value = error as { name?: unknown; code?: unknown; message?: unknown; stderr?: unknown; meta?: { code?: unknown; message?: unknown } } | null;
   const bounded = (input: unknown) => typeof input === "string" ? input.slice(0, 8192) : "";
-  const text = [value?.message, value?.stderr, value?.meta?.message].map(bounded).join("\n");
-  const names = ["Error", "TypeError", "RangeError", "PrismaClientKnownRequestError", "PrismaClientUnknownRequestError", "PrismaClientInitializationError"];
+  const text = [typeof value?.stderr === "string" ? value.stderr : value?.message, value?.meta?.message].map(bounded).join("\n");
+  const names = ["PrismaClientKnownRequestError", "PrismaClientUnknownRequestError", "PrismaClientInitializationError", "TypeError", "RangeError", "Error"];
   const codes = ["P2010", "P2028", "P2034", "P1001", "P1002", "P1017", "P0001", "23503", "23505", "40001", "40P01", "55P03", "57014", "42601", "42883", "42501", "ETIMEDOUT", "ENOBUFS", "ENOENT", "ECONNREFUSED"];
   const messages = [
     "Service private cleanup unavailable", "Service cleanup authority invalid",
     "Campaign Support ownership changed", "Campaign Support authority invalid",
-    "Campaign Support claims ambiguous", "Campaign lifecycle contract changed",
+    "Campaign Support graph ambiguous", "Campaign Support ownership ambiguous",
+    "Campaign Support namespace invalid", "Campaign Support candidate invalid",
+    "Campaign lifecycle fenced", "Campaign lifecycle cleanup refused", "Campaign lifecycle contract changed",
     "Campaign lifecycle binding changed", "Campaign service contract changed",
-    "Campaign service cleanup incomplete", "Campaign erasure fence incomplete",
-    "Campaign service erasure incomplete", "Unsupported campaign service",
+    "Campaign service cleanup incomplete", "Unsupported campaign service",
     "Campaign journal or schema changed", "Campaign journal changed",
     "Untracked campaign mutation", "Foreign campaign reference",
     "Foreign campaign graph reference", "Campaign binding changed",
@@ -82,7 +83,7 @@ function cleanupFailure(error: unknown) {
     "canceling statement due to statement timeout", "Disposable database query refused",
   ];
   return {
-    errorType: names.find(name => name === value?.name || text.includes(name)) ?? "unclassified-error-type",
+    errorType: names.find(name => name === value?.name) ?? names.find(name => text.includes(name)) ?? "unclassified-error-type",
     codes: codes.filter(code => code === value?.code || code === value?.meta?.code || new RegExp(`\\b${code}\\b`).test(text)),
     classifications: messages.filter(message => text.includes(message)),
   };
@@ -1250,6 +1251,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
         // A 404, failed admission/redemption or an auth failure is setup failure, never that behavioral RED.
         const issued = await contact("request", owner, { phone });
         if (typeof issued.body.requestId === "string") smsIds.add(issued.body.requestId);
+        await observeIssuance("contact", issued, 200);
         if (issued.status >= 400) {
           expect(await digest(id)).toBe(journal);
           expect(await unchanged()).toEqual(initial);
@@ -1740,7 +1742,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
               catch (error) { if (!['BucketAlreadyExists', 'BucketAlreadyOwnedByYou'].includes(error.name)) throw error; }
               console.log(JSON.stringify(await new ExpireServiceContent(db, new S3RetiredObjectStore(s3, 'service-private')).execute(new Date(process.argv[1])))); }
             finally { s3.destroy(); await db.onModuleDestroy(); }
-          })().catch(error => { console.error(error); process.exitCode = 1; });
+          })().catch(error => { console.error('[issue-901-cleanup]', JSON.stringify((${cleanupFailure.toString()})(error))); console.error(error); process.exitCode = 1; });
         `, now.toISOString()], {
           timeout: 30000, cwd: `${root}/apps/worker`, env: { ...process.env, TSX_TSCONFIG_PATH: `${root}/apps/worker/tsconfig.json` },
         });
