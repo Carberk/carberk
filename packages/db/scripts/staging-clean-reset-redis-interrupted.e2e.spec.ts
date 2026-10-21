@@ -335,6 +335,73 @@ describe("real interrupted Redis intent and lost Lua reply on disposable transpo
     expect(await query("SELECT count(*)::int AS count FROM users")).toEqual([{ count: 0 }]);
   }
 
+  async function restartRedis(storage: "saved-rdb" | "no-rdb") {
+    // These tests select RDB explicitly. Never rely on Redis' timed save defaults
+    // or a graceful shutdown opportunistically saving an otherwise lost marker.
+    expect(await redis.config("GET", "save")).toEqual(["save", ""]);
+    expect(await redis.config("GET", "appendonly")).toEqual(["appendonly", "no"]);
+    expect(await redis.config("GET", "dir")).toEqual(["dir", "/data"]);
+    expect(await redis.config("GET", "dbfilename")).toEqual(["dbfilename", "dump.rdb"]);
+    if (storage === "saved-rdb") expect(await redis.save()).toBe("OK");
+    const disk = await redisContainer.exec(["sh", "-c", storage === "saved-rdb"
+      ? "test -s /data/dump.rdb" : "test ! -e /data/dump.rdb"]);
+    expect(disk.exitCode).toBe(0);
+    const before = await snapshot();
+    const runId = async () => {
+      const id = (await redis.info("server")).match(/^run_id:([a-f0-9]{40})\r?$/m)?.[1];
+      expect(id).toMatch(/^[a-f0-9]{40}$/);
+      return id;
+    };
+    const previousRun = await runId();
+    const previousContainer = redisContainer.getId();
+    expect(fences.size).toBe(0);
+    monitor.disconnect();
+    redis.disconnect();
+    // Real container/process restart, retaining its filesystem. No in-memory
+    // replacement or manufactured success authority crosses this boundary.
+    await redisContainer.restart({ timeout: 0 });
+    expect(redisContainer.getId()).toBe(previousContainer);
+    connection = { ...connection, host: redisContainer.getHost(), port: redisContainer.getMappedPort(6379) };
+    redis = new Redis(connection);
+    expect(await redis.ping()).toBe("PONG");
+    expect(await runId()).not.toBe(previousRun);
+    const commands = await redis.call("COMMAND") as [string, number, string[], ...unknown[]][];
+    const writeCommands = new Set(commands.filter(command => command[2].includes("write")).map(command => command[0].toLowerCase()));
+    monitor = await redis.monitor();
+    monitor.on("monitor", (_time: string, args: string[]) => {
+      const command = args[0]?.toLowerCase();
+      if (command && writeCommands.has(command)) redisWrites++;
+      if (command === "echo" && args[1]) fences.get(args[1])?.();
+    });
+    // snapshot() fences the new MONITOR before recovery, independently of any
+    // receipt returned by the program. Keep the old counter across the restart.
+    const after = await snapshot();
+    expect(after.pg).toBe(before.pg);
+    expect(after.writes).toBe(before.writes);
+    expect(after.redis.config).toBe(before.redis.config);
+    if (storage === "saved-rdb") expect(after.redis).toEqual(before.redis);
+    else expect(after.redis.entries).toEqual([]); // Foreign values also disappear without persistence.
+    return after;
+  }
+
+  async function lostReplyForRestart() {
+    expect(initialCompletionClassified, "SETUP BLOCKED: uninterrupted completion must pass first").toBe(true);
+    expect(await redis.config("SET", "save", "")).toBe("OK");
+    const setup = await prepare();
+    const before = await snapshotRedis();
+    const interrupted = await run(setup.command, environment(), "lua-reply");
+    expect(interrupted.code).toBe(1);
+    expect(interrupted.failure).toMatch(/^Clean reset refused/);
+    expect(interrupted.receipt).toBeUndefined();
+    redacted(interrupted);
+    const row = await storedRow();
+    const pending = pendingState(setup, row["redis_state"]);
+    expect(immutable(row)).toEqual(immutable(setup.originalRow));
+    const completed = await completedMarker(setup, pending);
+    await preserved(before);
+    return { setup, row, completed };
+  }
+
   it("classifies uninterrupted initial completion before any recovery RED", async () => {
     const setup = await prepare();
     const before = await snapshotRedis();
@@ -470,5 +537,72 @@ describe("real interrupted Redis intent and lost Lua reply on disposable transpo
       expect(receiptOf(await run(setup.command))).toEqual(expectedReceipt(setup, "observed"));
       expect(await snapshot()).toEqual(afterRecovery);
     }
+  });
+  it("recovers pending PG once after a real Redis restart reloads the actual completed marker", async () => {
+    const { setup, row, completed } = await lostReplyForRestart();
+    const before = await restartRedis("saved-rdb");
+    expect(await storedRow()).toEqual(row);
+    expect(await completedMarker(setup, row["redis_state"] as RecordValue)).toEqual(completed);
+    expect(receiptOf(await run(setup.command))).toEqual(expectedReceipt(setup, "completed"));
+    const recovered = await storedRow();
+    expect(recovered["redis_state"]).toEqual(completed);
+    expect(immutable(recovered)).toEqual(immutable(setup.originalRow));
+    const after = await snapshot();
+    expect(after.redis).toEqual(before.redis);
+    expect(after.writes).toBe(before.writes);
+    expect(after.pg).not.toBe(before.pg);
+    for (let replay = 0; replay < 2; replay++) {
+      expect(receiptOf(await run(setup.command))).toEqual(expectedReceipt(setup, "observed"));
+      expect(await snapshot()).toEqual(after); // Includes PG xmin/ctid and all Redis bytes/configuration.
+    }
+  });
+
+  it("refuses pending PG after a real Redis restart loses the marker even with empty queues", async () => {
+    const { setup, row } = await lostReplyForRestart();
+    const before = await restartRedis("no-rdb");
+    expect(await redis.dbsize()).toBe(0);
+    expect(await redis.get(markerKey)).toBeNull();
+    expect(await storedRow()).toEqual(row);
+    await refuses(setup.command);
+    await refuses(setup.command);
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it("replays actual completed PG read-only after Redis marker loss and refuses contradictory post-state", async () => {
+    expect(initialCompletionClassified, "SETUP BLOCKED: uninterrupted completion must pass first").toBe(true);
+    expect(await redis.config("SET", "save", "")).toBe("OK");
+    const setup = await prepare();
+    const original = await snapshotRedis();
+    expect(receiptOf(await run(setup.command))).toEqual(expectedReceipt(setup, "completed"));
+    const completed = await completedMarker(setup);
+    const row = await storedRow();
+    expect(row["redis_state"]).toEqual(completed);
+    expect(immutable(row)).toEqual(immutable(setup.originalRow));
+    await preserved(original);
+    const before = await restartRedis("no-rdb");
+    expect(await redis.dbsize()).toBe(0);
+    expect(await redis.get(markerKey)).toBeNull();
+    expect(await storedRow()).toEqual(row);
+    for (let replay = 0; replay < 2; replay++) {
+      expect(receiptOf(await run(setup.command))).toEqual(expectedReceipt(setup, "observed"));
+      expect(await snapshot()).toEqual(before);
+    }
+    await refuses({ ...setup.command, binding: { ...binding, owner: "other-owner" } });
+    // Negative authority only. Never seed a positive marker or completed PG row.
+    await redis.set(markerKey, "contradictory-marker");
+    await refuses(setup.command);
+    expect(await storedRow()).toEqual(row);
+    // Keep the contradictory marker; use a separate actual restart to lose it.
+    expect(await redis.config("SET", "save", "")).toBe("OK");
+    await restartRedis("no-rdb");
+    const restoredQueue = new bull.Queue("email-code", { connection });
+    try { await restoredQueue.add("restored", { privateValue }, { jobId: "restored-after-restart" }); }
+    finally { await restoredQueue.close(); }
+    const restored = await snapshot();
+    expect(restored.redis.entries.length).toBeGreaterThan(0);
+    await refuses(setup.command);
+    await refuses(setup.command);
+    expect(await snapshot()).toEqual(restored);
+    expect(await storedRow()).toEqual(row);
   });
 });
