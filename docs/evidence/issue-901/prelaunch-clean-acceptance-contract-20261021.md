@@ -2,20 +2,21 @@
 
 ## Hosted receipt update, 2026-10-21
 
-The exact `8f8709aa` hosted evidence is recorded in [the receipt](prelaunch-hosted-receipt-8f8709aa-20261021.md). These rows update evidence status only; they do not retire tests or convert later-head unknowns into proof.
+The latest exact hosted evidence is the [`c253ab93` receipt](prelaunch-hosted-receipt-c253ab93-20261021.md). The [`8f8709aa` receipt](prelaunch-hosted-receipt-8f8709aa-20261021.md) remains historical. These rows update evidence status only; they do not retire tests or certify source after `c253ab93`.
 
 | Contract area | Exact hosted evidence | Status |
 |---|---|---|
-| Lane/static/frontend and exact-head runtime | Run `39603533735`; runtime `39603533703` | pass |
-| Documentation lane | Run `39603533735` | skipped |
-| Worker suites | 56/56 files, 369/369 tests; CleanRetiredUploads 23/23, ServiceLifecycle 8/8 | 8f hosted PASS; later head not certified |
-| API BusinessMembership | 12/12 tests | 8f hosted PASS; later head not certified |
+| Lane/static/frontend and exact-head runtime | Run `39611345283`; runtime `39611345284` | pass |
+| Documentation lane | Run `39611345283` | skipped |
+| Worker suites | 56/56 files, 369/369 tests | c253 hosted PASS; later head not certified |
+| API BusinessMembership | 12/12 tests | c253 hosted PASS; later head not certified |
+| Support close/reopen journey | Owned close/reopen with exact reset | c253 hosted PASS |
 | S2A | 6/6 checks | pass |
-| Q3 command boundary | Missing/extra argument assertion passes; intended missing-command/bootstrap assertions remain red | partial, red |
-| DB hosted suite | 35/36 files, 359/371 tests; 12 intended Q3 failures | fail |
-| API hosted suite | 316/317 files, 3064/3067 tests; three retained full-v3 teardown races | fail |
-| Support/Q3 source after `8f8709aa` | No exact-head hosted run for that later source | runtime unknown |
-| Observer `a3e935e2` | Assembled in root `6a66bc1a`; affected suite 182/182, syntax/docs/diff pass; focused independent review pending; issuer-binding and complete worker-log gaps still refuse | review pending; gaps remain |
+| Q3 bootstrap command | 13/13 tests; missing-command red at `8f8709aa` | c253 hosted PASS |
+| DB hosted suite | 36/36 files, 371/371 tests | pass |
+| API hosted suite | 316/317 files, 3064/3067 tests; three retained full-v3 reset-tail tests (`:2299`, `:3288` ×2) | fail |
+| Observer `a3e935e2` | Focused review: no blocking defect only while always refusing; history/active-job `b2` is not final quiescence proof | gaps remain |
+| Q2 continuity/transfer (D2/D3) | ADR-0108 records founder-approved option 1; supersedes the "Q2 open" wording in the tables below | decided; implementation (#914) incomplete |
 
 Acceptance-contract checkpoint for #901 under #897, sole integration PR #904. Base `a43ee64ebf695f9ebf661d9b28604b8cebcaca3e`, tree `3df55a48bd934d9d70159d31acba661e487cee8e`. Documentation only: no source, test, schema, CI, staging, production, credential or GitHub execution change. **No reset, deletion, deployment or live read was performed. Nothing here is a pass.**
 
