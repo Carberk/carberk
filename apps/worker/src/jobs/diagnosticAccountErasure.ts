@@ -13,6 +13,7 @@ export function diagnosticAccountErasureWrites(db: PrismaService, userId: string
    WHERE o."erasedAt" IS NULL AND (o."commissionerId"=${userId} OR r.state->>'authorId'=${userId} OR r.state->>'reviewerId'=${userId})
    ORDER BY r.id FOR UPDATE OF r`,
   db.$executeRaw`UPDATE diagnostic_reports r SET "erasedAt"=COALESCE(r."erasedAt",${now}::timestamp), version=r.version+1, "updatedAt"=${now}::timestamp,
+   "identityRecordId"=NULL, "identityRecordHash"=NULL,
    "withdrawalReason"=CASE WHEN r.status='withdrawn' THEN '[erased]' ELSE NULL END,
    state=r.state || jsonb_build_object('authorId',NULL,'reviewerId',NULL,'returnReason',NULL,'correctionReason',NULL,
     'withdrawalReason',CASE WHEN r.status='withdrawn' THEN '[erased]' ELSE NULL END)

@@ -98,6 +98,7 @@
     "diagnostic_identity_records.diagnostic_identity_record_immutable",
     "diagnostic_pdf_artifacts.diagnostic_pdf_snapshot",
     "diagnostic_reports.diagnostic_report_pinned",
+    "diagnostic_reports.diagnostic_report_identity_pin",
     "history_artifacts.history_artifact_original_immutable",
     "history_artifacts.history_artifact_source_facts_immutable",
     "history_deliveries.history_delivery_exact_order",
