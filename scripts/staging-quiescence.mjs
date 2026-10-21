@@ -51,6 +51,55 @@ async function readDeployments(platform, identity, candidate) {
   return result;
 }
 
+// The public Query.deployments connection supports includeDeleted, first/after
+// and pageInfo. Exhaust it rather than treating a latest deployment as history.
+async function readHistory(platform, identity, deployments) {
+  const histories = {};
+  const statuses = ['BUILDING', 'CRASHED', 'DEPLOYING', 'FAILED', 'INITIALIZING', 'NEEDS_APPROVAL', 'QUEUED', 'REMOVED', 'REMOVING', 'SKIPPED', 'SLEEPING', 'SUCCESS', 'WAITING'];
+  const instanceStatuses = ['CRASHED', 'CREATED', 'EXITED', 'INITIALIZING', 'REMOVED', 'REMOVING', 'RESTARTING', 'RUNNING', 'SKIPPED', 'STOPPED'];
+  for (const [role, serviceId] of Object.entries(identity.services)) {
+    const records = [], ids = new Set(), cursors = new Set();
+    let after = null;
+    // Resource bound is a refusal, never a successful truncated inventory.
+    for (let page = 0; ; page++) {
+      if (page >= 1000) fail('deployment history pagination bound exceeded');
+      const { deployments: connection } = await platform.query(`query quiescenceHistory($input: DeploymentListInput!, $first: Int!, $after: String) {
+        deployments(input: $input, first: $first, after: $after) {
+          edges { cursor node { id status meta projectId environmentId serviceId createdAt updatedAt statusUpdatedAt deploymentStopped instances { id status } } }
+          pageInfo { endCursor hasNextPage }
+        }
+      }`, { input: { projectId: identity.projectId, environmentId: identity.environmentId, serviceId, includeDeleted: true }, first: 100, after });
+      if (!exact(connection, ['edges', 'pageInfo']) || !Array.isArray(connection.edges) || connection.edges.length > 100 ||
+          !exact(connection.pageInfo, ['endCursor', 'hasNextPage']) || typeof connection.pageInfo.hasNextPage !== 'boolean') fail('deployment history pagination unavailable');
+      for (const edge of connection.edges) {
+        if (!exact(edge, ['cursor', 'node']) || typeof edge.cursor !== 'string' || !edge.cursor || cursors.has(edge.cursor)) fail('deployment history cursor ambiguous');
+        cursors.add(edge.cursor);
+        const d = edge.node;
+        if (!exact(d, ['id', 'status', 'meta', 'projectId', 'environmentId', 'serviceId', 'createdAt', 'updatedAt', 'statusUpdatedAt', 'deploymentStopped', 'instances']) ||
+            !id(d.id) || ids.has(d.id) || !statuses.includes(d.status) || !hash(d.meta?.commitHash, 40) ||
+            d.projectId !== identity.projectId || d.environmentId !== identity.environmentId || d.serviceId !== serviceId ||
+            !timestamp(d.createdAt) || !timestamp(d.updatedAt) || (d.statusUpdatedAt !== null && !timestamp(d.statusUpdatedAt)) ||
+            typeof d.deploymentStopped !== 'boolean' || !Array.isArray(d.instances) || d.instances.some(i => !exact(i, ['id', 'status']) || !id(i.id) || !instanceStatuses.includes(i.status)) ||
+            new Set(d.instances.map(i => i.id)).size !== d.instances.length) fail('deployment history identity or commit binding unavailable');
+        ids.add(d.id);
+        // Every API record is a possible issuer, including an older deployment of
+        // the same SHA. These flags are observations, not restart/lifetime proof.
+        if (d.id !== deployments[role].id && (!['CRASHED', 'FAILED', 'REMOVED', 'SKIPPED'].includes(d.status) || d.deploymentStopped !== true ||
+            d.instances.some(i => !['CRASHED', 'EXITED', 'REMOVED', 'SKIPPED', 'STOPPED'].includes(i.status)))) fail('prior deployment stop state ambiguous');
+        records.push(d);
+      }
+      const { endCursor, hasNextPage } = connection.pageInfo;
+      if (connection.edges.length === 0 ? endCursor !== null || hasNextPage : endCursor !== connection.edges.at(-1).cursor) fail('deployment history continuation incomplete');
+      if (!hasNextPage) break;
+      after = endCursor;
+    }
+    const current = records.find(d => d.id === deployments[role].id);
+    if (!current || current.deploymentStopped || !equal(Object.fromEntries(Object.keys(deployments[role]).map(key => [key, current[key]])), deployments[role])) fail('deployment history current candidate binding unavailable');
+    histories[role] = records;
+  }
+  return histories;
+}
+
 async function readVariables(platform, identity, role) {
   const { variables } = await platform.query(`query quiescenceVariables($projectId: String!, $environmentId: String!, $serviceId: String!) {
     variables(projectId: $projectId, environmentId: $environmentId, serviceId: $serviceId)
@@ -78,9 +127,10 @@ async function readRemote(platform, request, deployment, role, configuration) {
   // No banners or extra structured outputs are accepted as evidence.
   let receipt; try { receipt = JSON.parse(output.trim()); } catch { fail('exact remote observation unavailable'); }
   const common = ['operationId', 'candidate', 'nonce', 'role', 'projectId', 'environmentId', 'serviceId', 'deploymentId'];
-  const fields = role === 'worker' ? ['queueWorkers', 'heartbeat', 'heartbeatKey'] : ['readyz', 'healthz', 'observedAt', 'otherBackends'];
+  const fields = role === 'worker' ? ['queueWorkers', 'activeJobs', 'heartbeat', 'heartbeatKey'] : ['readyz', 'healthz', 'observedAt', 'otherBackends'];
   if (!exact(receipt, [...common, ...fields]) || common.some(key => receipt[key] !== input[key])) fail('remote observation is stale or has ambiguous identity');
   if (role === 'worker') {
+    if (!exact(receipt.activeJobs, QUEUES) || QUEUES.some(queue => receipt.activeJobs[queue] !== 0)) fail('active queue jobs present or unknown');
     if (!exact(receipt.queueWorkers, QUEUES) || QUEUES.some(queue => receipt.queueWorkers[queue] !== 0) || receipt.heartbeat !== 'absent' ||
         receipt.heartbeatKey !== `operations:${configuration.operationsScope}:worker`) fail('queue workers or scoped heartbeat present or unknown');
   } else {
@@ -98,7 +148,7 @@ function verifyIngress(value, candidate) {
 /**
  * Fresh read-only Railway/HTTP/process observations, never caller proof JSON.
  * Deliberately cannot emit an evaluateQuiescence/evaluateWindow proof until the
- * prior ingress issuer and complete log history have authoritative sources.
+ * prior issuer lifetimes, continuous closure and complete history have authority.
  * No executor, controller or ledger capability is used here.
  */
 export async function observeQuiescence(platform, request) {
@@ -107,6 +157,7 @@ export async function observeQuiescence(platform, request) {
   const target = structuredClone(request), identity = target.identity;
   await platform.attest(identity);
   const deployments = await readDeployments(platform, identity, target.candidate);
+  const history = await readHistory(platform, identity, deployments);
   const apiConfig = await readVariables(platform, identity, 'api');
   const workerConfig = await readVariables(platform, identity, 'worker');
   if (apiConfig.redisOrigin !== workerConfig.redisOrigin || apiConfig.redisOrigin !== platform.redisOrigin) fail('API and worker Redis scopes differ');
@@ -139,13 +190,15 @@ export async function observeQuiescence(platform, request) {
   // Bracket the runtime reads with a fresh inventory to refuse a deployment race.
   const after = await readDeployments(platform, identity, target.candidate);
   if (!equal(deployments, after)) fail('deployment identity changed during observation');
+  const historyAfter = await readHistory(platform, identity, after);
+  if (!equal(history, historyAfter)) fail('deployment history changed during observation');
   if (logs.some(log => Date.parse(log.timestamp) > Date.parse(api.observedAt))) fail('worker log is newer than database observation');
-  // Do not turn successful bounded reads into an unsupported proof. Current source
-  // has no persisted prior ingress issuer binding. Log API has a limit but no
-  // retention/completeness receipt. Both unknowns must refuse, even with no consumers.
-  const error = new Error('Quiescence refused: prior ingress grant issuer authority unavailable; worker log retention/completeness authority unavailable');
+  // History binds possible prior issuers to commits, but cannot establish their
+  // actual issued-grant TTLs, uninterrupted closure, non-resumability or retained
+  // deleted-history completeness. Bounded logs also lack a completeness receipt.
+  const error = new Error('Quiescence refused: prior issuer lifetime and continuous window authority unavailable; deployment terminal/restart authority unavailable; deleted-history retention authority unavailable; worker log retention/completeness authority unavailable');
   error.code = 'QUIESCENCE_EVIDENCE_GAP';
-  error.gaps = Object.freeze(['prior-ingress-grant-issuer', 'worker-log-completeness']);
+  error.gaps = Object.freeze(['prior-issuer-lifetime-and-window', 'deployment-terminal-restart-semantics', 'deleted-history-retention', 'worker-log-completeness']);
   // No observation/closure is returned, including when all other reads passed.
   throw error;
 }

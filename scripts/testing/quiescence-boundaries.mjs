@@ -16,7 +16,7 @@ export function quiescenceBoundary() {
   const state = {
     effects: [], mutations: [], executorCalls: 0, remoteErrors: [], receipts: [], queueNames: [], heartbeatKeys: [], sql: [],
     scope: { projectId: 'project', environmentId: 'stage' },
-    variables: {}, instances: {}, env: {}, workers: Object.fromEntries(names.map(name => [name, []])), heartbeat: null,
+    variables: {}, instances: {}, histories: {}, historyRequests: [], activeReads: [], env: {}, workers: Object.fromEntries(names.map(name => [name, []])), activeJobs: Object.fromEntries(names.map(name => [name, []])), heartbeat: null,
     database: { observedAt: '2026-10-21T12:00:00.000Z', otherBackends: 0, completeVisibility: true, trackActivities: 'on' },
     readyz: { status: 'maintenance', service: 'api', maintenance: 'photo-conversion', businessReady: false },
     healthz: { status: 'ok', service: 'api', maintenance: 'photo-conversion', commitSha: target.candidate },
@@ -32,6 +32,7 @@ export function quiescenceBoundary() {
     const deployment = { id: `deployment-${role}`, status: 'SUCCESS', meta: { commitHash: target.candidate }, projectId: 'project', environmentId: 'stage', serviceId: role,
       createdAt: '2026-10-21T11:59:00.000Z', instances: [{ id: `instance-${role}`, status: 'RUNNING' }] };
     state.instances[role] = { serviceId: role, environmentId: 'stage', latestDeployment: deployment, activeDeployments: [deployment] };
+    state.histories[role] = [{ ...structuredClone(deployment), updatedAt: deployment.createdAt, statusUpdatedAt: deployment.createdAt, deploymentStopped: false }];
   }
   const fetch = async (url, options) => {
     if (url.startsWith(target.identity.origins.api) || url.startsWith('http://127.0.0.1:3006')) {
@@ -48,7 +49,18 @@ export function quiescenceBoundary() {
     if (/\bmutation\b/.test(query)) { state.mutations.push(query); throw new Error('Mutation forbidden'); }
     let data;
     if (query.includes('projectToken')) data = { projectToken: state.scope, project: { id: 'project', environments: { edges: [{ node: { id: 'stage', name: state.environmentName ?? 'staging' } }] }, services: { edges: [{ node: { id: 'api' } }, { node: { id: 'worker' } }] } } };
-    else if (query.includes('activeDeployments')) {
+    else if (query.includes('deployments(input:')) {
+      assert.deepEqual(variables.input, { projectId: 'project', environmentId: 'stage', serviceId: variables.input.serviceId, includeDeleted: true });
+      assert.equal(variables.first, 100);
+      assert.ok(['api', 'worker'].includes(variables.input.serviceId));
+      state.historyRequests.push(structuredClone(variables));
+      const history = state.histories[variables.input.serviceId];
+      const start = variables.after === null ? 0 : Number(variables.after.slice(7)) + 1;
+      const edges = history.slice(start, start + (state.historyPageSize ?? 100)).map((node, index) => ({ cursor: `cursor-${start + index}`, node }));
+      let connection = { edges, pageInfo: { endCursor: edges.at(-1)?.cursor ?? null, hasNextPage: start + edges.length < history.length } };
+      if (state.transformHistory) connection = state.transformHistory(structuredClone(connection), variables, state.historyRequests.length);
+      data = { deployments: connection };
+    } else if (query.includes('activeDeployments')) {
       state.inventoryReads = (state.inventoryReads ?? 0) + 1;
       if (state.changeInventory) state.changeInventory(variables.serviceId, state.inventoryReads);
       data = { serviceInstance: state.instances[variables.serviceId] };
@@ -78,7 +90,16 @@ export function quiescenceBoundary() {
           if (options.skipMetasUpdate !== true) { state.mutations.push('queue meta write'); throw new Error('meta mutation'); }
           assert.equal(options.connection.url, state.env.worker.REDIS_URL);
           this.name = name; state.queueNames.push(name);
-          this.client = Promise.resolve({ get: async key => { state.heartbeatKeys.push(key); return state.heartbeat; } });
+          this.toKey = suffix => `bull:${name}:${suffix}`;
+          this.client = Promise.resolve({
+            get: async key => { state.heartbeatKeys.push(key); return state.heartbeat; },
+            llen: async key => {
+              assert.equal(key, `bull:${name}:active`);
+              state.activeReads.push(key);
+              if (state.activeReadError) throw new Error('SECRET Redis failure');
+              return Object.hasOwn(state.activeReplies ?? {}, name) ? state.activeReplies[name] : state.activeJobs[name].length;
+            },
+          });
         }
         on() {}
         async getWorkers() { if (state.queueError) throw new Error('SECRET queue failure'); return state.workers[this.name]; }
