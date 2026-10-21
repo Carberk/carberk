@@ -36,6 +36,9 @@ import { AdminController } from "../../admin/presentation/admin.controller";
 import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
 import { GlobalErrorFilter } from "../../../common/error.filter";
 import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
+import { defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
+import { DeleteObjectCommand, HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import sharp from "sharp";
 
 const root = resolve(__dirname, "../../../../../..");
 const packageRoot = `${root}/packages/db`;
@@ -1807,5 +1810,302 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
 
   it("refuses the exact delayed contact carrier after reset while unrelated fresh phone reuse survives retry", () => withKnownJobs(known =>
     contactOrdering("e3".repeat(16), "+99366905843", false, known)));
+
+  // B3 joined media case under the root D1-D5 disposition in
+  // docs/evidence/issue-897/support-assembly-and-media-disposition-20261021.md. Literal accounting was derived
+  // before editing (full-v3-media-publication-test-20261021.md): primary 76/103 before reset, 76/177 terminal;
+  // foreign stock control 66/87, then 66/152. Guards stay 128 records / 2048 events.
+  // FIRST NEW BEHAVIORAL BARRIER: the first ordinary conditional presign commits an unjournaled media_uploads row,
+  // so its upload-ownership assertion fails. Catalog, MinIO, auth, admission or contact failures are setup failures.
+  const mediaTables = ["media_uploads", "listing_media"];
+  const mediaSuite = defineE2eSuite("campaign897-full-v3-media-901");
+  async function mediaDisposed(id: string, before: RecordKey[], requestIds: string[]) {
+    expect(await rows(`SELECT state FROM "cf_${id}".campaign_manifest`)).toEqual([{ state: "disposed" }]);
+    expect(await owned(id)).toEqual(before.filter(row => row.table_name === "audit_logs"));
+    for (const record of before) {
+      expect([...tables, ...mediaTables]).toContain(record.table_name);
+      const actual = await rows<{ value: { actorId: string | null; targetType: string; targetId: string; details: object } }>(`SELECT to_jsonb(t) AS value FROM public.${record.table_name} t WHERE to_jsonb(t) @> $1::jsonb`, JSON.stringify(record.row_key));
+      if (record.table_name === "audit_logs") {
+        expect(actual).toHaveLength(1);
+        expect(actual[0]?.value).toMatchObject({ actorId: null, targetType: "SyntheticCampaign", targetId: id });
+        expect(actual[0]?.value.details).toEqual({ profile, disposition: "redacted-synthetic-audit" });
+      } else expect(actual, `owned ${record.table_name} ${JSON.stringify(record.row_key)} disposed`).toEqual([]);
+    }
+    expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_ledger ORDER BY request_id`)).toEqual([...requestIds].sort().map(request_id => ({ request_id })));
+    expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_sink`)).toEqual([]);
+    expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_sms_sink`)).toEqual([]);
+    const redis = await queue.client;
+    for (const requestId of requestIds) {
+      expect(await queue.getJob(requestId)).toBeUndefined();
+      const key = queue.toKey(`de:campaign-cf_${id}-${requestId}`);
+      expect(await redis.get(key)).toBe(`disposed:cf_${id}:${candidate}:${requestId}`);
+      expect(await redis.pttl(key)).toBe(-1);
+    }
+  }
+
+  it("publishes ordinary conditional business media, keeps it through Sales removal, refuses foreign keys and resets to exact object absence", () => withKnownJobs(async known => {
+    const id = "c1".repeat(16), foreignId = "c2".repeat(16);
+    const phone = "+99363382801", foreignPhone = "+99363259840";
+    for (const [reservation, number] of [[id, phone], [foreignId, foreignPhone]] as const) {
+      expect(`+9936${(BigInt(`0x${createHash("sha256").update(`campaign897-contact-phone-v1:${reservation}:${candidate}`, "ascii").digest("hex")}`) % 10000000n).toString().padStart(7, "0")}`).toBe(number);
+    }
+    const cleanupIds = [id];
+    // Exact object keys learned from each presign response, per reservation. Buckets and prefixes are never listed.
+    const objectKeys = new Map<string, string[]>([[id, []], [foreignId, []]]);
+    const smsIds = new Set<string>();
+    const catalog = mediaSuite.catalog;
+    const endpoint = process.env["MINIO_ENDPOINT"] ?? "", publicUrl = (process.env["MINIO_PUBLIC_URL"] ?? "").replace(/\/$/, "");
+    const loopback = (value: string) => { try { return ["localhost", "127.0.0.1"].includes(new URL(value).hostname); } catch { return false; } };
+    let s3: S3Client | undefined, catalogOwned = false;
+    const head = (Key: string) => s3!.send(new HeadObjectCommand({ Bucket: "listing-photos", Key })).then(() => 200,
+      (error: { $metadata?: { httpStatusCode?: number } }) => error.$metadata?.httpStatusCode ?? error);
+    const variants = (key: string) => ["original", "thumbnail", "list", "detail", "fullscreen"].map(name => key.replace(/original\.webp$/, `${name}.webp`));
+    const catalogRows = async () => ({
+      brands: await db.brand.findMany({ where: { OR: [{ id: catalog.brandId }, { slug: catalog.brandSlug }] } }),
+      models: await db.model.findMany({ where: { OR: [{ id: catalog.modelId }, { slug: catalog.modelSlug }] } }),
+      regions: await db.region.findMany({ where: { OR: [{ id: catalog.regionId }, { slug: catalog.regionSlug }] } }),
+      cities: await db.city.findMany({ where: { OR: [{ id: catalog.cityId }, { slug: catalog.citySlug }] } }),
+    });
+    const catalogReferences = async () =>
+      await db.listing.count({ where: { OR: [{ brandId: catalog.brandId }, { modelId: catalog.modelId }, { regionId: catalog.regionId }, { cityId: catalog.cityId }] } }) +
+      await db.dealership.count({ where: { cityId: catalog.cityId } }) + await db.generation.count({ where: { modelId: catalog.modelId } }) +
+      await db.model.count({ where: { brandId: catalog.brandId, id: { not: catalog.modelId } } }) + await db.city.count({ where: { regionId: catalog.regionId, id: { not: catalog.cityId } } });
+    try {
+      expect(loopback(endpoint) && loopback(publicUrl), "SETUP: lane-local disposable MinIO required, not behavioral RED").toBe(true);
+      s3 = new S3Client({ endpoint, region: process.env["MINIO_REGION"] ?? "us-east-1", forcePathStyle: true, requestChecksumCalculation: "WHEN_REQUIRED",
+        credentials: { accessKeyId: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin", secretAccessKey: process.env["MINIO_SECRET_KEY"] ?? "minioadmin" } });
+      // D1: exact-ID test-owned catalog outside every reservation. An existing row is a foreign collision: stop untouched.
+      expect(await catalogRows(), "SETUP: test-owned catalog IDs and slugs must be unused").toEqual({ brands: [], models: [], regions: [], cities: [] });
+      catalogOwned = true;
+      await seedSuiteCatalog(db, mediaSuite);
+      const image = await sharp({ create: { width: 80, height: 60, channels: 3, background: "#377080" } }).webp().toBuffer();
+      await resetAfter(cleanupIds, async () => {
+        const draftsPath = "/api/v1/listings/drafts";
+        const business = (attempt: ReturnType<typeof post>, businessId: string) => attempt.set("x-business-id", businessId);
+        const journal = async (reservation: string, records: number, events: number) => {
+          expect(await rows(`SELECT (SELECT count(*)::int FROM "cf_${reservation}".campaign_records) AS records,(SELECT count(*)::int FROM "cf_${reservation}".campaign_events) AS events`)).toEqual([{ records, events }]);
+          expect(records).toBeLessThanOrEqual(128);
+          expect(events).toBeLessThan(2048);
+        };
+        const confirmContact = async (reservation: string, login: Login, businessId: string, number: string) => {
+          const contact = (action: "request" | "verify", body: object) => business(post(`/api/v1/me/contact-phones/${action}`, login, body), businessId);
+          const issued = await contact("request", { phone: number });
+          if (typeof issued.body.requestId === "string") smsIds.add(issued.body.requestId);
+          expect(issued.status, "SETUP: proven ordinary contact request").toBe(200);
+          const [delivered] = await rows<{ message: string }>(`SELECT message FROM "cf_${reservation}".campaign_sms_sink WHERE request_id=$1`, issued.body.requestId);
+          const code = delivered?.message.match(/\b\d{6}\b/)?.[0];
+          expect(code, "SETUP: protected SMS sink code").toBeDefined();
+          expect((await contact("verify", { phone: number, code }).expect(200)).body.contactPhone).toMatchObject({ phone: number, source: "confirmed" });
+        };
+        // Ordinary conditional presign, then the client PUT through the returned if-match authority.
+        const upload = async (reservation: string, login: Login, businessId: string) => {
+          const signed = await business(post("/api/v1/uploads/presign", login, { kind: "image", contentType: "image/webp", sizeBytes: image.length, writeProtocol: "conditional-v1" }), businessId);
+          const key = signed.body?.key as string;
+          if (typeof key === "string" && /original\.webp$/.test(key)) objectKeys.get(reservation)!.push(...variants(key));
+          expect(signed.status, "ordinary conditional business presign").toBe(201);
+          const row = await db.mediaUpload.findUniqueOrThrow({ where: { key } });
+          expect(await owned(reservation), "presigned media_uploads row must be journal-owned by its reservation").toContainEqual({ table_name: "media_uploads", row_key: { id: row.id } });
+          expect(row).toMatchObject({ userId: login.user.id, businessId, kind: "image", contentType: "image/webp", sizeBytes: image.length, writeProtocol: "conditional-v1", state: "AVAILABLE", objectKeys: variants(key) });
+          for (const objectKey of variants(key)) expect(await head(objectKey), `initialized ${objectKey}`).toBe(200);
+          expect(signed.body.headers).toMatchObject({ "if-match": expect.any(String), "content-type": "image/webp" });
+          const put = await fetch(signed.body.uploadUrl as string, { method: "PUT", headers: signed.body.headers as Record<string, string>, body: new Uint8Array(image) });
+          expect(put.ok, "client PUT through returned if-match").toBe(true);
+          return { key, id: row.id };
+        };
+        const payload = (photos: { key: string }[], contactPhone: string) => ({ brandId: catalog.brandId, modelId: catalog.modelId, year: 2020, cityId: catalog.cityId, regionId: catalog.regionId,
+          priceAmount: 100000, priceCurrency: "TMT", condition: "used", mileageKm: 1000, conditionDisclosure: { damaged: false }, description: "Synthetic full-v3 business stock",
+          contactPhone, allowCalls: true, allowChat: true, photos: photos.map(({ key }, sortOrder) => ({ photoId: randomUUID(), key, sortOrder })) });
+        const mediaState = async (businessId: string) => ({
+          uploads: await db.mediaUpload.findMany({ where: { businessId }, orderBy: { id: "asc" } }),
+          listings: await db.listing.findMany({ where: { businessId }, orderBy: { id: "asc" } }),
+          media: await db.listingMedia.findMany({ where: { listing: { businessId } }, orderBy: { id: "asc" } }),
+          drafts: await db.listingDraft.findMany({ where: { businessId }, orderBy: { id: "asc" } }),
+          business: await businessState(businessId),
+        });
+
+        // Proven setup: ordinary sign-in, staff TOTP and grant, admission, Owner redemption, contact, Sales membership.
+        const roster = await seed(id);
+        const { coordinator, staff } = await elevatedStaff(id, roster, known, ["founder.admission"]);
+        const owner = await signIn(id, actor(roster, "buyer-a"), known);
+        const sales = await signIn(id, actor(roster, "sales-a"), known);
+        const admitted = (await post("/api/v1/business/admission", staff, admissionFor(id, owner.user.id)).expect(201)).body as { businessId: string; token: string };
+        const businessId = admitted.businessId, inventoryPath = `/api/v1/businesses/${businessId}/inventory`;
+        await post("/api/v1/business/invitations/redeem", owner, { token: admitted.token }).expect(201);
+        await confirmContact(id, owner, businessId, phone);
+        const invitation = (await post(`/api/v1/business/${businessId}/invitations`, owner, { recipientUserId: sales.user.id }).expect(201)).body as { token: string };
+        await post("/api/v1/business/invitations/redeem", sales, { token: invitation.token }).expect(201);
+        const ownerDraft = (await post(draftsPath, owner, { businessId, initialPayload: { description: "Synthetic Owner business draft kept through Sales removal" } }).expect(201)).body as { id: string };
+        await journal(id, 64, 81);
+
+        // Three Sales uploads, each journal-owned as soon as presign commits.
+        const photos: { key: string; id: string }[] = [];
+        for (let index = 0; index < 3; index += 1) photos.push(await upload(id, sales, businessId));
+        const salesPayload = payload(photos, phone);
+        const salesDraft = (await post(draftsPath, sales, { businessId, initialPayload: salesPayload }).expect(201)).body as { id: string };
+        expect(await owned(id)).toContainEqual({ table_name: "listing_drafts", row_key: { id: salesDraft.id } });
+        const published = (await business(post(`${draftsPath}/${salesDraft.id}/publish`, sales, {}), businessId).expect(201)).body as { id: string; sellerId: string; status: string };
+        const listingId = published.id;
+        expect(published).toMatchObject({ sellerId: sales.user.id, status: "active" });
+        const listing = await db.listing.findUniqueOrThrow({ where: { id: listingId } });
+        expect(listing).toMatchObject({ businessId, sellerId: sales.user.id, lastEditedById: sales.user.id, status: "active", contactPhone: phone,
+          brandId: catalog.brandId, modelId: catalog.modelId, cityId: catalog.cityId, regionId: catalog.regionId });
+        const media = await db.listingMedia.findMany({ where: { listingId }, orderBy: { sortOrder: "asc" } });
+        expect(media.map(({ id: mediaId, key, sortOrder, uploadId, kind }) => ({ id: mediaId, key, sortOrder, uploadId, kind }))).toEqual(
+          salesPayload.photos.map((photo, index) => ({ id: photo.photoId, key: photo.key, sortOrder: photo.sortOrder, uploadId: photos[index]!.id, kind: "image" })));
+        for (const row of media) expect(row.thumbHash).toEqual(expect.any(String));
+        const adopted = (ids: string[]) => db.mediaUpload.findMany({ where: { id: { in: ids } }, orderBy: { id: "asc" }, select: { id: true, state: true, claimTargetType: true, claimTargetId: true, claimToken: true } });
+        expect(await adopted(photos.map(photo => photo.id))).toEqual(photos.map(photo => photo.id).sort().map(uploadId => ({ id: uploadId, state: "ADOPTED", claimTargetType: "listing", claimTargetId: listingId, claimToken: null })));
+        expect(await db.listingDraft.findUnique({ where: { id: salesDraft.id } })).toBeNull();
+        const publishedAudit = await db.auditLog.findFirstOrThrow({ where: { action: "listing.published", targetType: "Listing", targetId: listingId } });
+        expect(publishedAudit).toMatchObject({ actorId: sales.user.id, details: { brandId: catalog.brandId, modelId: catalog.modelId, cityId: catalog.cityId, priceAmount: 100000, priceCurrency: "TMT" } });
+        const ownedPublished = await owned(id);
+        for (const row of [{ table_name: "listings", row_key: { id: listingId } }, { table_name: "audit_logs", row_key: { id: publishedAudit.id } },
+          ...media.map(({ id: mediaId }) => ({ table_name: "listing_media", row_key: { id: mediaId } }))]) expect(ownedPublished, `owned ${row.table_name}`).toContainEqual(row);
+        expect(ownedPublished).not.toContainEqual({ table_name: "listing_drafts", row_key: { id: salesDraft.id } });
+        expect((await get(inventoryPath, owner).expect(200)).body).toMatchObject({ businessId, counts: { active: 1, drafts: 1 } });
+        const detail = (await request.get(`/api/v1/listings/${listingId}`).expect(200)).body as { media: { id: string; key: string; variants: Record<string, string> }[] };
+        expect(detail).toMatchObject({ id: listingId, businessId, sellerId: sales.user.id, status: "active", contactPhone: phone });
+        expect(detail.media.map(item => item.id)).toEqual(media.map(row => row.id));
+        for (const item of detail.media) for (const size of ["thumbnail", "list", "detail", "fullscreen"]) {
+          const url = new URL(item.variants[size]!);
+          expect(`${url.origin}${url.pathname}`).toBe(`${publicUrl}/listing-photos/${item.key.replace(/original\.webp$/, `${size}.webp`)}`);
+        }
+        for (const key of objectKeys.get(id)!) expect(await head(key), `published ${key}`).toBe(200);
+        await journal(id, 73, 97);
+
+        // Foreign stock control: a second reservation's ordinary admitted business publishes its own uploads.
+        cleanupIds.push(foreignId);
+        const foreignRoster = await seed(foreignId);
+        const foreignStaff = await elevatedStaff(foreignId, foreignRoster, known, ["founder.admission"]);
+        const foreignOwner = await signIn(foreignId, actor(foreignRoster, "buyer-a"), known);
+        const foreignAdmitted = (await post("/api/v1/business/admission", foreignStaff.staff, admissionFor(foreignId, foreignOwner.user.id)).expect(201)).body as { businessId: string; token: string };
+        const foreignBusinessId = foreignAdmitted.businessId;
+        await post("/api/v1/business/invitations/redeem", foreignOwner, { token: foreignAdmitted.token }).expect(201);
+        await confirmContact(foreignId, foreignOwner, foreignBusinessId, foreignPhone);
+        const foreignPhotos: { key: string; id: string }[] = [];
+        for (let index = 0; index < 3; index += 1) foreignPhotos.push(await upload(foreignId, foreignOwner, foreignBusinessId));
+        const foreignDraft = (await post(draftsPath, foreignOwner, { businessId: foreignBusinessId, initialPayload: payload(foreignPhotos, foreignPhone) }).expect(201)).body as { id: string };
+        const foreignListing = (await business(post(`${draftsPath}/${foreignDraft.id}/publish`, foreignOwner, {}), foreignBusinessId).expect(201)).body as { id: string };
+        await journal(foreignId, 66, 87);
+        const fourth = await upload(id, sales, businessId);
+
+        const reason = (response: { body: { details?: unknown } }) => response.body.details;
+        const refused = async (label: string, attempt: () => Promise<unknown>) => {
+          const before = { journal: await digest(id), foreign: await digest(foreignId), state: await mediaState(businessId), foreignState: await mediaState(foreignBusinessId) };
+          await attempt();
+          expect({ journal: await digest(id), foreign: await digest(foreignId), state: await mediaState(businessId), foreignState: await mediaState(foreignBusinessId) }, `${label} writes nothing`).toEqual(before);
+        };
+        const attach = (login: Login, target: string, key: string, context: string) => business(post(`/api/v1/listings/${target}/media/attach`, login, { key, kind: "image", sortOrder: 3 }), context);
+        await refused("foreign-key and non-member refusals", async () => {
+          expect((await attach(foreignOwner, foreignListing.id, fourth.key, foreignBusinessId).expect(400)).body.code).toBe("UPLOAD_NOT_AVAILABLE");
+          expect((await attach(sales, listingId, foreignPhotos[0]!.key, businessId).expect(400)).body.code).toBe("UPLOAD_NOT_AVAILABLE");
+          expect(reason(await attach(foreignOwner, listingId, fourth.key, businessId).expect(403))).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+          expect(reason(await business(post(`${draftsPath}/${ownerDraft.id}/publish`, foreignOwner, {}), businessId).expect(403))).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+          expect(reason(await get(inventoryPath, foreignOwner).expect(403))).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+          expect(reason(await business(post("/api/v1/uploads/presign", foreignOwner, { kind: "image", contentType: "image/webp", sizeBytes: image.length, writeProtocol: "conditional-v1" }), businessId).expect(403))).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+          expect(execute("reset", id, { candidate: "b".repeat(40) })).toMatchObject({ code: 1, receipt: undefined });
+        });
+
+        // Fourth photo, then ordinary Sales removal with its exact audit.
+        const attached = (await attach(sales, listingId, fourth.key, businessId).expect(201)).body as { id: string; sortOrder: number };
+        expect(attached.sortOrder).toBe(3);
+        expect(await owned(id)).toContainEqual({ table_name: "listing_media", row_key: { id: attached.id } });
+        expect(await adopted([fourth.id])).toEqual([{ id: fourth.id, state: "ADOPTED", claimTargetType: "listing", claimTargetId: listingId, claimToken: null }]);
+        expect((await post(`/api/v1/business/${businessId}/members`, owner, { targetUserId: sales.user.id, action: "remove" }).expect(201)).body).toEqual({ ok: true });
+        expect(await db.dealershipMember.findUnique({ where: { userId: sales.user.id } })).toBeNull();
+        const removal = await db.auditLog.findFirstOrThrow({ where: { targetType: "Dealership", targetId: businessId, action: "BUSINESS_MEMBERSHIP_CHANGED" } });
+        expect(removal).toMatchObject({ actorId: owner.user.id, details: { targetUserId: sales.user.id, action: "remove" } });
+        expect(removal.details).toEqual({ targetUserId: sales.user.id, action: "remove" });
+        await refused("removed Sales", async () => {
+          expect(reason(await get(inventoryPath, sales).expect(403))).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+          expect(reason(await attach(sales, listingId, fourth.key, businessId).expect(403))).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+          expect(reason(await business(post(`${draftsPath}/${ownerDraft.id}/publish`, sales, {}), businessId).expect(403))).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+          expect(reason(await business(post("/api/v1/uploads/presign", sales, { kind: "image", contentType: "image/webp", sizeBytes: image.length, writeProtocol: "conditional-v1" }), businessId).expect(403))).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+        });
+        // Owner keeps the stock: original seller, publication time, contact and all four photos. No silent transfer.
+        expect(await db.listing.findUniqueOrThrow({ where: { id: listingId } })).toEqual(listing);
+        const kept = (await business(get(`/api/v1/listings/${listingId}`, owner), businessId).expect(200)).body as { media: { id: string }[] };
+        expect(kept).toMatchObject({ sellerId: sales.user.id, contactPhone: phone, publishedAt: listing.publishedAt!.toISOString(), status: "active" });
+        expect(kept.media.map(item => item.id)).toEqual([...media.map(row => row.id), attached.id]);
+        const stock = (await get(inventoryPath, owner).expect(200)).body;
+        expect(stock).toMatchObject({ counts: { active: 1, drafts: 1 } });
+        expect(stock.drafts).toEqual([expect.objectContaining({ id: ownerDraft.id, userId: owner.user.id, businessId, payload: { description: "Synthetic Owner business draft kept through Sales removal" } })]);
+
+        // Literal accounting before reset: 76 records (draft and Sales member deleted) / 103 events.
+        const before = await owned(id), foreignBefore = await owned(foreignId);
+        const perTable = (keys: RecordKey[]) => keys.reduce<Record<string, number>>((counts, row) => ({ ...counts, [row.table_name]: (counts[row.table_name] ?? 0) + 1 }), {});
+        expect(perTable(before)).toEqual({ users: 15, sessions: 4, otp_requests: 5, totp_enrollments: 2, totp_backup_codes: 20, staff_grants: 3, audit_logs: 9,
+          dealerships: 2, dealership_members: 2, dealership_invitations: 2, listing_drafts: 1, media_uploads: 4, listings: 1, listing_media: 4 });
+        expect(perTable(foreignBefore)).toEqual({ users: 15, sessions: 3, otp_requests: 4, totp_enrollments: 2, totp_backup_codes: 20, staff_grants: 3, audit_logs: 6,
+          dealerships: 2, dealership_members: 2, dealership_invitations: 1, media_uploads: 3, listings: 1, listing_media: 3 });
+        for (const upload of [...photos, fourth]) expect(before).toContainEqual({ table_name: "media_uploads", row_key: { id: upload.id } });
+        for (const upload of foreignPhotos) expect(foreignBefore).toContainEqual({ table_name: "media_uploads", row_key: { id: upload.id } });
+        expect(before.filter(row => mediaTables.includes(row.table_name) && foreignBefore.some(other => JSON.stringify(other) === JSON.stringify(row)))).toEqual([]);
+        await journal(id, 76, 103);
+        await journal(foreignId, 66, 87);
+        const requestIds = [coordinator.requestId, staff.requestId, owner.requestId, sales.requestId];
+        const foreignRequestIds = [foreignStaff.coordinator.requestId, foreignStaff.staff.requestId, foreignOwner.requestId];
+        expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_ledger ORDER BY request_id`)).toEqual([...requestIds].sort().map(request_id => ({ request_id })));
+        expect(objectKeys.get(id)).toHaveLength(20);
+        expect(objectKeys.get(foreignId)).toHaveLength(15);
+        for (const key of [...objectKeys.get(id)!, ...objectKeys.get(foreignId)!]) expect(await head(key), `live ${key}`).toBe(200);
+        const foreignState = await mediaState(foreignBusinessId), foreignDigest = await digest(foreignId);
+
+        // D2: the existing reset disposes the journal-owned rows and establishes exact object absence, lost-response retry stable.
+        const terminalReceipt = { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 };
+        expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+        await mediaDisposed(id, before, requestIds);
+        await journal(id, 76, 177);
+        expect(await db.auditLog.findUnique({ where: { id: publishedAudit.id }, select: { actorId: true, targetType: true, targetId: true, details: true } })).toEqual(
+          { actorId: null, targetType: "SyntheticCampaign", targetId: id, details: { profile, disposition: "redacted-synthetic-audit" } });
+        for (const key of objectKeys.get(id)!) expect(await head(key), `journal-owned object ${key} absent after reset`).toBe(404);
+        for (const key of objectKeys.get(foreignId)!) expect(await head(key), `foreign object ${key} preserved`).toBe(200);
+        expect(await mediaState(foreignBusinessId)).toEqual(foreignState);
+        expect(await digest(foreignId)).toBe(foreignDigest);
+        const terminal = await digest(id);
+        expect(execute("reset", id)).toMatchObject({ code: 0, receipt: terminalReceipt });
+        expect(await digest(id)).toBe(terminal);
+        await mediaDisposed(id, before, requestIds);
+        for (const key of objectKeys.get(id)!) expect(await head(key), `retry keeps ${key} absent`).toBe(404);
+        expect(reason(await get(inventoryPath, owner).expect(403))).toEqual({ reason: "SESSION_REQUIRED" });
+        await request.post("/api/v1/auth/refresh").send({ refreshToken: sales.refreshToken }).expect(401);
+        expect(await mediaState(foreignBusinessId)).toEqual(foreignState);
+        expect(await digest(foreignId)).toBe(foreignDigest);
+        expect((await request.get(`/api/v1/listings/${foreignListing.id}`).expect(200)).body).toMatchObject({ businessId: foreignBusinessId, contactPhone: foreignPhone });
+
+        // The control then disposes only its own graph and objects.
+        expect(execute("reset", foreignId)).toMatchObject({ code: 0, receipt: terminalReceipt });
+        await mediaDisposed(foreignId, foreignBefore, foreignRequestIds);
+        await journal(foreignId, 66, 152);
+        for (const key of objectKeys.get(foreignId)!) expect(await head(key), `control object ${key} absent after its reset`).toBe(404);
+      });
+    } finally {
+      // After both soft-asserted resets: exact known objects, SMS evidence, then the exact catalog rows once unreferenced.
+      for (const reservation of [id, foreignId]) {
+        const [contract] = await rows<{ present: boolean }>(`SELECT to_regclass('"cf_${reservation}".campaign_sms_ledger') IS NOT NULL AS present`);
+        if (contract?.present) for (const entry of await rows<{ request_id: string }>(`SELECT request_id FROM "cf_${reservation}".campaign_sms_ledger`)) smsIds.add(entry.request_id);
+      }
+      for (const requestId of smsIds) expect.soft(await queue.getJob(requestId), "synchronous SMS has no email job").toBeUndefined();
+      if (s3) for (const key of [...objectKeys.values()].flat()) {
+        const status = await head(key);
+        const failure = status === 200 ? await s3.send(new DeleteObjectCommand({ Bucket: "listing-photos", Key: key })).then(() => undefined, (error: unknown) => error) : status === 404 ? undefined : status;
+        expect.soft(failure, `exact known object cleanup ${key}`).toBeUndefined();
+      }
+      if (catalogOwned) {
+        const references = await catalogReferences();
+        expect.soft(references, "test-owned catalog retained: a reference survives cleanup").toBe(0);
+        if (references === 0) {
+          const failure = await (async () => {
+            await db.city.deleteMany({ where: { id: catalog.cityId } });
+            await db.region.deleteMany({ where: { id: catalog.regionId } });
+            await db.model.deleteMany({ where: { id: catalog.modelId } });
+            await db.brand.deleteMany({ where: { id: catalog.brandId } });
+          })().then(() => undefined, (error: unknown) => error);
+          expect.soft(failure, "exact test-owned catalog cleanup").toBeUndefined();
+        }
+      }
+      s3?.destroy();
+    }
+  }));
 
 });
