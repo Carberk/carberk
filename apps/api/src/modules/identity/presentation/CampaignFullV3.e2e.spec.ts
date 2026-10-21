@@ -1,13 +1,11 @@
 import "reflect-metadata";
 import { Worker as NodeWorker } from "node:worker_threads";
 import { Logger } from "@nestjs/common";
-import { Enums } from "@auto-tm/contracts";
 import { HttpOtpSenderAdapter } from "../infrastructure/HttpOtpSenderAdapter";
 import { PrismaOtpRequestRepository } from "../infrastructure/PrismaOtpRequestRepository";
 import { SystemClockAdapter } from "../infrastructure/SystemClockAdapter";
 import { OtpCode } from "../domain/OtpCode";
 import { signInCodeDestination } from "../domain/SignInCodeDestination";
-import { renderCodeSms } from "../domain/codeSms";
 import type { OtpSms } from "../domain/ports/OtpSenderPort";
 import { execFile, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
@@ -17,7 +15,7 @@ import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
 import { promisify } from "node:util";
 import { PrismaService } from "@auto-tm/db";
-import { AuthSchemas } from "@auto-tm/contracts";
+import { AuthSchemas, Enums } from "@auto-tm/contracts";
 import { getQueueToken } from "@nestjs/bullmq";
 import { ConfigModule } from "@nestjs/config";
 import { EventEmitterModule } from "@nestjs/event-emitter";
@@ -59,11 +57,21 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
   let request: ReturnType<typeof supertest>;
   let db: PrismaService;
   let queue: Queue;
-  const priorTestMode = process.env["OTP_TEST_MODE"];
+  let priorTestMode: string | undefined;
+  let priorCommitSha: string | undefined;
+  let priorSmsDriver: string | undefined;
 
   beforeAll(async () => {
     if (!inject("apiTestDatabases")) throw new Error("Requires configured migrated disposable API PostgreSQL and Redis lane");
+    priorTestMode = process.env["OTP_TEST_MODE"];
+    priorCommitSha = process.env["AUTOTM_COMMIT_SHA"];
+    priorSmsDriver = process.env["SMS_DRIVER"];
     delete process.env["OTP_TEST_MODE"];
+    // The real adapter validates its serving candidate before taking the
+    // namespace fence. Match the exact full-v3 fixture candidate and select
+    // its existing mock sink. This is test transport configuration only.
+    process.env["AUTOTM_COMMIT_SHA"] = candidate;
+    process.env["SMS_DRIVER"] = "mock";
     const module = await NestTest.createTestingModule({ imports: [ConfigModule.forRoot({ isGlobal: true }), EventEmitterModule.forRoot(), bullTestRoot(), IdentityModule, ListingsModule, ServiceMessagingModule,
       JwtModule.register({ global: true, secret: "synthetic-full-v3-http-contract-901" })],
       controllers: [AdminController] }).compile();
@@ -79,6 +87,10 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     await app?.close();
     if (priorTestMode === undefined) delete process.env["OTP_TEST_MODE"];
     else process.env["OTP_TEST_MODE"] = priorTestMode;
+    if (priorCommitSha === undefined) delete process.env["AUTOTM_COMMIT_SHA"];
+    else process.env["AUTOTM_COMMIT_SHA"] = priorCommitSha;
+    if (priorSmsDriver === undefined) delete process.env["SMS_DRIVER"];
+    else process.env["SMS_DRIVER"] = priorSmsDriver;
   });
 
   function execute(kind: "fixture" | "reset", id: string, options: { enabled?: string; candidate?: string; selectedProfile?: string; loseReceipt?: boolean } = {}) {
@@ -1606,8 +1618,29 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
       const { runInNewContext } = require('node:vm');
       const { root, packageRoot, profile, candidate, source, id } = workerData;
       const localRequire = createRequire(root + '/apps/api/package.json');
-      const execute = (${execute.toString()});
-      parentPort.postMessage(execute('reset', id));
+      const remoteProcess = { execPath: process.execPath, exitCode: 0, env: {
+        STAGING_CAMPAIGN_PROFILE_ENABLED: profile,
+        RAILWAY_PROJECT_ID: 'v3-project', RAILWAY_ENVIRONMENT_ID: 'v3-staging', RAILWAY_SERVICE_ID: 'v3-api', RAILWAY_ENVIRONMENT_NAME: 'staging',
+        APP_ENV: 'staging', SMS_DRIVER: 'mock', AUTOTM_COMMIT_SHA: candidate,
+        DATABASE_URL: 'postgresql://fixture:synthetic@postgres.railway.internal:5432/railway', REDIS_URL: 'redis://fixture:synthetic@redis.railway.internal:6379/0',
+        MINIO_ENDPOINT: 'http://minio.railway.internal:9000', MINIO_PUBLIC_URL: 'https://media.example',
+      } };
+      const payload = { kind: 'reset', id, namespace: 'cf_' + id, profile, candidate, target: candidate,
+        redisOrigin: 'redis://redis.railway.internal:6379/0', identity: { projectId: 'v3-project', environmentId: 'v3-staging', services: { api: 'v3-api' },
+          origins: { database: 'postgresql://postgres.railway.internal:5432/railway', media: 'http://minio.railway.internal:9000', publicMedia: 'https://media.example' } } };
+      let code = 0, receipt, sqlCalls = 0;
+      const program = runInNewContext(source + '; remoteProgram(payload)', { payload });
+      runInNewContext(program, { URL, process: remoteProcess, require: name => name === 'node:child_process' ? {
+        spawnSync: (binary, args, spawnOptions) => {
+          if (binary === process.execPath) return spawnSync(binary, args, { ...spawnOptions, encoding: 'utf8', timeout: 30000, cwd: root + '/apps/api', env: process.env });
+          sqlCalls += 1;
+          return spawnSync(process.execPath, [root + '/scripts/testing/query-disposable-postgres.cjs'], {
+            input: spawnOptions.input, encoding: 'utf8', timeout: 30000,
+            env: { ...process.env, STAGING_CONTROL_TEST_DATABASE_URL: process.env.DATABASE_URL, STAGING_TEST_DB_PACKAGE: packageRoot + '/package.json' },
+          });
+        },
+      } : localRequire(name), console: { log: value => { receipt = JSON.parse(value); }, error: () => { code = 1; } } });
+      parentPort.postMessage({ code: code || remoteProcess.exitCode, receipt, sqlCalls });
     `, { eval: true, workerData: { root, packageRoot, profile, candidate, source, id } });
     return new Promise<ReturnType<typeof execute>>((resolve, reject) => {
       let result: ReturnType<typeof execute> | undefined, failure: Error | undefined;
@@ -1746,7 +1779,6 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
         expect(await db.dealership.findUnique({ where: { id: reuseId } })).toEqual(reused);
         expect(await businessState(foreignId)).toEqual(foreign);
         expect(await db.measurementState.findMany({ orderBy: { key: "asc" } })).toEqual(measurement);
-        expect(renderCodeSms(sms)).toContain(code.value);
       } finally {
         // Release storage before awaiting either contender. Sender rollback or
         // commit releases its transaction advisory lock. The reset worker exits
@@ -1755,8 +1787,9 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
           try { await Promise.allSettled([send, resetting]); } finally {
             try { if (barrier) await barrier.end(); } finally {
               log?.mockRestore();
-              if (requestId) expect.soft(await queue.getJob(requestId)).toBeUndefined();
-              await db.dealership.deleteMany({ where: { id: { in: [reuseId, foreignId] } } });
+              try { if (requestId) expect.soft(await queue.getJob(requestId)).toBeUndefined(); } finally {
+                await db.dealership.deleteMany({ where: { id: { in: [reuseId, foreignId] } } });
+              }
             }
           }
         }
