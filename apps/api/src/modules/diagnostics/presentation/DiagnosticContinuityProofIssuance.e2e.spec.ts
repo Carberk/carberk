@@ -443,6 +443,157 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
     return response.body.proofId as string;
   }
 
+  const reinspectionInput = (p: Pair, proofId: string, reportId = randomUUID()) => ({
+    reportId, predecessorId: p.released.id, expectedOrderVersion: p.b.version,
+    reason: "Private manual continuity follow-up", proofId,
+  });
+
+  async function consumptionMaterial(evidenceId: string) {
+    const a = await visit(original, "consumption A");
+    const [ia] = await history(a); const pa = randomUUID();
+    await verified(a, pa); await append(a, ia!, capture(a, ia!, pa));
+    const draft = (await post("technician", `orders/${a.id}/reports`, { reportId: randomUUID(), expectedOrderVersion: a.version }).expect(201)).body;
+    const finding = { id: randomUUID(), checkId: "brakes", assessment: "fault", explanation: "Observed synthetic brake wear",
+      evidenceIds: [evidenceId], kind: null, source: null, measurement: null, location: null };
+    await request.put(`/api/v1/diagnostics/reports/${draft.id}/evidence/${evidenceId}?findingId=${finding.id}&expectedVersion=0`)
+      .set(headers("technician")).set("content-type", "application/octet-stream").set("x-evidence-type", "image/png")
+      .send(Buffer.from(red.input, "base64")).expect(200);
+    await post("technician", `reports/${draft.id}/findings`, { expectedVersion: 0, finding }).expect(201);
+    await post("technician", `reports/${draft.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
+    await post("reviewer", `reports/${draft.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    const released = (await get("reviewer", `reports/${draft.id}`).expect(200)).body;
+    const templates = (await get("reception", `centers/${centerId}/templates`).expect(200)).body;
+    const definition = { ...released.template, title: { tk: "Gaýtadan", ru: "Повторная", en: "Private follow-up" } };
+    const published = (await post("reception", `centers/${centerId}/templates`, { expectedVersion: templates[0].version, definition, synthetic: true }).expect(201)).body;
+    const previousTemplate = templateId;
+    let b: Order;
+    try { templateId = published.id; b = await visit(successorObservation, "consumption B"); }
+    finally { templateId = previousTemplate; }
+    const [ib] = await history(b); const pb = randomUUID();
+    await verified(b, pb, blue); await append(b, ib!, capture(b, ib!, pb), blue);
+    // This reader has ordinary B authority before proof issuance, and none on A.
+    await assignment(b, "alternateReviewer", true);
+    const p = { a, b, commissionerA: "buyer" as const, commissionerB: "buyer" as const, released, ia: ia!, ib: ib!, pa, pb, body: {
+      predecessorId: released.id as string, expectedPredecessorVersion: 3, expectedOrderVersion: b.version,
+      predecessorIdentityRecordId: ia!.id, candidateIdentityRecordId: ib!.id, linkingTechnicianId: suite.id("technician"),
+      method: "comparative_attestation", rationale: "Same stamped chassis; independently observed on both visits", provenanceRecordIds: [pa, pb],
+    } };
+    await comparativeBytes(b, released.id, pa, red); await comparativeBytes(b, released.id, pb, blue);
+    return { p, definition, candidateTemplateId: published.id as string, finding };
+  }
+
+  it("consumes the current technician-bound private manual proof into a fresh B report without copying A material", async () => {
+    const evidenceId = randomUUID();
+    try {
+      const { p, definition, candidateTemplateId, finding } = await consumptionMaterial(evidenceId);
+      expect(candidateTemplateId).not.toBe(p.released.templateVersionId);
+      const sourceImage = await get("technician", `reports/${p.released.id}/evidence/${evidenceId}`).expect(200);
+      expect(Buffer.from(sourceImage.body).toString("base64")).toBe(red.output);
+      const documentsA = (await get("technician", `reports/${p.released.id}/documents`).expect(200)).body;
+      expect(documentsA).toHaveLength(3);
+      for (const suffix of ["", `/evidence/${evidenceId}`, "/documents", "/documents/en"]) {
+        await get("alternateReviewer", `reports/${p.released.id}${suffix}`).expect(403);
+      }
+      const proofId = await ordinaryProof(p);
+      const before = await stored(p);
+      const artifactsA = await db.diagnosticPdfArtifact.findMany({ where: { reportId: p.released.id }, orderBy: { id: "asc" } });
+      const input = reinspectionInput(p, proofId);
+      // FIRST new behavior assertion: real ordinary HTTP, no contract/source shortcut.
+      const created = await post("technician", `orders/${p.b.id}/reinspections`, input);
+      expect(created.status).toBe(201);
+      privateNoStore(created);
+      expect(created.body).toMatchObject({ id: input.reportId, orderId: p.b.id, audience: "buyer_private", status: "draft", version: 0,
+        templateVersionId: candidateTemplateId, template: definition, observedAt: "2026-10-21T11:00:00.000Z", mileageKm: 123100,
+        findings: [], authorId: suite.id("technician"), reviewerId: null, successorOf: p.released.id,
+        correctionReason: input.reason, finalizedAt: null, supersededBy: null, lineageKind: "reinspection" });
+      expect((await get("technician", `orders/${p.b.id}/reports`).expect(200)).body).toEqual([created.body]);
+      for (const who of ["reviewer", "buyer"] as const) {
+        const predecessor = await get(who, `reports/${p.released.id}`).expect(200);
+        privateNoStore(predecessor);
+        expect(predecessor.body).toMatchObject({ id: p.released.id, findings: [finding], supersededBy: null });
+        expect(predecessor.body).not.toHaveProperty("successorKind");
+      }
+      expect((await get("alternateReviewer", `reports/${created.body.id}`).expect(200)).body.id).toBe(created.body.id);
+      for (const suffix of ["", `/evidence/${evidenceId}`, "/documents", "/documents/en"]) {
+        await get("alternateReviewer", `reports/${p.released.id}${suffix}`).expect(403);
+      }
+      await get("technician", `reports/${created.body.id}/evidence/${evidenceId}`).expect(403);
+      const copied = await post("technician", `reports/${created.body.id}/findings`, { expectedVersion: 0, finding }).expect(400);
+      expect(copied.body.code).toBe("REPORT_EVIDENCE_UNAVAILABLE");
+      expect((await get("technician", `reports/${created.body.id}`).expect(200)).body).toMatchObject({ version: 0, findings: [] });
+      expect((await get("technician", `reports/${created.body.id}/documents`).expect(200)).body).toEqual([]);
+      expect(await db.diagnosticEvidence.count({ where: { reportId: created.body.id } })).toBe(0);
+      expect(await db.diagnosticPdfArtifact.count({ where: { reportId: created.body.id } })).toBe(0);
+      expect(await db.diagnosticPdfArtifact.findMany({ where: { reportId: p.released.id }, orderBy: { id: "asc" } })).toEqual(artifactsA);
+      const after = await stored(p);
+      expect(after.reports.find(row => row.id === p.released.id)).toEqual(before.reports.find(row => row.id === p.released.id));
+      expect(after.reports).toHaveLength(2);
+      expect(after.reports.find(row => row.id === created.body.id)).toMatchObject({ predecessorId: p.released.id, reinspection: true, status: "draft", version: 0 });
+      const addedAudits = after.audits.filter(row => !before.audits.some(prior => prior.id === row.id));
+      expect(addedAudits.length).toBeGreaterThan(0);
+      expect(addedAudits.filter(row => row.action === "REPORT_REINSPECTION_CREATED")).toHaveLength(1);
+    } finally {
+      // Only this new fixture's exact report evidence row/object, even on setup RED.
+      try { await objects.send(new DeleteObjectCommand({ Bucket: "diagnostic-test-private", Key: `diagnostic-evidence/${evidenceId}/${red.sha256}` })); }
+      finally { await db.diagnosticEvidence.deleteMany({ where: { id: evidenceId } }); }
+    }
+  });
+
+  it("returns the exact private reinspection result on an unchanged proof retry without duplicating report or consumption audit", async () => {
+    const p = await pair();
+    const proofId = await ordinaryProof(p);
+    const input = reinspectionInput(p, proofId);
+    const first = await post("technician", `orders/${p.b.id}/reinspections`, input);
+    expect(first.status).toBe(201);
+    privateNoStore(first);
+    const beforeRetry = await stored(p);
+    const retry = await post("technician", `orders/${p.b.id}/reinspections`, input);
+    expect(retry.status).toBe(201);
+    privateNoStore(retry);
+    expect(retry.body).toEqual(first.body);
+    expect(await stored(p)).toEqual(beforeRetry);
+    expect(await db.diagnosticReportRecord.count({ where: { predecessorId: p.released.id } })).toBe(1);
+    expect((await db.diagnosticAudit.findMany({ where: { centerId, orderId: p.b.id, action: "REPORT_REINSPECTION_CREATED" } })).length).toBe(1);
+  });
+
+  it.each(["proof", "reason", "order version"] as const)("conflicts on changed %s in an existing private reinspection retry without persistence changes", async binding => {
+    const p = await pair();
+    const proofId = await ordinaryProof(p);
+    const otherProofId = await ordinaryProof(p);
+    expect(otherProofId).not.toBe(proofId);
+    const input = reinspectionInput(p, proofId);
+    const first = await post("technician", `orders/${p.b.id}/reinspections`, input);
+    expect(first.status).toBe(201);
+    const before = await stored(p);
+    const changedInput = { ...input };
+    if (binding === "proof") changedInput.proofId = otherProofId;
+    if (binding === "reason") changedInput.reason = "Changed follow-up reason";
+    if (binding === "order version") changedInput.expectedOrderVersion = 8;
+    const changed = await post("technician", `orders/${p.b.id}/reinspections`, changedInput);
+    expect(changed.status).toBe(409);
+    privateNoStore(changed);
+    expect(changed.body.code).toBe("DIAGNOSTIC_REINSPECTION_CONFLICT");
+    expect(await stored(p)).toEqual(before);
+    // The original binding still retries exactly after the refused changed input.
+    expect((await post("technician", `orders/${p.b.id}/reinspections`, input).expect(201)).body).toEqual(first.body);
+    expect(await stored(p)).toEqual(before);
+  });
+
+  it("refuses a second private successor that tries to consume an already used proof", async () => {
+    const p = await pair();
+    const proofId = await ordinaryProof(p);
+    const firstInput = reinspectionInput(p, proofId);
+    const first = await post("technician", `orders/${p.b.id}/reinspections`, firstInput);
+    expect(first.status).toBe(201);
+    const before = await stored(p);
+    const second = await post("technician", `orders/${p.b.id}/reinspections`, reinspectionInput(p, proofId));
+    expect(second.status).toBe(409);
+    privateNoStore(second);
+    expect(second.body.code).toBe("DIAGNOSTIC_REINSPECTION_CONFLICT");
+    expect(await stored(p)).toEqual(before);
+    expect(await db.diagnosticReportRecord.count({ where: { predecessorId: p.released.id } })).toBe(1);
+  });
+
   it.each(["candidate", "predecessor"] as const)("permanently invalidates an unused proof after ordinary %s assignment revocation and reassignment", async side => {
     const p = await pair();
     const proofId = await ordinaryProof(p);
