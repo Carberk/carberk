@@ -1476,6 +1476,163 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     });
   }));
 
+  // Literal write ledger: full-v3-support-close-reopen-test-20261021.md.
+  // No clock mutation: successful 14-day awaiting closure and 90-day purge remain deferred.
+  it("closes and reopens owned Support with current assignment, response debt and repeatable exact reset", () => withKnownJobs(known => {
+    const id = "f3".repeat(16), foreignId = "f4".repeat(16);
+    const cleanupIds = [id];
+    return resetAfter(cleanupIds, async () => {
+      const roster = await seed(id);
+      const { coordinator, staff } = await elevatedStaff(id, roster, known, ["support.operations"]);
+      const customer = await signIn(id, actor(roster, "buyer-a"), known);
+      const outsider = await signIn(id, actor(roster, "buyer-b"), known);
+      const next = await signIn(id, actor(roster, "history-fulfiller"), known);
+      await grant(coordinator, next.user.id, "support.operations").expect(204);
+      await elevate(next);
+      const requestIds = [...known];
+      await supportJournal(id, 68, 84);
+      const opened = await post("/api/v1/services/conversations", customer, { purpose: "support", synthetic: true }).expect(201);
+      const conversationId = opened.body.id as string, resourceId = opened.body.resourceId as string;
+      const path = `/api/v1/services/conversations/${conversationId}`;
+      const send = (login: Login, body: string, extra: object = {}) => post(`${path}/messages`, login,
+        { clientMessageId: randomUUID(), body, visibility: "customer", ...extra });
+      const customerSent = await send(customer, "Synthetic lifecycle request").expect(201);
+      await post(`${path}/assignment`, staff, { expectedVersion: 0 }).expect(201);
+      const debt = (await get(path, customer).expect(200)).body.support.unansweredSince;
+      expect(debt).toEqual(expect.any(String));
+      const beforeCommand = await supportSnapshot(id);
+      await supportJournal(id, 76, 96);
+      // FIRST NEW RED: text=false leaves actor() without campaign admission before debt validation.
+      // Setup/admission/auth failures above are not this behavioral refusal.
+      const owed = await post(`${path}/support`, staff, { kind: "close_resolved" });
+      expect(await supportSnapshot(id)).toEqual(beforeCommand);
+      expect(owed.status, "ordinary response-debt refusal must pass the campaign command gate").toBe(400);
+      expect(owed.body.code).toBe("INVALID_MESSAGE");
+
+      // All refusals roll back even the locked staff access audit.
+      for (const login of [customer, outsider, next]) {
+        await post(`${path}/support`, login, { kind: "close_resolved" }).expect(403);
+        await post(`${path}/support`, login, { kind: "reopen" }).expect(403);
+      }
+      expect(await supportSnapshot(id)).toEqual(beforeCommand);
+      const information = await send(staff, "Synthetic request for information", { supportKind: "request_information" }).expect(201);
+      const waiting = await get(path, customer).expect(200);
+      expect(waiting.body.support).toMatchObject({ unansweredSince: null, awaitingCustomerSince: expect.any(String) });
+      const awaitingClosure = { kind: "close_awaiting", reason: "Synthetic awaiting closure reason", body: "Synthetic closure notice. Reply to reopen.", clientMessageId: randomUUID() };
+      const beforeAwaiting = await supportSnapshot(id);
+      await post(`${path}/support`, staff, awaitingClosure).expect(400);
+      expect(await supportSnapshot(id)).toEqual(beforeAwaiting);
+      expect(await db.serviceMessage.findMany({ where: { conversationId, clientMessageId: awaitingClosure.clientMessageId } })).toEqual([]);
+      // Too-early closure must not emit its customer notice or consume a sequence.
+      expect((await get(path, customer).expect(200)).body.lastSequence).toBe(3);
+      const reply = await send(staff, "Synthetic resolved reply", { supportKind: "reply" }).expect(201);
+      const notice = { clientMessageId: randomUUID(), body: "Synthetic resolution notice. Reply to reopen.", visibility: "customer", supportKind: "notice", reason: "Synthetic customer-specific resolution reason" };
+      const noticeSent = await post(`${path}/messages`, staff, notice).expect(201);
+      expect(noticeSent.body).toMatchObject({ sender: "carberk", visibility: "customer", sequence: 5, body: notice.body });
+      const noticeBefore = await db.serviceMessage.findMany({ where: { conversationId }, orderBy: { sequence: "asc" } });
+      const outboxBefore = await db.serviceOutbox.findMany({ where: { conversationId }, orderBy: { sequence: "asc" } });
+      expect((await post(`${path}/messages`, staff, notice).expect(201)).body).toEqual(noticeSent.body);
+      expect(await db.serviceMessage.findMany({ where: { conversationId }, orderBy: { sequence: "asc" } })).toEqual(noticeBefore);
+      expect(await db.serviceOutbox.findMany({ where: { conversationId }, orderBy: { sequence: "asc" } })).toEqual(outboxBefore);
+      await supportJournal(id, 89, 115); // Retry adds exactly one SERVICE_SEND access audit.
+      expect((await get(path, customer).expect(200)).body.support).toMatchObject({ unansweredSince: null, awaitingCustomerSince: null });
+      await post(`${path}/support`, staff, { kind: "close_resolved" }).expect(201);
+      const closed = await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } });
+      expect(closed).toMatchObject({ status: "closed", closedAt: expect.any(Date), unansweredSince: null });
+      // Resolved closure has no implicit message/notice or outbox under the ordinary contract.
+      expect(await db.serviceMessage.findMany({ where: { conversationId }, orderBy: { sequence: "asc" } })).toEqual(noticeBefore);
+      expect(await db.serviceOutbox.findMany({ where: { conversationId }, orderBy: { sequence: "asc" } })).toEqual(outboxBefore);
+      expect((await get(path, customer).expect(200)).body).toMatchObject({ status: "closed", lastSequence: 5 });
+      const reopenedMessage = await send(customer, "Synthetic reply reopens retained case").expect(201);
+      const reopened = await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } });
+      expect(reopened).toMatchObject({ status: "open", closedAt: null, unansweredSince: expect.any(Date), awaitingCustomerSince: null });
+      const extraMessage = await send(customer, "Synthetic extra request preserves oldest debt").expect(201);
+      expect((await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } })).unansweredSince).toEqual(reopened.unansweredSince);
+      expect((await post("/api/v1/services/conversations", customer, { purpose: "support", synthetic: true }).expect(201)).body).toEqual(opened.body);
+      await post(`${path}/assignment`, staff, { expectedVersion: 1, targetUserId: next.user.id }).expect(201);
+      const handedOver = await supportSnapshot(id);
+      for (const kind of ["close_resolved", "reopen"]) await post(`${path}/support`, staff, { kind }).expect(403);
+      expect(await supportSnapshot(id)).toEqual(handedOver);
+      await post(`${path}/support`, next, { kind: "reopen" }).expect(201);
+      expect(await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } })).toMatchObject({ assigneeId: next.user.id, assignmentVersion: 2, status: "open", closedAt: null, unansweredSince: reopened.unansweredSince });
+      const stillOwed = await supportSnapshot(id);
+      await post(`${path}/support`, next, { kind: "close_resolved" }).expect(400);
+      expect(await supportSnapshot(id)).toEqual(stillOwed);
+      const nextReply = await send(next, "Synthetic current owner resolves request", { supportKind: "reply" }).expect(201);
+      await post(`${path}/support`, next, { kind: "close_resolved" }).expect(201);
+      expect(await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } })).toMatchObject({ status: "closed", closedAt: expect.any(Date), unansweredSince: null });
+      await post(`${path}/support`, next, { kind: "reopen" }).expect(201);
+      expect(await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } })).toMatchObject({ status: "open", closedAt: null, unansweredSince: null, awaitingCustomerSince: null });
+
+      cleanupIds.push(foreignId);
+      const foreignRoster = await seed(foreignId);
+      const foreignCustomer = await signIn(foreignId, actor(foreignRoster, "buyer-a"), known);
+      const foreignOpened = await post("/api/v1/services/conversations", foreignCustomer, { purpose: "support", synthetic: true }).expect(201);
+      const foreignBefore = await supportSnapshot(foreignId), ownBefore = await supportSnapshot(id);
+      for (const kind of ["close_resolved", "reopen"]) {
+        await post(`${path}/support`, foreignCustomer, { kind }).expect(403);
+        await post(`/api/v1/services/conversations/${foreignOpened.body.id}/support`, next, { kind }).expect(403);
+      }
+      expect(await supportSnapshot(id)).toEqual(ownBefore);
+      expect(await supportSnapshot(foreignId)).toEqual(foreignBefore);
+      await supportJournal(foreignId, 25, 27);
+      const audits = await db.serviceAudit.findMany({ where: { resourceId }, orderBy: { id: "asc" } });
+      expect(audits.map(({ action }) => action).sort()).toEqual([
+        ...Array<string>(2).fill("SERVICE_ASSIGN"), ...Array<string>(2).fill("SERVICE_HANDOVER"),
+        ...Array<string>(4).fill("SERVICE_NOTE"), ...Array<string>(5).fill("SERVICE_SEND"),
+        ...Array<string>(3).fill("SUPPORT_CUSTOMER_MESSAGE"), ...Array<string>(2).fill("SUPPORT_REPLY"),
+        "SUPPORT_REQUEST_INFORMATION", "SUPPORT_NOTICE", ...Array<string>(2).fill("SUPPORT_CLOSE_RESOLVED"), ...Array<string>(2).fill("SUPPORT_REOPEN"),
+      ].sort());
+      expect(audits.filter(audit => audit.action === "SUPPORT_CLOSE_RESOLVED").map(audit => ({ actorId: audit.actorId, assignmentVersion: audit.assignmentVersion })).sort((a, b) => Number(a.assignmentVersion) - Number(b.assignmentVersion))).toEqual([
+        { actorId: staff.user.id, assignmentVersion: 1 }, { actorId: next.user.id, assignmentVersion: 2 },
+      ]);
+      expect(audits.filter(audit => audit.action === "SUPPORT_REOPEN")).toEqual([
+        expect.objectContaining({ actorId: next.user.id, assignmentVersion: 2 }), expect.objectContaining({ actorId: next.user.id, assignmentVersion: 2 }),
+      ]);
+      expect(audits.find(audit => audit.action === "SUPPORT_NOTICE")).toMatchObject({ actorId: staff.user.id, reason: notice.reason, assignmentVersion: 1 });
+      const messages = [customerSent, information, reply, noticeSent, reopenedMessage, extraMessage, nextReply];
+      const outbox = await db.serviceOutbox.findMany({ where: { conversationId }, orderBy: { sequence: "asc" } });
+      expect(outbox.map(({ eventType, sequence, visibility, lifecycleEpoch }) => ({ eventType, sequence, visibility, lifecycleEpoch }))).toEqual(
+        Array.from({ length: 9 }, (_, index) => ({ eventType: index === 1 || index === 7 ? "handover" : "message", sequence: index + 1, visibility: "customer", lifecycleEpoch: 0 })));
+      const customerRead = await get(path, customer).expect(200);
+      expect(customerRead.body.messages.map((message: { id: string }) => message.id)).toEqual(messages.map(message => message.body.id));
+      expect(customerRead.body.messages.every((message: { sender: string; operatorName: string | null }) => message.sender === "customer" || message.sender === "carberk" && message.operatorName === null)).toBe(true);
+      const before = await owned(id);
+      const keys = [
+        { table_name: "support_cases", row_key: { id: resourceId } }, { table_name: "service_conversations", row_key: { id: conversationId } },
+        ...messages.map(message => ({ table_name: "service_messages", row_key: { id: message.body.id } })),
+        ...outbox.map(({ id }) => ({ table_name: "service_outbox", row_key: { id } })), ...audits.map(({ id }) => ({ table_name: "service_audits", row_key: { id } })),
+      ];
+      expect(before.filter(row => serviceTables.includes(row.table_name))).toHaveLength(42);
+      expect(before.filter(row => serviceTables.includes(row.table_name))).toEqual(expect.arrayContaining(keys));
+      const live = await supportJournal(id, 110, 148);
+      expect(await rows(`SELECT table_name,count(*)::int AS count FROM "cf_${id}".campaign_records GROUP BY table_name ORDER BY table_name`)).toEqual(
+        Object.entries({ audit_logs: 4, dealership_members: 1, dealerships: 1, otp_requests: 5, service_audits: 24, service_conversations: 1, service_messages: 7, service_outbox: 9, sessions: 5, staff_grants: 4, support_cases: 1, totp_backup_codes: 30, totp_enrollments: 3, users: 15 }).sort(([a], [b]) => a.localeCompare(b)).map(([table_name, count]) => ({ table_name, count })));
+      expect(await rows(`SELECT table_name,mutation,count(*)::int AS count FROM "cf_${id}".campaign_events WHERE mutation<>'INSERT' GROUP BY table_name,mutation ORDER BY table_name`)).toEqual([
+        { table_name: "otp_requests", mutation: "UPDATE", count: 10 }, { table_name: "service_conversations", mutation: "UPDATE", count: 9 },
+        { table_name: "sessions", mutation: "UPDATE", count: 3 }, { table_name: "support_cases", mutation: "UPDATE", count: 13 }, { table_name: "totp_enrollments", mutation: "UPDATE", count: 3 },
+      ]);
+      const terminalReceipt = { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 };
+      expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+      await supportDisposed(id, before, audits, requestIds);
+      const terminal = await supportJournal(id, 110, 258);
+      expect(terminal.events.slice(0, 148)).toEqual(live.events);
+      for (const record of terminal.records) {
+        const prior = live.records.find(row => row.table_name === record.table_name && JSON.stringify(row.row_key) === JSON.stringify(record.row_key));
+        expect(Number(record.version)).toBe(Number(prior!.version) + 1);
+        expect(terminal.events.filter(event => event.table_name === record.table_name && JSON.stringify(event.row_key) === JSON.stringify(record.row_key)).at(-1)?.mutation).toBe(["audit_logs", "service_audits"].includes(record.table_name) ? "UPDATE" : "DELETE");
+      }
+      const terminalSnapshot = await supportSnapshot(id);
+      expect(execute("reset", id)).toMatchObject({ code: 0, receipt: terminalReceipt });
+      expect(await supportSnapshot(id)).toEqual(terminalSnapshot);
+      expect(await supportSnapshot(foreignId)).toEqual(foreignBefore);
+      const foreignKeys = await owned(foreignId);
+      expect(execute("reset", foreignId)).toMatchObject({ code: 0, receipt: terminalReceipt });
+      await supportDisposed(foreignId, foreignKeys, [], [foreignCustomer.requestId]);
+      await supportJournal(foreignId, 25, 52);
+    });
+  }));
+
   // B2 text-only contexts. Per reservation, count BEFORE writing: primary 68 records / 91 events
   // before reset, 159 events after reset; foreign control 24 / 26, then 50 events after its reset.
   // Fixed guards remain 128 records / 2048 events. No catalog, contact, media or publish setup.
