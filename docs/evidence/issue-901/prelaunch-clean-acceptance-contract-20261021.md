@@ -2,7 +2,7 @@
 
 ## Hosted receipt update, 2026-10-21
 
-The latest classified hosted evidence is the [`7283f2f1` receipt](prelaunch-hosted-receipt-7283f2f1-20261021.md). DB passes 387/390 tests; three new process-restart cases fail at configuration snapshot equality before recovery assertions. Worker passes 373/373 tests. API passes 3086/3155 tests; 66 failures reach missing private-proof issuance routes and three are the retained full-v3 reset tails. Lane/static/frontend/image runtime pass; docs skip. The [`2b00c38e` receipt](prelaunch-hosted-receipt-2b00c38e-20261021.md) remains prior GREEN for interrupted recovery without restart. This status retires no test and establishes no deployed or reset readiness.
+The latest classified hosted evidence is the [`5646e056` receipt](prelaunch-hosted-receipt-5646e056-20261021.md). All six interrupted Redis cases pass, including the three process-restart cases that failed in the [`7283f2f1` receipt](prelaunch-hosted-receipt-7283f2f1-20261021.md). DB passes 390/391 tests; only the new reference-seed snapshot fails, before repeated seeding and the second database. Its test-only expectation correction is assembled and awaits hosted runtime. Worker passes 373/373 tests. API passes 3086/3155 tests; 66 failures reach missing private-proof issuance routes and three are the retained full-v3 reset tails. Lane/static/frontend/image runtime pass; docs skip. This status retires no test and establishes no deployed or reset readiness.
 
 The following table preserves the historical [`c253ab93` receipt](prelaunch-hosted-receipt-c253ab93-20261021.md). The [`8f8709aa` receipt](prelaunch-hosted-receipt-8f8709aa-20261021.md) also remains historical. Exact results apply only to their named candidates.
 
