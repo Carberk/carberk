@@ -1,16 +1,16 @@
 # Full-v3 diagnostics public-chain capacity disposition
 
-Docs-only design handoff for #901 under #897 / PR #904. Exact base `bf2dbc57427ac2690804e651a47438ddaa6c9f4d`; reservation branch `agent/issue-901-diagnostics-capacity-20261021` was pushed at that base before edits. This note proposes options only. It approves no allocation, cap, architecture or product change. Root decides.
+Docs-only design handoff for #901 under #897 / PR #904. Exact base `bf2dbc57427ac2690804e651a47438ddaa6c9f4d`; reservation branch `agent/issue-901-diagnostics-capacity-20261021` was pushed at that base before edits. The original alternatives remain below for accounting history. Root now adopts mapping D for acceptance actor allocation only. No cap, architecture or governing scope change is approved.
 
 Inputs: [diagnostics graph plan](full-v3-diagnostics-graph-plan-20261020.md) (ledger and per-operation costs), [accounting rules](full-v3-capacity-inventory-20261020.md#accounting-rules-source-at-base), [auth costs](full-v3-capacity-inventory-20261020.md#authentication-lifecycle-costs-grounded) and the [criterion index](../issue-897/criterion-evidence-index-20261018.md). Fixed: 128 records, 2048 events, 128 deliveries, the joined public correction/template/withdrawal chain, ordinary OTP/TOTP/HTTP grants. This note does not repeat the release audit or re-derive auth behavior.
 
-## Obligation sources: participation versus existence
+## Historical M obligation sources: participation versus existence
 
 - **Existence only.** All 15 aliases are bootstrap users in every reservation ([roster](../../../scripts/staging-campaign.mjs#L237), [user insert](../../../scripts/staging-campaign.mjs#L849)), inside the 21 bootstrap records. Existence costs no further records.
 - **Required participation (matrix).** [X3](../issue-897/release-acceptance-matrix-20261020.md#L100) names `independent-reviewer (public)` and `private-reviewer (audited self-review)`. [X1](../issue-897/release-acceptance-matrix-20261020.md#L98) names `reception-steward in admin diagnostics`. [S1](../issue-897/release-acceptance-matrix-20261020.md#L41) requires granting "each capability to its matching alias". [Execution order 2](../issue-897/release-acceptance-matrix-20261020.md#L157) requires recording "every required alias/capability". Root's [allocation](full-v3-diagnostics-graph-plan-20261020.md#L9) and its [alias table](full-v3-diagnostics-graph-plan-20261020.md#L18) bind reception/templates to `reception-steward` and the public reviewer to `independent-reviewer`.
 - **Governing specification.** The specification requires only a *different qualified reviewer* for public reports and audited self-review for private reports: [feature 50](../../prd/features/50-reports-tier.md#L17), [ADR-0104](../../adr/0104-center-diagnostics-with-private-and-public-reports.md#L18) and [flow 66](../../prd/flows/66-diagnostic-inspection.md#L31). [Feature 40](../../prd/features/40-admin.md#L167) states "One named person may hold multiple explicit grants." No specification names an alias. [Root disposition](full-v3-capacity-inventory-20261020.md#L43) allows S1/S2 to be shown per alias in that alias's group.
 
-As a result, the specification permits reviewer reuse. The matrix's actor naming and root's allocation do not. Any fit therefore needs a root decision on actor mapping. No source or specification change is needed.
+Root has amended the matrix and graph allocation to D. The public independent-reviewer holds explicit reception/templates/reviewer grants and current center qualifications, distinct from the technician author. Private X1 stays with reception-steward; private audited self-review is unchanged. Coordinator grants every capability, with no self-grants or temporary management delegation. Reception may self-assign the order reviewer capability under existing source. Independence means different author and reviewer, not a different receptionist. Each alias remains denied outside its explicit grants. No source or specification change follows from this allocation.
 
 ## Source facts used
 
@@ -30,7 +30,7 @@ As a result, the specification permits reviewer reuse. The matrix's actor naming
   - **C**, the contact proof, is therefore ≥ 2 records (OTP plus confirmation). Confidence is medium; I did not trace the exact write path.
   - The current v3 OTP guard admits `sign_in` and the bound `buyer-a`/admitted-business contact path. That does not authorize this owner's personal contact proof, which remains unsupported.
 
-## Alternatives evaluated (public reservation only)
+## Alternatives evaluated before D adoption (public reservation only)
 
 - **M: matrix as written.** Coordinator, reception-steward, technician, independent-reviewer, owner and buyer-b; S=6, K=4, G=4.
 - **A: coordinator reviews the public report.** Coordinator grants `staff.manage` to the already-elevated reception-steward. Reception-steward grants coordinator `diagnostics.reviewer` and assigns it on the order. Coordinator then revokes reception-steward's `staff.manage`; without the revoke, reception-steward reaches outside its area, contrary to [S2](../issue-897/release-acceptance-matrix-20261020.md#L42). `independent-reviewer` does not participate. Source permits A.
@@ -60,17 +60,11 @@ Event totals exclude contact events. Reset adds at least one event per live row 
 
 **Lower bound under M.** The three named staff (X1, X2, X3) and the coordinator must each sign in and enroll. The coordinator is the only possible granter: bootstrap grants are fixed and self-grants are refused. That fixes K=4 at 85 auth records. The content floor is 44 records plus F+E ≥ 3 plus C ≥ 2. Moving buyer-b's public mobile read to owner or anonymous web saves 2 records, which still leaves ≥132 including contact. Moving return/resubmit (2 records) and PDF retry (UNKNOWN) to the private reservation is already assumed. **M cannot fit 128.** With buyer-b, the table gives ≥132 before contact and ≥134 with it. Without buyer-b, those bounds are ≥130 and ≥132 respectively. Reinspection and unmeasured bootstrap/storage costs are additional.
 
-## Disposition (proposal, not approved)
+## Root disposition, mapping D adopted
 
-A, B and D have lower-bound estimates below 128; none yet proves a complete fit. The apparent 4 (A) or 7 (B/D) records of headroom must cover all additional required-check saves, evidence, bootstrap audit and storage costs, whose full ledger remains unknown. **A is dominated.** It costs 3 more records than B or D, needs a temporary management delegation, makes the coordinator both granter and reviewer, and still leaves `independent-reviewer` without its X3 role. **D is the preferred candidate for root disposition.** It keeps X3 exactly: `independent-reviewer` is the qualified public reviewer, separate from `technician`, and private audited self-review is unchanged. Its deviation is that the public order's reception and publication-consent actor is not `reception-steward`. B keeps X1 intact and moves X3 instead. No template or actor choice is approved here.
+D is the selected acceptance allocation. A and B remain historical alternatives, not authorized work. D's **≥121** records is only a lower bound. It does not prove complete fit under 128. M remains **≥134 including contact**; without buyer-b it remains **≥132 including contact**, or **≥130 before contact**. No cap increase or split of the joined public correction/template/withdrawal chain is approved.
 
-Decisions root must make:
-
-1. Amend the [allocation](full-v3-diagnostics-graph-plan-20261020.md#L9) and the X1/X3 actor mapping. Choose D, B or A, or confirm M and accept that the public chain cannot run under 128.
-2. Decide whether the reviewer's self-assignment of the order reviewer capability (B/D) meets "independent review" policy.
-3. Fix template size (checks/panels) within the remaining headroom.
-4. Choose where return/resubmit, PDF failure/retry, unassigned-staff denial and buyer-b's public mobile read run.
-5. Approve a v3 contact-phone path for the owner's personal Listing, or approve an existing account-phone alternative.
+Template size, full finding/evidence counts, reinspection, bootstrap audit and storage counts remain **UNKNOWN**. Qualification authority rejects null and expired `qualifiedUntil` even though the schema permits null. Center/bootstrap/runtime/disposal architecture remains **UNAPPROVED**. All governing criteria remain required, including return/resubmit, PDF failure/retry, unassigned-staff denial, buyer-b reads, reinspection and personal Listing contact proof. Their complete allocation and ledger still need evidence.
 
 Still UNAPPROVED or open, with no assignment:
 - Trusted reservation-aware runtime admission.
@@ -83,4 +77,4 @@ Reinspection is required by [ADR-0104](../../adr/0104-center-diagnostics-with-pr
 
 ## Checks
 
-Only this file changed. Offline: `git diff --check`, `pnpm check:agent-docs`, a local link/line existence check, and single-path diff review. No tests, services, staging, GitHub comments, PRs, agents or CI were run.
+Original checkpoint checks covered this file only. Current five-file checkpoint checks are recorded in [the hosted checkpoint](../issue-897/checkpoint-46f9ab8a-20261021.md). Offline: `git diff --check`, `pnpm check:agent-docs`, a local link/line existence check, and single-path diff review. No tests, services, staging, GitHub comments, PRs, agents or CI were run.

@@ -38,8 +38,8 @@ Each batch row gives its preconditions, a trigger with its observable result, th
 | ID | Preconditions | Trigger → observable | Artifact | Gate |
 |---|---|---|---|---|
 | S0 | Reservation recorded; Railway identity verified | `/readyz`, worker boot, media readiness, mock delivery config; bundle API/socket/media origins match staging | deployment IDs and SHA, readiness receipt, origin receipt | scoped staging token (refused before); v3 operational |
-| S1 | admin `login` → `workspace`; coordinator; browser | ordinary email OTP sign-in, TOTP enroll and elevate, grant each capability to its matching alias with a reason; self-grant refused | audit rows (redacted), screenshots **Dn Lc** | needs v3+ Session/TOTP |
-| S2 | S1 actors | each alias reaches only its own area; revoke one grant mid-task → next direct read/mutation/file URL refused; stale elevation expires | HTTP status and screen pairs | needs v3+ |
+| S1 | admin `login` → `workspace`; coordinator; browser | ordinary email OTP sign-in, TOTP enroll and elevate, coordinator grants each capability to its explicitly allocated alias with a reason, including public independent-reviewer reception/templates/reviewer under mapping D; self-grant refused; no temporary management delegation | audit rows (redacted), screenshots **Dn Lc** | needs v3+ Session/TOTP |
+| S2 | S1 actors | each alias reaches only areas authorized by its explicit grants, including mapping D; every area outside those grants is denied; revoke one grant mid-task → next direct read/mutation/file URL refused; stale elevation expires | HTTP status and screen pairs | needs v3+ |
 | S3 | admin shell/viewers ([#906 evidence](../issue-906/verification.md)) | listing/user directory, full read-only viewer, protected video context; desktop, narrow and tablet; keyboard-only path | screenshots **Lc** | needs v3+ |
 
 ### M. Existing marketplace (must stay intact)
@@ -95,9 +95,9 @@ Each batch row gives its preconditions, a trigger with its observable result, th
 
 | ID | Preconditions | Trigger → observable | Artifact | Gate |
 |---|---|---|---|---|
-| X1 | mobile `diagnostics/*`; buyer-a and owner; reception-steward in admin `diagnostics` | intake with physical vs publication consent; requested time not shown as confirmed; duplicate request does not double-book | screenshots | needs v3+ diagnostics graph; synthetic center |
+| X1 | mobile `diagnostics/*`; buyer-a and owner; reception-steward for private X1, independent-reviewer for public reception/templates, in admin `diagnostics` | intake with physical vs publication consent; requested time not shown as confirmed; duplicate request does not double-book | screenshots | needs v3+ diagnostics graph; synthetic center |
 | X2 | technician | checklist, body map ↔ list equivalence, evidence retry, unsaved-work guard; removed technician refused | screenshots **Dn Rc** | v3+ |
-| X3 | independent-reviewer (public), private-reviewer (audited self-review) | release immutable v1; correction creates v2 with v1 kept; withdrawal hides public; template v2 does not alter v1 | audit plus reader screenshots | v3+ |
+| X3 | independent-reviewer (public reception/templates/reviewer, current center qualifications, different from technician author; may self-assign reviewer capability), private-reviewer (unchanged audited self-review) | release immutable v1; correction creates v2 with v1 kept; withdrawal hides public; template v2 does not alter v1 | audit plus reader screenshots | v3+ |
 | X4 | web `[locale]/diagnostics/[id]`, mobile reader; buyer-b and outsider | reader and PDF from the same snapshot in TK/RU/EN; private report invisible to seller and buyer-b; badge on Results and detail only for available public reports | screenshots plus PDF hash | v3+ |
 
 ### A. Measurement and Improvement (#905, #917, #918) — [analytics UI](../../prd/ui/analytics-improvement.md), [D](dealer-measurement-criterion-reconciliation.md)
@@ -130,6 +130,8 @@ These never pass through synthetic runs. Record each fact as present, absent or 
 | Founder physical Full HD 60 fps / 4K 60 fps / HDR recordings | founder |
 | Signing identities, assetlinks/AASA, Play disclosures, versionCode, [#329](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/329) signed-candidate gate | founder |
 | TM provider/storage/network/hardware facts | founder |
+
+Mapping D is acceptance actor allocation only, with no governing scope change. [The capacity disposition](../issue-901/full-v3-diagnostics-capacity-disposition-20261021.md#root-disposition-mapping-d-adopted) records D ≥121 as a lower bound, not complete fit. Template size/full evidence/reinspection/bootstrap audit and storage counts remain UNKNOWN. Qualification authority rejects null/expired validity; center/bootstrap/runtime/disposal architecture remains UNAPPROVED. Whole acceptance criteria remain required. [The 46f9ab8a checkpoint](checkpoint-46f9ab8a-20261021.md) records hosted RED media and reinspection; this candidate is not green.
 
 ## Unresolved prerequisites
 
