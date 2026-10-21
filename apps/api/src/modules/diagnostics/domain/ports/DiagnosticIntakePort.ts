@@ -17,4 +17,5 @@ export interface DiagnosticIntakePort {
   appointment(subject: DiagnosticSubject, id: string, input: DiagnosticSchemas.DiagnosticAppointmentChange): Promise<DiagnosticSchemas.DiagnosticOrder>;
   assign(subject: DiagnosticSubject, id: string, input: DiagnosticSchemas.DiagnosticAssignmentChange): Promise<DiagnosticSchemas.DiagnosticOrder>;
   observeVehicle(subject: DiagnosticSubject, id: string, input: DiagnosticSchemas.DiagnosticObservedVehicle): Promise<DiagnosticSchemas.DiagnosticOrder>;
+  identityRecords(subject: DiagnosticSubject, id: string): Promise<DiagnosticSchemas.DiagnosticIdentityRecord[]>;
 }

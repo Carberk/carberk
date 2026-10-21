@@ -20,6 +20,7 @@
     "diagnostic_center_assignments": "delete",
     "diagnostic_centers": "refuse-if-approved",
     "diagnostic_evidence": "delete",
+    "diagnostic_identity_records": "delete",
     "diagnostic_order_assignments": "delete",
     "diagnostic_pdf_artifacts": "delete",
     "diagnostic_reports": "delete",
@@ -94,6 +95,7 @@
   "migrationTriggers": [
     "dealership_members.business_enquiry_membership_revocation",
     "diagnostic_evidence.diagnostic_evidence_identity",
+    "diagnostic_identity_records.diagnostic_identity_record_immutable",
     "diagnostic_pdf_artifacts.diagnostic_pdf_snapshot",
     "diagnostic_reports.diagnostic_report_pinned",
     "history_artifacts.history_artifact_original_immutable",
