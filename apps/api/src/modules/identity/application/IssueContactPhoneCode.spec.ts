@@ -71,6 +71,17 @@ describe("IssueContactPhoneCode", () => {
     expect(result).not.toHaveProperty("testCode");
   });
 
+  it("keeps campaign codes private even when ordinary test mode is enabled", async () => {
+    const delivery = { kind: "campaign" as const, reservationId: "e1".repeat(16), candidate: "a".repeat(40),
+      namespace: `cf_${"e1".repeat(16)}`, requestId: "00000000-0000-4000-8000-000000000001" };
+    otp.smsDelivery = delivery;
+    const result = await useCase(true).execute(input);
+    expect(result).not.toHaveProperty("testCode");
+    expect(sms[0]?.smsDelivery).toEqual(delivery);
+    expect(sms[0]?.code).toMatch(/^\d{6}$/);
+    expect(hash(sms[0]!.code)).toBe(otp.records[0]?.codeHash);
+  });
+
   it("counts sign-in and every other purpose against the number's daily budget", async () => {
     for (let i = 0; i < 5; i += 1) {
       otp.seed({

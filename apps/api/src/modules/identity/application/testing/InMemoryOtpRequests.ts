@@ -1,3 +1,4 @@
+import type { SmsDelivery } from "../../domain/ports/OtpSenderPort";
 import type { ClockPort } from "../../domain/ports/ClockPort";
 import { OtpAttemptLedger, SIGN_IN_CODE_RATE_POLICY } from "../../domain/OtpAttemptLedger";
 import { SignInCodeRateLimitedError } from "../../domain/SignInCodeRateLimitedError";
@@ -8,6 +9,7 @@ import type { SignInCodeChannel } from "../../domain/types";
 /** Every `otp_requests` behaviour the code use-cases rely on, in memory. */
 export class InMemoryOtpRequests implements OtpRequestRepository {
   records: OtpRequest[] = [];
+  smsDelivery: SmsDelivery = { kind: "ordinary" };
 
   constructor(private readonly now: () => Date) {}
 
@@ -52,7 +54,7 @@ export class InMemoryOtpRequests implements OtpRequestRepository {
       destination: destination.value, expiresAt: destination.expiresAt(now) });
     const admitted = { ...record, createdAt: now };
     this.records[this.records.indexOf(record)] = admitted;
-    return { record: admitted, resendInSeconds: rateCheck.resendInSeconds, smsDelivery: { kind: "ordinary" } };
+    return { record: admitted, resendInSeconds: rateCheck.resendInSeconds, smsDelivery: this.smsDelivery };
   }
 
   async create(input: {
