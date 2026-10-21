@@ -58,3 +58,31 @@ Root inspects this checkpoint, assembles it with the independent DB restart repa
 Unproved: isolated A-only erasure with surviving other material, retained null/legacy pins, rights-expiry cleanup and referenced-chain cleanup on actual storage, issuer/linking-technician deletion detachment, concurrent issuance/authority loss, atomic audit failure, monotonic invalidation on actual mutate/revert, and generation/race interleavings. The newly added lifecycle/invalidation SQL and public participant-binding adapter have not received new executable PostgreSQL RED/GREEN beyond the hosted base's issuance/refusal contract; that evidence gap is explicit.
 
 Still subsequent: automatic VIN, both mixed manual/VIN directions, justified corrected mismatches, public seller/Listing/commissioner transfer, proof consumption, exact retry, successor contention, mutate/revert race acceptance, and surviving B after consumed A erasure. Existing reinspection consumption input and temporary link admission are unchanged. This is neither full lifecycle proof nor ADR-0108 completion.
+
+## Root assembly and combined offline verification
+
+Root acknowledged terminal checkpoint `d2f9caf20ac4d14080fb861c9e35610a23b742b7`, tree `d1843b49c4912a4c6d42ae012b1a60484d97ab2a`, and inspected the complete 26-file range from `7283f2f1`. Commits `e36dc5ff`, `3d621537`, `2009119a` and `d2f9caf2` are assembled as `c479f2fe`, `405f46ef`, `72b0a87b` and `bb21e872` after the independent seed correction. Every changed source/test/migration file matches the child's terminal content. The three original reset specs, interrupted Redis spec and both CampaignFullV3 specs remain byte-identical to `5646e056`. The proof HTTP suite changes only its exact center-owned proof-row teardown, one added line.
+
+At assembled source `bb21e872`, root ran the following without connecting to a database or starting Docker:
+
+| Gate | Result |
+|---|---|
+| Contracts build, DB client generation/build | Pass; Prisma config uses only inert `postgresql://unused:unused@127.0.0.1:1/unused` |
+| `pnpm test:unit` | 10/10 workspace tasks pass; API 2,425 pass with two existing skips, worker 292, contracts 567, DB 119, mobile 3,806, admin 330, web 184 and SMS gateway 3 |
+| `pnpm typecheck` | 11/11 workspace tasks pass |
+| API, worker, contracts and DB lint and TypeScript 6 | Pass |
+| `pnpm test:root` | 590 pass, zero fail, one existing skip, 591 total; the complete suite was rerun after the manifest correction |
+| Proof suite executable collection | 66 cases import and collect; no hooks or test bodies run |
+| Seed suite static collection | One intended case; hosted two-database/repeated-seed behavior remains pending |
+| Agent docs, glossary, runtime imports, migration/retained-SQL byte comparison and diff checks | Pass |
+
+Vitest's default static parser returned 23 declaration-like entries, including two false positives from setup calls. That output is not the 66-case receipt. Root then used `vitest list --no-static-parse` with a temporary collection-only config, no global service setup, to import and expand all 66 cases. This is collection evidence only.
+
+Logs in `/tmp/carberk-resume-20261021`:
+
+- `bb21-unit.log`, SHA-256 `f244dd94676fdf7168f7cef3a8ff1229a1b9efd0dd5fbad9fb1ada0fbfaf5abb`.
+- `bb21-typecheck.log`, SHA-256 `d40ef74e9e30fd25e5f9c065f8ba1b290169673d270bcc237e236a760eb6989c`.
+- `bb21-root.log`, SHA-256 `9ff01133c7f969b5c3de36e165019fefab7ae52753fe812c27594409344bf62b`.
+- `bb21-proof-runtime-collection.json`, SHA-256 `44b7a1ec7be05af0c755a87225af9491f4c0c986f179bd563edfb8cfdf48822a`.
+
+Hosted migration, HTTP, storage, lifecycle and race results remain unproved on this assembled source. No reset, deployment, activation, Railway retry, merge or release action occurred. Root owns the next exact-candidate hosted classification before expanding this slice.
