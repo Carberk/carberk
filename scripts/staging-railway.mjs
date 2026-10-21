@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { remoteProgram } from './staging-remote.mjs';
+import { observeQuiescence } from './staging-quiescence.mjs';
 import { businessReceipt, businessDisposalEvidence } from './staging-control.mjs';
 
 const run = promisify(execFile);
@@ -104,6 +105,10 @@ export class RailwayPlatform {
         result.fixtures !== (result.state === 'disposed' ? 'absent' : 'present')) throw new Error('Reserved campaign proof incomplete');
     if (result.state === 'disposed' && (result.reservationId !== lease.id || result.cleanupVersion !== 1 || result.deliveryCleanup !== 'disposed' ||
         result.queueJobs !== 0 || result.sinkRecords !== 0 || result.tombstone !== true)) throw new Error('Reserved delivery disposal proof incomplete');
+  }
+  /** Read-only observer; no reset/controller/ledger activation. */
+  async observeQuiescence(request) {
+    return observeQuiescence(this, request);
   }
   async deployment(id) {
     const { deployment } = await this.query(`query deployment($id: String!) { deployment(id: $id) { id status meta } }`, { id });
