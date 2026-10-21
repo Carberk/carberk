@@ -2445,7 +2445,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
 
   // Additive boundary tests. The original 28 cases and their helpers stay byte-for-byte unchanged.
   it.each(["publish", "attach"] as const)("fences a recorded %s generator across recovery and exact reset while foreign stock survives", mode => withKnownJobs(async known => {
-    const id = (mode === "publish" ? "c3" : "c5").repeat(16);
+    const id = (mode === "publish" ? "c3" : "c7").repeat(16);
     const foreignId = (mode === "publish" ? "c4" : "c6").repeat(16);
     const suite = defineE2eSuite(`campaign897-full-v3-media-races-${mode}-901`);
     const catalog = suite.catalog;
