@@ -73,11 +73,40 @@ describe("real interrupted Redis intent and lost Lua reply on disposable transpo
   const fences = new Map<string, () => void>();
   let connection: { host: string; port: number; password: string; maxRetriesPerRequest: null };
   let cleanResetProgram: (payload: unknown) => string;
+  let pgFixtureOrdinal = 0;
+  const monotonicMs = () => Number(process.hrtime.bigint() / 1000000n);
+  const validPid = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 2147483647;
+  async function maintenanceObservation(stage: "before-run" | "after-run") {
+    const startedAt = monotonicMs();
+    try {
+      // Observe through /postgres only; a target connection would obstruct the guard.
+      const result = await admin.query(`SELECT pg_backend_pid() AS observer, count(*)::int AS count,
+        coalesce((array_agg(pid ORDER BY pid))[1:16], '{}'::int[]) AS pids
+        FROM pg_stat_activity WHERE datname=$1 AND backend_type='client backend'`, [postgres.getDatabase()]);
+      const row = result.rows[0] as { observer?: unknown; count?: unknown; pids?: unknown } | undefined;
+      if (row && validPid(row.observer) && typeof row.count === "number" && Number.isInteger(row.count) && row.count >= 0 &&
+          row.count <= 2147483647 && Array.isArray(row.pids) && row.pids.length === Math.min(row.count, 16) && row.pids.every(validPid)) {
+        console.error(`Disposable PG maintenance: stage=${stage} observer=${row.observer} count=${row.count} pids=${row.pids.join(",") || "none"} startedAtMs=${startedAt} finishedAtMs=${monotonicMs()}`);
+      } else console.error("Disposable PG maintenance: unavailable");
+    } catch { console.error("Disposable PG maintenance: unavailable"); }
+  }
 
   async function query(sql: string, values: unknown[] = []): Promise<RecordValue[]> {
+    const ordinal = ++pgFixtureOrdinal;
+    const startedAt = monotonicMs();
     const client = new Client({ connectionString: databaseUrl });
     await client.connect();
-    try { return (await client.query(sql, values)).rows as RecordValue[]; } finally { await client.end(); }
+    const connectedAt = monotonicMs();
+    // pg receives this PID in BackendKeyData; @types/pg omits the runtime property.
+    const runtimePid = (client as Client & { processID?: unknown }).processID;
+    const backendPid = validPid(runtimePid) ? runtimePid : 0;
+    try {
+      return (await client.query(sql, values)).rows as RecordValue[];
+    } finally {
+      await client.end();
+      // The close event is awaited above. Keep this diagnostic outside query output and bounded.
+      console.error(`Disposable PG lifecycle: role=fixture-query ordinal=${ordinal} pid=${backendPid} startedAtMs=${startedAt} connectedAtMs=${connectedAt} closedAtMs=${monotonicMs()}`);
+    }
   }
   async function settle() {
     for (let attempt = 0; attempt < 100; attempt++) {
@@ -152,8 +181,11 @@ describe("real interrupted Redis intent and lost Lua reply on disposable transpo
 
   async function run(payload: unknown, env: Record<string, string> = environment(), interruption?: "before-lua" | "lua-reply"): Promise<Outcome> {
     await settle();
+    await maintenanceObservation("before-run");
     const proxy = interruption ? await interruptRedis(connection, interruption) : undefined;
     const outcome: Outcome = { code: 0, failure: "", sqlDiagnostics: [] };
+    const suppliedPhase = payload && typeof payload === "object" ? (payload as RecordValue)["phase"] : undefined;
+    const phase = ["inventoried", "rows", "redis-inventoried", "redis"].includes(suppliedPhase as string) ? suppliedPhase : "unknown";
     const process = { env, exitCode: 0 };
     const clients: { disconnect: () => void }[] = [];
     const remap = (args: unknown[]) => {
@@ -189,13 +221,33 @@ describe("real interrupted Redis intent and lost Lua reply on disposable transpo
       if (name === "node:child_process") return {
         spawnSync: (command: string, _args: string[], options: { input: string }) => {
           if (command !== "psql") throw new Error("Unsupported remote subprocess");
+          const childOrdinal = ++pgFixtureOrdinal;
+          const childStartedAt = monotonicMs();
           const result = spawnSync(globalThis.process.execPath, [`${root}/scripts/testing/query-disposable-postgres.cjs`], {
             input: options.input, encoding: "utf8", timeout: 30000, env: { ...globalThis.process.env,
-              STAGING_CONTROL_TEST_DATABASE_URL: databaseUrl, STAGING_TEST_DB_PACKAGE: `${packageRoot}/package.json`, STAGING_TEST_SQL_DIAGNOSTICS: "1" },
+              STAGING_CONTROL_TEST_DATABASE_URL: databaseUrl, STAGING_TEST_DB_PACKAGE: `${packageRoot}/package.json`, STAGING_TEST_SQL_DIAGNOSTICS: "1",
+              STAGING_TEST_PG_DIAGNOSTICS: "1", STAGING_TEST_PG_ROLE: "sql-child", STAGING_TEST_PG_ORDINAL: String(childOrdinal) },
           });
           // Bounded SQLSTATE metadata only. Do not print SQL, stderr, connection values or rows.
           const diagnostic = result.stderr?.split(/\r?\n/).find(line => /^Disposable database SQL diagnostic: SQLSTATE=[A-Z0-9]{5}(?: position=[0-9]{1,10})?(?: internalPosition=[0-9]{1,10})?$/.test(line));
           if (diagnostic) outcome.sqlDiagnostics.push(diagnostic);
+          const lifecycle = result.stderr?.split(/\r?\n/).find(line => /^Disposable PG lifecycle: role=sql-child ordinal=(?:0|[1-9][0-9]{0,5}) pid=(?:0|[1-9][0-9]{0,9}) connectedAtMs=\d{1,16} closedAtMs=\d{1,16}$/.test(line));
+          if (lifecycle) console.error(lifecycle);
+          const activity = result.stderr?.split(/\r?\n/).find(line => /^Disposable PG activity: ordinal=(?:0|[1-9][0-9]{0,5}) count=(?:0|[1-9][0-9]{0,9}) pids=(?:none|[1-9][0-9]{0,9}(?:,[1-9][0-9]{0,9}){0,15})$/.test(line));
+          if (activity) console.error(activity);
+          const envelope = result.stdout?.split(/\r?\n/).find(line => line.startsWith("clean-reset:"));
+          if (envelope) {
+            try {
+              const value = JSON.parse(envelope.slice("clean-reset:".length)) as RecordValue;
+              const stage = Object.hasOwn(value, "inventory") ? "initial-inventory" : Object.hasOwn(value, "verdict") ? "locked-reset" : "unknown";
+              const inventory = value["inventory"] as RecordValue | undefined;
+              const count = inventory?.["backends"];
+              const backends = typeof count === "number" && Number.isInteger(count) && count >= 0 && count <= 2147483647 ? count : "unknown";
+              const verdict = ["backends", "changed", "completed"].includes(value["verdict"] as string) ? value["verdict"] : "none";
+              console.error(`Disposable reset envelope: phase=${phase} child=${childOrdinal} stage=${stage} backends=${backends} verdict=${verdict}`);
+            } catch { /* The production program's bounded refusal remains authoritative. */ }
+          }
+          console.error(`Disposable PG child exit: ordinal=${childOrdinal} status=${result.status === 0 ? "zero" : result.status === null ? "unavailable" : "nonzero"} startedAtMs=${childStartedAt} exitedAtMs=${monotonicMs()}`);
           return result;
         },
       };
@@ -213,6 +265,7 @@ describe("real interrupted Redis intent and lost Lua reply on disposable transpo
       outcome.code = process.exitCode;
       return outcome;
     } finally {
+      await maintenanceObservation("after-run");
       for (const client of clients) client.disconnect();
       if (proxy) {
         await proxy.close();

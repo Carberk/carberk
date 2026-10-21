@@ -62,7 +62,7 @@ test('lifecycle diagnostics emit only bounded role, ordinal, pid and timings', a
   const result = await query(null, '1', true);
   assert.deepEqual(result.stdout, ['2']);
   assert.equal(result.stderr.length, 1);
-  assert.match(result.stderr[0], /^Disposable PG lifecycle: ordinal=7 pid=4321 connectedAtMs=\d+ closedAtMs=\d+$/);
+  assert.match(result.stderr[0], /^Disposable PG lifecycle: role=sql-child ordinal=7 pid=4321 connectedAtMs=\d+ closedAtMs=\d+$/);
 });
 
 test('diagnostic opt-in preserves rows and waits for local close even on SQL failure', async () => {
@@ -72,6 +72,31 @@ test('diagnostic opt-in preserves rows and waits for local close even on SQL fai
   assert.equal(result.code, 1);
   assert.match(result.stderr[0], /^Disposable PG lifecycle:/);
   assert.deepEqual(result.stderr.slice(1), ['Disposable database query refused', 'Disposable database SQL diagnostic: SQLSTATE=42601']);
+});
+
+test('the real serialized inventory SQL is instrumented only inside the disposable query transport', async () => {
+  const { cleanResetProgram } = await import('../staging-clean-reset-remote.mjs');
+  const identity = { projectId: '176ddec0-dd65-4087-b82c-798599fc2ebe', environmentId: '652abc79-fdb0-48b0-9f6c-ad0ff572d7b2',
+    services: { api: '6db6f1b1-5c7a-4033-88d0-53f5f315bfc0', worker: '24aa02e0-25a9-4e80-9cc2-c1795ef82091' },
+    origins: { database: 'postgresql://postgres.railway.internal:5432/railway' } };
+  const candidate = 'c'.repeat(40);
+  const sql = [];
+  const program = cleanResetProgram({ operation: 'clean-reset', phase: 'inventoried', operationId: 'e'.repeat(32),
+    reservationId: 'f'.repeat(32), candidate, identity });
+  await runInNewContext(program, { URL, Buffer, process: { env: { RAILWAY_PROJECT_ID: identity.projectId,
+    RAILWAY_ENVIRONMENT_ID: identity.environmentId, RAILWAY_SERVICE_ID: identity.services.api,
+    RAILWAY_ENVIRONMENT_NAME: 'staging', APP_ENV: 'staging', AUTOTM_COMMIT_SHA: candidate, DATABASE_URL: identity.origins.database } },
+  console: { error() {}, log() {} }, require: name => {
+    assert.equal(name, 'node:child_process');
+    return { spawnSync: (_command, _args, options) => { sql.push(options.input); return { status: 1 }; } };
+  } });
+  assert.equal(sql.length, 1);
+  const injected = [];
+  await query(null, '1', true, { input: sql[0], sql: injected });
+  assert.match(injected[0], /set_config\('staging_test.backends'/);
+  assert.equal(injected[0].split('AS staging_test_backends').length, 2);
+  assert.equal(cleanResetProgram({ operation: 'clean-reset', phase: 'inventoried', operationId: 'e'.repeat(32),
+    reservationId: 'f'.repeat(32), candidate, identity }), program);
 });
 
 const backendCount = "(SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND backend_type = 'client backend')";
@@ -100,5 +125,5 @@ test('diagnostics reject untrusted roles, ordinals, PIDs and activity rows witho
   }, result: { rows: [{ staging_test_backends: '{"count":1,"pids":["secret"]}' }] } });
   assert.deepEqual(result.stdout, []);
   assert.equal(result.stderr.length, 1);
-  assert.match(result.stderr[0], /^Disposable PG lifecycle: ordinal=0 pid=0 connectedAtMs=\d+ closedAtMs=\d+$/);
+  assert.match(result.stderr[0], /^Disposable PG lifecycle: role=unknown ordinal=0 pid=0 connectedAtMs=\d+ closedAtMs=\d+$/);
 });
