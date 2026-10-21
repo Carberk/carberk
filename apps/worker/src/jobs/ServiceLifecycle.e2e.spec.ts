@@ -71,6 +71,22 @@ describe.skipIf(!hosted)("private service lifecycle on disposable PostgreSQL and
   expect(await db.serviceMessage.count({ where: { conversationId: { in: [reopened.id, history.id] } } })).toBe(2);
   expect((await db.supportCase.findUniqueOrThrow({ where: { id: closed.resourceId } })).customerId).toBeNull();
  });
+ it("purges every due Support case in one sweep and does not repeat either case", async () => {
+  const first = await fixture("support", "closed", new Date("2000-03-03T12:00:00Z"));
+  const second = await fixture("support", "closed", new Date("2000-01-01T00:00:00Z"));
+  const expire = new ExpireServiceContent(db, objects);
+  expect((await expire.execute(now)).supportPurged).toBe(2);
+  expect((await expire.execute(now)).supportPurged).toBe(0);
+  for (const target of [first, second]) {
+   expect((await db.serviceConversation.findUniqueOrThrow({ where: { id: target.id } })).erasedAt).toEqual(now);
+   expect(await db.serviceMessage.count({ where: { conversationId: target.id } })).toBe(0);
+   expect(await db.serviceErasureFence.findUniqueOrThrow({ where: { conversationId: target.id } })).toMatchObject({ epoch: 1, cleanupCompletedAt: now });
+   expect(await db.serviceAudit.count({ where: { resourceId: target.resourceId, action: "SERVICE_CONTENT_PURGED" } })).toBe(1);
+   expect((await db.supportCase.findUniqueOrThrow({ where: { id: target.resourceId } })).customerId).toBeNull();
+   await expect(s3.send(new HeadObjectCommand({ Bucket: "service-private", Key: target.key }))).rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
+  }
+ }, 60000);
+
  /** Transparent scheduling boundary: the worker's own selection returns unchanged rows,
   * then pauses after it selected `caseId` and before any per-case transaction begins. */
  function pauseAfterSelecting(caseId: string) {
