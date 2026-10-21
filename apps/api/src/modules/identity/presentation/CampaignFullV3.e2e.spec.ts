@@ -58,12 +58,15 @@ const tables = ["users", "sessions", "otp_requests", "totp_enrollments", "totp_b
 
 // Failure-only diagnostics: inspect at most 8192 characters per field, emit only
 // fixed vocabulary (never raw messages/stderr), and retain no diagnostic buffers.
+// Read structured Prisma 7 driver metadata in the child before execFile wraps it.
 function cleanupFailure(error: unknown) {
-  const value = error as { name?: unknown; code?: unknown; message?: unknown; stderr?: unknown; meta?: { code?: unknown; message?: unknown } } | null;
+  const value = error as { name?: unknown; code?: unknown; message?: unknown; stderr?: unknown; meta?: { code?: unknown; message?: unknown; driverAdapterError?: { cause?: { originalCode?: unknown; kind?: unknown } } }; cause?: { originalCode?: unknown; kind?: unknown } } | null;
+  const driver = value?.meta?.driverAdapterError?.cause ?? value?.cause;
   const bounded = (input: unknown) => typeof input === "string" ? input.slice(0, 8192) : "";
   const text = [typeof value?.stderr === "string" ? value.stderr : value?.message, value?.meta?.message].map(bounded).join("\n");
   const names = ["PrismaClientKnownRequestError", "PrismaClientUnknownRequestError", "PrismaClientInitializationError", "TypeError", "RangeError", "Error"];
-  const codes = ["P2010", "P2028", "P2034", "P1001", "P1002", "P1017", "P0001", "23503", "23505", "40001", "40P01", "55P03", "57014", "42601", "42883", "42501", "ETIMEDOUT", "ENOBUFS", "ENOENT", "ECONNREFUSED"];
+  const codes = ["P2010", "P2028", "P2034", "P1001", "P1002", "P1017", "P0001", "23503", "23505", "40001", "40P01", "55P03", "57014", "42601", "42703", "42702", "42P01", "22P02", "42883", "42501", "ETIMEDOUT", "ENOBUFS", "ENOENT", "ECONNREFUSED"];
+  const driverCategories = ["postgres", "ColumnNotFound", "TableDoesNotExist", "InvalidInputValue", "TransactionWriteConflict", "TransactionAlreadyClosed", "SocketTimeout", "ConnectionClosed", "DatabaseNotReachable", "TooManyConnections"];
   const messages = [
     "Service private cleanup unavailable", "Service cleanup authority invalid",
     "Campaign Support ownership changed", "Campaign Support authority invalid",
@@ -87,7 +90,8 @@ function cleanupFailure(error: unknown) {
   ];
   return {
     errorType: names.find(name => name === value?.name) ?? names.find(name => text.includes(name)) ?? "unclassified-error-type",
-    codes: codes.filter(code => code === value?.code || code === value?.meta?.code || new RegExp(`\\b${code}\\b`).test(text)),
+    codes: codes.filter(code => code === value?.code || code === value?.meta?.code || code === driver?.originalCode || new RegExp(`\\b${code}\\b`).test(text)),
+    driverCategories: driverCategories.filter(category => category === driver?.kind || text.includes(JSON.stringify(category))),
     classifications: messages.filter(message => text.includes(message)),
   };
 }
@@ -1745,7 +1749,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
               catch (error) { if (!['BucketAlreadyExists', 'BucketAlreadyOwnedByYou'].includes(error.name)) throw error; }
               console.log(JSON.stringify(await new ExpireServiceContent(db, new S3RetiredObjectStore(s3, 'service-private')).execute(new Date(process.argv[1])))); }
             finally { s3.destroy(); await db.onModuleDestroy(); }
-          })().catch(error => { console.error('[issue-901-cleanup]', JSON.stringify((${cleanupFailure.toString()})(error))); console.error(error); process.exitCode = 1; });
+          })().catch(error => { console.error('[issue-901-cleanup]', JSON.stringify((${cleanupFailure.toString()})(error))); console.error('Deadline Support worker refused'); process.exitCode = 1; });
         `, now.toISOString()], {
           timeout: 30000, cwd: `${root}/apps/worker`, env: { ...process.env, TSX_TSCONFIG_PATH: `${root}/apps/worker/tsconfig.json` },
         });
