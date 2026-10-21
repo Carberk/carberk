@@ -252,6 +252,11 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries, disp
   // V3 ordinary conditional business images only (ADR-0088 conditional-v1 WebP manifests). Personal,
   // legacy and video uploads, media removal and every other claim path stay closed.
   if (bootstrapV3) tables.push('media_uploads', 'listing_media');
+  // V3 first diagnostics slice (#901): one reservation-derived synthetic center, the two reception-steward
+  // qualifications issued under a protected two-hour binding, ordinary template v1 and one buyer-private intake.
+  // Reports, evidence, PDFs, workers, reinspection and every later roster tuple stay closed.
+  const diagnosticTables = ['diagnostic_centers', 'diagnostic_center_assignments', 'diagnostic_template_versions', 'inspection_orders', 'diagnostic_order_assignments', 'diagnostic_audits'];
+  if (bootstrapV3) tables.push(...diagnosticTables);
   const uuidV4 = '[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
   // V3 ordinary staff grant/revoke (PrismaStaffAuthority.change): one composite grant transition
   // and one audit from a distinct current roster manager. Bootstrap rows stay fixed. The set is
@@ -659,7 +664,11 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries, disp
   const serviceParents = { conversationId: 'service_conversations', supportCaseId: 'support_cases', historyRequestId: 'vehicle_history_requests', attachmentId: 'service_attachments',
     customerId: 'users', assigneeId: 'users', senderId: 'users', userId: 'users', actorId: 'users', targetStaffId: 'users', resourceId: 'support_cases', sourceListingId: 'listings' };
   const serviceList = serviceTables.map(t => `'${t}'`).join(',');
-  const parentMap = bootstrapV3 ? `(CASE WHEN TG_TABLE_NAME IN (${serviceList}) THEN '${JSON.stringify(serviceParents)}' ELSE '${JSON.stringify(parents)}' END)::jsonb` : `'${JSON.stringify(parents)}'::jsonb`;
+  // Diagnostic rows resolve ownership only through the owned center, template, order and roster Users.
+  const diagnosticParents = { centerId: 'diagnostic_centers', templateVersionId: 'diagnostic_template_versions', orderId: 'inspection_orders',
+    userId: 'users', actorId: 'users', commissionerId: 'users', publishedById: 'users', listingId: 'listings' };
+  const diagnosticList = diagnosticTables.map(t => `'${t}'`).join(',');
+  const parentMap = bootstrapV3 ? `(CASE WHEN TG_TABLE_NAME IN (${serviceList}) THEN '${JSON.stringify(serviceParents)}' WHEN TG_TABLE_NAME IN (${diagnosticList}) THEN '${JSON.stringify(diagnosticParents)}' ELSE '${JSON.stringify(parents)}' END)::jsonb` : `'${JSON.stringify(parents)}'::jsonb`;
   const rosterUser = value => `EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=${value})`;
   const serviceActions = ['SERVICE_READ', 'SERVICE_SEND', 'SERVICE_NOTE', 'SERVICE_ASSIGN', 'SERVICE_HANDOVER', 'SUPPORT_CUSTOMER_MESSAGE', 'SUPPORT_PRIVATE_NOTE', 'SUPPORT_REPLY', 'SUPPORT_REQUEST_INFORMATION', 'SUPPORT_NOTICE', 'SUPPORT_CLOSE_RESOLVED', 'SUPPORT_REOPEN'].map(a => `'${a}'`).join(',');
   // Bounded Support text, resolved closure and reopen only. Successful awaiting closure has no
@@ -778,6 +787,136 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries, disp
     (SELECT attrelid,attnum,attname,atttypid,attnotnull,attgenerated FROM pg_attribute WHERE attrelid IN (${relationIds}) AND attnum>0 AND NOT attisdropped) a)`;
   const journalHash = `(SELECT md5(coalesce(jsonb_agg(to_jsonb(journal_row) ORDER BY table_name,row_key),'[]'::jsonb)::text) FROM "${n}".campaign_records journal_row)`;
   const eventHash = `(SELECT md5(coalesce(jsonb_agg(to_jsonb(event_row) ORDER BY sequence),'[]'::jsonb)::text) FROM "${n}".campaign_events event_row)`;
+  // First diagnostics slice. The center and both qualifications are synthetic test-only facts, never a
+  // real center approval: operationalApproval stays null and provenance is recorded in the protected binding.
+  const reception = identities.find(identity => identity.alias === 'reception-steward');
+  const diagnosticProvenance = 'synthetic-test-only-v1';
+  const centerId = uuid(`campaign897:diagnostics:center:${input.id}:${input.candidate}`);
+  const centerCode = `campaign897-${input.id}-${input.candidate.slice(0, 12)}-diagnostics`;
+  const centerNames = `'{"en":"Carberk synthetic diagnostics","ru":"Carberk synthetic diagnostics","tk":"Carberk synthetic diagnostics"}'::jsonb`;
+  const centerAudit = uuid(`campaign897:diagnostics:audit:CENTER_SYNTHETIC_BOOTSTRAPPED:center:${input.candidate}`);
+  const qualifications = ['diagnostics.reception', 'diagnostics.templates'].map(capability => ({ capability,
+    id: uuid(`campaign897:diagnostics:qualification:reception-steward:${capability}:${input.candidate}`),
+    audit: uuid(`campaign897:diagnostics:audit:CENTER_QUALIFICATION_SYNTHETIC:${capability}:${input.candidate}`) }));
+  const bootstrapKeys = [['diagnostic_centers', centerId], ['diagnostic_audits', centerAudit], ...qualifications.flatMap(q => [['diagnostic_center_assignments', q.id], ['diagnostic_audits', q.audit]])]
+    .map(([table, id]) => `('${table}',jsonb_build_object('id','${id}'))`).join(',');
+  const diagnosticBinding = `"${n}".campaign_diagnostic_binding`;
+  const diagnosticBindingHash = `(SELECT md5(jsonb_build_object('binding',(SELECT coalesce(jsonb_agg(to_jsonb(b) ORDER BY reservation_id),'[]'::jsonb) FROM ${diagnosticBinding} b),
+    'columns',(SELECT jsonb_agg(to_jsonb(a) ORDER BY attnum) FROM (SELECT attnum,attname,atttypid,atttypmod,attnotnull FROM pg_attribute WHERE attrelid='${diagnosticBinding}'::regclass AND attnum>0 AND NOT attisdropped) a),
+    'constraints',(SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY conname) FROM pg_constraint WHERE conrelid='${diagnosticBinding}'::regclass))::text))`;
+  const diagnosticSignature = `"${n}".campaign_diagnostic_authority(text,text,text,text,text,text,text)`;
+  const diagnosticContract = `md5(pg_get_functiondef('${diagnosticSignature}'::regprocedure))`;
+  // PostgreSQL server time decides validity at every write and admission. No renewal path exists.
+  const serverNow = `(clock_timestamp() AT TIME ZONE 'UTC')`;
+  const liveBinding = `EXISTS(SELECT 1 FROM ${diagnosticBinding} b WHERE b.reservation_id='${input.id}' AND b.candidate='${input.candidate}' AND b.center_id='${centerId}' AND
+    b.provenance='${diagnosticProvenance}' AND b.issued_at<=${serverNow} AND b.qualification_deadline>${serverNow})`;
+  const centerShape = row => `${row}->>'id'='${centerId}' AND ${row}->>'code'='${centerCode}' AND ${row}->>'planCode'='standard' AND ${row}->'names'=${centerNames} AND ${row}->>'operationalApproval' IS NULL`;
+  const qualificationShape = row => `(${qualifications.map(q => `(${row}->>'id'='${q.id}' AND ${row}->>'capability'='${q.capability}')`).join(' OR ')}) AND
+    ${row}->>'centerId'='${centerId}' AND ${row}->>'userId'='${reception.id}' AND ${row}->>'revokedAt' IS NULL AND
+    EXISTS(SELECT 1 FROM ${diagnosticBinding} b WHERE b.center_id='${centerId}' AND (${row}->>'qualifiedUntil')::timestamp=b.qualification_deadline)`;
+  const bootstrapAudit = row => `${row}->>'centerId'='${centerId}' AND ${row}->>'orderId' IS NULL AND ${row}->>'actorId' IS NULL AND (
+    (${row}->>'id'='${centerAudit}' AND ${row}->>'action'='CENTER_SYNTHETIC_BOOTSTRAPPED' AND ${row}->'details'=jsonb_build_object('profile','${profile}','provenance','${diagnosticProvenance}')) OR
+    ${qualifications.map(q => `(${row}->>'id'='${q.audit}' AND ${row}->>'action'='CENTER_QUALIFICATION_SYNTHETIC' AND
+      ${row}->'details'=jsonb_build_object('profile','${profile}','provenance','${diagnosticProvenance}','capability','${q.capability}','userId','${reception.id}'))`).join(' OR ')})`;
+  // Ordinary PrismaDiagnosticIntake writes: template v1+ and its audit, one buyer-private order without a
+  // Listing, its reception assignment and intake audit. Any UPDATE, later transition or other audit refuses.
+  const diagnosticGuard = bootstrapV3 ? `
+        IF TG_TABLE_NAME IN (${diagnosticList}) AND NOT coalesce(TG_OP='INSERT' AND ${liveBinding} AND CASE TG_TABLE_NAME
+          WHEN 'diagnostic_centers' THEN ${centerShape('v_row')}
+          WHEN 'diagnostic_center_assignments' THEN ${qualificationShape('v_row')}
+          WHEN 'diagnostic_template_versions' THEN v_row->>'centerId'='${centerId}' AND v_row->>'synthetic'='true' AND v_row->>'publishedById' IS NOT NULL AND
+            (v_row->>'version')::int>=1 AND jsonb_typeof(v_row->'definition')='object'
+          WHEN 'inspection_orders' THEN v_row->>'centerId'='${centerId}' AND v_row->>'audience'='buyer_private' AND v_row->>'listingId' IS NULL AND v_row->>'commissionerId' IS NOT NULL AND
+            v_row->>'synthetic'='true' AND v_row->>'status'='requested' AND v_row->>'version'='0' AND v_row->>'erasedAt' IS NULL AND
+            v_row->>'physicalAuthorization' IS NULL AND v_row->>'publicationAuthorization' IS NULL AND v_row->>'observedVehicle' IS NULL AND
+            v_row->>'listingIdentityDigest' IS NULL AND v_row->>'associationValidatedAt' IS NULL AND
+            EXISTS(SELECT 1 FROM public.diagnostic_template_versions t WHERE t.id=v_row->>'templateVersionId' AND t."centerId"=v_row->>'centerId' AND t.synthetic AND ${currentRow('diagnostic_template_versions', 't')})
+          WHEN 'diagnostic_order_assignments' THEN v_row->>'capability'='diagnostics.reception' AND v_row->>'revokedAt' IS NULL AND
+            EXISTS(SELECT 1 FROM public.inspection_orders io JOIN public.diagnostic_center_assignments q ON q."centerId"=io."centerId"
+              WHERE io.id=v_row->>'orderId' AND q."userId"=v_row->>'userId' AND q.capability='diagnostics.reception' AND q."revokedAt" IS NULL AND
+                ${currentRow('inspection_orders', 'io')} AND ${currentRow('diagnostic_center_assignments', 'q')})
+          WHEN 'diagnostic_audits' THEN (${bootstrapAudit('v_row')}) OR
+            (v_row->>'action'='TEMPLATE_PUBLISHED' AND v_row->>'centerId'='${centerId}' AND v_row->>'orderId' IS NULL AND v_row->>'actorId' IS NOT NULL AND
+              EXISTS(SELECT 1 FROM public.diagnostic_template_versions t WHERE t.id=v_row->'details'->>'templateVersionId' AND t."centerId"=v_row->>'centerId' AND
+                t."publishedById"=v_row->>'actorId' AND ${currentRow('diagnostic_template_versions', 't')} AND
+                v_row->'details'=jsonb_build_object('templateVersionId',t.id,'version',t.version,'synthetic',true)) AND
+              (SELECT count(*) FROM public.diagnostic_audits a WHERE a.action='TEMPLATE_PUBLISHED' AND a.details->>'templateVersionId'=v_row->'details'->>'templateVersionId')=1) OR
+            (v_row->>'action'='INTAKE_CREATED' AND
+              EXISTS(SELECT 1 FROM public.inspection_orders io WHERE io.id=v_row->>'orderId' AND io."centerId"=v_row->>'centerId' AND io."commissionerId"=v_row->>'actorId' AND
+                ${currentRow('inspection_orders', 'io')} AND v_row->'details'=jsonb_build_object('audience',io.audience,'templateVersionId',io."templateVersionId",'synthetic',true)) AND
+              (SELECT count(*) FROM public.diagnostic_audits a WHERE a."orderId"=v_row->>'orderId' AND a.action='INTAKE_CREATED')=1)
+          ELSE false END,false) THEN RAISE EXCEPTION 'Unsupported campaign diagnostics'; END IF;` : '';
+  const rosterIds = `(SELECT user_id FROM "${n}".campaign_entities)`;
+  const diagnosticInventory = bootstrapV3 ? `
+    IF (SELECT diagnostic_binding_hash FROM "${n}".campaign_manifest) IS DISTINCT FROM ${diagnosticBindingHash} OR
+      (SELECT diagnostic_contract_hash FROM "${n}".campaign_manifest) IS DISTINCT FROM ${diagnosticContract}
+      THEN RAISE EXCEPTION 'Campaign diagnostic contract changed'; END IF;
+    IF (NOT EXISTS(SELECT 1 FROM ${diagnosticBinding}) AND EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name IN (${diagnosticList}))) OR
+      (EXISTS(SELECT 1 FROM ${diagnosticBinding}) AND (SELECT count(*) FROM "${n}".campaign_records WHERE (table_name,row_key) IN (${bootstrapKeys}))<>6)
+      THEN RAISE EXCEPTION 'Campaign diagnostic ownership changed'; END IF;
+    IF (SELECT state FROM "${n}".campaign_manifest)<>'disposed' AND (
+      EXISTS(SELECT 1 FROM public.diagnostic_centers c WHERE (c.id='${centerId}' OR c.code='${centerCode}') AND NOT ${ownedRow('diagnostic_centers', 'c')}) OR
+      EXISTS(SELECT 1 FROM public.diagnostic_center_assignments q WHERE (q."centerId"='${centerId}' OR q."userId" IN ${rosterIds} OR q.id IN (${qualifications.map(q => `'${q.id}'`).join(',')})) AND NOT ${ownedRow('diagnostic_center_assignments', 'q')}) OR
+      EXISTS(SELECT 1 FROM public.diagnostic_template_versions t WHERE (t."centerId"='${centerId}' OR t."publishedById" IN ${rosterIds}) AND NOT ${ownedRow('diagnostic_template_versions', 't')}) OR
+      EXISTS(SELECT 1 FROM public.inspection_orders io WHERE (io."centerId"='${centerId}' OR io."commissionerId" IN ${rosterIds}) AND NOT ${ownedRow('inspection_orders', 'io')}) OR
+      EXISTS(SELECT 1 FROM public.diagnostic_order_assignments a WHERE (a."userId" IN ${rosterIds} OR a."orderId" IN (SELECT row_key->>'id' FROM "${n}".campaign_records WHERE table_name='inspection_orders')) AND NOT ${ownedRow('diagnostic_order_assignments', 'a')}) OR
+      EXISTS(SELECT 1 FROM public.diagnostic_audits a WHERE (a."centerId"='${centerId}' OR a."actorId" IN ${rosterIds} OR a.id IN ('${centerAudit}',${qualifications.map(q => `'${q.audit}'`).join(',')})) AND NOT ${ownedRow('diagnostic_audits', 'a')}))
+      THEN RAISE EXCEPTION 'Untracked campaign diagnostics'; END IF;` : '';
+  // Reports, evidence and PDFs are later slices. Any such row naming an owned key, by FK or JSON, refuses reset;
+  // a foreign diagnostic audit naming one does too.
+  const diagnosticReferences = bootstrapV3 ? `
+    IF EXISTS(SELECT 1 FROM public.diagnostic_audits x CROSS JOIN "${n}".campaign_records parent WHERE parent.row_key ? 'id' AND parent.table_name IN ('users',${diagnosticList}) AND
+      position(parent.row_key->>'id' IN x.details::text)>0 AND NOT ${ownedRow('diagnostic_audits', 'x')}) THEN RAISE EXCEPTION 'Foreign JSON graph reference'; END IF;
+    ${['diagnostic_reports', 'diagnostic_evidence', 'diagnostic_pdf_artifacts'].map(t => `IF EXISTS(SELECT 1 FROM public.${t} x CROSS JOIN "${n}".campaign_records parent WHERE parent.row_key ? 'id' AND
+      parent.table_name IN ('users',${diagnosticList}) AND position(parent.row_key->>'id' IN to_jsonb(x)::text)>0) THEN RAISE EXCEPTION 'Unsupported campaign diagnostic graph'; END IF;`).join('\n    ')}` : '';
+  // Admission and issuance hold the sorted diagnostics table locks before the namespace fence, as reset does.
+  const diagnosticLocks = `((SELECT count(DISTINCT relation) FROM pg_locks WHERE pid=pg_backend_pid() AND locktype='relation' AND mode IN ('RowExclusiveLock','ShareRowExclusiveLock') AND granted AND
+      relation IN (${diagnosticTables.map(t => `'public.${t}'::regclass`).join(',')}))=${diagnosticTables.length} AND
+    EXISTS(SELECT 1 FROM pg_locks WHERE pid=pg_backend_pid() AND locktype='advisory' AND granted AND objsubid=1 AND ((classid::bigint<<32)|objid::bigint)=hashtextextended('${n}',0)))`;
+  // Serving-API authority for the exact live journaled principal and Session, then an optional owned center,
+  // template, order and reception peer. The first request for the derived center issues the binding, center,
+  // both qualifications and their three audits atomically; later calls never insert or extend them.
+  const diagnosticAuthority = `CREATE FUNCTION ${diagnosticSignature.replace('(text,text,text,text,text,text,text)', '(p_principal text,p_session text,p_center text,p_template text,p_order text,p_peer text,p_candidate text)')} RETURNS boolean LANGUAGE plpgsql AS $diagnostic$
+    DECLARE stamp timestamp; BEGIN
+      IF NOT EXISTS(SELECT 1 FROM "${n}".campaign_manifest m
+        JOIN "${n}".campaign_entities ce ON ce.user_id=$1
+        JOIN public.users u ON u.id=ce.user_id AND u.email=ce.email AND u."suspendedAt" IS NULL AND u."deletionScheduledAt" IS NULL AND ${currentRow('users', 'u')}
+        JOIN public.sessions s ON s.id=$2 AND s."userId"=u.id AND s."expiresAt">(now() AT TIME ZONE 'UTC') AND ${currentRow('sessions', 's')}
+        WHERE (SELECT count(*) FROM "${n}".campaign_manifest)=1 AND (SELECT count(*) FROM "${n}".campaign_entities)=15 AND
+          NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE (alias,user_id,email) NOT IN (${identityValues})) AND
+          m.state='identities' AND m.profile='campaign897-full-v3' AND m.delivery_version=3 AND m.reservation_id='${input.id}' AND m.candidate='${input.candidate}' AND m.candidate=$7 AND
+          m.schema_hash=${schemaHash} AND m.journal_hash=${journalHash} AND m.event_hash=${eventHash} AND
+          m.tracking_hash=md5(pg_get_functiondef(to_regprocedure('"${n}".track_business()'))) AND
+          m.diagnostic_contract_hash=md5(pg_get_functiondef(to_regprocedure('${diagnosticSignature}'))) AND m.diagnostic_binding_hash=${diagnosticBindingHash}) THEN RETURN false; END IF;
+      IF NOT EXISTS(SELECT 1 FROM ${diagnosticBinding}) THEN
+        IF $3 IS NULL AND $4 IS NULL AND $5 IS NULL AND $6 IS NULL THEN RETURN true; END IF;
+        IF $3 IS DISTINCT FROM '${centerId}' OR $4 IS NOT NULL OR $5 IS NOT NULL OR $6 IS NOT NULL OR NOT ${diagnosticLocks} OR
+          NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities e JOIN public.users u ON u.id=e.user_id AND u.email=e.email
+            WHERE e.alias='reception-steward' AND u.id='${reception.id}' AND u."suspendedAt" IS NULL AND u."deletionScheduledAt" IS NULL AND ${currentRow('users', 'u')}) OR
+          EXISTS(SELECT 1 FROM public.diagnostic_centers WHERE id='${centerId}' OR code='${centerCode}') OR
+          EXISTS(SELECT 1 FROM public.diagnostic_center_assignments WHERE "centerId"='${centerId}' OR id IN (${qualifications.map(q => `'${q.id}'`).join(',')})) OR
+          EXISTS(SELECT 1 FROM public.diagnostic_audits WHERE "centerId"='${centerId}' OR id IN ('${centerAudit}',${qualifications.map(q => `'${q.audit}'`).join(',')})) THEN RETURN false; END IF;
+        stamp := date_trunc('milliseconds',${serverNow});
+        INSERT INTO ${diagnosticBinding}(reservation_id,candidate,center_id,issued_at,qualification_deadline,provenance)
+          VALUES('${input.id}','${input.candidate}','${centerId}',stamp,stamp+interval '2 hours','${diagnosticProvenance}');
+        UPDATE "${n}".campaign_manifest SET diagnostic_binding_hash=${diagnosticBindingHash};
+        INSERT INTO public.diagnostic_centers(id,code,"planCode",names,"operationalApproval") VALUES('${centerId}','${centerCode}','standard',${centerNames},NULL);
+        INSERT INTO public.diagnostic_audits(id,"centerId","orderId","actorId",action,details) VALUES('${centerAudit}','${centerId}',NULL,NULL,'CENTER_SYNTHETIC_BOOTSTRAPPED',
+          jsonb_build_object('profile','${profile}','provenance','${diagnosticProvenance}'));
+        ${qualifications.map(q => `INSERT INTO public.diagnostic_center_assignments(id,"centerId","userId",capability,"qualifiedUntil") VALUES('${q.id}','${centerId}','${reception.id}','${q.capability}',stamp+interval '2 hours');
+        INSERT INTO public.diagnostic_audits(id,"centerId","orderId","actorId",action,details) VALUES('${q.audit}','${centerId}',NULL,NULL,'CENTER_QUALIFICATION_SYNTHETIC',
+          jsonb_build_object('profile','${profile}','provenance','${diagnosticProvenance}','capability','${q.capability}','userId','${reception.id}'));`).join('\n        ')}
+      END IF;
+      RETURN EXISTS(SELECT 1 FROM ${diagnosticBinding} b JOIN public.diagnostic_centers c ON c.id=b.center_id
+        WHERE b.candidate=$7 AND ${liveBinding} AND ${centerShape('to_jsonb(c)')} AND ${currentRow('diagnostic_centers', 'c')} AND
+          (SELECT count(*) FROM public.diagnostic_center_assignments q WHERE q."centerId"=c.id AND q."qualifiedUntil"=b.qualification_deadline AND ${qualificationShape('to_jsonb(q)')} AND ${currentRow('diagnostic_center_assignments', 'q')})=2 AND
+          ($3 IS NULL OR $3=c.id) AND
+          ($4 IS NULL OR EXISTS(SELECT 1 FROM public.diagnostic_template_versions t WHERE t.id=$4 AND t."centerId"=c.id AND t.synthetic AND ${currentRow('diagnostic_template_versions', 't')})) AND
+          ($5 IS NULL OR EXISTS(SELECT 1 FROM public.inspection_orders io WHERE io.id=$5 AND io."centerId"=c.id AND io.synthetic AND ${currentRow('inspection_orders', 'io')})) AND
+          ($6 IS NULL OR EXISTS(SELECT 1 FROM "${n}".campaign_entities pe JOIN public.users pu ON pu.id=pe.user_id AND pu.email=pe.email AND pu."suspendedAt" IS NULL AND pu."deletionScheduledAt" IS NULL
+            JOIN public.diagnostic_center_assignments pq ON pq."centerId"=c.id AND pq."userId"=pu.id AND pq.capability='diagnostics.reception' AND pq."revokedAt" IS NULL AND pq."qualifiedUntil"=b.qualification_deadline
+            WHERE pe.user_id=$6 AND ${currentRow('users', 'pu')} AND ${currentRow('diagnostic_center_assignments', 'pq')})));
+    END $diagnostic$;`;
   const objectHash = `(SELECT md5(coalesce(jsonb_agg(jsonb_build_object('object_key',l.object_key,'upload_id',l.upload_id,'bucket',l.bucket) ORDER BY l.object_key),'[]'::jsonb)::text) FROM "${n}".campaign_object_ledger l)`;
   const objectInventory = bootstrapV3 ? `
     IF (SELECT count(*) FROM "${n}".campaign_object_ledger)>640 OR
@@ -857,7 +996,7 @@ ${bootstrapV3 ? `    IF (SELECT count(*) FROM pg_trigger t WHERE t.tgname='${n}_
     IF EXISTS(SELECT 1 FROM public.users u JOIN "${n}".campaign_entities e ON u.id=e.user_id OR u.email=e.email WHERE NOT EXISTS(
       SELECT 1 FROM "${n}".campaign_records r WHERE r.table_name='users' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',u.id))) OR
       EXISTS(SELECT 1 FROM public.dealerships d WHERE (id='${rootId}' OR slug='${rootSlug}' OR "contactPhone"='${rootContact}') AND NOT EXISTS(
-      SELECT 1 FROM "${n}".campaign_records r WHERE r.table_name='dealerships' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',d.id))) THEN RAISE EXCEPTION 'Untracked campaign root'; END IF;${authInventory}${deliveryInventory()}${serviceInventory}${objectInventory}
+      SELECT 1 FROM "${n}".campaign_records r WHERE r.table_name='dealerships' AND NOT r.deleted AND r.row_key=jsonb_build_object('id',d.id))) THEN RAISE EXCEPTION 'Untracked campaign root'; END IF;${authInventory}${deliveryInventory()}${serviceInventory}${objectInventory}${diagnosticInventory}
   END $guard$;`;
   // Inventory every incoming FK using OIDs and catalog column names, including
   // non-public sources and composite/non-ID targets. No cascade grants ownership.
@@ -891,14 +1030,15 @@ ${bootstrapV3 ? `    IF (SELECT count(*) FROM pg_trigger t WHERE t.tgname='${n}_
       SELECT 1 FROM "${n}".campaign_records owned WHERE owned.table_name='${t}' AND NOT owned.deleted AND owned.row_key=jsonb_build_object('id',x.id))) THEN RAISE EXCEPTION 'Foreign JSON graph reference'; END IF;`).join('\n')}${bootstrapV3 ? `
     IF EXISTS(SELECT 1 FROM public.service_audits x JOIN "${n}".campaign_records r ON NOT r.deleted AND r.table_name IN ('support_cases','users') AND r.row_key->>'id' IN (x."resourceId",x."targetStaffId")
       WHERE NOT EXISTS(SELECT 1 FROM "${n}".campaign_records owned WHERE owned.table_name='service_audits' AND NOT owned.deleted AND owned.row_key=jsonb_build_object('id',x.id))) THEN RAISE EXCEPTION 'Foreign polymorphic reference'; END IF;` : ''}
-${mediaReferences}  END $guard$;`;
+${mediaReferences}${diagnosticReferences}
+  END $guard$;`;
   const completedServiceFences = bootstrapV3 ? `DO $guard$ BEGIN
     IF EXISTS(SELECT 1 FROM public.service_erasure_fences f JOIN "${n}".campaign_records r ON r.table_name='service_erasure_fences' AND NOT r.deleted AND r.row_key=jsonb_build_object('conversationId',f."conversationId")
       JOIN public.service_conversations c ON c.id=f."conversationId" WHERE f."cleanupCompletedAt" IS NULL OR f."objectKeys"<>'[]'::jsonb OR
         f.epoch<>c."lifecycleEpoch" OR f."erasedAt" IS DISTINCT FROM c."erasedAt") THEN RAISE EXCEPTION 'Campaign service cleanup incomplete'; END IF;
     END $guard$;` : '';
   const setup = `CREATE SCHEMA "${n}";
-    CREATE TABLE "${n}".campaign_manifest(reservation_id text PRIMARY KEY,candidate text NOT NULL,profile text NOT NULL,state text NOT NULL CHECK(state IN ('identities','cleaning','disposed')),delivery_version integer NOT NULL DEFAULT ${version},${bootstrapV3 ? "object_hash text,sms_hash text,sms_schema_hash text,sms_contract_hash text,delivery_hash text NOT NULL DEFAULT md5('[]'),baseline_trigger_hash text,service_contract_hash text,lifecycle_contract_hash text," : ''}schema_hash text NOT NULL,journal_hash text NOT NULL DEFAULT md5('[]'),event_hash text NOT NULL DEFAULT md5('[]'),tracking_hash text);
+    CREATE TABLE "${n}".campaign_manifest(reservation_id text PRIMARY KEY,candidate text NOT NULL,profile text NOT NULL,state text NOT NULL CHECK(state IN ('identities','cleaning','disposed')),delivery_version integer NOT NULL DEFAULT ${version},${bootstrapV3 ? "object_hash text,sms_hash text,sms_schema_hash text,sms_contract_hash text,delivery_hash text NOT NULL DEFAULT md5('[]'),baseline_trigger_hash text,service_contract_hash text,lifecycle_contract_hash text,diagnostic_binding_hash text,diagnostic_contract_hash text," : ''}schema_hash text NOT NULL,journal_hash text NOT NULL DEFAULT md5('[]'),event_hash text NOT NULL DEFAULT md5('[]'),tracking_hash text);
     INSERT INTO "${n}".campaign_manifest(reservation_id,candidate,profile,state,delivery_version,schema_hash) VALUES('${input.id}','${input.candidate}','${profile}','identities',${version},${schemaHash});
     CREATE TABLE "${n}".campaign_entities(alias text PRIMARY KEY,user_id text UNIQUE NOT NULL,email text UNIQUE NOT NULL);
     INSERT INTO "${n}".campaign_entities VALUES ${identityValues};
@@ -997,6 +1137,12 @@ ${mediaReferences}  END $guard$;`;
       RETURN true;
     END $retention$;
     UPDATE "${n}".campaign_manifest SET lifecycle_contract_hash=md5(pg_get_functiondef('"${n}".campaign_support_lifecycle_authority(text,text,text,text,text)'::regprocedure));
+    -- Protected diagnostics binding: at most one server-issued, nonrenewable two-hour synthetic window.
+    CREATE TABLE ${diagnosticBinding}(reservation_id text PRIMARY KEY CHECK(reservation_id='${input.id}'),candidate text NOT NULL CHECK(candidate='${input.candidate}'),
+      center_id text NOT NULL UNIQUE CHECK(center_id='${centerId}'),issued_at timestamp(3) NOT NULL,qualification_deadline timestamp(3) NOT NULL,
+      provenance text NOT NULL CHECK(provenance='${diagnosticProvenance}'),CHECK(qualification_deadline=issued_at+interval '2 hours'));
+    ${diagnosticAuthority}
+    UPDATE "${n}".campaign_manifest SET diagnostic_binding_hash=${diagnosticBindingHash},diagnostic_contract_hash=${diagnosticContract};
     ` : ''}CREATE FUNCTION "${n}".track_business() RETURNS trigger LANGUAGE plpgsql AS $fn$
     DECLARE v_row jsonb; prior jsonb; rowkey jsonb; oldkey jsonb; edge record; parent_table text; lifecycle text; owned boolean; fingerprint text;${bootstrapV3 ? ' adopted jsonb; admitting boolean := false; proof jsonb; service_lifecycle boolean := false;' : ''}
     BEGIN${bootstrapV3 ? `
@@ -1020,6 +1166,8 @@ ${mediaReferences}  END $guard$;`;
         owned := owned OR v_row->>'id'='${rootId}' OR prior->>'id'='${rootId}' OR v_row->>'slug'='${rootSlug}' OR prior->>'slug'='${rootSlug}' OR v_row->>'contactPhone'='${rootContact}' OR prior->>'contactPhone'='${rootContact}';
       ${bootstrapV3 ? `ELSIF TG_TABLE_NAME='otp_requests' THEN
         owned := owned OR EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE email IN (v_row->>'destination',prior->>'destination') OR user_id IN (v_row->>'userId',prior->>'userId'));
+      ELSIF TG_TABLE_NAME='diagnostic_centers' THEN
+        owned := owned OR '${centerId}' IN (v_row->>'id',prior->>'id') OR '${centerCode}' IN (v_row->>'code',prior->>'code');
       ` : ''}ELSE
         FOR edge IN SELECT * FROM jsonb_each_text(${parentMap}) LOOP
           -- Foreign reporters targeting an owned listing remain foreign. Reset
@@ -1060,6 +1208,7 @@ ${mediaReferences}  END $guard$;`;
       IF TG_OP<>'INSERT' AND NOT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=TG_TABLE_NAME AND row_key=oldkey AND NOT deleted AND row_hash=md5(prior::text)) THEN RAISE EXCEPTION 'Untracked campaign mutation'; END IF;
       IF lifecycle='identities' AND TG_OP='INSERT' AND EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=TG_TABLE_NAME AND row_key=rowkey) THEN RAISE EXCEPTION 'Campaign key reuse'; END IF;
       IF lifecycle='identities' AND TG_OP='DELETE' AND (TG_TABLE_NAME IN ('users','dealerships') OR (TG_TABLE_NAME='dealership_members' AND v_row->>'userId'='${owner.id}')) THEN RAISE EXCEPTION 'Campaign roots retained until disposal'; END IF;
+      ${bootstrapV3 ? `IF lifecycle='identities' AND TG_OP='DELETE' AND TG_TABLE_NAME IN (${diagnosticList}) THEN RAISE EXCEPTION 'Unsupported campaign diagnostics'; END IF;` : ''}
       ${bootstrapV3 ? `IF lifecycle='identities' AND TG_OP='DELETE' AND TG_TABLE_NAME IN ('dealership_invitations','dealership_members') AND v_row->>'dealershipId'<>'${rootId}' AND NOT coalesce(TG_TABLE_NAME='dealership_members' AND v_row->>'role'='sales' AND v_row->>'status' IN ('active','suspended') AND ${mediaBusiness("v_row->>'dealershipId'")},false) THEN RAISE EXCEPTION 'Unsupported campaign business'; END IF;
       ${lifecycleGuard}
       IF lifecycle='identities' AND TG_OP='DELETE' AND TG_TABLE_NAME IN (${serviceList}) AND NOT service_lifecycle THEN RAISE EXCEPTION 'Unsupported campaign service'; END IF;
@@ -1073,7 +1222,7 @@ ${mediaReferences}  END $guard$;`;
         FOR edge IN SELECT * FROM jsonb_each_text(v_row) LOOP
           parent_table := ${parentMap}->>edge.key;
           IF parent_table IS NOT NULL AND edge.value IS NOT NULL AND NOT EXISTS(SELECT 1 FROM "${n}".campaign_records WHERE table_name=parent_table AND row_key=jsonb_build_object('id',edge.value) AND NOT deleted) THEN RAISE EXCEPTION 'Foreign campaign graph reference'; END IF;
-        END LOOP;${admissionClosed}${admittedBusiness}${promotionRole}${serviceGuard}
+        END LOOP;${admissionClosed}${admittedBusiness}${promotionRole}${serviceGuard}${diagnosticGuard}
         IF TG_TABLE_NAME='users' AND (NOT EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=v_row->>'id' AND email=v_row->>'email') OR
           ${bootstrapV3 ? `(v_row->>'role'<>'buyer' AND NOT (v_row->>'id'='${coordinator.id}' AND v_row->>'role'='admin' AND TG_OP='UPDATE'))` : "v_row->>'role'<>'buyer'"} OR v_row->>'emailVerifiedAt' IS NULL OR v_row->>'phone' IS NOT NULL OR v_row->>'avatarKey' IS NOT NULL OR v_row->>'avatarUploadId' IS NOT NULL OR v_row->>'avatarUrl' IS NOT NULL OR v_row->>'suspendedAt' IS NOT NULL OR v_row->>'suspendedById' IS NOT NULL OR v_row->>'deletionScheduledAt' IS NOT NULL) THEN RAISE EXCEPTION 'Synthetic identity changed'; END IF;
         IF TG_TABLE_NAME='dealerships'${bootstrapV3 ? ` AND v_row->>'id'='${rootId}'` : ''} AND (v_row->>'id'<>'${rootId}' OR v_row->>'slug'<>'${rootSlug}' OR v_row->>'contactPhone' IS DISTINCT FROM '${rootContact}' OR v_row->>'status'<>'recovery' OR v_row->>'admissionMode'<>'synthetic' OR v_row->>'admittedAt' IS NOT NULL OR v_row->>'checkedEvidence' IS NOT NULL OR v_row->>'contactConfirmedAt' IS NOT NULL OR v_row->>'logoUrl' IS NOT NULL) THEN RAISE EXCEPTION 'Synthetic root identity changed'; END IF;
@@ -1149,7 +1298,8 @@ ${mediaReferences}  END $guard$;`;
     if (bootstrapV3) disposeObjects(objectLedger(), false);
     // Explicit child-first deletion. AFTER triggers verify the lock-held cleaning
     // transition and record each deletion. Never mark unexamined rows disposed.
-    const order = [...(bootstrapV3 ? ['service_erasure_fences', 'service_read_states', 'service_outbox', 'service_messages', 'service_conversations', 'support_cases'] : []), 'content_reports', 'staff_grants', 'favorites', 'business_enquiry_audits', 'conversation_participants', 'messages', 'conversations', 'listing_drafts', ...(bootstrapV3 ? ['listing_media', 'media_uploads'] : []), 'listings', 'dealership_invitations', 'dealership_members', 'verified_contact_phones', 'owned_vehicles', 'blocked_users', 'notification_preferences', 'dealerships', ...(bootstrapV3 ? ['totp_backup_codes', 'totp_enrollments', 'sessions', 'otp_requests'] : []), 'users'];
+    const order = [...(bootstrapV3 ? ['service_erasure_fences', 'service_read_states', 'service_outbox', 'service_messages', 'service_conversations', 'support_cases',
+      'diagnostic_order_assignments', 'diagnostic_audits', 'inspection_orders', 'diagnostic_template_versions', 'diagnostic_center_assignments', 'diagnostic_centers'] : []), 'content_reports', 'staff_grants', 'favorites', 'business_enquiry_audits', 'conversation_participants', 'messages', 'conversations', 'listing_drafts', ...(bootstrapV3 ? ['listing_media', 'media_uploads'] : []), 'listings', 'dealership_invitations', 'dealership_members', 'verified_contact_phones', 'owned_vehicles', 'blocked_users', 'notification_preferences', 'dealerships', ...(bootstrapV3 ? ['totp_backup_codes', 'totp_enrollments', 'sessions', 'otp_requests'] : []), 'users'];
     const deletes = order.map(table => `DELETE FROM public.${table} t USING "${n}".campaign_records r WHERE r.table_name='${table}' AND NOT r.deleted AND ${key('to_jsonb(t)',table)}=r.row_key;`).join('\n');
     sql(`BEGIN; ${lock} ${integrity} ${preflight}${completedServiceFences}${bootstrapV3 ? ` ${objectSetGuard}` : ''}${bootstrapV3 ? `
       DELETE FROM "${n}".campaign_sms_sink;

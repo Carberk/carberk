@@ -89,6 +89,45 @@ test('v3 reset redacts retained service audits exactly and disposes Support text
   assert.ok(sql.includes(`WHEN $3=''service_read_states'' THEN jsonb_build_object(''conversationId'',to_jsonb(child)->>''conversationId'',''userId'',to_jsonb(child)->>''userId'')`));
 });
 
+const diagnosticTables = ['diagnostic_centers', 'diagnostic_center_assignments', 'diagnostic_template_versions', 'inspection_orders', 'diagnostic_order_assignments', 'diagnostic_audits'];
+
+test('v3 journals the first diagnostics slice behind a contract-hashed authority and nonrenewable binding', () => {
+  const sql = captureV3('fixture'), n = `cf_${'f1'.repeat(16)}`;
+  for (const table of diagnosticTables) assert.ok(sql.includes(`CREATE TRIGGER "${n}_business" AFTER INSERT OR UPDATE OR DELETE ON public.${table} FOR EACH ROW`), table);
+  assert.match(sql, /CREATE TABLE "cf_(?:f1){16}"\.campaign_diagnostic_binding\(reservation_id text PRIMARY KEY CHECK\(reservation_id='(?:f1){16}'\)/);
+  assert.ok(sql.includes(`CHECK(qualification_deadline=issued_at+interval '2 hours')`) && sql.includes(`CHECK(provenance='synthetic-test-only-v1')`));
+  assert.match(sql, /CREATE FUNCTION "cf_(?:f1){16}"\.campaign_diagnostic_authority\(p_principal text,p_session text,p_center text,p_template text,p_order text,p_peer text,p_candidate text\) RETURNS boolean LANGUAGE plpgsql/);
+  assert.ok(sql.includes(`diagnostic_contract_hash=md5(pg_get_functiondef('"${n}".campaign_diagnostic_authority(text,text,text,text,text,text,text)'::regprocedure))`));
+  const authority = sql.match(/AS \$diagnostic\$([\s\S]*?)\$diagnostic\$/)?.[1] ?? '';
+  for (const fragment of ["m.state='identities'", 'm.candidate=$7', "sr.table_name='sessions'", 's."userId"=u.id', 'm.journal_hash=', 'm.event_hash=', 'm.tracking_hash=', 'm.schema_hash=',
+    'm.diagnostic_binding_hash=', "date_trunc('milliseconds',(clock_timestamp() AT TIME ZONE 'UTC'))", "stamp+interval '2 hours'", "b.qualification_deadline>(clock_timestamp() AT TIME ZONE 'UTC')",
+    "pq.capability='diagnostics.reception'", "pur.table_name='users'"]) assert.ok(authority.includes(fragment), fragment);
+  // Issuance inserts exactly one center, two reception-steward qualifications and three audits; nothing updates them.
+  assert.equal(authority.match(/INSERT INTO public\.diagnostic_centers/g)?.length, 1);
+  assert.equal(authority.match(/INSERT INTO public\.diagnostic_center_assignments/g)?.length, 2);
+  assert.equal(authority.match(/INSERT INTO public\.diagnostic_audits/g)?.length, 3);
+  assert.doesNotMatch(authority, /\bUPDATE public\.|\bDELETE FROM public\.|INSERT INTO public\.(?!diagnostic_centers|diagnostic_center_assignments|diagnostic_audits)/);
+  assert.ok(authority.includes(`'uuid-campaign897:diagnostics:center:${'f1'.repeat(16)}:${'a'.repeat(40)}'`));
+  for (const capability of ['diagnostics.reception', 'diagnostics.templates']) assert.ok(authority.includes(`'uuid-campaign897:diagnostics:qualification:reception-steward:${capability}:${'a'.repeat(40)}'`), capability);
+  assert.doesNotMatch(authority, /diagnostics\.(?:technician|reviewer)/);
+  assert.ok(sql.includes(`"centerId":"diagnostic_centers"`) && sql.includes(`"orderId":"inspection_orders"`) && sql.includes(`"templateVersionId":"diagnostic_template_versions"`));
+  assert.match(sql, /RAISE EXCEPTION 'Unsupported campaign diagnostics'/);
+  assert.match(sql, /RAISE EXCEPTION 'Untracked campaign diagnostics'/);
+});
+
+test('v3 reset refuses later diagnostic graphs and disposes the owned slice before its roster Users', () => {
+  const sql = captureV3('reset');
+  const order = ['support_cases', 'diagnostic_order_assignments', 'diagnostic_audits', 'inspection_orders', 'diagnostic_template_versions', 'diagnostic_center_assignments', 'diagnostic_centers', 'staff_grants', 'listings', 'sessions', 'users']
+    .map(table => sql.indexOf(`DELETE FROM public.${table} t USING`));
+  assert.ok(order.every(index => index > 0), 'every disposal statement present');
+  assert.deepEqual([...order].sort((a, b) => a - b), order);
+  for (const table of ['diagnostic_reports', 'diagnostic_evidence', 'diagnostic_pdf_artifacts']) assert.ok(sql.includes(`FROM public.${table} x CROSS JOIN`), table);
+  assert.match(sql, /RAISE EXCEPTION 'Unsupported campaign diagnostic graph'/);
+  // Diagnostic audits are deleted with their center; only campaign audit_logs and service audits are retained.
+  assert.doesNotMatch(sql, /UPDATE public\.diagnostic_audits/);
+  assert.match(sql, /AND table_name NOT IN \('audit_logs','service_audits'\)\) THEN RAISE EXCEPTION 'Campaign disposal incomplete'/);
+});
+
 const mediaBinding = { reservationId: 'f1'.repeat(16), namespace: `cf_${'f1'.repeat(16)}`, candidate: 'a'.repeat(40), profile: 'campaign897-full-v3' };
 const mediaDirectory = 'pending/12345678-1234-4234-8234-123456789abc/';
 const mediaKeys = ['original', 'thumbnail', 'list', 'detail', 'fullscreen'].map(name => `${mediaDirectory}${name}.webp`);
