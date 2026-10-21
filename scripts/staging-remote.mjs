@@ -1,10 +1,10 @@
-import { campaignMain, businessMain, campaignQueueMain } from './staging-campaign.mjs';
+import { campaignMain, businessMain, campaignQueueMain, campaignObjectMain } from './staging-campaign.mjs';
 
 /** Serialized into one fixed remote Node process. There is no arbitrary shell/SQL input. */
 export function remoteProgram(payload) {
-  return `(${remoteMain.toString()})(${JSON.stringify(payload)}, ${campaignMain.toString()}, ${businessMain.toString()}, ${campaignQueueMain.toString()})`;
+  return `(${remoteMain.toString()})(${JSON.stringify(payload)}, ${campaignMain.toString()}, ${businessMain.toString()}, ${campaignQueueMain.toString()}, ${campaignObjectMain.toString()})`;
 }
-function remoteMain(input, campaign, businessMain, queueMain) {
+function remoteMain(input, campaign, businessMain, queueMain, objectMain) {
   try {
     const { spawnSync } = require('node:child_process');
     const p = input.identity; const e = process.env;
@@ -47,8 +47,16 @@ function remoteMain(input, campaign, businessMain, queueMain) {
       });
       if (result.status !== 0 || result.error || result.stdout.trim() !== '{"queueJobs":0}') throw new Error();
     };
+    const disposeObjects = (ledger, observeOnly = false) => {
+      if (Array.isArray(ledger) && ledger.length === 0) return;
+      const binding = { namespace: input.namespace, reservationId: input.id, candidate: input.candidate, profile: input.profile };
+      const result = spawnSync(process.execPath, ['-e', `(${objectMain.toString()})(${JSON.stringify(ledger)},${JSON.stringify(observeOnly)},${JSON.stringify(binding)})`], {
+        encoding: 'utf8', timeout: 30000, maxBuffer: 1024 * 1024, env: e,
+      });
+      if (result.status !== 0 || result.error || result.stdout.trim() !== JSON.stringify({ objects: ledger.length, absent: ledger.length })) throw new Error();
+    };
     if (input.profile === 'campaign897-business-v2') return businessMain(input, { sql, uuid, exists });
-    if (input.profile === 'campaign897-full-v3') return businessMain(input, { sql, uuid, exists, disposeDeliveries });
+    if (input.profile === 'campaign897-full-v3') return businessMain(input, { sql, uuid, exists, disposeDeliveries, disposeObjects });
     if (input.profile === 'campaign897-identities-v1') return campaign(input, { sql, uuid, exists, disposeDeliveries });
     if (exists && sql(`SELECT reservation_id FROM "${namespace}".manifest;`) !== input.id) throw new Error();
     const user = uuid('seller'); const listing = uuid('listing');

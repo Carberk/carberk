@@ -52,7 +52,7 @@ function captureV3(kind) {
   const source = readFileSync(new URL('./staging-campaign.mjs', import.meta.url), 'utf8').replaceAll('export function ', 'function ').replaceAll('export async function ', 'async function ');
   const businessMain = runInNewContext(`${source}; businessMain`, { require: createRequire(import.meta.url), console: { log() {} } });
   businessMain({ id, namespace: `cf_${id}`, candidate, target: candidate, profile: 'campaign897-full-v3', kind }, {
-    exists: kind === 'reset', uuid: label => `uuid-${label}`, disposeDeliveries() {},
+    exists: kind === 'reset', uuid: label => `uuid-${label}`, disposeDeliveries() {}, disposeObjects() {},
     sql: query => { queries.push(query); return query.startsWith('SELECT state') ? 'identities' : query.includes('SELECT coalesce(json_agg') ? '[]' : '0'; },
   });
   return queries.join('\n');
@@ -86,4 +86,138 @@ test('v3 reset redacts retained service audits exactly and disposes Support text
   assert.match(sql, /RAISE EXCEPTION 'Campaign service audit disposition changed'/);
   // Preflight attributes composite read-state children by their own key.
   assert.ok(sql.includes(`WHEN $3=''service_read_states'' THEN jsonb_build_object(''conversationId'',to_jsonb(child)->>''conversationId'',''userId'',to_jsonb(child)->>''userId'')`));
+});
+
+const mediaBinding = { reservationId: 'f1'.repeat(16), namespace: `cf_${'f1'.repeat(16)}`, candidate: 'a'.repeat(40), profile: 'campaign897-full-v3' };
+const mediaDirectory = 'pending/12345678-1234-4234-8234-123456789abc/';
+const mediaKeys = ['original', 'thumbnail', 'list', 'detail', 'fullscreen'].map(name => `${mediaDirectory}${name}.webp`);
+const mediaLedger = mediaKeys.map(key => ({ object_key: key, upload_id: '12345678-1234-4234-8234-123456789def', bucket: 'listing-photos' }));
+
+async function disposeMedia({ ledger = mediaLedger, observeOnly = false, versioning, failDelete, present = new Set(mediaKeys), credentials = true } = {}) {
+  const source = readFileSync(new URL('./staging-campaign.mjs', import.meta.url), 'utf8').replaceAll('export function ', 'function ').replaceAll('export async function ', 'async function ');
+  const runtime = { exitCode: 0, env: { MINIO_ENDPOINT: 'http://localhost:9000', ...(credentials ? { MINIO_ACCESS_KEY: 'disposable', MINIO_SECRET_KEY: 'secret' } : {}) } };
+  const operations = [], logs = [];
+  function GetBucketVersioningCommand(input) { this.input = input; }
+  function DeleteObjectCommand(input) { this.input = input; }
+  function HeadObjectCommand(input) { this.input = input; }
+  class S3Client {
+    async send(command) {
+      operations.push(command.constructor.name);
+      if (command instanceof GetBucketVersioningCommand) return { Status: versioning };
+      const key = command.input.Key;
+      if (command instanceof DeleteObjectCommand) {
+        if (key === failDelete) throw new Error('storage unavailable');
+        present.delete(key); return {};
+      }
+      if (!present.has(key)) throw { $metadata: { httpStatusCode: 404 } };
+      return {};
+    }
+    destroy() {}
+  }
+  const run = runInNewContext(`${source}; typeof campaignObjectMain === 'function' ? campaignObjectMain : undefined`, {
+    require: name => { assert.equal(name, '@aws-sdk/client-s3'); return { S3Client, GetBucketVersioningCommand, DeleteObjectCommand, HeadObjectCommand }; },
+    process: runtime, URL, AbortSignal, console: { log: value => logs.push(value) },
+  });
+  assert.equal(typeof run, 'function', 'serialized exact-key object disposer exists');
+  await run(ledger, observeOnly, mediaBinding);
+  return { code: runtime.exitCode, present: [...present], operations, logs };
+}
+
+test('reset deletes only the recorded complete manifest and proves exact absence', async () => {
+  const foreignKey = 'pending/22345678-1234-4234-8234-123456789abc/original.webp';
+  const result = await disposeMedia({ present: new Set([...mediaKeys, foreignKey]) });
+  assert.equal(result.code, 0);
+  assert.deepEqual(result.present, [foreignKey]);
+  assert.deepEqual(result.logs, ['{"objects":5,"absent":5}']);
+});
+
+test('reset refuses malformed or incomplete provenance before any storage operation', async () => {
+  for (const ledger of [mediaLedger.slice(1), [...mediaLedger, mediaLedger[0]], mediaLedger.map(row => ({ ...row, object_key: row.object_key.replace('pending/', 'foreign/') })), mediaLedger.map(row => ({ ...row, bucket: 'other' })), Array.from({ length: 641 }, () => mediaLedger[0])]) {
+    const result = await disposeMedia({ ledger });
+    assert.equal(result.code, 1);
+    assert.deepEqual(result.operations, []);
+    assert.deepEqual(result.present, mediaKeys);
+    assert.deepEqual(result.logs, []);
+  }
+});
+
+test('versioned storage and missing explicit credentials refuse deletion', async () => {
+  for (const options of [{ versioning: 'Enabled' }, { versioning: 'Suspended' }, { credentials: false }]) {
+    const result = await disposeMedia(options);
+    assert.equal(result.code, 1);
+    assert.deepEqual(result.present, mediaKeys);
+    assert.deepEqual(result.logs, []);
+  }
+});
+
+test('partial object failure produces no receipt and the same manifest can retry', async () => {
+  const present = new Set(mediaKeys);
+  const failed = await disposeMedia({ present, failDelete: mediaKeys[2] });
+  assert.equal(failed.code, 1);
+  assert.deepEqual(failed.logs, []);
+  assert.ok(present.size > 0 && present.size < 5);
+  const retried = await disposeMedia({ present });
+  assert.equal(retried.code, 0);
+  assert.deepEqual(retried.present, []);
+});
+
+test('terminal observation is read-only and refuses a resurrected object', async () => {
+  const absent = await disposeMedia({ observeOnly: true, present: new Set() });
+  assert.equal(absent.code, 0);
+  assert.ok(!absent.operations.includes('DeleteObjectCommand'));
+  const resurrected = await disposeMedia({ observeOnly: true, present: new Set([mediaKeys[4]]) });
+  assert.equal(resurrected.code, 1);
+  assert.deepEqual(resurrected.present, [mediaKeys[4]]);
+  assert.ok(!resurrected.operations.includes('DeleteObjectCommand'));
+  assert.deepEqual(resurrected.logs, []);
+});
+
+function resetLifecycle({ state = 'identities', failObjects = false } = {}) {
+  const source = readFileSync(new URL('./staging-campaign.mjs', import.meta.url), 'utf8').replaceAll('export function ', 'function ').replaceAll('export async function ', 'async function ');
+  const logs = [], transactions = [], objectModes = [];
+  const run = runInNewContext(`${source}; businessMain`, { require: createRequire(import.meta.url), console: { log: value => logs.push(value) } });
+  const database = { state };
+  const execute = () => run({ ...mediaBinding, id: mediaBinding.reservationId, target: mediaBinding.candidate, kind: 'reset' }, {
+    exists: true, uuid: label => `uuid-${label}`, disposeDeliveries() {},
+    sql(query) {
+      if (query.startsWith('BEGIN;')) {
+        transactions.push(query);
+        if (query.includes("SET state='cleaning'")) database.state = 'cleaning';
+        if (query.includes("SET state='disposed'")) database.state = 'disposed';
+      }
+      if (query.startsWith('SELECT state')) return database.state;
+      if (query.includes('SELECT coalesce(json_agg')) return query.includes('.campaign_object_ledger') ? JSON.stringify(mediaLedger) : '[]';
+      return '0';
+    },
+    disposeObjects(ledger, observeOnly) {
+      assert.deepEqual(JSON.parse(JSON.stringify(ledger)), mediaLedger);
+      objectModes.push(observeOnly);
+      if (!observeOnly) {
+        assert.equal(database.state, 'cleaning', 'durable intent commits before external object I/O');
+        if (failObjects) throw new Error('partial object disposal');
+      }
+    },
+  });
+  return { execute, database, transactions, logs, objectModes };
+}
+
+test('failed object disposal keeps cleaning with no row disposal or receipt, and the same reset retries', () => {
+  const failed = resetLifecycle({ failObjects: true });
+  assert.throws(failed.execute, /partial object disposal/);
+  assert.equal(failed.database.state, 'cleaning');
+  assert.deepEqual(failed.logs, []);
+  assert.ok(!failed.transactions.some(query => query.includes('DELETE FROM public.')));
+  const retried = resetLifecycle({ state: failed.database.state });
+  retried.execute();
+  assert.equal(retried.database.state, 'disposed');
+  assert.deepEqual(retried.objectModes, [false, true]);
+  assert.equal(JSON.parse(retried.logs[0]).state, 'disposed');
+});
+
+test('lost-response reset reads terminal object evidence without repeating durable writes', () => {
+  const terminal = resetLifecycle({ state: 'disposed' });
+  terminal.execute();
+  assert.deepEqual(terminal.objectModes, [true]);
+  assert.ok(terminal.transactions.every(query => !/\b(UPDATE|INSERT INTO|DELETE FROM)\b/.test(query.replace(/'(?:''|[^'])*'/g, "''"))));
+  assert.equal(JSON.parse(terminal.logs[0]).state, 'disposed');
 });
