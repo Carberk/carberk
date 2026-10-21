@@ -49,18 +49,22 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
     return DiagnosticSchemas.DiagnosticTemplateSchema.parse({ ...row, publishedAt: row.publishedAt.toISOString() });
   }
   async create(subject: DiagnosticSubject, input: DiagnosticSchemas.DiagnosticCreate): Promise<DiagnosticSchemas.DiagnosticOrder> {
-    if (!this.runtime.syntheticAllowed(subject)) throw new DiagnosticRuleError("DIAGNOSTIC_SERVICE_UNAVAILABLE");
     return this.db.$transaction(async tx => {
-      await this.current(tx, subject);
+      const campaign = await this.authority.admitted(tx, subject, {}, "DIAGNOSTIC_SERVICE_UNAVAILABLE");
       const prior = await tx.inspectionOrder.findUnique({ where: { commissionerId_requestKey: { commissionerId: subject.userId, requestKey: input.requestKey } } });
       if (prior) {
         if (prior.centerId !== input.centerId || prior.templateVersionId !== input.templateVersionId || prior.audience !== input.audience || prior.listingId !== (input.listingId ?? null)) throw new DiagnosticRuleError("DIAGNOSTIC_IDEMPOTENCY_CONFLICT");
         if (prior.erasedAt) throw denial();
+        // A reservation replay reads back only an order its own journal recorded.
+        if (campaign && !await this.authority.owned(tx, campaign, subject, { orderId: prior.id })) throw denial();
         return this.dto(tx, prior, false);
       }
+      // The first full-v3 slice admits buyer-private intake only; Listing-linked orders are a later slice.
+      if (campaign && (input.audience !== "buyer_private" || input.listingId)) throw denial();
       await tx.$queryRaw`SELECT id FROM diagnostic_centers WHERE id=${input.centerId} FOR UPDATE`;
       const template = await tx.diagnosticTemplateVersion.findUnique({ where: { id: input.templateVersionId } });
       if (!template || template.centerId !== input.centerId || !template.synthetic) throw new DiagnosticRuleError("DIAGNOSTIC_TEMPLATE_UNAVAILABLE");
+      if (campaign && !await this.authority.owned(tx, campaign, subject, { centerId: input.centerId, templateVersionId: input.templateVersionId })) throw denial();
       if (input.listingId) {
         const listing = await tx.listing.findUnique({ where: { id: input.listingId }, select: { businessId: true, sellerId: true, status: true, deletedAt: true } });
         if (!listing || listing.deletedAt || !["active", "sold", "paused"].includes(listing.status)) throw denial();
@@ -70,7 +74,11 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
         }
       }
       const reception = await tx.diagnosticCenterAssignment.findMany({ where: { centerId: input.centerId, capability: "diagnostics.reception", revokedAt: null, qualifiedUntil: { gt: this.runtime.now() }, user: { suspendedAt: null, deletionScheduledAt: null, staffGrants: { some: { capability: "diagnostics.reception", revokedAt: null } } } } });
-      const assigned = reception.filter(item => this.runtime.syntheticAllowed({ userId: item.userId, sessionId: "" }));
+      // A reservation assigns only its own journaled, qualified reception peers; no Session is invented for them.
+      const assigned: typeof reception = [];
+      for (const item of reception) {
+        if (campaign ? await this.authority.owned(tx, campaign, subject, { centerId: input.centerId, peerId: item.userId }) : this.runtime.syntheticAllowed({ userId: item.userId, sessionId: "" })) assigned.push(item);
+      }
       if (!assigned.length) throw new DiagnosticRuleError("DIAGNOSTIC_SERVICE_UNAVAILABLE");
       const row = await tx.inspectionOrder.create({ data: { id: this.runtime.id(), centerId: input.centerId, templateVersionId: input.templateVersionId,
         commissionerId: subject.userId, requestKey: input.requestKey, audience: input.audience, listingId: input.listingId ?? null, synthetic: true,
@@ -136,14 +144,14 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
   }
   async queue(subject: DiagnosticSubject, centerId: string): Promise<DiagnosticSchemas.DiagnosticOrder[]> {
     return this.db.$transaction(async tx => {
-      await this.current(tx, subject); await this.centerAuthority(tx, subject, centerId, "diagnostics.reception");
+      await this.authority.admitted(tx, subject, { centerId }); await this.centerAuthority(tx, subject, centerId, "diagnostics.reception");
       const rows = await tx.inspectionOrder.findMany({ where: { centerId, erasedAt: null, synthetic: true, assignments: { some: { userId: subject.userId, capability: "diagnostics.reception", revokedAt: null } } }, orderBy: { createdAt: "asc" }, take: 50 });
       return Promise.all(rows.map(row => this.dto(tx, row, true)));
     });
   }
   async templates(subject: DiagnosticSubject, centerId: string): Promise<DiagnosticSchemas.DiagnosticTemplate[]> {
     return this.db.$transaction(async tx => {
-      await this.current(tx, subject);
+      await this.authority.admitted(tx, subject, { centerId });
       let allowed = false;
       for (const capability of DiagnosticSchemas.DiagnosticCapabilitySchema.options) {
         try { await this.centerAuthority(tx, subject, centerId, capability); allowed = true; break; }
@@ -155,7 +163,7 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
   }
   async publishTemplate(subject: DiagnosticSubject, centerId: string, input: DiagnosticSchemas.PublishDiagnosticTemplate): Promise<DiagnosticSchemas.DiagnosticTemplate> {
     return this.db.$transaction(async tx => {
-      await this.current(tx, subject); await this.centerAuthority(tx, subject, centerId, "diagnostics.templates");
+      await this.authority.admitted(tx, subject, { centerId }); await this.centerAuthority(tx, subject, centerId, "diagnostics.templates");
       await tx.$queryRaw`SELECT id FROM diagnostic_centers WHERE id=${centerId} FOR UPDATE`;
       const latest = await tx.diagnosticTemplateVersion.findFirst({ where: { centerId }, orderBy: { version: "desc" } });
       if ((latest?.version ?? 0) !== input.expectedVersion) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");

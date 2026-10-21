@@ -4,6 +4,7 @@ import type { Prisma } from "@auto-tm/db";
 import { BUSINESS_AUTHORITY_PORT, STAFF_AUTHORITY_PORT, StaffAuthorityDenied, type BusinessAuthorityPort, type StaffAuthorityPort } from "../../identity/identity.public";
 import { DiagnosticRuleError } from "../domain/InspectionOrder";
 import { DIAGNOSTIC_RUNTIME, type DiagnosticRuntime, type DiagnosticSubject } from "../domain/ports/DiagnosticIntakePort";
+import { CampaignDiagnosticAdmission, type CampaignDiagnosticGraph, type CampaignDiagnosticScope } from "./campaignDiagnosticAdmission";
 
 type Tx = Prisma.TransactionClient;
 const denied = () => new DiagnosticRuleError("DIAGNOSTIC_NO_ACCESS");
@@ -12,10 +13,25 @@ const denied = () => new DiagnosticRuleError("DIAGNOSTIC_NO_ACCESS");
 export class DiagnosticAuthority {
   constructor(@Inject(STAFF_AUTHORITY_PORT) private readonly staff: StaffAuthorityPort,
     @Inject(BUSINESS_AUTHORITY_PORT) private readonly business: BusinessAuthorityPort,
-    @Inject(DIAGNOSTIC_RUNTIME) private readonly runtime: DiagnosticRuntime) {}
+    @Inject(DIAGNOSTIC_RUNTIME) private readonly runtime: DiagnosticRuntime,
+    @Inject(CampaignDiagnosticAdmission) private readonly campaign: CampaignDiagnosticAdmission) {}
   async current(tx: Tx, subject: DiagnosticSubject): Promise<void> {
     if (!this.runtime.syntheticAllowed(subject)) throw denied();
     try { await this.business.resolve(subject, tx); } catch { throw denied(); }
+  }
+  /** Template publication and private intake only: the ordinary runtime gate, otherwise the full-v3
+   * reservation authority for this exact principal, Session and requested graph. The current Session
+   * check always follows; grants, qualifications and assignments remain separate checks. */
+  async admitted(tx: Tx, subject: DiagnosticSubject, graph: CampaignDiagnosticGraph = {}, refusal = "DIAGNOSTIC_NO_ACCESS"): Promise<CampaignDiagnosticScope | null> {
+    if (this.runtime.syntheticAllowed(subject)) { await this.current(tx, subject); return null; }
+    const scope = await this.campaign.begin(tx, subject);
+    if (!scope || !await this.campaign.admit(tx, scope, subject, graph)) throw new DiagnosticRuleError(refusal);
+    try { await this.business.resolve(subject, tx); } catch { throw denied(); }
+    return scope;
+  }
+  /** Proves more of the same reservation's graph inside an already admitted transaction. */
+  async owned(tx: Tx, scope: CampaignDiagnosticScope, subject: DiagnosticSubject, graph: CampaignDiagnosticGraph): Promise<boolean> {
+    return this.campaign.admit(tx, scope, subject, graph);
   }
   async center(tx: Tx, subject: DiagnosticSubject, centerId: string, capability: DiagnosticSchemas.DiagnosticCapability): Promise<void> {
     try { await this.staff.authorize({ ...subject, capability }, tx); }
