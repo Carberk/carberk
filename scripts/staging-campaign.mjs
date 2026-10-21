@@ -656,14 +656,19 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries, disp
   const serviceList = serviceTables.map(t => `'${t}'`).join(',');
   const parentMap = bootstrapV3 ? `(CASE WHEN TG_TABLE_NAME IN (${serviceList}) THEN '${JSON.stringify(serviceParents)}' ELSE '${JSON.stringify(parents)}' END)::jsonb` : `'${JSON.stringify(parents)}'::jsonb`;
   const rosterUser = value => `EXISTS(SELECT 1 FROM "${n}".campaign_entities WHERE user_id=${value})`;
-  const serviceActions = ['SERVICE_READ', 'SERVICE_SEND', 'SERVICE_NOTE', 'SERVICE_ASSIGN', 'SERVICE_HANDOVER', 'SUPPORT_CUSTOMER_MESSAGE', 'SUPPORT_PRIVATE_NOTE', 'SUPPORT_REPLY', 'SUPPORT_REQUEST_INFORMATION', 'SUPPORT_NOTICE'].map(a => `'${a}'`).join(',');
-  // Ordinary open/send/assign/read-state writes only. Closure, purge, delivery updates, attachments
-  // and source listings stay closed, so lifecycle and push producers cannot change this graph.
+  const serviceActions = ['SERVICE_READ', 'SERVICE_SEND', 'SERVICE_NOTE', 'SERVICE_ASSIGN', 'SERVICE_HANDOVER', 'SUPPORT_CUSTOMER_MESSAGE', 'SUPPORT_PRIVATE_NOTE', 'SUPPORT_REPLY', 'SUPPORT_REQUEST_INFORMATION', 'SUPPORT_NOTICE', 'SUPPORT_CLOSE_RESOLVED', 'SUPPORT_REOPEN'].map(a => `'${a}'`).join(',');
+  // Bounded Support text, resolved closure and reopen only. Successful awaiting closure has no
+  // admitted audit action. Purge, delivery updates, attachments and source listings stay closed.
   const serviceGuard = bootstrapV3 ? `
         IF TG_TABLE_NAME IN (${serviceList}) AND NOT coalesce(
-          (TG_TABLE_NAME='support_cases' AND v_row->>'mode'='synthetic' AND ${rosterUser("v_row->>'customerId'")} AND v_row->>'status'='open' AND v_row->>'closedAt' IS NULL AND
+          (TG_TABLE_NAME='support_cases' AND v_row->>'mode'='synthetic' AND ${rosterUser("v_row->>'customerId'")} AND (
+            (v_row->>'status'='open' AND v_row->>'closedAt' IS NULL) OR
+            (TG_OP='UPDATE' AND v_row->>'status'='closed' AND v_row->>'closedAt' IS NOT NULL AND
+              v_row->>'unansweredSince' IS NULL AND v_row->>'investigationState'='none')) AND
             v_row->>'sourceListingId' IS NULL AND ((TG_OP='INSERT' AND v_row->>'assigneeId' IS NULL AND v_row->>'assignmentVersion'='0') OR
-            (TG_OP='UPDATE' AND v_row->'customerId'=prior->'customerId' AND v_row->'mode'=prior->'mode' AND v_row->'createdAt'=prior->'createdAt' AND (
+            (TG_OP='UPDATE' AND v_row->'customerId'=prior->'customerId' AND v_row->'mode'=prior->'mode' AND v_row->'createdAt'=prior->'createdAt' AND
+              v_row->'priority'=prior->'priority' AND v_row->'escalatedAt' IS NOT DISTINCT FROM prior->'escalatedAt' AND
+              v_row->'investigationState'=prior->'investigationState' AND (
               (v_row->'assigneeId' IS NOT DISTINCT FROM prior->'assigneeId' AND v_row->'assignmentVersion'=prior->'assignmentVersion') OR
               (v_row->>'assigneeId' IS NOT NULL AND ${rosterUser("v_row->>'assigneeId'")} AND (v_row->>'assignmentVersion')::int=(prior->>'assignmentVersion')::int+1))))) OR
           (TG_TABLE_NAME='service_conversations' AND v_row->>'purpose'='support' AND v_row->>'historyRequestId' IS NULL AND v_row->>'erasedAt' IS NULL AND v_row->>'lifecycleEpoch'='0' AND (

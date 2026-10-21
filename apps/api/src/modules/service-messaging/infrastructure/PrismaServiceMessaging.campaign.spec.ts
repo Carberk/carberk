@@ -72,7 +72,7 @@ describe("campaign Support text admission at the service boundary", () => {
    service.file(subject, conversationId, caseId),
    service.subscribePush(subject, conversationId, "device"),
    service.send(subject, conversationId, { clientMessageId: "m1", visibility: "customer", attachmentId: caseId } as never),
-   service.supportCommand(subject, conversationId, { kind: "reopen" } as never),
+   service.supportCommand(subject, conversationId, { kind: "investigate" }),
    service.historySnapshot(subject, conversationId),
   ];
   for (const attempt of attempts) expect(await code(attempt)).toBe("COLLECTION_DISABLED");
