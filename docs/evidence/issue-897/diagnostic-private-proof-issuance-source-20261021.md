@@ -86,3 +86,9 @@ Logs in `/tmp/carberk-resume-20261021`:
 - `bb21-proof-runtime-collection.json`, SHA-256 `44b7a1ec7be05af0c755a87225af9491f4c0c986f179bd563edfb8cfdf48822a`.
 
 Hosted migration, HTTP, storage, lifecycle and race results remain unproved on this assembled source. No reset, deployment, activation, Railway retry, merge or release action occurred. Root owns the next exact-candidate hosted classification before expanding this slice.
+
+## Completed hosted issuance verification
+
+At candidate `96c0c844cdfed5a0e5f1ce658e6788ea65d14f90`, API job `119522309679` in [PR Checks 39686572675](https://github.com/Carberk/carberk/actions/runs/39686572675) executes and passes all 66 `DiagnosticContinuityProofIssuance.e2e.spec.ts` cases. This replaces the pending HTTP/storage result above for the first private manual/manual issuance slice. The genuine predecessor missing-route RED remains preserved. Existing diagnostic identity/history/evidence/report suites also pass. The complete API gate remains RED at 3159/3162 tests because three retained reset-race cases fail.
+
+This does not establish consumption, broader identity/public-transfer issuance, exact retry, successor contention or all lifecycle and concurrency boundaries. New assignment-revoke/restore and PostgreSQL audit-failure rollback cases are being prepared separately and have no executed result yet. The [candidate receipt](../issue-901/prelaunch-hosted-receipt-96c0c844-20261021.md) records reached assertions, remaining failures and raw-log digests. No reset or deployment occurred.
