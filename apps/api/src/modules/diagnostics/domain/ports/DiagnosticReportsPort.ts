@@ -8,4 +8,6 @@ export interface DiagnosticReportsPort {
   save(subject: DiagnosticSubject, reportId: string, input: DiagnosticSchemas.DiagnosticFindingSave): Promise<DiagnosticSchemas.DiagnosticReportRecord>;
   transition(subject: DiagnosticSubject, reportId: string, input: DiagnosticSchemas.DiagnosticReportTransition): Promise<DiagnosticSchemas.DiagnosticReportRecord>;
   correct(subject: DiagnosticSubject, reportId: string, input: DiagnosticSchemas.DiagnosticCorrection): Promise<DiagnosticSchemas.DiagnosticReportRecord>;
+  /** `orderId` is the new visit. No predecessor read authority is granted. */
+  reinspect(subject: DiagnosticSubject, orderId: string, input: DiagnosticSchemas.DiagnosticReinspection): Promise<DiagnosticSchemas.DiagnosticReportRecord>;
 }

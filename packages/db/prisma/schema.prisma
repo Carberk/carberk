@@ -1673,6 +1673,8 @@ model DiagnosticReportRecord {
   templateVersionId String
   templateVersion DiagnosticTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
   predecessorId String? @unique
+  /// Immutable: a new physical visit on another order, not a same-order correction.
+  reinspection Boolean @default(false)
   predecessor DiagnosticReportRecord? @relation("DiagnosticCorrections", fields: [predecessorId], references: [id], onDelete: Restrict)
   successor DiagnosticReportRecord? @relation("DiagnosticCorrections")
   audience String
