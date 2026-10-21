@@ -33,7 +33,7 @@ async function readQuiescenceRemote(input) {
       const { Queue } = require('bullmq');
       const queues = ['video-transcode', 'notification-fanout', 'orphan-cleanup', 'account-purge', 'retired-upload-cleanup',
         'listing-view-retention', 'measurement-retention', 'measurement-outbox', 'service-lifecycle', 'service-push', 'diagnostic-artifacts', 'email-code'];
-      const workers = {};
+      const workers = {}, activeJobs = {};
       // Sequential reads, one bounded non-cluster connection per queue. No Worker is constructed.
       for (const name of queues) {
         const queue = new Queue(name, { skipMetasUpdate: true, connection: { url: e.REDIS_URL,
@@ -44,14 +44,19 @@ async function readQuiescenceRemote(input) {
           if (!Array.isArray(result)) fail();
           workers[name] = result.length;
           if (result.length !== 0) fail(); // Includes BullMQ's unsupported CLIENT LIST sentinel.
+          // BullMQ 5.76.8 maps active jobs to the active list and LLEN. Read
+          // the raw reply: getActiveCount normalizes missing values to zero.
+          const client = await queue.client;
+          const active = await client.llen(queue.toKey('active'));
+          if (!Number.isSafeInteger(active) || active < 0 || active !== 0) fail();
+          activeJobs[name] = active;
           if (name === 'email-code') {
-            const client = await queue.client;
             const heartbeat = await client.get(`operations:${scope}:worker`);
             if (heartbeat !== null) fail();
           }
         } finally { await queue.close(); }
       }
-      Object.assign(receipt, { queueWorkers: workers, heartbeat: 'absent', heartbeatKey: `operations:${scope}:worker` });
+      Object.assign(receipt, { queueWorkers: workers, activeJobs, heartbeat: 'absent', heartbeatKey: `operations:${scope}:worker` });
     } else {
       if (input.operationsScope !== null || !/^\d{1,5}$/.test(e.PORT ?? '3006') || Number(e.PORT ?? '3006') < 1 || Number(e.PORT ?? '3006') > 65535) fail();
       const endpoint = `http://127.0.0.1:${e.PORT ?? '3006'}`;
