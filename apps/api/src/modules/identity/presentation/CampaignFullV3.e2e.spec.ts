@@ -56,6 +56,38 @@ type Login = { accessToken: string; refreshToken: string; user: { id: string; ro
 type RecordKey = { table_name: string; row_key: Record<string, string> };
 const tables = ["users", "sessions", "otp_requests", "totp_enrollments", "totp_backup_codes", "staff_grants", "audit_logs", "dealerships", "dealership_members", "dealership_invitations", "listings", "listing_drafts", "conversations", "conversation_participants", "messages", "business_enquiry_audits", "favorites", "verified_contact_phones", "owned_vehicles", "blocked_users", "notification_preferences", "content_reports"];
 
+// Failure-only diagnostics: inspect at most 8192 characters per field, emit only
+// fixed vocabulary (never raw messages/stderr), and retain no diagnostic buffers.
+function cleanupFailure(error: unknown) {
+  const value = error as { name?: unknown; code?: unknown; message?: unknown; stderr?: unknown; meta?: { code?: unknown; message?: unknown } } | null;
+  const bounded = (input: unknown) => typeof input === "string" ? input.slice(0, 8192) : "";
+  const text = [value?.message, value?.stderr, value?.meta?.message].map(bounded).join("\n");
+  const names = ["Error", "TypeError", "RangeError", "PrismaClientKnownRequestError", "PrismaClientUnknownRequestError", "PrismaClientInitializationError"];
+  const codes = ["P2010", "P2028", "P2034", "P1001", "P1002", "P1017", "P0001", "23503", "23505", "40001", "40P01", "55P03", "57014", "42601", "42883", "42501", "ETIMEDOUT", "ENOBUFS", "ENOENT", "ECONNREFUSED"];
+  const messages = [
+    "Service private cleanup unavailable", "Service cleanup authority invalid",
+    "Campaign Support ownership changed", "Campaign Support authority invalid",
+    "Campaign Support claims ambiguous", "Campaign lifecycle contract changed",
+    "Campaign lifecycle binding changed", "Campaign service contract changed",
+    "Campaign service cleanup incomplete", "Campaign erasure fence incomplete",
+    "Campaign service erasure incomplete", "Unsupported campaign service",
+    "Campaign journal or schema changed", "Campaign journal changed",
+    "Untracked campaign mutation", "Foreign campaign reference",
+    "Foreign campaign graph reference", "Campaign binding changed",
+    "Campaign graph cleaning", "Campaign graph disposed", "Campaign graph limit",
+    "Campaign disposal incomplete", "Campaign terminal rows present",
+    "Campaign delivery sink retained", "Campaign media claim in flight",
+    "Transaction already closed", "Unable to start a transaction",
+    "deadlock detected", "canceling statement due to lock timeout",
+    "canceling statement due to statement timeout", "Disposable database query refused",
+  ];
+  return {
+    errorType: names.find(name => name === value?.name || text.includes(name)) ?? "unclassified-error-type",
+    codes: codes.filter(code => code === value?.code || code === value?.meta?.code || new RegExp(`\\b${code}\\b`).test(text)),
+    classifications: messages.filter(message => text.includes(message)),
+  };
+}
+
 // No application provider overrides, JWT signing, auth inserts or elevated-session writes.
 // The remote process adapter changes only transport to the disposable worker SQL/Redis.
 describe("default-closed full-v3 ordinary authentication joins reservation-owned business disposal", () => {
@@ -115,20 +147,26 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     const payload = { kind, id, namespace: `cf_${id}`, profile: selectedProfile, candidate: options.candidate ?? candidate, target: candidate,
       redisOrigin: "redis://redis.railway.internal:6379/0", identity: { projectId: "v3-project", environmentId: "v3-staging", services: { api: "v3-api" },
         origins: { database: "postgresql://postgres.railway.internal:5432/railway", media: "http://minio.railway.internal:9000", publicMedia: "https://media.example" } } };
+    const observe = <T extends { status: number | null; error?: Error; stderr?: string | null }>(result: T, transport: "sql" | "disposal") => {
+      if (result.status !== 0 || result.error) console.error("[issue-901-cleanup]", JSON.stringify({ kind, transport, sqlCalls,
+        ...cleanupFailure(result.error ?? { stderr: result.stderr }) }));
+      return result;
+    };
+    // Existing bridge supports bounded SQLSTATE diagnostics behind this test-only flag.
     const program = runInNewContext(`${source}; remoteProgram(payload)`, { payload });
     runInNewContext(program, { URL, process: remoteProcess, require: (name: string) => name === "node:child_process" ? {
       spawnSync: (binary: string, args: string[], spawnOptions: { input: string }) => {
-        if (binary === process.execPath) return spawnSync(binary, args, { ...spawnOptions, encoding: "utf8", timeout: 30000, cwd: `${root}/apps/api`, env: { ...process.env,
+        if (binary === process.execPath) return observe(spawnSync(binary, args, { ...spawnOptions, encoding: "utf8", timeout: 30000, cwd: `${root}/apps/api`, env: { ...process.env,
           // Disposable credentials from docker-compose.ci.yml, only in the existing local child bridge.
           ...(process.env["APP_ENV"] === "test" && ["localhost", "127.0.0.1"].includes(new URL(process.env["MINIO_ENDPOINT"] ?? "http://invalid").hostname)
-            ? { MINIO_ACCESS_KEY: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin", MINIO_SECRET_KEY: process.env["MINIO_SECRET_KEY"] ?? "minioadmin" } : {}) } });
+            ? { MINIO_ACCESS_KEY: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin", MINIO_SECRET_KEY: process.env["MINIO_SECRET_KEY"] ?? "minioadmin" } : {}) } }), "disposal");
         sqlCalls += 1;
-        return spawnSync(process.execPath, [`${root}/scripts/testing/query-disposable-postgres.cjs`], {
+        return observe(spawnSync(process.execPath, [`${root}/scripts/testing/query-disposable-postgres.cjs`], {
           input: spawnOptions.input, encoding: "utf8", timeout: 30000,
-          env: { ...process.env, STAGING_CONTROL_TEST_DATABASE_URL: process.env["DATABASE_URL"], STAGING_TEST_DB_PACKAGE: `${packageRoot}/package.json` },
-        });
+          env: { ...process.env, STAGING_CONTROL_TEST_DATABASE_URL: process.env["DATABASE_URL"], STAGING_TEST_DB_PACKAGE: `${packageRoot}/package.json`, STAGING_TEST_SQL_DIAGNOSTICS: "1" },
+        }), "sql");
       },
-    } : localRequire(name), console: { log: (value: string) => { if (!options.loseReceipt) receipt = JSON.parse(value); }, error: () => { code = 1; } } });
+    } : localRequire(name), console: { log: (value: string) => { if (!options.loseReceipt) receipt = JSON.parse(value); }, error: () => { console.error("[issue-901-cleanup]", JSON.stringify({ kind, transport: "operator-refusal", sqlCalls })); code = 1; } } });
     return { code: code || remoteProcess.exitCode, receipt, sqlCalls };
   }
   const email = (id: string, alias: string) => `${alias}.${id}.${candidate.slice(0, 12)}@campaign897.invalid`;
@@ -168,9 +206,23 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     const requestId = response.body?.requestId;
     if (typeof requestId === "string" && requestId.length > 0) known.add(requestId);
   }
+  async function observeIssuance(kind: "sign-in" | "contact", issued: { status: number; body: { code?: unknown; details?: { reason?: unknown } } }, expected: number) {
+    if (issued.status === expected) return;
+    const codes = ["RATE_LIMITED", "BAD_REQUEST", "VALIDATION_ERROR", "HTTP_ERROR", "INTERNAL_SERVER_ERROR", "FORBIDDEN", "UNAUTHORIZED"];
+    const reasons = ["ip_limit", "destination_limit", "backoff", "USER_SUSPENDED"];
+    // These are the two possible loopback transports of this local HTTP harness.
+    const since = new Date(Date.now() - 3600000);
+    const budget = await Promise.all(["127.0.0.1", "::1"].map(ip => db.otpRequest.count({ where: { ip, createdAt: { gte: since } } })))
+      .then(counts => ({ loopbackHourlyRows: counts.reduce((sum, count) => sum + count, 0), loopbackHourlyMax: Math.max(...counts) }),
+        () => ({ counts: "unavailable" }));
+    console.error("[issue-901-issuance]", JSON.stringify({ kind, status: issued.status,
+      responseCode: codes.find(code => code === issued.body.code) ?? "unclassified-response-code",
+      detailsCategory: reasons.find(reason => reason === issued.body.details?.reason) ?? "absent-or-unclassified-details", ...budget }));
+  }
   async function signIn(id: string, person: Actor, known: Set<string>): Promise<Login> {
     const issued = await request.post("/api/v1/auth/otp/request").send({ email: person.email });
     learn(known, issued);
+    await observeIssuance("sign-in", issued, 201);
     expect(issued.status).toBe(201);
     expect(issued.body.testCode).toBeUndefined();
     const requestId = issued.body.requestId as string;
@@ -1734,6 +1786,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
       // Preserve the raw worker error and prove rollback; do not label setup/transport failures as this RED.
       const purge = await worker(deadline).then(result => ({ result, error: undefined }), (error: unknown) => ({ result: undefined, error }));
       if (purge.error) {
+        console.error("[issue-901-cleanup]", JSON.stringify({ phase: "deadline-worker", ...cleanupFailure(purge.error) }));
         expect(await snapshot(id)).toEqual(primaryBefore);
         expect(await snapshot(foreignId)).toEqual(foreignBefore);
       }
@@ -1920,8 +1973,9 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
             credentials: { accessKeyId: process.env.MINIO_ACCESS_KEY ?? 'minioadmin', secretAccessKey: process.env.MINIO_SECRET_KEY ?? 'minioadmin' } });
           try { console.log(JSON.stringify(await new ExpireServiceContent(db, new S3RetiredObjectStore(s3, 'service-private')).execute(new Date(process.argv[1])))); }
           finally { s3.destroy(); await db.onModuleDestroy(); }
-        })().catch(() => { console.error('Owned Support worker refused'); process.exitCode = 1; });
-      `, now.toISOString()], { timeout: 30000, cwd: `${root}/apps/worker`, env: { ...process.env, DATABASE_URL: database.toString(), MINIO_ENDPOINT: endpoint, TSX_TSCONFIG_PATH: `${root}/apps/worker/tsconfig.json` } }, (error, stdout) => {
+        })().catch(error => { console.error('[issue-901-cleanup]', JSON.stringify((${cleanupFailure.toString()})(error))); console.error('Owned Support worker refused'); process.exitCode = 1; });
+      `, now.toISOString()], { timeout: 30000, cwd: `${root}/apps/worker`, env: { ...process.env, DATABASE_URL: database.toString(), MINIO_ENDPOINT: endpoint, TSX_TSCONFIG_PATH: `${root}/apps/worker/tsconfig.json` } }, (error, stdout, stderr) => {
+        if (error) console.error("[issue-901-cleanup]", JSON.stringify({ phase: "owned-support-worker", ...cleanupFailure({ name: error.name, code: error.code, stderr }) }));
         if (error) reject(new Error("Owned Support worker failed before result"));
         else { try { resolve(JSON.parse(stdout.trim())); } catch { reject(new Error("Owned Support worker result invalid")); } }
       });
@@ -2627,6 +2681,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
           const contact = (action: "request" | "verify", body: object) => business(post(`/api/v1/me/contact-phones/${action}`, login, body), businessId);
           const issued = await contact("request", { phone: number });
           if (typeof issued.body.requestId === "string") smsIds.add(issued.body.requestId);
+          await observeIssuance("contact", issued, 200);
           expect(issued.status, "SETUP: proven ordinary contact request").toBe(200);
           const [delivered] = await rows<{ message: string }>(`SELECT message FROM "cf_${reservation}".campaign_sms_sink WHERE request_id=$1`, issued.body.requestId);
           const code = delivered?.message.match(/\b\d{6}\b/)?.[0];
@@ -2982,6 +3037,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
         const phone = `+9936${(BigInt(`0x${createHash("sha256").update(`campaign897-contact-phone-v1:${reservation}:${candidate}`, "ascii").digest("hex")}`) % 10000000n).toString().padStart(7, "0")}`;
         const issued = await business(post("/api/v1/me/contact-phones/request", owner, { phone }), businessId);
         if (typeof issued.body.requestId === "string") smsIds.add(issued.body.requestId);
+        await observeIssuance("contact", issued, 200);
         expect(issued.status, "SETUP: ordinary contact request").toBe(200);
         await journal(reservation, 57, 69);
         const [delivered] = await rows<{ message: string }>(`SELECT message FROM "cf_${reservation}".campaign_sms_sink WHERE request_id=$1`, issued.body.requestId);
