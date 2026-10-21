@@ -591,7 +591,8 @@ if marker ~= ${JSON.stringify(markerKey)} or #completed > 16384 or redis.call('E
 for _, key in ipairs(deletions) do
   if redis.call('DEL', key) ~= 1 then return redis.error_reply('incomplete') end
 end
-if redis.call('SET', marker, completed, 'NX') ~= 'OK' then return redis.error_reply('incomplete') end
+redis.call('SET', marker, completed, 'NX')
+if redis.call('GET', marker) ~= completed or redis.call('PTTL', marker) ~= -1 then return redis.error_reply('incomplete') end
 return {'completed'}
 `);
     const result = await redis.evalBuffer(mutationScript, 0, ...args, before.snapshot.length, ...before.snapshot.flat(), markerKey, encoded);
