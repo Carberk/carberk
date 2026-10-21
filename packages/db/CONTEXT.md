@@ -2,6 +2,8 @@
 
 The schema, migration history, generated-client boundary, and seed inputs live here. Inspect `schema.prisma` for fields and relations instead of copying them into documentation. Runtime consumers load the compiled package. [The source capture adapter](src/measurement-capture.ts) is shared by API and worker source transactions, preserving collector authority, savepoint isolation and latency budgets without importing either application.
 
+The default-closed [prelaunch clean-reset program](../../scripts/staging-clean-reset-remote.mjs) owns the operation-local `staging_clean_reset.receipts` store outside Prisma. Its rows receipt remains immutable while an additive Redis state records bounded initial completion and completed replay. [Source evidence](../../docs/evidence/issue-901/prelaunch-reset-redis-initial-completion-source-20261021.md) distinguishes offline checks from pending hosted verification. Interrupted pending continuation and full recovery remain blocked; this source enables no live controller or production adapter.
+
 `Listing.publicNumber` is a unique, database-assigned integer for the public detail footer. Its migration numbers existing Listings; subsequent inserts take the next sequence value. UUIDs remain the internal identity and route key.
 
 `users.nameNumber` (1000 to 9999) and `users.avatarIndex` (0 to 11) have random column defaults and range check constraints that Prisma cannot express; `schema.prisma` mirrors the defaults as `dbgenerated` in PostgreSQL's own rendering, so `prisma migrate diff` stays empty. The defaults numbered existing Users when the columns were added and let an older API still create Users; the API normally draws both values itself.
