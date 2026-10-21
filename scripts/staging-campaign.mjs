@@ -354,7 +354,12 @@ export function businessMain(input, { sql, uuid, exists, disposeDeliveries, disp
           THEN RAISE EXCEPTION 'Campaign business required'; END IF;` : '';
   // V3 business media. An owned, active synthetic admitted business whose writer is its current journaled owner or sales member.
   const ownedRow = (table, alias) => `EXISTS(SELECT 1 FROM "${n}".campaign_records ${alias}r WHERE ${alias}r.table_name='${table}' AND NOT ${alias}r.deleted AND ${alias}r.row_key=jsonb_build_object('id',${alias}.id))`;
-  const currentRow = (table, alias) => `EXISTS(SELECT 1 FROM "${n}".campaign_records ${alias}r WHERE ${alias}r.table_name='${table}' AND NOT ${alias}r.deleted AND ${alias}r.row_key=jsonb_build_object('id',${alias}.id) AND ${alias}r.row_hash=md5(to_jsonb(${alias})::text))`;
+  const currentRow = (table, alias) => {
+    const key = table === 'service_erasure_fences'
+      ? `jsonb_build_object('conversationId',${alias}."conversationId")`
+      : `jsonb_build_object('id',${alias}.id)`;
+    return `EXISTS(SELECT 1 FROM "${n}".campaign_records ${alias}r WHERE ${alias}r.table_name='${table}' AND NOT ${alias}r.deleted AND ${alias}r.row_key=${key} AND ${alias}r.row_hash=md5(to_jsonb(${alias})::text))`;
+  };
   const mediaBusiness = business => `${business} IS NOT NULL AND ${business}<>'${rootId}' AND
           EXISTS(SELECT 1 FROM public.dealerships d WHERE d.id=${business} AND d.status='active' AND d."admissionMode"='synthetic' AND ${currentRow('dealerships', 'd')}) AND ${activeOwner(business)}`;
   const mediaMember = (business, user) => `EXISTS(SELECT 1 FROM public.dealership_members m WHERE m."dealershipId"=${business} AND m."userId"=${user} AND m.role IN ('owner','sales') AND m.status='active' AND ${currentRow('dealership_members', 'm')})`;
