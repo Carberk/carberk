@@ -45,3 +45,5 @@ export {
   type AdminSessionElevationPort,
   type AdminSessionElevationResult,
 } from "./domain/ports/AdminSessionElevationPort";
+
+export { STAFF_BINDING_PORT, type StaffBindingPort, type StaffBinding, type StaffBindingSubject } from "./domain/ports/StaffBindingPort";

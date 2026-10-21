@@ -80,7 +80,7 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
       return row => provenance.has(row.id);
     });
   }
-  private async compared(tx: Tx, subject: DiagnosticSubject, orderId: string, predecessorId: string) {
+  async compared(tx: Tx, subject: DiagnosticSubject, orderId: string, predecessorId: string) {
     await this.authority.current(tx, subject);
     // Discover lock targets only. Match the existing cross-order write lock order,
     // then re-read all facts and current authority under those locks.
@@ -98,6 +98,7 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
       throw denied();
     };
     const order = await staffOrder(orderId);
+    await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${predecessorId} FOR SHARE`;
     const prior = await tx.diagnosticReportRecord.findUnique({ where: { id: predecessorId } });
     if (!prior) throw denied();
     const priorOrder = await staffOrder(prior.orderId);
@@ -117,7 +118,7 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
     const comparison: DiagnosticReinspectionComparison = { predecessor: { reportId: prior.id, reportVersion: prior.version, snapshotHash: prior.snapshotHash,
       identityRecordId: retained.id, identityRecordHash: prior.identityRecordHash, identity: a.identity },
     candidate: { orderId, orderVersion: order.version, identityRecordId: candidate.id, identityRecordHash: candidate.observationHash, identity: b.identity } };
-    return { comparison, provenance: new Set([...a.provenance, ...b.provenance]) };
+    return { comparison, order, prior, priorOrder, retained, candidate, provenance: new Set([...a.provenance, ...b.provenance]) };
   }
   async create(subject: DiagnosticSubject, orderId: string, input: DiagnosticSchemas.DiagnosticDraftCreate) {
     return this.db.$transaction(async tx => {

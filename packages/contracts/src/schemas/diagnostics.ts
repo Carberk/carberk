@@ -92,6 +92,8 @@ export const DiagnosticReportTransitionSchema = z.object({ expectedVersion: z.nu
 export const DiagnosticCorrectionSchema = z.object({ expectedVersion: z.number().int().nonnegative(), successorId: z.string().uuid(), reason: z.string().trim().min(1).max(1000) }).strict();
 /** Links a new physical visit's first report to a released or withdrawn predecessor on another order. */
 export const DiagnosticReinspectionSchema = z.object({ reportId: z.string().uuid(), predecessorId: z.string().uuid(), expectedOrderVersion: z.number().int().nonnegative(), reason: z.string().trim().min(1).max(1000) }).strict();
+export const DiagnosticContinuityProofIssuanceSchema = z.object({ predecessorId: z.string().uuid(), expectedPredecessorVersion: z.number().int().nonnegative(), expectedOrderVersion: z.number().int().nonnegative(), predecessorIdentityRecordId: z.string().uuid(), candidateIdentityRecordId: z.string().uuid(), linkingTechnicianId: z.string().uuid(), method: z.literal("comparative_attestation"), rationale: z.string().trim().min(1).max(1000), provenanceRecordIds: z.array(z.string().uuid()).min(1).max(40).refine(ids => new Set(ids).size === ids.length) }).strict();
+export const DiagnosticContinuityProofSchema = z.object({ proofId: z.string().uuid(), policyVersion: z.literal("ADR-0108"), predecessor: z.object({ reportId: z.string().uuid(), reportVersion: z.number().int().nonnegative(), snapshotHash: sha256, identityRecordId: z.string().uuid(), identityRecordHash: sha256 }).strict(), candidate: z.object({ orderId: z.string().uuid(), orderVersion: z.number().int().nonnegative(), identityRecordId: z.string().uuid(), identityRecordHash: sha256 }).strict(), linkingTechnicianId: z.string().uuid(), method: z.literal("comparative_attestation"), result: z.literal("same_vehicle"), rationale: restrictedText(1000), provenanceRecordIds: z.array(z.string().uuid()).min(1), issuedBy: z.string().uuid(), issuedAt: z.string().datetime() }).strict();
 /** Live reader metadata; never part of a released snapshot. Missing or unrecognized kinds permit neutral labels. */
 const DiagnosticLineageKindSchema = z.enum(["original", "correction", "reinspection"]);
 export const DiagnosticReportSchema = z.object({
@@ -110,6 +112,8 @@ export type DiagnosticFindingSave = z.infer<typeof DiagnosticFindingSaveSchema>;
 export type DiagnosticReportTransition = z.infer<typeof DiagnosticReportTransitionSchema>;
 export type DiagnosticCorrection = z.infer<typeof DiagnosticCorrectionSchema>;
 export type DiagnosticReinspection = z.infer<typeof DiagnosticReinspectionSchema>;
+export type DiagnosticContinuityProofIssuance = z.infer<typeof DiagnosticContinuityProofIssuanceSchema>;
+export type DiagnosticContinuityProof = z.infer<typeof DiagnosticContinuityProofSchema>;
 export type DiagnosticReportRecord = z.infer<typeof DiagnosticReportSchema>;
 
 /** Stored release input. No live Listing, booking or customer fields enter rendering. */

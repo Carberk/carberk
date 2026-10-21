@@ -18,6 +18,11 @@ export function diagnosticAccountErasureWrites(db: PrismaService, userId: string
    state=r.state || jsonb_build_object('authorId',NULL,'reviewerId',NULL,'returnReason',NULL,'correctionReason',NULL,
     'withdrawalReason',CASE WHEN r.status='withdrawn' THEN '[erased]' ELSE NULL END)
    FROM inspection_orders o WHERE o.id=r."orderId" AND o."commissionerId"=${userId} AND o."erasedAt" IS NULL`,
+  // Unconsumed private proofs have no independent hold or anonymous-hash exception.
+  // Remove the complete restricted record and both-visit linkage before intake erasure.
+  db.$executeRaw`DELETE FROM diagnostic_continuity_proofs p WHERE p."issuerId"=${userId} OR p."linkingTechnicianId"=${userId}
+   OR EXISTS (SELECT 1 FROM inspection_orders o WHERE o."commissionerId"=${userId}
+    AND (o.id=p."predecessorOrderId" OR o.id=p."candidateOrderId"))`,
   // Keep write/generation leases. A writer already doing network I/O must finish
   // within its bounded lease before cleanup can delete and verify its exact key.
   db.$executeRaw`UPDATE diagnostic_pdf_artifacts a SET state='cleanup_pending', epoch=gen_random_uuid()::text,

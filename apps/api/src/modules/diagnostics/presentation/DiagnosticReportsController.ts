@@ -4,6 +4,8 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { DiagnosticRuleError } from "../domain/InspectionOrder";
 import type { DiagnosticSubject } from "../domain/ports/DiagnosticIntakePort";
+import { IssueDiagnosticContinuityProof } from "../application/IssueDiagnosticContinuityProof";
+import { ReadDiagnosticContinuityProof } from "../application/ReadDiagnosticContinuityProof";
 import { DIAGNOSTIC_REPORTS_PORT, type DiagnosticReportsPort } from "../domain/ports/DiagnosticReportsPort";
 
 import { DIAGNOSTIC_EVIDENCE_PORT, type DiagnosticEvidencePort } from "../domain/ports/DiagnosticEvidencePort";
@@ -21,6 +23,8 @@ function parse<S extends z.ZodType>(schema: S, value: unknown): z.output<S> {
 @Controller("api/v1/diagnostics")
 export class DiagnosticReportsController {
   constructor(@Inject(DIAGNOSTIC_REPORTS_PORT) private readonly reports: DiagnosticReportsPort,
+    @Inject(IssueDiagnosticContinuityProof) private readonly issueContinuityProof: IssueDiagnosticContinuityProof,
+    @Inject(ReadDiagnosticContinuityProof) private readonly readContinuityProof: ReadDiagnosticContinuityProof,
     @Inject(DIAGNOSTIC_EVIDENCE_PORT) private readonly evidence: DiagnosticEvidencePort,
     @Inject(DIAGNOSTIC_DOCUMENTS_PORT) private readonly documents: DiagnosticDocumentsPort,
     @Inject(DIAGNOSTIC_IDENTITY_EVIDENCE_PORT) private readonly identity: DiagnosticIdentityEvidencePort) {}
@@ -46,6 +50,16 @@ export class DiagnosticReportsController {
     // Set before authorization so uniform denials carry the same private cache policy.
     reply.header("Cache-Control", "no-store, private");
     return this.run(() => this.reports.comparison(this.subject(req), parse(uuid, id), parse(z.object({ predecessorId: uuid }).strict(), query).predecessorId));
+  }
+  @Post("orders/:id/continuity-proofs") issueProof(@Req() req: Request, @Param("id") id: string, @Body() body: unknown, @Query() query: unknown, @Res({ passthrough: true }) reply: FastifyReply) {
+    reply.header("Cache-Control", "no-store, private");
+    parse(z.object({}).strict(), query);
+    return this.run(() => this.issueContinuityProof.execute(this.subject(req), parse(uuid, id), parse(DiagnosticSchemas.DiagnosticContinuityProofIssuanceSchema, body)));
+  }
+  @Get("orders/:id/continuity-proofs/:proofId") readProof(@Req() req: Request, @Param("id") id: string, @Param("proofId") proofId: string, @Query() query: unknown, @Res({ passthrough: true }) reply: FastifyReply) {
+    reply.header("Cache-Control", "no-store, private");
+    parse(z.object({}).strict(), query);
+    return this.run(() => this.readContinuityProof.execute(this.subject(req), parse(uuid, id), parse(uuid, proofId)));
   }
   /** Restricted identity routes set private/no-store before validation so syntax errors and
    * uniform denials carry the same cache policy as successful responses. */
