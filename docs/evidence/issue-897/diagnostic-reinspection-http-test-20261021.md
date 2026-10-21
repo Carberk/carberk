@@ -36,10 +36,12 @@ On hosted `pnpm test:api`, the failure should be at step 3: `expected 201 "Creat
 | `DATABASE_URL=<dummy, unused> pnpm --filter @auto-tm/db generate && pnpm --filter @auto-tm/db build` | generated the client locally, no connection |
 | `pnpm --filter @auto-tm/api typecheck` | pass |
 | `pnpm exec eslint --max-warnings 0 <spec>` (apps/api) | pass |
-| `AUTO_TM_TEST_DATABASES=off pnpm exec vitest list <spec>` (apps/api) | 13 cases collected, including the new case |
+| `AUTO_TM_TEST_DATABASES=off pnpm exec vitest list <spec>` (apps/api) | new named case present in static collection; runtime total not established |
 | `pnpm check:agent-docs`; `git diff --check` | pass; clean |
 
 No Docker, services, integration tests, staging, Railway or CI were run.
+
+Root assembly checks also passed API TS7/TS6, focused lint, static collection, agent-doc links and diff checks. The file has 12 explicit `it` declarations after this addition. The static collection output also contains two configuration expressions, so its entry count is not an executed-test count.
 
 ## Limitations and open decisions
 
