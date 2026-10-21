@@ -1,8 +1,52 @@
 # Structured identity lifecycle coverage checkpoint
 
-Test checkpoint for #914 within #897, integration PR #904. Base `168448d733ac2c6509ee1af11e787250b2b306de`; the source is `988f5ceb`, assembled as `df008555`. Reservation `agent/issue-914-identity-lifecycle-coverage-20261021` was pushed at the base before any edits. This checkpoint covers the gaps listed in the [source handoff](diagnostic-identity-evidence-source-20261021.md) under the [capture contract](diagnostic-identity-evidence-capture-contract-20261021.md) and [ADR-0108](../../adr/0108-pair-bound-diagnostic-reinspection-continuity-proof.md).
+Test checkpoint for #914 within #897, integration PR #904. Base `13f1f09b4a637f555ac762b9276e41be3d3988b0`; this repair is on `agent/issue-914-lifecycle-clock-repair-20261021`, reserved and pushed before edits. The prior lifecycle suite source is the parent candidate. This checkpoint covers the gaps listed in the [source handoff](diagnostic-identity-evidence-source-20261021.md) under the [capture contract](diagnostic-identity-evidence-capture-contract-20261021.md) and [ADR-0108](../../adr/0108-pair-bound-diagnostic-reinspection-continuity-proof.md).
+
+The original lifecycle checkpoint started at `168448d733ac2c6509ee1af11e787250b2b306de`, reservation `agent/issue-914-identity-lifecycle-coverage-20261021`; its source was `988f5ceb`, assembled as `df008555`.
 
 It is tests only. No source changed. The existing suites are byte-unchanged: the oracle, erasure, binding and worker artifact suites. The writer did not run the 9 identity evidence HTTP cases; the later parent classification below records their hosted result.
+
+## Clock repair diagnosis
+
+The hosted RED was confined to the two `deleteAndPurge` calls: `deletionScheduledAt` used wall time (`2026-11-20T18:20:39.308Z` and `18:20:41.700Z`) instead of the fixed `purgeTime` (`2026-11-20T12:00:00.000Z`). `DeleteMe` injects the concrete identity `SystemClockAdapter`, while this suite previously overrode only the `IDENTITY_CLOCK_PORT` alias. The account-erasure oracle already establishes the supported seam: Vitest fake timers with `toFake: ["Date"]`, retaining real timers. The lifecycle suite now applies that setup and restores real timers during teardown. Persistence and product deletion semantics are unchanged.
+
+This diagnoses a test harness setup defect, not a product clock bug. The repair is limited to the new lifecycle spec and this evidence file. It does not change the fixed 30-day literal, assertions, purge subprocess, worker suite, or any pre-existing reset race.
+
+Ranked hypotheses and probes, using the supplied hosted RED instead of a prohibited local service replay:
+
+1. If deletion bypasses the overridden alias, its injected provider will read wall time. Confirmed by `DeleteMe.ts` injecting `SystemClockAdapter`, `identity.module.ts` binding `IDENTITY_TOKENS.ClockPort` with `useExisting`, and `SystemClockAdapter.now()` returning `new Date()`. Replacing an alias provider does not replace the concrete provider. `DiagnosticIdentityErasure.e2e.spec.ts` already freezes Date to make its literal 30-day schedule pass.
+2. If persistence rewrites the date, a database write/default/trigger would replace the supplied timestamp. `PrismaAccountDeletionUnitOfWork.scheduleDeletion` writes the supplied `deletionScheduledAt` directly; the hosted values exactly track wall time plus 30 days. No persistence change is needed.
+3. If the suite's mutable diagnostic time leaked into deletion, it would still be advanced at the failing call. Its only assignment advances to `12:01` for expiry, and a `finally` restores `initialTime` before either failing deletion. Neither hosted value matches that synthetic advance.
+
+Hosted input: PR Checks `39651254447`, API job `119400811377`, candidate `13f1f09b`. Raw `/tmp/carberk-resume-20261021/13f1f09b-api-119400811377.raw.log`, SHA-256 verified locally as `adca4578c9e867049532ed67fd303771ecb62b435ae1304212e21efc0191155a`. API 320/322 files and 3083/3088 tests passed. The two other new HTTP lifecycle cases passed, as did all four new worker retention cases. The original nine-case identity-evidence oracle passed; no speculative rejection repair is included. The separate Support/publish/attach reset races remain blockers.
+
+## Clock repair offline verification
+
+Logs are `/tmp/issue-914-lifecycle-clock-repair-*.log`. No dependency versions or lockfile changed. The first DB build lacked `DATABASE_URL`; the successful retry used the inert `postgresql://offline:offline@localhost:5432/offline` only for code generation, without opening a database connection.
+
+| Command | Result |
+|---|---|
+| `pnpm install --frozen-lockfile --offline` | PASS, existing lock/store only |
+| `pnpm --filter @auto-tm/contracts build` | PASS |
+| `DATABASE_URL='postgresql://offline:offline@localhost:5432/offline' pnpm --filter @auto-tm/db build` | PASS, generated ignored client |
+| `pnpm --filter @auto-tm/api typecheck` | PASS |
+| `pnpm --filter @auto-tm/worker typecheck` | PASS |
+| `pnpm --filter @auto-tm/api exec tsc6 --noEmit` | PASS |
+| `pnpm --filter @auto-tm/worker exec tsc6 --noEmit` | PASS |
+| `pnpm --filter @auto-tm/api exec eslint src/modules/diagnostics/presentation/DiagnosticIdentityEvidenceLifecycle.e2e.spec.ts --max-warnings 0` | PASS |
+| `pnpm --filter @auto-tm/worker lint` | PASS |
+| `git diff --check` | PASS |
+
+Docs: no external dependency or API change; no documentation lookup needed. The module ownership and product behavior documented in the overviews remain unchanged.
+
+| Acceptance criterion | Evidence | Result |
+|---|---|---|
+| Classify the exact scheduling failure before editing | Hosted timestamps, concrete clock injection, alias composition, persistence path and existing erasure oracle | PASS, harness setup |
+| Repair only the clock setup in the new lifecycle suite | Date-only fake setup and guaranteed restoration; complete diff inspection | PASS |
+| Preserve literal schedule, ordinary HTTP deletion, session revocation, isolation/OTP guards, real purge subprocess, upload barriers, generation/pins/foreign survival | All test bodies byte-unchanged from `13f1f09b`; worker and product source absent from diff | PASS by inspection |
+| Same hosted assertions GREEN after repair | Parent must assemble and run hosted CI | BLOCKED at this bounded handoff |
+
+No local services, Docker, HTTP/database tests, broad unit/root reruns, CI dispatch, live infrastructure or GitHub content mutations were performed. Only the requested reservation/checkpoint branch was pushed. Hosted GREEN for the repaired suite remains the parent's gate; offline checks do not prove it.
 
 ## New suites
 

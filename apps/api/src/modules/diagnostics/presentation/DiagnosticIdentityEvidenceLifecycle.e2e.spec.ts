@@ -107,6 +107,10 @@ describe("structured identity evidence through held uploads, rights expiry and a
     await cleanSuiteFixtures(db, suite, { userAliases: people });
   }
   beforeAll(async () => {
+    // DELETE /me injects SystemClockAdapter directly, beyond the identity port override.
+    // Match the account-erasure oracle: fake Date only and keep real timers active.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(initialTime);
     const testing = await Test.createTestingModule({ imports: [ConfigModule.forRoot({ isGlobal: true, load: [() => ({ DIAGNOSTIC_PRIVATE_BUCKET: "diagnostic-test-private" })] }),
       EventEmitterModule.forRoot(), bullTestRoot(), DiagnosticsModule, JwtModule.register({ global: true, secret: "synthetic-diagnostic-lifecycle-test" })] })
       .overrideProvider(IDENTITY_CLOCK_PORT).useValue({ now: () => now })
@@ -134,7 +138,11 @@ describe("structured identity evidence through held uploads, rights expiry and a
       checks: [{ id: "brakes", label: localized, required: true, evidenceRequired: false, measurement: null }], panels: [] };
     templateId = (await post("reception", `centers/${centerId}/templates`, { expectedVersion: 0, definition, synthetic: true }).expect(201)).body.id;
   });
-  afterAll(async () => { try { await cleanup(); } finally { objects?.destroy(); await app?.close(); } });
+  afterAll(async () => {
+    try { await cleanup(); } finally {
+      try { objects?.destroy(); await app?.close(); } finally { vi.useRealTimers(); }
+    }
+  });
 
   async function visit(commissioner: Commissioner, recorder: Recorder = "technician"): Promise<Order> {
     let { body: order } = await post(commissioner, "orders", { requestKey: randomUUID(), centerId, templateVersionId: templateId, audience: "buyer_private", synthetic: true }).expect(201);
