@@ -253,10 +253,11 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
       const projection = Object.fromEntries(Object.entries(held).filter(([key]) => key !== 'redis_state'));
       if (!exact(projection, ['operation_id', 'reservation_id', 'candidate', 'project_id', 'environment_id', 'phase', 'expected', 'result']) ||
           projection.operation_id !== input.operationId || projection.reservation_id !== input.reservationId || projection.candidate !== input.candidate ||
-          projection.project_id !== p.projectId || projection.environment_id !== p.environmentId || projection.phase !== 'rows' ||
-          !sameDigest(digestOf(projection.result), digest) ||
-          hash(canonical(projection)) !== input.expectedInventory.rowsReceiptDigest) refused('Redis rows receipt changed');
+          projection.project_id !== p.projectId || projection.environment_id !== p.environmentId || projection.phase !== 'rows')
+        refused('Redis rows receipt changed');
       digestOf(projection.expected);
+      if (!sameDigest(digestOf(projection.result), digest) || hash(canonical(projection)) !== input.expectedInventory.rowsReceiptDigest)
+        refused('Redis rows receipt changed');
       const state = Object.hasOwn(held, 'redis_state') ? held.redis_state : {};
       if (!record(state)) refused('Invalid Redis state');
       const jsonSql = value => `convert_from(decode('${Buffer.from(canonical(value), 'utf8').toString('hex')}', 'hex'), 'UTF8')::jsonb`;
@@ -283,9 +284,9 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
       };
       // Inventory reads every operation state so another unresolved operation cannot be bypassed.
       const others = sql(`BEGIN READ ONLY; ${settings}
-        SELECT '${marker}' || jsonb_build_object('states', coalesce(jsonb_agg(to_jsonb(r)->'redis_state'), '[]'::jsonb))::text
+        SELECT '${marker}' || jsonb_build_object('states', coalesce(jsonb_agg(coalesce(to_jsonb(r)->'redis_state', '{}'::jsonb)), '[]'::jsonb))::text
         FROM ${OPERATOR}.receipts r WHERE operation_id <> ${operationSql}; COMMIT;`);
-      if (!exact(others, ['states']) || !Array.isArray(others.states) || others.states.some(value => value !== null && canonical(value) !== '{}'))
+      if (!exact(others, ['states']) || !Array.isArray(others.states) || others.states.some(value => canonical(value) !== '{}'))
         refused('Other Redis operation unresolved');
       return cleanResetRedis(input, staging, refuse, { state, store, canonical, exact, date, hash }).catch(report);
     }
@@ -515,7 +516,7 @@ return { 'ok', entries, indexes }`;
           !Number.isSafeInteger(state.preState.entryCount) || state.preState.entryCount < 0 ||
           canonical(state.postState) !== canonical(empty) || !date(state.intentAt) || !date(state.completedAt) || Date.parse(state.completedAt) < Date.parse(state.intentAt) ||
           before.entries.length !== 0 || before.digest !== empty.digest ||
-          (before.control !== undefined && (!Buffer.isBuffer(before.control) || before.control.toString('utf8') !== canonical(state))))
+          (before.control !== undefined && (!Buffer.isBuffer(before.control) || !before.control.equals(Buffer.from(canonical(state), 'utf8')))))
         refused('Redis completion authority changed or pending');
       receipt('observed');
       return;
@@ -596,7 +597,7 @@ return {'completed'}
     const result = await redis.evalBuffer(mutationScript, 0, ...args, before.snapshot.length, ...before.snapshot.flat(), markerKey, encoded);
     if (!Array.isArray(result) || result.length !== 1 || String(result[0]) !== 'completed') refused('Redis deletion incomplete');
     const after = await observe();
-    if (after.entries.length !== 0 || after.digest !== empty.digest || !Buffer.isBuffer(after.control) || after.control.toString('utf8') !== encoded)
+    if (after.entries.length !== 0 || after.digest !== empty.digest || !Buffer.isBuffer(after.control) || !after.control.equals(Buffer.from(encoded, 'utf8')))
       refused('Redis completion proof unavailable');
     store(pending, completed);
     receipt('completed');
