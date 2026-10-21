@@ -92,13 +92,7 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
       return this.dto(tx, row, false);
     });
   }
-  private async staffScope(tx: Tx, subject: DiagnosticSubject, id: string) {
-    for (const capability of DiagnosticSchemas.DiagnosticCapabilitySchema.options) {
-      try { return await this.scope(tx, subject, id, capability); }
-      catch (error) { if (!(error instanceof DiagnosticRuleError)) throw error; }
-    }
-    throw denial();
-  }
+  private staffScope(tx: Tx, subject: DiagnosticSubject, id: string) { return this.authority.staffed(tx, subject, id); }
   async assigned(subject: DiagnosticSubject): Promise<DiagnosticSchemas.DiagnosticOrder[]> {
     return this.db.$transaction(async tx => {
       await this.current(tx, subject);

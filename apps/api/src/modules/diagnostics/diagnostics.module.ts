@@ -9,6 +9,8 @@ import { DiagnosticReportAccess } from "./infrastructure/DiagnosticReportAccess"
 import { PrismaDiagnosticEvidence } from "./infrastructure/PrismaDiagnosticEvidence";
 import { S3DiagnosticObjects } from "./infrastructure/S3DiagnosticObjects";
 import { DiagnosticBinaryParser } from "./presentation/DiagnosticBinaryParser";
+import { DIAGNOSTIC_IDENTITY_EVIDENCE_PORT } from "./domain/ports/DiagnosticIdentityEvidencePort";
+import { PrismaDiagnosticIdentityEvidence } from "./infrastructure/PrismaDiagnosticIdentityEvidence";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { DIAGNOSTIC_INTAKE_PORT, DIAGNOSTIC_RUNTIME } from "./domain/ports/DiagnosticIntakePort";
@@ -25,6 +27,7 @@ import { diagnosticRuntime } from "./infrastructure/diagnosticRuntime";
 @Module({ imports: [ConfigModule, PrismaModule, IdentityModule], controllers: [DiagnosticIntakeController, DiagnosticReportsController, DiagnosticPublicController], providers: [{ provide: DIAGNOSTIC_DOCUMENTS_PORT, useClass: PrismaDiagnosticDocuments }, { provide: DIAGNOSTIC_PUBLIC_PORT, useClass: PrismaDiagnosticPublic }, DiagnosticAuthority, CampaignDiagnosticAdmission, DiagnosticReportAccess, DiagnosticBinaryParser,
   { provide: DIAGNOSTIC_OBJECTS, useClass: S3DiagnosticObjects },
   { provide: DIAGNOSTIC_EVIDENCE_PORT, useClass: PrismaDiagnosticEvidence },
+  PrismaDiagnosticIdentityEvidence, { provide: DIAGNOSTIC_IDENTITY_EVIDENCE_PORT, useExisting: PrismaDiagnosticIdentityEvidence },
   { provide: DIAGNOSTIC_REPORTS_PORT, useClass: PrismaDiagnosticReports },
   { provide: DIAGNOSTIC_INTAKE_PORT, useClass: PrismaDiagnosticIntake },
   { provide: DIAGNOSTIC_RUNTIME, inject: [ConfigService], useFactory: diagnosticRuntime },

@@ -39,6 +39,8 @@ export class PrismaDiagnosticEvidence implements DiagnosticEvidencePort {
         return tx.diagnosticEvidence.update({ where: { id: prior.id }, data: { epoch: this.runtime.id(), writeLeaseUntil: new Date(this.runtime.now().getTime() + 120_000) } });
       }
       if (await tx.diagnosticEvidence.count({ where: { reportId: input.reportId } }) >= 100) throw new DiagnosticRuleError("REPORT_EVIDENCE_LIMIT");
+      // Identity provenance shares this object namespace; an id belongs to one owner only.
+      if (await tx.diagnosticIdentityProvenance.findUnique({ where: { id: input.evidenceId } })) throw denied();
       // Commit this exact immutable intent before any object write can occur.
       return tx.diagnosticEvidence.create({ data: { id: input.evidenceId, reportId: input.reportId, findingId: input.findingId,
         objectKey: `diagnostic-evidence/${input.evidenceId}/${hash}`, sha256: hash, sizeBytes: clean.bytes.byteLength, mime: clean.mime, createdById: subject.userId, writeLeaseUntil: new Date(this.runtime.now().getTime() + 120_000) } });

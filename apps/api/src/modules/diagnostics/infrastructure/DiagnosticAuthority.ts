@@ -62,4 +62,12 @@ export class DiagnosticAuthority {
     }
     throw denied();
   }
+  /** Any current staff capability assigned on this order; commissioner fallback never applies. */
+  async staffed(tx: Tx, subject: DiagnosticSubject, id: string): Promise<{ row: Prisma.InspectionOrderGetPayload<object>; staff: boolean }> {
+    for (const capability of DiagnosticSchemas.DiagnosticCapabilitySchema.options) {
+      try { return await this.order(tx, subject, id, capability); }
+      catch (error) { if (!(error instanceof DiagnosticRuleError)) throw error; }
+    }
+    throw denied();
+  }
 }

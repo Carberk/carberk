@@ -13,7 +13,7 @@ export function diagnosticAccountErasureWrites(db: PrismaService, userId: string
    WHERE o."erasedAt" IS NULL AND (o."commissionerId"=${userId} OR r.state->>'authorId'=${userId} OR r.state->>'reviewerId'=${userId})
    ORDER BY r.id FOR UPDATE OF r`,
   db.$executeRaw`UPDATE diagnostic_reports r SET "erasedAt"=COALESCE(r."erasedAt",${now}::timestamp), version=r.version+1, "updatedAt"=${now}::timestamp,
-   "identityRecordId"=NULL, "identityRecordHash"=NULL,
+   "identityRecordId"=NULL, "identityRecordHash"=NULL, "identityEvidenceId"=NULL, "identityEvidenceHash"=NULL,
    "withdrawalReason"=CASE WHEN r.status='withdrawn' THEN '[erased]' ELSE NULL END,
    state=r.state || jsonb_build_object('authorId',NULL,'reviewerId',NULL,'returnReason',NULL,'correctionReason',NULL,
     'withdrawalReason',CASE WHEN r.status='withdrawn' THEN '[erased]' ELSE NULL END)
@@ -44,6 +44,18 @@ export function diagnosticAccountErasureWrites(db: PrismaService, userId: string
   db.$executeRaw`DELETE FROM diagnostic_order_assignments WHERE "userId"=${userId} OR "orderId" IN
    (SELECT id FROM inspection_orders WHERE "commissionerId"=${userId})`,
   db.$executeRaw`DELETE FROM diagnostic_center_assignments WHERE "userId"=${userId}`,
+  // Structured identity evidence and its classified provenance: fence the private
+  // objects for exact cleanup after write leases settle, then clear restricted
+  // content, hashes and personal linkage in place before intake erasure.
+  db.$executeRaw`UPDATE diagnostic_identity_provenance p SET state='cleanup_pending', epoch=gen_random_uuid()::text, rights=NULL, "createdById"=NULL,
+   "cleanupRequestedAt"=COALESCE(p."cleanupRequestedAt",${now}::timestamp), "cleanupCompletedAt"=NULL, "erasedAt"=COALESCE(p."erasedAt",${now}::timestamp)
+   FROM inspection_orders o WHERE o.id=p."orderId" AND o."commissionerId"=${userId} AND o."erasedAt" IS NULL`,
+  db.$executeRaw`UPDATE diagnostic_identity_evidence e SET "observationHash"=NULL, identifiers=NULL, provenance=NULL, rights=NULL, explanation=NULL,
+   "recordHash"=NULL, "recordedById"=NULL, "erasedAt"=COALESCE(e."erasedAt",${now}::timestamp)
+   FROM inspection_orders o WHERE o.id=e."orderId" AND o."commissionerId"=${userId} AND o."erasedAt" IS NULL`,
+  // Staff deletion detaches attribution only; another commissioner's material stays retained.
+  db.$executeRaw`UPDATE diagnostic_identity_evidence SET "recordedById"=NULL WHERE "recordedById"=${userId}`,
+  db.$executeRaw`UPDATE diagnostic_identity_provenance SET "createdById"=NULL WHERE "createdById"=${userId}`,
   // Identity records are append-only: erasure clears restricted content and
   // recorder linkage in place, before the order itself is erased below.
   db.$executeRaw`UPDATE diagnostic_identity_records SET observation=NULL, "observationHash"=NULL, "recordedById"=NULL,
@@ -54,6 +66,7 @@ export function diagnosticAccountErasureWrites(db: PrismaService, userId: string
   db.$executeRaw`UPDATE inspection_orders SET "commissionerId"=NULL, "physicalAuthorization"=NULL,
    "publicationAuthorization"=NULL, "observedVehicle"=NULL, "listingId"=NULL, "listingIdentityDigest"=NULL,
    "associationValidatedAt"=NULL, "erasedAt"=COALESCE("erasedAt",${now}::timestamp), epoch=gen_random_uuid()::text,
+   "identityEvidenceGeneration"="identityEvidenceGeneration"+1,
    version=version+1, "updatedAt"=${now}::timestamp WHERE "commissionerId"=${userId}`,
  ];
 }
