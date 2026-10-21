@@ -322,3 +322,37 @@ test('completed phases replay observe-only; changed operation, owner, reservatio
   assert.throws(() => nextPhase({ ...record('rows'), completed: true }, request('redis')), /Exact phase record/);
   assert.throws(() => nextPhase(record('rows'), request('teardown')), /Exact phase request/);
 });
+
+test('identity fields must be actual strings: numeric or array IDs refuse even when policy and attestation agree', () => {
+  const numeric = stagingInput();
+  numeric.request.policy.projectId = 176; numeric.attestation.projectId = 176;
+  assert.throws(() => guardTarget(numeric), /Exact clean-reset policy/);
+  const numericService = stagingInput();
+  numericService.request.policy.services.api = 6; numericService.attestation.services.api = 6;
+  assert.throws(() => guardTarget(numericService), /Exact clean-reset policy/);
+  const attestedNumber = stagingInput(); attestedNumber.attestation.services.worker = 24;
+  assert.throws(() => guardTarget(attestedNumber), /Exact authoritative attestation/);
+  assert.throws(() => parseRequest({ ...stagingPolicy, environmentId: [stagingPolicy.environmentId] }, claim), /Exact clean-reset policy/);
+  assert.throws(() => parseRequest(stagingPolicy, { ...claim, id: [claim.id] }), /Exact clean-reset claim/);
+  assert.throws(() => parseRequest(stagingPolicy, { ...claim, candidate: [claim.candidate] }), /Exact clean-reset claim/);
+  const deployment = quiet(); deployment.deployments.api[0].id = 42;
+  assert.throws(() => evaluateQuiescence(deployment, context), /quiescence/i);
+  assert.throws(() => evaluateQuiescence(quiet(), { operationId: [operationId], candidate: claim.candidate }), /operation identity/);
+  assert.throws(() => nextPhase(record('rows'), request('redis', { owner: ['alice'] })), /Exact phase request/);
+  assert.throws(() => nextPhase(record('rows'), request('redis', { operationId: [operationId] })), /Exact phase request/);
+  const namespace = live(); namespace.cfNamespaces[0].name = [ns];
+  assert.throws(() => planTables(manifest, namespace), /cf namespace inventory|live inventory/);
+});
+
+test('inherited object names are never manifest tables for live tables, trigger tables or foreign-key endpoints', () => {
+  for (const name of ['__proto__', 'constructor', 'toString', 'hasOwnProperty']) {
+    const table = live(); table.tables.push({ schema: 'public', name, rows: 0 });
+    assert.throws(() => planTables(manifest, table), /Unknown live table/, name);
+    const trigger = live(); trigger.triggers.push({ table: name, name: 'x', functionSchema: 'public', truncate: false });
+    assert.throws(() => planTables(manifest, trigger), /Unknown trigger table/, name);
+    for (const key of [{ name: 'x', from: `public.${name}`, to: 'public.users' }, { name: 'x', from: 'public.sessions', to: `public.${name}` }]) {
+      const fk = live(); fk.foreignKeys.push(key);
+      assert.throws(() => planTables(manifest, fk), /Unknown foreign key/, `${key.from}->${key.to}`);
+    }
+  }
+});
