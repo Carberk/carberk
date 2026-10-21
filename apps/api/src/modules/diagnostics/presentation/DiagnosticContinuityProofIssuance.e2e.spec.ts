@@ -1,5 +1,8 @@
 import "reflect-metadata";
+import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { resolve } from "node:path";
+import { promisify } from "node:util";
 import { S3Client, CreateBucketCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { ConfigModule } from "@nestjs/config";
 import { Reflector } from "@nestjs/core";
@@ -9,9 +12,9 @@ import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fa
 import { Test } from "@nestjs/testing";
 import { PrismaService } from "@auto-tm/db";
 import supertest from "supertest";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
-import { cleanSuiteFixtures, defineE2eSuite } from "../../../../test/helpers/e2eSuite";
+import { cleanSuiteFixtures, defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
 import { GlobalErrorFilter } from "../../../common/error.filter";
 import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
 import { IDENTITY_CLOCK_PORT } from "../../identity/identity.public";
@@ -19,10 +22,10 @@ import { DiagnosticsModule } from "../diagnostics.module";
 import { DIAGNOSTIC_RUNTIME } from "../domain/ports/DiagnosticIntakePort";
 
 const suite = defineE2eSuite("diagnostic-private-proof-issuance");
-const people = ["buyer", "reception", "technician", "reviewer"] as const;
+const people = ["buyer", "otherBuyer", "erasureBuyer", "erasureReadBuyer", "founder", "reception", "technician", "reviewer", "alternateReviewer"] as const;
 type Person = typeof people[number];
 const capability: Partial<Record<Person, string>> = {
-  reception: "diagnostics.reception", technician: "diagnostics.technician", reviewer: "diagnostics.reviewer",
+  reception: "diagnostics.reception", technician: "diagnostics.technician", reviewer: "diagnostics.reviewer", alternateReviewer: "diagnostics.reviewer",
 };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const hash = /^[a-f0-9]{64}$/;
@@ -64,6 +67,7 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
   let request: ReturnType<typeof supertest>; let objects: S3Client;
   let templateId: string;
   const now = initialTime;
+  let allowPublic = false;
   const ownedProvenance = new Set<string>();
   const headers = (who: Person) => ({ authorization: `Bearer ${jwt.sign({ sub: suite.id(who), sid: suite.id(`${who}-session`), role: "buyer" })}` });
   const post = (who: Person, path: string, body: object) => request.post(`/api/v1/diagnostics/${path}`).set(headers(who)).send(body);
@@ -101,7 +105,7 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
     const testing = await Test.createTestingModule({ imports: [ConfigModule.forRoot({ isGlobal: true, load: [() => ({ DIAGNOSTIC_PRIVATE_BUCKET: "diagnostic-test-private" })] }),
       EventEmitterModule.forRoot(), bullTestRoot(), DiagnosticsModule, JwtModule.register({ global: true, secret: "synthetic-diagnostic-test" })] })
       .overrideProvider(IDENTITY_CLOCK_PORT).useValue({ now: () => now })
-      .overrideProvider(DIAGNOSTIC_RUNTIME).useValue({ now: () => now, id: randomUUID, publicSyntheticAllowed: () => false,
+      .overrideProvider(DIAGNOSTIC_RUNTIME).useValue({ now: () => now, id: randomUUID, publicSyntheticAllowed: () => allowPublic,
         syntheticAllowed: ({ userId }: { userId: string }) => people.some(who => suite.id(who) === userId) }).compile();
     app = testing.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
     db = app.get(PrismaService); jwt = app.get(JwtService);
@@ -117,6 +121,7 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
       await db.session.create({ data: { id: suite.id(`${who}-session`), userId: suite.id(who), refreshTokenHash: suite.id(`${who}-refresh`), expiresAt: future, adminTotpExpiresAt: future } });
       if (capability[who]) await db.staffGrant.create({ data: { userId: suite.id(who), capability: capability[who]! } });
     }
+    await db.staffGrant.createMany({ data: ["staff.manage", "founder.control"].map(capability => ({ userId: suite.id("founder"), capability })) });
     await db.diagnosticCenter.create({ data: { id: centerId, code: suite.slugFor("center"), names: localized } });
     for (const who of people) if (capability[who]) await db.diagnosticCenterAssignment.create({ data: { centerId, userId: suite.id(who), capability: capability[who]!, qualifiedUntil: future } });
     await db.staffGrant.create({ data: { userId: suite.id("reception"), capability: "diagnostics.templates" } });
@@ -130,10 +135,31 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
       try { objects?.destroy(); await app?.close(); } finally { vi.useRealTimers(); }
     }
   });
-  async function visit(observation: Observation, visitName: string): Promise<Order> {
-    let { body: order } = await post("buyer", "orders", { requestKey: randomUUID(), centerId,
-      templateVersionId: templateId, audience: "buyer_private", synthetic: true }).expect(201);
-    expect(order).toMatchObject({ version: 0, audience: "buyer_private", listingId: null });
+  afterEach(async () => {
+    allowPublic = false;
+    // Restore only established cross-context authority fixtures, even after expected RED.
+    for (const who of ["reviewer", "technician"] as const) {
+      await db.user.update({ where: { id: suite.id(who) }, data: { suspendedAt: null, deletionScheduledAt: null } });
+      await db.session.upsert({ where: { id: suite.id(`${who}-session`) },
+        create: { id: suite.id(`${who}-session`), userId: suite.id(who), refreshTokenHash: suite.id(`${who}-refresh`), expiresAt: future, adminTotpExpiresAt: future },
+        update: { expiresAt: future, adminTotpExpiresAt: future } });
+      await db.staffGrant.upsert({ where: { userId_capability: { userId: suite.id(who), capability: capability[who]! } },
+        create: { userId: suite.id(who), capability: capability[who]! }, update: { revokedAt: null } });
+      await db.diagnosticCenterAssignment.updateMany({ where: { centerId, userId: suite.id(who) }, data: { qualifiedUntil: future, revokedAt: null } });
+    }
+  });
+  async function visit(observation: Observation, visitName: string, commissioner: Person = "buyer", audience: "buyer_private" | "listing_public" = "buyer_private"): Promise<Order> {
+    let listingId: string | null = null;
+    if (audience === "listing_public") {
+      allowPublic = true;
+      await seedSuiteCatalog(db, suite);
+      listingId = randomUUID();
+      await db.listing.create({ data: { id: listingId, sellerId: suite.id(commissioner), brandId: suite.catalog.brandId,
+        modelId: suite.catalog.modelId, cityId: suite.catalog.cityId, status: "active", priceAmount: 100000, priceTmt: 100000, priceCurrency: "TMT" } });
+    }
+    let { body: order } = await post(commissioner, "orders", { requestKey: randomUUID(), centerId,
+      templateVersionId: templateId, audience, ...(listingId ? { listingId } : {}), synthetic: true }).expect(201);
+    expect(order).toMatchObject({ version: 0, audience, listingId });
     // Each visit independently receives T and the distinct reviewer R through reception HTTP.
     for (const who of ["technician", "reviewer"] as const) {
       ({ body: order } = await post("reception", `orders/${order.id}/assignments`, { expectedVersion: order.version,
@@ -141,11 +167,13 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
     }
     ({ body: order } = await post("reception", `orders/${order.id}/authorization`, { expectedVersion: order.version,
       kind: "physical", authorityReference: `Synthetic physical authorization for visit ${visitName}` }).expect(201));
+    if (audience === "listing_public") ({ body: order } = await post("reception", `orders/${order.id}/authorization`, {
+      expectedVersion: order.version, kind: "publication", authorityReference: `Separate synthetic publication authorization ${visitName}` }).expect(201));
     for (const state of ["confirmed", "arrived"]) {
       ({ body: order } = await post("reception", `orders/${order.id}/appointment`, { expectedVersion: order.version, state }).expect(201));
     }
     ({ body: order } = await post("technician", `orders/${order.id}/vehicle`, { expectedVersion: order.version, ...observation }).expect(201));
-    expect(order).toMatchObject({ version: 6, status: "arrived", physicalAuthorized: true, observedVehicle: observation });
+    expect(order).toMatchObject({ version: audience === "buyer_private" ? 6 : 7, status: "arrived", physicalAuthorized: true, observedVehicle: observation });
     return order;
   }
   function intent(o: Order, id: string, image: Image = red, classification = rights) {
@@ -167,16 +195,16 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
   function capture(o: Order, raw: Raw, p: string, value = "SYN-CHASSIS-041", correction: { supersedesId: string; explanation: string } | null = null, id: string = randomUUID()) {
     return { id, expectedOrderVersion: o.version, identityRecordId: raw.id, identifiers: [identifier(p, value)], rights, correction };
   }
-  async function append(o: Order, raw: Raw, input: ReturnType<typeof capture>, image: Image = red) {
-    expect(o.version).toBe(6);
+  async function append(o: Order, raw: Raw, input: ReturnType<typeof capture>, image: Image = red, audience: "buyer_private" | "listing_public" = "buyer_private") {
+    expect(o.version).toBe(audience === "buyer_private" ? 6 : 7);
     const response = await post("technician", evidencePath(o), input).expect(201);
     privateNoStore(response);
-    expect(response.body).toEqual({ id: input.id, orderId: o.id, orderVersion: 7, identityRecordId: raw.id,
+    expect(response.body).toEqual({ id: input.id, orderId: o.id, orderVersion: audience === "buyer_private" ? 7 : 8, identityRecordId: raw.id,
       observationHash: raw.observationHash, observation: raw.observation, identifiers: input.identifiers,
       provenance: input.identifiers[0]!.provenanceIds.map(id => metadata(id, image)), rights, correction: input.correction,
       recordHash: expect.stringMatching(/^[a-f0-9]{64}$/), recordedBy: suite.id("technician"), recordedAt: "2026-10-21T12:00:00.000Z" });
-    o.version = 7;
-    expect(await version(o)).toBe(7);
+    o.version = audience === "buyer_private" ? 7 : 8;
+    expect(await version(o)).toBe(audience === "buyer_private" ? 7 : 8);
     return response.body;
   }
   async function release(o: Order) {
@@ -320,5 +348,291 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
     expect((await get("reviewer", `orders/${a.id}/reports`).expect(200)).body).toEqual([releasedA]);
     expect((await get("reviewer", comparisonPath(b, releasedA.id)).expect(200)).body).toEqual(comparison.body);
     expect(await db.diagnosticAudit.findMany({ where: { centerId, id: { notIn: auditsBefore.map(row => row.id) } } })).toEqual(issuedAudits);
+  });
+
+  type PairOptions = {
+    commissionerA?: Person; commissionerB?: Person;
+    audienceA?: "buyer_private" | "listing_public"; audienceB?: "buyer_private" | "listing_public";
+    material?: "freeform" | "different" | "contradictory";
+  };
+  async function pair(options: PairOptions = {}) {
+    const a = await visit(original, "denial A", options.commissionerA, options.audienceA);
+    const [ia] = await history(a); const pa = randomUUID();
+    if (options.material !== "freeform") {
+      await verified(a, pa);
+      await append(a, ia!, capture(a, ia!, pa), red, options.audienceA);
+    }
+    const released = await release(a);
+    expect(released).toMatchObject({ version: 3, status: "finalized", supersededBy: null });
+    const b = await visit(successorObservation, "denial B", options.commissionerB, options.audienceB);
+    const [ib] = await history(b); const pb = randomUUID();
+    if (options.material !== "freeform") {
+      await verified(b, pb, blue);
+      const input = capture(b, ib!, pb, options.material === "different" ? "SYN-CHASSIS-999" : "SYN-CHASSIS-041");
+      if (options.material === "contradictory") input.identifiers.push({ ...identifier(pb, "SYN-CHASSIS-999"), location: "Second stamped chassis location" });
+      await append(b, ib!, input, blue, options.audienceB);
+    }
+    expect((await get("reviewer", `orders/${b.id}/reports`).expect(200)).body).toEqual([]);
+    // Gate normal same-commissioner pairs on actual restricted comparison and retained bytes.
+    if (!options.material && !options.audienceA && !options.audienceB && options.commissionerA === options.commissionerB) {
+      const comparison = await get("reviewer", comparisonPath(b, released.id)).expect(200);
+      privateNoStore(comparison);
+      expect(comparison.body.predecessor).toMatchObject({ reportId: released.id, reportVersion: 3, identityRecordId: ia!.id, identityRecordHash: ia!.observationHash });
+      expect(comparison.body.candidate).toMatchObject({ orderId: b.id, orderVersion: 7, identityRecordId: ib!.id, identityRecordHash: ib!.observationHash });
+      await comparativeBytes(b, released.id, pa, red); await comparativeBytes(b, released.id, pb, blue);
+    }
+    return { a, b, commissionerA: options.commissionerA ?? "buyer", commissionerB: options.commissionerB ?? "buyer", released, ia: ia!, ib: ib!, pa, pb, body: {
+      predecessorId: released.id as string, expectedPredecessorVersion: 3, expectedOrderVersion: b.version,
+      predecessorIdentityRecordId: ia!.id, candidateIdentityRecordId: ib!.id,
+      linkingTechnicianId: suite.id("technician"), method: "comparative_attestation",
+      rationale: "Same stamped chassis; independently observed on both visits", provenanceRecordIds: [pa, pb],
+    } };
+  }
+  type Pair = Awaited<ReturnType<typeof pair>>;
+  const issuancePath = (p: Pair) => `orders/${p.b.id}/continuity-proofs`;
+  async function assignment(o: Order, who: Person, active: boolean, purpose = "diagnostics.reviewer") {
+    o.version = (await post("reception", `orders/${o.id}/assignments`, {
+      expectedVersion: await version(o), userId: suite.id(who), capability: purpose, active,
+    }).expect(201)).body.version;
+  }
+  const grant = (target: Person, enabled: boolean) => request.post("/api/v1/staff/grants").set(headers("founder"))
+    .send({ targetUserId: suite.id(target), capability: "diagnostics.reviewer", reason: "Synthetic issuance revocation coverage", grant: enabled });
+  async function stored(p: Pair) {
+    // Audit has no HTTP reader. Stored reports also catch a hidden draft successor after
+    // refusal, including when erasure/revocation closes staff access to that report.
+    // Observe existing state only, never seed a proof, release pin, marker or audit.
+    return {
+      reports: await db.diagnosticReportRecord.findMany({ where: { orderId: { in: [p.a.id, p.b.id] } }, orderBy: { id: "asc" } }),
+      representations: await Promise.all((["a", "b"] as const).map(async side => {
+        const order = p[side];
+        const row = await db.inspectionOrder.findUniqueOrThrow({ where: { id: order.id }, select: { erasedAt: true } });
+        if (row.erasedAt) return db.diagnosticReportRecord.findMany({ where: { orderId: order.id }, orderBy: { id: "asc" } });
+        const who = side === "a" ? p.commissionerA : p.commissionerB;
+        return (await get(who, `orders/${order.id}/reports`).expect(200)).body;
+      })),
+      orders: await db.inspectionOrder.findMany({ where: { id: { in: [p.a.id, p.b.id] } }, orderBy: { id: "asc" } }),
+      audits: await db.diagnosticAudit.findMany({ where: { centerId }, orderBy: { id: "asc" } }),
+    };
+  }
+  async function refused(p: Pair, send: () => PromiseLike<supertest.Response>, status = 403, code = "DIAGNOSTIC_NO_ACCESS") {
+    const before = await stored(p);
+    try {
+      const response = await send();
+      expect(response.status).toBe(status);
+      privateNoStore(response);
+      expect(response.body).toEqual({ statusCode: status, code, message: status === 400 ? "Invalid diagnostic request" : "Inspection request could not be completed",
+        timestamp: "2026-10-21T12:00:00.000Z", requestId: "unknown" });
+      // Exact generic envelope excludes ids, rationale, hashes, findings, contact and storage data.
+      expect(response.text).not.toContain(p.released.id);
+      expect(response.text).not.toContain(p.ia.observationHash);
+      expect(response.text).not.toContain(p.pa);
+      return response.body;
+    } finally {
+      expect(await stored(p)).toEqual(before);
+    }
+  }
+  async function ordinaryProof(p: Pair, who: Person = "reviewer") {
+    const response = await post(who, issuancePath(p), p.body);
+    // Read denial tests cannot pass this gate at the supplied base. Never seed a proof handle.
+    expect(response.status).toBe(201); privateNoStore(response);
+    expect(response.body).toEqual({ proofId: expect.stringMatching(uuid) });
+    const readable = await get(who, `${issuancePath(p)}/${response.body.proofId}`).expect(200);
+    privateNoStore(readable); expect(readable.body.proofId).toBe(response.body.proofId);
+    return response.body.proofId as string;
+  }
+
+  it("refuses a B-only linking technician without disclosing whether the predecessor exists", async () => {
+    const p = await pair();
+    await assignment(p.a, "technician", false, "diagnostics.technician");
+    const real = await refused(p, () => post("technician", issuancePath(p), p.body));
+    const unknown = await refused(p, () => post("technician", issuancePath(p), { ...p.body, predecessorId: randomUUID() }));
+    expect(unknown).toEqual(real);
+  });
+
+  it.each(["A", "B"] as const)("refuses a qualified reviewer never assigned to %s", async missing => {
+    const p = await pair();
+    await assignment(missing === "A" ? p.b : p.a, "alternateReviewer", true);
+    p.body.expectedOrderVersion = p.b.version;
+    await refused(p, () => post("alternateReviewer", issuancePath(p), p.body));
+  });
+
+  it.each(["A", "B"] as const)("withholds an ordinarily issued proof from a qualified reviewer missing %s assignment", async missing => {
+    const p = await pair(); const proofId = await ordinaryProof(p);
+    await assignment(missing === "A" ? p.b : p.a, "alternateReviewer", true);
+    const real = await refused(p, () => get("alternateReviewer", `${issuancePath(p)}/${proofId}`));
+    expect(await refused(p, () => get("alternateReviewer", `${issuancePath(p)}/${randomUUID()}`))).toEqual(real);
+  });
+
+  it("refuses the linking technician even with reviewer qualification and both reviewer assignments", async () => {
+    const p = await pair();
+    await grant("technician", true).expect(204);
+    await db.diagnosticCenterAssignment.create({ data: { centerId, userId: suite.id("technician"), capability: "diagnostics.reviewer", qualifiedUntil: future } });
+    await assignment(p.a, "technician", true); await assignment(p.b, "technician", true);
+    p.body.expectedOrderVersion = p.b.version;
+    try { await refused(p, () => post("technician", issuancePath(p), p.body)); }
+    finally {
+      await grant("technician", false).expect(204);
+      await db.diagnosticCenterAssignment.deleteMany({ where: { centerId, userId: suite.id("technician"), capability: "diagnostics.reviewer" } });
+    }
+  });
+
+  const authorityLosses = ["missing grant", "revoked grant", "revoked A assignment", "revoked B assignment", "expired qualification", "expired session", "suspended issuer", "deleting issuer"] as const;
+  type AuthorityLoss = typeof authorityLosses[number];
+  async function loseAuthority(p: Pair, loss: AuthorityLoss) {
+    if (loss === "missing grant") await db.staffGrant.delete({ where: { userId_capability: { userId: suite.id("reviewer"), capability: "diagnostics.reviewer" } } });
+    if (loss === "revoked grant") await grant("reviewer", false).expect(204);
+    if (loss === "revoked A assignment") await assignment(p.a, "reviewer", false);
+    if (loss === "revoked B assignment") await assignment(p.b, "reviewer", false);
+    if (loss === "expired qualification") await db.diagnosticCenterAssignment.updateMany({ where: { centerId, userId: suite.id("reviewer"), capability: "diagnostics.reviewer" }, data: { qualifiedUntil: initialTime } });
+    if (loss === "expired session") await db.session.update({ where: { id: suite.id("reviewer-session") }, data: { expiresAt: initialTime } });
+    if (loss === "suspended issuer") await db.user.update({ where: { id: suite.id("reviewer") }, data: { suspendedAt: initialTime } });
+    if (loss === "deleting issuer") await request.delete("/api/v1/me").set(headers("reviewer")).expect(204, "");
+  }
+  it.each(authorityLosses)("refuses issuance with the identical JWT after %s", async loss => {
+    const p = await pair(); const sameJwt = headers("reviewer");
+    await get("reviewer", comparisonPath(p.b, p.released.id)).set(sameJwt).expect(200);
+    await loseAuthority(p, loss);
+    await refused(p, () => request.post(`/api/v1/diagnostics/${issuancePath(p)}`).set(sameJwt).send(p.body));
+  });
+  it.each(authorityLosses)("normalizes real and unknown proof reads after %s using the identical JWT", async loss => {
+    const p = await pair(); const sameJwt = headers("reviewer"); const proofId = await ordinaryProof(p);
+    await loseAuthority(p, loss);
+    const real = await refused(p, () => request.get(`/api/v1/diagnostics/${issuancePath(p)}/${proofId}`).set(sameJwt));
+    const unknown = await refused(p, () => request.get(`/api/v1/diagnostics/${issuancePath(p)}/${randomUUID()}`).set(sameJwt));
+    expect(unknown).toEqual(real);
+  });
+  it.each(["buyer", "technician", "alternateReviewer"] as const)("withholds real and unknown proof handles from %s", async who => {
+    const p = await pair(); const proofId = await ordinaryProof(p);
+    const real = await refused(p, () => get(who, `${issuancePath(p)}/${proofId}`));
+    expect(await refused(p, () => get(who, `${issuancePath(p)}/${randomUUID()}`))).toEqual(real);
+  });
+
+  it("returns generic denial for an unknown proof handle to the current qualified reviewer", async () => {
+    const p = await pair(); await ordinaryProof(p);
+    await refused(p, () => get("reviewer", `${issuancePath(p)}/${randomUUID()}`));
+  });
+
+  const malformedBodies: [string, (p: Pair) => object][] = [
+    ["unknown field", p => ({ ...p.body, extra: true })],
+    ["client proof id", p => ({ ...p.body, proofId: randomUUID() })],
+    ["client audience", p => ({ ...p.body, audience: "listing_public" })],
+    ["client actor", p => ({ ...p.body, issuedBy: suite.id("reviewer") })],
+    ["client rights", p => ({ ...p.body, rights })],
+    ["client result", p => ({ ...p.body, result: "same_vehicle" })],
+    ["malformed predecessor", p => ({ ...p.body, predecessorId: "not-a-uuid" })],
+    ["negative version", p => ({ ...p.body, expectedOrderVersion: -1 })],
+    ["fractional version", p => ({ ...p.body, expectedPredecessorVersion: 1.5 })],
+    ["string version", p => ({ ...p.body, expectedOrderVersion: "7" })],
+    ["null raw pin", p => ({ ...p.body, candidateIdentityRecordId: null })],
+    ["malformed provenance", p => ({ ...p.body, provenanceRecordIds: ["not-a-uuid"] })],
+    ["nested provenance", p => ({ ...p.body, provenanceRecordIds: [{ id: p.pa, extra: true }] })],
+    ["missing linking technician", p => { const { linkingTechnicianId: _omitted, ...body } = p.body; return body; }],
+    ["missing rationale", p => { const { rationale: _omitted, ...body } = p.body; return body; }],
+    ["empty rationale", p => ({ ...p.body, rationale: "" })],
+    ["automatic method outside this slice", p => ({ ...p.body, method: "automatic_vin" })],
+    ["public transfer method outside this slice", p => ({ ...p.body, method: "public_transfer" })],
+  ];
+  it.each(malformedBodies)("rejects strict issuance input: %s", async (_label, body) => {
+    const p = await pair();
+    await refused(p, () => post("reviewer", issuancePath(p), body(p)), 400, "DIAGNOSTIC_INVALID_INPUT");
+  });
+  it("rejects unknown issuance query fields", async () => {
+    const p = await pair();
+    await refused(p, () => post("reviewer", `${issuancePath(p)}?extra=true`, p.body), 400, "DIAGNOSTIC_INVALID_INPUT");
+  });
+  it.each(["not-a-uuid", "unknown-query"])("rejects malformed proof read input: %s", async input => {
+    const p = await pair(); const proofId = await ordinaryProof(p);
+    const path = input === "unknown-query" ? `${issuancePath(p)}/${proofId}?extra=true` : `${issuancePath(p)}/${input}`;
+    await refused(p, () => get("reviewer", path), 400, "DIAGNOSTIC_INVALID_INPUT");
+  });
+
+  it.each(["predecessor version", "order version", "predecessor raw pin", "candidate raw pin"] as const)("returns an authorized conflict for stale %s", async stale => {
+    const p = await pair(); const body = { ...p.body };
+    if (stale === "predecessor version") body.expectedPredecessorVersion = 2;
+    if (stale === "order version") body.expectedOrderVersion = 6;
+    if (stale === "predecessor raw pin") {
+      p.a.version = (await post("technician", `orders/${p.a.id}/vehicle`, { expectedVersion: p.a.version, ...newestA }).expect(201)).body.version;
+      const records = await history(p.a); body.predecessorIdentityRecordId = records[1]!.id;
+      expect(body.predecessorIdentityRecordId).not.toBe(p.ia.id);
+    }
+    if (stale === "candidate raw pin") {
+      p.b.version = (await post("technician", `orders/${p.b.id}/vehicle`, { expectedVersion: p.b.version, ...successorObservation, mileageKm: 123101 }).expect(201)).body.version;
+      body.expectedOrderVersion = 8;
+      expect((await history(p.b))[1]!.id).not.toBe(body.candidateIdentityRecordId);
+    }
+    await refused(p, () => post("reviewer", issuancePath(p), body), 409, "DIAGNOSTIC_STALE_VERSION");
+  });
+
+  it.each(["arbitrary", "unverified", "verified but unretained"] as const)("refuses %s provenance without changing either visit", async kind => {
+    const p = await pair(); const foreign = randomUUID();
+    if (kind === "unverified") await stage(p.b, foreign);
+    if (kind === "verified but unretained") await verified(p.b, foreign);
+    await refused(p, () => post("reviewer", issuancePath(p), { ...p.body, provenanceRecordIds: [p.pa, foreign] }));
+  });
+  it.each(["freeform", "different", "contradictory"] as const)("refuses %s identity material despite reviewer authority on both visits", async material => {
+    const p = await pair({ material });
+    // Freeform references have real observations/releases but no classified retained evidence.
+    await refused(p, () => post("reviewer", issuancePath(p), p.body));
+  });
+  it("refuses provenance that omits either visit's retained evidence", async () => {
+    const p = await pair();
+    await refused(p, () => post("reviewer", issuancePath(p), { ...p.body, provenanceRecordIds: [p.pa] }));
+  });
+  it("refuses different private commissioners", async () => {
+    const p = await pair({ commissionerB: "otherBuyer" });
+    await refused(p, () => post("reviewer", issuancePath(p), p.body));
+  });
+  it.each(["public A", "public B", "both public"] as const)("keeps %s outside private comparative admission", async audiences => {
+    const p = await pair({ audienceA: audiences === "public B" ? "buyer_private" : "listing_public",
+      audienceB: audiences === "public A" ? "buyer_private" : "listing_public" });
+    await refused(p, () => post("reviewer", issuancePath(p), p.body));
+  });
+
+  async function purgeCommissioner(who: "erasureBuyer" | "erasureReadBuyer") {
+    await request.delete("/api/v1/me").set(headers(who)).expect(204, "");
+    const scheduled = await db.user.findUniqueOrThrow({ where: { id: suite.id(who) } });
+    expect(scheduled.deletionScheduledAt?.toISOString()).toBe("2026-11-20T12:00:00.000Z");
+    expect(await db.session.count({ where: { userId: suite.id(who) } })).toBe(0);
+    // Established worker-job subprocess pattern. Refuse global selection before any purge
+    // when it could reach another suite's due account or expired sign-in code.
+    const workerRoot = resolve(__dirname, "../../../../../worker");
+    const script = `
+      require('reflect-metadata'); require('tsx/cjs');
+      const { PrismaService } = require('@auto-tm/db');
+      const { PurgeExpiredAccounts } = require('./src/jobs/PurgeExpiredAccounts.ts');
+      async function main() {
+        const db = new PrismaService();
+        try {
+          const now = new Date(${JSON.stringify(scheduled.deletionScheduledAt!.toISOString())});
+          const target = ${JSON.stringify(suite.id(who))};
+          const due = await db.user.findMany({ where: { deletionScheduledAt: { lte: now } }, select: { id: true } });
+          if (due.length !== 1 || due[0].id !== target) throw new Error('Issuance erasure isolation refused: foreign or missing due account');
+          const stale = await db.otpRequest.findMany({ where: { createdAt: { lt: new Date(now.getTime() - 30 * 86400000) } }, select: { userId: true, destination: true } });
+          if (stale.some(row => !(row.userId === target || row.userId === null && row.destination === ${JSON.stringify(suite.phone(who))}))) throw new Error('Issuance erasure isolation refused: foreign expired OTP rows');
+          const result = await new PurgeExpiredAccounts(db).execute({ now });
+          if (result.purgedCount !== 1) throw new Error('Expected exactly one product-scheduled purge');
+        } finally { await db.$disconnect(); }
+      }
+      void main().catch(error => { console.error(error); process.exitCode = 1; });
+    `;
+    await promisify(execFile)(process.execPath, ["-e", script], { cwd: workerRoot,
+      env: { ...process.env, TSX_TSCONFIG_PATH: resolve(workerRoot, "tsconfig.json") }, timeout: 30000, killSignal: "SIGKILL" });
+    expect(await db.user.findUniqueOrThrow({ where: { id: suite.id(who) }, select: { phone: true, deletionScheduledAt: true } }))
+      .toEqual({ phone: null, deletionScheduledAt: null });
+  }
+  it("normalizes erased/null-commissioner and unknown predecessors without a new audit or successor", async () => {
+    const p = await pair({ commissionerA: "erasureBuyer", commissionerB: "erasureBuyer" });
+    await purgeCommissioner("erasureBuyer");
+    expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: p.a.id }, select: { commissionerId: true, erasedAt: true } }))
+      .toEqual({ commissionerId: null, erasedAt: new Date("2026-11-20T12:00:00.000Z") });
+    const erased = await refused(p, () => post("reviewer", issuancePath(p), p.body));
+    expect(await refused(p, () => post("reviewer", issuancePath(p), { ...p.body, predecessorId: randomUUID() }))).toEqual(erased);
+  });
+  it("normalizes erased and unknown proof handles after product commissioner purge", async () => {
+    const p = await pair({ commissionerA: "erasureReadBuyer", commissionerB: "erasureReadBuyer" });
+    const proofId = await ordinaryProof(p);
+    await purgeCommissioner("erasureReadBuyer");
+    const erased = await refused(p, () => get("reviewer", `${issuancePath(p)}/${proofId}`));
+    expect(await refused(p, () => get("reviewer", `${issuancePath(p)}/${randomUUID()}`))).toEqual(erased);
   });
 });
