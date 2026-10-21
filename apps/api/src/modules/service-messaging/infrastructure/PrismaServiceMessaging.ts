@@ -357,7 +357,7 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
  }
  async mine(subject: ServiceSubject) {
   return this.db.$transaction(async tx => {
-   const actor = await this.actor(tx, subject, "support");
+   const actor = await this.actor(tx, subject, "support", { scope: await this.campaignScope(tx, subject, true) });
    if (!actor.sessionValid || actor.deleting) throw new ServiceDenied("NO_ACCESS");
    const rows = await tx.serviceConversation.findMany({ where: { erasedAt: null, OR: [{ supportCase: { customerId: subject.userId } }, { historyRequest: { customerId: subject.userId } }] }, orderBy: { createdAt: "desc" }, take: 50 });
    return rows.map(row => ({ id: row.id, purpose: ServiceMessagingSchemas.ServicePurposeSchema.parse(row.purpose), createdAt: row.createdAt.toISOString() }));

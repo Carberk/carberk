@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { runInNewContext } from 'node:vm';
+import { readFileSync } from 'node:fs';
 import { remoteProgram } from './staging-remote.mjs';
 
 function captureFixtureSql() {
@@ -44,4 +45,45 @@ test('serialized integrity guard keeps the row-key CASE inside the IF expression
   // PL/pgSQL reads IF up to THEN at depth zero. CASE must stay nested until END.
   assert.match(guard, /entry\.row_key IS DISTINCT FROM \(CASE WHEN entry\.table_name='staff_grants' THEN jsonb_build_object\('userId',entry\.row_key->>'userId','capability',entry\.row_key->>'capability'\) ELSE jsonb_build_object\('id',entry\.row_key->>'id'\) END\) OR/);
   assert.match(guard, /EXISTS\(SELECT 1 FROM jsonb_each\(entry\.row_key\) e WHERE e\.value='null'::jsonb\) THEN RAISE EXCEPTION 'Unknown campaign row key'/);
+});
+
+function captureV3(kind) {
+  const id = 'f1'.repeat(16), candidate = 'a'.repeat(40), queries = [];
+  const source = readFileSync(new URL('./staging-campaign.mjs', import.meta.url), 'utf8').replaceAll('export function ', 'function ').replaceAll('export async function ', 'async function ');
+  const businessMain = runInNewContext(`${source}; businessMain`, { require: createRequire(import.meta.url), console: { log() {} } });
+  businessMain({ id, namespace: `cf_${id}`, candidate, target: candidate, profile: 'campaign897-full-v3', kind }, {
+    exists: kind === 'reset', uuid: label => `uuid-${label}`, disposeDeliveries() {},
+    sql: query => { queries.push(query); return query.startsWith('SELECT state') ? 'identities' : query.includes('SELECT coalesce(json_agg') ? '[]' : '0'; },
+  });
+  return queries.join('\n');
+}
+const serviceTables = ['support_cases', 'service_conversations', 'service_messages', 'service_outbox', 'service_read_states', 'service_audits'];
+
+test('v3 journals Support text tables and exposes only a contract-hashed reservation authority', () => {
+  const sql = captureV3('fixture');
+  for (const table of serviceTables) assert.ok(sql.includes(`CREATE TRIGGER "cf_${'f1'.repeat(16)}_business" AFTER INSERT OR UPDATE OR DELETE ON public.${table} FOR EACH ROW`), table);
+  assert.match(sql, /CREATE FUNCTION "cf_(?:f1){16}"\.campaign_service_authority\(principal_id text,session_id text,conversation_id text,peer_id text,runtime_candidate text\) RETURNS boolean LANGUAGE sql/);
+  assert.match(sql, /service_contract_hash=md5\(pg_get_functiondef\('"cf_(?:f1){16}"\.campaign_service_authority\(text,text,text,text,text\)'::regprocedure\)\)/);
+  // The authority binds the exact live journaled principal and Session, then the requested conversation and peer.
+  const authority = sql.match(/AS \$service\$([\s\S]*?)\$service\$/)?.[1] ?? '';
+  for (const fragment of ["m.state='identities'", 'm.candidate=$5', "sr.table_name='sessions'", 's."userId"=u.id', "cr.table_name='service_conversations'", "c.purpose='support'", "scr.table_name='support_cases'", "pr.table_name='users'", 'm.journal_hash=', 'm.event_hash=', 'm.tracking_hash=', 'm.schema_hash=']) assert.ok(authority.includes(fragment), fragment);
+  // Service ownership edges resolve through service tables, never Listing Conversations.
+  assert.ok(sql.includes(`"conversationId":"service_conversations"`) && sql.includes(`"supportCaseId":"support_cases"`) && sql.includes(`"resourceId":"support_cases"`));
+  assert.match(sql, /RAISE EXCEPTION 'Unsupported campaign service'/);
+  assert.match(sql, /WHEN TG_TABLE_NAME='service_read_states' THEN jsonb_build_object\('conversationId',v_row->>'conversationId','userId',v_row->>'userId'\)/);
+  assert.match(sql, /WHEN entry\.table_name='service_read_states' THEN jsonb_build_object\('conversationId',entry\.row_key->>'conversationId','userId',entry\.row_key->>'userId'\)/);
+});
+
+test('v3 reset redacts retained service audits exactly and disposes Support text before its parents', () => {
+  const sql = captureV3('reset');
+  assert.match(sql, /UPDATE public\.service_audits a SET "actorId"=NULL,reason=NULL,"targetStaffId"=NULL,"resourceId"='redacted-synthetic-service' FROM "cf_(?:f1){16}"\.campaign_records r WHERE r\.table_name='service_audits'/);
+  const order = ['service_read_states', 'service_outbox', 'service_messages', 'service_conversations', 'support_cases', 'staff_grants', 'listings', 'sessions', 'users']
+    .map(table => sql.indexOf(`DELETE FROM public.${table} t USING`));
+  assert.ok(order.every(index => index > 0), 'every disposal statement present');
+  assert.deepEqual([...order].sort((a, b) => a - b), order);
+  assert.ok(sql.indexOf('UPDATE public.service_audits a SET') < order[0], 'audits are redacted before any parent can SET NULL them');
+  assert.match(sql, /AND table_name NOT IN \('audit_logs','service_audits'\)\) THEN RAISE EXCEPTION 'Campaign disposal incomplete'/);
+  assert.match(sql, /RAISE EXCEPTION 'Campaign service audit disposition changed'/);
+  // Preflight attributes composite read-state children by their own key.
+  assert.ok(sql.includes(`WHEN $3=''service_read_states'' THEN jsonb_build_object(''conversationId'',to_jsonb(child)->>''conversationId'',''userId'',to_jsonb(child)->>''userId'')`));
 });
