@@ -10,7 +10,7 @@ Reset writes an exact-key object ledger and its hash in the same transaction tha
 
 The only harness change forwards the disposable CI MinIO credentials explicitly in the existing `process.execPath` bridge, using `minioadmin` values from `infra/compose/docker-compose.ci.yml`. The deployed remote path forwards the service environment unchanged and has no credential default. The parent still validates the Railway media and public-media origins.
 
-Known limits remain the accepted ADR-0088 scope: late orphan placeholders, legacy or personal uploads, video, operator conversion scripts and a producer racing outside the conditional writer fence are not claimed by this source slice. Worker stranded-claim recovery remains admissible without a live member, while an owned `PREPARING` upload blocks reset.
+ADR-0088 accepts empty placeholders left by an interrupted initializer or failed provenance write, before upload authority is exposed, and excludes general orphan sweeping. It does not exclude the remaining release work. Personal uploads, video, the broader owned graph and recorded producer/reset races remain unverified by this slice. Operator conversion uses the existing pause/drain procedure. Worker stranded-claim recovery remains admissible without a live member, while an owned `PREPARING` upload blocks reset. Hosted acceptance must still exercise a recorded generator PUT across reset, both recovery branches, cleanup retry, foreign preservation and an unchanged terminal digest.
 
 Offline checks run on this checkpoint:
 
