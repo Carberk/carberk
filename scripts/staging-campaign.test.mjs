@@ -52,7 +52,7 @@ function captureV3(kind) {
   const source = readFileSync(new URL('./staging-campaign.mjs', import.meta.url), 'utf8').replaceAll('export function ', 'function ').replaceAll('export async function ', 'async function ');
   const businessMain = runInNewContext(`${source}; businessMain`, { require: createRequire(import.meta.url), console: { log() {} } });
   businessMain({ id, namespace: `cf_${id}`, candidate, target: candidate, profile: 'campaign897-full-v3', kind }, {
-    exists: kind === 'reset', uuid: label => `uuid-${label}`, disposeDeliveries() {},
+    exists: kind === 'reset', uuid: label => `uuid-${label}`, disposeDeliveries() {}, disposeObjects() {},
     sql: query => { queries.push(query); return query.startsWith('SELECT state') ? 'identities' : query.includes('SELECT coalesce(json_agg') ? '[]' : '0'; },
   });
   return queries.join('\n');
@@ -97,9 +97,9 @@ async function disposeMedia({ ledger = mediaLedger, observeOnly = false, version
   const source = readFileSync(new URL('./staging-campaign.mjs', import.meta.url), 'utf8').replaceAll('export function ', 'function ').replaceAll('export async function ', 'async function ');
   const runtime = { exitCode: 0, env: { MINIO_ENDPOINT: 'http://localhost:9000', ...(credentials ? { MINIO_ACCESS_KEY: 'disposable', MINIO_SECRET_KEY: 'secret' } : {}) } };
   const operations = [], logs = [];
-  class GetBucketVersioningCommand { constructor(input) { this.input = input; } }
-  class DeleteObjectCommand { constructor(input) { this.input = input; } }
-  class HeadObjectCommand { constructor(input) { this.input = input; } }
+  function GetBucketVersioningCommand(input) { this.input = input; }
+  function DeleteObjectCommand(input) { this.input = input; }
+  function HeadObjectCommand(input) { this.input = input; }
   class S3Client {
     async send(command) {
       operations.push(command.constructor.name);
@@ -124,9 +124,10 @@ async function disposeMedia({ ledger = mediaLedger, observeOnly = false, version
 }
 
 test('reset deletes only the recorded complete manifest and proves exact absence', async () => {
-  const result = await disposeMedia();
+  const foreignKey = 'pending/22345678-1234-4234-8234-123456789abc/original.webp';
+  const result = await disposeMedia({ present: new Set([...mediaKeys, foreignKey]) });
   assert.equal(result.code, 0);
-  assert.deepEqual(result.present, []);
+  assert.deepEqual(result.present, [foreignKey]);
   assert.deepEqual(result.logs, ['{"objects":5,"absent":5}']);
 });
 
@@ -169,4 +170,54 @@ test('terminal observation is read-only and refuses a resurrected object', async
   assert.deepEqual(resurrected.present, [mediaKeys[4]]);
   assert.ok(!resurrected.operations.includes('DeleteObjectCommand'));
   assert.deepEqual(resurrected.logs, []);
+});
+
+function resetLifecycle({ state = 'identities', failObjects = false } = {}) {
+  const source = readFileSync(new URL('./staging-campaign.mjs', import.meta.url), 'utf8').replaceAll('export function ', 'function ').replaceAll('export async function ', 'async function ');
+  const logs = [], transactions = [], objectModes = [];
+  const run = runInNewContext(`${source}; businessMain`, { require: createRequire(import.meta.url), console: { log: value => logs.push(value) } });
+  const database = { state };
+  const execute = () => run({ ...mediaBinding, id: mediaBinding.reservationId, target: mediaBinding.candidate, kind: 'reset' }, {
+    exists: true, uuid: label => `uuid-${label}`, disposeDeliveries() {},
+    sql(query) {
+      if (query.startsWith('BEGIN;')) {
+        transactions.push(query);
+        if (query.includes("SET state='cleaning'")) database.state = 'cleaning';
+        if (query.includes("SET state='disposed'")) database.state = 'disposed';
+      }
+      if (query.startsWith('SELECT state')) return database.state;
+      if (query.includes('SELECT coalesce(json_agg')) return query.includes('.campaign_object_ledger') ? JSON.stringify(mediaLedger) : '[]';
+      return '0';
+    },
+    disposeObjects(ledger, observeOnly) {
+      assert.deepEqual(JSON.parse(JSON.stringify(ledger)), mediaLedger);
+      objectModes.push(observeOnly);
+      if (!observeOnly) {
+        assert.equal(database.state, 'cleaning', 'durable intent commits before external object I/O');
+        if (failObjects) throw new Error('partial object disposal');
+      }
+    },
+  });
+  return { execute, database, transactions, logs, objectModes };
+}
+
+test('failed object disposal keeps cleaning with no row disposal or receipt, and the same reset retries', () => {
+  const failed = resetLifecycle({ failObjects: true });
+  assert.throws(failed.execute, /partial object disposal/);
+  assert.equal(failed.database.state, 'cleaning');
+  assert.deepEqual(failed.logs, []);
+  assert.ok(!failed.transactions.some(query => query.includes('DELETE FROM public.')));
+  const retried = resetLifecycle({ state: failed.database.state });
+  retried.execute();
+  assert.equal(retried.database.state, 'disposed');
+  assert.deepEqual(retried.objectModes, [false, true]);
+  assert.equal(JSON.parse(retried.logs[0]).state, 'disposed');
+});
+
+test('lost-response reset reads terminal object evidence without repeating durable writes', () => {
+  const terminal = resetLifecycle({ state: 'disposed' });
+  terminal.execute();
+  assert.deepEqual(terminal.objectModes, [true]);
+  assert.ok(terminal.transactions.every(query => !/\b(UPDATE|INSERT INTO|DELETE FROM)\b/.test(query.replace(/'(?:''|[^'])*'/g, "''"))));
+  assert.equal(JSON.parse(terminal.logs[0]).state, 'disposed');
 });

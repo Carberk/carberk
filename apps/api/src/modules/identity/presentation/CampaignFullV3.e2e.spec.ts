@@ -115,7 +115,10 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     const program = runInNewContext(`${source}; remoteProgram(payload)`, { payload });
     runInNewContext(program, { URL, process: remoteProcess, require: (name: string) => name === "node:child_process" ? {
       spawnSync: (binary: string, args: string[], spawnOptions: { input: string }) => {
-        if (binary === process.execPath) return spawnSync(binary, args, { ...spawnOptions, encoding: "utf8", timeout: 30000, cwd: `${root}/apps/api`, env: process.env });
+        if (binary === process.execPath) return spawnSync(binary, args, { ...spawnOptions, encoding: "utf8", timeout: 30000, cwd: `${root}/apps/api`, env: { ...process.env,
+          // Disposable credentials from docker-compose.ci.yml, only in the existing local child bridge.
+          ...(process.env["APP_ENV"] === "test" && ["localhost", "127.0.0.1"].includes(new URL(process.env["MINIO_ENDPOINT"] ?? "http://invalid").hostname)
+            ? { MINIO_ACCESS_KEY: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin", MINIO_SECRET_KEY: process.env["MINIO_SECRET_KEY"] ?? "minioadmin" } : {}) } });
         sqlCalls += 1;
         return spawnSync(process.execPath, [`${root}/scripts/testing/query-disposable-postgres.cjs`], {
           input: spawnOptions.input, encoding: "utf8", timeout: 30000,
@@ -1636,7 +1639,9 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
       const program = runInNewContext(source + '; remoteProgram(payload)', { payload });
       runInNewContext(program, { URL, process: remoteProcess, require: name => name === 'node:child_process' ? {
         spawnSync: (binary, args, spawnOptions) => {
-          if (binary === process.execPath) return spawnSync(binary, args, { ...spawnOptions, encoding: 'utf8', timeout: 30000, cwd: root + '/apps/api', env: process.env });
+          if (binary === process.execPath) return spawnSync(binary, args, { ...spawnOptions, encoding: 'utf8', timeout: 30000, cwd: root + '/apps/api', env: { ...process.env,
+            ...(process.env.APP_ENV === 'test' && ['localhost', '127.0.0.1'].includes(new URL(process.env.MINIO_ENDPOINT ?? 'http://invalid').hostname)
+              ? { MINIO_ACCESS_KEY: process.env.MINIO_ACCESS_KEY ?? 'minioadmin', MINIO_SECRET_KEY: process.env.MINIO_SECRET_KEY ?? 'minioadmin' } : {}) } });
           sqlCalls += 1;
           return spawnSync(process.execPath, [root + '/scripts/testing/query-disposable-postgres.cjs'], {
             input: spawnOptions.input, encoding: 'utf8', timeout: 30000,
