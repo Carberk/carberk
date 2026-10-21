@@ -52,6 +52,8 @@ export const DiagnosticReportTransitionSchema = z.object({ expectedVersion: z.nu
 export const DiagnosticCorrectionSchema = z.object({ expectedVersion: z.number().int().nonnegative(), successorId: z.string().uuid(), reason: z.string().trim().min(1).max(1000) }).strict();
 /** Links a new physical visit's first report to a released or withdrawn predecessor on another order. */
 export const DiagnosticReinspectionSchema = z.object({ reportId: z.string().uuid(), predecessorId: z.string().uuid(), expectedOrderVersion: z.number().int().nonnegative(), reason: z.string().trim().min(1).max(1000) }).strict();
+/** Live reader metadata; never part of a released snapshot. Missing or unrecognized kinds permit neutral labels. */
+const DiagnosticLineageKindSchema = z.enum(["original", "correction", "reinspection"]);
 export const DiagnosticReportSchema = z.object({
   id: z.string().uuid(), orderId: z.string().uuid(), audience: DiagnosticAudienceSchema,
   status: z.enum(["draft", "submitted", "returned", "finalized", "withdrawn"]), templateVersionId: z.string().uuid(),
@@ -60,6 +62,7 @@ export const DiagnosticReportSchema = z.object({
   correctionReason: z.string().nullable(), returnReason: z.string().nullable(), finalizedAt: z.string().datetime().nullable(),
   withdrawnAt: z.string().datetime().nullable(), withdrawalReason: z.string().nullable(), version: z.number().int().nonnegative(),
   template: DiagnosticTemplateDefinitionSchema, synthetic: z.boolean(), supersededBy: z.string().uuid().nullable().default(null),
+  lineageKind: DiagnosticLineageKindSchema.optional().catch(undefined), successorKind: z.enum(["correction", "reinspection"]).optional().catch(undefined),
 });
 export type DiagnosticFinding = z.infer<typeof DiagnosticFindingSchema>;
 export type DiagnosticDraftCreate = z.infer<typeof DiagnosticDraftCreateSchema>;
@@ -71,7 +74,7 @@ export type DiagnosticReportRecord = z.infer<typeof DiagnosticReportSchema>;
 
 /** Stored release input. No live Listing, booking or customer fields enter rendering. */
 export const DiagnosticReleasedSnapshotSchema = z.object({
-  report: DiagnosticReportSchema.omit({ version: true, template: true, synthetic: true, supersededBy: true }),
+  report: DiagnosticReportSchema.omit({ version: true, template: true, synthetic: true, supersededBy: true, lineageKind: true, successorKind: true }),
   template: DiagnosticTemplateDefinitionSchema,
   synthetic: z.boolean(),
 }).strict();

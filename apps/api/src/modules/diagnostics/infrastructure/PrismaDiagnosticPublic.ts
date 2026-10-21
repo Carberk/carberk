@@ -39,7 +39,7 @@ export class PrismaDiagnosticPublic implements DiagnosticPublicPort {
       const { row } = await this.access.loadPublic(tx, reportId);
       const snapshot = D.DiagnosticReleasedSnapshotSchema.parse(row.snapshot);
       return D.PublicDiagnosticReportSchema.parse({ ...snapshot.report, version: row.version, template: snapshot.template, synthetic: true,
-        authorId: null, reviewerId: null, returnReason: null, supersededBy: await this.access.successorId(tx, row, null) });
+        authorId: null, reviewerId: null, returnReason: null, lineageKind: row.reinspection ? "reinspection" : row.predecessorId ? "correction" : "original", ...await this.access.successor(tx, row, null) });
     });
   }
   private async readable(tx: Prisma.TransactionClient, reportId: string, evidenceId: string) {
