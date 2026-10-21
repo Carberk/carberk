@@ -47,3 +47,10 @@ S1 refuses nonterminal namespaces by default. That is not a requirement to finis
 ## Limits
 
 This proves no execution, deletion, reseed, product behavior or live fact. Adapter field sources are proposed shapes; S2 must map them to Railway, `railway ssh`, BullMQ and `pg_*`. The FK closure trusts the live FK list it is given. Admin and web ingress rely on API maintenance. The production authorization model and identity source remain open. Q2 is untouched.
+
+## Amendment: strict identity strings and own manifest keys
+
+Root inspection of `db77917e` found two guard gaps. `RegExp#test` coerced non-string IDs, so a numeric `projectId` or service ID in both policy and attestation passed the guard. The `in` checks let inherited names (`__proto__`, `constructor`, `toString`) count as manifest tables for live tables, trigger tables and FK endpoints.
+
+- RED `66073251` (test only): `node --test scripts/staging-clean-reset.test.mjs` gave 20 tests, 18 pass, 2 fail. The first failure was a missing expected exception for numeric policy and attestation IDs. The second was a wrong refusal message for a `__proto__` live table. Log sha256 prefix `f5e2235efebf23c8` (local `/tmp`).
+- GREEN: every identity pattern (`id`, `hex32`, `sha`, `cf`, owner `login`) now requires `typeof === 'string'` before matching. That covers policy, attestation, claim, deployment, operation, phase and namespace identities. Manifest membership uses `Object.hasOwn`. The focused tests pass 37/37, `pnpm test:staging-control` passes 176/176 and `git diff --check` passes. Scope, the production switch and CLI default closure are unchanged.

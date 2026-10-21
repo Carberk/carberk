@@ -24,10 +24,13 @@ export const GRANT_ISSUERS = Object.freeze([
 ].map(Object.freeze));
 export const GRANT_WINDOW_SECONDS = 900;
 
-const id = /^[a-zA-Z0-9-]{1,80}$/;
-const hex32 = /^[a-f0-9]{32}$/;
-const sha = /^[a-f0-9]{40}$/;
-const cf = /^cf_[a-f0-9]{32}$/;
+// RegExp#test coerces its argument; identities must be actual strings.
+const pattern = re => Object.freeze({ test: value => typeof value === 'string' && re.test(value) });
+const id = pattern(/^[a-zA-Z0-9-]{1,80}$/);
+const hex32 = pattern(/^[a-f0-9]{32}$/);
+const sha = pattern(/^[a-f0-9]{40}$/);
+const cf = pattern(/^cf_[a-f0-9]{32}$/);
+const login = pattern(/^[a-zA-Z0-9][a-zA-Z0-9-]{0,38}$/);
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const exact = (value, keys) => record(value) && Object.keys(value).sort().join(',') === [...keys].sort().join(',');
 const count = value => Number.isSafeInteger(value) && value >= 0;
@@ -153,7 +156,7 @@ export function planTables(manifest, live) {
     fail('Exact cf namespace inventory required');
   const rows = new Map();
   for (const table of l.tables) {
-    if (!(table.name in manifest.tables)) fail(`Unknown live table public.${table.name}`);
+    if (!Object.hasOwn(manifest.tables, table.name)) fail(`Unknown live table public.${table.name}`);
     if (rows.has(table.name)) fail('Exact live inventory required');
     rows.set(table.name, table.rows);
   }
@@ -164,7 +167,7 @@ export function planTables(manifest, live) {
     if (disposition === 'refuse-if-approved' && l.approvedDiagnosticCenters !== 0) fail(`Approved diagnostic center present in public.${name}`);
     if (!disposition.startsWith('retain')) truncate.add(`public.${name}`);
   }
-  const known = name => name.startsWith('public.') && name.slice(7) in manifest.tables;
+  const known = name => name.startsWith('public.') && Object.hasOwn(manifest.tables, name.slice(7));
   for (const key of l.foreignKeys) {
     if (!known(key.from) || !known(key.to)) fail(`Unknown foreign key ${key.name}`);
     if (truncate.has(key.to) && !truncate.has(key.from)) fail(`Retained table references deleted table: ${key.from} -> ${key.to}`);
@@ -172,7 +175,7 @@ export function planTables(manifest, live) {
   const detachTriggers = [];
   for (const trigger of l.triggers) {
     if (trigger.truncate) fail(`TRUNCATE trigger refused: ${trigger.name}`);
-    if (!(trigger.table in manifest.tables)) fail(`Unknown trigger table ${trigger.table}`);
+    if (!Object.hasOwn(manifest.tables, trigger.table)) fail(`Unknown trigger table ${trigger.table}`);
     if (trigger.functionSchema === 'public' && manifest.migrationTriggers.includes(`${trigger.table}.${trigger.name}`)) continue;
     if (namespaces.includes(trigger.functionSchema) && cfTriggers.some(s => trigger.name === `${trigger.functionSchema}_${s}`)) {
       detachTriggers.push({ namespace: trigger.functionSchema, table: `public.${trigger.table}`, trigger: trigger.name });
@@ -201,7 +204,7 @@ export function planTables(manifest, live) {
 
 const phaseKeys = ['operationId', 'reservationId', 'owner', 'candidate', 'phase'];
 const validPhase = value => exact(value, phaseKeys) && hex32.test(value.operationId) && hex32.test(value.reservationId) &&
-  /^[a-zA-Z0-9][a-zA-Z0-9-]{0,38}$/.test(value.owner ?? '') && sha.test(value.candidate) && PHASES.includes(value.phase);
+  login.test(value.owner) && sha.test(value.candidate) && PHASES.includes(value.phase);
 
 /** Durable phase ordering. Completed phases replay observe-only; nothing is skipped on a claimed completion. */
 export function nextPhase(current, request) {
