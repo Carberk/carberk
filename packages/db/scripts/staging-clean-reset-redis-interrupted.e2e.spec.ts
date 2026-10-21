@@ -115,7 +115,16 @@ describe("real interrupted Redis intent and lost Lua reply on disposable transpo
       if (!dump) throw new Error("Disposable Redis changed during independent snapshot");
       entries.push({ keyDigest: hash(key), bytesDigest: hash(dump), expiresAt: Number(await redis.call("PEXPIRETIME", key)) });
     }
-    return { entries, config: hash(JSON.stringify(await redis.config("GET", "requirepass", "maxmemory-policy", "appendonly"))) };
+    const reply = await redis.config("GET", "requirepass", "maxmemory-policy", "appendonly") as string[];
+    const config: Record<string, string> = {};
+    // CONFIG GET pair order can change across processes. Preserve each option's
+    // exact value, including requirepass, while canonicalizing only key order.
+    for (let index = 0; index < reply.length; index += 2) {
+      const option = reply[index], value = reply[index + 1];
+      if (option === undefined || value === undefined) throw new Error("Incomplete disposable Redis configuration");
+      config[option] = value;
+    }
+    return { entries, config: hash(canonical(config)) };
   }
   async function writeCount() {
     const token = `recovery-read-fence-${++fenceSequence}`;
