@@ -3,6 +3,16 @@ const { createRequire } = require('node:module');
 const { readFileSync } = require('node:fs');
 const localRequire = createRequire(process.env.STAGING_TEST_DB_PACKAGE);
 const { Client, types } = localRequire('pg');
+// Diagnostics are opt-in and restricted to the local disposable transport. This never
+// changes the serialized production program or a remote database's SQL.
+const diagnosticEnabled = process.env.STAGING_TEST_PG_DIAGNOSTICS === '1' && (() => {
+  try { return ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(process.env.STAGING_CONTROL_TEST_DATABASE_URL).hostname); }
+  catch { return false; }
+})();
+const ordinal = /^(?:0|[1-9][0-9]{0,5})$/.test(process.env.STAGING_TEST_PG_ORDINAL || '') ? Number(process.env.STAGING_TEST_PG_ORDINAL) : 0;
+const role = process.env.STAGING_TEST_PG_ROLE === 'sql-child' ? 'sql-child' : 'unknown';
+const monotonic = () => Number(process.hrtime.bigint() / 1000000n);
+const pid = value => Number.isInteger(value) && value > 0 && value <= 2147483647;
 (async () => {
   const client = new Client({ connectionString: process.env.STAGING_CONTROL_TEST_DATABASE_URL,
     types: { getTypeParser(oid, format) {
@@ -11,11 +21,37 @@ const { Client, types } = localRequire('pg');
     } },
   });
   await client.connect();
+  const connectedAt = diagnosticEnabled ? monotonic() : 0;
   try {
-    const result = await client.query(readFileSync(0, 'utf8'));
+    let sql = readFileSync(0, 'utf8');
+    const activity = "FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND backend_type = 'client backend'";
+    const count = `(SELECT count(*) ${activity})`;
+    if (diagnosticEnabled && sql.includes(count)) {
+      // TEST-ONLY perturbation: record count and bounded PIDs from the SAME aggregate
+      // feeding the guard. A transaction-local GUC carries it to a private result before
+      // COMMIT. No extra target connection, snapshot clear, wait or retry is introduced.
+      if (sql.split('COMMIT;').length !== 2) throw new Error('Unsupported disposable diagnostic transaction');
+      sql = sql.replaceAll(count, `(SELECT (set_config('staging_test.backends', jsonb_build_object('count', count(*),
+        'pids', coalesce(to_jsonb((array_agg(pid ORDER BY pid))[1:16]), '[]'::jsonb))::text, true)::jsonb->>'count')::bigint ${activity})`)
+        .replace('COMMIT;', "SELECT current_setting('staging_test.backends', true) AS staging_test_backends; COMMIT;");
+    }
+    const result = await client.query(sql);
     const results = Array.isArray(result) ? result : [result];
-    for (const item of results) for (const row of item.rows) console.log(Object.values(row).join('|'));
-  } finally { await client.end(); }
+    for (const item of results) for (const row of item.rows) {
+      if (diagnosticEnabled && Object.keys(row).length === 1 && Object.hasOwn(row, 'staging_test_backends')) {
+        try {
+          const value = JSON.parse(row.staging_test_backends);
+          if (Number.isInteger(value.count) && value.count >= 0 && value.count <= 2147483647 &&
+              Array.isArray(value.pids) && value.pids.length === Math.min(value.count, 16) && value.pids.every(pid)) {
+            console.error(`Disposable PG activity: ordinal=${ordinal} count=${value.count} pids=${value.pids.join(',') || 'none'}`);
+          }
+        } catch { /* Never forward diagnostic rows or parse errors. */ }
+      } else console.log(Object.values(row).join('|'));
+    }
+  } finally {
+    await client.end();
+    if (diagnosticEnabled) console.error(`Disposable PG lifecycle: role=${role} ordinal=${ordinal} pid=${pid(client.processID) ? client.processID : 0} connectedAtMs=${connectedAt} closedAtMs=${monotonic()}`);
+  }
 })().catch(error => {
   console.error('Disposable database query refused');
   if (process.env.STAGING_TEST_SQL_DIAGNOSTICS === '1' &&
