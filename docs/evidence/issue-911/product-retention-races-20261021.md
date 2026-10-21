@@ -15,7 +15,7 @@ The existing `rechecks reopened cases` test creates an already-open row. Selecti
 - `pauseAfterSelecting(caseId)` is a transparent `Proxy` over the real `PrismaService`. Only `supportCase.findMany` is wrapped. It runs the worker's own selection query and returns its rows unchanged. If those rows contain `caseId`, it then waits for the test. Every other member is passed through, bound to the real client. Selection is followed by `CampaignSupportRetention` discovery, which does not lock, and then by the per-case transaction. The pause therefore lands after the due case is selected and before the worker requests any lock.
 - Test 1 also uses a real reopen transaction as its lock holder. Its `pg_backend_pid()` is the oracle. `pg_stat_activity` is polled every 25 ms until a backend whose `pg_blocking_pids` include the holder is running `support_cases ... FOR UPDATE`. That backend is the worker waiting on the guarded row lock.
 - Time bounds: selection 10 s, holder lock 10 s, worker blocked 10 s, reopen commit 10 s, account erasure 20 s, worker completion 20 s, test 60 s. Each wait fails with a named message.
-- In `finally`, the test releases the pause and commits the holder. It then drains the worker and reopen promises with `Promise.allSettled`, so the original failure is preserved. Fixture IDs and object keys are pushed to the spec's existing tracked arrays and removed by its `afterAll`.
+- In `finally`, the test releases the pause and commits the holder. It then drains the worker and reopen promises with `Promise.allSettled`, so the original failure is preserved. The drain adds no timeout. Once the gates are released, it is bounded by the real database transactions (the worker's per-case transaction and the reopen transaction's 20 s timeout) and by the storage transport. Fixture IDs and object keys are pushed to the spec's existing tracked arrays and removed by its `afterAll`.
 
 ## Test 1: reopen commits before the worker obtains its row lock
 
@@ -50,7 +50,8 @@ Order of events:
 1. The worker selects A's case and pauses.
 2. The real `PurgeExpiredAccounts` runs to commit.
 3. The test checks the intermediate state: A's conversation is erased with `lifecycleEpoch` 1. Its fence has `epoch` 1, `objectKeys` `[key]` and `cleanupCompletedAt` null.
-4. The stale worker resumes and completes, followed by one more ordinary worker run.
+4. The stale worker resumes and completes. Its cleanup phase completes the fence. Before the late sweep, the test requires `cleanupCompletedAt` equal to `now` and a 404 for the target object.
+5. One late sweep runs with the real `objects` store wrapped by a transparent counter. Each `deleteAndVerify` manifest containing the target key increments the counter and is still delivered to the real store unchanged. No result is faked and nothing is deleted by the wrapper. Manifests for unrelated cases in the same worker database are forwarded and not constrained.
 
 Terminal assertions for A:
 - Conversation: `lifecycleEpoch` still 1 (the worker did not fence again).
@@ -61,6 +62,8 @@ Terminal assertions for A:
 Terminal assertions for B and C:
 - Each conversation is unerased at epoch 0, with 1 message and no fence.
 - The bytes are present and the owning `customerId` is unchanged.
+
+NP3 oracle: the target-key request count for the late sweep must be exactly 0. This is an explicit counted assertion. Nothing is inferred from the job or file passing.
 
 Remove the reread `erasedAt` check and the stale worker would raise the epoch to 2 and write the purge audit.
 
