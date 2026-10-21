@@ -203,6 +203,16 @@ it("persists Support response debt independently of notes/notices and fences man
  expect((await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } })).escalatedAt).not.toBeNull();
  await request.post(`${path}/assignment`).set("Authorization", auth(oldStaff)).send({ expectedVersion: 1, targetUserId: nextStaff }).expect(201);
  await request.post(`${path}/support`).set("Authorization", auth(oldStaff)).send({ kind: "reopen" }).expect(403);
+ await request.post(`${path}/support`).set("Authorization", auth(oldStaff)).send({ kind: "close_resolved" }).expect(403);
+ await request.post(`${path}/support`).set("Authorization", auth(nextStaff)).send({ kind: "close_resolved" }).expect(400);
+ await send(nextStaff, "Your appeal has been resolved").expect(201);
+ await request.post(`${path}/support`).set("Authorization", auth(nextStaff)).send({ kind: "close_resolved" }).expect(201);
+ const closed = await request.get(path).set("Authorization", auth(customerId)).expect(200);
+ expect(closed.body).toMatchObject({ status: "closed", support: { unansweredSince: null } });
+ await request.post(`${path}/support`).set("Authorization", auth(oldStaff)).send({ kind: "reopen" }).expect(403);
+ await request.post(`${path}/support`).set("Authorization", auth(nextStaff)).send({ kind: "reopen" }).expect(201);
+ const reopened = await request.get(path).set("Authorization", auth(customerId)).expect(200);
+ expect(reopened.body).toMatchObject({ status: "open", support: { unansweredSince: null, awaitingCustomerSince: null } });
 });
 
 it("orders the actual Support queue by incident/account category then oldest unanswered time", async () => {
