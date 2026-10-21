@@ -85,7 +85,7 @@ describe("diagnostics:bootstrap-synthetic command — disposable migrated Postgr
   }
 
   /** An active verified ordinary User holding the named active staff grants. */
-  async function staffUser(capabilities: string[] = ["diagnostics.templates"], data: Partial<{ emailVerifiedAt: Date | null; suspendedAt: Date; deletionScheduledAt: Date }> = {}) {
+  async function staffUser(capabilities: string[] = ["diagnostics.templates"], data: Partial<{ email: null; emailVerifiedAt: null; suspendedAt: Date; deletionScheduledAt: Date }> = {}) {
     const user = await db.user.create({ data: { email: `${randomUUID()}@synthetic.example.test`, emailVerifiedAt: VERIFIED_AT, role: "buyer", updatedAt: UPDATED_AT, ...data } });
     for (const capability of capabilities) await db.staffGrant.create({ data: { userId: user.id, capability } });
     return user.id;
@@ -254,7 +254,8 @@ describe("diagnostics:bootstrap-synthetic command — disposable migrated Postgr
     it("refuses a missing, unverified, suspended or deletion-scheduled allowlisted User", async () => {
       const users = [
         randomUUID(),
-        await staffUser(["diagnostics.templates"], { emailVerifiedAt: null }),
+        // users_email_verified_check pairs email with emailVerifiedAt, so an unverified User holds no Sign-in Method.
+        await staffUser(["diagnostics.templates"], { email: null, emailVerifiedAt: null }),
         await staffUser(["diagnostics.templates"], { suspendedAt: VERIFIED_AT }),
         await staffUser(["diagnostics.templates"], { deletionScheduledAt: VERIFIED_AT }),
       ];
