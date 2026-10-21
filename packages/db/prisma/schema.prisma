@@ -1461,6 +1461,7 @@ model DiagnosticIdentityRecord {
   recordedBy User? @relation("DiagnosticIdentityRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
   recordedAt DateTime
   erasedAt DateTime?
+  reports DiagnosticReportRecord[]
   @@unique([orderId, orderVersion])
   @@index([recordedById])
   @@map("diagnostic_identity_records")
@@ -1703,6 +1704,10 @@ model DiagnosticReportRecord {
   state Json
   snapshot Json?
   snapshotHash String?
+  /// Restricted raw observation selected at first draft; never part of a released snapshot.
+  identityRecordId String?
+  identityRecordHash String?
+  identityRecord DiagnosticIdentityRecord? @relation(fields: [identityRecordId], references: [id], onDelete: Restrict)
   finalizedAt DateTime?
   withdrawnAt DateTime?
   withdrawalReason String?

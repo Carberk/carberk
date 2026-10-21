@@ -40,6 +40,11 @@ export class DiagnosticReportsController {
   @Post("orders/:id/reinspections") @Header("Cache-Control", "no-store, private") reinspect(@Req() req: Request, @Param("id") id: string, @Body() body: unknown) {
     return this.run(() => this.reports.reinspect(this.subject(req), parse(uuid, id), parse(DiagnosticSchemas.DiagnosticReinspectionSchema, body)));
   }
+  @Get("orders/:id/reinspection-comparison") comparison(@Req() req: Request, @Param("id") id: string, @Query() query: unknown, @Res({ passthrough: true }) reply: FastifyReply) {
+    // Set before authorization so uniform denials carry the same private cache policy.
+    reply.header("Cache-Control", "no-store, private");
+    return this.run(() => this.reports.comparison(this.subject(req), parse(uuid, id), parse(z.object({ predecessorId: uuid }).strict(), query).predecessorId));
+  }
   @Get("orders/:id/reports") @Header("Cache-Control", "no-store, private") forOrder(@Req() req: Request, @Param("id") id: string) {
     return this.run(() => this.reports.forOrder(this.subject(req), parse(uuid, id)));
   }

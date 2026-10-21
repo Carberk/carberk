@@ -5,7 +5,7 @@ import { PrismaService, Prisma } from "@auto-tm/db";
 import { DiagnosticReport, type DiagnosticReportState } from "../domain/DiagnosticReport";
 import { DiagnosticRuleError } from "../domain/InspectionOrder";
 import { DIAGNOSTIC_RUNTIME, type DiagnosticRuntime, type DiagnosticSubject } from "../domain/ports/DiagnosticIntakePort";
-import type { DiagnosticReportsPort } from "../domain/ports/DiagnosticReportsPort";
+import type { DiagnosticReinspectionComparison, DiagnosticReportsPort } from "../domain/ports/DiagnosticReportsPort";
 import { DiagnosticReportAccess } from "./DiagnosticReportAccess";
 import { DiagnosticAuthority } from "./DiagnosticAuthority";
 import { diagnosticListingDigest } from "./PrismaDiagnosticIntake";
@@ -63,6 +63,46 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
   private firstReport(tx: Tx, orderId: string) {
     return tx.diagnosticReportRecord.findFirst({ where: { orderId, OR: [{ predecessorId: null }, { reinspection: true }] } });
   }
+  /** Called under the order lock. Legacy orders without append-only history stay unpinned. */
+  private async currentIdentity(tx: Tx, orderId: string) {
+    return tx.diagnosticIdentityRecord.findFirst({ where: { orderId, erasedAt: null }, orderBy: { orderVersion: "desc" } });
+  }
+  async comparison(subject: DiagnosticSubject, orderId: string, predecessorId: string): Promise<DiagnosticReinspectionComparison> {
+    return this.db.$transaction(async tx => {
+      await this.authority.current(tx, subject);
+      // Discover lock targets only. Match the existing cross-order write lock order,
+      // then re-read all facts and current authority under those locks.
+      const discovered = [await tx.inspectionOrder.findUnique({ where: { id: orderId } }),
+        (await tx.diagnosticReportRecord.findUnique({ where: { id: predecessorId }, include: { order: true } }))?.order].filter(item => !!item);
+      for (const id of [...new Set(discovered.flatMap(item => item.audience === "listing_public" && item.listingId ? [item.listingId] : []))].sort()) {
+        await tx.$queryRaw`SELECT id FROM listings WHERE id=${id} FOR SHARE`;
+      }
+      for (const id of [...new Set(discovered.map(item => item.id))].sort()) await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${id} FOR UPDATE`;
+      const staffOrder = async (id: string) => {
+        for (const capability of ["diagnostics.technician", "diagnostics.reviewer"] as const) {
+          try { return (await this.authority.order(tx, subject, id, capability)).row; }
+          catch (error) { if (!(error instanceof DiagnosticRuleError) || error.code !== "DIAGNOSTIC_NO_ACCESS") throw error; }
+        }
+        throw denied();
+      };
+      const order = await staffOrder(orderId);
+      const prior = await tx.diagnosticReportRecord.findUnique({ where: { id: predecessorId } });
+      if (!prior) throw denied();
+      await staffOrder(prior.orderId);
+      if (prior.orderId === orderId || prior.erasedAt || !prior.snapshot || !prior.snapshotHash || !prior.identityRecordId || !prior.identityRecordHash ||
+        !["finalized", "withdrawn"].includes(prior.status)) throw denied();
+      const retained = await tx.diagnosticIdentityRecord.findUnique({ where: { id: prior.identityRecordId } });
+      const candidate = await this.currentIdentity(tx, orderId);
+      if (!retained || retained.erasedAt || retained.orderId !== prior.orderId || retained.observationHash !== prior.identityRecordHash || !candidate?.observationHash) throw denied();
+      const observation = DiagnosticSchemas.DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true });
+      const before = observation.safeParse(retained.observation);
+      const current = observation.safeParse(candidate.observation);
+      if (!before.success || !current.success) throw denied();
+      return { predecessor: { reportId: prior.id, reportVersion: prior.version, snapshotHash: prior.snapshotHash,
+        identityRecordId: retained.id, identityRecordHash: prior.identityRecordHash, identity: before.data },
+      candidate: { orderId, orderVersion: order.version, identityRecordId: candidate.id, identityRecordHash: candidate.observationHash, identity: current.data } };
+    });
+  }
   async create(subject: DiagnosticSubject, orderId: string, input: DiagnosticSchemas.DiagnosticDraftCreate) {
     return this.db.$transaction(async tx => {
       const { row: order } = await this.authority.order(tx, subject, orderId, "diagnostics.technician");
@@ -78,7 +118,8 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
       const state: DiagnosticReportState = { id: input.reportId, orderId, audience: DiagnosticSchemas.DiagnosticAudienceSchema.parse(order.audience),
         templateVersionId: order.templateVersionId, status: "draft", observedAt: observed.data.observedAt, mileageKm: observed.data.mileageKm,
         findings: [], authorId: subject.userId, reviewerId: null, successorOf: null, correctionReason: null, returnReason: null, finalizedAt: null, withdrawnAt: null, withdrawalReason: null };
-      const row = await tx.diagnosticReportRecord.create({ data: { id: input.reportId, orderId, audience: state.audience, templateVersionId: state.templateVersionId, state: json(state) } });
+      const identity = await this.currentIdentity(tx, orderId);
+      const row = await tx.diagnosticReportRecord.create({ data: { identityRecordId: identity?.id ?? null, identityRecordHash: identity?.observationHash ?? null, id: input.reportId, orderId, audience: state.audience, templateVersionId: state.templateVersionId, state: json(state) } });
       await this.audit(tx, subject, order, row.id, "REPORT_DRAFT_CREATED");
       return this.dto(tx, row, subject, true);
     });
@@ -170,7 +211,7 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
       }
       this.version(row, input.expectedVersion);
       const state = (await this.model(tx, row)).correct(input.successorId, subject.userId, input.reason).state;
-      const saved = await tx.diagnosticReportRecord.create({ data: { id: state.id, orderId: order.id, audience: row.audience, templateVersionId: row.templateVersionId, predecessorId: row.id, state: json(state) } });
+      const saved = await tx.diagnosticReportRecord.create({ data: { id: state.id, orderId: order.id, audience: row.audience, templateVersionId: row.templateVersionId, predecessorId: row.id, identityRecordId: row.identityRecordId, identityRecordHash: row.identityRecordHash, state: json(state) } });
       await this.audit(tx, subject, order, saved.id, "REPORT_CORRECTION_CREATED", { predecessorId: row.id, reason: input.reason });
       return this.dto(tx, saved, subject, true);
     });
@@ -216,9 +257,10 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
       await this.publicAssociation(tx, order);
       const state = new DiagnosticReport(prior.state as unknown as DiagnosticReportState).reinspect({ reportId: input.reportId, orderId, templateVersionId: order.templateVersionId,
         authorId: subject.userId, observedAt: observed.data.observedAt, mileageKm: observed.data.mileageKm, reason: input.reason }).state;
+      const identity = await this.currentIdentity(tx, orderId);
       let saved: Row;
       try {
-        saved = await tx.diagnosticReportRecord.create({ data: { id: state.id, orderId, audience: state.audience, templateVersionId: state.templateVersionId, predecessorId: prior.id, reinspection: true, state: json(state) } });
+        saved = await tx.diagnosticReportRecord.create({ data: { id: state.id, orderId, audience: state.audience, templateVersionId: state.templateVersionId, predecessorId: prior.id, reinspection: true, identityRecordId: identity?.id ?? null, identityRecordHash: identity?.observationHash ?? null, state: json(state) } });
       } catch (error) {
         // Report id, predecessor and first-report uniqueness are the only races left after locking.
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
