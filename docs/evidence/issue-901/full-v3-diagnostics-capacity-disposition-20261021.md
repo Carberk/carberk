@@ -28,7 +28,7 @@ As a result, the specification permits reviewer reuse. The matrix's actor naming
 - Publication ([InspectionOrder](../../../apps/api/src/modules/diagnostics/domain/InspectionOrder.ts#L44)): publication consent on a private order is refused with no write.
 - Contact phone: personal publication requires a contact method ([PublishListing](../../../apps/api/src/modules/listings/application/PublishListing.ts#L70)), and bootstrap users have no phone.
   - **C**, the contact proof, is therefore ≥ 2 records (OTP plus confirmation). Confidence is medium; I did not trace the exact write path.
-  - The current v3 OTP guard admits only `sign_in` email OTP, so this path is refused today.
+  - The current v3 OTP guard admits `sign_in` and the bound `buyer-a`/admitted-business contact path. That does not authorize this owner's personal contact proof, which remains unsupported.
 
 ## Alternatives evaluated (public reservation only)
 
@@ -58,11 +58,11 @@ Event totals exclude contact events. Reset adds at least one event per live row 
 - Refresh: one Session event.
 - Failed or resend flows: UNKNOWN.
 
-**Lower bound under M.** The three named staff (X1, X2, X3) and the coordinator must each sign in and enroll. The coordinator is the only possible granter: bootstrap grants are fixed and self-grants are refused. That fixes K=4 at 85 auth records. The content floor is 44 records plus F+E ≥ 3 plus C ≥ 2. Moving buyer-b's public mobile read to owner or anonymous web saves 2 records, which still leaves ≥132. Moving return/resubmit (2 records) and PDF retry (UNKNOWN) to the private reservation is already assumed. **M cannot fit 128.** The smallest proven bound is 132 before contact proof and ≥134 with it.
+**Lower bound under M.** The three named staff (X1, X2, X3) and the coordinator must each sign in and enroll. The coordinator is the only possible granter: bootstrap grants are fixed and self-grants are refused. That fixes K=4 at 85 auth records. The content floor is 44 records plus F+E ≥ 3 plus C ≥ 2. Moving buyer-b's public mobile read to owner or anonymous web saves 2 records, which still leaves ≥132 including contact. Moving return/resubmit (2 records) and PDF retry (UNKNOWN) to the private reservation is already assumed. **M cannot fit 128.** With buyer-b, the table gives ≥132 before contact and ≥134 with it. Without buyer-b, those bounds are ≥130 and ≥132 respectively. Reinspection and unmeasured bootstrap/storage costs are additional.
 
 ## Disposition (proposal, not approved)
 
-A, B and D all fit by record count. Remaining headroom limits the template: with one panel, v1 can carry at most 4 (A) or 7 (B/D) extra required checks, including any evidence those checks require, before reaching 128. **A is dominated.** It costs 3 more records than B or D, needs a temporary management delegation, makes the coordinator both granter and reviewer, and still leaves `independent-reviewer` without its X3 role. **D is the decisive alternative.** It keeps X3 exactly: `independent-reviewer` is the qualified public reviewer, separate from `technician`, and private audited self-review is unchanged. Its only deviation is that the public order's reception and publication-consent actor is not `reception-steward`. B keeps X1 intact and moves X3 instead.
+A, B and D have lower-bound estimates below 128; none yet proves a complete fit. The apparent 4 (A) or 7 (B/D) records of headroom must cover all additional required-check saves, evidence, bootstrap audit and storage costs, whose full ledger remains unknown. **A is dominated.** It costs 3 more records than B or D, needs a temporary management delegation, makes the coordinator both granter and reviewer, and still leaves `independent-reviewer` without its X3 role. **D is the preferred candidate for root disposition.** It keeps X3 exactly: `independent-reviewer` is the qualified public reviewer, separate from `technician`, and private audited self-review is unchanged. Its deviation is that the public order's reception and publication-consent actor is not `reception-steward`. B keeps X1 intact and moves X3 instead. No template or actor choice is approved here.
 
 Decisions root must make:
 
