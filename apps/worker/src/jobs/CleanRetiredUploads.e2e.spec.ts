@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { Readable } from "node:stream";
 
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -32,6 +34,8 @@ const DUE = new Date("2000-01-01T00:00:00Z");
 const SWEEP = new Date("2000-01-02T00:00:00Z");
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
+/** The product's per-request S3 budget (ConditionalImageStorage, S3RetiredObjectStore). */
+const REQUEST_BUDGET_MS = 10_000;
 
 describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", () => {
   let prisma: PrismaService;
@@ -90,9 +94,9 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
       .map((name) => `${directory}${name}.webp`)];
   }
 
-  async function exists(Key: string): Promise<boolean> {
+  async function exists(Key: string, abortSignal?: AbortSignal): Promise<boolean> {
     try {
-      await s3.send(new HeadObjectCommand({ Bucket: RETIRED_UPLOAD_BUCKET, Key }));
+      await s3.send(new HeadObjectCommand({ Bucket: RETIRED_UPLOAD_BUCKET, Key }), abortSignal ? { abortSignal } : {});
       return true;
     } catch (error) {
       if ((error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404) return false;
@@ -100,7 +104,10 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
     }
   }
 
-  const present = async (keys: string[]) => (await Promise.all(keys.map(exists))).filter(Boolean).length;
+  const present = async (keys: string[]) => (await Promise.all(keys.map((Key) => exists(Key)))).filter(Boolean).length;
+  /** `present` within the product's request budget, so a store that serialized reads behind a held PUT fails instead of hanging. */
+  const presentInBudget = async (keys: string[]) =>
+    (await Promise.all(keys.map((Key) => exists(Key, AbortSignal.timeout(REQUEST_BUDGET_MS))))).filter(Boolean).length;
 
   /** A fenced upload with its current five or historical nine stored objects, retired and waiting for cleanup unless told otherwise. */
   async function retiredUpload(options: {
@@ -147,6 +154,98 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
       sellerId: userId, status: "active", brandId: catalog.brandId, modelId: catalog.modelId,
       cityId: catalog.cityId, priceAmount: 100000, priceCurrency: "TMT", publishedAt: new Date(),
     } });
+  }
+
+  async function bytesOf(Key: string): Promise<Buffer> {
+    const object = await s3.send(new GetObjectCommand({ Bucket: RETIRED_UPLOAD_BUCKET, Key }),
+      { abortSignal: AbortSignal.timeout(REQUEST_BUDGET_MS) });
+    if (!object.Body) throw new Error(`No body for ${Key}`);
+    return Buffer.from(await object.Body.transformToByteArray());
+  }
+
+  /** Another seller's adopted photo in another directory; a race on this suite's upload must leave it byte-identical. */
+  async function foreignStock() {
+    const stock = await retiredUpload({ state: "ADOPTED", work: "none" });
+    await prisma.listingMedia.create({ data: {
+      listingId: (await listing()).id, kind: "image", sortOrder: 0, key: stock.key, uploadId: stock.id,
+    } });
+    const bytes = await Promise.all(stock.keys.map(bytesOf));
+    return {
+      expectIntact: async () => {
+        expect(await stateOf(stock.id)).toBe("ADOPTED");
+        expect(await prisma.mediaUploadCleanup.count({ where: { uploadId: stock.id } })).toBe(0);
+        const now = await Promise.all(stock.keys.map(bytesOf));
+        expect(now.map((current, index) => current.equals(bytes[index] ?? Buffer.alloc(0)))).toEqual(stock.keys.map(() => true));
+      },
+    };
+  }
+
+  /**
+   * The API's retirement of an AVAILABLE upload (PrismaUploadClaims.retireUnclaimed
+   * and retire), repeated because the worker cannot import the API: under the
+   * upload lock, only an unheld upload with no adopter is retired, and its exact
+   * manifest is recorded as PENDING work. `now` is the API clock, in this
+   * suite's year 2000.
+   */
+  async function retireUnclaimed(uploadId: string, now: Date): Promise<boolean> {
+    return prisma.$transaction(async (tx) => {
+      const [upload] = await tx.$queryRaw<{ id: string; key: string; objectKeys: string[]; writeProtocol: string; state: string }[]>`
+        SELECT id, "key", "objectKeys", "writeProtocol", "state" FROM media_uploads WHERE id = ${uploadId} FOR UPDATE`;
+      const [adopters] = await tx.$queryRaw<{ total: bigint }[]>`
+        SELECT (SELECT count(*) FROM listing_media WHERE "uploadId" = ${uploadId}) +
+               (SELECT count(*) FROM users WHERE "avatarUploadId" = ${uploadId}) AS total`;
+      if (!upload || upload.state !== "AVAILABLE" || Number(adopters?.total ?? 0) > 0) return false;
+      await tx.$executeRaw`
+        UPDATE media_uploads SET "state" = 'RETIRED', "retiredAt" = ${now}, "claimToken" = NULL, "claimDeadline" = NULL
+        WHERE id = ${uploadId}`;
+      await tx.$executeRaw`
+        INSERT INTO media_upload_cleanups ("uploadId", "key", "objectKeys", "writeProtocol", "status", "nextAttemptAt")
+        VALUES (${upload.id}, ${upload.key}, ${upload.objectKeys}::text[], ${upload.writeProtocol},
+          ${upload.writeProtocol === "conditional-v1" ? "PENDING" : "LEGACY_PENDING"}, ${now})
+        ON CONFLICT ("uploadId") DO NOTHING`;
+      return true;
+    });
+  }
+
+  /**
+   * NP-4: the generator's variant write (ConditionalImageStorage: read the
+   * ETag, then PUT with IfMatch) as one real streamed request. Its first bytes
+   * are taken by the HTTP request, then the rest waits on a gate, so the PUT is
+   * in flight at the S3 boundary while recovery and cleanup run. The answer is
+   * MinIO's own; nothing is faked. `release` is idempotent, for `finally`.
+   */
+  function heldGeneratorPut(Key: string, IfMatch: string) {
+    const body = Buffer.from(`late variant for ${Key}`);
+    const half = Math.floor(body.length / 2);
+    let reads = 0;
+    let settled = false;
+    let open!: () => void;
+    let taken!: () => void;
+    const gate = new Promise<void>((resolve) => { open = resolve; });
+    const firstBytesTaken = new Promise<void>((resolve) => { taken = resolve; });
+    // highWaterMark 1: a second read happens only once the first bytes are consumed.
+    const stream = new Readable({
+      highWaterMark: 1,
+      read() {
+        reads += 1;
+        if (reads === 1) this.push(body.subarray(0, half));
+        if (reads === 2) {
+          taken();
+          void gate.then(() => { this.push(body.subarray(half)); this.push(null); });
+        }
+      },
+    });
+    const outcome = s3.send(new PutObjectCommand({
+      Bucket: RETIRED_UPLOAD_BUCKET, Key, Body: stream, ContentLength: body.length,
+      ContentType: "image/webp", IfMatch, CacheControl: "no-store",
+    })).then(
+      () => "written" as const,
+      (error: { $metadata?: { httpStatusCode?: number }; name?: string }) => error.$metadata?.httpStatusCode ?? error.name,
+    ).finally(() => { settled = true; });
+    const started = Promise.race([firstBytesTaken, outcome.then((answer) => {
+      throw new Error(`The generator PUT settled before it was held: ${String(answer)}`);
+    })]);
+    return { started, outcome, inFlight: () => !settled, release: () => open() };
   }
 
   /** Deletes for real, then fails before the whole manifest is gone. */
@@ -239,6 +338,88 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
     expect(await prisma.mediaUpload.findUniqueOrThrow({ where: { id: upload.id } }))
       .toMatchObject({ claimToken: null, claimDeadline: null });
   });
+
+  it("NP-4 publish: a generator PUT held across claim recovery, ordinary retirement and cleanup resurrects nothing", async () => {
+    const foreign = await foreignStock();
+    // retiredUpload's claim target is a Listing id that does not exist yet: a publish claim.
+    const upload = await retiredUpload({ preparing: true });
+    const thumbnail = `${upload.directory}thumbnail.webp`;
+    const { ETag } = await s3.send(new HeadObjectCommand({ Bucket: RETIRED_UPLOAD_BUCKET, Key: thumbnail }));
+    if (!ETag) throw new Error("The conditional variant has no ETag");
+    const held = heldGeneratorPut(thumbnail, ETag);
+    try {
+      await held.started;
+
+      // The deadline passes with the PUT still in flight: the claim is released, good bytes kept.
+      expect(await job.execute({ now: SWEEP, limit: 10 })).toEqual({ cancelledPreparations: 1, deleted: 0, waiting: 0 });
+      expect(await prisma.mediaUpload.findUniqueOrThrow({ where: { id: upload.id } })).toMatchObject({
+        state: "AVAILABLE", claimToken: null, claimDeadline: null, claimTargetType: null, claimTargetId: null, retiredAt: null,
+      });
+      expect(await prisma.mediaUploadCleanup.count({ where: { uploadId: upload.id } })).toBe(0);
+      expect(await presentInBudget(upload.keys)).toBe(5);
+      expect(held.inFlight()).toBe(true);
+
+      // Only the ordinary retirement of the unclaimed upload records deletion work.
+      expect(await retireUnclaimed(upload.id, SWEEP)).toBe(true);
+      const work = await workOf(upload.id);
+      expect(work).toMatchObject({ status: "PENDING", attempts: 0, key: upload.key, writeProtocol: "conditional-v1" });
+      expect([...work.objectKeys].sort()).toEqual([...upload.keys].sort());
+
+      expect(await job.execute({ now: SWEEP, limit: 10 })).toEqual({ cancelledPreparations: 0, deleted: 1, waiting: 0 });
+      expect(await workOf(upload.id)).toMatchObject({ status: "DONE" });
+      expect(await stateOf(upload.id)).toBe("DELETED");
+      expect(await presentInBudget(upload.keys)).toBe(0);
+      expect(held.inFlight()).toBe(true);
+
+      held.release();
+      expect([404, 409, 412]).toContain(await held.outcome);
+      expect(await present(upload.keys)).toBe(0);
+      await foreign.expectIntact();
+    } finally {
+      held.release();
+      await held.outcome;
+    }
+  }, 4 * REQUEST_BUDGET_MS);
+
+  it("NP-4 attach: a generator PUT held across claim recovery and cleanup resurrects nothing", async () => {
+    const foreign = await foreignStock();
+    const upload = await retiredUpload({ preparing: true });
+    const target = await listing();
+    await prisma.mediaUpload.update({ where: { id: upload.id }, data: { claimTargetId: target.id } });
+    const thumbnail = `${upload.directory}thumbnail.webp`;
+    const { ETag } = await s3.send(new HeadObjectCommand({ Bucket: RETIRED_UPLOAD_BUCKET, Key: thumbnail }));
+    if (!ETag) throw new Error("The conditional variant has no ETag");
+    const held = heldGeneratorPut(thumbnail, ETag);
+    try {
+      await held.started;
+
+      // Recovery alone first, so the recorded work is visible before cleanup takes it.
+      expect(await ledger.retireExpiredPreparations(SWEEP, 10)).toBe(1);
+      expect(await prisma.mediaUpload.findUniqueOrThrow({ where: { id: upload.id } })).toMatchObject({
+        state: "RETIRED", retiredAt: SWEEP, claimToken: null, claimDeadline: null,
+        claimTargetType: "listing", claimTargetId: target.id,
+      });
+      const work = await workOf(upload.id);
+      expect(work).toMatchObject({ status: "PENDING", attempts: 0, key: upload.key, writeProtocol: "conditional-v1" });
+      expect([...work.objectKeys].sort()).toEqual([...upload.keys].sort());
+      expect(await presentInBudget(upload.keys)).toBe(5);
+      expect(held.inFlight()).toBe(true);
+
+      expect(await job.execute({ now: SWEEP, limit: 10 })).toEqual({ cancelledPreparations: 0, deleted: 1, waiting: 0 });
+      expect(await workOf(upload.id)).toMatchObject({ status: "DONE", attempts: 1 });
+      expect(await stateOf(upload.id)).toBe("DELETED");
+      expect(await presentInBudget(upload.keys)).toBe(0);
+      expect(held.inFlight()).toBe(true);
+
+      held.release();
+      expect([404, 409, 412]).toContain(await held.outcome);
+      expect(await present(upload.keys)).toBe(0);
+      await foreign.expectIntact();
+    } finally {
+      held.release();
+      await held.outcome;
+    }
+  }, 4 * REQUEST_BUDGET_MS);
 
   it("releases an expired publish claim to AVAILABLE without deleting any bytes or recording cleanup", async () => {
     const upload = await retiredUpload({ preparing: true });
