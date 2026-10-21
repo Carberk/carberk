@@ -23,7 +23,7 @@ const digest = (bytes: Uint8Array | string) => createHash("sha256").update(bytes
 
 /** Every transport uses this transaction boundary. User/session locks fence
  * grant/deletion changes; owner/conversation locks fence handover and retries.
- * Full-v3 campaign principals reach only Support text paths, after reservation admission. */
+ * Full-v3 campaign principals reach bounded Support text and close/reopen paths after reservation admission. */
 @Injectable()
 export class PrismaServiceMessaging implements ServiceMessagingPort {
  constructor(@Inject(PrismaService) private readonly db: PrismaService,
@@ -263,7 +263,7 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
     await tx.serviceMessage.create({ data: { conversationId: id, clientMessageId: command.clientMessageId, sequence: updated.lastSequence, senderId: subject.userId, senderKind: "staff", visibility: "customer", body: command.body, requestHash: hash } });
     await tx.serviceOutbox.create({ data: { conversationId: id, eventType: "message", sequence: updated.lastSequence, visibility: "customer", lifecycleEpoch: scope.lifecycleEpoch } });
    } else await this.applySupport(tx, row.supportCase, command, subject.userId);
-  });
+  }, undefined, command.kind === "close_resolved" || command.kind === "reopen" || command.kind === "close_awaiting");
  }
  async assign(subject: ServiceSubject, id: string, expectedVersion: number, targetUserId?: string) {
   await this.locked(subject, id, "assign", async (tx, row, scope) => {
