@@ -62,10 +62,10 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
   let priorSmsDriver: string | undefined;
 
   beforeAll(async () => {
-    if (!inject("apiTestDatabases")) throw new Error("Requires configured migrated disposable API PostgreSQL and Redis lane");
     priorTestMode = process.env["OTP_TEST_MODE"];
     priorCommitSha = process.env["AUTOTM_COMMIT_SHA"];
     priorSmsDriver = process.env["SMS_DRIVER"];
+    if (!inject("apiTestDatabases")) throw new Error("Requires configured migrated disposable API PostgreSQL and Redis lane");
     delete process.env["OTP_TEST_MODE"];
     // The real adapter validates its serving candidate before taking the
     // namespace fence. Match the exact full-v3 fixture candidate and select
@@ -84,13 +84,14 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     request = supertest(app.getHttpServer());
   });
   afterAll(async () => {
-    await app?.close();
-    if (priorTestMode === undefined) delete process.env["OTP_TEST_MODE"];
-    else process.env["OTP_TEST_MODE"] = priorTestMode;
-    if (priorCommitSha === undefined) delete process.env["AUTOTM_COMMIT_SHA"];
-    else process.env["AUTOTM_COMMIT_SHA"] = priorCommitSha;
-    if (priorSmsDriver === undefined) delete process.env["SMS_DRIVER"];
-    else process.env["SMS_DRIVER"] = priorSmsDriver;
+    try { await app?.close(); } finally {
+      if (priorTestMode === undefined) delete process.env["OTP_TEST_MODE"];
+      else process.env["OTP_TEST_MODE"] = priorTestMode;
+      if (priorCommitSha === undefined) delete process.env["AUTOTM_COMMIT_SHA"];
+      else process.env["AUTOTM_COMMIT_SHA"] = priorCommitSha;
+      if (priorSmsDriver === undefined) delete process.env["SMS_DRIVER"];
+      else process.env["SMS_DRIVER"] = priorSmsDriver;
+    }
   });
 
   function execute(kind: "fixture" | "reset", id: string, options: { enabled?: string; candidate?: string; selectedProfile?: string; loseReceipt?: boolean } = {}) {
@@ -1705,7 +1706,11 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
           m.sms_hash,m.sms_schema_hash,m.sms_contract_hash,m.tracking_hash,m.schema_hash
           FROM "cf_${id}".campaign_sms_binding b CROSS JOIN "cf_${id}".campaign_manifest m`, requestId);
         const retained = await authority();
-        expect(retained).toHaveLength(1);
+        expect(retained).toMatchObject([{ binding: { reservation_id: id, candidate, destination: phone,
+          business_id: admitted.businessId, owner_id: owner.user.id }, ledger: { request_id: requestId,
+          reservation_id: id, candidate, destination: phone, business_id: admitted.businessId, owner_id: owner.user.id,
+          purpose: "listing_contact_phone", code_hash: createHash("sha256").update(code.value).digest("hex"),
+          issue_row_hash: expect.stringMatching(/^[a-f0-9]{32}$/) } }]);
         const sink = () => rows<{ message: string }>(`SELECT message FROM "cf_${id}".campaign_sms_sink WHERE request_id=$1`, requestId);
         expect(await sink()).toEqual([]);
         log = vi.spyOn(Logger.prototype, "log").mockImplementation(() => {});
@@ -1766,7 +1771,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
         // Reset-first invokes this exact generated reserve result for the first
         // time only after disposal. Sender-first also checks its delayed retry.
         await expect(sender.send(sms)).rejects.toThrow("Campaign SMS delivery refused");
-        expect(log).not.toHaveBeenCalled();
+        expect(log.mock.calls.length, "campaign send must never reach code/provider logging").toBe(0);
         expect(await sink()).toEqual([]);
         expect(await queue.getJob(requestId)).toBeUndefined();
         expect(await authority()).toEqual(retained);
