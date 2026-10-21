@@ -87,3 +87,86 @@ test('v3 reset redacts retained service audits exactly and disposes Support text
   // Preflight attributes composite read-state children by their own key.
   assert.ok(sql.includes(`WHEN $3=''service_read_states'' THEN jsonb_build_object(''conversationId'',to_jsonb(child)->>''conversationId'',''userId'',to_jsonb(child)->>''userId'')`));
 });
+
+const mediaBinding = { reservationId: 'f1'.repeat(16), namespace: `cf_${'f1'.repeat(16)}`, candidate: 'a'.repeat(40), profile: 'campaign897-full-v3' };
+const mediaDirectory = 'pending/12345678-1234-4234-8234-123456789abc/';
+const mediaKeys = ['original', 'thumbnail', 'list', 'detail', 'fullscreen'].map(name => `${mediaDirectory}${name}.webp`);
+const mediaLedger = mediaKeys.map(key => ({ object_key: key, upload_id: '12345678-1234-4234-8234-123456789def', bucket: 'listing-photos' }));
+
+async function disposeMedia({ ledger = mediaLedger, observeOnly = false, versioning, failDelete, present = new Set(mediaKeys), credentials = true } = {}) {
+  const source = readFileSync(new URL('./staging-campaign.mjs', import.meta.url), 'utf8').replaceAll('export function ', 'function ').replaceAll('export async function ', 'async function ');
+  const runtime = { exitCode: 0, env: { MINIO_ENDPOINT: 'http://localhost:9000', ...(credentials ? { MINIO_ACCESS_KEY: 'disposable', MINIO_SECRET_KEY: 'secret' } : {}) } };
+  const operations = [], logs = [];
+  class GetBucketVersioningCommand { constructor(input) { this.input = input; } }
+  class DeleteObjectCommand { constructor(input) { this.input = input; } }
+  class HeadObjectCommand { constructor(input) { this.input = input; } }
+  class S3Client {
+    async send(command) {
+      operations.push(command.constructor.name);
+      if (command instanceof GetBucketVersioningCommand) return { Status: versioning };
+      const key = command.input.Key;
+      if (command instanceof DeleteObjectCommand) {
+        if (key === failDelete) throw new Error('storage unavailable');
+        present.delete(key); return {};
+      }
+      if (!present.has(key)) throw { $metadata: { httpStatusCode: 404 } };
+      return {};
+    }
+    destroy() {}
+  }
+  const run = runInNewContext(`${source}; typeof campaignObjectMain === 'function' ? campaignObjectMain : undefined`, {
+    require: name => { assert.equal(name, '@aws-sdk/client-s3'); return { S3Client, GetBucketVersioningCommand, DeleteObjectCommand, HeadObjectCommand }; },
+    process: runtime, URL, AbortSignal, console: { log: value => logs.push(value) },
+  });
+  assert.equal(typeof run, 'function', 'serialized exact-key object disposer exists');
+  await run(ledger, observeOnly, mediaBinding);
+  return { code: runtime.exitCode, present: [...present], operations, logs };
+}
+
+test('reset deletes only the recorded complete manifest and proves exact absence', async () => {
+  const result = await disposeMedia();
+  assert.equal(result.code, 0);
+  assert.deepEqual(result.present, []);
+  assert.deepEqual(result.logs, ['{"objects":5,"absent":5}']);
+});
+
+test('reset refuses malformed or incomplete provenance before any storage operation', async () => {
+  for (const ledger of [mediaLedger.slice(1), [...mediaLedger, mediaLedger[0]], mediaLedger.map(row => ({ ...row, object_key: row.object_key.replace('pending/', 'foreign/') })), mediaLedger.map(row => ({ ...row, bucket: 'other' })), Array.from({ length: 641 }, () => mediaLedger[0])]) {
+    const result = await disposeMedia({ ledger });
+    assert.equal(result.code, 1);
+    assert.deepEqual(result.operations, []);
+    assert.deepEqual(result.present, mediaKeys);
+    assert.deepEqual(result.logs, []);
+  }
+});
+
+test('versioned storage and missing explicit credentials refuse deletion', async () => {
+  for (const options of [{ versioning: 'Enabled' }, { versioning: 'Suspended' }, { credentials: false }]) {
+    const result = await disposeMedia(options);
+    assert.equal(result.code, 1);
+    assert.deepEqual(result.present, mediaKeys);
+    assert.deepEqual(result.logs, []);
+  }
+});
+
+test('partial object failure produces no receipt and the same manifest can retry', async () => {
+  const present = new Set(mediaKeys);
+  const failed = await disposeMedia({ present, failDelete: mediaKeys[2] });
+  assert.equal(failed.code, 1);
+  assert.deepEqual(failed.logs, []);
+  assert.ok(present.size > 0 && present.size < 5);
+  const retried = await disposeMedia({ present });
+  assert.equal(retried.code, 0);
+  assert.deepEqual(retried.present, []);
+});
+
+test('terminal observation is read-only and refuses a resurrected object', async () => {
+  const absent = await disposeMedia({ observeOnly: true, present: new Set() });
+  assert.equal(absent.code, 0);
+  assert.ok(!absent.operations.includes('DeleteObjectCommand'));
+  const resurrected = await disposeMedia({ observeOnly: true, present: new Set([mediaKeys[4]]) });
+  assert.equal(resurrected.code, 1);
+  assert.deepEqual(resurrected.present, [mediaKeys[4]]);
+  assert.ok(!resurrected.operations.includes('DeleteObjectCommand'));
+  assert.deepEqual(resurrected.logs, []);
+});
