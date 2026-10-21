@@ -53,6 +53,20 @@ describe("business admission/membership/recovery through HTTP and disposable Pos
   try{await join("owner",invitation).expect(201);expect(await prisma.measurementState.findUnique({where:{key}})).toBeNull();}
   finally{await prisma.measurementState.deleteMany({where:{key:{in:[key,"collector"]}}});}
  });
+ it.each(["root", "admitted"])("refuses admission using an existing %s Dealership slug", async (kind) => {
+  const slug = suite.slugFor("occupied");
+  const businessId = kind === "root"
+   ? (await prisma.dealership.create({ data: { name: "Existing root Business", slug } })).id
+   : (await admit("owner", "occupied")).businessId;
+  const before = await prisma.dealership.findUniqueOrThrow({ where: { id: businessId } });
+  const refused = await post("/admission", "founder", {
+   name: "Another Business", slug, ownerUserId: suite.id("replacement"), mode: "synthetic", evidence: "Fixture only", reason: "Collision proof",
+  }).expect(409);
+  expect(refused.body.details.reason).toBe("MEMBERSHIP_CONFLICT");
+  expect(await prisma.dealership.findUniqueOrThrow({ where: { id: businessId } })).toEqual(before);
+  expect(await prisma.dealershipInvitation.count({ where: { dealershipId: businessId, recipientUserId: suite.id("replacement") } })).toBe(0);
+ });
+
  it("requires current scoped elevated admission authority and records truthful synthetic identity scope", async () => {
   const body = { name: "Business", slug: suite.slugFor("refused"), ownerUserId: suite.id("owner"), mode: "synthetic", evidence: "Fixture only", reason: "Contract proof" };
   await post("/admission", "other", body).expect(403);
@@ -127,6 +141,21 @@ describe("business admission/membership/recovery through HTTP and disposable Pos
   expect(await authority.authorize({ ...subject("sales"), businessId })).toMatchObject({ role: "sales", status: "active" });
   expect(await prisma.auditLog.findFirst({ where: { targetId: businessId, action: "BUSINESS_OWNER_RECOVERY" } })).toMatchObject({ actorId: suite.id("founder"), details: { reason: "Deleted sole owner" } });
  });
+ it("refuses owner recovery to a User who belongs to a different business", async () => {
+  const first = await active();
+  const second = await admit("owner2", "foreign");
+  await join("owner2", second).expect(201);
+  await post(`/${second.businessId}/recovery`, "founder", {
+   ownerUserId: suite.id("replacement"), evidence: "Existing owner proof", reason: "Must refuse foreign takeover",
+  }).expect(409);
+  await request.delete("/api/v1/me").set("authorization", `Bearer ${token("owner")}`).expect(204);
+  const refused = await post(`/${first.businessId}/recovery`, "founder", {
+   ownerUserId: suite.id("owner2"), evidence: "Foreign membership proof", reason: "Must refuse foreign business",
+  }).expect(409);
+  expect(refused.body.details.reason).toBe("MEMBERSHIP_CONFLICT");
+  expect((await current("owner2").expect(200)).body.workspace.business.id).toBe(second.businessId);
+ });
+
  it("requires explicit founder recovery and recipient consent before an existing Sales member becomes Owner", async () => {
   const { businessId } = await active();
   const invitation = (await post(`/${businessId}/invitations`, "owner", { recipientUserId: suite.id("sales") }).expect(201)).body; await join("sales", invitation).expect(201);
