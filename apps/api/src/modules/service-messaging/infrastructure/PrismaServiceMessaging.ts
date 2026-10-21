@@ -14,6 +14,7 @@ import { artifactRights, historyArtifactCommand } from "./history/PrismaHistoryA
 import { normalizeVin, HistoryDenied } from "../domain/history/HistoryPolicy";
 import { historyCommand } from "./history/PrismaHistoryOperations";
 import { cleanServiceBytes } from "./cleanServiceBytes";
+import { CampaignServiceAdmission, type CampaignServiceScope } from "./campaignServiceAdmission";
 
 type Tx = Prisma.TransactionClient;
 const graph = { supportCase: true, historyRequest: true } as const;
@@ -21,16 +22,26 @@ type Conversation = Prisma.ServiceConversationGetPayload<{ include: typeof graph
 const digest = (bytes: Uint8Array | string) => createHash("sha256").update(bytes).digest("hex");
 
 /** Every transport uses this transaction boundary. User/session locks fence
- * grant/deletion changes; owner/conversation locks fence handover and retries. */
+ * grant/deletion changes; owner/conversation locks fence handover and retries.
+ * Full-v3 campaign principals reach only Support text paths, after reservation admission. */
 @Injectable()
 export class PrismaServiceMessaging implements ServiceMessagingPort {
  constructor(@Inject(PrismaService) private readonly db: PrismaService,
   @Inject(STAFF_AUTHORITY_PORT) private readonly staff: StaffAuthorityPort,
   @Inject(SERVICE_PRIVATE_STORE) private readonly store: ServicePrivateStore,
-  @Inject(SERVICE_RUNTIME) private readonly runtime: ServiceRuntime) {}
+  @Inject(SERVICE_RUNTIME) private readonly runtime: ServiceRuntime,
+  @Inject(CampaignServiceAdmission) private readonly campaign: CampaignServiceAdmission) {}
 
- private async actor(tx: Tx, subject: ServiceSubject, purpose: ServiceMessagingSchemas.ServicePurpose): Promise<ServiceActor> {
-  if (!this.runtime.syntheticSubjectAllowed(subject)) throw new ServiceDenied("COLLECTION_DISABLED");
+ /** Only Support text callers pass `text`; every other path keeps the ordinary runtime gate alone. */
+ private async campaignScope(tx: Tx, subject: ServiceSubject, text: boolean) {
+  return text && !this.runtime.syntheticSubjectAllowed(subject) ? this.campaign.begin(tx, subject) : null;
+ }
+ private async actor(tx: Tx, subject: ServiceSubject, purpose: ServiceMessagingSchemas.ServicePurpose, campaign?: { scope: CampaignServiceScope | null; conversationId?: string; peerId?: string | undefined }): Promise<ServiceActor> {
+  if (!this.runtime.syntheticSubjectAllowed(subject)) {
+   if (!campaign?.scope || purpose !== "support" || !await this.campaign.admit(tx, campaign.scope, subject)) throw new ServiceDenied("COLLECTION_DISABLED");
+   // The principal is admitted; a conversation or peer outside its reservation is ordinary NO_ACCESS.
+   if ((campaign.conversationId || campaign.peerId) && !await this.campaign.admit(tx, campaign.scope, subject, { conversationId: campaign.conversationId, peerId: campaign.peerId })) throw new ServiceDenied("NO_ACCESS");
+  }
   await tx.$queryRaw`SELECT id FROM users WHERE id = ${subject.userId} FOR UPDATE`;
   await tx.$queryRaw`SELECT id FROM sessions WHERE id = ${subject.sessionId} FOR UPDATE`;
   const [user, session] = await Promise.all([tx.user.findUnique({ where: { id: subject.userId } }), tx.session.findUnique({ where: { id: subject.sessionId } })]);
@@ -39,8 +50,9 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
   catch (error) { if (!(error instanceof StaffAuthorityDenied)) throw error; }
   return { ...subject, sessionValid: !!user && !!session && session.userId === subject.userId && session.expiresAt > this.runtime.now(), deleting: !!user?.deletionScheduledAt, suspended: !!user?.suspendedAt, staffAuthorized };
  }
- private async locked<T>(subject: ServiceSubject, id: string, action: ServiceAction, work: (tx: Tx, row: Conversation, scope: ServiceScope, actor: ServiceActor, audience: "customer" | "staff") => Promise<T>, otherPrincipal?: string): Promise<T> {
+ private async locked<T>(subject: ServiceSubject, id: string, action: ServiceAction, work: (tx: Tx, row: Conversation, scope: ServiceScope, actor: ServiceActor, audience: "customer" | "staff") => Promise<T>, otherPrincipal?: string, text = false): Promise<T> {
   return this.db.$transaction(async tx => {
+   const campaign = await this.campaignScope(tx, subject, text);
    // Lock principal first, the order used by Identity's deletion/grant writers.
    await tx.$queryRaw`SELECT id FROM users WHERE id IN (${subject.userId}, ${otherPrincipal ?? subject.userId}) ORDER BY id FOR UPDATE`;
    const initial = await tx.serviceConversation.findUnique({ where: { id }, include: graph });
@@ -52,7 +64,7 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
    const owner = row.supportCase ?? row.historyRequest;
    if (!owner || (row.purpose !== "support" && row.purpose !== "history")) throw new ServiceDenied("NO_ACCESS");
    const scope: ServiceScope = { purpose: row.purpose, conversationId: id, resourceId: owner.id, customerId: owner.customerId, assigneeId: owner.assigneeId, assignmentVersion: owner.assignmentVersion, lifecycleEpoch: row.lifecycleEpoch, erased: row.erasedAt !== null };
-   const actor = await this.actor(tx, subject, scope.purpose);
+   const actor = await this.actor(tx, subject, scope.purpose, { scope: campaign, conversationId: id, peerId: otherPrincipal });
    const audience = assertServiceAccess(scope, actor, action === "file" ? "read" : action);
    if (audience === "staff") await tx.serviceAudit.create({ data: { actorId: subject.userId, purpose: row.purpose, resourceId: owner.id, action: `SERVICE_${action.toUpperCase()}`, assignmentVersion: owner.assignmentVersion } });
    return work(tx, row, scope, actor, audience);
@@ -163,12 +175,16 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
   });
  }
  async open(subject: ServiceSubject, purpose: ServiceMessagingSchemas.ServicePurpose, sourceListingId?: string, proposedVin?: string) {
-  if (!this.runtime.syntheticEnabled()) throw new ServiceDenied("COLLECTION_DISABLED");
+  // Support may still be admitted by a campaign reservation inside the transaction.
+  if (!this.runtime.syntheticEnabled() && purpose !== "support") throw new ServiceDenied("COLLECTION_DISABLED");
   return this.db.$transaction(async tx => {
-   const actor = await this.actor(tx, subject, purpose);
+   const campaign = await this.campaignScope(tx, subject, purpose === "support");
+   const actor = await this.actor(tx, subject, purpose, { scope: campaign });
    if (!actor.sessionValid || actor.deleting) throw new ServiceDenied("NO_ACCESS");
    if (purpose === "support") {
     const prior = await tx.supportCase.findUnique({ where: { customerId: subject.userId }, include: { conversation: true } });
+    // A campaign principal never adopts a case its reservation did not journal.
+    if (prior?.conversation && campaign && !this.runtime.syntheticSubjectAllowed(subject) && !await this.campaign.admit(tx, campaign, subject, { conversationId: prior.conversation.id })) throw new ServiceDenied("COLLECTION_DISABLED");
     if (prior?.conversation && !prior.conversation.erasedAt) return { id: prior.conversation.id, resourceId: prior.id };
    }
    if (sourceListingId && !await tx.listing.findUnique({ where: { id: sourceListingId }, select: { id: true } })) throw new ServiceDenied("NO_ACCESS");
@@ -195,7 +211,7 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
    ]);
    const owner = row.supportCase ?? row.historyRequest;
    return { id, resourceId: scope.resourceId, purpose: scope.purpose, status: owner?.status ?? "unavailable", assignmentVersion: scope.assignmentVersion, assigned: scope.assigneeId !== null, operatorName: assigned ? assigned.displayName ?? `#${assigned.nameNumber}` : null, sourceListingId: owner?.sourceListingId ?? null, canSend: true, support: row.supportCase ? { unansweredSince: row.supportCase.unansweredSince?.toISOString() ?? null, awaitingCustomerSince: row.supportCase.awaitingCustomerSince?.toISOString() ?? null, investigation: row.supportCase.investigationState === "active", category: this.supportState(row.supportCase).category, escalatedAt: row.supportCase.escalatedAt?.toISOString() ?? null, staffedElapsedMs: row.supportCase.unansweredSince ? staffedMilliseconds(row.supportCase.unansweredSince, this.runtime.now()) : 0, overdue: !!row.supportCase.unansweredSince && staffedMilliseconds(row.supportCase.unansweredSince, this.runtime.now()) >= 4 * 3600000 } : null, messages: messages.slice(0, limit).map(message => this.messageDto(message, scope.purpose, audience === "staff")), lastSequence: row.lastSequence, readThrough: state?.lastSequence ?? 0, peerReadThrough: peerState?.lastSequence ?? 0, unread, hasMore: messages.length > limit };
-  });
+  }, undefined, true);
  }
  private messageDto(row: Prisma.ServiceMessageGetPayload<{ include: { attachment: true; sender: { select: { displayName: true; nameNumber: true } } } }>, purpose: ServiceMessagingSchemas.ServicePurpose, staffViewer = false): ServiceMessagingSchemas.ServiceMessage {
   return { id: row.id, clientMessageId: row.clientMessageId, sequence: row.sequence, sender: row.senderKind === "customer" ? "customer" : purpose === "support" ? "carberk" : "operator", operatorName: row.senderKind === "staff" && (purpose === "history" || staffViewer) && row.sender ? row.sender.displayName ?? `#${row.sender.nameNumber}` : null, visibility: row.visibility === "staff" ? "staff" : "customer", body: row.body, createdAt: row.createdAt.toISOString(), attachment: row.attachment && !row.attachment.removedAt ? { id: row.attachment.id, contentType: row.attachment.contentType, filename: row.attachment.filename, sizeBytes: row.attachment.sizeBytes ?? 0 } : null };
@@ -225,7 +241,7 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
    const saved = await tx.serviceMessage.create({ data: { id: this.runtime.id(), conversationId: id, sequence: updated.lastSequence, clientMessageId: message.clientMessageId, senderId: subject.userId, senderKind: audience, visibility: message.visibility, body: message.body?.trim() || null, attachmentId: message.attachmentId ?? null, requestHash: hash }, include: { attachment: true, sender: { select: { displayName: true, nameNumber: true } } } });
    await tx.serviceOutbox.create({ data: { id: this.runtime.id(), conversationId: id, eventType: "message", sequence: saved.sequence, visibility: message.visibility, lifecycleEpoch: scope.lifecycleEpoch } });
    return this.messageDto(saved, scope.purpose, audience === "staff");
-  });
+  }, undefined, !message.attachmentId);
  }
  private supportState(row: Prisma.SupportCaseGetPayload<Record<string, never>>): SupportState {
   return { status: row.status === "closed" ? "closed" : "open", closedAt: row.closedAt, unansweredSince: row.unansweredSince, awaitingCustomerSince: row.awaitingCustomerSince, investigation: row.investigationState === "active", category: row.priority === "exposure" || row.priority === "account" ? row.priority : "ordinary", escalatedAt: row.escalatedAt };
@@ -261,14 +277,14 @@ export class PrismaServiceMessaging implements ServiceMessagingPort {
    await tx.serviceAudit.create({ data: { actorId: subject.userId, purpose: scope.purpose, resourceId: scope.resourceId, action: "SERVICE_HANDOVER", targetStaffId: target, assignmentVersion: expectedVersion + 1 } });
    const updated = await tx.serviceConversation.update({ where: { id }, data: { lastSequence: { increment: 1 } } });
    await tx.serviceOutbox.create({ data: { id: this.runtime.id(), conversationId: id, eventType: "handover", sequence: updated.lastSequence, visibility: "customer", lifecycleEpoch: scope.lifecycleEpoch } });
-  }, targetUserId);
+  }, targetUserId, true);
  }
  async markRead(subject: ServiceSubject, id: string, throughSequence: number) {
   await this.locked(subject, id, "read", async (tx, row) => {
    const through = Math.min(throughSequence, row.lastSequence);
    await tx.serviceReadState.upsert({ where: { conversationId_userId: { conversationId: id, userId: subject.userId } }, create: { conversationId: id, userId: subject.userId, lastSequence: through }, update: {} });
    await tx.serviceReadState.updateMany({ where: { conversationId: id, userId: subject.userId, lastSequence: { lt: through } }, data: { lastSequence: through } });
-  });
+  }, undefined, true);
  }
  async stage(subject: ServiceSubject, id: string, upload: ServiceMessagingSchemas.ServiceStageAttachment) {
   return this.locked(subject, id, upload.visibility === "staff" ? "note" : "send", async (tx, _row, scope, _actor, audience) => {
