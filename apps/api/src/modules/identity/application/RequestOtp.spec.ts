@@ -125,6 +125,7 @@ describe("RequestOtp", () => {
     expect(repo.records[0]!.expiresAt).toEqual(new Date(START.getTime() + 5 * 60_000));
     expect(repo.records[0]!.codeHash).toMatch(/^[a-f0-9]{64}$/);
     expect(sms.sent).toEqual([{
+        smsDelivery: { kind: "ordinary" },
       phone: "+99361234567",
       code: expect.stringMatching(/^\d{6}$/),
       purpose: "sign-in",

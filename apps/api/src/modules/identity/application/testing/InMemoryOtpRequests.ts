@@ -52,7 +52,7 @@ export class InMemoryOtpRequests implements OtpRequestRepository {
       destination: destination.value, expiresAt: destination.expiresAt(now) });
     const admitted = { ...record, createdAt: now };
     this.records[this.records.indexOf(record)] = admitted;
-    return { record: admitted, resendInSeconds: rateCheck.resendInSeconds };
+    return { record: admitted, resendInSeconds: rateCheck.resendInSeconds, smsDelivery: { kind: "ordinary" } };
   }
 
   async create(input: {

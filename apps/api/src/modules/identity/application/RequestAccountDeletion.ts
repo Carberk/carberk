@@ -64,7 +64,7 @@ export class RequestAccountDeletion {
       : await this.userRepo.findByEmail(destination.value);
 
     const code = OtpCode.generate();
-    const { record, resendInSeconds } = await this.otpRequestRepo.reserve({
+    const { record, resendInSeconds, smsDelivery } = await this.otpRequestRepo.reserve({
       purpose: Enums.SignInCodePurpose.AccountDeletion,
       destination,
       codeHash: createHash("sha256").update(code.value).digest("hex"),
@@ -74,6 +74,7 @@ export class RequestAccountDeletion {
 
     if (destination.channel === SIGN_IN_CODE_CHANNELS.PHONE) {
       await this.otpSender.send({
+        smsDelivery,
         phone: destination.value,
         code: code.value,
         purpose: Enums.SignInCodePurpose.AccountDeletion,

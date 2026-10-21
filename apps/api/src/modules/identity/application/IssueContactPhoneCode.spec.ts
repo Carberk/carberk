@@ -55,6 +55,7 @@ describe("IssueContactPhoneCode", () => {
 
     expect(sms).toEqual([
       {
+        smsDelivery: { kind: "ordinary" },
         phone: PHONE,
         code: result.testCode,
         purpose: "listing-contact-phone",

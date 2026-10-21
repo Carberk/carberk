@@ -99,6 +99,7 @@ describe("RequestAccountDeletion", () => {
       expiresAt: new Date(NOW.getTime() + 5 * 60_000),
     });
     expect(sms).toEqual([{
+        smsDelivery: { kind: "ordinary" },
       phone: "+99361234567",
       code: result.testCode,
       purpose: "account-deletion",
