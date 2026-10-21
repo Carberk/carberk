@@ -4,6 +4,10 @@ Bounded #901 recovery handoff from published base `2e4b5a091788a97107a0e6a2b630b
 
 The hosted RED is DB job `119417651775`, PR checks `39656347576`, on candidate `2e4b5a09`. Raw log SHA-256 is `41e1a2667eb018600ae5f2f72c105b25f3fa0dc76e23cfa267c0fb09e0d86a3d`. It reports 39/40 files and 386/387 tests passing. All three old reset oracles pass unchanged. In the new interrupted oracle, initial completion, pending-without-marker refusal, actual Lua effect, dropped response, exact permanent completed marker, empty post-state, immutable rows and preservation all pass. The sole RED is line 396: recovery returns `Clean reset refused: Redis completion authority changed or pending`.
 
+## Observed hosted GREEN
+
+On assembled candidate `2b00c38ec28d6180d4fd32ccc248e8735dd44d53`, PR Checks `39660947360`, DB job `119433585275` passes all 40 files and 387 tests, including interrupted recovery and its negative controls. The [exact receipt](prelaunch-hosted-receipt-2b00c38e-20261021.md) preserves attribution, hashes and remaining reset gates. Actual process-restart continuity is separate pending evidence. Earlier RED and offline-only claims below describe this writer's original checkpoint.
+
 ## Diagnosis and source change
 
 The source rejected every non-empty `redis_state` unless it was already a completed record. That made the actual pending PostgreSQL row fail before the program inspected the real completed marker.

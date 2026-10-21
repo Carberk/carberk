@@ -2,6 +2,10 @@
 
 Test-only preparation for #914 within #897 through sole integration PR #904. Base `2e4b5a091788a97107a0e6a2b630b33581de2535`. Reservation branch `agent/issue-914-private-proof-issuance-red-20261021` was created and pushed at that exact base before edits. The host supplied isolated worktree `/Users/bagtyyar/.t3/worktrees/carberk/t3-086cbd3b`; its unchanged scaffold branch was `t3/private-proof-issuance-red-test` at the same base. Root is the sole assembler. No new PR, nested agent, product source, schema, contract or existing-suite change belongs to this checkpoint.
 
+## Observed hosted result
+
+On assembled candidate `2b00c38ec28d6180d4fd32ccc248e8735dd44d53`, PR Checks `39660947360`, API job `119433585642`, the new suite reaches line 276 after its real HTTP/storage setup and receives 404 instead of expected 201 from the absent issuance route. This is now actual intended RED. Later proof/read/audit assertions remain unreached. The [exact hosted receipt](../issue-901/prelaunch-hosted-receipt-2b00c38e-20261021.md) records counts, raw-log hashes, retained failures and limits. Preparation and predicted results below remain historical evidence.
+
 ## Authority and entry evidence
 
 Read the full supplied `/tmp/issue-914-proof-issuance-next-red-plan.md`, accepted [ADR-0108](../../adr/0108-pair-bound-diagnostic-reinspection-continuity-proof.md), [next RED contract](diagnostic-pair-proof-next-red-contract-20261021.md), [classified capture contract](diagnostic-identity-evidence-capture-contract-20261021.md), owning overview, glossary, current intake/reports/evidence/authority composition and existing HTTP fixtures. ADR-0108 option 1 is founder approved. The overview and existing source remain unchanged.
