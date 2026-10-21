@@ -17,7 +17,7 @@ import { GlobalErrorFilter } from "../../../common/error.filter";
 import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
 import { IDENTITY_CLOCK_PORT } from "../../identity/identity.public";
 import { DiagnosticsModule } from "../diagnostics.module";
-import { DIAGNOSTIC_RUNTIME } from "../domain/ports/DiagnosticIntakePort";
+import { DIAGNOSTIC_RUNTIME, type DiagnosticRuntime } from "../domain/ports/DiagnosticIntakePort";
 import { DIAGNOSTIC_OBJECTS, type DiagnosticObjects } from "../domain/ports/DiagnosticObjects";
 import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
 import { cleanSuiteFixtures, defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
@@ -263,6 +263,99 @@ describe("diagnostic authoring and immutable audience release", () => {
     await publicGet(`listings/${suite.id("public-car")}`).expect(404);
     await publicGet(`reports/${report.id}`).expect(404);
     expect((await get("buyer", `reports/${report.id}`).expect(200)).body.status).toBe("withdrawn");
+  });
+  /** One commissioner, one Listing and one matching VIN across two physical visits.
+   * Each visit has its own intake, consent, arrival, observation and template pin. */
+  const vin = "SYNTHVIN000000914";
+  async function arrive(templateVersionId: string, audience: "buyer_private" | "listing_public", observedAt: Date, mileageKm: number) {
+    let { body: order } = await post("buyer", "orders", { requestKey: randomUUID(), centerId, templateVersionId, audience, listingId: suite.id("public-car"), synthetic: true }).expect(201);
+    for (const who of ["technician", "reviewer"] as const) ({ body: order } = await post("reception", `orders/${order.id}/assignments`, { expectedVersion: order.version, userId: suite.id(who), capability: capability[who], active: true }).expect(201));
+    ({ body: order } = await post("reception", `orders/${order.id}/authorization`, { expectedVersion: order.version, kind: "physical", authorityReference: `Synthetic visit authorization ${observedAt.toISOString()}` }).expect(201));
+    if (audience === "listing_public") ({ body: order } = await post("reception", `orders/${order.id}/authorization`, { expectedVersion: order.version, kind: "publication", authorityReference: `Synthetic public consent ${observedAt.toISOString()}` }).expect(201));
+    for (const state of ["confirmed", "arrived"]) ({ body: order } = await post("reception", `orders/${order.id}/appointment`, { expectedVersion: order.version, state }).expect(201));
+    ({ body: order } = await post("technician", `orders/${order.id}/vehicle`, { expectedVersion: order.version, observedAt: observedAt.toISOString(), mileageKm, method: "vin", vin, manualReference: null }).expect(201));
+    return order;
+  }
+  it("releases a public reinspection from a new physical visit without inheriting findings, evidence or the old snapshot", async () => {
+    const earlier = new Date("2026-09-18T00:00:00.000Z"); const later = new Date("2026-10-25T00:00:00.000Z");
+    const publicGet = (path: string) => request.get(`/api/v1/public-diagnostics/${path}`);
+    await seedSuiteCatalog(db, suite);
+    await db.listing.create({ data: { id: suite.id("public-car"), sellerId: suite.id("buyer"), brandId: suite.catalog.brandId, modelId: suite.catalog.modelId, cityId: suite.catalog.cityId, status: "active", vin, priceAmount: 100000, priceTmt: 100000, priceCurrency: "TMT" } });
+    await db.staffGrant.create({ data: { userId: suite.id("reception"), capability: "diagnostics.templates" } });
+    await db.diagnosticCenterAssignment.create({ data: { centerId, userId: suite.id("reception"), capability: "diagnostics.templates", qualifiedUntil: future } });
+    const { body: firstTemplate } = await post("reception", `centers/${centerId}/templates`, { expectedVersion: 0, definition, synthetic: true }).expect(201);
+
+    // Predecessor visit: released publicly with real sanitized evidence.
+    const firstOrder = await arrive(firstTemplate.id, "listing_public", earlier, 118000);
+    const { body: first } = await post("technician", `orders/${firstOrder.id}/reports`, { reportId: randomUUID(), expectedOrderVersion: firstOrder.version }).expect(201);
+    const worn = { ...normal(), assessment: "fault", explanation: "Observed synthetic brake wear", evidenceIds: [randomUUID()] };
+    const image = await sharp({ create: { width: 4, height: 4, channels: 3, background: "red" } }).jpeg().toBuffer();
+    await request.put(`/api/v1/diagnostics/reports/${first.id}/evidence/${worn.evidenceIds[0]}?findingId=${worn.id}&expectedVersion=0`).set(headers("technician")).set("content-type", "application/octet-stream").set("x-evidence-type", "image/jpeg").send(image).expect(200);
+    await post("technician", `reports/${first.id}/findings`, { expectedVersion: 0, finding: worn }).expect(201);
+    await post("technician", `reports/${first.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
+    await post("reviewer", `reports/${first.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    const released = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: first.id } });
+    const releasedArtifacts = await db.diagnosticPdfArtifact.findMany({ where: { reportId: first.id }, orderBy: { locale: "asc" } });
+    expect((await publicGet(`listings/${suite.id("public-car")}`).expect(200)).body.reportId).toBe(first.id);
+
+    // A later visit under a newer template: the only route to the new draft is the reinspection link.
+    const reinspectionDefinition = { ...definition, title: { tk: "Gaýtadan", ru: "Повторная", en: "Reinspection" } };
+    const { body: secondTemplate } = await post("reception", `centers/${centerId}/templates`, { expectedVersion: 1, definition: reinspectionDefinition, synthetic: true }).expect(201);
+    const clock = vi.spyOn(app.get<DiagnosticRuntime>(DIAGNOSTIC_RUNTIME), "now").mockReturnValue(later);
+    try {
+      const secondOrder = await arrive(secondTemplate.id, "listing_public", later, 123500);
+      const reason = "Scheduled reinspection after brake service";
+      const created = await post("technician", `orders/${secondOrder.id}/reinspections`, { reportId: randomUUID(), predecessorId: first.id, expectedOrderVersion: secondOrder.version, reason }).expect(201);
+      const reinspection = created.body;
+      expect(created.headers["cache-control"]).toContain("no-store");
+      expect(reinspection).toMatchObject({ orderId: secondOrder.id, audience: "listing_public", status: "draft", templateVersionId: secondTemplate.id,
+        observedAt: later.toISOString(), mileageKm: 123500, findings: [], authorId: suite.id("technician"), reviewerId: null, successorOf: first.id,
+        correctionReason: reason, finalizedAt: null, template: reinspectionDefinition, supersededBy: null });
+
+      // Current order authority: assigned non-authors, the commissioner and outsiders cannot link a visit.
+      for (const who of ["reception", "reviewer", "buyer", "other", "admin"] as const) {
+        await post(who, `orders/${secondOrder.id}/reinspections`, { reportId: randomUUID(), predecessorId: first.id, expectedOrderVersion: secondOrder.version, reason }).expect(403);
+      }
+      expect((await get("technician", `orders/${secondOrder.id}/reports`).expect(200)).body.map((item: { id: string }) => item.id)).toEqual([reinspection.id]);
+      // An unreleased reinspection does not displace the current public release.
+      expect((await publicGet(`listings/${suite.id("public-car")}`).expect(200)).body.reportId).toBe(first.id);
+      await publicGet(`reports/${reinspection.id}`).expect(404);
+
+      // Prior-visit evidence never carries across orders, even under its original finding identity.
+      const inherited = await post("technician", `reports/${reinspection.id}/findings`, { expectedVersion: 0, finding: worn }).expect(400);
+      expect(inherited.body.code).toBe("REPORT_EVIDENCE_UNAVAILABLE");
+      expect((await get("technician", `reports/${reinspection.id}`).expect(200)).body).toMatchObject({ version: 0, findings: [] });
+
+      const serviced = normal();
+      await post("technician", `reports/${reinspection.id}/findings`, { expectedVersion: 0, finding: serviced }).expect(201);
+      await post("technician", `reports/${reinspection.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
+      await post("technician", `reports/${reinspection.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(403);
+      await post("reviewer", `reports/${reinspection.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+
+      const availability = await publicGet(`listings/${suite.id("public-car")}`).expect(200);
+      expect(availability.body).toEqual({ listingId: suite.id("public-car"), reportId: reinspection.id, observedAt: later.toISOString(), mileageKm: 123500, synthetic: true });
+      expect((await publicGet(`reports/${reinspection.id}`).expect(200)).body).toMatchObject({ id: reinspection.id, status: "finalized", observedAt: later.toISOString(),
+        mileageKm: 123500, findings: [serviced], successorOf: first.id, templateVersionId: secondTemplate.id, template: reinspectionDefinition, supersededBy: null });
+      expect((await publicGet(`reports/${first.id}`).expect(200)).body).toMatchObject({ id: first.id, observedAt: earlier.toISOString(), mileageKm: 118000,
+        findings: [worn], templateVersionId: firstTemplate.id, template: definition, supersededBy: reinspection.id });
+      const unchanged = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: first.id } });
+      expect(unchanged.snapshot).toEqual(released.snapshot); expect(unchanged.snapshotHash).toBe(released.snapshotHash);
+      expect(await db.diagnosticPdfArtifact.findMany({ where: { reportId: first.id }, orderBy: { locale: "asc" } })).toEqual(releasedArtifacts);
+      const newArtifacts = await db.diagnosticPdfArtifact.findMany({ where: { reportId: reinspection.id }, orderBy: { locale: "asc" } });
+      expect(newArtifacts.map(row => [row.locale, row.state])).toEqual([["en", "pending"], ["ru", "pending"], ["tk", "pending"]]);
+      expect(newArtifacts.some(row => row.snapshotHash === released.snapshotHash)).toBe(false);
+
+      // Audience is never crossed: a private visit by the same commissioner on the same car cannot link a public release.
+      const privateOrder = await arrive(secondTemplate.id, "buyer_private", later, 123600);
+      await post("technician", `orders/${privateOrder.id}/reinspections`, { reportId: randomUUID(), predecessorId: reinspection.id, expectedOrderVersion: privateOrder.version, reason }).expect(403);
+      expect((await get("technician", `orders/${privateOrder.id}/reports`).expect(200)).body).toEqual([]);
+
+      // Withdrawal removes the badge and reader with no fallback to the older favorable release.
+      await post("reviewer", `reports/${reinspection.id}/transition`, { expectedVersion: 3, action: "withdraw", reason: "Synthetic reinspection dispute" }).expect(201);
+      await publicGet(`listings/${suite.id("public-car")}`).expect(404);
+      await publicGet(`reports/${reinspection.id}`).expect(404);
+      expect((await get("buyer", `reports/${reinspection.id}`).expect(200)).body.status).toBe("withdrawn");
+    } finally { clock.mockRestore(); }
   });
   it("does not disclose private reports through anonymous known IDs or artifacts", async () => {
     const { report } = await draft();
