@@ -1,9 +1,13 @@
 // S2A remote program for the prelaunch clean reset (#901). It validates the
 // fixed command and in-container identity, then inventories PostgreSQL and,
 // for `rows`, truncates the S1 plan's exact disposable tables in one
-// transaction. It makes no Redis, object or platform call. The operator CLI
-// remains default closed.
+// transaction. `redis-inventoried` is a separate read-only Redis observation
+// before any PostgreSQL access; the `redis` deletion phase always refuses until
+// a durable completion receipt exists. It makes no object or platform call.
+// The operator CLI remains default closed.
 import { readFileSync } from 'node:fs';
+
+import { QUEUES } from './staging-clean-reset.mjs';
 
 const text = name => readFileSync(new URL(name, import.meta.url), 'utf8');
 const manifest = JSON.parse(text('./staging-clean-reset.tables.json'));
@@ -14,13 +18,24 @@ const planner = s1.replace(/^export (?=(?:const|function) )/gm, '');
 if (/\bimport\b|\brequire\s*\(/.test(s1) || /^export\b/m.test(planner) || !/^function planTables\(/m.test(planner))
   throw new Error('Clean reset planner source must stay pure');
 const plannerProgram = `(() => { 'use strict';\n${planner}\nreturn planTables; })()`;
+// The operator CLI's pinned staging target (scripts/staging.mjs). Redis phases compare
+// the caller's claims with it; a claimed worker ID alone is no attestation.
+const STAGING = { projectId: '176ddec0-dd65-4087-b82c-798599fc2ebe', environmentId: '652abc79-fdb0-48b0-9f6c-ad0ff572d7b2',
+  services: { api: '6db6f1b1-5c7a-4033-88d0-53f5f315bfc0', worker: '24aa02e0-25a9-4e80-9cc2-c1795ef82091' }, redis: 'redis://redis.railway.internal:6379/0' };
 
 /** Serialized into one fixed remote Node process. There is no arbitrary shell/SQL input. */
 export function cleanResetProgram(payload) {
-  return `(${cleanResetMain.toString()})(${JSON.stringify(payload)}, ${JSON.stringify(manifest)}, ${plannerProgram})`;
+  return `(${cleanResetMain.toString()})(${JSON.stringify(payload)}, ${JSON.stringify(manifest)}, ${plannerProgram}, ` +
+    `${cleanResetRedis.toString()}, ${JSON.stringify({ ...STAGING, queues: QUEUES })})`;
 }
 
-function cleanResetMain(input, manifest, planTables) {
+function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
+  const report = error => {
+    const message = typeof error?.message === 'string' && /^Clean reset (refused: .+|executor not implemented)$/.test(error.message)
+      ? error.message : 'Clean reset refused or incomplete; diagnostics suppressed';
+    console.error(message);
+    process.exitCode = 1;
+  };
   try {
     const refuse = () => { throw new Error('Clean reset refused: target'); };
     const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -29,15 +44,19 @@ function cleanResetMain(input, manifest, planTables) {
     // Strict strings only: arrays and numbers must never coerce into an identity.
     const text = pattern => value => typeof value === 'string' && pattern.test(value);
     const id = text(/^[a-zA-Z0-9-]{1,80}$/); const hex32 = text(/^[a-f0-9]{32}$/); const hex64 = text(/^[a-f0-9]{64}$/); const sha = text(/^[a-f0-9]{40}$/);
-    const keys = { inventoried: ['operation', 'phase', 'operationId', 'reservationId', 'candidate', 'identity'],
-      rows: ['operation', 'phase', 'operationId', 'reservationId', 'candidate', 'identity', 'expectedInventory'] };
+    const base = ['operation', 'phase', 'operationId', 'reservationId', 'candidate', 'identity'];
+    // `redis-inventoried` is a remote transport selector, not an S1 ledger phase.
+    const keys = { inventoried: base, rows: [...base, 'expectedInventory'], 'redis-inventoried': base, redis: [...base, 'expectedInventory'] };
     if (!record(input) || typeof input.phase !== 'string' || !Object.hasOwn(keys, input.phase) || !exact(input, keys[input.phase]) ||
         input.operation !== 'clean-reset' || !hex32(input.operationId) || !hex32(input.reservationId) || !sha(input.candidate)) refuse();
+    const redisPhase = input.phase === 'redis-inventoried' || input.phase === 'redis';
     // The digest binds schema definitions (tables, triggers, FKs), retained contents and disposable contents.
     if (input.phase === 'rows' && (!exact(input.expectedInventory, ['schema', 'retained', 'disposable']) ||
         !['schema', 'retained', 'disposable'].every(part => hex64(input.expectedInventory[part])))) refuse();
+    if (input.phase === 'redis' && (!exact(input.expectedInventory, ['digest']) || !hex64(input.expectedInventory.digest))) refuse();
     const p = input.identity;
-    if (!exact(p, ['projectId', 'environmentId', 'services', 'origins']) || !exact(p.services, ['api', 'worker']) || !exact(p.origins, ['database']) ||
+    if (!exact(p, ['projectId', 'environmentId', 'services', 'origins']) || !exact(p.services, ['api', 'worker']) ||
+        !exact(p.origins, redisPhase ? ['database', 'redis'] : ['database']) ||
         ![p.projectId, p.environmentId, p.services.api, p.services.worker].every(id) ||
         typeof p.origins.database !== 'string') refuse();
     const e = process.env;
@@ -48,6 +67,8 @@ function cleanResetMain(input, manifest, planTables) {
     if (!['postgres:', 'postgresql:'].includes(db.protocol) || db.hostname !== 'postgres.railway.internal' || db.search || db.hash) refuse();
     db.username = ''; db.password = '';
     if (db.toString().replace(/\/$/, '') !== p.origins.database) refuse();
+    // Redis phases never open PostgreSQL or start a subprocess.
+    if (redisPhase) return cleanResetRedis(input, staging, refuse).catch(report);
 
     const refused = message => { throw new Error(`Clean reset refused: ${message}`); };
     const parts = ['schema', 'retained', 'disposable'];
@@ -258,10 +279,131 @@ function cleanResetMain(input, manifest, planTables) {
     const after = digestOf(outcome.digest);
     if (after.schema !== expected.schema || after.retained !== expected.retained) refused('database operation failed');
     console.log(JSON.stringify({ ...bound, phase: 'rows', state: 'completed', digest: after }));
-  } catch (error) {
-    const message = typeof error?.message === 'string' && /^Clean reset (refused: .+|executor not implemented)$/.test(error.message)
-      ? error.message : 'Clean reset refused or incomplete; diagnostics suppressed';
-    console.error(message);
-    process.exitCode = 1;
+  } catch (error) { report(error); }
+}
+
+/**
+ * `redis-inventoried`: a redacted observation receipt, never a producer-closure attestation.
+ * `redis`: refused, because no durable completion receipt can bind a Redis deletion yet.
+ * Recognized state is derived from the application's Redis producers and the pinned
+ * BullMQ 5.76.8 key layout (QueueKeys, obliterate and removeJobKeys). Anything else in an
+ * application namespace refuses; keys outside those namespaces are foreign and untouched.
+ */
+async function cleanResetRedis(input, staging, refuse) {
+  const refused = message => { throw new Error(`Clean reset refused: ${message}`); };
+  const p = input.identity, e = process.env;
+  if (p.projectId !== staging.projectId || p.environmentId !== staging.environmentId || p.services.api !== staging.services.api ||
+      p.services.worker !== staging.services.worker || p.origins.redis !== staging.redis) refuse();
+  let url;
+  try { url = new URL(e.REDIS_URL); } catch { refuse(); }
+  const database = ['', '/'].includes(url.pathname) ? '0' : url.pathname.slice(1);
+  if (url.protocol !== 'redis:' || url.search || url.hash || `redis://${url.hostname}:${url.port || '6379'}/${database}` !== p.origins.redis) refuse();
+  if (input.phase === 'redis') refused('Redis completion receipt authority unavailable');
+
+  // Read-only, one-atomic-script Redis observation. The script is flagged no-writes, so Redis
+  // itself rejects any write; time is frozen inside it, so the snapshot is coherent. It walks
+  // every key but reads only the application namespaces; foreign keys are never read.
+  const script = `#!lua flags=no-writes
+local maxKeys, maxBytes, maxMembers, owned = tonumber(ARGV[1]), tonumber(ARGV[2]), tonumber(ARGV[3]), tonumber(ARGV[4])
+if redis.call('DBSIZE') > maxKeys then return {'limit'} end
+local sizes = { hash = 'HLEN', list = 'LLEN', set = 'SCARD', zset = 'ZCARD', stream = 'XLEN' }
+local bytes, members, entries, indexes = 0, 0, {}, {}
+for _, key in ipairs(redis.call('KEYS', '*')) do
+  for i = 5, 4 + owned do
+    if string.sub(key, 1, #ARGV[i]) == ARGV[i] then
+      local kind = redis.call('TYPE', key)['ok']
+      local count = -1
+      if kind == 'string' then count = 1 elseif sizes[kind] then count = redis.call(sizes[kind], key) end
+      local dump = redis.call('DUMP', key)
+      bytes = bytes + #key + #dump
+      if bytes > maxBytes then return {'limit'} end
+      entries[#entries + 1] = { key, kind, count, redis.call('PEXPIRETIME', key), dump }
+      break
+    end
+  end
+end
+for i = 5 + owned, #ARGV do
+  local kind, items = redis.call('TYPE', ARGV[i])['ok'], {}
+  if kind == 'list' or kind == 'zset' then
+    members = members + redis.call(sizes[kind], ARGV[i])
+    if members > maxMembers then return {'limit'} end
+    if kind == 'list' then items = redis.call('LRANGE', ARGV[i], 0, -1) else items = redis.call('ZRANGE', ARGV[i], 0, -1) end
+    for _, item in ipairs(items) do bytes = bytes + #item end
+    if bytes > maxBytes then return {'limit'} end
+  end
+  indexes[#indexes + 1] = items
+end
+return { 'ok', entries, indexes }`;
+
+  const queues = staging.queues;
+  const owned = ['bull:', 'identity:', 'email:', 'measurement:', 'operations:'];
+  const indexes = { wait: 'list', active: 'list', paused: 'list', delayed: 'zset', prioritized: 'zset', completed: 'zset', failed: 'zset',
+    'waiting-children': 'zset', repeat: 'zset' };
+  const fixed = { ...indexes, meta: 'hash', id: 'string', events: 'stream', marker: 'zset', stalled: 'set', 'stalled-check': 'string', limiter: 'string',
+    pc: 'string', 'metrics:completed': 'hash', 'metrics:failed': 'hash', 'metrics:completed:data': 'list', 'metrics:failed:data': 'list' };
+  const jobParts = { logs: 'list', lock: 'string', dependencies: 'set', processed: 'hash', failed: 'hash', unsuccessful: 'zset' };
+  const monitoring = ['snapshot', 'technical', 'incident', 'alert-receipt', 'smtp-alert-receipt'];
+  const indexKeys = queues.flatMap(queue => Object.keys(indexes).map(index => `bull:${queue}:${index}`));
+
+  const ioredis = require('ioredis');
+  const Redis = ioredis.Redis ?? ioredis;
+  const redis = new Redis(e.REDIS_URL, { lazyConnect: true, db: 0, connectTimeout: 10000, commandTimeout: 30000, maxRetriesPerRequest: 0,
+    enableOfflineQueue: false, retryStrategy: () => null, reconnectOnError: () => false });
+  // Client errors can name the endpoint; they are never forwarded.
+  redis.on('error', () => undefined);
+  let reply;
+  try {
+    await redis.connect();
+    reply = await redis.evalBuffer(script, 0, 50000, 64 * 1024 * 1024, 100000, owned.length, ...owned, ...indexKeys);
+  } catch { refused('Redis observation failed'); } finally { redis.disconnect(); }
+  if (!Array.isArray(reply) || String(reply[0]) !== 'ok') refused(String(reply?.[0]) === 'limit' ? 'Redis inventory bounds exceeded' : 'Redis observation failed');
+  const [, observed, lists] = reply;
+  if (!Array.isArray(observed) || !Array.isArray(lists) || lists.length !== indexKeys.length || !lists.every(Array.isArray)) refused('Redis observation failed');
+  const members = new Map(indexKeys.map((key, index) => [key, lists[index].map(String)]));
+  const jobs = new Map(queues.map(queue => [queue,
+    new Set(Object.keys(indexes).filter(index => index !== 'repeat').flatMap(index => members.get(`bull:${queue}:${index}`)))]));
+
+  const classify = (key, type) => {
+    const operations = /^operations:[a-z0-9-]{1,48}:([a-z-]+)$/.exec(key);
+    if (operations) return operations[1] === 'worker' ? 'producer' : monitoring.includes(operations[1]) && type === 'string' ? 'monitoring' : 'unknown';
+    const own = (pattern, expected) => pattern.test(key) && type === expected;
+    if (own(/^identity:reserved-phone-attempt:[a-f0-9]{64}$/, 'string') || own(/^email:daily-sends:\d{4}-\d{2}-\d{2}$/, 'set') ||
+        own(/^measurement:cap:v1:\d{1,16}:[A-Za-z0-9_-]{1,128}$/, 'string')) return 'entry';
+    const [, queue, suffix] = /^bull:([^:]+):(.+)$/s.exec(key) ?? [];
+    if (!queues.includes(queue)) return 'unknown';
+    // Campaign deduplication tombstones are retained only against a verified SQL ledger.
+    if (suffix.startsWith('de:')) return queue === 'email-code' && suffix.startsWith('de:campaign-') ? 'control' : 'unknown';
+    if (Object.hasOwn(fixed, suffix)) return fixed[suffix] === type ? 'entry' : 'unknown';
+    const ids = jobs.get(queue);
+    if (ids.has(suffix)) return type === 'hash' ? 'entry' : 'unknown';
+    const cut = suffix.lastIndexOf(':'), part = suffix.slice(cut + 1);
+    if (cut > 0 && ids.has(suffix.slice(0, cut)) && Object.hasOwn(jobParts, part)) return jobParts[part] === type ? 'entry' : 'unknown';
+    if (suffix.startsWith('repeat:') && members.get(`bull:${queue}:repeat`).includes(suffix.slice('repeat:'.length))) return type === 'hash' ? 'entry' : 'unknown';
+    return 'unknown';
+  };
+
+  const { createHash } = require('node:crypto');
+  const hash = value => createHash('sha256').update(value).digest('hex');
+  const found = new Set(), entries = [];
+  for (const item of observed) {
+    const [raw, type, count, expiresAt, dump] = Array.isArray(item) ? item : [];
+    if (!Buffer.isBuffer(raw) || !Buffer.isBuffer(dump) || !Number.isSafeInteger(count) || !Number.isSafeInteger(expiresAt) || expiresAt < -1)
+      refused('Redis observation failed');
+    const key = raw.toString('utf8');
+    const kind = Buffer.from(key, 'utf8').equals(raw) ? classify(key, String(type)) : 'unknown';
+    found.add(kind);
+    if (kind === 'entry') entries.push({ keyDigest: hash(raw), type: String(type), count, contentDigest: hash(dump), expiresAt });
   }
+  if (found.has('unknown')) refused('unknown Redis application state');
+  if (found.has('control')) refused('Redis control disposition unavailable');
+  const size = (queue, index) => members.get(`bull:${queue}:${index}`).length;
+  if (found.has('producer') || queues.some(queue => size(queue, 'active') > 0)) refused('Redis producer or active job present');
+
+  entries.sort((a, b) => a.keyDigest < b.keyDigest ? -1 : 1);
+  console.log(JSON.stringify({ operation: 'clean-reset', phase: 'redis-inventoried', operationId: input.operationId, reservationId: input.reservationId,
+    candidate: input.candidate, identity: p, state: 'observed', digest: hash(JSON.stringify(entries)),
+    queues: queues.map(name => ({ name, counts: { waiting: size(name, 'wait'), delayed: size(name, 'delayed'), completed: size(name, 'completed'),
+      failed: size(name, 'failed'), active: size(name, 'active'), paused: size(name, 'paused'), prioritized: size(name, 'prioritized'),
+      waitingChildren: size(name, 'waiting-children') }, repeatRecords: size(name, 'repeat') })),
+    entries }));
 }
