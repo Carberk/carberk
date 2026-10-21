@@ -45,13 +45,17 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
     const base = ['operation', 'phase', 'operationId', 'reservationId', 'candidate', 'identity'];
     // `redis-inventoried` is a remote transport selector, not an S1 ledger phase.
     const keys = { inventoried: base, rows: [...base, 'expectedInventory'], 'redis-inventoried': base, redis: [...base, 'expectedInventory', 'binding'] };
-    if (!record(input) || typeof input.phase !== 'string' || !Object.hasOwn(keys, input.phase) || !exact(input, keys[input.phase]) ||
+    const legacyRedis = record(input) && input.phase === 'redis' && exact(input, [...base, 'expectedInventory']) &&
+      exact(input.expectedInventory, ['digest']) && hex64(input.expectedInventory.digest);
+    if (!record(input) || typeof input.phase !== 'string' ||
+        !Object.hasOwn(keys, input.phase) ||
+        (!legacyRedis && !exact(input, keys[input.phase])) ||
         input.operation !== 'clean-reset' || !hex32(input.operationId) || !hex32(input.reservationId) || !sha(input.candidate)) refuse();
     const redisPhase = input.phase === 'redis-inventoried' || input.phase === 'redis';
     // The digest binds schema definitions (tables, triggers, FKs), retained contents and disposable contents.
     if (input.phase === 'rows' && (!exact(input.expectedInventory, ['schema', 'retained', 'disposable']) ||
         !['schema', 'retained', 'disposable'].every(part => hex64(input.expectedInventory[part])))) refuse();
-    if (input.phase === 'redis' && (!exact(input.expectedInventory, ['digest', 'rowsReceiptDigest']) ||
+    if (input.phase === 'redis' && !legacyRedis && (!exact(input.expectedInventory, ['digest', 'rowsReceiptDigest']) ||
         !hex64(input.expectedInventory.digest) || !hex64(input.expectedInventory.rowsReceiptDigest))) refuse();
     const canonical = value => Array.isArray(value) ? `[${value.map(canonical).join(',')}]` : record(value)
       ? `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}` : JSON.stringify(value);
@@ -67,7 +71,7 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
         ['api', 'worker'].every(service => Array.isArray(binding.deployments[service]) && binding.deployments[service].length === 1 &&
           binding.deployments[service].every(d => exact(d, ['id', 'status', 'sha']) && id(d.id) && d.status === 'SUCCESS' && d.sha === input.candidate));
     };
-    if (input.phase === 'redis' && !validBinding(input.binding)) refuse();
+    if (input.phase === 'redis' && !legacyRedis && !validBinding(input.binding)) refuse();
     const p = input.identity;
     if (!exact(p, ['projectId', 'environmentId', 'services', 'origins']) || !exact(p.services, ['api', 'worker']) ||
         !exact(p.origins, redisPhase ? ['database', 'redis'] : ['database']) ||
@@ -90,6 +94,8 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
       if (redisUrl.protocol !== 'redis:' || redisUrl.search || redisUrl.hash ||
           `redis://${redisUrl.hostname}:${redisUrl.port || '6379'}/${database}` !== p.origins.redis) refuse();
     }
+    // The pre-binding legacy deletion shape remains a closed, no-resource refusal.
+    if (legacyRedis) throw new Error('Clean reset refused: Redis completion receipt authority unavailable');
     // Inventory never opens PostgreSQL or starts a subprocess.
     if (input.phase === 'redis-inventoried') return cleanResetRedis(input, staging, refuse).catch(report);
 
@@ -528,7 +534,8 @@ return { 'ok', entries, indexes }`;
     if (Buffer.byteLength(encoded) > 16384 || completed.completedAt < pending.intentAt) refused('Invalid Redis completion');
     // Intent commits before any Redis write. No retry is attempted after uncertainty.
     store({}, pending);
-    const mutationScript = script.replace('#!lua flags=no-writes\n', '').replace("return { 'ok', entries, indexes }", `
+    // A callback keeps Lua dollar anchors literal instead of JavaScript replacement tokens.
+    const mutationScript = script.replace('#!lua flags=no-writes\n', '').replace("return { 'ok', entries, indexes }", () => `
 -- This layout comes from the fixed program, never request-selected prefixes or keys.
 local layout = cjson.decode(${JSON.stringify(JSON.stringify({ queues, indexNames: Object.keys(indexes), fixed, jobParts, monitoring }))})
 local jobs, repeats, queueSet, monitorSet = {}, {}, {}, {}

@@ -14,11 +14,11 @@ const command = () => ({ operation: 'clean-reset', phase: 'redis', operationId, 
   binding: { owner: 'operator-901', leaseCommit: 'a'.repeat(40),
     window: { operationId, candidate, closedAt: '2026-10-21T00:00:00.000Z', observedAt: '2026-10-21T00:15:00.000Z', elapsedSeconds: 900 },
     deployments: { api: [{ id: 'api-deployment', status: 'SUCCESS', sha: candidate }], worker: [{ id: 'worker-deployment', status: 'SUCCESS', sha: candidate }] } } });
-function preflight(payload) {
+function preflight(payload, envChanges = {}) {
   const ports = [], errors = [], output = [];
   const process = { exitCode: 0, env: { RAILWAY_PROJECT_ID: identity.projectId, RAILWAY_ENVIRONMENT_ID: identity.environmentId,
     RAILWAY_SERVICE_ID: identity.services.api, RAILWAY_ENVIRONMENT_NAME: 'staging', APP_ENV: 'staging', AUTOTM_COMMIT_SHA: candidate,
-    DATABASE_URL: identity.origins.database, REDIS_URL: identity.origins.redis } };
+    DATABASE_URL: identity.origins.database, REDIS_URL: identity.origins.redis, ...envChanges } };
   const program = cleanResetProgram(payload);
   new Script(program);
   runInNewContext(program, { URL, Buffer, process, console: { log: value => output.push(value), error: value => errors.push(value) },
@@ -45,4 +45,29 @@ test('malformed additive binding and digest pairs refuse before any resource bou
     const c = command(); change(c); variants.push(c);
   }
   for (const c of variants) assert.deepEqual(preflight(c), { ports: [], code: 1, output: [], errors: ['Clean reset refused: target'] });
+});
+
+const legacyCommand = () => {
+  const c = command(); delete c.binding; c.expectedInventory = { digest: '1'.repeat(64) }; return c;
+};
+
+test('exact legacy Redis deletion and retries keep the no-authority refusal without resource access', () => {
+  for (const change of [{}, { operationId: 'a'.repeat(32) }, { reservationId: 'b'.repeat(32) }, { candidate: 'd'.repeat(40) }]) {
+    assert.deepEqual(preflight({ ...legacyCommand(), ...change }, { AUTOTM_COMMIT_SHA: change.candidate ?? candidate }),
+      { ports: [], code: 1, output: [], errors: ['Clean reset refused: Redis completion receipt authority unavailable'] });
+  }
+});
+
+test('malformed legacy requests and partial new bindings remain target refusals without resource access', () => {
+  const variants = [];
+  for (const change of [c => { c.expectedInventory.digest = ['1'.repeat(64)]; }, c => { c.expectedInventory.extra = true; },
+    c => { c.expectedInventory = {}; }, c => { c.quiesced = true; }, c => { c.operationId = [operationId]; },
+    c => { c.identity.origins.redis = 'redis://redis.railway.internal:6379/1'; }, c => { c.binding = {}; }]) {
+    const c = legacyCommand(); change(c); variants.push(c);
+  }
+  const missingBinding = command(); delete missingBinding.binding; variants.push(missingBinding);
+  const missingReceiptDigest = command(); delete missingReceiptDigest.expectedInventory.rowsReceiptDigest; variants.push(missingReceiptDigest);
+  for (const c of variants) assert.deepEqual(preflight(c), { ports: [], code: 1, output: [], errors: ['Clean reset refused: target'] });
+  assert.deepEqual(preflight(legacyCommand(), { APP_ENV: 'production' }),
+    { ports: [], code: 1, output: [], errors: ['Clean reset refused: target'] });
 });
