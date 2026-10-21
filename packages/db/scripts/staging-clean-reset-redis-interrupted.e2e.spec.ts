@@ -94,7 +94,7 @@ describe("real interrupted Redis intent and lost Lua reply on disposable transpo
   async function query(sql: string, values: unknown[] = []): Promise<RecordValue[]> {
     const ordinal = ++pgFixtureOrdinal;
     const startedAt = monotonicMs();
-    const client = new Client({ connectionString: databaseUrl });
+    const client = new Client({ connectionString: databaseUrl, application_name: "staging-test-fixture" });
     await client.connect();
     const connectedAt = monotonicMs();
     // pg receives this PID in BackendKeyData; @types/pg omits the runtime property.
@@ -235,6 +235,8 @@ describe("real interrupted Redis intent and lost Lua reply on disposable transpo
           if (lifecycle) console.error(lifecycle);
           const activity = result.stderr?.split(/\r?\n/).find(line => /^Disposable PG activity: ordinal=(?:0|[1-9][0-9]{0,5}) count=(?:0|[1-9][0-9]{0,9}) pids=(?:none|[1-9][0-9]{0,9}(?:,[1-9][0-9]{0,9}){0,15})$/.test(line));
           if (activity) console.error(activity);
+          const attribution = result.stderr?.split(/\r?\n/).find(line => /^Disposable PG attribution: ordinal=(?:0|[1-9][0-9]{0,5}) rows=(?:none|[1-9][0-9]{0,9}:(?:pg-isready|known-fixture|sql-child|other):(?:loopback|other|unavailable):(?:known|unavailable)(?:\|[1-9][0-9]{0,9}:(?:pg-isready|known-fixture|sql-child|other):(?:loopback|other|unavailable):(?:known|unavailable)){0,15})$/.test(line));
+          if (attribution) console.error(attribution);
           const envelope = result.stdout?.split(/\r?\n/).find(line => line.startsWith("clean-reset:"));
           if (envelope) {
             try {

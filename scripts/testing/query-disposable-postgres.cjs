@@ -15,6 +15,7 @@ const monotonic = () => Number(process.hrtime.bigint() / 1000000n);
 const pid = value => Number.isInteger(value) && value > 0 && value <= 2147483647;
 (async () => {
   const client = new Client({ connectionString: process.env.STAGING_CONTROL_TEST_DATABASE_URL,
+    ...(diagnosticEnabled ? { application_name: 'staging-test-sql-child' } : {}),
     types: { getTypeParser(oid, format) {
       if ((format === undefined || format === 'text') && (oid === 114 || oid === 3802)) return value => value;
       return types.getTypeParser(oid, format);
@@ -28,11 +29,16 @@ const pid = value => Number.isInteger(value) && value > 0 && value <= 2147483647
     const count = `(SELECT count(*) ${activity})`;
     if (diagnosticEnabled && sql.includes(count)) {
       // TEST-ONLY perturbation: record count and bounded PIDs from the SAME aggregate
-      // feeding the guard. A transaction-local GUC carries it to a private result before
-      // COMMIT. No extra target connection, snapshot clear, wait or retry is introduced.
+      // feeding the guard. Classification adds SQL work and can perturb timing.
+      // A transaction-local GUC carries it to a private result before COMMIT. No extra target connection, snapshot clear, wait or retry is introduced.
       if (sql.split('COMMIT;').length !== 2) throw new Error('Unsupported disposable diagnostic transaction');
       sql = sql.replaceAll(count, `(SELECT (set_config('staging_test.backends', jsonb_build_object('count', count(*),
-        'pids', coalesce(to_jsonb((array_agg(pid ORDER BY pid))[1:16]), '[]'::jsonb))::text, true)::jsonb->>'count')::bigint ${activity})`)
+        'pids', coalesce(to_jsonb((array_agg(pid ORDER BY pid))[1:16]), '[]'::jsonb),
+        'rows', coalesce(to_jsonb((array_agg(jsonb_build_object('pid', pid,
+          'application', CASE application_name WHEN 'pg_isready' THEN 'pg-isready' WHEN 'staging-test-fixture' THEN 'known-fixture' WHEN 'staging-test-sql-child' THEN 'sql-child' ELSE 'other' END,
+          'origin', CASE WHEN client_addr IS NULL THEN 'unavailable' WHEN client_addr IN (inet '127.0.0.1', inet '::1') THEN 'loopback' ELSE 'other' END,
+          'state', CASE WHEN state IN ('active', 'idle', 'idle in transaction', 'idle in transaction (aborted)', 'fastpath function call', 'disabled') THEN 'known' ELSE 'unavailable' END)
+          ORDER BY pid))[1:16]), '[]'::jsonb))::text, true)::jsonb->>'count')::bigint ${activity})`)
         .replace('COMMIT;', "SELECT current_setting('staging_test.backends', true) AS staging_test_backends; COMMIT;");
     }
     const result = await client.query(sql);
@@ -44,6 +50,12 @@ const pid = value => Number.isInteger(value) && value > 0 && value <= 2147483647
           if (Number.isInteger(value.count) && value.count >= 0 && value.count <= 2147483647 &&
               Array.isArray(value.pids) && value.pids.length === Math.min(value.count, 16) && value.pids.every(pid)) {
             console.error(`Disposable PG activity: ordinal=${ordinal} count=${value.count} pids=${value.pids.join(',') || 'none'}`);
+            if (Array.isArray(value.rows) && value.rows.length === value.pids.length && value.rows.every((row, index) =>
+              row && Object.keys(row).sort().join(',') === 'application,origin,pid,state' && row.pid === value.pids[index] &&
+              ['pg-isready', 'known-fixture', 'sql-child', 'other'].includes(row.application) &&
+              ['loopback', 'other', 'unavailable'].includes(row.origin) && ['known', 'unavailable'].includes(row.state))) {
+              console.error(`Disposable PG attribution: ordinal=${ordinal} rows=${value.rows.map(row => `${row.pid}:${row.application}:${row.origin}:${row.state}`).join('|') || 'none'}`);
+            }
           }
         } catch { /* Never forward diagnostic rows or parse errors. */ }
       } else console.log(Object.values(row).join('|'));

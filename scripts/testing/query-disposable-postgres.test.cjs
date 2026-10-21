@@ -11,6 +11,7 @@ async function query(error, enabled, lifecycle = false, options = {}) {
     STAGING_TEST_PG_DIAGNOSTICS: lifecycle ? '1' : '0', STAGING_TEST_PG_ROLE: 'sql-child', STAGING_TEST_PG_ORDINAL: '7',
     STAGING_CONTROL_TEST_DATABASE_URL: 'postgresql://secret@127.0.0.1/disposable', ...options.env }, exitCode: 0 };
   class Client {
+    constructor(config) { options.configs?.push(config); }
     processID = options.pid ?? 4321;
     async connect() {}
     async query(sql) {
@@ -100,6 +101,15 @@ test('the real serialized inventory SQL is instrumented only inside the disposab
     reservationId: 'f'.repeat(32), candidate, identity }), program);
 });
 
+// Literal expected SQL at the database port, including the unchanged selection predicate.
+const expectedAggregate = `(SELECT (set_config('staging_test.backends', jsonb_build_object('count', count(*),
+        'pids', coalesce(to_jsonb((array_agg(pid ORDER BY pid))[1:16]), '[]'::jsonb),
+        'rows', coalesce(to_jsonb((array_agg(jsonb_build_object('pid', pid,
+          'application', CASE application_name WHEN 'pg_isready' THEN 'pg-isready' WHEN 'staging-test-fixture' THEN 'known-fixture' WHEN 'staging-test-sql-child' THEN 'sql-child' ELSE 'other' END,
+          'origin', CASE WHEN client_addr IS NULL THEN 'unavailable' WHEN client_addr IN (inet '127.0.0.1', inet '::1') THEN 'loopback' ELSE 'other' END,
+          'state', CASE WHEN state IN ('active', 'idle', 'idle in transaction', 'idle in transaction (aborted)', 'fastpath function call', 'disabled') THEN 'known' ELSE 'unavailable' END)
+          ORDER BY pid))[1:16]), '[]'::jsonb))::text, true)::jsonb->>'count')::bigint FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND backend_type = 'client backend')`;
+
 const backendCount = "(SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND backend_type = 'client backend')";
 test('only opted-in loopback disposable SQL records the same activity observation and strips its private result', async () => {
   const input = `BEGIN; SELECT 'clean-reset:' || jsonb_build_object('backends', ${backendCount}); COMMIT;`;
@@ -112,11 +122,22 @@ test('only opted-in loopback disposable SQL records the same activity observatio
   assert.match(sql[0], /set_config\('staging_test.backends'/);
   assert.match(sql[0], /array_agg\(pid ORDER BY pid\)/);
   assert.match(sql[0], /current_setting\('staging_test.backends', true\)/);
+  assert.equal(sql[0], input.replaceAll(backendCount, expectedAggregate).replace('COMMIT;', "SELECT current_setting('staging_test.backends', true) AS staging_test_backends; COMMIT;"));
   assert.match(result.stderr[0], /^Disposable PG activity: ordinal=7 count=1 pids=1234$/);
-  for (const options of [{}, { env: { STAGING_CONTROL_TEST_DATABASE_URL: 'postgresql://secret@remote.invalid/disposable' } }]) {
-    const captured = [];
-    await query(null, '1', Boolean(options.env), { ...options, input, sql: captured });
+  for (const env of [{ STAGING_TEST_PG_DIAGNOSTICS: '0' }, { STAGING_TEST_PG_DIAGNOSTICS: 'true' },
+    { STAGING_CONTROL_TEST_DATABASE_URL: 'postgresql://secret@remote.invalid/disposable' },
+    { STAGING_CONTROL_TEST_DATABASE_URL: 'invalid' }]) {
+    const captured = [], configs = [];
+    const result = await query(null, '1', true, { env, input, sql: captured, configs });
     assert.equal(captured[0], input);
+    assert.equal(Object.hasOwn(configs[0], 'application_name'), false);
+    assert.deepEqual(result, { stderr: [], stdout: ['2'], code: 0 });
+  }
+  for (const host of ['127.0.0.1', 'localhost', '[::1]']) {
+    const captured = [], configs = [];
+    await query(null, '1', true, { env: { STAGING_CONTROL_TEST_DATABASE_URL: `postgresql://secret@${host}/disposable` }, input, sql: captured, configs });
+    assert.equal(configs[0].application_name, 'staging-test-sql-child');
+    assert.equal(captured[0], input.replaceAll(backendCount, expectedAggregate).replace('COMMIT;', "SELECT current_setting('staging_test.backends', true) AS staging_test_backends; COMMIT;"));
   }
 });
 
@@ -160,7 +181,7 @@ test('malformed attribution never emits private values or a partial attribution'
   }
 });
 
-test('attribution truncates at sixteen rows and represents an empty observation', async () => {
+test('attribution accepts sixteen capped rows and represents an empty observation', async () => {
   for (const count of [0, 17]) {
     const pids = count === 0 ? [] : Array.from({ length: 16 }, (_, index) => index + 1);
     const result = await query(null, '1', true, { result: diagnosticRow({ count, pids,
@@ -171,20 +192,17 @@ test('attribution truncates at sixteen rows and represents an empty observation'
 
 test('fixture forwards only the bounded attribution line emitted by the transport', async () => {
   const fixture = readFileSync(`${__dirname}/../../packages/db/scripts/staging-clean-reset-redis-interrupted.e2e.spec.ts`, 'utf8');
-  const expression = fixture.match(/const attribution = result\.stderr\?\.split\(\/\\r\?\\n\/\)\.find\(line => (\/.*\/)\.test\(line\)\);/);
-  assert.ok(expression, 'fixture must validate attribution before forwarding');
-  const pattern = runInNewContext(expression[1]);
-  assert.equal(pattern.test('Disposable PG attribution: ordinal=7 rows=1234:pg-isready:loopback:known'), true);
+  const forwarding = fixture.match(/const attribution = result\.stderr\?\.split\(\/\\r\?\\n\/\)\.find\(line => \/.*\/\.test\(line\)\);\n          if \(attribution\) console\.error\(attribution\);/);
+  assert.ok(forwarding, 'fixture must validate attribution before forwarding');
+  const valid = 'Disposable PG attribution: ordinal=7 rows=1234:pg-isready:loopback:known';
+  const logs = [];
+  runInNewContext(forwarding[0], { result: { stderr: `unrelated\n${valid}\nprivate` }, console: { error: line => logs.push(line) } });
+  assert.deepEqual(logs, [valid]);
   for (const line of ['Disposable PG attribution: ordinal=7 rows=secret',
     'Disposable PG attribution: ordinal=7 rows=1234:secret:loopback:known',
-    'Disposable PG attribution: ordinal=7 rows=1234:pg-isready:loopback:known\nsecret']) assert.equal(pattern.test(line), false);
+    'Disposable PG attribution: ordinal=7 rows=1234:pg-isready:loopback:known secret']) {
+    const logs = [];
+    runInNewContext(forwarding[0], { result: { stderr: line }, console: { error: line => logs.push(line) } });
+    assert.deepEqual(logs, []);
+  }
 });
-
-// Literal expected SQL at the database port, including the unchanged selection predicate.
-const expectedAggregate = `(SELECT (set_config('staging_test.backends', jsonb_build_object('count', count(*),
-        'pids', coalesce(to_jsonb((array_agg(pid ORDER BY pid))[1:16]), '[]'::jsonb),
-        'rows', coalesce(to_jsonb((array_agg(jsonb_build_object('pid', pid,
-          'application', CASE application_name WHEN 'pg_isready' THEN 'pg-isready' WHEN 'staging-test-fixture' THEN 'known-fixture' WHEN 'staging-test-sql-child' THEN 'sql-child' ELSE 'other' END,
-          'origin', CASE WHEN client_addr IS NULL THEN 'unavailable' WHEN client_addr IN (inet '127.0.0.1', inet '::1') THEN 'loopback' ELSE 'other' END,
-          'state', CASE WHEN state IN ('active', 'idle', 'idle in transaction', 'idle in transaction (aborted)', 'fastpath function call', 'disabled') THEN 'known' ELSE 'unavailable' END)
-          ORDER BY pid))[1:16]), '[]'::jsonb))::text, true)::jsonb->>'count')::bigint FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND backend_type = 'client backend')`;
