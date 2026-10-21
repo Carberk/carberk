@@ -50,6 +50,8 @@ export const DiagnosticDraftCreateSchema = z.object({ reportId: z.string().uuid(
 export const DiagnosticFindingSaveSchema = z.object({ expectedVersion: z.number().int().nonnegative(), finding: DiagnosticFindingSchema }).strict();
 export const DiagnosticReportTransitionSchema = z.object({ expectedVersion: z.number().int().nonnegative(), action: z.enum(["submit", "return", "finalize", "withdraw"]), reason: z.string().trim().min(1).max(1000).optional(), privateSelfReview: z.boolean().optional() }).strict();
 export const DiagnosticCorrectionSchema = z.object({ expectedVersion: z.number().int().nonnegative(), successorId: z.string().uuid(), reason: z.string().trim().min(1).max(1000) }).strict();
+/** Links a new physical visit's first report to a released or withdrawn predecessor on another order. */
+export const DiagnosticReinspectionSchema = z.object({ reportId: z.string().uuid(), predecessorId: z.string().uuid(), expectedOrderVersion: z.number().int().nonnegative(), reason: z.string().trim().min(1).max(1000) }).strict();
 export const DiagnosticReportSchema = z.object({
   id: z.string().uuid(), orderId: z.string().uuid(), audience: DiagnosticAudienceSchema,
   status: z.enum(["draft", "submitted", "returned", "finalized", "withdrawn"]), templateVersionId: z.string().uuid(),
@@ -64,6 +66,7 @@ export type DiagnosticDraftCreate = z.infer<typeof DiagnosticDraftCreateSchema>;
 export type DiagnosticFindingSave = z.infer<typeof DiagnosticFindingSaveSchema>;
 export type DiagnosticReportTransition = z.infer<typeof DiagnosticReportTransitionSchema>;
 export type DiagnosticCorrection = z.infer<typeof DiagnosticCorrectionSchema>;
+export type DiagnosticReinspection = z.infer<typeof DiagnosticReinspectionSchema>;
 export type DiagnosticReportRecord = z.infer<typeof DiagnosticReportSchema>;
 
 /** Stored release input. No live Listing, booking or customer fields enter rendering. */

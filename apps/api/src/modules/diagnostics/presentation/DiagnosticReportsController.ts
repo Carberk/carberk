@@ -37,6 +37,9 @@ export class DiagnosticReportsController {
   @Post("orders/:id/reports") @Header("Cache-Control", "no-store, private") create(@Req() req: Request, @Param("id") id: string, @Body() body: unknown) {
     return this.run(() => this.reports.create(this.subject(req), parse(uuid, id), parse(DiagnosticSchemas.DiagnosticDraftCreateSchema, body)));
   }
+  @Post("orders/:id/reinspections") @Header("Cache-Control", "no-store, private") reinspect(@Req() req: Request, @Param("id") id: string, @Body() body: unknown) {
+    return this.run(() => this.reports.reinspect(this.subject(req), parse(uuid, id), parse(DiagnosticSchemas.DiagnosticReinspectionSchema, body)));
+  }
   @Get("orders/:id/reports") @Header("Cache-Control", "no-store, private") forOrder(@Req() req: Request, @Param("id") id: string) {
     return this.run(() => this.reports.forOrder(this.subject(req), parse(uuid, id)));
   }

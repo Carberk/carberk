@@ -38,9 +38,8 @@ export class PrismaDiagnosticPublic implements DiagnosticPublicPort {
     return this.db.$transaction(async tx => {
       const { row } = await this.access.loadPublic(tx, reportId);
       const snapshot = D.DiagnosticReleasedSnapshotSchema.parse(row.snapshot);
-      const successor = await tx.diagnosticReportRecord.findFirst({ where: { predecessorId: row.id, snapshotHash: { not: null }, erasedAt: null } });
       return D.PublicDiagnosticReportSchema.parse({ ...snapshot.report, version: row.version, template: snapshot.template, synthetic: true,
-        authorId: null, reviewerId: null, returnReason: null, supersededBy: successor?.id ?? null });
+        authorId: null, reviewerId: null, returnReason: null, supersededBy: await this.access.successorId(tx, row, null) });
     });
   }
   private async readable(tx: Prisma.TransactionClient, reportId: string, evidenceId: string) {

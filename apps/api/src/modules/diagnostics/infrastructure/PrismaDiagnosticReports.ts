@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { DiagnosticSchemas } from "@auto-tm/contracts";
-import { PrismaService, type Prisma } from "@auto-tm/db";
+import { PrismaService, Prisma } from "@auto-tm/db";
 import { DiagnosticReport, type DiagnosticReportState } from "../domain/DiagnosticReport";
 import { DiagnosticRuleError } from "../domain/InspectionOrder";
 import { DIAGNOSTIC_RUNTIME, type DiagnosticRuntime, type DiagnosticSubject } from "../domain/ports/DiagnosticIntakePort";
@@ -43,11 +43,11 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
   private async model(tx: Tx, row: Row): Promise<DiagnosticReport> {
     return new DiagnosticReport(row.state as unknown as DiagnosticReportState, await this.definition(tx, row));
   }
-  private async dto(tx: Tx, row: Row, staff: boolean): Promise<DiagnosticSchemas.DiagnosticReportRecord> {
+  private async dto(tx: Tx, row: Row, subject: DiagnosticSubject, staff: boolean): Promise<DiagnosticSchemas.DiagnosticReportRecord> {
     const state = row.state as unknown as DiagnosticReportState;
     const released = row.snapshot ? DiagnosticSchemas.DiagnosticReleasedSnapshotSchema.parse(row.snapshot).report : state;
-    const successor = await tx.diagnosticReportRecord.findFirst({ where: { predecessorId: row.id, snapshotHash: { not: null }, erasedAt: null } });
-    return DiagnosticSchemas.DiagnosticReportSchema.parse({ ...released, status: row.status, withdrawnAt: row.withdrawnAt?.toISOString() ?? null, withdrawalReason: row.withdrawalReason, supersededBy: successor?.id ?? null, authorId: staff ? state.authorId : null,
+    return DiagnosticSchemas.DiagnosticReportSchema.parse({ ...released, status: row.status, withdrawnAt: row.withdrawnAt?.toISOString() ?? null, withdrawalReason: row.withdrawalReason,
+      supersededBy: await this.access.successorId(tx, row, subject.userId), authorId: staff ? state.authorId : null,
       reviewerId: staff ? state.reviewerId : null, version: row.version, template: await this.definition(tx, row), synthetic: true });
   }
   private async audit(tx: Tx, subject: DiagnosticSubject, order: Order, reportId: string, action: string, details: Prisma.InputJsonObject = {}): Promise<void> {
@@ -58,43 +58,49 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
     return tx.diagnosticReportRecord.update({ where: { id: row.id }, data: { state: json(next), status: next.status, version: { increment: 1 },
       withdrawnAt: next.withdrawnAt ? new Date(next.withdrawnAt) : null, withdrawalReason: next.withdrawalReason } });
   }
+  /** An order's first report is its original or the reinspection that opened it. */
+  private firstReport(tx: Tx, orderId: string) {
+    return tx.diagnosticReportRecord.findFirst({ where: { orderId, OR: [{ predecessorId: null }, { reinspection: true }] } });
+  }
   async create(subject: DiagnosticSubject, orderId: string, input: DiagnosticSchemas.DiagnosticDraftCreate) {
     return this.db.$transaction(async tx => {
       const { row: order } = await this.authority.order(tx, subject, orderId, "diagnostics.technician");
       const prior = await tx.diagnosticReportRecord.findUnique({ where: { id: input.reportId } });
       if (prior) {
-        if (prior.orderId !== orderId || prior.erasedAt || (prior.state as unknown as DiagnosticReportState).authorId !== subject.userId) throw denied();
-        return this.dto(tx, prior, true);
+        if (prior.orderId !== orderId || prior.predecessorId || prior.erasedAt || (prior.state as unknown as DiagnosticReportState).authorId !== subject.userId) throw denied();
+        return this.dto(tx, prior, subject, true);
       }
       if (order.version !== input.expectedOrderVersion) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
       const observed = DiagnosticSchemas.DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true }).safeParse(order.observedVehicle);
       if (order.status !== "arrived" || !order.physicalAuthorization || !observed.success) throw new DiagnosticRuleError("DIAGNOSTIC_OBSERVATION_REQUIRED");
-      if (await tx.diagnosticReportRecord.findFirst({ where: { orderId, predecessorId: null } })) throw new DiagnosticRuleError("DIAGNOSTIC_REPORT_EXISTS");
+      if (await this.firstReport(tx, orderId)) throw new DiagnosticRuleError("DIAGNOSTIC_REPORT_EXISTS");
       const state: DiagnosticReportState = { id: input.reportId, orderId, audience: DiagnosticSchemas.DiagnosticAudienceSchema.parse(order.audience),
         templateVersionId: order.templateVersionId, status: "draft", observedAt: observed.data.observedAt, mileageKm: observed.data.mileageKm,
         findings: [], authorId: subject.userId, reviewerId: null, successorOf: null, correctionReason: null, returnReason: null, finalizedAt: null, withdrawnAt: null, withdrawalReason: null };
       const row = await tx.diagnosticReportRecord.create({ data: { id: input.reportId, orderId, audience: state.audience, templateVersionId: state.templateVersionId, state: json(state) } });
       await this.audit(tx, subject, order, row.id, "REPORT_DRAFT_CREATED");
-      return this.dto(tx, row, true);
+      return this.dto(tx, row, subject, true);
     });
   }
   async read(subject: DiagnosticSubject, reportId: string) {
-    return this.db.$transaction(async tx => { const { row, staff } = await this.load(tx, subject, reportId); return this.dto(tx, row, staff); });
+    return this.db.$transaction(async tx => { const { row, staff } = await this.load(tx, subject, reportId); return this.dto(tx, row, subject, staff); });
   }
   async forOrder(subject: DiagnosticSubject, orderId: string) {
     return this.db.$transaction(async tx => {
       const scope = await this.authority.order(tx, subject, orderId);
       const rows = await tx.diagnosticReportRecord.findMany({ where: { orderId, erasedAt: null, ...(!scope.staff ? { snapshotHash: { not: null } } : {}) }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
-      return Promise.all(rows.map(row => this.dto(tx, row, scope.staff)));
+      return Promise.all(rows.map(row => this.dto(tx, row, subject, scope.staff)));
     });
   }
   private async evidence(tx: Tx, row: Row, state: DiagnosticReportState): Promise<void> {
+    // Same-visit corrections reuse evidence. A reinspection opens a new visit, so the walk
+    // includes it and never fetches an earlier order's report.
     const reportIds = [row.id];
-    let predecessorId = row.predecessorId;
+    let predecessorId = row.reinspection ? null : row.predecessorId;
     while (predecessorId) {
       const prior = await tx.diagnosticReportRecord.findUnique({ where: { id: predecessorId } });
       if (!prior || prior.orderId !== row.orderId || prior.audience !== row.audience || prior.erasedAt || reportIds.includes(prior.id)) throw denied();
-      reportIds.push(prior.id); predecessorId = prior.predecessorId;
+      reportIds.push(prior.id); predecessorId = prior.reinspection ? null : prior.predecessorId;
     }
     const ids = state.findings.flatMap(finding => finding.evidenceIds);
     const records = await tx.diagnosticEvidence.findMany({ where: { id: { in: ids }, reportId: { in: reportIds }, state: "verified", cleanupRequestedAt: null } });
@@ -113,7 +119,7 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
       const removed = prior.filter(id => !retained.has(id));
       if (removed.length) await tx.diagnosticEvidence.updateMany({ where: { id: { in: removed }, reportId: row.id, state: "verified" }, data: { state: "cleanup_pending", cleanupRequestedAt: this.runtime.now() } });
       await this.audit(tx, subject, order, row.id, "REPORT_FINDING_SAVED", { findingId: input.finding.id, checkId: input.finding.checkId });
-      return this.dto(tx, saved, true);
+      return this.dto(tx, saved, subject, true);
     });
   }
   private async publicAssociation(tx: Tx, order: Order): Promise<void> {
@@ -149,7 +155,7 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
         }
       } else saved = await this.persist(tx, row, next);
       await this.audit(tx, subject, order, row.id, `REPORT_${input.action.toUpperCase()}`, { ...(input.reason ? { reason: input.reason } : {}), privateSelfReview: input.privateSelfReview === true && model.state.authorId === subject.userId });
-      return this.dto(tx, saved, true);
+      return this.dto(tx, saved, subject, true);
     });
   }
   async correct(subject: DiagnosticSubject, reportId: string, input: DiagnosticSchemas.DiagnosticCorrection) {
@@ -158,14 +164,67 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
       const existing = await tx.diagnosticReportRecord.findUnique({ where: { predecessorId: reportId } });
       if (existing) {
         const state = existing.state as unknown as DiagnosticReportState;
-        if (existing.id !== input.successorId || state.correctionReason !== input.reason || state.authorId !== subject.userId || existing.erasedAt) throw new DiagnosticRuleError("DIAGNOSTIC_CORRECTION_CONFLICT");
-        return this.dto(tx, existing, true);
+        if (existing.reinspection || existing.orderId !== order.id || existing.id !== input.successorId || state.correctionReason !== input.reason || state.authorId !== subject.userId || existing.erasedAt) throw new DiagnosticRuleError("DIAGNOSTIC_CORRECTION_CONFLICT");
+        return this.dto(tx, existing, subject, true);
       }
       this.version(row, input.expectedVersion);
       const state = (await this.model(tx, row)).correct(input.successorId, subject.userId, input.reason).state;
       const saved = await tx.diagnosticReportRecord.create({ data: { id: state.id, orderId: order.id, audience: row.audience, templateVersionId: row.templateVersionId, predecessorId: row.id, state: json(state) } });
       await this.audit(tx, subject, order, saved.id, "REPORT_CORRECTION_CREATED", { predecessorId: row.id, reason: input.reason });
-      return this.dto(tx, saved, true);
+      return this.dto(tx, saved, subject, true);
+    });
+  }
+  /** Opens a new visit's first report from a released or withdrawn report on another order.
+   * Only the new order's current technician links; the predecessor is inspected internally and
+   * never loaded through reader authority. Temporary admission (until D2/D3 decisions): both
+   * orders public, same Listing, same non-null commissioner and equal observed VINs. */
+  async reinspect(subject: DiagnosticSubject, orderId: string, input: DiagnosticSchemas.DiagnosticReinspection) {
+    return this.db.$transaction(async tx => {
+      // Unlocked discovery only selects lock targets: identity, Listings, orders in id order,
+      // then assignments and the predecessor report. Every fact is re-read after locking.
+      await this.authority.current(tx, subject);
+      const discovered = [await tx.inspectionOrder.findUnique({ where: { id: orderId } }),
+        (await tx.diagnosticReportRecord.findUnique({ where: { id: input.predecessorId }, include: { order: true } }))?.order].filter(item => !!item);
+      for (const id of [...new Set(discovered.flatMap(item => item.audience === "listing_public" && item.listingId ? [item.listingId] : []))].sort()) {
+        await tx.$queryRaw`SELECT id FROM listings WHERE id=${id} FOR SHARE`;
+      }
+      for (const id of [...new Set(discovered.map(item => item.id))].sort()) await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${id} FOR UPDATE`;
+      const { row: order } = await this.authority.order(tx, subject, orderId, "diagnostics.technician");
+      await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${input.predecessorId} FOR UPDATE`;
+      const existing = await tx.diagnosticReportRecord.findUnique({ where: { id: input.reportId } });
+      if (existing) {
+        const state = existing.state as unknown as DiagnosticReportState;
+        if (!existing.reinspection || existing.orderId !== orderId || existing.predecessorId !== input.predecessorId || state.correctionReason !== input.reason ||
+          state.authorId !== subject.userId || existing.erasedAt) throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
+        return this.dto(tx, existing, subject, true);
+      }
+      if (order.version !== input.expectedOrderVersion) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
+      const vehicle = DiagnosticSchemas.DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true });
+      const observed = vehicle.safeParse(order.observedVehicle);
+      if (order.status !== "arrived" || !order.physicalAuthorization || !observed.success) throw new DiagnosticRuleError("DIAGNOSTIC_OBSERVATION_REQUIRED");
+      if (await this.firstReport(tx, orderId)) throw new DiagnosticRuleError("DIAGNOSTIC_REPORT_EXISTS");
+      const prior = await tx.diagnosticReportRecord.findUnique({ where: { id: input.predecessorId }, include: { order: true } });
+      const priorObserved = vehicle.safeParse(prior?.order.observedVehicle);
+      const vin = (value: { method: string; vin: string | null }) => value.method === "vin" && value.vin ? value.vin.trim().toUpperCase() : null;
+      // Uniform refusal: no predecessor existence, audience, Listing or commissioner fact leaks.
+      if (!prior || prior.erasedAt || !prior.snapshot || prior.order.erasedAt || !prior.order.synthetic || prior.audience !== "listing_public" ||
+        prior.order.audience !== "listing_public" || order.audience !== "listing_public" || !order.listingId || prior.order.listingId !== order.listingId ||
+        !order.commissionerId || prior.order.commissionerId !== order.commissionerId || !priorObserved.success || !vin(observed.data) ||
+        vin(observed.data) !== vin(priorObserved.data)) throw denied();
+      if (await tx.diagnosticReportRecord.findUnique({ where: { predecessorId: prior.id } })) throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
+      await this.publicAssociation(tx, order);
+      const state = new DiagnosticReport(prior.state as unknown as DiagnosticReportState).reinspect({ reportId: input.reportId, orderId, templateVersionId: order.templateVersionId,
+        authorId: subject.userId, observedAt: observed.data.observedAt, mileageKm: observed.data.mileageKm, reason: input.reason }).state;
+      let saved: Row;
+      try {
+        saved = await tx.diagnosticReportRecord.create({ data: { id: state.id, orderId, audience: state.audience, templateVersionId: state.templateVersionId, predecessorId: prior.id, reinspection: true, state: json(state) } });
+      } catch (error) {
+        // Report id, predecessor and first-report uniqueness are the only races left after locking.
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
+        throw error;
+      }
+      await this.audit(tx, subject, order, saved.id, "REPORT_REINSPECTION_CREATED", { predecessorId: prior.id, predecessorOrderId: prior.orderId, reason: state.correctionReason ?? input.reason });
+      return this.dto(tx, saved, subject, true);
     });
   }
 }

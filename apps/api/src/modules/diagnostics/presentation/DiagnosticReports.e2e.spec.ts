@@ -357,6 +357,65 @@ describe("diagnostic authoring and immutable audience release", () => {
       expect((await get("buyer", `reports/${reinspection.id}`).expect(200)).body.status).toBe("withdrawn");
     } finally { clock.mockRestore(); }
   });
+  it("retries a reinspection link exactly, refuses conflicting links and keeps each visit's evidence and successor disclosure separate", async () => {
+    const earlier = new Date("2026-09-18T00:00:00.000Z");
+    const publicGet = (path: string) => request.get(`/api/v1/public-diagnostics/${path}`);
+    const upload = (reportId: string, evidenceId: string, findingId: string, image: Buffer) => request.put(`/api/v1/diagnostics/reports/${reportId}/evidence/${evidenceId}?findingId=${findingId}&expectedVersion=0`)
+      .set(headers("technician")).set("content-type", "application/octet-stream").set("x-evidence-type", "image/jpeg").send(image).expect(200);
+    await seedSuiteCatalog(db, suite);
+    await db.listing.create({ data: { id: suite.id("public-car"), sellerId: suite.id("buyer"), brandId: suite.catalog.brandId, modelId: suite.catalog.modelId, cityId: suite.catalog.cityId, status: "active", vin, priceAmount: 100000, priceTmt: 100000, priceCurrency: "TMT" } });
+    await db.staffGrant.create({ data: { userId: suite.id("reception"), capability: "diagnostics.templates" } });
+    await db.diagnosticCenterAssignment.create({ data: { centerId, userId: suite.id("reception"), capability: "diagnostics.templates", qualifiedUntil: future } });
+    const { body: template } = await post("reception", `centers/${centerId}/templates`, { expectedVersion: 0, definition, synthetic: true }).expect(201);
+    const image = await sharp({ create: { width: 4, height: 4, channels: 3, background: "red" } }).jpeg().toBuffer();
+    const firstOrder = await arrive(template.id, "listing_public", earlier, 118000);
+    const { body: first } = await post("technician", `orders/${firstOrder.id}/reports`, { reportId: randomUUID(), expectedOrderVersion: firstOrder.version }).expect(201);
+    const worn = { ...normal(), assessment: "fault", explanation: "Observed synthetic brake wear", evidenceIds: [randomUUID()] };
+    await upload(first.id, worn.evidenceIds[0]!, worn.id, image);
+    await post("technician", `reports/${first.id}/findings`, { expectedVersion: 0, finding: worn }).expect(201);
+    await post("technician", `reports/${first.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
+    await post("reviewer", `reports/${first.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+
+    const secondOrder = await arrive(template.id, "listing_public", new Date("2026-10-01T00:00:00.000Z"), 120000);
+    const reason = "Follow-up visit after repair";
+    const link = { reportId: randomUUID(), predecessorId: first.id, expectedOrderVersion: secondOrder.version, reason };
+    const { body: reinspection } = await post("technician", `orders/${secondOrder.id}/reinspections`, link).expect(201);
+    expect((await post("technician", `orders/${secondOrder.id}/reinspections`, link).expect(201)).body).toEqual(reinspection);
+    expect(await db.diagnosticAudit.count({ where: { orderId: secondOrder.id, action: "REPORT_REINSPECTION_CREATED" } })).toBe(1);
+    expect((await post("technician", `orders/${secondOrder.id}/reinspections`, { ...link, reason: "Another reason" }).expect(409)).body.code).toBe("DIAGNOSTIC_REINSPECTION_CONFLICT");
+    expect((await post("technician", `orders/${secondOrder.id}/reinspections`, { ...link, reportId: randomUUID(), expectedOrderVersion: secondOrder.version + 1 }).expect(409)).body.code).toBe("DIAGNOSTIC_STALE_VERSION");
+    expect((await post("technician", `orders/${secondOrder.id}/reinspections`, { ...link, reportId: randomUUID() }).expect(409)).body.code).toBe("DIAGNOSTIC_REPORT_EXISTS");
+    expect((await post("technician", `orders/${secondOrder.id}/reports`, { reportId: randomUUID(), expectedOrderVersion: secondOrder.version }).expect(409)).body.code).toBe("DIAGNOSTIC_REPORT_EXISTS");
+    // A draft successor is never disclosed, and a physical revisit is not an editorial correction.
+    expect((await get("technician", `reports/${first.id}`).expect(200)).body.supersededBy).toBeNull();
+    expect((await publicGet(`reports/${first.id}`).expect(200)).body.supersededBy).toBeNull();
+    expect((await post("technician", `reports/${first.id}/corrections`, { expectedVersion: 3, successorId: reinspection.id, reason }).expect(409)).body.code).toBe("DIAGNOSTIC_CORRECTION_CONFLICT");
+    expect((await post("technician", `reports/${first.id}/corrections`, { expectedVersion: 3, successorId: randomUUID(), reason }).expect(409)).body.code).toBe("DIAGNOSTIC_CORRECTION_CONFLICT");
+    const thirdOrder = await arrive(template.id, "listing_public", new Date("2026-10-02T00:00:00.000Z"), 120100);
+    expect((await post("technician", `orders/${thirdOrder.id}/reinspections`, { ...link, reportId: randomUUID(), expectedOrderVersion: thirdOrder.version }).expect(409)).body.code).toBe("DIAGNOSTIC_REINSPECTION_CONFLICT");
+
+    // Continuity is admitted at link time only: a later predecessor-side reobservation does not block the new visit.
+    const current = await get("technician", `orders/${firstOrder.id}`).expect(200);
+    await post("technician", `orders/${firstOrder.id}/vehicle`, { expectedVersion: current.body.version, observedAt: earlier.toISOString(), mileageKm: 118000, method: "manual", manualReference: "Synthetic predecessor rematch", vin: null }).expect(201);
+    const repaired = { ...normal(), assessment: "fault", explanation: "Residual synthetic brake wear", evidenceIds: [randomUUID()] };
+    await upload(reinspection.id, repaired.evidenceIds[0]!, repaired.id, image);
+    await post("technician", `reports/${reinspection.id}/findings`, { expectedVersion: 0, finding: repaired }).expect(201);
+    await post("technician", `reports/${reinspection.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
+    await post("reviewer", `reports/${reinspection.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+
+    // A correction of the reinspection reuses that visit's evidence and never the earlier visit's.
+    const correction = await post("technician", `reports/${reinspection.id}/corrections`, { expectedVersion: 3, successorId: randomUUID(), reason: "Corrected wording" }).expect(201);
+    expect(correction.body).toMatchObject({ orderId: secondOrder.id, successorOf: reinspection.id, findings: [repaired] });
+    expect((await post("technician", `reports/${correction.body.id}/findings`, { expectedVersion: 0, finding: { ...repaired, evidenceIds: worn.evidenceIds } }).expect(400)).body.code).toBe("REPORT_EVIDENCE_UNAVAILABLE");
+    await post("technician", `reports/${correction.body.id}/findings`, { expectedVersion: 0, finding: { ...repaired, explanation: "Residual synthetic brake wear, corrected" } }).expect(201);
+
+    // Each successor id is disclosed only through its own public availability or its own commissioner.
+    expect((await publicGet(`reports/${first.id}`).expect(200)).body.supersededBy).toBe(reinspection.id);
+    await post("reviewer", `reports/${reinspection.id}/transition`, { expectedVersion: 3, action: "withdraw", reason: "Synthetic revisit dispute" }).expect(201);
+    expect((await publicGet(`reports/${first.id}`).expect(200)).body.supersededBy).toBeNull();
+    expect((await get("technician", `reports/${first.id}`).expect(200)).body.supersededBy).toBeNull();
+    expect((await get("buyer", `reports/${first.id}`).expect(200)).body.supersededBy).toBe(reinspection.id);
+  });
   it("does not disclose private reports through anonymous known IDs or artifacts", async () => {
     const { report } = await draft();
     await post("technician", `reports/${report.id}/findings`, { expectedVersion: 0, finding: normal() }).expect(201);
