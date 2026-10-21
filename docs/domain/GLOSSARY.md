@@ -186,6 +186,18 @@ An immutable released version of an Inspection Report, preserving its observatio
 
 _Avoid_: Editable final report, latest template
 
+**Diagnostic Visit Identity Record**
+
+Immutable evidence of the vehicle identity observed at one physical inspection, with its method, identifiers and restricted provenance. Corrections append evidence without rewriting the original record.
+
+_Avoid_: Vehicle registry, editable identity snapshot
+
+**Diagnostic Continuity Proof**
+
+A restricted, single-use record binding a predecessor report and new Inspection Order to exact identity evidence and versions. It proves reinspection continuity under ADR-0108 without transferring report access, findings or consent.
+
+_Avoid_: VIN equality, transferable report authorization
+
 ## Listings
 
 **Listing View**
