@@ -57,7 +57,7 @@ function captureV3(kind) {
   });
   return queries.join('\n');
 }
-const serviceTables = ['support_cases', 'service_conversations', 'service_messages', 'service_outbox', 'service_read_states', 'service_audits'];
+const serviceTables = ['support_cases', 'service_conversations', 'service_messages', 'service_outbox', 'service_read_states', 'service_audits', 'service_erasure_fences'];
 
 test('v3 journals Support text tables and exposes only a contract-hashed reservation authority', () => {
   const sql = captureV3('fixture');
@@ -77,11 +77,12 @@ test('v3 journals Support text tables and exposes only a contract-hashed reserva
 test('v3 reset redacts retained service audits exactly and disposes Support text before its parents', () => {
   const sql = captureV3('reset');
   assert.match(sql, /UPDATE public\.service_audits a SET "actorId"=NULL,reason=NULL,"targetStaffId"=NULL,"resourceId"='redacted-synthetic-service' FROM "cf_(?:f1){16}"\.campaign_records r WHERE r\.table_name='service_audits'/);
-  const order = ['service_read_states', 'service_outbox', 'service_messages', 'service_conversations', 'support_cases', 'staff_grants', 'listings', 'sessions', 'users']
+  const order = ['service_erasure_fences', 'service_read_states', 'service_outbox', 'service_messages', 'service_conversations', 'support_cases', 'staff_grants', 'listings', 'sessions', 'users']
     .map(table => sql.indexOf(`DELETE FROM public.${table} t USING`));
   assert.ok(order.every(index => index > 0), 'every disposal statement present');
   assert.deepEqual([...order].sort((a, b) => a - b), order);
   assert.ok(sql.indexOf('UPDATE public.service_audits a SET') < order[0], 'audits are redacted before any parent can SET NULL them');
+  assert.ok(sql.includes(`DELETE FROM public.service_erasure_fences t USING "cf_${'f1'.repeat(16)}".campaign_records r WHERE r.table_name='service_erasure_fences' AND NOT r.deleted AND jsonb_build_object('conversationId',to_jsonb(t)->>'conversationId')=r.row_key;`), 'fence disposal uses its actual non-ID primary key');
   assert.match(sql, /AND table_name NOT IN \('audit_logs','service_audits'\)\) THEN RAISE EXCEPTION 'Campaign disposal incomplete'/);
   assert.match(sql, /RAISE EXCEPTION 'Campaign service audit disposition changed'/);
   // Preflight attributes composite read-state children by their own key.
