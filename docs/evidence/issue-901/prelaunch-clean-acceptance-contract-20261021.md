@@ -1,5 +1,21 @@
 # Prelaunch clean-acceptance contract, 2026-10-21
 
+## Hosted receipt update, 2026-10-21
+
+The exact `8f8709aa` hosted evidence is recorded in [the receipt](prelaunch-hosted-receipt-8f8709aa-20261021.md). These rows update evidence status only; they do not retire tests or convert later-head unknowns into proof.
+
+| Contract area | Exact hosted evidence | Status |
+|---|---|---|
+| Lane/static/frontend and exact-head runtime | Run `39603533735`; runtime `39603533703` | pass |
+| Documentation lane | Run `39603533735` | skipped |
+| Worker suites | 56/56 files, 369/369 tests; CleanRetiredUploads 23/23, ServiceLifecycle 8/8, BusinessMembership 12/12 | pass |
+| S2A | 6/6 checks | pass |
+| Q3 command boundary | Missing/extra argument assertion passes; intended missing-command/bootstrap assertions remain red | partial, red |
+| DB hosted suite | 35/36 files, 359/371 tests; 12 intended Q3 failures | fail |
+| API hosted suite | 316/317 files, 3064/3067 tests; three retained full-v3 teardown races | fail |
+| Support/Q3 source after `8f8709aa` | No exact-head hosted run for that later source | runtime unknown |
+| Observer `a3e935e2` | Terminal but not assembled or independently reviewed; 72 local tests do not prove issuer binding or complete worker logs | runtime unknown |
+
 Acceptance-contract checkpoint for #901 under #897, sole integration PR #904. Base `a43ee64ebf695f9ebf661d9b28604b8cebcaca3e`, tree `3df55a48bd934d9d70159d31acba661e487cee8e`. Documentation only: no source, test, schema, CI, staging, production, credential or GitHub execution change. **No reset, deletion, deployment or live read was performed. Nothing here is a pass.**
 
 Authority: the founder's prelaunch data decision and revised plan in [#897 comment 6314266361](https://github.com/Carberk/carberk/issues/897#issuecomment-6314266361). All existing staging and production application data is disposable test data until public launch. That authority replaces historical-environment preservation. It does **not** replace the selected #897 scope, the existing marketplace, security criteria, ordinary authentication or any product lifecycle, concurrency or erasure requirement. Accepted ADRs are not edited (ADR-0020). This note grants no new security power. It specifies what a later reviewed operator change must do and prove.
