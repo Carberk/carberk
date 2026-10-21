@@ -154,6 +154,9 @@ export class PrismaDiagnosticIdentityEvidence implements DiagnosticIdentityEvide
   /** Records in append order and the ids still permitted: retained content, current rights,
    * retained provenance and a permitted ancestor. No partial chain survives a missing ancestor. */
   private async graph(tx: Tx, orderId: string) {
+    await tx.$queryRaw`SELECT id FROM diagnostic_identity_records WHERE "orderId"=${orderId} ORDER BY id FOR SHARE`;
+    await tx.$queryRaw`SELECT id FROM diagnostic_identity_evidence WHERE "orderId"=${orderId} ORDER BY id FOR SHARE`;
+    await tx.$queryRaw`SELECT id FROM diagnostic_identity_provenance WHERE "orderId"=${orderId} ORDER BY id FOR SHARE`;
     const records = await tx.diagnosticIdentityEvidence.findMany({ where: { orderId }, include: { identityRecord: true }, orderBy: { orderVersion: "asc" } });
     const provenance = new Map((await tx.diagnosticIdentityProvenance.findMany({ where: { orderId } })).map(row => [row.id, row]));
     const usable = new Set<string>();

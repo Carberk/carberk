@@ -83,6 +83,7 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
     for (const id of ownedProvenance) for (const image of [red, blue]) {
       await objects.send(new DeleteObjectCommand({ Bucket: "diagnostic-test-private", Key: `diagnostic-evidence/${id}/${image.sha256}` }));
     }
+    await db.diagnosticContinuityProof.deleteMany({ where: { candidateOrder: { centerId } } });
     await db.diagnosticPdfArtifact.deleteMany({ where: { report: { order: { centerId } } } });
     const reports = await db.diagnosticReportRecord.findMany({ where: { order: { centerId } } });
     while (reports.length) {

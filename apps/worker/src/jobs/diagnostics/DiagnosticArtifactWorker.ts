@@ -158,6 +158,10 @@ export class DiagnosticArtifactWorker {
    * place and bumps the visit's generation. Provenance follows its rights, abandoned intents
    * and verified items never attached to any evidence record use the upload lifecycle rule. */
   private async retireIdentity(now: Date): Promise<void> {
+    // The proof's declared end is the shortest retained evidence/provenance right,
+    // not a newly invented TTL. Delete the whole restricted payload and linkage.
+    await this.db.$executeRaw`DELETE FROM diagnostic_continuity_proofs WHERE id IN
+      (SELECT id FROM diagnostic_continuity_proofs WHERE "rightsUntil"<=${now}::timestamp ORDER BY "rightsUntil",id LIMIT 100)`;
     const cutoff = new Date(now.getTime() - 86400_000);
     const expired = await this.db.diagnosticIdentityEvidence.findMany({ where: { erasedAt: null, rightsUntil: { lte: now } }, orderBy: [{ rightsUntil: "asc" }, { id: "asc" }], take: 100, select: { id: true, orderId: true } });
     for (const item of expired) await this.db.$transaction(async tx => {

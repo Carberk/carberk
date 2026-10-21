@@ -1,3 +1,5 @@
+import { STAFF_BINDING_PORT } from "./domain/ports/StaffBindingPort";
+import { PrismaStaffBindings } from "./infrastructure/PrismaStaffBindings";
 import { MeasurementModule } from "../measurement/measurement.module";
 import { AdmitBusiness } from "./application/AdmitBusiness";
 import { InviteBusinessMember } from "./application/InviteBusinessMember";
@@ -108,6 +110,7 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     AccountDeletionController,
   ],
   providers: [
+    { provide: STAFF_BINDING_PORT, useClass: PrismaStaffBindings },
     CheckAdminSessionElevation,
     { provide: ADMIN_SESSION_ELEVATION_PORT, useExisting: CheckAdminSessionElevation },
     AdmitBusiness, InviteBusinessMember, RedeemBusinessInvitation, RevokeBusinessInvitation, ChangeBusinessMembership, UpdateBusinessSettings, RecoverBusinessOwner,
@@ -273,6 +276,7 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     },
   ],
   exports: [
+    STAFF_BINDING_PORT,
     BUSINESS_AUTHORITY_PORT,
     STAFF_AUTHORITY_PORT,
     SELLER_PROFILE_READ_PORT,

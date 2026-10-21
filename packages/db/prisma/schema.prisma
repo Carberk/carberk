@@ -1432,6 +1432,7 @@ model InspectionOrder {
   identityRecords DiagnosticIdentityRecord[]
   identityEvidence DiagnosticIdentityEvidence[]
   identityProvenance DiagnosticIdentityProvenance[]
+  continuityProofCandidates DiagnosticContinuityProof[] @relation("ContinuityProofCandidate")
   @@unique([commissionerId, requestKey])
   @@index([commissionerId, createdAt(sort: Desc)])
   @@index([centerId, status, createdAt])
@@ -1781,6 +1782,7 @@ model DiagnosticReportRecord {
   identityEvidenceId String?
   identityEvidenceHash String?
   identityEvidence DiagnosticIdentityEvidence? @relation(fields: [identityEvidenceId], references: [id], onDelete: Restrict)
+  continuityProofPredecessors DiagnosticContinuityProof[] @relation("ContinuityProofPredecessor")
   finalizedAt DateTime?
   withdrawnAt DateTime?
   withdrawalReason String?
@@ -1791,6 +1793,34 @@ model DiagnosticReportRecord {
   artifacts DiagnosticPdfArtifact[]
   @@index([orderId, createdAt])
   @@map("diagnostic_reports")
+}
+
+/// Restricted proof content follows the shortest declared evidence/provenance rights.
+/// Invalidation is permanent even if current source values are later restored.
+model DiagnosticContinuityProof {
+  id String @id
+  predecessorReportId String?
+  predecessorReport DiagnosticReportRecord? @relation("ContinuityProofPredecessor", fields: [predecessorReportId], references: [id], onDelete: Restrict)
+  candidateOrderId String?
+  candidateOrder InspectionOrder? @relation("ContinuityProofCandidate", fields: [candidateOrderId], references: [id], onDelete: Restrict)
+  predecessorOrderId String?
+  issuerId String?
+  issuerSessionId String?
+  linkingTechnicianId String?
+  /// Minimal restricted reader envelope, never exposed by ordinary report readers.
+  content Json?
+  /// Server-only audiences, historical commissioners, immutable pins, classification
+  /// hashes, authorizations, candidate/observation/authority generations.
+  bindings Json?
+  rightsUntil DateTime
+  issuedAt DateTime
+  invalidatedAt DateTime?
+  erasedAt DateTime?
+  @@index([candidateOrderId, id])
+  @@index([predecessorReportId])
+  @@index([predecessorOrderId])
+  @@index([rightsUntil, erasedAt])
+  @@map("diagnostic_continuity_proofs")
 }
 
 /// Object identity is exact and immutable. Storage never exposes a public URL.
