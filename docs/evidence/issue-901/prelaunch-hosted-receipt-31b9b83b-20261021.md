@@ -7,9 +7,9 @@ PR Checks [39691115985](https://github.com/Carberk/carberk/actions/runs/39691115
 | Gate | Actual result | Limit |
 |---|---|---|
 | DB `119537514301` | 40/41 files, 390/391 tests pass | One interrupted-Redis case fails in the final read-only replay case. The new diagnostic records the locked-reset inventory as one backend, PID `467`, with verdict `backends`; the child connection is separately recorded as PID `460`. The refusal is `Clean reset refused: other database backends present`. No repair or cause is selected. |
-| Seed reconstruction | Pass in the prior assembled DB evidence | The approved deployed reference edits are still not established; this does not authorize a reset. |
+| Seed reconstruction | Pass in this DB job across two fresh migrated databases and repeated seeds | The approved deployed reference edits are still not established; this does not authorize a reset. |
 | Worker, within API job | 57/57 files, 373/373 tests pass | Existing worker correctness passes; deployed producer exclusion and grant-drain proof remain open. |
-| API `119537514253` | 323/324 files, 3159/3162 tests pass | All 69 private proof issuance cases pass. The three failures are the retained CampaignFullV3 Support barrier and suspended publish/attach PUT assertions; their later ordering assertions are unreached. |
+| API `119537514253` | 323/324 files, 3162/3165 tests pass | All 69 private proof issuance cases pass. The three failures are the retained CampaignFullV3 Support barrier and suspended publish/attach PUT assertions; their later ordering assertions are unreached. |
 | Private proof issuance and rollback | 69/69 cases pass | Real manual/manual issuance, restricted reads, invalidation, and PostgreSQL audit rollback execute. Consumption is not present in this candidate. |
 | Retained reset tails | Three RED assertions | Support barrier at `CampaignFullV3.e2e.spec.ts:2299`; publish and attach suspended-PUT assertions at `:3288`. No assertion, timeout or skip changes. |
 
