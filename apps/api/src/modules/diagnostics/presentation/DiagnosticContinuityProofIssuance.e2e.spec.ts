@@ -116,6 +116,7 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
     try { await objects.send(new CreateBucketCommand({ Bucket: "diagnostic-test-private" })); }
     catch (error) { if ((error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode !== 409) throw error; }
     await cleanup();
+    await seedSuiteCatalog(db, suite);
     for (const who of people) {
       await db.user.create({ data: { id: suite.id(who), phone: suite.phone(who), role: "buyer", phoneVerifiedAt: now } });
       await db.session.create({ data: { id: suite.id(`${who}-session`), userId: suite.id(who), refreshTokenHash: suite.id(`${who}-refresh`), expiresAt: future, adminTotpExpiresAt: future } });
@@ -152,7 +153,6 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
     let listingId: string | null = null;
     if (audience === "listing_public") {
       allowPublic = true;
-      await seedSuiteCatalog(db, suite);
       listingId = randomUUID();
       await db.listing.create({ data: { id: listingId, sellerId: suite.id(commissioner), brandId: suite.catalog.brandId,
         modelId: suite.catalog.modelId, cityId: suite.catalog.cityId, status: "active", priceAmount: 100000, priceTmt: 100000, priceCurrency: "TMT" } });
@@ -501,10 +501,51 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
     const unknown = await refused(p, () => request.get(`/api/v1/diagnostics/${issuancePath(p)}/${randomUUID()}`).set(sameJwt));
     expect(unknown).toEqual(real);
   });
-  it.each(["buyer", "technician", "alternateReviewer"] as const)("withholds real and unknown proof handles from %s", async who => {
+  it.each([["buyer", "buyer"], ["B-only technician", "technician"], ["unassigned alternate reviewer", "alternateReviewer"]] as const)("withholds real and unknown proof handles from %s", async (_label, who) => {
     const p = await pair(); const proofId = await ordinaryProof(p);
+    if (who === "technician") await assignment(p.a, "technician", false, "diagnostics.technician");
     const real = await refused(p, () => get(who, `${issuancePath(p)}/${proofId}`));
     expect(await refused(p, () => get(who, `${issuancePath(p)}/${randomUUID()}`))).toEqual(real);
+  });
+
+  it("lets a current qualified technician assigned to both orders read the same restricted proof as the reviewer", async () => {
+    const p = await pair(); const proofId = await ordinaryProof(p);
+    const comparison = await get("reviewer", comparisonPath(p.b, p.released.id)).expect(200);
+    const expected = {
+      proofId,
+      policyVersion: "ADR-0108",
+      predecessor: {
+        reportId: p.released.id,
+        reportVersion: 3,
+        snapshotHash: comparison.body.predecessor.snapshotHash,
+        identityRecordId: p.ia.id,
+        identityRecordHash: p.ia.observationHash,
+      },
+      candidate: {
+        orderId: p.b.id,
+        orderVersion: 7,
+        identityRecordId: p.ib.id,
+        identityRecordHash: p.ib.observationHash,
+      },
+      linkingTechnicianId: suite.id("technician"),
+      method: "comparative_attestation",
+      result: "same_vehicle",
+      rationale: "Same stamped chassis; independently observed on both visits",
+      provenanceRecordIds: [p.pa, p.pb],
+      issuedBy: suite.id("reviewer"),
+      issuedAt: "2026-10-21T12:00:00.000Z",
+    };
+    const before = await stored(p);
+    try {
+      const reviewer = await get("reviewer", `${issuancePath(p)}/${proofId}`).expect(200);
+      const technician = await get("technician", `${issuancePath(p)}/${proofId}`).expect(200);
+      privateNoStore(reviewer); privateNoStore(technician);
+      expect(reviewer.body).toEqual(expected);
+      expect(technician.body).toEqual(expected);
+      expect(technician.body).toEqual(reviewer.body);
+    } finally {
+      expect(await stored(p)).toEqual(before);
+    }
   });
 
   it("returns generic denial for an unknown proof handle to the current qualified reviewer", async () => {
