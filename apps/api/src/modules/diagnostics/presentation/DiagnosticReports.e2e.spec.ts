@@ -456,22 +456,34 @@ describe("diagnostic authoring and immutable audience release", () => {
   const audits = async () => (await db.diagnosticAudit.findMany({ where: { centerId } })).map(row => ({ id: row.id, orderId: row.orderId, actorId: row.actorId, action: row.action, reportId: (row.details as { reportId?: string }).reportId }));
   /** Real PostgreSQL barrier, no fixed delay: the test holds both visit rows until every dispatched
    * request is observed waiting on them (directly or queued behind another contender's identity
-   * lock), then releases them together so the transactions contend inside the product's own locks. */
+   * lock), then releases them together so the transactions contend inside the product's own locks.
+   * Requests are only awaited after the holder has unwound (waiting earlier would deadlock on its rows);
+   * a barrier failure drains them first and stays the thrown error, otherwise any request failure propagates. */
   async function contend(orderIds: string[], dispatch: () => ReturnType<typeof post>[]) {
-    let responses!: Promise<Awaited<ReturnType<typeof post>>[]>;
-    await db.$transaction(async tx => {
-      const [holder] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
-      for (const id of [...orderIds].sort()) await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${id} FOR UPDATE`;
-      const requests = dispatch(); responses = Promise.all(requests);
-      // pg_stat_activity is snapshotted per transaction, so waiters are observed outside the holder.
-      for (let attempt = 0; ; attempt++) {
-        const [observed] = await db.$queryRaw<{ waiting: number }[]>`WITH direct AS (SELECT activity.pid FROM pg_stat_activity activity WHERE ${holder!.pid}::int = ANY(pg_blocking_pids(activity.pid)))
-          SELECT ((SELECT count(*) FROM direct) + (SELECT count(*) FROM pg_stat_activity activity WHERE activity.pid NOT IN (SELECT pid FROM direct) AND pg_blocking_pids(activity.pid) && ARRAY(SELECT pid FROM direct)))::int AS waiting`;
-        if (observed!.waiting >= requests.length) break;
-        if (attempt === 500) throw new Error(`Only ${observed!.waiting} of ${requests.length} diagnostic requests reached the row-lock barrier`);
-      }
-    });
-    return responses;
+    let settled: Promise<PromiseSettledResult<Awaited<ReturnType<typeof post>>>[]> | undefined;
+    try {
+      await db.$transaction(async tx => {
+        const [holder] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+        for (const id of [...orderIds].sort()) await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${id} FOR UPDATE`;
+        // allSettled sends every request and observes its rejection at once, and never rejects itself.
+        const requests = dispatch(); settled = Promise.allSettled(requests);
+        // pg_stat_activity is snapshotted per transaction, so waiters are observed outside the holder.
+        for (let attempt = 0; ; attempt++) {
+          const [observed] = await db.$queryRaw<{ waiting: number }[]>`WITH direct AS (SELECT activity.pid FROM pg_stat_activity activity WHERE ${holder!.pid}::int = ANY(pg_blocking_pids(activity.pid)))
+            SELECT ((SELECT count(*) FROM direct) + (SELECT count(*) FROM pg_stat_activity activity WHERE activity.pid NOT IN (SELECT pid FROM direct) AND pg_blocking_pids(activity.pid) && ARRAY(SELECT pid FROM direct)))::int AS waiting`;
+          if (observed!.waiting >= requests.length) break;
+          if (attempt === 500) throw new Error(`Only ${observed!.waiting} of ${requests.length} diagnostic requests reached the row-lock barrier`);
+        }
+      });
+    } catch (barrierFailure) {
+      // The holder has rolled back and released the rows, so draining cannot deadlock or throw.
+      await settled;
+      throw barrierFailure;
+    }
+    const results = await settled!;
+    const failed = results.find(result => result.status === "rejected");
+    if (failed) throw failed.reason;
+    return results.map(result => (result as PromiseFulfilledResult<Awaited<ReturnType<typeof post>>>).value);
   }
   it("links one reinspection when identical requests contend for the same visit and predecessor", async () => {
     const { first, secondOrder, released } = await contestedPredecessor("technician");

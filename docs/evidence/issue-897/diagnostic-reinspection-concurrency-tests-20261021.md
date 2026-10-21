@@ -17,6 +17,17 @@ A 500 or raw Prisma error fails the status oracle. An unexpected interleaving fa
 
 `contend` opens a test-owned transaction. It locks orders A and B with `FOR UPDATE`, sorted by id, then dispatches the requests. It releases the locks only when PostgreSQL shows every request waiting, either on the holder or behind another contender that is itself blocked by the holder. Waiters are counted outside the holder transaction, because `pg_stat_activity` is snapshotted per transaction. The wait has a bound of 500 queries and no fixed delay. Product locks then decide the order: identity row, Listing `FOR SHARE`, order A, then report A, for both `correct` and `reinspect`.
 
+### Request lifecycle and cleanup (follow-up to root's pre-assembly finding)
+
+The first checkpoint started `Promise.all(requests)` inside the holder callback. If the observer query, the holder transaction or the 500-query bound failed, `contend` threw without awaiting those requests. They could then finish during teardown, and a rejection could go unhandled while the observer was still running. The follow-up changes only the helper's request lifecycle:
+
+1. As soon as `dispatch()` returns, `Promise.allSettled(requests)` calls `then` on each supertest request. That sends every request and attaches a rejection handler in the same step. The aggregate never rejects, so no request can become an unhandled rejection at any point.
+2. Requests are never awaited inside the callback. The holder still owns the order row locks there, and the requests are blocked on those locks, so waiting at that point would deadlock.
+3. Failure path: `$transaction` rejects only after Prisma has rolled the holder back, which releases the rows. The `catch` then awaits the settled aggregate. That lets every dispatched request run to completion against the released rows before the helper returns. The `catch` then rethrows the original barrier or transaction error unchanged. Draining cannot replace that error, because `allSettled` cannot reject. If `dispatch()` itself throws, nothing was sent, since supertest sends only on `then`/`end`. The aggregate is still unset, the drain is a no-op, and that error is rethrown.
+4. Success path: after the holder commits, the helper awaits the aggregate. If any request rejected (a transport error, not an HTTP status), its reason is thrown, so a failure is never reported as success. Otherwise it returns the responses in dispatch order, as before. The status, body, storage and audit oracles of both cases are unchanged.
+
+The timeout, request count, 500-query bound, `pg_blocking_pids` condition and lock order are unchanged. There is no fixed delay.
+
 The identical pair shares one actor, so the second request queues on the first request's `users` row lock. That is the product's real serialization, and the barrier counts it as waiting. The race pair uses two currently assigned, center-qualified technicians with separate sessions, so both transactions block on the order rows at the same time.
 
 ## Small helper extensions (existing cases untouched)
@@ -34,6 +45,8 @@ The identical pair shares one actor, so the second request queues on the first r
 | `npx eslint --max-warnings 0 <spec>` (apps/api) | pass |
 | `AUTO_TM_TEST_DATABASES=off npx vitest list <spec>` | both new cases collected, along with all existing cases |
 | `pnpm check:agent-docs`; `git diff --check` | pass; clean |
+
+The request-lifecycle follow-up reran the same offline set once, after a `--frozen-lockfile` install: contracts/db build, TS7 and TS6 typecheck, eslint on the spec, `vitest list` (both new cases collected), `check:agent-docs` and `git diff --check`. All passed.
 
 **Runtime: UNKNOWN.** No PostgreSQL, MinIO, Docker, staging or CI run was used. Root's hosted `pnpm test:api` on the assembled candidate is the only runtime evidence. These cases were not written to fail. The source lock plan predicts green, but that is a prediction, not an execution.
 
