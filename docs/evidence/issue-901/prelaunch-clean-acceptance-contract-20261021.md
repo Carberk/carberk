@@ -178,6 +178,6 @@ Live access, origins, seed sufficiency and intentional deployed edits are **UNKN
 Before any operator code, the next new brief is **NP-4** in `CleanRetiredUploads.e2e.spec.ts`, with no campaign reservation. NP-3 continues with its active writer.
 
 - NP-3 is already assigned to the active `ServiceLifecycle` writer (worker selection, reopen and account erasure). It needs ordinary reopen behavior plus transparent locked database ordering on the same source row-lock contract, and a late sweep after purge making zero storage requests. It does not need worker/API cross-workspace scaffolding just because the old case used HTTP. If the contract cannot be shown this way, the writer records why. A deployed/browser joined HTTP race stays required where the spec demands it.
-- NP-4: a generator PUT held in flight across claim-deadline recovery and cleanup is refused and resurrects nothing. Cover publish and attach.
+- NP-4: cleanup serializes with a generator conditional PUT held in flight across claim-deadline recovery and removes what it wrote, while a conditional PUT submitted after deletion is refused. Nothing survives. Cover publish and attach.
 
 Record RED or the existing-coverage proof, then GREEN. Confirm rows 10, 11, 25 and 26 at the same time and add NP-1 or NP-2 only if needed. Then, as a separate reviewed writer, implement OT-GUARD and OT-QUIESCE first. Only after both are green does the assembly retire the reset tails of rows 28, 33 and 34.

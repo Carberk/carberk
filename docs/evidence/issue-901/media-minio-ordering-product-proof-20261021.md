@@ -1,6 +1,6 @@
 # NP-4 media ordering on MinIO: test-premise correction, 2026-10-21
 
-Test checkpoint for #901 under #897, integration PR #904, from integration SHA `7e077fab`. The only file changed is `apps/worker/src/jobs/CleanRetiredUploads.e2e.spec.ts`. It does not change product source, timeouts, retries, concurrency or guards. Nothing is skipped and no assertion is softened. This is an approved correction of a test premise. **It is not a claim that the source is GREEN.** `CampaignFullV3.e2e.spec.ts` `:2299` and both `:3288` media cases are unchanged and remain RED. They stay RED until an equivalent direct hosted proof and the S1/S2 operator replacement exist.
+Test checkpoint for #901 under #897, integration PR #904, from integration SHA `7e077fab`, with one follow-up for failure-path test isolation. The only test file changed is `apps/worker/src/jobs/CleanRetiredUploads.e2e.spec.ts`. The follow-up also updates this note and the NP-4 line of `prelaunch-clean-acceptance-contract-20261021.md`. Neither changes product source, requests, signals, timeouts, retries, concurrency, guards or ordering assertions. Nothing is skipped and no assertion is softened. This is an approved correction of a test premise. **It is not a claim that the source is GREEN.** `CampaignFullV3.e2e.spec.ts` `:2299` and both `:3288` media cases are unchanged and remain RED. They stay RED until an equivalent direct hosted proof and the S1/S2 operator replacement exist.
 
 ## Diagnosis
 
@@ -22,9 +22,11 @@ On a store that serializes per key, neither can be true. The prior read-only dia
 | Foreign account intact | Retained: the foreign User, active Listing, ListingMedia and ADOPTED upload are unchanged, with no work and byte-identical objects. |
 | — | Added: a later sweep on a fresh observed client returns `{0,0,0}` and issues **zero** storage commands. |
 
+Failure-path isolation: `sweepAgainstHeldPut` captures the first error thrown while the PUT is held. On every path it then releases the PUT and drains both `held.outcome` and the sweep. Only after that does it rethrow the captured error, or else a PUT or sweep rejection. A cleanup error cannot mask the first assertion, and no sweep keeps running into the next case.
+
 The ordering proof comes from the store's own answers, with no sleep. The DELETE is observed as issued before release. The If-Match PUT is then `written`, which needs the object to still exist with the old ETag. After that, every key answers 404 and no other writer exists. So MinIO applied the PUT before the DELETE, and cleanup removed what the late generator wrote. The observer only forwards each command to the real client with its own signal and records when it is issued and answered.
 
-The stale-ETag PUT-after-cleanup refusal test ("generation versus retirement") is byte-identical. Test names changed from "…held across … cleanup resurrects nothing" to "cleanup waits for a generator PUT held across …, then nothing survives". Contract note `prelaunch-clean-acceptance-contract-20261021.md:181` ("is refused") needs a matching wording update by its owner.
+The stale-ETag PUT-after-cleanup refusal test ("generation versus retirement") is byte-identical. Test names changed from "…held across … cleanup resurrects nothing" to "cleanup waits for a generator PUT held across …, then nothing survives". The NP-4 line of contract note `prelaunch-clean-acceptance-contract-20261021.md` now matches this wording.
 
 ## Verification (offline only)
 

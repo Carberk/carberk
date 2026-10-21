@@ -330,6 +330,10 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
     const observed = observedS3();
     const sweep = new CleanRetiredUploads(ledger, new S3RetiredObjectStore(observed.client))
       .execute({ now: SWEEP, limit: 10 });
+    // On every path the PUT is released and both it and the sweep are drained
+    // before returning, so nothing runs on into the next case. The first
+    // failure wins; a cleanup error never masks it.
+    let failure: { error: unknown } | undefined;
     try {
       expect(index).toBeGreaterThanOrEqual(0);
       await Promise.race([observed.issued("DeleteObjectCommand", heldKey), sweep.then((result) => {
@@ -346,11 +350,15 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
         { command: "DeleteObjectCommand", Key: heldKey, answered: false },
       ]);
       expect(held.inFlight()).toBe(true);
-    } finally {
-      held.release();
+    } catch (error) {
+      failure = { error };
     }
-    const put = await held.outcome;
-    return { put, sweep: await sweep, keys, calls: observed.calls };
+    held.release();
+    const [put, swept] = await Promise.allSettled([held.outcome, sweep]);
+    if (failure) throw failure.error;
+    if (put.status === "rejected") throw put.reason;
+    if (swept.status === "rejected") throw swept.reason;
+    return { put: put.value, sweep: swept.value, keys, calls: observed.calls };
   }
 
   /** The rest of NP-4, after the held PUT and the sweep both answered. */
