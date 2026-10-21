@@ -35,6 +35,71 @@ const sourceFiles = { "brands.json": brands, "models.json": models, "regions.jso
 const checksum = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const sorted = <T>(rows: T[], key: (row: T) => string) => [...rows].sort((a, b) => key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0);
 
+// Existing checked-in collisions, not approval to replace live reference content.
+// Pin every source variant and the literal persisted names independently of the CLI.
+const modelCollisions = [
+  { brandSlug: "lexus", slug: "is-f", inputs: [
+    { index: 89, nameRu: "IS F", nameTk: "IS F", nameEn: "IS F" },
+    { index: 90, nameRu: "IS-F", nameTk: "IS-F", nameEn: "IS-F" },
+  ], persisted: { nameRu: "IS-F", nameTk: "IS-F", nameEn: "IS-F" } },
+  { brandSlug: "hyundai", slug: "santa-cruz", inputs: [
+    { index: 366, nameRu: "Santa Cruz", nameTk: "Santa Cruz", nameEn: "Santa Cruz" },
+    { index: 367, nameRu: "Santa Cruz", nameTk: "Santa Cruz", nameEn: "Santa Cruz" },
+  ], persisted: { nameRu: "Santa Cruz", nameTk: "Santa Cruz", nameEn: "Santa Cruz" } },
+  { brandSlug: "chevrolet", slug: "trailblazer", inputs: [
+    { index: 563, nameRu: "TrailBlazer", nameTk: "TrailBlazer", nameEn: "TrailBlazer" },
+    { index: 565, nameRu: "Trailblazer", nameTk: "Trailblazer", nameEn: "Trailblazer" },
+  ], persisted: { nameRu: "Trailblazer", nameTk: "Trailblazer", nameEn: "Trailblazer" } },
+  { brandSlug: "mazda", slug: "mazda6", inputs: [
+    { index: 595, nameRu: "MAZDA6", nameTk: "MAZDA6", nameEn: "MAZDA6" },
+    { index: 606, nameRu: "Mazda6", nameTk: "Mazda6", nameEn: "Mazda6" },
+  ], persisted: { nameRu: "Mazda6", nameTk: "Mazda6", nameEn: "Mazda6" } },
+  { brandSlug: "nissan", slug: "cube", inputs: [
+    { index: 682, nameRu: "Cube", nameTk: "Cube", nameEn: "Cube" },
+    { index: 727, nameRu: "cube", nameTk: "cube", nameEn: "cube" },
+  ], persisted: { nameRu: "cube", nameTk: "cube", nameEn: "cube" } },
+  { brandSlug: "kia", slug: "bongo", inputs: [
+    { index: 729, nameRu: "Bongo", nameTk: "Bongo", nameEn: "Bongo" },
+    { index: 730, nameRu: "Bongo", nameTk: "Bongo", nameEn: "Bongo" },
+  ], persisted: { nameRu: "Bongo", nameTk: "Bongo", nameEn: "Bongo" } },
+  { brandSlug: "ford", slug: "th!nk", inputs: [
+    { index: 968, nameRu: "TH!NK", nameTk: "TH!NK", nameEn: "TH!NK" },
+    { index: 972, nameRu: "Th!nk", nameTk: "Th!nk", nameEn: "Th!nk" },
+  ], persisted: { nameRu: "Th!nk", nameTk: "Th!nk", nameEn: "Th!nk" } },
+  { brandSlug: "kamaz", slug: "6520", inputs: [
+    { index: 1237, nameRu: "6520", nameTk: "6520", nameEn: "6520" },
+    { index: 1238, nameRu: "6520", nameTk: "6520", nameEn: "6520" },
+  ], persisted: { nameRu: "6520", nameTk: "6520", nameEn: "6520" } },
+  { brandSlug: "pontiac", slug: "solstice", inputs: [
+    { index: 1475, nameRu: "Solstice", nameTk: "Solstice", nameEn: "Solstice" },
+    { index: 1476, nameRu: "Solstice", nameTk: "Solstice", nameEn: "Solstice" },
+  ], persisted: { nameRu: "Solstice", nameTk: "Solstice", nameEn: "Solstice" } },
+  { brandSlug: "komatsu", slug: "hm400-5", inputs: [
+    { index: 1785, nameRu: "HM400-5", nameTk: "HM400-5", nameEn: "HM400-5" },
+    { index: 1786, nameRu: "HM400-5", nameTk: "HM400-5", nameEn: "HM400-5" },
+  ], persisted: { nameRu: "HM400-5", nameTk: "HM400-5", nameEn: "HM400-5" } },
+  { brandSlug: "shantui", slug: "sg18-3", inputs: [
+    { index: 2299, nameRu: "SG18-3", nameTk: "SG18-3", nameEn: "SG18-3" },
+    { index: 2300, nameRu: "SG18-3", nameTk: "SG18-3", nameEn: "SG18-3" },
+  ], persisted: { nameRu: "SG18-3", nameTk: "SG18-3", nameEn: "SG18-3" } },
+  { brandSlug: "shantui", slug: "sg24-c5", inputs: [
+    { index: 2302, nameRu: "SG24-C5", nameTk: "SG24-C5", nameEn: "SG24-C5" },
+    { index: 2303, nameRu: "SG24-C5", nameTk: "SG24-C5", nameEn: "SG24-C5" },
+  ], persisted: { nameRu: "SG24-C5", nameTk: "SG24-C5", nameEn: "SG24-C5" } },
+  { brandSlug: "shantui", slug: "sr20ma", inputs: [
+    { index: 2315, nameRu: "SR20MA", nameTk: "SR20MA", nameEn: "SR20MA" },
+    { index: 2316, nameRu: "SR20MA", nameTk: "SR20MA", nameEn: "SR20MA" },
+  ], persisted: { nameRu: "SR20MA", nameTk: "SR20MA", nameEn: "SR20MA" } },
+  { brandSlug: "shantui", slug: "sr20yt", inputs: [
+    { index: 2317, nameRu: "SR20YT", nameTk: "SR20YT", nameEn: "SR20YT" },
+    { index: 2318, nameRu: "SR20YT", nameTk: "SR20YT", nameEn: "SR20YT" },
+  ], persisted: { nameRu: "SR20YT", nameTk: "SR20YT", nameEn: "SR20YT" } },
+  { brandSlug: "shantui", slug: "srd12", inputs: [
+    { index: 2321, nameRu: "SRD12", nameTk: "SRD12", nameEn: "SRD12" },
+    { index: 2322, nameRu: "SRD12", nameTk: "SRD12", nameEn: "SRD12" },
+  ], persisted: { nameRu: "SRD12", nameTk: "SRD12", nameEn: "SRD12" } },
+];
+
 type Snapshot = {
   brands: unknown[]; models: unknown[]; regions: unknown[]; cities: unknown[];
   bodyTypes: unknown[]; colors: unknown[]; engineTypes: unknown[]; transmissions: unknown[]; driveTypes: unknown[];
@@ -53,7 +118,7 @@ async function snapshot(pool: Pg.Pool): Promise<Snapshot> {
     engineTypes: await query('SELECT "nameRu", "nameTk", "nameEn" FROM engine_types ORDER BY "nameEn" COLLATE "C"'),
     transmissions: await query('SELECT "nameRu", "nameTk", "nameEn" FROM transmissions ORDER BY "nameEn" COLLATE "C"'),
     driveTypes: await query('SELECT "nameRu", "nameTk", "nameEn" FROM drive_types ORDER BY "nameEn" COLLATE "C"'),
-    exchangeRates: await query('SELECT "fromCurrency", "toCurrency", rate::double precision AS rate, "setByUserId" FROM exchange_rates ORDER BY "fromCurrency", "toCurrency"'),
+    exchangeRates: await query('SELECT "fromCurrency", "toCurrency", rate::double precision AS rate, "setByUserId" FROM exchange_rates ORDER BY "fromCurrency"::text COLLATE "C", "toCurrency"::text COLLATE "C"'),
     generations: Number((await query<{ count: string }>('SELECT count(*)::text AS count FROM generations'))[0]?.count ?? 0),
     protectedCounts: Object.fromEntries(await Promise.all([
       "users", "sessions", "staff_grants", "diagnostic_centers", "diagnostic_center_assignments", "diagnostic_template_versions",
@@ -63,8 +128,25 @@ async function snapshot(pool: Pg.Pool): Promise<Snapshot> {
 }
 
 function expected(): Snapshot {
+  const modelKey = (row: { brandSlug: string; slug: string }) => `${row.brandSlug}\0${row.slug}`;
+  const groups = new Map<string, Array<(typeof models)[number] & { index: number }>>();
+  models.forEach((row, index) => {
+    const key = modelKey(row);
+    groups.set(key, [...(groups.get(key) ?? []), { index, ...row }]);
+  });
+  // Fail on any new, missing or changed collision, including its source position.
+  expect(sorted([...groups.entries()].filter(([, rows]) => rows.length > 1).map(([key, inputs]) => ({ key, inputs })), (group) => group.key)).toEqual(
+    sorted(modelCollisions.map(({ brandSlug, slug, inputs }) => ({ key: modelKey({ brandSlug, slug }), inputs: inputs.map((input) => ({ brandSlug, slug, ...input })) })), (group) => group.key),
+  );
+  expect(groups.size).toBe(2420);
+  const collisionKeys = new Set(modelCollisions.map(modelKey));
+  const persistedModels = [
+    ...models.filter((row) => !collisionKeys.has(modelKey(row))),
+    ...modelCollisions.map(({ brandSlug, slug, persisted }) => ({ brandSlug, slug, ...persisted })),
+  ];
+  expect(persistedModels).toHaveLength(2420);
   return {
-    brands: sorted(brands.map((x) => ({ ...x, logoKey: null })), (x) => x.slug), models: sorted(models, (x) => `${x.brandSlug}\0${x.slug}`),
+    brands: sorted(brands.map((x) => ({ ...x, logoKey: null })), (x) => x.slug), models: sorted(persistedModels, modelKey),
     regions: sorted(regions, (x) => x.slug), cities: sorted(cities, (x) => `${x.regionSlug}\0${x.slug}`),
     bodyTypes: sorted(bodyTypes, (x) => x.nameEn), colors: sorted(colors, (x) => x.nameEn),
     engineTypes: sorted(engineTypes, (x) => x.nameEn), transmissions: sorted(transmissions, (x) => x.nameEn), driveTypes: sorted(driveTypes, (x) => x.nameEn),
@@ -121,7 +203,7 @@ describe("checked-in baseline seed on fresh migrated PostgreSQL", () => {
       expect(first).toContain("Seeded 130 brands");
       const firstSnapshot = await snapshot(pool); expect(firstSnapshot).toEqual(baseline); snapshots.push(firstSnapshot);
       const ids = await readIds(); identities.push(ids);
-      expect(ids).toHaveLength(2647);
+      expect(ids).toHaveLength(2632);
       for (const row of ids) expect(row.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
       execFileSync("pnpm", ["seed"], { cwd: packageRoot, env: { ...process.env, DATABASE_URL: databaseUrl }, stdio: "pipe" });
       expect(await snapshot(pool)).toEqual(firstSnapshot);
