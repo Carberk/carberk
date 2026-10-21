@@ -2451,6 +2451,22 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     const catalog = suite.catalog;
     const keys = new Map<string, string[]>([[id, []], [foreignId, []]]);
     const cleanupIds: string[] = [], smsIds = new Set<string>();
+    const traceOrigin = process.hrtime.bigint();
+    const monotonicMs = () => Number(process.hrtime.bigint() - traceOrigin) / 1_000_000;
+    type Timing = { stage: string; tMs: number; key?: string; durationMs?: number; name?: string; status?: number | null; aborted?: boolean };
+    const timings: Timing[] = [];
+    let droppedTimings = 0, traceHeads = false;
+    const trace = (stage: string, fields: Omit<Timing, "stage" | "tMs"> = {}) => {
+      if (timings.length < 80) timings.push({ stage, tMs: Math.round(monotonicMs() * 1000) / 1000, ...fields });
+      else droppedTimings += 1;
+    };
+    const syntheticKey = (key: string) => `primary-key-${keys.get(id)!.indexOf(key) + 1}`;
+    const failureFields = (error: unknown) => {
+      const failure = error as { name?: unknown; $metadata?: { httpStatusCode?: unknown } } | null;
+      const name = typeof failure?.name === "string" && /^[A-Za-z][A-Za-z0-9]{0,47}$/.test(failure.name) ? failure.name : "UnknownError";
+      const status = failure?.$metadata?.httpStatusCode;
+      return { name, status: typeof status === "number" && Number.isInteger(status) && status >= 100 && status <= 599 ? status : null };
+    };
     let s3: S3Client | undefined, catalogOwned = false;
     let resume = () => {};
     let pending: Promise<{ status: number }> | undefined;
@@ -2494,8 +2510,17 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
       });
       return JSON.parse(result.stdout.trim()) as number | { cancelledPreparations: number; deleted: number; waiting: number };
     };
-    const head = (Key: string) => s3!.send(new HeadObjectCommand({ Bucket: "listing-photos", Key })).then(() => 200,
-      (error: { $metadata?: { httpStatusCode?: number } }) => error.$metadata?.httpStatusCode ?? error);
+    const head = (Key: string) => {
+      const observed = traceHeads && keys.get(id)!.includes(Key), began = monotonicMs();
+      if (observed) trace("verification-head-start", { key: syntheticKey(Key) });
+      return s3!.send(new HeadObjectCommand({ Bucket: "listing-photos", Key })).then(() => {
+        if (observed) trace("verification-head-end", { key: syntheticKey(Key), durationMs: monotonicMs() - began, status: 200 });
+        return 200;
+      }, (error: { $metadata?: { httpStatusCode?: number } }) => {
+        if (observed) trace("verification-head-end", { key: syntheticKey(Key), durationMs: monotonicMs() - began, ...failureFields(error) });
+        return error.$metadata?.httpStatusCode ?? error;
+      });
+    };
     const manifest = (key: string) => ["original", "thumbnail", "list", "detail", "fullscreen"].map(name => key.replace(/original\.webp$/, `${name}.webp`));
     const business = (attempt: ReturnType<typeof post>, businessId: string) => attempt.set("x-business-id", businessId);
     const state = async (businessId: string) => ({
@@ -2622,7 +2647,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
       const held = new Set<string>(), refusals: number[] = [];
       let allStarted!: () => void, released = false, completedBeforeRelease = false;
       const started = new Promise<void>(resolve => { allStarted = resolve; });
-      const release = new Promise<void>(resolve => { resume = () => { released = true; resolve(); }; });
+      const release = new Promise<void>(resolve => { resume = () => { if (!released) trace("stream-release"); released = true; resolve(); }; });
       generator.s3 = { send: async (command: unknown, options?: { abortSignal?: AbortSignal }) => {
         if (command instanceof PutObjectCommand && photos.some(photo => manifest(photo.key).includes(command.input.Key ?? "")) && !held.has(command.input.Key!)) {
           const key = command.input.Key!;
@@ -2632,19 +2657,30 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
           expect(Buffer.isBuffer(command.input.Body)).toBe(true);
           const body = command.input.Body as Buffer;
           const split = Math.max(1, Math.floor(body.length / 2));
+          const began = monotonicMs(), signal = options?.abortSignal;
+          let settlement = { name: "Fulfilled", status: null as number | null };
+          const onAbort = () => trace("held-abort", { key: syntheticKey(key), durationMs: monotonicMs() - began, aborted: signal?.aborted ?? false });
+          signal?.addEventListener("abort", onAbort, { once: true });
+          trace("held-send", { key: syntheticKey(key), aborted: signal?.aborted ?? false });
           const streamed = Readable.from((async function* () {
             yield body.subarray(0, split);
+            trace("held-body-consumed", { key: syntheticKey(key), durationMs: monotonicMs() - began, aborted: signal?.aborted ?? false });
             held.add(key);
             if (held.size === photos.length) allStarted();
             await release;
             yield body.subarray(split);
           })());
           try {
-            return await s3!.send(new PutObjectCommand({ ...command.input, Body: streamed, ContentLength: body.length }), options);
+            const result = await s3!.send(new PutObjectCommand({ ...command.input, Body: streamed, ContentLength: body.length }), options);
+            settlement = { ...failureFields({ name: "Fulfilled", $metadata: result.$metadata }) };
+            return result;
           } catch (error) {
+            settlement = failureFields(error);
             refusals.push((error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode ?? 0);
             throw error;
           } finally {
+            trace("held-settled", { key: syntheticKey(key), durationMs: monotonicMs() - began, ...settlement, aborted: signal?.aborted ?? false });
+            signal?.removeEventListener("abort", onAbort);
             if (!released) completedBeforeRelease = true;
           }
         }
@@ -2666,14 +2702,20 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
       if (mode === "publish") expect(await db.listing.findUnique({ where: { id: targetId } })).toBeNull();
       else expect(targetId).toBe(primary.listingId);
       const beforeBlockedReset = await digest(id), beforeState = await state(primary.businessId);
-      expect(execute("reset", id)).toMatchObject({ code: 1, receipt: undefined });
+      const blockedResetBegan = monotonicMs();
+      trace("blocked-reset-start");
+      try { expect(execute("reset", id)).toMatchObject({ code: 1, receipt: undefined }); }
+      finally { trace("blocked-reset-end", { durationMs: monotonicMs() - blockedResetBegan }); }
       expect(await digest(id)).toBe(beforeBlockedReset);
       expect(await state(primary.businessId)).toEqual(beforeState);
       await foreignUnchanged();
       // Existing production recovery time input. No fake global clock or database timestamp edits.
       const now = new Date(Math.max(...preparing.map(upload => upload.claimDeadline!.getTime())) + 1);
       await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 78 : 89);
-      expect(await workerCleanup("recover", now, 3)).toBe(mode === "publish" ? 3 : 1);
+      const recoveryBegan = monotonicMs();
+      trace("recovery-start");
+      try { expect(await workerCleanup("recover", now, 3)).toBe(mode === "publish" ? 3 : 1); }
+      finally { trace("recovery-end", { durationMs: monotonicMs() - recoveryBegan }); }
       await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 81 : 90);
       for (const photo of photos) {
         expect(await db.mediaUpload.findUniqueOrThrow({ where: { id: photo.id } })).toMatchObject({
@@ -2691,10 +2733,15 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
       expect(await owned(foreignId)).toHaveLength(65);
       const receipt = { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 };
       await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 81 : 90);
-      expect(await asynchronousReset(id)).toMatchObject({ code: 0, receipt });
+      const resetBegan = monotonicMs();
+      trace("exact-reset-start");
+      try { expect(await asynchronousReset(id)).toMatchObject({ code: 0, receipt }); }
+      finally { trace("exact-reset-end", { durationMs: monotonicMs() - resetBegan }); }
       await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 142 : 156);
       await mediaDisposed(id, before, primary.requestIds);
-      for (const key of keys.get(id)!) expect(await head(key), `absent before generator resumes ${key}`).toBe(404);
+      traceHeads = true;
+      try { for (const key of keys.get(id)!) expect(await head(key), `absent before generator resumes ${key}`).toBe(404); }
+      finally { traceHeads = false; }
       const terminal = await digest(id);
       const objectLedger = () => rows(`SELECT object_key,upload_id,bucket,absent FROM "cf_${id}".campaign_object_ledger ORDER BY object_key`);
       const terminalObjects = await objectLedger();
@@ -2728,40 +2775,50 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
         await foreignUnchanged();
       }
       await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 142 : 156);
-      expect(execute("reset", id)).toMatchObject({ code: 0, receipt });
+      const retryBegan = monotonicMs();
+      trace("terminal-retry-start");
+      try { expect(execute("reset", id)).toMatchObject({ code: 0, receipt }); }
+      finally { trace("terminal-retry-end", { durationMs: monotonicMs() - retryBegan }); }
       expect(await digest(id)).toBe(terminal);
       expect(await objectLedger()).toEqual(terminalObjects);
       for (const key of keys.get(id)!) expect(await head(key)).toBe(404);
       await foreignUnchanged();
       await journal(foreignId, 66, 87);
       const foreignBefore = await owned(foreignId);
-      expect(execute("reset", foreignId)).toMatchObject({ code: 0, receipt });
+      const controlResetBegan = monotonicMs();
+      trace("control-reset-start");
+      try { expect(execute("reset", foreignId)).toMatchObject({ code: 0, receipt }); }
+      finally { trace("control-reset-end", { durationMs: monotonicMs() - controlResetBegan }); }
       await journal(foreignId, 66, 152);
       await mediaDisposed(foreignId, foreignBefore, foreign.requestIds);
       for (const key of keys.get(foreignId)!) expect(await head(key)).toBe(404);
     } finally {
-      resume();
-      try { await pending; } finally {
-        if (generator) generator.s3 = originalTransport;
-        try {
-          for (const reservation of cleanupIds) expect.soft(execute("reset", reservation).code, `exact reset ${reservation}`).toBe(0);
-          for (const requestId of smsIds) expect.soft(await queue.getJob(requestId), "SMS has no email job").toBeUndefined();
-          if (s3) for (const key of [...keys.values()].flat()) {
-            const status = await head(key);
-            const failure = status === 200 ? await s3.send(new DeleteObjectCommand({ Bucket: "listing-photos", Key: key })).then(() => undefined, (error: unknown) => error) : status === 404 ? undefined : status;
-            expect.soft(failure, `exact known key cleanup ${key}`).toBeUndefined();
-          }
-          if (catalogOwned) {
-            const references = await catalogReferences();
-            expect.soft(references, "catalog retained while referenced").toBe(0);
-            if (references === 0) {
-              await db.city.deleteMany({ where: { id: catalog.cityId } });
-              await db.region.deleteMany({ where: { id: catalog.regionId } });
-              await db.model.deleteMany({ where: { id: catalog.modelId } });
-              await db.brand.deleteMany({ where: { id: catalog.brandId } });
+      try {
+        resume();
+        try { await pending; } finally {
+          if (generator) generator.s3 = originalTransport;
+          try {
+            for (const reservation of cleanupIds) expect.soft(execute("reset", reservation).code, `exact reset ${reservation}`).toBe(0);
+            for (const requestId of smsIds) expect.soft(await queue.getJob(requestId), "SMS has no email job").toBeUndefined();
+            if (s3) for (const key of [...keys.values()].flat()) {
+              const status = await head(key);
+              const failure = status === 200 ? await s3.send(new DeleteObjectCommand({ Bucket: "listing-photos", Key: key })).then(() => undefined, (error: unknown) => error) : status === 404 ? undefined : status;
+              expect.soft(failure, `exact known key cleanup ${key}`).toBeUndefined();
             }
-          }
-        } finally { s3?.destroy(); }
+            if (catalogOwned) {
+              const references = await catalogReferences();
+              expect.soft(references, "catalog retained while referenced").toBe(0);
+              if (references === 0) {
+                await db.city.deleteMany({ where: { id: catalog.cityId } });
+                await db.region.deleteMany({ where: { id: catalog.regionId } });
+                await db.model.deleteMany({ where: { id: catalog.modelId } });
+                await db.brand.deleteMany({ where: { id: catalog.brandId } });
+              }
+            }
+          } finally { s3?.destroy(); }
+        }
+      } finally {
+        console.info(JSON.stringify({ diagnostic: "media-runtime-race-timing-v1", mode, entries: timings, dropped: droppedTimings }));
       }
     }
   }));
