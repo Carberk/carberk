@@ -2,7 +2,9 @@
 
 ## Hosted receipt update, 2026-10-21
 
-The latest exact hosted evidence is the [`c253ab93` receipt](prelaunch-hosted-receipt-c253ab93-20261021.md). The [`8f8709aa` receipt](prelaunch-hosted-receipt-8f8709aa-20261021.md) remains historical. These rows update evidence status only; they do not retire tests or certify source after `c253ab93`.
+The latest classified hosted evidence is the [`2b00c38e` receipt](prelaunch-hosted-receipt-2b00c38e-20261021.md). DB passes 40/40 files and 387/387 tests, including interrupted Redis completion recovery and negative controls. Worker passes 57/57 files and 373/373 tests. API passes 3086/3090 tests; its failures are the actual missing private-proof issuance route and the same three retained full-v3 reset tails. Lane/static/frontend/image runtime pass; docs skip. New process-restart tests remain pending runtime. This status retires no test and establishes no deployed or reset readiness.
+
+The following table preserves the historical [`c253ab93` receipt](prelaunch-hosted-receipt-c253ab93-20261021.md). The [`8f8709aa` receipt](prelaunch-hosted-receipt-8f8709aa-20261021.md) also remains historical. Exact results apply only to their named candidates.
 
 | Contract area | Exact hosted evidence | Status |
 |---|---|---|
@@ -22,7 +24,7 @@ Acceptance-contract checkpoint for #901 under #897, sole integration PR #904. Ba
 
 Authority: the founder's prelaunch data decision and revised plan in [#897 comment 6314266361](https://github.com/Carberk/carberk/issues/897#issuecomment-6314266361). All existing staging and production application data is disposable test data until public launch. That authority replaces historical-environment preservation. It does **not** replace the selected #897 scope, the existing marketplace, security criteria, ordinary authentication or any product lifecycle, concurrency or erasure requirement. Accepted ADRs are not edited (ADR-0020). This note grants no new security power. It specifies what a later reviewed operator change must do and prove.
 
-Current exact-head facts (run [39586347653](https://github.com/Carberk/carberk/actions/runs/39586347653)): API 3061/3064, worker 364/364, CampaignFullV3Diagnostics 1/1, DiagnosticReports 15/15. The only failures are `CampaignFullV3.e2e.spec.ts:2299` (Support barrier not observed) and both `:3288` media cases (`PUT must still be suspended after exact reset, not timed out`). Raw CLI log SHA-256 `793b7c43b010f8b802d93315a362f17afc4ea5c5337b9d5217ec33c5ef595702`. They remain **RED** until the replacement below is assembled and proved. They are not skipped, no timeout is raised and no assertion is weakened here.
+At the initial contract checkpoint, run [39586347653](https://github.com/Carberk/carberk/actions/runs/39586347653) recorded API 3061/3064, worker 364/364, CampaignFullV3Diagnostics 1/1 and DiagnosticReports 15/15. Its only failures were `CampaignFullV3.e2e.spec.ts:2299` (Support barrier not observed) and both `:3288` media cases (`PUT must still be suspended after exact reset, not timed out`). Raw CLI log SHA-256 `793b7c43b010f8b802d93315a362f17afc4ea5c5337b9d5217ec33c5ef595702`. Those three tails remain **RED** until the replacement below is assembled and proved. They are not skipped, no timeout is raised and no assertion is weakened here.
 
 ## 1. Non-inference rules
 
@@ -116,7 +118,7 @@ Production also protects the currently documented Play App access configuration 
 
 Existing `cf_*` schemas, delivery journals, campaign triggers and permanent BullMQ dedup tombstones are inventoried before reset. They remain protected until all old campaign profiles and their producers are proved closed and their exact disposal is reviewed. Under the founder's prelaunch data direction, identified campaign scenario history may then be deleted in the same ordered reset, including its obsolete triggers and matching dedup keys. No historical delivery-proof archive or permanent tombstone is required after verified reset. Operational records needed to recover the current reset, protected configuration and approved reproducible reference inputs remain outside that deletion set. The v3 path is not activated.
 
-Current source status: S2A already records row completion in `staging_clean_reset.receipts`. The [Redis recovery design](prelaunch-reset-redis-recovery-design-20261021.md) selects the next bounded engineering work under Q5; its intent/completion extension, Redis marker and gated cleanup are **unimplemented**. Redis deletion, campaign control disposal and the CLI/controller closure paths remain refused. This amendment authorizes no execution and leaves §§3.2, 3.4, 3.6–3.9 and independent integration review gates intact.
+Current source status: S2A records immutable row completion in `staging_clean_reset.receipts`. The [Redis recovery design](prelaunch-reset-redis-recovery-design-20261021.md) now has an implemented additive intent/completion extension and permanent marker. Initial Redis deletion, completed replay and exact lost-reply recovery are hosted GREEN on `2b00c38e`. Actual process-restart acceptance and separately gated receipt cleanup remain incomplete. Object cleanup, reseeding/reopening, campaign control disposal and CLI/controller closure activation remain closed. This amendment authorizes no execution and leaves §§3.2, 3.4, 3.6–3.9 and independent integration review gates intact.
 
 ### 3.4 Quiescence, including signed uploads
 

@@ -53,6 +53,17 @@ All official downloads used `curl -fsSL`; commands succeeded. No overview update
 - `packages/db/scripts/staging-clean-reset-redis-recovery.e2e.spec.ts`: `81cbc8942d77e2a7961524b0bdf2aaf60e6fdac587150ba633c03381abb637db`.
 - Original three interrupted case bodies, contiguous block starting at the first `it` and ending after the third case, with trailing whitespace stripped: `d4fb402b55dab940e1d45a5f2de1b7810baa87e3a881da9ac3f29adf80f96f80`.
 
+## Root assembly verification
+
+Root inspected checkpoint `a89acf00e2cec7119065f2c5e6abb4f721634029` and assembled it as `65654061`. The integration worktree already has ordinary dependency directories at root, `packages/db` and `apps/api`; none is a symlink. No dependency or task-state path was changed to retry the child's refused setup.
+
+- `pnpm --filter @auto-tm/db exec eslint scripts/staging-clean-reset-redis-interrupted.e2e.spec.ts --max-warnings 0`: pass. Log `/tmp/carberk-resume-20261021/restart-assembled-lint.log`.
+- `pnpm --filter @auto-tm/db typecheck`: pass. Log `/tmp/carberk-resume-20261021/restart-assembled-typecheck.log`.
+- Changed-spec syntax, documentation links, glossary and diff checks: pass.
+- Direct byte comparisons: assembled spec matches the child checkpoint; all three protected specs and the contiguous original interrupted case bodies match `2b00c38e` exactly.
+
+These are affected offline checks on the assembled files. The child's refusal remains recorded above. No local container was started and no new runtime result exists yet.
+
 ## Handoff gate
 
 All three new restart runtime criteria are pending. No actual new RED or GREEN is claimed. The source already appears to implement these rules; seek hosted GREEN on the assembled candidate rather than inventing a source repair. Next action belongs to root: inspect this test-only checkpoint, provide normal dependencies, run lint/typecheck, assemble in sole PR #904, and run the hosted disposable DB lane. Preserve this branch/worktree until integration acceptance and normal lifecycle cleanup.
