@@ -71,7 +71,10 @@ describe("consumed private diagnostic link after predecessor material rights exp
   let templateId: string;
   let now = initialTime;
   const owned = { orders: [] as string[], reports: [] as string[], pdfs: [] as string[],
-    raw: [] as string[], evidence: [] as string[], provenance: [] as string[], proofs: [] as string[], keys: new Set<string>(), users: [] as string[] };
+    raw: [] as string[], evidence: [] as string[], provenance: [] as string[], proofs: [] as string[], keys: new Set<string>(), users: [] as string[],
+    sessions: [] as string[], grants: [] as { userId: string; capability: string }[], qualifications: [] as string[],
+    requestKeys: [] as string[], findings: [] as string[], assignments: [] as { orderId: string; userId: string; capability: string }[],
+    pdfKeys: new Set<string>() };
   let ownsCenter = false;
   const headers = (who: Person) => ({ authorization: `Bearer ${jwt.sign({ sub: suite.id(who), sid: suite.id(`${who}-session`), role: "buyer" })}` });
   const post = (who: Person, path: string, body: object) => request.post(`/api/v1/diagnostics/${path}`).set(headers(who)).send(body);
@@ -86,37 +89,124 @@ describe("consumed private diagnostic link after predecessor material rights exp
     // Only request-registered keys, including an upload that wrote bytes before failing.
     // Never derive deletion authority from discovered database rows or bucket listings.
     const failures: unknown[] = [];
-    for (const objectKey of owned.keys) {
-      try {
-        await objects.send(new DeleteObjectCommand({ Bucket: "diagnostic-test-private", Key: objectKey }));
-        await expect(objects.send(new HeadObjectCommand({ Bucket: "diagnostic-test-private", Key: objectKey })))
-          .rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
-      } catch (error) { failures.push(new Error(`Teardown failed for registered object ${objectKey}`, { cause: error })); }
-    }
     try {
-      await db.diagnosticContinuityProof.deleteMany({ where: { id: { in: owned.proofs } } });
-      await db.diagnosticPdfArtifact.deleteMany({ where: { id: { in: owned.pdfs } } });
-      for (const id of [...owned.reports].reverse()) await db.diagnosticReportRecord.deleteMany({ where: { id } });
-      // Order/raw/evidence deletes have cascades. Refuse unregistered descendants
-      // rather than letting teardown erase a row rejected by the worker manifest.
+      // Identity DELETE guards permit only parent-order cascades. Establish all
+      // ownership before touching objects or rows, including cross-order pins.
+      const orders = await db.inspectionOrder.findMany({ where: { id: { in: owned.orders } } });
+      expect(orders.every(order => order.centerId === centerId && order.templateVersionId === templateId
+        && order.commissionerId === suite.id("buyer") && owned.requestKeys.includes(order.requestKey)),
+      "Teardown refused: unregistered order binding").toBe(true);
       for (const [rows, ids] of [
+        [await db.diagnosticContinuityProof.findMany({ where: { OR: [{ candidateOrderId: { in: owned.orders } },
+          { predecessorOrderId: { in: owned.orders } }, { predecessorReportId: { in: owned.reports } },
+          { issuerId: { in: owned.users } }, { linkingTechnicianId: { in: owned.users } },
+          { issuerSessionId: { in: owned.sessions } }] }, select: { id: true } }), owned.proofs],
+        [await db.diagnosticReportRecord.findMany({ where: { OR: [{ orderId: { in: owned.orders } },
+          { predecessorId: { in: owned.reports } }, { identityRecordId: { in: owned.raw } },
+          { identityEvidenceId: { in: owned.evidence } }, { continuityProofId: { in: owned.proofs } }, { templateVersionId: templateId ?? "unissued-template" }] }, select: { id: true } }), owned.reports],
+        [await db.diagnosticPdfArtifact.findMany({ where: { reportId: { in: owned.reports } }, select: { id: true } }), owned.pdfs],
         [await db.diagnosticIdentityEvidence.findMany({ where: { OR: [{ orderId: { in: owned.orders } },
           { identityRecordId: { in: owned.raw } }, { supersedesId: { in: owned.evidence } }] }, select: { id: true } }), owned.evidence],
         [await db.diagnosticIdentityProvenance.findMany({ where: { orderId: { in: owned.orders } }, select: { id: true } }), owned.provenance],
         [await db.diagnosticIdentityRecord.findMany({ where: { orderId: { in: owned.orders } }, select: { id: true } }), owned.raw],
       ] as const) expect(rows.every(row => ids.includes(row.id)), "Teardown refused: unregistered cascade descendant").toBe(true);
-      await db.diagnosticIdentityEvidence.deleteMany({ where: { id: { in: owned.evidence } } });
-      await db.diagnosticIdentityProvenance.deleteMany({ where: { id: { in: owned.provenance } } });
+      const reports = await db.diagnosticReportRecord.findMany({ where: { id: { in: owned.reports } } });
+      for (const report of reports) {
+        const state = report.state as { findings?: { id: string }[] };
+        expect(owned.orders.includes(report.orderId) && report.templateVersionId === templateId
+          && Array.isArray(state.findings) && state.findings.every(finding => owned.findings.includes(finding.id)),
+        "Teardown refused: unregistered report/finding binding").toBe(true);
+      }
+      const provenance = await db.diagnosticIdentityProvenance.findMany({ where: { id: { in: owned.provenance } } });
+      expect(provenance.every(row => owned.orders.includes(row.orderId) && (row.objectKey === null || owned.keys.has(row.objectKey))),
+        "Teardown refused: unregistered provenance object").toBe(true);
+      const pdfs = await db.diagnosticPdfArtifact.findMany({ where: { id: { in: owned.pdfs } } });
+      expect(pdfs.every(row => owned.reports.includes(row.reportId) && owned.pdfKeys.has(row.objectKey)
+        && row.objectKey === `diagnostic-pdf/${row.reportId}/${row.id}.pdf`),
+        "Teardown refused: unregistered PDF object").toBe(true);
+      const audits = await db.diagnosticAudit.findMany({ where: { OR: [{ centerId },
+        { orderId: { in: owned.orders } }, { actorId: { in: owned.users } }] } });
+      expect(audits.every(row => {
+        const details = row.details as { templateVersionId?: string; reportId?: string };
+        return ownsCenter && row.centerId === centerId && row.actorId !== null && owned.users.includes(row.actorId)
+          && (row.orderId !== null ? owned.orders.includes(row.orderId)
+            : row.action === "TEMPLATE_PUBLISHED" && details.templateVersionId === templateId)
+          && (details.reportId === undefined || owned.reports.includes(details.reportId));
+      }), "Teardown refused: unregistered audit binding").toBe(true);
+      expect(await db.diagnosticEvidence.count({ where: { reportId: { in: owned.reports } } }),
+        "Teardown refused: unregistered report evidence").toBe(0);
+      const unknownAssignments = await db.diagnosticOrderAssignment.count({ where: {
+        orderId: { in: owned.orders }, NOT: { OR: owned.assignments } } });
+      expect(unknownAssignments, "Teardown refused: unregistered assignment").toBe(0);
+      if (ownsCenter) {
+        expect(await db.inspectionOrder.count({ where: { OR: [{ centerId }, { templateVersionId: templateId ?? "unissued-template" }], id: { notIn: owned.orders } } }),
+          "Teardown refused: unregistered center order").toBe(0);
+        expect(await db.diagnosticTemplateVersion.count({ where: { centerId, id: { not: templateId ?? "unissued-template" } } }),
+          "Teardown refused: unregistered center template").toBe(0);
+        expect(await db.diagnosticCenterAssignment.count({ where: { centerId, id: { notIn: owned.qualifications } } }),
+          "Teardown refused: unregistered center qualification").toBe(0);
+      }
+      // User SET NULL relations matter as well as CASCADE relations. Compare
+      // every relation count with only the explicitly registered children.
+      const sessions = await db.session.findMany({ where: { id: { in: owned.sessions } }, include: { _count: true } });
+      expect(sessions.every(session => owned.users.includes(session.userId)
+        && Object.values(session._count).every(count => count === 0)),
+      "Teardown refused: unregistered Session descendant").toBe(true);
+      const users = await db.user.findMany({ where: { id: { in: owned.users } },
+        include: { _count: true, totpEnrollment: true, notificationPreferences: true } });
+      for (const user of users) {
+        const registered = await db.user.findUniqueOrThrow({ where: { id: user.id }, select: { _count: { select: {
+          sessions: { where: { id: { in: owned.sessions } } },
+          staffGrants: { where: { OR: owned.grants } },
+          diagnosticCenterAssignments: { where: { id: { in: owned.qualifications }, centerId } },
+          diagnosticCommissions: { where: { id: { in: owned.orders } } },
+          diagnosticOrderAssignments: { where: { OR: owned.assignments } },
+          publishedDiagnosticTemplates: { where: { id: templateId ?? "unissued-template" } },
+          diagnosticAuditEntries: { where: { centerId, OR: [{ orderId: { in: owned.orders } },
+            { orderId: null, action: "TEMPLATE_PUBLISHED", details: { path: ["templateVersionId"], equals: templateId ?? "unissued-template" } }] } },
+          diagnosticIdentityRecords: { where: { id: { in: owned.raw } } },
+          diagnosticIdentityEvidence: { where: { id: { in: owned.evidence } } },
+          diagnosticIdentityProvenance: { where: { id: { in: owned.provenance } } },
+        } } } });
+        const allowed: Record<string, number> = registered._count;
+        expect(user.totpEnrollment === null && user.notificationPreferences === null
+          && Object.entries(user._count).every(([relation, count]) => count === (allowed[relation] ?? 0)),
+        "Teardown refused: unregistered user descendant").toBe(true);
+      }
+      for (const objectKey of [...owned.keys, ...owned.pdfKeys]) {
+        try {
+          await objects.send(new DeleteObjectCommand({ Bucket: "diagnostic-test-private", Key: objectKey }));
+          await expect(objects.send(new HeadObjectCommand({ Bucket: "diagnostic-test-private", Key: objectKey })))
+            .rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
+        } catch (error) { failures.push(new Error(`Teardown failed for registered object ${objectKey}`, { cause: error })); }
+      }
+      if (failures.length) throw new AggregateError(failures, "Exact object cleanup failed; database rows preserved");
+      await db.diagnosticContinuityProof.deleteMany({ where: { id: { in: owned.proofs } } });
+      await db.diagnosticPdfArtifact.deleteMany({ where: { id: { in: owned.pdfs } } });
+      for (const id of [...owned.reports].reverse()) await db.diagnosticReportRecord.deleteMany({ where: { id } });
       if (ownsCenter) await db.diagnosticAudit.deleteMany({ where: { centerId, actorId: { in: owned.users },
         OR: [{ orderId: { in: owned.orders } }, { orderId: null }] } });
-      await db.diagnosticOrderAssignment.deleteMany({ where: { orderId: { in: owned.orders } } });
-      await db.inspectionOrder.deleteMany({ where: { id: { in: owned.orders } } });
+      await db.diagnosticOrderAssignment.deleteMany({ where: { OR: owned.assignments } });
+      // Reports no longer pin identity rows. The guarded rows leave only through
+      // these exact request-registered order parents, never by direct DELETE.
+      await db.inspectionOrder.deleteMany({ where: { id: { in: owned.orders }, centerId,
+        commissionerId: suite.id("buyer"), requestKey: { in: owned.requestKeys } } });
       if (ownsCenter) {
-        await db.diagnosticTemplateVersion.deleteMany({ where: { centerId } });
-        await db.diagnosticCenterAssignment.deleteMany({ where: { centerId } });
+        await db.diagnosticTemplateVersion.deleteMany({ where: { id: templateId ?? "unissued-template" } });
+        await db.diagnosticCenterAssignment.deleteMany({ where: { id: { in: owned.qualifications } } });
         await db.diagnosticCenter.delete({ where: { id: centerId } });
       }
-      await db.user.deleteMany({ where: { id: { in: owned.users } } });
+      await db.session.deleteMany({ where: { id: { in: owned.sessions } } });
+      await db.staffGrant.deleteMany({ where: { OR: owned.grants } });
+      for (const id of owned.users) {
+        const user = await db.user.findUnique({ where: { id }, include: { _count: true } });
+        // User deletion cascades to many contexts. Preserve any actor with an unknown
+        // descendant instead of treating a namespace or owned parent as authority.
+        if (user) {
+          expect(Object.values(user._count).every(count => count === 0), "Teardown refused: unregistered user descendant").toBe(true);
+          await db.user.delete({ where: { id } });
+        }
+      }
     } catch (error) { failures.push(error); }
     if (failures.length) throw new AggregateError(failures, "Owned fixture teardown failed; test assertions are reported separately");
   }
@@ -140,15 +230,26 @@ describe("consumed private diagnostic link after predecessor material rights exp
     for (const who of people) {
       await db.user.create({ data: { id: suite.id(who), phone: suite.phone(who), role: "buyer", phoneVerifiedAt: now } });
       owned.users.push(suite.id(who));
+      owned.sessions.push(suite.id(`${who}-session`));
       await db.session.create({ data: { id: suite.id(`${who}-session`), userId: suite.id(who), refreshTokenHash: suite.id(`${who}-refresh`), expiresAt: future, adminTotpExpiresAt: future } });
-      if (capability[who]) await db.staffGrant.create({ data: { userId: suite.id(who), capability: capability[who]! } });
+      if (capability[who]) {
+        const grant = { userId: suite.id(who), capability: capability[who]! }; owned.grants.push(grant);
+        await db.staffGrant.create({ data: grant });
+      }
     }
-    await db.staffGrant.createMany({ data: ["staff.manage", "founder.control"].map(capability => ({ userId: suite.id("founder"), capability })) });
+    const founderGrants = ["staff.manage", "founder.control"].map(capability => ({ userId: suite.id("founder"), capability }));
+    owned.grants.push(...founderGrants);
+    await db.staffGrant.createMany({ data: founderGrants });
     await db.diagnosticCenter.create({ data: { id: centerId, code: suite.slugFor("center"), names: localized } });
     ownsCenter = true;
-    for (const who of people) if (capability[who]) await db.diagnosticCenterAssignment.create({ data: { centerId, userId: suite.id(who), capability: capability[who]!, qualifiedUntil: future } });
-    await db.staffGrant.create({ data: { userId: suite.id("reception"), capability: "diagnostics.templates" } });
-    await db.diagnosticCenterAssignment.create({ data: { centerId, userId: suite.id("reception"), capability: "diagnostics.templates", qualifiedUntil: future } });
+    for (const who of people) if (capability[who]) {
+      const id = suite.id(`${who}-qualification`); owned.qualifications.push(id);
+      await db.diagnosticCenterAssignment.create({ data: { id, centerId, userId: suite.id(who), capability: capability[who]!, qualifiedUntil: future } });
+    }
+    const templateGrant = { userId: suite.id("reception"), capability: "diagnostics.templates" }; owned.grants.push(templateGrant);
+    await db.staffGrant.create({ data: templateGrant });
+    owned.qualifications.push(suite.id("template-qualification"));
+    await db.diagnosticCenterAssignment.create({ data: { id: suite.id("template-qualification"), centerId, userId: suite.id("reception"), capability: "diagnostics.templates", qualifiedUntil: future } });
     const definition = { title: localized, limitations: localized, syntheticNotice: localized,
       checks: [{ id: "brakes", label: localized, required: true, evidenceRequired: false, measurement: null }], panels: [] };
     templateId = (await post("reception", `centers/${centerId}/templates`, { expectedVersion: 0, definition, synthetic: true }).expect(201)).body.id;
@@ -157,11 +258,18 @@ describe("consumed private diagnostic link after predecessor material rights exp
     try { await teardownOwnedFixtures(); } finally { try { objects?.destroy(); await app?.close(); } finally { vi.useRealTimers(); } }
   });
   async function visit(observation: Observation, visitName: string): Promise<Order> {
-    let { body: order } = await post("buyer", "orders", { requestKey: randomUUID(), centerId,
-      templateVersionId: templateId, audience: "buyer_private", synthetic: true }).expect(201);
-    owned.orders.push(order.id);
+    const requestKey = randomUUID(); owned.requestKeys.push(requestKey);
+    const response = await post("buyer", "orders", { requestKey, centerId,
+      templateVersionId: templateId, audience: "buyer_private", synthetic: true });
+    let order = response.body;
+    if (typeof order.id === "string") {
+      owned.orders.push(order.id);
+      owned.assignments.push({ orderId: order.id, userId: suite.id("reception"), capability: "diagnostics.reception" });
+    }
+    expect(response.status, JSON.stringify(response.body)).toBe(201);
     expect(order).toMatchObject({ version: 0, audience: "buyer_private", listingId: null });
     for (const who of ["technician", "reviewer"] as const) {
+      owned.assignments.push({ orderId: order.id, userId: suite.id(who), capability: capability[who]! });
       ({ body: order } = await post("reception", `orders/${order.id}/assignments`, { expectedVersion: order.version,
         userId: suite.id(who), capability: capability[who], active: true }).expect(201));
     }
@@ -211,6 +319,7 @@ describe("consumed private diagnostic link after predecessor material rights exp
     const reportId = randomUUID(); owned.reports.push(reportId);
     const { body: draft } = await post("technician", `orders/${o.id}/reports`, { reportId, expectedOrderVersion: o.version }).expect(201);
     const finding = { id: randomUUID(), checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: [], kind: null, source: null, measurement: null, location: null };
+    owned.findings.push(finding.id);
     await post("technician", `reports/${draft.id}/findings`, { expectedVersion: 0, finding }).expect(201);
     await post("technician", `reports/${draft.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
     await post("reviewer", `reports/${draft.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
@@ -241,6 +350,7 @@ describe("consumed private diagnostic link after predecessor material rights exp
       const released = await release(a);
       const documents = (await get("buyer", `reports/${released.id}/documents`).expect(200)).body as { id: string; locale: string; generation: number; state: string }[];
       owned.pdfs.push(...documents.map(d => d.id));
+      for (const document of documents) owned.pdfKeys.add(`diagnostic-pdf/${released.id}/${document.id}.pdf`);
       expect(documents).toEqual(["en", "ru", "tk"].map(locale => ({ id: expect.stringMatching(uuid), locale,
         generation: 1, rendererVersion: "v1", state: "pending", generatedAt: null, retryAt: null })));
       expect(new Set(documents.map(d => d.id)).size).toBe(3);
@@ -319,7 +429,7 @@ describe("consumed private diagnostic link after predecessor material rights exp
         evidencePins: [{ orderId: a.id, id: ea.id, hash: ea.recordHash }, { orderId: b.id, id: eb.id, hash: eb.recordHash }] });
       const audits = () => db.diagnosticAudit.findMany({ where: { centerId }, orderBy: { id: "asc" } });
       const beforeAudits = await audits();
-      const restricted = [proofPath, evidencePath(a), provenancePath(a, pa), comparisonPath(b, released.id),
+      const restricted = [proofPath, provenancePath(a, pa), comparisonPath(b, released.id),
         `orders/${b.id}/reinspection-comparison/provenance/${pa}?predecessorId=${released.id}`];
       async function denied(who: "technician" | "reviewer", path: string) {
         const response = await get(who, path).expect(403); privateNoStore(response);
@@ -334,12 +444,18 @@ describe("consumed private diagnostic link after predecessor material rights exp
       }
       setTime("2026-10-21T12:04:59.999Z");
       for (const who of ["technician", "reviewer"] as const) {
-        for (const path of restricted) privateNoStore(await get(who, path).expect(200));
+        for (const path of [...restricted, evidencePath(a)]) privateNoStore(await get(who, path).expect(200));
       }
       await unknownHandlesRefused();
       setTime(expiry);
       async function refused() {
-        for (const who of ["technician", "reviewer"] as const) for (const path of restricted) await denied(who, path);
+        for (const who of ["technician", "reviewer"] as const) {
+          const response = await get(who, evidencePath(a)).expect(200); privateNoStore(response);
+          expect(response.body, "Expired A evidence list omits unavailable records").toEqual([]);
+          for (const secret of [red.output, red.sha256, key(pa, red), "SYN-CHASSIS-041", ia!.observationHash,
+            ea.recordHash, proofId, pa, ea.id, original.manualReference!]) expect(response.text).not.toContain(secret);
+          for (const path of restricted) await denied(who, path);
+        }
         await unknownHandlesRefused();
       }
       await refused();
@@ -451,6 +567,7 @@ describe("consumed private diagnostic link after predecessor material rights exp
       expect((await send().expect(201)).body).toEqual(created.body);
       expect(await audits()).toEqual(beforeAudits);
       const finding = { id: randomUUID(), checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: [], kind: null, source: null, measurement: null, location: null };
+      owned.findings.push(finding.id);
       await post("technician", `reports/${input.reportId}/findings`, { expectedVersion: 0, finding }).expect(201);
       const current = (await get("technician", `reports/${input.reportId}`).expect(200)).body;
       expect(current).toMatchObject({ version: 1, findings: [finding], successorOf: released.id });
