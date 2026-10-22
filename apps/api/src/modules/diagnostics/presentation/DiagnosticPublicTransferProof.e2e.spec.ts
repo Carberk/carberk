@@ -703,6 +703,8 @@ describe("public continuity across different sellers and Listings", { concurrent
     const aArtifacts = await db.diagnosticPdfArtifact.findMany({ where: { reportId: p.released.id }, orderBy: { id: "asc" } });
     const aOrder = await db.inspectionOrder.findUniqueOrThrow({ where: { id: p.a.id } });
     const bOrder = await db.inspectionOrder.findUniqueOrThrow({ where: { id: p.b.id } });
+    expect(aSnapshot).toMatchObject({ status: "finalized", version: 3, snapshotHash: expect.stringMatching(hash), identityRecordId: p.ia.id,
+      identityRecordHash: p.ia.observationHash, identityEvidenceId: p.ea.id, identityEvidenceHash: p.ea.recordHash });
     expect(p.a.id).not.toBe(p.b.id); expect(p.ia.id).not.toBe(p.ib.id); expect(p.pa).not.toBe(p.pb);
     expect(suite.id("reviewer")).not.toBe(suite.id("technician"));
     for (const order of [aOrder, bOrder]) expect(order).toMatchObject({ commissionerId: suite.id("sellerA"), listingId: p.listingId,
@@ -762,8 +764,10 @@ describe("public continuity across different sellers and Listings", { concurrent
     const finding = await submitLinked(input.reportId);
     await post("technician", `reports/${input.reportId}/transition`, { expectedVersion: 2, action: "finalize" }).expect(403);
     expect((await finalizeLinked(input.reportId)).status).toBe(201);
-    expect((await publicGet(`reports/${input.reportId}`).expect(200)).body).toMatchObject({ successorOf: p.released.id, findings: [finding],
+    const publicReport = await publicGet(`reports/${input.reportId}`).expect(200);
+    expect(publicReport.body).toMatchObject({ successorOf: p.released.id, findings: [finding],
       observedAt: "2026-10-21T11:00:00.000Z", mileageKm: 123100, status: "finalized" });
+    for (const restrictedId of [proofId, p.pa, p.pb, p.ia.id, p.ib.id, p.ea.id, p.eb.id]) expect(publicReport.text).not.toContain(restrictedId);
     expect((await publicGet(`listings/${p.listingId}`).expect(200)).body).toEqual({ listingId: p.listingId, reportId: input.reportId,
       observedAt: "2026-10-21T11:00:00.000Z", mileageKm: 123100, synthetic: true });
     await publicGet(`reports/${input.reportId}/evidence/${p.pa}`).expect(404);
