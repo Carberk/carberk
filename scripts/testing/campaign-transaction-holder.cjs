@@ -35,5 +35,10 @@ client.on("error", error => {
     else { backendTerminated = true; phase("backend-57P01"); }
   } finally { await client.end().catch(() => { unexpectedError = true; phase("unexpected-end-error"); }); }
   if (!connectionEnded) unexpectedError = true;
-  phase(!unexpectedError && backendTerminated ? "terminated-cleanly" : "holder-failed");
+  // Forced exit can discard queued IPC. Drain the terminal send before exiting;
+  // a failed send rejects and must take the nonzero exit path below.
+  await new Promise((resolve, reject) => {
+    process.send({ holderPhase: !unexpectedError && backendTerminated ? "terminated-cleanly" : "holder-failed" },
+      error => error ? reject(error) : resolve());
+  });
 })().then(() => process.exit(unexpectedError ? 1 : 0)).catch(() => process.exit(1));
