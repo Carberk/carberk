@@ -88,31 +88,88 @@ describe("supported VIN recording correction continuity", { concurrent: false },
     // Never derive deletion authority from discovered database rows or bucket listings.
     const failures: unknown[] = [];
     try {
-      // Order/raw/evidence deletes have cascades. Refuse unregistered descendants
-      // rather than letting teardown erase a row outside the fixture registry.
+      // Identity DELETE guards permit only parent-order cascades. Establish all
+      // ownership before touching objects or rows, including cross-order pins.
+      const orders = await db.inspectionOrder.findMany({ where: { id: { in: owned.orders } } });
+      expect(orders.every(order => order.centerId === centerId && order.templateVersionId === templateId
+        && order.commissionerId === suite.id("buyer") && owned.requestKeys.includes(order.requestKey)),
+      "Teardown refused: unregistered order binding").toBe(true);
       for (const [rows, ids] of [
         [await db.diagnosticContinuityProof.findMany({ where: { OR: [{ candidateOrderId: { in: owned.orders } },
-          { predecessorOrderId: { in: owned.orders } }] }, select: { id: true } }), owned.proofs],
+          { predecessorOrderId: { in: owned.orders } }, { predecessorReportId: { in: owned.reports } },
+          { issuerId: { in: owned.users } }, { linkingTechnicianId: { in: owned.users } },
+          { issuerSessionId: { in: owned.sessions } }] }, select: { id: true } }), owned.proofs],
         [await db.diagnosticReportRecord.findMany({ where: { OR: [{ orderId: { in: owned.orders } },
-          { predecessorId: { in: owned.reports } }] }, select: { id: true } }), owned.reports],
+          { predecessorId: { in: owned.reports } }, { identityRecordId: { in: owned.raw } },
+          { identityEvidenceId: { in: owned.evidence } }, { continuityProofId: { in: owned.proofs } }, { templateVersionId: templateId ?? "unissued-template" }] }, select: { id: true } }), owned.reports],
         [await db.diagnosticPdfArtifact.findMany({ where: { reportId: { in: owned.reports } }, select: { id: true } }), owned.pdfs],
         [await db.diagnosticIdentityEvidence.findMany({ where: { OR: [{ orderId: { in: owned.orders } },
           { identityRecordId: { in: owned.raw } }, { supersedesId: { in: owned.evidence } }] }, select: { id: true } }), owned.evidence],
         [await db.diagnosticIdentityProvenance.findMany({ where: { orderId: { in: owned.orders } }, select: { id: true } }), owned.provenance],
         [await db.diagnosticIdentityRecord.findMany({ where: { orderId: { in: owned.orders } }, select: { id: true } }), owned.raw],
       ] as const) expect(rows.every(row => ids.includes(row.id)), "Teardown refused: unregistered cascade descendant").toBe(true);
+      const reports = await db.diagnosticReportRecord.findMany({ where: { id: { in: owned.reports } } });
+      for (const report of reports) {
+        const state = report.state as { findings?: { id: string }[] };
+        expect(owned.orders.includes(report.orderId) && report.templateVersionId === templateId
+          && Array.isArray(state.findings) && state.findings.every(finding => owned.findings.includes(finding.id)),
+        "Teardown refused: unregistered report/finding binding").toBe(true);
+      }
+      const provenance = await db.diagnosticIdentityProvenance.findMany({ where: { id: { in: owned.provenance } } });
+      expect(provenance.every(row => owned.orders.includes(row.orderId) && (row.objectKey === null || owned.keys.has(row.objectKey))),
+        "Teardown refused: unregistered provenance object").toBe(true);
+      const pdfs = await db.diagnosticPdfArtifact.findMany({ where: { id: { in: owned.pdfs } } });
+      expect(pdfs.every(row => owned.reports.includes(row.reportId) && owned.keys.has(row.objectKey)
+        && row.objectKey === `diagnostic-pdf/${row.reportId}/${row.id}.pdf`),
+        "Teardown refused: unregistered PDF object").toBe(true);
+      const audits = await db.diagnosticAudit.findMany({ where: { OR: [{ centerId },
+        { orderId: { in: owned.orders } }, { actorId: { in: owned.users } }] } });
+      expect(audits.every(row => {
+        const details = row.details as { templateVersionId?: string; reportId?: string };
+        return ownsCenter && row.centerId === centerId && row.actorId !== null && owned.users.includes(row.actorId)
+          && (row.orderId !== null ? owned.orders.includes(row.orderId)
+            : row.action === "TEMPLATE_PUBLISHED" && details.templateVersionId === templateId)
+          && (details.reportId === undefined || owned.reports.includes(details.reportId));
+      }), "Teardown refused: unregistered audit binding").toBe(true);
       expect(await db.diagnosticEvidence.count({ where: { reportId: { in: owned.reports } } }),
         "Teardown refused: unregistered report evidence").toBe(0);
       const unknownAssignments = await db.diagnosticOrderAssignment.count({ where: {
         orderId: { in: owned.orders }, NOT: { OR: owned.assignments } } });
       expect(unknownAssignments, "Teardown refused: unregistered assignment").toBe(0);
       if (ownsCenter) {
-        expect(await db.inspectionOrder.count({ where: { centerId, id: { notIn: owned.orders } } }),
+        expect(await db.inspectionOrder.count({ where: { OR: [{ centerId }, { templateVersionId: templateId ?? "unissued-template" }], id: { notIn: owned.orders } } }),
           "Teardown refused: unregistered center order").toBe(0);
         expect(await db.diagnosticTemplateVersion.count({ where: { centerId, id: { not: templateId ?? "unissued-template" } } }),
           "Teardown refused: unregistered center template").toBe(0);
         expect(await db.diagnosticCenterAssignment.count({ where: { centerId, id: { notIn: owned.qualifications } } }),
           "Teardown refused: unregistered center qualification").toBe(0);
+      }
+      // User SET NULL relations matter as well as CASCADE relations. Compare
+      // every relation count with only the explicitly registered children.
+      const sessions = await db.session.findMany({ where: { id: { in: owned.sessions } }, include: { _count: true } });
+      expect(sessions.every(session => owned.users.includes(session.userId)
+        && Object.values(session._count).every(count => count === 0)),
+      "Teardown refused: unregistered Session descendant").toBe(true);
+      const users = await db.user.findMany({ where: { id: { in: owned.users } },
+        include: { _count: true, totpEnrollment: true, notificationPreferences: true } });
+      for (const user of users) {
+        const registered = await db.user.findUniqueOrThrow({ where: { id: user.id }, select: { _count: { select: {
+          sessions: { where: { id: { in: owned.sessions } } },
+          staffGrants: { where: { OR: owned.grants } },
+          diagnosticCenterAssignments: { where: { id: { in: owned.qualifications }, centerId } },
+          diagnosticCommissions: { where: { id: { in: owned.orders } } },
+          diagnosticOrderAssignments: { where: { OR: owned.assignments } },
+          publishedDiagnosticTemplates: { where: { id: templateId ?? "unissued-template" } },
+          diagnosticAuditEntries: { where: { centerId, OR: [{ orderId: { in: owned.orders } },
+            { orderId: null, action: "TEMPLATE_PUBLISHED", details: { path: ["templateVersionId"], equals: templateId ?? "unissued-template" } }] } },
+          diagnosticIdentityRecords: { where: { id: { in: owned.raw } } },
+          diagnosticIdentityEvidence: { where: { id: { in: owned.evidence } } },
+          diagnosticIdentityProvenance: { where: { id: { in: owned.provenance } } },
+        } } } });
+        const allowed: Record<string, number> = registered._count;
+        expect(user.totpEnrollment === null && user.notificationPreferences === null
+          && Object.entries(user._count).every(([relation, count]) => count === (allowed[relation] ?? 0)),
+        "Teardown refused: unregistered user descendant").toBe(true);
       }
       for (const objectKey of owned.keys) {
         try {
@@ -125,21 +182,18 @@ describe("supported VIN recording correction continuity", { concurrent: false },
       await db.diagnosticContinuityProof.deleteMany({ where: { id: { in: owned.proofs } } });
       await db.diagnosticPdfArtifact.deleteMany({ where: { id: { in: owned.pdfs } } });
       for (const id of [...owned.reports].reverse()) await db.diagnosticReportRecord.deleteMany({ where: { id } });
-      for (const id of [...owned.evidence].reverse()) await db.diagnosticIdentityEvidence.deleteMany({ where: { id } });
-      await db.diagnosticIdentityRecord.deleteMany({ where: { id: { in: owned.raw } } });
-      await db.diagnosticIdentityProvenance.deleteMany({ where: { id: { in: owned.provenance } } });
       if (ownsCenter) await db.diagnosticAudit.deleteMany({ where: { centerId, actorId: { in: owned.users },
         OR: [{ orderId: { in: owned.orders } }, { orderId: null }] } });
       await db.diagnosticOrderAssignment.deleteMany({ where: { OR: owned.assignments } });
-      await db.inspectionOrder.deleteMany({ where: { id: { in: owned.orders } } });
+      // Reports no longer pin identity rows. The guarded rows leave only through
+      // these exact request-registered order parents, never by direct DELETE.
+      await db.inspectionOrder.deleteMany({ where: { id: { in: owned.orders }, centerId,
+        commissionerId: suite.id("buyer"), requestKey: { in: owned.requestKeys } } });
       if (ownsCenter) {
         await db.diagnosticTemplateVersion.deleteMany({ where: { id: templateId ?? "unissued-template" } });
         await db.diagnosticCenterAssignment.deleteMany({ where: { id: { in: owned.qualifications } } });
         await db.diagnosticCenter.delete({ where: { id: centerId } });
       }
-      const sessions = await db.session.findMany({ where: { id: { in: owned.sessions } }, include: { _count: true } });
-      expect(sessions.every(session => Object.values(session._count).every(count => count === 0)),
-        "Teardown refused: unregistered Session descendant").toBe(true);
       await db.session.deleteMany({ where: { id: { in: owned.sessions } } });
       await db.staffGrant.deleteMany({ where: { OR: owned.grants } });
       for (const id of owned.users) {
