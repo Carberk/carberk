@@ -64,7 +64,8 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
     const bindings = { predecessor: visit(ao), candidate: visit(b), authority,
       evidencePins: sides.map(item => ({ orderId: item.identity.evidence?.orderId, id: item.identity.evidence?.id, hash: item.identity.evidence?.recordHash })),
       assignmentsHash: hash(staffing.assignments), qualificationsHash: hash(staffing.qualifications),
-      evidence: records.map(record => ({ id: record.id, recordHash: record.recordHash, rightsHash: hash(record.rights) })),
+      evidence: records.map(record => ({ id: record.id, recordHash: record.recordHash, identityRecordId: record.identityRecordId,
+        observationHash: record.observationHash, rightsHash: hash(record.rights) })),
       provenance: provenance.map(row => ({ id: row.id, sha256: row.sha256, epoch: row.epoch, rightsHash: hash(row.rights) })) };
     return { provenance, bindings };
   }
@@ -81,6 +82,7 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
    * cannot hide a prior different vehicle; visit date/mileage changes do not change identity. */
   private async comparisonRights(tx: Tx, pair: Pair, method: D.DiagnosticContinuityProof["method"], provenance: { rightsUntil: Date }[], now: Date) {
     const identities = [pair.comparison.predecessor.identity, pair.comparison.candidate.identity];
+    const vinPair = method === "comparative_attestation" && identities.every(identity => identity.observation.method === "vin");
     const manualCorrection = method === "comparative_attestation" && identities.every(identity => identity.observation.method === "manual") &&
       identities.some(identity => identity.evidence?.correction || identity.corrections.length || identity.correctionHeadHash);
     const side = async (order: Order, identity: D.DiagnosticComparisonIdentity) => {
@@ -88,12 +90,14 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
       const orderId = order.id;
       const chain = [identity.evidence, ...identity.corrections];
       const history = [];
+      const rawRecords = [];
       let evidenceRecordCount = 0;
-      if (method === "automatic_normalized_vin") {
-        // This bounded method has one retained root per visit. Other roots or any
-        // correction require a broader policy; never ignore their identifiers/rights.
-        const roots = await tx.diagnosticIdentityEvidence.findMany({ where: { orderId }, select: { id: true } });
-        evidenceRecordCount = roots.some(root => root.id === identity.evidence?.id) ? roots.length : 0;
+      if (method === "automatic_normalized_vin" || vinPair) {
+        if (method === "automatic_normalized_vin") {
+          // Automatic admission requires exactly one unchanged root.
+          const roots = await tx.diagnosticIdentityEvidence.findMany({ where: { orderId }, select: { id: true } });
+          evidenceRecordCount = roots.some(root => root.id === identity.evidence?.id) ? roots.length : 0;
+        }
         const current = D.DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true }).safeParse(order.observedVehicle);
         if (!current.success) throw denied();
         history.push(current.data);
@@ -102,16 +106,18 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
           const observation = D.DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true }).safeParse(record.observation);
           if (record.erasedAt || !record.observationHash || !observation.success) throw denied();
           history.push(observation.data);
+          rawRecords.push({ id: record.id, observationHash: record.observationHash, observation: observation.data });
         }
       }
       // identity() returns the pin's explicit component, not every root on the order.
       // A supported correction must not conceal simultaneous disconnected claims.
-      const graph = manualCorrection ? {
+      const currentObservation = history[0];
+      const graph = manualCorrection || vinPair ? {
         pin: { id: identity.evidence.id, recordHash: identity.evidence.recordHash,
           identityRecordId: identity.evidence.identityRecordId, observationHash: identity.evidence.observationHash },
-        records: chain,
+        records: chain, ...(vinPair ? { rawRecords, currentObservation } : {}),
       } : undefined;
-      if (manualCorrection) evidenceRecordCount = await tx.diagnosticIdentityEvidence.count({ where: { orderId } });
+      if (manualCorrection || vinPair) evidenceRecordCount = await tx.diagnosticIdentityEvidence.count({ where: { orderId } });
       return { method: identity.observation.method, vin: identity.observation.vin, history, evidenceRecordCount, graph,
         corrected: !!identity.evidence.correction || !!identity.corrections.length || !!identity.correctionHeadHash,
         identifiers: chain.flatMap(record => record.identifiers), rightsUntil: chain.map(record => record.rights.schedule.until) };

@@ -13,16 +13,22 @@ export interface AttestationIdentity {
   graph?: {
     pin: Pick<D.DiagnosticIdentityEvidence, "id" | "recordHash" | "identityRecordId" | "observationHash">;
     records: D.DiagnosticIdentityEvidence[];
+    /** VIN comparison also accounts for all retained raw observations and current intake.
+     * Record observations come from their bound immutable raw rows, not the report pin. */
+    rawRecords?: { id: string; observationHash: string; observation: D.DiagnosticComparisonIdentity["observation"] }[];
+    currentObservation?: D.DiagnosticComparisonIdentity["observation"] | undefined;
   } | undefined;
 }
 /** Private same-vehicle policy. Mixed comparison reconciles observed VIN with retained
  * VIN stamps; automatic comparison additionally requires unchanged raw identity. */
 export function privateContinuityAttestation(a: AttestationIdentity, b: AttestationIdentity, provenanceRights: string[], now: Date, method: "comparative_attestation" | "automatic_normalized_vin" = "comparative_attestation"): Date {
   const denied = () => { throw new DiagnosticRuleError("DIAGNOSTIC_NO_ACCESS"); };
-  // Only supported manual/manual comparative corrections gain graph interpretation.
-  // Other methods keep their existing flattened-evidence admission rules.
-  if (method === "comparative_attestation" && a.method === "manual" && b.method === "manual" &&
-    (a.corrected || b.corrected || a.graph || b.graph)) {
+  const vinPair = a.method === "vin" && b.method === "vin";
+  // Resolve complete explicit components for same-method comparative identity.
+  // Mixed corrections remain outside this bounded admission.
+  if (method === "comparative_attestation" && a.method !== b.method && (a.corrected || b.corrected)) denied();
+  if (method === "comparative_attestation" && a.method === b.method &&
+    (vinPair || a.corrected || b.corrected || a.graph || b.graph)) {
     const current = (side: AttestationIdentity): AttestationIdentity => {
       const graph = side.graph;
       if (!graph || !graph.records.length) throw new DiagnosticRuleError("DIAGNOSTIC_NO_ACCESS");
@@ -34,7 +40,7 @@ export function privateContinuityAttestation(a: AttestationIdentity, b: Attestat
       const children = new Map<string, D.DiagnosticIdentityEvidence>();
       const rawHashes = new Map<string, string>();
       for (const record of records) {
-        if (record.orderId !== pinned.orderId || record.observation.method !== "manual" || !record.identifiers.length ||
+        if (record.orderId !== pinned.orderId || record.observation.method !== side.method || !record.identifiers.length ||
           !record.provenance.length || record.identifiers.some(item => !item.provenanceIds.length || item.provenanceIds.some(id => !record.provenance.some(ref => ref.id === id))) ||
           (rawHashes.has(record.identityRecordId) && rawHashes.get(record.identityRecordId) !== record.observationHash)) denied();
         rawHashes.set(record.identityRecordId, record.observationHash);
@@ -59,7 +65,23 @@ export function privateContinuityAttestation(a: AttestationIdentity, b: Attestat
         leaf = record;
       }
       if (visited.size !== records.length || !leaf) throw new DiagnosticRuleError("DIAGNOSTIC_NO_ACCESS");
-      return { ...side, identifiers: leaf.identifiers, rightsUntil: [...side.rightsUntil, ...records.map(record => record.rights.schedule.until)] };
+      if (vinPair) {
+        const raw = graph.rawRecords;
+        const current = graph.currentObservation;
+        const normalized = (vin: string | null | undefined) => vin?.trim().toUpperCase();
+        if (!raw?.length || !current || current.method !== "vin" || normalized(current.vin) !== normalized(leaf.observation.vin)) denied();
+        for (const record of records) {
+          const vin = normalized(record.observation.vin);
+          if (!record.identityRecordId || !record.observationHash || !vin ||
+            !raw?.some(item => item.id === record.identityRecordId && item.observationHash === record.observationHash &&
+              item.observation.method === "vin" && normalized(item.observation.vin) === vin) ||
+            !record.identifiers.some(item => item.kind === "vin_stamp") ||
+            record.identifiers.some(item => item.kind === "vin_stamp" && normalized(item.value) !== vin)) denied();
+        }
+        // No unrepresented raw change may be excused by a correction rationale.
+        if (raw?.some(item => !records.some(record => record.identityRecordId === item.id && record.observationHash === item.observationHash))) denied();
+      }
+      return { ...side, vin: leaf.observation.vin, identifiers: leaf.identifiers, rightsUntil: [...side.rightsUntil, ...records.map(record => record.rights.schedule.until)] };
     };
     a = current(a); b = current(b);
   }
@@ -74,13 +96,12 @@ export function privateContinuityAttestation(a: AttestationIdentity, b: Attestat
         side.identifiers.some(item => item.kind === "vin_stamp" && item.value.trim().toUpperCase() !== vin)) denied();
     }
   } else if (a.method !== "manual" || b.method !== "manual") {
-    // This bounded comparative admission covers one manual and one VIN visit.
-    // A common chassis cannot override contradictory raw VIN/stamp evidence.
-    if (a.method === b.method) denied();
-    const side = a.method === "vin" ? a : b;
-    const vin = side.vin?.trim().toUpperCase();
-    if (!vin || !side.identifiers.some(item => item.kind === "vin_stamp") ||
-      side.identifiers.some(item => item.kind === "vin_stamp" && item.value.trim().toUpperCase() !== vin)) denied();
+    // Every effective VIN must agree with all simultaneous physical VIN claims.
+    for (const side of [a, b].filter(item => item.method === "vin")) {
+      const vin = side.vin?.trim().toUpperCase();
+      if (!vin || !side.identifiers.some(item => item.kind === "vin_stamp") ||
+        side.identifiers.some(item => item.kind === "vin_stamp" && item.value.trim().toUpperCase() !== vin)) denied();
+    }
   }
   const values = new Map<string, string>();
   for (const item of [...a.identifiers, ...b.identifiers]) {
