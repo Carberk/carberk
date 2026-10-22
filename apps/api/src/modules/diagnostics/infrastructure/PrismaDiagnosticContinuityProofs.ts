@@ -222,10 +222,8 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
       if (hash(bound.predecessor) !== hash({ reportId: a.id, reportVersion: a.version, snapshotHash: a.snapshotHash, identityRecordId: comparison.predecessor.identityRecordId, identityRecordHash: comparison.predecessor.identityRecordHash }) ||
         hash(bound.candidate) !== hash({ orderId: b.id, orderVersion: b.version, identityRecordId: comparison.candidate.identityRecordId, identityRecordHash: comparison.candidate.identityRecordHash })) throw denied();
       const { bindings, provenance } = await this.facts(tx, current, staffing, bound.provenanceRecordIds, staffBindings);
-      if (bound.method === "automatic_normalized_vin") {
-        const rightsUntil = await this.comparisonRights(tx, current, bound.method, provenance, now);
-        if (rightsUntil.valueOf() !== proof.rightsUntil.valueOf()) throw denied();
-      }
+      const rightsUntil = await this.comparisonRights(tx, current, bound.method, provenance, now);
+      if (rightsUntil.valueOf() !== proof.rightsUntil.valueOf()) throw denied();
       if (hash(bindings) !== hash(proof.bindings)) throw denied();
       await tx.diagnosticContinuityProof.update({ where: { id: proof.id }, data: { consumedReportId: input.reportId, consumedAt: now } });
       const created = await this.reports.openReinspection(tx, subject, b, a, input, proof.id);
