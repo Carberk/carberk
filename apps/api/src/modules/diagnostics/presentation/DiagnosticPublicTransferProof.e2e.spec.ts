@@ -1,5 +1,8 @@
 import "reflect-metadata";
 import { createHash, randomUUID } from "node:crypto";
+import { execFile } from "node:child_process";
+import { resolve } from "node:path";
+import { promisify } from "node:util";
 import { S3Client, DeleteObjectCommand, HeadBucketCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { ConfigModule } from "@nestjs/config";
 import { Reflector } from "@nestjs/core";
@@ -19,7 +22,7 @@ import { DiagnosticsModule } from "../diagnostics.module";
 import { DIAGNOSTIC_RUNTIME } from "../domain/ports/DiagnosticIntakePort";
 
 const suite = defineE2eSuite("diagnostic-public-transfer-proof");
-const people = ["sellerA", "sellerB", "outsider", "reception", "technician", "reviewer"] as const;
+const people = ["sellerA", "sellerB", "erasureSeller", "outsider", "reception", "technician", "reviewer"] as const;
 type Person = typeof people[number];
 const capability: Partial<Record<Person, string>> = {
   reception: "diagnostics.reception", technician: "diagnostics.technician", reviewer: "diagnostics.reviewer",
@@ -71,6 +74,9 @@ describe("public continuity across different sellers and Listings", { concurrent
     raw: [] as string[], evidence: [] as string[], provenance: [] as string[], proofs: [] as string[], keys: new Set<string>(), users: [] as string[],
     sessions: [] as string[], grants: [] as { userId: string; capability: string }[], qualifications: [] as string[],
     requestKeys: [] as string[], findings: [] as string[], assignments: [] as { orderId: string; userId: string; capability: string }[] };
+  // Only this exact product-purged order may have its original ownership severed.
+  const erasedOrders = new Map<string, Date>();
+  const erasedAuditIds = new Set<string>();
   let ownsCenter = false;
   const listings: { id: string; sellerId: string }[] = [];
   let catalogRegistered = false;
@@ -92,7 +98,9 @@ describe("public continuity across different sellers and Listings", { concurrent
       // ownership before touching objects or rows, including cross-order pins.
       const orders = await db.inspectionOrder.findMany({ where: { id: { in: owned.orders } } });
       expect(orders.every(order => order.centerId === centerId && order.templateVersionId === templateId
-        && listings.some(listing => listing.id === order.listingId && listing.sellerId === order.commissionerId) && owned.requestKeys.includes(order.requestKey)),
+        && (listings.some(listing => listing.id === order.listingId && listing.sellerId === order.commissionerId)
+          || erasedOrders.has(order.id) && order.listingId === null && order.commissionerId === null
+            && order.erasedAt?.getTime() === erasedOrders.get(order.id)!.getTime()) && owned.requestKeys.includes(order.requestKey)),
       "Teardown refused: unregistered order binding").toBe(true);
       for (const [rows, ids] of [
         [await db.diagnosticContinuityProof.findMany({ where: { OR: [{ candidateOrderId: { in: owned.orders } },
@@ -126,7 +134,7 @@ describe("public continuity across different sellers and Listings", { concurrent
         { orderId: { in: owned.orders } }, { actorId: { in: owned.users } }] } });
       expect(audits.every(row => {
         const details = row.details as { templateVersionId?: string; reportId?: string };
-        return ownsCenter && row.centerId === centerId && row.actorId !== null && owned.users.includes(row.actorId)
+        return ownsCenter && row.centerId === centerId && (row.actorId !== null && owned.users.includes(row.actorId) || row.actorId === null && erasedAuditIds.has(row.id))
           && (row.orderId !== null ? owned.orders.includes(row.orderId)
             : row.action === "TEMPLATE_PUBLISHED" && details.templateVersionId === templateId)
           && (details.reportId === undefined || owned.reports.includes(details.reportId));
@@ -209,13 +217,14 @@ describe("public continuity across different sellers and Listings", { concurrent
       await db.diagnosticContinuityProof.deleteMany({ where: { id: { in: owned.proofs } } });
       await db.diagnosticPdfArtifact.deleteMany({ where: { id: { in: owned.pdfs } } });
       for (const id of [...owned.reports].reverse()) await db.diagnosticReportRecord.deleteMany({ where: { id } });
-      if (ownsCenter) await db.diagnosticAudit.deleteMany({ where: { centerId, actorId: { in: owned.users },
-        OR: [{ orderId: { in: owned.orders } }, { orderId: null }] } });
+      if (ownsCenter) await db.diagnosticAudit.deleteMany({ where: { centerId, AND: [{ OR: [{ actorId: { in: owned.users } }, { actorId: null, id: { in: [...erasedAuditIds] } }] },
+          { OR: [{ orderId: { in: owned.orders } }, { orderId: null }] }] } });
       await db.diagnosticOrderAssignment.deleteMany({ where: { OR: owned.assignments } });
       // Reports no longer pin identity rows. The guarded rows leave only through
       // these exact request-registered order parents, never by direct DELETE.
       await db.inspectionOrder.deleteMany({ where: { id: { in: owned.orders }, centerId,
-        OR: listings.map(listing => ({ listingId: listing.id, commissionerId: listing.sellerId })), requestKey: { in: owned.requestKeys } } });
+        OR: [...listings.map(listing => ({ listingId: listing.id, commissionerId: listing.sellerId })),
+          ...[...erasedOrders].map(([id, erasedAt]) => ({ id, listingId: null, commissionerId: null, erasedAt }))], requestKey: { in: owned.requestKeys } } });
       if (ownsCenter) {
         await db.diagnosticTemplateVersion.deleteMany({ where: { id: templateId ?? "unissued-template" } });
         await db.diagnosticCenterAssignment.deleteMany({ where: { id: { in: owned.qualifications } } });
@@ -345,6 +354,29 @@ describe("public continuity across different sellers and Listings", { concurrent
     if (Array.isArray(records.body)) owned.raw.push(...records.body.map((record: Raw) => record.id));
     expect(records.status, JSON.stringify(records.body)).toBe(200);
     expect(observed.status, JSON.stringify(observed.body)).toBe(201); order = observed.body;
+    expect(order).toMatchObject({ version: 7, status: "arrived", physicalAuthorized: true, publicationAuthorized: true, vehicleMatched: true, observedVehicle: observation });
+    return order;
+  }
+  async function visitOnListing(observation: Observation, seller: "sellerA" | "sellerB" | "erasureSeller", listingId: string): Promise<Order> {
+    const requestKey = randomUUID(); owned.requestKeys.push(requestKey);
+    const response = await post(seller, "orders", { requestKey, centerId, templateVersionId: templateId, audience: "listing_public", listingId, synthetic: true });
+    let order = response.body;
+    if (typeof order.id === "string") { owned.orders.push(order.id); owned.assignments.push({ orderId: order.id, userId: suite.id("reception"), capability: "diagnostics.reception" }); }
+    expect(response.status, JSON.stringify(response.body)).toBe(201);
+    expect(order).toMatchObject({ version: 0, audience: "listing_public", listingId });
+    expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: order.id } })).toMatchObject({ commissionerId: suite.id(seller), listingId });
+    for (const [who, expectedVersion, nextVersion] of [["technician", 0, 1], ["reviewer", 1, 2]] as const) {
+      owned.assignments.push({ orderId: order.id, userId: suite.id(who), capability: capability[who]! });
+      ({ body: order } = await post("reception", `orders/${order.id}/assignments`, { expectedVersion, userId: suite.id(who), capability: capability[who], active: true }).expect(201));
+      expect(order.version).toBe(nextVersion);
+    }
+    ({ body: order } = await post("reception", `orders/${order.id}/authorization`, { expectedVersion: 2, kind: "physical", authorityReference: `Synthetic physical authorization for visit ${listingId}` }).expect(201));
+    ({ body: order } = await post("reception", `orders/${order.id}/authorization`, { expectedVersion: 3, kind: "publication", authorityReference: `Fresh synthetic publication consent from ${seller} for Listing ${listingId}` }).expect(201));
+    for (const [state, expectedVersion] of [["confirmed", 4], ["arrived", 5]] as const) ({ body: order } = await post("reception", `orders/${order.id}/appointment`, { expectedVersion, state }).expect(201));
+    const observed = await post("technician", `orders/${order.id}/vehicle`, { expectedVersion: 6, ...observation });
+    const records = await get("technician", `orders/${order.id}/identity-records`);
+    if (Array.isArray(records.body)) owned.raw.push(...records.body.map((record: Raw) => record.id));
+    expect(records.status, JSON.stringify(records.body)).toBe(200); expect(observed.status, JSON.stringify(observed.body)).toBe(201); order = observed.body;
     expect(order).toMatchObject({ version: 7, status: "arrived", physicalAuthorized: true, publicationAuthorized: true, vehicleMatched: true, observedVehicle: observation });
     return order;
   }
@@ -755,6 +787,394 @@ describe("public continuity across different sellers and Listings", { concurrent
       expect(Object.values(business._count).every(count => count === 0), "Unknown business descendant").toBe(true);
       await db.dealership.delete({ where: { id: businessId } });
     }
+  });
+
+  // Boundary fixtures own only these exact other-context rows. Diagnostic state still
+  // comes from the original HTTP intake, consent, observation and capture helpers.
+  const membershipIntents = new Map<string, ("suspend" | "restore")[]>();
+  async function withBusiness(run: (businessId: string, memberId: string) => Promise<void>, differentStoredSeller = false) {
+    const businessId = randomUUID(); const ownerId = randomUUID(); const memberId = randomUUID();
+    const auditIds: string[] = [];
+    membershipIntents.set(businessId, []);
+    expect(await db.auditLog.count({ where: { targetType: "Dealership", targetId: businessId } })).toBe(0);
+    await db.dealership.create({ data: { id: businessId, slug: `synthetic-${businessId}`, name: "Synthetic public matrix business", status: "active", admissionMode: "synthetic" } });
+    try {
+      await db.dealershipMember.create({ data: { id: ownerId, dealershipId: businessId, userId: suite.id("sellerA"), role: "owner", status: "active" } });
+      await db.dealershipMember.create({ data: { id: memberId, dealershipId: businessId, userId: suite.id("sellerB"), role: "sales", status: "active" } });
+      for (const side of ["A", "B"]) await db.listing.update({ where: { id: suite.id(`listing-${side}`) }, data: { businessId,
+        ...(side === "B" && differentStoredSeller ? { sellerId: suite.id("sellerA") } : {}) } });
+      await run(businessId, memberId);
+    } finally {
+      // Business membership requests have one precisely shaped audit each. Do not
+      // erase unrelated audits merely because they mention this business or actor.
+      const audits = await db.auditLog.findMany({ where: { targetType: "Dealership", targetId: businessId } });
+      const remaining = [...membershipIntents.get(businessId)!];
+      for (const audit of audits) {
+        const action = (audit.details as { action: "suspend" | "restore" }).action;
+        expect(remaining).toContain(action);
+        remaining.splice(remaining.indexOf(action), 1);
+        expect(audit).toMatchObject({ actorId: suite.id("sellerA"), action: "BUSINESS_MEMBERSHIP_CHANGED", targetType: "Dealership", targetId: businessId });
+        expect(["suspend", "restore"].map(action => ({ targetUserId: suite.id("sellerB"), action }))).toContainEqual(audit.details);
+        auditIds.push(audit.id);
+      }
+      expect(remaining).toHaveLength(0);
+      await db.auditLog.deleteMany({ where: { id: { in: auditIds }, actorId: suite.id("sellerA"), targetType: "Dealership", targetId: businessId, action: "BUSINESS_MEMBERSHIP_CHANGED" } });
+      for (const [side, seller] of [["A", "sellerA"], ["B", "sellerB"]] as const) await db.listing.update({ where: { id: suite.id(`listing-${side}`) }, data: { businessId: null, sellerId: suite.id(seller) } });
+      const actual = await db.dealershipMember.findMany({ where: { dealershipId: businessId } });
+      expect(actual.every(row => row.id === ownerId && row.userId === suite.id("sellerA") || row.id === memberId && row.userId === suite.id("sellerB")), "Unknown matrix business member").toBe(true);
+      await db.dealershipMember.deleteMany({ where: { dealershipId: businessId, id: { in: [ownerId, memberId] } } });
+      const business = await db.dealership.findUniqueOrThrow({ where: { id: businessId }, include: { _count: true } });
+      expect(Object.values(business._count).every(count => count === 0), "Unknown matrix business descendant").toBe(true);
+      await db.dealership.delete({ where: { id: businessId } });
+    }
+  }
+  const membership = (businessId: string, action: "suspend" | "restore") => {
+    const intents = membershipIntents.get(businessId);
+    if (!intents) throw new Error("Unregistered business membership mutation");
+    intents.push(action);
+    return request.post(`/api/v1/business/${businessId}/members`).set(headers("sellerA")).send({ targetUserId: suite.id("sellerB"), action });
+  };
+  async function submitLinked(reportId: string) {
+    const finding = { id: randomUUID(), checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: [], kind: null, source: null, measurement: null, location: null };
+    owned.findings.push(finding.id);
+    await post("technician", `reports/${reportId}/findings`, { expectedVersion: 0, finding }).expect(201);
+    await post("technician", `reports/${reportId}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
+    return finding;
+  }
+  async function finalizeLinked(reportId: string) {
+    const response = await post("reviewer", `reports/${reportId}/transition`, { expectedVersion: 2, action: "finalize" });
+    const documents = await db.diagnosticPdfArtifact.findMany({ where: { reportId } });
+    owned.pdfs.push(...documents.map(row => row.id));
+    for (const row of documents) owned.keys.add(`diagnostic-pdf/${reportId}/${row.id}.pdf`);
+    return response;
+  }
+  it("publishes B for a different employee of the same business while preserving A's historical commissioner and denying membership staff powers", async () => {
+    await withBusiness(async (businessId, memberId) => {
+      const p = await freshPublicPair();
+      const historical = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: p.released.id } });
+      expect(await db.listing.findUniqueOrThrow({ where: { id: suite.id("listing-B") } })).toMatchObject({ sellerId: suite.id("sellerA"), businessId });
+      expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: p.b.id } })).toMatchObject({ commissionerId: suite.id("sellerB"), publicationAuthorization: expect.any(Object), associationValidatedAt: initialTime });
+      const body = { predecessorId: p.released.id, expectedPredecessorVersion: 3, expectedOrderVersion: 8,
+        predecessorIdentityRecordId: p.ia.id, candidateIdentityRecordId: p.ib.id, linkingTechnicianId: suite.id("technician"),
+        method: "comparative_attestation", rationale: "Independent physical identity material", provenanceRecordIds: [p.pa, p.pb] };
+      await denied(await post("sellerB", `orders/${p.b.id}/continuity-proofs`, body));
+      const proofId = await issuePublic(p); const input = publicLink(p, proofId);
+      expect((await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).bindings).toMatchObject({
+        predecessor: { commissionerId: suite.id("sellerA") }, candidate: { commissionerId: suite.id("sellerB"), listingBinding: {
+          sellerId: suite.id("sellerA"), businessId, publisher: { userId: suite.id("sellerB"), membershipId: memberId } } } });
+      await denied(await post("sellerB", `orders/${p.b.id}/reinspections`, input));
+      const created = await post("technician", `orders/${p.b.id}/reinspections`, input).expect(201);
+      expect(created.body).toMatchObject({ findings: [], successorOf: p.released.id, observedAt: "2026-10-21T11:00:00.000Z", mileageKm: 124100 });
+      const finding = await submitLinked(input.reportId);
+      expect((await finalizeLinked(input.reportId)).status).toBe(201);
+      expect((await publicGet(`reports/${input.reportId}`).expect(200)).body.id).toBe(input.reportId);
+      expect((await publicGet(`reports/${input.reportId}`).expect(200)).body).toMatchObject({ findings: [finding], status: "finalized" });
+      expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: p.released.id } })).toEqual(historical);
+      expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: p.a.id } })).toMatchObject({ commissionerId: suite.id("sellerA") });
+      expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: p.b.id } })).toMatchObject({ commissionerId: suite.id("sellerB") });
+      await denied(await get("sellerB", evidencePath(p.a)));
+      await post("reviewer", `reports/${input.reportId}/transition`, { expectedVersion: 3, action: "withdraw", reason: "Independent B withdrawal" }).expect(201);
+      await publicGet(`reports/${input.reportId}`).expect(404);
+    }, true);
+  });
+
+  it.each(["A", "B"] as const)("permanently refuses each SAME unused proof after %s Listing identity, seller or status restoration", async side => {
+    // Each mutation gets a distinct valid pair and proof, so a previous invalidation
+    // cannot make a missing trigger appear covered. Restoring the original row is exact.
+    for (const change of [{ year: 2020 }, { sellerId: suite.id("outsider") }, { status: "sold" as const }]) {
+      const p = await freshPublicPair(); const proofId = await issuePublic(p); const input = publicLink(p, proofId);
+      const id = suite.id(`listing-${side}`); const original = await db.listing.findUniqueOrThrow({ where: { id } });
+      try {
+        await db.listing.update({ where: { id }, data: change });
+        const invalid = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
+        expect(invalid.invalidatedAt).toBeInstanceOf(Date);
+        await denied(await post("technician", `orders/${p.b.id}/reinspections`, input));
+        expect(await db.diagnosticReportRecord.findUnique({ where: { id: input.reportId } })).toBeNull();
+        await db.listing.update({ where: { id }, data: { year: original.year, sellerId: original.sellerId, status: original.status, updatedAt: original.updatedAt } });
+        expect(await db.listing.findUniqueOrThrow({ where: { id } })).toEqual(original);
+        await denied(await post("technician", `orders/${p.b.id}/reinspections`, input));
+        expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).toEqual(invalid);
+        const replacement = await issuePublic(p);
+        expect(replacement).not.toBe(proofId);
+        await post("technician", `orders/${p.b.id}/reinspections`, { ...input, proofId: replacement }).expect(201);
+      } finally { await db.listing.update({ where: { id }, data: { year: original.year, sellerId: original.sellerId, status: original.status, updatedAt: original.updatedAt } }); }
+    }
+  });
+  it("permanently refuses the SAME unused proof after business suspension and restoration", async () => {
+    await withBusiness(async businessId => {
+      const p = await freshPublicPair(); const proofId = await issuePublic(p); const input = publicLink(p, proofId);
+      const original = await db.dealership.findUniqueOrThrow({ where: { id: businessId } });
+      await db.dealership.update({ where: { id: businessId }, data: { status: "suspended" } });
+      const invalid = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
+      expect(invalid.invalidatedAt).toBeInstanceOf(Date);
+      await denied(await post("technician", `orders/${p.b.id}/reinspections`, input));
+      await db.dealership.update({ where: { id: businessId }, data: { status: "active", updatedAt: original.updatedAt } });
+      expect(await db.dealership.findUniqueOrThrow({ where: { id: businessId } })).toEqual(original);
+      await denied(await post("technician", `orders/${p.b.id}/reinspections`, input));
+      expect(await db.diagnosticReportRecord.findUnique({ where: { id: input.reportId } })).toBeNull();
+      expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).toEqual(invalid);
+      const replacement = await issuePublic(p);
+      await post("technician", `orders/${p.b.id}/reinspections`, { ...input, proofId: replacement }).expect(201);
+    });
+  });
+  it("refuses missing, unknown and wrong-pair public proofs without creating a successor or consuming a valid proof", async () => {
+    const p = await freshPublicPair(); const other = await freshPublicPair();
+    const proofId = await issuePublic(p); const wrongPair = await issuePublic(other);
+    const input = publicLink(p, proofId); const { proofId: omitted, ...missing } = input;
+    expect(omitted).toBe(proofId);
+    await post("technician", `orders/${p.b.id}/reinspections`, missing).expect(400);
+    const before = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
+    for (const bad of [randomUUID(), wrongPair]) await denied(await post("technician", `orders/${p.b.id}/reinspections`, { ...input, proofId: bad }));
+    expect(await db.diagnosticReportRecord.count({ where: { orderId: p.b.id } })).toBe(0);
+    expect(await db.diagnosticReportRecord.count({ where: { predecessorId: p.released.id } })).toBe(0);
+    expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).toEqual(before);
+    await post("technician", `orders/${p.b.id}/reinspections`, input).expect(201);
+  });
+  it("refuses public automatic comparison across changed Listing and commissioner after reaching retained comparative material", async () => {
+    const p = await freshPublicPair();
+    const listing = await db.listing.findUniqueOrThrow({ where: { id: suite.id("listing-B") } });
+    await db.listing.update({ where: { id: listing.id }, data: { sellerId: suite.id("outsider") } });
+    try {
+      await get("reviewer", comparisonPath(p.b, p.released.id)).expect(200);
+      await comparativeBytes(p.b, p.released.id, p.pa, red); await comparativeBytes(p.b, p.released.id, p.pb, blue);
+      await denied(await post("reviewer", `orders/${p.b.id}/continuity-proofs`, { predecessorId: p.released.id, expectedPredecessorVersion: 3,
+        expectedOrderVersion: 8, predecessorIdentityRecordId: p.ia.id, candidateIdentityRecordId: p.ib.id, linkingTechnicianId: suite.id("technician"), method: "automatic_normalized_vin", rationale: "Equal raw VIN does not authorize changed public ownership", provenanceRecordIds: [p.pa, p.pb] }));
+      expect(await db.diagnosticContinuityProof.count({ where: { candidateOrderId: p.b.id } })).toBe(0);
+      expect(await db.diagnosticReportRecord.count({ where: { orderId: p.b.id } })).toBe(0);
+    } finally {
+      await db.listing.update({ where: { id: listing.id }, data: { sellerId: listing.sellerId } });
+    }
+    await issuePublic(p);
+  });
+
+  // Observe actual PostgreSQL lock waits outside the holder transaction, with the
+  // existing 500-query bound. Release on every failure before draining requests.
+  async function contendPublisher(businessId: string, operation: () => PromiseLike<supertest.Response>) {
+    let revoke: Promise<supertest.Response> | undefined; let admission: Promise<supertest.Response> | undefined;
+    let results: Promise<PromiseSettledResult<supertest.Response>[]> | undefined;
+    try {
+      await db.$transaction(async tx => {
+        const [holder] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+        await tx.$queryRaw`SELECT id FROM users WHERE id=${suite.id("sellerB")} FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM dealerships WHERE id=${businessId} FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM listings WHERE id=${suite.id("listing-B")} FOR UPDATE`;
+        const wait = async (count: number) => {
+          for (let attempt = 0; ; attempt++) {
+            const [observed] = await db.$queryRaw<{ waiting: number }[]>`WITH direct AS (SELECT activity.pid FROM pg_stat_activity activity WHERE ${holder!.pid}::int = ANY(pg_blocking_pids(activity.pid)))
+              SELECT ((SELECT count(*) FROM direct) + (SELECT count(*) FROM pg_stat_activity activity WHERE activity.pid NOT IN (SELECT pid FROM direct) AND pg_blocking_pids(activity.pid) && ARRAY(SELECT pid FROM direct)))::int AS waiting`;
+            if (observed!.waiting === count) return;
+            if (attempt === 500) throw new Error(`Only ${observed!.waiting} of ${count} publisher requests reached the User/Business lock holder`);
+          }
+        };
+        revoke = Promise.resolve(membership(businessId, "suspend"));
+        // Attach rejection handlers immediately; keep the original failure for the caller.
+        results = Promise.allSettled([revoke]);
+        await wait(1);
+        admission = Promise.resolve(operation()); results = Promise.allSettled([revoke, admission]);
+        await wait(2);
+      });
+    } catch (failure) { await results; throw failure; }
+    const settled = await results!;
+    const rejected = settled.find(result => result.status === "rejected");
+    if (rejected) throw rejected.reason;
+    return settled.map(result => (result as PromiseFulfilledResult<supertest.Response>).value);
+  }
+  it("serializes public consume against real business publisher membership revocation without stale release", async () => {
+    await withBusiness(async businessId => {
+      const p = await freshPublicPair(); const proofId = await issuePublic(p); const input = publicLink(p, proofId);
+      const [revoked, consumed] = await contendPublisher(businessId, () => post("technician", `orders/${p.b.id}/reinspections`, input));
+      expect(revoked!.status).toBe(201); expect(revoked!.body).toEqual({ ok: true });
+      expect(consumed!.status).toBe(403);
+      const proof = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
+      await denied(consumed!);
+      expect(proof).toMatchObject({ consumedReportId: null, consumedAt: null, invalidatedAt: expect.any(Date) });
+      expect(await db.diagnosticReportRecord.findUnique({ where: { id: input.reportId } })).toBeNull();
+      await publicGet(`reports/${input.reportId}`).expect(404);
+      await membership(businessId, "restore").expect(201);
+      await denied(await post("technician", `orders/${p.b.id}/reinspections`, input));
+      await post("technician", `orders/${p.b.id}/reinspections`, { ...input, proofId: await issuePublic(p) }).expect(201);
+    });
+  });
+  it("serializes independent B finalization against real business publisher membership revocation", async () => {
+    await withBusiness(async businessId => {
+      const p = await freshPublicPair(); const proofId = await issuePublic(p); const input = publicLink(p, proofId);
+      await post("technician", `orders/${p.b.id}/reinspections`, input).expect(201);
+      const finding = await submitLinked(input.reportId);
+      const consumedProof = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
+      const [revoked, finalized] = await contendPublisher(businessId, () => finalizeLinked(input.reportId));
+      expect(revoked!.status).toBe(201); expect(revoked!.body).toEqual({ ok: true });
+      expect(finalized!.status).toBe(403);
+      const current = (await get("technician", `reports/${input.reportId}`).expect(200)).body;
+      expect(current).toMatchObject({ findings: [finding], status: "submitted", version: 2 });
+      await denied(finalized!);
+      expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).toEqual(consumedProof);
+      await membership(businessId, "restore").expect(201);
+      expect((await finalizeLinked(input.reportId)).status).toBe(201);
+      expect((await publicGet(`reports/${input.reportId}`).expect(200)).body.id).toBe(input.reportId);
+      await post("reviewer", `reports/${input.reportId}/transition`, { expectedVersion: 3, action: "withdraw", reason: "Publisher race cleanup through product" }).expect(201);
+      await publicGet(`reports/${input.reportId}`).expect(404);
+    });
+  });
+
+  it("keeps different-commissioner B usable after A-only product account purge without disclosing or resurrecting A's restricted material", async () => {
+    const listingId = suite.id("listing-erasure-A");
+    expect(await db.listing.count({ where: { id: listingId } })).toBe(0);
+    listings.push({ id: listingId, sellerId: suite.id("erasureSeller") });
+    await db.listing.create({ data: { id: listingId, sellerId: suite.id("erasureSeller"), brandId: suite.catalog.brandId,
+      modelId: suite.catalog.modelId, cityId: suite.catalog.cityId, status: "active", vin: "SYN-VIN-041", priceAmount: 100000, priceTmt: 100000, priceCurrency: "TMT" } });
+    const observation: Observation = { observedAt: "2026-10-20T12:00:00.000Z", mileageKm: 124000, method: "vin", vin: "SYN-VIN-041", manualReference: null };
+    const a = await visitOnListing(observation, "erasureSeller", listingId); const [ia] = await history(a);
+    const pa = randomUUID(); await verified(a, pa, red); const ea = await capture(a, ia!, pa, red); const released = await release(a);
+    const listingB = await isolatedListing("sellerB");
+    const b = await visitOnListing({ ...observation, observedAt: "2026-10-21T11:00:00.000Z", mileageKm: 124100 }, "sellerB", listingB);
+    const [ib] = await history(b); const pb = randomUUID(); await verified(b, pb, blue, rightsB); const eb = await capture(b, ib!, pb, blue, rightsB);
+    const p = { a, b, ia: ia!, ib: ib!, pa, pb, ea, eb, released };
+    const proofId = await issuePublic(p); const input = publicLink(p, proofId);
+    const created = await post("technician", `orders/${b.id}/reinspections`, input).expect(201);
+    const beforeB = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: input.reportId } });
+    const orderB = await db.inspectionOrder.findUniqueOrThrow({ where: { id: b.id } });
+    const ownEvidence = await db.diagnosticIdentityEvidence.findUniqueOrThrow({ where: { id: eb.id } });
+    const ownProvenance = await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: pb } });
+    const beforeA = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: released.id } });
+    const auditsB = await db.diagnosticAudit.findMany({ where: { orderId: b.id }, orderBy: { id: "asc" } });
+    expect(orderB.commissionerId).toBe(suite.id("sellerB"));
+    const restricted = [evidencePath(a), `orders/${a.id}/identity-records`, provenancePath(a, pa),
+      comparisonPath(b, released.id), `orders/${b.id}/continuity-proofs/${proofId}`];
+    for (const path of restricted) await denied(await get("sellerB", path));
+    const targetAudits = await db.diagnosticAudit.findMany({ where: { actorId: suite.id("erasureSeller") } });
+    expect(targetAudits.every(row => row.centerId === centerId && row.orderId === a.id)).toBe(true);
+    for (const row of targetAudits) erasedAuditIds.add(row.id);
+    expect(await db.measurementInvestigationExport.count()).toBe(0);
+    expect(await db.measurementState.count({ where: { key: { startsWith: "inventory_baseline:" } } })).toBe(0);
+    await request.delete("/api/v1/me").set(headers("erasureSeller")).expect(204, "");
+    const scheduled = await db.user.findUniqueOrThrow({ where: { id: suite.id("erasureSeller") } });
+    expect(scheduled.deletionScheduledAt?.toISOString()).toBe("2026-11-20T12:00:00.000Z");
+    expect(await db.session.count({ where: { userId: scheduled.id } })).toBe(0);
+    expect(await db.listing.findUniqueOrThrow({ where: { id: listingId } })).toMatchObject({ status: "archived", archivedByDeletion: true });
+    // The production job is global at selection. Refuse before mutation unless
+    // every due account and stale OTP belongs to this exact registered fixture.
+    // No AppModule, scheduler, service override or global purge switch is used.
+    const workerRoot = resolve(__dirname, "../../../../../worker");
+    const script = `
+      require('reflect-metadata'); require('tsx/cjs');
+      const assert = require('node:assert/strict');
+      const { PrismaService } = require('@auto-tm/db');
+      const { PurgeExpiredAccounts } = require('./src/jobs/PurgeExpiredAccounts.ts');
+      async function main() {
+        const db = new PrismaService();
+        try {
+          assert.equal(process.env.GITHUB_ACTIONS, 'true', 'Purge isolation refused: hosted disposable services required');
+          const url = new URL(process.env.DATABASE_URL);
+          assert.match(url.hostname, /^(localhost|127[.]0[.]0[.]1)$/);
+          const now = new Date(${JSON.stringify(scheduled.deletionScheduledAt!.toISOString())});
+          const target = ${JSON.stringify(scheduled.id)};
+          assert.deepEqual(await db.user.findMany({ where: { deletionScheduledAt: { lte: now } }, select: { id: true } }), [{ id: target }], 'Purge isolation refused: foreign due account');
+          const stale = await db.otpRequest.findMany({ where: { createdAt: { lt: new Date(now.getTime() - 30 * 86400000) } }, select: { userId: true, destination: true } });
+          assert.equal(stale.every(row => row.userId === target || row.userId === null && row.destination === ${JSON.stringify(suite.phone("erasureSeller"))}), true, 'Purge isolation refused: foreign stale OTP');
+          assert.deepEqual((await db.inspectionOrder.findMany({ where: { commissionerId: target }, select: { id: true } })), [{ id: ${JSON.stringify(a.id)} }], 'Purge isolation refused: unknown commissioned order');
+          assert.equal(await db.diagnosticReportRecord.count({ where: { OR: [{ state: { path: ['authorId'], equals: target } }, { state: { path: ['reviewerId'], equals: target } }] } }), 0, 'Purge isolation refused: staff descendants');
+          assert.deepEqual(await new PurgeExpiredAccounts(db).execute({ now }), { purgedCount: 1 });
+        } finally { await db.$disconnect(); }
+      }
+      void main().catch(error => { console.error(error); process.exitCode = 1; });
+    `;
+    // Register the sole permitted severed ownership before a worker assertion can
+    // fail after commit. Cleanup still demands its exact erasedAt and null pins.
+    erasedOrders.set(a.id, scheduled.deletionScheduledAt!);
+    await promisify(execFile)(process.execPath, ["-e", script], { cwd: workerRoot,
+      env: { ...process.env, TSX_TSCONFIG_PATH: resolve(workerRoot, "tsconfig.json") }, timeout: 30000, killSignal: "SIGKILL" });
+    expect(await db.user.findUniqueOrThrow({ where: { id: scheduled.id } })).toMatchObject({ phone: null, deletionScheduledAt: null });
+    expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: a.id } })).toMatchObject({ commissionerId: null, listingId: null,
+      erasedAt: scheduled.deletionScheduledAt, observedVehicle: null, physicalAuthorization: null, publicationAuthorization: null });
+    const erasedA = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: released.id } });
+    expect(erasedA).toMatchObject({ erasedAt: scheduled.deletionScheduledAt, identityRecordId: null, identityEvidenceId: null,
+      snapshot: beforeA.snapshot, snapshotHash: beforeA.snapshotHash });
+    expect(await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: ia!.id } })).toMatchObject({ observation: null, observationHash: null, recordedById: null, erasedAt: scheduled.deletionScheduledAt });
+    expect(await db.diagnosticIdentityEvidence.findUniqueOrThrow({ where: { id: ea.id } })).toMatchObject({ identifiers: null, provenance: null, rights: null, recordHash: null, erasedAt: scheduled.deletionScheduledAt });
+    expect(await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: pa } })).toMatchObject({ state: "cleanup_pending", rights: null, erasedAt: scheduled.deletionScheduledAt, cleanupRequestedAt: scheduled.deletionScheduledAt });
+    expect((await db.diagnosticPdfArtifact.findMany({ where: { reportId: released.id } })).map(row => ({ state: row.state, cleanupRequestedAt: row.cleanupRequestedAt })))
+      .toEqual([1, 2, 3].map(() => ({ state: "cleanup_pending", cleanupRequestedAt: scheduled.deletionScheduledAt })));
+    expect(await db.diagnosticContinuityProof.findUnique({ where: { id: proofId } })).toBeNull();
+    expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: b.id } })).toEqual(orderB);
+    // Proof erasure removes restricted A/B material, retaining B's immutable
+    // original consumption pointer and own state, snapshot and authorship.
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: input.reportId } })).toEqual(beforeB);
+    expect(await db.diagnosticIdentityEvidence.findUniqueOrThrow({ where: { id: eb.id } })).toEqual(ownEvidence);
+    expect(await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: pb } })).toEqual(ownProvenance);
+    expect(await history(b)).toEqual([ib]);
+    expect((await get("technician", evidencePath(b)).expect(200)).body).toEqual([eb]);
+    expect((await get("technician", provenancePath(b, pb)).expect(200)).body.toString("base64")).toBe(blue.output);
+    for (const who of ["reviewer", "sellerB"] as const) {
+      for (const path of [...restricted, `reports/${released.id}`, `reports/${released.id}/documents`, `reports/${released.id}/documents/en`]) {
+        const response = await get(who, path); await denied(response);
+        for (const secret of [pa, ea.id, proofId, red.sha256, key(pa, red), ia!.observationHash, ea.recordHash]) expect(response.text).not.toContain(secret);
+      }
+    }
+    await publicGet(`reports/${released.id}`).expect(404); await publicGet(`listings/${listingId}`).expect(404);
+    expect((await post("technician", `orders/${b.id}/reinspections`, input).expect(201)).body).toEqual(created.body);
+    expect(await db.diagnosticAudit.findMany({ where: { orderId: b.id }, orderBy: { id: "asc" } })).toEqual(auditsB);
+    const finding = await submitLinked(input.reportId);
+    expect((await post("technician", `orders/${b.id}/reinspections`, input).expect(201)).body).toMatchObject({ status: "submitted", version: 2, findings: [finding] });
+    expect((await finalizeLinked(input.reportId)).status).toBe(201);
+    const publicB = await publicGet(`reports/${input.reportId}`).expect(200);
+    expect(publicB.body).toMatchObject({ findings: [finding], observedAt: "2026-10-21T11:00:00.000Z", mileageKm: 124100, successorOf: null });
+    expect(publicB.text).not.toContain(released.id);
+    expect((await publicGet(`listings/${listingB}`).expect(200)).body.reportId).toBe(input.reportId);
+    await post("reviewer", `reports/${input.reportId}/transition`, { expectedVersion: 3, action: "withdraw", reason: "Surviving B independent withdrawal" }).expect(201);
+    await publicGet(`listings/${listingB}`).expect(404); await publicGet(`listings/${listingId}`).expect(404);
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: released.id } })).toEqual(erasedA);
+  });
+
+  async function isolatedListing(seller: "sellerA" | "sellerB", year: number | null = null) {
+    const id = randomUUID(); const sellerId = suite.id(seller);
+    listings.push({ id, sellerId });
+    await db.listing.create({ data: { id, sellerId, brandId: suite.catalog.brandId, modelId: suite.catalog.modelId,
+      cityId: suite.catalog.cityId, status: "active", vin: "SYN-VIN-041", year, priceAmount: 100000, priceTmt: 100000, priceCurrency: "TMT" } });
+    return id;
+  }
+  it("admits changed Listing identity and id through B's fresh ordinary authorization and association", async () => {
+    const observation: Observation = { observedAt: "2026-10-20T12:00:00.000Z", mileageKm: 124000, method: "vin", vin: "SYN-VIN-041", manualReference: null };
+    const listingA = await isolatedListing("sellerA", 2019); const listingB = await isolatedListing("sellerB", 2020);
+    expect(listingB).not.toBe(listingA);
+    const a = await visitOnListing(observation, "sellerA", listingA); const [ia] = await history(a);
+    const pa = randomUUID(); await verified(a, pa, red); const ea = await capture(a, ia!, pa, red); const released = await release(a);
+    const b = await visitOnListing({ ...observation, mileageKm: 124100 }, "sellerB", listingB); const [ib] = await history(b);
+    const pb = randomUUID(); await verified(b, pb, blue, rightsB); const eb = await capture(b, ib!, pb, blue, rightsB);
+    const p = { a, b, ia: ia!, ib: ib!, pa, pb, ea, eb, released };
+    const proofId = await issuePublic(p); const input = publicLink(p, proofId);
+    const proof = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
+    expect(proof.bindings).toMatchObject({ predecessor: { listingBinding: { id: listingA, sellerId: suite.id("sellerA"), identity: { year: 2019 } } },
+      candidate: { listingBinding: { id: listingB, sellerId: suite.id("sellerB"), identity: { year: 2020 } }, publicationAuthorization: expect.any(Object), associationValidatedAt: initialTime.toISOString() } });
+    await post("technician", `orders/${b.id}/reinspections`, input).expect(201);
+    await submitLinked(input.reportId); expect((await finalizeLinked(input.reportId)).status).toBe(201);
+    expect((await publicGet(`listings/${listingB}`).expect(200)).body).toEqual({ listingId: listingB, reportId: input.reportId,
+      observedAt: observation.observedAt, mileageKm: 124100, synthetic: true });
+    expect((await publicGet(`listings/${listingA}`).expect(200)).body.reportId).toBe(released.id);
+    await post("reviewer", `reports/${input.reportId}/transition`, { expectedVersion: 3, action: "withdraw", reason: "Changed identity visit withdrawn independently" }).expect(201);
+    await publicGet(`listings/${listingB}`).expect(404);
+  });
+  it.each(["raw observation", "structured evidence correction"] as const)("refuses the SAME public proof after ordinary %s changes its bound source", async source => {
+    const p = await freshPublicPair(); const proofId = await issuePublic(p); const input = publicLink(p, proofId);
+    const historical = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: p.released.id } });
+    if (source === "raw observation") {
+      const changed = await post("technician", `orders/${p.b.id}/vehicle`, { expectedVersion: 8, ...p.ib.observation, mileageKm: 124101 }).expect(201);
+      expect(changed.body).toMatchObject({ version: 9, vehicleMatched: true, observedVehicle: { mileageKm: 124101 } });
+      const raw = await history(p.b); owned.raw.push(...raw.filter(row => row.id !== p.ib.id).map(row => row.id));
+      expect(raw).toHaveLength(2); expect(raw[0]).toEqual(p.ib); expect(raw[1]).toMatchObject({ orderVersion: 9, observation: { mileageKm: 124101 } });
+    } else {
+      const provenance = randomUUID(); await verified(p.b, provenance, blue, rightsB);
+      const id = randomUUID(); owned.evidence.push(id);
+      const correction = await post("technician", evidencePath(p.b), { id, expectedOrderVersion: 8, identityRecordId: p.ib.id,
+        identifiers: identifiers(provenance, "SYN-VIN-041"), rights: rightsB, correction: { supersedesId: p.eb.id, explanation: "Independent second stamp confirms the recorded vehicle" } }).expect(201);
+      expect(correction.body).toMatchObject({ id, orderVersion: 9, correction: { supersedesId: p.eb.id } });
+      expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: p.b.id } })).toMatchObject({ version: 9, identityEvidenceGeneration: 2 });
+    }
+    const invalid = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
+    expect(invalid.invalidatedAt).toBeInstanceOf(Date);
+    await denied(await post("technician", `orders/${p.b.id}/reinspections`, { ...input, expectedOrderVersion: 9 }));
+    expect(await db.diagnosticReportRecord.findUnique({ where: { id: input.reportId } })).toBeNull();
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: p.released.id } })).toEqual(historical);
+    expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).toEqual(invalid);
   });
 
 });
