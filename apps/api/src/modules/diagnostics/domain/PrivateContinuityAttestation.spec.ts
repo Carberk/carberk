@@ -21,3 +21,44 @@ describe("private manual comparative attestation", () => {
     expect(() => privateContinuityAttestation(a, other, provenanceRights, now)).toThrowError(expect.objectContaining({ code: "DIAGNOSTIC_NO_ACCESS" }));
   });
 });
+
+
+describe("private automatic normalized VIN comparison", () => {
+  const vin = { method: "vin" as const, vin: "  syn-vin-041  ",
+    identifiers: [{ kind: "vin_stamp", value: "SYN-VIN-041" }],
+    rightsUntil: ["2026-11-01T00:00:00.000Z"],
+    history: [{ method: "vin" as const, vin: "syn-vin-041" }], corrected: false };
+  const candidate = { ...vin, vin: "SYN-VIN-041" };
+  const automatic = (left = vin, right = candidate, rights = provenanceRights) =>
+    privateContinuityAttestation(left, right, rights, now, "automatic_normalized_vin");
+  it("accepts independently retained consistent VIN evidence through the shortest authorized right", () => {
+    expect(automatic().toISOString()).toBe("2026-11-01T00:00:00.000Z");
+    expect(automatic(vin, candidate, ["2026-10-22T00:00:00.000Z"]).toISOString()).toBe("2026-10-22T00:00:00.000Z");
+  });
+  it("requires matching observed VIN and supporting VIN stamps on both visits", () => {
+    for (const other of [
+      { ...candidate, vin: "SYN-VIN-999" }, { ...candidate, vin: "" },
+      { ...candidate, identifiers: [] },
+      { ...candidate, identifiers: [{ kind: "vin_stamp", value: "SYN-VIN-999" }] },
+      { ...candidate, identifiers: [{ kind: "chassis_stamp", value: "SYN-VIN-041" }] },
+    ]) expect(() => automatic(vin, other)).toThrowError(expect.objectContaining({ code: "DIAGNOSTIC_NO_ACCESS" }));
+  });
+  it("does not let equal VIN conceal contradictory chassis or manufacturer plates", () => {
+    for (const kind of ["chassis_stamp", "manufacturer_plate"]) {
+      expect(() => automatic({ ...vin, identifiers: [...vin.identifiers, { kind, value: "SYN-001" }] },
+        { ...candidate, identifiers: [...candidate.identifiers, { kind, value: "SYN-002" }] })).toThrowError(expect.objectContaining({ code: "DIAGNOSTIC_NO_ACCESS" }));
+    }
+  });
+  it("refuses changed raw vehicle identity and correction chains even after VIN is restored", () => {
+    for (const other of [
+      { ...candidate, corrected: true },
+      { ...candidate, history: [{ method: "vin" as const, vin: "SYN-VIN-999" }, ...candidate.history] },
+      { ...candidate, history: [{ method: "manual" as const, vin: null }, ...candidate.history] },
+      { ...candidate, history: [] },
+    ]) expect(() => automatic(vin, other)).toThrowError(expect.objectContaining({ code: "DIAGNOSTIC_NO_ACCESS" }));
+  });
+  it("refuses expired retained evidence and provenance", () => {
+    expect(() => automatic({ ...vin, rightsUntil: [now.toISOString()] })).toThrowError(expect.objectContaining({ code: "DIAGNOSTIC_NO_ACCESS" }));
+    expect(() => automatic(vin, candidate, [now.toISOString()])).toThrowError(expect.objectContaining({ code: "DIAGNOSTIC_NO_ACCESS" }));
+  });
+});
