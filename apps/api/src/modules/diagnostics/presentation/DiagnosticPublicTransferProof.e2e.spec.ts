@@ -371,7 +371,7 @@ describe("public continuity across different sellers and Listings", { concurrent
       expect(order.version).toBe(nextVersion);
     }
     ({ body: order } = await post("reception", `orders/${order.id}/authorization`, { expectedVersion: 2, kind: "physical", authorityReference: `Synthetic physical authorization for visit ${visitReference}` }).expect(201));
-    ({ body: order } = await post("reception", `orders/${order.id}/authorization`, { expectedVersion: 3, kind: "publication", authorityReference: `Fresh synthetic publication consent from ${seller} for Listing ${listingId}, visit ${visitReference}` }).expect(201));
+    ({ body: order } = await post("reception", `orders/${order.id}/authorization`, { expectedVersion: 3, kind: "publication", authorityReference: visitReference === listingId ? `Fresh synthetic publication consent from ${seller} for Listing ${listingId}` : `Fresh synthetic publication consent from ${seller} for Listing ${listingId}, visit ${visitReference}` }).expect(201));
     for (const [state, expectedVersion] of [["confirmed", 4], ["arrived", 5]] as const) ({ body: order } = await post("reception", `orders/${order.id}/appointment`, { expectedVersion, state }).expect(201));
     const observed = await post("technician", `orders/${order.id}/vehicle`, { expectedVersion: 6, ...observation });
     const records = await get("technician", `orders/${order.id}/identity-records`);
