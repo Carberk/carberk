@@ -317,7 +317,10 @@ describe("public continuity across different sellers and Listings", { concurrent
     const response = await post(seller, "orders", { requestKey, centerId,
       templateVersionId: templateId, audience: "listing_public", listingId: suite.id(`listing-${visitName}`), synthetic: true });
     let order = response.body;
-    if (typeof order.id === "string") owned.orders.push(order.id);
+    if (typeof order.id === "string") {
+      owned.orders.push(order.id);
+      owned.assignments.push({ orderId: order.id, userId: suite.id("reception"), capability: "diagnostics.reception" });
+    }
     expect(response.status, JSON.stringify(response.body)).toBe(201);
     expect(order).toMatchObject({ version: 0, audience: "listing_public", listingId: suite.id(`listing-${visitName}`) });
     expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: order.id } })).toMatchObject({ commissionerId: suite.id(seller), listingId: suite.id(`listing-${visitName}`) });

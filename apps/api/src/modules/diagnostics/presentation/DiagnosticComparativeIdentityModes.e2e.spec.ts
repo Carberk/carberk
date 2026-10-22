@@ -252,7 +252,10 @@ describe("private mixed-method comparative diagnostic continuity", { concurrent:
     const response = await post("buyer", "orders", { requestKey, centerId,
       templateVersionId: templateId, audience: "buyer_private", synthetic: true });
     let order = response.body;
-    if (typeof order.id === "string") owned.orders.push(order.id);
+    if (typeof order.id === "string") {
+      owned.orders.push(order.id);
+      owned.assignments.push({ orderId: order.id, userId: suite.id("reception"), capability: "diagnostics.reception" });
+    }
     expect(response.status, JSON.stringify(response.body)).toBe(201);
     expect(order).toMatchObject({ version: 0, audience: "buyer_private", listingId: null });
     for (const who of ["technician", "reviewer"] as const) {
