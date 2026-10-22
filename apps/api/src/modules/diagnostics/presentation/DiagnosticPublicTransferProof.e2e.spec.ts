@@ -11,18 +11,21 @@ import { JwtModule, JwtService } from "@nestjs/jwt";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import { Test } from "@nestjs/testing";
 import { PrismaService } from "@auto-tm/db";
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream, decodePDFRawStream } from "pdf-lib";
 import supertest from "supertest";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, inject, it, vi } from "vitest";
 import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
 import { defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
+import { workerDatabaseName, workerUrls } from "../../../../test/helpers/testDatabases";
 import { GlobalErrorFilter } from "../../../common/error.filter";
 import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
 import { IDENTITY_CLOCK_PORT } from "../../identity/identity.public";
 import { DiagnosticsModule } from "../diagnostics.module";
 import { DIAGNOSTIC_RUNTIME } from "../domain/ports/DiagnosticIntakePort";
+import { DIAGNOSTIC_OBJECTS, type DiagnosticObjects } from "../domain/ports/DiagnosticObjects";
 
 const suite = defineE2eSuite("diagnostic-public-transfer-proof");
-const people = ["sellerA", "sellerB", "erasureSeller", "outsider", "reception", "technician", "reviewer"] as const;
+const people = ["sellerA", "sellerB", "erasureSeller", "erasurePdfSeller", "outsider", "reception", "technician", "reviewer"] as const;
 type Person = typeof people[number];
 const capability: Partial<Record<Person, string>> = {
   reception: "diagnostics.reception", technician: "diagnostics.technician", reviewer: "diagnostics.reviewer",
@@ -64,6 +67,46 @@ const privateNoStore = (response: { headers: Record<string, string> }) => {
   expect(response.headers["cache-control"]).toContain("private");
   expect(response.headers["cache-control"]).toContain("no-store");
 };
+// Decode embedded subset-font Unicode maps and text operators. A search of raw
+// compressed PDF bytes would miss the very disclosure asserted by this suite.
+async function diagnosticPdfText(bytes: Uint8Array): Promise<string> {
+  const pdf = await PDFDocument.load(bytes);
+  const result: string[] = [];
+  for (const page of pdf.getPages()) {
+    const fonts = page.node.Resources()!.lookup(PDFName.of("Font"), PDFDict);
+    const maps = new Map<string, Map<string, string>>();
+    for (const [name, reference] of fonts.entries()) {
+      const font = pdf.context.lookup(reference, PDFDict);
+      const cmap = font.lookup(PDFName.of("ToUnicode")) as PDFRawStream;
+      const mapping = new Map<string, string>();
+      const source = Buffer.from(decodePDFRawStream(cmap).decode()).toString("ascii");
+      for (const block of source.matchAll(/beginbfchar([\s\S]*?)endbfchar/g)) {
+        for (const pair of block[1]!.matchAll(/<([0-9a-f]+)>\s*<([0-9a-f]+)>/gi)) {
+          mapping.set(pair[1]!.toUpperCase(), String.fromCharCode(...pair[2]!.match(/.{4}/g)!.map(code => parseInt(code, 16))));
+        }
+      }
+      expect(mapping.size, "Generated PDF has no decodable Unicode font map").toBeGreaterThan(0);
+      maps.set(name.toString(), mapping);
+    }
+    const contents = page.node.Contents();
+    const streams = contents instanceof PDFArray ? contents.asArray() : [contents!];
+    let currentFont = "";
+    for (const reference of streams) {
+      const stream = pdf.context.lookup(reference) as PDFRawStream;
+      const source = Buffer.from(decodePDFRawStream(stream).decode()).toString("ascii");
+      for (const token of source.matchAll(/(\/[^\s]+)\s+[\d.]+\s+Tf|<([0-9a-f]+)>\s*Tj/gi)) {
+        if (token[1]) currentFont = token[1];
+        else result.push(token[2]!.match(/.{4}/g)!.map(code => {
+          const value = maps.get(currentFont)?.get(code.toUpperCase());
+          if (value === undefined) throw new Error("Generated PDF contains an unmapped glyph");
+          return value;
+        }).join(""));
+      }
+    }
+  }
+  expect(result.length, "Generated PDF contains no decoded text").toBeGreaterThan(0);
+  return result.join("\n");
+}
 // P1: separate personal publishers and physical visits. No Listing transfer is fabricated.
 describe("public continuity across different sellers and Listings", { concurrent: false }, () => {
   let app: NestFastifyApplication; let db: PrismaService; let jwt: JwtService;
@@ -357,7 +400,7 @@ describe("public continuity across different sellers and Listings", { concurrent
     expect(order).toMatchObject({ version: 7, status: "arrived", physicalAuthorized: true, publicationAuthorized: true, vehicleMatched: true, observedVehicle: observation });
     return order;
   }
-  async function visitOnListing(observation: Observation, seller: "sellerA" | "sellerB" | "erasureSeller", listingId: string, visitReference = listingId): Promise<Order> {
+  async function visitOnListing(observation: Observation, seller: "sellerA" | "sellerB" | "erasureSeller" | "erasurePdfSeller", listingId: string, visitReference = listingId): Promise<Order> {
     const requestKey = randomUUID(); owned.requestKeys.push(requestKey);
     const response = await post(seller, "orders", { requestKey, centerId, templateVersionId: templateId, audience: "listing_public", listingId, synthetic: true });
     let order = response.body;
@@ -1162,14 +1205,66 @@ describe("public continuity across different sellers and Listings", { concurrent
     });
   });
 
-  it("keeps different-commissioner B usable after A-only product account purge without disclosing or resurrecting A's restricted material", async () => {
-    const listingId = suite.id("listing-erasure-A");
+  async function generateDocuments(reportId: string, locales: readonly string[]) {
+    const artifacts = await db.diagnosticPdfArtifact.findMany({ where: { reportId, locale: { in: [...locales] } }, orderBy: { locale: "asc" } });
+    expect(artifacts.map(row => row.locale)).toEqual([...locales].sort());
+    expect(artifacts.every(row => owned.pdfs.includes(row.id) && owned.keys.has(row.objectKey))).toBe(true);
+    const databases = inject("apiTestDatabases");
+    if (!databases) throw new Error("PDF isolation refused: missing injected apiTestDatabases");
+    const pool = Number(process.env["VITEST_POOL_ID"]);
+    const expectedUrl = workerUrls(databases, pool).databaseUrl;
+    const expectedName = workerDatabaseName(databases.prefix, pool);
+    const workerRoot = resolve(__dirname, "../../../../../worker");
+    const script = `
+      require('reflect-metadata'); require('tsx/cjs');
+      const assert = require('node:assert/strict');
+      const { randomUUID } = require('node:crypto');
+      const { readFile } = require('node:fs/promises');
+      const { PrismaService } = require('@auto-tm/db');
+      const { S3Client, HeadBucketCommand } = require('@aws-sdk/client-s3');
+      const { DiagnosticArtifactWorker } = require('./src/jobs/diagnostics/DiagnosticArtifactWorker.ts');
+      const { S3DiagnosticArtifactObjects } = require('./src/jobs/diagnostics/S3DiagnosticArtifactObjects.ts');
+      async function main() {
+        const db = new PrismaService(); let s3;
+        try {
+          assert.equal(process.env.GITHUB_ACTIONS, 'true', 'PDF isolation refused: hosted disposable services required');
+          assert.equal(process.env.DATABASE_URL, ${JSON.stringify(expectedUrl)}, 'PDF isolation refused: unexpected worker URL');
+          const expected = new URL(${JSON.stringify(expectedUrl)});
+          assert.notEqual(expected.pathname, new URL(${JSON.stringify(databases.baseDatabaseUrl)}).pathname, 'PDF isolation refused: base database');
+          assert.match(expected.hostname, /^(localhost|127[.]0[.]0[.]1)$/);
+          assert.deepEqual(await db.$queryRawUnsafe('SELECT current_database() AS name'), [{ name: ${JSON.stringify(expectedName)} }]);
+          const endpoint = process.env.MINIO_ENDPOINT || '';
+          assert.match(endpoint, new RegExp('^http://(localhost|127[.]0[.]0[.]1):[0-9]+$'), 'PDF isolation refused: hosted-local MinIO required');
+          s3 = new S3Client({ endpoint, region: 'us-east-1', forcePathStyle: true, credentials: {
+            accessKeyId: process.env.MINIO_ACCESS_KEY || 'minioadmin', secretAccessKey: process.env.MINIO_SECRET_KEY || 'minioadmin' } });
+          await s3.send(new HeadBucketCommand({ Bucket: 'diagnostic-test-private' }));
+          const artifacts = ${JSON.stringify(artifacts)};
+          for (const artifact of artifacts) {
+            assert.deepEqual(JSON.parse(JSON.stringify(await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: artifact.id } }))), artifact);
+            assert.equal(artifact.reportId, ${JSON.stringify(reportId)});
+            assert.equal(artifact.objectKey, 'diagnostic-pdf/' + artifact.reportId + '/' + artifact.id + '.pdf');
+          }
+          const [regular, bold] = await Promise.all(['Regular', 'Bold'].map(weight => readFile('./assets/fonts/NotoSans-' + weight + '.ttf')));
+          const worker = new DiagnosticArtifactWorker(db, new S3DiagnosticArtifactObjects(s3, 'diagnostic-test-private'), { regular, bold },
+            { now: () => new Date(${JSON.stringify(initialTime.toISOString())}), id: randomUUID, enabled: () => true });
+          for (const artifact of artifacts) assert.equal(await worker.generate(artifact.id), true, 'Expected exact artifact generation');
+        } finally { s3?.destroy(); await db.onModuleDestroy(); }
+      }
+      void main().catch(error => { console.error(error); process.exitCode = 1; });
+    `;
+    await promisify(execFile)(process.execPath, ["-e", script], { cwd: workerRoot,
+      env: { ...process.env, TSX_TSCONFIG_PATH: resolve(workerRoot, "tsconfig.json") }, timeout: 60000, killSignal: "SIGKILL" });
+  }
+
+  it.each(["draft", "finalized"] as const)("keeps different-commissioner %s B usable after A-only product account purge without disclosing or resurrecting A's restricted material", async phase => {
+    const erasureSeller = phase === "draft" ? "erasureSeller" : "erasurePdfSeller";
+    const listingId = suite.id(`listing-erasure-A-${phase}`);
     expect(await db.listing.count({ where: { id: listingId } })).toBe(0);
-    listings.push({ id: listingId, sellerId: suite.id("erasureSeller") });
-    await db.listing.create({ data: { id: listingId, sellerId: suite.id("erasureSeller"), brandId: suite.catalog.brandId,
+    listings.push({ id: listingId, sellerId: suite.id(erasureSeller) });
+    await db.listing.create({ data: { id: listingId, sellerId: suite.id(erasureSeller), brandId: suite.catalog.brandId,
       modelId: suite.catalog.modelId, cityId: suite.catalog.cityId, status: "active", vin: "SYN-VIN-041", priceAmount: 100000, priceTmt: 100000, priceCurrency: "TMT" } });
     const observation: Observation = { observedAt: "2026-10-20T12:00:00.000Z", mileageKm: 124000, method: "vin", vin: "SYN-VIN-041", manualReference: null };
-    const a = await visitOnListing(observation, "erasureSeller", listingId); const [ia] = await history(a);
+    const a = await visitOnListing(observation, erasureSeller, listingId); const [ia] = await history(a);
     const pa = randomUUID(); await verified(a, pa, red); const ea = await capture(a, ia!, pa, red); const released = await release(a);
     const listingB = await isolatedListing("sellerB");
     const b = await visitOnListing({ ...observation, observedAt: "2026-10-21T11:00:00.000Z", mileageKm: 124100 }, "sellerB", listingB);
@@ -1177,6 +1272,26 @@ describe("public continuity across different sellers and Listings", { concurrent
     const p = { a, b, ia: ia!, ib: ib!, pa, pb, ea, eb, released };
     const proofId = await issuePublic(p); const input = publicLink(p, proofId);
     const created = await post("technician", `orders/${b.id}/reinspections`, input).expect(201);
+    let finding: Awaited<ReturnType<typeof submitLinked>> | undefined;
+    let issuedBytes: Buffer | undefined;
+    let issuedExposesPredecessor = false;
+    let issuedArtifact: Awaited<ReturnType<typeof db.diagnosticPdfArtifact.findUniqueOrThrow>> | undefined;
+    const storage = app.get<DiagnosticObjects>(DIAGNOSTIC_OBJECTS);
+    if (phase === "finalized") {
+      finding = await submitLinked(input.reportId);
+      expect((await finalizeLinked(input.reportId)).status).toBe(201);
+      await generateDocuments(input.reportId, ["en"]);
+      const issued = await publicGet(`reports/${input.reportId}/documents/en`).expect(200);
+      privateNoStore(issued);
+      expect(issued.headers["content-type"]).toContain("application/pdf");
+      issuedBytes = Buffer.from(issued.body);
+      // This issued copy is historical. Erasure cannot recall or overwrite it.
+      const text = await diagnosticPdfText(issuedBytes);
+      expect(text).toContain(input.reportId);
+      issuedExposesPredecessor = text.includes(released.id);
+      issuedArtifact = await db.diagnosticPdfArtifact.findFirstOrThrow({ where: { reportId: input.reportId, locale: "en" } });
+    }
+    const retryBeforeErasure = (await post("technician", `orders/${b.id}/reinspections`, input).expect(201)).body;
     const beforeB = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: input.reportId } });
     const orderB = await db.inspectionOrder.findUniqueOrThrow({ where: { id: b.id } });
     const ownEvidence = await db.diagnosticIdentityEvidence.findUniqueOrThrow({ where: { id: eb.id } });
@@ -1187,13 +1302,13 @@ describe("public continuity across different sellers and Listings", { concurrent
     const restricted = [evidencePath(a), `orders/${a.id}/identity-records`, provenancePath(a, pa),
       comparisonPath(b, released.id), `orders/${b.id}/continuity-proofs/${proofId}`];
     for (const path of restricted) await denied(await get("sellerB", path));
-    const targetAudits = await db.diagnosticAudit.findMany({ where: { actorId: suite.id("erasureSeller") } });
+    const targetAudits = await db.diagnosticAudit.findMany({ where: { actorId: suite.id(erasureSeller) } });
     expect(targetAudits.every(row => row.centerId === centerId && row.orderId === a.id)).toBe(true);
     for (const row of targetAudits) erasedAuditIds.add(row.id);
     expect(await db.measurementInvestigationExport.count()).toBe(0);
     expect(await db.measurementState.count({ where: { key: { startsWith: "inventory_baseline:" } } })).toBe(0);
-    await request.delete("/api/v1/me").set(headers("erasureSeller")).expect(204, "");
-    const scheduled = await db.user.findUniqueOrThrow({ where: { id: suite.id("erasureSeller") } });
+    await request.delete("/api/v1/me").set(headers(erasureSeller)).expect(204, "");
+    const scheduled = await db.user.findUniqueOrThrow({ where: { id: suite.id(erasureSeller) } });
     expect(scheduled.deletionScheduledAt?.toISOString()).toBe("2026-11-20T12:00:00.000Z");
     expect(await db.session.count({ where: { userId: scheduled.id } })).toBe(0);
     expect(await db.listing.findUniqueOrThrow({ where: { id: listingId } })).toMatchObject({ status: "archived", archivedByDeletion: true });
@@ -1216,7 +1331,7 @@ describe("public continuity across different sellers and Listings", { concurrent
           const target = ${JSON.stringify(scheduled.id)};
           assert.deepEqual(await db.user.findMany({ where: { deletionScheduledAt: { lte: now } }, select: { id: true } }), [{ id: target }], 'Purge isolation refused: foreign due account');
           const stale = await db.otpRequest.findMany({ where: { createdAt: { lt: new Date(now.getTime() - 30 * 86400000) } }, select: { userId: true, destination: true } });
-          assert.equal(stale.every(row => row.userId === target || row.userId === null && row.destination === ${JSON.stringify(suite.phone("erasureSeller"))}), true, 'Purge isolation refused: foreign stale OTP');
+          assert.equal(stale.every(row => row.userId === target || row.userId === null && row.destination === ${JSON.stringify(suite.phone(erasureSeller))}), true, 'Purge isolation refused: foreign stale OTP');
           assert.deepEqual((await db.inspectionOrder.findMany({ where: { commissionerId: target }, select: { id: true } })), [{ id: ${JSON.stringify(a.id)} }], 'Purge isolation refused: unknown commissioned order');
           assert.equal(await db.diagnosticReportRecord.count({ where: { OR: [{ state: { path: ['authorId'], equals: target } }, { state: { path: ['reviewerId'], equals: target } }] } }), 0, 'Purge isolation refused: staff descendants');
           assert.deepEqual(await new PurgeExpiredAccounts(db).execute({ now }), { purgedCount: 1 });
@@ -1227,8 +1342,27 @@ describe("public continuity across different sellers and Listings", { concurrent
     // Register the sole permitted severed ownership before a worker assertion can
     // fail after commit. Cleanup still demands its exact erasedAt and null pins.
     erasedOrders.set(a.id, scheduled.deletionScheduledAt!);
-    await promisify(execFile)(process.execPath, ["-e", script], { cwd: workerRoot,
+    const purge = () => promisify(execFile)(process.execPath, ["-e", script], { cwd: workerRoot,
       env: { ...process.env, TSX_TSCONFIG_PATH: resolve(workerRoot, "tsconfig.json") }, timeout: 30000, killSignal: "SIGKILL" });
+    if (phase === "finalized") {
+      const read = storage.read.bind(storage);
+      let erasedDuringRead = false;
+      const paused = vi.spyOn(storage, "read").mockImplementationOnce(async (...args) => {
+        const bytes = await read(...args);
+        await purge(); erasedDuringRead = true;
+        return bytes;
+      });
+      try {
+        const raced = await publicGet(`reports/${input.reportId}/documents/en`);
+        expect(erasedDuringRead, "Erasure must occur after real storage I/O").toBe(true);
+        // Soft assertions still fail the case, while allowing hosted RED to reach
+        // newly generated PDFs even if this historical download also exposes A.
+        if (issuedExposesPredecessor) {
+          expect.soft(raced.status, "Post-I/O gate must withhold stale lineage bytes").not.toBe(200);
+          expect.soft(raced.headers["content-type"]).not.toContain("application/pdf");
+        } else if (raced.status === 200) expect(await diagnosticPdfText(Buffer.from(raced.body))).not.toContain(released.id);
+      } finally { paused.mockRestore(); }
+    } else await purge();
     expect(await db.user.findUniqueOrThrow({ where: { id: scheduled.id } })).toMatchObject({ phone: null, deletionScheduledAt: null });
     expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: a.id } })).toMatchObject({ commissionerId: null, listingId: null,
       erasedAt: scheduled.deletionScheduledAt, observedVehicle: null, physicalAuthorization: null, publicationAuthorization: null });
@@ -1257,14 +1391,51 @@ describe("public continuity across different sellers and Listings", { concurrent
       }
     }
     await publicGet(`reports/${released.id}`).expect(404); await publicGet(`listings/${listingId}`).expect(404);
-    expect((await post("technician", `orders/${b.id}/reinspections`, input).expect(201)).body).toEqual(created.body);
+    expect((await post("technician", `orders/${b.id}/reinspections`, input).expect(201)).body).toEqual(retryBeforeErasure);
+    if (phase === "draft") expect(retryBeforeErasure).toEqual(created.body);
     expect(await db.diagnosticAudit.findMany({ where: { orderId: b.id }, orderBy: { id: "asc" } })).toEqual(auditsB);
-    const finding = await submitLinked(input.reportId);
-    expect((await post("technician", `orders/${b.id}/reinspections`, input).expect(201)).body).toMatchObject({ status: "submitted", version: 2, findings: [finding] });
-    expect((await finalizeLinked(input.reportId)).status).toBe(201);
+    if (phase === "draft") {
+      finding = await submitLinked(input.reportId);
+      expect((await post("technician", `orders/${b.id}/reinspections`, input).expect(201)).body).toMatchObject({ status: "submitted", version: 2, findings: [finding] });
+      expect((await finalizeLinked(input.reportId)).status).toBe(201);
+    }
+    const releasedB = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: input.reportId } });
+    const documents = await publicGet(`reports/${input.reportId}/documents`).expect(200);
+    privateNoStore(documents);
+    expect(documents.body.map((row: { locale: string }) => row.locale).sort()).toEqual(["en", "ru", "tk"]);
+    expect(JSON.stringify(documents.body)).not.toMatch(/objectKey|sha256|diagnostic-pdf\//);
+    const newLocales = phase === "draft" ? ["tk", "ru", "en"] as const : ["tk", "ru"] as const;
+    await generateDocuments(input.reportId, newLocales);
+    for (const locale of newLocales) {
+      const downloaded = await publicGet(`reports/${input.reportId}/documents/${locale}`).expect(200);
+      privateNoStore(downloaded);
+      expect(downloaded.headers["content-type"]).toContain("application/pdf");
+      const text = await diagnosticPdfText(Buffer.from(downloaded.body));
+      for (const own of [input.reportId, finding!.id, templateId, "2026-10-21T11:00:00.000Z", "124100 km"]) expect(text).toContain(own);
+      for (const secret of [released.id, released.findings[0].id, pa, ea.id, proofId, red.sha256, key(pa, red), ia!.observationHash, ea.recordHash]) {
+        expect.soft(text, `New ${locale} PDF must not disclose erased A material`).not.toContain(secret);
+      }
+    }
+    const readyDocuments = await publicGet(`reports/${input.reportId}/documents`).expect(200);
+    for (const locale of newLocales) expect(readyDocuments.body).toContainEqual(expect.objectContaining({ locale, state: "ready" }));
+    if (issuedBytes && issuedArtifact) {
+      expect(await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: issuedArtifact.id } })).toEqual(issuedArtifact);
+      expect(Buffer.from(await storage.read(issuedArtifact.objectKey, issuedArtifact.sizeBytes!, issuedArtifact.sha256!))).toEqual(issuedBytes);
+      // Already-issued bytes remain immutable. Current public access must not
+      // return a historical copy that still contains the erased predecessor id.
+      if (issuedExposesPredecessor) {
+        const historical = await publicGet(`reports/${input.reportId}/documents/en`);
+        expect.soft(historical.status, "Historical immutable A-bearing bytes must be withheld").not.toBe(200);
+        expect.soft(readyDocuments.body.find((row: { locale: string }) => row.locale === "en")?.state).not.toBe("ready");
+      }
+    }
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: input.reportId } })).toEqual(releasedB);
     const publicB = await publicGet(`reports/${input.reportId}`).expect(200);
-    expect(publicB.body).toMatchObject({ findings: [finding], observedAt: "2026-10-21T11:00:00.000Z", mileageKm: 124100, successorOf: null });
-    expect(publicB.text).not.toContain(released.id);
+    expect.soft(publicB.body).toMatchObject({ findings: [finding], observedAt: "2026-10-21T11:00:00.000Z", mileageKm: 124100, templateVersionId: templateId, template: definition, successorOf: null });
+    for (const secret of [released.id, released.findings[0].id, pa, ea.id, proofId, red.sha256, key(pa, red), ia!.observationHash, ea.recordHash]) {
+      expect.soft(publicB.text).not.toContain(secret);
+      expect.soft(JSON.stringify(readyDocuments.body)).not.toContain(secret);
+    }
     expect((await publicGet(`listings/${listingB}`).expect(200)).body.reportId).toBe(input.reportId);
     await post("reviewer", `reports/${input.reportId}/transition`, { expectedVersion: 3, action: "withdraw", reason: "Surviving B independent withdrawal" }).expect(201);
     await publicGet(`listings/${listingB}`).expect(404); await publicGet(`listings/${listingId}`).expect(404);
