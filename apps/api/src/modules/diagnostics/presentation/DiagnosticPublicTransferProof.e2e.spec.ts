@@ -659,14 +659,39 @@ describe("public continuity across different sellers and Listings", { concurrent
     await verified(b, pb, blue, rightsB); const eb = await capture(b, ib!, pb, blue, rightsB);
     return { a,b,ia: ia!,ib: ib!,pa,pb,ea,eb,released };
   }
-  async function issuePublic(p: Awaited<ReturnType<typeof freshPublicPair>>, expectedPredecessorVersion = 3) {
+  async function issuePublic(p: Awaited<ReturnType<typeof freshPublicPair>>, expectedPredecessorVersion = 3, retainedProvenance: string[] = []) {
     const response = await post("reviewer", `orders/${p.b.id}/continuity-proofs`, { predecessorId: p.released.id, expectedPredecessorVersion,
       expectedOrderVersion: p.b.version, predecessorIdentityRecordId: p.ia.id, candidateIdentityRecordId: p.ib.id,
       linkingTechnicianId: suite.id("technician"), method: "comparative_attestation", rationale: "Independently retained synthetic VIN and chassis material",
-      provenanceRecordIds: [p.pa,p.pb] });
+      provenanceRecordIds: [p.pa,p.pb,...retainedProvenance] });
     if (typeof response.body.proofId === "string") owned.proofs.push(response.body.proofId);
     expect(response.status, JSON.stringify(response.body)).toBe(201);
     return response.body.proofId as string;
+  }
+  async function reobservePublicCandidate(p: Awaited<ReturnType<typeof freshPublicPair>>) {
+    const current = await get("technician", `orders/${p.b.id}`).expect(200);
+    expect(current.body).toMatchObject({ vehicleMatched: false, physicalAuthorized: true, publicationAuthorized: true });
+    const original = p.ib; const originalEvidence = p.eb; const retainedProvenance = p.pb;
+    const observation = await post("technician", `orders/${p.b.id}/vehicle`, { expectedVersion: current.body.version, ...original.observation });
+    const raw = await history(p.b);
+    const appended = raw.filter(record => record.id !== original.id);
+    owned.raw.push(...appended.map(record => record.id));
+    expect(observation.status, JSON.stringify(observation.body)).toBe(201);
+    expect(observation.body).toMatchObject({ version: current.body.version + 1, vehicleMatched: true });
+    expect(raw).toHaveLength(2); expect(raw[0]).toEqual(original); expect(appended).toHaveLength(1);
+    expect(appended[0]).toMatchObject({ observation: original.observation, orderVersion: current.body.version + 1 });
+    p.b.version = observation.body.version;
+    const provenanceId = randomUUID(); await verified(p.b, provenanceId, blue, rightsB);
+    const id = randomUUID(); owned.evidence.push(id);
+    const correction = await post("technician", evidencePath(p.b), { id, expectedOrderVersion: p.b.version,
+      identityRecordId: appended[0]!.id, identifiers: identifiers(provenanceId, "SYN-VIN-041"), rights: rightsB,
+      correction: { supersedesId: originalEvidence.id, explanation: "Fresh physical observation revalidates B after the Listing was restored" } });
+    expect(correction.status, JSON.stringify(correction.body)).toBe(201);
+    expect(correction.body).toMatchObject({ id, identityRecordId: appended[0]!.id, orderVersion: p.b.version + 1,
+      correction: { supersedesId: originalEvidence.id } });
+    expect((await get("technician", evidencePath(p.b)).expect(200)).body).toContainEqual(originalEvidence);
+    p.b.version = correction.body.orderVersion; p.ib = appended[0]!; p.eb = correction.body; p.pb = provenanceId;
+    return [retainedProvenance];
   }
   function publicLink(p: Awaited<ReturnType<typeof freshPublicPair>>, proofId: string) {
     const reportId = randomUUID(); owned.reports.push(reportId);
@@ -1040,9 +1065,12 @@ describe("public continuity across different sellers and Listings", { concurrent
         expect(await db.listing.findUniqueOrThrow({ where: { id } })).toEqual(original);
         await denied(await post("technician", `orders/${p.b.id}/reinspections`, input));
         expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).toEqual(invalid);
-        const replacement = await issuePublic(p);
+        const retainedProvenance = side === "B" && ("year" in change || "sellerId" in change) ? await reobservePublicCandidate(p) : [];
+        await denied(await post("technician", `orders/${p.b.id}/reinspections`, input));
+        expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).toEqual(invalid);
+        const replacement = await issuePublic(p, 3, retainedProvenance);
         expect(replacement).not.toBe(proofId);
-        await post("technician", `orders/${p.b.id}/reinspections`, { ...input, proofId: replacement }).expect(201);
+        await post("technician", `orders/${p.b.id}/reinspections`, { ...input, expectedOrderVersion: p.b.version, proofId: replacement }).expect(201);
       } finally { await db.listing.update({ where: { id }, data: { year: original.year, sellerId: original.sellerId, status: original.status, updatedAt: original.updatedAt } }); }
     }
   });
@@ -1068,7 +1096,7 @@ describe("public continuity across different sellers and Listings", { concurrent
     const proofId = await issuePublic(p); const wrongPair = await issuePublic(other);
     const input = publicLink(p, proofId); const { proofId: omitted, ...missing } = input;
     expect(omitted).toBe(proofId);
-    await post("technician", `orders/${p.b.id}/reinspections`, missing).expect(400);
+    await denied(await post("technician", `orders/${p.b.id}/reinspections`, missing));
     const before = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
     for (const bad of [randomUUID(), wrongPair]) await denied(await post("technician", `orders/${p.b.id}/reinspections`, { ...input, proofId: bad }));
     expect(await db.diagnosticReportRecord.count({ where: { orderId: p.b.id } })).toBe(0);
@@ -1090,7 +1118,8 @@ describe("public continuity across different sellers and Listings", { concurrent
     } finally {
       await db.listing.update({ where: { id: listing.id }, data: { sellerId: listing.sellerId } });
     }
-    await issuePublic(p);
+    const retainedProvenance = await reobservePublicCandidate(p);
+    await issuePublic(p, 3, retainedProvenance);
   });
 
   // Observe actual PostgreSQL lock waits outside the holder transaction, with the
