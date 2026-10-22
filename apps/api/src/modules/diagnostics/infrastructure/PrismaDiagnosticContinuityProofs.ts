@@ -77,6 +77,38 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
     return !!(await tx.diagnosticReportRecord.count({ where: { predecessorId: a.id } }) || await tx.diagnosticReportRecord.count({ where: { orderId: b.id } }));
   }
 
+  /** Raw history is inspected under the same order locks as comparison. A restored VIN
+   * cannot hide a prior different vehicle; visit date/mileage changes do not change identity. */
+  private async comparisonRights(tx: Tx, pair: Pair, method: D.DiagnosticContinuityProof["method"], provenance: { rightsUntil: Date }[], now: Date) {
+    const side = async (order: Order, identity: D.DiagnosticComparisonIdentity) => {
+      if (!identity.evidence) throw denied();
+      const orderId = order.id;
+      const chain = [identity.evidence, ...identity.corrections];
+      const history = [];
+      let evidenceRecordCount = 0;
+      if (method === "automatic_normalized_vin") {
+        // This bounded method has one retained root per visit. Other roots or any
+        // correction require a broader policy; never ignore their identifiers/rights.
+        const roots = await tx.diagnosticIdentityEvidence.findMany({ where: { orderId }, select: { id: true } });
+        evidenceRecordCount = roots.some(root => root.id === identity.evidence?.id) ? roots.length : 0;
+        const current = D.DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true }).safeParse(order.observedVehicle);
+        if (!current.success) throw denied();
+        history.push(current.data);
+        const records = await tx.diagnosticIdentityRecord.findMany({ where: { orderId }, orderBy: { orderVersion: "asc" } });
+        for (const record of records) {
+          const observation = D.DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true }).safeParse(record.observation);
+          if (record.erasedAt || !record.observationHash || !observation.success) throw denied();
+          history.push(observation.data);
+        }
+      }
+      return { method: identity.observation.method, vin: identity.observation.vin, history, evidenceRecordCount,
+        corrected: !!identity.evidence.correction || !!identity.corrections.length || !!identity.correctionHeadHash,
+        identifiers: chain.flatMap(record => record.identifiers), rightsUntil: chain.map(record => record.rights.schedule.until) };
+    };
+    return privateContinuityAttestation(await side(pair.priorOrder, pair.comparison.predecessor.identity),
+      await side(pair.order, pair.comparison.candidate.identity), provenance.map(row => row.rightsUntil.toISOString()), now, method);
+  }
+
   async issue(subject: DiagnosticSubject, orderId: string, input: D.DiagnosticContinuityProofIssuance) {
     return this.db.$transaction(async tx => {
       // Identity owns sorted participant User/Session locks and the grant binding. Feature
@@ -100,13 +132,8 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
       if (a.version !== input.expectedPredecessorVersion || b.version !== input.expectedOrderVersion ||
         comparison.predecessor.identityRecordId !== input.predecessorIdentityRecordId || comparison.candidate.identityRecordId !== input.candidateIdentityRecordId) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
       const { provenance, bindings } = await this.facts(tx, pair, staffing, input.provenanceRecordIds, staffBindings);
-      const side = (identity: D.DiagnosticComparisonIdentity) => {
-        if (!identity.evidence) throw denied();
-        const chain = [identity.evidence, ...identity.corrections];
-        return { method: identity.observation.method, identifiers: chain.flatMap(record => record.identifiers), rightsUntil: chain.map(record => record.rights.schedule.until) };
-      };
       const now = this.runtime.now();
-      const rightsUntil = privateContinuityAttestation(side(comparison.predecessor.identity), side(comparison.candidate.identity), provenance.map(row => row.rightsUntil.toISOString()), now);
+      const rightsUntil = await this.comparisonRights(tx, pair, input.method, provenance, now);
       const proofId = this.runtime.id();
       const content = D.DiagnosticContinuityProofSchema.parse({ proofId, policyVersion: "ADR-0108",
         predecessor: { reportId: a.id, reportVersion: a.version, snapshotHash: a.snapshotHash, identityRecordId: comparison.predecessor.identityRecordId, identityRecordHash: comparison.predecessor.identityRecordHash },
@@ -122,7 +149,7 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
     });
   }
 
-  /** B's linking technician consumes one unused private manual/manual proof into B's own empty
+  /** B's linking technician consumes one unused private continuity proof into B's own empty
    * linked draft, with the proof marked consumed and both audits in one transaction. Every bound
    * fact and the issuer's current Session, qualification and both assignments are rechecked under
    * the issuance lock order. An existing report id is an exact retry: it returns the authorized
@@ -177,7 +204,11 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
       const bound = content.data;
       if (hash(bound.predecessor) !== hash({ reportId: a.id, reportVersion: a.version, snapshotHash: a.snapshotHash, identityRecordId: comparison.predecessor.identityRecordId, identityRecordHash: comparison.predecessor.identityRecordHash }) ||
         hash(bound.candidate) !== hash({ orderId: b.id, orderVersion: b.version, identityRecordId: comparison.candidate.identityRecordId, identityRecordHash: comparison.candidate.identityRecordHash })) throw denied();
-      const { bindings } = await this.facts(tx, current, staffing, bound.provenanceRecordIds, staffBindings);
+      const { bindings, provenance } = await this.facts(tx, current, staffing, bound.provenanceRecordIds, staffBindings);
+      if (bound.method === "automatic_normalized_vin") {
+        const rightsUntil = await this.comparisonRights(tx, current, bound.method, provenance, now);
+        if (rightsUntil.valueOf() !== proof.rightsUntil.valueOf()) throw denied();
+      }
       if (hash(bindings) !== hash(proof.bindings)) throw denied();
       await tx.diagnosticContinuityProof.update({ where: { id: proof.id }, data: { consumedReportId: input.reportId, consumedAt: now } });
       const created = await this.reports.openReinspection(tx, subject, b, a, input, proof.id);

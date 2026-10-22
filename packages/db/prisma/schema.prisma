@@ -1798,6 +1798,7 @@ model DiagnosticReportRecord {
   @@map("diagnostic_reports")
 }
 
+/// Private comparative and unchanged normalized-VIN proofs share the same immutable consumption binding.
 /// Restricted proof content follows the shortest declared evidence/provenance rights.
 /// Invalidation is permanent even if current source values are later restored.
 model DiagnosticContinuityProof {

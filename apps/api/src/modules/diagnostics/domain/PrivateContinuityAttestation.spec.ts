@@ -24,12 +24,12 @@ describe("private manual comparative attestation", () => {
 
 
 describe("private automatic normalized VIN comparison", () => {
-  const vin = { method: "vin" as const, vin: "  syn-vin-041  ",
+  const vin: AttestationIdentity & { vin: string; history: { method: "manual" | "vin"; vin: string | null }[]; corrected: boolean } = { method: "vin" as const, vin: "  syn-vin-041  ",
     identifiers: [{ kind: "vin_stamp", value: "SYN-VIN-041" }],
     rightsUntil: ["2026-11-01T00:00:00.000Z"],
-    history: [{ method: "vin" as const, vin: "syn-vin-041" }], corrected: false };
+    history: [{ method: "vin" as const, vin: "syn-vin-041" }], corrected: false, evidenceRecordCount: 1 };
   const candidate = { ...vin, vin: "SYN-VIN-041" };
-  const automatic = (left = vin, right = candidate, rights = provenanceRights) =>
+  const automatic = (left: AttestationIdentity = vin, right: AttestationIdentity = candidate, rights = provenanceRights) =>
     privateContinuityAttestation(left, right, rights, now, "automatic_normalized_vin");
   it("accepts independently retained consistent VIN evidence through the shortest authorized right", () => {
     expect(automatic().toISOString()).toBe("2026-11-01T00:00:00.000Z");
@@ -37,7 +37,8 @@ describe("private automatic normalized VIN comparison", () => {
   });
   it("requires matching observed VIN and supporting VIN stamps on both visits", () => {
     for (const other of [
-      { ...candidate, vin: "SYN-VIN-999" }, { ...candidate, vin: "" },
+      { ...candidate, vin: "SYN-VIN-999" }, { ...candidate, vin: "" }, { ...candidate, vin: null },
+      { ...candidate, method: "manual" as const },
       { ...candidate, identifiers: [] },
       { ...candidate, identifiers: [{ kind: "vin_stamp", value: "SYN-VIN-999" }] },
       { ...candidate, identifiers: [{ kind: "chassis_stamp", value: "SYN-VIN-041" }] },
@@ -56,6 +57,16 @@ describe("private automatic normalized VIN comparison", () => {
       { ...candidate, history: [{ method: "manual" as const, vin: null }, ...candidate.history] },
       { ...candidate, history: [] },
     ]) expect(() => automatic(vin, other)).toThrowError(expect.objectContaining({ code: "DIAGNOSTIC_NO_ACCESS" }));
+  });
+  it("refuses additional evidence roots rather than ignoring their material", () => {
+    expect(() => automatic(vin, { ...candidate, evidenceRecordCount: 2 })).toThrowError(expect.objectContaining({ code: "DIAGNOSTIC_NO_ACCESS" }));
+  });
+  it("allows unchanged raw VIN recaptures with different visit dates and mileages", () => {
+    const history = [
+      { method: "vin" as const, vin: "syn-vin-041", observedAt: "2026-10-21T10:00:00.000Z", mileageKm: 123000 },
+      { method: "vin" as const, vin: "SYN-VIN-041", observedAt: "2026-10-21T11:00:00.000Z", mileageKm: 123100 },
+    ];
+    expect(automatic(vin, { ...candidate, history }).toISOString()).toBe("2026-11-01T00:00:00.000Z");
   });
   it("refuses expired retained evidence and provenance", () => {
     expect(() => automatic({ ...vin, rightsUntil: [now.toISOString()] })).toThrowError(expect.objectContaining({ code: "DIAGNOSTIC_NO_ACCESS" }));

@@ -3,11 +3,26 @@ export interface AttestationIdentity {
   method: "manual" | "vin";
   identifiers: { kind: string; value: string }[];
   rightsUntil: string[];
+  vin?: string | null;
+  history?: { method: "manual" | "vin"; vin: string | null }[];
+  corrected?: boolean;
+  evidenceRecordCount?: number;
 }
-/** First checkpoint: retained manual evidence only. No corrected mismatch policy. */
-export function privateContinuityAttestation(a: AttestationIdentity, b: AttestationIdentity, provenanceRights: string[], now: Date): Date {
+/** Private same-vehicle policy. Automatic comparison requires unchanged raw VIN identity
+ * and retained VIN stamps; comparative attestation keeps its manual/manual boundary. */
+export function privateContinuityAttestation(a: AttestationIdentity, b: AttestationIdentity, provenanceRights: string[], now: Date, method: "comparative_attestation" | "automatic_normalized_vin" = "comparative_attestation"): Date {
   const denied = () => { throw new DiagnosticRuleError("DIAGNOSTIC_NO_ACCESS"); };
-  if (a.method !== "manual" || b.method !== "manual" || !a.identifiers.length || !b.identifiers.length) denied();
+  if (!a.identifiers.length || !b.identifiers.length) denied();
+  if (method === "automatic_normalized_vin") {
+    const vin = a.vin?.trim().toUpperCase();
+    if (!vin || b.vin?.trim().toUpperCase() !== vin) denied();
+    for (const side of [a, b]) {
+      if (side.method !== "vin" || side.corrected !== false || side.evidenceRecordCount !== 1 || !side.history?.length ||
+        side.history.some(item => item.method !== "vin" || item.vin?.trim().toUpperCase() !== vin) ||
+        !side.identifiers.some(item => item.kind === "vin_stamp") ||
+        side.identifiers.some(item => item.kind === "vin_stamp" && item.value.trim().toUpperCase() !== vin)) denied();
+    }
+  } else if (a.method !== "manual" || b.method !== "manual") denied();
   const values = new Map<string, string>();
   for (const item of [...a.identifiers, ...b.identifiers]) {
     const value = item.value.trim().toUpperCase();
