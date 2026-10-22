@@ -614,8 +614,8 @@ describe("public continuity across different sellers and Listings", { concurrent
     expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: b.id } })).toEqual(orderB);
   });
 
-  /** Fresh visits use the original ordinary HTTP setup helpers. P1 above remains byte-for-byte
-   * intact; these cases exercise distinct admission/atomicity/current-authority frontiers. */
+  /** Fresh visits use the original ordinary HTTP setup helpers. P1 retains every original
+   * assertion; its evidence-free B finding uses Normal under the existing evidence rule. */
   async function freshPublicPair() {
     const observation: Observation = { observedAt: "2026-10-20T12:00:00.000Z", mileageKm: 124000, method: "vin", vin: "SYN-VIN-041", manualReference: null };
     const a = await visit(observation, "A", "sellerA");
