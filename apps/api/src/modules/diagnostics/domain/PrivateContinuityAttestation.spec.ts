@@ -73,3 +73,46 @@ describe("private automatic normalized VIN comparison", () => {
     expect(() => automatic(vin, candidate, [now.toISOString()])).toThrowError(expect.objectContaining({ code: "DIAGNOSTIC_NO_ACCESS" }));
   });
 });
+
+
+describe("private mixed-method comparative attestation", () => {
+  const manual: AttestationIdentity = { ...a };
+  const vin: AttestationIdentity = { method: "vin", vin: "  syn-vin-041  ",
+    identifiers: [{ kind: "chassis_stamp", value: "SYN-CHASSIS-041" }, { kind: "vin_stamp", value: "SYN-VIN-041" }],
+    rightsUntil: ["2026-12-01T00:00:00.000Z"] };
+  for (const direction of ["manual to VIN", "VIN to manual"] as const) {
+    const compare = (physicalVin: AttestationIdentity = vin, physicalManual: AttestationIdentity = manual, rights = provenanceRights) =>
+      direction === "manual to VIN"
+        ? privateContinuityAttestation(physicalManual, physicalVin, rights, now)
+        : privateContinuityAttestation(physicalVin, physicalManual, rights, now);
+    it(`accepts ${direction} with consistent observed VIN, retained VIN stamps and shared physical chassis`, () => {
+      expect(compare().toISOString()).toBe("2026-11-01T00:00:00.000Z");
+      expect(compare(vin, manual, ["2026-10-22T00:00:00.000Z"]).toISOString()).toBe("2026-10-22T00:00:00.000Z");
+    });
+    it(`refuses ${direction} when shared chassis conceals an uncorrected raw VIN and retained VIN-stamp conflict`, () => {
+      expect(() => compare({ ...vin, identifiers: [
+        { kind: "chassis_stamp", value: "SYN-CHASSIS-041" }, { kind: "vin_stamp", value: "SYN-VIN-999" },
+      ] })).toThrowError(expect.objectContaining({ code: "DIAGNOSTIC_NO_ACCESS" }));
+    });
+    it(`refuses ${direction} with missing observed VIN or retained physical VIN support`, () => {
+      for (const other of [
+        { ...vin, vin: null }, { ...vin, vin: " " }, { ...vin, identifiers: [] },
+        { ...vin, identifiers: [{ kind: "chassis_stamp", value: "SYN-CHASSIS-041" }] },
+      ]) expect(() => compare(other)).toThrowError(expect.objectContaining({ code: "DIAGNOSTIC_NO_ACCESS" }));
+    });
+    it(`refuses ${direction} with absent, different or contradictory common physical identity`, () => {
+      for (const identifiers of [[], [{ kind: "manufacturer_plate", value: "SYN-PLATE-041" }],
+        [{ kind: "chassis_stamp", value: "SYN-CHASSIS-999" }],
+        [{ kind: "chassis_stamp", value: "SYN-CHASSIS-041" }, { kind: "chassis_stamp", value: "SYN-CHASSIS-999" }],
+      ]) expect(() => compare(vin, { ...manual, identifiers })).toThrowError(expect.objectContaining({ code: "DIAGNOSTIC_NO_ACCESS" }));
+    });
+    it(`refuses ${direction} once either visit's evidence or comparison provenance expires`, () => {
+      expect(() => compare({ ...vin, rightsUntil: ["2026-10-21T12:00:00.000Z"] })).toThrowError(expect.objectContaining({ code: "DIAGNOSTIC_NO_ACCESS" }));
+      expect(() => compare(vin, { ...manual, rightsUntil: ["2026-10-21T11:59:59.000Z"] })).toThrowError(expect.objectContaining({ code: "DIAGNOSTIC_NO_ACCESS" }));
+      expect(() => compare(vin, manual, ["2026-10-21T12:00:00.000Z"])).toThrowError(expect.objectContaining({ code: "DIAGNOSTIC_NO_ACCESS" }));
+    });
+  }
+  it("keeps VIN/VIN comparative eligibility outside this mixed-method policy", () => {
+    expect(() => privateContinuityAttestation(vin, vin, provenanceRights, now)).toThrowError(expect.objectContaining({ code: "DIAGNOSTIC_NO_ACCESS" }));
+  });
+});
