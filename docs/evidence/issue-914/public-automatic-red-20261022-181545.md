@@ -20,3 +20,14 @@ The negative case mutates B's Listing seller, restores the exact original row, t
 ## Source blocker
 
 `continuityPair` admits public pairs only for `comparative_attestation`. `PrismaDiagnosticContinuityProofs` and the migration SQL retain that public method gate. The current order stores mutable Listing digest/association state but does not retain an immutable ownership-at-visit fact in the identity record or released public snapshot. Allowing automatic by comparing current Listing equality would fabricate historical continuity after seller/identity mutation and restoration. This slice records that blocker without changing policy or schema.
+
+## Final local receipt
+
+- Reservation: base `fea9350155c20533a15dbcd2d4c9ac331b23d619`, branch pushed before edits.
+- Import-only collection: `pnpm --filter @auto-tm/api exec vitest list --config /tmp/public-auto-181545-collection.config.mts --staticParse=false --json` returned 20 imported cases, including the two new cases. No setup/global hooks or bodies ran. Hosted HTTP/PostgreSQL result remains UNKNOWN.
+- `DATABASE_URL=postgresql://placeholder:placeholder@127.0.0.1:1/not_connected pnpm --filter @auto-tm/db build`: pass. Contracts build, API TS7 typecheck, API TS6 typecheck, API lint, API build, runtime-import check, and root typecheck: pass. Root typecheck used 10 cache hits and executed the changed API task. Root unit test used 9 cache hits and executed the API unit task: 10 tasks passed, API 267 files / 2552 tests passed with 2 skipped.
+- Initial API TS7/runtime checks before package builds were blocked by absent `@auto-tm/db` and `@auto-tm/contracts` dist outputs. The initial DB build also correctly refused a missing `DATABASE_URL`; no service connection was attempted.
+- Root docs and glossary checks: pass. `git diff --check`: pass.
+- Final source SHA256: see the Root handoff manifest; final commit/tree are recorded below.
+
+This test slice intentionally leaves the current automatic public gate RED. It does not add a public ownership column, epoch, actor, DTO, migration, issuer power, or policy decision.
