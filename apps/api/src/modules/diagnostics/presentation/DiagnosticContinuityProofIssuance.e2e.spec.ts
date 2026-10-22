@@ -879,10 +879,23 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
     const p = await pair({ commissionerB: "otherBuyer" });
     await refused(p, () => post("reviewer", issuancePath(p), p.body));
   });
-  it.each(["public A", "public B", "both public"] as const)("keeps %s outside private comparative admission", async audiences => {
+  it.each(["public A", "public B"] as const)("keeps mixed audiences with %s outside comparative admission", async audiences => {
     const p = await pair({ audienceA: audiences === "public B" ? "buyer_private" : "listing_public",
       audienceB: audiences === "public A" ? "buyer_private" : "listing_public" });
     await refused(p, () => post("reviewer", issuancePath(p), p.body));
+  });
+  it("issues a public comparative proof under ADR-0108 without creating a successor", async () => {
+    const p = await pair({ audienceA: "listing_public", audienceB: "listing_public" });
+    const before = await stored(p);
+    const proofId = await ordinaryProof(p);
+    const after = await stored(p);
+    expect(after.reports).toEqual(before.reports);
+    expect(after.representations).toEqual(before.representations);
+    expect(after.orders).toEqual(before.orders);
+    expect(after.audits).toHaveLength(before.audits.length + 1);
+    expect(after.audits.find(audit => audit.id === proofId)).toMatchObject({
+      orderId: p.b.id, actorId: suite.id("reviewer"), action: "CONTINUITY_PROOF_ISSUED", details: {},
+    });
   });
 
   async function purgeCommissioner(who: "erasureBuyer" | "erasureReadBuyer") {
