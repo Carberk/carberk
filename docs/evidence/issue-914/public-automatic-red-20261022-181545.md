@@ -31,3 +31,5 @@ The negative case mutates B's Listing seller, restores the exact original row, t
 - Final source SHA256: see the Root handoff manifest; final commit/tree are recorded below.
 
 This test slice intentionally leaves the current automatic public gate RED. It does not add a public ownership column, epoch, actor, DTO, migration, issuer power, or policy decision.
+
+Final candidate after the disclosure assertions: commit `e4e03f053a16f782ab4ff7402e453364868e5f6d`, tree `9d8c38d6f3ca551a925587bab909993567e3a3a1`. Final source SHA256 is recomputed at handoff. The broader continuity import collection returned 135 cases, including 20 public cases, with setup/hooks disabled; the focused file collection returned 20.
