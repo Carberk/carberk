@@ -289,7 +289,13 @@ describe("real interrupted Redis intent and lost Lua reply on disposable transpo
     redisWrites = 0;
     ({ cleanResetProgram } = await import(pathToFileURL(`${root}/scripts/staging-clean-reset-remote.mjs`).href));
     expect(workerRequire("bullmq/package.json").version).toBe("5.76.8");
-    postgres = await new PostgreSqlContainer("postgres:16-alpine").start();
+    // Keep the recurring liveness probe off the target database's exclusive reset boundary.
+    postgres = await new PostgreSqlContainer("postgres:16-alpine").withHealthCheck({
+      test: ["CMD-SHELL", "PGPASSWORD=test pg_isready --host localhost --username test --dbname postgres"],
+      interval: 250,
+      timeout: 1000,
+      retries: 1000,
+    }).start();
     databaseUrl = postgres.getConnectionUri();
     const maintenance = new URL(databaseUrl); maintenance.pathname = "/postgres";
     admin = new Pool({ connectionString: maintenance.toString(), max: 1 });
@@ -668,5 +674,34 @@ describe("real interrupted Redis intent and lost Lua reply on disposable transpo
     await refuses(setup.command);
     expect(await snapshot()).toEqual(restored);
     expect(await storedRow()).toEqual(row);
+  });
+
+  // Target-backend refusal and whole-database immutability are covered by the unchanged
+  // "another backend on the database refuses observation and deletion" PostgreSQL control.
+  it("a held maintenance backend permits target inventory and row deletion", async () => {
+    const maintenance = new URL(databaseUrl); maintenance.pathname = "/postgres";
+    const other = new Client({ connectionString: maintenance.toString() });
+    await other.connect();
+    try {
+      const held = (await other.query("SELECT pg_backend_pid() AS pid, current_database() AS database")).rows[0] as { pid: number; database: string };
+      expect(held.database).toBe("postgres");
+      expect(validPid(held.pid)).toBe(true);
+      const assertHeld = async () => {
+        const result = await admin.query("SELECT datname, backend_type FROM pg_stat_activity WHERE pid=$1", [held.pid]);
+        expect(result.rows).toEqual([{ datname: "postgres", backend_type: "client backend" }]);
+      };
+      await assertHeld();
+      expect(await query("SELECT id FROM users ORDER BY id")).toEqual([{ id: "redis-reset-user" }]);
+      const before = { redis: await snapshotRedis(), writes: await writeCount() };
+      const inventoried = receiptOf(await run(pgRequest("inventoried")));
+      expect(inventoried["digest"]).toEqual(digestShape);
+      await assertHeld();
+      const rows = receiptOf(await run(pgRequest("rows", inventoried["digest"])));
+      expect(rows).toEqual({ ...base, phase: "rows", environmentId: identity.environmentId, state: "completed", digest: digestShape });
+      await assertHeld();
+      expect(await query("SELECT id FROM users ORDER BY id")).toEqual([]);
+      expect((await storedRow())["result"]).toEqual(rows["digest"]);
+      expect({ redis: await snapshotRedis(), writes: await writeCount() }).toEqual(before);
+    } finally { await other.end(); }
   });
 });
