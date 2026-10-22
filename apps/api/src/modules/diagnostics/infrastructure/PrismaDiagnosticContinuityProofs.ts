@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Inject, Injectable } from "@nestjs/common";
 import { DiagnosticSchemas as D } from "@auto-tm/contracts";
 import { PrismaService, type Prisma } from "@auto-tm/db";
-import { STAFF_BINDING_PORT, StaffAuthorityDenied, type StaffBindingPort } from "../../identity/identity.public";
+import { STAFF_BINDING_PORT, StaffAuthorityDenied, type StaffBinding, type StaffBindingPort } from "../../identity/identity.public";
 import type { DiagnosticContinuityProofsPort } from "../application/ports/DiagnosticContinuityProofsPort";
 import { DiagnosticRuleError } from "../domain/InspectionOrder";
 import { privateContinuityAttestation } from "../domain/PrivateContinuityAttestation";
@@ -15,8 +15,11 @@ import { PrismaDiagnosticReports } from "./PrismaDiagnosticReports";
 const denied = () => new DiagnosticRuleError("DIAGNOSTIC_NO_ACCESS");
 const hash = (value: unknown) => createHash("sha256").update(canonical(JSON.parse(JSON.stringify(value)))).digest("hex");
 const json = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+type Tx = Prisma.TransactionClient;
+type Order = Prisma.InspectionOrderGetPayload<object>;
+type Pair = Awaited<ReturnType<PrismaDiagnosticReports["compared"]>>;
 
-/** One private issuance transaction. Neither issuance nor a read creates a report or successor. */
+/** Private issuance and consumption transactions. Neither issuance nor a read creates a report or successor. */
 @Injectable()
 export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityProofsPort {
   constructor(@Inject(PrismaService) private readonly db: PrismaService,
@@ -25,6 +28,54 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
     @Inject(PrismaDiagnosticReports) private readonly reports: PrismaDiagnosticReports,
     @Inject(PrismaDiagnosticIdentityEvidence) private readonly evidence: PrismaDiagnosticIdentityEvidence,
     @Inject(DIAGNOSTIC_RUNTIME) private readonly runtime: DiagnosticRuntime) {}
+
+  /** Under the order locks: the issuer/technician pair's current assignments and qualifications,
+   * with the linking technician's current B assignment and qualification. */
+  private async staffing(tx: Tx, issuerId: string, technicianId: string, { order: b, priorOrder: ao }: Pair) {
+    // Lock target assignments and qualifications in a stable order, then reread them.
+    const assignments = await tx.$queryRaw<{ id: string; orderId: string; userId: string; capability: string; assignedAt: Date; revokedAt: Date | null }[]>`
+      SELECT id,"orderId","userId",capability,"assignedAt","revokedAt" FROM diagnostic_order_assignments
+      WHERE "orderId" IN (${ao.id},${b.id}) AND "userId" IN (${issuerId},${technicianId}) ORDER BY id FOR SHARE`;
+    const qualifications = await tx.$queryRaw<{ id: string; centerId: string; userId: string; capability: string; qualifiedUntil: Date | null; revokedAt: Date | null; assignedAt: Date }[]>`
+      SELECT id,"centerId","userId",capability,"qualifiedUntil","revokedAt","assignedAt" FROM diagnostic_center_assignments
+      WHERE "centerId" IN (${ao.centerId},${b.centerId}) AND "userId" IN (${issuerId},${technicianId}) ORDER BY id FOR SHARE`;
+    const t = technicianId;
+    if (!assignments.some(row => row.orderId === b.id && row.userId === t && row.capability === "diagnostics.technician" && !row.revokedAt) ||
+      !qualifications.some(row => row.centerId === b.centerId && row.userId === t && row.capability === "diagnostics.technician" && !row.revokedAt && row.qualifiedUntil && row.qualifiedUntil > this.runtime.now())) throw denied();
+    return { assignments, qualifications };
+  }
+  /** Bound evidence/provenance and the visit, authority and staffing digests. Issuance stores
+   * these; consumption requires them unchanged. */
+  private async facts(tx: Tx, pair: Pair, staffing: Awaited<ReturnType<PrismaDiagnosticContinuityProofs["staffing"]>>, provenanceRecordIds: string[], authority: StaffBinding[]) {
+    const { order: b, priorOrder: ao, comparison } = pair;
+    const sides = [comparison.predecessor, comparison.candidate];
+    const records = sides.flatMap(side => {
+      const evidence = side.identity.evidence;
+      if (!evidence || evidence.identityRecordId !== side.identityRecordId || evidence.observationHash !== side.identityRecordHash) throw denied();
+      return [evidence, ...side.identity.corrections];
+    });
+    if (pair.provenance.size !== provenanceRecordIds.length || provenanceRecordIds.some(id => !pair.provenance.has(id))) throw denied();
+    const provenance = await tx.diagnosticIdentityProvenance.findMany({ where: { id: { in: provenanceRecordIds } }, orderBy: { id: "asc" } });
+    if (provenance.length !== provenanceRecordIds.length) throw denied();
+    const visit = (order: Order) => ({ id: order.id, centerId: order.centerId, audience: order.audience, commissionerId: order.commissionerId,
+      // Private proof has no public Listing authority, even if intake happens to name one.
+      listingBinding: null, version: order.version, epoch: order.epoch, evidenceGeneration: order.identityEvidenceGeneration,
+      physicalAuthorizationHash: hash(order.physicalAuthorization), observationHash: hash(order.observedVehicle) });
+    const bindings = { predecessor: visit(ao), candidate: visit(b), authority,
+      evidencePins: sides.map(item => ({ orderId: item.identity.evidence?.orderId, id: item.identity.evidence?.id, hash: item.identity.evidence?.recordHash })),
+      assignmentsHash: hash(staffing.assignments), qualificationsHash: hash(staffing.qualifications),
+      evidence: records.map(record => ({ id: record.id, recordHash: record.recordHash, rightsHash: hash(record.rights) })),
+      provenance: provenance.map(row => ({ id: row.id, sha256: row.sha256, epoch: row.epoch, rightsHash: hash(row.rights) })) };
+    return { provenance, bindings };
+  }
+  /** Same-commissioner private visits: retained finalized/withdrawn A, arrived physically authorized B. */
+  private privatePair({ order: b, prior: a, priorOrder: ao }: Pair) {
+    return ao.audience === "buyer_private" && a.audience === "buyer_private" && b.audience === "buyer_private" && !!ao.commissionerId && ao.commissionerId === b.commissionerId &&
+      !!ao.physicalAuthorization && !!b.physicalAuthorization && b.status === "arrived";
+  }
+  private async linked(tx: Tx, { order: b, prior: a }: Pair) {
+    return !!(await tx.diagnosticReportRecord.count({ where: { predecessorId: a.id } }) || await tx.diagnosticReportRecord.count({ where: { orderId: b.id } }));
+  }
 
   async issue(subject: DiagnosticSubject, orderId: string, input: D.DiagnosticContinuityProofIssuance) {
     return this.db.$transaction(async tx => {
@@ -43,30 +94,12 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
       await this.authority.order(tx, subject, ao.id, "diagnostics.reviewer");
       await this.authority.order(tx, subject, b.id, "diagnostics.reviewer");
       if (subject.userId === input.linkingTechnicianId || !this.runtime.syntheticAllowed({ userId: input.linkingTechnicianId, sessionId: "" })) throw denied();
-      // Lock target assignments and qualifications in a stable order, then reread them.
-      const assignments = await tx.$queryRaw<{ id: string; orderId: string; userId: string; capability: string; assignedAt: Date; revokedAt: Date | null }[]>`
-        SELECT id,"orderId","userId",capability,"assignedAt","revokedAt" FROM diagnostic_order_assignments
-        WHERE "orderId" IN (${ao.id},${b.id}) AND "userId" IN (${subject.userId},${input.linkingTechnicianId}) ORDER BY id FOR SHARE`;
-      const qualifications = await tx.$queryRaw<{ id: string; centerId: string; userId: string; capability: string; qualifiedUntil: Date | null; revokedAt: Date | null; assignedAt: Date }[]>`
-        SELECT id,"centerId","userId",capability,"qualifiedUntil","revokedAt","assignedAt" FROM diagnostic_center_assignments
-        WHERE "centerId" IN (${ao.centerId},${b.centerId}) AND "userId" IN (${subject.userId},${input.linkingTechnicianId}) ORDER BY id FOR SHARE`;
       const t = input.linkingTechnicianId;
-      if (!assignments.some(row => row.orderId === b.id && row.userId === t && row.capability === "diagnostics.technician" && !row.revokedAt) ||
-        !qualifications.some(row => row.centerId === b.centerId && row.userId === t && row.capability === "diagnostics.technician" && !row.revokedAt && row.qualifiedUntil && row.qualifiedUntil > this.runtime.now())) throw denied();
-      if (ao.audience !== "buyer_private" || a.audience !== "buyer_private" || b.audience !== "buyer_private" || !ao.commissionerId || ao.commissionerId !== b.commissionerId ||
-        !ao.physicalAuthorization || !b.physicalAuthorization || b.status !== "arrived" ||
-        await tx.diagnosticReportRecord.count({ where: { predecessorId: a.id } }) || await tx.diagnosticReportRecord.count({ where: { orderId: b.id } })) throw denied();
+      const staffing = await this.staffing(tx, subject.userId, t, pair);
+      if (!this.privatePair(pair) || await this.linked(tx, pair)) throw denied();
       if (a.version !== input.expectedPredecessorVersion || b.version !== input.expectedOrderVersion ||
         comparison.predecessor.identityRecordId !== input.predecessorIdentityRecordId || comparison.candidate.identityRecordId !== input.candidateIdentityRecordId) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
-      const sides = [comparison.predecessor, comparison.candidate];
-      const records = sides.flatMap(side => {
-        const evidence = side.identity.evidence;
-        if (!evidence || evidence.identityRecordId !== side.identityRecordId || evidence.observationHash !== side.identityRecordHash) throw denied();
-        return [evidence, ...side.identity.corrections];
-      });
-      if (pair.provenance.size !== input.provenanceRecordIds.length || input.provenanceRecordIds.some(id => !pair.provenance.has(id))) throw denied();
-      const provenance = await tx.diagnosticIdentityProvenance.findMany({ where: { id: { in: input.provenanceRecordIds } }, orderBy: { id: "asc" } });
-      if (provenance.length !== input.provenanceRecordIds.length) throw denied();
+      const { provenance, bindings } = await this.facts(tx, pair, staffing, input.provenanceRecordIds, staffBindings);
       const side = (identity: D.DiagnosticComparisonIdentity) => {
         if (!identity.evidence) throw denied();
         const chain = [identity.evidence, ...identity.corrections];
@@ -80,21 +113,78 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
         candidate: { orderId: b.id, orderVersion: b.version, identityRecordId: comparison.candidate.identityRecordId, identityRecordHash: comparison.candidate.identityRecordHash },
         linkingTechnicianId: t, method: input.method, result: "same_vehicle", rationale: input.rationale,
         provenanceRecordIds: input.provenanceRecordIds, issuedBy: subject.userId, issuedAt: now.toISOString() });
-      const visit = (order: typeof b) => ({ id: order.id, centerId: order.centerId, audience: order.audience, commissionerId: order.commissionerId,
-        // Private proof has no public Listing authority, even if intake happens to name one.
-        listingBinding: null, version: order.version, epoch: order.epoch, evidenceGeneration: order.identityEvidenceGeneration,
-        physicalAuthorizationHash: hash(order.physicalAuthorization), observationHash: hash(order.observedVehicle) });
       await tx.diagnosticContinuityProof.create({ data: { id: proofId, predecessorReportId: a.id, predecessorOrderId: ao.id, candidateOrderId: b.id,
-        issuerId: subject.userId, issuerSessionId: subject.sessionId, linkingTechnicianId: t, issuedAt: now, rightsUntil, content: json(content),
-        bindings: json({ predecessor: visit(ao), candidate: visit(b), authority: staffBindings,
-          evidencePins: sides.map(item => ({ orderId: item.identity.evidence?.orderId, id: item.identity.evidence?.id, hash: item.identity.evidence?.recordHash })),
-          assignmentsHash: hash(assignments), qualificationsHash: hash(qualifications),
-          evidence: records.map(record => ({ id: record.id, recordHash: record.recordHash, rightsHash: hash(record.rights) })),
-          provenance: provenance.map(row => ({ id: row.id, sha256: row.sha256, epoch: row.epoch, rightsHash: hash(row.rights) })) }) } });
+        issuerId: subject.userId, issuerSessionId: subject.sessionId, linkingTechnicianId: t, issuedAt: now, rightsUntil, content: json(content), bindings: json(bindings) } });
       // Audit holds no rationale, provenance, personal linkage or identity hashes.
       await tx.diagnosticAudit.create({ data: { id: this.runtime.id(), centerId: b.centerId, orderId: b.id, actorId: subject.userId,
         action: "CONTINUITY_PROOF_ISSUED", details: {}, createdAt: now } });
       return { proofId };
+    });
+  }
+
+  /** B's linking technician consumes one unused private manual/manual proof into B's own empty
+   * linked draft, with the proof marked consumed and both audits in one transaction. Every bound
+   * fact and the issuer's current Session, qualification and both assignments are rechecked under
+   * the issuance lock order. An existing report id is an exact retry: it returns the authorized
+   * result or conflicts and never reruns admission, so later A changes cannot block B. */
+  async consume(subject: DiagnosticSubject, orderId: string, input: D.DiagnosticReinspection & { proofId: string }) {
+    return this.db.$transaction(async tx => {
+      // Unlocked discovery selects the path and the issuer's identity lock targets only.
+      if (await tx.diagnosticReportRecord.findUnique({ where: { id: input.reportId }, select: { id: true } })) {
+        await this.reports.reinspectionLocks(tx, subject, orderId, input.predecessorId);
+        const retried = await this.reports.reinspectionRetry(tx, subject, orderId, input);
+        if (!retried) throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
+        return retried;
+      }
+      const initial = await tx.diagnosticContinuityProof.findUnique({ where: { id: input.proofId } });
+      if (!initial?.issuerId || !initial.issuerSessionId || initial.linkingTechnicianId !== subject.userId) throw denied();
+      const issuer = { userId: initial.issuerId, sessionId: initial.issuerSessionId };
+      // Exactly the issuance binding shape: identity locks precede every feature lock.
+      let staffBindings;
+      try {
+        staffBindings = await this.staff.bind([
+          { ...issuer, capability: "diagnostics.reviewer" },
+          { userId: subject.userId, capability: "diagnostics.technician" },
+        ], tx);
+      } catch (error) { if (error instanceof StaffAuthorityDenied) throw denied(); throw error; }
+      // The issuer's current comparative authority, rechecked as at issuance on both visits.
+      const pair = await this.reports.compared(tx, issuer, orderId, input.predecessorId);
+      const { prior: a, priorOrder: ao, comparison } = pair;
+      await this.authority.order(tx, issuer, ao.id, "diagnostics.reviewer");
+      await this.authority.order(tx, issuer, pair.order.id, "diagnostics.reviewer");
+      // The acting linking technician's own current Session and B authority.
+      const { row: b } = await this.authority.order(tx, subject, orderId, "diagnostics.technician");
+      const current = { ...pair, order: b };
+      await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${a.id} FOR UPDATE`;
+      const staffing = await this.staffing(tx, issuer.userId, subject.userId, current);
+      await tx.$queryRaw`SELECT id FROM diagnostic_continuity_proofs WHERE id=${input.proofId} FOR UPDATE`;
+      const raced = await this.reports.reinspectionRetry(tx, subject, orderId, input);
+      if (raced) return raced;
+      const proof = await tx.diagnosticContinuityProof.findUnique({ where: { id: input.proofId } });
+      const content = D.DiagnosticContinuityProofSchema.safeParse(proof?.content);
+      if (!proof || !content.success || proof.erasedAt || proof.candidateOrderId !== b.id || proof.predecessorReportId !== a.id || proof.predecessorOrderId !== ao.id ||
+        proof.issuerId !== issuer.userId || proof.issuerSessionId !== issuer.sessionId || proof.linkingTechnicianId !== subject.userId ||
+        content.data.issuedBy !== issuer.userId || content.data.linkingTechnicianId !== subject.userId) throw denied();
+      if (proof.consumedReportId) throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
+      const now = this.runtime.now();
+      // Invalidation is permanent; reverting a source value never revives the proof.
+      if (proof.invalidatedAt || proof.rightsUntil <= now) throw denied();
+      if (!this.privatePair(current)) throw denied();
+      // A successor elsewhere is a protected predecessor fact; B's own first report is not.
+      if (await tx.diagnosticReportRecord.count({ where: { predecessorId: a.id } })) throw denied();
+      if (await tx.diagnosticReportRecord.count({ where: { orderId: b.id } })) throw new DiagnosticRuleError("DIAGNOSTIC_REPORT_EXISTS");
+      if (b.version !== input.expectedOrderVersion) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
+      const bound = content.data;
+      if (hash(bound.predecessor) !== hash({ reportId: a.id, reportVersion: a.version, snapshotHash: a.snapshotHash, identityRecordId: comparison.predecessor.identityRecordId, identityRecordHash: comparison.predecessor.identityRecordHash }) ||
+        hash(bound.candidate) !== hash({ orderId: b.id, orderVersion: b.version, identityRecordId: comparison.candidate.identityRecordId, identityRecordHash: comparison.candidate.identityRecordHash })) throw denied();
+      const { bindings } = await this.facts(tx, current, staffing, bound.provenanceRecordIds, staffBindings);
+      if (hash(bindings) !== hash(proof.bindings)) throw denied();
+      await tx.diagnosticContinuityProof.update({ where: { id: proof.id }, data: { consumedReportId: input.reportId, consumedAt: now } });
+      const created = await this.reports.openReinspection(tx, subject, b, a, input, proof.id);
+      // Like issuance, the audit holds no rationale, provenance, personal linkage or identity hashes.
+      await tx.diagnosticAudit.create({ data: { id: this.runtime.id(), centerId: b.centerId, orderId: b.id, actorId: subject.userId,
+        action: "CONTINUITY_PROOF_CONSUMED", details: { reportId: created.id }, createdAt: now } });
+      return created;
     });
   }
 
