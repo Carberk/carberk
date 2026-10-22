@@ -388,6 +388,15 @@ describe("consumed private diagnostic link after predecessor material rights exp
       expect((await get("reviewer", `orders/${a.id}/reports`).expect(200)).body.map((r: { id: string }) => r.id)).toEqual([released.id]);
       expect((await get("technician", `orders/${b.id}/reports`).expect(200)).body).toEqual([created.body]);
 
+      // B's draft is settled. Preserve each reader's full HTTP projection before
+      // expiry; a buyer's redacted attribution is not a staff erasure oracle.
+      const buyerBefore = await get("buyer", `reports/${released.id}`).expect(200); privateNoStore(buyerBefore);
+      const staffBefore = await get("reviewer", `reports/${released.id}`).expect(200); privateNoStore(staffBefore);
+      expect(buyerBefore.body).toMatchObject({ authorId: null, reviewerId: null });
+      expect(staffBefore.body).toMatchObject({ authorId: suite.id("technician"), reviewerId: suite.id("reviewer") });
+      expect(staffBefore.body).toEqual(released);
+      expect(buyerBefore.body).toEqual({ ...staffBefore.body, authorId: null, reviewerId: null });
+
       // Explicit IDs came from requests or HTTP responses. Never discover an allowlist from
       // an unfiltered table. These exact-id snapshots are also the subprocess's full-row oracle.
       const reports = await db.diagnosticReportRecord.findMany({ where: { id: { in: [released.id, input.reportId] } }, orderBy: { id: "asc" } });
@@ -560,7 +569,10 @@ describe("consumed private diagnostic link after predecessor material rights exp
       expect(await db.diagnosticPdfArtifact.findMany({ where: { id: { in: documents.map(d => d.id) } }, orderBy: { id: "asc" } })).toEqual(pdfs);
       expect(await history(a)).toEqual([ia]);
       expect(await history(b)).toEqual([ib]);
-      expect((await get("buyer", `reports/${released.id}`).expect(200)).body).toEqual(released);
+      const buyerAfter = await get("buyer", `reports/${released.id}`).expect(200); privateNoStore(buyerAfter);
+      expect(buyerAfter.body).toEqual(buyerBefore.body);
+      const staffAfter = await get("reviewer", `reports/${released.id}`).expect(200); privateNoStore(staffAfter);
+      expect(staffAfter.body).toEqual(staffBefore.body);
       expect((await get("buyer", `reports/${released.id}/documents`).expect(200)).body).toEqual(documents);
       await refused();
       expect(await audits()).toEqual(beforeAudits);
