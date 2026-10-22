@@ -1783,6 +1783,9 @@ model DiagnosticReportRecord {
   identityEvidenceHash String?
   identityEvidence DiagnosticIdentityEvidence? @relation(fields: [identityEvidenceId], references: [id], onDelete: Restrict)
   continuityProofPredecessors DiagnosticContinuityProof[] @relation("ContinuityProofPredecessor")
+  /// Private reinspection only: the consumed proof and expected order version, immutable exact-retry binding.
+  continuityProofId String? @unique
+  reinspectionOrderVersion Int?
   finalizedAt DateTime?
   withdrawnAt DateTime?
   withdrawalReason String?
@@ -1815,6 +1818,9 @@ model DiagnosticContinuityProof {
   rightsUntil DateTime
   issuedAt DateTime
   invalidatedAt DateTime?
+  /// Set once by the consuming reinspection; a consumed proof is never invalidated or reused.
+  consumedReportId String? @unique
+  consumedAt DateTime?
   erasedAt DateTime?
   @@index([candidateOrderId, id])
   @@index([predecessorReportId])

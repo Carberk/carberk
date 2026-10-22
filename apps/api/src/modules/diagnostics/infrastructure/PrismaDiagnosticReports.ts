@@ -233,58 +233,83 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
       return this.dto(tx, saved, subject, true);
     });
   }
+  /** Shared reinspection lock order. Unlocked discovery only selects lock targets: identity,
+   * Listings, orders in id order, then assignments and the predecessor report. Every fact is
+   * re-read after locking; returns B under its linking technician's current authority. */
+  async reinspectionLocks(tx: Tx, subject: DiagnosticSubject, orderId: string, predecessorId: string): Promise<Order> {
+    await this.authority.current(tx, subject);
+    const discovered = [await tx.inspectionOrder.findUnique({ where: { id: orderId } }),
+      (await tx.diagnosticReportRecord.findUnique({ where: { id: predecessorId }, include: { order: true } }))?.order].filter(item => !!item);
+    for (const id of [...new Set(discovered.flatMap(item => item.audience === "listing_public" && item.listingId ? [item.listingId] : []))].sort()) {
+      await tx.$queryRaw`SELECT id FROM listings WHERE id=${id} FOR SHARE`;
+    }
+    for (const id of [...new Set(discovered.map(item => item.id))].sort()) await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${id} FOR UPDATE`;
+    const { row: order } = await this.authority.order(tx, subject, orderId, "diagnostics.technician");
+    await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${predecessorId} FOR UPDATE`;
+    return order;
+  }
+  /** Under reinspection locks. An existing report id returns its exact authorized result. A changed
+   * predecessor, reason, author, proof or proof-bound expected order version conflicts. */
+  async reinspectionRetry(tx: Tx, subject: DiagnosticSubject, orderId: string, input: DiagnosticSchemas.DiagnosticReinspection) {
+    const existing = await tx.diagnosticReportRecord.findUnique({ where: { id: input.reportId } });
+    if (!existing) return null;
+    const state = existing.state as unknown as DiagnosticReportState;
+    if (!existing.reinspection || existing.orderId !== orderId || existing.predecessorId !== input.predecessorId || state.correctionReason !== input.reason ||
+      state.authorId !== subject.userId || existing.erasedAt || existing.continuityProofId !== (input.proofId ?? null) ||
+      (existing.continuityProofId && existing.reinspectionOrderVersion !== input.expectedOrderVersion)) throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
+    return this.dto(tx, existing, subject, true);
+  }
+  /** B's arrived, physically authorized own observation, or refusal. */
+  observed(order: Order) {
+    const observed = DiagnosticSchemas.DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true }).safeParse(order.observedVehicle);
+    if (order.status !== "arrived" || !order.physicalAuthorization || !observed.success) throw new DiagnosticRuleError("DIAGNOSTIC_OBSERVATION_REQUIRED");
+    return observed.data;
+  }
+  /** Under reinspection locks after admission: B's own empty first report with its own date,
+   * mileage, template and pins, linked to `prior`, plus its audit. A proof binding is persisted
+   * for exact retries; the database admits a private link only with that consumed proof. */
+  async openReinspection(tx: Tx, subject: DiagnosticSubject, order: Order, prior: Row, input: DiagnosticSchemas.DiagnosticReinspection, proofId: string | null) {
+    const observed = this.observed(order);
+    const state = new DiagnosticReport(prior.state as unknown as DiagnosticReportState).reinspect({ reportId: input.reportId, orderId: order.id, templateVersionId: order.templateVersionId,
+      authorId: subject.userId, observedAt: observed.observedAt, mileageKm: observed.mileageKm, reason: input.reason }).state;
+    const pins = await this.pins(tx, order.id);
+    let saved: Row;
+    try {
+      saved = await tx.diagnosticReportRecord.create({ data: { id: state.id, orderId: order.id, audience: state.audience, templateVersionId: state.templateVersionId, predecessorId: prior.id, reinspection: true, ...pins,
+        ...(proofId ? { continuityProofId: proofId, reinspectionOrderVersion: input.expectedOrderVersion } : {}), state: json(state) } });
+    } catch (error) {
+      // Report id, predecessor, proof and first-report uniqueness are the only races left after locking.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
+      throw error;
+    }
+    await this.audit(tx, subject, order, saved.id, "REPORT_REINSPECTION_CREATED", { predecessorId: prior.id, predecessorOrderId: prior.orderId, reason: state.correctionReason ?? input.reason });
+    return this.dto(tx, saved, subject, true);
+  }
   /** Opens a new visit's first report from a released or withdrawn report on another order.
    * Only the new order's current technician links; the predecessor is inspected internally and
-   * never loaded through reader authority. Temporary admission (until D2/D3 decisions): both
-   * orders public, same Listing, same non-null commissioner and equal observed VINs. */
+   * never loaded through reader authority. Temporary public admission (until its ADR-0108
+   * replacement): both orders public, same Listing, same non-null commissioner and equal observed
+   * VINs. Proof-bearing private input is consumed by the continuity proof adapter instead. */
   async reinspect(subject: DiagnosticSubject, orderId: string, input: DiagnosticSchemas.DiagnosticReinspection) {
+    if (input.proofId) throw denied();
     return this.db.$transaction(async tx => {
-      // Unlocked discovery only selects lock targets: identity, Listings, orders in id order,
-      // then assignments and the predecessor report. Every fact is re-read after locking.
-      await this.authority.current(tx, subject);
-      const discovered = [await tx.inspectionOrder.findUnique({ where: { id: orderId } }),
-        (await tx.diagnosticReportRecord.findUnique({ where: { id: input.predecessorId }, include: { order: true } }))?.order].filter(item => !!item);
-      for (const id of [...new Set(discovered.flatMap(item => item.audience === "listing_public" && item.listingId ? [item.listingId] : []))].sort()) {
-        await tx.$queryRaw`SELECT id FROM listings WHERE id=${id} FOR SHARE`;
-      }
-      for (const id of [...new Set(discovered.map(item => item.id))].sort()) await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${id} FOR UPDATE`;
-      const { row: order } = await this.authority.order(tx, subject, orderId, "diagnostics.technician");
-      await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${input.predecessorId} FOR UPDATE`;
-      const existing = await tx.diagnosticReportRecord.findUnique({ where: { id: input.reportId } });
-      if (existing) {
-        const state = existing.state as unknown as DiagnosticReportState;
-        if (!existing.reinspection || existing.orderId !== orderId || existing.predecessorId !== input.predecessorId || state.correctionReason !== input.reason ||
-          state.authorId !== subject.userId || existing.erasedAt) throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
-        return this.dto(tx, existing, subject, true);
-      }
+      const order = await this.reinspectionLocks(tx, subject, orderId, input.predecessorId);
+      const retried = await this.reinspectionRetry(tx, subject, orderId, input);
+      if (retried) return retried;
       if (order.version !== input.expectedOrderVersion) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
-      const vehicle = DiagnosticSchemas.DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true });
-      const observed = vehicle.safeParse(order.observedVehicle);
-      if (order.status !== "arrived" || !order.physicalAuthorization || !observed.success) throw new DiagnosticRuleError("DIAGNOSTIC_OBSERVATION_REQUIRED");
+      const observed = this.observed(order);
       if (await this.firstReport(tx, orderId)) throw new DiagnosticRuleError("DIAGNOSTIC_REPORT_EXISTS");
       const prior = await tx.diagnosticReportRecord.findUnique({ where: { id: input.predecessorId }, include: { order: true } });
-      const priorObserved = vehicle.safeParse(prior?.order.observedVehicle);
+      const priorObserved = DiagnosticSchemas.DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true }).safeParse(prior?.order.observedVehicle);
       const vin = (value: { method: string; vin: string | null }) => value.method === "vin" && value.vin ? value.vin.trim().toUpperCase() : null;
       // Uniform refusal: no predecessor existence, audience, Listing or commissioner fact leaks.
       if (!prior || prior.erasedAt || !prior.snapshot || prior.order.erasedAt || !prior.order.synthetic || prior.audience !== "listing_public" ||
         prior.order.audience !== "listing_public" || order.audience !== "listing_public" || !order.listingId || prior.order.listingId !== order.listingId ||
-        !order.commissionerId || prior.order.commissionerId !== order.commissionerId || !priorObserved.success || !vin(observed.data) ||
-        vin(observed.data) !== vin(priorObserved.data)) throw denied();
+        !order.commissionerId || prior.order.commissionerId !== order.commissionerId || !priorObserved.success || !vin(observed) ||
+        vin(observed) !== vin(priorObserved.data)) throw denied();
       if (await tx.diagnosticReportRecord.findUnique({ where: { predecessorId: prior.id } })) throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
       await this.publicAssociation(tx, order);
-      const state = new DiagnosticReport(prior.state as unknown as DiagnosticReportState).reinspect({ reportId: input.reportId, orderId, templateVersionId: order.templateVersionId,
-        authorId: subject.userId, observedAt: observed.data.observedAt, mileageKm: observed.data.mileageKm, reason: input.reason }).state;
-      const pins = await this.pins(tx, orderId);
-      let saved: Row;
-      try {
-        saved = await tx.diagnosticReportRecord.create({ data: { id: state.id, orderId, audience: state.audience, templateVersionId: state.templateVersionId, predecessorId: prior.id, reinspection: true, ...pins, state: json(state) } });
-      } catch (error) {
-        // Report id, predecessor and first-report uniqueness are the only races left after locking.
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
-        throw error;
-      }
-      await this.audit(tx, subject, order, saved.id, "REPORT_REINSPECTION_CREATED", { predecessorId: prior.id, predecessorOrderId: prior.orderId, reason: state.correctionReason ?? input.reason });
-      return this.dto(tx, saved, subject, true);
+      return this.openReinspection(tx, subject, order, prior, input, null);
     });
   }
 }

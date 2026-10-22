@@ -6,6 +6,7 @@ import { DiagnosticRuleError } from "../domain/InspectionOrder";
 import type { DiagnosticSubject } from "../domain/ports/DiagnosticIntakePort";
 import { IssueDiagnosticContinuityProof } from "../application/IssueDiagnosticContinuityProof";
 import { ReadDiagnosticContinuityProof } from "../application/ReadDiagnosticContinuityProof";
+import { ConsumeDiagnosticContinuityProof } from "../application/ConsumeDiagnosticContinuityProof";
 import { DIAGNOSTIC_REPORTS_PORT, type DiagnosticReportsPort } from "../domain/ports/DiagnosticReportsPort";
 
 import { DIAGNOSTIC_EVIDENCE_PORT, type DiagnosticEvidencePort } from "../domain/ports/DiagnosticEvidencePort";
@@ -25,6 +26,7 @@ export class DiagnosticReportsController {
   constructor(@Inject(DIAGNOSTIC_REPORTS_PORT) private readonly reports: DiagnosticReportsPort,
     @Inject(IssueDiagnosticContinuityProof) private readonly issueContinuityProof: IssueDiagnosticContinuityProof,
     @Inject(ReadDiagnosticContinuityProof) private readonly readContinuityProof: ReadDiagnosticContinuityProof,
+    @Inject(ConsumeDiagnosticContinuityProof) private readonly consumeContinuityProof: ConsumeDiagnosticContinuityProof,
     @Inject(DIAGNOSTIC_EVIDENCE_PORT) private readonly evidence: DiagnosticEvidencePort,
     @Inject(DIAGNOSTIC_DOCUMENTS_PORT) private readonly documents: DiagnosticDocumentsPort,
     @Inject(DIAGNOSTIC_IDENTITY_EVIDENCE_PORT) private readonly identity: DiagnosticIdentityEvidencePort) {}
@@ -44,7 +46,12 @@ export class DiagnosticReportsController {
     return this.run(() => this.reports.create(this.subject(req), parse(uuid, id), parse(DiagnosticSchemas.DiagnosticDraftCreateSchema, body)));
   }
   @Post("orders/:id/reinspections") @Header("Cache-Control", "no-store, private") reinspect(@Req() req: Request, @Param("id") id: string, @Body() body: unknown) {
-    return this.run(() => this.reports.reinspect(this.subject(req), parse(uuid, id), parse(DiagnosticSchemas.DiagnosticReinspectionSchema, body)));
+    // A named proof selects private consumption; without one only the temporary public admission applies.
+    return this.run(() => {
+      const subject = this.subject(req); const orderId = parse(uuid, id); const input = parse(DiagnosticSchemas.DiagnosticReinspectionSchema, body);
+      const { proofId } = input;
+      return proofId ? this.consumeContinuityProof.execute(subject, orderId, { ...input, proofId }) : this.reports.reinspect(subject, orderId, input);
+    });
   }
   @Get("orders/:id/reinspection-comparison") comparison(@Req() req: Request, @Param("id") id: string, @Query() query: unknown, @Res({ passthrough: true }) reply: FastifyReply) {
     // Set before authorization so uniform denials carry the same private cache policy.
