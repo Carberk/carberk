@@ -932,4 +932,134 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
     const erased = await refused(p, () => get("reviewer", `${issuancePath(p)}/${proofId}`));
     expect(await refused(p, () => get("reviewer", `${issuancePath(p)}/${randomUUID()}`))).toEqual(erased);
   });
+
+  // Private consumption authority slice. This block is appended so the original
+  // issuance/read cases above remain byte-for-byte unchanged.
+  async function consumptionState(p: Pair, proofId: string) {
+    return {
+      reports: await db.diagnosticReportRecord.findMany({ where: { orderId: { in: [p.a.id, p.b.id] } }, orderBy: { id: "asc" } }),
+      proof: await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId }, select: { consumedReportId: true, consumedAt: true, invalidatedAt: true } }),
+      audits: await db.diagnosticAudit.findMany({ where: { centerId }, orderBy: { id: "asc" } }),
+    };
+  }
+
+  async function consumeDenied(p: Pair, proofId: string, input = reinspectionInput(p, proofId), sameJwt = headers("technician")) {
+    const before = await consumptionState(p, proofId);
+    expect(before.proof).toMatchObject({ consumedReportId: null, consumedAt: null });
+    expect(before.reports.filter(row => row.orderId === p.b.id || row.predecessorId === p.released.id)).toEqual([]);
+    const response = await request.post(`/api/v1/diagnostics/orders/${p.b.id}/reinspections`).set(sameJwt).send(input);
+    expect(response.status).toBe(403);
+    privateNoStore(response);
+    expect(response.body).toEqual({ statusCode: 403, code: "DIAGNOSTIC_NO_ACCESS", message: "Inspection request could not be completed",
+      timestamp: "2026-10-21T12:00:00.000Z", requestId: "unknown" });
+    expect(response.text).not.toContain(p.released.id);
+    for (const secret of [proofId, p.ia.observationHash, p.ib.observationHash, p.pa, p.pb, p.body.rationale]) expect(response.text).not.toContain(secret);
+    expect(await consumptionState(p, proofId)).toEqual(before);
+    return response;
+  }
+
+  it("lets a B-only linking technician consume a real proof without A assignment or A material access", async () => {
+    const evidenceId = randomUUID();
+    try {
+    const { p } = await consumptionMaterial(evidenceId);
+    await assignment(p.a, "technician", false, "diagnostics.technician");
+    const proofId = await ordinaryProof(p);
+    await refused(p, () => get("technician", comparisonPath(p.b, p.released.id)));
+    await refused(p, () => get("technician", `${issuancePath(p)}/${proofId}`));
+    await refused(p, () => get("technician", evidencePath(p.a)));
+    for (const suffix of ["", `/evidence/${evidenceId}`, "/documents", "/documents/en"]) {
+      await get("technician", `reports/${p.released.id}${suffix}`).expect(403);
+    }
+    const before = await consumptionState(p, proofId);
+    const input = reinspectionInput(p, proofId);
+    const consumed = await post("technician", `orders/${p.b.id}/reinspections`, input);
+    expect(consumed.status).toBe(201);
+    privateNoStore(consumed);
+    expect(consumed.body).toMatchObject({ id: input.reportId, orderId: p.b.id, status: "draft", successorOf: p.released.id, findings: [] });
+    const after = await consumptionState(p, proofId);
+    expect(after.proof.consumedReportId).toBe(input.reportId);
+    expect(after.proof.consumedAt).toEqual(new Date("2026-10-21T12:00:00.000Z"));
+    expect(after.audits.filter(row => !before.audits.some(prior => prior.id === row.id)).map(row => row.action).sort())
+      .toEqual(["CONTINUITY_PROOF_CONSUMED", "REPORT_REINSPECTION_CREATED"]);
+    expect(after.reports.find(row => row.id === input.reportId)).toMatchObject({ predecessorId: p.released.id, reinspection: true, status: "draft" });
+    expect((await get("technician", `reports/${input.reportId}/documents`).expect(200)).body).toEqual([]);
+    expect(await db.diagnosticEvidence.count({ where: { reportId: input.reportId } })).toBe(0);
+    const freshId = randomUUID();
+    const finding = { id: randomUUID(), checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: [freshId], kind: null, source: null, measurement: null, location: null };
+    try {
+      await request.put(`/api/v1/diagnostics/reports/${input.reportId}/evidence/${freshId}?findingId=${finding.id}&expectedVersion=0`)
+        .set(headers("technician")).set("content-type", "application/octet-stream").set("x-evidence-type", "image/png")
+        .send(Buffer.from(blue.input, "base64")).expect(200);
+      await post("technician", `reports/${input.reportId}/findings`, { expectedVersion: 0, finding }).expect(201);
+      expect((await get("technician", `reports/${input.reportId}`).expect(200)).body.findings).toEqual([finding]);
+    } finally {
+      try { await objects.send(new DeleteObjectCommand({ Bucket: "diagnostic-test-private", Key: `diagnostic-evidence/${freshId}/${blue.sha256}` })); }
+      finally { await db.diagnosticEvidence.deleteMany({ where: { id: freshId } }); }
+    }
+    } finally {
+      try { await objects.send(new DeleteObjectCommand({ Bucket: "diagnostic-test-private", Key: `diagnostic-evidence/${evidenceId}/${red.sha256}` })); }
+      finally { await db.diagnosticEvidence.deleteMany({ where: { id: evidenceId } }); }
+    }
+  });
+
+  const issuerConsumptionLosses = ["revoked grant", "revoked A assignment", "revoked B assignment", "expired qualification", "expired session", "suspended issuer", "deleting issuer"] as const;
+  it.each(issuerConsumptionLosses)("denies consumption with the same JWT after issuer %s", async loss => {
+    const p = await pair();
+    const proofId = await ordinaryProof(p);
+    const sameJwt = headers("technician");
+    if (loss === "revoked grant") await grant("reviewer", false).expect(204);
+    if (loss === "revoked A assignment") await assignment(p.a, "reviewer", false);
+    if (loss === "revoked B assignment") await assignment(p.b, "reviewer", false);
+    if (loss === "expired qualification") await db.diagnosticCenterAssignment.updateMany({ where: { centerId, userId: suite.id("reviewer"), capability: "diagnostics.reviewer" }, data: { qualifiedUntil: initialTime } });
+    if (loss === "expired session") await db.session.update({ where: { id: suite.id("reviewer-session") }, data: { expiresAt: initialTime } });
+    if (loss === "suspended issuer") await db.user.update({ where: { id: suite.id("reviewer") }, data: { suspendedAt: initialTime } });
+    if (loss === "deleting issuer") await request.delete("/api/v1/me").set(headers("reviewer")).expect(204, "");
+    const input = reinspectionInput(p, proofId);
+    const real = await consumeDenied(p, proofId, input, sameJwt);
+    expect((await consumeDenied(p, proofId, { ...input, proofId: randomUUID() }, sameJwt)).body).toEqual(real.body);
+    expect((await consumeDenied(p, proofId, { ...input, predecessorId: randomUUID() }, sameJwt)).body).toEqual(real.body);
+  });
+
+  const technicianConsumptionLosses = ["revoked B assignment", "revoked technician grant", "expired technician qualification", "expired technician session", "suspended technician", "deleting technician"] as const;
+  it.each(technicianConsumptionLosses)("denies consumption after linking technician %s", async loss => {
+    const p = await pair();
+    const proofId = await ordinaryProof(p);
+    const sameJwt = headers("technician");
+    if (loss === "revoked B assignment") await assignment(p.b, "technician", false, "diagnostics.technician");
+    if (loss === "revoked technician grant") await request.post("/api/v1/staff/grants").set(headers("founder"))
+      .send({ targetUserId: suite.id("technician"), capability: "diagnostics.technician", reason: "Synthetic consumption revocation coverage", grant: false }).expect(204);
+    if (loss === "expired technician qualification") await db.diagnosticCenterAssignment.updateMany({ where: { centerId, userId: suite.id("technician"), capability: "diagnostics.technician" }, data: { qualifiedUntil: initialTime } });
+    if (loss === "expired technician session") await db.session.update({ where: { id: suite.id("technician-session") }, data: { expiresAt: initialTime } });
+    if (loss === "suspended technician") await db.user.update({ where: { id: suite.id("technician") }, data: { suspendedAt: initialTime } });
+    if (loss === "deleting technician") await request.delete("/api/v1/me").set(sameJwt).expect(204, "");
+    const input = reinspectionInput(p, proofId);
+    const real = await consumeDenied(p, proofId, input, sameJwt);
+    expect((await consumeDenied(p, proofId, { ...input, proofId: randomUUID() }, sameJwt)).body).toEqual(real.body);
+    expect((await consumeDenied(p, proofId, { ...input, predecessorId: randomUUID() }, sameJwt)).body).toEqual(real.body);
+    if (loss === "expired technician session") {
+      const proofBeforeRestore = await consumptionState(p, proofId);
+      await db.session.update({ where: { id: suite.id("technician-session") }, data: { expiresAt: future } });
+      expect(await consumptionState(p, proofId)).toEqual(proofBeforeRestore);
+      const retry = await request.post(`/api/v1/diagnostics/orders/${p.b.id}/reinspections`).set(sameJwt).send(input);
+      expect(retry.status).toBe(201);
+      expect(retry.body.id).toBe(input.reportId);
+    }
+  });
+
+  it.each(["A", "B"] as const)("keeps a proof permanently invalid after reviewer %s assignment restoration", async side => {
+    const p = await pair();
+    const proofId = await ordinaryProof(p);
+    const target = side === "A" ? p.a : p.b;
+    await assignment(target, "reviewer", false);
+    const invalidatedAt = (await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId }, select: { invalidatedAt: true } })).invalidatedAt;
+    expect(invalidatedAt).toEqual(expect.any(Date));
+    await assignment(target, "reviewer", true);
+    p.body.expectedOrderVersion = p.b.version;
+    const restored = await get("reviewer", `${issuancePath(p)}/${proofId}`).expect(200);
+    privateNoStore(restored);
+    await consumeDenied(p, proofId, reinspectionInput(p, proofId));
+    expect((await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId }, select: { invalidatedAt: true } })).invalidatedAt)
+      .toEqual(invalidatedAt);
+  });
+
 });
