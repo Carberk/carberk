@@ -1187,4 +1187,119 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
     expect((await post("technician", `orders/${p.b.id}/reinspections`, input).expect(201)).body).toMatchObject({ id: input.reportId, successorOf: p.released.id, findings: [] });
   });
 
+  // Private consumed-link lifecycle slice. Original 96 cases/helpers/hooks remain byte-identical.
+  const lifecycleExpiry = "2026-10-21T12:05:00.000Z";
+  async function atLifecycleTime<T>(instant: string, run: () => Promise<T>): Promise<T> {
+    // Replace only the already injected test fakes. Keep the original const now untouched.
+    const diagnostic = app.get<{ now(): Date }>(DIAGNOSTIC_RUNTIME);
+    const identity = app.get<{ now(): Date }>(IDENTITY_CLOCK_PORT);
+    const diagnosticNow = diagnostic.now; const identityNow = identity.now;
+    const previousDate = new Date();
+    try {
+      diagnostic.now = () => new Date(instant); identity.now = () => new Date(instant);
+      vi.setSystemTime(new Date(instant));
+      return await run();
+    } finally {
+      diagnostic.now = diagnosticNow; identity.now = identityNow; vi.setSystemTime(previousDate);
+    }
+  }
+  async function lifecyclePair(): Promise<Pair> {
+    const a = await visit(original, "short declared rights A");
+    const [ia] = await history(a); const pa = randomUUID();
+    const declared = { ...rights, schedule: { ...rights.schedule, until: lifecycleExpiry } };
+    await verified(a, pa, red, declared);
+    // append() deliberately asserts the original global rights. This bounded capture uses
+    // the same ordinary endpoint, with the exact separately declared A classification.
+    const input = { ...capture(a, ia!, pa), rights: declared };
+    const captured = await post("technician", evidencePath(a), input).expect(201);
+    privateNoStore(captured);
+    expect(captured.body).toEqual({ id: input.id, orderId: a.id, orderVersion: 7, identityRecordId: ia!.id,
+      observationHash: ia!.observationHash, observation: original, identifiers: input.identifiers,
+      provenance: [metadata(pa)], rights: declared, correction: null, recordHash: expect.stringMatching(hash),
+      recordedBy: suite.id("technician"), recordedAt: "2026-10-21T12:00:00.000Z" });
+    a.version = 7; expect(await version(a)).toBe(7);
+    const released = await release(a);
+    const b = await visit(successorObservation, "later declared rights B");
+    const [ib] = await history(b); const pb = randomUUID();
+    await verified(b, pb, blue); await append(b, ib!, capture(b, ib!, pb), blue);
+    const comparison = await get("reviewer", comparisonPath(b, released.id)).expect(200);
+    expect(comparison.body.predecessor.identityRecordId).toBe(ia!.id);
+    expect(comparison.body.candidate.identityRecordId).toBe(ib!.id);
+    await comparativeBytes(b, released.id, pa, red); await comparativeBytes(b, released.id, pb, blue);
+    return { a, b, commissionerA: "buyer", commissionerB: "buyer", released, ia: ia!, ib: ib!, pa, pb, body: {
+      predecessorId: released.id, expectedPredecessorVersion: 3, expectedOrderVersion: b.version,
+      predecessorIdentityRecordId: ia!.id, candidateIdentityRecordId: ib!.id,
+      linkingTechnicianId: suite.id("technician"), method: "comparative_attestation",
+      rationale: "Same stamped chassis; independently observed on both visits", provenanceRecordIds: [pa, pb],
+    } };
+  }
+
+  it.each(["2026-10-21T12:04:59.999Z", lifecycleExpiry])("honors A's exact ordinary declared rights boundary at %s for an unused proof", async instant => {
+    const p = await lifecyclePair(); const proofId = await ordinaryProof(p);
+    expect((await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).rightsUntil).toEqual(new Date(lifecycleExpiry));
+    for (const order of [p.a, p.b]) {
+      const expected = order.id === p.a.id ? lifecycleExpiry : "2026-12-01T00:00:00.000Z";
+      expect((await db.diagnosticIdentityEvidence.findFirstOrThrow({ where: { orderId: order.id } })).rightsUntil).toEqual(new Date(expected));
+      expect((await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: order.id === p.a.id ? p.pa : p.pb } })).rightsUntil).toEqual(new Date(expected));
+    }
+    const input = reinspectionInput(p, proofId); const sameJwt = headers("technician");
+    const before = await consumptionState(p, proofId);
+    await atLifecycleTime(instant, async () => {
+      const send = (body: object) => request.post(`/api/v1/diagnostics/orders/${p.b.id}/reinspections`).set(sameJwt).send(body);
+      const response = await send(input); privateNoStore(response);
+      if (instant === lifecycleExpiry) {
+        expect(response.status).toBe(403);
+        expect(response.body).toEqual({ statusCode: 403, code: "DIAGNOSTIC_NO_ACCESS", message: "Inspection request could not be completed",
+          timestamp: lifecycleExpiry, requestId: "unknown" });
+        for (const body of [{ ...input, proofId: randomUUID() }, { ...input, predecessorId: randomUUID() }]) {
+          const unknown = await send(body); expect(unknown.status).toBe(403); privateNoStore(unknown); expect(unknown.body).toEqual(response.body);
+        }
+        expect(await consumptionState(p, proofId)).toEqual(before);
+      } else {
+        expect(response.status).toBe(201);
+        expect(response.body).toMatchObject({ id: input.reportId, orderId: p.b.id, successorOf: p.released.id, status: "draft", findings: [] });
+        const after = await consumptionState(p, proofId);
+        expect(after.proof).toMatchObject({ consumedReportId: input.reportId, consumedAt: new Date(instant) });
+        expect(after.audits.filter(row => !before.audits.some(prior => prior.id === row.id)).map(row => row.action).sort())
+          .toEqual(["CONTINUITY_PROOF_CONSUMED", "REPORT_REINSPECTION_CREATED"]);
+      }
+    });
+    expect(new Date()).toEqual(initialTime);
+    expect(app.get<{ now(): Date }>(DIAGNOSTIC_RUNTIME).now()).toEqual(initialTime);
+    expect(app.get<{ now(): Date }>(IDENTITY_CLOCK_PORT).now()).toEqual(initialTime);
+  });
+
+  it("preserves B's consumed retry and own finding after A assignments end while restricted reads follow current authority", async () => {
+    const p = await pair(); const proofId = await ordinaryProof(p); const otherProofId = await ordinaryProof(p);
+    const input = reinspectionInput(p, proofId); const sameJwt = headers("technician");
+    const send = (body: object) => request.post(`/api/v1/diagnostics/orders/${p.b.id}/reinspections`).set(sameJwt).send(body);
+    const first = await send(input).expect(201); privateNoStore(first);
+    await assignment(p.a, "reviewer", false);
+    await assignment(p.a, "technician", false, "diagnostics.technician");
+    for (const who of ["reviewer", "technician"] as const) {
+      for (const path of [`${issuancePath(p)}/${proofId}`, comparisonPath(p.b, p.released.id), evidencePath(p.a),
+        provenancePath(p.a, p.pa), `orders/${p.b.id}/reinspection-comparison/provenance/${p.pa}?predecessorId=${p.released.id}`,
+        `reports/${p.released.id}`, `reports/${p.released.id}/documents`, `reports/${p.released.id}/documents/en`]) {
+        await refused(p, () => get(who, path));
+      }
+    }
+    const beforeRetry = await consumptionState(p, proofId);
+    const retried = await send(input).expect(201); privateNoStore(retried); expect(retried.body).toEqual(first.body);
+    expect(await consumptionState(p, proofId)).toEqual(beforeRetry);
+    const finding = { id: randomUUID(), checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: [], kind: null, source: null, measurement: null, location: null };
+    await post("technician", `reports/${input.reportId}/findings`, { expectedVersion: 0, finding }).expect(201);
+    const current = await get("technician", `reports/${input.reportId}`).expect(200);
+    expect(current.body).toMatchObject({ version: 1, findings: [finding], successorOf: p.released.id });
+    const afterWrite = await consumptionState(p, proofId);
+    expect((await send(input).expect(201)).body).toEqual(current.body);
+    for (const changed of [{ ...input, proofId: otherProofId }, { ...input, reason: "Changed lifecycle reason" },
+      { ...input, expectedOrderVersion: input.expectedOrderVersion + 1 }]) {
+      const response = await send(changed).expect(409); privateNoStore(response);
+      expect(response.body.code).toBe("DIAGNOSTIC_REINSPECTION_CONFLICT");
+      expect(await consumptionState(p, proofId)).toEqual(afterWrite);
+    }
+    expect((await send(input).expect(201)).body).toEqual(current.body);
+    expect(await consumptionState(p, proofId)).toEqual(afterWrite);
+  });
+
 });
