@@ -1387,8 +1387,12 @@ describe("public continuity across different sellers and Listings", { concurrent
         // Soft assertions still fail the case, while allowing hosted RED to reach
         // newly generated PDFs even if this historical download also exposes A.
         if (issuedExposesPredecessor) {
-          expect.soft(raced.status, "Post-I/O gate must withhold stale lineage bytes").not.toBe(200);
-          expect.soft(raced.headers["content-type"]).not.toContain("application/pdf");
+          if (raced.status === 200) {
+            const text = await diagnosticPdfText(Buffer.from(raced.body));
+            expect(text).toContain(input.reportId);
+            expect.soft(text, "Post-I/O gate must not deliver erased predecessor content").not.toContain(released.id);
+            expect.soft(Buffer.from(raced.body)).not.toEqual(issuedBytes);
+          } else expect.soft(raced.headers["content-type"]).not.toContain("application/pdf");
         } else if (raced.status === 200) expect(await diagnosticPdfText(Buffer.from(raced.body))).not.toContain(released.id);
       } finally { paused.mockRestore(); }
     } else await purge();
@@ -1450,12 +1454,26 @@ describe("public continuity across different sellers and Listings", { concurrent
     if (issuedBytes && issuedArtifact) {
       expect(await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: issuedArtifact.id } })).toEqual(issuedArtifact);
       expect(Buffer.from(await storage.read(issuedArtifact.objectKey, issuedArtifact.sizeBytes!, issuedArtifact.sha256!))).toEqual(issuedBytes);
-      // Already-issued bytes remain immutable. Current public access must not
-      // return a historical copy that still contains the erased predecessor id.
+      // The route selects the current artifact, not the historical artifact id.
+      // It may serve a safe replacement while the issued bytes remain immutable.
       if (issuedExposesPredecessor) {
-        const historical = await publicGet(`reports/${input.reportId}/documents/en`);
-        expect.soft(historical.status, "Historical immutable A-bearing bytes must be withheld").not.toBe(200);
-        expect.soft(readyDocuments.body.find((row: { locale: string }) => row.locale === "en")?.state).not.toBe("ready");
+        const current = await publicGet(`reports/${input.reportId}/documents/en`);
+        const descriptor = readyDocuments.body.find((row: { locale: string }) => row.locale === "en");
+        if (current.status === 200) {
+          privateNoStore(current);
+          expect(current.headers["content-type"]).toContain("application/pdf");
+          const text = await diagnosticPdfText(Buffer.from(current.body));
+          for (const own of [input.reportId, finding!.id, templateId, "2026-10-21T11:00:00.000Z", "124100 km"]) expect(text).toContain(own);
+          for (const secret of [released.id, released.findings[0].id, pa, ea.id, proofId, red.sha256, key(pa, red), ia!.observationHash, ea.recordHash]) {
+            expect.soft(text, "Current EN PDF must not disclose erased A material").not.toContain(secret);
+          }
+          expect.soft(descriptor).toMatchObject({ state: "ready" });
+          expect.soft(descriptor?.id, "Safe replacement has its own artifact identity").not.toBe(issuedArtifact.id);
+          expect.soft(Buffer.from(current.body)).not.toEqual(issuedBytes);
+        } else {
+          expect.soft(current.headers["content-type"]).not.toContain("application/pdf");
+          expect.soft(descriptor?.state).not.toBe("ready");
+        }
       }
     }
     expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: input.reportId } })).toEqual(releasedB);
