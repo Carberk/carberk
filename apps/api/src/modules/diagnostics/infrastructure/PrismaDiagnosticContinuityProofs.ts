@@ -80,6 +80,9 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
   /** Raw history is inspected under the same order locks as comparison. A restored VIN
    * cannot hide a prior different vehicle; visit date/mileage changes do not change identity. */
   private async comparisonRights(tx: Tx, pair: Pair, method: D.DiagnosticContinuityProof["method"], provenance: { rightsUntil: Date }[], now: Date) {
+    const identities = [pair.comparison.predecessor.identity, pair.comparison.candidate.identity];
+    const manualCorrection = method === "comparative_attestation" && identities.every(identity => identity.observation.method === "manual") &&
+      identities.some(identity => identity.evidence?.correction || identity.corrections.length || identity.correctionHeadHash);
     const side = async (order: Order, identity: D.DiagnosticComparisonIdentity) => {
       if (!identity.evidence) throw denied();
       const orderId = order.id;
@@ -101,7 +104,15 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
           history.push(observation.data);
         }
       }
-      return { method: identity.observation.method, vin: identity.observation.vin, history, evidenceRecordCount,
+      // identity() returns the pin's explicit component, not every root on the order.
+      // A supported correction must not conceal simultaneous disconnected claims.
+      const graph = manualCorrection ? {
+        pin: { id: identity.evidence.id, recordHash: identity.evidence.recordHash,
+          identityRecordId: identity.evidence.identityRecordId, observationHash: identity.evidence.observationHash },
+        records: chain,
+      } : undefined;
+      if (manualCorrection) evidenceRecordCount = await tx.diagnosticIdentityEvidence.count({ where: { orderId } });
+      return { method: identity.observation.method, vin: identity.observation.vin, history, evidenceRecordCount, graph,
         corrected: !!identity.evidence.correction || !!identity.corrections.length || !!identity.correctionHeadHash,
         identifiers: chain.flatMap(record => record.identifiers), rightsUntil: chain.map(record => record.rights.schedule.until) };
     };
