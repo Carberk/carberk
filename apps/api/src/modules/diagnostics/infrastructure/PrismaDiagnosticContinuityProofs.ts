@@ -85,6 +85,9 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
     const vinPair = method === "comparative_attestation" && identities.every(identity => identity.observation.method === "vin");
     const manualCorrection = method === "comparative_attestation" && identities.every(identity => identity.observation.method === "manual") &&
       identities.some(identity => identity.evidence?.correction || identity.corrections.length || identity.correctionHeadHash);
+    const correctedMixed = method === "comparative_attestation" && pair.comparison.predecessor.identity.observation.method !== pair.comparison.candidate.identity.observation.method &&
+      identities.some(identity => identity.evidence?.correction || identity.corrections.length || identity.correctionHeadHash);
+    const completeRaw = vinPair || correctedMixed;
     const side = async (order: Order, identity: D.DiagnosticComparisonIdentity) => {
       if (!identity.evidence) throw denied();
       const orderId = order.id;
@@ -92,7 +95,7 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
       const history = [];
       const rawRecords = [];
       let evidenceRecordCount = 0;
-      if (method === "automatic_normalized_vin" || vinPair) {
+      if (method === "automatic_normalized_vin" || completeRaw) {
         if (method === "automatic_normalized_vin") {
           // Automatic admission requires exactly one unchanged root.
           const roots = await tx.diagnosticIdentityEvidence.findMany({ where: { orderId }, select: { id: true } });
@@ -112,12 +115,12 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
       // identity() returns the pin's explicit component, not every root on the order.
       // A supported correction must not conceal simultaneous disconnected claims.
       const currentObservation = history[0];
-      const graph = manualCorrection || vinPair ? {
+      const graph = manualCorrection || completeRaw ? {
         pin: { id: identity.evidence.id, recordHash: identity.evidence.recordHash,
           identityRecordId: identity.evidence.identityRecordId, observationHash: identity.evidence.observationHash },
-        records: chain, ...(vinPair ? { rawRecords, currentObservation } : {}),
+        records: chain, ...(completeRaw ? { rawRecords, currentObservation } : {}),
       } : undefined;
-      if (manualCorrection || vinPair) evidenceRecordCount = await tx.diagnosticIdentityEvidence.count({ where: { orderId } });
+      if (manualCorrection || completeRaw) evidenceRecordCount = await tx.diagnosticIdentityEvidence.count({ where: { orderId } });
       return { method: identity.observation.method, vin: identity.observation.vin, history, evidenceRecordCount, graph,
         corrected: !!identity.evidence.correction || !!identity.corrections.length || !!identity.correctionHeadHash,
         identifiers: chain.flatMap(record => record.identifiers), rightsUntil: chain.map(record => record.rights.schedule.until) };

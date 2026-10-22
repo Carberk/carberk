@@ -13,7 +13,7 @@ export interface AttestationIdentity {
   graph?: {
     pin: Pick<D.DiagnosticIdentityEvidence, "id" | "recordHash" | "identityRecordId" | "observationHash">;
     records: D.DiagnosticIdentityEvidence[];
-    /** VIN comparison also accounts for all retained raw observations and current intake.
+    /** VIN/VIN and corrected mixed comparison account for all retained raw observations and current intake.
      * Record observations come from their bound immutable raw rows, not the report pin. */
     rawRecords?: { id: string; observationHash: string; observation: D.DiagnosticComparisonIdentity["observation"] }[];
     currentObservation?: D.DiagnosticComparisonIdentity["observation"] | undefined;
@@ -24,11 +24,10 @@ export interface AttestationIdentity {
 export function privateContinuityAttestation(a: AttestationIdentity, b: AttestationIdentity, provenanceRights: string[], now: Date, method: "comparative_attestation" | "automatic_normalized_vin" = "comparative_attestation"): Date {
   const denied = () => { throw new DiagnosticRuleError("DIAGNOSTIC_NO_ACCESS"); };
   const vinPair = a.method === "vin" && b.method === "vin";
-  // Resolve complete explicit components for same-method comparative identity.
-  // Mixed corrections remain outside this bounded admission.
-  if (method === "comparative_attestation" && a.method !== b.method && (a.corrected || b.corrected)) denied();
-  if (method === "comparative_attestation" && a.method === b.method &&
-    (vinPair || a.corrected || b.corrected || a.graph || b.graph)) {
+  const correctedMixed = a.method !== b.method && !!(a.corrected || b.corrected);
+  // Corrections resolve complete components without changing either visit's method.
+  if (method === "comparative_attestation" &&
+    (correctedMixed || (a.method === b.method && (vinPair || a.corrected || b.corrected || a.graph || b.graph)))) {
     const current = (side: AttestationIdentity): AttestationIdentity => {
       const graph = side.graph;
       if (!graph || !graph.records.length) throw new DiagnosticRuleError("DIAGNOSTIC_NO_ACCESS");
@@ -65,6 +64,27 @@ export function privateContinuityAttestation(a: AttestationIdentity, b: Attestat
         leaf = record;
       }
       if (visited.size !== records.length || !leaf) throw new DiagnosticRuleError("DIAGNOSTIC_NO_ACCESS");
+      if (correctedMixed) {
+        const raw = graph.rawRecords;
+        const current = graph.currentObservation;
+        const sameObservation = (left: D.DiagnosticComparisonIdentity["observation"], right: D.DiagnosticComparisonIdentity["observation"]) =>
+          left.method === right.method && left.vin === right.vin && left.manualReference === right.manualReference &&
+          left.observedAt === right.observedAt && left.mileageKm === right.mileageKm;
+        if (!raw?.length || !current || !sameObservation(current, leaf.observation)) denied();
+        for (const record of records) {
+          if (!record.identityRecordId || !record.observationHash || !raw?.some(item =>
+            item.id === record.identityRecordId && item.observationHash === record.observationHash &&
+            sameObservation(item.observation, record.observation))) denied();
+          if (side.method === "vin") {
+            const vin = record.observation.vin?.trim().toUpperCase();
+            if (!vin || !record.identifiers.some(item => item.kind === "vin_stamp") ||
+              record.identifiers.some(item => item.kind === "vin_stamp" && item.value.trim().toUpperCase() !== vin)) denied();
+          }
+        }
+        // Multiple evidence records can bind one raw row; every raw row still needs support.
+        if (raw?.some(item => !records.some(record => record.identityRecordId === item.id &&
+          record.observationHash === item.observationHash && sameObservation(record.observation, item.observation)))) denied();
+      }
       if (vinPair) {
         const raw = graph.rawRecords;
         const current = graph.currentObservation;
