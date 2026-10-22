@@ -94,7 +94,19 @@ describe("private supported VIN recording correction", () => {
       { ...ec, provenance: em.provenance, identifiers: ec.identifiers.map(item => ({ ...item, provenanceIds: [em.provenance[0]!.id] })) },
       { ...ec, identifiers: ec.identifiers.map(item => ({ ...item, provenanceIds: ["missing"] })) }]) refused(side([ea, em, changed]));
   });
+  it("retains original and descendant rights when both visits have explicit corrections", () => {
+    const oldB = record("old-b", "b", 5, "SYN-VIN-04I");
+    const newB = { ...eb, correction: { supersedesId: oldB.id, explanation: "New independent physical support" } };
+    expect(compare(side(), side([newB, oldB], oldB, eb.observation)).toISOString()).toBe("2026-12-01T00:00:00.000Z");
+    for (const expired of [oldB.id, newB.id]) {
+      const records = [oldB, newB].map(item => item.id === expired ? { ...item, rights: { ...rights, schedule: { ...rights.schedule, until: now.toISOString() } } } : item);
+      refused(side(), side(records, records[0]!, eb.observation));
+    }
+  });
   it("keeps corrected data outside automatic and mixed comparative admission", () => {
+    const correctedPin = { ...side([ea, em, ec], ec), history: [{ method: "vin" as const, vin: "SYN-VIN-041" }] };
+    expect(() => privateContinuityAttestation(correctedPin, { ...b, history: correctedPin.history }, [until], now, "automatic_normalized_vin"))
+      .toThrowError(expect.objectContaining({ code: "DIAGNOSTIC_NO_ACCESS" }));
     expect(() => privateContinuityAttestation(side(), b, [until], now, "automatic_normalized_vin"))
       .toThrowError(expect.objectContaining({ code: "DIAGNOSTIC_NO_ACCESS" }));
     refused(side(), { ...b, method: "manual", vin: null });
