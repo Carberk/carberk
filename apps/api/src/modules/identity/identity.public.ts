@@ -47,3 +47,5 @@ export {
 } from "./domain/ports/AdminSessionElevationPort";
 
 export { STAFF_BINDING_PORT, type StaffBindingPort, type StaffBinding, type StaffBindingSubject } from "./domain/ports/StaffBindingPort";
+
+export { PUBLISHER_BINDING_PORT, type PublisherBindingPort, type PublisherBinding, type PublisherParticipants } from "./domain/ports/PublisherBindingPort";

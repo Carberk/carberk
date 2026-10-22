@@ -1,3 +1,5 @@
+import { PUBLISHER_BINDING_PORT } from "./domain/ports/PublisherBindingPort";
+import { PrismaPublisherBindings } from "./infrastructure/PrismaPublisherBindings";
 import { STAFF_BINDING_PORT } from "./domain/ports/StaffBindingPort";
 import { PrismaStaffBindings } from "./infrastructure/PrismaStaffBindings";
 import { MeasurementModule } from "../measurement/measurement.module";
@@ -110,6 +112,7 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     AccountDeletionController,
   ],
   providers: [
+    { provide: PUBLISHER_BINDING_PORT, useClass: PrismaPublisherBindings },
     { provide: STAFF_BINDING_PORT, useClass: PrismaStaffBindings },
     CheckAdminSessionElevation,
     { provide: ADMIN_SESSION_ELEVATION_PORT, useExisting: CheckAdminSessionElevation },
@@ -276,6 +279,7 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     },
   ],
   exports: [
+    PUBLISHER_BINDING_PORT,
     STAFF_BINDING_PORT,
     BUSINESS_AUTHORITY_PORT,
     STAFF_AUTHORITY_PORT,

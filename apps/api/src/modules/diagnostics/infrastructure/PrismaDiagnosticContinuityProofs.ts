@@ -3,9 +3,11 @@ import { z } from "zod";
 import { Inject, Injectable } from "@nestjs/common";
 import { DiagnosticSchemas as D } from "@auto-tm/contracts";
 import { PrismaService, type Prisma } from "@auto-tm/db";
-import { STAFF_BINDING_PORT, StaffAuthorityDenied, type StaffBinding, type StaffBindingPort } from "../../identity/identity.public";
+import { STAFF_BINDING_PORT, StaffAuthorityDenied, type StaffBinding, type StaffBindingPort, type PublisherParticipants } from "../../identity/identity.public";
 import type { DiagnosticContinuityProofsPort } from "../application/ports/DiagnosticContinuityProofsPort";
 import { DiagnosticRuleError } from "../domain/InspectionOrder";
+import { continuityPair } from "../domain/ContinuityPair";
+import { DiagnosticPublicBindings } from "./DiagnosticPublicBindings";
 import { privateContinuityAttestation } from "../domain/PrivateContinuityAttestation";
 import { DIAGNOSTIC_RUNTIME, type DiagnosticRuntime, type DiagnosticSubject } from "../domain/ports/DiagnosticIntakePort";
 import { DiagnosticAuthority } from "./DiagnosticAuthority";
@@ -19,7 +21,7 @@ type Tx = Prisma.TransactionClient;
 type Order = Prisma.InspectionOrderGetPayload<object>;
 type Pair = Awaited<ReturnType<PrismaDiagnosticReports["compared"]>>;
 
-/** Private issuance and consumption transactions. Neither issuance nor a read creates a report or successor. */
+/** Pair-bound private/public issuance and consumption transactions. Neither issuance nor a read creates a report or successor. */
 @Injectable()
 export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityProofsPort {
   constructor(@Inject(PrismaService) private readonly db: PrismaService,
@@ -27,6 +29,7 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
     @Inject(STAFF_BINDING_PORT) private readonly staff: StaffBindingPort,
     @Inject(PrismaDiagnosticReports) private readonly reports: PrismaDiagnosticReports,
     @Inject(PrismaDiagnosticIdentityEvidence) private readonly evidence: PrismaDiagnosticIdentityEvidence,
+    @Inject(DiagnosticPublicBindings) private readonly publicBindings: DiagnosticPublicBindings,
     @Inject(DIAGNOSTIC_RUNTIME) private readonly runtime: DiagnosticRuntime) {}
 
   /** Under the order locks: the issuer/technician pair's current assignments and qualifications,
@@ -46,7 +49,7 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
   }
   /** Bound evidence/provenance and the visit, authority and staffing digests. Issuance stores
    * these; consumption requires them unchanged. */
-  private async facts(tx: Tx, pair: Pair, staffing: Awaited<ReturnType<PrismaDiagnosticContinuityProofs["staffing"]>>, provenanceRecordIds: string[], authority: StaffBinding[]) {
+  private async facts(tx: Tx, pair: Pair, staffing: Awaited<ReturnType<PrismaDiagnosticContinuityProofs["staffing"]>>, provenanceRecordIds: string[], authority: StaffBinding[], locked: PublisherParticipants) {
     const { order: b, priorOrder: ao, comparison } = pair;
     const sides = [comparison.predecessor, comparison.candidate];
     const records = sides.flatMap(side => {
@@ -57,11 +60,13 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
     if (pair.provenance.size !== provenanceRecordIds.length || provenanceRecordIds.some(id => !pair.provenance.has(id))) throw denied();
     const provenance = await tx.diagnosticIdentityProvenance.findMany({ where: { id: { in: provenanceRecordIds } }, orderBy: { id: "asc" } });
     if (provenance.length !== provenanceRecordIds.length) throw denied();
-    const visit = (order: Order) => ({ id: order.id, centerId: order.centerId, audience: order.audience, commissionerId: order.commissionerId,
-      // Private proof has no public Listing authority, even if intake happens to name one.
-      listingBinding: null, version: order.version, epoch: order.epoch, evidenceGeneration: order.identityEvidenceGeneration,
+    const predecessorListing = await this.publicBindings.listing(tx, ao);
+    const candidatePublic = await this.publicBindings.candidate(tx, b, locked);
+    const visit = (order: Order, listingBinding: unknown) => ({ id: order.id, centerId: order.centerId, audience: order.audience, commissionerId: order.commissionerId,
+      listingBinding, ...(order.audience === "listing_public" ? { publicationAuthorization: order.publicationAuthorization, publicationAuthorizationHash: hash(order.publicationAuthorization),
+        associationValidatedAt: order.associationValidatedAt?.toISOString() ?? null, listingIdentityDigest: order.listingIdentityDigest } : {}), version: order.version, epoch: order.epoch, evidenceGeneration: order.identityEvidenceGeneration,
       physicalAuthorizationHash: hash(order.physicalAuthorization), observationHash: hash(order.observedVehicle) });
-    const bindings = { predecessor: visit(ao), candidate: visit(b), authority,
+    const bindings = { predecessor: visit(ao, predecessorListing), candidate: visit(b, candidatePublic && { ...candidatePublic.listing, publisher: candidatePublic.publisher }), authority,
       evidencePins: sides.map(item => ({ orderId: item.identity.evidence?.orderId, id: item.identity.evidence?.id, hash: item.identity.evidence?.recordHash })),
       assignmentsHash: hash(staffing.assignments), qualificationsHash: hash(staffing.qualifications),
       evidence: records.map(record => ({ id: record.id, recordHash: record.recordHash, identityRecordId: record.identityRecordId,
@@ -69,10 +74,10 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
       provenance: provenance.map(row => ({ id: row.id, sha256: row.sha256, epoch: row.epoch, rightsHash: hash(row.rights) })) };
     return { provenance, bindings };
   }
-  /** Same-commissioner private visits: retained finalized/withdrawn A, arrived physically authorized B. */
-  private privatePair({ order: b, prior: a, priorOrder: ao }: Pair) {
-    return ao.audience === "buyer_private" && a.audience === "buyer_private" && b.audience === "buyer_private" && !!ao.commissionerId && ao.commissionerId === b.commissionerId &&
-      !!ao.physicalAuthorization && !!b.physicalAuthorization && b.status === "arrived";
+  private pair(pair: Pair, method: D.DiagnosticContinuityProof["method"]) {
+    const visit = (order: Order) => ({ audience: order.audience, commissionerId: order.commissionerId, physicalAuthorized: !!order.physicalAuthorization });
+    continuityPair(visit(pair.priorOrder), visit(pair.order), method);
+    if (pair.prior.audience !== pair.priorOrder.audience || pair.order.status !== "arrived") throw denied();
   }
   private async linked(tx: Tx, { order: b, prior: a }: Pair) {
     return !!(await tx.diagnosticReportRecord.count({ where: { predecessorId: a.id } }) || await tx.diagnosticReportRecord.count({ where: { orderId: b.id } }));
@@ -131,8 +136,9 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
 
   async issue(subject: DiagnosticSubject, orderId: string, input: D.DiagnosticContinuityProofIssuance) {
     return this.db.$transaction(async tx => {
-      // Identity owns sorted participant User/Session locks and the grant binding. Feature
-      // locks follow those locks, matching assignment, revocation and account erasure.
+      // Lock every actor/publisher User before Business and feature locks. The held Users
+      // also serialize subsequent staff Session/grant checks with authority writers.
+      const participants = await this.publicBindings.pairLocks(tx, orderId, input.predecessorId, [subject.userId, input.linkingTechnicianId]);
       let staffBindings;
       try {
         staffBindings = await this.staff.bind([
@@ -148,10 +154,11 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
       if (subject.userId === input.linkingTechnicianId || !this.runtime.syntheticAllowed({ userId: input.linkingTechnicianId, sessionId: "" })) throw denied();
       const t = input.linkingTechnicianId;
       const staffing = await this.staffing(tx, subject.userId, t, pair);
-      if (!this.privatePair(pair) || await this.linked(tx, pair)) throw denied();
+      this.pair(pair, input.method);
+      if (await this.linked(tx, pair)) throw denied();
       if (a.version !== input.expectedPredecessorVersion || b.version !== input.expectedOrderVersion ||
         comparison.predecessor.identityRecordId !== input.predecessorIdentityRecordId || comparison.candidate.identityRecordId !== input.candidateIdentityRecordId) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
-      const { provenance, bindings } = await this.facts(tx, pair, staffing, input.provenanceRecordIds, staffBindings);
+      const { provenance, bindings } = await this.facts(tx, pair, staffing, input.provenanceRecordIds, staffBindings, participants);
       const now = this.runtime.now();
       const rightsUntil = await this.comparisonRights(tx, pair, input.method, provenance, now);
       const proofId = this.runtime.id();
@@ -163,13 +170,13 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
       await tx.diagnosticContinuityProof.create({ data: { id: proofId, predecessorReportId: a.id, predecessorOrderId: ao.id, candidateOrderId: b.id,
         issuerId: subject.userId, issuerSessionId: subject.sessionId, linkingTechnicianId: t, issuedAt: now, rightsUntil, content: json(content), bindings: json(bindings) } });
       // Audit holds no rationale, provenance, personal linkage or identity hashes.
-      await tx.diagnosticAudit.create({ data: { id: this.runtime.id(), centerId: b.centerId, orderId: b.id, actorId: subject.userId,
+      await tx.diagnosticAudit.create({ data: { id: b.audience === "listing_public" ? proofId : this.runtime.id(), centerId: b.centerId, orderId: b.id, actorId: subject.userId,
         action: "CONTINUITY_PROOF_ISSUED", details: {}, createdAt: now } });
       return { proofId };
     });
   }
 
-  /** B's linking technician consumes one unused private continuity proof into B's own empty
+  /** B's linking technician consumes one unused pair-bound continuity proof into B's own empty
    * linked draft, with the proof marked consumed and both audits in one transaction. Every bound
    * fact and the issuer's current Session, qualification and both assignments are rechecked under
    * the issuance lock order. An existing report id is an exact retry: it returns the authorized
@@ -186,7 +193,8 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
       const initial = await tx.diagnosticContinuityProof.findUnique({ where: { id: input.proofId } });
       if (!initial?.issuerId || !initial.issuerSessionId || initial.linkingTechnicianId !== subject.userId) throw denied();
       const issuer = { userId: initial.issuerId, sessionId: initial.issuerSessionId };
-      // Exactly the issuance binding shape: identity locks precede every feature lock.
+      // Lock the whole actor/publisher User union before any Business or feature locks.
+      const participants = await this.publicBindings.pairLocks(tx, orderId, input.predecessorId, [issuer.userId, subject.userId]);
       let staffBindings;
       try {
         staffBindings = await this.staff.bind([
@@ -214,9 +222,11 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
         content.data.issuedBy !== issuer.userId || content.data.linkingTechnicianId !== subject.userId) throw denied();
       if (proof.consumedReportId) throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
       const now = this.runtime.now();
+      // A public successor race is a link conflict after full reviewer and technician authority.
+      if (b.audience === "listing_public" && await tx.diagnosticReportRecord.count({ where: { predecessorId: a.id } })) throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
       // Invalidation is permanent; reverting a source value never revives the proof.
       if (proof.invalidatedAt || proof.rightsUntil <= now) throw denied();
-      if (!this.privatePair(current)) throw denied();
+      this.pair(current, content.data.method);
       // A successor elsewhere is a protected predecessor fact; B's own first report is not.
       if (await tx.diagnosticReportRecord.count({ where: { predecessorId: a.id } })) throw denied();
       if (await tx.diagnosticReportRecord.count({ where: { orderId: b.id } })) throw new DiagnosticRuleError("DIAGNOSTIC_REPORT_EXISTS");
@@ -224,14 +234,14 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
       const bound = content.data;
       if (hash(bound.predecessor) !== hash({ reportId: a.id, reportVersion: a.version, snapshotHash: a.snapshotHash, identityRecordId: comparison.predecessor.identityRecordId, identityRecordHash: comparison.predecessor.identityRecordHash }) ||
         hash(bound.candidate) !== hash({ orderId: b.id, orderVersion: b.version, identityRecordId: comparison.candidate.identityRecordId, identityRecordHash: comparison.candidate.identityRecordHash })) throw denied();
-      const { bindings, provenance } = await this.facts(tx, current, staffing, bound.provenanceRecordIds, staffBindings);
+      const { bindings, provenance } = await this.facts(tx, current, staffing, bound.provenanceRecordIds, staffBindings, participants);
       const rightsUntil = await this.comparisonRights(tx, current, bound.method, provenance, now);
       if (rightsUntil.valueOf() !== proof.rightsUntil.valueOf()) throw denied();
       if (hash(bindings) !== hash(proof.bindings)) throw denied();
       await tx.diagnosticContinuityProof.update({ where: { id: proof.id }, data: { consumedReportId: input.reportId, consumedAt: now } });
       const created = await this.reports.openReinspection(tx, subject, b, a, input, proof.id);
       // Like issuance, the audit holds no rationale, provenance, personal linkage or identity hashes.
-      await tx.diagnosticAudit.create({ data: { id: this.runtime.id(), centerId: b.centerId, orderId: b.id, actorId: subject.userId,
+      await tx.diagnosticAudit.create({ data: { id: b.audience === "listing_public" ? created.id : this.runtime.id(), centerId: b.centerId, orderId: b.id, actorId: subject.userId,
         action: "CONTINUITY_PROOF_CONSUMED", details: { reportId: created.id }, createdAt: now } });
       return created;
     });

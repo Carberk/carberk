@@ -573,7 +573,7 @@ describe("public continuity across different sellers and Listings", { concurrent
     await publicGet(`reports/${reportId}/evidence/${pa}`).expect(404);
     expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: releasedA.id } })).toEqual(storedA);
     expect(await db.diagnosticPdfArtifact.findMany({ where: { reportId: releasedA.id }, orderBy: { id: "asc" } })).toEqual(artifactsA);
-    const findingB = { id: randomUUID(), checkId: "brakes", assessment: "note", explanation: "Independent B physical inspection finding",
+    const findingB = { id: randomUUID(), checkId: "brakes", assessment: "normal", explanation: "Independent B physical inspection finding",
       evidenceIds: [], kind: null, source: null, measurement: null, location: null };
     owned.findings.push(findingB.id);
     await post("technician", `reports/${reportId}/findings`, { expectedVersion: 0, finding: findingB }).expect(201);
@@ -613,4 +613,148 @@ describe("public continuity across different sellers and Listings", { concurrent
     expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: a.id } })).toEqual(orderA);
     expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: b.id } })).toEqual(orderB);
   });
+
+  /** Fresh visits use the original ordinary HTTP setup helpers. P1 above remains byte-for-byte
+   * intact; these cases exercise distinct admission/atomicity/current-authority frontiers. */
+  async function freshPublicPair() {
+    const observation: Observation = { observedAt: "2026-10-20T12:00:00.000Z", mileageKm: 124000, method: "vin", vin: "SYN-VIN-041", manualReference: null };
+    const a = await visit(observation, "A", "sellerA");
+    const [ia] = await history(a); const pa = randomUUID();
+    await verified(a, pa, red); const ea = await capture(a, ia!, pa, red);
+    const released = await release(a);
+    const b = await visit({ ...observation, observedAt: "2026-10-21T11:00:00.000Z", mileageKm: 124100 }, "B", "sellerB");
+    const [ib] = await history(b); const pb = randomUUID();
+    await verified(b, pb, blue, rightsB); const eb = await capture(b, ib!, pb, blue, rightsB);
+    return { a,b,ia: ia!,ib: ib!,pa,pb,ea,eb,released };
+  }
+  async function issuePublic(p: Awaited<ReturnType<typeof freshPublicPair>>, expectedPredecessorVersion = 3) {
+    const response = await post("reviewer", `orders/${p.b.id}/continuity-proofs`, { predecessorId: p.released.id, expectedPredecessorVersion,
+      expectedOrderVersion: p.b.version, predecessorIdentityRecordId: p.ia.id, candidateIdentityRecordId: p.ib.id,
+      linkingTechnicianId: suite.id("technician"), method: "comparative_attestation", rationale: "Independently retained synthetic VIN and chassis material",
+      provenanceRecordIds: [p.pa,p.pb] });
+    if (typeof response.body.proofId === "string") owned.proofs.push(response.body.proofId);
+    expect(response.status, JSON.stringify(response.body)).toBe(201);
+    return response.body.proofId as string;
+  }
+  function publicLink(p: Awaited<ReturnType<typeof freshPublicPair>>, proofId: string) {
+    const reportId = randomUUID(); owned.reports.push(reportId);
+    return { reportId, predecessorId: p.released.id, expectedOrderVersion: p.b.version, proofId, reason: "Fresh independently authorized public visit" };
+  }
+  it("binds actual public identities and refuses missing-proof SQL and non-atomic consumption", async () => {
+    const p = await freshPublicPair(); const proofId = await issuePublic(p); const input = publicLink(p,proofId);
+    const proof = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
+    expect(proof.bindings).toMatchObject({
+      predecessor: { audience: "listing_public", commissionerId: suite.id("sellerA"), listingBinding: { id: suite.id("listing-A"), sellerId: suite.id("sellerA"), businessId: null,
+        identity: { vin: "SYN-VIN-041", brandId: suite.catalog.brandId, modelId: suite.catalog.modelId }, identityDigest: expect.stringMatching(hash) } },
+      candidate: { audience: "listing_public", commissionerId: suite.id("sellerB"), publicationAuthorizationHash: expect.stringMatching(hash),
+        associationValidatedAt: initialTime.toISOString(), listingBinding: { id: suite.id("listing-B"), sellerId: suite.id("sellerB"), businessId: null,
+          publisher: { userId: suite.id("sellerB"), sellerId: suite.id("sellerB"), businessId: null, membershipId: null, generation: expect.stringMatching(hash) } } },
+    });
+    const { proofId: _, ...missing } = input;
+    await denied(await post("technician", `orders/${p.b.id}/reinspections`, missing));
+    const state = { id: input.reportId, orderId: p.b.id, audience: "listing_public", status: "draft", templateVersionId: templateId,
+      observedAt: p.ib.observation.observedAt, mileageKm: p.ib.observation.mileageKm, findings: [], authorId: suite.id("technician"), reviewerId: null,
+      successorOf: p.released.id, correctionReason: input.reason, returnReason: null, finalizedAt: null, withdrawnAt: null, withdrawalReason: null };
+    const data = { id: input.reportId, orderId: p.b.id, audience: "listing_public", templateVersionId: templateId!, predecessorId: p.released.id,
+      reinspection: true, identityRecordId: p.ib.id, identityRecordHash: p.ib.observationHash, identityEvidenceId: p.eb.id, identityEvidenceHash: p.eb.recordHash, state };
+    await expect(db.diagnosticReportRecord.create({ data })).rejects.toThrow(/diagnostic_reinspection_continuity/);
+    // Marking a proof consumed without its report/audits must fail at commit and roll back.
+    await expect(db.$transaction(async tx => {
+      await tx.diagnosticContinuityProof.update({ where: { id: proofId }, data: { consumedReportId: input.reportId, consumedAt: initialTime } });
+    })).rejects.toThrow(/diagnostic_public_continuity_consumption_atomic/);
+    // A proof and report without the consumption/creation audits also roll back together.
+    await expect(db.$transaction(async tx => {
+      await tx.diagnosticContinuityProof.update({ where: { id: proofId }, data: { consumedReportId: input.reportId, consumedAt: initialTime } });
+      await tx.diagnosticReportRecord.create({ data: { ...data, continuityProofId: proofId, reinspectionOrderVersion: p.b.version } });
+    })).rejects.toThrow(/diagnostic_public_continuity_consumption_atomic/);
+    expect(await db.diagnosticReportRecord.findUnique({ where: { id: input.reportId } })).toBeNull();
+    expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).toEqual(proof);
+    await post("technician", `orders/${p.b.id}/reinspections`, input).expect(201);
+  });
+  it("permanently refuses the SAME unused proof after the personal publisher is suspended then restored", async () => {
+    const p = await freshPublicPair(); const proofId = await issuePublic(p); const input = publicLink(p,proofId);
+    try {
+      await db.user.update({ where: { id: suite.id("sellerB") }, data: { suspendedAt: initialTime } });
+      const invalid = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
+      expect(invalid.invalidatedAt).toBeInstanceOf(Date);
+      await db.user.update({ where: { id: suite.id("sellerB") }, data: { suspendedAt: null } });
+      await denied(await post("technician", `orders/${p.b.id}/reinspections`, input));
+      expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).toEqual(invalid);
+      expect(await db.diagnosticReportRecord.findUnique({ where: { id: input.reportId } })).toBeNull();
+      const replacement = await issuePublic(p);
+      expect(replacement).not.toBe(proofId);
+      await post("technician", `orders/${p.b.id}/reinspections`, { ...input, proofId: replacement }).expect(201);
+    } finally { await db.user.update({ where: { id: suite.id("sellerB") }, data: { suspendedAt: null } }); }
+  });
+  it("rechecks B publisher power at independent release while preserving its consumed link and ordinary draft writes", async () => {
+    const p = await freshPublicPair(); const proofId = await issuePublic(p); const input = publicLink(p,proofId);
+    await post("technician", `orders/${p.b.id}/reinspections`, input).expect(201);
+    const consumed = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
+    try {
+      await db.user.update({ where: { id: suite.id("sellerB") }, data: { suspendedAt: initialTime } });
+      const finding = { id: randomUUID(), checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: [], kind: null, source: null, measurement: null, location: null };
+      owned.findings.push(finding.id);
+      await post("technician", `reports/${input.reportId}/findings`, { expectedVersion: 0, finding }).expect(201);
+      await post("technician", `reports/${input.reportId}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
+      await denied(await post("reviewer", `reports/${input.reportId}/transition`, { expectedVersion: 2, action: "finalize" }));
+      expect((await get("reviewer", `reports/${input.reportId}`).expect(200)).body).toMatchObject({ version: 2, status: "submitted", findings: [finding] });
+      expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).toEqual(consumed);
+      await db.user.update({ where: { id: suite.id("sellerB") }, data: { suspendedAt: null } });
+      // A changes after consumption; B publication must never re-run A admission.
+      await post("reviewer", `reports/${p.released.id}/transition`, { expectedVersion: 3, action: "withdraw", reason: "Independent A history" }).expect(201);
+      const finalized = await post("reviewer", `reports/${input.reportId}/transition`, { expectedVersion: 2, action: "finalize" });
+      const pdfs = await db.diagnosticPdfArtifact.findMany({ where: { reportId: input.reportId } });
+      owned.pdfs.push(...pdfs.map(row => row.id));
+      for (const row of pdfs) owned.keys.add(`diagnostic-pdf/${input.reportId}/${row.id}.pdf`);
+      expect(finalized.status, JSON.stringify(finalized.body)).toBe(201);
+      expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).toEqual(consumed);
+    } finally { await db.user.update({ where: { id: suite.id("sellerB") }, data: { suspendedAt: null } }); }
+  });
+  it("admits retained withdrawn A without requiring its historical personal seller to publish B", async () => {
+    const p = await freshPublicPair();
+    await post("reviewer", `reports/${p.released.id}/transition`, { expectedVersion: 3, action: "withdraw", reason: "Retained historical predecessor" }).expect(201);
+    const historical = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: p.released.id } });
+    try {
+      await db.user.update({ where: { id: suite.id("sellerA") }, data: { suspendedAt: initialTime } });
+      const proofId = await issuePublic(p,4); const input = publicLink(p,proofId);
+      await post("technician", `orders/${p.b.id}/reinspections`, input).expect(201);
+      expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: p.released.id } })).toEqual(historical);
+      expect((await get("technician", `reports/${input.reportId}`).expect(200)).body).toMatchObject({ findings: [], orderId: p.b.id, successorOf: p.released.id });
+    } finally { await db.user.update({ where: { id: suite.id("sellerA") }, data: { suspendedAt: null } }); }
+  });
+  it("permanently invalidates the SAME business publisher proof across membership revoke and restore", async () => {
+    const businessId = suite.id("public-transfer-business");
+    const members = [{ id: suite.id("public-transfer-owner"), userId: suite.id("sellerA"), role: "owner" as const },
+      { id: suite.id("public-transfer-sales"), userId: suite.id("sellerB"), role: "sales" as const }];
+    // Other-context prerequisites use real identity/Listing rows, never a publisher Session.
+    await db.dealership.create({ data: { id: businessId, slug: suite.slugFor("public-transfer-business"), name: "Synthetic public transfer business", status: "active", admissionMode: "synthetic" } });
+    try {
+      for (const member of members) await db.dealershipMember.create({ data: { ...member, dealershipId: businessId, status: "active" } });
+      for (const name of ["A","B"]) await db.listing.update({ where: { id: suite.id(`listing-${name}`) }, data: { businessId } });
+      const p = await freshPublicPair(); const proofId = await issuePublic(p); const input = publicLink(p,proofId);
+      const proof = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
+      expect(proof.bindings).toMatchObject({ candidate: { listingBinding: { businessId,
+        publisher: { userId: suite.id("sellerB"), membershipId: members[1]!.id, businessId, generation: expect.stringMatching(hash) } } } });
+      const memberBefore = await db.dealershipMember.findUniqueOrThrow({ where: { id: members[1]!.id } });
+      await db.dealershipMember.update({ where: { id: memberBefore.id }, data: { status: "suspended" } });
+      const invalid = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
+      expect(invalid.invalidatedAt).toBeInstanceOf(Date);
+      await db.dealershipMember.update({ where: { id: memberBefore.id }, data: { status: "active" } });
+      expect(await db.dealershipMember.findUniqueOrThrow({ where: { id: memberBefore.id } })).toEqual(memberBefore);
+      await denied(await post("technician", `orders/${p.b.id}/reinspections`, input));
+      expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).toEqual(invalid);
+      const replacement = await issuePublic(p);
+      await post("technician", `orders/${p.b.id}/reinspections`, { ...input, proofId: replacement }).expect(201);
+    } finally {
+      // Exact registered business fixture only. Unknown descendants refuse cleanup.
+      for (const name of ["A","B"]) await db.listing.update({ where: { id: suite.id(`listing-${name}`) }, data: { businessId: null } });
+      const actual = await db.dealershipMember.findMany({ where: { dealershipId: businessId } });
+      expect(actual.every(row => members.some(member => member.id === row.id && member.userId === row.userId)), "Unknown business member descendant").toBe(true);
+      await db.dealershipMember.deleteMany({ where: { dealershipId: businessId, id: { in: members.map(member => member.id) } } });
+      const business = await db.dealership.findUniqueOrThrow({ where: { id: businessId }, include: { _count: true } });
+      expect(Object.values(business._count).every(count => count === 0), "Unknown business descendant").toBe(true);
+      await db.dealership.delete({ where: { id: businessId } });
+    }
+  });
+
 });
