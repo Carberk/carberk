@@ -1234,7 +1234,7 @@ describe("public continuity across different sellers and Listings", { concurrent
     });
   });
 
-  async function generateDocuments(reportId: string, locales: readonly string[]) {
+  async function generateDocuments(reportId: string, locales: readonly string[], maintain = false) {
     const artifacts = await db.diagnosticPdfArtifact.findMany({ where: { reportId, locale: { in: [...locales] } }, orderBy: { locale: "asc" } });
     expect(artifacts.map(row => row.locale)).toEqual([...locales].sort());
     expect(artifacts.every(row => owned.pdfs.includes(row.id) && owned.keys.has(row.objectKey))).toBe(true);
@@ -1276,13 +1276,43 @@ describe("public continuity across different sellers and Listings", { concurrent
           const [regular, bold] = await Promise.all(['Regular', 'Bold'].map(weight => readFile('./assets/fonts/NotoSans-' + weight + '.ttf')));
           const worker = new DiagnosticArtifactWorker(db, new S3DiagnosticArtifactObjects(s3, 'diagnostic-test-private'), { regular, bold },
             { now: () => new Date(${JSON.stringify(initialTime.toISOString())}), id: randomUUID, enabled: () => true });
+          if (${JSON.stringify(maintain)}) {
+            // execute() selects globally, including cleanup. Refuse all foreign
+            // diagnostic rows/objects before either generation or maintenance.
+            for (const [model, ids] of [
+              ['inspectionOrder', ${JSON.stringify(owned.orders)}],
+              ['diagnosticReportRecord', ${JSON.stringify(owned.reports)}],
+              ['diagnosticPdfArtifact', ${JSON.stringify(owned.pdfs)}],
+              ['diagnosticIdentityRecord', ${JSON.stringify(owned.raw)}],
+              ['diagnosticIdentityEvidence', ${JSON.stringify(owned.evidence)}],
+              ['diagnosticIdentityProvenance', ${JSON.stringify(owned.provenance)}],
+              ['diagnosticContinuityProof', ${JSON.stringify(owned.proofs)}],
+            ]) assert.equal(await db[model].count({ where: { id: { notIn: ids } } }), 0, 'PDF maintenance refused: unregistered ' + model);
+            assert.equal(await db.diagnosticEvidence.count(), 0, 'PDF maintenance refused: unexpected finding evidence');
+            for (const model of ['diagnosticPdfArtifact', 'diagnosticIdentityProvenance']) {
+              for (const row of await db[model].findMany()) assert.ok(row.objectKey === null || ${JSON.stringify([...owned.keys])}.includes(row.objectKey), 'PDF maintenance refused: unregistered object');
+            }
+          }
           for (const artifact of artifacts) assert.equal(await worker.generate(artifact.id), true, 'Expected exact artifact generation');
+          // One ordinary bounded pass, even when EN is already ready. Do not
+          // reset its state or manufacture a replacement intent in test setup.
+          if (${JSON.stringify(maintain)}) await worker.execute();
         } finally { s3?.destroy(); await db.onModuleDestroy(); }
       }
       void main().catch(error => { console.error(error); process.exitCode = 1; });
     `;
     await promisify(execFile)(process.execPath, ["-e", script], { cwd: workerRoot,
       env: { ...process.env, TSX_TSCONFIG_PATH: resolve(workerRoot, "tsconfig.json") }, timeout: 60000, killSignal: "SIGKILL" });
+    if (maintain) {
+      // Register only ids returned by B's public list, as at finalization. A
+      // production-created replacement must also pass exact teardown guards.
+      const documents = await publicGet(`reports/${reportId}/documents`).expect(200);
+      for (const document of documents.body) {
+        expect(document.id).toMatch(uuid);
+        if (!owned.pdfs.includes(document.id)) owned.pdfs.push(document.id);
+        owned.keys.add(`diagnostic-pdf/${reportId}/${document.id}.pdf`);
+      }
+    }
   }
 
   it.each(["draft", "finalized"] as const)("keeps different-commissioner %s B usable after A-only product account purge without disclosing or resurrecting A's restricted material", async phase => {
@@ -1438,42 +1468,33 @@ describe("public continuity across different sellers and Listings", { concurrent
     expect(documents.body.map((row: { locale: string }) => row.locale).sort()).toEqual(["en", "ru", "tk"]);
     expect(JSON.stringify(documents.body)).not.toMatch(/objectKey|sha256|diagnostic-pdf\//);
     const newLocales = phase === "draft" ? ["tk", "ru", "en"] as const : ["tk", "ru"] as const;
-    await generateDocuments(input.reportId, newLocales);
-    for (const locale of newLocales) {
-      const downloaded = await publicGet(`reports/${input.reportId}/documents/${locale}`).expect(200);
-      privateNoStore(downloaded);
-      expect(downloaded.headers["content-type"]).toContain("application/pdf");
-      const text = await diagnosticPdfText(Buffer.from(downloaded.body));
-      for (const own of [input.reportId, finding!.id, templateId, "2026-10-21T11:00:00.000Z", "124100 km"]) expect(text).toContain(own);
-      for (const secret of [released.id, released.findings[0].id, pa, ea.id, proofId, red.sha256, key(pa, red), ia!.observationHash, ea.recordHash]) {
-        expect.soft(text, `New ${locale} PDF must not disclose erased A material`).not.toContain(secret);
-      }
-    }
-    const readyDocuments = await publicGet(`reports/${input.reportId}/documents`).expect(200);
-    for (const locale of newLocales) expect(readyDocuments.body).toContainEqual(expect.objectContaining({ locale, state: "ready" }));
+    await generateDocuments(input.reportId, newLocales, phase === "finalized");
     if (issuedBytes && issuedArtifact) {
       expect(await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: issuedArtifact.id } })).toEqual(issuedArtifact);
       expect(Buffer.from(await storage.read(issuedArtifact.objectKey, issuedArtifact.sizeBytes!, issuedArtifact.sha256!))).toEqual(issuedBytes);
-      // The route selects the current artifact, not the historical artifact id.
-      // It may serve a safe replacement while the issued bytes remain immutable.
-      if (issuedExposesPredecessor) {
-        const current = await publicGet(`reports/${input.reportId}/documents/en`);
-        const descriptor = readyDocuments.body.find((row: { locale: string }) => row.locale === "en");
-        if (current.status === 200) {
-          privateNoStore(current);
-          expect(current.headers["content-type"]).toContain("application/pdf");
-          const text = await diagnosticPdfText(Buffer.from(current.body));
-          for (const own of [input.reportId, finding!.id, templateId, "2026-10-21T11:00:00.000Z", "124100 km"]) expect(text).toContain(own);
-          for (const secret of [released.id, released.findings[0].id, pa, ea.id, proofId, red.sha256, key(pa, red), ia!.observationHash, ea.recordHash]) {
-            expect.soft(text, "Current EN PDF must not disclose erased A material").not.toContain(secret);
-          }
-          expect.soft(descriptor).toMatchObject({ state: "ready" });
-          expect.soft(descriptor?.id, "Safe replacement has its own artifact identity").not.toBe(issuedArtifact.id);
-          expect.soft(Buffer.from(current.body)).not.toEqual(issuedBytes);
-        } else {
-          expect.soft(current.headers["content-type"]).not.toContain("application/pdf");
-          expect.soft(descriptor?.state).not.toBe("ready");
-        }
+    }
+    const recoveredLocales = ["tk", "ru", "en"] as const;
+    const readyDocuments = await publicGet(`reports/${input.reportId}/documents`).expect(200);
+    for (const locale of recoveredLocales) {
+      const downloaded = await publicGet(`reports/${input.reportId}/documents/${locale}`);
+      const descriptor = readyDocuments.body.find((row: { locale: string }) => row.locale === locale);
+      if (downloaded.status !== 200) {
+        expect.soft(downloaded.headers["content-type"]).not.toContain("application/pdf");
+        expect.soft(descriptor?.state).not.toBe("ready");
+      }
+      expect(downloaded.status, `Current ${locale} PDF must recover after ordinary artifact maintenance`).toBe(200);
+      privateNoStore(downloaded);
+      expect(downloaded.headers["content-type"]).toContain("application/pdf");
+      expect(descriptor).toMatchObject({ state: "ready" });
+      const text = await diagnosticPdfText(Buffer.from(downloaded.body));
+      for (const own of [input.reportId, finding!.id, templateId, "2026-10-21T11:00:00.000Z", "124100 km"]) expect(text).toContain(own);
+      for (const secret of [released.id, released.findings[0].id, pa, ea.id, proofId, red.sha256, key(pa, red), ia!.observationHash, ea.recordHash]) {
+        expect.soft(text, `Current ${locale} PDF must not disclose erased A material`).not.toContain(secret);
+      }
+      // The locale route selects the current artifact, not a historical id.
+      if (locale === "en" && issuedExposesPredecessor && issuedArtifact) {
+        expect(descriptor?.id, "Safe replacement has its own artifact identity").not.toBe(issuedArtifact.id);
+        expect(Buffer.from(downloaded.body)).not.toEqual(issuedBytes);
       }
     }
     expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: input.reportId } })).toEqual(releasedB);
