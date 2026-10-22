@@ -79,3 +79,67 @@ Docs: not applicable to an external integration change. This uses existing repos
 No release exclusion is inferred for an outstanding row. Root must inspect/assemble the returned commits before publishing or assigning another slice, then run hosted HTTP/DB acceptance and independent Standards/Spec review. This checkpoint is not a merge, promotion or launch approval.
 
 Preservation inventory: all 4,168 base paths retained with no mode changes; 4,155 byte-identical, 13 changed. Of 101 existing repository E2E files, 99 are byte-identical; only public P1 and the corresponding legacy public report fixture file changed. All six original private continuity domain source/spec files and all eight protected reset source/test files are byte-identical. New original20 corrected-mixed and graph6 tests remain unchanged. The actual declaration comparison retains116 plus5, and legacy report collection retains every original name. The exact legacy assertion-line changes are listed in `legacy-assertion-preservation.json`; substantive snapshot, own-observation, no-copy, uniqueness and disclosure assertions remain.
+
+## Pushed source and exact artifact hashes
+
+RED `5e98a7225bc5e879c5c312c11a8dbaa0c8b9d2c2`, tree `64bc19f5ca41f15a9484595cebd61314fe78f1e3`. Source `c875c72dc0c5e7c7a68f87a8d9d2e03d84421510`, tree `f049bdba708513aab37a155ece39c1d07b46170d`. The final receipt-only commit follows this source with no implementation change. `commands.json` maps executed command logs to exact invocations. Final source is preserved as `source.diff`.
+
+| Artifact | SHA256 |
+| --- | --- |
+| `agent-docs.log` | `8f5507ea6fcde992f7d6733d113abc538ae4957b777bc97cadd580f651c93b20` |
+| `base-manifest.txt` | `f6cebb09d8d85f3ea841c63aea4e9e02656d8f2289aab9d0a57de0ca14519a94` |
+| `build-final.log` | `9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538` |
+| `build-verified.log` | `9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538` |
+| `collection.config.mts` | `37a8bf7b39620274908bf5f8acaf4aa8853f8da1ec2d0d7d6137e7113b38b4f4` |
+| `collection.json` | `3da186e8ba83f63276906fa800467b6b50a3f5a87d9c48b8b1698fd725ea35c2` |
+| `collection.stderr` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `commands.json` | `716ffaa291d72a862af6df613641ff5cde535b14dbb220e6c18b213cac2200d0` |
+| `contracts-build-final.log` | `b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616` |
+| `contracts-build.log` | `b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616` |
+| `contracts-lint.log` | `960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632` |
+| `contracts-ts6.log` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `db-build-final.log` | `e8a263dec96367b13c066619babcd374728c11e5df1d4f12ed11188072a04b00` |
+| `db-build.log` | `7af71623d4177ce17c8cc8c4ffee0a87d96d18c0f1ec9a61970f55b161daa5de` |
+| `db-lint.log` | `960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632` |
+| `db-ts6.log` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `declaration-comparison.json` | `2c4f0cd64dcccec715fd53ceaed8f4a5541ea01d4d83cf78c2253b1464de7f56` |
+| `domain-final.log` | `53323c024b4e5850ba7f3f6bbddf3fab956c424f516e267683b4ed46b8dafc8c` |
+| `domain-green.log` | `a58c703b573385f793451cd7ba9a8bdf783dd8ccc8b3bfb6693a6cfc3b4a63ea` |
+| `domain-red.log` | `352cda0c132e762fbb80d620423488c875e61840d200f5afbe3ede5771df9c1d` |
+| `glossary.log` | `d0863b4ecc26a15f30aa60280c93ab71299462ab7b6fd8e15e5c042c23144621` |
+| `install-repair.log` | `cb76052abe05ec403641471ee5ccc7113dc5c73df25798d1aeacdbd0920954c0` |
+| `install.log` | `56b8b8eaf7dc2b3449838c17591c551e5578e80b2fbd6ff73c1dd8f63c23873a` |
+| `legacy-assertion-preservation.json` | `2efd0b6b6b318bdd3df10ac0c932627a28063486d4ab354274aeabf87a852e44` |
+| `legacy-collection.config.mts` | `44ccdd01c9e41f1b75310507c57ea91bd5e09338687a63d2d15118b5d8cc02c5` |
+| `legacy-collection.json` | `9f4e995d81d6dfa0c8b7f0ad5f19a0337f219879430e3cc5b19929fe5c3f534c` |
+| `legacy-collection.stderr` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `lint-final.log` | `960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632` |
+| `lint-initial.log` | `8ced42c0ee1ea5721d625c8c4ce4e31e8e302f5ae51f15ba6354119eb0c082cb` |
+| `lint-second.log` | `960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632` |
+| `lint-verified.log` | `960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632` |
+| `migration-offline.log` | `6501bc3f5faa413b3b3c47f165475ee17a9bc56af1bae781796e9aaeada022b4` |
+| `migration-offline.mjs` | `ead1bc0a2bce0d0d467676a05e96f7c691b4851813bff1ba7f6305f7cbd4e7a7` |
+| `p1-preservation.json` | `3f5693d0c7d6b3b4aa2d1d57a5c90420872eebb3a93d573d6ed7d82df84e38fa` |
+| `preservation.json` | `412bc2c03700bdebbfd0fff9e2a6c5baf11fb6c5b1bb0c575a2b9cd35fcc92ae` |
+| `preservation.log` | `1d719e3d5b7718fdbfdded296e239fa620cc2f10089484315640089f310a6464` |
+| `preserve.py` | `406856516283964a3b7c17f7a3a216fc1f9b6b8432e8e163f160691f8366a627` |
+| `prisma-validate.log` | `e1344514cb0e93026a245afd134e0c874287a64f7c5798cbda02eff700d2aa22` |
+| `runtime.log` | `2920e5c9967fdaf4eb831dfb48e054ff0bd4262a1ef314658ceca54821fa5d97` |
+| `schema-profile.log` | `724761c36868e763aa6b3348d96f1c5a45b484ab2f397ff4611577971e0a43ca` |
+| `source.diff` | `2acba502292e2b5306e8610d1dfe76adde9265aab65533839bf18ecf47de8362` |
+| `ts6-final.log` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `ts6-verified.log` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `ts7-final.log` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `ts7-fourth.log` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `ts7-initial.log` | `84f90bc755227e82575fc0ed59a03c998775a86a174e74dc701c368535a5661f` |
+| `ts7-second.log` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `ts7-third.log` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `ts7-verified.log` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `typecheck-final.log` | `5478cd1269624791af7df9d7a0fd1e462a8cc8bbca83654c8a3aba37976e9530` |
+| `typecheck-verified.log` | `06c0fb3b98a9f538d1b5b504901203017dd20a5dbcccf178c05badf321b18ac9` |
+| `typecheck.log` | `4c4e97314b10d27ee662d6bbfb492140795bc76a0ca55951396884bdad088a72` |
+| `unit-final.log` | `1eb45475cc2a25fa76430e46ea9b0a8bedf29709db1dae30996008b561c699bd` |
+| `unit-verified.log` | `440371a4a867d6f9d4049f6075a9d984a9598451ab99e4f891d7e22a7f40ec34` |
+| `unit.log` | `18f7c61bb304ba4a442b93212eafdbabe823e025f4db88ada4c84d8622c45b1a` |
+
+The full artifact inventory is `artifact-hashes.json`, SHA256 `15c93f4148f1dc6873e70387cabb31099b954371375d1c7ca4b05b4827428b31`. Artifact paths are local to this host. No interrupted verification process remains; install/generated artifacts are confined to this worktree or `/tmp`. Root owns hosted GREEN, assembly and remaining slices.
