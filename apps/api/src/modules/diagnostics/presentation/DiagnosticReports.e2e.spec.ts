@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { S3Client, CreateBucketCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, CreateBucketCommand, DeleteObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { ConfigModule } from "@nestjs/config";
 import { Reflector } from "@nestjs/core";
 import { EventEmitterModule } from "@nestjs/event-emitter";
@@ -41,8 +41,19 @@ describe("diagnostic authoring and immutable audience release", () => {
   const headers = (who: Person) => ({ authorization: `Bearer ${jwt.sign({ sub: suite.id(who), sid: suite.id(`${who}-session`), role: who === "admin" ? "admin" : "buyer" })}` });
   const post = (who: Person, path: string, body: object) => request.post(`/api/v1/diagnostics/${path}`).set(headers(who)).send(body);
   const get = (who: Person, path: string) => request.get(`/api/v1/diagnostics/${path}`).set(headers(who));
+  const continuityOwned = { proofs: [] as string[], evidence: [] as string[], provenance: [] as string[], keys: new Set<string>() };
+  const continuityMaterials = new Map<string, { rawId: string; provenanceId: string }>();
   async function cleanup() {
     if (!db) return;
+    for (const key of continuityOwned.keys) {
+      await objects.send(new DeleteObjectCommand({ Bucket: "diagnostic-test-private", Key: key }));
+      await expect(objects.send(new HeadObjectCommand({ Bucket: "diagnostic-test-private", Key: key }))).rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
+    }
+    await db.diagnosticContinuityProof.deleteMany({ where: { id: { in: continuityOwned.proofs } } });
+    const structured = await db.diagnosticIdentityEvidence.findMany({ where: { order: { centerId } }, select: { id: true } });
+    const provenance = await db.diagnosticIdentityProvenance.findMany({ where: { order: { centerId } }, select: { id: true } });
+    expect(structured.every(row => continuityOwned.evidence.includes(row.id)), "Unknown structured fixture descendant").toBe(true);
+    expect(provenance.every(row => continuityOwned.provenance.includes(row.id)), "Unknown provenance fixture descendant").toBe(true);
     const reports = await db.diagnosticReportRecord.findMany({ where: { order: { centerId } }, orderBy: { createdAt: "desc" } });
     const evidence = await db.diagnosticEvidence.findMany({ where: { reportId: { in: reports.map(row => row.id) } } });
     for (const item of evidence) await objects.send(new DeleteObjectCommand({ Bucket: "diagnostic-test-private", Key: item.objectKey }));
@@ -59,6 +70,8 @@ describe("diagnostic authoring and immutable audience release", () => {
     await db.diagnosticAudit.deleteMany({ where: { centerId } });
     await db.diagnosticOrderAssignment.deleteMany({ where: { order: { centerId } } });
     await db.inspectionOrder.deleteMany({ where: { centerId } });
+    continuityOwned.proofs.length = 0; continuityOwned.evidence.length = 0; continuityOwned.provenance.length = 0;
+    continuityOwned.keys.clear(); continuityMaterials.clear();
     await db.diagnosticTemplateVersion.deleteMany({ where: { centerId } });
     await db.diagnosticCenterAssignment.deleteMany({ where: { centerId } });
     await db.diagnosticCenter.deleteMany({ where: { id: centerId } });
@@ -274,7 +287,38 @@ describe("diagnostic authoring and immutable audience release", () => {
     if (audience === "listing_public") ({ body: order } = await post("reception", `orders/${order.id}/authorization`, { expectedVersion: order.version, kind: "publication", authorityReference: `Synthetic public consent ${observedAt.toISOString()}` }).expect(201));
     for (const state of ["confirmed", "arrived"]) ({ body: order } = await post("reception", `orders/${order.id}/appointment`, { expectedVersion: order.version, state }).expect(201));
     ({ body: order } = await post(technician, `orders/${order.id}/vehicle`, { expectedVersion: order.version, observedAt: observedAt.toISOString(), mileageKm, method: "vin", vin, manualReference: null }).expect(201));
+    if (audience === "listing_public") await continuityCapture(order, technician);
     return order;
+  }
+  // Only the legacy public reinspection fixtures gain classified capture. Their original
+  // report/evidence/snapshot/disclosure assertions below remain intact.
+  async function continuityCapture(order: { id: string; version: number }, technician: Person) {
+    const provenanceId = randomUUID(); continuityOwned.provenance.push(provenanceId);
+    const evidenceId = randomUUID(); continuityOwned.evidence.push(evidenceId);
+    const input = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVR4nGP4z8AARwgWXg4ArpMP8aaUSCMAAAAASUVORK5CYII=", "base64");
+    continuityOwned.keys.add(`diagnostic-evidence/${provenanceId}/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1`);
+    const rights = { category: "vehicle_observation", purpose: "Synthetic public reinspection", basis: "Owned generated fixture",
+      provenance: "Independent synthetic VIN tile for this visit", identifiability: "pseudonymous", use: ["service"], supplierRestrictions: "No redistribution", hold: null,
+      schedule: { kind: "until", until: "2026-11-10T00:00:00.000Z", reason: "Declared fixture rights" } };
+    const path = `orders/${order.id}/identity-provenance`;
+    await post(technician, path, { id: provenanceId, expectedOrderVersion: order.version, contentType: "image/png", sizeBytes: input.length, rights }).expect(201);
+    await request.put(`/api/v1/diagnostics/${path}/${provenanceId}?expectedOrderVersion=${order.version}`).set(headers(technician))
+      .set("content-type", "application/octet-stream").set("x-evidence-type", "image/png").send(input).expect(200);
+    const { body: raw } = await get(technician, `orders/${order.id}/identity-records`).expect(200);
+    await post(technician, `orders/${order.id}/identity-evidence`, { id: evidenceId, expectedOrderVersion: order.version, identityRecordId: raw[0].id,
+      identifiers: [{ kind: "vin_stamp", location: "Synthetic VIN stamp", value: vin, provenanceIds: [provenanceId] }], rights, correction: null }).expect(201);
+    order.version++;
+    continuityMaterials.set(order.id, { rawId: raw[0].id, provenanceId });
+  }
+  async function continuityProof(first: { id: string; orderId: string }, second: { id: string; version: number }, technician: Person = "technician") {
+    const a = continuityMaterials.get(first.orderId)!; const b = continuityMaterials.get(second.id)!;
+    const response = await post("reviewer", `orders/${second.id}/continuity-proofs`, { predecessorId: first.id, expectedPredecessorVersion: 3,
+      expectedOrderVersion: second.version, predecessorIdentityRecordId: a.rawId, candidateIdentityRecordId: b.rawId,
+      linkingTechnicianId: suite.id(technician), method: "comparative_attestation", rationale: "Independent retained VIN tiles establish the same synthetic vehicle",
+      provenanceRecordIds: [a.provenanceId,b.provenanceId] });
+    if (typeof response.body.proofId === "string") continuityOwned.proofs.push(response.body.proofId);
+    expect(response.status, JSON.stringify(response.body)).toBe(201);
+    return response.body.proofId as string;
   }
   it("releases a public reinspection from a new physical visit without inheriting findings, evidence or the old snapshot", async () => {
     const earlier = new Date("2026-09-18T00:00:00.000Z"); const later = new Date("2026-10-25T00:00:00.000Z");
@@ -305,7 +349,10 @@ describe("diagnostic authoring and immutable audience release", () => {
     try {
       const secondOrder = await arrive(secondTemplate.id, "listing_public", later, 123500);
       const reason = "Scheduled reinspection after brake service";
-      const created = await post("technician", `orders/${secondOrder.id}/reinspections`, { reportId: randomUUID(), predecessorId: first.id, expectedOrderVersion: secondOrder.version, reason }).expect(201);
+      const unproved = { reportId: randomUUID(), predecessorId: first.id, expectedOrderVersion: secondOrder.version, reason };
+      await post("technician", `orders/${secondOrder.id}/reinspections`, unproved).expect(403);
+      const proofId = await continuityProof(first, secondOrder);
+      const created = await post("technician", `orders/${secondOrder.id}/reinspections`, { ...unproved, proofId }).expect(201);
       const reinspection = created.body;
       expect(created.headers["cache-control"]).toContain("no-store");
       expect(reinspection).toMatchObject({ orderId: secondOrder.id, audience: "listing_public", status: "draft", templateVersionId: secondTemplate.id,
@@ -378,15 +425,15 @@ describe("diagnostic authoring and immutable audience release", () => {
 
     const secondOrder = await arrive(template.id, "listing_public", new Date("2026-10-01T00:00:00.000Z"), 120000);
     const reason = "Follow-up visit after repair";
-    const link = { reportId: randomUUID(), predecessorId: first.id, expectedOrderVersion: secondOrder.version, reason };
+    const link = { reportId: randomUUID(), predecessorId: first.id, expectedOrderVersion: secondOrder.version, reason, proofId: await continuityProof(first, secondOrder) };
     const { body: reinspection } = await post("technician", `orders/${secondOrder.id}/reinspections`, link).expect(201);
     expect(reinspection).toMatchObject({ lineageKind: "reinspection", supersededBy: null });
     expect(reinspection).not.toHaveProperty("successorKind");
     expect((await post("technician", `orders/${secondOrder.id}/reinspections`, link).expect(201)).body).toEqual(reinspection);
     expect(await db.diagnosticAudit.count({ where: { orderId: secondOrder.id, action: "REPORT_REINSPECTION_CREATED" } })).toBe(1);
     expect((await post("technician", `orders/${secondOrder.id}/reinspections`, { ...link, reason: "Another reason" }).expect(409)).body.code).toBe("DIAGNOSTIC_REINSPECTION_CONFLICT");
-    expect((await post("technician", `orders/${secondOrder.id}/reinspections`, { ...link, reportId: randomUUID(), expectedOrderVersion: secondOrder.version + 1 }).expect(409)).body.code).toBe("DIAGNOSTIC_STALE_VERSION");
-    expect((await post("technician", `orders/${secondOrder.id}/reinspections`, { ...link, reportId: randomUUID() }).expect(409)).body.code).toBe("DIAGNOSTIC_REPORT_EXISTS");
+    expect((await post("technician", `orders/${secondOrder.id}/reinspections`, { ...link, reportId: randomUUID(), expectedOrderVersion: secondOrder.version + 1 }).expect(409)).body.code).toBe("DIAGNOSTIC_REINSPECTION_CONFLICT");
+    expect((await post("technician", `orders/${secondOrder.id}/reinspections`, { ...link, reportId: randomUUID() }).expect(409)).body.code).toBe("DIAGNOSTIC_REINSPECTION_CONFLICT");
     expect((await post("technician", `orders/${secondOrder.id}/reports`, { reportId: randomUUID(), expectedOrderVersion: secondOrder.version }).expect(409)).body.code).toBe("DIAGNOSTIC_REPORT_EXISTS");
     // A draft successor is never disclosed, and a physical revisit is not an editorial correction.
     expect((await get("technician", `reports/${first.id}`).expect(200)).body.supersededBy).toBeNull();
@@ -398,7 +445,7 @@ describe("diagnostic authoring and immutable audience release", () => {
     expect((await post("technician", `reports/${first.id}/corrections`, { expectedVersion: 3, successorId: reinspection.id, reason }).expect(409)).body.code).toBe("DIAGNOSTIC_CORRECTION_CONFLICT");
     expect((await post("technician", `reports/${first.id}/corrections`, { expectedVersion: 3, successorId: randomUUID(), reason }).expect(409)).body.code).toBe("DIAGNOSTIC_CORRECTION_CONFLICT");
     const thirdOrder = await arrive(template.id, "listing_public", new Date("2026-10-02T00:00:00.000Z"), 120100);
-    expect((await post("technician", `orders/${thirdOrder.id}/reinspections`, { ...link, reportId: randomUUID(), expectedOrderVersion: thirdOrder.version }).expect(409)).body.code).toBe("DIAGNOSTIC_REINSPECTION_CONFLICT");
+    expect((await post("technician", `orders/${thirdOrder.id}/reinspections`, { ...link, reportId: randomUUID(), expectedOrderVersion: thirdOrder.version }).expect(403)).body.code).toBe("DIAGNOSTIC_NO_ACCESS");
 
     // Continuity is admitted at link time only: a later predecessor-side reobservation does not block the new visit.
     const current = await get("technician", `orders/${firstOrder.id}`).expect(200);
@@ -487,8 +534,9 @@ describe("diagnostic authoring and immutable audience release", () => {
   }
   it("links one reinspection when identical requests contend for the same visit and predecessor", async () => {
     const { first, secondOrder, released } = await contestedPredecessor("technician");
-    const before = await released(); const prior = await audits();
-    const link = { reportId: randomUUID(), predecessorId: first.id, expectedOrderVersion: secondOrder.version, reason: "Concurrent follow-up visit" };
+    const before = await released();
+    const link = { reportId: randomUUID(), predecessorId: first.id, expectedOrderVersion: secondOrder.version, reason: "Concurrent follow-up visit", proofId: await continuityProof(first, secondOrder, "technician") };
+    const prior = await audits();
     const responses = await contend([first.orderId, secondOrder.id], () => [post("technician", `orders/${secondOrder.id}/reinspections`, link), post("technician", `orders/${secondOrder.id}/reinspections`, link)]);
     expect(responses.map(response => response.status)).toEqual([201, 201]);
     expect(responses[1]!.body).toEqual(responses[0]!.body);
@@ -499,7 +547,9 @@ describe("diagnostic authoring and immutable audience release", () => {
     expect((await db.diagnosticReportRecord.findMany({ where: { predecessorId: first.id } })).map(row => row.id)).toEqual([link.reportId]);
     expect((await db.diagnosticReportRecord.findMany({ where: { orderId: secondOrder.id } })).map(row => row.id)).toEqual([link.reportId]);
     expect((await db.diagnosticReportRecord.findMany({ where: { orderId: first.orderId } })).map(row => row.id)).toEqual([first.id]);
-    const created = (await audits()).filter(row => !prior.some(item => item.id === row.id));
+    const added = (await audits()).filter(row => !prior.some(item => item.id === row.id));
+    expect(added.filter(row => row.action === "CONTINUITY_PROOF_CONSUMED")).toHaveLength(1);
+    const created = added.filter(row => row.action !== "CONTINUITY_PROOF_CONSUMED");
     expect(created.map(({ id: _, ...row }) => row)).toEqual([{ orderId: secondOrder.id, actorId: suite.id("technician"), action: "REPORT_REINSPECTION_CREATED", reportId: link.reportId }]);
     expect(await released()).toEqual(before);
 
@@ -507,14 +557,15 @@ describe("diagnostic authoring and immutable audience release", () => {
     const stored = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: link.reportId } });
     expect((await post("technician", `orders/${secondOrder.id}/reinspections`, link).expect(201)).body).toEqual(responses[0]!.body);
     expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: link.reportId } })).toEqual(stored);
-    expect(await audits()).toHaveLength(prior.length + 1);
+    expect(await audits()).toHaveLength(prior.length + 2);
     expect(await released()).toEqual(before);
   });
   it("admits exactly one successor when a correction and a reinspection race for the same released predecessor", async () => {
     const { template, first, finding, secondOrder, released } = await contestedPredecessor("revisitTechnician");
-    const before = await released(); const prior = await audits();
+    const before = await released();
     const correction = { expectedVersion: 3, successorId: randomUUID(), reason: "Concurrent editorial correction" };
-    const link = { reportId: randomUUID(), predecessorId: first.id, expectedOrderVersion: secondOrder.version, reason: "Concurrent follow-up visit" };
+    const link = { reportId: randomUUID(), predecessorId: first.id, expectedOrderVersion: secondOrder.version, reason: "Concurrent follow-up visit", proofId: await continuityProof(first, secondOrder, "revisitTechnician") };
+    const prior = await audits();
     // Distinct current technicians on each visit, so no shared identity lock serializes the contenders.
     const [corrected, linked] = await contend([first.orderId, secondOrder.id], () => [post("technician", `reports/${first.id}/corrections`, correction),
       post("revisitTechnician", `orders/${secondOrder.id}/reinspections`, link)]);
@@ -534,7 +585,9 @@ describe("diagnostic authoring and immutable audience release", () => {
     expect(await db.diagnosticReportRecord.findUnique({ where: { id: loserId } })).toBeNull();
     expect((await db.diagnosticReportRecord.findMany({ where: { orderId: secondOrder.id } })).map(row => row.id)).toEqual(correctionWon ? [] : [winnerId]);
     expect((await db.diagnosticReportRecord.findMany({ where: { orderId: first.orderId } })).map(row => row.id).sort()).toEqual((correctionWon ? [first.id, winnerId] : [first.id]).sort());
-    const created = (await audits()).filter(row => !prior.some(item => item.id === row.id));
+    const added = (await audits()).filter(row => !prior.some(item => item.id === row.id));
+    expect(added.filter(row => row.action === "CONTINUITY_PROOF_CONSUMED")).toHaveLength(correctionWon ? 0 : 1);
+    const created = added.filter(row => row.action !== "CONTINUITY_PROOF_CONSUMED");
     expect(created.map(({ id: _, ...row }) => row)).toEqual([correctionWon
       ? { orderId: first.orderId, actorId: suite.id("technician"), action: "REPORT_CORRECTION_CREATED", reportId: winnerId }
       : { orderId: secondOrder.id, actorId: suite.id("revisitTechnician"), action: "REPORT_REINSPECTION_CREATED", reportId: winnerId }]);
@@ -548,7 +601,7 @@ describe("diagnostic authoring and immutable audience release", () => {
     expect((await again.expect(409)).body.code).toBe(loser.body.code);
     expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: winnerId } })).toEqual(stored);
     expect(await db.diagnosticReportRecord.findUnique({ where: { id: loserId } })).toBeNull();
-    expect(await audits()).toHaveLength(prior.length + 1);
+    expect(await audits()).toHaveLength(prior.length + (correctionWon ? 1 : 2));
     expect(await released()).toEqual(before);
   });
   it("does not disclose private reports through anonymous known IDs or artifacts", async () => {

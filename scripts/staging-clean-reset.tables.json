@@ -97,8 +97,11 @@
   },
   "migrationTriggers": [
     "dealership_members.business_enquiry_membership_revocation",
+    "dealership_members.diagnostic_public_continuity_member_changed",
+    "dealerships.diagnostic_public_continuity_business_changed",
     "diagnostic_center_assignments.diagnostic_continuity_qualification_changed",
     "diagnostic_continuity_proofs.diagnostic_continuity_proof_guard",
+    "diagnostic_continuity_proofs.diagnostic_public_continuity_atomic",
     "diagnostic_evidence.diagnostic_evidence_identity",
     "diagnostic_evidence.diagnostic_evidence_owner_disjoint",
     "diagnostic_identity_evidence.diagnostic_continuity_evidence_changed",
@@ -121,6 +124,7 @@
     "history_quotes.history_quote_facts_immutable",
     "inspection_orders.diagnostic_continuity_order_changed",
     "inspection_orders.inspection_order_identity_generation",
+    "listings.diagnostic_public_continuity_listing_changed",
     "listings.invalidate_diagnostic_listing_association",
     "otp_requests.otp_requests_fill_compat_columns_trigger",
     "service_conversations.service_erasure_guard",
@@ -128,6 +132,7 @@
     "staff_grants.diagnostic_continuity_grant_changed",
     "users.business_enquiry_user_revocation",
     "users.diagnostic_continuity_user_changed",
+    "users.diagnostic_public_continuity_user_changed",
     "vehicle_history_requests.service_confirmed_vin_guard"
   ]
 }

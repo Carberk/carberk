@@ -1,3 +1,4 @@
+import { DiagnosticPublicBindings } from "./infrastructure/DiagnosticPublicBindings";
 import { DIAGNOSTIC_DOCUMENTS_PORT } from "./domain/ports/DiagnosticDocumentsPort";
 import { DIAGNOSTIC_PUBLIC_PORT } from "./domain/ports/DiagnosticPublicPort";
 import { PrismaDiagnosticDocuments } from "./infrastructure/PrismaDiagnosticDocuments";
@@ -29,7 +30,7 @@ import { PrismaDiagnosticContinuityProofs } from "./infrastructure/PrismaDiagnos
 import { IssueDiagnosticContinuityProof } from "./application/IssueDiagnosticContinuityProof";
 import { ReadDiagnosticContinuityProof } from "./application/ReadDiagnosticContinuityProof";
 import { ConsumeDiagnosticContinuityProof } from "./application/ConsumeDiagnosticContinuityProof";
-@Module({ imports: [ConfigModule, PrismaModule, IdentityModule], controllers: [DiagnosticIntakeController, DiagnosticReportsController, DiagnosticPublicController], providers: [{ provide: DIAGNOSTIC_DOCUMENTS_PORT, useClass: PrismaDiagnosticDocuments }, { provide: DIAGNOSTIC_PUBLIC_PORT, useClass: PrismaDiagnosticPublic }, DiagnosticAuthority, CampaignDiagnosticAdmission, DiagnosticReportAccess, DiagnosticBinaryParser, PrismaDiagnosticContinuityProofs,
+@Module({ imports: [ConfigModule, PrismaModule, IdentityModule], controllers: [DiagnosticIntakeController, DiagnosticReportsController, DiagnosticPublicController], providers: [DiagnosticPublicBindings, { provide: DIAGNOSTIC_DOCUMENTS_PORT, useClass: PrismaDiagnosticDocuments }, { provide: DIAGNOSTIC_PUBLIC_PORT, useClass: PrismaDiagnosticPublic }, DiagnosticAuthority, CampaignDiagnosticAdmission, DiagnosticReportAccess, DiagnosticBinaryParser, PrismaDiagnosticContinuityProofs,
   { provide: DIAGNOSTIC_CONTINUITY_PROOFS_PORT, useExisting: PrismaDiagnosticContinuityProofs },
   { provide: IssueDiagnosticContinuityProof, inject: [DIAGNOSTIC_CONTINUITY_PROOFS_PORT], useFactory: (proofs: DiagnosticContinuityProofsPort) => new IssueDiagnosticContinuityProof(proofs) },
   { provide: ReadDiagnosticContinuityProof, inject: [DIAGNOSTIC_CONTINUITY_PROOFS_PORT], useFactory: (proofs: DiagnosticContinuityProofsPort) => new ReadDiagnosticContinuityProof(proofs) },

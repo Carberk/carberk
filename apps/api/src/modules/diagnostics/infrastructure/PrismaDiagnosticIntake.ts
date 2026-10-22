@@ -12,9 +12,9 @@ type Tx = Prisma.TransactionClient;
 type Order = Prisma.InspectionOrderGetPayload<object>;
 const denial = () => new DiagnosticRuleError("DIAGNOSTIC_NO_ACCESS");
 const json = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
-export function diagnosticListingDigest(listing: { id: string; sellerId: string; businessId: string | null; vin: string | null; brandId: string; modelId: string; year: number | null }): string {
-  return createHash("sha256").update(JSON.stringify([listing.id, listing.sellerId, listing.businessId, listing.vin?.trim().toUpperCase() ?? null, listing.brandId, listing.modelId, listing.year])).digest("hex");
-}
+export { diagnosticListingDigest } from "./diagnosticListingDigest";
+import { diagnosticListingDigest } from "./diagnosticListingDigest";
+import { DiagnosticPublicBindings } from "./DiagnosticPublicBindings";
 
 /** Stable binding of one recorded observation to its visit and resulting order version. */
 export function diagnosticObservationHash(orderId: string, orderVersion: number, observed: Omit<DiagnosticSchemas.DiagnosticObservedVehicle, "expectedVersion">): string {
@@ -28,6 +28,7 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
   constructor(@Inject(PrismaService) private readonly db: PrismaService,
     @Inject(DiagnosticAuthority) private readonly authority: DiagnosticAuthority,
     @Inject(BUSINESS_AUTHORITY_PORT) private readonly business: BusinessAuthorityPort,
+    @Inject(DiagnosticPublicBindings) private readonly publicBindings: DiagnosticPublicBindings,
     @Inject(DIAGNOSTIC_RUNTIME) private readonly runtime: DiagnosticRuntime) {}
 
   private current(tx: Tx, subject: DiagnosticSubject): Promise<void> { return this.authority.current(tx, subject); }
@@ -210,6 +211,8 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
   }
   async observeVehicle(subject: DiagnosticSubject, id: string, input: DiagnosticSchemas.DiagnosticObservedVehicle): Promise<DiagnosticSchemas.DiagnosticOrder> {
     return this.db.$transaction(async tx => {
+      // Listing mutations acquire Listing before order. Never wait for a Listing under an order lock.
+      await this.publicBindings.lock(tx, [id], [subject.userId]);
       const { row } = await this.scope(tx, subject, id, "diagnostics.technician");
       const { expectedVersion, ...observed } = input;
       this.version(row, expectedVersion);
