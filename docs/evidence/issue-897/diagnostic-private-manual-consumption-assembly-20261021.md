@@ -59,7 +59,7 @@ Base `e56e9d84` hosted run [39697405425](https://github.com/Carberk/carberk/acti
 
 - **DB:** 390/391. The pending-PG Redis restart case fails before its intended assertion. A same-observation loopback `pg_isready` backend (480, at child218) caused the initial inventory refusal.
 - **Worker:** 373/373.
-- **API:** 3162/3171. Six private consumption first POSTs return HTTP 400 instead of 201, the intended RED at lines 503, 533, 566 and 587. The three unrelated CampaignFullV3 reset tails are unchanged.
+- **API:** 3162/3171. Six private consumption first POSTs return HTTP 400 instead of 201, the intended RED at lines 503, 547, 566 (three parameters) and 587. The three unrelated CampaignFullV3 reset tails are unchanged.
 
 No production repair is established. This assembly preserves those classifications. It claims no hosted GREEN and has not run PostgreSQL, so migration apply, triggers, locks and the six consumption cases remain runtime-unknown.
 
@@ -72,3 +72,7 @@ No production repair is established. This assembly preserves those classificatio
   - The DB pending-PG restart attribution must be reclassified on its own evidence.
 - Independent Standards/Spec review, parent fast-forward of `agent/spec-897-campaign`, shared-staging acceptance and staging restoration remain with the parent.
 - Concurrency and erasure-after-consumption acceptance, automatic/mixed/corrected/public-transfer admissions and the full ADR-0108 replacement of the public fallback remain separate slices.
+
+## Parent publication inspection
+
+Root independently compared stable patch ids for b9→8e5 and e56→f5d09ce3 (both `2e78fa5b0171654f920255179438894d8c8be674`), checked all seven protected files plus both attribution files byte-for-byte, inspected the complete source/migration diff and checked the combined unit/typecheck logs. The current main `9fde309c3da17f2661fe9c266504e6e56a1b97c9` is already an ancestor. Root fast-forwarded the owned checkout to `928eee90` without conflict. The [terminal e56 receipt](../issue-901/prelaunch-hosted-receipt-e56e9d84-20261022.md) now preserves the exact preceding runtime failures and log hashes. Final independent Standards/Spec review remains a later gate on the complete candidate; this inspection is assembly evidence. No hosted GREEN is claimed for the changed runtime.
