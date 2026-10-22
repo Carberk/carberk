@@ -1061,4 +1061,130 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
       .toEqual(invalidatedAt);
   });
 
+  // Private consumption atomicity slice. Existing cases and helpers above stay unchanged.
+  // Same bounded PostgreSQL barrier as DiagnosticReports.e2e.spec.ts: both requests
+  // must reach actual row-lock contention before either may finish consumption.
+  async function contendConsumption(p: Pair, inputs: ReturnType<typeof reinspectionInput>[]) {
+    let settled: Promise<PromiseSettledResult<supertest.Response>[]> | undefined;
+    try {
+      await db.$transaction(async tx => {
+        const [holder] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+        for (const id of [p.a.id, p.b.id].sort()) await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${id} FOR UPDATE`;
+        settled = Promise.allSettled(inputs.map(input => post("technician", `orders/${p.b.id}/reinspections`, input)));
+        for (let attempt = 0; ; attempt++) {
+          const [observed] = await db.$queryRaw<{ waiting: number }[]>`WITH direct AS (SELECT activity.pid FROM pg_stat_activity activity WHERE ${holder!.pid}::int = ANY(pg_blocking_pids(activity.pid)))
+            SELECT ((SELECT count(*) FROM direct) + (SELECT count(*) FROM pg_stat_activity activity WHERE activity.pid NOT IN (SELECT pid FROM direct) AND pg_blocking_pids(activity.pid) && ARRAY(SELECT pid FROM direct)))::int AS waiting`;
+          if (observed!.waiting >= inputs.length) break;
+          if (attempt === 500) throw new Error(`Only ${observed!.waiting} of ${inputs.length} private consumption requests reached the row-lock barrier`);
+        }
+      });
+    } catch (barrierFailure) {
+      await settled;
+      throw barrierFailure;
+    }
+    const results = await settled!;
+    const failed = results.find(result => result.status === "rejected");
+    if (failed) throw failed.reason;
+    return results.map(result => (result as PromiseFulfilledResult<supertest.Response>).value);
+  }
+
+  it.each(["identical request", "distinct report ids", "two unused proofs"] as const)("creates only one private successor under observed contention for %s", async scenario => {
+    const p = await pair();
+    const proofId = await ordinaryProof(p);
+    const otherProofId = scenario === "two unused proofs" ? await ordinaryProof(p) : proofId;
+    if (scenario === "two unused proofs") expect(otherProofId).not.toBe(proofId);
+    const first = reinspectionInput(p, proofId);
+    const second = scenario === "identical request" ? first : reinspectionInput(p, otherProofId);
+    const before = await stored(p);
+    const proofsBefore = await db.diagnosticContinuityProof.findMany({ where: { candidateOrderId: p.b.id }, orderBy: { id: "asc" } });
+    expect(proofsBefore.every(row => row.consumedAt === null && row.consumedReportId === null && row.invalidatedAt === null)).toBe(true);
+    const responses = await contendConsumption(p, [first, second]);
+    for (const response of responses) privateNoStore(response);
+    expect(responses.map(response => response.status).sort()).toEqual(scenario === "identical request" ? [201, 201] : scenario === "distinct report ids" ? [201, 409] : [201, 403]);
+    const winner = responses.findIndex(response => response.status === 201);
+    const winningInput = [first, second][winner]!;
+    const result = responses[winner]!;
+    expect(result.body).toMatchObject({ id: winningInput.reportId, orderId: p.b.id, status: "draft", successorOf: p.released.id, findings: [] });
+    if (scenario === "identical request") expect(responses[1]!.body).toEqual(responses[0]!.body);
+    else {
+      const conflict = responses.find(response => response.status !== 201)!;
+      expect(conflict.body).toEqual({ statusCode: scenario === "distinct report ids" ? 409 : 403,
+        code: scenario === "distinct report ids" ? "DIAGNOSTIC_REINSPECTION_CONFLICT" : "DIAGNOSTIC_NO_ACCESS",
+        message: "Inspection request could not be completed", timestamp: "2026-10-21T12:00:00.000Z", requestId: "unknown" });
+    }
+    const after = await stored(p);
+    expect(after.orders).toEqual(before.orders);
+    expect(after.reports.filter(row => row.orderId === p.a.id)).toEqual(before.reports);
+    expect(after.reports.filter(row => row.orderId === p.b.id)).toHaveLength(1);
+    expect(await db.diagnosticReportRecord.count({ where: { predecessorId: p.released.id } })).toBe(1);
+    const proofsAfter = await db.diagnosticContinuityProof.findMany({ where: { candidateOrderId: p.b.id }, orderBy: { id: "asc" } });
+    expect(proofsAfter.filter(row => row.consumedReportId !== null)).toHaveLength(1);
+    expect(proofsAfter.find(row => row.id === winningInput.proofId)).toEqual({ ...proofsBefore.find(row => row.id === winningInput.proofId), consumedReportId: winningInput.reportId, consumedAt: initialTime });
+    for (const unused of proofsBefore.filter(row => row.id !== winningInput.proofId)) expect(proofsAfter.find(row => row.id === unused.id)).toEqual({ ...unused, invalidatedAt: expect.any(Date) });
+    const addedAudits = after.audits.filter(row => !before.audits.some(prior => prior.id === row.id));
+    expect(addedAudits.map(row => row.action).sort()).toEqual(["CONTINUITY_PROOF_CONSUMED", "REPORT_REINSPECTION_CREATED"]);
+    for (const audit of addedAudits) expect(audit).toMatchObject({ orderId: p.b.id, actorId: suite.id("technician"), details: { reportId: winningInput.reportId } });
+    expect((await get("technician", `orders/${p.b.id}/reports`).expect(200)).body).toEqual([result.body]);
+    expect((await post("technician", `orders/${p.b.id}/reinspections`, winningInput).expect(201)).body).toEqual(result.body);
+    expect(await stored(p)).toEqual(after);
+    expect(await db.diagnosticContinuityProof.findMany({ where: { candidateOrderId: p.b.id }, orderBy: { id: "asc" } })).toEqual(proofsAfter);
+  });
+
+  it.each(["REPORT_REINSPECTION_CREATED", "CONTINUITY_PROOF_CONSUMED"] as const)("rolls back all private consumption writes when the exact %s audit INSERT fails", async action => {
+    const p = await pair();
+    const proofId = await ordinaryProof(p);
+    const input = reinspectionInput(p, proofId);
+    const databases = inject("apiTestDatabases");
+    if (!databases) throw new Error("Consumption audit fault requires the hosted per-worker test database");
+    const worker = Number(process.env["VITEST_POOL_ID"]);
+    expect(Number.isInteger(worker) && worker >= 1 && worker <= databases.workers).toBe(true);
+    expect(await db.$queryRaw`SELECT current_database() AS name`).toEqual([{ name: workerDatabaseName(databases.prefix, worker) }]);
+    const proofs = () => db.diagnosticContinuityProof.findMany({ where: { candidateOrderId: p.b.id }, orderBy: { id: "asc" } });
+    const before = { ...await stored(p), proofs: await proofs() };
+    expect(before.proofs).toHaveLength(1);
+    expect(before.proofs[0]).toMatchObject({ consumedAt: null, consumedReportId: null });
+    for (const id of [p.a.id, p.b.id, p.released.id, proofId, input.reportId, centerId, suite.id("technician")]) expect(id).toMatch(uuid);
+    const namespace = `consume914_${p.b.id.replaceAll("-", "")}`;
+    const triggerName = `${namespace}_audit`;
+    await db.$transaction(async tx => {
+      await tx.$executeRawUnsafe(`CREATE SCHEMA "${namespace}"`);
+      await tx.$executeRawUnsafe(`CREATE SEQUENCE "${namespace}".audit_reached`);
+      await tx.$executeRawUnsafe(`CREATE FUNCTION "${namespace}".refuse_audit() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+          IF EXISTS (SELECT 1 FROM public.diagnostic_continuity_proofs
+              WHERE id = '${proofId}' AND "consumedReportId" = '${input.reportId}' AND "consumedAt" IS NOT NULL)
+            AND EXISTS (SELECT 1 FROM public.diagnostic_reports
+              WHERE id = '${input.reportId}' AND "orderId" = '${p.b.id}' AND "predecessorId" = '${p.released.id}') THEN
+            PERFORM nextval('"${namespace}".audit_reached');
+          END IF;
+          RAISE EXCEPTION 'issue914 exact consumption audit INSERT fault';
+        END $$`);
+      await tx.$executeRawUnsafe(`CREATE TRIGGER "${triggerName}" BEFORE INSERT ON public.diagnostic_audits
+        FOR EACH ROW WHEN (NEW."orderId" = '${p.b.id}' AND NEW."centerId" = '${centerId}'
+          AND NEW."actorId" = '${suite.id("technician")}' AND NEW.action = '${action}'
+          AND NEW.details->>'reportId' = '${input.reportId}')
+        EXECUTE FUNCTION "${namespace}".refuse_audit()`);
+    });
+    try {
+      expect(await db.$queryRawUnsafe(`SELECT is_called FROM "${namespace}".audit_reached`)).toEqual([{ is_called: false }]);
+      const response = await post("technician", `orders/${p.b.id}/reinspections`, input);
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ statusCode: 500, code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred",
+        timestamp: "2026-10-21T12:00:00.000Z", requestId: "unknown" });
+      for (const secret of [namespace, action, proofId, input.reportId, p.released.id, p.ia.observationHash, p.ib.observationHash, p.body.rationale]) expect(response.text).not.toContain(secret);
+      expect(await db.$queryRawUnsafe(`SELECT last_value::int, is_called FROM "${namespace}".audit_reached`)).toEqual([{ last_value: 1, is_called: true }]);
+      expect({ ...await stored(p), proofs: await proofs() }).toEqual(before);
+      expect(await db.diagnosticReportRecord.count({ where: { OR: [{ id: input.reportId }, { predecessorId: p.released.id }, { orderId: p.b.id }] } })).toBe(0);
+    } finally {
+      await db.$transaction(async tx => {
+        await tx.$executeRawUnsafe(`DROP TRIGGER "${triggerName}" ON public.diagnostic_audits`);
+        await tx.$executeRawUnsafe(`DROP FUNCTION "${namespace}".refuse_audit()`);
+        await tx.$executeRawUnsafe(`DROP SEQUENCE "${namespace}".audit_reached`);
+        await tx.$executeRawUnsafe(`DROP SCHEMA "${namespace}"`);
+      });
+    }
+    expect(await db.$queryRaw`SELECT nspname FROM pg_namespace WHERE nspname = ${namespace}`).toEqual([]);
+    expect((await post("technician", `orders/${p.b.id}/reinspections`, input).expect(201)).body).toMatchObject({ id: input.reportId, successorOf: p.released.id, findings: [] });
+  });
+
 });
