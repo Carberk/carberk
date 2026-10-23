@@ -1,0 +1,46 @@
+# Handoff and scheduling attribution assembly, 2026-10-23
+
+Bounded assembly for #897 and sole [PR904](https://github.com/Carberk/carberk/pull/904), using the repository run-issue verification workflow. Owned worktree `/Users/bagtyyar/.t3/worktrees/carberk/t3-30f5b096`, branch `agent/release897-handoff-attribution-assembly-20261023`. Host scaffold `t3/30f5b096` remains at supplied local root `464f79c0ea024aa45e36a34b0b444bed38646b06`, tree `aa84596bb6acdf0e8b5f5fe530cb91523ff6431d`. No push or PR-body edit was made; parent owns the coherent integration push.
+
+Original checkpoints are retained through two conflict-free merges, not rewritten or squashed. `ac5476c267b6377a6879e59344d95f0c5360efe5` merges scheduling receipt `e6fa8f4d3afae83ddcd5293079095c0785efb1c1`, tree `71af3466f8f784a7c6dd207b39afcc305d4ed7d8`, including ancestors `fb8c6fba` and `f1286808`. `37f2ad95e27063948a4f0e3d51336970b2b1695b` merges docs-only plan `a36890cda876907f49122aa536d77a5cccd135b8`, tree `76b27d97752f596e39d7c51a7f22a77031436dff`. Supplied #923 RED `0f95f63d` and source `966d3807` remain ancestors. Latest supplied and locally recorded `origin/main` `9fde309c3da17f2661fe9c266504e6e56a1b97c9` is an ancestor. No in-flight classified capture branch was incorporated.
+
+The assembly changes exactly four paths relative to `464f79c0`: `apps/worker/src/jobs/diagnostics/SafeReplacementScheduling.spec.ts`, the unchanged classified capture plan, the scheduling attribution receipt, and this receipt. All product source, schema, migrations, security behavior, approved seed edits and prior evidence from `464f79c0` remain byte-identical. Worker changes share immutable font reads, add one FIFO outcome expectation and fixed-phase failure diagnostics. All previous expectation lines survive verbatim. No timeout, retry or concurrency budget changes. Shared font reads are negligible and this is diagnostic evidence only; the hosted timeout cause remains UNKNOWN. The scheduling receipt wording is corrected: field count is fixed and completed-phase durations are capped, while elapsed/active-phase fields are numeric and uncapped. No product fix is claimed.
+
+Preservation checks compared the full existing private HTTP file prefix byte-for-byte before appended journeys. Public file prefix also matches after reversing only the additional isolated fixture actor roster and helper type. The automatic discovery file matches after reversing only its two new journey VIN arguments. Existing assertions and prior bodies are preserved. The private append contains a B-only consumption journey, a five-case authority/rights journey group and a traversal journey; the public append adds the isolated A-erasure/B-survival journey. They are configured source, not locally executed real-service evidence. New offline handoff tests and strict contracts remain additive. The 40-test handoff/discovery run is current offline authority; the earlier stale-built-export/wrong-E2E setup attempt does not establish behavior or service execution.
+
+Full main-relative candidate inventory before this receipt was 1,462 changed files, 92,635 insertions and 2,270 deletions; the 327-entry test-change inventory is inherited from the supplied assembly plus the bounded worker spec. Full `7b70288d`-relative delta before this receipt was 20 files, 816 insertions and 74 deletions. These are aggregate inherited diffs, not new assembly edits. Exact diff artifacts, preservation JSON and inventories live under the unique directory below. All 11 handoff receipt log hashes and six scheduling receipt log hashes independently matched existing artifacts. Parent focused log `/tmp/carberk-resume-20261021/464f-root-focused.log` also shows 40/40 pass, SHA-256 `6ddffde8fabfdd86d97238bb3cbf8f77f214daad1172a66044fdeffbedf6871f`.
+
+## Combined verification
+
+Logs are unique to this assembly at `/tmp/carberk-897-assembly-20261023.pkVOQ0/`. Build generation used only `postgresql://generation:generation@localhost:5432/generation`; no runtime SQL, service launch or disposable-service suite ran. Turbo cache was reused for unchanged inputs. Initial unit execution lacked installed worker dependencies. `pnpm install --frozen-lockfile --offline` repaired the owned worktree installation with zero downloads and no tracked lockfile change. The original setup failure remains in `unit-missing-installed-dependencies.log`; the final complete pass supersedes it.
+
+| Command | Result | Log and SHA-256 |
+| --- | --- | --- |
+| `pnpm --filter @auto-tm/contracts build` | pass | `contracts-build.log` `761dc08d1dcf4ddb4bca4840e25682993d0d477ffc6847b06692306f3aa2292d` |
+| `DATABASE_URL=<generation-only placeholder> pnpm --filter @auto-tm/db build` | pass | `db-build.log` `1096c07443aa6516bf4dbd88a2ffe237f203daca782b3016a590a493d78e59f7` |
+| `DATABASE_URL=<generation-only placeholder> pnpm test:unit` | 10/10 tasks; 9 cached; worker reran, 297 pass | `unit.log` `6d8998f5707548ebc92cd2a7baf8c152209a50616d95b45ba6d9d2b56104cc45` |
+| `DATABASE_URL=<generation-only placeholder> pnpm typecheck` | 11/11 tasks; 10 cached | `typecheck.log` `2bd7d40e9dd62f1dd7827d9951e5ced8580f8bed1094912f658547064a9a760b` |
+| `pnpm --filter @auto-tm/api --filter @auto-tm/worker --filter @auto-tm/contracts --filter @auto-tm/db lint` | pass, all four workspaces | `lint.log` `1ce36e2548f12a3dc7ea601080fda9004a3216fc5364adf6fa44f09fde5bfe50` |
+| `pnpm --filter @auto-tm/api --filter @auto-tm/worker build` | pass, both workspaces | `apps-build.log` `0ddc0c0833f50963e819273ce0db5a0e257cc902a01d9acba9bff0274f0e33ec` |
+| `pnpm --filter @auto-tm/worker exec tsc6 --noEmit` | pass | `worker-ts6.log` `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `pnpm check:runtime-imports` | pass | `runtime.log` `2920e5c9967fdaf4eb831dfb48e054ff0bd4262a1ef314658ceca54821fa5d97` |
+| `pnpm test:agent-docs` | pass, 8 tests | `docs.log` `1a12ca68a4d3abb1bdc0a2dc413ef51ea13cb896517b06fc70dacb2c1f618417` |
+| `pnpm test:glossary` | pass, 40 tests | `glossary.log` `1e8838f9e87c7e332a859a7d3bcc499f22416e2b247e9d4ac88d684dd9196a2f` |
+| `pnpm check:glossary` | pass | `glossary-check.log` `d0863b4ecc26a15f30aa60280c93ab71299462ab7b6fd8e15e5c042c23144621` |
+| `pnpm --filter @auto-tm/api test:unit src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts` | 40/40 pass | `focused.log` `6279d6b3574cea6b5d156231a04873e4f8a4717f9439ec557059933c68fa0e31` |
+| `pnpm --filter @auto-tm/worker test:unit src/jobs/diagnostics/SafeReplacementScheduling.spec.ts src/jobs/diagnostics/ErasedPredecessorArtifacts.spec.ts src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts src/jobs/PurgeExpiredAccounts.spec.ts` | 24/24 pass | `worker-focused.log` `599ac37c6baaeebfbb6c90b6297379dfb14b9be5ad873415896b1cc87aea87c7` |
+
+| Acceptance criterion | Evidence | Result |
+| --- | --- | --- |
+| Preserve supplied source/checkpoint ancestry and main inclusion | merge parents, `merge-base --is-ancestor`, `preservation.json`, full diff inventory | pass |
+| Only finished scheduling diagnostics and classified plan incorporated | exact four-path assembly delta, source blob preservation | pass |
+| Current combined offline checks | commands above, 40 handoff/discovery and 24 worker focused tests | pass |
+| Real HTTP/SQL handoff, concurrency and purge behavior | configured appended hosted journeys, not run here | blocked, hosted UNKNOWN |
+| Scheduling hosted timeout attribution | prior 5,000ms transport probe emitted three fixed-phase records; hosted hook run still pending | blocked, cause UNKNOWN |
+| Full release acceptance | parent independent Standards/Spec review, configured hosted CI and deployed acceptance | blocked, parent-owned |
+
+Supplied hosted baseline `7b70288d`, run `39911838576`, remains API 3,424 pass / 5 fail and worker 375 pass / 3 fail. Finalized-B EN safe PDF and draft purge passed. Discovery failed before its endpoint on the VIN fixture now corrected in `464f79c0`; no reached hosted discovery GREEN is claimed. Automatic 403 versus 201, three historical reset failures, three worker 5,000ms timeouts and new handoff hosted results remain separate gates. The diagnostic baseline behavioral RED, pending versus ready, and prior 24-focused GREEN remain preserved, not reinterpreted as a timeout fix.
+
+No nested agents, extra PR, integration push, CI rerun/poll, deployment, Railway action, reset, quota/credential access, device, emulator, signing or store action. The three Railway refusals remain terminal; founder's automated emulator prohibition remains effective. Source-only inspection and offline gates cannot substitute for service acceptance. Docs: not applicable, assembly of existing internal checkpoints and evidence wording only. Documentation changes are exempt from behavioral RED; ancestry, preservation and documentation checks provide alternative proof. No overview or glossary ownership changed.
+
+Final diff check: `git diff --check 464f79c0 HEAD` passes for the assembly. The full main-relative `git diff --check 9fde309c HEAD` reports nine trailing blank-line warnings in inherited files, identical to `git diff --check 9fde309c 464f79c0`. Baseline/candidate diagnostic logs compare byte-for-byte; no inherited file was rewritten to remove them. Full candidate diff-check is therefore not green.

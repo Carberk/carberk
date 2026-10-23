@@ -2,7 +2,7 @@
 
 Checkpoint: `f1286808ddd4965cd72f7548841d23a3658b60a0` (tree `28f3af32fa6b90a2808ffe5c7939de0d5e3f1b0d`), branch `agent/issue-914-scheduling-test-cost-20261023`. Parent PR remains #904.
 
-The scheduling spec now registers Vitest 5.0.4 `onTestFailed`. The hook runs after Vitest marks a 5,000ms test timeout and emits one bounded stderr record per failed locale. Records contain only locale, capped elapsed time, fixed phase names, and capped phase durations; they contain no IDs, PDF bytes, or personal data. No timers, background work, retries, timeout changes, concurrency changes, or product edits were added.
+The scheduling spec now registers Vitest 5.0.4 `onTestFailed`. The hook runs after Vitest marks a 5,000ms test timeout and emits one bounded stderr record per failed locale. Records have a fixed field count and contain only locale, numeric elapsed fields, fixed phase names, and capped completed-phase durations; they contain no IDs, PDF bytes, or personal data. No timers, background work, retries, timeout changes, concurrency changes, or product edits were added.
 
 A transport probe replaced the maintenance await with an unresolved promise while retaining the 5,000ms budget. It proved the hook survives timeout and identifies the active phase:
 
