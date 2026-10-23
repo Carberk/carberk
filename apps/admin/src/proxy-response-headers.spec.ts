@@ -106,15 +106,27 @@ describe("diagnostics proxy response headers", () => {
     expectProtected(response);
   });
 
-  it("protects a rotated action mutation and shares exactly one renewal", async () => {
+  it("protects a fresh-session successful mutation without renewing or returning authority", async () => {
+    vi.mocked(fetch).mockResolvedValue(Response.json({ id: file, state: "staged" }));
+    const response = await enter(request());
+    const { diagnosticStageIdentityProvenance } = await import("./app/diagnostics/actions");
+    expect(await diagnosticStageIdentityProvenance(order, stage)).toEqual({ ok: true, data: { id: file, state: "staged" } });
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expectProtected(response);
+  });
+
+  it.each([201, 403])("protects a rotated mutation's %s outcome and shares exactly one renewal without replay", async status => {
     const access = current();
     vi.mocked(fetch).mockImplementation(async url => String(url).endsWith("/auth/refresh")
       ? Response.json({ accessToken: access, refreshToken: rotatedRefresh })
-      : Response.json({ id: file, state: "staged" }));
+      : Response.json({ id: file, state: "staged" }, { status }));
     const oldCookie = `auto_tm_admin_access=${jwt(1)}; auto_tm_admin_refresh=${refresh}`;
     const [response, concurrent] = await Promise.all([enter(request(oldCookie)), enter(request(oldCookie))]);
     const { diagnosticStageIdentityProvenance } = await import("./app/diagnostics/actions");
-    expect(await diagnosticStageIdentityProvenance(order, stage)).toEqual({ ok: true, data: { id: file, state: "staged" } });
+    expect(await diagnosticStageIdentityProvenance(order, stage)).toEqual(status === 201
+      ? { ok: true, data: { id: file, state: "staged" } }
+      : { ok: false, error: "denied", code: "DIAGNOSTIC_NO_ACCESS" });
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(fetch).toHaveBeenLastCalledWith(`http://api.example.test/api/v1/diagnostics/orders/${order}/identity-provenance`, expect.objectContaining({ method: "POST", body: JSON.stringify(stage), headers: { Authorization: `Bearer ${access}`, "Content-Type": "application/json" } }));
     for (const result of [response, concurrent]) {

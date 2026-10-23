@@ -10,6 +10,18 @@ import { ADMIN_RETURN_TO_HEADER, validateOrigin, validateReturnTo } from "./lib/
 const PROTECTED_PREFIXES = ["/reports", "/audit", "/listings", "/users", "/catalog", "/workspace", "/business-admission", "/services", "/diagnostics", "/improvement"];
 
 export async function proxy(request: NextRequest) {
+  const response = await sessionResponse(request);
+  const { pathname } = request.nextUrl;
+  if (pathname === "/diagnostics" || pathname.startsWith("/diagnostics/")) {
+    // Response headers, including early origin/renewal refusals. Request
+    // overrides remain owned by sessionResponse; never copy them to clients.
+    response.headers.set("Cache-Control", "private, no-store");
+    response.headers.set("X-Content-Type-Options", "nosniff");
+  }
+  return response;
+}
+
+async function sessionResponse(request: NextRequest) {
   const { pathname } = request.nextUrl;
   request.headers.delete(SESSION_EXPIRED_HEADER);
   const settings = authCookieSettings();
