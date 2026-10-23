@@ -213,3 +213,7 @@ aecc3fad493f95385b2eb915f12a25975582dfc392a5f942fea2eecbcf8cf7db  docs.log
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  diff-check.log
 1ed47d68d15ffc5f1b2480d3fc91c663c46bea1850037c770355ba8c10626f3a  preservation.log
 ```
+
+## Recovery authority wording correction
+
+Docs-only follow-up from `e7389f97eb5e8c33383d38b355e920de29f307a8`. The diagnostics overview now distinguishes current dual reviewer authority for issuance recovery from current B authority for completed B pointer recovery without A/proof admission. Same-current-Session and disposed-identity boundaries remain explicit. Source/tests/schema are unchanged. Inspected no-listener documentation, local-link and diff checks pass; no compiler, unit, broad script, service or operational command ran. Evidence is under `/tmp/issue-923-request-recovery-authority-docs/`; checkpoint/tree and hashes are returned separately.
