@@ -18,4 +18,7 @@ describe("pair audience and public transfer admission", () => {
   it("refuses automatic public transfer until unchanged ownership is established", () => {
     expect(() => continuityPair(publicA, { ...publicA, commissionerId: "b" }, "automatic_normalized_vin")).toThrow("DIAGNOSTIC_NO_ACCESS");
   });
+  it("admits automatic public continuity for the same commissioner", () => {
+    expect(() => continuityPair(publicA, publicA, "automatic_normalized_vin")).not.toThrow();
+  });
 });
