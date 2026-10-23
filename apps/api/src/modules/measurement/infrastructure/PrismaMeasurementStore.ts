@@ -3,6 +3,7 @@ import type { PrismaService } from "@auto-tm/db";
 import { MeasurementSchemas } from "@auto-tm/contracts";
 import type { MeasurementSubjectPort } from "../application/AcceptClientMeasurementBatch";
 import type { MeasurementAuthority, MeasurementLedgerPort, MeasurementConversionPort } from "../measurement.public";
+import { reportMeasurementUnavailable } from "../application/MeasurementUnavailableDiagnostic";
 import { MeasurementVisit } from "../domain/MeasurementVisit";
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -80,24 +81,33 @@ export class PrismaMeasurementStore implements MeasurementLedgerPort, Measuremen
  }
  async appendIfEligible(record: Parameters<MeasurementLedgerPort["appendIfEligible"]>[0]): Promise<"accepted" | "duplicate" | "revoked"> {
   if (!this.admitted()) return "revoked";
-  return this.prisma.$transaction(async (tx) => {
-   const states = await tx.$queryRaw<{ epoch: string }[]>`SELECT "epoch" FROM "measurement_state" WHERE "key" = 'collector' FOR SHARE`;
-   if (states[0]?.epoch !== this.config.epoch) return "revoked";
-   const rows = await tx.$queryRaw<Principal[]>`SELECT * FROM "measurement_principals" WHERE "pseudonym" = ${record.authority.subject.pseudonym} FOR UPDATE`;
-   const principal = rows[0];
-   if (!principal || principal.epoch !== this.config.epoch || principal.generation !== record.authority.subject.generation
-    || principal.kind !== record.authority.subject.kind || (principal.expiresAt && principal.expiresAt <= this.now())) return "revoked";
-   if (record.authority.origin === "client" || record.event.visitId) {
-    if (!record.event.visitId) return "revoked";
-    const visit = await tx.measurementVisit.findUnique({ where: { id: record.event.visitId } });
-    if (!visit || !MeasurementVisit.permits(visit, principal.id, new Date(record.event.occurredAt))) return "revoked";
-   }
-   const conversionEligible=this.conversion?await this.conversion.eligible(tx,{userId:principal.userId,event:record.event}):false;
-   const inserted = await tx.measurementRecord.createMany({ data: [{ id: record.event.eventId, principalId: principal.id, visitId: record.event.visitId ?? null,
-    event: JSON.parse(JSON.stringify(record.event)), origin: record.authority.origin, environment: record.authority.environment, population: record.authority.population, conversionEligible,
-    occurredAt: new Date(record.event.occurredAt), receivedAt: record.receivedAt, expiresAt: record.expiresAt }], skipDuplicates: true });
-   return inserted.count ? "accepted" : "duplicate";
-  }, { maxWait: 250, timeout: 1000 });
+  let phase: Parameters<typeof reportMeasurementUnavailable>[0] = "transaction_start";
+  try {
+   return await this.prisma.$transaction(async (tx) => {
+    phase = "epoch_lock";
+    const states = await tx.$queryRaw<{ epoch: string }[]>`SELECT "epoch" FROM "measurement_state" WHERE "key" = 'collector' FOR SHARE`;
+    if (states[0]?.epoch !== this.config.epoch) return "revoked";
+    phase = "principal_lock";
+    const rows = await tx.$queryRaw<Principal[]>`SELECT * FROM "measurement_principals" WHERE "pseudonym" = ${record.authority.subject.pseudonym} FOR UPDATE`;
+    const principal = rows[0];
+    if (!principal || principal.epoch !== this.config.epoch || principal.generation !== record.authority.subject.generation
+     || principal.kind !== record.authority.subject.kind || (principal.expiresAt && principal.expiresAt <= this.now())) return "revoked";
+    if (record.authority.origin === "client" || record.event.visitId) {
+     if (!record.event.visitId) return "revoked";
+     phase = "visit_read";
+     const visit = await tx.measurementVisit.findUnique({ where: { id: record.event.visitId } });
+     if (!visit || !MeasurementVisit.permits(visit, principal.id, new Date(record.event.occurredAt))) return "revoked";
+    }
+    phase = "conversion_check";
+    const conversionEligible=this.conversion?await this.conversion.eligible(tx,{userId:principal.userId,event:record.event}):false;
+    phase = "record_insert";
+    const inserted = await tx.measurementRecord.createMany({ data: [{ id: record.event.eventId, principalId: principal.id, visitId: record.event.visitId ?? null,
+     event: JSON.parse(JSON.stringify(record.event)), origin: record.authority.origin, environment: record.authority.environment, population: record.authority.population, conversionEligible,
+     occurredAt: new Date(record.event.occurredAt), receivedAt: record.receivedAt, expiresAt: record.expiresAt }], skipDuplicates: true });
+    phase = "transaction_commit";
+    return inserted.count ? "accepted" : "duplicate";
+   }, { maxWait: 250, timeout: 1000 });
+  } catch (error) { reportMeasurementUnavailable(phase, error); throw error; }
  }
  /** Guest-safe erasure requires its scoped secret. No account or other app privileges. */
  async eraseGuest(capability: string): Promise<void> {
