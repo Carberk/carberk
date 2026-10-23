@@ -4,10 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({ request: undefined as NextRequest | undefined }));
 // Only Next's request-local storage boundary is replaced. Actions, guards,
 // renewal, contracts and NextRequest/NextResponse run unchanged.
-vi.mock("next/headers", () => ({
-  headers: async () => state.request!.headers,
-  cookies: async () => state.request!.cookies,
-}));
+vi.mock("next/headers", () => {
+  function incoming() {
+    if (!state.request) throw new Error("Proxy request storage has not been entered");
+    return state.request;
+  }
+  return { headers: async () => incoming().headers, cookies: async () => incoming().cookies };
+});
 
 const order = "11111111-1111-4111-8111-111111111111";
 const file = "22222222-2222-4222-8222-222222222222";
@@ -146,7 +149,7 @@ describe("diagnostics proxy response headers", () => {
     expect(fetch).toHaveBeenCalledTimes(mode === "missing" ? 0 : 1);
     expect(response.headers.get("x-middleware-next")).toBe("1");
     expect(response.headers.get("location")).toBeNull();
-    expect(state.request!.cookies.get("auto_tm_admin_refresh")).toBeUndefined();
+    expect(state.request?.cookies.get("auto_tm_admin_refresh")).toBeUndefined();
     expect(response.cookies.get("auto_tm_admin_access")).toMatchObject({ value: "", maxAge: 0 });
     expect(response.cookies.get("auto_tm_admin_refresh")).toMatchObject({ value: "", maxAge: 0 });
     expectProtected(response);
