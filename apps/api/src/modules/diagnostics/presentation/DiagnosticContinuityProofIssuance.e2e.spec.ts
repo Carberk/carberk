@@ -1317,6 +1317,13 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
 
 
   // #923 B-owned handoff slice: append-only journeys. All prior helpers/assertions stay unchanged.
+  // Reception keeps its independent current assignment when both T and R lose A access.
+  async function handoffReviewerAssignment(o: Order, active: boolean) {
+    const current = (await get("reception", `orders/${o.id}`).expect(200)).body as Order;
+    o.version = (await post("reception", `orders/${o.id}/assignments`, {
+      expectedVersion: current.version, userId: suite.id("reviewer"), capability: "diagnostics.reviewer", active,
+    }).expect(201)).body.version;
+  }
   const handoffPath = (p: Pair) => `orders/${p.b.id}/continuity-handoffs`;
   const handoffCommand = (p: Pair) => ({ reportId: randomUUID(), expectedOrderVersion: p.b.version, reason: "B-owned new physical visit" });
   async function bOnlyPair(shortRights = false) {
@@ -1349,7 +1356,7 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
     expect(after.audits.filter(row => !before.audits.some(prior => prior.id === row.id)).map(row => row.action).sort()).toEqual(["CONTINUITY_PROOF_CONSUMED", "REPORT_REINSPECTION_CREATED"]);
     for (const changed of [{ ...input, reason: "Changed" }, { ...input, expectedOrderVersion: input.expectedOrderVersion + 1 }])
       privateNoStore(await post("technician", commandPath, changed).expect(409));
-    await assignment(p.a, "reviewer", false);
+    await handoffReviewerAssignment(p.a, false);
     expect((await get("technician", handoffPath(p)).expect(200)).body.result).toEqual({ proofId, reportId: input.reportId });
     expect((await post("technician", commandPath, input).expect(201)).body).toEqual({ reportId: input.reportId });
     expect((await get("technician", `${issuancePath(p)}/${proofId}`)).status).toBe(403);
@@ -1373,13 +1380,13 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
       expect(await db.diagnosticAudit.count({ where: { orderId: p.b.id, action: "CONTINUITY_PROOF_CONSUMED" } })).toBe(0);
     };
     if (change === "assignment") {
-      await assignment(p.a, "reviewer", false); await assignment(p.a, "reviewer", true);
+      await handoffReviewerAssignment(p.a, false); await handoffReviewerAssignment(p.a, true);
       // Historical restricted contents may still be read, but can never revive usability.
       await get("reviewer", `${issuancePath(p)}/${proofId}`).expect(200);
       expect((await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).invalidatedAt).toBeInstanceOf(Date);
     }
     if (change === "issuer Session") await db.session.update({ where: { id: suite.id("reviewer-session") }, data: { expiresAt: initialTime } });
-    if (change === "issuer grant") await grant("reviewer", false).expect(201);
+    if (change === "issuer grant") await grant("reviewer", false).expect(204);
     if (change === "B qualification") await db.diagnosticCenterAssignment.updateMany({ where: { centerId, userId: suite.id("technician"), capability: "diagnostics.technician" }, data: { qualifiedUntil: initialTime } });
     if (change === "A rights") await atLifecycleTime(lifecycleExpiry, verify); else await verify();
   });
@@ -1409,7 +1416,7 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
     const cursor = firstPage!.body.nextCursor as string;
     await get("reviewer", `${handoffPath(p)}?cursor=${cursor}`).expect(403);
     await get("technician", `${handoffPath(p)}?cursor=${cursor.slice(0, -1)}!`).expect(403);
-    await assignment(p.a, "reviewer", false); await assignment(p.a, "reviewer", true);
+    await handoffReviewerAssignment(p.a, false); await handoffReviewerAssignment(p.a, true);
     const historical = await get("technician", `${handoffPath(p)}?cursor=${cursor}`).expect(200);
     expect(historical.body.handoffs).toEqual([]);
     expect(historical.body.nextCursor).toHaveLength(1062);
