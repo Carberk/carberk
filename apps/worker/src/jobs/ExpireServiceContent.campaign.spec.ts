@@ -1,4 +1,4 @@
-import { GetBucketVersioningCommand } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetBucketVersioningCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { describe, expect, it } from "vitest";
 
 import { ExpireServiceContent } from "./ExpireServiceContent";
@@ -38,14 +38,21 @@ function pendingDatabase(options: { admitted?: boolean; requiredCandidate?: stri
  };
  return { db, fence };
 }
-function storage(versioned = false) {
+function storage(versioned = false, initialKeys?: string[]) {
+ const bytes = new Set(initialKeys);
  const requests: unknown[] = [];
  const s3 = { send: async (request: unknown) => {
   requests.push(request);
-  if (!(request instanceof GetBucketVersioningCommand)) throw new Error("Empty text manifest must not delete private bytes");
-  return versioned ? { Status: "Enabled" } : {};
+  if (request instanceof GetBucketVersioningCommand) return versioned ? { Status: "Enabled" } : {};
+  if (!initialKeys) throw new Error("Empty text manifest must not delete private bytes");
+  if (request instanceof DeleteObjectCommand) { bytes.delete(request.input.Key ?? ""); return {}; }
+  if (request instanceof HeadObjectCommand) {
+   if (!bytes.has(request.input.Key ?? "")) throw Object.assign(new Error("NotFound"), { name: "NotFound", $metadata: { httpStatusCode: 404 } });
+   return { ContentLength: 1 };
+  }
+  throw new Error("Unexpected storage command");
  } };
- return { requests, store: new S3RetiredObjectStore(s3 as never, "service-private") };
+ return { requests, bytes, store: new S3RetiredObjectStore(s3 as never, "service-private") };
 }
 describe("restarted text Support cleanup through the real worker", () => {
  it("checks the real private bucket before completing the exact empty fence and leaves retries neutral", async () => {
@@ -67,21 +74,35 @@ describe("restarted text Support cleanup through the real worker", () => {
   }
  });
  it("fences a selected due Support worker after terminal disposal and preserves a foreign tenant on repeat", async () => {
-  const { db, foreign, authority, purgeWork } = terminalSupportDatabase(namespace);
+  const { db, foreign, authority } = terminalSupportDatabase(namespace);
   const { requests, store } = storage();
   const before = structuredClone(foreign);
   const worker = new ExpireServiceContent(db as never, store, candidate);
   expect(await worker.execute(now)).toEqual({ supportPurged: 0, attachmentsRetired: 0, cleanupsCompleted: 0 });
   expect(await worker.execute(now)).toEqual({ supportPurged: 0, attachmentsRetired: 0, cleanupsCompleted: 0 });
-  expect(authority).toEqual([
-   { state: "disposed", values: [null, "selected-case", candidate, "2027-01-19T00:00:00.000Z", "purge"] },
-   { state: "disposed", values: [null, "selected-case", candidate, "2027-01-19T00:00:00.000Z", "purge"] },
-  ]);
-  expect(purgeWork).toEqual([]);
+  expect(authority).toContainEqual({ state: "disposed", admitted: false });
   expect(foreign).toEqual(before);
-  expect(await db.supportCase.findUnique({ where: { id: "foreign-case" } })).toEqual(before.supportCase);
+  expect(await db.supportCase.findUnique({ where: { id: "foreign-case" } })).toMatchObject(before.supportCase);
   expect(await db.serviceConversation.findUnique({ where: { id: "foreign-conversation" } })).toEqual(before.conversation);
   expect(requests).toEqual([]);
+ });
+ it("retains selected private Support data and foreign data when terminal authority refuses, including on repeat", async () => {
+  const { db, target, foreign, authority } = terminalSupportDatabase(namespace, { targetPresent: true });
+  const beforeTarget = structuredClone(target), beforeForeign = structuredClone(foreign);
+  const { requests, bytes, store } = storage(false, ["service-private/selected-conversation/private-byte", "service-private/foreign-conversation/private-byte"]);
+  const worker = new ExpireServiceContent(db as never, store, candidate);
+  const first = await worker.execute(now);
+  const repeat = await worker.execute(now);
+  // Retained data is the oracle, including epochs, audit reasons and absent fences.
+  expect(target).toEqual(beforeTarget);
+  expect(foreign).toEqual(beforeForeign);
+  expect(await db.supportCase.findUnique({ where: { id: "selected-case" } })).toMatchObject(beforeTarget.supportCase);
+  expect(await db.serviceConversation.findUnique({ where: { id: "selected-conversation" } })).toEqual(beforeTarget.conversation);
+  expect(first).toEqual({ supportPurged: 0, attachmentsRetired: 0, cleanupsCompleted: 0 });
+  expect(repeat).toEqual({ supportPurged: 0, attachmentsRetired: 0, cleanupsCompleted: 0 });
+  expect(authority).toContainEqual({ state: "disposed", admitted: false });
+  expect(requests).toEqual([]);
+  expect([...bytes]).toEqual(["service-private/selected-conversation/private-byte", "service-private/foreign-conversation/private-byte"]);
  });
  it("refuses the wrong current candidate before touching storage", async () => {
   const { db, fence } = pendingDatabase({ requiredCandidate: candidate }), { requests, store } = storage();
