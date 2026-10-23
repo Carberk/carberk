@@ -74,3 +74,27 @@ Local command and artifact hashes:
 | `pnpm check:glossary` | pass, 31 terms |
 
 The DB build was inspected but intentionally not executed: its first command is `pnpm exec prisma generate`; no connection/listener path was needed to establish this blocker. No package-wide tests, services, migrations, seeds, or generated Prisma client were run.
+
+## Setup completion checkpoint
+
+The earlier declaration failures were unmet build prerequisites, not established baseline source errors. With the explicitly authorized offline generation step, the exact command below completed without a database connection:
+
+```sh
+DATABASE_URL='postgresql://offline:offline@localhost:5432/offline_codegen_only' pnpm --filter @auto-tm/db build
+```
+
+`packages/db/prisma.config.ts` read the syntactically valid inert URL; Prisma generated the client and the package build completed. No migrate, seed, listener, service, Docker, or database action ran. The generated client is ignored; `git status --porcelain` remained clean before the receipt edit.
+
+Post-build verification manifest:
+
+| Command/artifact | SHA-256 or result |
+| --- | --- |
+| DB build log | `4b8557c53bd906627ee758c02ae4cfe0dbdfaaf1dc908d0c94ac7bc752239371` (pass) |
+| API `pnpm --filter @auto-tm/api typecheck` log | `8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92` (pass) |
+| API `pnpm --filter @auto-tm/api exec tsc6 --noEmit` log | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca4959911b7852b855` (pass) |
+| Focused lifecycle lint from `apps/api` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca4959911b7852b855` (pass) |
+| `git diff --check` | pass |
+| `pnpm check:agent-docs` log | `8f5507ea6fcde992f7d6733d113abc538ae4957b777bc97cadd580f651c93b20` (pass) |
+| `pnpm check:glossary` log | `d0863b4ecc26a15f30aa60280c93ab71299462ab7b6fd8e15e5c042c23144621` (pass) |
+
+The prior blocked typecheck logs remain historical evidence of the missing declaration setup before this prerequisite; they are superseded by the passing post-build checks above. No tracked product, schema, test, or generated source bytes changed.
