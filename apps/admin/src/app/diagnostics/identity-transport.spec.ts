@@ -66,3 +66,59 @@ it("refuses unbounded or non-JSON upstream data without decoding it", async () =
  vi.stubGlobal("fetch", async () => new Response("private", { headers: { "Content-Type": "text/html" } }));
  expect(await actions.diagnosticIdentityRecords(order)).toMatchObject({ ok: false });
 });
+it("uniformly denies malformed browser origins before validation or transport", async () => {
+ state.headers.set("origin", "invalid-origin-private-value"); const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+ expect(await actions.diagnosticStageIdentityProvenance(order, stage)).toEqual(denied); expect(fetcher).not.toHaveBeenCalled();
+});
+const observation = { observedAt: "2026-10-23T00:00:00.000Z", mileageKm: 1000, method: "manual", vin: null, manualReference: "Physical chassis observation" };
+const raw = { id: predecessor, orderId: order, orderVersion: 3, observationHash: "a".repeat(64), observation, recordedBy: order, recordedAt: "2026-10-23T00:00:00.000Z" };
+const capture = { id: order, expectedOrderVersion: 3, identityRecordId: predecessor, identifiers: [{ kind: "chassis_stamp", location: "Frame", value: "SYNTHETIC-01", provenanceIds: [predecessor] }], rights, correction: { supersedesId: predecessor, explanation: "Supported recording correction" } };
+const evidence = { id: order, orderId: order, orderVersion: 3, identityRecordId: predecessor, observationHash: "a".repeat(64), observation, identifiers: capture.identifiers, provenance: [{ id: predecessor, sha256: "b".repeat(64), mime: "image/webp", sizeBytes: 3 }], rights, correction: capture.correction, recordHash: "c".repeat(64), recordedBy: order, recordedAt: "2026-10-23T00:00:00.000Z" };
+const identity = { observation, evidence, corrections: [evidence], evidenceGeneration: 2, correctionHeadHash: "c".repeat(64) };
+const comparison = { predecessor: { reportId: predecessor, reportVersion: 2, snapshotHash: "d".repeat(64), identityRecordId: predecessor, identityRecordHash: "a".repeat(64), identity }, candidate: { orderId: order, orderVersion: 3, identityRecordId: order, identityRecordHash: "a".repeat(64), identity } };
+const issuance = { predecessorId: predecessor, expectedPredecessorVersion: 2, expectedOrderVersion: 3, predecessorIdentityRecordId: predecessor, candidateIdentityRecordId: order, linkingTechnicianId: order, method: "comparative_attestation", rationale: "Supported pair comparison", provenanceRecordIds: [predecessor] };
+const proof = { proofId: predecessor, policyVersion: "ADR-0108", predecessor: { reportId: predecessor, reportVersion: 2, snapshotHash: "d".repeat(64), identityRecordId: predecessor, identityRecordHash: "a".repeat(64) }, candidate: { orderId: order, orderVersion: 3, identityRecordId: order, identityRecordHash: "a".repeat(64) }, linkingTechnicianId: order, method: "comparative_attestation", result: "same_vehicle", rationale: issuance.rationale, provenanceRecordIds: [predecessor], issuedBy: predecessor, issuedAt: "2026-10-23T00:00:00.000Z" };
+it("preserves raw history and explicit correction records without rewriting observations", async () => {
+ vi.stubGlobal("fetch", async () => Response.json([raw])); expect(await actions.diagnosticIdentityRecords(order)).toEqual({ ok: true, data: [raw] });
+ vi.stubGlobal("fetch", async () => Response.json(evidence)); expect(await actions.diagnosticAppendIdentityEvidence(order, capture)).toEqual({ ok: true, data: evidence });
+ vi.stubGlobal("fetch", async () => Response.json([evidence])); expect(await actions.diagnosticIdentityEvidence(order)).toEqual({ ok: true, data: [evidence] });
+});
+it("reads the exact pair with pins and complete correction material or refuses the whole projection", async () => {
+ const fetcher = vi.fn(async () => Response.json(comparison)); vi.stubGlobal("fetch", fetcher);
+ expect(await actions.diagnosticReinspectionComparison(order, { predecessorId: predecessor })).toEqual({ ok: true, data: comparison });
+ expect(fetcher).toHaveBeenCalledWith(expect.stringContaining(`/orders/${order}/reinspection-comparison?predecessorId=${predecessor}`), expect.objectContaining({ method: "GET" }));
+ vi.stubGlobal("fetch", async () => Response.json({ ...comparison, candidate: null })); expect(await actions.diagnosticReinspectionComparison(order, { predecessorId: predecessor })).toMatchObject({ ok: false });
+});
+it("forwards strict proof issuance and full proof reads separately from B-only consumption", async () => {
+ const fetcher = vi.fn(async () => Response.json(proof)); vi.stubGlobal("fetch", fetcher);
+ expect(await actions.diagnosticIssueContinuityProof(order, issuance)).toEqual({ ok: true, data: proof });
+ expect(fetcher).toHaveBeenLastCalledWith(expect.stringContaining(`/orders/${order}/continuity-proofs`), expect.objectContaining({ method: "POST", body: JSON.stringify(issuance) }));
+ expect(await actions.diagnosticContinuityProof(order, predecessor)).toEqual({ ok: true, data: proof });
+ expect(fetcher).toHaveBeenLastCalledWith(expect.stringContaining(`/orders/${order}/continuity-proofs/${predecessor}`), expect.objectContaining({ method: "GET" }));
+ const command = { reportId: order, expectedOrderVersion: 3, reason: "Explicit B linking operation" };
+ fetcher.mockImplementation(async () => Response.json({ reportId: order }));
+ expect(await actions.diagnosticConsumeContinuityHandoff(order, predecessor, command)).toEqual({ ok: true, data: { reportId: order } });
+ expect(fetcher).toHaveBeenLastCalledWith(expect.stringContaining(`/orders/${order}/continuity-handoffs/${predecessor}/consume`), expect.objectContaining({ method: "POST", body: JSON.stringify(command) }));
+});
+it("does not add A bindings to B commands or retry a failed mutation", async () => {
+ const fetcher = vi.fn(async () => { throw new Error("secret lost reply"); }); vi.stubGlobal("fetch", fetcher);
+ const command = { reportId: order, expectedOrderVersion: 3, reason: "Explicit B linking operation" };
+ expect(await actions.diagnosticConsumeContinuityHandoff(order, predecessor, { ...command, predecessorId: predecessor })).toMatchObject({ ok: false }); expect(fetcher).not.toHaveBeenCalled();
+ expect(await actions.diagnosticConsumeContinuityHandoff(order, predecessor, command)).toMatchObject({ ok: false }); expect(fetcher).toHaveBeenCalledOnce();
+});
+it("reads only the current B technician selector without using a general staff directory", async () => {
+ const data = { technicians: [{ userId: order, name: "Synthetic technician" }] };
+ const fetcher = vi.fn(async () => Response.json(data)); vi.stubGlobal("fetch", fetcher);
+ expect(await actions.diagnosticLinkingTechnicians(order)).toEqual({ ok: true, data });
+ expect(fetcher).toHaveBeenCalledWith(expect.stringContaining(`/orders/${order}/linking-technicians`), expect.anything());
+});
+it("cancels oversized chunked JSON before returning any protected projection", async () => {
+ let chunks = 0; const cancel = vi.fn();
+ vi.stubGlobal("fetch", async () => new Response(new ReadableStream<Uint8Array>({ pull(controller) { chunks++; controller.enqueue(new Uint8Array(4 * 1024 * 1024)); }, cancel }, { highWaterMark: 0 }), { headers: { "Content-Type": "application/json" } }));
+ expect(await actions.diagnosticIdentityRecords(order)).toMatchObject({ ok: false }); expect(chunks).toBe(3); expect(cancel).toHaveBeenCalledOnce();
+});
+it.each(["stage", "append", "issue", "consume"])("rejects expired sessions before %s mutation validation", async name => {
+ state.headers.set("x-admin-session-expired", "1"); const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+ const work = { stage: () => actions.diagnosticStageIdentityProvenance("bad", null), append: () => actions.diagnosticAppendIdentityEvidence("bad", null), issue: () => actions.diagnosticIssueContinuityProof("bad", null), consume: () => actions.diagnosticConsumeContinuityHandoff("bad", "bad", null) }[name]!;
+ await expect(work()).rejects.toThrow("/login?reason=session-expired"); expect(fetcher).not.toHaveBeenCalled();
+});
