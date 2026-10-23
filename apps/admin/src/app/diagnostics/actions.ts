@@ -83,3 +83,30 @@ export async function diagnosticIssueContinuityProof(orderId: string, input: unk
 export async function diagnosticConsumeContinuityHandoff(orderId: string, proofId: string, input: unknown) {
  return protectedDiagnostic(true, async token => diagnosticJson(await diagnosticFetch(`/diagnostics/orders/${id(orderId)}/continuity-handoffs/${id(proofId)}/consume`, token, { body: D.DiagnosticContinuityCommandSchema.parse(input) }), z.object({ reportId: z.string().uuid() }).strict()));
 }
+
+// Opaque request recovery uses the current Session only. Pending identities contain
+// no saved command; completed issue handles are historical, never admission.
+export async function diagnosticPrepareContinuityRequest(orderId: string, input: unknown) {
+ return protectedDiagnostic(true, async token => {
+  const command = D.DiagnosticContinuityRequestPrepareSchema.parse(input);
+  return diagnosticJson(await diagnosticFetch(`/diagnostics/orders/${id(orderId)}/continuity-requests`, token, { body: command }),
+   D.DiagnosticContinuityRequestSchema.refine(value => value.kind === command.kind && value.state === "pending_input"));
+ });
+}
+export async function diagnosticContinuityRequests(orderId: string, query: unknown) {
+ return protectedDiagnostic(false, async token => {
+  const page = D.DiagnosticPredecessorQuerySchema.parse(query);
+  return diagnosticJson(await diagnosticFetch(`/diagnostics/orders/${id(orderId)}/continuity-requests?${new URLSearchParams(page.cursor === undefined ? {} : { cursor: page.cursor })}`, token), D.DiagnosticContinuityRequestsSchema);
+ });
+}
+export async function diagnosticRecoverContinuityRequest(orderId: string, requestId: string) {
+ return protectedDiagnostic(false, async token => diagnosticJson(await diagnosticFetch(`/diagnostics/orders/${id(orderId)}/continuity-requests/${id(requestId)}`, token),
+  D.DiagnosticContinuityRequestSchema.refine(value => value.requestId === requestId)));
+}
+export async function diagnosticExecuteContinuityRequest(orderId: string, requestId: string, input: unknown) {
+ return protectedDiagnostic(true, async token => {
+  const command = D.DiagnosticContinuityRequestExecuteSchema.parse(input);
+  return diagnosticJson(await diagnosticFetch(`/diagnostics/orders/${id(orderId)}/continuity-requests/${id(requestId)}/execute`, token, { body: command }),
+   D.DiagnosticContinuityRequestSchema.refine(value => value.requestId === requestId && value.kind === command.kind));
+ });
+}
