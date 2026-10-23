@@ -67,8 +67,8 @@ Local command and artifact hashes:
 | `pnpm --filter @auto-tm/contracts build` log | `b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616` (pass) |
 | synthetic logger and source-preservation probe log | `ea9d93be636ba594a749a07f4b6a770211ec076eca0cf78143123aa372922b50` (pass) |
 | focused API lint from `apps/api` package cwd | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca4959911b7852b855` (pass) |
-| `pnpm --filter @auto-tm/api typecheck` log | `shasum` recorded in `/tmp/carberk-p2028-assembly-20261023/api-tsc.log`; blocked by unresolved `@auto-tm/db` declarations |
-| `pnpm --filter @auto-tm/api exec tsc6 --noEmit` log | `shasum` recorded in `/tmp/carberk-p2028-assembly-20261023/api-tsc6.log`; same generated-DB blocker |
+| `pnpm --filter @auto-tm/api typecheck` log | `a463ae3b9e5f53d3c04a922aa0f8f84e49e877a6932fece9589916a7d984fcd7`; blocked by unresolved `@auto-tm/db` declarations |
+| `pnpm --filter @auto-tm/api exec tsc6 --noEmit` log | `c832dfaed93c3c72f0941701139d12d1c1180726c2dce5b8ff8a33019af38353`; same generated-DB blocker |
 | `git diff --check` | pass |
 | `pnpm check:agent-docs` | pass |
 | `pnpm check:glossary` | pass, 31 terms |
