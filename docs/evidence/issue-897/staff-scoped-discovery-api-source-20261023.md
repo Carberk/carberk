@@ -25,3 +25,5 @@ The controller sets `Cache-Control: no-store, private` before validation and map
 - The existing disposable service-backed automatic proof suite has an added discovery journey with real HTTP/SQL assertions. Hosted HTTP/SQL execution is UNKNOWN here because local services and CI are out of scope for this writer.
 
 No schema migration, proof mutation, handoff projection, admin file proxy, mobile work, deployment or staging operation was performed. Existing automatic `201` assertions and privacy/security tests were preserved. The measurement diagnostic checkpoint remains unassembled and untouched.
+
+Repository-wide `pnpm test:unit` and `pnpm typecheck` were attempted. They are blocked by the normal workspace environment: the DB build requires `DATABASE_URL`, and unrelated Admin packages lack installed Next/testing dependencies. The focused API, contracts and DB checks above pass with the configured localhost placeholder; no services were started.
