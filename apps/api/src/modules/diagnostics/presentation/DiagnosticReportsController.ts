@@ -1,3 +1,5 @@
+import { DiscoverDiagnosticPredecessors } from "../application/DiscoverDiagnosticPredecessors";
+import { ListDiagnosticLinkingTechnicians } from "../application/ListDiagnosticLinkingTechnicians";
 import { BadRequestException, Body, Controller, ForbiddenException, Get, Header, HttpException, Inject, Param, Post, Put, Query, Req, Res } from "@nestjs/common";
 import { DiagnosticSchemas } from "@auto-tm/contracts";
 import type { FastifyReply, FastifyRequest } from "fastify";
@@ -23,7 +25,9 @@ function parse<S extends z.ZodType>(schema: S, value: unknown): z.output<S> {
 }
 @Controller("api/v1/diagnostics")
 export class DiagnosticReportsController {
-  constructor(@Inject(DIAGNOSTIC_REPORTS_PORT) private readonly reports: DiagnosticReportsPort,
+  constructor(@Inject(DiscoverDiagnosticPredecessors) private readonly discoverPredecessors: DiscoverDiagnosticPredecessors,
+    @Inject(ListDiagnosticLinkingTechnicians) private readonly listLinkingTechnicians: ListDiagnosticLinkingTechnicians,
+    @Inject(DIAGNOSTIC_REPORTS_PORT) private readonly reports: DiagnosticReportsPort,
     @Inject(IssueDiagnosticContinuityProof) private readonly issueContinuityProof: IssueDiagnosticContinuityProof,
     @Inject(ReadDiagnosticContinuityProof) private readonly readContinuityProof: ReadDiagnosticContinuityProof,
     @Inject(ConsumeDiagnosticContinuityProof) private readonly consumeContinuityProof: ConsumeDiagnosticContinuityProof,
@@ -41,6 +45,17 @@ export class DiagnosticReportsController {
       const status = error.code.includes("STALE") || error.code.includes("CONFLICT") || error.code.includes("EXISTS") || error.code === "DIAGNOSTIC_PDF_NOT_READY" ? 409 : error.code === "DIAGNOSTIC_NO_ACCESS" ? 403 : ["DIAGNOSTIC_PDF_UNAVAILABLE", "DIAGNOSTIC_EVIDENCE_UNAVAILABLE"].includes(error.code) ? 503 : 400;
       throw new HttpException({ code: error.code, message: "Inspection request could not be completed" }, status);
     }
+  }
+  @Get("orders/:id/predecessor-candidates") predecessors(@Req() req: Request, @Param("id") id: string, @Query() query: unknown, @Res({ passthrough: true }) reply: FastifyReply) {
+    reply.header("Cache-Control", "no-store, private");
+    return this.run(() => this.discoverPredecessors.execute(this.subject(req), parse(uuid, id), parse(DiagnosticSchemas.DiagnosticPredecessorQuerySchema, query)));
+  }
+  @Get("orders/:id/linking-technicians") linkingTechnicians(@Req() req: Request, @Param("id") id: string, @Query() query: unknown, @Res({ passthrough: true }) reply: FastifyReply) {
+    reply.header("Cache-Control", "no-store, private");
+    return this.run(() => {
+      parse(z.object({}).strict(), query);
+      return this.listLinkingTechnicians.execute(this.subject(req), parse(uuid, id));
+    });
   }
   @Post("orders/:id/reports") @Header("Cache-Control", "no-store, private") create(@Req() req: Request, @Param("id") id: string, @Body() body: unknown) {
     return this.run(() => this.reports.create(this.subject(req), parse(uuid, id), parse(DiagnosticSchemas.DiagnosticDraftCreateSchema, body)));

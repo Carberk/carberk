@@ -8,6 +8,21 @@ import type { StaffBindingPort, StaffBindingSubject, StaffBinding } from "../dom
 /** Identity owns access to current participant grants and issuer Session facts. */
 @Injectable()
 export class PrismaStaffBindings implements StaffBindingPort {
+  async eligibleNames(subjects: StaffBindingSubject[], transaction: unknown): Promise<{ userId: string; name: string }[]> {
+    const tx = transaction as Prisma.TransactionClient;
+    // Lock the complete feature-supplied union before reading any Identity facts.
+    for (const id of [...new Set(subjects.map(subject => subject.userId))].sort()) await tx.$queryRaw`SELECT id FROM users WHERE id=${id} FOR UPDATE`;
+    const names: { userId: string; name: string }[] = [];
+    for (const subject of subjects) {
+      try {
+        await this.bind([subject], transaction);
+        const user = await tx.user.findUnique({ where: { id: subject.userId }, select: { displayName: true } });
+        const name = user?.displayName?.trim();
+        if (name) names.push({ userId: subject.userId, name });
+      } catch (error) { if (!(error instanceof StaffAuthorityDenied)) throw error; }
+    }
+    return names;
+  }
   async bind(subjects: StaffBindingSubject[], transaction: unknown): Promise<StaffBinding[]> {
     const tx = transaction as Prisma.TransactionClient;
     for (const id of [...new Set(subjects.map(subject => subject.userId))].sort()) await tx.$queryRaw`SELECT id FROM users WHERE id=${id} FOR UPDATE`;
