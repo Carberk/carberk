@@ -94,3 +94,24 @@ The first preservation script failed on Git-quoted Unicode asset paths before co
 Owned delivery paths relative to incorporated parent are `apps/admin/src/app/diagnostics/actions.ts`, new `apps/admin/src/app/diagnostics/request-recovery.transport.spec.ts`, and this receipt only. The source checkpoint changes only the first two. `source-diff.patch` and `source-manifest.json` pin the exact source delta and file hashes; final `delivery-diff.patch`, `delivery-manifest.json` and `artifact-manifest.sha256` are returned with the clean pushed head. Incorporation also brings the parent's diagnostics/worker overview and backend-receipt changes; those are not this writer's edits.
 
 Next action: Chief of Staff inspects and assembles this pushed branch into sole draft PR #904, preserves the runtime-import limitation, obtains independent review and hosted acceptance, and resolves the final action-envelope header evidence before accepting that requirement. No issue closure, operational readiness or UI recovery completion is claimed. Stop after this handoff.
+
+
+## Offline runtime prerequisite and overview followup
+
+Parent explicitly authorized this verification/docs-only followup from `8116eb7e2993eb26c98dce44f194047ce82d0257` (tree `c40c03b6563c224d35461e9ee7508ea57288d732`). The earlier runtime-import BLOCKED result above is historical and is now resolved. Existing contracts/DB package scripts, Prisma generator/config, exports, runtime-import script and DB import/connection boundary were inspected first. Contracts build compiles to ignored `dist`; DB build performs only Prisma generation and TypeScript compilation. The supplied nonconnecting `DATABASE_URL=postgresql://offline:offline@127.0.0.1:1/offline` satisfied generation configuration. No migration, database connection, service or listener was started. The single subsequent `pnpm check:runtime-imports` passes with both `@auto-tm/db: ok` and `@auto-tm/contracts: ok`.
+
+Only the stale diagnostics overview sentence is replaced: protected Admin server-action transport is implemented; staff UI and real SQL/worker acceptance remain pending. All other overview content, including current dual reviewer authority for issuance recovery and current B-only completed-pointer recovery, is unchanged. This receipt is appended only. Source, tests, schema and configuration remain byte-identical to `8116eb7e`; the 158 named-test evidence and earlier Admin lint/typecheck/build evidence are reused without rerunning tests for documentation. The original handoff's runtime-import limitation is superseded by this passing followup; independent review, hosted/SQL/worker acceptance, staff UI/founder manual device acceptance and final Next private/nosniff action-envelope runtime evidence remain pending/UNKNOWN.
+
+Logs and exact command/exit/hash records are in `/tmp/issue-923-admin-runtime-followup-20261023`. Final docs/glossary/diff/preservation and push records, checkpoint/tree, diff and complete manifest are returned separately. No source/test/schema/config edit, package-wide/wildcard test, local listener, Docker/e2e/infra/Railway/CI polling/browser/device/signing/store/nested work, integration push or new PR was performed.
+
+| Log | Exact command | Exit | SHA256 |
+|---|---|---|---|
+| `contracts-build.log` | `pnpm --filter @auto-tm/contracts build` | 0 | `b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616` |
+| `db-build.log` | `env DATABASE_URL=postgresql://offline:offline@127.0.0.1:1/offline pnpm --filter @auto-tm/db build` | 0 | `0d9efa8f262187f9ac78ec83306dd746c89402545be4ce55ff38079d8a0c4e1a` |
+| `runtime-imports.log` | `pnpm check:runtime-imports` | 0 | `2920e5c9967fdaf4eb831dfb48e054ff0bd4262a1ef314658ceca54821fa5d97` |
+| `preservation.log` | `python3 /tmp/issue-923-admin-runtime-followup-20261023/preserve.py` | 0 | `87e2c306d3d7d8d6a0c1e9b066ba70a68e4e16fbac2203b5c2afde6f00c2ea0d` |
+| `diff.log` | `git diff --check` | 0 | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `glossary.log` | `pnpm check:glossary` | 0 | `d0863b4ecc26a15f30aa60280c93ab71299462ab7b6fd8e15e5c042c23144621` |
+| `docs.log` | `pnpm check:agent-docs` | 0 | `8f5507ea6fcde992f7d6733d113abc538ae4957b777bc97cadd580f651c93b20` |
+
+Followup result: offline shared builds, the single runtime-import check, docs/glossary/diff checks and byte preservation all PASS. The required runtime-import gate is no longer blocked. Only the authorized overview sentence and this appended evidence change; final head/tree and artifacts accompany the handoff. Chief of Staff owns integration publication and the remaining acceptance gates.
