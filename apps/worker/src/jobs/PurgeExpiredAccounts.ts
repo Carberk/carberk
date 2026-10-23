@@ -61,7 +61,9 @@ export class PurgeExpiredAccounts {
     await this.prisma.$transaction([
       // The User row lock comes before any upload lock, the order every writer
       // of a Profile Photo uses (ADR-0088).
-      this.prisma.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`,
+      this.prisma.$queryRaw`WITH prefix AS MATERIALIZED (
+        SELECT diagnostic_dispose_ownership(${userId}::text,${now}::timestamp)
+      ) SELECT id FROM users CROSS JOIN prefix WHERE id = ${userId} FOR UPDATE OF users`,
       ...serviceAccountErasureWrites(this.prisma, userId, now),
       ...videoAccountErasureWrites(this.prisma, userId, now),
       ...diagnosticAccountErasureWrites(this.prisma, userId, now),
