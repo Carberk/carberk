@@ -29,6 +29,7 @@ const inventoried = (): Record<string, unknown> => ({ operation: "clean-reset", 
   identity: structuredClone(identity) });
 const rows = (expectedInventory: unknown): Record<string, unknown> => ({ ...inventoried(), phase: "rows", expectedInventory });
 const hex64 = /^[a-f0-9]{64}$/;
+const monotonicMs = () => Number(process.hrtime.bigint() / 1000000n);
 const cfNamespace = `cf_${"9".repeat(32)}`;
 
 // Independently written retained set: reference catalog, protected state, migration history.
@@ -49,19 +50,30 @@ describe("staging clean-reset remote operation on disposable application schema"
   let databaseUrl: string;
   let database: string;
   let admin: Pool;
+  let childOrdinal = 0;
+  let settledAt = 0;
+  let lastFixtureClose = "none";
   let cleanResetProgram: (payload: unknown) => string;
 
   // Short-lived target connections, so the operation's own activity guard sees only itself.
   async function query<T extends Record<string, unknown>>(sql: string, values: unknown[] = []): Promise<T[]> {
-    const client = new Client({ connectionString: databaseUrl });
+    const client = new Client({ connectionString: databaseUrl, application_name: "staging-test-fixture" });
     await client.connect();
-    try { return (await client.query(sql, values)).rows as T[]; } finally { await client.end(); }
+    const connectedAt = monotonicMs();
+    // pg exposes BackendKeyData at runtime; @types/pg omits processID.
+    const runtimePid = (client as Client & { processID?: unknown }).processID;
+    const pid = typeof runtimePid === "number" && Number.isInteger(runtimePid) && runtimePid > 0 && runtimePid <= 2147483647 ? runtimePid : 0;
+    try { return (await client.query(sql, values)).rows as T[]; } finally {
+      await client.end();
+      // Keep only the latest close, emitted beside the next operation, rather than logging every snapshot query.
+      lastFixtureClose = `pid=${pid} connectedAtMs=${connectedAt} closedAtMs=${monotonicMs()}`;
+    }
   }
   // Observed from the maintenance database: wait until no client backend remains on the target.
   async function settle(): Promise<void> {
     for (let attempt = 0; attempt < 100; attempt++) {
       const found = (await admin.query(`SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=$1 AND backend_type='client backend'`, [database])).rows[0];
-      if (found?.count === 0) return;
+      if (found?.count === 0) { settledAt = monotonicMs(); return; }
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     throw new Error("Disposable target database did not settle");
@@ -109,10 +121,21 @@ describe("staging clean-reset remote operation on disposable application schema"
       spawnSync: (command: string, _args: string[], options: { input: string }) => {
         if (command !== "psql") return { status: 1, stdout: "", stderr: "", error: new Error("Unsupported remote subprocess") };
         queries++;
+        const ordinal = ++childOrdinal;
+        const startedAt = monotonicMs();
         const result = spawnSync(globalThis.process.execPath, [`${root}/scripts/testing/query-disposable-postgres.cjs`], {
           input: options.input, encoding: "utf8", timeout: 30000,
-          env: { ...globalThis.process.env, STAGING_CONTROL_TEST_DATABASE_URL: databaseUrl, STAGING_TEST_DB_PACKAGE: `${packageRoot}/package.json`, STAGING_TEST_SQL_DIAGNOSTICS: "1" },
+          env: { ...globalThis.process.env, STAGING_CONTROL_TEST_DATABASE_URL: databaseUrl, STAGING_TEST_DB_PACKAGE: `${packageRoot}/package.json`, STAGING_TEST_SQL_DIAGNOSTICS: "1",
+            STAGING_TEST_PG_DIAGNOSTICS: "1", STAGING_TEST_PG_ROLE: "sql-child", STAGING_TEST_PG_ORDINAL: String(ordinal) },
         });
+        // Reuse the loopback-only transport's validated categories. Never forward raw stderr.
+        const lifecycle = result.stderr?.split(/\r?\n/).find(line => /^Disposable PG lifecycle: role=sql-child ordinal=(?:0|[1-9][0-9]{0,5}) pid=(?:0|[1-9][0-9]{0,9}) connectedAtMs=\d{1,16} closedAtMs=\d{1,16}$/.test(line));
+        if (lifecycle) console.error(lifecycle);
+        const activity = result.stderr?.split(/\r?\n/).find(line => /^Disposable PG activity: ordinal=(?:0|[1-9][0-9]{0,5}) count=(?:0|[1-9][0-9]{0,9}) pids=(?:none|[1-9][0-9]{0,9}(?:,[1-9][0-9]{0,9}){0,15})$/.test(line));
+        if (activity) console.error(activity);
+        const attribution = result.stderr?.split(/\r?\n/).find(line => /^Disposable PG attribution: ordinal=(?:0|[1-9][0-9]{0,5}) rows=(?:none|[1-9][0-9]{0,9}:(?:pg-isready|known-fixture|sql-child|other):(?:loopback|other|unavailable):(?:known|unavailable)(?:\|[1-9][0-9]{0,9}:(?:pg-isready|known-fixture|sql-child|other):(?:loopback|other|unavailable):(?:known|unavailable)){0,15})$/.test(line));
+        if (attribution) console.error(attribution);
+        console.error(`Disposable reset DB boundary: child=${ordinal} settledAtMs=${settledAt} startedAtMs=${startedAt} exitedAtMs=${monotonicMs()} lastFixtureClose=${lastFixtureClose}`);
         // Retain status and bounded SQLSTATE metadata only, never SQL, rows, stderr or error messages.
         const errorCode = (result.error as NodeJS.ErrnoException | undefined)?.code;
         subprocesses.push({ status: result.status, signal: result.signal,
