@@ -14,7 +14,7 @@ const reportId = "44444444-4444-4444-8444-444444444444";
 const pending = { requestId, kind: "consume", state: "pending_input" };
 const completed = { requestId, kind: "consume", state: "completed", result: { proofId, reportId } };
 const historical = { requestId, kind: "issue", state: "completed", proofId, usability: "historical" };
-const consume = { kind: "consume", command: { proofId, reportId, expectedOrderVersion: 3, reason: "Explicit synthetic B link" } };
+const consume = { kind: "consume", command: { reportId, expectedOrderVersion: 3, reason: "Explicit synthetic B link", proofId } };
 const issue = { kind: "issue", command: { predecessorId: reportId, expectedPredecessorVersion: 2, expectedOrderVersion: 3, predecessorIdentityRecordId: proofId, candidateIdentityRecordId: order, linkingTechnicianId: order, method: "comparative_attestation", rationale: "Explicit synthetic comparison", provenanceRecordIds: [proofId] } };
 const denied = { ok: false, error: "denied", code: "DIAGNOSTIC_NO_ACCESS" };
 const invalid = { ok: false, error: "error", code: "DIAGNOSTIC_INVALID_INPUT" };
@@ -34,14 +34,15 @@ beforeEach(() => { vi.stubEnv("ADMIN_ORIGIN", "https://admin.example.invalid"); 
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 it.each(operations)("%s uses the exact protected route, method and current bearer once", async operation => {
- const fetcher = vi.fn(async () => Response.json(response(operation))); vi.stubGlobal("fetch", fetcher);
+ const fetcher = vi.fn<typeof fetch>(async () => Response.json(response(operation))); vi.stubGlobal("fetch", fetcher);
  expect(await invoke(operation)).toEqual({ ok: true, data: response(operation) });
  const suffix = { prepare: "", discover: "?", recover: `/${requestId}`, execute: `/${requestId}/execute` }[operation];
  expect(fetcher).toHaveBeenCalledExactlyOnceWith(expect.stringContaining(basePath + suffix), expect.objectContaining({
   method: operation === "prepare" || operation === "execute" ? "POST" : "GET", cache: "no-store", redirect: "manual",
   headers: expect.objectContaining({ Authorization: "Bearer current-session" }),
-  ...(operation === "prepare" ? { body: JSON.stringify({ kind: "consume" }) } : operation === "execute" ? { body: JSON.stringify(consume) } : { body: undefined }),
+  ...(operation === "prepare" ? { body: JSON.stringify({ kind: "consume" }) } : operation === "execute" ? { body: JSON.stringify(consume) } : {}),
  }));
+ if (operation === "discover" || operation === "recover") expect(fetcher.mock.calls[0]?.[1]?.body).toBeUndefined();
 });
 it("forwards issue commands separately and returns only the original historical proof handle", async () => {
  const fetcher = vi.fn(async () => Response.json(historical)); vi.stubGlobal("fetch", fetcher);
