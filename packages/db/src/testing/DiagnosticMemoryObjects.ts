@@ -3,11 +3,13 @@ import { diagnosticTestSha } from "./DiagnosticMemoryDatabase";
 export class DiagnosticMemoryObjects {
   readonly bytes = new Map<string, Uint8Array>();
   afterPut: (() => Promise<void>) | null = null;
+  afterRead: (() => Promise<void>) | null = null;
   async put(key: string, bytes: Uint8Array) { this.bytes.set(key, bytes.slice()); await this.afterPut?.(); }
   async read(key: string, size: number, sha: string) {
     const bytes = this.bytes.get(key);
     if (!bytes) throw Object.assign(new Error("Not found"), { $metadata: { httpStatusCode: 404 } });
     if (bytes.length !== size || diagnosticTestSha(bytes) !== sha) throw new Error("Integrity mismatch");
+    await this.afterRead?.();
     return bytes.slice();
   }
   async deleteAndVerify(keys: string[]) { for (const key of keys) this.bytes.delete(key); }

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { DiagnosticSchemas as D } from "@auto-tm/contracts";
-import { PrismaService, type Prisma } from "@auto-tm/db";
+import { PrismaService, diagnosticReaderProjection, DIAGNOSTIC_PDF_RENDERERS, type Prisma } from "@auto-tm/db";
 
 import { DiagnosticRuleError } from "../domain/InspectionOrder";
 import type { DiagnosticDocumentsPort } from "../domain/ports/DiagnosticDocumentsPort";
@@ -24,11 +24,13 @@ export class PrismaDiagnosticDocuments implements DiagnosticDocumentsPort {
     return this.db.$transaction(async tx => {
       const { row } = await this.load(tx, subject, reportId);
       if (!row.snapshotHash) return [];
-      const artifacts = await tx.diagnosticPdfArtifact.findMany({ where: { reportId, snapshotHash: row.snapshotHash, rendererVersion: "v1" }, orderBy: [{ locale: "asc" }, { generation: "desc" }] });
+      const { rendererVersion } = await diagnosticReaderProjection(tx, row, D.DiagnosticReleasedSnapshotSchema.parse(row.snapshot).report);
+      const artifacts = await tx.diagnosticPdfArtifact.findMany({ where: { reportId, snapshotHash: row.snapshotHash, rendererVersion: { in: DIAGNOSTIC_PDF_RENDERERS } }, orderBy: [{ locale: "asc" }, { generation: "desc" }] });
       const seen = new Set<string>();
+      artifacts.sort((a, b) => a.locale.localeCompare(b.locale) || Number(b.rendererVersion === rendererVersion) - Number(a.rendererVersion === rendererVersion) || b.generation - a.generation);
       return artifacts.filter(item => { if (seen.has(item.locale)) return false; seen.add(item.locale); return true; }).map(item => D.DiagnosticDocumentSchema.parse({
         id: item.id, locale: item.locale, generation: item.generation, rendererVersion: item.rendererVersion,
-        state: item.cleanupRequestedAt || ["cleanup_pending", "removed"].includes(item.state) ? "unavailable" : item.state,
+        state: item.rendererVersion !== rendererVersion || item.cleanupRequestedAt || ["cleanup_pending", "removed"].includes(item.state) ? "unavailable" : item.state,
         generatedAt: item.verifiedAt?.toISOString() ?? null, retryAt: item.retryAt?.toISOString() ?? null,
       }));
     });
@@ -36,7 +38,8 @@ export class PrismaDiagnosticDocuments implements DiagnosticDocumentsPort {
   private async ready(tx: Tx, subject: Subject, reportId: string, locale: string) {
     const { row } = await this.load(tx, subject, reportId);
     if (!row.snapshotHash) throw unavailable();
-    const artifact = await tx.diagnosticPdfArtifact.findFirst({ where: { reportId, locale, snapshotHash: row.snapshotHash, rendererVersion: "v1" }, orderBy: { generation: "desc" } });
+    const { rendererVersion } = await diagnosticReaderProjection(tx, row, D.DiagnosticReleasedSnapshotSchema.parse(row.snapshot).report);
+    const artifact = await tx.diagnosticPdfArtifact.findFirst({ where: { reportId, locale, snapshotHash: row.snapshotHash, rendererVersion }, orderBy: { generation: "desc" } });
     if (!artifact || artifact.state !== "ready" || artifact.cleanupRequestedAt || !artifact.verifiedAt || !artifact.sizeBytes || !artifact.sha256 ||
       artifact.objectKey !== `diagnostic-pdf/${reportId}/${artifact.id}.pdf`) throw unavailable();
     return { ...artifact, sha256: artifact.sha256, sizeBytes: artifact.sizeBytes };

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { DiagnosticSchemas as D } from "@auto-tm/contracts";
-import { Prisma, type PrismaService } from "@auto-tm/db";
+import { Prisma, diagnosticReaderProjection, DIAGNOSTIC_ERASED_LINEAGE_RENDERER, DIAGNOSTIC_PDF_RENDERERS, type PrismaService } from "@auto-tm/db";
 
 import { renderDiagnosticPdf, type DiagnosticPdfFonts } from "./DiagnosticPdfRenderer";
 
@@ -37,7 +37,10 @@ export class DiagnosticArtifactWorker {
       (report.audience === "buyer_private" && !report.order.commissionerId) || report.snapshotHash !== artifact.snapshotHash ||
       !report.snapshot || sha(canonical(report.snapshot)) !== artifact.snapshotHash) return null;
     const parsed = D.DiagnosticReleasedSnapshotSchema.safeParse(report.snapshot);
-    return parsed.success && parsed.data.synthetic && parsed.data.report.id === report.id && parsed.data.report.status === "finalized" ? parsed.data : null;
+    if (!parsed.success || !parsed.data.synthetic || parsed.data.report.id !== report.id || parsed.data.report.status !== "finalized") return null;
+    const projection = await diagnosticReaderProjection(tx, report, parsed.data.report);
+    if (artifact.rendererVersion !== projection.rendererVersion) return null;
+    return { ...parsed.data, report: projection.report };
   }
   private async locked(tx: Tx, artifact: Artifact): Promise<Artifact | null> {
     await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${artifact.reportId} FOR UPDATE`;
@@ -53,19 +56,26 @@ export class DiagnosticArtifactWorker {
     if (!this.runtime.enabled()) return false;
     const intent = await this.db.$transaction(async tx => {
       const candidate = await tx.diagnosticPdfArtifact.findUnique({ where: { id } });
-      if (!candidate || !available(candidate, this.runtime.now()) || candidate.rendererVersion !== "v1" || !["tk", "ru", "en"].includes(candidate.locale) ||
+      if (!candidate || !available(candidate, this.runtime.now()) || !DIAGNOSTIC_PDF_RENDERERS.includes(candidate.rendererVersion) || !["tk", "ru", "en"].includes(candidate.locale) ||
         candidate.objectKey !== `diagnostic-pdf/${candidate.reportId}/${candidate.id}.pdf`) return null;
       await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${candidate.reportId} FOR UPDATE`;
       const row = await tx.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id } });
       if (!available(row, this.runtime.now())) return null;
       const snapshot = await this.current(tx, row);
-      if (!snapshot) { await this.retire(tx, row); return null; }
+      if (!snapshot) {
+        const replacementId = await this.requestSafeReplacement(tx, row);
+        if (replacementId) return { replacementId };
+        await this.retire(tx, row); return null;
+      }
       const epoch = this.runtime.id();
       const claimed = await tx.diagnosticPdfArtifact.updateMany({ where: { id, epoch: row.epoch, state: row.state, cleanupRequestedAt: null, leaseUntil: row.leaseUntil }, data: { state: "processing", epoch, attempts: { increment: 1 }, leaseUntil: leaseEnd(this.runtime.now()), failureCode: null, retryAt: null } });
       if (!claimed.count) return null;
       return { artifact: await tx.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id } }), snapshot };
     });
     if (!intent) return false;
+    // The requested old intent cannot change its immutable identity. Complete
+    // its current replacement outside the transaction and its report lock.
+    if ("replacementId" in intent) return this.generate(intent.replacementId);
     const { artifact, snapshot } = intent;
     try {
       let bytes: Uint8Array | undefined;
@@ -116,9 +126,46 @@ export class DiagnosticArtifactWorker {
     }
   }
 
+  /** Under B's report lock. Source and projection must both validate before
+   * a new exact-key intent is created. No artifact identity is ever rewritten. */
+  private async requestSafeReplacement(tx: Tx, row: Artifact): Promise<string | null> {
+    if (row.rendererVersion !== "v1") return null;
+    const safe = { ...row, rendererVersion: DIAGNOSTIC_ERASED_LINEAGE_RENDERER };
+    if (!await this.current(tx, safe)) return null;
+    if (row.state !== "ready" && !row.cleanupRequestedAt) await this.retire(tx, row);
+    const existing = await tx.diagnosticPdfArtifact.findFirst({ where: { reportId: row.reportId, locale: row.locale,
+      rendererVersion: DIAGNOSTIC_ERASED_LINEAGE_RENDERER, cleanupRequestedAt: null } });
+    if (existing) return existing.id;
+    const latest = await tx.diagnosticPdfArtifact.findFirst({ where: { reportId: row.reportId, locale: row.locale }, orderBy: { generation: "desc" } });
+    const id = this.runtime.id();
+    await tx.diagnosticPdfArtifact.create({ data: { id, reportId: row.reportId, snapshotHash: row.snapshotHash, locale: row.locale,
+      rendererVersion: DIAGNOSTIC_ERASED_LINEAGE_RENDERER, generation: (latest?.generation ?? 0) + 1,
+      objectKey: `diagnostic-pdf/${row.reportId}/${id}.pdf` } });
+    return id;
+  }
+
+  /** A ready issued copy is historical and remains byte-identical. Its source
+   * projection no longer authorizes current delivery. Request a distinct exact
+   * object; unfinished obsolete writes instead follow the existing lease cleanup. */
+  private async replaceErasedLineage(): Promise<void> {
+    for (const locale of ["tk", "ru", "en"]) {
+      const candidates = await this.db.diagnosticPdfArtifact.findMany({ where: {
+        rendererVersion: "v1", locale, report: { erasedAt: null,
+          predecessor: { OR: [{ erasedAt: { not: null } }, { order: { erasedAt: { not: null } } }] },
+          artifacts: { none: { locale, rendererVersion: DIAGNOSTIC_ERASED_LINEAGE_RENDERER, cleanupRequestedAt: null } } },
+      }, orderBy: { id: "asc" }, take: 100 });
+      for (const candidate of candidates) await this.db.$transaction(async tx => {
+        await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${candidate.reportId} FOR UPDATE`;
+        const row = await tx.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: candidate.id } });
+        await this.requestSafeReplacement(tx, row);
+      });
+    }
+  }
+
   async execute(): Promise<void> {
     if (!this.runtime.enabled()) return;
     const now = this.runtime.now();
+    await this.replaceErasedLineage();
     // A crash on the last allowed attempt must become an honest terminal failure.
     await this.db.diagnosticPdfArtifact.updateMany({ where: { state: "processing", attempts: { gte: 5 }, cleanupRequestedAt: null, leaseUntil: { lte: now } }, data: { state: "failed", leaseUntil: null, retryAt: null, failureCode: "attempts_exhausted" } });
     const pending = await this.db.diagnosticPdfArtifact.findMany({ where: { cleanupRequestedAt: null, attempts: { lt: 5 }, OR: [{ state: "pending" }, { state: "failed", retryAt: { lte: now } }, { state: "processing", leaseUntil: { lte: now } }] }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 5 });

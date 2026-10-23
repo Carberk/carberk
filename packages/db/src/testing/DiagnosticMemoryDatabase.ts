@@ -1,8 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
-import type { PrismaService } from "../../src/prisma.service";
+
+import type { PrismaService } from "../prisma.service";
 
 type Row = Record<string, unknown>;
-type Args = { where?: Row; data?: Row; include?: Row; select?: Row; orderBy?: Row | Row[]; take?: number };
+type Args = { where?: Row | undefined; data?: Row; include?: Row; select?: Row; orderBy?: Row | Row[]; take?: number };
 const clone = <T>(value: T): T => structuredClone(value);
 const object = (value: unknown): value is Row => !!value && typeof value === "object" && !(value instanceof Date);
 function matches(row: Row, where: Row = {}): boolean {
@@ -10,6 +11,7 @@ function matches(row: Row, where: Row = {}): boolean {
     if (key === "AND") return (Array.isArray(wanted) ? wanted : [wanted]).every(w => matches(row, w as Row));
     if (key === "OR") return (wanted as Row[]).some(w => matches(row, w));
     const actual = row[key];
+    if (key.includes("_") && object(wanted)) return matches(row, wanted);
     if (!object(wanted)) return actual === wanted;
     return Object.entries(wanted).every(([op, value]) => {
       if (op === "not") return actual !== value;
@@ -17,6 +19,7 @@ function matches(row: Row, where: Row = {}): boolean {
       if (op === "lt") return actual != null && (actual as number) < (value as number);
       if (op === "lte") return actual != null && (actual as number) <= (value as number);
       if (op === "gt") return actual != null && (actual as number) > (value as number);
+      if (op === "none") return Array.isArray(actual) && !actual.some(r => matches(r as Row, value as Row));
       if (op === "some") return Array.isArray(actual) && actual.some(r => matches(r as Row, value as Row));
       return object(actual) && matches(actual, { [op]: value });
     });
@@ -27,14 +30,20 @@ function matches(row: Row, where: Row = {}): boolean {
 export class DiagnosticMemoryDatabase {
   private readonly tables = new Map<string, Row[]>();
   readonly client: PrismaService;
+  private table(name: string): Row[] {
+    const rows = this.tables.get(name);
+    if (!rows) throw new Error(`Unknown fake table ${name}`);
+    return rows;
+  }
   constructor() {
     const client: Row = { $queryRaw: async () => [], $executeRaw: async () => 0 };
-    for (const name of ["inspectionOrder", "listing", "diagnosticReportRecord", "diagnosticPdfArtifact", "diagnosticEvidence", "diagnosticTemplateVersion", "diagnosticOrderAssignment", "diagnosticCenterAssignment", "diagnosticIdentityEvidence", "diagnosticIdentityProvenance"]) {
+    for (const name of ["user", "session", "dealershipMember", "inspectionOrder", "listing", "diagnosticReportRecord", "diagnosticPdfArtifact", "diagnosticEvidence", "diagnosticTemplateVersion", "diagnosticOrderAssignment", "diagnosticCenterAssignment", "diagnosticIdentityEvidence", "diagnosticIdentityProvenance"]) {
       this.tables.set(name, []);
-      const rows = () => this.tables.get(name)!;
+      const rows = () => this.table(name);
+      const reportRelations = (row: Row): Row => ({ ...row, order: this.table("inspectionOrder").find(o => o["id"] === row["orderId"]), artifacts: this.table("diagnosticPdfArtifact").filter(a => a["reportId"] === row["id"]) });
       const related = (row: Row): Row => ({ ...row,
-        ...(name === "diagnosticReportRecord" ? { order: this.tables.get("inspectionOrder")!.find(o => o["id"] === row["orderId"]), artifacts: this.tables.get("diagnosticPdfArtifact")!.filter(a => a["reportId"] === row["id"]), evidence: [] } : {}),
-        ...(name === "diagnosticEvidence" ? { report: this.tables.get("diagnosticReportRecord")!.find(r => r["id"] === row["reportId"]) } : {}) });
+        ...(name === "diagnosticReportRecord" ? { order: this.table("inspectionOrder").find(o => o["id"] === row["orderId"]), artifacts: this.table("diagnosticPdfArtifact").filter(a => a["reportId"] === row["id"]), evidence: [], predecessor: this.table("diagnosticReportRecord").filter(r => r["id"] === row["predecessorId"]).map(reportRelations)[0] ?? null } : {}),
+        ...(["diagnosticEvidence", "diagnosticPdfArtifact"].includes(name) ? { report: this.table("diagnosticReportRecord").filter(r => r["id"] === row["reportId"]).map(r => ({ ...reportRelations(r), predecessor: this.table("diagnosticReportRecord").filter(p => p["id"] === r["predecessorId"]).map(reportRelations)[0] ?? null }))[0] } : {}) });
       const findMany = async (args: Args = {}) => {
         let result = rows().map(related).filter(r => matches(r, args.where));
         const order = args.orderBy ? Array.isArray(args.orderBy) ? args.orderBy : [args.orderBy] : [];
@@ -49,8 +58,8 @@ export class DiagnosticMemoryDatabase {
         });
         if (args.take) result = result.slice(0, args.take);
         return result.map(row => {
-          const output = { ...row };
-          for (const key of ["order", "artifacts", "evidence", "report"]) if (!args.include?.[key]) delete output[key];
+          const relations = ["order", "artifacts", "evidence", "report", "predecessor"];
+          const output = Object.fromEntries(Object.entries(row).filter(([key]) => !relations.includes(key) || args.include?.[key]));
           return clone(args.select ? Object.fromEntries(Object.keys(args.select).map(k => [k, row[k]])) : output);
         });
       };
@@ -58,6 +67,11 @@ export class DiagnosticMemoryDatabase {
       const findUniqueOrThrow = async (args: Args) => { const row = await findFirst(args); if (!row) throw new Error("Missing fake database row"); return row; };
       const updateMany = async (args: Args) => {
         const selected = rows().filter(row => matches(related(row), args.where));
+        if (name === "diagnosticPdfArtifact") for (const row of selected) {
+          for (const key of ["id", "reportId", "snapshotHash", "locale", "rendererVersion", "generation", "objectKey"]) {
+            if (args.data && key in args.data && args.data[key] !== row[key]) throw new Error("diagnostic_pdf_identity_immutable");
+          }
+        }
         for (const row of selected) for (const [key, value] of Object.entries(args.data ?? {})) row[key] = object(value) && "increment" in value ? Number(row[key]) + Number(value["increment"]) : clone(value);
         return { count: selected.length };
       };
@@ -68,7 +82,7 @@ export class DiagnosticMemoryDatabase {
     client["$transaction"] = async (fn: (tx: unknown) => Promise<unknown>) => fn(client);
     this.client = client as unknown as PrismaService;
   }
-  seed(table: string, row: Row) { this.tables.get(table)!.push(clone(row)); }
+  seed(table: string, row: Row) { this.table(table).push(clone(row)); }
 }
 export const diagnosticTestId = (n: number) => `11111111-1111-4111-8111-${String(n).padStart(12, "0")}`;
 export const diagnosticTestNow = new Date("2026-10-23T00:00:00.000Z");

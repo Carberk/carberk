@@ -1,17 +1,38 @@
-import type { Prisma, PrismaService } from "@auto-tm/db";
+import { Prisma, type PrismaService } from "@auto-tm/db";
 
 /** Runs after the User lock in the account purge transaction. Report writes
  * must precede intake erasure: their identity trigger requires a live order.
  * Historical snapshots stay immutable; current access and exact private object
  * intents are fenced without imposing a new retention timer on observations. */
 export function diagnosticAccountErasureWrites(db: PrismaService, userId: string, now: Date): Prisma.PrismaPromise<unknown>[] {
- return [
-  db.$queryRaw`SELECT o.id FROM inspection_orders o WHERE o."erasedAt" IS NULL AND
+ // The User lock serializes public first consumption involving this commissioner.
+ // Predecessor/order bindings are immutable. Discover the entire direct-reader
+ // union before taking any order/report lock; never add B locks after locking A.
+ // B corrections reference B, not A, and carry no A report pointer in their own
+ // snapshot. Their order is included so concurrent authoring remains ordered.
+ const affected = Prisma.sql`o."erasedAt" IS NULL AND
    (o."commissionerId"=${userId} OR EXISTS (SELECT 1 FROM diagnostic_reports r WHERE r."orderId"=o.id AND
-    (r.state->>'authorId'=${userId} OR r.state->>'reviewerId'=${userId}))) ORDER BY o.id FOR UPDATE OF o`,
+    (r.state->>'authorId'=${userId} OR r.state->>'reviewerId'=${userId})) OR EXISTS (
+    SELECT 1 FROM diagnostic_reports b JOIN diagnostic_reports a ON a.id=b."predecessorId"
+    JOIN inspection_orders ao ON ao.id=a."orderId"
+    WHERE b."orderId"=o.id AND ao."commissionerId"=${userId} AND ao."erasedAt" IS NULL))`;
+ return [
+  // These personal Listings are updated later by account purge. Take their locks
+  // before orders, as publisher writers do. No surviving B Listing is mutated.
+  db.$queryRaw`SELECT id FROM listings WHERE "sellerId"=${userId} AND "businessId" IS NULL ORDER BY id FOR UPDATE`,
+  db.$queryRaw`WITH locked AS MATERIALIZED (
+   SELECT o.id FROM inspection_orders o WHERE ${affected} ORDER BY o.id FOR UPDATE OF o
+  ) SELECT set_config('carberk.diagnostic_erasure_orders', COALESCE(jsonb_agg(id ORDER BY id),'[]'::jsonb)::text, true) FROM locked`,
+  // Private first consumption can finish while purge waits for A's order lock.
+  // A new edge must roll back this purge, never extend its lock set behind A.
+  // This transaction-local list is only a lock receipt, not data authority.
+  db.$queryRaw`SELECT (CASE WHEN COALESCE((SELECT jsonb_agg(o.id ORDER BY o.id)
+   FROM inspection_orders o WHERE ${affected}),'[]'::jsonb) =
+   current_setting('carberk.diagnostic_erasure_orders')::jsonb THEN '1' ELSE 'diagnostic_erasure_lock_set_changed' END)::integer AS stable`,
+  // Re-evaluate the immutable binding predicate after the full sorted order set
+  // is locked, then lock every report in that set before any erasure write.
   db.$queryRaw`SELECT r.id FROM diagnostic_reports r JOIN inspection_orders o ON o.id=r."orderId"
-   WHERE o."erasedAt" IS NULL AND (o."commissionerId"=${userId} OR r.state->>'authorId'=${userId} OR r.state->>'reviewerId'=${userId})
-   ORDER BY r.id FOR UPDATE OF r`,
+   WHERE ${affected} ORDER BY r.id FOR UPDATE OF r`,
   db.$executeRaw`UPDATE diagnostic_reports r SET "erasedAt"=COALESCE(r."erasedAt",${now}::timestamp), version=r.version+1, "updatedAt"=${now}::timestamp,
    "identityRecordId"=NULL, "identityRecordHash"=NULL, "identityEvidenceId"=NULL, "identityEvidenceHash"=NULL,
    "withdrawalReason"=CASE WHEN r.status='withdrawn' THEN '[erased]' ELSE NULL END,

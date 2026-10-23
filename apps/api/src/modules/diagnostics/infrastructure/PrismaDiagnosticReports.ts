@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { DiagnosticSchemas } from "@auto-tm/contracts";
-import { PrismaService, Prisma } from "@auto-tm/db";
+import { PrismaService, Prisma, diagnosticReaderProjection } from "@auto-tm/db";
 import { DiagnosticReport, type DiagnosticReportState } from "../domain/DiagnosticReport";
 import { DiagnosticRuleError } from "../domain/InspectionOrder";
 import { DIAGNOSTIC_RUNTIME, type DiagnosticRuntime, type DiagnosticSubject } from "../domain/ports/DiagnosticIntakePort";
@@ -40,9 +40,12 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
   private async model(tx: Tx, row: Row): Promise<DiagnosticReport> {
     return new DiagnosticReport(row.state as unknown as DiagnosticReportState, await this.definition(tx, row));
   }
-  private async dto(tx: Tx, row: Row, subject: DiagnosticSubject, staff: boolean): Promise<DiagnosticSchemas.DiagnosticReportRecord> {
+  private async dto(tx: Tx, row: Row, subject: DiagnosticSubject, staff: boolean, exactReceipt = false): Promise<DiagnosticSchemas.DiagnosticReportRecord> {
     const state = row.state as unknown as DiagnosticReportState;
-    const released = row.snapshot ? DiagnosticSchemas.DiagnosticReleasedSnapshotSchema.parse(row.snapshot).report : state;
+    const historical = row.snapshot ? DiagnosticSchemas.DiagnosticReleasedSnapshotSchema.parse(row.snapshot).report : state;
+    // Exact mutation retries retain their immutable consumption binding. Current
+    // readers, including staff, receive the same erasure-safe projection.
+    const released = exactReceipt ? historical : (await diagnosticReaderProjection(tx, row, historical)).report;
     return DiagnosticSchemas.DiagnosticReportSchema.parse({ ...released, status: row.status, withdrawnAt: row.withdrawnAt?.toISOString() ?? null, withdrawalReason: row.withdrawalReason,
       lineageKind: row.reinspection ? "reinspection" : row.predecessorId ? "correction" : "original",
       ...await this.access.successor(tx, row, subject.userId), authorId: staff ? state.authorId : null,
@@ -205,9 +208,10 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
         const snapshot = json({ report: next, template: await this.definition(tx, row), synthetic: true });
         const hash = createHash("sha256").update(canonical(snapshot)).digest("hex");
         saved = await tx.diagnosticReportRecord.update({ where: { id: row.id }, data: { state: json(next), status: next.status, version: { increment: 1 }, snapshot, snapshotHash: hash, finalizedAt: this.runtime.now() } });
+        const { rendererVersion } = await diagnosticReaderProjection(tx, saved, next);
         for (const locale of ["tk", "ru", "en"]) {
           const id = this.runtime.id();
-          await tx.diagnosticPdfArtifact.create({ data: { id, reportId, snapshotHash: hash, locale, rendererVersion: "v1", objectKey: `diagnostic-pdf/${reportId}/${id}.pdf` } });
+          await tx.diagnosticPdfArtifact.create({ data: { id, reportId, snapshotHash: hash, locale, rendererVersion, objectKey: `diagnostic-pdf/${reportId}/${id}.pdf` } });
         }
       } else saved = await this.persist(tx, row, next);
       await this.audit(tx, subject, order, row.id, `REPORT_${input.action.toUpperCase()}`, { ...(input.reason ? { reason: input.reason } : {}), privateSelfReview: input.privateSelfReview === true && model.state.authorId === subject.userId });
@@ -247,7 +251,7 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
     if (!existing.reinspection || existing.orderId !== orderId || existing.predecessorId !== input.predecessorId || state.correctionReason !== input.reason ||
       state.authorId !== subject.userId || existing.erasedAt || existing.continuityProofId !== (input.proofId ?? null) ||
       (existing.continuityProofId && existing.reinspectionOrderVersion !== input.expectedOrderVersion)) throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
-    return this.dto(tx, existing, subject, true);
+    return this.dto(tx, existing, subject, true, true);
   }
   /** B's arrived, physically authorized own observation, or refusal. */
   observed(order: Order) {

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { DiagnosticSchemas as D } from "@auto-tm/contracts";
-import { PrismaService, type Prisma } from "@auto-tm/db";
+import { PrismaService, diagnosticReaderProjection, type Prisma } from "@auto-tm/db";
 
 import { DiagnosticRuleError } from "../domain/InspectionOrder";
 import type { DiagnosticPublicPort } from "../domain/ports/DiagnosticPublicPort";
@@ -38,7 +38,7 @@ export class PrismaDiagnosticPublic implements DiagnosticPublicPort {
     return this.db.$transaction(async tx => {
       const { row } = await this.access.loadPublic(tx, reportId);
       const snapshot = D.DiagnosticReleasedSnapshotSchema.parse(row.snapshot);
-      return D.PublicDiagnosticReportSchema.parse({ ...snapshot.report, version: row.version, template: snapshot.template, synthetic: true,
+      return D.PublicDiagnosticReportSchema.parse({ ...(await diagnosticReaderProjection(tx, row, snapshot.report)).report, version: row.version, template: snapshot.template, synthetic: true,
         authorId: null, reviewerId: null, returnReason: null, lineageKind: row.reinspection ? "reinspection" : row.predecessorId ? "correction" : "original", ...await this.access.successor(tx, row, null) });
     });
   }
