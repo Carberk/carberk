@@ -73,7 +73,9 @@ export async function renderDiagnosticPdf(input: DiagnosticPdfInput, fonts: Diag
   addPage(); heading(copy.title);
   text(`${copy.observed}: ${report.observedAt}`); text(`${copy.mileage}: ${report.mileageKm} km`);
   text(`${copy.template}: ${report.templateVersionId}`); text(`${copy.title}: ${report.id}`);
-  if (report.successorOf) text(`${copy.title} → ${report.successorOf}`);
+  // Noto Sans does not contain U+2192; pdf-lib otherwise emits its missing
+  // glyph (CID 0000), leaving the generated PDF without a ToUnicode mapping.
+  if (report.successorOf) text(`${copy.title} -> ${report.successorOf}`);
   if (report.correctionReason) text(report.correctionReason);
   heading(copy.scope); text(input.snapshot.template.title[input.locale]); text(input.snapshot.template.limitations[input.locale]); text(copy.limit);
   heading(copy.findings);
