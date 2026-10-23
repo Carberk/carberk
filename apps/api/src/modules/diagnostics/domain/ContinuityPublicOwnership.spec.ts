@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { continuityPair } from "./ContinuityPair";
+import type { PublicOwnershipVisit } from "./PublicAutomaticOwnership";
 
 // These are domain inputs, never database or HTTP admission fixtures. Persistence
 // must authenticate their contents and supply the complete raw history.
@@ -7,7 +8,9 @@ const owner = {
   listingId: "listing", listingIdentityDigest: "a".repeat(64), sellerId: "seller", commissionerId: "seller",
   businessId: null as string | null, membershipId: null as string | null,
 };
-function visit(orderId: string) {
+type Raw = PublicOwnershipVisit["records"][number];
+type FixtureOwnership = Omit<PublicOwnershipVisit, "records"> & { records: [Raw, ...Raw[]] };
+function visit(orderId: string): { audience: string; commissionerId: string; physicalAuthorized: boolean; ownership: FixtureOwnership } {
   return {
     audience: "listing_public", commissionerId: "seller", physicalAuthorized: true,
     ownership: {
@@ -36,6 +39,7 @@ describe("public automatic ownership admission", () => {
       side.ownership.currentRecordId = `${side.ownership.orderId}-second`;
     }
     a.ownership.selectedRecordId = "A-second";
+    b.ownership.selectedRecordId = "B-second";
     // Input order does not establish the original observation.
     a.ownership.records.reverse();
     admits(a, b);
@@ -45,7 +49,7 @@ describe("public automatic ownership admission", () => {
     (side === "A" ? a : b).ownership.transition = "changed";
     refuses(a, b);
   });
-  it.each(["legacy_unavailable", "erased"])("refuses %s material anywhere in the raw history", state => {
+  it.each(["legacy_unavailable", "erased"] as const)("refuses %s material anywhere in the raw history", state => {
     const a = visit("A"); const b = visit("B");
     a.ownership.records.push({ ...a.ownership.records[0], id: "A-second", orderVersion: 6, fact: { ...owner, state } });
     a.ownership.currentRecordId = "A-second";
@@ -58,7 +62,7 @@ describe("public automatic ownership admission", () => {
   });
   it("refuses an observed ownership change even when the effective value and selected pin match again", () => {
     const a = visit("A");
-    a.ownership.records.push({ ...a.ownership.records[0], id: "A-middle", orderVersion: 6, fact: { ...owner, sellerId: "other" } },
+    a.ownership.records.push({ ...a.ownership.records[0], id: "A-middle", orderVersion: 6, fact: { state: "available", ...owner, sellerId: "other" } },
       { ...a.ownership.records[0], id: "A-last", orderVersion: 8 });
     a.ownership.currentRecordId = "A-last";
     refuses(a);
@@ -75,6 +79,12 @@ describe("public automatic ownership admission", () => {
   it("refuses using an older raw record as the current candidate", () => {
     const b = visit("B");
     b.ownership.records.push({ ...b.ownership.records[0], id: "B-second", orderVersion: 9 });
+    refuses(visit("A"), b);
+  });
+  it("refuses a candidate selection that differs from its effective current raw record", () => {
+    const b = visit("B");
+    b.ownership.records.push({ ...b.ownership.records[0], id: "B-second", orderVersion: 9 });
+    b.ownership.currentRecordId = "B-second";
     refuses(visit("A"), b);
   });
   it("refuses a raw record belonging to another visit", () => {
@@ -96,8 +106,9 @@ describe("public automatic ownership admission", () => {
     const a = visit("A"); Object.assign(a.ownership, { transition }); refuses(a);
   });
   it("refuses duplicated raw identities and versions", () => {
-    const a = visit("A"); a.ownership.records.push({ ...a.ownership.records[0] }); refuses(a);
-    a.ownership.records[1].id = "different"; refuses(a);
+    const a = visit("A"); const duplicate = { ...a.ownership.records[0] };
+    a.ownership.records.push(duplicate); refuses(a);
+    duplicate.id = "different"; refuses(a);
   });
   it("requires ownership material on both visits", () => {
     const a = visit("A"); const b = visit("B");
