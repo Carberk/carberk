@@ -158,3 +158,79 @@ Verification for this docs-only checkpoint:
 | Bounded next task and fixture tradeoff recorded | No implementation; next experiment and conditional fixture map only | pass |
 
 Checkpoint branch: `agent/issue-914-worker-renderer-cost-diagnosis-20261023`. The branch is reserved and pushed from the supplied base. No CI polling/dispatch/rerun, deployment, Railway retry, Docker, database/HTTP service, listener, native/device action, credential probe, or external message occurred. The three Railway refusals and three prior repair attempts remain terminal; this research does not restart either budget. No background process was started. Parent owns assembly, exact-candidate acceptance and all later manual native testing.
+
+## Authorized single local instrumented run, 2026-10-23
+
+This append records the parent's separately authorized one-run experiment after inspection of the temporary config, runtime, transform, all 24 preparation manifest artifacts, 1,375 runtime input hashes, and four source hashes. It supersedes the earlier statement that no timing run was authorized only for this one exact invocation. Parent explicitly allowed intrinsic Vitest local API-token/cache management as incidental runner state. No token file was manually inspected, printed, changed, redirected or patched. API/UI/browser remained off, and no listener or device checks were added.
+
+The run used this writer's owned worktree at frozen source checkpoint `0593e3757d2bdcd3ba91fa21a6b934630c793762`, tree `2e332b86bd883bb45d6431ff46680de2d4984146`. Parent integration was `0ca85a6276286278b49333cfa25e0cc99cd93166`. Direct `git show` byte comparisons confirmed that the worker, renderer, parser and named spec are identical at both commits and in this worktree. No rebase occurred. Other tracked files were unchanged before this append.
+
+Preparation used the authorized `pnpm install --offline --frozen-lockfile --ignore-scripts`, with 2,034 reused packages and zero downloads, then the exact local contracts and DB builds. DB code generation used only the explicitly inert URL from the preparation receipt. No migration, seed, database connection, application build or borrowed output occurred. Parent reviewed the installed/generated passive import chain. The standalone temporary config imports no repository global setup or setup-env, retains the original maxWorkers and default 5,000 ms bound, and disables API/UI/browser, HMR and file watching. It uses the real module identities without aliases or mocks. Original tracked test bytes, arguments, imports, await expressions, assertions, ordinary generation and scheduling remain unchanged. Four in-memory transforms were guarded by exact source hashes and expected edit counts, with byte-exact inverse reconstruction checked before the run. The existing failure hook would freeze per-case AsyncLocalStorage records after emission; this successful run did not exercise its timeout path.
+
+Exactly one timing command was executed, from `/Users/bagtyyar/.t3/worktrees/carberk/t3-674e5c28`:
+
+```sh
+AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run --config /tmp/914-worker-renderer-parser-probe/config.mts src/jobs/diagnostics/SafeReplacementScheduling.spec.ts
+```
+
+Output was redirected once to `/tmp/914-worker-renderer-parser-probe/authorized-once.log`. Terminal exit was **0**. Vitest 5.0.4 reported **1 file passed, 3 tests passed**, duration **1.95 s**, with tests 62%, import 34% and transform 3%. There was no setup failure, retry, fallback, or second timing invocation. Each locale produced exactly one completed probe record.
+
+### Completed measurements
+
+All times below are local monotonic elapsed milliseconds, rounded by the prepared hook. Outer phases include their nested work.
+
+| Outer phase | TK | RU | EN |
+|---|---:|---:|---:|
+| Total case | 444.9 | 371.8 | 362.5 |
+| fixture-fonts | 10.0 | 0.2 | 0.2 |
+| issued-generation | 65.7 | 38.2 | 34.7 |
+| issued-read-parse | 4.0 | 1.6 | 1.1 |
+| backlog-erasure | 0.3 | 0.2 | 0.2 |
+| pending-locales | 83.0 | 66.5 | 69.5 |
+| maintenance | 185.9 | 173.3 | 168.2 |
+| replacement-preservation | 21.0 | 20.3 | 16.2 |
+| ordinary-drain | 75.1 | 71.6 | 72.4 |
+
+Each outer phase count was one per locale. Each renderer phase completed ten entries per locale; parse-load completed four, parse-font-maps and parse-content twelve each, worker-current thirty-five and worker-cleanup two.
+
+| Inner phase | Calls per locale | TK ms | RU ms | EN ms |
+|---|---:|---:|---:|---:|
+| render-create | 10 | 1.4 | 0.0 | 0.2 |
+| render-fonts | 10 | 12.0 | 6.2 | 6.2 |
+| render-layout | 10 | 301.2 | 271.3 | 268.2 |
+| render-save | 10 | 85.4 | 66.3 | 64.6 |
+| parse-load | 4 | 3.2 | 1.1 | 1.0 |
+| parse-font-maps | 12 | 4.0 | 2.9 | 2.5 |
+| parse-content | 12 | 0.8 | 0.5 | 0.4 |
+| worker-current | 35 | 4.6 | 2.4 | 2.1 |
+| worker-cleanup | 2 | 0.5 | 0.3 | 0.3 |
+
+The expected ten renders and four full PDF parses completed in every case, thirty renders and twelve parses overall. The twelve page-map/content entries per case are consistent with the actual four parsed three-page PDFs. Ten font-phase entries each cover both embedded font calls. A rounded zero is below this hook's resolution, not proof of no work.
+
+All original assertions passed: three distinct ready safe replacements with one generation attempt, predecessor A absent from replacement text, B's own report/finding/template/mileage/date preserved, the first pass completing exactly the expected four FIFO ordinary artifacts, final drain completing all six, the original B record and issued artifact row/bytes preserved, and the unrelated object retained. No cached fixture output, skipped parse or changed ordinary artifact state was introduced.
+
+### Interpretation and evidence limits
+
+For this single completed local run, layout/drawing is the largest measured renderer phase; save is next. The layout phase includes wrapping, fontkit-backed text measurement, drawing, diagram work and associated allocation. The experiment does not isolate which of those dominates. The save phase includes deferred font subsetting/embedding and full PDF serialization, so it cannot be described as serialization alone. The direct embedFont phase is smaller here; that does not establish total font cost because shaping and deferred subsets occur in later phases.
+
+PDF load/font-map/content decoding, current validation and cleanup are small in these local records. Replacement-preservation includes other reads/assertions beyond the measured parser. Nested phases and outer phases are not disjoint and must not be summed together. Rounding per segment, instrumentation, the added case promise bookkeeping, library initialization and scheduler waits affect these elapsed values. There is no uninstrumented control run under this authorization and no CPU profile. No repeat or timing loop is justified by these numbers.
+
+This is local in-memory fixture evidence only. It does not establish why hosted d9cc needed more than five seconds, does not attribute hosted cost to layout, does not simulate hosted contention, and supplies no hosted GREEN or release-readiness evidence. The known scheduling baseline RED and existing product correction remain preserved. No timeout, concurrency, retention, authority, lock, assertion, renderer or fixture change is authorized by this result.
+
+The smallest next evidence task is for parent to decide whether the completed phase counters should be carried into a separately authorized representative hosted observation. Local evidence makes layout/save the first phases to compare, while retaining parser/current/cleanup counters to detect a changed cost distribution. Do not run another local timing experiment, change wrapping/subsetting/parser behavior, add cached fixture PDFs, or infer hosted benefit from this one local sample. If no hosted observation is authorized, keep the hosted cost attribution unresolved.
+
+### Artifacts and append verification
+
+All preparation and run artifacts remain under `/tmp/914-worker-renderer-parser-probe`. The original preparation manifest is preserved as `SHA256SUMS.pre-run`. The updated manifest lists the 24 reviewed preparation artifacts and five added receipt artifacts. It intentionally excludes runner-managed cache/token files; none were inspected for this handoff.
+
+| Artifact | SHA-256 |
+|---|---|
+| `authorized-once.log`, complete one-run output | `f2fea49975648a5e794762b515e8c31b1e74087dbc4da5a5e6124a4895bf1964` |
+| `measurement-records.json`, exact three parsed records | `f8e42057ece9b66ca59095771d5e1b2ee08d440488f01f44a85667ba6ec05e02` |
+| `run-exit.json`, exact command/cwd/base, exit 0, invocation count 1 | `2e64479fba59858b8fefaaa9ab20aa4b380b3f7189e5d3c8f3fea6d74dfe466d` |
+| `post-run-source-preservation.json`, four frozen/parent source comparisons and pre-append clean status | `e91aeb735ef1c0d27752660fa02c39da62c33c1e2b7aa67f8c35d69d9fac1a50` |
+| `SHA256SUMS`, updated controlled artifact manifest | `dbab0c3a431f440d1ace2860c2d86624230b97886f7bb2a6bbcce6de0fc2e477` |
+
+The earlier PREPARATION.md runner-token concern is superseded solely by the parent's explicit disposition above. Preparation artifacts and executable probe hashes stayed unchanged for the authorized invocation. The earlier source-review.json is a pre-run receipt; post-run-source-preservation.json and run-exit.json own current run status.
+
+Append-only verification uses `git show 0593e3757d2bdcd3ba91fa21a6b934630c793762:docs/evidence/issue-914/worker-renderer-parser-cost-diagnosis-20261023.md` as the exact preserved prefix, `node scripts/check-agent-docs.mjs`, `node scripts/check-domain-glossary.mjs`, and `git diff --check`. No additional tests were run for the docs checkpoint. This document is the sole tracked diff. Its pushed commit/tree are returned in the handoff without rewriting the earlier receipt. Parent owns integration assembly and any next authorization.
