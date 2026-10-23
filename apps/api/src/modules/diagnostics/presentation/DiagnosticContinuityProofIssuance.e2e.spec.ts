@@ -1486,6 +1486,21 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
     await post("technician", path, { kind: "consume", command: { ...command, reason: "Explicit fresh input after rollback" } }).expect(201);
   });
 
+  it("disposes opaque pending identities with Session expiry or deletion and never revives their handles", async () => {
+    const p = await pair();
+    const requestId = await preparedRequest(p, "issue");
+    await db.session.update({ where: { id: suite.id("reviewer-session") }, data: { expiresAt: initialTime } });
+    await db.$transaction(async tx => { await tx.$queryRaw`SELECT diagnostic_dispose_expired_requests(${initialTime}::timestamp)`; });
+    expect(await db.diagnosticContinuityRequest.findUnique({ where: { id: requestId } })).toBeNull();
+    await db.session.update({ where: { id: suite.id("reviewer-session") }, data: { expiresAt: future } });
+    privateNoStore(await get("reviewer", `${requestsPath(p)}/${requestId}`).expect(403));
+    await post("reviewer", `${requestsPath(p)}/${requestId}/execute`, { kind: "issue", command: p.body }).expect(403);
+    expect(await db.diagnosticContinuityProof.count({ where: { requestId } })).toBe(0);
+    const pending = await preparedRequest(p, "consume");
+    await db.session.delete({ where: { id: suite.id("technician-session") } });
+    expect(await db.diagnosticContinuityRequest.findUnique({ where: { id: pending } })).toBeNull();
+  });
+
   it("preserves request-bound B after real A rights disposal and fences erased B metadata", async () => {
     const { p, proofId } = await bOnlyPair(true);
     const requestId = await preparedRequest(p, "consume");
