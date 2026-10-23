@@ -1,3 +1,4 @@
+import { DiagnosticDiscoveryCursor } from "./DiagnosticDiscoveryCursor";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { Inject, Injectable } from "@nestjs/common";
@@ -6,6 +7,7 @@ import { PrismaService, type Prisma } from "@auto-tm/db";
 import { STAFF_BINDING_PORT, StaffAuthorityDenied, type StaffBinding, type StaffBindingPort, type PublisherParticipants } from "../../identity/identity.public";
 import type { DiagnosticContinuityProofsPort } from "../application/ports/DiagnosticContinuityProofsPort";
 import { DiagnosticRuleError } from "../domain/InspectionOrder";
+import { DiagnosticReport, type DiagnosticReportState } from "../domain/DiagnosticReport";
 import { continuityPair } from "../domain/ContinuityPair";
 import { DiagnosticPublicBindings } from "./DiagnosticPublicBindings";
 import { privateContinuityAttestation } from "../domain/PrivateContinuityAttestation";
@@ -24,7 +26,8 @@ type Pair = Awaited<ReturnType<PrismaDiagnosticReports["compared"]>>;
 /** Pair-bound private/public issuance and consumption transactions. Neither issuance nor a read creates a report or successor. */
 @Injectable()
 export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityProofsPort {
-  constructor(@Inject(PrismaService) private readonly db: PrismaService,
+  constructor(@Inject(DiagnosticDiscoveryCursor) private readonly cursors: DiagnosticDiscoveryCursor,
+    @Inject(PrismaService) private readonly db: PrismaService,
     @Inject(DiagnosticAuthority) private readonly authority: DiagnosticAuthority,
     @Inject(STAFF_BINDING_PORT) private readonly staff: StaffBindingPort,
     @Inject(PrismaDiagnosticReports) private readonly reports: PrismaDiagnosticReports,
@@ -204,60 +207,138 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
         if (!retried) throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
         return retried;
       }
-      const initial = await tx.diagnosticContinuityProof.findUnique({ where: { id: input.proofId } });
-      if (!initial?.issuerId || !initial.issuerSessionId || initial.linkingTechnicianId !== subject.userId) throw denied();
-      const issuer = { userId: initial.issuerId, sessionId: initial.issuerSessionId };
-      // Lock the whole actor/publisher User union before any Business or feature locks.
-      const participants = await this.publicBindings.pairLocks(tx, orderId, input.predecessorId, [issuer.userId, subject.userId]);
-      let staffBindings;
-      try {
-        staffBindings = await this.staff.bind([
-          { ...issuer, capability: "diagnostics.reviewer" },
-          { userId: subject.userId, capability: "diagnostics.technician" },
-        ], tx);
-      } catch (error) { if (error instanceof StaffAuthorityDenied) throw denied(); throw error; }
-      // The issuer's current comparative authority, rechecked as at issuance on both visits.
-      const pair = await this.reports.compared(tx, issuer, orderId, input.predecessorId);
-      const { prior: a, priorOrder: ao, comparison } = pair;
-      await this.authority.order(tx, issuer, ao.id, "diagnostics.reviewer");
-      await this.authority.order(tx, issuer, pair.order.id, "diagnostics.reviewer");
-      // The acting linking technician's own current Session and B authority.
-      const { row: b } = await this.authority.order(tx, subject, orderId, "diagnostics.technician");
-      const current = { ...pair, order: b };
-      await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${a.id} FOR UPDATE`;
-      const staffing = await this.staffing(tx, issuer.userId, subject.userId, current);
-      await tx.$queryRaw`SELECT id FROM diagnostic_continuity_proofs WHERE id=${input.proofId} FOR UPDATE`;
-      const raced = await this.reports.reinspectionRetry(tx, subject, orderId, input);
-      if (raced) return raced;
-      const proof = await tx.diagnosticContinuityProof.findUnique({ where: { id: input.proofId } });
-      const content = D.DiagnosticContinuityProofSchema.safeParse(proof?.content);
-      if (!proof || !content.success || proof.erasedAt || proof.candidateOrderId !== b.id || proof.predecessorReportId !== a.id || proof.predecessorOrderId !== ao.id ||
-        proof.issuerId !== issuer.userId || proof.issuerSessionId !== issuer.sessionId || proof.linkingTechnicianId !== subject.userId ||
-        content.data.issuedBy !== issuer.userId || content.data.linkingTechnicianId !== subject.userId) throw denied();
-      if (proof.consumedReportId) throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
-      const now = this.runtime.now();
-      // A public successor race is a link conflict after full reviewer and technician authority.
-      if (b.audience === "listing_public" && await tx.diagnosticReportRecord.count({ where: { predecessorId: a.id } })) throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
-      // Invalidation is permanent; reverting a source value never revives the proof.
-      if (proof.invalidatedAt || proof.rightsUntil <= now) throw denied();
-      this.pair(current, content.data.method);
-      // A successor elsewhere is a protected predecessor fact; B's own first report is not.
-      if (await tx.diagnosticReportRecord.count({ where: { predecessorId: a.id } })) throw denied();
-      if (await tx.diagnosticReportRecord.count({ where: { orderId: b.id } })) throw new DiagnosticRuleError("DIAGNOSTIC_REPORT_EXISTS");
-      if (b.version !== input.expectedOrderVersion) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
-      const bound = content.data;
-      if (hash(bound.predecessor) !== hash({ reportId: a.id, reportVersion: a.version, snapshotHash: a.snapshotHash, identityRecordId: comparison.predecessor.identityRecordId, identityRecordHash: comparison.predecessor.identityRecordHash }) ||
-        hash(bound.candidate) !== hash({ orderId: b.id, orderVersion: b.version, identityRecordId: comparison.candidate.identityRecordId, identityRecordHash: comparison.candidate.identityRecordHash })) throw denied();
-      const { bindings, provenance } = await this.facts(tx, current, staffing, bound.provenanceRecordIds, staffBindings, participants);
-      const rightsUntil = await this.comparisonRights(tx, current, bound.method, provenance, now);
-      if (rightsUntil.valueOf() !== proof.rightsUntil.valueOf()) throw denied();
-      if (hash(bindings) !== hash(proof.bindings)) throw denied();
-      await tx.diagnosticContinuityProof.update({ where: { id: proof.id }, data: { consumedReportId: input.reportId, consumedAt: now } });
-      const created = await this.reports.openReinspection(tx, subject, b, a, input, proof.id);
-      // Like issuance, the audit holds no rationale, provenance, personal linkage or identity hashes.
-      await tx.diagnosticAudit.create({ data: { id: b.audience === "listing_public" ? created.id : this.runtime.id(), centerId: b.centerId, orderId: b.id, actorId: subject.userId,
-        action: "CONTINUITY_PROOF_CONSUMED", details: { reportId: created.id }, createdAt: now } });
-      return created;
+      const admitted = await this.admit(tx, subject, orderId, input.proofId, input.predecessorId, input);
+      if (admitted.retried) return admitted.retried;
+      return this.createFromAdmission(tx, subject, input, admitted);
+    });
+  }
+
+  /** The same locked, read-only current admission drives discovery and first consumption. */
+  private async admit(tx: Tx, subject: DiagnosticSubject, orderId: string, proofId: string, predecessorId: string, input?: D.DiagnosticReinspection & { proofId: string }) {
+    const initial = await tx.diagnosticContinuityProof.findUnique({ where: { id: proofId } });
+    if (!initial?.issuerId || !initial.issuerSessionId || initial.candidateOrderId !== orderId || initial.predecessorReportId !== predecessorId || initial.linkingTechnicianId !== subject.userId) throw denied();
+    const issuer = { userId: initial.issuerId, sessionId: initial.issuerSessionId };
+    // Lock the whole actor/publisher User union before any Business or feature locks.
+    const participants = await this.publicBindings.pairLocks(tx, orderId, predecessorId, [issuer.userId, subject.userId]);
+    let staffBindings;
+    try {
+      staffBindings = await this.staff.bind([
+        { ...issuer, capability: "diagnostics.reviewer" },
+        { userId: subject.userId, capability: "diagnostics.technician" },
+      ], tx);
+    } catch (error) { if (error instanceof StaffAuthorityDenied) throw denied(); throw error; }
+    // The issuer's current comparative authority, rechecked as at issuance on both visits.
+    const pair = await this.reports.compared(tx, issuer, orderId, predecessorId);
+    const { prior: a, priorOrder: ao, comparison } = pair;
+    await this.authority.order(tx, issuer, ao.id, "diagnostics.reviewer");
+    await this.authority.order(tx, issuer, pair.order.id, "diagnostics.reviewer");
+    // The acting linking technician's own current Session and B authority.
+    const { row: b } = await this.authority.order(tx, subject, orderId, "diagnostics.technician");
+    const current = { ...pair, order: b };
+    await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${a.id} FOR UPDATE`;
+    const staffing = await this.staffing(tx, issuer.userId, subject.userId, current);
+    await tx.$queryRaw`SELECT id FROM diagnostic_continuity_proofs WHERE id=${proofId} FOR UPDATE`;
+    const raced = input ? await this.reports.reinspectionRetry(tx, subject, orderId, input) : null;
+    if (raced) return { retried: raced };
+    const proof = await tx.diagnosticContinuityProof.findUnique({ where: { id: proofId } });
+    const content = D.DiagnosticContinuityProofSchema.safeParse(proof?.content);
+    if (!proof || !content.success || content.data.proofId !== proof.id || proof.erasedAt || proof.candidateOrderId !== b.id || proof.predecessorReportId !== a.id || proof.predecessorOrderId !== ao.id ||
+      proof.issuerId !== issuer.userId || proof.issuerSessionId !== issuer.sessionId || proof.linkingTechnicianId !== subject.userId ||
+      content.data.issuedBy !== issuer.userId || content.data.linkingTechnicianId !== subject.userId) throw denied();
+    if (proof.consumedReportId) throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
+    const now = this.runtime.now();
+    // A public successor race is a link conflict after full reviewer and technician authority.
+    if (b.audience === "listing_public" && await tx.diagnosticReportRecord.count({ where: { predecessorId: a.id } })) throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
+    // Invalidation is permanent; reverting a source value never revives the proof.
+    if (proof.invalidatedAt || proof.rightsUntil <= now) throw denied();
+    this.pair(current, content.data.method);
+    // A successor elsewhere is a protected predecessor fact; B's own first report is not.
+    if (await tx.diagnosticReportRecord.count({ where: { predecessorId: a.id } })) throw denied();
+    if (await tx.diagnosticReportRecord.count({ where: { orderId: b.id } })) throw new DiagnosticRuleError("DIAGNOSTIC_REPORT_EXISTS");
+    if (input && b.version !== input.expectedOrderVersion) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
+    const bound = content.data;
+    if (b.version !== bound.candidate.orderVersion) throw denied();
+    if (hash(bound.predecessor) !== hash({ reportId: a.id, reportVersion: a.version, snapshotHash: a.snapshotHash, identityRecordId: comparison.predecessor.identityRecordId, identityRecordHash: comparison.predecessor.identityRecordHash }) ||
+      hash(bound.candidate) !== hash({ orderId: b.id, orderVersion: b.version, identityRecordId: comparison.candidate.identityRecordId, identityRecordHash: comparison.candidate.identityRecordHash })) throw denied();
+    const { bindings, provenance } = await this.facts(tx, current, staffing, bound.provenanceRecordIds, staffBindings, participants);
+    const rightsUntil = await this.comparisonRights(tx, current, bound.method, provenance, now);
+    if (rightsUntil.valueOf() !== proof.rightsUntil.valueOf()) throw denied();
+    if (hash(bindings) !== hash(proof.bindings)) throw denied();
+    // Usable also means the same domain transition can open B's own empty draft.
+    // This is pure validation; no report, id or audit is persisted by discovery.
+    const observation = this.reports.observed(b);
+    new DiagnosticReport(a.state as unknown as DiagnosticReportState).reinspect({ reportId: input?.reportId ?? proof.id,
+      orderId: b.id, templateVersionId: b.templateVersionId, authorId: subject.userId, observedAt: observation.observedAt,
+      mileageKm: observation.mileageKm, reason: input?.reason ?? "B-owned handoff" });
+    return { proof, b, a, now, retried: null };
+  }
+
+  private async createFromAdmission(tx: Tx, subject: DiagnosticSubject, input: D.DiagnosticReinspection & { proofId: string }, admitted: { proof: Prisma.DiagnosticContinuityProofGetPayload<object>; b: Order; a: Prisma.DiagnosticReportRecordGetPayload<object>; now: Date }) {
+    const { proof, b, a, now } = admitted;
+    await tx.diagnosticContinuityProof.update({ where: { id: proof.id }, data: { consumedReportId: input.reportId, consumedAt: now } });
+    const created = await this.reports.openReinspection(tx, subject, b, a, input, proof.id);
+    // Like issuance, the audit holds no rationale, provenance, personal linkage or identity hashes.
+    await tx.diagnosticAudit.create({ data: { id: b.audience === "listing_public" ? created.id : this.runtime.id(), centerId: b.centerId, orderId: b.id, actorId: subject.userId,
+      action: "CONTINUITY_PROOF_CONSUMED", details: { reportId: created.id }, createdAt: now } });
+    return created;
+  }
+
+  /** Existing B result recovery deliberately never reads A or restricted proof payloads. */
+  private async result(tx: Tx, subject: DiagnosticSubject, orderId: string) {
+    const row = await tx.diagnosticReportRecord.findFirst({ where: { orderId, erasedAt: null, reinspection: true, continuityProofId: { not: null } } });
+    if (!row || (row.state as { authorId?: string }).authorId !== subject.userId || !row.continuityProofId) return null;
+    return { proofId: row.continuityProofId, reportId: row.id };
+  }
+
+  async handoffs(subject: DiagnosticSubject, orderId: string, query: D.DiagnosticPredecessorQuery): Promise<D.DiagnosticContinuityHandoffs> {
+    // Authorize B before cursor parsing/scan. A result is B-owned, even if erasure deleted its proof.
+    await this.db.$transaction(tx => this.authority.order(tx, subject, orderId, "diagnostics.technician"));
+    const position = this.cursors.open(query.cursor, subject, orderId, this.runtime.now(), "b-handoffs-v1");
+    const rows = await this.db.diagnosticContinuityProof.findMany({ where: { candidateOrderId: orderId, linkingTechnicianId: subject.userId,
+      consumedReportId: null, issuedAt: { lte: new Date(position.until) }, ...(position.after ? { id: { gt: position.after.id } } : {}) },
+      orderBy: { id: "asc" }, take: 21, select: { id: true, predecessorReportId: true, issuerId: true, issuedAt: true } });
+    const page = rows.slice(0, 20);
+    return this.db.$transaction(async tx => {
+      // Discover targets only; hold the full page's actor/order union before admitting any pair.
+      const predecessors = await tx.diagnosticReportRecord.findMany({ where: { id: { in: page.flatMap(row => row.predecessorReportId ? [row.predecessorReportId] : []) } }, select: { orderId: true } });
+      await this.publicBindings.lock(tx, [orderId, ...new Set(predecessors.map(row => row.orderId))],
+        [subject.userId, ...page.flatMap(row => row.issuerId ? [row.issuerId] : [])]);
+      await this.authority.order(tx, subject, orderId, "diagnostics.technician");
+      const handoffs: D.DiagnosticContinuityHandoffs["handoffs"] = [];
+      for (const row of page) {
+        try {
+          if (!row.predecessorReportId) throw denied();
+          const admitted = await this.admit(tx, subject, orderId, row.id, row.predecessorReportId);
+          if (!admitted.b) throw denied();
+          handoffs.push({ proofId: row.id, status: "usable", expectedOrderVersion: admitted.b.version });
+        } catch (error) { if (!(error instanceof DiagnosticRuleError)) throw error; }
+      }
+      const last = page.at(-1);
+      const nextCursor = rows.length > 20 && last ? this.cursors.seal({ ...position, after: { at: last.issuedAt.toISOString(), id: last.id } }) : null;
+      return D.DiagnosticContinuityHandoffsSchema.parse({ handoffs, result: await this.result(tx, subject, orderId), nextCursor, scope: "current_b_owned_handoffs" });
+    });
+  }
+
+  async useHandoff(subject: DiagnosticSubject, orderId: string, proofId: string, input: D.DiagnosticContinuityCommand): Promise<{ reportId: string }> {
+    return this.db.$transaction(async tx => {
+      const existing = await tx.diagnosticReportRecord.findUnique({ where: { id: input.reportId } });
+      if (existing) {
+        await this.reports.reinspectionLocks(tx, subject, orderId, "");
+        // Resolve the surviving binding under B's lock, including severed A linkage.
+        const current = await tx.diagnosticReportRecord.findUnique({ where: { id: input.reportId } });
+        if (!current) throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
+        const retry = await this.reports.reinspectionRetry(tx, subject, orderId, { ...input, proofId, predecessorId: current.predecessorId });
+        if (!retry) throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
+        return { reportId: retry.id };
+      }
+      const initial = await tx.diagnosticContinuityProof.findUnique({ where: { id: proofId } });
+      if (!initial?.predecessorReportId || initial.candidateOrderId !== orderId || initial.linkingTechnicianId !== subject.userId) throw denied();
+      const bound = { ...input, proofId, predecessorId: initial.predecessorReportId };
+      let admitted;
+      try { admitted = await this.admit(tx, subject, orderId, proofId, initial.predecessorReportId, bound); }
+      catch (error) { if (error instanceof DiagnosticRuleError) throw denied(); throw error; }
+      const report = admitted.retried ?? await this.createFromAdmission(tx, subject, bound, admitted);
+      return { reportId: report.id };
     });
   }
 

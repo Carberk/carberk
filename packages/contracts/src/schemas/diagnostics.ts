@@ -161,3 +161,14 @@ export const DiagnosticLinkingTechniciansSchema = z.object({ technicians: z.arra
 export type DiagnosticPredecessorQuery = z.infer<typeof DiagnosticPredecessorQuerySchema>;
 export type DiagnosticPredecessorPage = z.infer<typeof DiagnosticPredecessorPageSchema>;
 export type DiagnosticLinkingTechnicians = z.infer<typeof DiagnosticLinkingTechniciansSchema>;
+
+/** B-only projection: an opaque handle is actionable only after locked current admission. */
+export const DiagnosticContinuityHandoffSchema = z.object({ proofId: z.string().uuid(), status: z.literal("usable"), expectedOrderVersion: z.number().int().nonnegative() }).strict();
+export const DiagnosticContinuityResultSchema = z.object({ proofId: z.string().uuid(), reportId: z.string().uuid() }).strict();
+export const DiagnosticContinuityHandoffsSchema = z.object({
+  handoffs: z.array(DiagnosticContinuityHandoffSchema).max(20), result: DiagnosticContinuityResultSchema.nullable(),
+  nextCursor: z.string().nullable(), scope: z.literal("current_b_owned_handoffs"),
+}).strict();
+export const DiagnosticContinuityCommandSchema = z.object({ reportId: z.string().uuid(), expectedOrderVersion: z.number().int().nonnegative(), reason: z.string().trim().min(1).max(1000) }).strict();
+export type DiagnosticContinuityHandoffs = z.infer<typeof DiagnosticContinuityHandoffsSchema>;
+export type DiagnosticContinuityCommand = z.infer<typeof DiagnosticContinuityCommandSchema>;

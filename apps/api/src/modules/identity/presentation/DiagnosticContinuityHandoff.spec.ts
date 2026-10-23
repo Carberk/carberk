@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { ConfigService } from "@nestjs/config";
 import { Test } from "@nestjs/testing";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
-import { PrismaService } from "@auto-tm/db";
+import { PrismaService, Prisma } from "@auto-tm/db";
 import { DiagnosticMemoryDatabase, diagnosticTestId as id, diagnosticTestNow as now } from "@auto-tm/db/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DiagnosticsModule } from "../../diagnostics/diagnostics.module";
@@ -62,7 +62,7 @@ describe("B-owned continuity handoff through real HTTP, application, authority a
     const text = { tk: "Synthetic", ru: "Synthetic", en: "Synthetic" };
     memory.seed("diagnosticTemplateVersion", { id: id(500), synthetic: true, definition: { title: text, limitations: text, syntheticNotice: text, checks: [{ id: "brakes", label: text, required: true, evidenceRequired: false, measurement: null }], panels: [] } });
     visit(20, false); assign(b, 2, "diagnostics.technician");
-    const runtime = { now: () => currentTime, id: randomUUID, syntheticAllowed: () => true, publicSyntheticAllowed: () => false };
+    const runtime = { now: () => currentTime, id: (() => { let next = 800000; return () => id(next++); })(), syntheticAllowed: () => true, publicSyntheticAllowed: () => false };
     const module = await Test.createTestingModule({ controllers: [DiagnosticReportsController],
       // Use production diagnostic composition, replacing only database/time/config boundaries.
       providers: [...Reflect.getMetadata("providers", DiagnosticsModule),
@@ -100,13 +100,15 @@ describe("B-owned continuity handoff through real HTTP, application, authority a
     expect((await get(`${b}/continuity-proofs/${proofId}`, technician)).status).toBe(403);
     expect((await get(`${b}/continuity-handoffs`)).status).toBe(403);
     expect((await get(`${b}/continuity-handoffs`, { userId: id(3), sessionId: id(103) })).status).toBe(403);
+    assign(b, 3, "diagnostics.technician");
+    expect((await get(`${b}/continuity-handoffs`, { userId: id(3), sessionId: id(103) })).body).toEqual({ handoffs: [], result: null, nextCursor: null, scope: "current_b_owned_handoffs" });
   });
   it("uses only B command fields and recovers B after proof payload loss and later A erasure", async () => {
     const proofId = await issue();
     const command = { reportId: id(9000), expectedOrderVersion: 1, reason: "B visit follow-up" };
     const created = await post(`${b}/continuity-handoffs/${proofId}/consume`, command, technician);
     expect(created.status).toBe(201); expect(created.body).toEqual({ reportId: id(9000) });
-    await db.diagnosticContinuityProof.update({ where: { id: proofId }, data: { content: null, bindings: null, erasedAt: now, issuerId: null, issuerSessionId: null, linkingTechnicianId: null, candidateOrderId: null, predecessorReportId: null, predecessorOrderId: null } });
+    await db.diagnosticContinuityProof.update({ where: { id: proofId }, data: { content: Prisma.DbNull, bindings: Prisma.DbNull, erasedAt: now, issuerId: null, issuerSessionId: null, linkingTechnicianId: null, candidateOrderId: null, predecessorReportId: null, predecessorOrderId: null } });
     await db.inspectionOrder.update({ where: { id: id(30) }, data: { erasedAt: now } });
     await db.diagnosticReportRecord.update({ where: { id: id(4030) }, data: { erasedAt: now } });
     const recovered = await get(`${b}/continuity-handoffs`, technician);
@@ -115,5 +117,78 @@ describe("B-owned continuity handoff through real HTTP, application, authority a
     expect((await post(`${b}/continuity-handoffs/${proofId}/consume`, { ...command, reason: "Changed" }, technician)).status).toBe(409);
     expect((await post(`${b}/continuity-handoffs/${randomUUID()}/consume`, command, technician)).status).toBe(409);
     expect(await db.diagnosticAudit.count({ where: { action: "CONTINUITY_PROOF_CONSUMED" } })).toBe(1);
+    await db.diagnosticReportRecord.update({ where: { id: id(9000) }, data: { erasedAt: now } });
+    expect((await get(`${b}/continuity-handoffs`, technician)).body.result).toBeNull();
+    expect((await post(`${b}/continuity-handoffs/${proofId}/consume`, command, technician)).status).toBe(409);
+  });
+
+  it.each([
+    ["issuer Session expiry", "session", { id: id(101) }, { expiresAt: now }],
+    ["issuer grant loss", "staffGrant", { userId: id(1) }, { revokedAt: now }],
+    ["issuer qualification loss", "diagnosticCenterAssignment", { userId: id(1) }, { qualifiedUntil: now }],
+    ["issuer A assignment loss", "diagnosticOrderAssignment", { orderId: id(30), userId: id(1) }, { revokedAt: now }],
+    ["issuer B assignment loss", "diagnosticOrderAssignment", { orderId: b, userId: id(1) }, { revokedAt: now }],
+    ["A erasure", "inspectionOrder", { id: id(30) }, { erasedAt: now }],
+    ["A raw erasure", "diagnosticIdentityRecord", { orderId: id(30) }, { erasedAt: now }],
+    ["A rights expiry", "diagnosticIdentityProvenance", { orderId: id(30) }, { rightsUntil: now }],
+    ["B rights expiry", "diagnosticIdentityEvidence", { orderId: b }, { rightsUntil: now }],
+    ["changed B version", "inspectionOrder", { id: b }, { version: 2 }],
+    ["changed A version", "diagnosticReportRecord", { id: id(4030) }, { version: 2 }],
+    ["proof rights expiry", "diagnosticContinuityProof", {}, { rightsUntil: now }],
+    ["permanent invalidation", "diagnosticContinuityProof", {}, { invalidatedAt: now }],
+  ] as const)("uniformly omits and refuses %s at read and again at action", async (_name, table, where, data) => {
+    const proofId = await issue();
+    expect((await get(`${b}/continuity-handoffs`, technician)).body.handoffs).toHaveLength(1);
+    // Database mutation boundary; fake has no trigger behavior. Admission must reject even without triggers.
+    await (db[table].updateMany as (args: object) => Promise<unknown>)({ where, data });
+    expect((await get(`${b}/continuity-handoffs`, technician)).body).toEqual({ handoffs: [], result: null, nextCursor: null, scope: "current_b_owned_handoffs" });
+    const denied = await post(`${b}/continuity-handoffs/${proofId}/consume`, { reportId: id(9000), expectedOrderVersion: 1, reason: "B follow-up" }, technician);
+    expect(denied).toMatchObject({ status: 403, body: { code: "DIAGNOSTIC_NO_ACCESS", message: "Inspection request could not be completed" } });
+    expect(await db.diagnosticReportRecord.count({ where: { orderId: b } })).toBe(0);
+    expect(await db.diagnosticAudit.count({ where: { action: "CONTINUITY_PROOF_CONSUMED" } })).toBe(0);
+  });
+  it.each([
+    ["Session", "session", { id: id(102) }, { expiresAt: now }],
+    ["grant", "staffGrant", { userId: id(2) }, { revokedAt: now }],
+    ["qualification", "diagnosticCenterAssignment", { userId: id(2) }, { qualifiedUntil: now }],
+    ["B assignment", "diagnosticOrderAssignment", { orderId: b, userId: id(2) }, { revokedAt: now }],
+  ] as const)("fences B %s changes even on empty pages and consumed result recovery", async (_name, table, where, data) => {
+    const proofId = await issue(); const command = { reportId: id(9000), expectedOrderVersion: 1, reason: "B follow-up" };
+    expect((await post(`${b}/continuity-handoffs/${proofId}/consume`, command, technician)).status).toBe(201);
+    await (db[table].updateMany as (args: object) => Promise<unknown>)({ where, data });
+    expect((await get(`${b}/continuity-handoffs`, technician)).status).toBe(403);
+    expect((await post(`${b}/continuity-handoffs/${proofId}/consume`, command, technician)).status).toBe(403);
+  });
+  it("keeps readable historical proofs separate from current usability and traverses beyond 50", async () => {
+    const proofId = await issue();
+    const proof = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
+    for (let n = 10000; n < 10061; n++) memory.seed("diagnosticContinuityProof", { ...proof, id: id(n), content: { ...(proof.content as object), proofId: id(n) }, invalidatedAt: now });
+    expect((await get(`${b}/continuity-proofs/${id(10000)}`)).status).toBe(200);
+    let route = `${b}/continuity-handoffs`; const handles: string[] = []; let pages = 0;
+    for (; pages < 10; pages++) {
+      const response = await get(route, technician); expect(response.status).toBe(200);
+      expect(Object.keys(response.body).sort()).toEqual(["handoffs", "nextCursor", "result", "scope"]);
+      handles.push(...response.body.handoffs.map((handle: { proofId: string }) => handle.proofId));
+      if (!response.body.nextCursor) break;
+      expect(response.body.nextCursor).toHaveLength(1062);
+      route = `${b}/continuity-handoffs?cursor=${response.body.nextCursor}`;
+    }
+    expect(pages).toBe(3); expect(handles).toEqual([proofId]);
+    expect((await get(`${b}/continuity-handoffs`, technician)).body.handoffs).toEqual([]);
+  });
+  it("binds continuation to the query, actor, Session, B and expiry, without inherited authority", async () => {
+    const proofId = await issue(); const proof = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
+    for (let n = 10000; n < 10021; n++) memory.seed("diagnosticContinuityProof", { ...proof, id: id(n), invalidatedAt: now });
+    const cursor = (await get(`${b}/continuity-handoffs`, technician)).body.nextCursor;
+    expect((await get(`${b}/predecessor-candidates?cursor=${cursor}`)).status).toBe(403);
+    expect((await get(`${b}/continuity-handoffs?cursor=${cursor.slice(0, -1)}!`, technician)).status).toBe(403);
+    currentTime = new Date(now.getTime() + 15 * 60_000);
+    expect((await get(`${b}/continuity-handoffs?cursor=${cursor}`, technician)).status).toBe(403);
+  });
+  it("rejects A bindings, protected fields and unrecognized query/command fields", async () => {
+    const proofId = await issue(); const command = { reportId: id(9000), expectedOrderVersion: 1, reason: "B follow-up" };
+    for (const extra of [{ predecessorId: id(4030) }, { rationale: "private" }, { requestId: randomUUID() }])
+      expect((await post(`${b}/continuity-handoffs/${proofId}/consume`, { ...command, ...extra }, technician)).status).toBe(400);
+    expect((await get(`${b}/continuity-handoffs?predecessorId=${id(4030)}`, technician)).status).toBe(400);
   });
 });

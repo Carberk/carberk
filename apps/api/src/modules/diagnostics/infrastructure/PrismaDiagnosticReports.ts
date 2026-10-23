@@ -244,7 +244,7 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
   }
   /** Under reinspection locks. An existing report id returns its exact authorized result. A changed
    * predecessor, reason, author, proof or proof-bound expected order version conflicts. */
-  async reinspectionRetry(tx: Tx, subject: DiagnosticSubject, orderId: string, input: DiagnosticSchemas.DiagnosticReinspection) {
+  async reinspectionRetry(tx: Tx, subject: DiagnosticSubject, orderId: string, input: Omit<DiagnosticSchemas.DiagnosticReinspection, "predecessorId"> & { predecessorId: string | null }) {
     const existing = await tx.diagnosticReportRecord.findUnique({ where: { id: input.reportId } });
     if (!existing) return null;
     const state = existing.state as unknown as DiagnosticReportState;

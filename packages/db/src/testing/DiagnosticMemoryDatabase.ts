@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
+import { Prisma } from "../../generated/prisma/client/client";
 import type { PrismaService } from "../prisma.service";
 
 type Row = Record<string, unknown>;
@@ -51,7 +52,11 @@ export class DiagnosticMemoryDatabase {
       const orderRelations = (row: Row): Row => ({ ...row, assignments: this.table("diagnosticOrderAssignment").filter(a => a["orderId"] === row["id"]) });
       const related = (row: Row): Row => ({ ...row,
         ...(name === "inspectionOrder" ? orderRelations(row) : {}),
-        ...(name === "session" ? { user: this.table("user").find(u => u["id"] === row["userId"]) ?? row["user"] } : {}),
+        ...(name === "session" ? { user: (() => {
+          const user = this.table("user").find(u => u["id"] === row["userId"]);
+          const grants = this.table("staffGrant").filter(g => g["userId"] === row["userId"]);
+          return user ? { ...user, ...(grants.length ? { staffGrants: grants.filter(g => !g["revokedAt"]) } : {}) } : row["user"];
+        })() } : {}),
         ...(name === "diagnosticIdentityEvidence" ? { identityRecord: this.table("diagnosticIdentityRecord").find(r => r["id"] === row["identityRecordId"]), successor: this.table("diagnosticIdentityEvidence").find(r => r["supersedesId"] === row["id"]) ?? null } : {}),
         ...(name === "diagnosticReportRecord" ? { order: this.table("inspectionOrder").filter(o => o["id"] === row["orderId"]).map(orderRelations)[0], artifacts: this.table("diagnosticPdfArtifact").filter(a => a["reportId"] === row["id"]), evidence: [], predecessor: this.table("diagnosticReportRecord").filter(r => r["id"] === row["predecessorId"]).map(reportRelations)[0] ?? null } : {}),
         ...(["diagnosticEvidence", "diagnosticPdfArtifact"].includes(name) ? { report: this.table("diagnosticReportRecord").filter(r => r["id"] === row["reportId"]).map(r => ({ ...reportRelations(r), predecessor: this.table("diagnosticReportRecord").filter(p => p["id"] === r["predecessorId"]).map(reportRelations)[0] ?? null }))[0] } : {}) });
@@ -83,7 +88,7 @@ export class DiagnosticMemoryDatabase {
             if (args.data && key in args.data && args.data[key] !== row[key]) throw new Error("diagnostic_pdf_identity_immutable");
           }
         }
-        for (const row of selected) for (const [key, value] of Object.entries(args.data ?? {})) row[key] = object(value) && "increment" in value ? Number(row[key]) + Number(value["increment"]) : clone(value);
+        for (const row of selected) for (const [key, value] of Object.entries(args.data ?? {})) row[key] = value === Prisma.DbNull || value === Prisma.JsonNull ? null : object(value) && "increment" in value ? Number(row[key]) + Number(value["increment"]) : clone(value);
         return { count: selected.length };
       };
       client[name] = { count: async (args: Args) => (await findMany(args)).length, findMany, findFirst, findUnique: findFirst, findUniqueOrThrow, findFirstOrThrow: findUniqueOrThrow, updateMany,

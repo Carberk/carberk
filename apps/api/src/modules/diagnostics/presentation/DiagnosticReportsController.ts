@@ -1,3 +1,5 @@
+import { UseDiagnosticContinuityHandoff } from "../application/UseDiagnosticContinuityHandoff";
+import { DiscoverDiagnosticContinuityHandoffs } from "../application/DiscoverDiagnosticContinuityHandoffs";
 import { DiscoverDiagnosticPredecessors } from "../application/DiscoverDiagnosticPredecessors";
 import { ListDiagnosticLinkingTechnicians } from "../application/ListDiagnosticLinkingTechnicians";
 import { BadRequestException, Body, Controller, ForbiddenException, Get, Header, HttpException, Inject, Param, Post, Put, Query, Req, Res } from "@nestjs/common";
@@ -25,7 +27,9 @@ function parse<S extends z.ZodType>(schema: S, value: unknown): z.output<S> {
 }
 @Controller("api/v1/diagnostics")
 export class DiagnosticReportsController {
-  constructor(@Inject(DiscoverDiagnosticPredecessors) private readonly discoverPredecessors: DiscoverDiagnosticPredecessors,
+  constructor(@Inject(DiscoverDiagnosticContinuityHandoffs) private readonly discoverHandoffs: DiscoverDiagnosticContinuityHandoffs,
+    @Inject(UseDiagnosticContinuityHandoff) private readonly useHandoff: UseDiagnosticContinuityHandoff,
+    @Inject(DiscoverDiagnosticPredecessors) private readonly discoverPredecessors: DiscoverDiagnosticPredecessors,
     @Inject(ListDiagnosticLinkingTechnicians) private readonly listLinkingTechnicians: ListDiagnosticLinkingTechnicians,
     @Inject(DIAGNOSTIC_REPORTS_PORT) private readonly reports: DiagnosticReportsPort,
     @Inject(IssueDiagnosticContinuityProof) private readonly issueContinuityProof: IssueDiagnosticContinuityProof,
@@ -72,6 +76,17 @@ export class DiagnosticReportsController {
     // Set before authorization so uniform denials carry the same private cache policy.
     reply.header("Cache-Control", "no-store, private");
     return this.run(() => this.reports.comparison(this.subject(req), parse(uuid, id), parse(z.object({ predecessorId: uuid }).strict(), query).predecessorId));
+  }
+  @Get("orders/:id/continuity-handoffs") handoffs(@Req() req: Request, @Param("id") id: string, @Query() query: unknown, @Res({ passthrough: true }) reply: FastifyReply) {
+    reply.header("Cache-Control", "no-store, private");
+    return this.run(() => this.discoverHandoffs.execute(this.subject(req), parse(uuid, id), parse(DiagnosticSchemas.DiagnosticPredecessorQuerySchema, query)));
+  }
+  @Post("orders/:id/continuity-handoffs/:proofId/consume") consumeHandoff(@Req() req: Request, @Param("id") id: string, @Param("proofId") proofId: string, @Body() body: unknown, @Query() query: unknown, @Res({ passthrough: true }) reply: FastifyReply) {
+    reply.header("Cache-Control", "no-store, private");
+    return this.run(() => {
+      parse(z.object({}).strict(), query);
+      return this.useHandoff.execute(this.subject(req), parse(uuid, id), parse(uuid, proofId), parse(DiagnosticSchemas.DiagnosticContinuityCommandSchema, body));
+    });
   }
   @Post("orders/:id/continuity-proofs") issueProof(@Req() req: Request, @Param("id") id: string, @Body() body: unknown, @Query() query: unknown, @Res({ passthrough: true }) reply: FastifyReply) {
     reply.header("Cache-Control", "no-store, private");

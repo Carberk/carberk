@@ -308,13 +308,13 @@ describe("private automatic normalized-VIN diagnostic continuity proof", () => {
     expect((await get("reviewer", `orders/${a.id}/reports`).expect(200)).body).toEqual([releasedA]);
   });
   it("discovers a retained predecessor and names only B's assigned technician through disposable HTTP/SQL", async () => {
-    const a = await visit(original, "discovery-A", "SYN-VIN-041");
+    const a = await visit(original, "discovery-A", original.vin!);
     const [rawA] = await history(a);
     const pa = suite.id("discovery-a-provenance");
     await verified(a, pa);
     await append(a, rawA!, capture(a, rawA!, pa));
     const released = await release(a);
-    const b = await visit(successorObservation, "discovery-B", "SYN-VIN-041");
+    const b = await visit(successorObservation, "discovery-B", successorObservation.vin!);
     const [rawB] = await history(b);
     const pb = suite.id("discovery-b-provenance");
     await verified(b, pb, blue);

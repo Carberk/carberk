@@ -25,7 +25,7 @@ import { DIAGNOSTIC_RUNTIME } from "../domain/ports/DiagnosticIntakePort";
 import { DIAGNOSTIC_OBJECTS, type DiagnosticObjects } from "../domain/ports/DiagnosticObjects";
 
 const suite = defineE2eSuite("diagnostic-public-transfer-proof");
-const people = ["sellerA", "sellerB", "erasureSeller", "erasurePdfSeller", "outsider", "reception", "technician", "reviewer"] as const;
+const people = ["sellerA", "sellerB", "erasureSeller", "erasurePdfSeller", "handoffErasureSeller", "outsider", "reception", "technician", "reviewer"] as const;
 type Person = typeof people[number];
 const capability: Partial<Record<Person, string>> = {
   reception: "diagnostics.reception", technician: "diagnostics.technician", reviewer: "diagnostics.reviewer",
@@ -400,7 +400,7 @@ describe("public continuity across different sellers and Listings", { concurrent
     expect(order).toMatchObject({ version: 7, status: "arrived", physicalAuthorized: true, publicationAuthorized: true, vehicleMatched: true, observedVehicle: observation });
     return order;
   }
-  async function visitOnListing(observation: Observation, seller: "sellerA" | "sellerB" | "erasureSeller" | "erasurePdfSeller", listingId: string, visitReference = listingId): Promise<Order> {
+  async function visitOnListing(observation: Observation, seller: "sellerA" | "sellerB" | "erasureSeller" | "erasurePdfSeller" | "handoffErasureSeller", listingId: string, visitReference = listingId): Promise<Order> {
     const requestKey = randomUUID(); owned.requestKeys.push(requestKey);
     const response = await post(seller, "orders", { requestKey, centerId, templateVersionId: templateId, audience: "listing_public", listingId, synthetic: true });
     let order = response.body;
@@ -1656,4 +1656,91 @@ describe("public continuity across different sellers and Listings", { concurrent
     expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).toEqual(invalid);
   });
 
+
+  // #923 append-only journey. Product account erasure must not rerun A admission for B recovery.
+  it("recovers only the existing B result after A-only product erasure removes the restricted handoff", async () => {
+    const erasureSeller = "handoffErasureSeller" as const;
+    const listingId = suite.id("listing-erasure-A-handoff");
+    expect(await db.listing.count({ where: { id: listingId } })).toBe(0);
+    listings.push({ id: listingId, sellerId: suite.id(erasureSeller) });
+    await db.listing.create({ data: { id: listingId, sellerId: suite.id(erasureSeller), brandId: suite.catalog.brandId,
+      modelId: suite.catalog.modelId, cityId: suite.catalog.cityId, status: "active", vin: "SYN-VIN-041", priceAmount: 100000, priceTmt: 100000, priceCurrency: "TMT" } });
+    const observation: Observation = { observedAt: "2026-10-20T12:00:00.000Z", mileageKm: 124000, method: "vin", vin: "SYN-VIN-041", manualReference: null };
+    const a = await visitOnListing(observation, erasureSeller, listingId); const [ia] = await history(a);
+    const pa = randomUUID(); await verified(a, pa, red); const ea = await capture(a, ia!, pa, red); const released = await release(a);
+    const listingB = await isolatedListing("sellerB");
+    const b = await visitOnListing({ ...observation, observedAt: "2026-10-21T11:00:00.000Z", mileageKm: 124100 }, "sellerB", listingB);
+    const [ib] = await history(b); const pb = randomUUID(); await verified(b, pb, blue, rightsB); const eb = await capture(b, ib!, pb, blue, rightsB);
+    const p = { a, b, ia: ia!, ib: ib!, pa, pb, ea, eb, released };
+    const input = publicLink(p, randomUUID());
+    // Remove A access before issuing a replacement; the selected technician remains B-only.
+    await post("reception", `orders/${a.id}/assignments`, { expectedVersion: await version(a), userId: suite.id("technician"), capability: "diagnostics.technician", active: false }).expect(201);
+    const handoffProofId = await issuePublic(p);
+    const path = `orders/${b.id}/continuity-handoffs`;
+    expect((await get("technician", path).expect(200)).body.handoffs).toEqual([{ proofId: handoffProofId, status: "usable", expectedOrderVersion: b.version }]);
+    await denied(await get("technician", `orders/${b.id}/continuity-proofs/${handoffProofId}`));
+    const command = { reportId: input.reportId, expectedOrderVersion: input.expectedOrderVersion, reason: input.reason };
+    const commandPath = `${path}/${handoffProofId}/consume`;
+    expect((await post("technician", commandPath, command).expect(201)).body).toEqual({ reportId: input.reportId });
+    const beforeB = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: input.reportId } });
+    const auditsB = await db.diagnosticAudit.findMany({ where: { orderId: b.id }, orderBy: { id: "asc" } });
+    const targetAudits = await db.diagnosticAudit.findMany({ where: { actorId: suite.id(erasureSeller) } });
+    expect(targetAudits.every(row => row.centerId === centerId && row.orderId === a.id)).toBe(true);
+    for (const row of targetAudits) erasedAuditIds.add(row.id);
+    expect(await db.measurementInvestigationExport.count()).toBe(0);
+    expect(await db.measurementState.count({ where: { key: { startsWith: "inventory_baseline:" } } })).toBe(0);
+    await request.delete("/api/v1/me").set(headers(erasureSeller)).expect(204, "");
+    const scheduled = await db.user.findUniqueOrThrow({ where: { id: suite.id(erasureSeller) } });
+    expect(scheduled.deletionScheduledAt?.toISOString()).toBe("2026-11-20T12:00:00.000Z");
+    expect(await db.session.count({ where: { userId: scheduled.id } })).toBe(0);
+    expect(await db.listing.findUniqueOrThrow({ where: { id: listingId } })).toMatchObject({ status: "archived", archivedByDeletion: true });
+    // The production job is global at selection. Refuse before mutation unless
+    // every due account and stale OTP belongs to this exact registered fixture.
+    // No AppModule, scheduler, service override or global purge switch is used.
+    const workerRoot = resolve(__dirname, "../../../../../worker");
+    const script = `
+      require('reflect-metadata'); require('tsx/cjs');
+      const assert = require('node:assert/strict');
+      const { PrismaService } = require('@auto-tm/db');
+      const { PurgeExpiredAccounts } = require('./src/jobs/PurgeExpiredAccounts.ts');
+      async function main() {
+        const db = new PrismaService();
+        try {
+          assert.equal(process.env.GITHUB_ACTIONS, 'true', 'Purge isolation refused: hosted disposable services required');
+          const url = new URL(process.env.DATABASE_URL);
+          assert.match(url.hostname, /^(localhost|127[.]0[.]0[.]1)$/);
+          const now = new Date(${JSON.stringify(scheduled.deletionScheduledAt!.toISOString())});
+          const target = ${JSON.stringify(scheduled.id)};
+          assert.deepEqual(await db.user.findMany({ where: { deletionScheduledAt: { lte: now } }, select: { id: true } }), [{ id: target }], 'Purge isolation refused: foreign due account');
+          const stale = await db.otpRequest.findMany({ where: { createdAt: { lt: new Date(now.getTime() - 30 * 86400000) } }, select: { userId: true, destination: true } });
+          assert.equal(stale.every(row => row.userId === target || row.userId === null && row.destination === ${JSON.stringify(suite.phone(erasureSeller))}), true, 'Purge isolation refused: foreign stale OTP');
+          assert.deepEqual((await db.inspectionOrder.findMany({ where: { commissionerId: target }, select: { id: true } })), [{ id: ${JSON.stringify(a.id)} }], 'Purge isolation refused: unknown commissioned order');
+          assert.equal(await db.diagnosticReportRecord.count({ where: { OR: [{ state: { path: ['authorId'], equals: target } }, { state: { path: ['reviewerId'], equals: target } }] } }), 0, 'Purge isolation refused: staff descendants');
+          assert.deepEqual(await new PurgeExpiredAccounts(db).execute({ now }), { purgedCount: 1 });
+        } finally { await db.$disconnect(); }
+      }
+      void main().catch(error => { console.error(error); process.exitCode = 1; });
+    `;
+    // Register the sole permitted severed ownership before a worker assertion can
+    // fail after commit. Cleanup still demands its exact erasedAt and null pins.
+    erasedOrders.set(a.id, scheduled.deletionScheduledAt!);
+    const purge = () => promisify(execFile)(process.execPath, ["-e", script], { cwd: workerRoot,
+      env: { ...process.env, TSX_TSCONFIG_PATH: resolve(workerRoot, "tsconfig.json") }, timeout: 30000, killSignal: "SIGKILL" });
+    await purge();
+    expect(await db.diagnosticContinuityProof.findUnique({ where: { id: handoffProofId } })).toBeNull();
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: input.reportId } })).toEqual(beforeB);
+    const recovered = await get("technician", path).expect(200); privateNoStore(recovered);
+    expect(recovered.body).toEqual({ handoffs: [], result: { proofId: handoffProofId, reportId: input.reportId }, nextCursor: null, scope: "current_b_owned_handoffs" });
+    expect((await post("technician", commandPath, command).expect(201)).body).toEqual({ reportId: input.reportId });
+    for (const changed of [{ ...command, reason: "Changed" }, { ...command, expectedOrderVersion: command.expectedOrderVersion + 1 }])
+      privateNoStore(await post("technician", commandPath, changed).expect(409));
+    expect(await db.diagnosticAudit.findMany({ where: { orderId: b.id }, orderBy: { id: "asc" } })).toEqual(auditsB);
+    for (const who of ["reviewer", "technician"] as const) await denied(await get(who, `orders/${b.id}/continuity-proofs/${handoffProofId}`));
+    await submitLinked(input.reportId);
+    expect((await finalizeLinked(input.reportId)).status).toBe(201);
+    expect((await publicGet(`reports/${input.reportId}`).expect(200)).body).toMatchObject({ id: input.reportId, successorOf: null, status: "finalized" });
+    await post("reception", `orders/${b.id}/assignments`, { expectedVersion: await version(b), userId: suite.id("technician"), capability: "diagnostics.technician", active: false }).expect(201);
+    await get("technician", path).expect(403);
+    await post("technician", commandPath, command).expect(403);
+  });
 });

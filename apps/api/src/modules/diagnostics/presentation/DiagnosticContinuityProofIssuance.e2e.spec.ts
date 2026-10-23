@@ -1315,4 +1315,104 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
     expect(await consumptionState(p, proofId)).toEqual(afterWrite);
   });
 
+
+  // #923 B-owned handoff slice: append-only journeys. All prior helpers/assertions stay unchanged.
+  const handoffPath = (p: Pair) => `orders/${p.b.id}/continuity-handoffs`;
+  const handoffCommand = (p: Pair) => ({ reportId: randomUUID(), expectedOrderVersion: p.b.version, reason: "B-owned new physical visit" });
+  async function bOnlyPair(shortRights = false) {
+    const p = shortRights ? await lifecyclePair() : await pair();
+    // Remove T's A access BEFORE issuance; reviewer retains independent pair authority.
+    await assignment(p.a, "technician", false, "diagnostics.technician");
+    const proofId = await ordinaryProof(p);
+    return { p, proofId };
+  }
+  it("reloads and consumes a B-only handoff over real HTTP/SQL without widening pair readers", async () => {
+    const { p, proofId } = await bOnlyPair();
+    const aBefore = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: p.released.id } });
+    const expected = { handoffs: [{ proofId, status: "usable", expectedOrderVersion: p.b.version }], result: null, nextCursor: null, scope: "current_b_owned_handoffs" };
+    for (let reload = 0; reload < 2; reload++) {
+      const page = await get("technician", handoffPath(p)).expect(200); privateNoStore(page); expect(page.body).toEqual(expected);
+    }
+    privateNoStore(await get("reviewer", `${issuancePath(p)}/${proofId}`).expect(200));
+    for (const path of [`${issuancePath(p)}/${proofId}`, comparisonPath(p.b, p.released.id), evidencePath(p.a), provenancePath(p.a, p.pa)])
+      await refused(p, () => get("technician", path));
+    for (const who of ["reviewer", "buyer", "reception"] as const) privateNoStore(await get(who, handoffPath(p)).expect(403));
+    const input = handoffCommand(p); const commandPath = `${handoffPath(p)}/${proofId}/consume`;
+    const before = await consumptionState(p, proofId);
+    const responses = await Promise.all([post("technician", commandPath, input), post("technician", commandPath, input)]);
+    for (const response of responses) { expect(response.status).toBe(201); privateNoStore(response); expect(response.body).toEqual({ reportId: input.reportId }); }
+    expect((await get("technician", handoffPath(p)).expect(200)).body).toEqual({ handoffs: [], result: { proofId, reportId: input.reportId }, nextCursor: null, scope: "current_b_owned_handoffs" });
+    const report = (await get("technician", `reports/${input.reportId}`).expect(200)).body;
+    expect(report).toMatchObject({ id: input.reportId, orderId: p.b.id, findings: [], status: "draft", version: 0, observedAt: successorObservation.observedAt, mileageKm: successorObservation.mileageKm, templateVersionId: templateId });
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: p.released.id } })).toEqual(aBefore);
+    const after = await consumptionState(p, proofId);
+    expect(after.audits.filter(row => !before.audits.some(prior => prior.id === row.id)).map(row => row.action).sort()).toEqual(["CONTINUITY_PROOF_CONSUMED", "REPORT_REINSPECTION_CREATED"]);
+    for (const changed of [{ ...input, reason: "Changed" }, { ...input, expectedOrderVersion: input.expectedOrderVersion + 1 }])
+      privateNoStore(await post("technician", commandPath, changed).expect(409));
+    await assignment(p.a, "reviewer", false);
+    expect((await get("technician", handoffPath(p)).expect(200)).body.result).toEqual({ proofId, reportId: input.reportId });
+    expect((await post("technician", commandPath, input).expect(201)).body).toEqual({ reportId: input.reportId });
+    expect((await get("technician", `${issuancePath(p)}/${proofId}`)).status).toBe(403);
+    const finding = { id: randomUUID(), checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: [], kind: null, source: null, measurement: null, location: null };
+    await post("technician", `reports/${input.reportId}/findings`, { expectedVersion: 0, finding }).expect(201);
+    await post("technician", `reports/${input.reportId}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
+    await post("reviewer", `reports/${input.reportId}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    expect((await get("buyer", `reports/${input.reportId}`).expect(200)).body).toMatchObject({ status: "finalized", findings: [finding] });
+  });
+  it.each(["assignment", "issuer Session", "issuer grant", "B qualification", "A rights"] as const)("fences B handoff usability and action after %s over real HTTP/SQL", async change => {
+    const { p, proofId } = await bOnlyPair(change === "A rights");
+    expect((await get("technician", handoffPath(p)).expect(200)).body.handoffs).toHaveLength(1);
+    const command = handoffCommand(p);
+    const verify = async () => {
+      const page = await get("technician", handoffPath(p)); privateNoStore(page);
+      if (change === "B qualification") expect(page.status).toBe(403);
+      else { expect(page.status).toBe(200); expect(page.body.handoffs).toEqual([]); expect(page.body.result).toBeNull(); }
+      const denied = await post("technician", `${handoffPath(p)}/${proofId}/consume`, command).expect(403); privateNoStore(denied);
+      expect(denied.body.code).toBe("DIAGNOSTIC_NO_ACCESS");
+      expect(await db.diagnosticReportRecord.count({ where: { orderId: p.b.id } })).toBe(0);
+      expect(await db.diagnosticAudit.count({ where: { orderId: p.b.id, action: "CONTINUITY_PROOF_CONSUMED" } })).toBe(0);
+    };
+    if (change === "assignment") {
+      await assignment(p.a, "reviewer", false); await assignment(p.a, "reviewer", true);
+      // Historical restricted contents may still be read, but can never revive usability.
+      await get("reviewer", `${issuancePath(p)}/${proofId}`).expect(200);
+      expect((await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).invalidatedAt).toBeInstanceOf(Date);
+    }
+    if (change === "issuer Session") await db.session.update({ where: { id: suite.id("reviewer-session") }, data: { expiresAt: initialTime } });
+    if (change === "issuer grant") await grant("reviewer", false).expect(201);
+    if (change === "B qualification") await db.diagnosticCenterAssignment.updateMany({ where: { centerId, userId: suite.id("technician"), capability: "diagnostics.technician" }, data: { qualifiedUntil: initialTime } });
+    if (change === "A rights") await atLifecycleTime(lifecycleExpiry, verify); else await verify();
+  });
+
+  it("traverses more than 50 ordinarily issued B handoffs with stable bounded continuation and reload", async () => {
+    const { p, proofId } = await bOnlyPair();
+    const issued = [proofId];
+    for (let n = 0; n < 60; n++) {
+      // Real issuance/audit and database guards; no inserted proof rows or manufactured bindings.
+      const response = await post("reviewer", issuancePath(p), p.body).expect(201);
+      issued.push(response.body.proofId);
+    }
+    const seen: string[] = []; let path = handoffPath(p); let firstPage: supertest.Response | undefined;
+    for (let page = 0; page < 4; page++) {
+      const response = await get("technician", path).expect(200); privateNoStore(response);
+      expect(response.body.handoffs.length).toBeLessThanOrEqual(20);
+      expect(Object.keys(response.body).sort()).toEqual(["handoffs", "nextCursor", "result", "scope"]);
+      if (page === 0) {
+        firstPage = response;
+        expect((await get("technician", path).expect(200)).body.handoffs).toEqual(response.body.handoffs);
+      }
+      seen.push(...response.body.handoffs.map((handle: { proofId: string }) => handle.proofId));
+      if (page === 3) expect(response.body.nextCursor).toBeNull();
+      else { expect(response.body.nextCursor).toHaveLength(1062); path = `${handoffPath(p)}?cursor=${response.body.nextCursor}`; }
+    }
+    expect(seen).toEqual([...issued].sort()); expect(new Set(seen).size).toBe(61);
+    const cursor = firstPage!.body.nextCursor as string;
+    await get("reviewer", `${handoffPath(p)}?cursor=${cursor}`).expect(403);
+    await get("technician", `${handoffPath(p)}?cursor=${cursor.slice(0, -1)}!`).expect(403);
+    await assignment(p.a, "reviewer", false); await assignment(p.a, "reviewer", true);
+    const historical = await get("technician", `${handoffPath(p)}?cursor=${cursor}`).expect(200);
+    expect(historical.body.handoffs).toEqual([]);
+    expect(historical.body.nextCursor).toHaveLength(1062);
+    await get("reviewer", `${issuancePath(p)}/${proofId}`).expect(200);
+  });
 });

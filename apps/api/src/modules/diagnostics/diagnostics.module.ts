@@ -1,3 +1,5 @@
+import { UseDiagnosticContinuityHandoff } from "./application/UseDiagnosticContinuityHandoff";
+import { DiscoverDiagnosticContinuityHandoffs } from "./application/DiscoverDiagnosticContinuityHandoffs";
 import { randomBytes } from "node:crypto";
 import { DiagnosticDiscoveryCursor } from "./infrastructure/DiagnosticDiscoveryCursor";
 import { PrismaDiagnosticDiscovery } from "./infrastructure/PrismaDiagnosticDiscovery";
@@ -43,6 +45,8 @@ import { ConsumeDiagnosticContinuityProof } from "./application/ConsumeDiagnosti
   { provide: ListDiagnosticLinkingTechnicians, inject: [DIAGNOSTIC_DISCOVERY_PORT], useFactory: (discovery: DiagnosticDiscoveryPort) => new ListDiagnosticLinkingTechnicians(discovery) },
   DiagnosticPublicBindings, { provide: DIAGNOSTIC_DOCUMENTS_PORT, useClass: PrismaDiagnosticDocuments }, { provide: DIAGNOSTIC_PUBLIC_PORT, useClass: PrismaDiagnosticPublic }, DiagnosticAuthority, CampaignDiagnosticAdmission, DiagnosticReportAccess, DiagnosticBinaryParser, PrismaDiagnosticContinuityProofs,
   { provide: DIAGNOSTIC_CONTINUITY_PROOFS_PORT, useExisting: PrismaDiagnosticContinuityProofs },
+  { provide: DiscoverDiagnosticContinuityHandoffs, inject: [DIAGNOSTIC_CONTINUITY_PROOFS_PORT], useFactory: (proofs: DiagnosticContinuityProofsPort) => new DiscoverDiagnosticContinuityHandoffs(proofs) },
+  { provide: UseDiagnosticContinuityHandoff, inject: [DIAGNOSTIC_CONTINUITY_PROOFS_PORT], useFactory: (proofs: DiagnosticContinuityProofsPort) => new UseDiagnosticContinuityHandoff(proofs) },
   { provide: IssueDiagnosticContinuityProof, inject: [DIAGNOSTIC_CONTINUITY_PROOFS_PORT], useFactory: (proofs: DiagnosticContinuityProofsPort) => new IssueDiagnosticContinuityProof(proofs) },
   { provide: ReadDiagnosticContinuityProof, inject: [DIAGNOSTIC_CONTINUITY_PROOFS_PORT], useFactory: (proofs: DiagnosticContinuityProofsPort) => new ReadDiagnosticContinuityProof(proofs) },
   { provide: ConsumeDiagnosticContinuityProof, inject: [DIAGNOSTIC_CONTINUITY_PROOFS_PORT], useFactory: (proofs: DiagnosticContinuityProofsPort) => new ConsumeDiagnosticContinuityProof(proofs) },
