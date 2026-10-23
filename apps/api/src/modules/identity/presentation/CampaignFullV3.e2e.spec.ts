@@ -2232,8 +2232,12 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
         await run.selected;
         if (targetState === "present") {
           // Negative authority fixture: terminal state with the real graph/journal intact.
-          // No trigger, SQL predicate, permission or product callback is replaced.
-          await db.$executeRawUnsafe(`UPDATE "cf_${primary.id}".campaign_manifest SET state='disposed'`);
+          // The terminal manifest must carry the generated empty object-ledger hash because
+          // integrity/preflight validates it before authority can return false. No trigger,
+          // SQL predicate, permission or product callback is replaced.
+          expect(await rows(`SELECT object_key FROM "cf_${primary.id}".campaign_object_ledger`)).toEqual([]);
+          expect(await rows(`SELECT state,object_hash FROM "cf_${primary.id}".campaign_manifest`)).toEqual([{ state: "identities", object_hash: null }]);
+          await db.$executeRawUnsafe(`UPDATE "cf_${primary.id}".campaign_manifest SET state='disposed', object_hash=(SELECT md5(coalesce(jsonb_agg(jsonb_build_object('object_key',l.object_key,'upload_id',l.upload_id,'bucket',l.bucket) ORDER BY l.object_key),'[]'::jsonb)::text) FROM "cf_${primary.id}".campaign_object_ledger l)`);
         } else {
           expect(execute("reset", primary.id)).toMatchObject({ code: 0, receipt: supportRaceReceipt });
           expect(await db.supportCase.findUnique({ where: { id: primary.resourceId } })).toBeNull();
@@ -2258,7 +2262,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
         }
       } finally {
         await run.settle();
-        if (targetState === "present") await db.$executeRawUnsafe(`UPDATE "cf_${primary.id}".campaign_manifest SET state='identities'`);
+        if (targetState === "present") await db.$executeRawUnsafe(`UPDATE "cf_${primary.id}".campaign_manifest SET state='identities', object_hash=NULL`);
         await storage.close();
       }
     });
