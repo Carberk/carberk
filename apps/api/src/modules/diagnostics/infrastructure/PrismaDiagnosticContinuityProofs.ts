@@ -130,13 +130,8 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
         corrected: !!identity.evidence.correction || !!identity.corrections.length || !!identity.correctionHeadHash,
         identifiers: chain.flatMap(record => record.identifiers), rightsUntil: chain.map(record => record.rights.schedule.until) };
     };
-    const predecessor = await side(pair.priorOrder, pair.comparison.predecessor.identity);
-    const candidate = await side(pair.order, pair.comparison.candidate.identity);
-    // Automatic public admission has no ownership-history witness yet. A second
-    // retained raw visit therefore cannot be treated as unchanged ownership by
-    // comparing only the mutable Listing and commissioner rows.
-    if (method === "automatic_normalized_vin" && (predecessor.history.length !== 2 || candidate.history.length !== 2)) throw denied();
-    return privateContinuityAttestation(predecessor, candidate, provenance.map(row => row.rightsUntil.toISOString()), now, method);
+    return privateContinuityAttestation(await side(pair.priorOrder, pair.comparison.predecessor.identity),
+      await side(pair.order, pair.comparison.candidate.identity), provenance.map(row => row.rightsUntil.toISOString()), now, method);
   }
 
   async issue(subject: DiagnosticSubject, orderId: string, input: D.DiagnosticContinuityProofIssuance) {
