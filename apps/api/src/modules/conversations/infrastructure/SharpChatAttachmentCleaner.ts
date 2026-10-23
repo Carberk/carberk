@@ -81,10 +81,11 @@ export class SharpChatAttachmentCleaner implements ChatAttachmentCleaner {
     if (cleaned) {
       await this.s3.send(
         new PutObjectCommand({
-          Bucket: BUCKET,
+          Bucket: key.startsWith("business-chat-private/") ? "business-chat-private" : BUCKET,
           Key: key,
           Body: cleaned,
           ContentType: `image/${format}`,
+          ...(key.startsWith("business-chat-private/") ? { CacheControl: "no-store, private" } : {}),
         }),
       );
     }
@@ -100,11 +101,11 @@ export class SharpChatAttachmentCleaner implements ChatAttachmentCleaner {
   private async read(key: string): Promise<Buffer | "too-large" | null> {
     try {
       const head = await this.s3.send(
-        new HeadObjectCommand({ Bucket: BUCKET, Key: key }),
+        new HeadObjectCommand({ Bucket: key.startsWith("business-chat-private/") ? "business-chat-private" : BUCKET, Key: key }),
       );
       if ((head.ContentLength ?? 0) > CHAT_ATTACHMENT_MAX_SIZE_BYTES) return "too-large";
       const object = await this.s3.send(
-        new GetObjectCommand({ Bucket: BUCKET, Key: key }),
+        new GetObjectCommand({ Bucket: key.startsWith("business-chat-private/") ? "business-chat-private" : BUCKET, Key: key }),
       );
       if (!object.Body) return null;
       if ((object.ContentLength ?? 0) > CHAT_ATTACHMENT_MAX_SIZE_BYTES) {

@@ -42,9 +42,9 @@ const MAX_RETRIES = 3;
 const RETRY_DELAYS = [1000, 2000, 4000]; // exponential backoff
 const SAVE_TIMEOUT_MS = 10_000;
 
-export function useWizardAutosave(draftId: string | undefined) {
+export function useWizardAutosave(draftId: string | undefined, businessId?: string) {
   const { t } = useTranslation();
-  const updateDraft = useUpdateDraft();
+  const updateDraft = useUpdateDraft(businessId);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
   const saveStatusRef = useRef(saveStatus);

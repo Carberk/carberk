@@ -9,7 +9,12 @@ import { readClientIpPolicy } from "./client-ip";
  */
 const SECRET_HEADER_PATHS = [
   "req.headers.authorization",
+  'req.headers["x-measurement-guest"]',
+  'req.headers["x-measurement-synthetic"]',
   "req.headers.cookie",
+  "req.headers.referer",
+  "req.headers.referrer",
+  'req.headers["x-app-install-id"]',
   'req.headers["proxy-authorization"]',
   'req.headers["x-api-key"]',
   'res.headers["set-cookie"]',
@@ -29,6 +34,11 @@ const SIGN_IN_CODE_PATHS = new Set([
 ]);
 
 const FORWARDING_HEADERS = ["x-real-ip", "x-forwarded-for", "forwarded"];
+
+/** Removes query data and bearer capabilities before any HTTP path reaches logs. */
+export function requestLogPath(url: string): string {
+  return (url.split("?")[0] ?? "").replace(/(\/video-grants\/)[^/]+/g, "$1[Redacted]");
+}
 
 /**
  * Options for the API's HTTP request logger (`LoggerModule.forRoot`).
@@ -53,11 +63,15 @@ export function requestLoggingOptions(
       req(req: {
         url?: string;
         query?: unknown;
+        params?: unknown;
         remoteAddress?: string;
         remotePort?: number;
         headers?: Record<string, unknown>;
       }) {
-        if (typeof req.url === "string") req.url = req.url.split("?")[0] ?? req.url;
+        if (typeof req.url === "string") {
+          req.url = requestLogPath(req.url);
+          if (req.url.includes("/video-grants/")) delete req.params;
+        }
         delete req.query;
         if (SIGN_IN_CODE_PATHS.has(req.url ?? "")) {
           delete req.remoteAddress;

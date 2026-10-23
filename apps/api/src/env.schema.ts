@@ -43,6 +43,19 @@ const BaseSchema = z.object({
   REVIEW_DEMO_ACCOUNT_ENABLED: booleanFlag,
   REVIEW_DEMO_ACCOUNTS_JSON: z.string().default("[]"),
   TESTER_ACCOUNTS_JSON: z.string().default("[]"),
+  /** Video is an explicitly gated tester experiment; both switches are required. */
+  VIDEO_ROLLOUT_ENABLED: booleanFlag,
+  VIDEO_UPLOADS_ENABLED: booleanFlag,
+  VIDEO_PRIVATE_BUCKET: z.string().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+    .refine(value => !["listing-photos", "listing-videos", "chat-attachments", "catalog-assets"].includes(value), "Video requires a separate private bucket")
+    .default("listing-video-private"),
+  VIDEO_TESTER_USER_IDS: z.string().default("").transform((value, ctx) => {
+    const ids = value.split(",").map(id => id.trim()).filter(Boolean);
+    const parsed = z.array(z.string().uuid()).max(50).safeParse(ids);
+    if (parsed.success) return [...new Set(parsed.data)];
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Expected at most 50 tester User UUIDs" });
+    return z.NEVER;
+  }),
 
   RATE_LIMIT_GENERAL: z.coerce.number().int().positive().default(60),
   RATE_LIMIT_OTP_PHONE_DAILY: z.coerce.number().int().positive().default(5),
@@ -81,6 +94,18 @@ const BaseSchema = z.object({
     .default("true"),
 
   INSPECTION_INTEREST_ENABLED: booleanFlag,
+  SERVICE_SYNTHETIC_ENABLED: booleanFlag,
+  SERVICE_SYNTHETIC_USER_IDS: z.string().default("[]").transform((value, ctx) => {
+    try { return z.array(z.string().uuid()).max(50).parse(JSON.parse(value)); } catch { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Expected at most 50 fixture User UUIDs" }); return z.NEVER; }
+  }),
+  MEASUREMENT_ENABLED: booleanFlag,
+  MEASUREMENT_SYNTHETIC_CAPABILITY_HASH: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  MEASUREMENT_SYNTHETIC_CAPABILITY_EXPIRES_AT: z.string().datetime().optional(),
+  MEASUREMENT_COLLECTOR_EPOCH: z.string().uuid().optional(),
+  MEASUREMENT_EVIDENCE_REF: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),
+  // Only synthetic population is currently composable. Real activation needs its independent evidence gate.
+  LISTING_VIEWS_ENABLED: booleanFlag,
+  LISTING_VIEW_SALT_SECRET: z.string().min(32).optional(),
 });
 
 type BaseEnv = z.infer<typeof BaseSchema>;
@@ -426,6 +451,13 @@ export const EnvSchema = BaseSchema.superRefine((env, ctx) => {
   const add = (path: string, message: string) =>
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
 
+  if (env.LISTING_VIEWS_ENABLED && !env.LISTING_VIEW_SALT_SECRET) {
+    add("LISTING_VIEW_SALT_SECRET", "Listing views require a dedicated stable salt secret");
+  }
+  if (env.MEASUREMENT_ENABLED && (!env.MEASUREMENT_COLLECTOR_EPOCH || !env.MEASUREMENT_EVIDENCE_REF)) {
+    add("MEASUREMENT_ENABLED", "Measurement requires externally provisioned collector epoch and admitted evidence");
+  }
+  if (env.APP_ENV === "production" && env.SERVICE_SYNTHETIC_ENABLED) add("SERVICE_SYNTHETIC_ENABLED", "Synthetic service collection is forbidden in production");
   validateEndpoints(env, add);
   validateSecrets(env, add);
   validateReviewerSafety(env, add);

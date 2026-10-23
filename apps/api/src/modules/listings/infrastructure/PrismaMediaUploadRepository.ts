@@ -1,4 +1,5 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { ListingOwnership, assertListingOwnership, type ListingActor } from "../application/ListingOwnership";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { PrismaService } from "@auto-tm/db";
 
 import type { MediaUpload, NewMediaUpload, UploadState } from "../domain/MediaUpload";
@@ -6,13 +7,19 @@ import type { MediaUploadRepository } from "../domain/ports/MediaUploadRepositor
 
 @Injectable()
 export class PrismaMediaUploadRepository implements MediaUploadRepository {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService, @Optional() @Inject(ListingOwnership) private readonly ownership?: ListingOwnership) {}
 
-  async record(upload: NewMediaUpload): Promise<void> {
-    await this.prisma.mediaUpload.create({
+  async record(upload: NewMediaUpload, actor?: ListingActor): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      if (upload.businessId) {
+        if (!actor) throw new Error("Business upload requires current actor");
+        await assertListingOwnership(this.ownership, actor, upload, tx);
+      }
+      await tx.mediaUpload.create({
       data: {
         id: upload.id,
         userId: upload.userId,
+        businessId: upload.businessId ?? null,
         key: upload.key,
         kind: upload.kind,
         contentType: upload.contentType,
@@ -21,6 +28,7 @@ export class PrismaMediaUploadRepository implements MediaUploadRepository {
         objectKeys: upload.objectKeys ?? [],
         createdAt: upload.createdAt,
       },
+    });
     });
   }
 
@@ -33,6 +41,7 @@ export class PrismaMediaUploadRepository implements MediaUploadRepository {
     return rows.map((row) => ({
       id: row.id,
       userId: row.userId,
+      ...(row.businessId ? { businessId: row.businessId } : {}),
       key: row.key,
       kind: row.kind,
       contentType: row.contentType,

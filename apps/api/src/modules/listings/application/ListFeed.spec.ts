@@ -1,3 +1,4 @@
+import { InMemoryPublicMarketplace } from "./testing/InMemoryPublicMarketplace";
 import { describe, it, expect, beforeEach } from "vitest";
 import { ListFeed } from "./ListFeed";
 import { Listing } from "../domain/Listing";
@@ -135,6 +136,7 @@ function makeUseCase(
   favorites?: FakeFavoriteRepository,
   cards?: FakeListingCardReadPort,
   sellers?: InMemorySellerProfiles,
+  publicMarketplace?: InMemoryPublicMarketplace,
 ) {
   return new ListFeed(
     ranking ?? new FakeFeedRankingPort(),
@@ -143,6 +145,7 @@ function makeUseCase(
     favorites ?? new FakeFavoriteRepository(),
     cards ?? new FakeListingCardReadPort(),
     sellers ?? new InMemorySellerProfiles(),
+    publicMarketplace,
   );
 }
 
@@ -184,6 +187,15 @@ describe("ListFeed", () => {
       ...overrides,
     });
   }
+
+  it("returns the owning business public identity rather than the creating user identity", async () => {
+    ranking.items = [seedListing({ businessId: "business" })];
+    const publicMarketplace = new InMemoryPublicMarketplace();
+    publicMarketplace.businesses.set("business", { id: "business", slug: "ahal", name: "Ahal Motors", logoUrl: null, city: null, identityChecked: false, contactPhone: null });
+    const result = await makeUseCase(ranking, exchangeRates, undefined, undefined, undefined, undefined, publicMarketplace).execute({});
+    expect(result.items[0]?.business).toMatchObject({ id: "business", slug: "ahal", name: "Ahal Motors", identityChecked: false });
+    expect(result.items[0]?.seller).toBeUndefined();
+  });
 
   it("returns empty feed when no listings", async () => {
     const uc = makeUseCase(ranking, exchangeRates);

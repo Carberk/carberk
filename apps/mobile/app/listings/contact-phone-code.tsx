@@ -46,6 +46,7 @@ function parseInitialSeconds(value: string | undefined): number {
 export default function ContactPhoneCodeScreen() {
   const params = useLocalSearchParams<{
     phone?: string;
+    businessId?: string;
     resendInSeconds?: string;
     testCode?: string;
     purpose?: string;
@@ -55,8 +56,8 @@ export default function ContactPhoneCodeScreen() {
   const { t } = useTranslation();
   const goBack = useSafeBack();
   const { show } = useToast();
-  const confirm = useConfirmContactPhone();
-  const requestCode = useRequestContactPhoneCode();
+  const confirm = useConfirmContactPhone(firstParam(params.businessId));
+  const requestCode = useRequestContactPhoneCode(firstParam(params.businessId));
   const republish = useRepublishListing();
 
   const phone = firstParam(params.phone);
@@ -74,7 +75,10 @@ export default function ContactPhoneCodeScreen() {
   const [secondsRemaining, setSecondsRemaining] = useState(() =>
     parseInitialSeconds(firstParam(params.resendInSeconds)),
   );
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{
+    message: string;
+    kind: "backoff" | "other";
+  } | null>(null);
   const [needsNewCode, setNeedsNewCode] = useState(false);
   const [dailyLimit, setDailyLimit] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -92,6 +96,12 @@ export default function ContactPhoneCodeScreen() {
     }, 1000);
     return () => clearInterval(timer);
   }, [secondsRemaining]);
+
+  useEffect(() => {
+    if (secondsRemaining === 0 && error?.kind === "backoff") {
+      setError(null);
+    }
+  }, [error, secondsRemaining]);
 
   useEffect(() => {
     if (phone) return;
@@ -123,7 +133,7 @@ export default function ContactPhoneCodeScreen() {
       contactPhoneReturnHref(
         returnPathname,
         purpose,
-        phone ? { confirmedContactPhone: phone } : {},
+        { ...(phone ? { confirmedContactPhone: phone } : {}), ...(params.businessId ? { businessId: params.businessId } : {}) },
       ),
     );
   }
@@ -141,7 +151,7 @@ export default function ContactPhoneCodeScreen() {
       setCode("");
       lastSubmittedCode.current = null;
       const copy = getContactPhoneVerifyErrorCopy(verifyError, t);
-      setError(copy.message);
+      setError({ message: copy.message, kind: "other" });
       setNeedsNewCode(copy.needsNewCode);
       if (copy.needsNewCode) {
         // The code is dead, so what was left of its resend wait no longer
@@ -196,14 +206,15 @@ export default function ContactPhoneCodeScreen() {
       // A backoff refusal carries the wait: the message says it and the
       // countdown holds the button, also for "Send a new code".
       if (copy.retryInSeconds != null) {
-        setError(
-          t("contactPhoneRateWait", {
+        setError({
+          message: t("contactPhoneRateWait", {
             time: formatResendWait(copy.retryInSeconds),
           }),
-        );
+          kind: "backoff",
+        });
         setSecondsRemaining(copy.retryInSeconds);
       } else {
-        setError(copy.message);
+        setError({ message: copy.message, kind: "other" });
       }
     } finally {
       setIsResending(false);
@@ -284,7 +295,7 @@ export default function ContactPhoneCodeScreen() {
                 accessibilityLiveRegion="polite"
                 className="flex-1 text-callout leading-snug text-destructive"
               >
-                {error}
+                {error.message}
               </Text>
             </View>
           ) : null}

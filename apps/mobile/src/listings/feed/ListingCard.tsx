@@ -3,6 +3,7 @@ import { Enums } from "@auto-tm/contracts";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
+import { BusinessIdentityLink } from "../../business/BusinessIdentityLink";
 import { formatPrice } from "../formatPrice";
 
 import { ListingPhoto, cardPhotoThumbHash } from "./ListingPhoto";
@@ -67,6 +68,7 @@ export function ListingCard({
           </Text>
         </View>
 
+        {listing.business ? <BusinessIdentityLink business={listing.business} compact /> : null}
         <View className="flex-row flex-wrap items-center gap-2">
           {listing.status === Enums.ListingStatus.Sold && (
             <Badge variant="secondary" className="shrink-0 px-2 py-0.5">

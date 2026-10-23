@@ -1,3 +1,4 @@
+import { inventoryActor } from "./inventoryActor";
 import {
   BadRequestException,
   Body,
@@ -63,6 +64,7 @@ export class ContactPhonesController {
 
     try {
       const result = await this.requestCode.execute({
+        ...inventoryActor(req),
         userId,
         phone,
         ip: resolveClientIp(req),
@@ -89,7 +91,7 @@ export class ContactPhonesController {
     );
 
     try {
-      const confirmed = await this.confirmContactPhone.execute({ userId, phone, code });
+      const confirmed = await this.confirmContactPhone.execute({ ...inventoryActor(req), userId, phone, code });
       return {
         contactPhone: {
           phone: confirmed.phone,
@@ -106,7 +108,7 @@ export class ContactPhonesController {
   @Get()
   async list(@Req() req: FastifyRequest): Promise<ListingsSchemas.MyContactPhonesResponse> {
     const userId = await this.signedInSeller(req);
-    const { items } = await this.listMyContactPhones.execute({ userId });
+    const { items } = await this.listMyContactPhones.execute({ ...inventoryActor(req), userId });
     return { items: items.map(toResponse) };
   }
 

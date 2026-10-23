@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException, ForbiddenException, BadRequestException } from "@nestjs/common";
+import { Inject, Injectable, Optional, NotFoundException, ForbiddenException, BadRequestException } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 
 import type { MediaStoragePort } from "../../listings/domain/ports/MediaStoragePort";
@@ -15,12 +15,15 @@ import {
   chatAttachmentKey,
 } from "../domain/ChatAttachment";
 import { CONVERSATION_ERROR_CODES } from "../domain/types";
+import type { ConversationActor } from "../domain/ports/BusinessEnquiryRepository";
+import { BusinessEnquiryAccess } from "./BusinessEnquiryAccess";
 
 export interface PresignChatAttachmentUploadInput {
   userId: string;
   conversationId: string;
   contentType: string;
   sizeBytes: number;
+  actor?: ConversationActor;
 }
 
 export interface PresignChatAttachmentUploadResult {
@@ -45,6 +48,7 @@ export class PresignChatAttachmentUpload {
     private readonly storage: MediaStoragePort,
     @Inject(IDENTITY_CHECK_PORT)
     private readonly identityCheck: IdentityCheckPort,
+    @Inject(BusinessEnquiryAccess) @Optional() private readonly businessAccess?: BusinessEnquiryAccess,
   ) {}
 
   async execute(
@@ -68,7 +72,10 @@ export class PresignChatAttachmentUpload {
       });
     }
 
-    if (!conversation.isParticipant(input.userId)) {
+    if (conversation.businessId) {
+      if (!input.actor || !this.businessAccess) throw new ForbiddenException({ code: "FORBIDDEN", message: "Business context required" });
+      await this.businessAccess.authorize(conversation, input.actor, { send: true });
+    } else if (!conversation.isParticipant(input.userId)) {
       throw new ForbiddenException({
         code: "FORBIDDEN",
         message: "You are not a participant in this conversation",
@@ -91,7 +98,12 @@ export class PresignChatAttachmentUpload {
     }
 
     const ext = "webp";
-    const key = chatAttachmentKey(input.conversationId, randomUUID(), ext);
+    const key = chatAttachmentKey(input.conversationId, randomUUID(), ext, !!conversation.businessId);
+
+    if (conversation.businessId) return {
+      uploadUrl: `/conversations/${conversation.id}/attachments/${key.split("/")[2]}/bytes`,
+      key, expiresIn: 0, maxSizeBytes: CHAT_ATTACHMENT_MAX_SIZE_BYTES,
+    };
 
     const { url } = await this.storage.presignUpload({
       key,

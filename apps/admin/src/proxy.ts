@@ -1,13 +1,27 @@
+
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { normalizeAdminLocale, translateAdmin } from "./lib/messages";
 import { authCookieSettings, SESSION_EXPIRED_HEADER } from "./lib/auth-cookie-options";
 import { hasCurrentAccessToken, renewSession } from "./lib/session-renewal";
 import { ADMIN_RETURN_TO_HEADER, validateOrigin, validateReturnTo } from "./lib/validators";
 
-const PROTECTED_PREFIXES = ["/reports", "/audit", "/listings", "/users", "/catalog"];
+const PROTECTED_PREFIXES = ["/reports", "/audit", "/listings", "/users", "/catalog", "/workspace", "/business-admission", "/services", "/diagnostics", "/improvement"];
 
 export async function proxy(request: NextRequest) {
+  const response = await sessionResponse(request);
+  const { pathname } = request.nextUrl;
+  if (pathname === "/diagnostics" || pathname.startsWith("/diagnostics/")) {
+    // Response headers, including early origin/renewal refusals. Request
+    // overrides remain owned by sessionResponse; never copy them to clients.
+    response.headers.set("Cache-Control", "private, no-store");
+    response.headers.set("X-Content-Type-Options", "nosniff");
+  }
+  return response;
+}
+
+async function sessionResponse(request: NextRequest) {
   const { pathname } = request.nextUrl;
   request.headers.delete(SESSION_EXPIRED_HEADER);
   const settings = authCookieSettings();
@@ -30,7 +44,9 @@ export async function proxy(request: NextRequest) {
   if (!hasCurrentAccessToken(request.cookies.get(settings.accessName)?.value)) {
     const renewal = refreshToken ? await renewSession(refreshToken) : { kind: "rejected" as const };
     if (renewal.kind === "unavailable") {
-      return new NextResponse("<!doctype html><html lang=\"ru\"><meta charset=\"utf-8\"><title>Временно недоступно</title><body><h1>Временно недоступно. Попробуйте ещё раз.</h1><p>Обновите страницу через несколько секунд. Сессия сохранена.</p></body></html>", {
+      const locale = normalizeAdminLocale(request.cookies.get("carberk_admin_locale")?.value);
+      const t = (text: string) => translateAdmin(text, locale);
+      return new NextResponse(`<!doctype html><html lang="${locale}"><meta charset="utf-8"><title>${t("Временно недоступно")}</title><body><h1>${t("Временно недоступно. Попробуйте ещё раз.")}</h1><p>${t("Обновите страницу через несколько секунд. Сессия сохранена.")}</p></body></html>`, {
         status: 503,
         headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store", "Retry-After": "5" },
       });
@@ -74,7 +90,7 @@ export async function proxy(request: NextRequest) {
   const requestedReturnTo = validateReturnTo(request.nextUrl.searchParams.get("returnTo"));
   const destination = new URL(
     request.nextUrl.searchParams.get("mode") === "totp" ? "/login?mode=totp"
-      : tokens ? requestedReturnTo || "/reports" : "/login",
+      : tokens ? requestedReturnTo || "/workspace" : "/login",
     process.env["ADMIN_ORIGIN"] || request.url,
   );
   if (destination.pathname === "/login" && requestedReturnTo) destination.searchParams.set("returnTo", requestedReturnTo);

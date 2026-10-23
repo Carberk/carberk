@@ -4,6 +4,7 @@ import { AccessibilityInfo, BackHandler, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import type { ListingsSchemas, WizardSchemas } from "@auto-tm/contracts";
 
+import { useBusinessWorkspace } from "../../../src/business/api";
 import { useListingDetail } from "../../../src/api/listings/useListingDetail";
 import { useMyContactPhones } from "../../../src/api/listings/useMyContactPhones";
 import { useAuth } from "../../../src/auth/useAuth";
@@ -19,6 +20,7 @@ import {
   type OpState,
 } from "../../../src/listings/edit/useSaveListingEdit";
 import { EditSectionList, useCarTitle } from "../../../src/listings/wizard/CheckAndPublish";
+import { ListingVideoEditor } from "../../../src/listings/videoEditor/ListingVideoEditor";
 import Step2Photos from "../../../src/listings/wizard/Step2Photos";
 import Step4Specs from "../../../src/listings/wizard/Step4Specs";
 import Step5Price from "../../../src/listings/wizard/Step5Price";
@@ -133,13 +135,13 @@ function EditSaveErrorBanner({
 }
 
 export default function EditListingScreen() {
-  const { id } = useLocalSearchParams();
+  const { id, businessId } = useLocalSearchParams<{ id: string; businessId?: string }>();
   const listingId = id as string;
   // One edit session per Listing: another Listing starts from nothing of this one's.
-  return <EditListingSession key={listingId} listingId={listingId} />;
+  return <EditListingSession key={`${businessId ?? "personal"}:${listingId}`} listingId={listingId} businessId={businessId} />;
 }
 
-function EditListingSession({ listingId }: { listingId: string }) {
+function EditListingSession({ listingId, businessId }: { listingId: string; businessId?: string | undefined }) {
   const { t } = useTranslation();
   const { show } = useToast();
   const isFocused = useIsFocused();
@@ -150,17 +152,19 @@ function EditListingSession({ listingId }: { listingId: string }) {
   }>();
   // The picker's rows (ADR-0081): the sign-in phone and the numbers still
   // inside their 7 days. The Listing's own number is always selectable.
-  const { isAuthenticated, phone: accountPhone } = useAuth();
+  const { isAuthenticated, phone: accountPhone, userId } = useAuth();
   const viewer = useViewer();
+  const businessQuery = useBusinessWorkspace();
   const { data: contactPhonesData } = useMyContactPhones({
     userId: viewer?.userId ?? null,
     enabled: !!isAuthenticated,
+    businessId,
   });
   // The server refused the changed number; shown on the Contact step until
   // the seller picks or confirms one.
   const [contactPhoneRefused, setContactPhoneRefused] = useState(false);
 
-  const { data: listing } = useListingDetail(listingId);
+  const { data: listing } = useListingDetail(listingId, { businessId });
   const stagingKey = `edit-${listingId}`;
   const [machineState, dispatch] = useReducer(
     wizardMachineReducer,
@@ -186,7 +190,7 @@ function EditListingSession({ listingId }: { listingId: string }) {
   const uploadQueue = useUploadQueue(
     sessionListing ? stagingKey : "",
     editPayload,
-    { restoreLocalPhotos: false },
+    { restoreLocalPhotos: false, businessId },
   );
   // The upload queue starts empty and then holds the Listing's own photos; until
   // then its photos say nothing about what the seller changed.
@@ -197,6 +201,7 @@ function EditListingSession({ listingId }: { listingId: string }) {
     machineState.payload,
     uploadQueue.photos,
     listing?.media ?? [],
+    businessId,
   );
 
   useEffect(() => {
@@ -239,7 +244,7 @@ function EditListingSession({ listingId }: { listingId: string }) {
 
   const contactSelection = resolveContactPhoneSelection({
     phone: machineState.payload.contactPhone,
-    accountPhone,
+    accountPhone: businessId ? null : accountPhone,
     currentListingPhone: sessionListing?.contactPhone ?? null,
     confirmedPhones: contactPhonesData?.items,
   });
@@ -445,6 +450,7 @@ function EditListingSession({ listingId }: { listingId: string }) {
         publishLabel={t("saveChanges")}
       >
         {currentStep === "photos" && (
+          <>
           <Step2Photos
             photos={uploadQueue.photos}
             onAddPhoto={uploadQueue.addPhoto}
@@ -457,6 +463,8 @@ function EditListingSession({ listingId }: { listingId: string }) {
             showErrors={attemptedSteps.photos === true}
             continuesWhileUploading={false}
           />
+          {userId ? <ListingVideoEditor ownerId={userId} target={{ kind: "listing", id: listingId }} businessId={businessId} /> : null}
+          </>
         )}
         {currentStep === "specs" && (
           <Step4Specs
@@ -486,19 +494,20 @@ function EditListingSession({ listingId }: { listingId: string }) {
           <Step7DescContact
             payload={machineState.payload}
             onChange={handlePayloadChange}
-            accountPhone={accountPhone || null}
+            accountPhone={businessId ? null : accountPhone || null}
             confirmedPhones={contactPhonesData?.items}
             currentListingPhone={sessionListing.contactPhone ?? null}
+            canChangeNumber={!businessId || businessQuery.data?.workspace?.membership.role === "owner"}
             onAnotherNumber={() =>
               router.push({
                 pathname: "/listings/contact-phone",
-                params: { returnPathname: contactPhoneReturn },
+                params: { ...(businessId ? { businessId } : {}), returnPathname: contactPhoneReturn },
               })
             }
             onConfirmExpired={(phone) =>
               router.push({
                 pathname: "/listings/contact-phone",
-                params: { phone, reconfirm: "1", returnPathname: contactPhoneReturn },
+                params: { phone, reconfirm: "1", ...(businessId ? { businessId } : {}), returnPathname: contactPhoneReturn },
               })
             }
             selectionError={contactSelectionError}

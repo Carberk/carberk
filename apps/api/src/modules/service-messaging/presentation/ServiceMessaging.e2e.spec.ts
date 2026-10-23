@@ -1,0 +1,486 @@
+import "reflect-metadata";
+import sharp from "sharp";
+import { PDFDocument } from "pdf-lib";
+import { S3Client, CreateBucketCommand } from "@aws-sdk/client-s3";
+import { randomUUID } from "node:crypto";
+
+import { EventEmitterModule } from "@nestjs/event-emitter";
+import { io, type Socket } from "socket.io-client";
+import { Test } from "@nestjs/testing";
+import { JwtModule, JwtService } from "@nestjs/jwt";
+import { Reflector } from "@nestjs/core";
+import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
+import { PrismaService } from "@auto-tm/db";
+import { ServiceMessagingSchemas } from "@auto-tm/contracts";
+import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
+import supertest from "supertest";
+
+import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
+import { GlobalErrorFilter } from "../../../common/error.filter";
+import { defineE2eSuite } from "../../../../test/helpers/e2eSuite";
+import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
+import { ServiceMessagingModule } from "../service-messaging.module";
+import { SERVICE_PRIVATE_STORE, SERVICE_RUNTIME, type ServicePrivateStore } from "../domain/ports/ServiceMessagingPort";
+
+const suite = defineE2eSuite("service-messaging-boundaries");
+let app: NestFastifyApplication; let db: PrismaService; let request: ReturnType<typeof supertest>; let jwt: JwtService;
+const customer = suite.id("customer"), oldStaff = suite.id("operator"), nextStaff = suite.id("next"), stranger = suite.id("stranger");
+const reportBuyer = suite.id("report-buyer");
+const ids = [customer, oldStaff, nextStaff, stranger, reportBuyer];
+const tokens = new Map<string, string>();
+beforeAll(async () => {
+ const module = await Test.createTestingModule({ imports: [EventEmitterModule.forRoot(), bullTestRoot(), ServiceMessagingModule, JwtModule.register({ global: true, secret: "service-test-secret" })] }).overrideProvider(SERVICE_RUNTIME).useValue({ now: () => new Date(), id: randomUUID, syntheticEnabled: () => true, syntheticSubjectAllowed: (subject: { userId: string }) => ids.includes(subject.userId) }).compile();
+ app = module.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
+ jwt = app.get(JwtService); db = app.get(PrismaService);
+ app.useGlobalGuards(new JwtAuthGuard(app.get(Reflector), jwt)); app.useGlobalFilters(new GlobalErrorFilter());
+ await app.listen(0, "127.0.0.1"); request = supertest(app.getHttpServer());
+ const storage = new S3Client({ endpoint: process.env["MINIO_ENDPOINT"] ?? "http://localhost:9000", region: "us-east-1", forcePathStyle: true, credentials: { accessKeyId: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin", secretAccessKey: process.env["MINIO_SECRET_KEY"] ?? "minioadmin" } });
+ try { await storage.send(new CreateBucketCommand({ Bucket: "service-private" })); } catch (error) { if (!(error instanceof Error) || !["BucketAlreadyExists", "BucketAlreadyOwnedByYou"].includes(error.name)) throw error; } finally { storage.destroy(); }
+ for (const id of ids) {
+  await db.user.create({ data: { id, phone: suite.phone(id), phoneVerifiedAt: new Date(), role: id === stranger ? "admin" : "buyer", ...(id === customer ? { suspendedAt: new Date() } : {}) } });
+ }
+ await db.staffGrant.createMany({ data: [oldStaff, nextStaff].map(userId => ({ userId, capability: "support.operations" })) });
+});
+afterEach(() => { vi.restoreAllMocks(); });
+beforeEach(async () => {
+ for (const id of ids) {
+  const session = await db.session.create({ data: { userId: id, refreshTokenHash: randomUUID(), expiresAt: new Date(Date.now()+3600000), adminTotpExpiresAt: new Date(Date.now()+3600000) } });
+  tokens.set(id, jwt.sign({ sub: id, sid: session.id }));
+ }
+});
+afterAll(async () => {
+ if (db) {
+  const histories = await db.vehicleHistoryRequest.findMany({ where: { customerId: { in: ids } }, select: { conversation: { select: { id: true } } } });
+  const scopes = await db.supportCase.findMany({ where: { customerId: { in: ids } }, select: { conversation: { select: { id: true } } } });
+  const conversations = [...scopes, ...histories].flatMap(scope => scope.conversation ? [scope.conversation.id] : []);
+  const ownedFiles = await db.serviceAttachment.findMany({ where: { conversationId: { in: conversations } }, select: { objectKey: true } });
+  for (const file of ownedFiles) if (file.objectKey) await app.get<ServicePrivateStore>(SERVICE_PRIVATE_STORE).remove(file.objectKey);
+  await db.servicePushSubscription.deleteMany({ where: { conversationId: { in: conversations } } });
+  await db.serviceOutbox.deleteMany({ where: { conversationId: { in: conversations } } });
+  await db.serviceMessage.deleteMany({ where: { conversationId: { in: conversations } } });
+  await db.serviceAttachment.deleteMany({ where: { conversationId: { in: conversations } } });
+  await db.serviceReadState.deleteMany({ where: { conversationId: { in: conversations } } });
+  await db.serviceErasureFence.deleteMany({ where: { conversationId: { in: conversations } } });
+  await db.serviceConversation.deleteMany({ where: { id: { in: conversations } } });
+  await db.serviceAudit.deleteMany({ where: { actorId: { in: ids } } });
+  await db.supportCase.deleteMany({ where: { customerId: { in: ids } } });
+  const historyIds = (await db.vehicleHistoryRequest.findMany({ where: { customerId: { in: ids } }, select: { id: true } })).map(row => row.id);
+  const historyOrderIds = (await db.historyOrder.findMany({ where: { requestId: { in: historyIds } }, select: { id: true } })).map(row => row.id);
+  await db.historyPayment.deleteMany({ where: { orderId: { in: historyOrderIds } } });
+  await db.historyRefund.deleteMany({ where: { orderId: { in: historyOrderIds } } });
+  const artifacts = await db.historyArtifact.findMany({ where: { acquiredForOrderId: { in: historyOrderIds } } });
+  for (const artifact of artifacts) await app.get<ServicePrivateStore>(SERVICE_PRIVATE_STORE).remove(artifact.objectKey);
+  await db.historyDelivery.deleteMany({ where: { orderId: { in: historyOrderIds } } });
+  await db.historyArtifactCleanup.deleteMany({ where: { artifactId: { in: artifacts.map(row => row.id) } } });
+  await db.historyArtifact.deleteMany({ where: { id: { in: artifacts.map(row => row.id) } } });
+  await db.historyBooking.deleteMany({ where: { orderId: { in: historyOrderIds } } });
+  await db.historyPurchaseIntent.deleteMany({ where: { orderId: { in: historyOrderIds } } });
+  await db.historyOrder.deleteMany({ where: { id: { in: historyOrderIds } } });
+  await db.historyQuote.deleteMany({ where: { requestId: { in: historyIds } } });
+  await db.vehicleHistoryRequest.deleteMany({ where: { customerId: { in: ids } } });
+  await db.user.deleteMany({ where: { id: { in: ids } } });
+ }
+ await app?.close();
+});
+async function watchSocket(userId: string, conversationId: string): Promise<Socket> {
+ const socket = io(`${await app.getUrl()}/ws/services`, { auth: { token: tokens.get(userId) }, transports: ["websocket"], reconnection: false });
+ await new Promise<void>((resolve, reject) => { socket.once("connect", () => resolve()); socket.once("connect_error", reject); });
+ const ack = await socket.timeout(3000).emitWithAck("service:watch", { conversationId });
+ expect(ack.ok).toBe(true); return socket;
+}
+const auth = (id: string) => `Bearer ${tokens.get(id)}`;
+it("preserves restricted-user appeals, separate identities, exact assignment and idempotent sends", async () => {
+ const opened = await request.post("/api/v1/services/conversations").set("Authorization", auth(customer)).send({ purpose: "support", synthetic: true }).expect(201);
+ const id = opened.body.id as string;
+ expect(await db.conversation.count({ where: { buyerId: customer } })).toBe(0);
+ await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(stranger)).expect(403);
+ const sent = { clientMessageId: randomUUID(), body: "Restricted appeal, synthetic fixture", visibility: "customer" };
+ const [one, retry] = await Promise.all([request.post(`/api/v1/services/conversations/${id}/messages`).set("Authorization", auth(customer)).send(sent), request.post(`/api/v1/services/conversations/${id}/messages`).set("Authorization", auth(customer)).send(sent)]);
+ expect(one.status).toBe(201); expect(retry.status).toBe(201); expect(one.body.id).toBe(retry.body.id);
+ await request.post(`/api/v1/services/conversations/${id}/assignment`).set("Authorization", auth(oldStaff)).send({ expectedVersion: 0 }).expect(201);
+ await request.post(`/api/v1/services/conversations/${id}/messages`).set("Authorization", auth(oldStaff)).send({ clientMessageId: randomUUID(), body: "Internal note", visibility: "staff" }).expect(201);
+ const customerView = await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(customer)).expect(200);
+ expect(JSON.stringify(customerView.body)).not.toContain("Internal note");
+ expect(customerView.body.messages).toHaveLength(1);
+ expect(customerView.body.operatorName).toBeNull();
+ await request.post(`/api/v1/services/conversations/${id}/read`).set("Authorization", auth(oldStaff)).send({ throughSequence: 1 }).expect(201);
+ const oldView = await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(oldStaff)).expect(200);
+ expect(oldView.body.messages.find((message: { body: string }) => message.body === "Internal note").operatorName).toEqual(expect.any(String));
+ const readCustomer = await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(customer)).expect(200); expect(readCustomer.body.peerReadThrough).toBe(1);
+ const oldSocket = await watchSocket(oldStaff, id);
+ const denied = new Promise<void>(resolve => oldSocket.once("service:denied", () => resolve()));
+ await request.post(`/api/v1/services/conversations/${id}/assignment`).set("Authorization", auth(oldStaff)).send({ expectedVersion: 1, targetUserId: nextStaff }).expect(201);
+ await denied; oldSocket.disconnect();
+ const afterHandover = await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(customer)).expect(200); expect(afterHandover.body.peerReadThrough).toBe(0);
+ await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(oldStaff)).expect(403);
+ await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(nextStaff)).expect(200);
+ await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(customer)).expect(200);
+ await db.staffGrant.update({ where: { userId_capability: { userId: nextStaff, capability: "support.operations" } }, data: { revokedAt: new Date() } });
+ await request.get(`/api/v1/services/conversations/${id}`).set("Authorization", auth(nextStaff)).expect(403);
+ const audits = await db.serviceAudit.findMany({ where: { resourceId: opened.body.resourceId } });
+ expect(audits.length).toBeGreaterThan(0); expect(JSON.stringify(audits)).not.toContain("Internal note");
+});
+it("keeps staged bytes unusable until exact adoption and checks current audience on every private download", async () => {
+ const opened = await request.post("/api/v1/services/conversations").set("Authorization", auth(stranger)).send({ purpose: "support", synthetic: true }).expect(201);
+ const id = opened.body.id as string;
+ const other = await request.post("/api/v1/services/conversations").set("Authorization", auth(customer)).send({ purpose: "history", synthetic: true }).expect(201);
+ const original = await sharp({ create: { width: 20, height: 10, channels: 3, background: "red" } }).jpeg().withExif({ IFD0: { Artist: "Synthetic private metadata" } }).toBuffer();
+ const rights = { category: "support_communication", purpose: "Synthetic fixture", basis: "Owned test data", provenance: "Generated red pixels", identifiability: "personal", use: ["service"], schedule: { kind: "support_case", closedDays: 90, eraseOnAccountDeletion: true }, supplierRestrictions: "", hold: null };
+ const staged = await request.post(`/api/v1/services/conversations/${id}/attachments`).set("Authorization", auth(stranger)).send({ category: "support_communication", contentType: "image/jpeg", sizeBytes: original.length, filename: "synthetic.jpg", rights }).expect(201);
+ const file = staged.body.id as string;
+ expect(staged.body).not.toHaveProperty("objectKey"); expect(staged.body).not.toHaveProperty("url");
+ await request.get(`/api/v1/services/conversations/${id}/attachments/${file}`).set("Authorization", auth(stranger)).expect(403);
+ await request.post(`/api/v1/services/conversations/${other.body.id}/attachments/${file}/bytes`).set("Authorization", auth(customer)).set("Content-Type", "application/octet-stream").send(original).expect(400);
+ const privateStore = app.get<ServicePrivateStore>(SERVICE_PRIVATE_STORE), put = privateStore.putImmutable.bind(privateStore);
+ const lostResponse = vi.spyOn(privateStore, "putImmutable").mockImplementationOnce(async (...args) => { await put(...args); throw new Error("Synthetic lost storage response"); });
+ await request.post(`/api/v1/services/conversations/${id}/attachments/${file}/bytes`).set("Authorization", auth(stranger)).set("Content-Type", "application/octet-stream").send(original).expect(500);
+ const pending = await db.serviceAttachment.findUniqueOrThrow({ where: { id: file } }); expect(pending.objectKey).not.toBeNull(); expect(pending.sizeBytes).toBeNull();
+ lostResponse.mockRestore();
+ await request.post(`/api/v1/services/conversations/${id}/attachments/${file}/bytes`).set("Authorization", auth(stranger)).set("Content-Type", "application/octet-stream").send(original).expect(201);
+ await request.post(`/api/v1/services/conversations/${id}/attachments/${file}/bytes`).set("Authorization", auth(stranger)).set("Content-Type", "application/octet-stream").send(original).expect(201);
+ await request.get(`/api/v1/services/conversations/${id}/attachments/${file}`).set("Authorization", auth(stranger)).expect(403);
+ const message = { clientMessageId: randomUUID(), attachmentId: file, visibility: "customer" };
+ const first = await request.post(`/api/v1/services/conversations/${id}/messages`).set("Authorization", auth(stranger)).send(message).expect(201);
+ const retry = await request.post(`/api/v1/services/conversations/${id}/messages`).set("Authorization", auth(stranger)).send(message).expect(201);
+ expect(first.body.id).toBe(retry.body.id);
+ await request.post(`/api/v1/services/conversations/${id}/messages`).set("Authorization", auth(stranger)).send({ ...message, body: "Different content" }).expect(409);
+ const downloaded = await request.get(`/api/v1/services/conversations/${id}/attachments/${file}`).set("Authorization", auth(stranger)).expect(200);
+ expect(downloaded.headers["cache-control"]).toContain("no-store");
+ expect((await sharp(downloaded.body as Buffer).metadata()).exif).toBeUndefined();
+ await request.get(`/api/v1/services/conversations/${id}/attachments/${file}`).set("Authorization", auth(customer)).expect(403);
+ const row = await db.serviceAttachment.findUniqueOrThrow({ where: { id: file } });
+ const anonymous = await fetch(`${process.env["MINIO_ENDPOINT"]}/service-private/${row.objectKey}`); expect([401, 403]).toContain(anonymous.status);
+ await db.session.deleteMany({ where: { userId: stranger } });
+ await request.get(`/api/v1/services/conversations/${id}/attachments/${file}`).set("Authorization", auth(stranger)).expect(403);
+});
+
+it("binds push only to the current admitted Session and exact owned registered device", async () => {
+ const opened = await request.post("/api/v1/services/conversations").set("Authorization", auth(customer)).send({ purpose: "support", synthetic: true }).expect(201);
+ const id = opened.body.id as string;
+ const mine = await db.fcmDevice.create({ data: { userId: customer, token: `synthetic-service-${randomUUID()}`, platform: "android" } });
+ const other = await db.fcmDevice.create({ data: { userId: stranger, token: `synthetic-service-${randomUUID()}`, platform: "android" } });
+ await request.post(`/api/v1/services/conversations/${id}/push`).set("Authorization", auth(customer)).send({ deviceToken: other.token }).expect(403);
+ await request.post(`/api/v1/services/conversations/${id}/push`).set("Authorization", auth(customer)).send({ deviceToken: mine.token }).expect(201);
+ const session = jwt.decode(tokens.get(customer)!) as { sid: string };
+ expect(await db.servicePushSubscription.findMany({ where: { conversationId: id } })).toEqual([expect.objectContaining({ deviceId: mine.id, sessionId: session.sid, lifecycleEpoch: 0 })]);
+ await db.fcmDevice.update({ where: { id: mine.id }, data: { invalidatedAt: new Date() } });
+ await request.post(`/api/v1/services/conversations/${id}/push`).set("Authorization", auth(customer)).send({ deviceToken: mine.token }).expect(403);
+});
+
+it("persists Support response debt independently of notes/notices and fences manual closure against investigation/reopen", async () => {
+ await db.staffGrant.update({ where: { userId_capability: { userId: nextStaff, capability: "support.operations" } }, data: { revokedAt: null } });
+ const customerId = stranger;
+ const opened = await request.post("/api/v1/services/conversations").set("Authorization", auth(customerId)).send({ purpose: "support", synthetic: true }).expect(201);
+ const id = opened.body.id as string, resourceId = opened.body.resourceId as string;
+ const path = `/api/v1/services/conversations/${id}`;
+ await request.post(`${path}/assignment`).set("Authorization", auth(oldStaff)).send({ expectedVersion: 0 }).expect(201);
+ const send = (user: string, body: string, extra: object = {}) => request.post(`${path}/messages`).set("Authorization", auth(user)).send({ clientMessageId: randomUUID(), body, visibility: "customer", ...extra });
+ await send(customerId, "Synthetic account appeal").expect(201);
+ const first = (await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } })).unansweredSince;
+ expect(first).not.toBeNull();
+ await send(customerId, "Extra message must not reset debt").expect(201);
+ await send(oldStaff, "Private note", { visibility: "staff" }).expect(201);
+ await send(oldStaff, "Operational service notice", { supportKind: "notice", reason: "Affects this synthetic account" }).expect(201);
+ expect((await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } })).unansweredSince).toEqual(first);
+ expect(await db.serviceAudit.findFirst({ where: { resourceId, action: "SUPPORT_NOTICE" } })).toMatchObject({ reason: "Affects this synthetic account", actorId: oldStaff });
+ await request.post(`${path}/support`).set("Authorization", auth(oldStaff)).send({ kind: "close_resolved" }).expect(400);
+ await request.post(`${path}/support`).set("Authorization", auth(customerId)).send({ kind: "close_resolved" }).expect(403);
+ await send(oldStaff, "Please provide the listing number", { supportKind: "request_information" }).expect(201);
+ let row = await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } }); expect(row.unansweredSince).toBeNull(); expect(row.awaitingCustomerSince).not.toBeNull();
+ const closure = { kind: "close_awaiting", reason: "No response after requested information", body: "We are closing this request. Reply to reopen it.", clientMessageId: randomUUID() };
+ await request.post(`${path}/support`).set("Authorization", auth(oldStaff)).send(closure).expect(400);
+ await db.supportCase.update({ where: { id: resourceId }, data: { awaitingCustomerSince: new Date(Date.now() - 15 * 86400000) } });
+ await request.post(`${path}/support`).set("Authorization", auth(oldStaff)).send({ kind: "investigate" }).expect(201);
+ await request.post(`${path}/support`).set("Authorization", auth(oldStaff)).send(closure).expect(400);
+ await request.post(`${path}/support`).set("Authorization", auth(oldStaff)).send({ kind: "investigation_done" }).expect(201);
+ await request.post(`${path}/support`).set("Authorization", auth(oldStaff)).send(closure).expect(201);
+ await request.post(`${path}/support`).set("Authorization", auth(oldStaff)).send(closure).expect(201);
+ expect(await db.serviceMessage.count({ where: { conversationId: id, clientMessageId: closure.clientMessageId } })).toBe(1);
+ row = await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } }); expect(row.status).toBe("closed"); expect(row.closedAt).not.toBeNull();
+ await send(customerId, "Reopened appeal").expect(201);
+ row = await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } }); expect(row.status).toBe("open"); expect(row.closedAt).toBeNull(); expect(row.unansweredSince).not.toBeNull();
+ await request.post(`${path}/support`).set("Authorization", auth(oldStaff)).send({ kind: "category", category: "exposure" }).expect(201);
+ expect((await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } })).escalatedAt).not.toBeNull();
+ await request.post(`${path}/assignment`).set("Authorization", auth(oldStaff)).send({ expectedVersion: 1, targetUserId: nextStaff }).expect(201);
+ await request.post(`${path}/support`).set("Authorization", auth(oldStaff)).send({ kind: "reopen" }).expect(403);
+ await request.post(`${path}/support`).set("Authorization", auth(oldStaff)).send({ kind: "close_resolved" }).expect(403);
+ await request.post(`${path}/support`).set("Authorization", auth(nextStaff)).send({ kind: "close_resolved" }).expect(400);
+ await send(nextStaff, "Your appeal has been resolved").expect(201);
+ await request.post(`${path}/support`).set("Authorization", auth(nextStaff)).send({ kind: "close_resolved" }).expect(201);
+ const closed = await request.get(path).set("Authorization", auth(customerId)).expect(200);
+ expect(closed.body).toMatchObject({ status: "closed", support: { unansweredSince: null } });
+ await request.post(`${path}/support`).set("Authorization", auth(oldStaff)).send({ kind: "reopen" }).expect(403);
+ await request.post(`${path}/support`).set("Authorization", auth(nextStaff)).send({ kind: "reopen" }).expect(201);
+ const reopened = await request.get(path).set("Authorization", auth(customerId)).expect(200);
+ expect(reopened.body).toMatchObject({ status: "open", support: { unansweredSince: null, awaitingCustomerSince: null } });
+});
+
+it("orders the actual Support queue by incident/account category then oldest unanswered time", async () => {
+ const a = await request.post("/api/v1/services/conversations").set("Authorization", auth(customer)).send({ purpose: "support", synthetic: true }).expect(201);
+ const b = await request.post("/api/v1/services/conversations").set("Authorization", auth(stranger)).send({ purpose: "support", synthetic: true }).expect(201);
+ const c = await request.post("/api/v1/services/conversations").set("Authorization", auth(oldStaff)).send({ purpose: "support", synthetic: true }).expect(201);
+ await db.supportCase.update({ where: { id: a.body.resourceId }, data: { priority: "account", unansweredSince: new Date("2026-10-01T00:00:00Z") } });
+ await db.supportCase.update({ where: { id: b.body.resourceId }, data: { priority: "exposure", unansweredSince: new Date("2026-10-10T00:00:00Z") } });
+ await db.supportCase.update({ where: { id: c.body.resourceId }, data: { priority: "account", unansweredSince: new Date("2026-10-02T00:00:00Z") } });
+ const queue = await request.get("/api/v1/services/queue/support").set("Authorization", auth(nextStaff)).expect(200);
+ const ids = (queue.body as { id: string }[]).map(row => row.id);
+ expect(ids.indexOf(b.body.id)).toBeLessThan(ids.indexOf(a.body.id)); expect(ids.indexOf(a.body.id)).toBeLessThan(ids.indexOf(c.body.id));
+});
+
+it("denies History capacity when the assigned staff session expires under service time and accepts it after only expiry is extended", async () => {
+ await db.staffGrant.createMany({ data: [{ userId: oldStaff, capability: "history.fulfilment" }], skipDuplicates: true });
+ const wallNow = new Date();
+ const serviceNow = new Date(wallNow.getTime() + 2 * 3600000);
+ const session = await db.session.create({ data: { userId: oldStaff, refreshTokenHash: randomUUID(), expiresAt: new Date(wallNow.getTime() + 3600000), adminTotpExpiresAt: new Date(wallNow.getTime() + 3 * 3600000) } });
+ const bearer = `Bearer ${jwt.sign({ sub: oldStaff, sid: session.id })}`;
+ const opened = await request.post("/api/v1/services/conversations").set("Authorization", auth(stranger)).send({ purpose: "history", synthetic: true }).expect(201);
+ const id = opened.body.id as string;
+ await request.post(`/api/v1/services/conversations/${id}/assignment`).set("Authorization", bearer).send({ expectedVersion: 0 }).expect(201);
+ vi.spyOn(app.get<{ now: () => Date }>(SERVICE_RUNTIME), "now").mockReturnValue(serviceNow);
+ const day = new Date(serviceNow.getTime() + 86400000).toISOString().slice(0, 10);
+ const capacity = { kind: "capacity", expectedAssignmentVersion: 1, day, slotLimit: 1, morningLimit: 1, evidence: "Synthetic session expiry capacity", providers: [{ provider: "carfax", allowance: 1, consumed: 0, resetAt: `${day}T03:00:00.000Z`, evidence: "Synthetic session expiry allowance" }] };
+ const command = () => request.post(`/api/v1/services/conversations/${id}/history`).set("Authorization", bearer).send(capacity);
+ expect(session.expiresAt > new Date()).toBe(true);
+ expect(session.expiresAt <= serviceNow).toBe(true);
+ expect(session.adminTotpExpiresAt !== null && session.adminTotpExpiresAt > serviceNow).toBe(true);
+ try {
+  const denied = await command().expect(403);
+  expect(denied.body.code).toBe("NO_ACCESS");
+  // Keep the bearer, capability, assignment, elevation, command and service clock identical.
+  await db.session.update({ where: { id: session.id }, data: { expiresAt: new Date(serviceNow.getTime() + 3600000) } });
+  await command().expect(201);
+ } finally {
+  await db.historyProviderAllowance.deleteMany({ where: { provider: "carfax", day, evidence: "Synthetic session expiry allowance" } });
+  await db.historyCapacityDay.deleteMany({ where: { day, evidence: "Synthetic session expiry capacity" } });
+ }
+});
+
+it("holds one exact History quote atomically and never treats a screenshot or expired receipt as funds", async () => {
+ await db.staffGrant.createMany({ data: [{ userId: oldStaff, capability: "history.fulfilment" }, { userId: oldStaff, capability: "history.payment.verify" }] , skipDuplicates: true });
+ const opened = await request.post("/api/v1/services/conversations").set("Authorization", auth(stranger)).send({ purpose: "history", synthetic: true }).expect(201);
+ const id = opened.body.id as string;
+ await request.post(`/api/v1/services/conversations/${id}/assignment`).set("Authorization", auth(oldStaff)).send({ expectedVersion: 0 }).expect(201);
+ const now = new Date(`${new Date().toISOString().slice(0,10)}T04:10:00.000Z`);
+ // Both participants must remain valid under wall time and the scenario's service timeline.
+ const sessionUntil = new Date(Math.max(Date.now(), now.getTime() + 86400000) + 3600000);
+ for (const userId of [oldStaff, stranger]) {
+  const session = await db.session.create({ data: { userId, refreshTokenHash: randomUUID(), expiresAt: sessionUntil, adminTotpExpiresAt: sessionUntil } });
+  tokens.set(userId, jwt.sign({ sub: userId, sid: session.id }));
+ }
+ vi.spyOn(app.get<{ now: () => Date }>(SERVICE_RUNTIME), "now").mockReturnValue(now);
+ const tomorrow = new Date(now.getTime() + 86400000 + 5 * 3600000).toISOString().slice(0, 10);
+ const windowStart = `${tomorrow}T04:00:00.000Z`, windowEnd = `${tomorrow}T05:00:00.000Z`;
+ const command = (user: string, data: object) => request.post(`/api/v1/services/conversations/${id}/history`).set("Authorization", auth(user)).send(data);
+ await command(oldStaff, { kind: "capacity", expectedAssignmentVersion: 1, day: tomorrow, slotLimit: 1, morningLimit: 1, evidence: "Synthetic measured one slot", providers: [{ provider: "carfax", allowance: 1, consumed: 0, resetAt: `${tomorrow}T03:00:00.000Z`, evidence: "Synthetic account allowance" }] }).expect(201);
+ const quoteId = randomUUID(), vin = "1HGCM82633A004352";
+ const quote = { kind: "quote", expectedAssignmentVersion: 1, quoteId, vin, providers: ["carfax"], preflightOutcome: "available", preflightEvidence: "Synthetic licensed preflight", refundRule: "Founder decision if unusable", windowStart, windowEnd, feasible: true };
+ await command(oldStaff, quote).expect(201);
+ const acceptance = { kind: "accept", quoteId, vin, providers: ["carfax"], amount: 100, refundRule: quote.refundRule, windowStart, windowEnd, rights: { category: "payment_evidence", purpose: "Synthetic order", basis: "Owned test records", provenance: "Test", identifiability: "personal", use: ["service"], schedule: { kind: "until", until: new Date(now.getTime()+86400000*30).toISOString(), reason: "Synthetic schedule" }, supplierRestrictions: "", hold: null } };
+ await command(stranger, { ...acceptance, vin: "1HGCM82633A004353" }).expect(409);
+ const accepted = await Promise.all([command(stranger, acceptance), command(stranger, acceptance)]);
+ expect(accepted.map(result => result.status)).toEqual([201, 201]);
+ const orders = await db.historyOrder.findMany({ where: { requestId: opened.body.resourceId } }); expect(orders).toHaveLength(1);
+ const order = orders[0]!;
+ const paymentId = randomUUID(); await command(stranger, { kind: "payment", orderId: order.id, clientPaymentId: paymentId, claim: "Screenshot only" }).expect(201);
+ expect((await db.historyOrder.findUniqueOrThrow({ where: { id: order.id } })).state).toBe("held");
+ const payment = await db.historyPayment.findUniqueOrThrow({ where: { orderId_clientPaymentId: { orderId: order.id, clientPaymentId: paymentId } } });
+ await command(stranger, { kind: "verify", expectedAssignmentVersion: 1, expectedVersion: 0, orderId: order.id, paymentId: payment.id, verifiedFunds: true, amount: 100, receivedAt: now.toISOString(), evidence: "Untrusted customer claim" }).expect(403);
+ await db.historyOrder.update({ where: { id: order.id }, data: { holdExpiresAt: new Date(now.getTime()-1) } });
+ await command(oldStaff, { kind: "verify", expectedAssignmentVersion: 1, expectedVersion: 0, orderId: order.id, paymentId: payment.id, verifiedFunds: true, amount: 100, receivedAt: now.toISOString(), evidence: "Actual synthetic reconciliation" }).expect(201);
+ expect((await db.historyOrder.findUniqueOrThrow({ where: { id: order.id } })).state).toBe("review");
+ expect(await db.historyPurchaseIntent.count({ where: { orderId: order.id } })).toBe(0);
+ const newQuoteId = randomUUID(); await command(oldStaff, { ...quote, quoteId: newQuoteId }).expect(201);
+ await command(stranger, { ...acceptance, quoteId: newQuoteId }).expect(201);
+ const rebooked = await db.historyOrder.findUniqueOrThrow({ where: { id: order.id } }); expect(rebooked.state).toBe("paid"); expect(rebooked.quoteId).toBe(quoteId);
+ expect(await db.historyBooking.count({ where: { orderId: order.id } })).toBe(1);
+ await command(stranger, { ...acceptance, quoteId: newQuoteId }).expect(201);
+ expect(await db.historyBooking.count({ where: { orderId: order.id } })).toBe(1);
+
+});
+
+it("delivers original PDFs only through the purchased order and reuses licensed archives without earlier purchaser context", async () => {
+ await db.staffGrant.createMany({ data: [{ userId: nextStaff, capability: "history.fulfilment" }], skipDuplicates: true });
+ const create = async (buyer: string) => {
+  const opened = await request.post("/api/v1/services/conversations").set("Authorization", auth(buyer)).send({ purpose: "history", synthetic: true }).expect(201);
+  const id = opened.body.id as string;
+  await request.post(`/api/v1/services/conversations/${id}/assignment`).set("Authorization", auth(nextStaff)).send({ expectedVersion: 0 }).expect(201);
+  const day = "2026-10-20"; await db.historyCapacityDay.upsert({ where: { day }, create: { day, slotLimit: 10, morningLimit: 5, evidence: "Synthetic capacity" }, update: {} });
+  const quote = await db.historyQuote.create({ data: { requestId: opened.body.resourceId, vin: "1HGCM82633A004352", providers: ["carfax"], preflightOutcome: "available", preflightEvidence: "Synthetic availability", refundRule: "Founder refund review", windowStart: new Date("2026-10-20T04:00:00Z"), windowEnd: new Date("2026-10-20T05:00:00Z"), feasible: true, acceptedAt: new Date() } });
+  const order = await db.historyOrder.create({ data: { requestId: opened.body.resourceId, quoteId: quote.id, day, morning: false, holdExpiresAt: new Date(), promiseAt: quote.windowEnd, state: "paid", paidAt: new Date(), receivedAt: new Date(), rights: { category: "payment_evidence", schedule: { kind: "until", until: "2027-01-01T00:00:00Z" }, hold: null } } });
+  return { id, order };
+ };
+ const first = await create(stranger), second = await create(reportBuyer);
+ const enquiry = await request.post("/api/v1/services/conversations").set("Authorization", auth(reportBuyer)).send({ purpose: "history", synthetic: true, proposedVin: "1hg cm82633a004352" }).expect(201);
+ expect((await db.vehicleHistoryRequest.findUniqueOrThrow({ where: { id: enquiry.body.resourceId } })).proposedVin).toBe("1HGCM82633A004352");
+ await db.historyPurchaseIntent.create({ data: { orderId: first.order.id, vin: "1HGCM82633A004352", providers: ["carfax"], state: "completed" } });
+ await db.historyOrder.update({ where: { id: first.order.id }, data: { state: "fulfilling" } });
+ const artifactId = randomUUID();
+ const document = await PDFDocument.create(); document.addPage([100,100]); const pdf = Buffer.from(await document.save());
+ const hash = (await import("node:crypto")).createHash("sha256").update(pdf).digest("hex");
+ const rights = { category: "provider_artifact", purpose: "Synthetic licensed archive", basis: "Owned synthetic report", provenance: "Test-generated original PDF", identifiability: "anonymous", use: ["service", "archive", "redistribute"], schedule: { kind: "until", until: "2027-01-01T00:00:00Z", reason: "Synthetic source license" }, supplierRestrictions: "Synthetic reuse and reportBuyer PDF/link permitted", hold: null };
+ const command = (id: string, data: object) => request.post(`/api/v1/services/conversations/${id}/history/artifacts`).set("Authorization", auth(nextStaff)).send(data);
+ const facts = { vehicleIdentity: "Synthetic sedan 2010", mileage: { value: 64000, unit: "km", observedAt: "2025-12-31T00:00:00Z" }, sourceObservations: [{ page: 1, statement: "Synthetic source observation, preserved in original language" }] };
+ await command(first.id, { kind: "stage", expectedAssignmentVersion: 1, orderId: first.order.id, artifactId, ...facts, provider: "carfax", vin: "1HGCM82633A004352", originalDate: "2026-01-01T00:00:00Z", expectedPages: 1, sizeBytes: pdf.length, sha256: hash, rights, provenance: "Synthetic original source" }).expect(201);
+ expect((await db.historyArtifact.findUniqueOrThrow({ where: { id: artifactId } })).mileageValue).toBe(64000);
+ await expect(db.historyArtifact.update({ where: { id: artifactId }, data: { mileageValue: 64001 } })).rejects.toThrow("history_artifact_source_facts_immutable");
+ await request.post(`/api/v1/services/conversations/${first.id}/messages`).set("Authorization", auth(nextStaff)).send({ clientMessageId: randomUUID(), visibility: "staff", body: "Synthetic prior purchaser private operator note" }).expect(201);
+ await request.post(`/api/v1/services/conversations/${first.id}/history/artifacts/${artifactId}/bytes`).set("Authorization", auth(nextStaff)).set("Content-Type", "application/octet-stream").send(pdf).expect(201);
+ await request.get(`/api/v1/services/conversations/${first.id}/history/artifacts/${artifactId}`).set("Authorization", auth(stranger)).expect(403);
+ await command(first.id, { kind: "verify", expectedAssignmentVersion: 1, orderId: first.order.id, artifactId, vin: "1HGCM82633A004352", originalDate: "2026-01-01T00:00:00Z", readablePages: 1, readable: true }).expect(201);
+ await command(first.id, { kind: "deliver", expectedAssignmentVersion: 1, expectedVersion: 0, orderId: first.order.id, artifactId, sharedLink: "https://example.invalid/synthetic-report", linkMatches: true, linkChecked: true }).expect(201);
+ const payment = await db.historyPayment.create({ data: { orderId: first.order.id, clientPaymentId: randomUUID(), claim: "Synthetic historical receipt", evidence: "Synthetic private payment evidence" } });
+ await db.staffGrant.createMany({ data: [{ userId: nextStaff, capability: "history.payment.history" }], skipDuplicates: true });
+ const ordinary = await request.get(`/api/v1/services/conversations/${first.id}/history`).set("Authorization", auth(nextStaff)).expect(200);
+ expect(ordinary.body.payments).toEqual([]);
+ await request.post(`/api/v1/services/conversations/${first.id}/history/payment-history`).set("Authorization", auth(nextStaff)).send({ reason: " " }).expect(400);
+ const historical = await request.post(`/api/v1/services/conversations/${first.id}/history/payment-history`).set("Authorization", auth(nextStaff)).send({ reason: "Synthetic founder-authorized reconciliation" }).expect(201);
+ expect(historical.body.payments[0].id).toBe(payment.id);
+ expect(await db.serviceAudit.count({ where: { resourceId: first.order.requestId, action: "HISTORY_PAYMENT_HISTORY_READ", reason: "Synthetic founder-authorized reconciliation" } })).toBe(1);
+ await db.staffGrant.updateMany({ where: { userId: nextStaff, capability: "history.payment.history", revokedAt: null }, data: { revokedAt: new Date() } });
+ await request.post(`/api/v1/services/conversations/${first.id}/history/payment-history`).set("Authorization", auth(nextStaff)).send({ reason: "No longer authorized" }).expect(403);
+ const file = await request.get(`/api/v1/services/conversations/${first.id}/history/artifacts/${artifactId}`).set("Authorization", auth(stranger)).expect(200);
+ expect(Buffer.from(file.body)).toEqual(pdf);
+ await request.get(`/api/v1/services/conversations/${second.id}/history/artifacts/${artifactId}`).set("Authorization", auth(reportBuyer)).expect(403);
+ await command(second.id, { kind: "archive", expectedAssignmentVersion: 1, expectedVersion: 0, orderId: second.order.id, artifactId }).expect(201);
+ const selected = await request.get(`/api/v1/services/conversations/${second.id}/history/reports`).set("Authorization", auth(nextStaff)).expect(200);
+ expect(selected.body.staged[0].mileage).toEqual({ ...facts.mileage, observedAt: new Date(facts.mileage.observedAt).toISOString() }); expect(selected.body.staged[0].sourceObservations).toEqual(facts.sourceObservations);
+ expect(JSON.stringify(selected.body)).not.toContain("Synthetic prior purchaser private operator note");
+ await request.get(`/api/v1/services/conversations/${second.id}/history/artifacts/${artifactId}`).set("Authorization", auth(nextStaff)).expect(200);
+ const previousFirst = await request.get("/api/v1/services/history/previous?vin=1HGCM82633A004352").set("Authorization", auth(stranger)).expect(200);
+ expect(previousFirst.body).toEqual([{ conversationId: first.id, vin: "1HGCM82633A004352" }]);
+ // The second buyer has no delivered prior report yet, despite paying for the same VIN.
+ const previousSecond = await request.get("/api/v1/services/history/previous?vin=1HGCM82633A004352").set("Authorization", auth(reportBuyer)).expect(200); expect(previousSecond.body).toEqual([]);
+ await command(second.id, { kind: "deliver", expectedAssignmentVersion: 1, expectedVersion: 1, orderId: second.order.id, artifactId, sharedLink: "https://example.invalid/synthetic-report", linkMatches: true, linkChecked: true }).expect(201);
+ const reopened = await request.get(`/api/v1/services/conversations/${second.id}/history/reports`).set("Authorization", auth(reportBuyer)).expect(200);
+ expect(reopened.body.delivered[0].originalDate).toBe("2026-01-01T00:00:00.000Z");
+ expect(JSON.stringify(reopened.body)).not.toContain(stranger); expect(reopened.body.archive).toEqual([]); expect(reopened.body.staged).toEqual([]);
+ await db.historyArtifact.update({ where: { id: artifactId }, data: { state: "restricted", restrictedAt: new Date() } });
+ await request.get(`/api/v1/services/conversations/${second.id}/history/artifacts/${artifactId}`).set("Authorization", auth(reportBuyer)).expect(403);
+});
+
+it("records fixed recovery offers, rejects deadline drift/expired acceptance and gates late-funds refunds", async () => {
+ await db.staffGrant.createMany({ data: [{ userId: nextStaff, capability: "history.fulfilment" }], skipDuplicates: true });
+ let now = new Date("2026-10-15T14:30:00Z");
+ vi.spyOn(app.get<{ now: () => Date }>(SERVICE_RUNTIME), "now").mockImplementation(() => now);
+ const setup = async (state: string, paid: boolean) => {
+  const opened = await request.post("/api/v1/services/conversations").set("Authorization", auth(stranger)).send({ purpose: "history", synthetic: true }).expect(201);
+  const id = opened.body.id as string;
+  await request.post(`/api/v1/services/conversations/${id}/assignment`).set("Authorization", auth(nextStaff)).send({ expectedVersion: 0 }).expect(201);
+  const day = "2026-10-15";
+  await db.historyCapacityDay.upsert({ where: { day }, create: { day, slotLimit: 10, morningLimit: 5, evidence: "Synthetic recovery capacity" }, update: {} });
+  const quote = await db.historyQuote.create({ data: { requestId: opened.body.resourceId, vin: "1HGCM82633A004352", providers: ["carfax"], preflightOutcome: "available", preflightEvidence: "Synthetic evidence", refundRule: "Founder decision", windowStart: new Date("2026-10-15T04:00:00Z"), windowEnd: new Date("2026-10-15T05:00:00Z"), feasible: true, acceptedAt: now } });
+  const order = await db.historyOrder.create({ data: { requestId: opened.body.resourceId, quoteId: quote.id, day, morning: false, state, holdExpiresAt: quote.windowEnd, promiseAt: quote.windowEnd, ...(paid ? { paidAt: quote.windowStart, receivedAt: quote.windowStart, escalatedAt: now } : {}), rights: { category: "payment_evidence", schedule: { kind: "until", until: "2027-01-01T00:00:00Z" }, hold: null } } });
+  const command = (actor: string, data: object) => request.post(`/api/v1/services/conversations/${id}/history`).set("Authorization", auth(actor)).send(data);
+  return { id, order, command };
+ };
+ const first = await setup("fulfilling", true);
+ const offer = { kind: "recovery_offer", expectedAssignmentVersion: 1, expectedVersion: 0, orderId: first.order.id, reason: "Synthetic additional staffed hour" };
+ await first.command(stranger, offer).expect(403);
+ await first.command(nextStaff, offer).expect(201);
+ const snapshot = await request.get(`/api/v1/services/conversations/${first.id}/history`).set("Authorization", auth(stranger)).expect(200);
+ const deadline = snapshot.body.order.recoveryOfferedDeadline;
+ expect(deadline).toBe("2026-10-16T04:30:00.000Z");
+ expect(snapshot.body.order.recoveryDeadline).toBeNull();
+ now = new Date("2026-10-15T14:30:42Z");
+ const accept = { kind: "recovery", orderId: first.order.id, expectedVersion: 1, agree: true, deadline };
+ await first.command(stranger, { ...accept, deadline: "2026-10-16T04:30:42.000Z" }).expect(400);
+ await first.command(stranger, accept).expect(201);
+ const agreed = await db.historyOrder.findUniqueOrThrow({ where: { id: first.order.id } });
+ expect(agreed.recoveryDeadline?.toISOString()).toBe(deadline); expect(agreed.recoveryAgreedAt).toEqual(now); expect(agreed.recoveryUsed).toBe(true);
+ await first.command(stranger, accept).expect(409);
+ await first.command(nextStaff, { ...offer, expectedVersion: 2 }).expect(400);
+ const second = await setup("fulfilling", true);
+ await second.command(nextStaff, { ...offer, orderId: second.order.id }).expect(201);
+ now = new Date(now.getTime()+60000);
+ const secondOffer = await db.historyOrder.findUniqueOrThrow({ where: { id: second.order.id } });
+ await second.command(stranger, { ...accept, orderId: second.order.id, deadline: secondOffer.recoveryOfferedDeadline?.toISOString() }).expect(400);
+ await second.command(stranger, { kind: "recovery", orderId: second.order.id, expectedVersion: 1, agree: false }).expect(201);
+ expect((await db.historyRefund.findUniqueOrThrow({ where: { orderId: second.order.id } })).state).toBe("pending");
+ const late = await setup("review", false);
+ const refund = { kind: "refund_request", expectedAssignmentVersion: 1, expectedVersion: 0, orderId: late.order.id, reason: "No acceptable renewed booking for verified late funds" };
+ await late.command(nextStaff, refund).expect(400);
+ await db.historyPayment.create({ data: { orderId: late.order.id, clientPaymentId: randomUUID(), claim: "Synthetic verified late funds", state: "review", verifiedFunds: true, amount: 100, receivedAt: now, confirmedAt: now, confirmedById: nextStaff } });
+ await late.command(stranger, refund).expect(403);
+ await late.command(nextStaff, refund).expect(201);
+ expect((await db.historyOrder.findUniqueOrThrow({ where: { id: late.order.id } })).state).toBe("refund_pending");
+ expect((await db.historyRefund.findUniqueOrThrow({ where: { orderId: late.order.id } })).state).toBe("pending");
+ await late.command(nextStaff, { ...refund, expectedVersion: 1 }).expect(201);
+ expect(await db.historyRefund.count({ where: { orderId: late.order.id } })).toBe(1);
+});
+
+it("serializes shared holds and paid FIFO, fences duplicate purchase intents and rejects stale handover/capability", async () => {
+ await db.staffGrant.createMany({ data: ["history.fulfilment", "history.payment.verify"].map(capability => ({ userId: nextStaff, capability })), skipDuplicates: true });
+ let now = new Date("2001-01-01T04:10:00Z");
+ vi.spyOn(app.get<{ now: () => Date }>(SERVICE_RUNTIME), "now").mockImplementation(() => now);
+ const day = "2001-01-01", vin = "1HGCM82633A004352";
+ const setup = async (buyer: string) => {
+  const opened = await request.post("/api/v1/services/conversations").set("Authorization", auth(buyer)).send({ purpose: "history", synthetic: true }).expect(201);
+  const id = opened.body.id as string;
+  await request.post(`/api/v1/services/conversations/${id}/assignment`).set("Authorization", auth(nextStaff)).send({ expectedVersion: 0 }).expect(201);
+  const quoteId = randomUUID();
+  const quote = { quoteId, expectedAssignmentVersion: 1, kind: "quote", vin, providers: ["carfax"], preflightOutcome: "available", preflightEvidence: "Owned synthetic preflight", refundRule: "Founder-authorized failure refund", windowStart: "2001-01-01T04:10:00.000Z", windowEnd: "2001-01-01T05:00:00.000Z", feasible: true };
+  const command = (actor: string, data: object) => request.post(`/api/v1/services/conversations/${id}/history`).set("Authorization", auth(actor)).send(data);
+  await command(nextStaff, quote).expect(201);
+  const acceptance = { kind: "accept", quoteId, vin, providers: quote.providers, amount: 100, refundRule: quote.refundRule, windowStart: quote.windowStart, windowEnd: quote.windowEnd, rights: { category: "payment_evidence", purpose: "Synthetic concurrency proof", basis: "Owned fixtures", provenance: "Synthetic buyer", identifiability: "personal", use: ["service"], schedule: { kind: "until", until: "2027-01-01T00:00:00Z", reason: "Synthetic schedule" }, supplierRestrictions: "No actual provider action", hold: null } };
+  return { id, buyer, requestId: opened.body.resourceId as string, command, acceptance };
+ };
+ const one = await setup(stranger), two = await setup(reportBuyer);
+ const capacity = { kind: "capacity", expectedAssignmentVersion: 1, day, slotLimit: 1, morningLimit: 1, evidence: "Measured synthetic single slot", providers: [{ provider: "carfax", allowance: 10, consumed: 0, resetAt: "2001-01-01T04:00:00Z", evidence: "Synthetic verified allowance" }] };
+ await one.command(nextStaff, capacity).expect(201);
+ const holds = await Promise.all([one.command(one.buyer, one.acceptance), two.command(two.buyer, two.acceptance)]);
+ expect(holds.map(value => value.status).sort()).toEqual([201,400]);
+ expect(await db.historyOrder.count({ where: { day, state: "held" } })).toBe(1);
+ const first = holds[0]?.status === 201 ? one : two, second = holds[0]?.status === 201 ? two : one;
+ await first.command(nextStaff, { ...capacity, slotLimit: 2 }).expect(201);
+ await second.command(second.buyer, second.acceptance).expect(201);
+ const confirm = async (entry: typeof one, minute: number) => {
+  now = new Date(`2001-01-01T04:${minute}:00Z`);
+  const order = await db.historyOrder.findUniqueOrThrow({ where: { requestId: entry.requestId } });
+  const clientPaymentId = randomUUID();
+  let attachmentId: string | undefined;
+  if (minute === 11) {
+   const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: "#ffffff" } }).jpeg().toBuffer();
+   const stage = await request.post(`/api/v1/services/conversations/${entry.id}/attachments`).set("Authorization", auth(entry.buyer)).send({ category: "payment_evidence", visibility: "customer", contentType: "image/jpeg", filename: "synthetic-receipt.jpg", sizeBytes: image.length, rights: { ...entry.acceptance.rights, category: "payment_evidence" } }).expect(201);
+   attachmentId = stage.body.id as string;
+   await request.post(`/api/v1/services/conversations/${entry.id}/attachments/${attachmentId}/bytes`).set("Authorization", auth(entry.buyer)).set("Content-Type", "application/octet-stream").send(image).expect(201);
+  }
+  await entry.command(entry.buyer, { kind: "payment", orderId: order.id, clientPaymentId, claim: "Synthetic verified receipt", ...(attachmentId ? { attachmentId } : {}) }).expect(201);
+  if (attachmentId) {
+   expect((await db.serviceAttachment.findUniqueOrThrow({ where: { id: attachmentId } })).state).toBe("adopted");
+   await request.get(`/api/v1/services/conversations/${entry.id}/attachments/${attachmentId}`).set("Authorization", auth(nextStaff)).expect(200);
+   const stored = await db.serviceAttachment.findUniqueOrThrow({ where: { id: attachmentId } });
+   const originalRights = ServiceMessagingSchemas.ServiceRightsSchema.parse(stored.rights);
+   await db.serviceAttachment.update({ where: { id: attachmentId }, data: { rights: { ...originalRights,
+    schedule: { kind: "until", until: now.toISOString(), reason: "Synthetic expired audience before cleanup" },
+    hold: { until: new Date(now.getTime() + 86_400_000).toISOString(), reason: "Synthetic storage preservation does not extend audience" },
+   } } });
+   await request.get(`/api/v1/services/conversations/${entry.id}/attachments/${attachmentId}`).set("Authorization", auth(nextStaff)).expect(403);
+   expect((await db.serviceAttachment.findUniqueOrThrow({ where: { id: attachmentId } })).removedAt).toBeNull();
+   await db.serviceAttachment.update({ where: { id: attachmentId }, data: { rights: originalRights } });
+   expect((await db.historyOrder.findUniqueOrThrow({ where: { id: order.id } })).paidAt).toBeNull();
+  }
+  const payment = await db.historyPayment.findUniqueOrThrow({ where: { orderId_clientPaymentId: { orderId: order.id, clientPaymentId } } });
+  await entry.command(nextStaff, { kind: "verify", orderId: order.id, paymentId: payment.id, expectedAssignmentVersion: 1, expectedVersion: 0, amount: 100, verifiedFunds: true, receivedAt: now.toISOString(), evidence: "Synthetic actual receipt reconciliation" }).expect(201);
+  return order.id;
+ };
+ const firstOrder = await confirm(first, 11), secondOrder = await confirm(second, 12);
+ const purchase = { kind: "purchase", expectedAssignmentVersion: 1, expectedVersion: 1, reason: "Synthetic FIFO purchase intent" };
+ await second.command(nextStaff, { ...purchase, orderId: secondOrder }).expect(400);
+ const intents = await Promise.all([first.command(nextStaff, { ...purchase, orderId: firstOrder }), first.command(nextStaff, { ...purchase, orderId: firstOrder })]);
+ expect(intents.map(value => value.status).sort()).toEqual([201,409]);
+ expect(await db.historyPurchaseIntent.count({ where: { orderId: firstOrder } })).toBe(1);
+ expect((await db.historyProviderAllowance.findUniqueOrThrow({ where: { provider_day: { provider: "carfax", day } } })).consumed).toBe(1);
+ await first.command(nextStaff, { kind: "purchase_uncertain", expectedAssignmentVersion: 1, expectedVersion: 2, orderId: firstOrder, reason: "Synthetic timeout; external outcome unknown" }).expect(201);
+ await first.command(nextStaff, { ...purchase, expectedVersion: 3, orderId: firstOrder }).expect(201);
+ expect(await db.historyPurchaseIntent.count({ where: { orderId: firstOrder } })).toBe(1);
+ expect((await db.historyProviderAllowance.findUniqueOrThrow({ where: { provider_day: { provider: "carfax", day } } })).consumed).toBe(1);
+ await db.staffGrant.createMany({ data: [{ userId: oldStaff, capability: "history.fulfilment" }], skipDuplicates: true });
+ await request.post(`/api/v1/services/conversations/${second.id}/assignment`).set("Authorization", auth(nextStaff)).send({ expectedVersion: 1, targetUserId: oldStaff }).expect(201);
+ await second.command(nextStaff, { ...purchase, orderId: secondOrder }).expect(403);
+ await second.command(oldStaff, { ...purchase, orderId: secondOrder }).expect(409);
+ await db.staffGrant.updateMany({ where: { userId: oldStaff, capability: "history.fulfilment", revokedAt: null }, data: { revokedAt: new Date() } });
+ await second.command(oldStaff, { ...purchase, expectedAssignmentVersion: 2, orderId: secondOrder }).expect(403);
+ await second.command(second.buyer, { kind: "refund_request", cause: "company_error", expectedAssignmentVersion: 2, expectedVersion: 1, orderId: secondOrder, reason: "Customer cannot cancel a paid order" }).expect(403);
+ await first.command(nextStaff, { kind: "refund_request", cause: "company_error", expectedAssignmentVersion: 1, expectedVersion: 3, orderId: firstOrder, reason: "Synthetic operator purchased incorrect VIN" }).expect(201);
+ expect((await db.historyRefund.findUniqueOrThrow({ where: { orderId: firstOrder } })).reason).toContain("company_error");
+});

@@ -2,6 +2,7 @@ import { useCallback, useImperativeHandle, useMemo, useRef, useState, type React
 import { FlatList, Pressable, View, useWindowDimensions, type ListRenderItem, type ViewToken } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { videoPosterLabel } from "../videoEditor/videoPosterLabel";
 import { listingPhotoUrl } from "../detail/buildVariantUrl";
 
 import { GalleryBanner, GalleryImage, type GalleryPhoto } from "./GalleryImage";
@@ -84,7 +85,7 @@ interface DetailPhotoStripProps {
  * reader, and the viewer shows `n / N`.
  */
 export function DetailPhotoStrip({ photos, banner, onPressPhoto, ref, hiddenIndex, visibleTop = 0 }: DetailPhotoStripProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const tile = useDetailPhotoTile();
   const { width: viewport, height: windowHeight } = useWindowDimensions();
   const interval = tile.width + DETAIL_STRIP_SEAM;
@@ -158,6 +159,7 @@ export function DetailPhotoStrip({ photos, banner, onPressPhoto, ref, hiddenInde
             onDisplayedUri={(uri) => uris.current.set(index, uri)}
           />
         )}
+        {!item.pending && item.kind === "video" ? <View className="absolute bottom-3 left-3 rounded-md bg-black/70 px-3 py-2"><Text className="font-bold text-white">▶ {Math.ceil((item.durationMs ?? 0) / 1000)}s</Text></View> : null}
         {banner && <GalleryBanner label={banner} hidden />}
       </View>
     );
@@ -167,7 +169,7 @@ export function DetailPhotoStrip({ photos, banner, onPressPhoto, ref, hiddenInde
     return (
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={label}
+        accessibilityLabel={!item.pending && item.kind === "video" ? videoPosterLabel(item.durationMs, i18n.language) : label}
         accessibilityValue={value}
         onPress={() => onPressPhoto(index, tiles.current.get(index) ?? null)}
         className="active:opacity-90"
@@ -175,7 +177,7 @@ export function DetailPhotoStrip({ photos, banner, onPressPhoto, ref, hiddenInde
         {frame}
       </Pressable>
     );
-  }, [t, count, banner, tile, activeIndex, loadNeighbours, onPressPhoto, hiddenIndex]);
+  }, [t, i18n.language, count, banner, tile, activeIndex, loadNeighbours, onPressPhoto, hiddenIndex]);
 
   if (count === 0) {
     return (

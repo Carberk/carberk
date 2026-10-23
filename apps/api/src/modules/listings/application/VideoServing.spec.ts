@@ -1,0 +1,4 @@
+import { describe, expect, it } from "vitest";
+import { VideoGrantService } from "./VideoProcessing";
+import { VideoServingService } from "./VideoServing";
+describe("protected video serving", () => { it("requires grant hash/listing/expiry and disables shared caching", () => { const now = new Date("2026-10-15T00:00:00Z"); const grant = new VideoGrantService().issue({ listingId: "l", generationId: "g", purpose: "playback", now }); const service = new VideoServingService(); expect(service.authorize({ presentedSecret: grant.secret, storedHash: grant.hash, listingId: "l", requestedListingId: "l", expiresAt: grant.expiresAt, now }).ok).toBe(true); expect(service.authorize({ presentedSecret: grant.secret, storedHash: grant.hash, listingId: "l", requestedListingId: "x", expiresAt: grant.expiresAt, now })).toEqual({ ok: false }); }); });

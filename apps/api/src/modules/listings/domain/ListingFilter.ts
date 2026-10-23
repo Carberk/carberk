@@ -39,6 +39,9 @@ export class ListingFilter {
       );
     }
 
+    if (criteria.sellerType !== undefined && criteria.sellerType !== "personal" && criteria.sellerType !== "business") {
+      throw new DomainError(LISTING_ERROR_CODES.INVALID_FILTER_RANGE, "sellerType must be personal or business");
+    }
     return new ListingFilter({ ...criteria });
   }
 
@@ -56,6 +59,7 @@ export class ListingFilter {
       this.criteria.priceMax === undefined &&
       this.criteria.yearMin === undefined &&
       this.criteria.yearMax === undefined &&
+      this.criteria.sellerType === undefined &&
       this.criteria.condition === undefined
     );
   }

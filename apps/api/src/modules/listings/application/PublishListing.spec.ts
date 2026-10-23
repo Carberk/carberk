@@ -1,3 +1,4 @@
+import { FakeMeasurementCommit } from "../../measurement/application/testing/FakeMeasurementCommit";
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   NotFoundException,
@@ -144,6 +145,9 @@ class FakePrisma {
     this.auditLogs = [];
   }
 
+  $queryRaw = async () => [{ id: "locked-fixture" }];
+  videoUploadSession = { findFirst: async () => null };
+
   $transaction = async <T>(work: Promise<T>[] | ((tx: FakePrisma) => Promise<T>)): Promise<T | T[]> => {
     if (typeof work === "function") {
       try {
@@ -231,6 +235,7 @@ function makeUseCase(
   exchangeRates?: FakeExchangeRatePort,
   events?: FakeEventPublisher,
   variantGenerator?: FakeImageVariantGenerator,
+  measurement?: FakeMeasurementCommit,
 ) {
   return new PublishListing(
     draftRepo ?? new FakeListingDraftRepository(),
@@ -242,6 +247,8 @@ function makeUseCase(
     contactPhones.policy,
     clock,
     world.claims,
+    undefined,
+    measurement,
   );
 }
 
@@ -493,6 +500,21 @@ describe("PublishListing", () => {
     ]);
   });
 
+  it("commits a minimal authoritative publication fact and keeps publication usable during collection refusal", async () => {
+    seedDraft(draftRepo, validPayload);
+    const measurement = new FakeMeasurementCommit();
+    const result = await makeUseCase(draftRepo, prisma, exchangeRates, events, variantGenerator, measurement).execute({ draftId: "draft-1", userId: "user-1" });
+    expect(measurement.facts).toHaveLength(2);
+    expect(measurement.facts[0]?.event).toMatchObject({ eventName: "listing_published", context: { platform: "server" }, payload: { listingId: result.listing.id, cityId: validPayload.cityId, draftId: "draft-1" } });
+    expect(measurement.facts[1]?.event).toMatchObject({eventName:"listing_visibility_changed",payload:{listingId:result.listing.id,visibility:"public",reason:"published"}});
+    expect(JSON.stringify(measurement.facts)).not.toContain(validPayload.description);
+    expect(JSON.stringify(measurement.facts)).not.toContain(validPayload.contactPhone);
+  });
+  it("keeps publication usable when measurement capture is unavailable", async () => {
+    seedDraft(draftRepo, validPayload);
+    const measurement = new FakeMeasurementCommit(); measurement.unavailable = true;
+    expect((await makeUseCase(draftRepo, prisma, exchangeRates, events, variantGenerator, measurement).execute({ draftId: "draft-1", userId: "user-1" })).listing.status).toBe("active");
+  });
   it("publishes a valid draft", async () => {
     seedDraft(draftRepo, validPayload);
 

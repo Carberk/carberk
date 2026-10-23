@@ -9,10 +9,12 @@ import {
 
 import { createCleanRichMessage, type RichMessageInput } from "./RichMessageFactory";
 import { SendConversationMessage } from "./SendConversationMessage";
+import type { ConversationActor } from "../domain/ports/BusinessEnquiryRepository";
 
 export type SendMessageInput = RichMessageInput & {
   senderId: string;
   conversationId: string;
+  actor?: ConversationActor;
 };
 
 export interface SendMessageResult {
@@ -33,10 +35,12 @@ export class SendMessage {
     const result = await this.sendConversationMessage.execute({
       senderId: input.senderId,
       conversationId: input.conversationId,
+      ...(input.actor ? { actor: input.actor } : {}),
       clientMessageId: input.clientMessageId,
-      createMessage: ({ id, conversationId, senderId }) =>
+      createMessage: ({ id, conversationId, senderId, businessId }) =>
         createCleanRichMessage(this.attachmentCleaner, {
           id,
+          businessId,
           conversationId,
           senderId,
           input,

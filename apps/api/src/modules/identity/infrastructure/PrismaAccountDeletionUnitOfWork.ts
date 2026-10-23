@@ -22,10 +22,37 @@ export class PrismaAccountDeletionUnitOfWork implements AccountDeletionUnitOfWor
             where: { id: userId },
             data: { deletionScheduledAt },
           });
+          const membership = await tx.dealershipMember.findUnique({ where: { userId } });
+          if (membership) {
+            await tx.$queryRaw`SELECT "id" FROM "dealerships" WHERE "id" = ${membership.dealershipId} FOR UPDATE`;
+            await tx.dealershipMember.delete({ where: { id: membership.id } });
+            if (membership.role === "owner") await tx.dealership.updateMany({ where: { id: membership.dealershipId, status: { not: "suspended" } }, data: { status: "recovery" } });
+            await tx.auditLog.create({ data: { actorId: userId, action: "BUSINESS_MEMBERSHIP_ENDED_FOR_DELETION", targetType: "Dealership", targetId: membership.dealershipId, details: { role: membership.role, recoveryRequired: membership.role === "owner" } } });
+          }
+          // Erase measurement identities now, including raw facts/outbox and only
+          // linked current guest visits by cascading FKs. Core recovery cannot revive them.
+          // Fence investigative reads before erasing actor maps. Exports carry no reverse
+          // map, so conservatively invalidate every short-lived artifact on erasure.
+          const collector=await tx.$queryRaw<{epoch:string}[]>`SELECT "epoch" FROM "measurement_state" WHERE "key"='collector' FOR UPDATE`;
+          // Actor-owned visibility history is erased too. Fresh denominators must
+          // wait for authoritative rebaseline rather than silently losing inventory.
+          if(collector[0])await tx.measurementState.deleteMany({where:{key:`inventory_baseline:${collector[0].epoch}`}});
+          await tx.measurementInvestigationExport.deleteMany();
+          await tx.measurementPrincipal.deleteMany({ where: { userId } });
+          await tx.dealershipInvitation.deleteMany({ where: { recipientUserId: userId } });
+          // Restoration creates a fresh ordinary identity session, never silently
+          // reactivates staff grants that existed before the deletion request.
+          const revoked = await tx.$queryRaw<{ capability: string }[]>`
+            UPDATE "staff_grants" SET "revokedAt" = CURRENT_TIMESTAMP
+            WHERE "userId" = ${userId} AND "revokedAt" IS NULL RETURNING "capability"`;
+          if (revoked.length) await tx.auditLog.create({ data: {
+            actorId: userId, action: "STAFF_AUTHORITY_REVOKED_FOR_DELETION", targetType: "User", targetId: userId,
+            details: { reason: "Account deletion scheduled", capabilities: revoked.map((grant) => grant.capability).sort() },
+          } });
         },
         archiveActiveListings: async (sellerId) => {
           await tx.listing.updateMany({
-            where: { sellerId, status: "active" },
+            where: { sellerId, businessId: null, status: "active" },
             data: { status: "archived", archivedByDeletion: true },
           });
         },

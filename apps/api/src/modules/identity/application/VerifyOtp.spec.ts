@@ -100,6 +100,8 @@ function makeSession(overrides: Partial<Session> = {}): Session {
 }
 
 class FakeOtpRequestRepository implements OtpRequestRepository {
+  async reserve(): ReturnType<OtpRequestRepository["reserve"]> { throw new Error("unused"); }
+
   records: OtpRequest[] = [];
 
   async create(input: {

@@ -1,4 +1,6 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { BUSINESS_CONTACT_PHONE_REPOSITORY, type BusinessContactPhoneRepository } from "../domain/ports/BusinessContactPhoneRepository";
+import { Optional , Inject, Injectable } from "@nestjs/common";
+import { ListingOwnership, type ListingActor } from "./ListingOwnership";
 
 import {
   IDENTITY_CLOCK_PORT,
@@ -27,10 +29,18 @@ export class ListMyContactPhones {
     private readonly accountPhones: AccountPhonePort,
     @Inject(IDENTITY_CLOCK_PORT)
     private readonly clock: ClockPort,
+    @Optional() @Inject(BUSINESS_CONTACT_PHONE_REPOSITORY) private readonly businessPhones?: BusinessContactPhoneRepository,
+    @Optional() @Inject(ListingOwnership) private readonly ownership?: ListingOwnership,
   ) {}
 
-  async execute(input: { userId: string }): Promise<{ items: UsableContactPhone[] }> {
+  async execute(input: ListingActor): Promise<{ items: UsableContactPhone[] }> {
     const now = this.clock.now();
+    if (input.businessId) {
+      if (!this.ownership || !this.businessPhones) throw new Error("Business contact is unavailable");
+      await this.ownership.authorize(input, { businessId: input.businessId });
+      const phone = await this.businessPhones.find(input.businessId);
+      return { items: phone?.isReusableAt(now) ? [confirmedContactPhone(phone)] : [] };
+    }
     const reusable = (await this.confirmations.listBySeller(input.userId)).filter(
       (confirmation) => confirmation.isReusableAt(now),
     );

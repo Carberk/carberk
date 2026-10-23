@@ -1,0 +1,22 @@
+[
+  {
+    "name": "flower.mp4",
+    "sha256": "0cd83d944a6ca7822b4a8306cecc60a36e859b041f6702c6a1ad9ead78924451",
+    "sizeBytes": 1128375
+  },
+  {
+    "name": "synthetic-4k60.mp4",
+    "sha256": "d1637cecad24980eeae16b259c8f5111e36b0e5bb801bd087a53deff7107bd09",
+    "sizeBytes": 6516956
+  },
+  {
+    "name": "synthetic-portrait60.mp4",
+    "sha256": "f5f8822a8667547edbd8867047d4e320ae85fb5ac6720378dad521119081fa01",
+    "sizeBytes": 3314112
+  },
+  {
+    "name": "synthetic-91s.mp4",
+    "sha256": "07111235e3cd328dc33a581dc5589a8fa0bb6be304158b1f6448bf516a2f6fd1",
+    "sizeBytes": 4652469
+  }
+]

@@ -1,0 +1,4 @@
+import { diagnosticIdentityFile } from "@/lib/diagnostic-identity-files";
+
+type Context = { params: Promise<{ id: string; file: string }> };
+export async function GET(request: Request, context: Context) { return diagnosticIdentityFile(request, context, "pair"); }

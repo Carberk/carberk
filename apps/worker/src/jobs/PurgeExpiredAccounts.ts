@@ -1,6 +1,10 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService } from "@auto-tm/db";
 
+import { diagnosticAccountErasureWrites } from "./diagnosticAccountErasure";
+import { videoAccountErasureWrites } from "./video/videoAccountErasure";
+import { serviceAccountErasureWrites } from "./serviceAccountErasure";
+
 export interface PurgeExpiredAccountsInput {
   now: Date;
 }
@@ -57,7 +61,12 @@ export class PurgeExpiredAccounts {
     await this.prisma.$transaction([
       // The User row lock comes before any upload lock, the order every writer
       // of a Profile Photo uses (ADR-0088).
-      this.prisma.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`,
+      this.prisma.$queryRaw`WITH prefix AS MATERIALIZED (
+        SELECT diagnostic_dispose_ownership(${userId}::text,${now}::timestamp)
+      ) SELECT id FROM users CROSS JOIN prefix WHERE id = ${userId} FOR UPDATE OF users`,
+      ...serviceAccountErasureWrites(this.prisma, userId, now),
+      ...videoAccountErasureWrites(this.prisma, userId, now),
+      ...diagnosticAccountErasureWrites(this.prisma, userId, now),
 
       // Retire the Profile Photo's upload and record its storage deletion, in
       // the transaction that clears the photo below. The API's claim does the
@@ -129,7 +138,7 @@ export class PurgeExpiredAccounts {
       this.prisma.dealershipMember.deleteMany({ where: { userId } }),
 
       // Prune listing drafts
-      this.prisma.listingDraft.deleteMany({ where: { userId } }),
+      this.prisma.listingDraft.deleteMany({ where: { userId, businessId: null } }),
 
       // Prune confirmed Listing contact phones (ADR-0081)
       this.prisma.verifiedContactPhone.deleteMany({ where: { sellerId: userId } }),
@@ -139,7 +148,7 @@ export class PurgeExpiredAccounts {
 
       // Kept Listings stay archived; nobody can reach a purged User, so their
       // contact phone goes too
-      this.prisma.listing.updateMany({ where: { sellerId: userId }, data: { contactPhone: null } }),
+      this.prisma.listing.updateMany({ where: { sellerId: userId, businessId: null }, data: { contactPhone: null } }),
     ]);
   }
 }

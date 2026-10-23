@@ -1,15 +1,18 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { ScrollView, View, type ScrollViewProps } from "react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { ChevronRight, Flag } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 
+import { PublicDiagnosticAction } from "../../diagnostics/PublicDiagnosticAction";
+import { MarketplaceShareActions } from "../../business/MarketplaceShareActions";
 import type { CatalogMaps } from "../detail/useCatalogMaps";
 import {
   closedListingBannerKey,
   isClosedForContact,
 } from "../detail/closedListing";
 import { AskSellerChips } from "../detail/AskSellerChips";
+import { ListingViewCount } from "../detail/ListingViewCount";
 import { OwnerStatusCard } from "../detail/OwnerStatusCard";
 import { listingTitle, detailDate } from "../detail/presentation";
 import { ViewerFavorite } from "../detail/ViewerFavorite";
@@ -36,6 +39,7 @@ interface ListingDetailProps {
   onScroll?: ScrollViewProps["onScroll"];
   /** Room kept at the end of the scroll for a bar that floats over it. */
   bottomSpace?: number;
+  historyEntry?: ReactNode;
 }
 export function ListingDetailView({
   listing,
@@ -45,6 +49,7 @@ export function ListingDetailView({
   onSeeSimilar,
   onScroll,
   bottomSpace = 0,
+  historyEntry,
 }: ListingDetailProps) {
   const { t, i18n } = useTranslation();
   const scrollRef = useRef<View>(null);
@@ -95,6 +100,7 @@ export function ListingDetailView({
       scrollEventThrottle={16}
     >
       <PhotoGallery
+        listingId={listing.id}
         visibleTop={visibleTop}
         media={listing.media}
         banner={banner ? t(banner) : undefined}
@@ -127,8 +133,9 @@ export function ListingDetailView({
         }
       />
       <View testID="detail-body" className="gap-4 px-4 py-5">
+        <PublicDiagnosticAction listingId={listing.id}/>
         {isOwner && (
-          <OwnerStatusCard status={listing.status} favoriteCount={listing.favoriteCount} />
+          <OwnerStatusCard status={listing.status} favoriteCount={listing.favoriteCount} viewCount={listing.viewCount} viewsToday={listing.viewsToday} />
         )}
         <Text
           className="text-headline font-heading font-semibold text-foreground"
@@ -203,16 +210,19 @@ export function ListingDetailView({
             />
           </View>
         )}
+        {historyEntry}
         {listing.vinHistory?.decoded === true && (
           <View className="gap-3">
             <Separator />
             <VinHistorySection vinHistory={listing.vinHistory} />
           </View>
         )}
+        <MarketplaceShareActions kind="listings" id={listing.id} />
         {!isOwner && (
           <View className="gap-3">
             <Separator />
             <SellerBlock
+              business={listing.business}
               seller={listing.seller}
               cityName={maps.cityName(listing.cityId)}
               locationText={listing.locationText}
@@ -232,6 +242,7 @@ export function ListingDetailView({
         )}
         <Separator />
         <View className="gap-1 pb-5">
+          {(isOwner || !closed) && <ListingViewCount total={listing.viewCount} today={listing.viewsToday} />}
           <Text className="text-caption text-muted-foreground">
             {t("publicListingId", { id: listing.publicNumber })}
           </Text>

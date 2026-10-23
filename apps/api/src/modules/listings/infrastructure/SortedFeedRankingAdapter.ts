@@ -209,6 +209,7 @@ export class SortedFeedRankingAdapter implements FeedRankingPort {
     const conditions: Prisma.ListingWhereInput[] = [
       { deletedAt: null },
       { status: "active" },
+      { OR: [{ businessId: null }, { business: { status: "active" } }] },
     ];
 
     if (filters?.brandId) {
@@ -223,6 +224,7 @@ export class SortedFeedRankingAdapter implements FeedRankingPort {
     if (filters?.cityId) {
       conditions.push({ cityId: filters.cityId });
     }
+    if (filters?.sellerType) conditions.push({ businessId: filters.sellerType === "business" ? { not: null } : null });
     if (filters?.condition) {
       conditions.push({ condition: filters.condition });
     }

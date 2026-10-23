@@ -8,7 +8,9 @@ import {
   ForbiddenException,
   Req,
   Inject,
+  Optional,
 } from "@nestjs/common";
+import { MEASUREMENT_SIGN_IN_OUTCOME_PORT,type MeasurementSignInOutcomePort } from "../../measurement/measurement.public";
 import { AuthSchemas, AdminSchemas } from "@auto-tm/contracts";
 import type { FastifyRequest } from "fastify";
 import { AllowPendingDeletion } from "../../../common/allow-pending-deletion.decorator";
@@ -33,6 +35,7 @@ export class AuthController {
     @Inject(RefreshSession) private readonly refreshSession: RefreshSession,
     @Inject(Logout) private readonly logoutUseCase: Logout,
     @Inject(LogoutAll) private readonly logoutAllUseCase: LogoutAll,
+    @Optional() @Inject(MEASUREMENT_SIGN_IN_OUTCOME_PORT) private readonly signInMeasurement?:MeasurementSignInOutcomePort,
   ) {}
 
   @Public()
@@ -99,6 +102,11 @@ export class AuthController {
       });
     }
 
+    const startedAt=Date.now();
+    const attempt=req.headers["x-measurement-attempt"],guest=req.headers["x-measurement-guest"];
+    const record=(result:"success"|"expected_rejection"|"technical_failure",category?:"validation"|"permission"|"unknown")=>{
+      void this.signInMeasurement?.record({...(typeof attempt==="string"?{attemptId:attempt}:{}),...(typeof guest==="string"?{guestCapability:guest}:{}),result,durationMs:Math.min(86400000,Math.max(0,Date.now()-startedAt)),...(category?{category}:{})}).catch(()=>undefined);
+    };
     try {
       const userAgent = req.headers["user-agent"] as string | undefined;
 
@@ -111,8 +119,11 @@ export class AuthController {
         ...(userAgent !== undefined ? { userAgent } : {}),
       });
 
+      record("success");
       return result;
     } catch (err: unknown) {
+      const expected=err instanceof UserSuspendedError || (err instanceof Error && /^(OTP|Invalid OTP|Too many|Signups are currently disabled)/.test(err.message));
+      record(expected?"expected_rejection":"technical_failure",err instanceof UserSuspendedError?"permission":expected?"validation":"unknown");
       if (err instanceof UserSuspendedError) {
         throw new ForbiddenException({
           code: "FORBIDDEN",

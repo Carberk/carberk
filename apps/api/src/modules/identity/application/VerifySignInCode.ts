@@ -29,10 +29,12 @@ export class VerifySignInCode {
     destination: SignInCodeDestination;
     code: string;
     userId?: string;
+    businessId?: string | undefined;
   }): Promise<OtpRequest> {
     const { destination, code } = input;
     const request = await this.otpRequestRepo.findLatestForPurpose({
       purpose: input.purpose,
+      ...(input.businessId ? { businessId: input.businessId } : {}),
       channel: destination.channel,
       destination: destination.value,
       ...(input.userId === undefined ? {} : { userId: input.userId }),

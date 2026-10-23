@@ -10,6 +10,14 @@
     "outDir": "dist",
     "rootDir": "."
   },
-  "include": ["src/index.ts", "src/prisma.service.ts", "generated/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src/index.ts",
+    "src/prisma.service.ts",
+    "generated/**/*.ts",
+    "src/testing/index.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }

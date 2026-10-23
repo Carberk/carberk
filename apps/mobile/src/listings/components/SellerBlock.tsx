@@ -3,6 +3,7 @@ import { MapPin } from "lucide-react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
+import { BusinessIdentityLink } from "../../business/BusinessIdentityLink";
 import { localeTag } from "../../i18n/resources";
 import { useDisplayName } from "../../identity/useDisplayName";
 
@@ -12,11 +13,13 @@ import { Text } from "@/components/ui/text";
 
 interface SellerBlockProps {
   seller: ListingsSchemas.ListingDetail["seller"];
+  business?: ListingsSchemas.ListingDetail["business"];
   cityName?: string;
   locationText?: string;
 }
 export function SellerBlock({
   seller,
+  business,
   cityName,
   locationText,
 }: SellerBlockProps) {
@@ -30,6 +33,7 @@ export function SellerBlock({
     timeZone: "UTC",
   }).format(new Date(seller.memberSince));
   const location = [cityName, locationText].filter(Boolean).join(" · ");
+  if (business) return <BusinessIdentityLink business={business} />;
   return (
     <View className="gap-3">
       <Text className="text-subhead font-semibold">{t("seller")}</Text>

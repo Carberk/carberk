@@ -199,6 +199,8 @@ Stop owned Metro/device sessions before restoration, retain exact deployment/dev
 
 The EAS `production` profile builds Android package `com.auto_tm.ynamly`, the Play app that already exists ([#697](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/697)); it sets `ANDROID_APPLICATION_ID` in `eas.json`, which `app.config.js` reads. `staging`, `production-smoke`, development clients and local builds stay `tm.auto.app`. Each package needs its own Android app in its Firebase project, so the production `GOOGLE_SERVICES_JSON` must be the file for `com.auto_tm.ynamly`. The iOS bundle identifier is `tm.auto.app` everywhere. `simctl` and `adb` commands in this guide use `tm.auto.app` because they drive development builds.
 
+When recovering Android release metadata, use the existing production EAS project before requesting credentials. Follow the [read-only lookup and current receipt](../evidence/issue-897/play-signing-metadata-recovery-20261021.md#fresh-eas-recovery-2026-10-23-utc). Select `production` and filter builds by `com.auto_tm.ynamly`; other profiles are a different app. An EAS build code is not the all-track Play upload maximum, and the EAS upload certificate is not Google's app-signing certificate. Read the credentials summary only; metadata recovery does not require a key export or signing change.
+
 ## Documentation duty
 
 Update this guide when the operating procedure changes. Update `apps/mobile/CONTEXT.md` only when its documented boundary, constraint, or important limitation changes. Keep individual diagnoses in task evidence. Supersede changed architecture decisions with a new ADR; preserve merged ADR text.

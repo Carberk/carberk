@@ -4,6 +4,9 @@ import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 
+import { HistoryEntry } from "../../../src/services/HistoryEntry";
+import { useMeasurementScreen } from "../../../src/measurement/useMeasurementScreen";
+import { useListingViewSignal } from "../../../src/listings/detail/useListingViewSignal";
 import { useListingDetail } from "../../../src/api/listings/useListingDetail";
 import { useListingPreview } from "../../../src/api/listings/useListingPreview";
 import { useCatalogMaps } from "../../../src/listings/detail/useCatalogMaps";
@@ -80,7 +83,10 @@ export default function ListingDetailScreen() {
   const { maps } = useCatalogMaps(data?.brandId, data?.modelId, data?.regionId);
 
   const isOwner =
-    viewer != null && data != null && viewer.userId === data.sellerId;
+    viewer != null && data != null && !data.businessId && viewer.userId === data.sellerId;
+
+  useMeasurementScreen("listing_detail",data&&!isPending&&!error?{eventName:"listing_detail_opened",purpose:"product_improvement",payload:{listingId:data.id}}:null,data?.id);
+  useListingViewSignal(data?.id, !isPending && !error && data?.status === "active" && !isOwner && viewer !== undefined);
 
   // Reporting while signed out parks a pending action; returning from
   // authentication reopens the report sheet on this same screen.
@@ -104,7 +110,7 @@ export default function ListingDetailScreen() {
     return preview ? (
       <ListingPreview
         summary={preview}
-        isOwner={viewer != null && viewer.userId === preview.sellerId}
+        isOwner={viewer != null && !preview.businessId && viewer.userId === preview.sellerId}
         reportEnabled={config?.reportEntryEnabled !== false}
         onBack={goBack}
       />
@@ -165,6 +171,7 @@ export default function ListingDetailScreen() {
       <View className="flex-1" style={hasBar ? undefined : { paddingBottom: insets.bottom }}>
         <ListingDetailView
           bottomSpace={hasBar ? bar.space : 0}
+          historyEntry={<HistoryEntry sourceListingId={data.id} vin={data.vin}/>}
           listing={data}
           maps={maps}
           isOwner={isOwner}

@@ -125,3 +125,10 @@ describe("SellerBlock for a deleted seller", () => {
     expect(hosts(view, "Svg")).toHaveLength(0);
   });
 });
+
+it("renders business identity without private-seller claims or creator avatar", async () => {
+ const view = await renderMobile(<SellerBlock seller={seller()} business={{ id: "business", name: "Ahal Motors", slug: "ahal", logoUrl: null, city: null, identityChecked: true }} />);
+ expect(view.getByRole("button", { name: "Ahal Motors" })).toBeTruthy();
+ expect(view.queryByText("Private seller")).toBeNull();
+ expect(view.getByText("Business identity checked")).toBeTruthy();
+});

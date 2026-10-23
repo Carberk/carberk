@@ -1,6 +1,8 @@
 declare const process: {
   env: {
     EXPO_PUBLIC_API_URL?: string;
+    EXPO_PUBLIC_LISTING_VIEWS_ENABLED?: string;
+    EXPO_PUBLIC_MEASUREMENT_ENABLED?: string;
     EXPO_PUBLIC_WEB_URL?: string;
     EXPO_PUBLIC_WS_URL?: string;
     EXPO_PUBLIC_MEDIA_URL?: string;

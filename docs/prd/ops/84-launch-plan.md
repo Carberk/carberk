@@ -1,5 +1,11 @@
 # 84 — Launch plan (cutover from build to live)
 
+## Current delivery priority (2026-10-19)
+
+The app is already released on Google Play, as confirmed by the founder. The next release includes the existing marketplace and the full [#897 campaign](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/897). The [submission pack](88-play-console-submission.md#next-release-scope-founder-direction-2026-10-19) records that release scope and verification boundary. First-submission steps below describe the earlier phase; they do not defer campaign features from this next release.
+
+Deliver and verify the complete release first. Then review remaining issues, PRs and documentation for a clear purpose, deciding whether to implement, retain, finish, close as obsolete or defer with a reason. Necessary release blockers take priority; unrelated repository cleanup must not displace release delivery. Existing hosting, rights, service-activation and promotion safeguards continue to apply.
+
 > This is the store-verification, TM cutover and public soft-launch runbook. The proposed [Google Play-first cutover decision](../../adr/0100-google-play-first-tm-cutover-readiness.md) supersedes ADR-0039's both-store cutover trigger and owned/racked application-host requirement when accepted. Reviewer-only Railway production comes first; Google Play approval plus proven readiness then permits TM production cutover before TM real users. Railway production does not serve the public marketplace. Until the new decision is accepted and merged, ADR-0039 remains governing.
 
 

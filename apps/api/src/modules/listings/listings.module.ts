@@ -1,10 +1,32 @@
+import { PublicMarketplaceController } from "./presentation/PublicMarketplaceController";
+import { PrismaPublicMarketplaceReadRepository } from "./infrastructure/PrismaPublicMarketplaceReadRepository";
+import { PUBLIC_MARKETPLACE_READ_PORT } from "./domain/ports/PublicMarketplaceReadPort";
+import { BusinessInventoryController } from "./presentation/BusinessInventoryController";
+import { PrismaBusinessInventoryRepository } from "./infrastructure/PrismaBusinessInventoryRepository";
+import { BUSINESS_INVENTORY_REPOSITORY } from "./domain/ports/BusinessInventoryRepository";
+import { PrismaBusinessContactPhoneRepository } from "./infrastructure/PrismaBusinessContactPhoneRepository";
+import { BUSINESS_CONTACT_PHONE_REPOSITORY, type BusinessContactPhoneRepository } from "./domain/ports/BusinessContactPhoneRepository";
+import { ListingOwnership } from "./application/ListingOwnership";
+import { MeasurementModule } from "../measurement/measurement.module";
 import { Module } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { S3Client } from "@aws-sdk/client-s3";
+import { randomBytes, randomUUID } from "node:crypto";
+import type { Env } from "../../env.schema";
+import { VideoCapabilitiesController } from "./presentation/VideoCapabilitiesController";
+import { VideoDescriptorController } from "./presentation/VideoDescriptorController";
+import { VideoGrantController } from "./presentation/VideoGrantController";
+import { VideoPlaybackController } from "./presentation/VideoPlaybackController";
+import { PrismaVideoPlayback, VIDEO_GRANT_SECRET_FACTORY, VIDEO_PLAYBACK_ELIGIBILITY } from "./infrastructure/PrismaVideoPlayback";
+import { S3VideoPlaybackObjects } from "./infrastructure/S3VideoPlaybackObjects";
+import { VIDEO_DESCRIPTOR_READER, VIDEO_GRANT_ISSUER, VIDEO_PLAYBACK_AUTHORITY, VIDEO_PLAYBACK_OBJECTS } from "./application/VideoPlaybackPorts";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 
 import { PrismaModule } from "../../common/prisma.module";
 import { IdentityModule } from "../identity/identity.module";
-import { IDENTITY_CHECK_PORT, PROFILE_PHOTO_PORT } from "../identity/identity.public";
+import { IDENTITY_CHECK_PORT, PROFILE_PHOTO_PORT, IDENTITY_CLOCK_PORT, type ClockPort } from "../identity/identity.public";
 
+import { ListingViewsController } from "./presentation/ListingViewsController";
 import { ListingsController } from "./presentation/listings.controller";
 import { DraftsController } from "./presentation/DraftsController";
 import { UploadsController } from "./presentation/UploadsController";
@@ -12,6 +34,12 @@ import { MyListingsController } from "./presentation/MyListingsController";
 import { ExchangeRatesController } from "./presentation/ExchangeRatesController";
 import { FavoritesController } from "./presentation/FavoritesController";
 import { ContactPhonesController } from "./presentation/ContactPhonesController";
+import { VideoUploadController, ListingVideoRemovalController, VideoTargetController } from "./presentation/VideoUploadController";
+import { OWNED_VIDEO_UPLOAD_PROTOCOL, OwnedVideoUploadProtocol } from "./application/OwnedVideoUploadProtocol";
+import { PrismaOwnedVideoSessionLedger, VIDEO_ID_FACTORY } from "./infrastructure/PrismaOwnedVideoSessionLedger";
+import { VIDEO_OBJECT_STORAGE } from "./domain/ports/VideoObjectStorage";
+import { S3VideoObjectStorage } from "./infrastructure/S3VideoObjectStorage";
+import { VideoEligibility } from "./application/VideoEligibility";
 import { NullVinDecoder } from "./infrastructure/NullVinDecoder";
 import { NullContentClassifier } from "./infrastructure/NullContentClassifier";
 import { SortedFeedRankingAdapter } from "./infrastructure/SortedFeedRankingAdapter";
@@ -90,10 +118,18 @@ import {
 } from "./domain/ports/VerifiedContactPhoneRepository";
 import { ACCOUNT_PHONE_PORT, type AccountPhonePort } from "./domain/ports/AccountPhonePort";
 
+import { RecordListingView } from "./application/RecordListingView";
+import { PrismaListingViews } from "./infrastructure/PrismaListingViews";
+import { LISTING_VIEWS_PORT } from "./domain/ports/ListingViewsPort";
+
 @Module({
-  imports: [PrismaModule, EventEmitterModule, IdentityModule],
-  controllers: [ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController],
+  imports: [PrismaModule, EventEmitterModule, IdentityModule, MeasurementModule],
+  controllers: [PublicMarketplaceController, BusinessInventoryController, ListingViewsController, ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController, VideoUploadController, ListingVideoRemovalController, VideoTargetController, VideoCapabilitiesController, VideoGrantController, VideoDescriptorController, VideoPlaybackController],
   providers: [
+    { provide: PUBLIC_MARKETPLACE_READ_PORT, useClass: PrismaPublicMarketplaceReadRepository },
+    { provide: BUSINESS_INVENTORY_REPOSITORY, useClass: PrismaBusinessInventoryRepository },
+    { provide: BUSINESS_CONTACT_PHONE_REPOSITORY, useClass: PrismaBusinessContactPhoneRepository },
+    ListingOwnership,
     // Infrastructure adapters
     NullVinDecoder,
     NullContentClassifier,
@@ -214,8 +250,9 @@ import { ACCOUNT_PHONE_PORT, type AccountPhonePort } from "./domain/ports/Accoun
       useFactory: (
         accountPhones: AccountPhonePort,
         confirmations: VerifiedContactPhoneRepository,
-      ) => new ContactPhonePolicy(accountPhones, confirmations),
-      inject: [ACCOUNT_PHONE_PORT, VERIFIED_CONTACT_PHONE_REPOSITORY],
+        businessPhones: BusinessContactPhoneRepository,
+      ) => new ContactPhonePolicy(accountPhones, confirmations, businessPhones),
+      inject: [ACCOUNT_PHONE_PORT, VERIFIED_CONTACT_PHONE_REPOSITORY, BUSINESS_CONTACT_PHONE_REPOSITORY],
     },
 
     // Application use-cases
@@ -240,6 +277,8 @@ import { ACCOUNT_PHONE_PORT, type AccountPhonePort } from "./domain/ports/Accoun
     RemoveMedia,
     ReorderMedia,
     GetListingDetail,
+    RecordListingView,
+    { provide: LISTING_VIEWS_PORT, useClass: PrismaListingViews },
     ListFeed,
     ListMyListings,
     CountMyListings,
@@ -250,6 +289,38 @@ import { ACCOUNT_PHONE_PORT, type AccountPhonePort } from "./domain/ports/Accoun
     RequestContactPhoneCode,
     ConfirmContactPhone,
     ListMyContactPhones,
+    VideoEligibility,
+    PrismaOwnedVideoSessionLedger,
+    { provide: VIDEO_ID_FACTORY, useValue: randomUUID },
+    {
+      provide: VIDEO_OBJECT_STORAGE,
+      inject: [ConfigService, IDENTITY_CLOCK_PORT],
+      useFactory: (config: ConfigService<Env, true>, clock: ClockPort) => new S3VideoObjectStorage(new S3Client({ endpoint: config.get("MINIO_ENDPOINT", { infer: true }), region: config.get("MINIO_REGION", { infer: true }), forcePathStyle: true, credentials: { accessKeyId: config.get("MINIO_ACCESS_KEY", { infer: true }), secretAccessKey: config.get("MINIO_SECRET_KEY", { infer: true }) } }), config.get("VIDEO_PRIVATE_BUCKET", { infer: true }), () => clock.now()),
+    },
+    {
+      provide: OWNED_VIDEO_UPLOAD_PROTOCOL,
+      inject: [PrismaOwnedVideoSessionLedger, VIDEO_OBJECT_STORAGE],
+      useFactory: (ledger: PrismaOwnedVideoSessionLedger, storage: S3VideoObjectStorage) => new OwnedVideoUploadProtocol(ledger, storage),
+    },
+    PrismaVideoPlayback,
+    { provide: VIDEO_GRANT_SECRET_FACTORY, useValue: () => randomBytes(32).toString("base64url") },
+    { provide: VIDEO_PLAYBACK_ELIGIBILITY, useExisting: VideoEligibility },
+    { provide: VIDEO_DESCRIPTOR_READER, useExisting: PrismaVideoPlayback },
+    { provide: VIDEO_GRANT_ISSUER, useExisting: PrismaVideoPlayback },
+    { provide: VIDEO_PLAYBACK_AUTHORITY, useExisting: PrismaVideoPlayback },
+    {
+      provide: VIDEO_PLAYBACK_OBJECTS,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<Env, true>) => new S3VideoPlaybackObjects(new S3Client({
+        endpoint: config.get("MINIO_ENDPOINT", { infer: true }),
+        region: config.get("MINIO_REGION", { infer: true }),
+        forcePathStyle: true,
+        credentials: {
+          accessKeyId: config.get("MINIO_ACCESS_KEY", { infer: true }),
+          secretAccessKey: config.get("MINIO_SECRET_KEY", { infer: true }),
+        },
+      }), config.get("VIDEO_PRIVATE_BUCKET", { infer: true })),
+    },
   ],
   exports: [
     VIN_DECODER_PORT,

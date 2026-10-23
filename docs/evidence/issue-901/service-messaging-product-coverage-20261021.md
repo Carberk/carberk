@@ -1,0 +1,9 @@
+# Service messaging product coverage, 2026-10-21
+
+Bounded checkpoint for contract rows 23 and 24 under #901/#897, sole PR #904. Base `8f8709aae231314753a2c4fa75ee372c6a91aa51`; branch `agent/issue-901-service-product-coverage-20261021`.
+
+`ServiceMessaging.e2e.spec.ts` already directly covered separate customer/staff identities, customer-hidden staff notes, staff attribution, read watermarks, concurrent idempotent sends, response-debt age, closure fences and customer-message reopen. I extended its existing Support case only to cover the missing current-assignment mutation boundary: the previous assignee cannot close or reopen after handover; the current assignee cannot close while response debt remains; a public reply clears debt; the current assignee can close and manually reopen; reopening without an unanswered customer message does not invent debt.
+
+The new assertions are test-only and remain UNKNOWN until hosted disposable-service execution. No local services, Docker, SQL, staging, Railway, credentials, CI dispatch/wait, deployment or PR was used. No source/config changes or assertion/guard/timeout/concurrency weakening were made.
+
+Checks: `pnpm --filter @auto-tm/api exec eslint src/modules/service-messaging/presentation/ServiceMessaging.e2e.spec.ts --max-warnings 0` PASS; `node scripts/check-agent-docs.mjs` PASS; `git diff --check` PASS. TypeScript syntax parsing and an exact rows-23/24-only contract comparison also PASS. Full typecheck was not repeated: production code is unchanged, recent offline proof is recorded at the supplied base, and the test addition received focused checks. The lint launcher prepared dependencies from the local pnpm store with zero downloads; tracked configuration stayed unchanged. No external dependency lookup was needed. Root must obtain hosted e2e results before treating rows 23/24 as runtime passing evidence.

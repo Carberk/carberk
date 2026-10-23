@@ -41,6 +41,7 @@ const CARD_INCLUDE = {
 type CardRow = {
   id: string;
   sellerId: string;
+  businessId?: string | null;
   status: string;
   brandId: string;
   modelId: string;
@@ -86,7 +87,7 @@ export class PrismaListingsReadRepository
 
   async getListingSummary(id: string): Promise<ListingSummary | null> {
     const row = await this.prisma.listing.findUnique({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, OR: [{ businessId: null }, { business: { status: "active" } }] },
       include: CARD_INCLUDE,
     });
 
@@ -171,6 +172,7 @@ export class PrismaListingsReadRepository
         id: { in: ids },
         deletedAt: null,
         status: { in: [...VISIBLE_LISTING_STATUSES] },
+        OR: [{ businessId: null }, { business: { status: "active" } }],
       },
       include: CARD_INCLUDE,
     });
@@ -216,6 +218,7 @@ export class PrismaListingsReadRepository
     const rows = await this.prisma.listing.findMany({
       where: {
         sellerId: ownerId,
+        businessId: null,
         deletedAt: null,
       },
       take,
@@ -265,6 +268,7 @@ export class PrismaListingsReadRepository
     const card: ListingCard = {
       id: row.id,
       sellerId: row.sellerId,
+      ...(row.businessId ? { businessId: row.businessId } : {}),
       status: row.status as "active" | "sold" | "archived" | "banned",
       brandId: row.brandId,
       modelId: row.modelId,
@@ -321,6 +325,7 @@ function toListingSummary(card: ListingCard): ListingSummary {
   const summary: ListingSummary = {
     id: card.id,
     sellerId: card.sellerId,
+    ...(card.businessId ? { businessId: card.businessId } : {}),
     status: card.status,
     brandId: card.brandId,
     modelId: card.modelId,

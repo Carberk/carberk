@@ -2,6 +2,10 @@ import Link from "next/link";
 
 import { getConfig } from "../../actions";
 import { DirectActionForm } from "../../components/DirectActionForm";
+import { AdminContextUserDetail } from "../../components/AdminContextViews";
+
+import { readAdminContext, AdminContextSchemas } from "@/lib/admin-context";
+import { AdminText } from "@/lib/i18n";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -9,31 +13,28 @@ interface PageProps {
 
 export default async function UserActionPage({ params }: PageProps) {
   const { id } = await params;
+  const context = await readAdminContext(`users/${encodeURIComponent(id)}`, AdminContextSchemas.AdminContextUserDetailSchema);
+  if (!context.ok) return <div className="p-6 md:p-8"><p role="alert"><AdminText>{context.error}</AdminText></p></div>;
   const configResult = await getConfig();
   const moderationEnabled = configResult.ok
     ? configResult.data.adminModerationActionsEnabled
-    : true;
+    : false;
 
   return (
     <div className="p-6 md:p-8 max-w-2xl">
       <div className="mb-6">
-        <Link href="/reports" className="text-brand-600 hover:underline text-sm">
-          ← Назад к очереди
-        </Link>
+        <Link href="/reports" className="text-brand-600 hover:underline text-sm"><AdminText>← Назад к очереди</AdminText></Link>
       </div>
 
-      <h1 className="text-2xl font-bold mb-2">Действия с пользователем</h1>
+      <h1 className="text-2xl font-bold mb-2"><AdminText>Действия с пользователем</AdminText></h1>
       <p className="text-sm text-neutral-500 mb-6">ID: {id}</p>
 
+      <AdminContextUserDetail user={context.data}/>
       {moderationEnabled ? (
         <div className="space-y-6">
           <div className="rounded-md border bg-surface p-4">
-            <h2 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3">
-              Заблокировать пользователя
-            </h2>
-            <p className="text-xs text-neutral-500 mb-3">
-              Пользователь не сможет создавать объявления, отправлять сообщения или совершать другие действия. Существующие переписки останутся доступными.
-            </p>
+            <h2 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3"><AdminText>Заблокировать пользователя</AdminText></h2>
+            <p className="text-xs text-neutral-500 mb-3"><AdminText>Пользователь не сможет создавать объявления, отправлять сообщения или совершать другие действия. Существующие переписки останутся доступными.</AdminText></p>
             <DirectActionForm
               actionType="suspend"
               targetId={id}
@@ -41,12 +42,8 @@ export default async function UserActionPage({ params }: PageProps) {
           </div>
 
           <div className="rounded-md border bg-surface p-4">
-            <h2 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3">
-              Разблокировать пользователя
-            </h2>
-            <p className="text-xs text-neutral-500 mb-3">
-              Пользователь будет восстановлен. История блокировки сохранится в аудите.
-            </p>
+            <h2 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3"><AdminText>Разблокировать пользователя</AdminText></h2>
+            <p className="text-xs text-neutral-500 mb-3"><AdminText>Пользователь будет восстановлен. История блокировки сохранится в аудите.</AdminText></p>
             <DirectActionForm
               actionType="unsuspend"
               targetId={id}
@@ -55,9 +52,7 @@ export default async function UserActionPage({ params }: PageProps) {
         </div>
       ) : (
         <div className="rounded-md border bg-surface p-4">
-          <p className="text-sm text-neutral-500">
-            Действия модерации временно недоступны.
-          </p>
+          <p className="text-sm text-neutral-500"><AdminText>Действия модерации временно недоступны.</AdminText></p>
         </div>
       )}
     </div>

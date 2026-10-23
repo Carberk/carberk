@@ -1,4 +1,5 @@
-import { BadRequestException, Inject, Injectable } from "@nestjs/common";
+import { PUBLIC_MARKETPLACE_READ_PORT, type PublicMarketplaceReadPort } from "../domain/ports/PublicMarketplaceReadPort";
+import { BadRequestException, Optional, Inject, Injectable } from "@nestjs/common";
 
 import { ErrorCode, ListingsSchemas } from "@auto-tm/contracts";
 import type { z } from "zod";
@@ -65,6 +66,7 @@ export class ListFeed {
     private readonly cards: ListingCardReadPort,
     @Inject(SELLER_PROFILE_PORT)
     private readonly sellerProfiles: SellerProfilePort,
+    @Optional() @Inject(PUBLIC_MARKETPLACE_READ_PORT) private readonly publicMarketplace?: PublicMarketplaceReadPort,
   ) {}
 
   async execute(input: ListFeedInput): Promise<FeedResponseDto> {
@@ -87,18 +89,20 @@ export class ListFeed {
     const rateMap = await this.buildRateMap();
     // Batched per page, never per Listing: one media read, one seller read,
     // one favorites read.
-    const [photosById, sellers, favorited] = await Promise.all([
+    const [photosById, sellers, favorited, businesses] = await Promise.all([
       this.cards.getCardPhotos(listingIds),
       this.sellerProfiles.getCardSellers(sellerIds),
       input.viewerId !== undefined
         ? this.favorites.favoritedListingIds(input.viewerId, listingIds)
         : undefined,
+      this.publicMarketplace?.businessIdentities([...new Set(rankResult.items.flatMap(listing => listing.businessId ? [listing.businessId] : []))]) ?? new Map(),
     ]);
     const noPhotos = toCardPhotos([]);
 
     const items = rankResult.items.map((listing) => {
       const photos = photosById.get(listing.id) ?? noPhotos;
-      const seller = sellers.get(listing.sellerId);
+      const seller = listing.businessId ? undefined : sellers.get(listing.sellerId);
+      const business = listing.businessId ? businesses.get(listing.businessId) : undefined;
       const displayPriceTmt = this.computeDisplayPriceTmt(
         listing.priceAmount,
         listing.priceCurrency,
@@ -108,6 +112,8 @@ export class ListFeed {
       return {
         id: listing.id,
         sellerId: listing.sellerId,
+        ...(listing.businessId ? { businessId: listing.businessId } : {}),
+        ...(business ? { business: { id: business.id, slug: business.slug, name: business.name, logoUrl: business.logoUrl, city: business.city, identityChecked: business.identityChecked } } : {}),
         status: listing.status,
         brandId: listing.brandId,
         modelId: listing.modelId,

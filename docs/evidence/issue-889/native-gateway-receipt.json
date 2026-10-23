@@ -1,0 +1,12 @@
+{
+  "native": "desktop-AVFoundation",
+  "decodedFrame": true,
+  "status": 0,
+  "processExit": 0,
+  "requests": {
+    "manifests": 3,
+    "segments": 1,
+    "denied": 1
+  },
+  "newManifestAfterRemoval": 404
+}

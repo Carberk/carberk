@@ -151,6 +151,43 @@ describe("PrismaAccountDeletionUnitOfWork e2e", () => {
     expect(selfArchived).toMatchObject({ status: "archived", archivedByDeletion: false });
   });
 
+  it("invalidates synthetic inventory evidence atomically without publishing an erased actor fact",async()=>{
+    const epoch=suite.id("baseline-epoch"),key=`inventory_baseline:${epoch}`;
+    await prisma.measurementState.create({data:{key:"collector",epoch}});await prisma.measurementState.create({data:{key,epoch:NOW.toISOString()}});
+    try{
+      await expect(deleteMe(failingAfter(unitOfWork,"archiveActiveListings")).execute({userId:USER_ID})).rejects.toThrow("archiveActiveListings failed");expect(await prisma.measurementState.findUnique({where:{key}})).not.toBeNull();
+      await deleteMe().execute({userId:USER_ID});expect(await prisma.measurementState.findUnique({where:{key}})).toBeNull();
+    }finally{await prisma.measurementState.deleteMany({where:{key:{in:[key,"collector"]}}});}
+  });
+
+  it("erases telemetry immediately and rolls its erase back with a failed core deletion", async () => {
+    const principalId = randomUUID();
+    const guestId = randomUUID();
+    const visitId = randomUUID();
+    await prisma.measurementPrincipal.create({ data: {
+      id: principalId, pseudonym: "a".repeat(64), generation: randomUUID(), epoch: randomUUID(), kind: "account", userId: USER_ID,
+    } });
+    await prisma.measurementPrincipal.create({ data: {
+      id: guestId, pseudonym: "b".repeat(64), generation: randomUUID(), epoch: randomUUID(), kind: "guest", capabilityHash: "c".repeat(64), expiresAt: SCHEDULED_AT,
+    } });
+    await prisma.measurementVisit.create({ data: { id: visitId, principalId: guestId, linkedAccountId: principalId, startedAt: NOW, foregroundAt: NOW } });
+    const recordId = randomUUID();
+    await prisma.measurementRecord.create({ data: { id: recordId, principalId: guestId, visitId, event: {}, origin: "client", environment: "test", population: "synthetic", occurredAt: NOW, receivedAt: NOW, expiresAt: SCHEDULED_AT } });
+    await prisma.measurementOutbox.create({ data: { id: randomUUID(), principalId, generation: "old-generation", epoch: "old-epoch", environment: "test", population: "synthetic", event: {}, expiresAt: SCHEDULED_AT } });
+    try {
+      await expect(deleteMe(failingAfter(unitOfWork, "archiveActiveListings")).execute({ userId: USER_ID })).rejects.toThrow("archiveActiveListings failed");
+      expect(await prisma.measurementRecord.findUnique({ where: { id: recordId } })).not.toBeNull();
+      expect(await prisma.measurementPrincipal.findUnique({ where: { id: principalId } })).not.toBeNull();
+      await deleteMe().execute({ userId: USER_ID });
+      expect(await prisma.measurementPrincipal.findUnique({ where: { id: principalId } })).toBeNull();
+      expect(await prisma.measurementVisit.findUnique({ where: { id: visitId } })).toBeNull();
+      expect(await prisma.measurementRecord.findUnique({ where: { id: recordId } })).toBeNull();
+      expect(await prisma.measurementOutbox.count({ where: { principalId } })).toBe(0);
+      // Earlier guest continuity remains independent; only the account-linked visit was erased.
+      expect(await prisma.measurementPrincipal.findUnique({ where: { id: guestId } })).not.toBeNull();
+    } finally { await prisma.measurementPrincipal.deleteMany({ where: { id: { in: [guestId, principalId] } } }); }
+  });
+
   it.each<WriteName>(["scheduleDeletion", "archiveActiveListings"])(
     "rolls back both writes when %s fails, and a retry then completes",
     async (failing) => {

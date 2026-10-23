@@ -4,6 +4,7 @@ import * as Localization from "expo-localization";
 
 import { localeStore } from "../locale/localeStore";
 
+import { ensurePluralRules } from "./pluralRules";
 import { resources, resolveLocale, type Locale } from "./resources";
 
 function detectDeviceLocale(): Locale {
@@ -15,6 +16,8 @@ function detectDeviceLocale(): Locale {
 export async function initI18n(initialLocale?: Locale) {
   const storeLocale = localeStore.getState().locale;
   const locale = initialLocale ?? storeLocale ?? detectDeviceLocale();
+
+  ensurePluralRules();
 
   // eslint-disable-next-line import/no-named-as-default-member
   await i18n.use(initReactI18next).init({

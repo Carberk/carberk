@@ -1,0 +1,9 @@
+# Diagnostic account erasure
+
+The actual account purge previously left diagnostic commissioner linkage and private report artifacts intact. Hosted run 39098080606, API job 117588606704, candidate cae0758d observed the regression in `DiagnosticArtifactWorker.e2e.spec.ts`: expected `order.commissionerId` to be null after actual account purge, but it still contained the fixture UUID. Other worker tests passed, 334 passed and one failed.
+
+The diagnostic purge writes now run within the existing account deletion transaction after the User lock. They lock affected orders and reports in deterministic order, fence report access while the intake order still exists, rotate exact PDF/evidence epochs and request storage cleanup, and only then erase commissioner, consent, observed vehicle and current Listing association. Active bounded object write/generation/cleanup leases remain intact so deletion waits for outstanding writers. Old epochs cannot adopt bytes after the fence.
+
+Published snapshot JSON and its hash remain byte-equivalent in PostgreSQL, preserving original observations and protected historical attribution. Mutable attribution, audit reasons and current staff authority are removed separately. Deleting a staff account does not erase another commissioner's report. There is no new blanket report retention timer and no change to qualified vehicle/market knowledge rights. Immutable historical snapshots remain subject to their original audience; erasure removes current reader and artifact access.
+
+The hosted test exercises the real purge job, immutable report storage, generated PDF, exact private evidence bytes, old-epoch adoption refusal, unrelated-report preservation, storage cleanup and repeat purge. Hosted green remains pending assembly of the helper hook by the video writer, who owns the shared purge file. Local worker typecheck and affected ESLint passed. No local database suite ran.

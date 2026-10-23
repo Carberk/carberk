@@ -1,0 +1,180 @@
+import { createHash, randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
+import { CreateBucketCommand, DeleteObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { PrismaService, type Prisma } from "@auto-tm/db";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import sharp from "sharp";
+
+import { PurgeExpiredAccounts } from "../PurgeExpiredAccounts";
+
+import { S3DiagnosticArtifactObjects } from "./S3DiagnosticArtifactObjects";
+import { DiagnosticArtifactWorker, type DiagnosticArtifactObjects } from "./DiagnosticArtifactWorker";
+
+const endpoint = process.env["MINIO_ENDPOINT"] ?? "";
+const hosted = process.env["GITHUB_ACTIONS"] === "true" && !!process.env["DATABASE_URL"] && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(endpoint);
+const bucket = "diagnostic-test-private";
+const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+const canonical = (value: unknown): string => Array.isArray(value) ? `[${value.map(canonical).join(",")}]` : value && typeof value === "object" ? `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b, "en")).map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(",")}}` : JSON.stringify(value);
+const sha = (value: Uint8Array | string) => createHash("sha256").update(value).digest("hex");
+const localized = { tk: "Syntetik synag äçňöşüýž", ru: "Синтетический тест", en: "Synthetic test" };
+
+describe.skipIf(!hosted)("diagnostic artifacts on disposable PostgreSQL and private storage", () => {
+  const db = new PrismaService();
+  const s3 = new S3Client({ endpoint, region: "us-east-1", forcePathStyle: true, credentials: { accessKeyId: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin", secretAccessKey: process.env["MINIO_SECRET_KEY"] ?? "minioadmin" } });
+  const centers: string[] = [], users: string[] = [], keys: string[] = [];
+  let clock = new Date("2000-01-01T00:00:00.000Z");
+  const runtime = { now: () => clock, id: randomUUID, enabled: () => true };
+  const fonts = async () => ({ regular: await readFile(join(__dirname, "../../../assets/fonts/NotoSans-Regular.ttf")), bold: await readFile(join(__dirname, "../../../assets/fonts/NotoSans-Bold.ttf")) });
+  const storage: DiagnosticArtifactObjects = new S3DiagnosticArtifactObjects(s3, bucket);
+  beforeAll(async () => {
+    await db.$connect();
+    try { await s3.send(new CreateBucketCommand({ Bucket: bucket })); }
+    catch (error) { if ((error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode !== 409) throw error; }
+  });
+  afterAll(async () => {
+    for (const key of keys) await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+    const orders = await db.inspectionOrder.findMany({ where: { centerId: { in: centers } } });
+    const reports = await db.diagnosticReportRecord.findMany({ where: { orderId: { in: orders.map(row => row.id) } } });
+    await db.diagnosticEvidence.deleteMany({ where: { reportId: { in: reports.map(row => row.id) } } });
+    await db.diagnosticPdfArtifact.deleteMany({ where: { reportId: { in: reports.map(row => row.id) } } });
+    await db.diagnosticReportRecord.deleteMany({ where: { id: { in: reports.map(row => row.id) } } });
+    await db.diagnosticAudit.deleteMany({ where: { centerId: { in: centers } } });
+    await db.diagnosticOrderAssignment.deleteMany({ where: { orderId: { in: orders.map(row => row.id) } } });
+    await db.diagnosticCenterAssignment.deleteMany({ where: { centerId: { in: centers } } });
+    await db.inspectionOrder.deleteMany({ where: { id: { in: orders.map(row => row.id) } } });
+    await db.diagnosticTemplateVersion.deleteMany({ where: { centerId: { in: centers } } });
+    await db.diagnosticCenter.deleteMany({ where: { id: { in: centers } } });
+    await db.user.deleteMany({ where: { id: { in: users } } });
+    await db.$disconnect(); s3.destroy();
+  });
+  async function fixture(evidenceId?: string, staffId?: string) {
+    const userId = randomUUID(), centerId = randomUUID(), templateId = randomUUID(), orderId = randomUUID(), reportId = randomUUID(), id = randomUUID();
+    users.push(userId); centers.push(centerId);
+    await db.user.create({ data: { id: userId } });
+    await db.diagnosticCenter.create({ data: { id: centerId, code: centerId, names: localized } });
+    const template = { title: localized, limitations: localized, syntheticNotice: localized, checks: [{ id: "brakes", label: localized, required: true, evidenceRequired: false, measurement: null }], panels: [] };
+    await db.diagnosticTemplateVersion.create({ data: { id: templateId, centerId, version: 1, definition: template, publishedById: staffId ?? null } });
+    await db.inspectionOrder.create({ data: { id: orderId, centerId, templateVersionId: templateId, commissionerId: userId, requestKey: randomUUID(), audience: "buyer_private", synthetic: true } });
+    const findingId = randomUUID();
+    const report = { id: reportId, orderId, templateVersionId: templateId, audience: "buyer_private", status: "finalized", observedAt: clock.toISOString(), mileageKm: 123456, findings: [{ id: findingId, checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: evidenceId ? [evidenceId] : [], kind: null, source: null, measurement: null, location: null }], authorId: staffId ?? userId, reviewerId: randomUUID(), successorOf: null, correctionReason: null, returnReason: null, finalizedAt: clock.toISOString(), withdrawnAt: null, withdrawalReason: null };
+    const snapshot = { report, template, synthetic: true }, hash = sha(canonical(snapshot));
+    await db.diagnosticReportRecord.create({ data: { id: reportId, orderId, templateVersionId: templateId, audience: "buyer_private", state: json(report), status: "finalized", snapshot: json(snapshot), snapshotHash: hash, finalizedAt: clock } });
+    const key = `diagnostic-pdf/${reportId}/${id}.pdf`; keys.push(key);
+    await db.diagnosticPdfArtifact.create({ data: { id, reportId, snapshotHash: hash, locale: "tk", rendererVersion: "v1", objectKey: key, createdAt: clock } });
+    return { id, reportId, key, orderId, userId, centerId, templateId, findingId, snapshot, hash };
+  }
+  it("claims one renderer and adopts only actual verified immutable PDF bytes", async () => {
+    const row = await fixture(), worker = new DiagnosticArtifactWorker(db, storage, await fonts(), runtime);
+    const outcomes = await Promise.all([worker.generate(row.id), worker.generate(row.id)]);
+    expect(outcomes.filter(Boolean)).toHaveLength(1);
+    const artifact = await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: row.id } });
+    expect(artifact).toMatchObject({ state: "ready", attempts: 1 });
+    if (!artifact.sha256 || !artifact.sizeBytes) throw new Error("Missing verified artifact descriptor");
+    const bytes = await storage.read(row.key, artifact.sizeBytes, artifact.sha256);
+    expect(Buffer.from(bytes).subarray(0, 4).toString()).toBe("%PDF");
+    expect(await worker.generate(row.id)).toBe(false);
+  });
+  it("recovers the same bytes after a lost write reply without a second report revision", async () => {
+    const row = await fixture(); let lost = true;
+    const flaky: DiagnosticArtifactObjects = { read: storage.read.bind(storage), deleteAndVerify: storage.deleteAndVerify.bind(storage), async put(key: string, bytes: Uint8Array, mime: "application/pdf") { await storage.put(key, bytes, mime); if (lost) { lost = false; throw new Error("Synthetic lost reply"); } } };
+    const worker = new DiagnosticArtifactWorker(db, flaky, await fonts(), runtime);
+    await expect(worker.generate(row.id)).rejects.toThrow("DIAGNOSTIC_ARTIFACT_RETRY");
+    const failed = await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: row.id } });
+    expect(failed).toMatchObject({ state: "failed", failureCode: "storage_or_render", attempts: 1 });
+    expect(failed.sha256).toMatch(/^[a-f0-9]{64}$/);
+    clock = new Date(clock.getTime() + 600_000);
+    expect(await worker.generate(row.id)).toBe(true);
+    const ready = await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: row.id } });
+    expect(ready.sha256).toBe(failed.sha256); expect(ready.sizeBytes).toBe(failed.sizeBytes);
+    expect(await db.diagnosticReportRecord.count({ where: { orderId: (await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: row.reportId } })).orderId } })).toBe(1);
+  });
+  it("removes expired verified upload bytes only when no report revision references them", async () => {
+    const row = await fixture();
+    const bytes = new Uint8Array([1, 2, 3]); const hash = sha(bytes); const id = randomUUID();
+    const key = `diagnostic-evidence/${id}/${hash}`; keys.push(key);
+    // The fixture crosses the storage boundary directly; production evidence upload
+    // sanitization has its own HTTP contract.
+    await s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: bytes, ContentType: "image/webp" }));
+    await db.diagnosticEvidence.create({ data: { id, reportId: row.reportId, findingId: randomUUID(), objectKey: key, sha256: hash, sizeBytes: bytes.length, mime: "image/webp", state: "verified", createdAt: clock, verifiedAt: clock } });
+    const worker = new DiagnosticArtifactWorker(db, storage, await fonts(), runtime);
+    await worker.cleanup();
+    expect((await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }))).ContentLength).toBe(3);
+    clock = new Date(clock.getTime() + 2 * 86400_000);
+    await worker.cleanup();
+    await expect(s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }))).rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
+    expect((await db.diagnosticEvidence.findUniqueOrThrow({ where: { id } })).state).toBe("removed");
+  });
+  it("fences erasure during storage and reconciles a resumed late write after cleanup", async () => {
+    const row = await fixture(); let original: Uint8Array | undefined;
+    const erasing: DiagnosticArtifactObjects = { read: storage.read.bind(storage), deleteAndVerify: storage.deleteAndVerify.bind(storage), async put(key: string, bytes: Uint8Array, mime: "application/pdf") { original = bytes; await storage.put(key, bytes, mime); await db.diagnosticReportRecord.update({ where: { id: row.reportId }, data: { erasedAt: clock } }); } };
+    const worker = new DiagnosticArtifactWorker(db, erasing, await fonts(), runtime);
+    expect(await worker.generate(row.id)).toBe(false);
+    const artifact = await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: row.id } });
+    expect(artifact.cleanupRequestedAt).not.toBeNull(); expect(artifact.state).not.toBe("ready");
+    clock = new Date(clock.getTime() + 600_000); await worker.cleanup();
+    await expect(s3.send(new HeadObjectCommand({ Bucket: bucket, Key: row.key }))).rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
+    if (!original) throw new Error("Missing attempted PDF bytes");
+    await storage.put(row.key, original, "application/pdf");
+    await worker.cleanup();
+    await expect(s3.send(new HeadObjectCommand({ Bucket: bucket, Key: row.key }))).rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
+    expect((await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: row.id } })).state).not.toBe("ready");
+  });
+  it("account purge fences diagnostic revisions and late writers before erasing intake, preserves immutable observations and cleans exact private objects", async () => {
+    const evidenceId = randomUUID(), row = await fixture(evidenceId), control = await fixture();
+    const bytes = await sharp({ create: { width: 2, height: 2, channels: 3, background: "#ffffff" } }).webp().toBuffer();
+    const hash = sha(bytes), evidenceKey = `diagnostic-evidence/${evidenceId}/${hash}`;
+    keys.push(evidenceKey);
+    await s3.send(new PutObjectCommand({ Bucket: bucket, Key: evidenceKey, Body: bytes, ContentType: "image/webp" }));
+    await db.diagnosticEvidence.create({ data: { id: evidenceId, reportId: row.reportId, findingId: row.findingId, objectKey: evidenceKey,
+      sha256: hash, sizeBytes: bytes.length, mime: "image/webp", state: "verified", verifiedAt: clock, createdById: row.userId } });
+    const worker = new DiagnosticArtifactWorker(db, storage, await fonts(), runtime);
+    expect(await worker.generate(row.id)).toBe(true);
+    const artifact = await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: row.id } });
+    const evidence = await db.diagnosticEvidence.findUniqueOrThrow({ where: { id: evidenceId } });
+    await db.user.update({ where: { id: row.userId }, data: { deletionScheduledAt: new Date(clock.getTime() - 1) } });
+    await new PurgeExpiredAccounts(db).execute({ now: clock });
+    const order = await db.inspectionOrder.findUniqueOrThrow({ where: { id: row.orderId } });
+    const report = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: row.reportId } });
+    expect(order.commissionerId).toBeNull(); expect(order.erasedAt).not.toBeNull();
+    expect(order.physicalAuthorization).toBeNull(); expect(order.publicationAuthorization).toBeNull(); expect(order.observedVehicle).toBeNull();
+    expect(report.erasedAt).not.toBeNull(); expect(report.snapshot).toEqual(row.snapshot); expect(report.snapshotHash).toBe(row.hash);
+    const retiredPdf = await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: row.id } });
+    const retiredEvidence = await db.diagnosticEvidence.findUniqueOrThrow({ where: { id: evidenceId } });
+    expect(retiredPdf.cleanupRequestedAt).not.toBeNull(); expect(retiredPdf.epoch).not.toBe(artifact.epoch);
+    expect(retiredEvidence.cleanupRequestedAt).not.toBeNull(); expect(retiredEvidence.epoch).not.toBe(evidence.epoch);
+    expect(retiredEvidence.createdById).toBeNull();
+    expect((await db.diagnosticPdfArtifact.updateMany({ where: { id: row.id, epoch: artifact.epoch, cleanupRequestedAt: null }, data: { state: "ready" } })).count).toBe(0);
+    expect((await db.diagnosticEvidence.updateMany({ where: { id: evidenceId, epoch: evidence.epoch, cleanupRequestedAt: null }, data: { state: "verified" } })).count).toBe(0);
+    expect(await worker.generate(row.id)).toBe(false);
+    expect((await db.inspectionOrder.findUniqueOrThrow({ where: { id: control.orderId } })).commissionerId).toBe(control.userId);
+    expect((await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: control.reportId } })).snapshot).toEqual(control.snapshot);
+    expect((await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: control.id } })).cleanupRequestedAt).toBeNull();
+    await worker.cleanup();
+    for (const key of [row.key, evidenceKey]) await expect(s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }))).rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
+    expect((await db.diagnosticEvidence.findUniqueOrThrow({ where: { id: evidenceId } })).cleanupCompletedAt).not.toBeNull();
+    await db.user.update({ where: { id: row.userId }, data: { deletionScheduledAt: new Date(clock.getTime() - 1) } });
+    await expect(new PurgeExpiredAccounts(db).execute({ now: clock })).resolves.toMatchObject({ purgedCount: expect.any(Number) });
+  });
+  it("staff account purge removes current assignments and attribution while preserving another commissioner's report and exact historical snapshot", async () => {
+    const staffId = randomUUID(); users.push(staffId);
+    await db.user.create({ data: { id: staffId, deletionScheduledAt: new Date(clock.getTime() - 1) } });
+    const row = await fixture(undefined, staffId);
+    await db.diagnosticCenterAssignment.create({ data: { centerId: row.centerId, userId: staffId, capability: "diagnostics.technician", qualifiedUntil: new Date(clock.getTime() + 86400_000) } });
+    await db.diagnosticOrderAssignment.create({ data: { orderId: row.orderId, userId: staffId, capability: "diagnostics.technician" } });
+    await db.diagnosticAudit.create({ data: { centerId: row.centerId, orderId: row.orderId, actorId: staffId, action: "REPORT_DRAFT_CREATED", details: { reportId: row.reportId, reason: "private staff note" } } });
+    await new PurgeExpiredAccounts(db).execute({ now: clock });
+    const report = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: row.reportId } });
+    expect(report.erasedAt).toBeNull(); expect(report.snapshot).toEqual(row.snapshot); expect(report.snapshotHash).toBe(row.hash);
+    expect(report.state).toMatchObject({ authorId: null });
+    expect((await db.inspectionOrder.findUniqueOrThrow({ where: { id: row.orderId } })).commissionerId).toBe(row.userId);
+    expect((await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: row.id } })).cleanupRequestedAt).toBeNull();
+    expect((await db.diagnosticTemplateVersion.findUniqueOrThrow({ where: { id: row.templateId } })).publishedById).toBeNull();
+    expect(await db.diagnosticCenterAssignment.count({ where: { userId: staffId } })).toBe(0);
+    expect(await db.diagnosticOrderAssignment.count({ where: { userId: staffId } })).toBe(0);
+    expect(await db.diagnosticAudit.findMany({ where: { orderId: row.orderId } })).toMatchObject([{ actorId: null, details: { reportId: row.reportId } }]);
+    expect((await db.diagnosticAudit.findFirstOrThrow({ where: { orderId: row.orderId } })).details).not.toHaveProperty("reason");
+  });
+
+});

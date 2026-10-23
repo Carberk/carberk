@@ -46,6 +46,12 @@ class ProbeController {
   }
 }
 
+@Controller("video-grants")
+class VideoProbeController {
+  @Get(":secret/*")
+  read() { return { ok: true }; }
+}
+
 describe("API request logging", () => {
   let app: NestFastifyApplication | undefined;
 
@@ -75,7 +81,7 @@ describe("API request logging", () => {
 
     const moduleRef = await Test.createTestingModule({
       imports: [LoggerModule.forRoot({ pinoHttp: [requestLoggingOptions("info", clientIpHeader), out] })],
-      controllers: [ProbeController],
+      controllers: [ProbeController, VideoProbeController],
     }).compile();
     app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
     app.getHttpAdapter().getInstance().addHook("onSend", async (_req, reply) => {
@@ -87,6 +93,13 @@ describe("API request logging", () => {
     return lines.join("");
   }
 
+  it("keeps playback capabilities out of request paths, parameters and Referer headers", async () => {
+    const secret = "video-playback-secret-sentinel";
+    const log = await logOneRequest({ referer: `https://auto.tm/video-grants/${secret}/master.m3u8` }, `/video-grants/${secret}/360p/segment-0001.ts`);
+    expect(log).toContain("/video-grants/[Redacted]/360p/segment-0001.ts");
+    expect(log).not.toContain(secret);
+  });
+
   it("logs the path of a search without its query string or its parsed query", async () => {
     const log = await logOneRequest({}, "/api/v1/listings?q=toyota+camry+secret-search&limit=20");
 
@@ -94,6 +107,17 @@ describe("API request logging", () => {
     expect(log).not.toContain("secret-search");
     expect(log).not.toContain("limit");
     expect(log).not.toContain('"query"');
+  });
+
+  it("redacts the scoped guest association credential from every request log", async () => {
+    const log = await logOneRequest({ "x-measurement-guest": "mg_scoped-guest-secret-sentinel", "x-measurement-synthetic": "ms_synthetic-bootstrap-secret-sentinel" });
+    expect(log).not.toContain("scoped-guest-secret-sentinel");
+    expect(log).not.toContain("synthetic-bootstrap-secret-sentinel");
+  });
+
+  it("never retains the raw app-install identifier in request logs", async () => {
+    const log = await logOneRequest({ "x-app-install-id": "raw-install-sentinel" });
+    expect(log).not.toContain("raw-install-sentinel");
   });
 
   it("never writes a bearer token, a cookie or a set-cookie to the log", async () => {

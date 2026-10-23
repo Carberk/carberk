@@ -57,7 +57,8 @@ describe("Search parameters: opening", () => {
     const view = await open();
     expect(view.getByText("Search parameters")).toBeTruthy();
     expect(view.getByRole("button", { name: "Any Condition" })).toBeTruthy();
-    expect(view.getAllByText("City").length).toBeGreaterThan(0);
+    expect(view.getByLabelText("Region: Select region")).toBeTruthy();
+    expect(view.getByLabelText("City: Select a region first")).toBeTruthy();
     expect(view.getByLabelText("Brand: Select brand")).toBeTruthy();
     expect(view.getByLabelText("Model: Select model")).toBeTruthy();
     expect(view.getByText("Year range")).toBeTruthy();
@@ -76,6 +77,16 @@ describe("Search parameters: opening", () => {
     expect(view.getByDisplayValue("70,000")).toBeTruthy();
     expect(view.getByDisplayValue("120,000")).toBeTruthy();
     expect(lastFilters()).toEqual(expect.objectContaining({ condition: "used", brandId: "toyota", modelIds: ["camry"], yearMin: 2018, yearMax: 2020, priceMin: 70000, priceMax: 120000 }));
+  });
+});
+
+describe("Search parameters: the city field", () => {
+  it("labels Region and City once each, with no separate City heading", async () => {
+    const view = await open();
+    expect(view.getAllByText("City")).toHaveLength(1);
+    expect(view.getAllByText("Region")).toHaveLength(1);
+    expect(view.getByRole("button", { name: "Region: Select region" })).toBeTruthy();
+    expect(view.getByRole("button", { name: "City: Select a region first" })).toBeTruthy();
   });
 });
 

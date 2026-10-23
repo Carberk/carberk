@@ -1,0 +1,5125 @@
+{
+  "capturedDate": "2026-10-18",
+  "scope": "GitHub issue/PR organization only; no worktree removal result",
+  "sources": {
+    "issues-open-inventory.json": {
+      "sha256": "1adc31d7d4f916bce21dafe8b6366a8cf0e53b2994f2f15792ebf3331be1e698",
+      "data": [
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "milestone": null,
+          "number": 920,
+          "title": "Verify phase-specific hosting budgets, consistent recovery and release readiness",
+          "updatedAt": "2026-10-15T06:15:32Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/920"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 919,
+          "title": "Observe sanitized failures and independently detect outages without starving core flows",
+          "updatedAt": "2026-10-15T06:14:59Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/919"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 918,
+          "title": "Retain rights-qualified anonymous vehicle-market knowledge",
+          "updatedAt": "2026-10-15T06:14:27Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/918"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 917,
+          "title": "Explain marketplace outcomes with a reproducible trilingual Improvement scorecard",
+          "updatedAt": "2026-10-15T06:14:08Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/917"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCku_A",
+              "name": "web",
+              "description": "apps/web (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 916,
+          "title": "Read and export audience-safe diagnostic reports with neutral Listing badges",
+          "updatedAt": "2026-10-15T06:07:51Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/916"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 915,
+          "title": "Release immutable diagnostic snapshots with qualified review and corrections",
+          "updatedAt": "2026-10-15T06:07:18Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/915"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 914,
+          "title": "Author diagnostic findings and private evidence against pinned templates",
+          "updatedAt": "2026-10-15T06:06:41Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/914"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 913,
+          "title": "Deliver Vehicle History PDFs with rights-qualified archive reuse",
+          "updatedAt": "2026-10-15T01:08:59Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/913"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 912,
+          "title": "Reconcile Vehicle History quotes, capacity, payments and recovery decisions",
+          "updatedAt": "2026-10-15T01:08:14Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/912"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 911,
+          "title": "Operate General Support with staffed response clocks and deletion-safe case history",
+          "updatedAt": "2026-10-15T01:08:10Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/911"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCku_A",
+              "name": "web",
+              "description": "apps/web (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 910,
+          "title": "Discover and share dealer inventory with anonymous Listing and showroom readers",
+          "updatedAt": "2026-10-15T01:03:53Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/910"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 909,
+          "title": "Share listing enquiries with atomic business claims and immediate revocation",
+          "updatedAt": "2026-10-15T06:59:11Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/909"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 908,
+          "title": "Publish business-owned inventory through the existing seller wizard",
+          "updatedAt": "2026-10-15T06:49:12Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/908"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 907,
+          "title": "Establish scoped diagnostic intake and versioned report audiences",
+          "updatedAt": "2026-10-15T06:48:06Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/907"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 906,
+          "title": "Localize admin shell and bounded Listing and User viewers",
+          "updatedAt": "2026-10-15T00:45:45Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/906"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 905,
+          "title": "Deliver typed bounded first-party measurement ingress",
+          "updatedAt": "2026-10-15T06:58:43Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/905"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkzmA",
+              "name": "contracts",
+              "description": "packages/contracts",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 903,
+          "title": "Separate service case authority, messaging and private artifacts",
+          "updatedAt": "2026-10-15T00:35:44Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/903"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 902,
+          "title": "Admit free dealer businesses with protected membership and recovery",
+          "updatedAt": "2026-10-15T04:00:20Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/902"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "milestone": null,
+          "number": 901,
+          "title": "Guard reserved shared-staging fixtures and current-main restoration",
+          "updatedAt": "2026-10-15T00:29:18Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/901"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkzmA",
+              "name": "contracts",
+              "description": "packages/contracts",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk4XQ",
+              "name": "security",
+              "description": "Security issue (high priority)",
+              "color": "B60205"
+            }
+          ],
+          "milestone": null,
+          "number": 900,
+          "title": "Enforce current-session purpose-scoped staff capabilities",
+          "updatedAt": "2026-10-15T01:02:18Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/900"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "milestone": null,
+          "number": 899,
+          "title": "Expire Listing-view fingerprints within the approved two-day retention",
+          "updatedAt": "2026-10-15T00:54:08Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/899"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2Lw",
+              "name": "docs",
+              "description": "ADRs, PRD, CONTEXT.md, README",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 897,
+          "title": "Deliver the agreed Carberk marketplace, dealer, reports and analytics campaign",
+          "updatedAt": "2026-10-18T05:45:55Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/897"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "milestone": null,
+          "number": 896,
+          "title": "Guard video rollout and size its operational limits",
+          "updatedAt": "2026-10-14T23:12:26Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/896"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 895,
+          "title": "Add intentional Listing video navigation and native playback",
+          "updatedAt": "2026-10-14T23:12:20Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/895"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 894,
+          "title": "Recover seller video transfers without blocking photo publication",
+          "updatedAt": "2026-10-14T23:12:15Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/894"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 893,
+          "title": "Let sellers select, trim and prepare one Listing video",
+          "updatedAt": "2026-10-14T23:12:08Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/893"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkzmA",
+              "name": "contracts",
+              "description": "packages/contracts",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 892,
+          "title": "Expose authorized ready video across Listing reads and moderation",
+          "updatedAt": "2026-10-14T23:12:02Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/892"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 891,
+          "title": "Process Listing video with safe replacement and complete cleanup",
+          "updatedAt": "2026-10-14T23:11:56Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/891"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkzmA",
+              "name": "contracts",
+              "description": "packages/contracts",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 890,
+          "title": "Add owned resumable Listing video upload sessions",
+          "updatedAt": "2026-10-14T23:11:49Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/890"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "milestone": null,
+          "number": 889,
+          "title": "Prove video upload and serving contracts before backend implementation",
+          "updatedAt": "2026-10-15T01:12:56Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/889"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "milestone": null,
+          "number": 888,
+          "title": "Prove native Listing video trimming, preparation and recovery",
+          "updatedAt": "2026-10-15T00:46:12Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/888"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 886,
+          "title": "Carberk Listing video: 90-second trimming, resumable uploads and adaptive playback",
+          "updatedAt": "2026-10-14T23:13:12Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/886"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCku_A",
+              "name": "web",
+              "description": "apps/web (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2Mgwhg",
+              "name": "wayfinder:task",
+              "description": "Wayfinder task that unblocks a decision",
+              "color": "FBCA04"
+            }
+          ],
+          "milestone": null,
+          "number": 884,
+          "title": "Strengthen rendered journeys and remaining test harness evidence",
+          "updatedAt": "2026-10-14T12:51:10Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/884"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2Mgwhg",
+              "name": "wayfinder:task",
+              "description": "Wayfinder task that unblocks a decision",
+              "color": "FBCA04"
+            }
+          ],
+          "milestone": null,
+          "number": 883,
+          "title": "Repair media, storage ownership and transaction test evidence",
+          "updatedAt": "2026-10-14T12:51:05Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/883"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2Mgwhg",
+              "name": "wayfinder:task",
+              "description": "Wayfinder task that unblocks a decision",
+              "color": "FBCA04"
+            }
+          ],
+          "milestone": null,
+          "number": 882,
+          "title": "Repair identity and session test evidence",
+          "updatedAt": "2026-10-14T12:51:02Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/882"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2Mgwhg",
+              "name": "wayfinder:task",
+              "description": "Wayfinder task that unblocks a decision",
+              "color": "FBCA04"
+            }
+          ],
+          "milestone": null,
+          "number": 881,
+          "title": "Establish test foundations and repair discovery, authorization and SQL evidence",
+          "updatedAt": "2026-10-14T13:26:16Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/881"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2Mgwhg",
+              "name": "wayfinder:task",
+              "description": "Wayfinder task that unblocks a decision",
+              "color": "FBCA04"
+            }
+          ],
+          "milestone": null,
+          "number": 880,
+          "title": "Implement exact-commit CI promotion and reserved staging controls",
+          "updatedAt": "2026-10-14T13:26:10Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/880"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2Lw",
+              "name": "docs",
+              "description": "ADRs, PRD, CONTEXT.md, README",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2MgoyQ",
+              "name": "wayfinder:map",
+              "description": "Wayfinder destination map",
+              "color": "0E8A16"
+            }
+          ],
+          "milestone": null,
+          "number": 878,
+          "title": "Workflow transition and test evidence repairs: saved dependency map",
+          "updatedAt": "2026-10-14T13:26:05Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/878"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            }
+          ],
+          "milestone": null,
+          "number": 877,
+          "title": "Exercise Listing detail preview integration through real hooks and MSW",
+          "updatedAt": "2026-10-14T06:18:17Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/877"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "milestone": null,
+          "number": 874,
+          "title": "Listing detail shows how many people viewed it, in total and today",
+          "updatedAt": "2026-10-15T04:03:42Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/874"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            }
+          ],
+          "milestone": null,
+          "number": 873,
+          "title": "PR backends can opt in to the demo inventory on top of the native fixtures",
+          "updatedAt": "2026-10-14T00:51:24Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/873"
+        },
+        {
+          "labels": [],
+          "milestone": null,
+          "number": 856,
+          "title": "Run full CI only on ready PRs, and move CI to Blacksmith runners for the private repo",
+          "updatedAt": "2026-10-13T06:55:17Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/856"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkrdw",
+              "name": "ready-for-human",
+              "description": "Needs human implementation",
+              "color": "1D76DB"
+            }
+          ],
+          "milestone": null,
+          "number": 847,
+          "title": "Follow-up: deferred non-blocking review findings from the 2.0.4 batch",
+          "updatedAt": "2026-10-12T14:16:02Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/847"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "milestone": null,
+          "number": 826,
+          "title": "Add International Harvester to the catalog for pre-1986 IH machinery, with the IH logo",
+          "updatedAt": "2026-10-10T22:15:12Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/826"
+        },
+        {
+          "labels": [],
+          "milestone": null,
+          "number": 815,
+          "title": "Concurrent auth refresh on app start: one 201 and one 401 within 7 ms",
+          "updatedAt": "2026-10-10T20:10:48Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/815"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkrdw",
+              "name": "ready-for-human",
+              "description": "Needs human implementation",
+              "color": "1D76DB"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            }
+          ],
+          "milestone": null,
+          "number": 803,
+          "title": "iOS release scope after Apple enrolment",
+          "updatedAt": "2026-10-10T15:45:14Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/803"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACi_pH_g",
+              "name": "enhancement",
+              "description": "New feature or request",
+              "color": "a2eeef"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk0mQ",
+              "name": "ui",
+              "description": "packages/ui",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk5vQ",
+              "name": "phase-1",
+              "description": "MLP beta (current focus)",
+              "color": "0052CC"
+            }
+          ],
+          "milestone": null,
+          "number": 777,
+          "title": "Mobile: replace Geist with Inter for text and headings",
+          "updatedAt": "2026-10-08T15:16:51Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/777"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACi_pH3w",
+              "name": "bug",
+              "description": "Something isn't working",
+              "color": "d73a4a"
+            }
+          ],
+          "milestone": null,
+          "number": 770,
+          "title": "Flaky: CleanRetiredUploads e2e 'takes bounded batches, and overlapping sweeps' fails intermittently on the hosted check",
+          "updatedAt": "2026-10-08T12:48:01Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/770"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2MgoyQ",
+              "name": "wayfinder:map",
+              "description": "Wayfinder destination map",
+              "color": "0E8A16"
+            }
+          ],
+          "milestone": null,
+          "number": 763,
+          "title": "Android-specific polish: make the app feel native on Android, not an iOS design on Android",
+          "updatedAt": "2026-10-08T05:47:35Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/763"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACi_pH3w",
+              "name": "bug",
+              "description": "Something isn't working",
+              "color": "d73a4a"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            }
+          ],
+          "milestone": null,
+          "number": 758,
+          "title": "Profile photo: unreadable file crashes the app, and upload stays broken after a failure",
+          "updatedAt": "2026-10-08T20:42:36Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/758"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "milestone": null,
+          "number": 752,
+          "title": "Decide whether to move from TypeScript 5.9 to 7",
+          "updatedAt": "2026-10-08T02:16:09Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/752"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "milestone": null,
+          "number": 751,
+          "title": "Mobile tests: quiet the two repeated warnings and stop state updates after a test ends",
+          "updatedAt": "2026-10-08T02:16:06Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/751"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "milestone": null,
+          "number": 750,
+          "title": "Upload claims: follow-up tests deferred from the PR 738 review",
+          "updatedAt": "2026-10-08T00:35:46Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/750"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2MgoyQ",
+              "name": "wayfinder:map",
+              "description": "Wayfinder destination map",
+              "color": "0E8A16"
+            }
+          ],
+          "milestone": null,
+          "number": 746,
+          "title": "Admin after first release: Turkmen and English, catalog management, app management and a monitoring dashboard",
+          "updatedAt": "2026-10-15T00:33:18Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/746"
+        },
+        {
+          "labels": [],
+          "milestone": null,
+          "number": 711,
+          "title": "Demo inventory seed: follow-ups from the PR 704 reviews",
+          "updatedAt": "2026-10-06T19:39:00Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/711"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACi_pH3w",
+              "name": "bug",
+              "description": "Something isn't working",
+              "color": "d73a4a"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkzmA",
+              "name": "contracts",
+              "description": "packages/contracts",
+              "color": "5319E7"
+            }
+          ],
+          "milestone": null,
+          "number": 681,
+          "title": "Resume a draft on Car when the User left it on Car",
+          "updatedAt": "2026-10-05T20:32:33Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/681"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACi_pH3w",
+              "name": "bug",
+              "description": "Something isn't working",
+              "color": "d73a4a"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            }
+          ],
+          "milestone": null,
+          "number": 664,
+          "title": "Ask before leaving a changed Listing edit on iOS swipe back",
+          "updatedAt": "2026-10-05T17:44:17Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/664"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "milestone": null,
+          "number": 658,
+          "title": "Follow-ups from the contact phone review (PR 635)",
+          "updatedAt": "2026-10-05T15:19:25Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/658"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "milestone": null,
+          "number": 656,
+          "title": "Audit mobile tests and module depth after the release",
+          "updatedAt": "2026-10-07T06:03:58Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/656"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            }
+          ],
+          "milestone": null,
+          "number": 649,
+          "title": "Use the declared VALIDATION_FAILED code across the listings module",
+          "updatedAt": "2026-10-05T10:16:45Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/649"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "milestone": null,
+          "number": 630,
+          "title": "Sell entry and My listings follow-ups from PRs 594 and 596: test notes and missing native captures",
+          "updatedAt": "2026-10-04T03:44:56Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/630"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "milestone": null,
+          "number": 629,
+          "title": "Sell wizard follow-ups from PR 597: dead error wiring, Contact phone error, copy and test notes",
+          "updatedAt": "2026-10-05T10:46:44Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/629"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "milestone": null,
+          "number": 628,
+          "title": "Conversation follow-ups from PRs 579 and 625: toast, large text and test notes",
+          "updatedAt": "2026-10-04T02:47:48Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/628"
+        },
+        {
+          "labels": [],
+          "milestone": null,
+          "number": 624,
+          "title": "Listings native follow-ups: draft presentation and upload retry evidence",
+          "updatedAt": "2026-10-03T10:29:00Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/624"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAAC2MgsPA",
+              "name": "wayfinder:grilling",
+              "description": "Wayfinder human decision ticket",
+              "color": "D4C5F9"
+            }
+          ],
+          "milestone": null,
+          "number": 608,
+          "title": "Set monitoring gates for reviewer and real-user releases",
+          "updatedAt": "2026-10-14T23:41:40Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/608"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAAC2MgsPA",
+              "name": "wayfinder:grilling",
+              "description": "Wayfinder human decision ticket",
+              "color": "D4C5F9"
+            }
+          ],
+          "milestone": null,
+          "number": 607,
+          "title": "Define the team's incident response and product review loop",
+          "updatedAt": "2026-10-03T18:39:04Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/607"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAAC2MgsPA",
+              "name": "wayfinder:grilling",
+              "description": "Wayfinder human decision ticket",
+              "color": "D4C5F9"
+            }
+          ],
+          "milestone": null,
+          "number": 606,
+          "title": "Choose first product questions, metrics and scorecard",
+          "updatedAt": "2026-10-14T23:41:36Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/606"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAAC2MgsPA",
+              "name": "wayfinder:grilling",
+              "description": "Wayfinder human decision ticket",
+              "color": "D4C5F9"
+            }
+          ],
+          "milestone": null,
+          "number": 605,
+          "title": "Decide TM telemetry delivery and data boundaries",
+          "updatedAt": "2026-10-14T23:41:32Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/605"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAAC2MgsPA",
+              "name": "wayfinder:grilling",
+              "description": "Wayfinder human decision ticket",
+              "color": "D4C5F9"
+            }
+          ],
+          "milestone": null,
+          "number": 604,
+          "title": "Choose monitoring and product analytics services",
+          "updatedAt": "2026-10-14T23:41:29Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/604"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2Lw",
+              "name": "docs",
+              "description": "ADRs, PRD, CONTEXT.md, README",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2MgoyQ",
+              "name": "wayfinder:map",
+              "description": "Wayfinder destination map",
+              "color": "0E8A16"
+            }
+          ],
+          "milestone": null,
+          "number": 602,
+          "title": "AutoTM monitoring and daily product improvement plan",
+          "updatedAt": "2026-10-15T00:33:14Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/602"
+        },
+        {
+          "labels": [],
+          "milestone": null,
+          "number": 599,
+          "title": "Conversation: findings from the October 3 native evidence session",
+          "updatedAt": "2026-10-03T06:33:14Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/599"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkzmA",
+              "name": "contracts",
+              "description": "packages/contracts",
+              "color": "5319E7"
+            }
+          ],
+          "milestone": null,
+          "number": 540,
+          "title": "Type RATE_LIMITED details in OpenAPI and test identical answers for every reason",
+          "updatedAt": "2026-10-02T10:40:27Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/540"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2MguOw",
+              "name": "wayfinder:prototype",
+              "description": "Wayfinder prototype decision ticket",
+              "color": "C5DEF5"
+            }
+          ],
+          "milestone": null,
+          "number": 500,
+          "title": "Prototype in-app support Conversations with an AutoTM admin account",
+          "updatedAt": "2026-10-15T00:33:22Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/500"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACi_pH3w",
+              "name": "bug",
+              "description": "Something isn't working",
+              "color": "d73a4a"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            }
+          ],
+          "milestone": null,
+          "number": 493,
+          "title": "Price input precision and #472 evidence wording follow-ups",
+          "updatedAt": "2026-10-01T16:10:57Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/493"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "milestone": null,
+          "number": 492,
+          "title": "Native PR seed follow-ups: load-order test, script typecheck, API watched paths and media URL",
+          "updatedAt": "2026-10-06T11:09:18Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/492"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACi_pH3w",
+              "name": "bug",
+              "description": "Something isn't working",
+              "color": "d73a4a"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            }
+          ],
+          "milestone": null,
+          "number": 486,
+          "title": "Fix stale invalid count requests and polish Search parameters copy",
+          "updatedAt": "2026-10-03T09:12:11Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/486"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            }
+          ],
+          "milestone": null,
+          "number": 445,
+          "title": "Stop exposing Session refresh state through identity's public entry point",
+          "updatedAt": "2026-10-02T10:47:10Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/445"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            }
+          ],
+          "milestone": null,
+          "number": 413,
+          "title": "Admit Sign-in Code requests atomically against the destination and IP budgets",
+          "updatedAt": "2026-10-02T10:47:07Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/413"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkrdw",
+              "name": "ready-for-human",
+              "description": "Needs human implementation",
+              "color": "1D76DB"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2Mgwhg",
+              "name": "wayfinder:task",
+              "description": "Wayfinder task that unblocks a decision",
+              "color": "FBCA04"
+            }
+          ],
+          "milestone": {
+            "number": 1,
+            "title": "Android reviewer release",
+            "description": "Reviewer-only Android candidate under #320. Includes approved redesigns and selected stabilization; excludes public signup, real SMS, TM cutover, iOS submission and unsettled scope proposals. No due-date promise. Cross-platform S11 criteria are tracked separately.",
+            "dueOn": null
+          },
+          "number": 329,
+          "title": "Verify and freeze the signed Android release candidate",
+          "updatedAt": "2026-10-09T04:27:02Z",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/329"
+        }
+      ]
+    },
+    "prs-open-inventory.json": {
+      "sha256": "713e5c453e6c204c04da81ef7c9470d60115984af2a32cfab19a334df4a1804c",
+      "data": [
+        {
+          "baseRefName": "main",
+          "headRefName": "agent/spec-897-campaign",
+          "headRefOid": "3cb9646ef69ddb6750b88ce0bb866b81c9a70b96",
+          "isDraft": true,
+          "number": 904,
+          "title": "Deliver the agreed Carberk marketplace and operations campaign",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/904"
+        },
+        {
+          "baseRefName": "agent/issue-837",
+          "headRefName": "agent/issue-824",
+          "headRefOid": "705a14418bea39f9521c123d94d086645d44ec40",
+          "isDraft": true,
+          "number": 846,
+          "title": "feat(media): instant ThumbHash previews for Listing and chat photos",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/846"
+        },
+        {
+          "baseRefName": "agent/issue-823",
+          "headRefName": "agent/issue-837",
+          "headRefOid": "85da4c42943231d9790067621933e6f37d54cef0",
+          "isDraft": true,
+          "number": 845,
+          "title": "Add legacy-compatible ThumbHash media response contracts",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/845"
+        },
+        {
+          "baseRefName": "main",
+          "headRefName": "agent/issue-843",
+          "headRefOid": "343688176c38f44898938e54a2d5ef8f88f13817",
+          "isDraft": true,
+          "number": 844,
+          "title": "Keep the focused text input and chat composer visible above the keyboard (#843)",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/844"
+        },
+        {
+          "baseRefName": "main",
+          "headRefName": "agent/issue-841",
+          "headRefOid": "8aa68c1294bebe9464b8fef2bca929b83b1eec0a",
+          "isDraft": true,
+          "number": 842,
+          "title": "Guard native development sessions and media origins (#841)",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/842"
+        },
+        {
+          "baseRefName": "main",
+          "headRefName": "agent/issue-823",
+          "headRefOid": "99963c763199d234a5e6cdf66b47fd2739f6d493",
+          "isDraft": true,
+          "number": 835,
+          "title": "WebP-only photo uploads and safe stored-photo conversion",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/835"
+        },
+        {
+          "baseRefName": "main",
+          "headRefName": "agent/issue-833",
+          "headRefOid": "f666cf4fd52d3c72b81cf3c1b9d1226287dd8a21",
+          "isDraft": true,
+          "number": 834,
+          "title": "feat(mobile): refine Carberk launch and Alpha Motors credit",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/834"
+        },
+        {
+          "baseRefName": "main",
+          "headRefName": "claude/project-thread-vip05r",
+          "headRefOid": "7698dd386f1b044d6ba24f5c4c633cde9563bd52",
+          "isDraft": true,
+          "number": 557,
+          "title": "fix(mobile): agree Show N with its count and drop the repeated City heading",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/557"
+        }
+      ]
+    },
+    "issues-open-after-cleanup.json": {
+      "sha256": "0cbf237fc95e50c46580b7a14c4702b87f55703b4d9ee5e613a89644d8c5f7f0",
+      "data": [
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "number": 920,
+          "title": "Verify phase-specific hosting budgets, consistent recovery and release readiness",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/920"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 919,
+          "title": "Observe sanitized failures and independently detect outages without starving core flows",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/919"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 918,
+          "title": "Retain rights-qualified anonymous vehicle-market knowledge",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/918"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 917,
+          "title": "Explain marketplace outcomes with a reproducible trilingual Improvement scorecard",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/917"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCku_A",
+              "name": "web",
+              "description": "apps/web (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 916,
+          "title": "Read and export audience-safe diagnostic reports with neutral Listing badges",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/916"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 915,
+          "title": "Release immutable diagnostic snapshots with qualified review and corrections",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/915"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 914,
+          "title": "Author diagnostic findings and private evidence against pinned templates",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/914"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 913,
+          "title": "Deliver Vehicle History PDFs with rights-qualified archive reuse",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/913"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 912,
+          "title": "Reconcile Vehicle History quotes, capacity, payments and recovery decisions",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/912"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 911,
+          "title": "Operate General Support with staffed response clocks and deletion-safe case history",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/911"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCku_A",
+              "name": "web",
+              "description": "apps/web (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 910,
+          "title": "Discover and share dealer inventory with anonymous Listing and showroom readers",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/910"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 909,
+          "title": "Share listing enquiries with atomic business claims and immediate revocation",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/909"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 908,
+          "title": "Publish business-owned inventory through the existing seller wizard",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/908"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 907,
+          "title": "Establish scoped diagnostic intake and versioned report audiences",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/907"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 906,
+          "title": "Localize admin shell and bounded Listing and User viewers",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/906"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 905,
+          "title": "Deliver typed bounded first-party measurement ingress",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/905"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkzmA",
+              "name": "contracts",
+              "description": "packages/contracts",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 903,
+          "title": "Separate service case authority, messaging and private artifacts",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/903"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 902,
+          "title": "Admit free dealer businesses with protected membership and recovery",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/902"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "number": 901,
+          "title": "Guard reserved shared-staging fixtures and current-main restoration",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/901"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkzmA",
+              "name": "contracts",
+              "description": "packages/contracts",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk4XQ",
+              "name": "security",
+              "description": "Security issue (high priority)",
+              "color": "B60205"
+            }
+          ],
+          "number": 900,
+          "title": "Enforce current-session purpose-scoped staff capabilities",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/900"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "number": 899,
+          "title": "Expire Listing-view fingerprints within the approved two-day retention",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/899"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2Lw",
+              "name": "docs",
+              "description": "ADRs, PRD, CONTEXT.md, README",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 897,
+          "title": "Deliver the agreed Carberk marketplace, dealer, reports and analytics campaign",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/897"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "number": 896,
+          "title": "Guard video rollout and size its operational limits",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/896"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 895,
+          "title": "Add intentional Listing video navigation and native playback",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/895"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 894,
+          "title": "Recover seller video transfers without blocking photo publication",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/894"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 893,
+          "title": "Let sellers select, trim and prepare one Listing video",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/893"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkzmA",
+              "name": "contracts",
+              "description": "packages/contracts",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 892,
+          "title": "Expose authorized ready video across Listing reads and moderation",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/892"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 891,
+          "title": "Process Listing video with safe replacement and complete cleanup",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/891"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkzmA",
+              "name": "contracts",
+              "description": "packages/contracts",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 890,
+          "title": "Add owned resumable Listing video upload sessions",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/890"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "number": 889,
+          "title": "Prove video upload and serving contracts before backend implementation",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/889"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "number": 888,
+          "title": "Prove native Listing video trimming, preparation and recovery",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/888"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 886,
+          "title": "Carberk Listing video: 90-second trimming, resumable uploads and adaptive playback",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/886"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCku_A",
+              "name": "web",
+              "description": "apps/web (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2Mgwhg",
+              "name": "wayfinder:task",
+              "description": "Wayfinder task that unblocks a decision",
+              "color": "FBCA04"
+            }
+          ],
+          "number": 884,
+          "title": "Strengthen rendered journeys and remaining test harness evidence",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/884"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkxtw",
+              "name": "worker",
+              "description": "apps/worker",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2Mgwhg",
+              "name": "wayfinder:task",
+              "description": "Wayfinder task that unblocks a decision",
+              "color": "FBCA04"
+            }
+          ],
+          "number": 883,
+          "title": "Repair media, storage ownership and transaction test evidence",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/883"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2Mgwhg",
+              "name": "wayfinder:task",
+              "description": "Wayfinder task that unblocks a decision",
+              "color": "FBCA04"
+            }
+          ],
+          "number": 882,
+          "title": "Repair identity and session test evidence",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/882"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2Mgwhg",
+              "name": "wayfinder:task",
+              "description": "Wayfinder task that unblocks a decision",
+              "color": "FBCA04"
+            }
+          ],
+          "number": 881,
+          "title": "Establish test foundations and repair discovery, authorization and SQL evidence",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/881"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2Mgwhg",
+              "name": "wayfinder:task",
+              "description": "Wayfinder task that unblocks a decision",
+              "color": "FBCA04"
+            }
+          ],
+          "number": 880,
+          "title": "Implement exact-commit CI promotion and reserved staging controls",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/880"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2Lw",
+              "name": "docs",
+              "description": "ADRs, PRD, CONTEXT.md, README",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2MgoyQ",
+              "name": "wayfinder:map",
+              "description": "Wayfinder destination map",
+              "color": "0E8A16"
+            }
+          ],
+          "number": 878,
+          "title": "Workflow transition and test evidence repairs: saved dependency map",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/878"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            }
+          ],
+          "number": 877,
+          "title": "Exercise Listing detail preview integration through real hooks and MSW",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/877"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2zw",
+              "name": "feature",
+              "description": "New capability",
+              "color": "A2EEEF"
+            }
+          ],
+          "number": 874,
+          "title": "Listing detail shows how many people viewed it, in total and today",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/874"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            }
+          ],
+          "number": 873,
+          "title": "PR backends can opt in to the demo inventory on top of the native fixtures",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/873"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkrdw",
+              "name": "ready-for-human",
+              "description": "Needs human implementation",
+              "color": "1D76DB"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCksQg",
+              "name": "blocked",
+              "description": "Open blockers in body's Depends on section",
+              "color": "E11D21"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            }
+          ],
+          "number": 856,
+          "title": "Run full CI only on ready PRs, and move CI to Blacksmith runners for the private repo",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/856"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            }
+          ],
+          "number": 847,
+          "title": "Follow-up: deferred non-blocking review findings from the 2.0.4 batch",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/847"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "number": 826,
+          "title": "Add International Harvester to the catalog for pre-1986 IH machinery, with the IH logo",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/826"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACi_pH3w",
+              "name": "bug",
+              "description": "Something isn't working",
+              "color": "d73a4a"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            }
+          ],
+          "number": 815,
+          "title": "Concurrent auth refresh on app start: one 201 and one 401 within 7 ms",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/815"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkrdw",
+              "name": "ready-for-human",
+              "description": "Needs human implementation",
+              "color": "1D76DB"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            }
+          ],
+          "number": 803,
+          "title": "iOS release scope after Apple enrolment",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/803"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACi_pH_g",
+              "name": "enhancement",
+              "description": "New feature or request",
+              "color": "a2eeef"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk0mQ",
+              "name": "ui",
+              "description": "packages/ui",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk5vQ",
+              "name": "phase-1",
+              "description": "MLP beta (current focus)",
+              "color": "0052CC"
+            }
+          ],
+          "number": 777,
+          "title": "Mobile: replace Geist with Inter for text and headings",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/777"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACi_pH3w",
+              "name": "bug",
+              "description": "Something isn't working",
+              "color": "d73a4a"
+            }
+          ],
+          "number": 770,
+          "title": "Flaky: CleanRetiredUploads e2e 'takes bounded batches, and overlapping sweeps' fails intermittently on the hosted check",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/770"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2MgoyQ",
+              "name": "wayfinder:map",
+              "description": "Wayfinder destination map",
+              "color": "0E8A16"
+            }
+          ],
+          "number": 763,
+          "title": "Android-specific polish: make the app feel native on Android, not an iOS design on Android",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/763"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACi_pH3w",
+              "name": "bug",
+              "description": "Something isn't working",
+              "color": "d73a4a"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            }
+          ],
+          "number": 758,
+          "title": "Profile photo: unreadable file crashes the app, and upload stays broken after a failure",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/758"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "number": 751,
+          "title": "Mobile tests: quiet the two repeated warnings and stop state updates after a test ends",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/751"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "number": 750,
+          "title": "Upload claims: follow-up tests deferred from the PR 738 review",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/750"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkuNA",
+              "name": "admin",
+              "description": "apps/admin (Next.js)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2MgoyQ",
+              "name": "wayfinder:map",
+              "description": "Wayfinder destination map",
+              "color": "0E8A16"
+            }
+          ],
+          "number": 746,
+          "title": "Admin campaign delivery and deferred catalog and operator controls",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/746"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "number": 711,
+          "title": "Demo inventory seed: follow-ups from the PR 704 reviews",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/711"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACi_pH3w",
+              "name": "bug",
+              "description": "Something isn't working",
+              "color": "d73a4a"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkzmA",
+              "name": "contracts",
+              "description": "packages/contracts",
+              "color": "5319E7"
+            }
+          ],
+          "number": 681,
+          "title": "Resume a draft on Car when the User left it on Car",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/681"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACi_pH3w",
+              "name": "bug",
+              "description": "Something isn't working",
+              "color": "d73a4a"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            }
+          ],
+          "number": 664,
+          "title": "Ask before leaving a changed Listing edit on iOS swipe back",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/664"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "number": 658,
+          "title": "Follow-ups from the contact phone review (PR 635)",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/658"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "number": 656,
+          "title": "Audit mobile tests and module depth after the release",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/656"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            }
+          ],
+          "number": 649,
+          "title": "Use the declared VALIDATION_FAILED code across the listings module",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/649"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "number": 630,
+          "title": "Sell entry and My listings follow-ups from PRs 594 and 596: test notes and missing native captures",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/630"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "number": 629,
+          "title": "Sell wizard follow-ups from PR 597: dead error wiring, Contact phone error, copy and test notes",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/629"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "number": 628,
+          "title": "Conversation follow-ups from PRs 579 and 625: toast, large text and test notes",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/628"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            }
+          ],
+          "number": 624,
+          "title": "Listings native follow-ups: draft presentation and upload retry evidence",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/624"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk2Lw",
+              "name": "docs",
+              "description": "ADRs, PRD, CONTEXT.md, README",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2MgoyQ",
+              "name": "wayfinder:map",
+              "description": "Wayfinder destination map",
+              "color": "0E8A16"
+            }
+          ],
+          "number": 602,
+          "title": "Monitoring decisions delivered; remaining pilot and broader moderation planning",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/602"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            }
+          ],
+          "number": 599,
+          "title": "Conversation: findings from the October 3 native evidence session",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/599"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkzmA",
+              "name": "contracts",
+              "description": "packages/contracts",
+              "color": "5319E7"
+            }
+          ],
+          "number": 540,
+          "title": "Type RATE_LIMITED details in OpenAPI and test identical answers for every reason",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/540"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACi_pH3w",
+              "name": "bug",
+              "description": "Something isn't working",
+              "color": "d73a4a"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            }
+          ],
+          "number": 493,
+          "title": "Price input precision and #472 evidence wording follow-ups",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/493"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkysA",
+              "name": "db",
+              "description": "packages/db",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk3vQ",
+              "name": "task",
+              "description": "Chore / maintenance",
+              "color": "C2E0C6"
+            }
+          ],
+          "number": 492,
+          "title": "Native PR seed follow-ups: load-order test, script typecheck, API watched paths and media URL",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/492"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACi_pH3w",
+              "name": "bug",
+              "description": "Something isn't working",
+              "color": "d73a4a"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkqyA",
+              "name": "ready-for-agent",
+              "description": "AFK-ready, fully specified",
+              "color": "0E8A16"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            }
+          ],
+          "number": 486,
+          "title": "Fix stale invalid count requests and polish Search parameters copy",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/486"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            }
+          ],
+          "number": 445,
+          "title": "Stop exposing Session refresh state through identity's public entry point",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/445"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkomg",
+              "name": "needs-triage",
+              "description": "Maintainer needs to evaluate",
+              "color": "FBCA04"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCktNA",
+              "name": "api",
+              "description": "apps/api (NestJS)",
+              "color": "5319E7"
+            }
+          ],
+          "number": 413,
+          "title": "Admit Sign-in Code requests atomically against the destination and IP budgets",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/413"
+        },
+        {
+          "labels": [
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkrdw",
+              "name": "ready-for-human",
+              "description": "Needs human implementation",
+              "color": "1D76DB"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCkv1g",
+              "name": "mobile",
+              "description": "apps/mobile (Expo)",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAACjCk1ig",
+              "name": "infra",
+              "description": "Dockerfiles, compose, CI",
+              "color": "5319E7"
+            },
+            {
+              "id": "LA_kwDOScB2L88AAAAC2Mgwhg",
+              "name": "wayfinder:task",
+              "description": "Wayfinder task that unblocks a decision",
+              "color": "FBCA04"
+            }
+          ],
+          "number": 329,
+          "title": "Verify and freeze the signed Android release candidate",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/329"
+        }
+      ]
+    },
+    "prs-open-after-cleanup.json": {
+      "sha256": "4f1294c409d9d7362a79be9a569e280ade297ca8319b33060bda66a2c81c3578",
+      "data": [
+        {
+          "headRefOid": "83d8acf38d1837be0c4f860193903af365569d55",
+          "isDraft": true,
+          "number": 904,
+          "title": "Deliver the agreed Carberk marketplace and operations campaign",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/904"
+        },
+        {
+          "headRefOid": "7698dd386f1b044d6ba24f5c4c633cde9563bd52",
+          "isDraft": true,
+          "number": 557,
+          "title": "fix(mobile): agree Show N with its count and drop the repeated City heading",
+          "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/557"
+        }
+      ]
+    },
+    "github-cleanup-actions.jsonl": {
+      "sha256": "4f8ad65b407d69ce81fd245544fddc0086d0444477236188cf104c731d7178ac",
+      "data": [
+        {
+          "type": "superseded-pr-close",
+          "number": 834,
+          "head": "f666cf4fd52d3c72b81cf3c1b9d1226287dd8a21",
+          "commentOutput": "{\"applied\":true,\"url\":\"https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/834#issuecomment-6246525932\"}",
+          "closeExit": 0
+        },
+        {
+          "type": "superseded-pr-close",
+          "number": 835,
+          "head": "99963c763199d234a5e6cdf66b47fd2739f6d493",
+          "commentOutput": "{\"applied\":true,\"url\":\"https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/835#issuecomment-6246526981\"}",
+          "closeExit": 0
+        },
+        {
+          "type": "superseded-pr-close",
+          "number": 842,
+          "head": "8aa68c1294bebe9464b8fef2bca929b83b1eec0a",
+          "commentOutput": "{\"applied\":true,\"url\":\"https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/842#issuecomment-6246528037\"}",
+          "closeExit": 0
+        },
+        {
+          "type": "superseded-pr-close",
+          "number": 844,
+          "head": "343688176c38f44898938e54a2d5ef8f88f13817",
+          "commentOutput": "{\"applied\":true,\"url\":\"https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/844#issuecomment-6246529290\"}",
+          "closeExit": 0
+        },
+        {
+          "type": "superseded-pr-close",
+          "number": 845,
+          "head": "85da4c42943231d9790067621933e6f37d54cef0",
+          "commentOutput": "{\"applied\":true,\"url\":\"https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/845#issuecomment-6246530370\"}",
+          "closeExit": 0
+        },
+        {
+          "type": "superseded-pr-close",
+          "number": 846,
+          "head": "705a14418bea39f9521c123d94d086645d44ec40",
+          "commentOutput": "{\"applied\":true,\"url\":\"https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/846#issuecomment-6246531808\"}",
+          "closeExit": 0
+        },
+        {
+          "type": "planning-issue-close",
+          "number": 500,
+          "commentOutput": "{\"applied\":true,\"url\":\"https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/500#issuecomment-6246538604\"}",
+          "closeExit": 0
+        },
+        {
+          "type": "planning-issue-close",
+          "number": 604,
+          "commentOutput": "{\"applied\":true,\"url\":\"https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/604#issuecomment-6246539749\"}",
+          "closeExit": 0
+        },
+        {
+          "type": "planning-issue-close",
+          "number": 605,
+          "commentOutput": "{\"applied\":true,\"url\":\"https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/605#issuecomment-6246541383\"}",
+          "closeExit": 0
+        },
+        {
+          "type": "planning-issue-close",
+          "number": 606,
+          "commentOutput": "{\"applied\":true,\"url\":\"https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/606#issuecomment-6246542373\"}",
+          "closeExit": 0
+        },
+        {
+          "type": "planning-issue-close",
+          "number": 607,
+          "commentOutput": "{\"applied\":true,\"url\":\"https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/607#issuecomment-6246543632\"}",
+          "closeExit": 0
+        },
+        {
+          "type": "completed-issue-close",
+          "number": 752,
+          "evidence": "merged857/f8f245f3 and853comment6139211969",
+          "verified": "CLOSED COMPLETED"
+        },
+        {
+          "type": "planning-issue-close",
+          "number": 608,
+          "commentOutput": "{\"applied\":true,\"url\":\"https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/608#issuecomment-6246544848\"}",
+          "closeExit": 0
+        },
+        {
+          "type": "map-status-edit",
+          "number": 602,
+          "verified": true,
+          "title": "Monitoring decisions delivered; remaining pilot and broader moderation planning"
+        },
+        {
+          "type": "map-status-edit",
+          "number": 746,
+          "verified": true,
+          "title": "Admin campaign delivery and deferred catalog and operator controls"
+        },
+        {
+          "type": "labels",
+          "number": 847,
+          "added": [
+            "needs-triage"
+          ],
+          "removed": [
+            "ready-for-human"
+          ],
+          "verified": true
+        },
+        {
+          "type": "labels",
+          "number": 815,
+          "added": [
+            "bug",
+            "mobile",
+            "needs-triage"
+          ],
+          "removed": [],
+          "verified": true
+        },
+        {
+          "type": "labels",
+          "number": 856,
+          "added": [
+            "blocked",
+            "infra",
+            "ready-for-human"
+          ],
+          "removed": [],
+          "verified": true
+        },
+        {
+          "type": "labels",
+          "number": 624,
+          "added": [
+            "mobile",
+            "needs-triage"
+          ],
+          "removed": [],
+          "verified": true
+        },
+        {
+          "type": "labels",
+          "number": 599,
+          "added": [
+            "mobile",
+            "needs-triage"
+          ],
+          "removed": [],
+          "verified": true
+        },
+        {
+          "type": "labels",
+          "number": 711,
+          "added": [
+            "db",
+            "needs-triage",
+            "task"
+          ],
+          "removed": [],
+          "verified": true
+        },
+        {
+          "type": "labels",
+          "number": 763,
+          "added": [
+            "needs-triage"
+          ],
+          "removed": [],
+          "verified": true
+        },
+        {
+          "type": "labels",
+          "number": 746,
+          "added": [
+            "needs-triage"
+          ],
+          "removed": [],
+          "verified": true
+        },
+        {
+          "type": "labels",
+          "number": 777,
+          "added": [],
+          "removed": [
+            "blocked"
+          ],
+          "verified": true
+        }
+      ]
+    }
+  }
+}

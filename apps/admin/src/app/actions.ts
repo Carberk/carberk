@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect, unstable_rethrow } from "next/navigation";
-import { AuthSchemas, ErrorCode } from "@auto-tm/contracts";
+import { AuthSchemas, ErrorCode, type StaffSchemas } from "@auto-tm/contracts";
 
 import { rejectExpiredSession } from "@/lib/action-session";
 import { apiFetch, apiFetchOptional, ApiError } from "@/lib/api-client";
@@ -47,7 +47,7 @@ export async function requestOtp(
       if (err.code === ErrorCode.RateLimited) {
         return { ok: false, error: "Слишком много попыток. Попробуйте позже." };
       }
-      return { ok: false, error: err.message };
+      return { ok: false, error: "Временно недоступно. Попробуйте ещё раз." };
     }
     return { ok: false, error: "Не удалось отправить код. Попробуйте позже." };
   }
@@ -87,21 +87,24 @@ export async function verifyOtp(
       },
     );
 
-    if (result.user.role !== "admin") {
-      await clearAuthCookies();
-      return {
-        ok: false,
-        error:
-          "Доступ к панели администратора ограничен. Обратитесь к администратору.",
-      };
-    }
-
     await setAuthCookies(result.accessToken, result.refreshToken);
+    if (result.user.role !== "admin") {
+      try {
+        const summary = await apiFetchOptional<ReturnType<typeof StaffSchemas.StaffSummarySchema.parse>>("/staff/capabilities", { cache: "no-store" });
+        if (!summary || summary.capabilities.length === 0) throw new ApiError(403,"FORBIDDEN",{},"Current staff authority required");
+      } catch (error) {
+        unstable_rethrow(error);
+        if (!(error instanceof ApiError) || ![401,403].includes(error.status))
+          return { ok: false, error: "Временно недоступно. Попробуйте ещё раз." };
+        await clearAuthCookies();
+        return { ok: false, error: "Доступ к панели администратора ограничен. Обратитесь к администратору." };
+      }
+    }
 
     // After OTP, check TOTP status to decide where to send the user
     const totpStatus =
       await apiFetchOptional<AuthSchemas.AdminTotpStatusResponse>(
-        "/auth/admin/totp/status",
+        "/auth/staff/totp/status",
       );
 
     if (!totpStatus) {
@@ -130,7 +133,7 @@ export async function verifyOtp(
           error: "Неверный код. Попробуйте ещё раз.",
         };
       }
-      return { ok: false, error: err.message };
+      return { ok: false, error: "Временно недоступно. Попробуйте ещё раз." };
     }
     return { ok: false, error: "Не удалось подтвердить код. Попробуйте позже." };
   }
@@ -152,7 +155,7 @@ export async function getTotpStatus(): Promise<TotpStatusResult> {
   try {
     const status =
       await apiFetchOptional<AuthSchemas.AdminTotpStatusResponse>(
-        "/auth/admin/totp/status",
+        "/auth/staff/totp/status",
       );
     if (!status) return { ok: false };
     const result: TotpStatusResult = {
@@ -177,7 +180,7 @@ export async function enrollTotp(): Promise<TotpEnrollResult> {
   await rejectExpiredSession();
   try {
     const result = await apiFetch<AuthSchemas.AdminTotpEnrollResponse>(
-      "/auth/admin/totp/enroll",
+      "/auth/staff/totp/enroll",
       { method: "POST" },
     );
     // Generate the QR data URL server-side so the secret never reaches the client
@@ -198,7 +201,7 @@ export async function enrollTotp(): Promise<TotpEnrollResult> {
           error: "Двухфакторная аутентификация уже настроена.",
         };
       }
-      return { ok: false, error: err.message };
+      return { ok: false, error: "Временно недоступно. Попробуйте ещё раз." };
     }
     return {
       ok: false,
@@ -223,7 +226,7 @@ export async function verifyTotp(
 
   try {
     const result = await apiFetch<AuthSchemas.AdminTotpVerifyResponse>(
-      "/auth/admin/totp/verify",
+      "/auth/staff/totp/verify",
       { method: "POST", body: { code } as unknown },
     );
     const response: TotpVerifyResult = {
@@ -249,7 +252,7 @@ export async function verifyTotp(
           error: "Неверный код. Попробуйте ещё раз.",
         };
       }
-      return { ok: false, error: err.message };
+      return { ok: false, error: "Временно недоступно. Попробуйте ещё раз." };
     }
     return {
       ok: false,
@@ -295,7 +298,7 @@ export async function requireAuthWithReturnTo(
 ): Promise<void> {
   await rejectExpiredSession();
   const status = await apiFetchOptional<AuthSchemas.AdminTotpStatusResponse>(
-    "/auth/admin/totp/status",
+    "/auth/staff/totp/status",
   );
 
   if (!status) {

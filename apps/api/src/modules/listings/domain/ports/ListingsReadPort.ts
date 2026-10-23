@@ -4,6 +4,8 @@ import type { TimestampCursor } from "../types";
 export interface ListingSummary {
   id: string;
   sellerId: string;
+  /** Owning business; omitted for personal inventory. */
+  businessId?: string | null;
   status: ListingStatus;
   brandId: string;
   modelId: string;

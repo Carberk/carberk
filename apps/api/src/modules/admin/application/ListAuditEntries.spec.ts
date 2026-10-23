@@ -1,43 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { BadRequestException } from "@nestjs/common";
 
-import type { AuditLogRepository, AuditLogRow } from "../domain/ports/AuditLogRepository";
+import { FakeAuditLogRepository } from "./testing/FakeAuditLogRepository";
+import type { AuditLogRow } from "../domain/ports/AuditLogRepository";
 import type { ListingsReadPort } from "../../listings/domain/ports/ListingsReadPort";
 import type { IdentityUserSummary, IdentityReadPort } from "../../identity/identity.public";
 
 import { ListAuditEntries } from "./ListAuditEntries";
-
-class FakeAuditLogRepository implements AuditLogRepository {
-  rows: AuditLogRow[] = [];
-
-  async findMany(params: {
-    action?: string | undefined;
-    targetType?: string | undefined;
-    targetId?: string | undefined;
-    page: number;
-    pageSize: number;
-  }): Promise<{ items: AuditLogRow[]; total: number }> {
-    let filtered = this.rows;
-    if (params.action) {
-      filtered = filtered.filter((r) => r.action === params.action);
-    }
-    if (params.targetType) {
-      filtered = filtered.filter((r) => r.targetType === params.targetType);
-    }
-    if (params.targetId) {
-      filtered = filtered.filter((r) => r.targetId === params.targetId);
-    }
-    const sorted = filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    const total = sorted.length;
-    const start = (params.page - 1) * params.pageSize;
-    const items = sorted.slice(start, start + params.pageSize);
-    return { items, total };
-  }
-
-  async create(): Promise<AuditLogRow> {
-    throw new Error("Not implemented");
-  }
-}
 
 class FakeListingsReadPort implements ListingsReadPort {
   listings: Record<string, { id: string; sellerId: string; status: string; year: number | null; brandName: string; modelName: string }> = {};
@@ -137,6 +106,13 @@ describe("ListAuditEntries", () => {
     repo = new FakeAuditLogRepository();
     listings = new FakeListingsReadPort();
     identity = new FakeIdentityReadPort();
+  });
+
+  it("preserves the released marketplace audit contract and hides purpose-private staff transitions", async () => {
+    repo.rows = [makeRow("a1", "LISTING_BAN", "listing", "l1"), makeRow("a2", "STAFF_CAPABILITY_GRANTED", "User", "staff")];
+    const result = await makeUseCase(repo, listings, identity).execute({});
+    expect(result.items.map((row) => row.action)).toEqual(["LISTING_BAN"]);
+    expect(result.total).toBe(1);
   });
 
   it("defaults to newest-first order", async () => {

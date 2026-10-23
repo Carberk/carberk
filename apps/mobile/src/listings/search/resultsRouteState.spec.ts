@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import { readPickerResultsFilters, readResultsRouteState, writeResultsRouteState } from "./resultsRouteState";
 
 describe("readResultsRouteState", () => {
+  it("retains seller type through the applied Results route and rejects unknown choices", () => {
+    expect(readResultsRouteState({ sellerType: "business" })).toEqual({ sort: "newest", sellerType: "business" });
+    expect(readResultsRouteState({ sellerType: "promoted" })).toEqual({ sort: "newest" });
+  });
   it("returns the newest-first full feed when there are no parameters", () => {
     expect(readResultsRouteState({})).toEqual({ sort: "newest" });
   });
@@ -53,7 +57,7 @@ describe("writeResultsRouteState", () => {
   it("writes every key, joining models and leaving absent filters undefined", () => {
     expect(writeResultsRouteState({ brandId: "toyota", modelIds: ["camry", "corolla"], priceMin: 70000, sort: "price_asc" })).toEqual({
       brandId: "toyota", modelIds: "camry,corolla", modelId: undefined, cityId: undefined, priceMin: "70000", priceMax: undefined,
-      yearMin: undefined, yearMax: undefined, condition: undefined, sort: "price_asc",
+      yearMin: undefined, yearMax: undefined, condition: undefined, sellerType: undefined, sort: "price_asc",
     });
   });
 

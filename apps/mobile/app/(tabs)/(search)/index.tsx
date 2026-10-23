@@ -5,6 +5,7 @@ import { ActivityIndicator, FlatList, RefreshControl, View } from "react-native"
 import { useTranslation } from "react-i18next";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 
+import { useMeasurementScreen } from "../../../src/measurement/useMeasurementScreen";
 import { useEngineTypes } from "../../../src/api/catalog/useEngineTypes";
 import { useTransmissions } from "../../../src/api/catalog/useTransmissions";
 import { useListings } from "../../../src/api/listings/useListings";
@@ -40,6 +41,7 @@ const isSpacer = (cell: GridCell): cell is typeof GRID_SPACER => cell === GRID_S
  * filters and no safety banner here.
  */
 export default function HomeScreen() {
+  useMeasurementScreen("home",{eventName:"discovery_opened",purpose:"product_improvement",payload:{screen:"home"}});
   const { t } = useTranslation();
   // Tapping Search again while Home is showing glides the feed back to the top.
   const listRef = useRef<FlatList>(null);

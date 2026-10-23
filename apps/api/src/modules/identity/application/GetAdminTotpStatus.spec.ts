@@ -171,4 +171,11 @@ describe("GetAdminTotpStatus", () => {
     expect(result.elevated).toBe(false);
     expect(result.adminTotpExpiresAt).toBe(session.adminTotpExpiresAt!.toISOString());
   });
+  it.each([{ userId: "other" }, { expiresAt: NOW }])("does not report elevation from mismatched or expired current Session %j", async (patch) => {
+    const uc = new GetAdminTotpStatus(totpRepo, sessionRepo, clock);
+    const session = makeSession({ adminTotpExpiresAt: new Date("2026-05-15T12:00:00Z"), ...patch });
+    sessionRepo.sessions.push(session);
+    await expect(uc.execute({ userId: "user-1", sessionId: session.id })).rejects.toMatchObject({ reason: "SESSION_REQUIRED" });
+  });
+
 });

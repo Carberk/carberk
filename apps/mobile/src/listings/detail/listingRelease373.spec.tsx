@@ -261,17 +261,16 @@ describe("issue 373 approved detail content", () => {
     expect(screen.getByText(/92%/)).toBeTruthy();
   });
 
-  it("shows saves only to the owner, no view count to anyone, and moves lifecycle actions out of detail content", async () => {
+  it("shows loaded views to buyers and owners, saves only to the owner, and keeps lifecycle actions out of content", async () => {
     const screen = await renderMobile(
       <ListingDetailView listing={fixture()} maps={maps} />,
     );
-    expect(screen.queryByText(/views/)).toBeNull();
+    expect(screen.getByText("19 views")).toBeTruthy();
     expect(screen.queryByText(/saves/)).toBeNull();
     await screen.rerender(
       <ListingDetailView listing={fixture()} maps={maps} isOwner />,
     );
-    // Nothing counts Listing views yet, so the owner is not shown a number that is always 0.
-    expect(screen.queryByText(/views/)).toBeNull();
+    expect(screen.getAllByText("19 views")).toHaveLength(2);
     expect(screen.getByText("4 saves")).toBeTruthy();
     expect(screen.getByText("10,000 USD")).toBeTruthy();
     for (const name of ["Edit", "Mark as sold", "Remove from sale", "Delete"])

@@ -10,7 +10,7 @@ All admin and analytics workspaces support Turkmen, Russian and English, includi
 
 ## Scope and states
 
-Default seven completed UTC days versus previous seven; Today is separate triage. Label Listing city as marketplace context, not physical user location. Show exact filters and explicitly identify independent cohorts or fixed-release investigation fixtures. Preserve filters when opening/closing evidence.
+Conservative #917 release resolution uses the last completed Monday-to-Monday UTC calendar week versus the preceding disjoint calendar week. Today exposes freshness only and withholds aggregate totals. Published weekly counts remain fixed; maturity-bound rates may publish once after the entire fixed cohort matures. Label Listing city as marketplace context, not physical user location. Show exact filters and explicitly identify independent cohorts or fixed-release investigation fixtures. Preserve filters when opening/closing evidence.
 
 Loading, unavailable, delayed, empty inventory, incomplete observation window, suppressed small group and valid zero are distinct states. Withhold comparisons when collection is incomplete; immature D30 is unavailable, not zero retention. Counts accompany rates and small-sample labels. Apply privacy grouping across filter combinations; no individual inference through subtraction.
 
@@ -22,10 +22,16 @@ Preserve dashboard scroll/filter context, restore keyboard focus on close and pr
 
 ## Reviewed walkthrough evidence
 
-Synthetic fixture showed 16 contacts divided by 12 time-weighted active Listings, separate from 14 current active; 7/18 drafts published in seven days; 15/20 upload attempts completed; a release-specific chat retry with no Message text; separate account/guest returns and immature D30. Guided Photos/chat workflows preserved filters after closure, recorded simulated detailed-access/export audit, denied viewer timelines, and distinguished unavailable metrics from zero. Current wizard source identifiers are vehicle/specs/photos/price/location/contact/review.
+Synthetic fixture showed 16 contacts divided by 12 time-weighted active Listings, separate from 14 current active in that historical prototype; 7/18 drafts published in seven days; 15/20 upload attempts completed; a release-specific chat retry with no Message text; separate account/guest returns and immature D30. Guided Photos/chat workflows preserved filters after closure, recorded simulated detailed-access/export audit, denied viewer timelines, and distinguished unavailable metrics from zero. Current wizard source identifiers are vehicle/specs/photos/price/location/contact/review.
 
 The reviewed artifact is [retained approved synthetic analytics prototype](https://github.com/bagtyyarkovusov/auto.tm-rewrite/blob/4f1aebd826d898274e5ecdd31f18fcc51eb74178/output/campaign-review-20261014/analytics-improvement.html). Its retained branch is `prototype/campaign-review-20261014`, exact commit `4f1aebd826d898274e5ecdd31f18fcc51eb74178`. This is portable discussion evidence, not runtime or translated UI acceptance. Native/deployed evidence is reserved for the consolidated campaign.
 
 ## Optional market-insight research states
 
 Commercial extraction is disabled. Synthetic market-analysis scenarios distinguish unknown/declined age band, self-reported coarse residence, Listing market and search market. Label source and collection period honestly; suppress unsafe groups and combinations. Permission denial, missing rights, unavailable demographic data and valid zero remain distinct. Every chart/axis/legend/tooltip/table/export and validation/failure state follows the TK/RU/EN requirement above. Do not add an intrusive demographic onboarding step or infer a private trait.
+
+## Conservative disclosure resolution, 2026-10-18
+
+The campaign integration owner authorized fixed weekly partitions, per-metric suppression and a freshness-only Today view as the conservative autonomous implementation of the approved privacy requirement. This changes the rolling-window and current-inventory presentation in the retained prototype. The production scorecard labels active inventory at period end, not as a changing current total. Freshness may advance without changing previously released values. Late-record counts are withheld.
+
+Every positive disclosed metric and each positive success/failure complement needs at least five contributions and five distinct measured subjects. Withhold the contact family together when a component is unsafe. Withhold all seven wizard steps if any step or a small difference between displayed step counts is unsafe. Previously released empty or suppressed values remain fixed for that epoch and partition. No city/release filtering or demographic collection is activated by this policy. These controls reduce the specific repeated-read and small-cell disclosures covered by the fixtures; they are not a proof of anonymity against auxiliary information or arbitrary cross-metric combinations. Live collection and commercial disclosure remain closed.
