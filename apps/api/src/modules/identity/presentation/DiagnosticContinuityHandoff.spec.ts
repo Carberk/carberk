@@ -191,4 +191,89 @@ describe("B-owned continuity handoff through real HTTP, application, authority a
       expect((await post(`${b}/continuity-handoffs/${proofId}/consume`, { ...command, ...extra }, technician)).status).toBe(400);
     expect((await get(`${b}/continuity-handoffs?predecessorId=${id(4030)}`, technician)).status).toBe(400);
   });
+
+  // #923 commit-bound requests. Existing handoff cases above remain unchanged.
+  const requestPath = `${b}/continuity-requests`;
+  const issuanceCommand = () => ({ predecessorId: id(4030), expectedPredecessorVersion: 1, expectedOrderVersion: 1,
+    predecessorIdentityRecordId: id(1030), candidateIdentityRecordId: id(1020), linkingTechnicianId: id(2),
+    method: "comparative_attestation", rationale: "Private reviewer rationale", provenanceRecordIds: [id(2030), id(2020)] });
+  async function prepare(kind: "issue" | "consume", actor = reviewer) {
+    const response = await post(requestPath, { kind }, actor);
+    expect(response.status).toBe(201);
+    expect(response.headers["cache-control"]).toBe("no-store, private");
+    return response.body.requestId as string;
+  }
+  it("recovers lost preparation and issuance replies without storing pending text or duplicating issuance", async () => {
+    visit(30);
+    // Existing real issuance/comparison fixtures work before the new route is exercised.
+    const legacy = await post(`${b}/continuity-proofs`, issuanceCommand());
+    expect(legacy.status).toBe(201);
+    const requestId = await prepare("issue");
+    expect((await get(requestPath)).body).toEqual({ requests: [{ requestId, kind: "issue", state: "pending_input" }], nextCursor: null });
+    expect((await post(`${requestPath}/${requestId}/execute`, {})).status).toBe(400);
+    const command = issuanceCommand();
+    const executed = await post(`${requestPath}/${requestId}/execute`, { kind: "issue", command });
+    expect(executed.status).toBe(201);
+    const expected = { requestId, kind: "issue", state: "completed", proofId: executed.body.proofId, usability: "usable" };
+    // Reload needs neither command nor an ID retained in the browser.
+    expect((await get(requestPath)).body).toEqual({ requests: [expected], nextCursor: null });
+    expect((await get(`${requestPath}/${requestId}`)).body).toEqual(expected);
+    expect((await post(`${requestPath}/${requestId}/execute`, { kind: "issue", command })).body).toEqual(expected);
+    expect(await db.diagnosticContinuityProof.count({ where: { candidateOrderId: b } })).toBe(2);
+    expect(await db.diagnosticAudit.count({ where: { action: "CONTINUITY_PROOF_ISSUED" } })).toBe(2);
+    const other = await prepare("issue");
+    expect((await post(`${requestPath}/${other}/execute`, { kind: "issue", command })).status).toBe(201);
+    expect(await db.diagnosticContinuityProof.count({ where: { candidateOrderId: b } })).toBe(3);
+    for (const change of [{ rationale: "Changed" }, { linkingTechnicianId: id(3) }, { expectedOrderVersion: 2 }, { provenanceRecordIds: [id(2030)] }])
+      expect((await post(`${requestPath}/${requestId}/execute`, { kind: "issue", command: { ...command, ...change } })).status).toBe(409);
+  });
+  it("recovers a B-only committed request after proof disposal and A erasure without its command", async () => {
+    const proofId = await issue();
+    const requestId = await prepare("consume", technician);
+    const command = { proofId, reportId: id(9000), expectedOrderVersion: 1, reason: "B own follow-up" };
+    const expected = { requestId, kind: "consume", state: "completed", result: { proofId, reportId: id(9000) } };
+    expect((await post(`${requestPath}/${requestId}/execute`, { kind: "consume", command }, technician)).body).toEqual(expected);
+    // DB boundary simulates disposal; real SQL deletion/rollback is covered in hosted declarations.
+    await db.diagnosticContinuityProof.update({ where: { id: proofId }, data: { content: Prisma.DbNull, bindings: Prisma.DbNull, erasedAt: now, issuerId: null, issuerSessionId: null } });
+    await db.inspectionOrder.update({ where: { id: id(30) }, data: { erasedAt: now } });
+    await db.diagnosticReportRecord.update({ where: { id: id(4030) }, data: { erasedAt: now } });
+    expect((await get(requestPath, technician)).body).toEqual({ requests: [expected], nextCursor: null });
+    expect((await get(`${requestPath}/${requestId}`, technician)).body).toEqual(expected);
+    expect((await post(`${requestPath}/${requestId}/execute`, { kind: "consume", command }, technician)).body).toEqual(expected);
+    for (const change of [{ reason: "Changed" }, { expectedOrderVersion: 2 }, { proofId: randomUUID() }, { reportId: id(9001) }])
+      expect((await post(`${requestPath}/${requestId}/execute`, { kind: "consume", command: { ...command, ...change } }, technician)).status).toBe(409);
+    expect(await db.diagnosticAudit.count({ where: { action: "CONTINUITY_PROOF_CONSUMED" } })).toBe(1);
+    expect(await db.diagnosticAudit.count({ where: { action: "REPORT_REINSPECTION_CREATED" } })).toBe(1);
+    await db.diagnosticOrderAssignment.updateMany({ where: { orderId: b, userId: technician.userId }, data: { revokedAt: now } });
+    expect((await get(`${requestPath}/${requestId}`, technician)).status).toBe(403);
+  });
+  it("refuses unknown identities, new Sessions, wrong actors/kinds and pending command fields", async () => {
+    const proofId = await issue();
+    const requestId = await prepare("consume", technician);
+    expect((await post(requestPath, { kind: "consume", reason: "Never collect this" }, technician)).status).toBe(400);
+    memory.seed("session", { id: id(999), userId: technician.userId, expiresAt: future, adminTotpExpiresAt: future });
+    const newSession = { ...technician, sessionId: id(999) };
+    expect((await get(`${requestPath}/${requestId}`, newSession)).status).toBe(403);
+    expect((await get(`${requestPath}/${requestId}`, reviewer)).status).toBe(403);
+    const command = { proofId, reportId: id(9000), expectedOrderVersion: 1, reason: "B own follow-up" };
+    expect((await post(`${requestPath}/${randomUUID()}/execute`, { kind: "consume", command }, technician)).status).toBe(403);
+    expect((await post(`${requestPath}/${requestId}/execute`, { kind: "issue", command: issuanceCommand() }, technician)).status).toBe(403);
+    expect((await post(`${requestPath}/${requestId}/execute`, { kind: "consume", command }, newSession)).status).toBe(403);
+    expect(await db.diagnosticReportRecord.count({ where: { orderId: b } })).toBe(0);
+    expect((await get(requestPath, technician)).body.requests).toEqual([{ requestId, kind: "consume", state: "pending_input" }]);
+  });
+  it("keeps an invalidated issued request historical and refuses first consumption after authority loss", async () => {
+    visit(30);
+    const requestId = await prepare("issue"); const command = issuanceCommand();
+    const executed = await post(`${requestPath}/${requestId}/execute`, { kind: "issue", command });
+    expect(executed.status).toBe(201);
+    await db.diagnosticContinuityProof.update({ where: { id: executed.body.proofId }, data: { invalidatedAt: now } });
+    expect((await get(`${requestPath}/${requestId}`)).body.usability).toBe("historical");
+    expect((await post(`${requestPath}/${requestId}/execute`, { kind: "issue", command })).body.usability).toBe("historical");
+    const pending = await prepare("consume", technician);
+    await db.diagnosticCenterAssignment.updateMany({ where: { userId: technician.userId }, data: { qualifiedUntil: now } });
+    expect((await post(`${requestPath}/${pending}/execute`, { kind: "consume", command: { proofId: executed.body.proofId, reportId: id(9000), expectedOrderVersion: 1, reason: "B follow-up" } }, technician)).status).toBe(403);
+    expect(await db.diagnosticContinuityProof.count({ where: { candidateOrderId: b } })).toBe(1);
+  });
+
 });
