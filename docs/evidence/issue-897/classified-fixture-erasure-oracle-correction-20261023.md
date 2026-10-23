@@ -93,3 +93,49 @@ e9fac68489e0f14aabc8416fbdb227b7c0c36c1b1d6d6d0a2360fe525223245d  AFTER apps/api
 Real HTTP positives, SQL integrity/erasure/locking and worker acceptance remain UNKNOWN. The three Railway refusals and capped worker timeout attempts are terminal; this checkpoint makes no new infrastructure attempt or timeout workaround. No CI polling/rerun/dispatch, integration push or new PR was performed.
 
 Docs: no external dependency/API behavior changed; no external documentation lookup required. The local diagnostics skill was applied using supplied hosted failures, with local HTTP reproduction excluded by the writer brief.
+
+## Follow-up font-path correction, 2026-10-23
+
+Starting from published `d9cc1896ff95d37c73885e973ccd10d1222b8dd1` (tree `a419af389ffb71be7a54b65869eb359610ba764d`), hosted run `39951828758`, API job `120407974762`, reports API `3492 PASS / 8 FAIL`, worker `375 PASS / 3 known locale timeouts`, with DB/frontend/static checks passing. The raw hosted API log is `/tmp/carberk-resume-20261021/d9cc-api.log`, SHA-256 `ad3debc11aeb213e3ba4df1e26234ca59ede8536645533d077734221ecfb3894`; the sanitized log is `/tmp/carberk-resume-20261021/d9cc-api.plain.log`, SHA-256 `66f3935221131cc830d69db36dc35aed400d5ca0dfd038c75e33b231b5a20ec5`.
+
+The three newly reached ClassifiedOwnership lifecycle cases failed before worker logic with `ENOENT` for `./src/assets/fonts/NotoSans-Regular.ttf`. The inline child sets `root = resolve(__dirname, "../../../../../worker")` and passes `{ cwd: root }` to `execFile`, so its relative reads resolve under `apps/worker`. The packaged files are `apps/worker/assets/fonts/NotoSans-Regular.ttf` and `NotoSans-Bold.ttf`, matching the neighboring `DiagnosticPublicTransferProof.e2e.spec.ts:1370` helper. Only the two path literals changed to `./assets/fonts/...`.
+
+A filesystem-only proof read the exact child cwd without importing worker code or spawning a subprocess. The bad paths returned ENOENT. The corrected paths read bytes equal to the packaged files:
+
+```text
+Regular: 569208 bytes, b85c38ecea8a7cfb39c24e395a4007474fa5a4fc864f6ee33309eb4948d232d5
+Bold:    575740 bytes, c976e4b1b99edc88775377fcc21692ca4bfa46b6d6ca6522bfda505b28ff9d6a
+```
+
+The filesystem proof log is `/tmp/carberk-classified-font-path-20261023/font-filesystem.log`. It did not start a worker, service, database, listener, Docker container or HTTP request. It is a fixture-path proof, not worker acceptance.
+
+Focused offline commands passed:
+
+- `AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/api exec vitest run src/e2e-loopback.spec.ts`
+- `pnpm --filter @auto-tm/api exec eslint src/modules/diagnostics/presentation/DiagnosticClassifiedOwnership.e2e.spec.ts`
+- `pnpm --filter @auto-tm/api typecheck`
+- `pnpm --filter @auto-tm/api exec tsc6 --noEmit`
+- `pnpm check:agent-docs`
+- `pnpm check:glossary`
+- `git diff --check`
+
+Preservation from `d9cc1896`: only `DiagnosticClassifiedOwnership.e2e.spec.ts` changed, and only the two font path literals differ. The 931 existing test files remain otherwise unchanged; all worker setup, SQL/race assertions, clocks, bounds, cancellation and drain logic remain byte-identical. The preservation manifest is `/tmp/carberk-classified-font-path-20261023/preservation.json`; the exact patch is `/tmp/carberk-classified-font-path-20261023/font-path.patch`.
+
+The hosted d9cc result establishes 19 net fewer API failures than the prior 27-failure baseline. This follow-up font edit has no hosted acceptance result yet. The remaining hosted API failures and all worker locale timeouts are not claimed green. Actual SQL and worker acceptance remain UNKNOWN until hosted execution.
+
+Follow-up artifact SHA-256 manifest, under `/tmp/carberk-classified-font-path-20261023/`:
+
+```text
+8f5507ea6fcde992f7d6733d113abc538ae4957b777bc97cadd580f651c93b20  agent-docs.log
+c022d392d12e9a9a4eaa5f47685553efe3a92fea7cfe1215320f41fdae848487  font-filesystem.log
+78d87fd06d393635fe0ba7d458685e85e70aaaa6985e268fbead652af434162b  font-filesystem.mjs
+964e3804a7af7d338ececbc2d75f28c52e5952cbbdd306e7f24fa0e508c868e4  font-path.patch
+d0863b4ecc26a15f30aa60280c93ab71299462ab7b6fd8e15e5c042c23144621  glossary.log
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  lint.log
+5cc4d454e389ac0847484d8fef42b84e2096da1aa46768edfaba2c314274e0e0  loopback.log
+c07a3a5ba2bd05838365b056f553606bbe14e79b5808659c3198ddfe3afe1374  preservation.json
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ts6.log
+8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92  ts7.log
+```
+
+Filesystem proof command from the owned repository root: `node /tmp/carberk-classified-font-path-20261023/font-filesystem.mjs`. The script uses only Node filesystem/path/assert/crypto APIs, resolves the exact source-declared cwd, asserts both bad-path ENOENT failures and packaged byte equality, and records sizes and hashes. No mirror test was added. Prior d9cc offline build evidence is reused because production source/build inputs did not change.

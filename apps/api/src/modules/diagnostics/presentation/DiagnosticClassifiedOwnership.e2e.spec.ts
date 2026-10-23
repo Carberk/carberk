@@ -275,8 +275,8 @@ describe("classified forward ownership on real HTTP and disposable PostgreSQL", 
             const s3 = new S3Client({endpoint:process.env.MINIO_ENDPOINT,region:'us-east-1',forcePathStyle:true,
               credentials:{accessKeyId:process.env.MINIO_ACCESS_KEY||'minioadmin',secretAccessKey:process.env.MINIO_SECRET_KEY||'minioadmin'}});
             try {
-              const regular = await readFile('./src/assets/fonts/NotoSans-Regular.ttf');
-              const bold = await readFile('./src/assets/fonts/NotoSans-Bold.ttf');
+              const regular = await readFile('./assets/fonts/NotoSans-Regular.ttf');
+              const bold = await readFile('./assets/fonts/NotoSans-Bold.ttf');
               if (${!!control}) {
                 process.stdout.write('OWNERSHIP_WORKER_READY\\n');
                 await new Promise(resolve => process.stdin.once('data', resolve));
