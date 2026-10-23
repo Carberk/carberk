@@ -764,6 +764,100 @@ describe("public continuity across different sellers and Listings", { concurrent
     candidateIdentityRecordId: p.ib.id, linkingTechnicianId: suite.id("technician"), method: "automatic_normalized_vin",
     rationale: "Equal normalized VIN, consistent retained stamps and unchanged public identity and ownership", provenanceRecordIds: [p.pa, p.pb] });
 
+  async function refusesRestoredAutomaticOwnershipMutation(kind: "seller" | "vin") {
+    const prior = await automaticPredecessor();
+    const originalListing = await db.listing.findUniqueOrThrow({ where: { id: prior.listingId } });
+    const aSnapshot = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: prior.released.id } });
+    const aArtifacts = await db.diagnosticPdfArtifact.findMany({ where: { reportId: prior.released.id }, orderBy: { id: "asc" } });
+    const aOrder = await db.inspectionOrder.findUniqueOrThrow({ where: { id: prior.a.id } });
+    const aRaw = await db.diagnosticIdentityRecord.findMany({ where: { orderId: prior.a.id }, orderBy: { id: "asc" } });
+    const aEvidence = await db.diagnosticIdentityEvidence.findMany({ where: { orderId: prior.a.id }, orderBy: { id: "asc" } });
+    const proofWhere = { OR: [{ predecessorOrderId: prior.a.id }, { candidateOrderId: prior.a.id }] };
+    expect(await db.diagnosticContinuityProof.findMany({ where: proofWhere })).toEqual([]);
+    expect(aSnapshot).toMatchObject({ status: "finalized", version: 3, snapshotHash: expect.stringMatching(hash),
+      identityRecordId: prior.ia.id, identityRecordHash: prior.ia.observationHash,
+      identityEvidenceId: prior.ea.id, identityEvidenceHash: prior.ea.recordHash });
+    expect(aArtifacts.length).toBeGreaterThan(0);
+    expect(aRaw).toHaveLength(1); expect(aEvidence).toHaveLength(1);
+    expect(await history(prior.a)).toEqual([prior.ia]);
+
+    // This isolated Listing is the only mutable source. Never observe A again.
+    // Restore every scalar, including updatedAt, before creating B, even on failure.
+    let mutationFailed = false;
+    let restorationError: unknown;
+    try {
+      const changed = await db.listing.update({ where: { id: prior.listingId }, data: kind === "seller"
+        ? { sellerId: suite.id("sellerB"), updatedAt: originalListing.updatedAt }
+        : { vin: "SYN-VIN-999", updatedAt: originalListing.updatedAt } });
+      expect(changed).toMatchObject(kind === "seller" ? { sellerId: suite.id("sellerB") } : { vin: "SYN-VIN-999" });
+      expect(changed).not.toEqual(originalListing);
+    } catch (error) {
+      mutationFailed = true;
+      throw error;
+    } finally {
+      try {
+        await db.listing.update({ where: { id: prior.listingId }, data: originalListing });
+      } catch (error) {
+        restorationError = error;
+        if (mutationFailed) console.error("Owned Listing restoration also failed; preserving the original mutation failure", error);
+      }
+    }
+    if (restorationError) throw restorationError;
+    expect(await db.listing.findUniqueOrThrow({ where: { id: prior.listingId } })).toEqual(originalListing);
+    expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: prior.a.id } })).toMatchObject({ associationValidatedAt: null });
+
+    const p = await automaticCandidate(prior);
+    const currentA = await db.inspectionOrder.findUniqueOrThrow({ where: { id: p.a.id } });
+    const bOrder = await db.inspectionOrder.findUniqueOrThrow({ where: { id: p.b.id } });
+    expect(p.a.id).not.toBe(p.b.id); expect(p.ia.id).not.toBe(p.ib.id); expect(p.pa).not.toBe(p.pb);
+    for (const order of [currentA, bOrder]) expect(order).toMatchObject({ audience: "listing_public",
+      listingId: originalListing.id, commissionerId: originalListing.sellerId, listingIdentityDigest: aOrder.listingIdentityDigest });
+    expect(originalListing).toMatchObject({ sellerId: suite.id("sellerA"), businessId: null, vin: "SYN-VIN-041" });
+    expect(bOrder).toMatchObject({ associationValidatedAt: initialTime });
+    expect(bOrder.listingIdentityDigest).toMatch(hash);
+    expect(bOrder.publicationAuthorization).not.toEqual(aOrder.publicationAuthorization);
+    expect(bOrder.physicalAuthorization).not.toEqual(aOrder.physicalAuthorization);
+    for (const [order, raw, evidence] of [[p.a, p.ia, p.ea], [p.b, p.ib, p.eb]] as const) {
+      expect(await history(order)).toEqual([raw]);
+      expect((await get("technician", evidencePath(order)).expect(200)).body).toEqual([evidence]);
+      expect(evidence).toMatchObject({ correction: null, identifiers: identifiers(evidence.provenance[0].id, "SYN-VIN-041") });
+    }
+    const comparison = await get("reviewer", comparisonPath(p.b, p.released.id)).expect(200); privateNoStore(comparison);
+    expect(comparison.body).toMatchObject({ predecessor: { identityRecordId: p.ia.id, identity: { evidence: p.ea, corrections: [] } },
+      candidate: { identityRecordId: p.ib.id, identity: { evidence: p.eb, corrections: [] } } });
+    await comparativeBytes(p.b, p.released.id, p.pa, red); await comparativeBytes(p.b, p.released.id, p.pb, blue);
+    const orderIds = [p.a.id, p.b.id];
+    const audits = await db.diagnosticAudit.findMany({ where: { orderId: { in: orderIds } }, orderBy: { id: "asc" } });
+    expect(await db.diagnosticContinuityProof.count({ where: { candidateOrderId: p.b.id } })).toBe(0);
+
+    // MASKED: current public automatic admission is default-closed. A passing 403
+    // proves neither reached ownership discrimination nor behavioral RED. The
+    // unchanged positive below must still reach issuance and require 201.
+    const issuance = await post("reviewer", `orders/${p.b.id}/continuity-proofs`, automaticInput(p));
+    if (typeof issuance.body.proofId === "string") owned.proofs.push(issuance.body.proofId);
+    await denied(issuance);
+    expect(await db.diagnosticContinuityProof.findMany({ where: proofWhere })).toEqual([]);
+    expect(await db.diagnosticContinuityProof.count({ where: { candidateOrderId: p.b.id } })).toBe(0);
+    expect(await db.diagnosticReportRecord.count({ where: { orderId: p.b.id } })).toBe(0);
+    expect(await db.diagnosticReportRecord.count({ where: { predecessorId: p.released.id } })).toBe(0);
+    expect(await db.diagnosticAudit.findMany({ where: { orderId: { in: orderIds } }, orderBy: { id: "asc" } })).toEqual(audits);
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: prior.released.id } })).toEqual(aSnapshot);
+    expect(await db.diagnosticPdfArtifact.findMany({ where: { reportId: prior.released.id }, orderBy: { id: "asc" } })).toEqual(aArtifacts);
+    expect(await db.diagnosticIdentityRecord.findMany({ where: { orderId: prior.a.id }, orderBy: { id: "asc" } })).toEqual(aRaw);
+    expect(await db.diagnosticIdentityEvidence.findMany({ where: { orderId: prior.a.id }, orderBy: { id: "asc" } })).toEqual(aEvidence);
+    expect(await history(prior.a)).toEqual([prior.ia]); expect(await history(p.b)).toEqual([p.ib]);
+    expect((await get("technician", evidencePath(prior.a)).expect(200)).body).toEqual([prior.ea]);
+    expect(await db.listing.findUniqueOrThrow({ where: { id: prior.listingId } })).toEqual(originalListing);
+  }
+
+  it("refuses automatic continuity after a restored Listing seller change without reobserving A", async () => {
+    await refusesRestoredAutomaticOwnershipMutation("seller");
+  });
+
+  it("refuses automatic continuity after a restored Listing VIN change without reobserving A", async () => {
+    await refusesRestoredAutomaticOwnershipMutation("vin");
+  });
+
   it("links unchanged public Listing identity and ownership by normalized VIN with independent B release", async () => {
     const p = await automaticCandidate(await automaticPredecessor());
     const listing = await db.listing.findUniqueOrThrow({ where: { id: p.listingId } });
