@@ -9,6 +9,8 @@ import { DiagnosticArtifactWorker } from "./DiagnosticArtifactWorker";
 import { readDiagnosticPdfText } from "./testing/readDiagnosticPdfText";
 
 const locales = ["tk", "ru", "en"] as const;
+// Font bytes are immutable renderer inputs; each case still renders its own PDFs.
+const fonts = Promise.all([readFile(join(__dirname, "../../../assets/fonts/NotoSans-Regular.ttf")), readFile(join(__dirname, "../../../assets/fonts/NotoSans-Bold.ttf"))]).then(([regular, bold]) => ({ regular, bold }));
 const canonical = (value: unknown): string => Array.isArray(value) ? `[${value.map(canonical).join(",")}]` : value && typeof value === "object" ? `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b, "en")).map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(",")}}` : JSON.stringify(value);
 const descriptor = (row: { objectKey: string; sizeBytes: number | null; sha256: string | null }) => {
   if (!row.sizeBytes || !row.sha256) throw new Error("Missing PDF descriptor");
@@ -18,8 +20,7 @@ const descriptor = (row: { objectKey: string; sizeBytes: number | null; sha256: 
 it.each(locales)("recovers an issued %s PDF in one ordinary maintenance pass despite older generation work", async issuedLocale => {
   const { memory, db, snapshot, eraseA } = await diagnosticReaderFixture();
   const objects = new DiagnosticMemoryObjects();
-  const fonts = { regular: await readFile(join(__dirname, "../../../assets/fonts/NotoSans-Regular.ttf")), bold: await readFile(join(__dirname, "../../../assets/fonts/NotoSans-Bold.ttf")) };
-  const worker = new DiagnosticArtifactWorker(db, objects, fonts, { now: () => diagnosticTestNow, id: randomUUID, enabled: () => true });
+  const worker = new DiagnosticArtifactWorker(db, objects, await fonts, { now: () => diagnosticTestNow, id: randomUUID, enabled: () => true });
   const issuedId = id(40 + locales.indexOf(issuedLocale));
   expect(await worker.generate(issuedId)).toBe(true);
   const issued = await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: issuedId } });
@@ -64,6 +65,7 @@ it.each(locales)("recovers an issued %s PDF in one ordinary maintenance pass des
   }
   const ordinaryReady = await db.diagnosticPdfArtifact.findMany({ where: { id: { in: ordinaryIds }, state: "ready" } });
   expect(ordinaryReady).toHaveLength(4);
+  expect(ordinaryReady.map(row => row.id).sort()).toEqual([id(110), id(111), id(112), id(210)]);
   expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: id(2) } })).toEqual(beforeB);
   expect(await db.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: issued.id } })).toEqual(issued);
   expect(await objects.read(...descriptor(issued))).toEqual(issuedBytes);
