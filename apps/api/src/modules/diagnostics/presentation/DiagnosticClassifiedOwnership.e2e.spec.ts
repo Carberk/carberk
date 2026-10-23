@@ -44,6 +44,7 @@ describe("classified forward ownership on real HTTP and disposable PostgreSQL", 
   let s3: S3Client;
   const keys = new Set<string>();
   let app: NestFastifyApplication, db: PrismaService, jwt: JwtService, request: ReturnType<typeof supertest>, templateId: string;
+  const ownershipGrants = new Map<string, string>();
   const orders: string[] = [], listings: string[] = [], businesses: string[] = [];
   const headers = (who: Person) => ({ authorization: `Bearer ${jwt.sign({ sub: suite.id(who), sid: suite.id(`${who}-session`), role: "buyer" })}` });
   const post = (who: Person, path: string, body: object) => request.post(`/api/v1/diagnostics/${path}`).set(headers(who)).send(body);
@@ -93,7 +94,7 @@ describe("classified forward ownership on real HTTP and disposable PostgreSQL", 
       await cleanSuiteFixtures(db, suite, { userAliases: [...people] });
     } finally { s3?.destroy(); await app?.close(); }
   });
-  async function visit(business = false, sourceSeller: "seller" | "replacement" = "seller", commissioner: "commissioner" | "unrelated" = "commissioner"): Promise<Order> {
+  async function visit(business = false, sourceSeller: "seller" | "replacement" = "seller", commissioner: "commissioner" | "unrelated" = "commissioner", withGrant = true): Promise<Order> {
     const listingId = randomUUID(); listings.push(listingId);
     let businessId: string | null = null;
     if (business) {
@@ -101,6 +102,8 @@ describe("classified forward ownership on real HTTP and disposable PostgreSQL", 
       await db.dealershipMember.deleteMany({ where: { userId: suite.id("commissioner") } });
       await db.dealership.create({ data: { id: businessId, name: "SYNTHETIC ownership source", slug: `synthetic-${businessId}`, status: "active", admissionMode: "synthetic" } });
       await db.dealershipMember.create({ data: { dealershipId: businessId, userId: suite.id("commissioner"), role: "sales", status: "active" } });
+      await db.dealershipMember.deleteMany({ where: { userId: suite.id(sourceSeller) } });
+      await db.dealershipMember.create({ data: { dealershipId: businessId, userId: suite.id(sourceSeller), role: "owner", status: "active" } });
     }
     await db.listing.create({ data: { id: listingId, sellerId: suite.id(business ? sourceSeller : commissioner), businessId,
       brandId: suite.catalog.brandId, modelId: suite.catalog.modelId, cityId: suite.catalog.cityId, vin: observed.vin,
@@ -114,9 +117,73 @@ describe("classified forward ownership on real HTTP and disposable PostgreSQL", 
       expectedVersion: order.version, userId: suite.id(who), capability: "diagnostics.reviewer", active: true }).expect(201)).body;
     for (const kind of ["physical", "publication"]) order = (await post("reception", `orders/${order.id}/authorization`, { expectedVersion: order.version, kind, authorityReference: `SYNTHETIC ${kind} permission` }).expect(201)).body;
     for (const state of ["confirmed", "arrived"]) order = (await post("reception", `orders/${order.id}/appointment`, { expectedVersion: order.version, state }).expect(201)).body;
+    if (withGrant) {
+      const response = await post(business ? sourceSeller : commissioner, `orders/${order.id}/ownership-grant`, { rights }).expect(201);
+      ownershipGrants.set(order.id, response.body.id);
+    }
     return order;
   }
-  const observe = (order: Order, extra: object = {}) => post("technician", `orders/${order.id}/vehicle`, { expectedVersion: order.version, ...observed, ...extra });
+  const observe = (order: Order, extra: object = {}, useGrant = true) => post("technician", `orders/${order.id}/vehicle`, {
+    expectedVersion: order.version, ...observed, ...(useGrant && "ownershipClassification" in extra ? { ownershipGrantId: ownershipGrants.get(order.id) } : {}), ...extra });
+  it("collects source consent through the seller Session, denies technicians and forgery, and revokes without erasing the observation", async () => {
+    const order = await visit(false, "seller", "commissioner", false);
+    const path = `orders/${order.id}/ownership-grant`;
+    await request.post(`/api/v1/diagnostics/${path}`).send({ rights }).expect(401);
+    await post("technician", path, { rights }).expect(403);
+    await post("unrelated", path, { rights }).expect(403);
+    await post("commissioner", path, { rights, sellerId: suite.id("unrelated") }).expect(400);
+    await post("commissioner", path, { rights: { ...rights, schedule: { ...rights.schedule, until: now.toISOString() } } }).expect(403);
+    expect(await db.diagnosticOwnershipGrant.count({ where: { orderId: order.id } })).toBe(0);
+    const response = await post("commissioner", path, { rights }).expect(201);
+    expect(Object.keys(response.body)).toEqual(["id"]);
+    expect(response.headers["cache-control"]).toBe("no-store, private");
+    const grantId = response.body.id;
+    expect(await db.diagnosticOwnershipGrant.findUniqueOrThrow({ where: { id: grantId } })).toMatchObject({
+      grantorId: suite.id("commissioner"), sessionId: suite.id("commissioner-session"), sellerId: suite.id("commissioner"),
+      commissionerId: suite.id("commissioner"), rights, rightsUntil: end,
+    });
+    const first = await observe(order, { ownershipGrantId: grantId }).expect(201);
+    const before = await raw(order.id);
+    expect(await component(order.id)).toMatchObject({ state: "available", grantId });
+    await post("technician", `${path}/${grantId}/revoke`, {}).expect(403);
+    await post("commissioner", `${path}/${grantId}/revoke`, {}).expect(201);
+    expect(await db.diagnosticOwnershipGrant.findUniqueOrThrow({ where: { id: grantId } })).toMatchObject({ state: "erased", grantorId: null, sessionId: null, rights: null, sellerId: null });
+    expect(await component(order.id)).toMatchObject({ state: "erased", grantId: null, rights: null });
+    expect(await raw(order.id)).toEqual(before);
+    const auditCount = await db.diagnosticAudit.count({ where: { orderId: order.id } });
+    await observe(first.body, { ownershipGrantId: grantId }).expect(403);
+    expect(await raw(order.id)).toEqual(before);
+    expect(await db.diagnosticAudit.count({ where: { orderId: order.id } })).toBe(auditCount);
+    await post("commissioner", path, { rights }).expect(403);
+  });
+  it("permits only dealership OWNER collection and refuses a changed exact source or another order without writes", async () => {
+    const order = await visit(true, "seller", "commissioner", false);
+    await post("commissioner", `orders/${order.id}/ownership-grant`, { rights }).expect(403);
+    const response = await post("seller", `orders/${order.id}/ownership-grant`, { rights }).expect(201);
+    const grantId = response.body.id;
+    const other = await visit();
+    await observe(other, { ownershipGrantId: grantId }).expect(403);
+    const before = await db.inspectionOrder.findUniqueOrThrow({ where: { id: order.id } });
+    await db.listing.update({ where: { id: before.listingId! }, data: { sellerId: suite.id("replacement") } });
+    const changed = await db.inspectionOrder.findUniqueOrThrow({ where: { id: order.id } });
+    const audits = await db.diagnosticAudit.count({ where: { orderId: order.id } });
+    await observe({ id: order.id, version: changed.version }, { ownershipGrantId: grantId }).expect(403);
+    expect(await db.diagnosticIdentityRecord.count({ where: { orderId: order.id } })).toBe(0);
+    expect(await db.diagnosticAudit.count({ where: { orderId: order.id } })).toBe(audits);
+    // Revocation reduces permission even after the source is no longer grant-compatible.
+    await post("seller", `orders/${order.id}/ownership-grant/${grantId}/revoke`, {}).expect(201);
+  });
+  it("disposes unconsumed grant payloads at their declared end and for an erased source subject", async () => {
+    for (const subject of [null, suite.id("commissioner")]) {
+      const order = await visit(); const grantId = ownershipGrants.get(order.id)!;
+      await db.$queryRaw`SELECT diagnostic_dispose_ownership(${subject}::text,${subject ? now : end}::timestamp)`;
+      expect(await db.diagnosticOwnershipGrant.findUniqueOrThrow({ where: { id: grantId } })).toMatchObject({
+        state: "erased", rights: null, sessionId: null, listingId: null, identityDigest: null, sellerId: null, commissionerId: null, grantorId: null,
+      });
+      await observe(order, { ownershipGrantId: grantId }).expect(403);
+      expect(await db.diagnosticIdentityRecord.count({ where: { orderId: order.id } })).toBe(0);
+    }
+  });
   it("refuses unauthenticated and unassigned classified observations without writes", async () => {
     const order = await visit();
     const before = await db.inspectionOrder.findUniqueOrThrow({ where: { id: order.id } });
@@ -165,7 +232,7 @@ describe("classified forward ownership on real HTTP and disposable PostgreSQL", 
     const order = await visit(true);
     if (state === "missing") await db.dealershipMember.delete({ where: { userId: suite.id("commissioner") } });
     else await db.dealershipMember.update({ where: { userId: suite.id("commissioner") }, data: { status: "suspended" } });
-    await observe(order, envelope).expect(201);
+    await observe(order, envelope, false).expect(201);
     expect(await component(order.id)).toMatchObject({ state: "unavailable", businessId: null, membershipId: null, sellerId: null, rights: null });
   });
   it("fences rights synchronously at the exact end before disposal, then erases idempotently without changing raw or report pins", async () => {

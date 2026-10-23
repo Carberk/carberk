@@ -400,7 +400,7 @@ describe("public continuity across different sellers and Listings", { concurrent
     expect(order).toMatchObject({ version: 7, status: "arrived", physicalAuthorized: true, publicationAuthorized: true, vehicleMatched: true, observedVehicle: observation });
     return order;
   }
-  async function visitOnListing(observation: Observation, seller: "sellerA" | "sellerB" | "erasureSeller" | "erasurePdfSeller" | "handoffErasureSeller", listingId: string, visitReference = listingId): Promise<Order> {
+  async function visitOnListing(observation: Observation, seller: "sellerA" | "sellerB" | "erasureSeller" | "erasurePdfSeller" | "handoffErasureSeller", listingId: string, visitReference = listingId, requestOwnershipGrant = false): Promise<Order> {
     const requestKey = randomUUID(); owned.requestKeys.push(requestKey);
     const response = await post(seller, "orders", { requestKey, centerId, templateVersionId: templateId, audience: "listing_public", listingId, synthetic: true });
     let order = response.body;
@@ -416,7 +416,14 @@ describe("public continuity across different sellers and Listings", { concurrent
     ({ body: order } = await post("reception", `orders/${order.id}/authorization`, { expectedVersion: 2, kind: "physical", authorityReference: `Synthetic physical authorization for visit ${visitReference}` }).expect(201));
     ({ body: order } = await post("reception", `orders/${order.id}/authorization`, { expectedVersion: 3, kind: "publication", authorityReference: visitReference === listingId ? `Fresh synthetic publication consent from ${seller} for Listing ${listingId}` : `Fresh synthetic publication consent from ${seller} for Listing ${listingId}, visit ${visitReference}` }).expect(201));
     for (const [state, expectedVersion] of [["confirmed", 4], ["arrived", 5]] as const) ({ body: order } = await post("reception", `orders/${order.id}/appointment`, { expectedVersion, state }).expect(201));
-    const observed = await post("technician", `orders/${order.id}/vehicle`, { expectedVersion: 6, ...observation });
+    // Ordinary authenticated source permission, never a seeded grant or technician declaration.
+    const grant = requestOwnershipGrant ? await post(seller, `orders/${order.id}/ownership-grant`, { rights: { ...rights,
+      purpose: "Synthetic restricted ownership continuity comparison",
+      basis: "Authenticated synthetic seller explicitly grants the server-resolved ownership component",
+      provenance: `Seller supplies consent for Listing/vehicle and seller/commissioner subjects of visit ${visitReference}`,
+    } }).expect(201) : undefined;
+    const observed = await post("technician", `orders/${order.id}/vehicle`, { expectedVersion: 6, ...observation,
+      ...(grant ? { ownershipGrantId: grant.body.id } : {}) });
     const records = await get("technician", `orders/${order.id}/identity-records`);
     if (Array.isArray(records.body)) owned.raw.push(...records.body.map((record: Raw) => record.id));
     expect(records.status, JSON.stringify(records.body)).toBe(200); expect(observed.status, JSON.stringify(observed.body)).toBe(201); order = observed.body;
@@ -745,7 +752,7 @@ describe("public continuity across different sellers and Listings", { concurrent
     const listingId = await isolatedListing("sellerA");
     const observation: Observation = { observedAt: "2026-10-21T10:00:00.000Z", mileageKm: 123000,
       method: "vin", vin: "syn-vin-041", manualReference: null };
-    const a = await visitOnListing(observation, "sellerA", listingId, "A automatic physical visit");
+    const a = await visitOnListing(observation, "sellerA", listingId, "A automatic physical visit", true);
     const [ia] = await history(a); const pa = randomUUID();
     await verified(a, pa, red); const ea = await capture(a, ia!, pa, red);
     const released = await release(a);
@@ -753,7 +760,7 @@ describe("public continuity across different sellers and Listings", { concurrent
   }
   async function automaticCandidate(prior: Awaited<ReturnType<typeof automaticPredecessor>>) {
     const observation: Observation = { ...prior.observation, observedAt: "2026-10-21T11:00:00.000Z", mileageKm: 123100, vin: "SYN-VIN-041" };
-    const b = await visitOnListing(observation, "sellerA", prior.listingId, "B automatic physical visit with own consent");
+    const b = await visitOnListing(observation, "sellerA", prior.listingId, "B automatic physical visit with own consent", true);
     const [ib] = await history(b); const pb = randomUUID();
     const classification = { ...rights, provenance: "Independently generated B VIN tile authorized by unchanged seller A for visit B" };
     await verified(b, pb, blue, classification); const eb = await capture(b, ib!, pb, blue, classification);

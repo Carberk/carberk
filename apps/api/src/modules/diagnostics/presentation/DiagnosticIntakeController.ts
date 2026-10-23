@@ -43,6 +43,12 @@ export class DiagnosticIntakeController {
   @Get("centers/:id/queue") @Header("Cache-Control", "no-store, private") queue(@Req() req: Request, @Param("id") id: string) { return this.run(intake => intake.queue(this.subject(req), parse(uuid, id))); }
   @Get("centers/:id/templates") @Header("Cache-Control", "no-store, private") templates(@Req() req: Request, @Param("id") id: string) { return this.run(intake => intake.templates(this.subject(req), parse(uuid, id))); }
   @Post("centers/:id/templates") @Header("Cache-Control", "no-store, private") publish(@Req() req: Request, @Param("id") id: string, @Body() body: unknown) { return this.run(intake => intake.publishTemplate(this.subject(req), parse(uuid, id), parse(DiagnosticSchemas.PublishDiagnosticTemplateSchema, body))); }
+  @Post("orders/:id/ownership-grant") @Header("Cache-Control", "no-store, private") grantOwnership(@Req() req: Request, @Param("id") id: string, @Body() body: unknown) {
+    return this.run(intake => intake.grantOwnership(this.subject(req), parse(uuid, id), parse(DiagnosticSchemas.DiagnosticOwnershipGrantSchema, body)));
+  }
+  @Post("orders/:id/ownership-grant/:grantId/revoke") @Header("Cache-Control", "no-store, private") revokeOwnership(@Req() req: Request, @Param("id") id: string, @Param("grantId") grantId: string) {
+    return this.run(intake => intake.revokeOwnership(this.subject(req), parse(uuid, id), parse(uuid, grantId)));
+  }
   @Post("orders/:id/authorization") @Header("Cache-Control", "no-store, private") authorize(@Req() req: Request, @Param("id") id: string, @Body() body: unknown) { return this.run(intake => intake.authorize(this.subject(req), parse(uuid, id), parse(DiagnosticSchemas.DiagnosticAuthorizationSchema, body))); }
   @Post("orders/:id/appointment") @Header("Cache-Control", "no-store, private") appointment(@Req() req: Request, @Param("id") id: string, @Body() body: unknown) { return this.run(intake => intake.appointment(this.subject(req), parse(uuid, id), parse(DiagnosticSchemas.DiagnosticAppointmentChangeSchema, body))); }
   @Post("orders/:id/assignments") @Header("Cache-Control", "no-store, private") assign(@Req() req: Request, @Param("id") id: string, @Body() body: unknown) { return this.run(intake => intake.assign(this.subject(req), parse(uuid, id), parse(DiagnosticSchemas.DiagnosticAssignmentChangeSchema, body))); }

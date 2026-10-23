@@ -1403,6 +1403,7 @@ model DiagnosticTemplateVersion {
 }
 
 model InspectionOrder {
+  ownershipGrant DiagnosticOwnershipGrant?
   continuityRequests DiagnosticContinuityRequest[]
   id String @id @default(uuid())
   centerId String
@@ -1985,6 +1986,8 @@ model MarketKnowledgeDatasetSource {
 /// Disposal refreshes component IDs only within its unchanged locked graph.
 /// SQL function version: 20261023100000_diagnostic_ownership_disposal_same_graph.
 model DiagnosticOwnershipComponent {
+  grantId String?
+  grant DiagnosticOwnershipGrant? @relation(fields: [grantId], references: [id], onDelete: NoAction)
   identityRecordId String @id
   identityRecord DiagnosticIdentityRecord @relation(fields: [identityRecordId], references: [id], onDelete: Cascade)
   orderId String
@@ -2003,6 +2006,7 @@ model DiagnosticOwnershipComponent {
   declaredAt DateTime?
   erasedAt DateTime?
   @@unique([orderId, orderVersion])
+  @@index([grantId])
   @@index([sellerId])
   @@index([commissionerId])
   @@index([declaredById])
@@ -2024,4 +2028,32 @@ model DiagnosticContinuityRequest {
   kind String
   @@index([actorId, sessionId, orderId, id])
   @@map("diagnostic_continuity_requests")
+}
+
+/// One source-authenticated grant per visit, never backfilled or replaced.
+/// Erasure clears all personal content and retains only id/order/state.
+model DiagnosticOwnershipGrant {
+  id String @id
+  orderId String @unique
+  order InspectionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  state String
+  listingId String?
+  identityDigest String?
+  sellerId String?
+  commissionerId String?
+  businessId String?
+  membershipId String?
+  grantorId String?
+  grantorMembershipId String?
+  sessionId String?
+  rights Json?
+  rightsUntil DateTime?
+  declaredAt DateTime?
+  erasedAt DateTime?
+  components DiagnosticOwnershipComponent[]
+  @@index([sellerId])
+  @@index([commissionerId])
+  @@index([grantorId])
+  @@index([rightsUntil, state])
+  @@map("diagnostic_ownership_grants")
 }

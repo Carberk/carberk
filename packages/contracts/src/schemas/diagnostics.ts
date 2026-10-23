@@ -42,10 +42,14 @@ export const DiagnosticIdentityRightsSchema = z.object({
 /** Ownership is classified separately before the server copies its own source tuple.
  * This declaration never becomes part of the physical observation or its v1 hash. */
 export const DiagnosticOwnershipClassificationSchema = z.object({ rights: DiagnosticIdentityRightsSchema }).strict();
+export const DiagnosticOwnershipGrantSchema = z.object({ rights: DiagnosticIdentityRightsSchema }).strict();
+export type DiagnosticOwnershipGrant = z.infer<typeof DiagnosticOwnershipGrantSchema>;
+export const DiagnosticOwnershipGrantReceiptSchema = z.object({ id: z.string().uuid() }).strict();
 export const DiagnosticVehicleObservationRequestSchema = DiagnosticObservedVehicleSchema.innerType().extend({
   ownershipClassification: DiagnosticOwnershipClassificationSchema.optional(),
+  ownershipGrantId: z.string().uuid().optional(),
 }).strict().superRefine((value, ctx) => {
-  const observed = { ...value }; delete observed.ownershipClassification;
+  const observed = { ...value }; delete observed.ownershipClassification; delete observed.ownershipGrantId;
   const result = DiagnosticObservedVehicleSchema.safeParse(observed);
   if (!result.success) for (const issue of result.error.issues) ctx.addIssue(issue);
 });
