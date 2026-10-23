@@ -3,16 +3,16 @@ import { ConfigService } from "@nestjs/config";
 import type { FastifyRequest } from "fastify";
 import { describe, expect, it } from "vitest";
 import { DiagnosticMemoryDatabase, diagnosticTestId as id, diagnosticTestNow as now } from "@auto-tm/db/testing";
-import { CheckBusinessAuthority } from "../../identity/application/CheckBusinessAuthority";
-import { CheckStaffAuthority } from "../../identity/application/CheckStaffAuthority";
-import { PrismaBusinessAuthority } from "../../identity/infrastructure/PrismaBusinessAuthority";
-import { PrismaStaffAuthority } from "../../identity/infrastructure/PrismaStaffAuthority";
-import { PrismaPublisherBindings } from "../../identity/infrastructure/PrismaPublisherBindings";
-import { DiagnosticIntakeController } from "../presentation/DiagnosticIntakeController";
-import { DiagnosticAuthority } from "./DiagnosticAuthority";
-import { DiagnosticPublicBindings } from "./DiagnosticPublicBindings";
-import { CampaignDiagnosticAdmission } from "./campaignDiagnosticAdmission";
-import { PrismaDiagnosticIntake, diagnosticObservationHash } from "./PrismaDiagnosticIntake";
+import { CheckBusinessAuthority } from "../application/CheckBusinessAuthority";
+import { CheckStaffAuthority } from "../application/CheckStaffAuthority";
+import { PrismaBusinessAuthority } from "./PrismaBusinessAuthority";
+import { PrismaStaffAuthority } from "./PrismaStaffAuthority";
+import { PrismaPublisherBindings } from "./PrismaPublisherBindings";
+import { DiagnosticIntakeController } from "../../diagnostics/presentation/DiagnosticIntakeController";
+import { DiagnosticAuthority } from "../../diagnostics/infrastructure/DiagnosticAuthority";
+import { DiagnosticPublicBindings } from "../../diagnostics/infrastructure/DiagnosticPublicBindings";
+import { CampaignDiagnosticAdmission } from "../../diagnostics/infrastructure/campaignDiagnosticAdmission";
+import { PrismaDiagnosticIntake, diagnosticObservationHash } from "../../diagnostics/infrastructure/PrismaDiagnosticIntake";
 
 // Explicit synthetic source permission. This is software evidence, never a real-source basis.
 export const syntheticOwnershipRights = {
@@ -25,8 +25,19 @@ export const syntheticOwnershipRights = {
 };
 const observed = { observedAt: "2026-10-22T12:00:00.000Z", mileageKm: 123000, method: "vin", vin: "SYN-123", manualReference: null };
 async function fixture() {
-  const memory = new DiagnosticMemoryDatabase(), db = memory.client;
+  const memory = new DiagnosticMemoryDatabase(), base = memory.client;
+  const components: Record<string, unknown>[] = [];
+  const db = new Proxy(base, { get(target, key) {
+    if (key === "diagnosticOwnershipComponent") return { create: async ({ data }: { data: Record<string, unknown> }) => { components.push(structuredClone(data)); return data; } };
+    if (key === "$transaction") return async (work: (tx: typeof base) => unknown) => work(db);
+    if (key === "diagnosticIdentityRecord") return { ...base.diagnosticIdentityRecord,
+      findMany: async (args: Parameters<typeof base.diagnosticIdentityRecord.findMany>[0]) =>
+        (await base.diagnosticIdentityRecord.findMany(args)).map(raw => ({ ...raw, ownership: components.find(c => c["identityRecordId"] === raw.id) ?? null })),
+    };
+    return Reflect.get(target, key);
+  } });
   const future = new Date("2026-12-01T00:00:00Z");
+  memory.seed("user", { id: id(7), phoneVerifiedAt: now, deletionScheduledAt: null });
   memory.seed("user", { id: id(30), suspendedAt: null, deletionScheduledAt: null, dealershipMemberships: [] });
   memory.seed("session", { id: id(31), userId: id(30), expiresAt: future, adminTotpExpiresAt: future });
   memory.seed("staffGrant", { userId: id(30), capability: "diagnostics.technician", revokedAt: null });
@@ -41,19 +52,21 @@ async function fixture() {
   const intake = new PrismaDiagnosticIntake(db, authority, business, new DiagnosticPublicBindings(new PrismaPublisherBindings()), runtime);
   const controller = new DiagnosticIntakeController(intake);
   const req = { user: { sub: id(30), sid: id(31) } } as unknown as FastifyRequest;
-  return { db, observe: (extra: object = {}) => controller.vehicle(req, id(4), { expectedVersion: 6, ...observed, ...extra }) };
+  return { db, memory, components, observe: (extra: object = {}) => controller.vehicle(req, id(4), { expectedVersion: 6, ...observed, ...extra }) };
 }
 describe("classified forward ownership capture through the real intake transport", () => {
   it("accepts a separate synthetic classification without adding it to observedVehicle or changing observation hash v1", async () => {
     const f = await fixture();
     const result = await f.observe({ ownershipClassification: { rights: syntheticOwnershipRights } });
     expect(result.observedVehicle).toEqual(observed);
+    expect(f.components).toMatchObject([{ state: "available", sourceListingId: id(8), sellerId: id(7), commissionerId: id(7), businessId: null, membershipId: null, rights: syntheticOwnershipRights }]);
     const raw = await f.db.diagnosticIdentityRecord.findFirstOrThrow({ where: { orderId: id(4) } });
     expect(raw.observationHash).toBe(diagnosticObservationHash(id(4), 7, observed as Parameters<typeof diagnosticObservationHash>[2]));
   });
   it("keeps existing observations without a classification working", async () => {
     const f = await fixture();
     expect((await f.observe()).observedVehicle).toEqual(observed);
+    expect(f.components).toEqual([{ identityRecordId: expect.any(String), orderId: id(4), orderVersion: 7, state: "unavailable" }]);
   });
   it("refuses an expired classification atomically before ordinary observation writes", async () => {
     const f = await fixture();
@@ -62,4 +75,29 @@ describe("classified forward ownership capture through the real intake transport
     expect(await f.db.diagnosticIdentityRecord.count()).toBe(0);
     expect((await f.db.inspectionOrder.findUniqueOrThrow({ where: { id: id(4) } })).version).toBe(6);
   });
+  it.each([
+    { ownershipClassification: null },
+    { ownershipClassification: { rights: syntheticOwnershipRights, sellerId: id(80) } },
+    { ownershipClassification: { rights: { ...syntheticOwnershipRights, extra: true } } },
+  ])("strictly refuses malformed classification before writes: %j", async extra => {
+    const f = await fixture();
+    await expect(f.observe(extra)).rejects.toBeDefined();
+    expect(await f.db.diagnosticIdentityRecord.count()).toBe(0);
+    expect(f.components).toEqual([]);
+  });
+  it("cannot classify a later raw to repair an earlier missing anchor", async () => {
+    const f = await fixture();
+    await f.observe();
+    await f.observe({ expectedVersion: 7, ownershipClassification: { rights: syntheticOwnershipRights } });
+    expect(f.components.map(c => c["state"])).toEqual(["unavailable", "unavailable"]);
+  });
+  it.each(["active", "suspended", "missing"])("records Business source membership as %s without adding publisher admission to observation", async status => {
+    const f = await fixture();
+    await f.db.listing.update({ where: { id: id(8) }, data: { businessId: id(50) } });
+    if (status !== "missing") f.memory.seed("dealershipMember", { id: id(51), userId: id(7), dealershipId: id(50), status, role: "sales" });
+    await f.observe({ ownershipClassification: { rights: syntheticOwnershipRights } });
+    expect(f.components[0]).toMatchObject(status === "active" ? { state: "available", businessId: id(50), membershipId: id(51) } : { state: "unavailable" });
+    if (status !== "active") expect(f.components[0]).not.toHaveProperty("sellerId");
+  });
+
 });

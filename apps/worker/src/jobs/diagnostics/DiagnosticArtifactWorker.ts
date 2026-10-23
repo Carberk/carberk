@@ -212,6 +212,9 @@ export class DiagnosticArtifactWorker {
    * place and bumps the visit's generation. Provenance follows its rights, abandoned intents
    * and verified items never attached to any evidence record use the upload lifecycle rule. */
   private async retireIdentity(now: Date): Promise<void> {
+    await this.db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT diagnostic_dispose_ownership(NULL::text,${now}::timestamp)`;
+    });
     // The proof's declared end is the shortest retained evidence/provenance right,
     // not a newly invented TTL. Delete the whole restricted payload and linkage.
     await this.db.$executeRaw`DELETE FROM diagnostic_continuity_proofs WHERE id IN

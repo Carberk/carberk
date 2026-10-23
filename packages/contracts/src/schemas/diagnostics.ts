@@ -39,6 +39,18 @@ export const DiagnosticIdentityRightsSchema = z.object({
   schedule: z.object({ kind: z.literal("until"), until: z.string().datetime(), reason: restrictedText(500) }).strict(),
   supplierRestrictions: z.string().trim().max(1000), hold: z.null(),
 }).strict();
+/** Ownership is classified separately before the server copies its own source tuple.
+ * This declaration never becomes part of the physical observation or its v1 hash. */
+export const DiagnosticOwnershipClassificationSchema = z.object({ rights: DiagnosticIdentityRightsSchema }).strict();
+export const DiagnosticVehicleObservationRequestSchema = DiagnosticObservedVehicleSchema.innerType().extend({
+  ownershipClassification: DiagnosticOwnershipClassificationSchema.optional(),
+}).strict().superRefine((value, ctx) => {
+  const observed = { ...value }; delete observed.ownershipClassification;
+  const result = DiagnosticObservedVehicleSchema.safeParse(observed);
+  if (!result.success) for (const issue of result.error.issues) ctx.addIssue(issue);
+});
+export type DiagnosticOwnershipClassification = z.infer<typeof DiagnosticOwnershipClassificationSchema>;
+export type DiagnosticVehicleObservationRequest = z.infer<typeof DiagnosticVehicleObservationRequestSchema>;
 export const DiagnosticIdentityProvenanceStageSchema = z.object({ id: z.string().uuid(), expectedOrderVersion: z.number().int().nonnegative(),
   contentType: z.enum(["image/jpeg", "image/png", "image/webp"]), sizeBytes: z.number().int().positive().max(10 * 1024 * 1024), rights: DiagnosticIdentityRightsSchema }).strict();
 export const DiagnosticIdentityProvenanceStagedSchema = z.object({ id: z.string().uuid(), state: z.enum(["staged", "verified"]) }).strict();

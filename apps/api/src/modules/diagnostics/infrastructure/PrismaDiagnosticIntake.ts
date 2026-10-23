@@ -15,6 +15,7 @@ const json = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.stringif
 export { diagnosticListingDigest } from "./diagnosticListingDigest";
 import { diagnosticListingDigest } from "./diagnosticListingDigest";
 import { DiagnosticPublicBindings } from "./DiagnosticPublicBindings";
+import { DiagnosticOwnershipCapture } from "./DiagnosticOwnershipCapture";
 
 /** Stable binding of one recorded observation to its visit and resulting order version. */
 export function diagnosticObservationHash(orderId: string, orderVersion: number, observed: Omit<DiagnosticSchemas.DiagnosticObservedVehicle, "expectedVersion">): string {
@@ -209,12 +210,16 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
       await this.audit(tx, subject, row, "ORDER_ASSIGNMENT_CHANGED", { targetUserId: input.userId, capability: input.capability, active: input.active }); return this.dto(tx, next, true);
     });
   }
-  async observeVehicle(subject: DiagnosticSubject, id: string, input: DiagnosticSchemas.DiagnosticObservedVehicle): Promise<DiagnosticSchemas.DiagnosticOrder> {
+  async observeVehicle(subject: DiagnosticSubject, id: string, input: DiagnosticSchemas.DiagnosticVehicleObservationRequest): Promise<DiagnosticSchemas.DiagnosticOrder> {
+    const classification = DiagnosticOwnershipCapture.classification(input.ownershipClassification, this.runtime.now());
     return this.db.$transaction(async tx => {
       // Listing mutations acquire Listing before order. Never wait for a Listing under an order lock.
       await this.publicBindings.lock(tx, [id], [subject.userId]);
       const { row } = await this.scope(tx, subject, id, "diagnostics.technician");
-      const { expectedVersion, ...observed } = input;
+      const { expectedVersion } = input;
+      const observed = DiagnosticSchemas.DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true }).parse({
+        observedAt: input.observedAt, mileageKm: input.mileageKm, method: input.method, vin: input.vin, manualReference: input.manualReference,
+      });
       this.version(row, expectedVersion);
       if (row.status !== "arrived" || new Date(input.observedAt) > this.runtime.now()) throw new DiagnosticRuleError("DIAGNOSTIC_OBSERVATION_DENIED");
       let identityDigest: string | null = null;
@@ -228,8 +233,11 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
       }
       const next = await tx.inspectionOrder.update({ where: { id }, data: { observedVehicle: json(observed), listingIdentityDigest: identityDigest, associationValidatedAt: row.audience === "listing_public" ? this.runtime.now() : null, version: { increment: 1 } } });
       // Appended under the same order lock and bound to the resulting version; the order keeps only the newest observation.
-      await tx.diagnosticIdentityRecord.create({ data: { id: this.runtime.id(), orderId: id, orderVersion: next.version, observation: json(observed),
-        observationHash: diagnosticObservationHash(id, next.version, observed), recordedById: subject.userId, recordedAt: this.runtime.now() } });
+      const rawId = this.runtime.id();
+      const recordedAt = this.runtime.now();
+      await tx.diagnosticIdentityRecord.create({ data: { id: rawId, orderId: id, orderVersion: next.version, observation: json(observed),
+        observationHash: diagnosticObservationHash(id, next.version, observed), recordedById: subject.userId, recordedAt } });
+      await DiagnosticOwnershipCapture.append(tx, row, rawId, next.version, subject.userId, recordedAt, classification);
       await this.audit(tx, subject, row, "VEHICLE_OBSERVED", { method: input.method }); return this.dto(tx, next, true);
     });
   }

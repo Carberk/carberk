@@ -1470,6 +1470,9 @@ model DiagnosticIdentityRecord {
   erasedAt DateTime?
   reports DiagnosticReportRecord[]
   evidence DiagnosticIdentityEvidence[]
+  ownership DiagnosticOwnershipComponent?
+  /// Server-only transaction receipt for forward component INSERT, not an ownership history witness.
+  ownershipCaptureTransaction String?
   @@unique([orderId, orderVersion])
   @@index([recordedById])
   @@map("diagnostic_identity_records")
@@ -1969,4 +1972,32 @@ model MarketKnowledgeDatasetSource {
   @@id([datasetId, sourceId])
   @@index([sourceId])
   @@map("market_knowledge_dataset_sources")
+}
+
+/// Forward-only classified source ownership. No row for a historical raw means unavailable.
+/// Personal linkage and identifying declaration text are cleared together at the component end.
+model DiagnosticOwnershipComponent {
+  identityRecordId String @id
+  identityRecord DiagnosticIdentityRecord @relation(fields: [identityRecordId], references: [id], onDelete: Cascade)
+  orderId String
+  orderVersion Int
+  state String
+  scope String?
+  sourceListingId String?
+  identityDigest String?
+  sellerId String?
+  commissionerId String?
+  businessId String?
+  membershipId String?
+  rights Json?
+  rightsUntil DateTime?
+  declaredById String?
+  declaredAt DateTime?
+  erasedAt DateTime?
+  @@unique([orderId, orderVersion])
+  @@index([sellerId])
+  @@index([commissionerId])
+  @@index([declaredById])
+  @@index([rightsUntil, state])
+  @@map("diagnostic_ownership_components")
 }
