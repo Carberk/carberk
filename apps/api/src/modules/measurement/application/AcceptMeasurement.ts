@@ -1,6 +1,8 @@
 import { MeasurementSchemas } from "@auto-tm/contracts";
 import type { MeasurementAuthority, MeasurementEmitterPort, MeasurementLedgerPort, MeasurementReceipt } from "../measurement.public";
 
+import { reportMeasurementUnavailable } from "./MeasurementUnavailableDiagnostic";
+
 export interface MeasurementActivation {
  enabled: boolean; environment: MeasurementAuthority["environment"];
  purposes: MeasurementSchemas.MeasurementPurpose[]; evidenceRef: string; realCollectionApproved: boolean;
@@ -31,10 +33,17 @@ export class AcceptMeasurement implements MeasurementEmitterPort {
    || time < receivedAt.getTime() - MeasurementSchemas.MEASUREMENT_LIMITS.queueAgeMs) return "invalid";
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-   return await Promise.race([this.ledger.appendIfEligible({ event: fact,
-    authority: { ...authority, subject: { ...authority.subject } }, receivedAt,
-    expiresAt: new Date(time + MeasurementSchemas.MEASUREMENT_LIMITS.rawRetentionDays * 86400000),
-   }), new Promise<"unavailable">((resolve) => { timer = setTimeout(() => resolve("unavailable"), 250); })]);
+   const append = async () => {
+    try {
+     return await this.ledger.appendIfEligible({ event: fact,
+      authority: { ...authority, subject: { ...authority.subject } }, receivedAt,
+      expiresAt: new Date(time + MeasurementSchemas.MEASUREMENT_LIMITS.rawRetentionDays * 86400000),
+     });
+    } catch (error) { reportMeasurementUnavailable("ledger_rejected", error); throw error; }
+   };
+   return await Promise.race([append(), new Promise<"unavailable">((resolve) => {
+    timer = setTimeout(() => { reportMeasurementUnavailable("ledger_deadline"); resolve("unavailable"); }, 250);
+   })]);
   } catch { return "unavailable"; }
   finally { clearTimeout(timer); }
  }
