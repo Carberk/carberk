@@ -1976,6 +1976,8 @@ model MarketKnowledgeDatasetSource {
 
 /// Forward-only classified source ownership. No row for a historical raw means unavailable.
 /// Personal linkage and identifying declaration text are cleared together at the component end.
+/// Disposal refreshes component IDs only within its unchanged locked graph.
+/// SQL function version: 20261023100000_diagnostic_ownership_disposal_same_graph.
 model DiagnosticOwnershipComponent {
   identityRecordId String @id
   identityRecord DiagnosticIdentityRecord @relation(fields: [identityRecordId], references: [id], onDelete: Cascade)

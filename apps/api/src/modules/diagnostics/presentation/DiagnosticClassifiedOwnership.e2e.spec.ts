@@ -372,6 +372,7 @@ describe("classified forward ownership on real HTTP and disposable PostgreSQL", 
   const dbTime = async () => (await db.$queryRaw<{ value: Date }[]>`SELECT clock_timestamp() AT TIME ZONE 'UTC' AS value`)[0]!.value;
 
   it.each([false, true])("expires a capture committed after E inside the unchanged locked graph; Business=%s", async business => {
+    if (!business) await db.dealershipMember.deleteMany({ where: { userId: suite.id("commissioner") } });
     const pair = await consumed("seller", business);
     const c = await visit(false, "seller", "unrelated");
     c.version = (await observe(c, envelope).expect(201)).body.version;
@@ -380,15 +381,16 @@ describe("classified forward ownership on real HTTP and disposable PostgreSQL", 
     const cBefore = { raw: await raw(c.id), component: await component(c.id), report: await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: cReport } }) };
     const rawBefore = await db.diagnosticIdentityRecord.findMany({ where: { orderId: { in: [pair.a.id, pair.b.id] } }, orderBy: { id: "asc" } });
     const reportsBefore = await db.diagnosticReportRecord.findMany({ where: { id: { in: [pair.reportA, pair.input.reportId] } }, orderBy: { id: "asc" } });
-    expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: pair.input.proofId } })).toMatchObject({ consumedReportId: pair.input.reportId });
+    const proofBefore = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: pair.input.proofId } });
+    expect(proofBefore).toMatchObject({ consumedReportId: pair.input.reportId });
     // Preload the real worker before opening the short capture transaction. Only
     // the transport is gated; cleanup itself and every product boundary are real.
     let markReady!: () => void, runWorker!: () => void;
     const ready = new Promise<void>(resolve => { markReady = resolve; });
     const start = new Promise<void>(resolve => { runWorker = resolve; });
     const abort = new AbortController();
-    // Choose E after worker readiness below, then give the worker that exact clock.
-    // The worker obtains its clock at invocation, from the database, in this mode.
+    // Choose E after worker readiness. After release the worker obtains its own
+    // current cutoff from PostgreSQL, which the test has already observed past E.
     const operation = worker("expire", now, undefined, { signal: abort.signal, ready: markReady, start });
     const workerResult = Promise.allSettled([operation]);
     let captureResult: Promise<PromiseSettledResult<supertest.Response>[]> | undefined;
@@ -397,6 +399,7 @@ describe("classified forward ownership on real HTTP and disposable PostgreSQL", 
     try {
       await Promise.race([ready, operation.then(() => { throw new Error("Worker exited before readiness"); })]);
       const expiry = new Date((await dbTime()).getTime() + 2000);
+      expect(proofBefore.rightsUntil > expiry, "ownership disposal must delete a proof that is not itself expired").toBe(true);
       const short = { ownershipClassification: { rights: { ...rights, schedule: { ...rights.schedule, until: expiry.toISOString() } } } };
       const current = await db.inspectionOrder.findUniqueOrThrow({ where: { id: pair.a.id } });
       pair.a.version = (await observe({ id: pair.a.id, version: current.version }, short).expect(201)).body.version;
@@ -444,7 +447,7 @@ describe("classified forward ownership on real HTTP and disposable PostgreSQL", 
       if (result.status === "rejected") throw result.reason;
       const erased = await db.diagnosticOwnershipComponent.findMany({ where: { identityRecordId: { in: [first.identityRecordId, second.id] } } });
       expect(erased).toHaveLength(2);
-      for (const item of erased) expect(item).toMatchObject({ state: "erased", sourceListingId: null, identityDigest: null,
+      for (const item of erased) expect(item).toMatchObject({ state: "erased", scope: null, sourceListingId: null, identityDigest: null,
         sellerId: null, commissionerId: null, businessId: null, membershipId: null, rights: null, rightsUntil: null, declaredById: null, declaredAt: null });
       expect(await db.diagnosticContinuityProof.findUnique({ where: { id: pair.input.proofId } })).toBeNull();
       const snapshot = await db.diagnosticOwnershipComponent.findMany({ where: { orderId: pair.a.id }, orderBy: { orderVersion: "asc" } });
