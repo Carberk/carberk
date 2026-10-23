@@ -45,7 +45,7 @@ export class DiagnosticMemoryDatabase {
       if (sql.includes('SELECT id,"centerId","userId"')) return clone(this.table("diagnosticCenterAssignment").filter(row => values.slice(0, 2).includes(row["centerId"] as string) && values.slice(2).includes(row["userId"] as string)).sort((a, b) => String(a["id"]).localeCompare(String(b["id"]))));
       return [];
     }, $executeRaw: async () => 0 };
-    for (const name of ["user", "session", "staffGrant", "diagnosticIdentityRecord", "diagnosticContinuityProof", "diagnosticAudit", "dealershipMember", "inspectionOrder", "listing", "diagnosticReportRecord", "diagnosticPdfArtifact", "diagnosticEvidence", "diagnosticTemplateVersion", "diagnosticOrderAssignment", "diagnosticCenterAssignment", "diagnosticIdentityEvidence", "diagnosticIdentityProvenance"]) {
+    for (const name of ["diagnosticContinuityRequest", "user", "session", "staffGrant", "diagnosticIdentityRecord", "diagnosticContinuityProof", "diagnosticAudit", "dealershipMember", "inspectionOrder", "listing", "diagnosticReportRecord", "diagnosticPdfArtifact", "diagnosticEvidence", "diagnosticTemplateVersion", "diagnosticOrderAssignment", "diagnosticCenterAssignment", "diagnosticIdentityEvidence", "diagnosticIdentityProvenance"]) {
       this.tables.set(name, []);
       const rows = () => this.table(name);
       const reportRelations = (row: Row): Row => ({ ...row, order: this.table("inspectionOrder").filter(o => o["id"] === row["orderId"]).map(orderRelations)[0], artifacts: this.table("diagnosticPdfArtifact").filter(a => a["reportId"] === row["id"]) });

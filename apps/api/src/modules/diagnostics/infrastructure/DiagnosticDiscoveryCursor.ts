@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { DiagnosticSubject } from "../domain/ports/DiagnosticIntakePort";
 import { DiagnosticRuleError } from "../domain/InspectionOrder";
 const state = z.object({ userId: z.string(), sessionId: z.string(), orderId: z.string(),
-  query: z.enum(["retained-predecessors-v1", "b-handoffs-v1"]), until: z.number(), expires: z.number(), after: z.object({ at: z.string().datetime(), id: z.string() }).nullable() }).strict();
+  query: z.enum(["retained-predecessors-v1", "b-handoffs-v1", "requests-v1"]), until: z.number(), expires: z.number(), after: z.object({ at: z.string().datetime(), id: z.string() }).nullable() }).strict();
 export type DiscoveryPosition = z.infer<typeof state>;
 /** Fixed-size authenticated encryption hides scan positions, including omitted ids.
  * Process-local key: restart/replica change refuses uniformly; restart the scan. No persistent

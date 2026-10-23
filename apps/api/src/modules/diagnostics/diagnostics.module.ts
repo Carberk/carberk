@@ -1,3 +1,7 @@
+import { ExecuteDiagnosticContinuityRequest } from "./application/ExecuteDiagnosticContinuityRequest";
+import { DiscoverDiagnosticContinuityRequests } from "./application/DiscoverDiagnosticContinuityRequests";
+import { RecoverDiagnosticContinuityRequest } from "./application/RecoverDiagnosticContinuityRequest";
+import { PrepareDiagnosticContinuityRequest } from "./application/PrepareDiagnosticContinuityRequest";
 import { UseDiagnosticContinuityHandoff } from "./application/UseDiagnosticContinuityHandoff";
 import { DiscoverDiagnosticContinuityHandoffs } from "./application/DiscoverDiagnosticContinuityHandoffs";
 import { randomBytes } from "node:crypto";
@@ -50,6 +54,10 @@ import { ConsumeDiagnosticContinuityProof } from "./application/ConsumeDiagnosti
   { provide: IssueDiagnosticContinuityProof, inject: [DIAGNOSTIC_CONTINUITY_PROOFS_PORT], useFactory: (proofs: DiagnosticContinuityProofsPort) => new IssueDiagnosticContinuityProof(proofs) },
   { provide: ReadDiagnosticContinuityProof, inject: [DIAGNOSTIC_CONTINUITY_PROOFS_PORT], useFactory: (proofs: DiagnosticContinuityProofsPort) => new ReadDiagnosticContinuityProof(proofs) },
   { provide: ConsumeDiagnosticContinuityProof, inject: [DIAGNOSTIC_CONTINUITY_PROOFS_PORT], useFactory: (proofs: DiagnosticContinuityProofsPort) => new ConsumeDiagnosticContinuityProof(proofs) },
+  { provide: PrepareDiagnosticContinuityRequest, inject: [DIAGNOSTIC_CONTINUITY_PROOFS_PORT], useFactory: (proofs: DiagnosticContinuityProofsPort) => new PrepareDiagnosticContinuityRequest(proofs) },
+  { provide: RecoverDiagnosticContinuityRequest, inject: [DIAGNOSTIC_CONTINUITY_PROOFS_PORT], useFactory: (proofs: DiagnosticContinuityProofsPort) => new RecoverDiagnosticContinuityRequest(proofs) },
+  { provide: DiscoverDiagnosticContinuityRequests, inject: [DIAGNOSTIC_CONTINUITY_PROOFS_PORT], useFactory: (proofs: DiagnosticContinuityProofsPort) => new DiscoverDiagnosticContinuityRequests(proofs) },
+  { provide: ExecuteDiagnosticContinuityRequest, inject: [DIAGNOSTIC_CONTINUITY_PROOFS_PORT], useFactory: (proofs: DiagnosticContinuityProofsPort) => new ExecuteDiagnosticContinuityRequest(proofs) },
   { provide: DIAGNOSTIC_OBJECTS, useClass: S3DiagnosticObjects },
   { provide: DIAGNOSTIC_EVIDENCE_PORT, useClass: PrismaDiagnosticEvidence },
   PrismaDiagnosticIdentityEvidence, { provide: DIAGNOSTIC_IDENTITY_EVIDENCE_PORT, useExisting: PrismaDiagnosticIdentityEvidence },

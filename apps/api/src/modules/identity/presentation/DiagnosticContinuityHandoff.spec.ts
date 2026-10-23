@@ -214,7 +214,7 @@ describe("B-owned continuity handoff through real HTTP, application, authority a
     const command = issuanceCommand();
     const executed = await post(`${requestPath}/${requestId}/execute`, { kind: "issue", command });
     expect(executed.status).toBe(201);
-    const expected = { requestId, kind: "issue", state: "completed", proofId: executed.body.proofId, usability: "usable" };
+    const expected = { requestId, kind: "issue", state: "completed", proofId: executed.body.proofId, usability: "historical" };
     // Reload needs neither command nor an ID retained in the browser.
     expect((await get(requestPath)).body).toEqual({ requests: [expected], nextCursor: null });
     expect((await get(`${requestPath}/${requestId}`)).body).toEqual(expected);
@@ -274,6 +274,26 @@ describe("B-owned continuity handoff through real HTTP, application, authority a
     await db.diagnosticCenterAssignment.updateMany({ where: { userId: technician.userId }, data: { qualifiedUntil: now } });
     expect((await post(`${requestPath}/${pending}/execute`, { kind: "consume", command: { proofId: executed.body.proofId, reportId: id(9000), expectedOrderVersion: 1, reason: "B follow-up" } }, technician)).status).toBe(403);
     expect(await db.diagnosticContinuityProof.count({ where: { candidateOrderId: b } })).toBe(1);
+  });
+
+  it("bounds request discovery, binds continuations to Session/B/query and stages linkage only", async () => {
+    for (let n = 0; n < 21; n++) await prepare("consume", technician);
+    const first = await get(requestPath, technician);
+    expect(first.body.requests).toHaveLength(20);
+    const cursor = first.body.nextCursor as string;
+    expect(cursor).toHaveLength(1062);
+    const next = await get(`${requestPath}?cursor=${cursor}`, technician);
+    expect(next.body.requests).toHaveLength(1); expect(next.body.nextCursor).toBeNull();
+    expect(new Set([...first.body.requests, ...next.body.requests].map((r: { requestId: string }) => r.requestId)).size).toBe(21);
+    expect((await get(`${b}/continuity-handoffs?cursor=${cursor}`, technician)).status).toBe(403);
+    const rows = await db.diagnosticContinuityRequest.findMany({ where: { orderId: b } });
+    for (const row of rows) {
+      // Fake CRUD adds its general defaults; selected persisted command fields must remain absent.
+      expect(row).not.toHaveProperty("command"); expect(row).not.toHaveProperty("reason"); expect(row).not.toHaveProperty("commandHash");
+      expect(row).toMatchObject({ actorId: technician.userId, sessionId: technician.sessionId, kind: "consume", orderId: b });
+    }
+    currentTime = new Date(now.getTime() + 15 * 60_000);
+    expect((await get(`${requestPath}?cursor=${cursor}`, technician)).status).toBe(403);
   });
 
 });

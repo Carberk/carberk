@@ -184,3 +184,21 @@ export const DiagnosticContinuityHandoffsSchema = z.object({
 export const DiagnosticContinuityCommandSchema = z.object({ reportId: z.string().uuid(), expectedOrderVersion: z.number().int().nonnegative(), reason: z.string().trim().min(1).max(1000) }).strict();
 export type DiagnosticContinuityHandoffs = z.infer<typeof DiagnosticContinuityHandoffsSchema>;
 export type DiagnosticContinuityCommand = z.infer<typeof DiagnosticContinuityCommandSchema>;
+
+/** Opaque preparation contains no command. First execute supplies the existing strict command. */
+export const DiagnosticContinuityRequestPrepareSchema = z.object({ kind: z.enum(["issue", "consume"]) }).strict();
+export const DiagnosticContinuityRequestExecuteSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("issue"), command: DiagnosticContinuityProofIssuanceSchema }).strict(),
+  z.object({ kind: z.literal("consume"), command: DiagnosticContinuityCommandSchema.extend({ proofId: z.string().uuid() }).strict() }).strict(),
+]);
+export const DiagnosticContinuityRequestSchema = z.union([
+  z.object({ requestId: z.string().uuid(), kind: z.enum(["issue", "consume"]), state: z.literal("pending_input") }).strict(),
+  // Completion certifies the original issuance, never current consumption usability.
+  z.object({ requestId: z.string().uuid(), kind: z.literal("issue"), state: z.literal("completed"), proofId: z.string().uuid(), usability: z.literal("historical") }).strict(),
+  z.object({ requestId: z.string().uuid(), kind: z.literal("consume"), state: z.literal("completed"), result: DiagnosticContinuityResultSchema }).strict(),
+]);
+export const DiagnosticContinuityRequestsSchema = z.object({ requests: z.array(DiagnosticContinuityRequestSchema).max(20), nextCursor: z.string().nullable() }).strict();
+export type DiagnosticContinuityRequestPrepare = z.infer<typeof DiagnosticContinuityRequestPrepareSchema>;
+export type DiagnosticContinuityRequestExecute = z.infer<typeof DiagnosticContinuityRequestExecuteSchema>;
+export type DiagnosticContinuityRequest = z.infer<typeof DiagnosticContinuityRequestSchema>;
+export type DiagnosticContinuityRequests = z.infer<typeof DiagnosticContinuityRequestsSchema>;

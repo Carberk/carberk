@@ -262,7 +262,7 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
   /** Under reinspection locks after admission: B's own empty first report with its own date,
    * mileage, template and pins, linked to `prior`, plus its audit. A proof binding is persisted
    * for exact retries; the database admits a link only with that consumed proof. */
-  async openReinspection(tx: Tx, subject: DiagnosticSubject, order: Order, prior: Row, input: DiagnosticSchemas.DiagnosticReinspection, proofId: string | null) {
+  async openReinspection(tx: Tx, subject: DiagnosticSubject, order: Order, prior: Row, input: DiagnosticSchemas.DiagnosticReinspection, proofId: string | null, requestId?: string) {
     const observed = this.observed(order);
     const state = new DiagnosticReport(prior.state as unknown as DiagnosticReportState).reinspect({ reportId: input.reportId, orderId: order.id, templateVersionId: order.templateVersionId,
       authorId: subject.userId, observedAt: observed.observedAt, mileageKm: observed.mileageKm, reason: input.reason }).state;
@@ -270,7 +270,8 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
     let saved: Row;
     try {
       saved = await tx.diagnosticReportRecord.create({ data: { id: state.id, orderId: order.id, audience: state.audience, templateVersionId: state.templateVersionId, predecessorId: prior.id, reinspection: true, ...pins,
-        ...(proofId ? { continuityProofId: proofId, reinspectionOrderVersion: input.expectedOrderVersion } : {}), state: json(state) } });
+        ...(proofId ? { continuityProofId: proofId, reinspectionOrderVersion: input.expectedOrderVersion } : {}),
+        ...(requestId ? { continuityRequestId: requestId, continuityRequestSessionId: subject.sessionId } : {}), state: json(state) } });
     } catch (error) {
       // Report id, predecessor, proof and first-report uniqueness are the only races left after locking.
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");

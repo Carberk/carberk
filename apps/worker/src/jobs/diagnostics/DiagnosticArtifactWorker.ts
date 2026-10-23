@@ -212,6 +212,10 @@ export class DiagnosticArtifactWorker {
    * place and bumps the visit's generation. Provenance follows its rights, abandoned intents
    * and verified items never attached to any evidence record use the upload lifecycle rule. */
   private async retireIdentity(now: Date): Promise<void> {
+    // Separate transaction: both disposers acquire their own complete upstream prefix.
+    await this.db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT diagnostic_dispose_expired_requests(${now}::timestamp)`;
+    });
     await this.db.$transaction(async tx => {
       await tx.$queryRaw`SELECT diagnostic_dispose_ownership(NULL::text,${now}::timestamp)`;
     });

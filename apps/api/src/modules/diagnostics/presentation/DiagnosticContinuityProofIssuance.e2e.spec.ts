@@ -1422,4 +1422,90 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
     expect(historical.body.nextCursor).toHaveLength(1062);
     await get("reviewer", `${issuancePath(p)}/${proofId}`).expect(200);
   });
+
+  // #923 request lifecycle, hosted disposable services only. Prior journeys stay unchanged.
+  const requestsPath = (p: Pair) => `orders/${p.b.id}/continuity-requests`;
+  async function preparedRequest(p: Pair, kind: "issue" | "consume") {
+    const response = await post(kind === "issue" ? "reviewer" : "technician", requestsPath(p), { kind }).expect(201);
+    privateNoStore(response); return response.body.requestId as string;
+  }
+  it("serializes request issuance and consumption over real HTTP/SQL with no duplicate logical audits", async () => {
+    const p = await pair();
+    const requestId = await preparedRequest(p, "issue");
+    const execute = `${requestsPath(p)}/${requestId}/execute`;
+    const responses = await Promise.all([post("reviewer", execute, { kind: "issue", command: p.body }), post("reviewer", execute, { kind: "issue", command: p.body })]);
+    for (const response of responses) { expect(response.status).toBe(201); privateNoStore(response); expect(response.body).toEqual(responses[0]!.body); }
+    const proofId = responses[0]!.body.proofId as string;
+    expect(await db.diagnosticContinuityProof.count({ where: { requestId } })).toBe(1);
+    expect(await db.diagnosticAudit.count({ where: { orderId: p.b.id, action: "CONTINUITY_PROOF_ISSUED" } })).toBe(1);
+    privateNoStore(await post("reviewer", execute, { kind: "issue", command: { ...p.body, rationale: "Changed" } }).expect(409));
+    const other = await preparedRequest(p, "issue");
+    await post("reviewer", `${requestsPath(p)}/${other}/execute`, { kind: "issue", command: p.body }).expect(201);
+    expect(await db.diagnosticContinuityProof.count({ where: { candidateOrderId: p.b.id } })).toBe(2);
+    const consumeId = await preparedRequest(p, "consume");
+    const command = { ...handoffCommand(p), proofId };
+    const consumePath = `${requestsPath(p)}/${consumeId}/execute`;
+    const consumed = await Promise.all([post("technician", consumePath, { kind: "consume", command }), post("technician", consumePath, { kind: "consume", command })]);
+    const expected = { requestId: consumeId, kind: "consume", state: "completed", result: { proofId, reportId: command.reportId } };
+    for (const response of consumed) { expect(response.status).toBe(201); expect(response.body).toEqual(expected); privateNoStore(response); }
+    expect((await get("technician", `${requestsPath(p)}/${consumeId}`).expect(200)).body).toEqual(expected);
+    expect(await db.diagnosticAudit.count({ where: { orderId: p.b.id, action: "CONTINUITY_PROOF_CONSUMED" } })).toBe(1);
+    expect(await db.diagnosticAudit.count({ where: { orderId: p.b.id, action: "REPORT_REINSPECTION_CREATED" } })).toBe(1);
+    await expect(db.$executeRaw`UPDATE diagnostic_continuity_requests SET kind='issue' WHERE id=${consumeId}`).rejects.toThrow();
+    await expect(db.$executeRaw`UPDATE diagnostic_reports SET "continuityRequestId"=${other} WHERE id=${command.reportId}`).rejects.toThrow();
+    await expect(db.$executeRaw`UPDATE diagnostic_continuity_proofs SET "requestId"=${other} WHERE id=${proofId}`).rejects.toThrow();
+    // Deleting A's proof payload must delete only issuance identities, not B's receipt.
+    await db.diagnosticContinuityProof.deleteMany({ where: { candidateOrderId: p.b.id } });
+    expect(await db.diagnosticContinuityRequest.findUnique({ where: { id: requestId } })).toBeNull();
+    expect((await get("technician", `${requestsPath(p)}/${consumeId}`).expect(200)).body).toEqual(expected);
+    expect((await post("technician", consumePath, { kind: "consume", command }).expect(201)).body).toEqual(expected);
+    await post("reviewer", execute, { kind: "issue", command: p.body }).expect(403);
+  });
+
+  it("rolls back request consumption on a real audit fault and retains only opaque pending identity", async () => {
+    const { p, proofId } = await bOnlyPair();
+    const requestId = await preparedRequest(p, "consume");
+    const command = { ...handoffCommand(p), proofId };
+    const path = `${requestsPath(p)}/${requestId}/execute`;
+    const namespace = `request923_${p.b.id.replaceAll("-", "")}`;
+    for (const value of [p.b.id, requestId]) expect(value).toMatch(uuid);
+    await db.$executeRawUnsafe(`CREATE FUNCTION "${namespace}"() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+      IF NEW."orderId"='${p.b.id}' AND NEW.action='CONTINUITY_PROOF_CONSUMED' THEN RAISE EXCEPTION 'request923 audit fault'; END IF; RETURN NEW; END $$`);
+    await db.$executeRawUnsafe(`CREATE TRIGGER "${namespace}" BEFORE INSERT ON diagnostic_audits FOR EACH ROW EXECUTE FUNCTION "${namespace}"()`);
+    try {
+      await post("technician", path, { kind: "consume", command }).expect(500);
+      expect((await get("technician", `${requestsPath(p)}/${requestId}`).expect(200)).body).toEqual({ requestId, kind: "consume", state: "pending_input" });
+      expect(await db.diagnosticReportRecord.findUnique({ where: { id: command.reportId } })).toBeNull();
+      expect((await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).consumedAt).toBeNull();
+      const metadata = await db.diagnosticContinuityRequest.findUniqueOrThrow({ where: { id: requestId } });
+      expect(Object.keys(metadata).sort()).toEqual(["actorId", "createdAt", "id", "kind", "orderId", "sessionId"]);
+    } finally {
+      await db.$executeRawUnsafe(`DROP TRIGGER "${namespace}" ON diagnostic_audits`);
+      await db.$executeRawUnsafe(`DROP FUNCTION "${namespace}"()`);
+    }
+    await post("technician", path, { kind: "consume", command: { ...command, reason: "Explicit fresh input after rollback" } }).expect(201);
+  });
+
+  it("preserves request-bound B after real A rights disposal and fences erased B metadata", async () => {
+    const { p, proofId } = await bOnlyPair(true);
+    const requestId = await preparedRequest(p, "consume");
+    const command = { ...handoffCommand(p), proofId };
+    const expected = { requestId, kind: "consume", state: "completed", result: { proofId, reportId: command.reportId } };
+    await post("technician", `${requestsPath(p)}/${requestId}/execute`, { kind: "consume", command }).expect(201);
+    await atLifecycleTime(lifecycleExpiry, async () => {
+      // Existing ordinary source disposal deletes even consumed proof payloads.
+      await db.$transaction(async tx => { await tx.$queryRaw`SELECT diagnostic_dispose_ownership(NULL::text,${new Date(lifecycleExpiry)}::timestamp)`; });
+      await db.diagnosticContinuityProof.deleteMany({ where: { id: proofId, rightsUntil: { lte: new Date(lifecycleExpiry) } } });
+      expect(await db.diagnosticContinuityProof.findUnique({ where: { id: proofId } })).toBeNull();
+      expect((await get("technician", `${requestsPath(p)}/${requestId}`).expect(200)).body).toEqual(expected);
+      expect((await post("technician", `${requestsPath(p)}/${requestId}/execute`, { kind: "consume", command }).expect(201)).body).toEqual(expected);
+      const finding = { id: randomUUID(), checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: [], kind: null, source: null, measurement: null, location: null };
+      await post("technician", `reports/${command.reportId}/findings`, { expectedVersion: 0, finding }).expect(201);
+      await db.diagnosticReportRecord.update({ where: { id: command.reportId }, data: { erasedAt: new Date(lifecycleExpiry) } });
+      expect(await db.diagnosticContinuityRequest.findUnique({ where: { id: requestId } })).toBeNull();
+      privateNoStore(await get("technician", `${requestsPath(p)}/${requestId}`).expect(403));
+      privateNoStore(await post("technician", `${requestsPath(p)}/${requestId}/execute`, { kind: "consume", command }).expect(403));
+    });
+  });
+
 });

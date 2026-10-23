@@ -34,6 +34,7 @@ enum CodePurpose {
 }
 
 model User {
+  diagnosticContinuityRequests DiagnosticContinuityRequest[]
   diagnosticCenterAssignments DiagnosticCenterAssignment[]
   diagnosticCommissions InspectionOrder[] @relation("DiagnosticCommissioner")
   diagnosticOrderAssignments DiagnosticOrderAssignment[]
@@ -142,6 +143,7 @@ model OtpRequest {
 }
 
 model Session {
+  diagnosticContinuityRequests DiagnosticContinuityRequest[]
   videoGrants VideoGrant[] @relation("VideoGrantSession")
   id                 String    @id @default(uuid())
   userId             String
@@ -1401,6 +1403,7 @@ model DiagnosticTemplateVersion {
 }
 
 model InspectionOrder {
+  continuityRequests DiagnosticContinuityRequest[]
   id String @id @default(uuid())
   centerId String
   center DiagnosticCenter @relation(fields: [centerId], references: [id], onDelete: Restrict)
@@ -1787,6 +1790,8 @@ model DiagnosticReportRecord {
   identityEvidence DiagnosticIdentityEvidence? @relation(fields: [identityEvidenceId], references: [id], onDelete: Restrict)
   continuityProofPredecessors DiagnosticContinuityProof[] @relation("ContinuityProofPredecessor")
   /// Private reinspection only: the consumed proof and expected order version, immutable exact-retry binding.
+  continuityRequestId String? @unique
+  continuityRequestSessionId String?
   continuityProofId String? @unique
   reinspectionOrderVersion Int?
   finalizedAt DateTime?
@@ -1805,6 +1810,7 @@ model DiagnosticReportRecord {
 /// Restricted proof content follows the shortest declared evidence/provenance rights.
 /// Invalidation is permanent even if current source values are later restored.
 model DiagnosticContinuityProof {
+  requestId String? @unique
   id String @id
   predecessorReportId String?
   predecessorReport DiagnosticReportRecord? @relation("ContinuityProofPredecessor", fields: [predecessorReportId], references: [id], onDelete: Restrict)
@@ -2000,4 +2006,20 @@ model DiagnosticOwnershipComponent {
   @@index([declaredById])
   @@index([rightsUntil, state])
   @@map("diagnostic_ownership_components")
+}
+
+
+/// Restricted service linkage only. No command, digest or protected selector is staged here.
+model DiagnosticContinuityRequest {
+  id String @id
+  createdAt DateTime @default(now())
+  actorId String
+  actor User @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  sessionId String
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  orderId String
+  order InspectionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  kind String
+  @@index([actorId, sessionId, orderId, id])
+  @@map("diagnostic_continuity_requests")
 }
