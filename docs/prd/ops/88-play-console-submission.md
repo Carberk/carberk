@@ -1,5 +1,7 @@
 # 88 — Google Play Console submission pack
 
+The October 6 setup statuses below are historical. For #897, consult the [fresh EAS signing/build receipt](../../evidence/issue-897/play-signing-metadata-recovery-20261021.md#fresh-eas-recovery-2026-10-23-utc): production EAS has built version 2.0.4/code 11 and its upload certificate is recorded. The highest uploaded code across all Play tracks, Google's app-signing SHA-256 and Play's acceptance of the current upload certificate remain unverified. Do not reset remote version state to the historical code 4 or regenerate signing credentials from this checklist.
+
 ## Next release scope (founder direction, 2026-10-19)
 
 The founder confirms that the app has already been released on Google Play. This work updates the existing app `com.auto_tm.ynamly`; it is not the first Android release. The exact live version and artifact are not established by this scope record.
