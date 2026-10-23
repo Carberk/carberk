@@ -198,3 +198,18 @@ d64aaebb78d325ff57d820233b4d25d6b59cf2053715a7ac6abf5d7355e5eca0  worker-unit-co
 2571a6f37c2cbb77aa7a0d29cea95c55cf90cd3f84b0d615efe3e451d253364e  worker-unit-no-listeners.log
 4f0dc65374be8ba9fe924df1d33f97079e750cc01e870a05ddb03d2c29cb2d63  worker-unit.log
 ```
+
+## Owning overview correction, 2026-10-23
+
+Docs-only follow-up from `af79cad807799d0acc7843759c1b9a05d456c424`, tree `57493059b4467e714c71f509a8d975c24b4528a6`. The diagnostics overview now describes opaque preparation, strict atomic commit binding, same-current-Session recovery and the surviving authorized B pointer without A admission. It keeps Admin wiring and real SQL/worker acceptance pending. The worker overview adds one orientation sentence for the separate bounded Session-expiry request-linkage sweep. No source, test, schema or configuration changed.
+
+Behavioral RED is exempt for this documentation correction. Inspected no-listener checks only: `node scripts/check-agent-docs.mjs`, `node scripts/check-domain-glossary.mjs`, local Markdown link validation, source/test/schema preservation against `af79cad8`, and `git diff --check`. All exit 0. No unit, compiler, broad script, listener, e2e/service or operational action was run. The earlier forbidden unfiltered worker run remains explicitly excluded from acceptance; no package-wide unit command was repeated. No nested work, PR or integration push.
+
+Evidence directory `/tmp/issue-923-request-recovery-overview/`; final documentation checkpoint/tree and complete manifest are returned separately. Initial check-log hashes:
+
+```text
+aecc3fad493f95385b2eb915f12a25975582dfc392a5f942fea2eecbcf8cf7db  docs.log
+2e05fa0133022f990bd0007c0ce14a7141e5ad8e3bcf7bc68332b987daceaf09  glossary.log
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  diff-check.log
+1ed47d68d15ffc5f1b2480d3fc91c663c46bea1850037c770355ba8c10626f3a  preservation.log
+```
