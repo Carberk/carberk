@@ -52,7 +52,9 @@ export async function diagnosticJson<S extends z.ZodType>(response: Response, sc
   await response.body?.cancel(); throw new DiagnosticTransportError(502);
  }
  const bytes = await diagnosticBytes(response.body, response.headers.get("Content-Length"), DIAGNOSTIC_JSON_LIMIT);
- return schema.parse(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)));
+ const result = schema.safeParse(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)));
+ if (!result.success) throw new DiagnosticTransportError(502);
+ return result.data;
 }
 export async function diagnosticFetch(path: string, token: string, options: { body?: unknown } = {}): Promise<Response> {
  return fetch(`${getApiBaseUrl()}${path}`, {
@@ -70,7 +72,8 @@ export async function protectedDiagnostic<T>(mutation: boolean, work: (token: st
    const incoming = await headers(); const origin = incoming.get("origin");
    const expected = process.env["ADMIN_ORIGIN"];
    if (!origin) throw new DiagnosticTransportError(403);
-   const parsed = new URL(origin);
+   let parsed: URL;
+   try { parsed = new URL(origin); } catch { throw new DiagnosticTransportError(403); }
    if (!["http:", "https:"].includes(parsed.protocol) || parsed.origin !== origin || (expected ? origin !== expected : parsed.host !== incoming.get("host"))) throw new DiagnosticTransportError(403);
   }
   const token = await getAccessToken(); if (!token) throw new DiagnosticTransportError(403);

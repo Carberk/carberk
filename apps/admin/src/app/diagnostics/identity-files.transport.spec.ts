@@ -1,4 +1,5 @@
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
+
 import { GET, PUT } from "./orders/[id]/identity-provenance/[file]/route";
 import { GET as PAIR } from "./orders/[id]/reinspection-comparison/provenance/[file]/route";
 
@@ -81,4 +82,23 @@ it("returns protected errors for network, malformed JSON, or broadened upload re
  vi.stubGlobal("fetch", async () => { throw new Error("secret https://storage.invalid/private-key"); }); await protectedError(await GET(new Request(base), context), 502);
  vi.stubGlobal("fetch", async () => Response.json({ ...verified, storageUrl: "https://storage.invalid" })); await protectedError(await PUT(put(), context), 502);
  vi.stubGlobal("fetch", async () => new Response("secret", { headers: { "Content-Type": "application/json" } })); await protectedError(await PUT(put(), context), 502);
+});
+it.each(["image/jpeg", "image/png", "image/webp"])("supports classified upload type %s without changing the supplied MIME", async mime => {
+ const fetcher = vi.fn(async () => Response.json(verified)); vi.stubGlobal("fetch", fetcher);
+ const response = await PUT(put(undefined, { ...uploadHeaders, "X-Evidence-Type": mime }), context); expect(response.status).toBe(200);
+ expect(fetcher).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ headers: expect.objectContaining({ "X-Evidence-Type": mime }) }));
+});
+it("accepts the exact 10 MiB bound and refuses empty or truncated declared uploads", async () => {
+ vi.stubGlobal("fetch", async () => Response.json(verified));
+ const bytes = new Uint8Array(10 * 1024 * 1024);
+ const request = new Request(base + "?expectedOrderVersion=3", { method: "PUT", headers: { ...uploadHeaders, "Content-Length": "10485760" }, body: bytes });
+ expect((await PUT(request, context)).status).toBe(200);
+ for (const length of ["0", "4"]) await protectedError(await PUT(put(undefined, { ...uploadHeaders, "Content-Length": length }), context), 400);
+});
+it("refuses oversized declared upstream images before reading and protects stream failures", async () => {
+ let chunks = 0; const cancel = vi.fn();
+ vi.stubGlobal("fetch", async () => new Response(new ReadableStream<Uint8Array>({ pull(controller) { chunks++; controller.enqueue(new Uint8Array([1])); }, cancel }, { highWaterMark: 0 }), { headers: { "Content-Type": "image/webp", "Content-Length": "10485761" } }));
+ await protectedError(await GET(new Request(base), context), 400); expect(chunks).toBe(0); expect(cancel).toHaveBeenCalledOnce();
+ vi.stubGlobal("fetch", async () => new Response(new ReadableStream<Uint8Array>({ pull(controller) { controller.error(new Error("secret storage.invalid/private-key")); } }), { headers: { "Content-Type": "image/webp" } }));
+ await protectedError(await GET(new Request(base), context), 502);
 });

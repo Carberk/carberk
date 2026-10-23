@@ -1,15 +1,17 @@
+import type * as NextNavigation from "next/navigation";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
+
 import * as actions from "./actions";
 
 const state = vi.hoisted(() => ({ token: "current-session", headers: new Headers() }));
 vi.mock("next/headers", () => ({ headers: async () => state.headers, cookies: async () => ({ get: () => state.token ? { value: state.token } : undefined }) }));
-vi.mock("next/navigation", async original => ({ ...await original<typeof import("next/navigation")>(), redirect: (url: string) => { const error = new Error(url); Object.assign(error, { digest: `NEXT_REDIRECT;replace;${url};307;` }); throw error; } }));
+vi.mock("next/navigation", async original => ({ ...await original<typeof NextNavigation>(), redirect: (url: string) => { const error = new Error(url); Object.assign(error, { digest: `NEXT_REDIRECT;replace;${url};307;` }); throw error; } }));
 const order = "11111111-1111-4111-8111-111111111111", predecessor = "22222222-2222-4222-8222-222222222222";
 const rights = { category: "vehicle_observation", purpose: "Compare physical identity", basis: "Authorized synthetic fixture", provenance: "Synthetic capture", identifiability: "pseudonymous", use: ["service"], schedule: { kind: "until", until: "2026-12-01T00:00:00.000Z", reason: "Explicit fixture authorization" }, supplierRestrictions: "", hold: null };
 const stage = { id: predecessor, expectedOrderVersion: 3, contentType: "image/jpeg", sizeBytes: 3, rights };
 const denied = { ok: false, error: "denied", code: "DIAGNOSTIC_NO_ACCESS" };
-beforeEach(() => { state.token = "current-session"; state.headers = new Headers({ origin: "http://localhost:3001", host: "localhost:3001" }); });
-afterEach(() => vi.unstubAllGlobals());
+beforeEach(() => { vi.stubEnv("ADMIN_ORIGIN", "http://localhost:3001"); state.token = "current-session"; state.headers = new Headers({ origin: "http://localhost:3001", host: "localhost:3001" }); });
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 it("reads identity history using current cookie authority every time without caching", async () => {
  const fetcher = vi.fn(async () => Response.json([])); vi.stubGlobal("fetch", fetcher);
  expect(await actions.diagnosticIdentityRecords(order)).toEqual({ ok: true, data: [] });
@@ -117,8 +119,8 @@ it("cancels oversized chunked JSON before returning any protected projection", a
  vi.stubGlobal("fetch", async () => new Response(new ReadableStream<Uint8Array>({ pull(controller) { chunks++; controller.enqueue(new Uint8Array(4 * 1024 * 1024)); }, cancel }, { highWaterMark: 0 }), { headers: { "Content-Type": "application/json" } }));
  expect(await actions.diagnosticIdentityRecords(order)).toMatchObject({ ok: false }); expect(chunks).toBe(3); expect(cancel).toHaveBeenCalledOnce();
 });
-it.each(["stage", "append", "issue", "consume"])("rejects expired sessions before %s mutation validation", async name => {
+it.each(["stage", "append", "issue", "consume"] as const)("rejects expired sessions before %s mutation validation", async name => {
  state.headers.set("x-admin-session-expired", "1"); const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
- const work = { stage: () => actions.diagnosticStageIdentityProvenance("bad", null), append: () => actions.diagnosticAppendIdentityEvidence("bad", null), issue: () => actions.diagnosticIssueContinuityProof("bad", null), consume: () => actions.diagnosticConsumeContinuityHandoff("bad", "bad", null) }[name]!;
+ const work = { stage: () => actions.diagnosticStageIdentityProvenance("bad", null), append: () => actions.diagnosticAppendIdentityEvidence("bad", null), issue: () => actions.diagnosticIssueContinuityProof("bad", null), consume: () => actions.diagnosticConsumeContinuityHandoff("bad", "bad", null) }[name];
  await expect(work()).rejects.toThrow("/login?reason=session-expired"); expect(fetcher).not.toHaveBeenCalled();
 });

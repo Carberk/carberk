@@ -24,7 +24,7 @@ export async function diagnosticIdentityFile(request: Request, context: Context,
   const { id, file } = paramsSchema.parse(await context.params);
   const input = query(request);
   let path = `/diagnostics/orders/${id}/identity-provenance/${file}`;
-  let bytes: Uint8Array | undefined; let mime: string | undefined;
+  let bytes: Uint8Array | undefined; let mime = "";
   if (kind === "pair") {
    const pair = diagnosticPairQuery.parse(input);
    path = `/diagnostics/orders/${id}/reinspection-comparison/provenance/${file}?${new URLSearchParams(pair)}`;
@@ -36,7 +36,7 @@ export async function diagnosticIdentityFile(request: Request, context: Context,
    path += `?${new URLSearchParams({ expectedOrderVersion: String(version.expectedOrderVersion) })}`;
   } else z.object({}).strict().parse(input);
   const upstream = await fetch(`${getApiBaseUrl()}${path}`, {
-   method: upload ? "PUT" : "GET", headers: { Authorization: `Bearer ${token}`, ...(upload ? { "Content-Type": "application/octet-stream", "X-Evidence-Type": mime! } : {}) },
+   method: upload ? "PUT" : "GET", headers: { Authorization: `Bearer ${token}`, ...(upload ? { "Content-Type": "application/octet-stream", "X-Evidence-Type": mime } : {}) },
    ...(bytes ? { body: bytes as BodyInit } : {}), cache: "no-store", redirect: "manual", signal: AbortSignal.timeout(30000),
   });
   if (upload) {

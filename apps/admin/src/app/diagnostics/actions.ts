@@ -62,7 +62,7 @@ export async function diagnosticReinspectionComparison(orderId: string, query: u
 export async function diagnosticPredecessors(orderId: string, query: unknown) {
  return protectedDiagnostic(false, async token => {
   const input = D.DiagnosticPredecessorQuerySchema.parse(query);
-  return diagnosticJson(await diagnosticFetch(`/diagnostics/orders/${id(orderId)}/predecessor-candidates?${new URLSearchParams(input)}`, token), D.DiagnosticPredecessorPageSchema);
+  return diagnosticJson(await diagnosticFetch(`/diagnostics/orders/${id(orderId)}/predecessor-candidates?${new URLSearchParams(input.cursor === undefined ? {} : { cursor: input.cursor })}`, token), D.DiagnosticPredecessorPageSchema);
  });
 }
 export async function diagnosticLinkingTechnicians(orderId: string) {
@@ -71,7 +71,7 @@ export async function diagnosticLinkingTechnicians(orderId: string) {
 export async function diagnosticContinuityHandoffs(orderId: string, query: unknown) {
  return protectedDiagnostic(false, async token => {
   const input = D.DiagnosticPredecessorQuerySchema.parse(query);
-  return diagnosticJson(await diagnosticFetch(`/diagnostics/orders/${id(orderId)}/continuity-handoffs?${new URLSearchParams(input)}`, token), D.DiagnosticContinuityHandoffsSchema);
+  return diagnosticJson(await diagnosticFetch(`/diagnostics/orders/${id(orderId)}/continuity-handoffs?${new URLSearchParams(input.cursor === undefined ? {} : { cursor: input.cursor })}`, token), D.DiagnosticContinuityHandoffsSchema);
  });
 }
 export async function diagnosticContinuityProof(orderId: string, proofId: string) {
