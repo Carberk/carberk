@@ -307,4 +307,36 @@ describe("private automatic normalized-VIN diagnostic continuity proof", () => {
     expect((await get("buyer", `reports/${releasedA.id}`).expect(200)).body).toEqual(beforeA);
     expect((await get("reviewer", `orders/${a.id}/reports`).expect(200)).body).toEqual([releasedA]);
   });
+  it("discovers a retained predecessor and names only B's assigned technician through disposable HTTP/SQL", async () => {
+    const a = await visit(original, "discovery-A", "SYN-VIN-041");
+    const [rawA] = await history(a);
+    const pa = suite.id("discovery-a-provenance");
+    await verified(a, pa);
+    await append(a, rawA!, capture(a, rawA!, pa));
+    const released = await release(a);
+    const b = await visit(successorObservation, "discovery-B", "SYN-VIN-041");
+    const [rawB] = await history(b);
+    const pb = suite.id("discovery-b-provenance");
+    await verified(b, pb, blue);
+    await append(b, rawB!, capture(b, rawB!, pb), blue);
+    // Names are Identity-owned fixture facts. No reception capability is granted to reviewer.
+    await db.user.update({ where: { id: suite.id("technician") }, data: { displayName: "Synthetic B technician" } });
+    const choices = await get("reviewer", `orders/${b.id}/linking-technicians`).expect(200);
+    privateNoStore(choices);
+    expect(choices.body).toEqual({ technicians: [{ userId: suite.id("technician"), name: "Synthetic B technician" }] });
+    const page = await get("reviewer", `orders/${b.id}/predecessor-candidates`).expect(200);
+    privateNoStore(page);
+    expect(page.body.scope).toBe("currently_authorized_retained_predecessors");
+    expect(page.body.candidates).toContainEqual({ reportId: released.id, observedAt: original.observedAt, mileageKm: original.mileageKm });
+    for (const candidate of page.body.candidates) expect(Object.keys(candidate).sort()).toEqual(["mileageKm", "observedAt", "reportId"]);
+    for (const who of ["buyer", "reception"] as const) {
+      privateNoStore(await get(who, `orders/${b.id}/predecessor-candidates`).expect(403));
+      privateNoStore(await get(who, `orders/${b.id}/linking-technicians`).expect(403));
+    }
+    // A's current qualification and rights remain mandatory on every discovery page.
+    await post("reception", `orders/${a.id}/assignments`, { expectedVersion: await version(a), userId: suite.id("reviewer"), capability: "diagnostics.reviewer", active: false }).expect(201);
+    const unavailable = await get("reviewer", `orders/${b.id}/predecessor-candidates`).expect(200);
+    expect(unavailable.body.candidates.some((candidate: { reportId: string }) => candidate.reportId === released.id)).toBe(false);
+  });
+
 });

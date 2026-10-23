@@ -37,12 +37,16 @@ export class DiagnosticMemoryDatabase {
   }
   constructor() {
     const client: Row = { $queryRaw: async () => [], $executeRaw: async () => 0 };
-    for (const name of ["user", "session", "dealershipMember", "inspectionOrder", "listing", "diagnosticReportRecord", "diagnosticPdfArtifact", "diagnosticEvidence", "diagnosticTemplateVersion", "diagnosticOrderAssignment", "diagnosticCenterAssignment", "diagnosticIdentityEvidence", "diagnosticIdentityProvenance"]) {
+    for (const name of ["user", "session", "staffGrant", "diagnosticIdentityRecord", "dealershipMember", "inspectionOrder", "listing", "diagnosticReportRecord", "diagnosticPdfArtifact", "diagnosticEvidence", "diagnosticTemplateVersion", "diagnosticOrderAssignment", "diagnosticCenterAssignment", "diagnosticIdentityEvidence", "diagnosticIdentityProvenance"]) {
       this.tables.set(name, []);
       const rows = () => this.table(name);
-      const reportRelations = (row: Row): Row => ({ ...row, order: this.table("inspectionOrder").find(o => o["id"] === row["orderId"]), artifacts: this.table("diagnosticPdfArtifact").filter(a => a["reportId"] === row["id"]) });
+      const reportRelations = (row: Row): Row => ({ ...row, order: this.table("inspectionOrder").filter(o => o["id"] === row["orderId"]).map(orderRelations)[0], artifacts: this.table("diagnosticPdfArtifact").filter(a => a["reportId"] === row["id"]) });
+      const orderRelations = (row: Row): Row => ({ ...row, assignments: this.table("diagnosticOrderAssignment").filter(a => a["orderId"] === row["id"]) });
       const related = (row: Row): Row => ({ ...row,
-        ...(name === "diagnosticReportRecord" ? { order: this.table("inspectionOrder").find(o => o["id"] === row["orderId"]), artifacts: this.table("diagnosticPdfArtifact").filter(a => a["reportId"] === row["id"]), evidence: [], predecessor: this.table("diagnosticReportRecord").filter(r => r["id"] === row["predecessorId"]).map(reportRelations)[0] ?? null } : {}),
+        ...(name === "inspectionOrder" ? orderRelations(row) : {}),
+        ...(name === "session" ? { user: this.table("user").find(u => u["id"] === row["userId"]) ?? row["user"] } : {}),
+        ...(name === "diagnosticIdentityEvidence" ? { identityRecord: this.table("diagnosticIdentityRecord").find(r => r["id"] === row["identityRecordId"]) } : {}),
+        ...(name === "diagnosticReportRecord" ? { order: this.table("inspectionOrder").filter(o => o["id"] === row["orderId"]).map(orderRelations)[0], artifacts: this.table("diagnosticPdfArtifact").filter(a => a["reportId"] === row["id"]), evidence: [], predecessor: this.table("diagnosticReportRecord").filter(r => r["id"] === row["predecessorId"]).map(reportRelations)[0] ?? null } : {}),
         ...(["diagnosticEvidence", "diagnosticPdfArtifact"].includes(name) ? { report: this.table("diagnosticReportRecord").filter(r => r["id"] === row["reportId"]).map(r => ({ ...reportRelations(r), predecessor: this.table("diagnosticReportRecord").filter(p => p["id"] === r["predecessorId"]).map(reportRelations)[0] ?? null }))[0] } : {}) });
       const findMany = async (args: Args = {}) => {
         let result = rows().map(related).filter(r => matches(r, args.where));
@@ -58,7 +62,7 @@ export class DiagnosticMemoryDatabase {
         });
         if (args.take) result = result.slice(0, args.take);
         return result.map(row => {
-          const relations = ["order", "artifacts", "evidence", "report", "predecessor"];
+          const relations = ["order", "artifacts", "evidence", "report", "predecessor", "assignments", "identityRecord"];
           const output = Object.fromEntries(Object.entries(row).filter(([key]) => !relations.includes(key) || args.include?.[key]));
           return clone(args.select ? Object.fromEntries(Object.keys(args.select).map(k => [k, row[k]])) : output);
         });
