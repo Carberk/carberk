@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { performance } from "node:perf_hooks";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
 import { S3Client, CreateBucketCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
@@ -1509,7 +1510,32 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
     await post("technician", `${requestsPath(p)}/${requestId}/execute`, { kind: "consume", command }).expect(201);
     await atLifecycleTime(lifecycleExpiry, async () => {
       // Existing ordinary source disposal deletes even consumed proof payloads.
-      await db.$transaction(async tx => { await tx.$queryRaw`SELECT diagnostic_dispose_ownership(NULL::text,${new Date(lifecycleExpiry)}::timestamp)`; });
+      const phase = { started: performance.now(), callbackEntry: null as number | null, queryComplete: null as number | null,
+        callbackExit: null as number | null, resolved: null as number | null, rejected: null as number | null,
+        fakeDateBefore: Date.now(), fakeDateAfter: null as number | null };
+      try {
+        await db.$transaction(async tx => {
+          phase.callbackEntry = performance.now();
+          await tx.$queryRaw`SELECT diagnostic_dispose_ownership(NULL::text,${new Date(lifecycleExpiry)}::timestamp)`;
+          phase.queryComplete = performance.now();
+          phase.callbackExit = performance.now();
+        });
+        phase.resolved = performance.now();
+      } catch (error) {
+        phase.rejected = performance.now(); phase.fakeDateAfter = Date.now();
+        const candidate = error as { code?: unknown; meta?: { operation?: unknown; timeout?: unknown; timeTaken?: unknown } };
+        const meta = candidate.meta;
+        console.error("[diagnostic-lifecycle-p2028]", JSON.stringify({
+          monotonicMs: { started: phase.started, callbackEntry: phase.callbackEntry, queryComplete: phase.queryComplete,
+            callbackExit: phase.callbackExit, resolved: phase.resolved, rejected: phase.rejected },
+          fakeDateMs: { before: phase.fakeDateBefore, after: phase.fakeDateAfter },
+          code: candidate.code === "P2028" ? candidate.code : undefined,
+          operation: meta?.operation === "commit" ? meta.operation : undefined,
+          timeout: typeof meta?.timeout === "number" ? meta.timeout : undefined,
+          timeTaken: typeof meta?.timeTaken === "number" ? meta.timeTaken : undefined,
+        }));
+        throw error;
+      }
       await db.diagnosticContinuityProof.deleteMany({ where: { id: proofId, rightsUntil: { lte: new Date(lifecycleExpiry) } } });
       expect(await db.diagnosticContinuityProof.findUnique({ where: { id: proofId } })).toBeNull();
       expect((await get("technician", `${requestsPath(p)}/${requestId}`).expect(200)).body).toEqual(expected);
