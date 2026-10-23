@@ -1523,16 +1523,19 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
         phase.resolved = performance.now();
       } catch (error) {
         phase.rejected = performance.now(); phase.fakeDateAfter = Date.now();
-        const candidate = error as { code?: unknown; meta?: { operation?: unknown; timeout?: unknown; timeTaken?: unknown } };
-        const meta = candidate.meta;
+        const code = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
+        const rawMeta = typeof error === "object" && error !== null && "meta" in error ? error.meta : undefined;
+        const operation = typeof rawMeta === "object" && rawMeta !== null && "operation" in rawMeta ? rawMeta.operation : undefined;
+        const timeout = typeof rawMeta === "object" && rawMeta !== null && "timeout" in rawMeta ? rawMeta.timeout : undefined;
+        const timeTaken = typeof rawMeta === "object" && rawMeta !== null && "timeTaken" in rawMeta ? rawMeta.timeTaken : undefined;
         console.error("[diagnostic-lifecycle-p2028]", JSON.stringify({
           monotonicMs: { started: phase.started, callbackEntry: phase.callbackEntry, queryComplete: phase.queryComplete,
             callbackExit: phase.callbackExit, resolved: phase.resolved, rejected: phase.rejected },
           fakeDateMs: { before: phase.fakeDateBefore, after: phase.fakeDateAfter },
-          code: candidate.code === "P2028" ? candidate.code : undefined,
-          operation: meta?.operation === "commit" ? meta.operation : undefined,
-          timeout: typeof meta?.timeout === "number" ? meta.timeout : undefined,
-          timeTaken: typeof meta?.timeTaken === "number" ? meta.timeTaken : undefined,
+          code: code === "P2028" ? code : undefined,
+          operation: operation === "commit" ? operation : undefined,
+          timeout: timeout === 5000 ? timeout : undefined,
+          timeTaken: typeof timeTaken === "number" && Number.isFinite(timeTaken) ? timeTaken : undefined,
         }));
         throw error;
       }

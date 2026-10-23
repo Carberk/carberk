@@ -54,4 +54,23 @@ Use the next ordinary hosted run's single sanitized failure record. If monotonic
 
 ## Verification
 
-Production and schema bytes are unchanged by this milestone. The only source change in this milestone is the bounded diagnostic record around the existing lifecycle transaction; SQL, interaction order, clocks, assertions, budgets, retries, and concurrency are preserved. `pnpm --filter @auto-tm/api lint` passed. `pnpm exec eslint <file>` was not a valid focused command because ESLint resolves its config from the package working directory. `pnpm --filter @auto-tm/api typecheck` was run and remains blocked by pre-existing missing workspace declarations (`@auto-tm/db` and `@auto-tm/contracts`) plus cascaded baseline errors; no build was run to resolve them. `git diff --check`, `pnpm check:agent-docs`, and `pnpm check:glossary` passed. No service, DB, HTTP, e2e, or wildcard test was run.
+Production and schema bytes are unchanged by this milestone. The only source change in this milestone is the bounded diagnostic record around the existing lifecycle transaction; SQL, interaction order, clocks, assertions, budgets, retries, and concurrency are preserved. The logger guard was tested with null, undefined, strings, unrelated objects, malformed metadata, and valid P2028-shaped values. `pnpm --filter @auto-tm/contracts build` passed as an offline prerequisite. The DB build was not run because `packages/db/scripts/build.cjs` unconditionally invokes `prisma generate`, which this task forbids. `pnpm --filter @auto-tm/api lint` passed. `pnpm --filter @auto-tm/api typecheck` and `pnpm --filter @auto-tm/api exec tsc6 --noEmit` were run after the contracts build and remain blocked by the missing generated `@auto-tm/db` declarations; their logs are recorded below. `git diff --check`, `pnpm check:agent-docs`, and `pnpm check:glossary` passed. No service, DB, HTTP, e2e, or wildcard test was run.
+
+## Assembly checkpoint manifest
+
+Authorized docs checkpoint `0593e3757d2bdcd3ba91fa21a6b934630c793762` (tree `2e332b86bd883bb45d6431ff46680de2d4984146`) was merged from base `0a995b55f541675141f6a99704678f3466076a75`. The renderer receipt remains byte-identical to that checkpoint. The source preservation probe reconstructed the lifecycle test byte-for-byte after removing only this milestone's logger block and `node:perf_hooks` import. The changed paths relative to `0a995b55f541675141f6a99704678f3466076a75` are exactly this receipt, this lifecycle test, and the incorporated renderer receipt.
+
+Local command and artifact hashes:
+
+| Command/artifact | SHA-256 or result |
+| --- | --- |
+| `pnpm --filter @auto-tm/contracts build` log | `b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616` (pass) |
+| synthetic logger and source-preservation probe log | `ea9d93be636ba594a749a07f4b6a770211ec076eca0cf78143123aa372922b50` (pass) |
+| focused API lint from `apps/api` package cwd | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca4959911b7852b855` (pass) |
+| `pnpm --filter @auto-tm/api typecheck` log | `shasum` recorded in `/tmp/carberk-p2028-assembly-20261023/api-tsc.log`; blocked by unresolved `@auto-tm/db` declarations |
+| `pnpm --filter @auto-tm/api exec tsc6 --noEmit` log | `shasum` recorded in `/tmp/carberk-p2028-assembly-20261023/api-tsc6.log`; same generated-DB blocker |
+| `git diff --check` | pass |
+| `pnpm check:agent-docs` | pass |
+| `pnpm check:glossary` | pass, 31 terms |
+
+The DB build was inspected but intentionally not executed: its first command is `pnpm exec prisma generate`; no connection/listener path was needed to establish this blocker. No package-wide tests, services, migrations, seeds, or generated Prisma client were run.
