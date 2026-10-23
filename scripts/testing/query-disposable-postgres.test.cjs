@@ -192,7 +192,7 @@ test('attribution accepts sixteen capped rows and represents an empty observatio
 
 for (const name of ['staging-clean-reset-redis-interrupted', 'staging-clean-reset']) test(`${name} forwards only the bounded attribution line emitted by the transport`, async () => {
   const fixture = readFileSync(`${__dirname}/../../packages/db/scripts/${name}.e2e.spec.ts`, 'utf8');
-  const forwarding = fixture.match(/const attribution = result\.stderr\?\.split\(\/\\r\?\\n\/\)\.find\(line => \/.*\/\.test\(line\)\);\n          if \(attribution\) console\.error\(attribution\);/);
+  const forwarding = fixture.match(/const attribution = result\.stderr\?\.split\(\/\\r\?\\n\/\)\.find\(line => \/.*\/\.test\(line\)\);\n\s+if \(attribution\) console\.error\(attribution\);/);
   assert.ok(forwarding, 'fixture must validate attribution before forwarding');
   const valid = 'Disposable PG attribution: ordinal=7 rows=1234:pg-isready:loopback:known';
   const logs = [];
