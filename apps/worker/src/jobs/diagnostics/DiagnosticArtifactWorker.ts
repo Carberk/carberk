@@ -168,7 +168,14 @@ export class DiagnosticArtifactWorker {
     await this.replaceErasedLineage();
     // A crash on the last allowed attempt must become an honest terminal failure.
     await this.db.diagnosticPdfArtifact.updateMany({ where: { state: "processing", attempts: { gte: 5 }, cleanupRequestedAt: null, leaseUntil: { lte: now } }, data: { state: "failed", leaseUntil: null, retryAt: null, failureCode: "attempts_exhausted" } });
-    const pending = await this.db.diagnosticPdfArtifact.findMany({ where: { cleanupRequestedAt: null, attempts: { lt: 5 }, OR: [{ state: "pending" }, { state: "failed", retryAt: { lte: now } }, { state: "processing", leaseUntil: { lte: now } }] }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 5 });
+    const eligible: Prisma.DiagnosticPdfArtifactWhereInput = { cleanupRequestedAt: null, attempts: { lt: 5 }, OR: [{ state: "pending" }, { state: "failed", retryAt: { lte: now } }, { state: "processing", leaseUntil: { lte: now } }] };
+    // A newly discovered safe replacement must advance even behind older release
+    // work. Reserve one of the existing five slots, leaving at least four FIFO
+    // slots for all work so neither class can starve the other. Claims still
+    // recheck eligibility and current projection under the report lock.
+    const replacement = await this.db.diagnosticPdfArtifact.findFirst({ where: { ...eligible, rendererVersion: DIAGNOSTIC_ERASED_LINEAGE_RENDERER }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
+    const pending = await this.db.diagnosticPdfArtifact.findMany({ where: { ...eligible, ...(replacement ? { id: { not: replacement.id } } : {}) }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: replacement ? 4 : 5 });
+    if (replacement) pending.unshift(replacement);
     let failed = false;
     for (const row of pending) try { await this.generate(row.id); } catch { failed = true; }
     await this.cleanup();
