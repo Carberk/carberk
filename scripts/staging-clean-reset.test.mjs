@@ -356,3 +356,54 @@ test('inherited object names are never manifest tables for live tables, trigger 
     }
   }
 });
+
+// Read the recovery migration independently of the manifest so a new live table
+// or a trigger on an existing table cannot disappear from the plan fixture.
+function continuityRequestInventory() {
+  const sql = read('packages/db/prisma/migrations/20261023110000_diagnostic_continuity_requests/migration.sql');
+  const tables = [...sql.matchAll(/CREATE TABLE ([a-z_]+)\s*\(/g)].map(m => m[1]);
+  assert.deepEqual(tables, ['diagnostic_continuity_requests']);
+  const triggers = [...sql.matchAll(/CREATE TRIGGER ([a-z_]+)\s+[\s\S]*?\bON ([a-z_]+)\s+FOR EACH ROW/g)]
+    .map(m => ({ table: m[2], name: m[1], functionSchema: 'public', truncate: false }));
+  assert.equal(triggers.length, 6);
+  const inventory = live();
+  inventory.tables = inventory.tables.filter(t => !tables.includes(t.name));
+  inventory.tables.push(...tables.map(name => ({ schema: 'public', name, rows: 3 })));
+  inventory.triggers.push(...triggers);
+  const references = [...sql.matchAll(/"([a-zA-Z]+)" TEXT NOT NULL REFERENCES ([a-z_]+)\(id\)/g)];
+  assert.equal(references.length, 3);
+  inventory.foreignKeys.push(...references.map(m => ({ name: `diagnostic_continuity_requests_${m[1]}_fkey`,
+    from: 'public.diagnostic_continuity_requests', to: `public.${m[2]}` })));
+  return { inventory, triggers };
+}
+
+test('clean reset deletes populated continuity requests and admits their migration triggers without detaching them', () => {
+  const { inventory } = continuityRequestInventory();
+  const plan = planTables(manifest, inventory);
+  assert.ok(plan.truncate.includes('public.diagnostic_continuity_requests'));
+  assert.ok(!plan.retain.includes('public.diagnostic_continuity_requests'));
+  assert.equal(plan.mode, 'RESTRICT');
+  assert.deepEqual(plan.detachTriggers, [
+    { namespace: ns, table: 'public.audit_logs', trigger: `${ns}_promotion` },
+    { namespace: ns, table: 'public.users', trigger: `${ns}_auth` },
+  ]);
+});
+
+test('continuity request classification still refuses unknown tables and inexact or truncate triggers', () => {
+  const { inventory, triggers } = continuityRequestInventory();
+  // Establish that refusals below are not masked by the original manifest drift.
+  assert.doesNotThrow(() => planTables(manifest, inventory));
+  const unknownTable = clone(inventory);
+  unknownTable.tables.push({ schema: 'public', name: 'diagnostic_continuity_requests_shadow', rows: 0 });
+  assert.throws(() => planTables(manifest, unknownTable), /Unknown live table/);
+  for (const trigger of triggers) {
+    for (const change of [{ name: `${trigger.name}_shadow` }, { table: 'users' }, { functionSchema: 'other' }]) {
+      const unknownTrigger = clone(inventory);
+      unknownTrigger.triggers.push({ ...trigger, ...change });
+      assert.throws(() => planTables(manifest, unknownTrigger), /Unknown trigger/);
+    }
+    const truncateTrigger = clone(inventory);
+    truncateTrigger.triggers.push({ ...trigger, truncate: true });
+    assert.throws(() => planTables(manifest, truncateTrigger), /TRUNCATE trigger/);
+  }
+});
