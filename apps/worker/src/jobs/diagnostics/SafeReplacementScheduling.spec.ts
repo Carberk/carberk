@@ -28,7 +28,7 @@ it.each(locales)("recovers an issued %s PDF in one ordinary maintenance pass des
   const beforeB = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: id(2) } });
 
   // Earlier releases in the protected HTTP suite retain pending locale intents.
-  // Use real, independently renderable releases, including due retry/recovery.
+  // Use real, independently renderable releases, including due retries.
   const ordinaryIds: string[] = [];
   for (const n of [100, 200]) {
     const report = { ...snapshot.report, id: id(n), orderId: id(n + 1), successorOf: null, correctionReason: null };
@@ -39,8 +39,8 @@ it.each(locales)("recovers an issued %s PDF in one ordinary maintenance pass des
     for (const [index, locale] of locales.entries()) {
       const artifactId = id(n + 10 + index); ordinaryIds.push(artifactId);
       await db.diagnosticPdfArtifact.create({ data: { id: artifactId, reportId: id(n), snapshotHash: hash, locale, rendererVersion: "v1", objectKey: `diagnostic-pdf/${id(n)}/${artifactId}.pdf`,
-        createdAt: new Date("2026-10-22T00:00:00Z"), state: index === 0 ? "pending" : index === 1 ? "failed" : "processing", attempts: index === 0 ? 0 : 1,
-        retryAt: index === 1 ? new Date("2026-10-22T01:00:00Z") : null, leaseUntil: index === 2 ? new Date("2026-10-22T01:00:00Z") : null } });
+        createdAt: new Date("2026-10-22T00:00:00Z"), state: index === 1 ? "failed" : "pending", attempts: index === 1 ? 1 : 0,
+        retryAt: index === 1 ? new Date("2026-10-22T01:00:00Z") : null } });
     }
   }
   const unrelatedKey = "diagnostic-pdf/unrelated/retained.pdf";
@@ -53,7 +53,8 @@ it.each(locales)("recovers an issued %s PDF in one ordinary maintenance pass des
   const replacements = await db.diagnosticPdfArtifact.findMany({ where: { reportId: id(2), rendererVersion: "v1-erased-lineage" } });
   expect(replacements).toHaveLength(3);
   for (const locale of locales) {
-    const artifact = replacements.find(row => row.locale === locale)!;
+    const artifact = replacements.find(row => row.locale === locale);
+    if (!artifact) throw new Error(`Missing ${locale} replacement`);
     expect(artifact.state, `Current ${locale} PDF must recover after ordinary artifact maintenance`).toBe("ready");
     expect(artifact.id).not.toBe(id(40 + locales.indexOf(locale)));
     expect(artifact.attempts).toBe(1);
