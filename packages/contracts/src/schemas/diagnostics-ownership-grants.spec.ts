@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { DiagnosticOwnershipGrantSchema, DiagnosticVehicleObservationRequestSchema } from "./diagnostics";
 const rights = { category: "vehicle_observation", purpose: "Restricted comparison", basis: "Seller permission", provenance: "Seller authenticated declaration",
   identifiability: "personal", use: ["service"], schedule: { kind: "until", until: "2026-12-01T00:00:00.000Z", reason: "Seller-selected end" }, supplierRestrictions: "Service only", hold: null };
