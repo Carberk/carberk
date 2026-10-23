@@ -1,3 +1,9 @@
+import { randomBytes } from "node:crypto";
+import { DiagnosticDiscoveryCursor } from "./infrastructure/DiagnosticDiscoveryCursor";
+import { PrismaDiagnosticDiscovery } from "./infrastructure/PrismaDiagnosticDiscovery";
+import { DIAGNOSTIC_DISCOVERY_PORT, type DiagnosticDiscoveryPort } from "./application/ports/DiagnosticDiscoveryPort";
+import { DiscoverDiagnosticPredecessors } from "./application/DiscoverDiagnosticPredecessors";
+import { ListDiagnosticLinkingTechnicians } from "./application/ListDiagnosticLinkingTechnicians";
 import { DiagnosticPublicBindings } from "./infrastructure/DiagnosticPublicBindings";
 import { DIAGNOSTIC_DOCUMENTS_PORT } from "./domain/ports/DiagnosticDocumentsPort";
 import { DIAGNOSTIC_PUBLIC_PORT } from "./domain/ports/DiagnosticPublicPort";
@@ -30,7 +36,12 @@ import { PrismaDiagnosticContinuityProofs } from "./infrastructure/PrismaDiagnos
 import { IssueDiagnosticContinuityProof } from "./application/IssueDiagnosticContinuityProof";
 import { ReadDiagnosticContinuityProof } from "./application/ReadDiagnosticContinuityProof";
 import { ConsumeDiagnosticContinuityProof } from "./application/ConsumeDiagnosticContinuityProof";
-@Module({ imports: [ConfigModule, PrismaModule, IdentityModule], controllers: [DiagnosticIntakeController, DiagnosticReportsController, DiagnosticPublicController], providers: [DiagnosticPublicBindings, { provide: DIAGNOSTIC_DOCUMENTS_PORT, useClass: PrismaDiagnosticDocuments }, { provide: DIAGNOSTIC_PUBLIC_PORT, useClass: PrismaDiagnosticPublic }, DiagnosticAuthority, CampaignDiagnosticAdmission, DiagnosticReportAccess, DiagnosticBinaryParser, PrismaDiagnosticContinuityProofs,
+@Module({ imports: [ConfigModule, PrismaModule, IdentityModule], controllers: [DiagnosticIntakeController, DiagnosticReportsController, DiagnosticPublicController], providers: [
+  { provide: DiagnosticDiscoveryCursor, useFactory: () => new DiagnosticDiscoveryCursor(randomBytes(32)) },
+  { provide: DIAGNOSTIC_DISCOVERY_PORT, useClass: PrismaDiagnosticDiscovery },
+  { provide: DiscoverDiagnosticPredecessors, inject: [DIAGNOSTIC_DISCOVERY_PORT], useFactory: (discovery: DiagnosticDiscoveryPort) => new DiscoverDiagnosticPredecessors(discovery) },
+  { provide: ListDiagnosticLinkingTechnicians, inject: [DIAGNOSTIC_DISCOVERY_PORT], useFactory: (discovery: DiagnosticDiscoveryPort) => new ListDiagnosticLinkingTechnicians(discovery) },
+  DiagnosticPublicBindings, { provide: DIAGNOSTIC_DOCUMENTS_PORT, useClass: PrismaDiagnosticDocuments }, { provide: DIAGNOSTIC_PUBLIC_PORT, useClass: PrismaDiagnosticPublic }, DiagnosticAuthority, CampaignDiagnosticAdmission, DiagnosticReportAccess, DiagnosticBinaryParser, PrismaDiagnosticContinuityProofs,
   { provide: DIAGNOSTIC_CONTINUITY_PROOFS_PORT, useExisting: PrismaDiagnosticContinuityProofs },
   { provide: IssueDiagnosticContinuityProof, inject: [DIAGNOSTIC_CONTINUITY_PROOFS_PORT], useFactory: (proofs: DiagnosticContinuityProofsPort) => new IssueDiagnosticContinuityProof(proofs) },
   { provide: ReadDiagnosticContinuityProof, inject: [DIAGNOSTIC_CONTINUITY_PROOFS_PORT], useFactory: (proofs: DiagnosticContinuityProofsPort) => new ReadDiagnosticContinuityProof(proofs) },

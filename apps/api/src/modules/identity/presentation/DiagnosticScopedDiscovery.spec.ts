@@ -71,7 +71,7 @@ describe("B-scoped discovery through real HTTP, application, authority and datab
     }).compile();
     app = module.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
     // Authentication network boundary supplies a principal. Current Session/grants are real Identity checks.
-    app.use((req: { headers: Record<string, string>; user?: object }, _res: unknown, next: () => void) => { req.user = { sub: req.headers["x-test-user"], sid: req.headers["x-test-session"] }; next(); });
+    app.getHttpAdapter().getInstance().addHook("preHandler", (request, _reply, next) => { const req = request as unknown as { headers: Record<string, string>; user?: object }; req.user = { sub: req.headers["x-test-user"], sid: req.headers["x-test-session"] }; next(); });
     await app.init(); await app.getHttpAdapter().getInstance().ready();
   });
   afterEach(async () => { await app?.close(); });

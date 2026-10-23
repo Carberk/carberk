@@ -134,6 +134,20 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
       await side(pair.order, pair.comparison.candidate.identity), provenance.map(row => row.rightsUntil.toISOString()), now, method);
   }
 
+  /** Read-only discovery uses the same complete retained graph/rights policy as comparative
+   * admission. It neither grants issuance nor chooses a root or rewrites an original pin. */
+  async retainedCandidate(tx: Tx, subject: DiagnosticSubject, orderId: string, predecessorId: string) {
+    const pair = await this.reports.compared(tx, subject, orderId, predecessorId);
+    await this.authority.order(tx, subject, pair.priorOrder.id, "diagnostics.reviewer");
+    await this.authority.order(tx, subject, orderId, "diagnostics.reviewer");
+    this.pair(pair, "comparative_attestation");
+    const provenance = await tx.diagnosticIdentityProvenance.findMany({ where: { id: { in: [...pair.provenance] } } });
+    if (provenance.length !== pair.provenance.size) throw denied();
+    await this.comparisonRights(tx, pair, "comparative_attestation", provenance, this.runtime.now());
+    const observation = pair.comparison.predecessor.identity.observation;
+    return { reportId: predecessorId, observedAt: observation.observedAt, mileageKm: observation.mileageKm };
+  }
+
   async issue(subject: DiagnosticSubject, orderId: string, input: D.DiagnosticContinuityProofIssuance) {
     return this.db.$transaction(async tx => {
       // Lock every actor/publisher User before Business and feature locks. The held Users

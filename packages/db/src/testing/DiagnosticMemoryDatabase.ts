@@ -12,13 +12,14 @@ function matches(row: Row, where: Row = {}): boolean {
     if (key === "OR") return (wanted as Row[]).some(w => matches(row, w));
     const actual = row[key];
     if (key.includes("_") && object(wanted)) return matches(row, wanted);
-    if (!object(wanted)) return actual === wanted;
+    if (!object(wanted)) return actual instanceof Date && wanted instanceof Date ? actual.getTime() === wanted.getTime() : actual === wanted;
     return Object.entries(wanted).every(([op, value]) => {
+      if (op === "is") return actual === value;
       if (op === "not") return actual !== value;
       if (op === "in") return (value as unknown[]).includes(actual);
-      if (op === "lt") return actual != null && (actual as number) < (value as number);
-      if (op === "lte") return actual != null && (actual as number) <= (value as number);
-      if (op === "gt") return actual != null && (actual as number) > (value as number);
+      if (op === "lt") return actual != null && (actual instanceof Date ? actual.getTime() : actual as number) < (value instanceof Date ? value.getTime() : value as number);
+      if (op === "lte") return actual != null && (actual instanceof Date ? actual.getTime() : actual as number) <= (value instanceof Date ? value.getTime() : value as number);
+      if (op === "gt") return actual != null && (actual instanceof Date ? actual.getTime() : actual as number) > (value instanceof Date ? value.getTime() : value as number);
       if (op === "none") return Array.isArray(actual) && !actual.some(r => matches(r as Row, value as Row));
       if (op === "some") return Array.isArray(actual) && actual.some(r => matches(r as Row, value as Row));
       return object(actual) && matches(actual, { [op]: value });
@@ -45,7 +46,7 @@ export class DiagnosticMemoryDatabase {
       const related = (row: Row): Row => ({ ...row,
         ...(name === "inspectionOrder" ? orderRelations(row) : {}),
         ...(name === "session" ? { user: this.table("user").find(u => u["id"] === row["userId"]) ?? row["user"] } : {}),
-        ...(name === "diagnosticIdentityEvidence" ? { identityRecord: this.table("diagnosticIdentityRecord").find(r => r["id"] === row["identityRecordId"]) } : {}),
+        ...(name === "diagnosticIdentityEvidence" ? { identityRecord: this.table("diagnosticIdentityRecord").find(r => r["id"] === row["identityRecordId"]), successor: this.table("diagnosticIdentityEvidence").find(r => r["supersedesId"] === row["id"]) ?? null } : {}),
         ...(name === "diagnosticReportRecord" ? { order: this.table("inspectionOrder").filter(o => o["id"] === row["orderId"]).map(orderRelations)[0], artifacts: this.table("diagnosticPdfArtifact").filter(a => a["reportId"] === row["id"]), evidence: [], predecessor: this.table("diagnosticReportRecord").filter(r => r["id"] === row["predecessorId"]).map(reportRelations)[0] ?? null } : {}),
         ...(["diagnosticEvidence", "diagnosticPdfArtifact"].includes(name) ? { report: this.table("diagnosticReportRecord").filter(r => r["id"] === row["reportId"]).map(r => ({ ...reportRelations(r), predecessor: this.table("diagnosticReportRecord").filter(p => p["id"] === r["predecessorId"]).map(reportRelations)[0] ?? null }))[0] } : {}) });
       const findMany = async (args: Args = {}) => {
@@ -79,7 +80,7 @@ export class DiagnosticMemoryDatabase {
         for (const row of selected) for (const [key, value] of Object.entries(args.data ?? {})) row[key] = object(value) && "increment" in value ? Number(row[key]) + Number(value["increment"]) : clone(value);
         return { count: selected.length };
       };
-      client[name] = { findMany, findFirst, findUnique: findFirst, findUniqueOrThrow, findFirstOrThrow: findUniqueOrThrow, updateMany,
+      client[name] = { count: async (args: Args) => (await findMany(args)).length, findMany, findFirst, findUnique: findFirst, findUniqueOrThrow, findFirstOrThrow: findUniqueOrThrow, updateMany,
         update: async (args: Args) => { await updateMany(args); return findUniqueOrThrow({ where: args.where }); },
         create: async (args: Args) => { const row = { id: randomUUID(), epoch: randomUUID(), state: "pending", generation: 1, attempts: 0, retryAt: null, failureCode: null, leaseUntil: null, sha256: null, sizeBytes: null, verifiedAt: null, cleanupRequestedAt: null, cleanupCompletedAt: null, createdAt: new Date("2026-10-23T00:00:00Z"), ...clone(args.data) }; rows().push(row); return clone(row); } };
     }

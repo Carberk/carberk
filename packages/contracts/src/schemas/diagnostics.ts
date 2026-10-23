@@ -149,3 +149,15 @@ export const PublicDiagnosticAvailabilitySchema = z.object({
 export type PublicDiagnosticAvailability = z.infer<typeof PublicDiagnosticAvailabilitySchema>;
 export const PublicDiagnosticReportSchema = DiagnosticReportSchema.omit({ orderId: true });
 export type PublicDiagnosticReport = z.infer<typeof PublicDiagnosticReportSchema>;
+
+/** Continuations cover only this actor's current B-scoped retained scan, never global absence. */
+export const DiagnosticPredecessorQuerySchema = z.object({ cursor: z.string().min(1).max(2048).optional() }).strict();
+export const DiagnosticPredecessorCandidateSchema = z.object({ reportId: z.string().uuid(), observedAt: z.string().datetime(), mileageKm: z.number().int().nonnegative().max(10000000) }).strict();
+export const DiagnosticPredecessorPageSchema = z.object({
+  candidates: z.array(DiagnosticPredecessorCandidateSchema).max(20), nextCursor: z.string().nullable(), exhausted: z.boolean(),
+  scope: z.literal("currently_authorized_retained_predecessors"),
+}).strict().refine(page => page.exhausted === (page.nextCursor === null), "Exhaustion requires no continuation");
+export const DiagnosticLinkingTechniciansSchema = z.object({ technicians: z.array(z.object({ userId: z.string().uuid(), name: z.string().min(1).max(100) }).strict()) }).strict();
+export type DiagnosticPredecessorQuery = z.infer<typeof DiagnosticPredecessorQuerySchema>;
+export type DiagnosticPredecessorPage = z.infer<typeof DiagnosticPredecessorPageSchema>;
+export type DiagnosticLinkingTechnicians = z.infer<typeof DiagnosticLinkingTechniciansSchema>;
