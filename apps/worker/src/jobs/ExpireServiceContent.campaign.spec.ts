@@ -2,6 +2,7 @@ import { GetBucketVersioningCommand } from "@aws-sdk/client-s3";
 import { describe, expect, it } from "vitest";
 
 import { ExpireServiceContent } from "./ExpireServiceContent";
+import { terminalSupportDatabase } from "./application/testing/TerminalSupportRetentionDatabase";
 import { S3RetiredObjectStore } from "./S3RetiredObjectStore";
 
 const namespace = `cf_${"a".repeat(32)}`, candidate = "b".repeat(40), now = new Date("2027-01-19T00:00:00Z");
@@ -64,6 +65,23 @@ describe("restarted text Support cleanup through the real worker", () => {
    expect(requests).toEqual([]);
    expect(fence.cleanupCompletedAt).toBeNull();
   }
+ });
+ it("fences a selected due Support worker after terminal disposal and preserves a foreign tenant on repeat", async () => {
+  const { db, foreign, authority, purgeWork } = terminalSupportDatabase(namespace);
+  const { requests, store } = storage();
+  const before = structuredClone(foreign);
+  const worker = new ExpireServiceContent(db as never, store, candidate);
+  expect(await worker.execute(now)).toEqual({ supportPurged: 0, attachmentsRetired: 0, cleanupsCompleted: 0 });
+  expect(await worker.execute(now)).toEqual({ supportPurged: 0, attachmentsRetired: 0, cleanupsCompleted: 0 });
+  expect(authority).toEqual([
+   { state: "disposed", values: [null, "selected-case", candidate, "2027-01-19T00:00:00.000Z", "purge"] },
+   { state: "disposed", values: [null, "selected-case", candidate, "2027-01-19T00:00:00.000Z", "purge"] },
+  ]);
+  expect(purgeWork).toEqual([]);
+  expect(foreign).toEqual(before);
+  expect(await db.supportCase.findUnique({ where: { id: "foreign-case" } })).toEqual(before.supportCase);
+  expect(await db.serviceConversation.findUnique({ where: { id: "foreign-conversation" } })).toEqual(before.conversation);
+  expect(requests).toEqual([]);
  });
  it("refuses the wrong current candidate before touching storage", async () => {
   const { db, fence } = pendingDatabase({ requiredCandidate: candidate }), { requests, store } = storage();
