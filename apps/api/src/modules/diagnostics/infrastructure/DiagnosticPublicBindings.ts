@@ -30,16 +30,18 @@ export class DiagnosticPublicBindings {
   async lock(tx: Tx, ids: string[], actorIds: string[]): Promise<PublisherParticipants> {
     const orderIds = [...new Set(ids)].sort();
     const discovered = await this.targets(tx, orderIds);
+    const grants = await tx.diagnosticOwnershipGrant.findMany({ where: { orderId: { in: orderIds }, state: "available" }, orderBy: { id: "asc" } });
     let locked: PublisherParticipants;
     try {
-      locked = await this.publishers.lock({ userIds: [...actorIds, ...discovered.flatMap(row => row.audience === "listing_public" ? [row.commissionerId, row.sellerId].filter((id): id is string => !!id) : [])],
-        businessIds: discovered.flatMap(row => row.businessId ? [row.businessId] : []) }, tx);
+      locked = await this.publishers.lock({ userIds: [...actorIds, ...grants.flatMap(g => [g.grantorId, g.sellerId, g.commissionerId].filter((id): id is string => !!id)), ...discovered.flatMap(row => row.audience === "listing_public" ? [row.commissionerId, row.sellerId].filter((id): id is string => !!id) : [])],
+        businessIds: [...grants.flatMap(g => g.businessId ? [g.businessId] : []), ...discovered.flatMap(row => row.businessId ? [row.businessId] : [])] }, tx);
     } catch (error) { if (error instanceof BusinessAuthorityDenied) throw denied(); throw error; }
-    for (const id of [...new Set(discovered.filter(row => row.audience === "listing_public").flatMap(row => row.listingId ? [row.listingId] : []))].sort()) {
+    for (const id of [...new Set([...grants.flatMap(g => g.listingId ? [g.listingId] : []), ...discovered.filter(row => row.audience === "listing_public").flatMap(row => row.listingId ? [row.listingId] : [])])].sort()) {
       await tx.$queryRaw`SELECT id FROM listings WHERE id=${id} FOR SHARE`;
     }
     for (const id of orderIds) await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${id} FOR UPDATE`;
     if (JSON.stringify(discovered) !== JSON.stringify(await this.targets(tx, orderIds))) throw denied();
+    if (JSON.stringify(grants) !== JSON.stringify(await tx.diagnosticOwnershipGrant.findMany({ where: { orderId: { in: orderIds }, state: "available" }, orderBy: { id: "asc" } }))) throw denied();
     return locked;
   }
   async pairLocks(tx: Tx, orderId: string, predecessorId: string, actorIds: string[]) {

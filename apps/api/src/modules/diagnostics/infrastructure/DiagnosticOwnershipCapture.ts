@@ -1,7 +1,7 @@
 import { DiagnosticSchemas } from "@auto-tm/contracts";
 import type { Prisma } from "@auto-tm/db";
 import { DiagnosticRuleError } from "../domain/InspectionOrder";
-import { diagnosticListingDigest } from "./diagnosticListingDigest";
+import { DiagnosticOwnershipGrants } from "./DiagnosticOwnershipGrants";
 
 type Tx = Prisma.TransactionClient;
 type Order = Prisma.InspectionOrderGetPayload<object>;
@@ -16,35 +16,28 @@ export const DiagnosticOwnershipCapture = {
     return parsed.data;
   },
   async append(tx: Tx, row: Order, rawId: string, version: number, actorId: string, now: Date,
-    classification: DiagnosticSchemas.DiagnosticOwnershipClassification | undefined): Promise<void> {
+    classification: DiagnosticSchemas.DiagnosticOwnershipClassification | undefined, grantId?: string): Promise<void> {
     if (classification && new Date(classification.rights.schedule.until) <= now) throw new DiagnosticRuleError("DIAGNOSTIC_INVALID_INPUT");
     const unavailable = { identityRecordId: rawId, orderId: row.id, orderVersion: version, state: "unavailable" };
-    if (!classification || row.audience !== "listing_public" || !row.listingId || !row.commissionerId) {
+    if (!grantId || row.audience !== "listing_public" || !row.listingId || !row.commissionerId) {
       await tx.diagnosticOwnershipComponent.create({ data: unavailable }); return;
     }
+    const grant = await DiagnosticOwnershipGrants.compatible(tx, row, grantId, now);
     const earlier = await tx.diagnosticIdentityRecord.findMany({ where: { orderId: row.id, orderVersion: { lt: version } }, include: { ownership: true } });
     // No repin, backfill or resurrection, including a legacy raw that has no component row.
     if (earlier.some(raw => raw.ownership?.state !== "available" || !raw.ownership.rightsUntil || raw.ownership.rightsUntil <= now)) {
       await tx.diagnosticOwnershipComponent.create({ data: unavailable }); return;
     }
-    const listing = await tx.listing.findUnique({ where: { id: row.listingId } });
-    if (!listing || listing.deletedAt) throw new DiagnosticRuleError("DIAGNOSTIC_NO_ACCESS");
-    const subjects = await tx.user.findMany({ where: { id: { in: [listing.sellerId, row.commissionerId] } } });
-    if ([listing.sellerId, row.commissionerId].some(id => {
-      const user = subjects.find(candidate => candidate.id === id);
-      return !user || user.deletionScheduledAt || (!user.phoneVerifiedAt && !user.emailVerifiedAt);
-    })) {
-      await tx.diagnosticOwnershipComponent.create({ data: unavailable }); return;
+    const rights = DiagnosticSchemas.DiagnosticIdentityRightsSchema.parse(grant.rights);
+    if (classification) {
+      if (JSON.stringify({ ...rights, schedule: null }) !== JSON.stringify({ ...classification.rights, schedule: null }) || new Date(classification.rights.schedule.until) > new Date(rights.schedule.until)) throw new DiagnosticRuleError("DIAGNOSTIC_NO_ACCESS");
     }
-    const member = listing.businessId ? await tx.dealershipMember.findUnique({ where: { userId: row.commissionerId } }) : null;
-    if (listing.businessId && (!member || member.dealershipId !== listing.businessId || member.status !== "active")) {
-      await tx.diagnosticOwnershipComponent.create({ data: unavailable }); return;
-    }
+    const retainedRights = classification?.rights ?? rights;
     await tx.diagnosticOwnershipComponent.create({ data: {
-      ...unavailable, state: "available", scope: "diagnostic_ownership_continuity", sourceListingId: listing.id,
-      identityDigest: diagnosticListingDigest(listing), sellerId: listing.sellerId, commissionerId: row.commissionerId,
-      businessId: listing.businessId, membershipId: listing.businessId ? member?.id ?? null : null,
-      rights: classification.rights, rightsUntil: new Date(classification.rights.schedule.until), declaredById: actorId, declaredAt: now,
+      ...unavailable, grantId: grant.id, state: "available", scope: "diagnostic_ownership_continuity", sourceListingId: grant.listingId,
+      identityDigest: grant.identityDigest, sellerId: grant.sellerId, commissionerId: grant.commissionerId,
+      businessId: grant.businessId, membershipId: grant.membershipId,
+      rights: retainedRights, rightsUntil: new Date(retainedRights.schedule.until), declaredById: actorId, declaredAt: now,
     } });
   }
 };

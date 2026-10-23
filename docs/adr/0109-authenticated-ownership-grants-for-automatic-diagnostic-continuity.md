@@ -2,7 +2,8 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-23
-- **Deciders**: Founder, Chief of Staff
+- **Deciders**: Founder
+- **Recorder**: Chief of Staff
 
 ## Context
 

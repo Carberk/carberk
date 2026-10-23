@@ -15,6 +15,7 @@ const json = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.stringif
 export { diagnosticListingDigest } from "./diagnosticListingDigest";
 import { diagnosticListingDigest } from "./diagnosticListingDigest";
 import { DiagnosticPublicBindings } from "./DiagnosticPublicBindings";
+import { DiagnosticOwnershipGrants } from "./DiagnosticOwnershipGrants";
 import { DiagnosticOwnershipCapture } from "./DiagnosticOwnershipCapture";
 
 /** Stable binding of one recorded observation to its visit and resulting order version. */
@@ -210,12 +211,35 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
       await this.audit(tx, subject, row, "ORDER_ASSIGNMENT_CHANGED", { targetUserId: input.userId, capability: input.capability, active: input.active }); return this.dto(tx, next, true);
     });
   }
+  async grantOwnership(subject: DiagnosticSubject, id: string, input: DiagnosticSchemas.DiagnosticOwnershipGrant): Promise<{ id: string }> {
+    return this.db.$transaction(async tx => {
+      await this.publicBindings.lock(tx, [id], [subject.userId]); await this.current(tx, subject);
+      const row = await tx.inspectionOrder.findUnique({ where: { id } });
+      if (!row) throw denial();
+      return DiagnosticOwnershipGrants.create(tx, row, subject, input, this.runtime.now(), this.runtime.id());
+    }).catch(DiagnosticOwnershipGrants.refuse);
+  }
+  async revokeOwnership(subject: DiagnosticSubject, id: string, grantId: string): Promise<{ id: string }> {
+    return this.db.$transaction(async tx => {
+      const now = this.runtime.now();
+      const discovered = await tx.diagnosticOwnershipGrant.findUnique({ where: { id: grantId } });
+      if (!discovered || discovered.orderId !== id || discovered.grantorId !== subject.userId) throw denial();
+      // Complete graph locks precede even the current Session/identity check. Discovery is never authority.
+      await tx.$queryRaw`SELECT diagnostic_lock_ownership_disposal(NULL::text,${now}::timestamp,${grantId}::text)`;
+      await this.current(tx, subject);
+      const grant = await tx.diagnosticOwnershipGrant.findUnique({ where: { id: grantId } });
+      if (!grant || grant.orderId !== id || grant.state !== "available" || grant.grantorId !== subject.userId) throw denial();
+      await tx.$queryRaw`SELECT diagnostic_dispose_ownership_scope(NULL::text,${now}::timestamp,${grantId}::text)`;
+      return { id: grantId };
+    }).catch(DiagnosticOwnershipGrants.refuse);
+  }
   async observeVehicle(subject: DiagnosticSubject, id: string, input: DiagnosticSchemas.DiagnosticVehicleObservationRequest): Promise<DiagnosticSchemas.DiagnosticOrder> {
     const classification = DiagnosticOwnershipCapture.classification(input.ownershipClassification, this.runtime.now());
     return this.db.$transaction(async tx => {
       // Listing mutations acquire Listing before order. Never wait for a Listing under an order lock.
       await this.publicBindings.lock(tx, [id], [subject.userId]);
       const { row } = await this.scope(tx, subject, id, "diagnostics.technician");
+      if (input.ownershipGrantId) await DiagnosticOwnershipGrants.compatible(tx, row, input.ownershipGrantId, this.runtime.now());
       const { expectedVersion } = input;
       const observed = DiagnosticSchemas.DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true }).parse({
         observedAt: input.observedAt, mileageKm: input.mileageKm, method: input.method, vin: input.vin, manualReference: input.manualReference,
@@ -237,9 +261,9 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
       const recordedAt = this.runtime.now();
       await tx.diagnosticIdentityRecord.create({ data: { id: rawId, orderId: id, orderVersion: next.version, observation: json(observed),
         observationHash: diagnosticObservationHash(id, next.version, observed), recordedById: subject.userId, recordedAt } });
-      await DiagnosticOwnershipCapture.append(tx, row, rawId, next.version, subject.userId, recordedAt, classification);
+      await DiagnosticOwnershipCapture.append(tx, row, rawId, next.version, subject.userId, recordedAt, classification, input.ownershipGrantId);
       await this.audit(tx, subject, row, "VEHICLE_OBSERVED", { method: input.method }); return this.dto(tx, next, true);
-    });
+    }).catch(DiagnosticOwnershipGrants.refuse);
   }
   /** Single-visit history. Commissioner, marketplace admin and center staff not assigned here receive the uniform denial. */
   async identityRecords(subject: DiagnosticSubject, id: string): Promise<DiagnosticSchemas.DiagnosticIdentityRecord[]> {
