@@ -37,8 +37,14 @@ export class DiagnosticMemoryDatabase {
     return rows;
   }
   constructor() {
-    const client: Row = { $queryRaw: async () => [], $executeRaw: async () => 0 };
-    for (const name of ["user", "session", "staffGrant", "diagnosticIdentityRecord", "dealershipMember", "inspectionOrder", "listing", "diagnosticReportRecord", "diagnosticPdfArtifact", "diagnosticEvidence", "diagnosticTemplateVersion", "diagnosticOrderAssignment", "diagnosticCenterAssignment", "diagnosticIdentityEvidence", "diagnosticIdentityProvenance"]) {
+    const client: Row = { $queryRaw: async (parts: TemplateStringsArray, ...values: string[]) => {
+      // Material SELECTs used to bind staffing, with locks deliberately unmodelled.
+      const sql = parts.join("?");
+      if (sql.includes('SELECT id,"orderId","userId"')) return clone(this.table("diagnosticOrderAssignment").filter(row => values.slice(0, 2).includes(row["orderId"] as string) && values.slice(2).includes(row["userId"] as string)).sort((a, b) => String(a["id"]).localeCompare(String(b["id"]))));
+      if (sql.includes('SELECT id,"centerId","userId"')) return clone(this.table("diagnosticCenterAssignment").filter(row => values.slice(0, 2).includes(row["centerId"] as string) && values.slice(2).includes(row["userId"] as string)).sort((a, b) => String(a["id"]).localeCompare(String(b["id"]))));
+      return [];
+    }, $executeRaw: async () => 0 };
+    for (const name of ["user", "session", "staffGrant", "diagnosticIdentityRecord", "diagnosticContinuityProof", "diagnosticAudit", "dealershipMember", "inspectionOrder", "listing", "diagnosticReportRecord", "diagnosticPdfArtifact", "diagnosticEvidence", "diagnosticTemplateVersion", "diagnosticOrderAssignment", "diagnosticCenterAssignment", "diagnosticIdentityEvidence", "diagnosticIdentityProvenance"]) {
       this.tables.set(name, []);
       const rows = () => this.table(name);
       const reportRelations = (row: Row): Row => ({ ...row, order: this.table("inspectionOrder").filter(o => o["id"] === row["orderId"]).map(orderRelations)[0], artifacts: this.table("diagnosticPdfArtifact").filter(a => a["reportId"] === row["id"]) });
@@ -82,7 +88,7 @@ export class DiagnosticMemoryDatabase {
       };
       client[name] = { count: async (args: Args) => (await findMany(args)).length, findMany, findFirst, findUnique: findFirst, findUniqueOrThrow, findFirstOrThrow: findUniqueOrThrow, updateMany,
         update: async (args: Args) => { await updateMany(args); return findUniqueOrThrow({ where: args.where }); },
-        create: async (args: Args) => { const row = { id: randomUUID(), epoch: randomUUID(), state: "pending", generation: 1, attempts: 0, retryAt: null, failureCode: null, leaseUntil: null, sha256: null, sizeBytes: null, verifiedAt: null, cleanupRequestedAt: null, cleanupCompletedAt: null, createdAt: new Date("2026-10-23T00:00:00Z"), ...clone(args.data) }; rows().push(row); return clone(row); } };
+        create: async (args: Args) => { const row = { id: randomUUID(), epoch: randomUUID(), state: "pending", generation: 1, attempts: 0, retryAt: null, failureCode: null, leaseUntil: null, sha256: null, sizeBytes: null, verifiedAt: null, cleanupRequestedAt: null, cleanupCompletedAt: null, createdAt: new Date("2026-10-23T00:00:00Z"), ...(name === "diagnosticReportRecord" ? { status: "draft", version: 0, erasedAt: null, snapshot: null, withdrawnAt: null, withdrawalReason: null } : {}), ...(name === "diagnosticContinuityProof" ? { consumedReportId: null, consumedAt: null, invalidatedAt: null, erasedAt: null } : {}), ...clone(args.data) }; rows().push(row); return clone(row); } };
     }
     client["$transaction"] = async (fn: (tx: unknown) => Promise<unknown>) => fn(client);
     this.client = client as unknown as PrismaService;
