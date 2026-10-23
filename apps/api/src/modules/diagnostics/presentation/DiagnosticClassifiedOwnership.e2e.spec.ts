@@ -116,6 +116,18 @@ describe("classified forward ownership on real HTTP and disposable PostgreSQL", 
     return order;
   }
   const observe = (order: Order, extra: object = {}) => post("technician", `orders/${order.id}/vehicle`, { expectedVersion: order.version, ...observed, ...extra });
+  it("refuses unauthenticated and unassigned classified observations without writes", async () => {
+    const order = await visit();
+    const before = await db.inspectionOrder.findUniqueOrThrow({ where: { id: order.id } });
+    const audits = await db.diagnosticAudit.count({ where: { orderId: order.id } });
+    const body = { expectedVersion: order.version, ...observed, ...envelope };
+    await request.post(`/api/v1/diagnostics/orders/${order.id}/vehicle`).send(body).expect(401);
+    await post("commissioner", `orders/${order.id}/vehicle`, body).expect(403);
+    expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: order.id } })).toEqual(before);
+    expect(await db.diagnosticIdentityRecord.count({ where: { orderId: order.id } })).toBe(0);
+    expect(await db.diagnosticOwnershipComponent.count({ where: { orderId: order.id } })).toBe(0);
+    expect(await db.diagnosticAudit.count({ where: { orderId: order.id } })).toBe(audits);
+  });
   it.each([false, true])("retains only server-resolved classified source facts; Business=%s", async business => {
     const order = await visit(business), response = await observe(order, envelope).expect(201);
     expect(response.body.observedVehicle).toEqual(observed);
@@ -125,6 +137,10 @@ describe("classified forward ownership on real HTTP and disposable PostgreSQL", 
     expect(!!c.businessId).toBe(business); expect(!!c.membershipId).toBe(business);
     expect(r.observationHash).toBe(diagnosticObservationHash(order.id, response.body.version, observed));
     expect(JSON.stringify(response.body)).not.toContain("ownershipClassification");
+    await observe(response.body, envelope).expect(201);
+    expect(await db.diagnosticOwnershipComponent.findUniqueOrThrow({ where: { identityRecordId: r.id } })).toEqual(c);
+    expect(await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: r.id } })).toEqual(r);
+    expect(await component(order.id)).toMatchObject({ state: "available", rights });
   });
   it("does not repair an earlier unavailable anchor with later classification", async () => {
     const order = await visit(), first = await observe(order).expect(201);
@@ -144,9 +160,10 @@ describe("classified forward ownership on real HTTP and disposable PostgreSQL", 
     expect(await db.diagnosticIdentityRecord.count({ where: { orderId: order.id } })).toBe(0);
     expect(await db.diagnosticAudit.count({ where: { orderId: order.id } })).toBe(audits);
   });
-  it("records an ordinary observation after source membership removal without inventing a personal tuple", async () => {
+  it.each(["missing", "suspended"])("records an ordinary observation with %s source membership without inventing a personal tuple", async state => {
     const order = await visit(true);
-    await db.dealershipMember.delete({ where: { userId: suite.id("commissioner") } });
+    if (state === "missing") await db.dealershipMember.delete({ where: { userId: suite.id("commissioner") } });
+    else await db.dealershipMember.update({ where: { userId: suite.id("commissioner") }, data: { status: "suspended" } });
     await observe(order, envelope).expect(201);
     expect(await component(order.id)).toMatchObject({ state: "unavailable", businessId: null, membershipId: null, sellerId: null, rights: null });
   });
