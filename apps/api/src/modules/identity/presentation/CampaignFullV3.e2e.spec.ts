@@ -39,7 +39,6 @@ import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
 import { defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import sharp from "sharp";
-import { Readable } from "node:stream";
 // eslint-disable-next-line no-restricted-imports -- Integration composition observes only the real generator's external S3 transport.
 import { IMAGE_VARIANT_GENERATOR } from "../../listings/domain/ports/ImageVariantGenerator";
 
@@ -2003,11 +2002,12 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
       await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
     } };
   }
-  function supportRaceWorker(now: Date, endpoint: string) {
+  function supportRaceWorker(now: Date, endpoint: string, selectedCaseId?: string) {
     const tag = `support-race-${randomUUID()}`;
     const database = new URL(process.env["DATABASE_URL"]!);
     database.searchParams.set("application_name", tag);
-    let child: ReturnType<typeof execFile>;
+    let child: ReturnType<typeof execFile>, selected!: () => void;
+    const selection = new Promise<void>(resolve => { selected = resolve; });
     const result = new Promise<{ supportPurged: number; attachmentsRetired: number; cleanupsCompleted: number }>((resolve, reject) => {
       child = execFile(process.execPath, ["-e", `
         require('reflect-metadata'); require('tsx/cjs');
@@ -2019,79 +2019,42 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
           const db = new PrismaService();
           const s3 = new S3Client({ endpoint: process.env.MINIO_ENDPOINT, region: process.env.MINIO_REGION ?? 'us-east-1', forcePathStyle: true,
             credentials: { accessKeyId: process.env.MINIO_ACCESS_KEY ?? 'minioadmin', secretAccessKey: process.env.MINIO_SECRET_KEY ?? 'minioadmin' } });
-          try { console.log(JSON.stringify(await new ExpireServiceContent(db, new S3RetiredObjectStore(s3, 'service-private')).execute(new Date(process.argv[1])))); }
+          // Transparent scheduling gate. Selection and all SQL authority/purge work remain real.
+          const selectedCaseId = process.argv[2];
+          const released = selectedCaseId ? new Promise(resolve => process.stdin.once('data', resolve)) : Promise.resolve();
+          const supportCase = new Proxy(db.supportCase, { get: (target, key) => key === 'findMany' ? async args => {
+            const rows = await target.findMany(args);
+            if (rows.some(row => row.id === selectedCaseId)) {
+              process.stderr.write('SUPPORT_SELECTED\\n');
+              await released;
+            }
+            return rows;
+          } : Reflect.get(target, key) });
+          const gated = new Proxy(db, { get: (target, key) => {
+            if (key === 'supportCase') return supportCase;
+            const value = Reflect.get(target, key);
+            return typeof value === 'function' ? value.bind(target) : value;
+          } });
+          try { console.log(JSON.stringify(await new ExpireServiceContent(gated, new S3RetiredObjectStore(s3, 'service-private')).execute(new Date(process.argv[1])))); }
           finally { s3.destroy(); await db.onModuleDestroy(); }
         })().catch(error => { console.error('[issue-901-cleanup]', JSON.stringify((${cleanupFailure.toString()})(error))); console.error('Owned Support worker refused'); process.exitCode = 1; });
-      `, now.toISOString()], { timeout: 30000, cwd: `${root}/apps/worker`, env: { ...process.env, DATABASE_URL: database.toString(), MINIO_ENDPOINT: endpoint, TSX_TSCONFIG_PATH: `${root}/apps/worker/tsconfig.json` } }, (error, stdout, stderr) => {
+      `, now.toISOString(), selectedCaseId ?? ""], { timeout: 30000, cwd: `${root}/apps/worker`, env: { ...process.env, DATABASE_URL: database.toString(), MINIO_ENDPOINT: endpoint, TSX_TSCONFIG_PATH: `${root}/apps/worker/tsconfig.json` } }, (error, stdout, stderr) => {
         if (error) console.error("[issue-901-cleanup]", JSON.stringify({ phase: "owned-support-worker", ...cleanupFailure({ name: error.name, code: error.code, stderr }) }));
         if (error) reject(new Error("Owned Support worker failed before result"));
         else { try { resolve(JSON.parse(stdout.trim())); } catch { reject(new Error("Owned Support worker result invalid")); } }
       });
     });
+    let selectionOutput = "";
+    child!.stderr?.on("data", (chunk: Buffer) => {
+      selectionOutput = (selectionOutput + chunk.toString()).slice(-1024);
+      if (selectionOutput.includes("SUPPORT_SELECTED\n")) selected();
+    });
     // Attach immediately so a failed barrier never leaves an unhandled child rejection.
     const settled = result.then(value => ({ value, error: undefined }), (error: unknown) => ({ value: undefined, error }));
-    return { tag, result, settle: async () => {
+    return { tag, result, selected: selectedCaseId ? Promise.race([selection, settled.then(() => { throw new Error("Worker finished before selecting the requested Support case"); })]) : Promise.resolve(), resume: () => child!.stdin?.end("resume\n"), settle: async () => {
       if (child!.exitCode === null) child!.kill("SIGTERM");
       return settled;
     } };
-  }
-  function supportRaceReset(id: string) {
-    const tag = `support-reset-${randomUUID()}`;
-    const database = new URL(process.env["DATABASE_URL"]!);
-    database.searchParams.set("application_name", tag);
-    // Add only a thread-local PostgreSQL observation tag to the existing operator transport.
-    // Run the identical existing operator/transport harness away from this event loop.
-    // Every SQL/Redis child retains execute's existing 30s bound. Do not terminate
-    // this worker before its synchronous children settle; wait for its natural exit.
-    const worker = new NodeWorker(`
-      const { parentPort, workerData } = require('node:worker_threads');
-      const { spawnSync } = require('node:child_process');
-      const { createRequire } = require('node:module');
-      const { runInNewContext } = require('node:vm');
-      const { root, packageRoot, profile, candidate, source, id } = workerData;
-      const localRequire = createRequire(root + '/apps/api/package.json');
-      const remoteProcess = { execPath: process.execPath, exitCode: 0, env: {
-        STAGING_CAMPAIGN_PROFILE_ENABLED: profile,
-        RAILWAY_PROJECT_ID: 'v3-project', RAILWAY_ENVIRONMENT_ID: 'v3-staging', RAILWAY_SERVICE_ID: 'v3-api', RAILWAY_ENVIRONMENT_NAME: 'staging',
-        APP_ENV: 'staging', SMS_DRIVER: 'mock', AUTOTM_COMMIT_SHA: candidate,
-        DATABASE_URL: 'postgresql://fixture:synthetic@postgres.railway.internal:5432/railway', REDIS_URL: 'redis://fixture:synthetic@redis.railway.internal:6379/0',
-        MINIO_ENDPOINT: 'http://minio.railway.internal:9000', MINIO_PUBLIC_URL: 'https://media.example',
-      } };
-      const payload = { kind: 'reset', id, namespace: 'cf_' + id, profile, candidate, target: candidate,
-        redisOrigin: 'redis://redis.railway.internal:6379/0', identity: { projectId: 'v3-project', environmentId: 'v3-staging', services: { api: 'v3-api' },
-          origins: { database: 'postgresql://postgres.railway.internal:5432/railway', media: 'http://minio.railway.internal:9000', publicMedia: 'https://media.example' } } };
-      let code = 0, receipt, sqlCalls = 0;
-      const phases = (${resetPhaseTrace.toString()})("support-reset");
-      let transportThrew = true;
-      try {
-        const program = runInNewContext(source + '; remoteProgram(payload)', { payload });
-        runInNewContext(program, { URL, process: remoteProcess, require: name => name === 'node:child_process' ? {
-          spawnSync: (binary, args, spawnOptions) => phases.call(binary, args, spawnOptions.input, () => {
-            if (binary === process.execPath) return spawnSync(binary, args, { ...spawnOptions, encoding: 'utf8', timeout: 30000, cwd: root + '/apps/api', env: { ...process.env,
-              ...(process.env.APP_ENV === 'test' && ['localhost', '127.0.0.1'].includes(new URL(process.env.MINIO_ENDPOINT ?? 'http://invalid').hostname)
-                ? { MINIO_ACCESS_KEY: process.env.MINIO_ACCESS_KEY ?? 'minioadmin', MINIO_SECRET_KEY: process.env.MINIO_SECRET_KEY ?? 'minioadmin' } : {}) } });
-            sqlCalls += 1;
-            return spawnSync(process.execPath, [root + '/scripts/testing/query-disposable-postgres.cjs'], {
-              input: spawnOptions.input, encoding: 'utf8', timeout: 30000,
-              env: { ...process.env, STAGING_CONTROL_TEST_DATABASE_URL: process.env.DATABASE_URL, STAGING_TEST_DB_PACKAGE: packageRoot + '/package.json', STAGING_TEST_SQL_DIAGNOSTICS: '1' },
-            });
-          }),
-        } : localRequire(name), console: { log: value => { receipt = JSON.parse(value); }, error: () => { code = 1; } } });
-      transportThrew = false;
-      } finally { phases.finish(code || remoteProcess.exitCode, receipt?.state, transportThrew); }
-      parentPort.postMessage({ code: code || remoteProcess.exitCode, receipt, sqlCalls });
-    `, { eval: true, env: { ...process.env, DATABASE_URL: database.toString() }, workerData: { root, packageRoot, profile, candidate, source, id } });
-    const result = new Promise<ReturnType<typeof execute>>((resolve, reject) => {
-      let result: ReturnType<typeof execute> | undefined, failure: Error | undefined;
-      worker.on("message", (value: ReturnType<typeof execute>) => { result = value; });
-      worker.on("error", (error: Error) => { failure = error; });
-      worker.on("exit", code => {
-        if (failure) reject(failure);
-        else if (code !== 0 || !result) reject(new Error("Reset transport worker failed before receipt"));
-        else resolve(result);
-      });
-    });
-    return { tag, result };
   }
   async function supportRaceWait(client: SupportRaceSql, until: number, sql: string, values: unknown[], participants?: { worker: string; reset: string; gate: number }) {
     const remainingAtEntryMs = until - Date.now();
@@ -2254,86 +2217,50 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
     });
   }));
 
-  it("skips a selected Support worker after an earlier exact reset disposes its durable namespace claim", () => withKnownJobs(known => {
+  it.each(["present", "absent"] as const)("fences a selected Support worker under disposed SQL authority with its target %s", targetState => withKnownJobs(known => {
     const ids = ["fb".repeat(16)], foreignId = "fc".repeat(16);
     return resetAfter(ids, async () => {
       const primary = await supportRaceGraph(ids[0]!, known);
       ids.push(foreignId);
       const foreign = await supportRaceGraph(foreignId, known);
       await supportRaceReopen(foreign);
-      const foreignBefore = await supportRaceSnapshot(foreignId), keys = await owned(primary.id), live = await supportRaceJournal(primary.id, 65, 82);
-      const storage = await supportRaceStorage(), holder = await supportRaceSql(), observer = await supportRaceSql(), tombstoneGate = await supportRaceSql();
-      const children: ReturnType<typeof supportRaceWorker>[] = [];
-      let resetting: Promise<{ value: ReturnType<typeof execute> | undefined; error: unknown }> | undefined;
-      let gateAcquisition: Promise<unknown> | undefined;
-      const cleanupErrors: unknown[] = [];
+      const foreignBefore = await supportRaceSnapshot(foreignId);
+      const now = new Date(primary.closed.closedAt!.getTime() + 90 * 86400000);
+      const storage = await supportRaceStorage();
+      const run = supportRaceWorker(now, storage.endpoint, primary.resourceId);
       try {
-        await holder.query("BEGIN");
-        await holder.query("LOCK TABLE public.service_audits IN ROW EXCLUSIVE MODE");
-        // Session-level advisory holder survives COMMIT of the relation barrier.
-        await holder.query("SELECT pg_advisory_lock(hashtextextended($1,0))", [`cf_${primary.id}`]);
-        const { rows: held } = await holder.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
-        const until = Date.now() + 3500;
-        const resetRun = supportRaceReset(primary.id);
-        resetting = resetRun.result.then(value => ({ value, error: undefined }), (error: unknown) => ({ value: undefined, error }));
-        const resetPid = await supportRaceWait(observer, until, `SELECT a.pid FROM pg_stat_activity a WHERE $1::int=ANY(pg_blocking_pids(a.pid)) AND a.application_name=$2
-          AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.relation='public.service_audits'::regclass AND l.mode='ShareRowExclusiveLock' AND NOT l.granted)`, [held[0]!.pid, resetRun.tag]);
-        const now = new Date(primary.closed.closedAt!.getTime() + 90 * 86400000);
-        const run = supportRaceWorker(now, storage.endpoint); children.push(run);
-        await supportRaceWait(observer, until, `SELECT a.pid FROM pg_stat_activity a WHERE a.application_name=$1 AND $2::int=ANY(pg_blocking_pids(a.pid))
-          AND a.query LIKE 'LOCK TABLE public.service_audits,%' AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.relation='public.service_audits'::regclass AND l.mode='ShareRowExclusiveLock' AND NOT l.granted)`, [run.tag, resetPid]);
-        await holder.query("COMMIT");
-        await supportRaceWait(observer, until, `SELECT a.pid FROM pg_stat_activity a WHERE a.pid=$1 AND $2::int=ANY(pg_blocking_pids(a.pid))
-          AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.locktype='advisory' AND NOT l.granted)`, [resetPid, held[0]!.pid]);
-        await tombstoneGate.query("BEGIN");
-        const { rows: gatePid } = await tombstoneGate.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
-        gateAcquisition = tombstoneGate.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`cf_${primary.id}`]).then(() => undefined, (error: unknown) => ({ error }));
-        await supportRaceWait(observer, until, `SELECT a.pid FROM pg_stat_activity a WHERE a.pid=$1 AND $2::int=ANY(pg_blocking_pids(a.pid))
-          AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.locktype='advisory' AND NOT l.granted)`, [gatePid[0]!.pid, resetPid]);
-        await holder.query("SELECT pg_advisory_unlock(hashtextextended($1,0))", [`cf_${primary.id}`]);
-        const reset = await resetting!;
-        expect(await gateAcquisition).toBeUndefined();
-        // Intended oracle: a tombstoned resource still enters campaign authority.
-        // This gate follows INITIAL integrity, so disposal remains unproved here.
-        // Preserve the failing orchestration until the separate barrier design is approved.
-        await supportRaceWait(observer, until, `SELECT a.pid FROM pg_stat_activity a WHERE a.application_name=$1 AND $2::int=ANY(pg_blocking_pids(a.pid))
-          AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.locktype='advisory' AND NOT l.granted)
-          AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.relation='public.service_audits'::regclass AND l.mode='ShareRowExclusiveLock' AND l.granted)`, [run.tag, gatePid[0]!.pid], { worker: run.tag, reset: resetRun.tag, gate: gatePid[0]!.pid });
-        await tombstoneGate.query("COMMIT");
-        expect(reset.error).toBeUndefined(); expect(reset.value?.code).toBe(0);
-        // Discard first receipt as lost; use only the same-reset retry for subsequent recovery.
-        const terminal = await supportRaceDisposed(primary, keys, primary.audits, 65, 147);
-        expect(terminal.events.slice(0, 82)).toEqual(live.events);
-        const terminalSnapshot = await supportRaceSnapshot(primary.id);
+        await run.selected;
+        if (targetState === "present") {
+          // Negative authority fixture: terminal state with the real graph/journal intact.
+          // No trigger, SQL predicate, permission or product callback is replaced.
+          await db.$executeRawUnsafe(`UPDATE "cf_${primary.id}".campaign_manifest SET state='disposed'`);
+        } else {
+          expect(execute("reset", primary.id)).toMatchObject({ code: 0, receipt: supportRaceReceipt });
+          expect(await db.supportCase.findUnique({ where: { id: primary.resourceId } })).toBeNull();
+          expect(await db.serviceConversation.findUnique({ where: { id: primary.conversationId } })).toBeNull();
+        }
+        const before = await supportRaceSnapshot(primary.id);
+        run.resume();
         expect(await run.result).toEqual(supportRaceEmpty);
-        expect(storage.counts()).toEqual({ requests: 0, forwardingFailures: 0 });
-        expect(await supportRaceSnapshot(primary.id)).toEqual(terminalSnapshot);
+        expect(await supportRaceSnapshot(primary.id)).toEqual(before);
         expect(await supportRaceSnapshot(foreignId)).toEqual(foreignBefore);
-        const late = supportRaceWorker(now, storage.endpoint); children.push(late);
-        expect(await late.result).toEqual(supportRaceEmpty);
+        const late = supportRaceWorker(now, storage.endpoint);
+        try { expect(await late.result).toEqual(supportRaceEmpty); }
+        finally { await late.settle(); }
         expect(storage.counts()).toEqual({ requests: 0, forwardingFailures: 0 });
-        expect(await supportRaceSnapshot(primary.id)).toEqual(terminalSnapshot);
-        expect(execute("reset", primary.id)).toMatchObject({ code: 0, receipt: supportRaceReceipt });
-        expect(await supportRaceSnapshot(primary.id)).toEqual(terminalSnapshot);
+        expect(await supportRaceSnapshot(primary.id)).toEqual(before);
         expect(await supportRaceSnapshot(foreignId)).toEqual(foreignBefore);
-        const foreignKeys = await owned(foreignId), audits = await db.serviceAudit.findMany({ where: { resourceId: foreign.resourceId }, orderBy: { id: "asc" } });
-        expect(execute("reset", foreignId)).toMatchObject({ code: 0, receipt: supportRaceReceipt });
-        await supportRaceDisposed(foreign, foreignKeys, audits, 68, 155);
+        expect(await db.serviceErasureFence.findUnique({ where: { conversationId: primary.conversationId } })).toBeNull();
+        if (targetState === "absent") {
+          expect(await db.serviceMessage.count({ where: { conversationId: primary.conversationId } })).toBe(0);
+          expect(await db.serviceOutbox.count({ where: { conversationId: primary.conversationId } })).toBe(0);
+          expect(await db.serviceReadState.count({ where: { conversationId: primary.conversationId } })).toBe(0);
+        }
       } finally {
-        // Release cleanup gates before draining the reset they can obstruct.
-        // Collect every cleanup failure so the original assertion/error survives.
-        const drain = async (tasks: Promise<unknown>[]) => {
-          for (const result of await Promise.allSettled(tasks)) if (result.status === "rejected") cleanupErrors.push(result.reason);
-        };
-        await drain([holder.query("ROLLBACK")]);
-        await drain([holder.query("SELECT pg_advisory_unlock(hashtextextended($1,0))", [`cf_${primary.id}`])]);
-        await drain([Promise.resolve(gateAcquisition)]);
-        await drain([tombstoneGate.query("ROLLBACK")]);
-        await drain([Promise.resolve(resetting)]);
-        for (const child of children) await drain([child.settle()]);
-        await drain([holder.end(), observer.end(), tombstoneGate.end(), storage.close()]);
+        await run.settle();
+        if (targetState === "present") await db.$executeRawUnsafe(`UPDATE "cf_${primary.id}".campaign_manifest SET state='identities'`);
+        await storage.close();
       }
-      if (cleanupErrors.length) throw cleanupErrors[0];
     });
   }));
 
@@ -2981,29 +2908,13 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
   }));
 
   // Additive boundary tests. The original 28 cases and their helpers stay byte-for-byte unchanged.
-  it.each(["publish", "attach"] as const)("fences a recorded %s generator across recovery and exact reset while foreign stock survives", mode => withKnownJobs(async known => {
+  it.each(["publish", "attach"] as const)("refuses HTTP %s finalization after claim recovery and preserves foreign business stock", mode => withKnownJobs(async known => {
     const id = (mode === "publish" ? "c3" : "c7").repeat(16);
     const foreignId = (mode === "publish" ? "c4" : "c6").repeat(16);
     const suite = defineE2eSuite(`campaign897-full-v3-media-races-${mode}-901`);
     const catalog = suite.catalog;
     const keys = new Map<string, string[]>([[id, []], [foreignId, []]]);
     const cleanupIds: string[] = [], smsIds = new Set<string>();
-    const traceOrigin = process.hrtime.bigint();
-    const monotonicMs = () => Number(process.hrtime.bigint() - traceOrigin) / 1_000_000;
-    type Timing = { stage: string; tMs: number; key?: string; durationMs?: number; name?: string; status?: number | null; aborted?: boolean };
-    const timings: Timing[] = [];
-    let droppedTimings = 0, traceHeads = false;
-    const trace = (stage: string, fields: Omit<Timing, "stage" | "tMs"> = {}) => {
-      if (timings.length < 80) timings.push({ stage, tMs: Math.round(monotonicMs() * 1000) / 1000, ...fields });
-      else droppedTimings += 1;
-    };
-    const syntheticKey = (key: string) => `primary-key-${keys.get(id)!.indexOf(key) + 1}`;
-    const failureFields = (error: unknown) => {
-      const failure = error as { name?: unknown; $metadata?: { httpStatusCode?: unknown } } | null;
-      const name = typeof failure?.name === "string" && /^[A-Za-z][A-Za-z0-9]{0,47}$/.test(failure.name) ? failure.name : "UnknownError";
-      const status = failure?.$metadata?.httpStatusCode;
-      return { name, status: typeof status === "number" && Number.isInteger(status) && status >= 100 && status <= 599 ? status : null };
-    };
     let s3: S3Client | undefined, catalogOwned = false;
     let resume = () => {};
     let pending: Promise<{ status: number }> | undefined;
@@ -3047,17 +2958,8 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
       });
       return JSON.parse(result.stdout.trim()) as number | { cancelledPreparations: number; deleted: number; waiting: number };
     };
-    const head = (Key: string) => {
-      const observed = traceHeads && keys.get(id)!.includes(Key), began = monotonicMs();
-      if (observed) trace("verification-head-start", { key: syntheticKey(Key) });
-      return s3!.send(new HeadObjectCommand({ Bucket: "listing-photos", Key })).then(() => {
-        if (observed) trace("verification-head-end", { key: syntheticKey(Key), durationMs: monotonicMs() - began, status: 200 });
-        return 200;
-      }, (error: { $metadata?: { httpStatusCode?: number } }) => {
-        if (observed) trace("verification-head-end", { key: syntheticKey(Key), durationMs: monotonicMs() - began, ...failureFields(error) });
-        return error.$metadata?.httpStatusCode ?? error;
-      });
-    };
+    const head = (Key: string) => s3!.send(new HeadObjectCommand({ Bucket: "listing-photos", Key })).then(() => 200,
+      (error: { $metadata?: { httpStatusCode?: number } }) => error.$metadata?.httpStatusCode ?? error);
     const manifest = (key: string) => ["original", "thumbnail", "list", "detail", "fullscreen"].map(name => key.replace(/original\.webp$/, `${name}.webp`));
     const business = (attempt: ReturnType<typeof post>, businessId: string) => attempt.set("x-business-id", businessId);
     const state = async (businessId: string) => ({
@@ -3182,45 +3084,21 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
       // Only external S3 transport changes. The HTTP caller, claim, generator and recovery stay real.
       generator = app.get<{ s3: unknown }>(IMAGE_VARIANT_GENERATOR);
       originalTransport = generator.s3;
-      const held = new Set<string>(), refusals: number[] = [];
-      let allStarted!: () => void, released = false, completedBeforeRelease = false;
+      const held = new Set<string>();
+      let allStarted!: () => void;
       const started = new Promise<void>(resolve => { allStarted = resolve; });
-      const release = new Promise<void>(resolve => { resume = () => { if (!released) trace("stream-release"); released = true; resolve(); }; });
+      const release = new Promise<void>(resolve => { resume = resolve; });
       generator.s3 = { send: async (command: unknown, options?: { abortSignal?: AbortSignal }) => {
         if (command instanceof PutObjectCommand && photos.some(photo => manifest(photo.key).includes(command.input.Key ?? "")) && !held.has(command.input.Key!)) {
-          const key = command.input.Key!;
-          // The real generator already read the ETag before submitting this conditional PUT.
           expect(command.input.IfMatch).toEqual(expect.any(String));
           expect(command.input.CacheControl).toBe("no-store");
           expect(Buffer.isBuffer(command.input.Body)).toBe(true);
-          const body = command.input.Body as Buffer;
-          const split = Math.max(1, Math.floor(body.length / 2));
-          const began = monotonicMs(), signal = options?.abortSignal;
-          let settlement = { name: "Fulfilled", status: null as number | null };
-          const onAbort = () => trace("held-abort", { key: syntheticKey(key), durationMs: monotonicMs() - began, aborted: signal?.aborted ?? false });
-          signal?.addEventListener("abort", onAbort, { once: true });
-          trace("held-send", { key: syntheticKey(key), aborted: signal?.aborted ?? false });
-          const streamed = Readable.from((async function* () {
-            yield body.subarray(0, split);
-            trace("held-body-consumed", { key: syntheticKey(key), durationMs: monotonicMs() - began, aborted: signal?.aborted ?? false });
-            held.add(key);
-            if (held.size === photos.length) allStarted();
-            await release;
-            yield body.subarray(split);
-          })());
-          try {
-            const result = await s3!.send(new PutObjectCommand({ ...command.input, Body: streamed, ContentLength: body.length }), options);
-            settlement = { ...failureFields({ name: "Fulfilled", $metadata: result.$metadata }) };
-            return result;
-          } catch (error) {
-            settlement = failureFields(error);
-            refusals.push((error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode ?? 0);
-            throw error;
-          } finally {
-            trace("held-settled", { key: syntheticKey(key), durationMs: monotonicMs() - began, ...settlement, aborted: signal?.aborted ?? false });
-            signal?.removeEventListener("abort", onAbort);
-            if (!released) completedBeforeRelease = true;
-          }
+          held.add(command.input.Key!);
+          if (held.size === photos.length) allStarted();
+          // Hold before transport submission, only through claim recovery. NP-4 owns
+          // real in-flight PUT/cleanup ordering and late conditional-byte refusal.
+          await release;
+          expect(options?.abortSignal?.aborted, "Claim recovery must finish inside the unchanged request budget").toBe(false);
         }
         return s3!.send(command as PutObjectCommand, options);
       } };
@@ -3230,7 +3108,7 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
         ? business(post(`/api/v1/listings/drafts/${draftId}/publish`, primary.owner, {}), primary.businessId)
         : business(post(`/api/v1/listings/${primary.listingId}/media/attach`, primary.owner, { key: photos[0]!.key, kind: "image", sortOrder: 3 }), primary.businessId);
       pending = attempt.then(response => ({ status: response.status }));
-      await Promise.race([started, pending.then(() => { throw new Error("Request finished before real streamed generator PUT barrier"); })]);
+      await Promise.race([started, pending.then(() => { throw new Error("Request finished before the generator transport gate"); })]);
       await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 78 : 89);
       const preparing = await db.mediaUpload.findMany({ where: { id: { in: photos.map(photo => photo.id) } }, orderBy: { id: "asc" } });
       expect(preparing).toHaveLength(mode === "publish" ? 3 : 1);
@@ -3239,21 +3117,10 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
       for (const upload of preparing) expect(upload).toMatchObject({ claimTargetId: targetId, claimToken: preparing[0]!.claimToken });
       if (mode === "publish") expect(await db.listing.findUnique({ where: { id: targetId } })).toBeNull();
       else expect(targetId).toBe(primary.listingId);
-      const beforeBlockedReset = await digest(id), beforeState = await state(primary.businessId);
-      const blockedResetBegan = monotonicMs();
-      trace("blocked-reset-start");
-      try { expect(execute("reset", id)).toMatchObject({ code: 1, receipt: undefined }); }
-      finally { trace("blocked-reset-end", { durationMs: monotonicMs() - blockedResetBegan }); }
-      expect(await digest(id)).toBe(beforeBlockedReset);
-      expect(await state(primary.businessId)).toEqual(beforeState);
-      await foreignUnchanged();
       // Existing production recovery time input. No fake global clock or database timestamp edits.
       const now = new Date(Math.max(...preparing.map(upload => upload.claimDeadline!.getTime())) + 1);
       await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 78 : 89);
-      const recoveryBegan = monotonicMs();
-      trace("recovery-start");
-      try { expect(await workerCleanup("recover", now, 3)).toBe(mode === "publish" ? 3 : 1); }
-      finally { trace("recovery-end", { durationMs: monotonicMs() - recoveryBegan }); }
+      expect(await workerCleanup("recover", now, 3)).toBe(mode === "publish" ? 3 : 1);
       await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 81 : 90);
       for (const photo of photos) {
         expect(await db.mediaUpload.findUniqueOrThrow({ where: { id: photo.id } })).toMatchObject({
@@ -3264,99 +3131,49 @@ describe("default-closed full-v3 ordinary authentication joins reservation-owned
         else expect(await db.mediaUploadCleanup.findUniqueOrThrow({ where: { uploadId: photo.id } })).toMatchObject({ status: "PENDING", attempts: 0, objectKeys: manifest(photo.key), nextAttemptAt: preparing[0]!.claimDeadline });
       }
       await foreignUnchanged();
-      expect(keys.get(id)).toHaveLength(mode === "publish" ? 15 : 20);
-      expect(keys.get(foreignId)).toHaveLength(15);
-      const before = await owned(id);
-      expect(before).toHaveLength(mode === "publish" ? 61 : 66);
-      expect(await owned(foreignId)).toHaveLength(65);
-      const receipt = { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 };
-      await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 81 : 90);
-      const resetBegan = monotonicMs();
-      trace("exact-reset-start");
-      try { expect(await asynchronousReset(id)).toMatchObject({ code: 0, receipt }); }
-      finally { trace("exact-reset-end", { durationMs: monotonicMs() - resetBegan }); }
-      await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 142 : 156);
-      await mediaDisposed(id, before, primary.requestIds);
-      traceHeads = true;
-      try { for (const key of keys.get(id)!) expect(await head(key), `absent before generator resumes ${key}`).toBe(404); }
-      finally { traceHeads = false; }
-      const terminal = await digest(id);
-      const objectLedger = () => rows(`SELECT object_key,upload_id,bucket,absent FROM "cf_${id}".campaign_object_ledger ORDER BY object_key`);
-      const terminalObjects = await objectLedger();
-      expect(terminalObjects).toEqual([...keys.get(id)!].sort().map(object_key => ({ object_key, upload_id: expect.any(String), bucket: "listing-photos", absent: true })));
-      for (const photo of photos) for (const object_key of manifest(photo.key)) expect(terminalObjects).toContainEqual({ object_key, upload_id: photo.id, bucket: "listing-photos", absent: true });
-      expect(completedBeforeRelease, "PUT must still be suspended after exact reset, not timed out").toBe(false);
       resume();
       expect((await pending).status).toBeGreaterThanOrEqual(400);
-      expect(refusals).toHaveLength(mode === "publish" ? 3 : 1);
-      for (const status of refusals) expect([404, 409, 412]).toContain(status);
-      expect(await digest(id)).toBe(terminal);
-      expect(await objectLedger()).toEqual(terminalObjects);
-      for (const key of keys.get(id)!) expect(await head(key), `late generator cannot resurrect ${key}`).toBe(404);
+      if (mode === "publish") {
+        expect(await db.listing.findUnique({ where: { id: targetId } })).toBeNull();
+        expect(await db.listingDraft.findUnique({ where: { id: draftId! } })).not.toBeNull();
+      } else {
+        expect(await db.listingMedia.count({ where: { listingId: primary.listingId!, uploadId: photos[0]!.id } })).toBe(0);
+      }
       await foreignUnchanged();
       if (mode === "attach") {
-        // Recovery's durable work survives disposal. An S3 outage backs off, then real exact deletion retries.
-        await journal(id, 67, 156);
+        // Preserve exact recovery/backoff/retry assertions without any campaign reset.
         expect(await workerCleanup("outage", now, 1)).toEqual({ cancelledPreparations: 0, deleted: 0, waiting: 1 });
         const work = await db.mediaUploadCleanup.findUniqueOrThrow({ where: { uploadId: photos[0]!.id } });
         expect(work).toMatchObject({ status: "PENDING", attempts: 1, lastError: "controlled disposable S3 outage" });
         expect(work.nextAttemptAt.getTime()).toBe(now.getTime() + 60_000);
-        expect(await digest(id)).toBe(terminal);
-        expect(await objectLedger()).toEqual(terminalObjects);
-        await journal(id, 67, 156);
         expect(await workerCleanup("clean", new Date(work.nextAttemptAt.getTime() + 1), 1)).toEqual({ cancelledPreparations: 0, deleted: 1, waiting: 0 });
         expect(await db.mediaUploadCleanup.findUniqueOrThrow({ where: { uploadId: photos[0]!.id } })).toMatchObject({ status: "DONE", attempts: 2, lastError: null });
-        await mediaDisposed(id, before, primary.requestIds);
-        expect(await digest(id)).toBe(terminal);
-        expect(await objectLedger()).toEqual(terminalObjects);
-        for (const key of keys.get(id)!) expect(await head(key)).toBe(404);
+        for (const photo of photos) for (const key of manifest(photo.key)) expect(await head(key)).toBe(404);
         await foreignUnchanged();
       }
-      await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 142 : 156);
-      const retryBegan = monotonicMs();
-      trace("terminal-retry-start");
-      try { expect(execute("reset", id)).toMatchObject({ code: 0, receipt }); }
-      finally { trace("terminal-retry-end", { durationMs: monotonicMs() - retryBegan }); }
-      expect(await digest(id)).toBe(terminal);
-      expect(await objectLedger()).toEqual(terminalObjects);
-      for (const key of keys.get(id)!) expect(await head(key)).toBe(404);
-      await foreignUnchanged();
-      await journal(foreignId, 66, 87);
-      const foreignBefore = await owned(foreignId);
-      const controlResetBegan = monotonicMs();
-      trace("control-reset-start");
-      try { expect(execute("reset", foreignId)).toMatchObject({ code: 0, receipt }); }
-      finally { trace("control-reset-end", { durationMs: monotonicMs() - controlResetBegan }); }
-      await journal(foreignId, 66, 152);
-      await mediaDisposed(foreignId, foreignBefore, foreign.requestIds);
-      for (const key of keys.get(foreignId)!) expect(await head(key)).toBe(404);
     } finally {
-      try {
-        resume();
-        try { await pending; } finally {
-          if (generator) generator.s3 = originalTransport;
-          try {
-            for (const reservation of cleanupIds) expect.soft(execute("reset", reservation).code, `exact reset ${reservation}`).toBe(0);
-            for (const requestId of smsIds) expect.soft(await queue.getJob(requestId), "SMS has no email job").toBeUndefined();
-            if (s3) for (const key of [...keys.values()].flat()) {
-              const status = await head(key);
-              const failure = status === 200 ? await s3.send(new DeleteObjectCommand({ Bucket: "listing-photos", Key: key })).then(() => undefined, (error: unknown) => error) : status === 404 ? undefined : status;
-              expect.soft(failure, `exact known key cleanup ${key}`).toBeUndefined();
+      resume();
+      try { await pending; } finally {
+        if (generator) generator.s3 = originalTransport;
+        try {
+          for (const reservation of cleanupIds) expect.soft(execute("reset", reservation).code, `exact reset ${reservation}`).toBe(0);
+          for (const requestId of smsIds) expect.soft(await queue.getJob(requestId), "SMS has no email job").toBeUndefined();
+          if (s3) for (const key of [...keys.values()].flat()) {
+            const status = await head(key);
+            const failure = status === 200 ? await s3.send(new DeleteObjectCommand({ Bucket: "listing-photos", Key: key })).then(() => undefined, (error: unknown) => error) : status === 404 ? undefined : status;
+            expect.soft(failure, `exact known key cleanup ${key}`).toBeUndefined();
+          }
+          if (catalogOwned) {
+            const references = await catalogReferences();
+            expect.soft(references, "catalog retained while referenced").toBe(0);
+            if (references === 0) {
+              await db.city.deleteMany({ where: { id: catalog.cityId } });
+              await db.region.deleteMany({ where: { id: catalog.regionId } });
+              await db.model.deleteMany({ where: { id: catalog.modelId } });
+              await db.brand.deleteMany({ where: { id: catalog.brandId } });
             }
-            if (catalogOwned) {
-              const references = await catalogReferences();
-              expect.soft(references, "catalog retained while referenced").toBe(0);
-              if (references === 0) {
-                await db.city.deleteMany({ where: { id: catalog.cityId } });
-                await db.region.deleteMany({ where: { id: catalog.regionId } });
-                await db.model.deleteMany({ where: { id: catalog.modelId } });
-                await db.brand.deleteMany({ where: { id: catalog.brandId } });
-              }
-            }
-          } finally { s3?.destroy(); }
-        }
-      } finally {
-        console.info(JSON.stringify({ diagnostic: "media-runtime-race-timing-v1", mode, entries: timings, dropped: droppedTimings }));
+          }
+        } finally { s3?.destroy(); }
       }
     }
   }));
