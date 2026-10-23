@@ -109,7 +109,8 @@ describe("classified forward ownership on real HTTP and disposable PostgreSQL", 
       audience: "listing_public", listingId, synthetic: true }).expect(201)).body as Order;
     orders.push(order.id);
     order = (await post("reception", `orders/${order.id}/assignments`, { expectedVersion: order.version, userId: suite.id("technician"), capability: "diagnostics.technician", active: true }).expect(201)).body;
-    for (const who of ["reviewer", "replacementReviewer", "unrelated", "graphSeller"] as const) order = (await post("reception", `orders/${order.id}/assignments`, {
+    // Only qualified staff receive assignments; the other principals remain ordinary source fixtures.
+    for (const who of ["reviewer", "replacementReviewer"] as const) order = (await post("reception", `orders/${order.id}/assignments`, {
       expectedVersion: order.version, userId: suite.id(who), capability: "diagnostics.reviewer", active: true }).expect(201)).body;
     for (const kind of ["physical", "publication"]) order = (await post("reception", `orders/${order.id}/authorization`, { expectedVersion: order.version, kind, authorityReference: `SYNTHETIC ${kind} permission` }).expect(201)).body;
     for (const state of ["confirmed", "arrived"]) order = (await post("reception", `orders/${order.id}/appointment`, { expectedVersion: order.version, state }).expect(201)).body;
@@ -242,7 +243,7 @@ describe("classified forward ownership on real HTTP and disposable PostgreSQL", 
   // Exact injected worker DB, hosted loopback services and sole due-account fences
   // are checked before any maintenance. No local services are started by this spec.
   async function worker(action: "expire" | "purge", clock: Date, subject?: Person,
-    control?: { signal: AbortSignal; ready(): void; start: Promise<void> }) {
+    control?: { signal: AbortSignal; onReady(): void; start: Promise<void> }) {
     const databases = inject("apiTestDatabases");
     if (!databases) throw new Error("Ownership lifecycle requires injected disposable databases");
     const pool = Number(process.env["VITEST_POOL_ID"]), expected = workerUrls(databases, pool).databaseUrl;
@@ -296,7 +297,7 @@ describe("classified forward ownership on real HTTP and disposable PostgreSQL", 
       let output = "";
       execution.child.stdout?.on("data", chunk => {
         output += String(chunk);
-        if (output.includes("OWNERSHIP_WORKER_READY\n")) control.ready();
+        if (output.includes("OWNERSHIP_WORKER_READY\n")) control.onReady();
       });
       // Cancellation may close stdin between readiness and release; execution still
       // reports the child failure. Never leave an unhandled stream error behind.
@@ -391,7 +392,7 @@ describe("classified forward ownership on real HTTP and disposable PostgreSQL", 
     const abort = new AbortController();
     // Choose E after worker readiness. After release the worker obtains its own
     // current cutoff from PostgreSQL, which the test has already observed past E.
-    const operation = worker("expire", now, undefined, { signal: abort.signal, ready: markReady, start });
+    const operation = worker("expire", now, undefined, { signal: abort.signal, onReady: markReady, start });
     const workerResult = Promise.allSettled([operation]);
     let captureResult: Promise<PromiseSettledResult<supertest.Response>[]> | undefined;
     let capturePid: number | undefined;

@@ -260,7 +260,8 @@ describe("diagnostic identity history after product account deletion and due pur
     expect((await get("reviewer", `reports/${retainedReport.id}`).expect(200)).body).toEqual(retainedReport.staff);
     expect((await get("other", `reports/${retainedReport.id}`).expect(200)).body).toEqual(retainedReport.customer);
     expect(await records(erased.id)).toEqual(erased.raw.map(row => ({ ...row,
-      observation: null, observationHash: null, recordedById: null, erasedAt: new Date("2026-11-17T00:00:00.000Z") })));
+      observation: null, observationHash: null, recordedById: null, ownershipCaptureTransaction: null,
+      erasedAt: new Date("2026-11-17T00:00:00.000Z") })));
     expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: erased.id } })).toMatchObject({
       commissionerId: null, observedVehicle: null, physicalAuthorization: null, publicationAuthorization: null,
       listingId: null, listingIdentityDigest: null, associationValidatedAt: null, erasedAt: new Date("2026-11-17T00:00:00.000Z"),
