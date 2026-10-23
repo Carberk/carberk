@@ -1,0 +1,18 @@
+{
+  "staff-scoped-discovery-api-red-20261023.log": {
+    "originalSha256": "152f4950231ee3545209c66002f9e2555e0dc8600ee09e0f78f8ed37a03c1b12",
+    "normalizedSha256": "3cbb01e658151abe1777279ff957818d1d5314c4cba7618f88890a9dc77386e3"
+  },
+  "staff-scoped-discovery-api-green-20261023.log": {
+    "originalSha256": "effcbaef4a38e5d93bdfa2484634a202b38befe8b7e27ec70de1b10e8bc956a7",
+    "normalizedSha256": "caf5a11bbc33aeafa2cc2017c55d327a6ef65b27671e5b5f2dd2a77613f41c31"
+  },
+  "measurement-unavailable-red-20261023.log": {
+    "originalSha256": "5fb07dee8c324b373e0b45f19696d7d30c1293552695c8b043401bf0dd0e8926",
+    "normalizedSha256": "613664782af18c7189292ca328fe8ca36ebdb84d40ae6209ef0d5623757333a8"
+  },
+  "measurement-unavailable-green-20261023.log": {
+    "originalSha256": "8bf87254d5021c7f82f7e1e16a9a781bd242d1ed9d31998b3c7380d0456f834b",
+    "normalizedSha256": "b08572a040bf645da7b3ab3857b403491e822458099c9dc096dd705094b945c4"
+  }
+}

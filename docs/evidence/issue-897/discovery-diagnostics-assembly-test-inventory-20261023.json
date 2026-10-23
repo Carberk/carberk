@@ -1,6 +1,6 @@
 {
   "base": "4538ae99bfdfa2504f81a2e090eec2b6af496384",
-  "candidate": "47e86e370c265212e8b295b5dcdf19dd0f4c9c4f",
+  "sourceCandidate": "0dd9ed599f96c5e9f556dd79eb471173e7380a96",
   "originalTestFiles": 916,
   "unchangedByBlob": 915,
   "changedOriginalTests": [
@@ -8,7 +8,8 @@
   ],
   "newTestFiles": [
     "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
-    "apps/api/src/modules/measurement/infrastructure/MeasurementUnavailableDiagnostics.spec.ts"
+    "apps/api/src/modules/measurement/infrastructure/MeasurementUnavailableDiagnostics.spec.ts",
+    "apps/worker/src/jobs/diagnostics/SafeReplacementScheduling.spec.ts"
   ],
   "originalE2eRestoredExactlyAfterRemovingOneAddedJourney": true,
   "addedJourneyBytes": 2341,
