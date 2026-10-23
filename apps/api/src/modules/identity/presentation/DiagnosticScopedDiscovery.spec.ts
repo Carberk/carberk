@@ -26,7 +26,7 @@ const reviewer = { userId: id(1), sessionId: id(101) };
 const b = id(20);
 
 describe("B-scoped discovery through real HTTP, application, authority and database-boundary fake", () => {
-  let app: NestFastifyApplication; let memory: DiagnosticMemoryDatabase; let db: PrismaService;
+  let app: NestFastifyApplication; let memory: DiagnosticMemoryDatabase; let db: PrismaService; let currentTime: Date;
   const subjectHeaders = (actor = reviewer) => ({ "x-test-user": actor.userId, "x-test-session": actor.sessionId });
   const get = async (route: string, actor = reviewer) => {
     const response = await app.inject({ method: "GET", url: `/api/v1/diagnostics/orders/${route}`, headers: subjectHeaders(actor) });
@@ -56,10 +56,10 @@ describe("B-scoped discovery through real HTTP, application, authority and datab
       identityRecordId: id(n + 1000), identityRecordHash: "a".repeat(64), identityEvidenceId: id(n + 3000), identityEvidenceHash: "b".repeat(64), version: 1, state: { observedAt: observation.observedAt, mileageKm: 100 }, createdAt: new Date(now.getTime() - 1000) });
   }
   beforeEach(async () => {
-    memory = new DiagnosticMemoryDatabase(); db = memory.client;
+    memory = new DiagnosticMemoryDatabase(); db = memory.client; currentTime = now;
     staff(1, "diagnostics.reviewer", "Reviewer"); staff(2, "diagnostics.technician", "B technician"); staff(3, "diagnostics.technician", "Foreign technician");
     visit(20, false); assign(b, 2, "diagnostics.technician");
-    const runtime = { now: () => now, id: randomUUID, syntheticAllowed: () => true, publicSyntheticAllowed: () => false };
+    const runtime = { now: () => currentTime, id: randomUUID, syntheticAllowed: () => true, publicSyntheticAllowed: () => false };
     const module = await Test.createTestingModule({ controllers: [DiagnosticReportsController],
       // Use production diagnostic composition, replacing only database/time/config boundaries.
       providers: [...Reflect.getMetadata("providers", DiagnosticsModule),
@@ -131,4 +131,82 @@ describe("B-scoped discovery through real HTTP, application, authority and datab
       expect(denied.headers["cache-control"]).toBe("no-store, private");
     }
   });
+  it("replays a stable page, excludes later arrivals, and rechecks unseen A rights and assignments", async () => {
+    for (let n = 30; n < 72; n++) visit(n);
+    const first = await get(`${b}/predecessor-candidates`);
+    expect(first.status).toBe(200); expect(first.body.candidates).toHaveLength(20);
+    const next = `${b}/predecessor-candidates?cursor=${encodeURIComponent(first.body.nextCursor)}`;
+    const page = await get(next);
+    expect(page.status).toBe(200);
+    expect((await get(next)).body.candidates).toEqual(page.body.candidates);
+    // Later arrivals are outside this traversal's initial time fence, even if their id sorts earlier.
+    visit(25);
+    await db.diagnosticReportRecord.update({ where: { id: id(4025) }, data: { createdAt: new Date(now.getTime() + 1) } });
+    await db.diagnosticIdentityProvenance.updateMany({ where: { orderId: id(50) }, data: { rightsUntil: now } });
+    await db.diagnosticOrderAssignment.updateMany({ where: { orderId: id(51), userId: reviewer.userId }, data: { revokedAt: now } });
+    const changed = await get(next); expect(changed.status).toBe(200);
+    expect(changed.body.candidates.map((candidate: { reportId: string }) => candidate.reportId)).toEqual(Array.from({ length: 19 }, (_, index) => id(4052 + index)));
+    expect(JSON.stringify(changed.body)).not.toContain(id(4050));
+    expect(JSON.stringify(changed.body)).not.toContain(id(4051));
+    expect(JSON.stringify(changed.body)).not.toContain(id(4025));
+  });
+  it("keeps many unassigned visits out of continuation and exhaustion semantics", async () => {
+    visit(30);
+    const before = await get(`${b}/predecessor-candidates`);
+    for (let n = 31; n < 92; n++) visit(n);
+    await db.diagnosticOrderAssignment.updateMany({ where: { orderId: { in: Array.from({ length: 61 }, (_, index) => id(31 + index)) } }, data: { revokedAt: now } });
+    expect((await get(`${b}/predecessor-candidates`)).body).toEqual(before.body);
+  });
+  it.each(["grant", "inactive", "assignment", "unnamed"])("omits a B technician after current Identity or assignment %s loss", async loss => {
+    if (loss === "grant") await db.staffGrant.updateMany({ where: { userId: id(2) }, data: { revokedAt: now } });
+    if (loss === "inactive") await db.user.update({ where: { id: id(2) }, data: { suspendedAt: now } });
+    if (loss === "assignment") await db.diagnosticOrderAssignment.updateMany({ where: { orderId: b, userId: id(2) }, data: { revokedAt: now } });
+    if (loss === "unnamed") await db.user.update({ where: { id: id(2) }, data: { displayName: null } });
+    const response = await get(`${b}/linking-technicians`);
+    expect(response.status).toBe(200); expect(response.body).toEqual({ technicians: [] });
+  });
+  it("rejects a second current Session, cursor tampering without retaining pair data", async () => {
+    for (let n = 30; n < 51; n++) visit(n);
+    const first = await get(`${b}/predecessor-candidates`); expect(first.status).toBe(200);
+    const cursor: string = first.body.nextCursor;
+    expect(cursor).toHaveLength(1062);
+    memory.seed("session", { id: id(111), userId: reviewer.userId, expiresAt: future, adminTotpExpiresAt: future });
+    expect((await get(`${b}/predecessor-candidates?cursor=${cursor}`, { ...reviewer, sessionId: id(111) })).status).toBe(403);
+    const tampered = `${cursor[0] === "A" ? "B" : "A"}${cursor.slice(1)}`;
+    expect((await get(`${b}/predecessor-candidates?cursor=${tampered}`)).status).toBe(403);
+    currentTime = new Date(now.getTime() + 15 * 60_000);
+    expect((await get(`${b}/predecessor-candidates?cursor=${cursor}`)).status).toBe(403);
+  });
+  it("omits disconnected retained identity claims, expired B material and inconsistent raw history", async () => {
+    visit(30);
+    const before = await get(`${b}/predecessor-candidates`);
+    expect(before.body.candidates).toEqual([{ reportId: id(4030), observedAt: observation.observedAt, mileageKm: 100 }]);
+    const evidence = await db.diagnosticIdentityEvidence.findUniqueOrThrow({ where: { id: id(3030) } });
+    memory.seed("diagnosticIdentityEvidence", { ...evidence, id: id(9000), orderVersion: 2 });
+    expect((await get(`${b}/predecessor-candidates`)).body.candidates).toEqual([]);
+    visit(31);
+    await db.diagnosticIdentityRecord.updateMany({ where: { orderId: id(31) }, data: { observation: { ...observation, vin: "CONTRADICTORY" } } });
+    expect((await get(`${b}/predecessor-candidates`)).body.candidates).toEqual([]);
+    visit(32);
+    await db.diagnosticIdentityProvenance.updateMany({ where: { orderId: b }, data: { rightsUntil: now } });
+    expect((await get(`${b}/predecessor-candidates`)).body.candidates).toEqual([]);
+  });
+
+  it("allows an empty bounded page to continue without claiming absence", async () => {
+    for (let n = 30; n < 51; n++) visit(n);
+    await db.diagnosticIdentityProvenance.updateMany({ where: { orderId: { in: Array.from({ length: 20 }, (_, index) => id(30 + index)) } }, data: { rightsUntil: now } });
+    const first = await get(`${b}/predecessor-candidates`);
+    expect(first.status).toBe(200); expect(first.body.candidates).toEqual([]);
+    expect(first.body.exhausted).toBe(false); expect(first.body.nextCursor).toHaveLength(1062);
+    const second = await get(`${b}/predecessor-candidates?cursor=${first.body.nextCursor}`);
+    expect(second.body).toEqual({ candidates: [{ reportId: id(4050), observedAt: observation.observedAt, mileageKm: 100 }], nextCursor: null, exhausted: true, scope: "currently_authorized_retained_predecessors" });
+  });
+  it("omits malformed required retained evidence without a partial candidate or protected error", async () => {
+    visit(30);
+    await db.diagnosticIdentityEvidence.update({ where: { id: id(3030) }, data: { provenance: [{ id: id(2030), sha256: "f".repeat(64), mime: "image/webp", sizeBytes: 72 }] } });
+    const response = await get(`${b}/predecessor-candidates`);
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ candidates: [], nextCursor: null, exhausted: true, scope: "currently_authorized_retained_predecessors" });
+  });
+
 });
