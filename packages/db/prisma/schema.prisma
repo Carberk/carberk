@@ -2083,3 +2083,5 @@ model DiagnosticSourceAnchor {
   createdTransaction String
   @@map("diagnostic_source_anchors")
 }
+
+// Forward SQL guard inventory: 20261024010000_diagnostic_source_guard_repair.

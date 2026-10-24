@@ -14,7 +14,8 @@ const registry = JSON.parse(sql.match(/SELECT '(\[[\s\S]*?\])'::jsonb/)[1]);
 
 test('kernel has a byte-identical retained mirror and an additive exact schema inventory', () => {
   assert.equal(sql, readFileSync(new URL(`./testing/retained-schema/${name}.sql`, import.meta.url), 'utf8'));
-  const schema = hash(prisma), prior = 'c7bcd721033f6abdd74f38abe4c94f84fc95dfba85d1e06fd5d692ba2f2964fc';
+  // This test owns the held kernel snapshot. The guard-repair test owns the current inventory.
+  const schema = 'a93532709e5b1012f5a1007d5b633c98e982a54ea73fb33b71ddf0fad48c2f7c', prior = 'c7bcd721033f6abdd74f38abe4c94f84fc95dfba85d1e06fd5d692ba2f2964fc';
   const candidate = inventoryForSchema(schema, []), main = inventoryForSchema(prior, []);
   assert.deepEqual(candidate.filter(row => row.name !== name), main);
   assert.equal(candidate.find(row => row.name === name).checksum, hash(sql));

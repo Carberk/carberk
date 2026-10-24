@@ -10,7 +10,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { PrismaClient } from "../generated/prisma/client/client";
 import {
   assertDiagnosticSourceCommand, sealDiagnosticFirstObservation, withDiagnosticSourceCommand,
-  type DiagnosticSourceCommand, type DiagnosticSourceOperation, type PreparedDiagnosticSource,
+  type Prisma, type DiagnosticSourceCommand, type DiagnosticSourceOperation, type PreparedDiagnosticSource,
 } from "../src/index";
 
 function present<T>(value: T | null | undefined): T {
@@ -135,7 +135,7 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
   }
 
   function sourceCommand(operation: DiagnosticSourceOperation, rows: Plan[]): DiagnosticSourceCommand {
-    return { ...command(operation, rows), cutoff: null } as DiagnosticSourceCommand;
+    return { ...command(operation, rows), cutoff: null } as unknown as DiagnosticSourceCommand;
   }
 
   beforeAll(async () => {
@@ -205,7 +205,7 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     await expect(b.query("TRUNCATE diagnostic_source_commands")).rejects.toThrow("diagnostic_source_immutable");
     await finish(a, receipt); await a.query("COMMIT");
   });
-  it.each(["users", "inspection_orders", "diagnostic_template_versions", "diagnostic_centers"])("pre-held %s row lock refuses preparation before source writes", async table => {
+  it.each(["users", "dealerships", "listings", "inspection_orders", "diagnostic_template_versions", "diagnostic_centers", "media_uploads", "video_upload_sessions", "measurement_state", "service_conversations", "totp_enrollments"])("a pre-held %s locking statement refuses preparation before source writes", async table => {
     const a = await connect(); const p = await update(a, "users", { id: userId }, { deletionScheduledAt: null });
     await begin(a); await a.query(`SELECT 1 FROM public.${table} FOR UPDATE`);
     await expect(prepare(a, command("account_restore", [p]))).rejects.toThrow("diagnostic_source_preheld_lock");
@@ -313,7 +313,7 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
   });
   it("distinct resource hashes collide within one class, serialize, and never widen row coverage", async () => {
     const a = await connect(), b = await connect(), observer = await connect();
-    const collision = present((await pool.query<{ ids: string[] }>(`
+    const collision = present((await a.query<{ ids: string[] }>(`
       SELECT array_agg(id ORDER BY id) AS ids FROM (
         SELECT 'kernel-collision-'||n AS id,
           hashtext(jsonb_build_array('pk',jsonb_build_object('id','kernel-collision-'||n))::text) AS key
@@ -326,7 +326,8 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     const firstPlan = await update(a, "users", { id: firstId }, { deletionScheduledAt: null });
     const secondPlan = await update(b, "users", { id: secondId }, { deletionScheduledAt: null });
     await begin(a); const first = await prepare(a, command("account_restore", [firstPlan]));
-    const firstKeys = present((await a.query("SELECT lock_keys FROM diagnostic_source_commands WHERE id=$1", [first])).rows[0])["lock_keys"];
+    const firstKeys = present((await a.query("SELECT lock_keys FROM diagnostic_source_commands WHERE id=$1", [first])).rows[0])["lock_keys"] as { namespace: number; key: number }[];
+    expect(new Set(firstKeys.map(key => `${key.namespace}:${key.key}`)).size).toBe(firstKeys.length);
     await begin(b); const pending = prepare(b, command("account_restore", [secondPlan]));
     await waitBlocked(observer, b, a); await finish(a, first); await a.query("COMMIT");
     const second = await pending;
@@ -406,12 +407,18 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
       const oid = await newOrder(a, { audience: "listing_public", listingId });
       const grant = await ownershipGrant(a, oid);
       const vehicle = { method: "vin", vin: "AAA", observedAt: "2026-10-23T12:00:00.000Z", mileageKm: 100 };
-      const { plans, raw, component, rawId } = await observationPlans(a, oid, vehicle, grant);
+      const { plans, raw, rawId } = await observationPlans(a, oid, vehicle, grant);
+      present(present(plans[0]).next)["updatedAt"] = "2026-10-24T00:00:00";
       await prisma.$transaction(tx => withDiagnosticSourceCommand(tx, sourceCommand("observation_append", plans), async receipt => {
         await assertDiagnosticSourceCommand(tx, receipt, "observation_append");
-        await tx.inspectionOrder.update({ where: { id: oid }, data: { observedVehicle: vehicle, version: { increment: 1 } } });
-        await tx.$executeRaw`INSERT INTO diagnostic_identity_records SELECT (jsonb_populate_record(NULL::diagnostic_identity_records,${JSON.stringify(raw)}::jsonb)).*`;
-        await tx.$executeRaw`INSERT INTO diagnostic_ownership_components SELECT (jsonb_populate_record(NULL::diagnostic_ownership_components,${JSON.stringify(component)}::jsonb)).*`;
+        await tx.inspectionOrder.update({ where: { id: oid }, data: { observedVehicle: vehicle, version: { increment: 1 }, updatedAt: new Date("2026-10-24T00:00:00Z") } });
+        await tx.diagnosticIdentityRecord.create({ data: { id: rawId, orderId: oid, orderVersion: Number(raw["orderVersion"]),
+          observation: vehicle as Prisma.InputJsonObject, observationHash: "a".repeat(64), recordedById: userId,
+          recordedAt: new Date(String(raw["recordedAt"])) } });
+        await tx.diagnosticOwnershipComponent.create({ data: { identityRecordId: rawId, orderId: oid, orderVersion: Number(raw["orderVersion"]),
+          state: "available", grantId: String(grant["id"]), scope: "diagnostic_ownership_continuity", sourceListingId: listingId,
+          identityDigest: String(grant["identityDigest"]), sellerId: userId, commissionerId: userId, rights: grant["rights"] as Prisma.InputJsonObject,
+          rightsUntil: new Date(String(grant["rightsUntil"])+"Z"), declaredById: userId, declaredAt: new Date(String(raw["recordedAt"])) } });
         await sealDiagnosticFirstObservation(tx, receipt, oid, rawId);
       }));
       expect(await anchor(oid)).toMatchObject({ state: "unchanged", firstRecordId: rawId });
@@ -447,6 +454,119 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     try { await expect(prisma.user.update({ where: { id: userId }, data: { displayName: "ordinary" } })).rejects.toThrow("diagnostic_source_unprepared"); }
     finally { await pool.query("DROP TRIGGER kernel_move_source ON users"); await pool.query("DROP FUNCTION kernel_move_source()"); }
     expect((await prisma.user.findUniqueOrThrow({ where: { id: userId } })).displayName).toBeNull();
+  });
+
+  it("normalized VIN formatting preserves identity while raw source writes remain covered", async () => {
+    const a = await connect(); const oid = await newOrder(a, { audience: "listing_public", listingId });
+    const grant = await ownershipGrant(a, oid);
+    const first = await observe(a, oid, { method: "vin", vin: "AAA" }, true, grant);
+    await finish(a, first.receipt); await a.query("COMMIT");
+    for (const vin of [" aaa ", "AAA"]) {
+      const plan = await update(a, "listings", { id: listingId }, { vin });
+      await prisma.$transaction(tx => withDiagnosticSourceCommand(tx, sourceCommand("listing_change", [plan]), async receipt => {
+        await assertDiagnosticSourceCommand(tx, receipt, "listing_change");
+        await tx.listing.update({ where: { id: listingId }, data: { vin } });
+      }));
+    }
+    expect(await anchor(oid)).toMatchObject({ state: "unchanged", firstRecordId: first.rawId });
+    expect((await prisma.listing.findUniqueOrThrow({ where: { id: listingId } })).vin).toBe("AAA");
+  });
+
+  it.each([0, 1])("observed identity ABA on visit %s stays changed and preserves the other first slot", async changedVisit => {
+    const a = await connect(); const visits: { oid: string; grant: Row; rawId: string }[] = [];
+    for (let visit = 0; visit < 2; visit++) {
+      const oid = await newOrder(a, { audience: "listing_public", listingId }); const grant = await ownershipGrant(a, oid);
+      const first = await observe(a, oid, { method: "vin", vin: "AAA" }, true, grant);
+      await finish(a, first.receipt); await a.query("COMMIT"); visits.push({ oid, grant, rawId: first.rawId });
+    }
+    const changed = present(visits[changedVisit]);
+    for (const vin of ["BBB", "AAA"]) {
+      const later = await observe(a, changed.oid, { method: "vin", vin }, true, changed.grant);
+      await finish(a, later.receipt); await a.query("COMMIT");
+    }
+    const other = present(visits[1-changedVisit]);
+    expect(await anchor(changed.oid)).toMatchObject({ state: "changed", firstRecordId: changed.rawId });
+    expect(await anchor(other.oid)).toMatchObject({ state: "unchanged", firstRecordId: other.rawId });
+  });
+
+  it("identity provenance leases stay ordinary while material transitions remain guarded", async () => {
+    const a = await connect(); const id = randomUUID();
+    const next = await projection(a, "diagnostic_identity_provenance", { id, orderId: baseOrder["id"], contentType: "image/jpeg", declaredSizeBytes: 1,
+      rightsUntil: "2030-01-01T00:00:00", state: "staged", epoch: randomUUID(), cleanupAttempts: 0, createdAt: "2026-10-24T00:00:00" });
+    const plan: Plan = { table: "diagnostic_identity_provenance", key: { id }, verb: "insert", expected: "absent", next };
+    await begin(a); const receipt = await prepare(a, command("identity_material_change", [plan]));
+    await a.query("INSERT INTO diagnostic_identity_provenance SELECT (jsonb_populate_record(NULL::diagnostic_identity_provenance,$1::jsonb)).*", [JSON.stringify(next)]);
+    await finish(a, receipt); await a.query("COMMIT");
+    await begin(a);
+    await a.query(`UPDATE diagnostic_identity_provenance SET "writeLeaseUntil"=clock_timestamp()+interval '1 minute',"cleanupAttempts"=1 WHERE id=$1`, [id]);
+    const locks = await a.query("SELECT 1 FROM pg_locks WHERE pid=pg_backend_pid() AND relation='diagnostic_continuity_proofs'::regclass AND mode='RowExclusiveLock'");
+    expect(locks.rowCount).toBe(0); await a.query("COMMIT");
+    expect((await source(a, "diagnostic_identity_provenance", { id }))["cleanupAttempts"]).toBe(1);
+    await expect(a.query("UPDATE diagnostic_identity_provenance SET state='verified' WHERE id=$1", [id])).rejects.toThrow("diagnostic_source_unprepared");
+  });
+
+  it.each([false, true])("a new OWNER edge after discovery aborts the opposing absent-member command, reversed=%s", async reverse => {
+    const a = await connect(), b = await connect(), observer = await connect();
+    const business = randomUUID(), foreign = randomUUID();
+    await pool.query(`INSERT INTO dealerships(id,slug,name,status,"updatedAt") VALUES($1,$1,'kernel','active',clock_timestamp())`, [business]);
+    await pool.query('INSERT INTO users(id,"updatedAt") VALUES($1,clock_timestamp())', [foreign]);
+    const subjects = reverse ? [foreign, userId] : [userId, foreign];
+    const plans: Plan[] = subjects.map(uid => {
+      const id = randomUUID(); return { table: "dealership_members", key: { id }, verb: "insert", expected: "absent",
+        next: { id, userId: uid, dealershipId: business, role: "owner", status: "active" } };
+    });
+    const firstPlan = present(plans[0]), secondPlan = present(plans[1]);
+    await begin(a); const first = await prepare(a, command("member_create", [firstPlan]));
+    await begin(b); const pending = prepare(b, command("member_create", [secondPlan]));
+    const outcome = pending.then(() => "unexpected success", error => (error as Error).message);
+    await waitBlocked(observer, b, a);
+    await a.query(`INSERT INTO dealership_members(id,"userId","dealershipId",role) VALUES($1,$2,$3,'owner')`, [firstPlan.key["id"], present(firstPlan.next)["userId"], business]);
+    await finish(a, first); await a.query("COMMIT");
+    expect(await outcome).toContain("diagnostic_source_graph_changed"); await b.query("ROLLBACK");
+    expect((await pool.query('SELECT id FROM dealership_members WHERE "dealershipId"=$1', [business])).rows).toEqual([{ id: firstPlan.key["id"] }]);
+  });
+
+  it("same resource hashes in disjoint source classes and campaign key space cannot alias", async () => {
+    const a = await connect(), b = await connect();
+    const plan = await update(a, "users", { id: userId }, { deletionScheduledAt: null });
+    await begin(a); const receipt = await prepare(a, command("account_restore", [plan], [
+      { table: "users", key: { id: userId } }, { table: "listings", key: { id: userId } },
+    ]));
+    const physical = present((await a.query<{ key: number }>("SELECT hashtext(jsonb_build_array('pk',jsonb_build_object('id',$1::text))::text) AS key", [userId])).rows[0]).key;
+    const keys = present((await a.query<{ keys: { namespace: number; key: number }[] }>("SELECT lock_keys AS keys FROM diagnostic_source_commands WHERE id=$1", [receipt])).rows[0]).keys;
+    expect(keys).toEqual(expect.arrayContaining([{ namespace: 897100, key: physical }, { namespace: 897400, key: physical }]));
+    await begin(b);
+    const result = await b.query<{ locked: boolean }>("SELECT pg_try_advisory_xact_lock((897100::bigint<<32)|($1::bigint & 4294967295)) AS locked", [physical]);
+    expect(present(result.rows[0]).locked).toBe(true);
+    await b.query("ROLLBACK"); await finish(a, receipt); await a.query("COMMIT");
+  });
+
+  it("a preheld persisted campaign namespace lock refuses source preparation", async () => {
+    const a = await connect(); const ns = `cf_${randomUUID().replaceAll("-", "")}`;
+    await pool.query(`CREATE SCHEMA "${ns}"`);
+    try {
+      const plan = await update(a, "users", { id: userId }, { deletionScheduledAt: null });
+      await begin(a); await a.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [ns]);
+      await expect(prepare(a, command("account_restore", [plan]))).rejects.toThrow("diagnostic_source_preheld_lock");
+      await a.query("ROLLBACK");
+    } finally { await pool.query(`DROP SCHEMA "${ns}"`); }
+  });
+
+  it("an uncovered User-to-Session FK cascade refuses atomically and preserves foreign rows", async () => {
+    const a = await connect(); const foreign = randomUUID(), foreignSession = randomUUID();
+    await prisma.user.create({ data: { id: foreign } });
+    await prisma.session.create({ data: { id: foreignSession, userId: foreign, refreshTokenHash: foreignSession, expiresAt: new Date(Date.now()+600_000) } });
+    const prior = await source(a, "users", { id: foreign });
+    const plan: Plan = { table: "users", key: { id: foreign }, verb: "delete", expected: { source: prior }, next: null };
+    const c = { ...sourceCommand("account_purge", [plan]), cutoff: new Date() };
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx, c, async receipt => {
+      await assertDiagnosticSourceCommand(tx, receipt, "account_purge");
+      await tx.user.delete({ where: { id: foreign } });
+    }))).rejects.toThrow("diagnostic_source_uncovered_effect");
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: foreign } })).id).toBe(foreign);
+    expect((await prisma.session.findUniqueOrThrow({ where: { id: foreignSession } })).userId).toBe(foreign);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: userId } })).deletionScheduledAt).toBeNull();
+    expect((await prisma.listing.findUniqueOrThrow({ where: { id: listingId } })).sellerId).toBe(userId);
   });
 
 });
