@@ -21,6 +21,8 @@ export function DiagnosticContinuity({ context, handoff, denied, onDirty, onLock
  const [handle, setHandle] = useState<D.DiagnosticContinuityHandoffs["handoffs"][number] | null>(null), [existing, setExisting] = useState<string | null>(null), [checked, setChecked] = useState(false), [reason, setReason] = useState(""), [reviewB, setReviewB] = useState(false);
  const [receipts, setReceipts] = useState<D.DiagnosticContinuityRequest[]>([]), [receiptCursor, setReceiptCursor] = useState<string | null>(null), [proof, setProof] = useState<D.DiagnosticContinuityProof | null>(null), [copyStatus, setCopyStatus] = useState<"copied" | "copyFailed" | null>(null), [retryReady, setRetryReady] = useState(false), [statusRead,setStatusRead]=useState(false), [inspecting,setInspecting]=useState<string|null>(null), [inspectionError,setInspectionError]=useState<string|null>(null);
  const alive = useRef(true), fence = useRef(false), attempt = useRef<Attempt | null>(null), heading = useRef<HTMLHeadingElement>(null), inspectionButton = useRef<HTMLButtonElement | null>(null), searchCursors = useRef(new Set<string>()), handoffCursor=useRef<string|undefined>(undefined), handoffSeen=useRef(new Set<string>()), materialList=useRef<HTMLUListElement>(null), decisionHeading=useRef<HTMLHeadingElement>(null), pairHeading=useRef<HTMLHeadingElement>(null), pageHeading=useRef<HTMLHeadingElement>(null), reviewHeading=useRef<HTMLHeadingElement>(null), reviewBHeading=useRef<HTMLHeadingElement>(null), proofHeading=useRef<HTMLHeadingElement>(null), receiptSeen=useRef(new Set<string>()), compareInvoker=useRef<HTMLButtonElement|null>(null);
+ const canConsume = context.capabilities.includes("diagnostics.technician");
+ const lostPrepareKind = useRef<D.DiagnosticContinuityRequestExecute["kind"] | null>(null);
  const dualReviewer = context.capabilities.includes("diagnostics.reviewer");
  const material = pair ? [...new Set([pair.predecessor.identity, pair.candidate.identity].flatMap(identity => [identity.evidence, ...identity.corrections].flatMap(record => record?.provenance.map(item => item.id) ?? [])))] : [];
  const complete = !!pair && [pair.predecessor.identity, pair.candidate.identity].every(identity => {
@@ -58,6 +60,7 @@ export function DiagnosticContinuity({ context, handoff, denied, onDirty, onLock
  async function compare(id: string) { compareInvoker.current=document.activeElement as HTMLButtonElement; clearReview(); const result = await read(() => actions.diagnosticReinspectionComparison(order.id, { predecessorId: id })); if (result) { setPair(result); } }
  async function loadTechnicians() { setNamesLoaded(false); setTechnician(""); setAck([]); setSame(false); setReview(false); const result = await read(() => actions.diagnosticLinkingTechnicians(order.id)); if (result){setTechnicians(result.technicians);setNamesLoaded(true);} }
  async function checkHandoff() {
+  if (!canConsume) return false;
   if(checked){handoffCursor.current=undefined;handoffSeen.current.clear();}
   setHandle(null); setExisting(null); setChecked(false); setReviewB(false);
   const result = await read(async () => {
@@ -76,7 +79,7 @@ export function DiagnosticContinuity({ context, handoff, denied, onDirty, onLock
   if (result) { setChecked(true); if (result.result) setExisting(result.result.reportId); else setHandle(result.handoffs.find(item => item.proofId === handoff) ?? null); return true; }
   return false;
  }
- useEffect(() => { if (handoff) void checkHandoff(); /* Navigation performs reads only. */ }, []);
+ useEffect(() => { if (handoff && canConsume) void checkHandoff(); /* Navigation performs reads only. */ }, []);
  function recorded(receipt: D.DiagnosticContinuityRequest) {
   setReceipts(previous => [receipt, ...previous.filter(item => item.requestId !== receipt.requestId)]);
   if (receipt.state === "completed") { attempt.current = null; setUncertain(false); setRetryReady(false); setRationale(""); setReason(""); setReview(false); setReviewB(false); setSame(false); setAck([]); if (receipt.kind === "consume") setExisting(receipt.result.reportId); }
@@ -90,9 +93,10 @@ export function DiagnosticContinuity({ context, handoff, denied, onDirty, onLock
  async function start(input: D.DiagnosticContinuityRequestExecute) {
   if (attempt.current || uncertain || busy || blocked) return;
   // Freeze before prepare. A lost prepare reply never attaches this command to a discovered row.
-  const frozenInput=structuredClone(input);setUncertain(true);
+  const frozenInput=structuredClone(input);lostPrepareKind.current=input.kind;setUncertain(true);
   const result = await read(() => actions.diagnosticPrepareContinuityRequest(order.id, { kind: input.kind }),"preparing");
   if (!result) return;
+  lostPrepareKind.current = null;
   attempt.current = { requestId: result.requestId, input: frozenInput, pending: true };
   await execute();
  }
@@ -113,7 +117,22 @@ export function DiagnosticContinuity({ context, handoff, denied, onDirty, onLock
     throw new Error("Workspace closed");
    });
    if(result){setReceipts(result.requests);setStatusRead(true);receiptSeen.current.clear();if(result.nextCursor)receiptSeen.current.add(result.nextCursor);setReceiptCursor(result.nextCursor);
-    if(uncertain){const currentResult=await checkHandoff();if(alive.current&&currentResult){setUncertain(false);setReview(false);setReviewB(false);setAck([]);setSame(false);}}
+    if(uncertain){
+     // Issue discovery is reviewer-authorized. Handoff discovery requires a technician.
+     // Never attach unsent input to a discovered preparation, even of the same kind.
+     const kind=lostPrepareKind.current;
+     let currentResult=false;
+     if(kind==="consume" && canConsume) currentResult=await checkHandoff();
+     else if(kind==="issue" && dualReviewer){
+      const workspace=await read(()=>actions.diagnosticWorkspace(order.id));
+      if(workspace){
+       if(workspace.context.actorId!==context.actorId || workspace.context.order.id!==order.id || !workspace.context.capabilities.includes("diagnostics.reviewer")){alive.current=false;lostPrepareKind.current=null;denied();return;}
+       if(workspace.context.order.version!==order.version || workspace.reports.length){clearReview();setBlocked(true);}
+       currentResult=true;
+      }
+     }
+     if(alive.current&&currentResult){lostPrepareKind.current=null;setUncertain(false);setReview(false);setReviewB(false);setAck([]);setSame(false);}
+    }
    }
   }
  }
@@ -135,7 +154,7 @@ export function DiagnosticContinuity({ context, handoff, denied, onDirty, onLock
  useEffect(()=>{if(reviewB)reviewBHeading.current?.focus();},[reviewB]);
  useEffect(()=>{if(proof)proofHeading.current?.focus();},[proof]);
  function restart(kind:"issue"|"consume") {
-  if(busy||uncertain||attempt.current)return;
+  if(busy||blocked||uncertain||attempt.current||(kind==="consume"?!canConsume:!dualReviewer))return;
   clearReview();setReason("");setRationale("");decisionValidation.reset();reasonValidation.reset();
   if(kind==="consume")void checkHandoff();else {setBlocked(false);void discover();}
  }
@@ -145,15 +164,15 @@ export function DiagnosticContinuity({ context, handoff, denied, onDirty, onLock
  <h2 ref={heading} tabIndex={-1} className="text-lg font-medium">{handoff ? c.handoff : c.link}</h2><p>{c.noForms}</p>
  {busy && <p role="status">{activity?c[activity]:base.loading}</p>}{error && <p role="alert">{c.unavailable}</p>}{blocked && <p role="alert">{base.refresh}</p>}
  <section className="space-y-3"><h3>{c.operations}</h3><button className={button} disabled={busy} onClick={() => void recover()}>{c.status}</button>{uncertain && <p role="alert">{c.uncertain}</p>}{retryReady && <><button className={button} disabled={busy || blocked} onClick={() => void execute()}>{c.retryExact}</button><button className={button} disabled={busy} onClick={()=>{attempt.current=null;setUncertain(false);setRetryReady(false);clearReview();setReason("");setRationale("");}}>{c.edit}</button></>}
- <p>{c.sessionAbsence}</p>{statusRead&&!receipts.length&&<p role="status">{c.noOperations}</p>}<ul className="space-y-3">{receipts.map(receipt => <li key={receipt.requestId} aria-label={`${receipt.kind==="issue"?c.issue:c.consume} · ${receipt.state==="pending_input"?c.pending:receipt.kind==="issue"?c.recorded:c.reportAvailable} · ${c.current}`} className="min-h-14 space-y-2 border-b border-border py-3"><p>{receipt.kind === "issue" ? c.issue : c.consume}</p>{receipt.state === "pending_input" ? <><p>{c.pending}</p><button className={button} disabled={busy||frozen} onClick={()=>restart(receipt.kind)}>{receipt.kind==="issue"?c.restartComparison:c.restartHandoff}</button><button className={button} disabled={busy||frozen} onClick={returnToVisit}>{c.return}</button></> : receipt.kind === "issue" ? <><p>{c.recorded}</p>{dualReviewer && <button className={button} disabled={busy} onClick={e => void inspect(receipt, e.currentTarget)}>{c.inspect}</button>}{inspecting===receipt.requestId&&<p role="status">{base.loading}</p>}{inspectionError===receipt.requestId&&<p role="alert">{c.unavailable}</p>}</> : <><p>{c.reportAvailable}</p><button className={button} disabled={busy} onClick={() => onResult(receipt.result.reportId)}>{c.result}</button></>}</li>)}</ul>
+ <p>{c.sessionAbsence}</p>{statusRead&&!receipts.length&&<p role="status">{c.noOperations}</p>}<ul className="space-y-3">{receipts.map(receipt => <li key={receipt.requestId} aria-label={`${receipt.kind==="issue"?c.issue:c.consume} · ${receipt.state==="pending_input"?c.pending:receipt.kind==="issue"?c.recorded:c.reportAvailable} · ${c.current}`} className="min-h-14 space-y-2 border-b border-border py-3"><p>{receipt.kind === "issue" ? c.issue : c.consume}</p>{receipt.state === "pending_input" ? <><p>{c.pending}</p><button className={button} disabled={busy||blocked||frozen||(receipt.kind==="consume"?!canConsume:!dualReviewer)} onClick={()=>restart(receipt.kind)}>{receipt.kind==="issue"?c.restartComparison:c.restartHandoff}</button><button className={button} disabled={busy||frozen} onClick={returnToVisit}>{c.return}</button></> : receipt.kind === "issue" ? <><p>{c.recorded}</p>{dualReviewer && <button className={button} disabled={busy} onClick={e => void inspect(receipt, e.currentTarget)}>{c.inspect}</button>}{inspecting===receipt.requestId&&<p role="status">{base.loading}</p>}{inspectionError===receipt.requestId&&<p role="alert">{c.unavailable}</p>}</> : <><p>{c.reportAvailable}</p><button className={button} disabled={busy} onClick={() => onResult(receipt.result.reportId)}>{c.result}</button></>}</li>)}</ul>
  {receiptCursor && <button className={button} disabled={busy} onClick={async () => { const result = await read(() => actions.diagnosticContinuityRequests(order.id, { cursor: receiptCursor })); if (result) { if (result.nextCursor && receiptSeen.current.has(result.nextCursor)) { setError(true); setReceiptCursor(null); return; } if(result.nextCursor)receiptSeen.current.add(result.nextCursor); setReceipts(previous => [...previous.filter(item => !result.requests.some(next => next.requestId === item.requestId)), ...result.requests]); setReceiptCursor(result.nextCursor); } }}>{c.continueOperations}</button>}
  {proof && <section role="region" aria-label={c.recorded} className="space-y-3 border border-border p-4"><h3 ref={proofHeading} tabIndex={-1}>{c.recorded}</h3><p>{new Date(proof.issuedAt).toLocaleString(locale==="tk"?"tk-TM":locale==="ru"?"ru-RU":"en-GB", { timeZone: "UTC" })} UTC</p><p>{proof.method==="comparative_attestation"?c.comparative:c.automatic}</p><p className="whitespace-pre-wrap break-words">{proof.rationale}</p><pre className="whitespace-pre-wrap break-all">{JSON.stringify({ predecessor: proof.predecessor, candidate: proof.candidate, linkingTechnicianId: proof.linkingTechnicianId, provenanceRecordIds: proof.provenanceRecordIds }, null, 2)}</pre><button className={button} onClick={async () => { try { await navigator.clipboard.writeText(new URL(href, window.location.origin).href); if (alive.current) setCopyStatus("copied"); } catch { if (alive.current) setCopyStatus("copyFailed"); } }}>{c.copy}</button><a className={`${button} inline-flex items-center`} href={href}>{c.openLink}</a>{copyStatus && <p role="status">{c[copyStatus]}</p>}{copyStatus === "copyFailed" && <input className={field} aria-label={c.completeLink} readOnly value={new URL(href, window.location.origin).href} onFocus={e => e.currentTarget.select()}/>}<button className={button} onClick={() => { setProof(null); inspectionButton.current?.focus(); }}>{base.back}</button></section>}
  </section>
- <section className="space-y-4"><h3>{c.handoff}</h3>{!handoff && <p>{c.missing}</p>}<button className={button} disabled={busy || frozen} onClick={() => void checkHandoff()}>{c.check}</button>{existing ? <button className={button} disabled={busy} onClick={() => onResult(existing)}>{c.result}</button> : checked && !handle ? <p role="status">{c.missing}</p> : null}
+ {canConsume && <section className="space-y-4"><h3>{c.handoff}</h3>{!handoff && <p>{c.missing}</p>}<button className={button} disabled={busy || frozen} onClick={() => void checkHandoff()}>{c.check}</button>{existing ? <button className={button} disabled={busy} onClick={() => onResult(existing)}>{c.result}</button> : checked && !handle ? <p role="status">{c.missing}</p> : null}
  {handle && !existing && order.observedVehicle && order.physicalAuthorized && <><VisitFacts observation={order.observedVehicle} c={base} locale={locale}/><p>{base.template}: {context.template.definition.title[locale]} · {context.template.version}</p><p>{base.audience}: {base[order.audience]}</p><label className="block">{base.reason} · {c.required}<textarea {...reasonValidation.props("reason",`${base.reason} · ${c.required}`)} className={field} aria-required="true" required maxLength={1000} disabled={busy || frozen} value={reason} onChange={e => { setReason(e.target.value); setReviewB(false); }}/>{reasonValidation.feedback("reason",`${reason.length}/1000`)}</label>{reasonValidation.summary(c.invalidFields)}{!reviewB ? <button className={primary} disabled={busy} aria-disabled={frozen||blocked||!reasonValidation.valid} onClick={() => { if(frozen||blocked||!reasonValidation.validate())return;setReviewB(true); }}>{c.reviewB}</button> : <section role="region" aria-label={c.reviewB} className="space-y-3 border border-border p-4"><h3 ref={reviewBHeading} tabIndex={-1}>{c.reviewB}</h3><VisitFacts observation={order.observedVehicle} c={base} locale={locale}/><p>{base.template}: {context.template.definition.title[locale]} · {context.template.version}</p><p>{base.audience}: {base[order.audience]}</p><p className="whitespace-pre-wrap break-words">{reason}</p><p>{c.physicalCue}</p><button className={primary} disabled={busy || frozen} onClick={() => {if(!reasonValidation.valid||!reviewB)return;void start({ kind: "consume", command: { proofId: handle.proofId, reportId: crypto.randomUUID(), expectedOrderVersion: handle.expectedOrderVersion, reason } });}}>{c.consume}</button><button className={button} disabled={busy || frozen} onClick={() => {setReviewB(false);document.getElementById(reasonValidation.props("reason",`${base.reason} · ${c.required}`).id)?.focus();}}>{c.edit}</button></section>}</>}
- <button className={button} disabled={busy || frozen} onClick={returnToVisit}>{c.return}</button></section>
+ <button className={button} disabled={busy || frozen} onClick={returnToVisit}>{c.return}</button></section>}
  {!handoff && dualReviewer && !frozen && !blocked && <section className="space-y-4"><h3 ref={pageHeading} tabIndex={-1}>{c.search}</h3><button className={button} disabled={busy} onClick={() => void discover()}>{c.search}</button>{page && <><ul>{page.candidates.map(candidate => <li className="min-h-14 space-y-2 border-b border-border py-3" key={candidate.reportId}><p>{new Date(candidate.observedAt).toLocaleString(locale==="tk"?"tk-TM":locale==="ru"?"ru-RU":"en-GB", { timeZone: "UTC" })} UTC · {candidate.mileageKm.toLocaleString(locale)} km</p><button className={button} disabled={busy} onClick={() => void compare(candidate.reportId)}>{c.compare}</button></li>)}</ul>{page.nextCursor && <button className={button} disabled={busy} onClick={() => void discover(page.nextCursor ?? undefined)}>{c.continue}</button>}{page.exhausted && <p>{c.exhausted}</p>}</>}
- {pair && <><h3 ref={pairHeading} tabIndex={-1}>{c.compare}</h3><button className={button} disabled={busy} onClick={()=>{clearReview();if(compareInvoker.current?.isConnected)compareInvoker.current.focus();else pageHeading.current?.focus();}}>{base.back}</button><IdentityComparison predecessor={pair.predecessor.identity} candidate={pair.candidate.identity} c={c} base={base}/>
+ {pair && <><h3 ref={pairHeading} tabIndex={-1}>{c.compare}</h3><button className={button} disabled={busy} onClick={()=>{clearReview();if(compareInvoker.current?.isConnected)compareInvoker.current.focus();else pageHeading.current?.focus();}}>{base.back}</button><IdentityComparison comparison={pair} c={c} base={base}/>
 
  <h3>{c.materials} · {material.length}/40</h3>{material.length > 40 && <p role="status">{c.overCap}</p>}{!complete && <p role="alert">{c.unavailable}</p>}
  <ul ref={materialList}>{material.map((id, index) => <li key={id} className="min-h-14"><ContinuityMaterial src={`/diagnostics/orders/${order.id}/reinspection-comparison/provenance/${id}?predecessorId=${pair.predecessor.reportId}`} caption={`${c.materials} ${index + 1} · ${[pair.predecessor.identity, pair.candidate.identity].flatMap((identity, side) => [identity.evidence, ...identity.corrections].flatMap(record => record?.identifiers.filter(item => item.provenanceIds.includes(id)).map(item => `${side === 0 ? c.previous : c.current}: ${record.correction ? c.correction : c.root} · ${c[item.kind]} · ${item.location} · ${item.value}`) ?? [])).join('; ')}`} c={c} denied={denied} {...(complete && material.length <= 40 ? { checked: ack.includes(id), acknowledge: (value: boolean) => { setAck(previous => value ? [...new Set([...previous, id])] : previous.filter(item => item !== id)); setReview(false); } } : {})}/></li>)}</ul>
