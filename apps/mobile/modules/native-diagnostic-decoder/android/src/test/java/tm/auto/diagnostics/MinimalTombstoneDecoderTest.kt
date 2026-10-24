@@ -28,7 +28,7 @@ class MinimalTombstoneDecoderTest {
         val result = MinimalTombstoneDecoder.decode(fixture(extra = unknown), manifest)
         assertNotNull(result); assertFalse(result.toString().contains("fingerprint"))
     }
-    @Test fun `refuses malformed utf8 duplicate fields missing build ids and ambiguous modules`() {
+    @Test fun `refuses invalid frame wire types and duplicate root tids`() {
         val malformed = field(1, byteArrayOf(0x01)) + field(6, byteArrayOf(0xC3.toByte(), 0x28)) + field(8, "0123456789abcdef".toByteArray())
         assertNull(MinimalTombstoneDecoder.decode(scalar(1, 1) + scalar(6, 7) + field(10, scalar(1, 11) + scalar(3, 0)) + field(16, scalar(1, 7) + field(2, scalar(1, 7) + field(4, malformed))), manifest))
         assertNull(MinimalTombstoneDecoder.decode(fixture() + scalar(6, 8), manifest))
@@ -46,10 +46,11 @@ class MinimalTombstoneDecoderTest {
 
     @Test fun `rejects unsigned length overflow for known and skipped fields without throwing`() {
         val overflowLength = ByteArray(9) { 0x80.toByte() } + byteArrayOf(0x01)
-        val known = key(10) + overflowLength
-        val skipped = key(99) + overflowLength
-        assertNull(runCatching { MinimalTombstoneDecoder.decode(fixture(extra = known), manifest) }.getOrNull())
-        assertNull(runCatching { MinimalTombstoneDecoder.decode(fixture(extra = skipped), manifest) }.getOrNull())
+        // This is the first signal_info field, so its length reaches bytes() directly.
+        val known = scalar(1, 1) + scalar(6, 7) + key(10) + overflowLength
+        val skipped = fixture(extra = key(99) + overflowLength)
+        assertNull(MinimalTombstoneDecoder.decode(known, manifest))
+        assertNull(MinimalTombstoneDecoder.decode(skipped, manifest))
     }
 
     @Test fun `rejects duplicate manifest paths and aliases at the source boundary`() {
