@@ -6,11 +6,30 @@ const event = { version: 1 as const, eventId: "00000000-0000-4000-8000-000000000
   eventName: "listing_published" as const, context: { platform: "server" as const, release: "server", build: "unit", locale: "en" as const }, payload: { listingId: "00000000-0000-4000-8000-000000000002", cityId: "00000000-0000-4000-8000-000000000003" } };
 
 function txThatFailsOutbox() {
-  const raw = vi.fn(async (strings: TemplateStringsArray) => strings[0]?.includes("current_setting") ? [{ statement: "0", lock: "0" }] : strings[0]?.includes("SELECT p.") ? [{ id: "principal-1", generation: "generation-1" }] : []);
+  const raw = vi.fn(async (strings: TemplateStringsArray) => {
+    const sql = strings[0] ?? "";
+    if (sql.includes("current_setting")) return [{ statement: "0", lock: "0" }];
+    if (sql.includes('FROM "measurement_state"')) return [{ epoch: "epoch-1" }];
+    if (sql.includes('FROM "measurement_principals"')) return [{ id: "principal-1", generation: "generation-1", epoch: "epoch-1", userId: "user-1" }];
+    if (sql.includes('FROM "users"')) return [{ deletionScheduledAt: null }];
+    return [];
+  });
   return { $executeRaw: raw, $queryRaw: raw, measurementOutbox: { createMany: vi.fn(async () => { throw new Error("collector unavailable"); }) } };
 }
 
 describe("PrismaMeasurementCommit savepoint isolation", () => {
+  it("locks collector before principal and checks User eligibility after both", async () => {
+    const tx = txThatFailsOutbox();
+    await new PrismaMeasurementCommit(activation, "epoch-1").capture(tx, "user-1", event);
+    const sql = tx.$queryRaw.mock.calls.map(([strings]) => String(strings[0]));
+    const collector = sql.findIndex((query) => query.includes('FROM "measurement_state"'));
+    const principal = sql.findIndex((query) => query.includes('FROM "measurement_principals"'));
+    const user = sql.findIndex((query) => query.includes('FROM "users"'));
+    expect(collector).toBeGreaterThanOrEqual(0);
+    expect(principal).toBeGreaterThan(collector);
+    expect(user).toBeGreaterThan(principal);
+  });
+
   it("rolls back collector failure to its savepoint and reports unavailable", async () => {
     const tx = txThatFailsOutbox();
     const result = await new PrismaMeasurementCommit(activation, "epoch-1").capture(tx, "user-1", event);

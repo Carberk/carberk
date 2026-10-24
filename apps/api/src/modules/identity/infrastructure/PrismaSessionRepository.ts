@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { PrismaService, assertDiagnosticSourceCommand, withDiagnosticSourceCommand } from "@auto-tm/db";
 import type { Session } from "../domain/Session";
 import type { SessionRepository, SessionLookupResult } from "../domain/ports/SessionRepository";
 import type { PasswordHasherPort } from "../domain/ports/PasswordHasherPort";
@@ -119,10 +119,42 @@ export class PrismaSessionRepository implements SessionRepository {
   }
 
   async deleteAllByUserId(userId: string): Promise<number> {
-    const result = await this.prisma.session.deleteMany({
+    // Discover the complete deletion set before entering the prepared
+    // transaction. The source command then rechecks every row while holding
+    // the kernel's ordered locks, so a concurrent session create or change
+    // cannot be silently omitted.
+    const sessions = await this.prisma.session.findMany({
       where: { userId },
+      select: { id: true, userId: true, expiresAt: true, adminTotpExpiresAt: true },
     });
-    return result.count;
+    if (!sessions.length) return 0;
+    const rows = sessions.map((session) => ({
+      table: "sessions" as const,
+      key: { id: session.id },
+      verb: "delete" as const,
+      expected: {
+        source: {
+          id: session.id,
+          userId: session.userId,
+          expiresAt: session.expiresAt.toISOString(),
+          adminTotpExpiresAt: session.adminTotpExpiresAt?.toISOString() ?? null,
+        },
+      },
+      next: null,
+    }));
+    return this.prisma.$transaction((tx) => withDiagnosticSourceCommand(tx, {
+      operation: "session_change",
+      roots: sessions.map(({ id }) => ({ table: "sessions" as const, key: { id } })),
+      rows,
+      actorUserId: userId,
+      sessionId: null,
+      cutoff: null,
+      campaign: null,
+    }, async (receipt) => {
+      await assertDiagnosticSourceCommand(tx, receipt, "session_change");
+      const result = await tx.session.deleteMany({ where: { id: { in: sessions.map(({ id }) => id) }, userId } });
+      return result.count;
+    }));
   }
 
   private toDomain(

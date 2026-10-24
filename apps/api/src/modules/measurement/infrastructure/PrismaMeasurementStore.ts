@@ -43,16 +43,24 @@ export class PrismaMeasurementStore implements MeasurementLedgerPort, Measuremen
   if (!this.admitted()) return null;
   const now = this.now();
   return this.prisma.$transaction(async (tx) => {
-   const states = await tx.$queryRaw<{ epoch: string }[]>`SELECT "epoch" FROM "measurement_state" WHERE "key" = 'collector' FOR SHARE`;
-   if (states[0]?.epoch !== this.config.epoch) return null;
    let principal: Principal | null = null; let guestCapability: string | undefined;
    if (input.authenticatedUserId) {
     // The account row lock serializes issuance with the identity deletion transaction.
     const users = await tx.$queryRaw<{ deletionScheduledAt: Date | null }[]>`SELECT "deletionScheduledAt" FROM "users" WHERE "id" = ${input.authenticatedUserId} FOR UPDATE`;
     if (!users[0] || users[0].deletionScheduledAt) return null;
+    // Authenticated bootstrap takes the User lock before the collector lock.
+    // Account scheduling uses the same order, so issuance cannot observe a
+    // principal that deletion is about to erase.
+    const states = await tx.$queryRaw<{ epoch: string }[]>`SELECT "epoch" FROM "measurement_state" WHERE "key" = 'collector' FOR SHARE`;
+    if (states[0]?.epoch !== this.config.epoch) return null;
     principal = await tx.measurementPrincipal.findUnique({ where: { userId: input.authenticatedUserId } });
    } else if (input.guestCapability && /^mg_[A-Za-z0-9_-]{43}$/.test(input.guestCapability)) {
+    const states = await tx.$queryRaw<{ epoch: string }[]>`SELECT "epoch" FROM "measurement_state" WHERE "key" = 'collector' FOR SHARE`;
+    if (states[0]?.epoch !== this.config.epoch) return null;
     principal = await tx.measurementPrincipal.findUnique({ where: { capabilityHash: hash(input.guestCapability) } });
+   } else {
+    const states = await tx.$queryRaw<{ epoch: string }[]>`SELECT "epoch" FROM "measurement_state" WHERE "key" = 'collector' FOR SHARE`;
+    if (states[0]?.epoch !== this.config.epoch) return null;
    }
    if (principal && (principal.epoch !== this.config.epoch || (principal.expiresAt && principal.expiresAt <= now))) principal = null;
    if (!principal) {
