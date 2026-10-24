@@ -2108,3 +2108,5 @@ model CampaignPreparation {
 // Dormant source correction inventory: 20261024060000_diagnostic_source_correction.
 
 // Dormant finite moderation inventory: 20261024070000_diagnostic_user_eligibility.
+
+// Dormant complete moderation effects: 20261024080000_diagnostic_moderation_complete_effects.

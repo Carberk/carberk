@@ -745,7 +745,7 @@ describe("B1 disposal of lawful persisted ownership and consumed retry graphs", 
     expect(await db.diagnosticSourceCommand.count()).toBe(0);
   });
 
-  it.each(["finish", "delete"] as const)("Session deletion %s clears a consumed request's personal pair and preserves the actual report retry minimum", async mode => {
+  it.each(["finish", "delete"] as const)("Session deletion %s removes the consumed request and retains the immutable report pair and retry minimum", async mode => {
     const graph = await unusedProof();
     await guards(false);
     const sid = randomUUID(), actor = { userId: suite.id("technician"), sessionId: sid };
@@ -757,6 +757,9 @@ describe("B1 disposal of lawful persisted ownership and consumed retry graphs", 
     const proof = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: graph.proof.id } });
     const predecessor = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: graph.released.id } });
     const beforeSession = await db.session.findUniqueOrThrow({ where: { id: sid } });
+    const foreignSession = await db.session.findUniqueOrThrow({ where: { id: subject("outsider").sessionId } });
+    const rawSnapshots = await db.diagnosticIdentityRecord.findMany({ where: { orderId: { in: [graph.a.id, graph.b.id] } }, orderBy: { id: "asc" } });
+    expect(report).toMatchObject({ continuityRequestId: request.requestId, continuityRequestSessionId: sid, continuityProofId: proof.id, reinspectionOrderVersion: graph.orderB.version });
     await guards(true);
     const c = await db.$transaction(async tx => ({ operation: "session_change", roots: [{ table: "sessions", key: { id: sid } }], rows: [{ table: "sessions", key: { id: sid }, verb: "delete", expected: { source: await source(tx,"sessions",sid) }, next: null }], actorUserId: actor.userId, sessionId: sid, cutoff: null, campaign: null }) as DiagnosticSourceCommand);
     await expect(db.$transaction(tx => withDiagnosticSourceCommand(tx,c,async () => {
@@ -774,9 +777,20 @@ describe("B1 disposal of lawful persisted ownership and consumed retry graphs", 
     });
     expect(await db.session.findUnique({ where: { id: sid } })).toBeNull();
     expect(await db.diagnosticContinuityRequest.findUnique({ where: { id: request.requestId } })).toBeNull();
-    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: report.id } })).toEqual({ ...report, continuityRequestId: null, continuityRequestSessionId: null });
+    // Disposition of inherited two parameterized assertions: Session deletion
+    // cascades the request, but cannot change the immutable surviving pair.
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: report.id } })).toEqual(report);
     expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proof.id } })).toEqual(proof);
     expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: predecessor.id } })).toEqual(predecessor);
+    expect(await db.session.findUniqueOrThrow({ where: { id: foreignSession.id } })).toEqual(foreignSession);
+    expect(await db.diagnosticIdentityRecord.findMany({ where: { orderId: { in: [graph.a.id, graph.b.id] } }, orderBy: { id: "asc" } })).toEqual(rawSnapshots);
+    // A prepared caller still cannot substitute the nonexistent FK clear.
+    await expect(db.$transaction(async tx => {
+      const old = await source(tx, "diagnostic_reports", report.id);
+      return withDiagnosticSourceCommand(tx, { operation: "report_change", roots: [{ table: "diagnostic_reports", key: { id: report.id } }], rows: [{ table: "diagnostic_reports", key: { id: report.id }, verb: "update", expected: { source: old }, next: { ...old, continuityRequestId: null, continuityRequestSessionId: null } }], actorUserId: actor.userId, sessionId: null, cutoff: null, campaign: null },
+        () => tx.diagnosticReportRecord.update({ where: { id: report.id }, data: { continuityRequestId: null, continuityRequestSessionId: null } }));
+    })).rejects.toThrow("diagnostic_consumed_request_immutable");
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: report.id } })).toEqual(report);
     await expect(proofs.executeRequest(actor,graph.b.id,request.requestId,input)).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
     expect(await db.diagnosticSourceCommand.count()).toBe(0);
   });

@@ -423,4 +423,46 @@ describe("campaign preparation with existing campaign authority", () => {
     expect((await pool.query(`SELECT count(*)::int count FROM "${businessNamespace}".campaign_object_ledger`)).rows).toEqual([{ count: 5 }]);
   });
 
+
+  // Source counterexample found during the required complete campaign scan.
+  // Preparation supplies coverage, never authorization or a tracker exemption.
+  // A successful campaign moderation journey remains BLOCKED by the retained
+  // fixture policy. Do not relabel either refusal as positive acceptance.
+  it.each(["user-first", "audit-first"] as const)("complete campaign moderation %s preserves the existing policy refusal atomically", async order => {
+    const target = businessUser("sales-a"), actor = businessUser("coordinator"), reporter = businessUser("buyer-a");
+    const reportId = randomUUID(), auditId = randomUUID(), stamp = new Date(), reason = "Confirmed campaign abuse";
+    await prisma.$transaction(tx => withCampaignPreparation(tx, [{ table: "content_reports", key: { id: reportId }, verb: "insert", next: { reporterUserId: reporter, targetType: "user", targetId: target } }],
+      () => tx.contentReport.create({ data: { id: reportId, reporterUserId: reporter, targetType: "user", targetId: target, reason: "abuse" } })));
+    const before = await prisma.user.findUniqueOrThrow({ where: { id: target } });
+    const sessions = await prisma.session.findMany({ where: { userId: target }, orderBy: { id: "asc" } });
+    const report = await prisma.contentReport.findUniqueOrThrow({ where: { id: reportId } });
+    const foreign = await prisma.user.findUniqueOrThrow({ where: { id: users[1] } });
+    await expect(prisma.$transaction(async tx => {
+      const [r] = await tx.$queryRaw<{ source: DiagnosticSourceTuple }[]>`SELECT diagnostic_source_project(to_jsonb(u),diagnostic_source_meta('users')->'fields') source FROM users u WHERE id=${target}`;
+      const c: DiagnosticSourceCommand = { operation: "user_eligibility", roots: [{ table: "users", key: { id: target } }], rows: [{ table: "users", key: { id: target }, verb: "update", expected: { source: present(r).source },
+        next: { ...present(r).source, suspendedAt: stamp.toISOString(), suspendedById: actor, suspensionReason: reason } }],
+      actorUserId: actor, sessionId: null, cutoff: null, campaign: null, intent: { auditId, reason, report: { id: reportId, reviewedAt: stamp.toISOString() } } };
+      return withDiagnosticSourceCommand(tx, c, async receipt => {
+        const [state] = await tx.$queryRaw<{ campaigns: string[] }[]>`SELECT campaigns FROM diagnostic_source_commands WHERE id=${receipt.receiptId}::uuid`;
+        expect(present(state).campaigns).toContain(businessNamespace);
+        const audit = () => tx.auditLog.create({ data: { id: auditId, actorId: actor, action: "USER_SUSPEND", targetType: "user", targetId: target, details: {
+          reason, before: { suspendedAt: null, suspendedById: null, suspensionReason: null, reportStatus: "pending" },
+          after: { suspendedAt: stamp.toISOString(), suspendedById: actor, suspensionReason: reason, reportStatus: "actioned" }, reportId,
+        } } });
+        // Audit-first isolates its own tracker refusal. The existing admin
+        // use-case is User-first and is refused by the synthetic User policy.
+        if (order === "audit-first") await audit();
+        await tx.user.update({ where: { id: target }, data: { suspendedAt: stamp, suspendedById: actor, suspensionReason: reason } });
+        await tx.session.deleteMany({ where: { userId: target } });
+        await tx.contentReport.update({ where: { id: reportId }, data: { status: "actioned", reviewedById: actor, reviewedAt: stamp } });
+        if (order === "user-first") await audit();
+      });
+    })).rejects.toThrow(order === "user-first" ? "Synthetic identity changed" : "Unsupported campaign audit");
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: target } })).toEqual(before);
+    expect(await prisma.session.findMany({ where: { userId: target }, orderBy: { id: "asc" } })).toEqual(sessions);
+    expect(await prisma.contentReport.findUniqueOrThrow({ where: { id: reportId } })).toEqual(report);
+    expect(await prisma.auditLog.findUnique({ where: { id: auditId } })).toBeNull();
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: users[1] } })).toEqual(foreign);
+    expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
+  });
 });

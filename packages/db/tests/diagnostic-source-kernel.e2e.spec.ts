@@ -11,7 +11,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { PrismaClient } from "../generated/prisma/client/client";
 import {
   assertDiagnosticSourceCommand, sealDiagnosticFirstObservation, withDiagnosticSourceCommand,
-  type Prisma, type DiagnosticSourceCommand, type DiagnosticSourceOperation, type PreparedDiagnosticSource,
+  Prisma, type DiagnosticSourceCommand, type DiagnosticSourceOperation, type PreparedDiagnosticSource,
 } from "../src/index";
 
 function present<T>(value: T | null | undefined): T {
@@ -1662,7 +1662,7 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
       reason: "abuse", messageContext: message ? { messageId, senderId: userId } : Prisma.JsonNull } });
     const details = { reason, before: { ...before, ...(backed ? { reportStatus: "pending" } : {}) }, after: { ...after, ...(backed ? { reportStatus: "actioned" } : {}) },
       ...(backed ? { reportId } : {}), ...(message ? { messageId } : {}) };
-    const audit = { id: auditId, actorId: actor, action: kind === "unsuspend" ? "USER_UNSUSPEND" : "USER_SUSPEND", targetType: "user", targetId: userId, details };
+    const audit = { id: auditId, actorId: String(actor), action: kind === "unsuspend" ? "USER_UNSUSPEND" : "USER_SUSPEND", targetType: "user", targetId: userId, details };
     const plan = await update(client, "users", { id: userId }, after);
     const c = { ...sourceCommand("user_eligibility", [plan]), actorUserId: actor,
       intent: { auditId, reason, ...(backed ? { report: { id: reportId, reviewedAt: stamp.toISOString() } } : {}) } };
@@ -1677,7 +1677,10 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     return { c, actor, audit, prior, after, reportId, stamp, userWrite, reportWrite, write };
   }
 
-  it.each(["direct", "report", "message", "snapshot", "unsuspend"] as const)("complete %s moderation keeps original audit content and all required transaction effects", async kind => {
+  it.each([
+    ["direct", "finish"], ["report", "finish"], ["message", "finish"], ["snapshot", "finish"], ["unsuspend", "finish"],
+    ["direct", "delete"], ["report", "delete"], ["message", "delete"], ["snapshot", "delete"], ["unsuspend", "delete"],
+  ] as const)("complete %s moderation via %s keeps original audit content and all required transaction effects", async (kind, mode) => {
     const f = await adminModeration(kind);
     const sessions = await prisma.session.findMany({ where: { userId } });
     const foreign = await prisma.user.findUniqueOrThrow({ where: { id: f.actor } });
@@ -1688,7 +1691,13 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     expect(await prisma.session.findMany({ where: { userId } })).toEqual(sessions);
     expect(await prisma.auditLog.findUnique({ where: { id: f.audit.id } })).toBeNull();
     if ("report" in f.c.intent) expect(await prisma.contentReport.findUniqueOrThrow({ where: { id: f.reportId } })).toMatchObject({ status: "pending", reviewedAt: null });
-    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx, f.c, () => f.write(tx)));
+    await prisma.$transaction(async tx => {
+      if (mode === "finish") await withDiagnosticSourceCommand(tx, f.c, () => f.write(tx));
+      else {
+        const [r] = await tx.$queryRaw<{ id: string }[]>`SELECT diagnostic_prepare_source(${JSON.stringify(f.c)}::jsonb)::text id`;
+        await f.write(tx); await tx.$executeRaw`DELETE FROM diagnostic_source_commands WHERE id=${present(r).id}::uuid`;
+      }
+    });
     expect(await prisma.auditLog.findUniqueOrThrow({ where: { id: f.audit.id } })).toMatchObject(f.audit);
     expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toMatchObject({ suspendedAt: kind === "unsuspend" ? null : f.stamp, suspendedById: f.after.suspendedById, suspensionReason: f.after.suspensionReason });
     expect(await prisma.session.findMany({ where: { userId } })).toEqual(kind === "unsuspend" ? sessions : []);
@@ -1717,10 +1726,11 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
 
   it.each(["actor", "target", "reason", "action", "message", "audit-id", "report-actor", "report-time", "report-id"] as const)("wrong %s effect refuses the complete moderation transaction", async fault => {
     const f = await adminModeration("snapshot");
+    const foreignReport = await prisma.contentReport.create({ data: { reporterUserId: f.actor, targetType: "user", targetId: f.actor, reason: "abuse" } });
     await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx, f.c, async () => {
       await f.userWrite(tx);
       if (fault.startsWith("report-")) {
-        await tx.contentReport.update({ where: { id: fault === "report-id" ? randomUUID() : f.reportId }, data: {
+        await tx.contentReport.update({ where: { id: fault === "report-id" ? foreignReport.id : f.reportId }, data: {
           status: "actioned", reviewedById: fault === "report-actor" ? userId : f.actor, reviewedAt: fault === "report-time" ? new Date(0) : f.stamp,
         } });
       } else await f.reportWrite(tx);
@@ -1732,7 +1742,8 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
       if (fault === "message") audit.details.messageId = randomUUID();
       if (fault === "audit-id") audit.id = randomUUID();
       await tx.auditLog.create({ data: audit });
-    }))).rejects.toThrow();
+    }))).rejects.toThrow(/diagnostic_source_(effect_mismatch|uncovered_effect)/);
+    expect(await prisma.contentReport.findUniqueOrThrow({ where: { id: foreignReport.id } })).toEqual(foreignReport);
     expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(f.prior);
     expect(await prisma.session.findUnique({ where: { id: sessionId } })).not.toBeNull();
     expect(await prisma.auditLog.findUnique({ where: { id: f.audit.id } })).toBeNull();

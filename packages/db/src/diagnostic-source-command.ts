@@ -23,8 +23,7 @@ export type DiagnosticSourceRow = {
     | { readonly verb: "delete"; readonly expected: { readonly source: DiagnosticSourceTuple }; readonly next: null }
   )
 }[DiagnosticSourceTable];
-export interface DiagnosticSourceCommand {
-  readonly operation: DiagnosticSourceOperation;
+interface DiagnosticSourceCommandFields {
   readonly roots: readonly DiagnosticSourceRoot[];
   readonly rows: readonly DiagnosticSourceRow[];
   readonly actorUserId: string | null;
@@ -32,9 +31,16 @@ export interface DiagnosticSourceCommand {
   readonly cutoff: Date | null;
   /** Reservation authority is always resolved from persisted campaign ownership. */
   readonly campaign: null;
-  /** Only finite bootstrap inputs. SQL derives every center, qualification and audit effect. */
-  readonly intent?: Readonly<{ code: string; userId: string; capability: string; qualificationId: string }> | Readonly<{ reason: string }> | Readonly<Record<string, never>>;
 }
+/** Moderation metadata describes the complete admin operation. Without it the
+ * standalone Identity operation has no admin audit or report action. */
+export type DiagnosticSourceCommand = DiagnosticSourceCommandFields & (
+  | { readonly operation: "user_eligibility"; readonly intent?: Readonly<{
+    auditId: string; reason: string; report?: Readonly<{ id: string; reviewedAt: string }>;
+  }> }
+  | { readonly operation: Exclude<DiagnosticSourceOperation, "user_eligibility">;
+    readonly intent?: Readonly<{ code: string; userId: string; capability: string; qualificationId: string }> | Readonly<{ reason: string }> | Readonly<Record<string, never>> }
+);
 
 declare const prepared: unique symbol;
 /** A receipt proves coverage in this backend/transaction, never caller authority. */

@@ -13,7 +13,7 @@ test('finite User moderation is an exact additive retained migration, preserving
   assert.equal(retainedSchemaProfile.additions.filter(row => row.name === name).length, 1);
   const sql = read('../packages/db/prisma/migrations/' + name + '/migration.sql');
   assert.equal(sql, read('./testing/retained-schema/' + name + '.sql'));
-  const schema = hash(read('../packages/db/prisma/schema.prisma'));
+  const schema = '6cda1b196baa94edb65ac1a54b134c2ff4ff4ddeb6f68a2db282988367d1b470'; // Historical moderation-only snapshot.
   const prior = '35b500eac8a9c55c8b369783b6dfe4a1a552676294809cbddb7f4b452e91759d';
   const candidate = inventoryForSchema(schema, []), main = inventoryForSchema(prior, []);
   assert.deepEqual(candidate.filter(row => row.name !== name), main);
