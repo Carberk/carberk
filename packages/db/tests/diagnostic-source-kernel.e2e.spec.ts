@@ -1402,4 +1402,181 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
   });
 
+
+  // Moderation is a finite User command. Sessions and their incoming effects are
+  // server-derived, never caller rows. These cases use the exported module.
+  async function moderationPlan(client: PoolClient, suspendedAt: Date | null) {
+    const actor = randomUUID();
+    await prisma.user.create({ data: { id: actor, email: `${actor}@moderation.invalid` } });
+    const plan = await update(client, "users", { id: userId }, {
+      suspendedAt: suspendedAt?.toISOString() ?? null,
+      suspendedById: suspendedAt ? actor : null,
+      suspensionReason: suspendedAt ? "Explicit moderation scenario" : null,
+    });
+    const c = { ...sourceCommand("user_eligibility", [plan]), actorUserId: actor };
+    const write = async (tx: Prisma.TransactionClient, omitSessions = false) => {
+      await tx.user.update({ where: { id: userId }, data: {
+        suspendedAt, suspendedById: suspendedAt ? actor : null,
+        suspensionReason: suspendedAt ? "Explicit moderation scenario" : null,
+      } });
+      if (suspendedAt && !omitSessions) await tx.session.deleteMany({ where: { userId } });
+    };
+    return { c, plan, write };
+  }
+
+  it.each(["finish", "delete"] as const)("User moderation %s requires every actual Session deletion and rolls back the whole command", async mode => {
+    const a = await connect(), extra = randomUUID(), foreign = randomUUID(), foreignSession = randomUUID();
+    await prisma.user.create({ data: { id: foreign, email: `${foreign}@moderation.invalid` } });
+    for (const [id, uid] of [[extra, userId], [foreignSession, foreign]]) await prisma.session.create({ data: {
+      id, userId: uid, refreshTokenHash: id, expiresAt: new Date(Date.now()+600_000),
+    } });
+    const before = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const sessions = await prisma.session.findMany({ where: { userId }, orderBy: { id: "asc" } });
+    const foreignBefore = await prisma.session.findUniqueOrThrow({ where: { id: foreignSession } });
+    const suspendedAt = new Date(), m = await moderationPlan(a, suspendedAt);
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx, m.c, async receipt => {
+      await m.write(tx, true);
+      if (mode === "delete") await tx.$executeRaw`DELETE FROM diagnostic_source_commands WHERE id=${receipt.receiptId}::uuid`;
+    }))).rejects.toThrow("diagnostic_source_final_effect");
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(before);
+    expect(await prisma.session.findMany({ where: { userId }, orderBy: { id: "asc" } })).toEqual(sessions);
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx, m.c, async () => {
+      await m.write(tx); throw new Error("moderation whole transaction rollback");
+    }))).rejects.toThrow("moderation whole transaction rollback");
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(before);
+    expect(await prisma.session.findMany({ where: { userId }, orderBy: { id: "asc" } })).toEqual(sessions);
+    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx, m.c, async receipt => {
+      await assertDiagnosticSourceCommand(tx, receipt, "user_eligibility");
+      const [prepared] = await tx.$queryRaw<{ command: { rows: unknown[] }; effects: Plan[]; scope: unknown[] }[]>`SELECT command,effects,scope FROM diagnostic_source_commands WHERE id=${receipt.receiptId}::uuid`;
+      expect(present(prepared).command.rows).toHaveLength(1);
+      expect(present(prepared).effects.filter(e => e.table === "sessions").map(e => e.key["id"]).sort()).toEqual([sessionId, extra].sort());
+      expect(present(prepared).effects.filter(e => e.table === "sessions").every(e => e.verb === "delete")).toBe(true);
+      expect(present(prepared).scope).toContainEqual(expect.objectContaining({ table: "sessions", key: { id: extra } }));
+      await m.write(tx);
+    }));
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toMatchObject({ suspendedAt, suspendedById: m.c.actorUserId, suspensionReason: "Explicit moderation scenario", deletionScheduledAt: null });
+    expect(await prisma.session.count({ where: { userId } })).toBe(0);
+    expect(await prisma.session.findUniqueOrThrow({ where: { id: foreignSession } })).toEqual(foreignBefore);
+    const restored = await moderationPlan(a, null);
+    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx, restored.c, async receipt => {
+      const [prepared] = await tx.$queryRaw<{ effects: Plan[] }[]>`SELECT effects FROM diagnostic_source_commands WHERE id=${receipt.receiptId}::uuid`;
+      expect(present(prepared).effects.filter(e => e.table === "sessions")).toEqual([]);
+      await restored.write(tx);
+    }));
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toMatchObject({ suspendedAt: null, suspendedById: null, suspensionReason: null });
+    expect(await prisma.session.count({ where: { userId } })).toBe(0);
+    expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
+  });
+
+  it.each(["role", "deletionScheduledAt", "displayName", "wrong actor", "unchanged", "missing by", "missing reason", "extra User", "Session row", "wrong root"] as const)("moderation refuses %s intent before work", async kind => {
+    const a = await connect(), m = await moderationPlan(a, new Date());
+    const foreign = randomUUID();
+    await prisma.user.create({ data: { id: foreign, email: `${foreign}@moderation.invalid` } });
+    let rows = [m.plan], roots = m.c.roots;
+    if (["role", "deletionScheduledAt", "displayName"].includes(kind)) present(m.plan.next)[kind] = kind === "role" ? "admin" : kind === "displayName" ? "unauthorized change" : new Date().toISOString();
+    if (kind === "wrong actor") present(m.plan.next)["suspendedById"] = foreign;
+    if (kind === "missing by") present(m.plan.next)["suspendedById"] = null;
+    if (kind === "missing reason") present(m.plan.next)["suspensionReason"] = null;
+    if (kind === "unchanged") m.plan.next = (m.plan.expected as { source: Row }).source;
+    if (kind === "extra User") rows = [...rows, await update(a, "users", { id: foreign }, { suspendedAt: null })];
+    if (kind === "Session row") rows = [...rows, { table: "sessions", key: { id: sessionId }, verb: "delete", expected: { source: await source(a, "sessions", { id: sessionId }) }, next: null }];
+    if (kind === "wrong root") roots = [{ table: "users", key: { id: foreign } }];
+    const before = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx, { ...m.c, roots, rows } as DiagnosticSourceCommand, async () => {
+      throw new Error("invalid moderation reached work");
+    }))).rejects.toThrow(kind === "Session row" ? "diagnostic_source_row" : "diagnostic_source_moderation_intent");
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(before);
+    expect(await prisma.session.count({ where: { userId } })).toBe(1);
+    expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
+  });
+
+  it.each(["wrong User", "wrong fields", "extra Session"] as const)("a live moderation receipt refuses an actual %s effect", async kind => {
+    const a = await connect(), m = await moderationPlan(a, new Date()), foreign = randomUUID(), sid = randomUUID();
+    await prisma.user.create({ data: { id: foreign, email: `${foreign}@moderation.invalid` } });
+    await prisma.session.create({ data: { id: sid, userId: foreign, refreshTokenHash: sid, expiresAt: new Date(Date.now()+600_000) } });
+    const before = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx, m.c, async () => {
+      if (kind === "wrong User") await tx.user.update({ where: { id: foreign }, data: { suspendedAt: new Date() } });
+      else if (kind === "wrong fields") await tx.user.update({ where: { id: userId }, data: { role: "admin" } });
+      else { await m.write(tx); await tx.session.delete({ where: { id: sid } }); }
+    }))).rejects.toThrow(kind === "wrong fields" ? "diagnostic_source_effect_mismatch" : "diagnostic_source_uncovered_effect");
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(before);
+    expect(await prisma.session.count({ where: { id: { in: [sessionId, sid] } } })).toBe(2);
+    expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
+  });
+
+  it("moderation rejects naked fields, missing/foreign/finished receipts and second or late preparation", async () => {
+    const a = await connect(), m = await moderationPlan(a, new Date());
+    for (const data of [{ suspendedAt: new Date() }, { suspensionReason: "naked" }, { suspendedById: m.c.actorUserId }]) {
+      await expect(prisma.user.update({ where: { id: userId }, data })).rejects.toThrow("diagnostic_source_unprepared");
+    }
+    const fake = { receiptId: randomUUID() } as PreparedDiagnosticSource;
+    await expect(prisma.$transaction(tx => assertDiagnosticSourceCommand(tx, fake, "user_eligibility"))).rejects.toThrow("diagnostic_source_receipt");
+    let finished = fake;
+    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx, m.c, async receipt => {
+      finished = receipt;
+      await assertDiagnosticSourceCommand(tx, receipt, "user_eligibility");
+      await expect(prisma.$transaction(other => assertDiagnosticSourceCommand(other, receipt, "user_eligibility"))).rejects.toThrow("diagnostic_source_receipt");
+      await m.write(tx);
+    }));
+    await expect(prisma.$transaction(tx => assertDiagnosticSourceCommand(tx, finished, "user_eligibility"))).rejects.toThrow("diagnostic_source_receipt");
+    const restore = await moderationPlan(a, null);
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx, restore.c, () =>
+      withDiagnosticSourceCommand(tx, restore.c, async () => undefined)))).rejects.toThrow("diagnostic_source_nested");
+    await expect(prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM users WHERE id=${userId} FOR UPDATE`;
+      await withDiagnosticSourceCommand(tx, restore.c, () => restore.write(tx));
+    })).rejects.toThrow("diagnostic_source_preheld_lock");
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toMatchObject({ suspendedAt: expect.any(Date) });
+    expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
+  });
+
+  it.each([false, true])("suspension versus first capture holds the same graph before effects, captureFirst=%s", async captureFirst => {
+    const a = await connect(), observer = await connect();
+    const oid = await newOrder(a, { audience: "listing_public", listingId });
+    const grant = await ownershipGrant(a, oid);
+    const observation = await observationPlans(a, oid, { method: "vin", vin: "AAA", observedAt: new Date().toISOString(), mileageKm: 100, manualReference: null }, grant);
+    const capture = sourceCommand("observation_append", observation.plans), moderation = await moderationPlan(a, new Date());
+    let firstPid = 0, secondPid = 0;
+    let enter: () => void = () => { throw new Error("missing moderation barrier"); };
+    let release: () => void = () => { throw new Error("missing release"); };
+    let start: () => void = () => { throw new Error("missing second backend"); };
+    const ready = new Promise<void>(resolve => { enter=resolve; }), hold = new Promise<void>(resolve => { release=resolve; }), secondReady = new Promise<void>(resolve => { start=resolve; });
+    const first = prisma.$transaction(async tx => {
+      firstPid = present((await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() pid`)[0]).pid;
+      await withDiagnosticSourceCommand(tx, captureFirst ? capture : moderation.c, async receipt => {
+        enter(); await hold;
+        if (!captureFirst) await moderation.write(tx);
+        else {
+          await tx.$executeRaw`UPDATE inspection_orders SET "observedVehicle"=${JSON.stringify(observation.raw["observation"])}::jsonb,version=version+1 WHERE id=${oid}`;
+          await tx.$executeRaw`INSERT INTO diagnostic_identity_records SELECT (jsonb_populate_record(NULL::diagnostic_identity_records,${JSON.stringify(observation.raw)}::jsonb)).*`;
+          await tx.$executeRaw`INSERT INTO diagnostic_ownership_components SELECT (jsonb_populate_record(NULL::diagnostic_ownership_components,${JSON.stringify(observation.component)}::jsonb)).*`;
+          await sealDiagnosticFirstObservation(tx, receipt, oid, observation.rawId);
+        }
+      });
+    });
+    await ready;
+    const second = prisma.$transaction(async tx => {
+      secondPid = present((await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() pid`)[0]).pid; start();
+      await withDiagnosticSourceCommand(tx, captureFirst ? moderation.c : capture, async () => { throw new Error("changed graph reached work"); });
+    }).then(() => null, (error: unknown) => error);
+    await secondReady;
+    try {
+      const deadline = Date.now()+5000; let waiting = false;
+      while (Date.now()<deadline) {
+        if (present((await observer.query<{ blocked: boolean }>("SELECT $2::int=ANY(pg_blocking_pids($1::int)) blocked", [secondPid,firstPid])).rows[0]).blocked) { waiting=true; break; }
+      }
+      expect(waiting).toBe(true);
+    } finally { release(); }
+    await first;
+    const error = await second;
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/diagnostic_source_(graph_changed|stale)/);
+    expect(await anchor(oid)).toMatchObject({ state: captureFirst ? "unchanged" : "pending", firstRecordId: captureFirst ? observation.rawId : null });
+    expect(await prisma.diagnosticIdentityRecord.count({ where: { orderId: oid } })).toBe(captureFirst ? 1 : 0);
+    expect(await prisma.session.count({ where: { userId } })).toBe(captureFirst ? 1 : 0);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toMatchObject({ suspendedAt: captureFirst ? null : expect.any(Date) });
+    expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
+  });
+
 });
