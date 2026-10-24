@@ -2114,3 +2114,5 @@ model CampaignPreparation {
 // Dormant Message absence and Business enquiry effects: 20261024090000_diagnostic_message_enquiry_fences.
 
 // Dormant Sign-in Method, intake selection and object ownership: 20261024100000_diagnostic_signin_intake_object_owners.
+
+// Dormant ordinary User INSERT destination fence: 20261024110000_diagnostic_user_insert_fence.

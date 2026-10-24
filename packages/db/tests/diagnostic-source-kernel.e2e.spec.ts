@@ -2224,13 +2224,14 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     // Both columns are finite fixture identifiers, never request interpolation.
     return client.query(`INSERT INTO users(id,"${channel}","${channel}VerifiedAt","suspendedAt","suspendedById","suspensionReason","updatedAt") VALUES($1,$2,$3,CURRENT_TIMESTAMP,$4,'SQL fixture suspension',CURRENT_TIMESTAMP)`,[id,destination,stamp,suspender]);
   }
+  let userInsertPhoneSerial = 100000;
   function insertDestination(channel: "phone" | "email") {
-    return channel === "phone" ? `+99365${String(Math.floor(Math.random()*1_000_000)).padStart(6,"0")}` : `${randomUUID()}@insert-fence.invalid`;
+    return channel === "phone" ? `+99366${userInsertPhoneSerial += 2}` : `${randomUUID()}@insert-fence.invalid`;
   }
 
   it.each(["phone","email"] as const)("app-role %s INSERT refuses a prepared destination before its unique entry/FK, while a different destination can wait on the genuine FK", async channel => {
     const role = await userInsertRole(), a = await connect(), b = await connect(), observer = await connect();
-    const destination = insertDestination(channel), otherDestination = insertDestination(channel), stamp = new Date(), rejected = randomUUID(), unrelated = randomUUID();
+    const destination = insertDestination(channel), otherDestination = channel === "phone" ? `${destination.slice(0,-1)}${(Number(destination.at(-1))+1)%10}` : `other-${destination}`, stamp = new Date(), rejected = randomUUID(), unrelated = randomUUID();
     const before = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
     const foreignId = randomUUID(); await prisma.user.create({ data: { id: foreignId,email: `${foreignId}@foreign.invalid`,emailVerifiedAt: stamp } });
     const foreign = await prisma.user.findUniqueOrThrow({ where: { id: foreignId } });
