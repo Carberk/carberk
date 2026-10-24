@@ -162,3 +162,31 @@ it("discarding classification input clears the real form rather than only its di
  fireEvent.change(screen.getByLabelText(`${c.purpose} · ${c.required}`),{target:{value:"Private unsent classification"}});fireEvent.click(screen.getByRole("button",{name:c.link}));await screen.findByRole("region",{name:c.leave});fireEvent.click(screen.getByRole("button",{name:c.discard}));
  expect(screen.queryByDisplayValue("Private unsent classification")).toBeNull();expect(screen.getByRole("button",{name:c.search})).toBeTruthy();
 });
+
+it("validates correction fields on blur and links an ordered error summary without mutating", async () => {
+ setup(); fireEvent.click(await screen.findByRole("button", {name:c.visit})); fireEvent.click(screen.getByRole("button", {name:c.loadIdentity})); fireEvent.click(await screen.findByRole("button", {name:c.correction}));
+ const purpose=screen.getByLabelText(`${c.purpose} · ${c.required}`);
+ expect(purpose.getAttribute("aria-invalid")).toBeNull(); fireEvent.change(purpose,{target:{value:" "}}); fireEvent.blur(purpose);
+ expect(purpose.getAttribute("aria-invalid")).toBe("true"); expect(document.getElementById(purpose.getAttribute("aria-describedby")!.split(" ").at(-1)!)).toBeTruthy();
+ const capture=screen.getByRole("button",{name:c.capture}); expect(capture.getAttribute("aria-disabled")).toBe("true"); expect(capture.hasAttribute("disabled")).toBe(false); fireEvent.click(capture);
+ const summary=screen.getByRole("region",{name:c.invalidFields}); const first=within(summary).getAllByRole("link")[0]!; fireEvent.click(first);
+ expect(document.activeElement?.id).toBe(first.getAttribute("href")!.slice(1)); expect(writes).toEqual([]);
+});
+it("limits identifiers to twenty and returns removal focus to the preceding identifier", async()=>{
+ setup();fireEvent.click(await screen.findByRole("button",{name:c.visit}));fireEvent.click(screen.getByRole("button",{name:c.loadIdentity}));fireEvent.click(await screen.findByRole("button",{name:c.correction}));
+ const add=screen.getByRole("button",{name:c.add});for(let n=1;n<20;n++)fireEvent.click(add);
+ expect(add.getAttribute("aria-disabled")).toBe("true");fireEvent.click(add);expect(screen.getAllByRole("button",{name:c.remove})).toHaveLength(20);
+ fireEvent.click(screen.getAllByRole("button",{name:c.remove})[19]!);expect(document.activeElement?.textContent).toBe(`${c.identifier} 19`);
+});
+it("keeps unsent input on Escape only inside the leave choice and restores the invoking focus", async()=>{
+ setup(proofId);const input=await screen.findByRole("textbox",{name:`${base.reason} · ${c.required}`});fireEvent.change(input,{target:{value:"Keep private reason"}});
+ const refresh=screen.getByRole("button",{name:base.refresh});refresh.focus();fireEvent.click(refresh);const region=await screen.findByRole("region",{name:c.leave});
+ expect(region.contains(document.activeElement)).toBe(true);fireEvent.keyDown(input,{key:"Escape"});expect(screen.getByRole("region",{name:c.leave})).toBeTruthy();
+ fireEvent.keyDown(within(region).getByRole("button",{name:c.keep}),{key:"Escape"});expect(screen.queryByRole("region",{name:c.leave})).toBeNull();expect(document.activeElement).toBe(refresh);expect(screen.getByDisplayValue("Keep private reason")).toBeTruthy();
+});
+it("stops a longer receipt cursor cycle without exposing a retry command", async()=>{
+ const real=fetch;let cursorPage=0;
+ vi.stubGlobal("fetch",async(...args:Parameters<typeof fetch>)=>String(args[0]).includes("continuity-requests")?Response.json({requests:[],nextCursor:["receipt-a","receipt-b","receipt-a"][cursorPage++]??null}):real(...args));
+ setup();await link();fireEvent.click(screen.getByRole("button",{name:c.status}));fireEvent.click(await screen.findByRole("button",{name:c.continue}));await waitFor(()=>expect(cursorPage).toBe(2));fireEvent.click(screen.getByRole("button",{name:c.continue}));await screen.findByText(c.unavailable);
+ expect(screen.queryByRole("button",{name:c.retryExact})).toBeNull();expect(writes).toEqual([]);
+});
