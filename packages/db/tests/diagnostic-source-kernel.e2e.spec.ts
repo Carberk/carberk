@@ -1762,4 +1762,433 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(f.prior);
     expect(await prisma.auditLog.findUnique({ where: { id: f.audit.id } })).toBeNull();
   });
+  // Opposing writers use ordinary SQL and the actual Conversation adapter. These
+  // are authored PostgreSQL scenarios; offline verification never imports them.
+  async function genuineSavedMessage(f: Awaited<ReturnType<typeof adminModeration>>) {
+    const conversation = await prisma.conversation.create({ data: { listingId,buyerId: f.actor,sellerId: userId } });
+    const message = await prisma.message.create({ data: { id: String(f.audit.details.messageId),conversationId: conversation.id,senderId: userId,kind: "text",body: "Original reported message" } });
+    await prisma.contentReport.update({ where: { id: f.reportId },data: { messageContext: {
+      messageId: message.id,conversationId: conversation.id,listingId,buyerId: f.actor,sellerId: userId,senderId: userId,
+      createdAt: message.createdAt.toISOString(),body: message.body,deletedAt: null,surroundingMessages: [],
+    } } });
+    // Polymorphic reports survive physical Message deletion by design.
+    await prisma.message.delete({ where: { id: message.id } });
+  }
+
+  async function messageOpponent(id: string, senderId: string, adapter: boolean) {
+    const buyer = randomUUID(), seller = randomUUID();
+    await prisma.user.createMany({ data: [{ id: buyer }, { id: seller }] });
+    const conversation = await prisma.conversation.create({ data: { listingId, buyerId: buyer, sellerId: seller } });
+    const data = { id, conversationId: conversation.id, senderId, kind: "text" as const, body: "Ordinary replacement", metadata: null,
+      createdAt: new Date(), deletedAt: null, clientMessageId: null };
+    const write = async () => {
+      if (!adapter) {
+        await pool.query('INSERT INTO messages(id,"conversationId","senderId",kind,body) VALUES($1,$2,$3,\'text\',$4)', [id,conversation.id,senderId,data.body]);
+        return;
+      }
+      const path = fileURLToPath(new URL("../../../apps/api/src/modules/conversations/infrastructure/PrismaConversationRepository.ts", import.meta.url));
+      const { PrismaConversationRepository: Repository } = await import(/* @vite-ignore */ path) as {
+        PrismaConversationRepository: new (db: PrismaClient) => { saveMessage(message: typeof data): Promise<void> };
+      };
+      await new Repository(prisma).saveMessage(data);
+    };
+    return { conversation, write };
+  }
+
+  it.each([false,true])("prepared missing-Message fallback fences ordinary insertion (adapter=%s) without a Conversation lock deadlock", async adapter => {
+    const f = await adminModeration("snapshot"), foreign = randomUUID();
+    await prisma.user.create({ data: { id: foreign } });
+    await genuineSavedMessage(f);
+    const opponent = await messageOpponent(String(f.audit.details.messageId),foreign,adapter);
+    const report = await prisma.contentReport.findUniqueOrThrow({ where: { id: f.reportId } });
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx,f.c,async () => {
+      // T1 holds absent m. T2 already takes Conversation before its INSERT in
+      // the real adapter. Its nonblocking trigger must refuse before FK work.
+      await expect(opponent.write()).rejects.toThrow("diagnostic_source_message_busy");
+      await f.write(tx);
+      throw new Error("fenced moderation rollback");
+    }))).rejects.toThrow("fenced moderation rollback");
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(f.prior);
+    expect(await prisma.contentReport.findUniqueOrThrow({ where: { id: f.reportId } })).toEqual(report);
+    expect(await prisma.conversation.findUniqueOrThrow({ where: { id: opponent.conversation.id } })).toEqual(opponent.conversation);
+    expect(await prisma.auditLog.findUnique({ where: { id: f.audit.id } })).toBeNull();
+    // Rollback releases the key; the very same supported writer now succeeds.
+    await opponent.write();
+    expect(await prisma.message.findUniqueOrThrow({ where: { id: String(f.audit.details.messageId) } })).toMatchObject({ senderId: foreign });
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx,f.c,() => f.write(tx)))).rejects.toThrow("diagnostic_source_moderation_intent");
+    expect(await prisma.contentReport.findUniqueOrThrow({ where: { id: f.reportId } })).toEqual(report);
+  });
+
+  it("insert-first refuses preparation until the Message writer ends, then gives the live sender precedence", async () => {
+    const f = await adminModeration("snapshot"), foreign = randomUUID(), a = await connect(), b = await connect();
+    await prisma.user.create({ data: { id: foreign } });
+    await genuineSavedMessage(f);
+    const opponent = await messageOpponent(String(f.audit.details.messageId),foreign,false);
+    await begin(b);
+    await b.query('INSERT INTO messages(id,"conversationId","senderId",kind) VALUES($1,$2,$3,\'text\')', [f.audit.details.messageId,opponent.conversation.id,foreign]);
+    await begin(a);
+    await expect(prepare(a,f.c)).rejects.toThrow("diagnostic_source_message_busy");
+    await a.query("ROLLBACK"); await b.query("COMMIT");
+    await begin(a);
+    await expect(prepare(a,f.c)).rejects.toThrow("diagnostic_source_moderation_intent");
+    await a.query("ROLLBACK");
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(f.prior);
+    expect(await prisma.contentReport.findUniqueOrThrow({ where: { id: f.reportId } })).toMatchObject({ status: "pending" });
+    expect(await prisma.auditLog.findUnique({ where: { id: f.audit.id } })).toBeNull();
+  });
+
+  it("primary-key UPDATE cannot manufacture a live Message behind the prepared fallback", async () => {
+    const f = await adminModeration("snapshot"), oldId = randomUUID();
+    await genuineSavedMessage(f);
+    const opponent = await messageOpponent(oldId,f.actor,false); await opponent.write();
+    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx,f.c,async () => {
+      await expect(pool.query('UPDATE messages SET id=$1 WHERE id=$2',[f.audit.details.messageId,oldId])).rejects.toThrow("diagnostic_source_message_busy");
+      await f.write(tx);
+    }));
+    expect(await prisma.message.findUnique({ where: { id: String(f.audit.details.messageId) } })).toBeNull();
+    expect(await prisma.message.findUniqueOrThrow({ where: { id: oldId } })).toMatchObject({ senderId: f.actor });
+    expect(await prisma.contentReport.findUniqueOrThrow({ where: { id: f.reportId } })).toMatchObject({ status: "actioned" });
+  });
+
+  async function enquiryFixture(assigned = true) {
+    const business = randomUUID(), otherBusiness = randomUUID(), member = randomUUID(), buyer = randomUUID(), seller = randomUUID(), foreignAssignee = randomUUID();
+    await guards(false);
+    await prisma.user.createMany({ data: [{ id: buyer },{ id: seller },{ id: foreignAssignee }] });
+    await prisma.dealership.createMany({ data: [{ id: business,slug: business,name: "Membership Business" },{ id: otherBusiness,slug: otherBusiness,name: "Assignee-only Business" }] });
+    await prisma.dealershipMember.create({ data: { id: member,userId,dealershipId: business,role: "sales" } });
+    // U is neither buyer nor seller, and the second target is in a Business
+    // outside U's membership. Both still belong to the real requeue trigger.
+    const own = await prisma.conversation.create({ data: { listingId,buyerId: buyer,sellerId: seller,businessId: business,assigneeId: assigned ? userId : null,version: 3 } });
+    const other = await prisma.conversation.create({ data: { listingId,buyerId: seller,sellerId: buyer,businessId: otherBusiness,assigneeId: assigned ? userId : null,version: 7,enquiryState: "closed" } });
+    const foreign = await prisma.conversation.create({ data: { listingId,buyerId: foreignAssignee,sellerId: seller,businessId: otherBusiness,assigneeId: foreignAssignee,version: 1 } });
+    const foreignAudit = await prisma.businessEnquiryAudit.create({ data: { conversationId: foreign.id,version: 1,action: "assigned",assigneeId: foreignAssignee,enquiryState: "open" } });
+    await guards(true);
+    return { business,otherBusiness,member,own,other,foreign,foreignAudit };
+  }
+
+  it.each(["suspend","schedule","member-delete","member-status","member-same-status","member-role"] as const)("complete %s preserves every assigned/assignee-only enquiry effect, exact audit and rollback", async mode => {
+    const f = await enquiryFixture(), a = await connect();
+    const moderation = mode === "suspend" ? await adminModeration("direct") : null;
+    const stamp = new Date("2030-01-01Z");
+    if (mode === "member-same-status" || mode === "member-role") {
+      // Start suspended without running the departure trigger; then assign the
+      // supported fixture. Role-only UPDATE must not invent a status trigger.
+      await guards(false);
+      await prisma.dealershipMember.update({ where: { id: f.member },data: { status: "suspended" } });
+      await prisma.conversation.updateMany({ where: { id: { in: [f.own.id,f.other.id] } },data: { assigneeId: userId } });
+      await prisma.businessEnquiryAudit.deleteMany({ where: { conversationId: { in: [f.own.id,f.other.id] } } });
+      await prisma.conversation.update({ where: { id: f.own.id },data: { version: 3,updatedAt: f.own.updatedAt } });
+      await prisma.conversation.update({ where: { id: f.other.id },data: { version: 7,updatedAt: f.other.updatedAt } });
+      await guards(true);
+    }
+    const memberBefore = await prisma.dealershipMember.findUniqueOrThrow({ where: { id: f.member } });
+    const userBefore = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    let c: DiagnosticSourceCommand;
+    if (moderation) c = moderation.c;
+    else if (mode === "schedule") c = sourceCommand("account_schedule",[await update(a,"users",{ id: userId },{ deletionScheduledAt: stamp.toISOString() })]);
+    else if (mode === "member-delete") c = sourceCommand("member_remove",[{ table: "dealership_members",key: { id: f.member },verb: "delete",expected: { source: await source(a,"dealership_members",{ id: f.member }) },next: null }]);
+    else c = sourceCommand("member_eligibility",[await update(a,"dealership_members",{ id: f.member },mode === "member-role" ? { role: "owner" } : { status: "suspended" })]);
+    const writes = async (tx: Prisma.TransactionClient) => {
+      if (moderation) await moderation.write(tx);
+      else if (mode === "schedule") {
+        // Actual User-first account sequence: membership's second requeue is
+        // empty, and must not increment a version or append another audit.
+        await tx.user.update({ where: { id: userId },data: { deletionScheduledAt: stamp } });
+        await tx.dealershipMember.delete({ where: { id: f.member } });
+        const [id] = await tx.$queryRaw<{ id: string }[]>`SELECT diagnostic_source_account_audit_id(${userId},'membership') id`;
+        await tx.auditLog.create({ data: { id: present(id).id,actorId: userId,action: "BUSINESS_MEMBERSHIP_ENDED_FOR_DELETION",targetType: "Dealership",targetId: f.business,details: { role: "sales",recoveryRequired: false } } });
+      } else if (mode === "member-delete") await tx.dealershipMember.delete({ where: { id: f.member } });
+      else await tx.dealershipMember.update({ where: { id: f.member },data: mode === "member-role" ? { role: "owner" } : { status: "suspended" } });
+    };
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx,c,async () => {
+      await writes(tx); throw new Error("enquiry complete rollback");
+    }))).rejects.toThrow("enquiry complete rollback");
+    expect(await prisma.conversation.findUniqueOrThrow({ where: { id: f.own.id } })).toEqual(f.own);
+    expect(await prisma.conversation.findUniqueOrThrow({ where: { id: f.other.id } })).toEqual(f.other);
+    expect(await prisma.dealershipMember.findUniqueOrThrow({ where: { id: f.member } })).toEqual(memberBefore);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(userBefore);
+    expect(await prisma.businessEnquiryAudit.count({ where: { conversationId: { in: [f.own.id,f.other.id] } } })).toBe(0);
+    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx,c,async receipt => {
+      const [r] = await tx.$queryRaw<{ effects: { table: string; key: { id: string }; next: Row }[]; scope: { table: string; key: { id: string } }[] }[]>`SELECT effects,scope FROM diagnostic_source_commands WHERE id=${receipt.receiptId}::uuid`;
+      for (const id of [f.business,f.otherBusiness]) expect(present(r).scope).toContainEqual(expect.objectContaining({ table: "dealerships",key: { id } }));
+      await writes(tx);
+      for (const effect of present(r).effects.filter(e => e.table === "business_enquiry_audits")) {
+        const audit = await tx.businessEnquiryAudit.findUnique({ where: { id: effect.key.id } });
+        if (mode === "member-role") { expect(audit).toBeNull(); continue; }
+        expect(audit).toMatchObject({ id: effect.key.id,actorId: null,assigneeId: null,previousAssigneeId: userId,
+          action: mode === "suspend" || mode === "schedule" ? "user_inactive" : "membership_revoked" });
+        const [actual] = await tx.$queryRaw<{ row: Row }[]>`SELECT diagnostic_source_project(to_jsonb(a),diagnostic_source_meta('business_enquiry_audits')->'fields') row FROM business_enquiry_audits a WHERE id=${effect.key.id}`;
+        expect(present(actual).row).toEqual(effect.next);
+      }
+    }));
+    for (const before of [f.own,f.other]) expect(await prisma.conversation.findUniqueOrThrow({ where: { id: before.id } })).toMatchObject({
+      assigneeId: mode === "member-role" ? userId : null,version: before.version+(mode === "member-role" ? 0 : 1),enquiryState: before.enquiryState,
+    });
+    expect(await prisma.businessEnquiryAudit.count({ where: { conversationId: { in: [f.own.id,f.other.id] } } })).toBe(mode === "member-role" ? 0 : 2);
+    expect(await prisma.conversation.findUniqueOrThrow({ where: { id: f.foreign.id } })).toEqual(f.foreign);
+    expect(await prisma.businessEnquiryAudit.findUniqueOrThrow({ where: { id: f.foreignAudit.id } })).toEqual(f.foreignAudit);
+    expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
+  });
+
+  it.each(["insert","update"] as const)("prepared departure fences a concurrent ordinary assignment %s without reverse-order waiting", async mode => {
+    const f = await enquiryFixture(false), m = await adminModeration("direct"), b = await connect();
+    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx,m.c,async () => {
+      await begin(b);
+      await b.query('SELECT id FROM dealerships WHERE id=$1 FOR UPDATE',[f.otherBusiness]);
+      if (mode === "update") await expect(b.query('UPDATE conversations SET "assigneeId"=$1 WHERE id=$2',[userId,f.other.id])).rejects.toThrow("diagnostic_source_assignment_busy");
+      else await expect(b.query('INSERT INTO conversations(id,"listingId","buyerId","sellerId","businessId","assigneeId","updatedAt") VALUES($1,$2,$3,$4,$5,$6,CURRENT_TIMESTAMP)',[randomUUID(),listingId,m.actor,m.actor,f.otherBusiness,userId])).rejects.toThrow("diagnostic_source_assignment_busy");
+      await b.query("ROLLBACK"); await m.write(tx);
+    }));
+    expect(await prisma.conversation.findUniqueOrThrow({ where: { id: f.other.id } })).toEqual(f.other);
+    expect(await prisma.conversation.findUniqueOrThrow({ where: { id: f.foreign.id } })).toEqual(f.foreign);
+  });
+
+  it("assignment-first forces fresh departure discovery after the User key wait", async () => {
+    const f = await enquiryFixture(false), m = await adminModeration("direct"), a = await connect(), b = await connect(), observer = await connect();
+    await begin(b);
+    await b.query('UPDATE conversations SET "assigneeId"=$1 WHERE id=$2',[userId,f.other.id]);
+    await begin(a);
+    const pending = prepare(a,m.c).then(() => null,(error: unknown) => error);
+    await waitBlocked(observer,a,b); await b.query("COMMIT");
+    expect(String(await pending)).toContain("diagnostic_source_graph_changed"); await a.query("ROLLBACK");
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(m.prior);
+    expect(await prisma.conversation.findUniqueOrThrow({ where: { id: f.other.id } })).toMatchObject({ assigneeId: userId,version: 7 });
+    // A fresh outer preparation now discovers the committed assignment normally.
+    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx,m.c,() => m.write(tx)));
+    expect(await prisma.conversation.findUniqueOrThrow({ where: { id: f.other.id } })).toMatchObject({ assigneeId: null,version: 8 });
+    expect(await prisma.businessEnquiryAudit.findMany({ where: { conversationId: f.other.id } })).toMatchObject([{ action: "user_inactive",previousAssigneeId: userId,version: 8 }]);
+    expect(await prisma.conversation.findUniqueOrThrow({ where: { id: f.foreign.id } })).toEqual(f.foreign);
+  });
+
+  it("a member receipt grants no early assignment clearing or caller-generated enquiry audit authority", async () => {
+    const f = await enquiryFixture(), a = await connect();
+    const c = sourceCommand("member_eligibility",[await update(a,"dealership_members",{ id: f.member },{ status: "suspended" })]);
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx,c,async () => {
+      await tx.conversation.update({ where: { id: f.own.id },data: { assigneeId: null,version: 4 } });
+    }))).rejects.toThrow("diagnostic_source_enquiry_effect_mismatch");
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx,c,async receipt => {
+      const [r] = await tx.$queryRaw<{ id: string }[]>`SELECT e->'key'->>'id' id FROM diagnostic_source_commands r,LATERAL jsonb_array_elements(r.effects) e WHERE r.id=${receipt.receiptId}::uuid AND e->>'table'='business_enquiry_audits' LIMIT 1`;
+      await tx.businessEnquiryAudit.create({ data: { id: present(r).id,conversationId: f.own.id,version: 4,action: "membership_revoked",previousAssigneeId: userId,enquiryState: "open" } });
+    }))).rejects.toThrow("diagnostic_source_enquiry_effect_mismatch");
+    expect(await prisma.conversation.findUniqueOrThrow({ where: { id: f.own.id } })).toEqual(f.own);
+    expect(await prisma.businessEnquiryAudit.count({ where: { conversationId: { in: [f.own.id,f.other.id] } } })).toBe(0);
+    expect(await prisma.conversation.findUniqueOrThrow({ where: { id: f.foreign.id } })).toEqual(f.foreign);
+  });
+
+  it("a Message key holder waiting on a prepared Conversation FK cannot deadlock source preparation", async () => {
+    const f = await enquiryFixture(), m = await adminModeration("snapshot"); await genuineSavedMessage(m);
+    const a = await connect(), b = await connect(), writer = await connect(), observer = await connect();
+    const conversations = [f.own,f.other].sort((x,y) => x.id.localeCompare(y.id));
+    const first = present(conversations[0]), last = present(conversations[1]);
+    await begin(b); await b.query('SELECT id FROM conversations WHERE id=$1 FOR UPDATE',[last.id]);
+    await begin(a);
+    const preparing = prepare(a,m.c).then(() => null,(error: unknown) => error);
+    // Preparation has locked the first Conversation and waits on the second.
+    await waitBlocked(observer,a,b);
+    await begin(writer);
+    const inserting = writer.query('INSERT INTO messages(id,"conversationId","senderId",kind) VALUES($1,$2,$3,\'text\')',[m.audit.details.messageId,first.id,m.actor]);
+    await waitBlocked(observer,writer,a);
+    await b.query("COMMIT");
+    expect(String(await preparing)).toContain("diagnostic_source_message_busy");
+    await a.query("ROLLBACK"); await inserting; await writer.query("COMMIT");
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(m.prior);
+    expect(await prisma.conversation.findUniqueOrThrow({ where: { id: first.id } })).toEqual(first);
+    expect(await prisma.contentReport.findUniqueOrThrow({ where: { id: m.reportId } })).toMatchObject({ status: "pending" });
+    expect(await prisma.message.findUniqueOrThrow({ where: { id: String(m.audit.details.messageId) } })).toMatchObject({ senderId: m.actor });
+  });
+
+  it("unsuspension while deletion remains scheduled still requeues newly assigned enquiries without revoking Sessions", async () => {
+    await guards(false);
+    await prisma.user.update({ where: { id: userId },data: { deletionScheduledAt: new Date("2030-01-01Z") } });
+    await guards(true);
+    const m = await adminModeration("unsuspend"), f = await enquiryFixture();
+    const sessions = await prisma.session.findMany({ where: { userId } });
+    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx,m.c,() => m.write(tx)));
+    expect(await prisma.session.findMany({ where: { userId } })).toEqual(sessions);
+    for (const before of [f.own,f.other]) {
+      expect(await prisma.conversation.findUniqueOrThrow({ where: { id: before.id } })).toMatchObject({ assigneeId: null,version: before.version+1 });
+      expect(await prisma.businessEnquiryAudit.findMany({ where: { conversationId: before.id } })).toMatchObject([{ action: "user_inactive",previousAssigneeId: userId,version: before.version+1 }]);
+    }
+    expect(await prisma.conversation.findUniqueOrThrow({ where: { id: f.foreign.id } })).toEqual(f.foreign);
+  });
+
+  it("member replacement requeues the departed assignee across Businesses before installing a new member", async () => {
+    const f = await enquiryFixture(), a = await connect(), replacementUser = randomUUID(), replacement = randomUUID();
+    await prisma.user.create({ data: { id: replacementUser } });
+    const old = await source(a,"dealership_members",{ id: f.member });
+    const next = await projection(a,"dealership_members",{ id: replacement,userId: replacementUser,dealershipId: f.business,role: "sales",status: "active" });
+    const c = sourceCommand("member_replace",[
+      { table: "dealership_members",key: { id: f.member },verb: "delete",expected: { source: old },next: null },
+      { table: "dealership_members",key: { id: replacement },verb: "insert",expected: "absent",next },
+    ]);
+    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx,c,async () => {
+      await tx.dealershipMember.delete({ where: { id: f.member } });
+      await tx.dealershipMember.create({ data: { id: replacement,userId: replacementUser,dealershipId: f.business,role: "sales" } });
+    }));
+    for (const before of [f.own,f.other]) {
+      expect(await prisma.conversation.findUniqueOrThrow({ where: { id: before.id } })).toMatchObject({ assigneeId: null,version: before.version+1 });
+      expect(await prisma.businessEnquiryAudit.findMany({ where: { conversationId: before.id } })).toMatchObject([{ action: "membership_revoked",previousAssigneeId: userId,version: before.version+1 }]);
+    }
+    expect(await prisma.dealershipMember.findUnique({ where: { id: f.member } })).toBeNull();
+    expect(await prisma.dealershipMember.findUniqueOrThrow({ where: { id: replacement } })).toMatchObject({ userId: replacementUser,status: "active" });
+    expect(await prisma.conversation.findUniqueOrThrow({ where: { id: f.foreign.id } })).toEqual(f.foreign);
+  });
+
+  async function signInWriter(tx: Prisma.TransactionClient) {
+    const path = fileURLToPath(new URL("../../../apps/api/src/modules/identity/infrastructure/PrismaUserRepository.ts", import.meta.url));
+    const { PrismaUserRepository: Repository } = await import(/* @vite-ignore */ path) as {
+      PrismaUserRepository: new (db: Prisma.TransactionClient) => {
+        replaceSignInMethod(input: { userId: string; channel: "phone" | "email"; destination: string; verifiedAt: Date }): Promise<{ id: string }>;
+      };
+    };
+    return new Repository(tx);
+  }
+  it.each(["phone","email"] as const)("verified %s replacement uses its own finite operation and the real repository without unrelated effects", async channel => {
+    const a = await connect(), verifiedAt = new Date(), destination = channel === "phone" ? "+99365123456" : `${randomUUID()}@replacement.invalid`;
+    const before = await prisma.user.findUniqueOrThrow({ where: { id: userId } }), sessions = await prisma.session.findMany({ where: { userId } });
+    const plan = await update(a,"users",{ id: userId },{ [channel]: destination,[`${channel}VerifiedAt`]: verifiedAt.toISOString() });
+    const c = { ...sourceCommand("sign_in_method_change",[plan]),actorUserId: userId };
+    const write = async (tx: Prisma.TransactionClient) => (await signInWriter(tx)).replaceSignInMethod({ userId,channel,destination,verifiedAt });
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx,c,async () => { await write(tx); throw new Error("replacement rollback"); }))).rejects.toThrow("replacement rollback");
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(before);
+    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx,c,() => write(tx)));
+    const after = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    expect(after).toMatchObject({ [channel]: destination,[`${channel}VerifiedAt`]: verifiedAt });
+    expect({ ...after,[channel]: before[channel],[`${channel}VerifiedAt`]: before[channel === "phone" ? "phoneVerifiedAt" : "emailVerifiedAt"],updatedAt: before.updatedAt }).toEqual(before);
+    expect(await prisma.session.findMany({ where: { userId } })).toEqual(sessions);
+    expect(await prisma.auditLog.count({ where: { targetId: userId } })).toBe(0);
+  });
+
+  it.each(["unverified","both-pairs","foreign-actor","suspension"] as const)("Sign-in Method operation refuses %s without authorizing another User transition", async defect => {
+    const a = await connect(), destination = `${randomUUID()}@replacement.invalid`;
+    const changes: Row = { email: destination,emailVerifiedAt: defect === "unverified" ? null : new Date().toISOString() };
+    if (defect === "both-pairs") Object.assign(changes,{ phone: "+99365123457",phoneVerifiedAt: new Date().toISOString() });
+    if (defect === "suspension") changes["suspendedAt"]=new Date().toISOString();
+    const c = { ...sourceCommand("sign_in_method_change",[await update(a,"users",{ id: userId },changes)]),actorUserId: defect === "foreign-actor" ? randomUUID() : userId };
+    await begin(a); await expect(prepare(a,c)).rejects.toThrow("diagnostic_source_signin_intent"); await a.query("ROLLBACK");
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: userId } })).email).not.toBe(destination);
+  });
+
+  it("concurrent verified replacements retain destination fencing and the repository's taken-method error", async () => {
+    const a = await connect(), b = await connect(), observer = await connect(), other = randomUUID(), email = `${randomUUID()}@replacement.invalid`, stamp = new Date();
+    await prisma.user.create({ data: { id: other,email: `${other}@old.invalid`,emailVerifiedAt: stamp } });
+    const left = { ...sourceCommand("sign_in_method_change",[await update(a,"users",{ id: userId },{ email,emailVerifiedAt: stamp.toISOString() })]),actorUserId: userId };
+    const right = { ...sourceCommand("sign_in_method_change",[await update(b,"users",{ id: other },{ email,emailVerifiedAt: stamp.toISOString() })]),actorUserId: other };
+    await begin(a); const receipt = await prepare(a,left);
+    await begin(b); const waiting = prepare(b,right); await waitBlocked(observer,b,a);
+    await a.query('UPDATE users SET email=$1,"emailVerifiedAt"=$2 WHERE id=$3',[email,stamp,userId]); await finish(a,receipt); await a.query("COMMIT");
+    await waiting; await b.query("ROLLBACK");
+    const foreignBefore = await prisma.user.findUniqueOrThrow({ where: { id: other } });
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx,right,async () => (await signInWriter(tx)).replaceSignInMethod({ userId: other,channel: "email",destination: email,verifiedAt: stamp })))).rejects.toMatchObject({ code: "SIGN_IN_METHOD_TAKEN" });
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: other } })).toEqual(foreignBefore);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toMatchObject({ email });
+  });
+
+  async function objectOwners() {
+    const a = await connect(), id = randomUUID(), reportId = randomUUID();
+    await guards(false);
+    await prisma.diagnosticReportRecord.create({ data: { id: reportId,orderId: String(baseOrder["id"]),templateVersionId: String(baseOrder["templateVersionId"]),audience: "buyer_private",state: {} } });
+    await guards(true);
+    const next = await projection(a,"diagnostic_identity_provenance",{ id,orderId: baseOrder["id"],contentType: "image/jpeg",declaredSizeBytes: 1,rightsUntil: "2030-01-01T00:00:00",state: "staged",epoch: randomUUID(),cleanupAttempts: 0,createdById: userId,createdAt: new Date().toISOString() });
+    const c = sourceCommand("identity_material_change",[{ table: "diagnostic_identity_provenance",key: { id },verb: "insert",expected: "absent",next }]);
+    const provenance = (client: PoolClient) => client.query('INSERT INTO diagnostic_identity_provenance SELECT (jsonb_populate_record(NULL::diagnostic_identity_provenance,$1::jsonb)).*',[JSON.stringify(next)]);
+    const evidence = (client: PoolClient, evidenceId = id) => client.query('INSERT INTO diagnostic_evidence(id,"reportId","findingId","objectKey",sha256,"sizeBytes",mime,epoch,"createdById") VALUES($1,$2,\'finding\',$3,$4,1,\'image/jpeg\',$5,$6)',[evidenceId,reportId,`diagnostic-evidence/${evidenceId}/${"a".repeat(64)}`,"a".repeat(64),randomUUID(),userId]);
+    return { a,id,reportId,c,provenance,evidence };
+  }
+
+  it("report-evidence object ownership cannot deadlock a prepared provenance insertion through the Report FK", async () => {
+    const f = await objectOwners(), b = await connect(), observer = await connect();
+    await begin(f.a); await prepare(f.a,f.c);
+    await begin(b); const inserting = f.evidence(b);
+    await waitBlocked(observer,b,f.a);
+    // T2 owns object x and waits for T1's Report. T1's existing trigger must
+    // refuse instead of waiting for x. Its complete rollback releases the FK.
+    await expect(f.provenance(f.a)).rejects.toThrow("diagnostic_object_owner_busy");
+    await f.a.query("ROLLBACK"); await inserting; await b.query("COMMIT");
+    expect(await prisma.diagnosticIdentityProvenance.findUnique({ where: { id: f.id } })).toBeNull();
+    expect(await prisma.diagnosticEvidence.findUniqueOrThrow({ where: { id: f.id } })).toMatchObject({ reportId: f.reportId,state: "staged" });
+    await begin(f.a); await prepare(f.a,f.c);
+    await expect(f.provenance(f.a)).rejects.toThrow("diagnostic_object_owner_disjoint"); await f.a.query("ROLLBACK");
+  });
+
+  it("provenance-first refuses the opposite owner while supporting unrelated ordinary report evidence", async () => {
+    const f = await objectOwners(), b = await connect();
+    await begin(f.a); const receipt = await prepare(f.a,f.c); await f.provenance(f.a);
+    await begin(b); await expect(f.evidence(b)).rejects.toThrow("diagnostic_object_owner_busy"); await b.query("ROLLBACK");
+    await finish(f.a,receipt); await f.a.query("COMMIT");
+    await begin(b); await expect(f.evidence(b)).rejects.toThrow("diagnostic_object_owner_disjoint"); await b.query("ROLLBACK");
+    const other = randomUUID(); await f.evidence(b,other);
+    expect(await prisma.diagnosticEvidence.findUniqueOrThrow({ where: { id: other } })).toMatchObject({ reportId: f.reportId });
+    expect(await prisma.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: f.id } })).toMatchObject({ state: "staged",createdById: userId });
+  });
+
+  async function receptionSelection() {
+    const a = await connect(), selectedUser = randomUUID(), excludedUser = randomUUID(), centerId = String(baseOrder["centerId"]);
+    const selectedId = randomUUID(), excludedId = randomUUID();
+    await guards(false);
+    await prisma.user.createMany({ data: [{ id: selectedUser },{ id: excludedUser }] });
+    await prisma.staffGrant.createMany({ data: [{ userId: selectedUser,capability: "diagnostics.reception" },{ userId: excludedUser,capability: "diagnostics.reception" }] });
+    await prisma.diagnosticCenterAssignment.createMany({ data: [{ id: selectedId,centerId,userId: selectedUser,capability: "diagnostics.reception",qualifiedUntil: new Date("2030-01-01Z") },{ id: excludedId,centerId,userId: excludedUser,capability: "diagnostics.reception",qualifiedUntil: new Date("2030-01-01Z") }] });
+    await guards(true);
+    // Use the actual runtime policy to select from two persisted qualified
+    // peers. Removing a configured User never fabricates/revokes a DB grant.
+    const path = fileURLToPath(new URL("../../../apps/api/src/modules/diagnostics/infrastructure/diagnosticRuntime.ts", import.meta.url));
+    const { diagnosticRuntime } = await import(/* @vite-ignore */ path) as { diagnosticRuntime(config: { get(key: string, fallback?: unknown): unknown }): { syntheticAllowed(subject: { userId: string; sessionId: string }): boolean } };
+    const config = new Map<string,unknown>([["APP_ENV","test"],["DIAGNOSTIC_SYNTHETIC_ENABLED",true],["DIAGNOSTIC_SYNTHETIC_USER_IDS",[userId,selectedUser]]]);
+    const runtime = diagnosticRuntime({ get: (key,fallback) => config.get(key) ?? fallback });
+    const qualified = await prisma.diagnosticCenterAssignment.findMany({ where: { centerId,capability: "diagnostics.reception",revokedAt: null,qualifiedUntil: { gt: new Date() },user: { suspendedAt: null,deletionScheduledAt: null,staffGrants: { some: { capability: "diagnostics.reception",revokedAt: null } } } } });
+    const selection = qualified.filter(q => runtime.syntheticAllowed({ userId: q.userId,sessionId: "" })).map(q => q.id);
+    expect(selection).toEqual([selectedId]);
+    const p = await cloneOrder(a,{ listingId: null,audience: "buyer_private" });
+    const c = { ...sourceCommand("intake_create",[p]),operation: "intake_create" as const,actorUserId: userId,sessionId,intent: { receptionQualificationIds: selection } };
+    const write = async (tx: Prisma.TransactionClient, extra = false) => {
+      const [ids] = await tx.$queryRaw<{ audit: string; assignment: string; extra: string }[]>`SELECT diagnostic_intake_uuid(${'diagnostic-source:intake_create:'+String(p.key['id'])}) audit,diagnostic_intake_uuid(${'diagnostic-source:intake-assignment:'+String(p.key['id'])+':'+selectedId}) assignment,diagnostic_intake_uuid(${'diagnostic-source:intake-assignment:'+String(p.key['id'])+':'+excludedId}) extra`;
+      const i = present(ids);
+      await tx.$executeRaw(Prisma.sql`INSERT INTO inspection_orders SELECT (jsonb_populate_record(NULL::inspection_orders,${JSON.stringify(p.next)}::jsonb)).*`);
+      await tx.diagnosticOrderAssignment.create({ data: { id: i.assignment,orderId: String(p.key["id"]),userId: selectedUser,capability: "diagnostics.reception" } });
+      if (extra) await tx.diagnosticOrderAssignment.create({ data: { id: i.extra,orderId: String(p.key["id"]),userId: excludedUser,capability: "diagnostics.reception" } });
+      await tx.diagnosticAudit.create({ data: { id: i.audit,centerId,orderId: String(p.key["id"]),actorId: userId,action: "INTAKE_CREATED",details: { audience: "buyer_private",templateVersionId: String(baseOrder["templateVersionId"]),synthetic: true } } });
+    };
+    return { a,p,c,write,selectedId,excludedId,selectedUser,excludedUser };
+  }
+
+  it("intake assigns exactly the nonempty runtime-selected qualified reception subset with complete rollback", async () => {
+    const f = await receptionSelection();
+    const excluded = await prisma.diagnosticCenterAssignment.findUniqueOrThrow({ where: { id: f.excludedId } });
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx,f.c,async () => { await f.write(tx); throw new Error("selected intake rollback"); }))).rejects.toThrow("selected intake rollback");
+    expect(await prisma.inspectionOrder.findUnique({ where: { id: String(f.p.key["id"]) } })).toBeNull();
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx,f.c,() => f.write(tx,true)))).rejects.toThrow("diagnostic_source_uncovered");
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx,f.c,async () => undefined))).rejects.toThrow();
+    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx,f.c,() => f.write(tx)));
+    expect(await prisma.diagnosticOrderAssignment.findMany({ where: { orderId: String(f.p.key["id"]) } })).toMatchObject([{ userId: f.selectedUser,capability: "diagnostics.reception",revokedAt: null }]);
+    expect(await prisma.diagnosticAudit.findMany({ where: { orderId: String(f.p.key["id"]) } })).toMatchObject([{ actorId: userId,action: "INTAKE_CREATED" }]);
+    expect(await prisma.diagnosticCenterAssignment.findUniqueOrThrow({ where: { id: f.excludedId } })).toEqual(excluded);
+  });
+
+  it.each(["empty","duplicate","foreign","revoked","expired"] as const)("intake refuses a %s reception selection before creating an order", async fault => {
+    const f = await receptionSelection();
+    if (fault === "revoked" || fault === "expired") {
+      await guards(false);
+      await prisma.diagnosticCenterAssignment.update({ where: { id: f.selectedId },data: fault === "revoked" ? { revokedAt: new Date() } : { qualifiedUntil: new Date("2000-01-01Z") } });
+      await guards(true);
+    }
+    const selection = fault === "empty" ? [] : fault === "duplicate" ? [f.selectedId,f.selectedId] : fault === "foreign" ? [randomUUID()] : [f.selectedId];
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx,{ ...f.c,intent: { receptionQualificationIds: selection } },() => f.write(tx)))).rejects.toThrow("diagnostic_intake_reception_selection");
+    expect(await prisma.inspectionOrder.findUnique({ where: { id: String(f.p.key["id"]) } })).toBeNull();
+  });
+
+  it("intake rediscovers selected qualification revocation after its deterministic User-key wait", async () => {
+    const f = await receptionSelection(), b = await connect(), observer = await connect();
+    const prior = await source(b,"diagnostic_center_assignments",{ id: f.selectedId });
+    const revokedAt = new Date();
+    const c = sourceCommand("staff_eligibility",[{ table: "diagnostic_center_assignments",key: { id: f.selectedId },verb: "update",expected: { source: prior },next: { ...prior,revokedAt: revokedAt.toISOString() } }]);
+    await begin(b); const receipt = await prepare(b,c);
+    await begin(f.a); const pending = prepare(f.a,f.c).then(() => null,(error: unknown) => error);
+    await waitBlocked(observer,f.a,b);
+    await b.query('UPDATE diagnostic_center_assignments SET "revokedAt"=$1 WHERE id=$2',[revokedAt,f.selectedId]);
+    await finish(b,receipt); await b.query("COMMIT");
+    expect(String(await pending)).toMatch(/diagnostic_(source_graph_changed|intake_reception_selection)/); await f.a.query("ROLLBACK");
+    expect(await prisma.inspectionOrder.findUnique({ where: { id: String(f.p.key["id"]) } })).toBeNull();
+  });
+
 });

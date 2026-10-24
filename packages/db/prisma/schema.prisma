@@ -2110,3 +2110,7 @@ model CampaignPreparation {
 // Dormant finite moderation inventory: 20261024070000_diagnostic_user_eligibility.
 
 // Dormant complete moderation effects: 20261024080000_diagnostic_moderation_complete_effects.
+
+// Dormant Message absence and Business enquiry effects: 20261024090000_diagnostic_message_enquiry_fences.
+
+// Dormant Sign-in Method, intake selection and object ownership: 20261024100000_diagnostic_signin_intake_object_owners.

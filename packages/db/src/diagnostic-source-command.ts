@@ -6,7 +6,7 @@ export type { DiagnosticSourceKeys, DiagnosticSourceTable } from "./diagnostic-s
 export type DiagnosticSourceOperation =
   | "listing_create" | "listing_change" | "listing_delete"
   | "member_create" | "member_replace" | "member_remove" | "member_eligibility"
-  | "business_eligibility" | "user_eligibility" | "account_schedule" | "account_restore" | "account_purge"
+  | "sign_in_method_change" | "business_eligibility" | "user_eligibility" | "account_schedule" | "account_restore" | "account_purge"
   | "order_create" | "order_change" | "observation_append"
   | "intake_create" | "template_publish" | "center_bootstrap" | "campaign_admit" | "staff_bootstrap"
   | "ownership_grant" | "ownership_revoke" | "ownership_expire"
@@ -39,7 +39,7 @@ export type DiagnosticSourceCommand = DiagnosticSourceCommandFields & (
     auditId: string; reason: string; report?: Readonly<{ id: string; reviewedAt: string }>;
   }> }
   | { readonly operation: Exclude<DiagnosticSourceOperation, "user_eligibility">;
-    readonly intent?: Readonly<{ code: string; userId: string; capability: string; qualificationId: string }> | Readonly<{ reason: string }> | Readonly<Record<string, never>> }
+    readonly intent?: Readonly<{ receptionQualificationIds: readonly string[] }> | Readonly<{ code: string; userId: string; capability: string; qualificationId: string }> | Readonly<{ reason: string }> | Readonly<Record<string, never>> }
 );
 
 declare const prepared: unique symbol;

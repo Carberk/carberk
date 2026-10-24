@@ -1,0 +1,348 @@
+{
+  "base": "b9307a7c60276042be5ed6d96bbbf7e115399916",
+  "sourceFileHashes": [
+    {
+      "path": "packages/db/CONTEXT.md",
+      "sha256": "e978f0d4b4680e517dbd6c23563dd2ae5b9b1c64d976849e788b11363902d493"
+    },
+    {
+      "path": "packages/db/prisma/migrations/20261024090000_diagnostic_message_enquiry_fences/migration.sql",
+      "sha256": "19316d8fbab4d425af191477a997c49d0e518332b89dc9a39779c9a21d72995c"
+    },
+    {
+      "path": "packages/db/prisma/migrations/20261024100000_diagnostic_signin_intake_object_owners/migration.sql",
+      "sha256": "802bc18c5b98074046422b4e99b6e46877395166afe7f25fa80d37e53416fda6"
+    },
+    {
+      "path": "packages/db/prisma/schema.prisma",
+      "sha256": "f13288a0ca5dbe78b5f30c4e713b0b8f5aa5af4f38535b38131c86d4412b3fda"
+    },
+    {
+      "path": "packages/db/src/diagnostic-source-command.ts",
+      "sha256": "b9b96f5a7dfc61b34173012884d878416faa57db8b0857ef2bcd485ee9958507"
+    },
+    {
+      "path": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+      "sha256": "814b59b2882604b6c85abf436a550adad0be0a479cc0c8763a0aaac1c351c56f"
+    },
+    {
+      "path": "scripts/diagnostic-message-enquiry-fences-schema.test.mjs",
+      "sha256": "becc20e0c65ce9817f5e0eacfdccda85af174f8489a8fbb3c0e8b22399748525"
+    },
+    {
+      "path": "scripts/diagnostic-moderation-complete-effects-schema.test.mjs",
+      "sha256": "f4b7cd98f7edd9adedeea911a99428dcce2552c954f5e7f198871172879c6b84"
+    },
+    {
+      "path": "scripts/diagnostic-signin-intake-object-schema.test.mjs",
+      "sha256": "3f7fcc18508bdebdc139d476e5e57d2a771aa832d1049235c2c68c18d824a502"
+    },
+    {
+      "path": "scripts/staging-schema.mjs",
+      "sha256": "ce0ab29fca6893086d2bac6e1cbe11d40b9b58fc83159427278576a566c5a021"
+    },
+    {
+      "path": "scripts/testing/retained-schema/20261024090000_diagnostic_message_enquiry_fences.sql",
+      "sha256": "19316d8fbab4d425af191477a997c49d0e518332b89dc9a39779c9a21d72995c"
+    },
+    {
+      "path": "scripts/testing/retained-schema/20261024100000_diagnostic_signin_intake_object_owners.sql",
+      "sha256": "802bc18c5b98074046422b4e99b6e46877395166afe7f25fa80d37e53416fda6"
+    }
+  ],
+  "logs": [
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/agent-docs-final.log",
+      "sha256": "8f5507ea6fcde992f7d6733d113abc538ae4957b777bc97cadd580f651c93b20",
+      "bytes": 122
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/agent-docs.log",
+      "sha256": "8f5507ea6fcde992f7d6733d113abc538ae4957b777bc97cadd580f651c93b20",
+      "bytes": 122
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/api-offline-dependencies.log",
+      "sha256": "27792e6d2069e6113742544acaad24fd82b918106fa2e4187f139dd6fee1fd0c",
+      "bytes": 296
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/api-ts6-five.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/api-typecheck-five.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "bytes": 15
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/contracts-build.log",
+      "sha256": "b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616",
+      "bytes": 25
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-build-final.log",
+      "sha256": "36137b0fba0d5dcb3a16ef56d2042b92647f33fdc6f17877ebdbf6867b8edd1b",
+      "bytes": 194
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-build-five.log",
+      "sha256": "57afc244eafe5dfa38ac467f14460c8754f0a9493c072315669e7e7904305e7b",
+      "bytes": 194
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-build.log",
+      "sha256": "74af6ce037223308429e6bc09ecaa95397b541f399ee623fe349cb9a298faf0b",
+      "bytes": 425
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-lint-final.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "bytes": 28
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-lint-final2.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "bytes": 28
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-lint-five-final.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "bytes": 28
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-lint-five.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "bytes": 28
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-lint.log",
+      "sha256": "045108187bae7b60eff9a9d1359b52d81e1c471fe459df8e4d3f8a887b855b90",
+      "bytes": 6906
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-offline.log",
+      "sha256": "e80dce2d33a8457e657d812e40ccf185ef3c27be23030c1d721858fb27395f60",
+      "bytes": 629
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-ts6-final.log",
+      "sha256": "a741631f5a0954c0631fdd51ecf56cdc6e4fbd0f3d94e6eee26e6bced36ed533",
+      "bytes": 2477
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-ts6-final2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-ts6-five-final.log",
+      "sha256": "8006dee74ccad8a350d646bb8185c94ed03255c90de44c4869827f4377f3d5c7",
+      "bytes": 31471
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-ts6-five-final2.log",
+      "sha256": "162cd2869149a75e4ca608a9bce54d919ddce9346ab6e471c047acf1de140ecb",
+      "bytes": 626
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-ts6-five-final3.log",
+      "sha256": "0a44a58e325706125b4eccbf750c9ba39e9f80b26d93b159bc5035c0d4d3e472",
+      "bytes": 316
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-ts6-five-final4.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-typecheck-final.log",
+      "sha256": "e3d652ee5285ab9b70845d2093553807fff64dc73598896e1ae9a07d8da9cc39",
+      "bytes": 2536
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-typecheck-final2.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "bytes": 15
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-typecheck-five-final.log",
+      "sha256": "a356c271dd058b65546a16c1314c5966a0fecf73c19a9070eb53cfa4fe57ee09",
+      "bytes": 28679
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-typecheck-five-final2.log",
+      "sha256": "523cba01f4d95cb5b133bc29255bae7f06ee16d618997e9dcacb3ca9149b4de7",
+      "bytes": 685
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-typecheck-five-final3.log",
+      "sha256": "b01d7b5aa7d084f46f851192fd9ee456b632d48fe8464a20ff728fba3a07208d",
+      "bytes": 375
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-typecheck-five-final4.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "bytes": 15
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-typecheck-five.log",
+      "sha256": "7ee8920cd459f68c84e64dfbfdf8bad2ed3858d8b35ba777e65bd90378376052",
+      "bytes": 36765
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/db-typecheck.log",
+      "sha256": "e8e6d75d055c86c0c2d5bce592a92bf3630b463dab19bd5c9d1d3fa9cedeee66",
+      "bytes": 34170
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/diff-check-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/diff-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/prisma-validate-five.log",
+      "sha256": "e1344514cb0e93026a245afd134e0c874287a64f7c5798cbda02eff700d2aa22",
+      "bytes": 142
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/prisma-validate.log",
+      "sha256": "f42be55724289534e6fab7707bf97c906b59b2a65578449f3fbabc739f5b0606",
+      "bytes": 1010
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/profile-preservation.log",
+      "sha256": "d2475834b8bbfe0bf2098135ee5e17d314c417d036b1a752e548cbaf5f19641b",
+      "bytes": 105
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/runtime-imports-five.log",
+      "sha256": "2920e5c9967fdaf4eb831dfb48e054ff0bd4262a1ef314658ceca54821fa5d97",
+      "bytes": 80
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/runtime-imports.log",
+      "sha256": "2920e5c9967fdaf4eb831dfb48e054ff0bd4262a1ef314658ceca54821fa5d97",
+      "bytes": 80
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/schema-profile-final.log",
+      "sha256": "64973ecb3749cc51c81ce8a49f6b22501be52e4ece01e248c60f3969d4c1ad46",
+      "bytes": 2412
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/schema-profile-five-final.log",
+      "sha256": "b54d1b1a388fec5140a75429e9a32f424c6f25fc719a9263bf90185d0be1a1a8",
+      "bytes": 2518
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/schema-profile-five.log",
+      "sha256": "70d1375cc0700e70f56acfdc9e88d17fc7ea0b8aa8142b2418032d35559af045",
+      "bytes": 2515
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/schema-profile.log",
+      "sha256": "b6994b22303d7224cb7cf3e0047305951f67dc9addddd36737762add02746287",
+      "bytes": 2204
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/sql-parser-five-final.log",
+      "sha256": "dfb48687862239cd5175b78473d38e469313ca208d4e19a6e870c6c55515f1f0",
+      "bytes": 137
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/sql-parser.log",
+      "sha256": "629469c3f3e1783cd813ea16c73a1fc9db730b52cb12af2563c7b41bbac0be91",
+      "bytes": 41
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-logs/worker-offline-dependencies.log",
+      "sha256": "69cf6cd5ae4d652507a0b2c4014ada0b69674ccfcdaee87b4137de6a0c5616ee",
+      "bytes": 304
+    }
+  ],
+  "finalChecks": [
+    {
+      "command": "pnpm --filter @auto-tm/contracts build",
+      "log": "contracts-build.log",
+      "exit": 0
+    },
+    {
+      "command": "DATABASE_URL=postgresql://offline:offline@127.0.0.1:1/offline pnpm --filter @auto-tm/db build",
+      "log": "db-build-five.log",
+      "exit": 0
+    },
+    {
+      "command": "pnpm --filter @auto-tm/db typecheck",
+      "log": "db-typecheck-five-final4.log",
+      "exit": 0
+    },
+    {
+      "command": "pnpm --filter @auto-tm/db exec tsc6 --noEmit",
+      "log": "db-ts6-five-final4.log",
+      "exit": 0
+    },
+    {
+      "command": "pnpm --filter @auto-tm/api typecheck",
+      "log": "api-typecheck-five.log",
+      "exit": 0
+    },
+    {
+      "command": "pnpm --filter @auto-tm/api exec tsc6 --noEmit",
+      "log": "api-ts6-five.log",
+      "exit": 0
+    },
+    {
+      "command": "pnpm --filter @auto-tm/db lint",
+      "log": "db-lint-five-final.log",
+      "exit": 0
+    },
+    {
+      "command": "DATABASE_URL=postgresql://offline:offline@127.0.0.1:1/offline pnpm --filter @auto-tm/db exec prisma validate",
+      "log": "prisma-validate-five.log",
+      "exit": 0
+    },
+    {
+      "command": "node --test scripts/diagnostic-*-schema.test.mjs scripts/campaign-preparation-schema.test.mjs scripts/business-enquiries-schema.test.mjs",
+      "log": "schema-profile-five-final.log",
+      "exit": 0,
+      "cases": 24
+    },
+    {
+      "command": "pnpm --filter @auto-tm/db test:offline",
+      "log": "db-offline.log",
+      "exit": 0,
+      "cases": 5
+    },
+    {
+      "command": "pnpm check:runtime-imports",
+      "log": "runtime-imports-five.log",
+      "exit": 0
+    },
+    {
+      "command": "pnpm check:agent-docs",
+      "log": "agent-docs-final.log",
+      "exit": 0
+    },
+    {
+      "command": "PYTHONPATH=/tmp/897-sql-parser python3 (parse_sql + parse_plpgsql on both new migrations)",
+      "log": "sql-parser-five-final.log",
+      "exit": 0,
+      "sqlStatements": 35,
+      "plpgsqlFunctions": 18
+    },
+    {
+      "command": "git diff --check",
+      "log": "diff-check-final.log",
+      "exit": 0
+    }
+  ],
+  "earlierFailures": "Retained log files show setup (generated client/contracts, absent DATABASE_URL, ignored worker dependencies) and temporary authored-test typing errors. No SQL runtime test was attempted.",
+  "evidenceBoundary": "Compiler/schema/policy/grammar only; SQL/HTTP authored ZERO executed; no E2E imports, services, full CI, devices, activation, deployment or production callers."
+}

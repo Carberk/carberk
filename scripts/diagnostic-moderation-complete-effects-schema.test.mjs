@@ -10,7 +10,7 @@ const hash = value => createHash('sha256').update(value).digest('hex');
 test('complete moderation effects are one exact forward retained addition', () => {
   const sql = read('../packages/db/prisma/migrations/' + name + '/migration.sql');
   assert.equal(sql, read('./testing/retained-schema/' + name + '.sql'));
-  const schema = hash(read('../packages/db/prisma/schema.prisma'));
+  const schema = '8d05eb1f90161b1f2584c12a2884b167d275bd26904208eb7f6e395b860023cb'; // Historical complete-moderation snapshot.
   const prior = '6cda1b196baa94edb65ac1a54b134c2ff4ff4ddeb6f68a2db282988367d1b470';
   const candidate = inventoryForSchema(schema, []), main = inventoryForSchema(prior, []);
   assert.deepEqual(candidate.filter(row => row.name !== name), main);
