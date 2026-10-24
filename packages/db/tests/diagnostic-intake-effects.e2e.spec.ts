@@ -140,10 +140,13 @@ describe("finite diagnostic intake/bootstrap effects", () => {
       const c = await command(tx), r = present(c.rows[0]);
       return { ...c, roots: [{ table: "users", key: { id: target } }], rows: [{ ...r, key: { userId: target, capability }, next: { ...r.next, userId: target } }] } as DiagnosticSourceCommand;
     }
-    await expect(db.$transaction(async tx => withDiagnosticSourceCommand(tx, await targetCommand(tx), async receipt => {
-      await tx.staffGrant.create({ data: { userId: target, capability } });
-      if (mode === "delete") await tx.$executeRaw`DELETE FROM diagnostic_source_commands WHERE id=${receipt.receiptId}::uuid`;
-    }))).rejects.toThrow("diagnostic_source_final_effect");
+    await expect(db.$transaction(async tx => {
+      const c = await targetCommand(tx), next = present(c.rows[0]).next;
+      await withDiagnosticSourceCommand(tx, c, async receipt => {
+        await tx.staffGrant.create({ data: { userId: target, capability, grantedAt: new Date(String(next?.["grantedAt"])) } });
+        if (mode === "delete") await tx.$executeRaw`DELETE FROM diagnostic_source_commands WHERE id=${receipt.receiptId}::uuid`;
+      });
+    })).rejects.toThrow("diagnostic_source_final_effect");
     expect(await db.staffGrant.findUnique({ where: { userId_capability: { userId: target, capability } } })).toBeNull();
     await db.$transaction(async tx => {
       const c = await targetCommand(tx), next = present(c.rows[0]).next;
