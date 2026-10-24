@@ -31,6 +31,8 @@ Mobile is the primary marketplace client. The route tree, API hooks, feature mod
 
 ## Native verification
 
+[Offline diagnostic artifact preparation](scripts/diagnostic-artifacts.md) verifies supplied build identity/digests and retains private matching outputs outside mobile cleanup. It does not build or parse native binaries, upload symbols, enable capture or prove symbolication. Native association remains explicitly incomplete.
+
 Read [mobile/Expo checks](../../docs/agents/mobile-expo.md) before packages, Metro, navigation, or runtime changes. Keep `shamefullyHoist` in `pnpm-workspace.yaml` and explicit native dependencies. Expo Go cannot run the full app's push integration; runtime verification uses a development build. Preserve store permission restrictions and bundled native/JS release configuration rather than silently introducing an update channel.
 
 The merged Android manifest carries `android.permission.VIBRATE` through `expo-haptics`' own manifest; it is a normal permission with no prompt, the Sign-in Method selection tick does not need it, and it is not in `blockedPermissions`.

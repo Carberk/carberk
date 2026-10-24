@@ -54,7 +54,7 @@ test('retains digested final outputs privately and verifies after build cleanup'
   succeeds(f.run());
   const manifest = JSON.parse(fs.readFileSync(path.join(f.archive, 'manifest.json')));
   assert.deepEqual(manifest.identity, identity);
-  assert.equal(manifest.files.artifact.sha256, 'a09980d8ef9c6a8fed0867b039f1a9be764e84c5e01203d6d6550425fb7d408a62');
+  assert.equal(manifest.files.artifact.sha256, '70ea06053509b85e86aaa7ae9a844c489068f32741581cb6b773af42e272d088');
   assert.equal(manifest.nativeAssociationStatus, 'unsupported-incomplete');
   assert.equal(fs.statSync(f.archive).mode & 0o777, 0o700);
   assert.equal(fs.statSync(path.join(f.archive, manifest.files.finalSourceMap.path)).mode & 0o777, 0o600);
@@ -120,7 +120,7 @@ test('refuses overwriting archives and detects retained map and metadata tamperi
 test('records matching exported native IDs without claiming binary verification', (t) => {
   const f = fixture(t, 'ios');
   f.file('symbols0', 'fixture dSYM DWARF file');
-  f.metadata.nativeAssociations = [{ file: 'symbols0', arch: 'arm64', binaryId: 'exported-uuid', symbolId: 'exported-uuid' }];
+  f.metadata.nativeAssociations = [{ file: 'symbols0', idKind: 'macho-uuid', arch: 'arm64', binaryId: 'exported-uuid', symbolId: 'exported-uuid' }];
   succeeds(f.run());
   const manifest = JSON.parse(fs.readFileSync(path.join(f.archive, 'manifest.json')));
   assert.deepEqual(manifest.nativeAssociations, f.metadata.nativeAssociations);
@@ -131,8 +131,8 @@ test('records matching exported native IDs without claiming binary verification'
 test('refuses mismatched native IDs, missing symbols and wrong platform mappings', (t) => {
   const f = fixture(t, 'ios');
   f.file('symbols0', 'fixture DWARF');
-  f.metadata.nativeAssociations = [{ file: 'symbols0', arch: 'arm64', binaryId: 'uuid-a', symbolId: 'uuid-b' }];
-  refuses(f.run(), /native.*ID/);
+  f.metadata.nativeAssociations = [{ file: 'symbols0', idKind: 'macho-uuid', arch: 'arm64', binaryId: 'uuid-a', symbolId: 'uuid-b' }];
+  refuses(f.run(), /native.*ID/i);
   f.metadata.nativeAssociations[0].symbolId = 'uuid-a';
   delete f.metadata.files.symbols0;
   refuses(f.run(), /symbols0/);
@@ -147,7 +147,78 @@ test('refuses symlink inputs and archive destinations inside the mobile cleanup 
   f.metadata.files.artifact.path = 'link';
   refuses(f.run(), /regular file/);
   f.metadata.files.artifact.path = 'artifact.fixture';
-  f.run();
+  succeeds(f.run());
   const result = spawnSync(process.execPath, [cli, 'prepare', path.join(f.root, 'expected.json'), path.join(f.source, 'build-metadata.json'), path.join(path.dirname(cli), '../android/retained')], { encoding: 'utf8' });
   refuses(result, /outside.*mobile/);
+});
+
+for (const key of ['release', 'buildNumber', 'platform', 'bundle']) {
+  test(`archive verification refuses changed expected ${key}`, (t) => {
+    const f = fixture(t);
+    succeeds(f.run());
+    f.expected[key] = key === 'bundle' ? { ...identity.bundle, updateId: 'different-update' } : 'different';
+    refuses(f.run('verify'), /identity|platform/);
+  });
+}
+
+test('refuses malformed matching identities, unassociated symbols and wrong native ID kind', (t) => {
+  const f = fixture(t);
+  f.expected.release = f.metadata.identity.release = '';
+  refuses(f.run(), /release/);
+  f.expected.release = f.metadata.identity.release = identity.release;
+  f.file('symbols0', 'fixture native symbols');
+  refuses(f.run(), /Missing native ID/);
+  f.metadata.nativeAssociations = [{ file: 'symbols0', idKind: 'macho-uuid', arch: 'arm64', binaryId: 'fixture-id', symbolId: 'fixture-id' }];
+  refuses(f.run(), /platform/);
+  f.metadata.nativeAssociations[0].idKind = 'elf-build-id';
+  succeeds(f.run());
+  succeeds(f.run('verify'));
+});
+
+test('archive verification refuses manifest path substitution and missing retained symbols', (t) => {
+  const f = fixture(t, 'ios');
+  f.file('symbols0', 'fixture DWARF');
+  f.metadata.nativeAssociations = [{ file: 'symbols0', idKind: 'macho-uuid', arch: 'arm64', binaryId: 'fixture-uuid', symbolId: 'fixture-uuid' }];
+  succeeds(f.run());
+  const manifestPath = path.join(f.archive, 'manifest.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath));
+  const original = structuredClone(manifest);
+  manifest.files.symbols0.path = '../build/symbols0.fixture';
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+  refuses(f.run('verify'), /Manifest/);
+  fs.writeFileSync(manifestPath, JSON.stringify(original));
+  fs.rmSync(path.join(f.archive, original.files.symbols0.path));
+  refuses(f.run('verify'), /ENOENT/);
+});
+
+test('refuses empty outputs and cleanup destinations reached through a symlink parent', (t) => {
+  const f = fixture(t);
+  fs.writeFileSync(path.join(f.source, 'artifact.fixture'), '');
+  f.metadata.files.artifact.sha256 = digest('');
+  refuses(f.run(), /Empty output/);
+  f.file('artifact', 'fixture artifact');
+  succeeds(f.run());
+  const link = path.join(f.root, 'mobile-link');
+  fs.symlinkSync(path.dirname(cli), link);
+  const result = spawnSync(process.execPath, [cli, 'prepare', path.join(f.root, 'expected.json'), path.join(f.source, 'build-metadata.json'), path.join(link, 'retained')], { encoding: 'utf8' });
+  refuses(result, /outside.*mobile/);
+});
+
+test('archive verification refuses public permissions on maps or archive', (t) => {
+  const f = fixture(t);
+  succeeds(f.run());
+  fs.chmodSync(f.archive, 0o755);
+  refuses(f.run('verify'), /permissions/);
+  fs.chmodSync(f.archive, 0o700);
+  fs.chmodSync(path.join(f.archive, 'finalSourceMap.artifact'), 0o644);
+  refuses(f.run('verify'), /permissions/);
+});
+
+test('binds bundle bytes without inventing unavailable IDs and requires runtime identity for updates', (t) => {
+  const f = fixture(t);
+  f.expected.bundle = f.metadata.identity.bundle = { kind: 'javascript', id: null, runtimeVersion: null, updateId: null };
+  succeeds(f.run());
+  succeeds(f.run('verify'));
+  f.expected.bundle.updateId = 'actual-exported-update';
+  refuses(f.run('verify'), /runtimeVersion/);
 });
