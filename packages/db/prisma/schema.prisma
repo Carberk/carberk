@@ -1403,6 +1403,7 @@ model DiagnosticTemplateVersion {
 }
 
 model InspectionOrder {
+  sourceAnchor DiagnosticSourceAnchor?
   ownershipGrant DiagnosticOwnershipGrant?
   continuityRequests DiagnosticContinuityRequest[]
   id String @id @default(uuid())
@@ -2056,4 +2057,29 @@ model DiagnosticOwnershipGrant {
   @@index([grantorId])
   @@index([rightsUntil, state])
   @@map("diagnostic_ownership_grants")
+}
+
+/// Transient preparation only. Finish deletes it; deferred SQL rejects a live receipt at commit.
+model DiagnosticSourceCommand {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  backend_pid Int @default(dbgenerated("pg_backend_pid()"))
+  full_transaction_id String @default(dbgenerated("(pg_current_xact_id())::text"))
+  command Json
+  scope Json @default("[]")
+  lock_keys Json @default("[]")
+  effects Json @default("[]")
+  campaigns Json @default("[]")
+  @@unique([backend_pid, full_transaction_id])
+  @@map("diagnostic_source_commands")
+}
+
+/// Created for prepared NEW orders only. Missing historical shells stay unavailable.
+model DiagnosticSourceAnchor {
+  orderId String @id
+  order InspectionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  state String
+  firstRecordId String?
+  source Json?
+  createdTransaction String
+  @@map("diagnostic_source_anchors")
 }
