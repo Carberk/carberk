@@ -147,6 +147,8 @@ describe("campaign preparation with existing campaign authority", () => {
     it(`${operation} ordinary/source ordering ${ordinaryFirst ? "ordinary first" : "source first"} waits at the namespace before mutation`, async () => {
       const release = signal(), entered = signal(), waiting = signal();
       let firstPid = 0, secondPid = 0;
+      const beforeUser = await prisma.user.findUniqueOrThrow({ where: { id: users[0] } });
+      const beforeOrders = await prisma.inspectionOrder.findMany({ where: { commissionerId: users[0] }, orderBy: { id: "asc" } });
       const insertedId = randomUUID();
       const gateId = operation === "scalar" ? present(users[0]) : insertedId;
       const gate = await client();
@@ -183,12 +185,16 @@ describe("campaign preparation with existing campaign authority", () => {
       }
       const results = await Promise.allSettled([first, second]);
       expect(results[0].status).toBe("fulfilled");
-      if (operation === "session" && ordinaryFirst) {
+      if (ordinaryFirst) {
         expect(results[1].status).toBe("rejected");
         if (results[1].status === "rejected") expect(String(results[1].reason)).toContain("diagnostic_source_graph_changed");
       } else expect(results[1].status).toBe("fulfilled");
-      if (operation === "session") expect(await prisma.session.findUnique({ where: { id: insertedId } })).not.toBeNull();
-      else expect((await prisma.user.findUniqueOrThrow({ where: { id: users[0] } })).displayName).toBe("prepared scalar");
+      if (operation === "session") {
+        expect(await prisma.session.findUnique({ where: { id: insertedId } })).toMatchObject({ userId: users[0], refreshTokenHash: insertedId });
+        expect(await prisma.user.findUniqueOrThrow({ where: { id: users[0] } })).toEqual(beforeUser);
+      } else expect(await prisma.user.findUniqueOrThrow({ where: { id: users[0] } })).toEqual({ ...beforeUser, displayName: "prepared scalar", updatedAt: expect.any(Date) });
+      expect(await prisma.inspectionOrder.findMany({ where: { commissionerId: users[0] }, orderBy: { id: "asc" } })).toEqual(beforeOrders);
+      expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
     });
   }
 

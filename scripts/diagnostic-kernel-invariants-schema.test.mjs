@@ -12,7 +12,8 @@ const sql = read('../packages/db/prisma/migrations/' + name + '/migration.sql');
 
 test('finite invariant migration has its exact retained mirror and additive inventory', () => {
   assert.equal(sql, read('./testing/retained-schema/' + name + '.sql'));
-  const schema = hash(read('../packages/db/prisma/schema.prisma'));
+  // Preserve this held profile; the correction test owns the current profile.
+  const schema = 'fbc4ebcf15d6abf6dd8a3ef8d403f8b5dcf40794c356ec11c960cb462a1f5a4a';
   const prior = 'e40cc31cfa68c532d63b70b11704e2d14e4d4b59c22412438a98dc8b5a82f06a';
   const candidate = inventoryForSchema(schema, []), main = inventoryForSchema(prior, []);
   assert.deepEqual(candidate.filter(row => row.name !== name), main);

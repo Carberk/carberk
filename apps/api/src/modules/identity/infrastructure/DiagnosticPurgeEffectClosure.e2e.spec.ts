@@ -388,6 +388,60 @@ describe("B1 disposal of lawful persisted ownership and consumed retry graphs", 
     throw new Error("PostgreSQL did not reach the seller's declared end");
   }
 
+  it.each(["finish","delete"] as const)("Listing physical %s predeclares both FK targets and invalidates a genuine unused proof",async mode => {
+    const graph = await unusedProof();
+    const orderBefore = await db.inspectionOrder.findUniqueOrThrow({ where: { id: graph.b.id } });
+    const foreignOrder = await db.inspectionOrder.findUniqueOrThrow({ where: { id: graph.a.id } });
+    const targetListingId = present(orderBefore.listingId ?? undefined);
+    const foreignListingId = present(foreignOrder.listingId ?? undefined);
+    const target = await db.inspectionInterest.create({ data: { listingId: targetListingId,requesterUserId: suite.id("outsider"),side: "buyer" } });
+    const foreign = await db.inspectionInterest.create({ data: { listingId: foreignListingId,requesterUserId: suite.id("outsider"),side: "buyer" } });
+    const proofBefore = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: graph.proof.id } });
+    const rawBefore = await db.diagnosticIdentityRecord.findMany({ where: { orderId: { in: [graph.a.id,graph.b.id] } },orderBy: { id: "asc" } });
+    const reportBefore = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: graph.released.id } });
+    const anchorBefore = await db.diagnosticSourceAnchor.findUniqueOrThrow({ where: { orderId: graph.b.id } });
+    const intent = await db.$transaction(async tx => ({ operation: "listing_delete",roots: [{ table: "listings",key: { id: targetListingId } }],rows: [{
+      table: "listings",key: { id: targetListingId },verb: "delete",expected: { source: await source(tx,"listings",targetListingId) },next: null,
+    }],actorUserId: suite.id("sellerB"),sessionId: subject("sellerB").sessionId,cutoff: null,campaign: null }) as DiagnosticSourceCommand);
+    async function remove(tx: Tx, receiptId: string) {
+      const [receipt] = await tx.$queryRaw<{ effects: unknown[]; scope: unknown[] }[]>`SELECT effects,scope FROM diagnostic_source_commands WHERE id=${receiptId}::uuid`;
+      expect(present(receipt).effects).toEqual(expect.arrayContaining([
+        expect.objectContaining({ table: "inspection_orders",key: { id: graph.b.id },verb: "update",next: expect.objectContaining({ listingId: null }) }),
+        expect.objectContaining({ table: "inspection_interests",key: { id: target.id },verb: "delete" }),
+        expect.objectContaining({ table: "diagnostic_continuity_proofs",key: { id: graph.proof.id },derived: "invalidation",required: true }),
+      ]));
+      expect(present(receipt).scope).toEqual(expect.arrayContaining([
+        expect.objectContaining({ table: "diagnostic_source_anchors",key: { orderId: graph.b.id } }),
+        expect.objectContaining({ table: "inspection_interests",key: { id: target.id } }),
+      ]));
+      await tx.listing.delete({ where: { id: targetListingId } });
+    }
+    await expect(db.$transaction(tx => withDiagnosticSourceCommand(tx,intent,async receipt => {
+      await remove(tx,receipt.receiptId); throw new Error("physical proof closure rollback");
+    }))).rejects.toThrow("physical proof closure rollback");
+    expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: graph.b.id } })).toEqual(orderBefore);
+    expect(await db.inspectionInterest.findUniqueOrThrow({ where: { id: target.id } })).toEqual(target);
+    expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: graph.proof.id } })).toEqual(proofBefore);
+    expect(await db.diagnosticSourceAnchor.findUniqueOrThrow({ where: { orderId: graph.b.id } })).toEqual(anchorBefore);
+    await db.$transaction(async tx => {
+      if (mode === "finish") await withDiagnosticSourceCommand(tx,intent,receipt => remove(tx,receipt.receiptId));
+      else {
+        const [receipt] = await tx.$queryRaw<{ id: string }[]>`SELECT diagnostic_prepare_source(${JSON.stringify(intent)}::jsonb)::text id`;
+        await remove(tx,present(receipt).id);
+        await tx.$executeRaw`DELETE FROM diagnostic_source_commands WHERE id=${present(receipt).id}::uuid`;
+      }
+    });
+    expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: graph.b.id } })).toEqual({ ...orderBefore,listingId: null });
+    expect(await db.inspectionInterest.findUnique({ where: { id: target.id } })).toBeNull();
+    expect(await db.diagnosticSourceAnchor.findUniqueOrThrow({ where: { orderId: graph.b.id } })).toEqual({ ...anchorBefore,state: "changed" });
+    expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: graph.proof.id } })).toEqual({ ...proofBefore,invalidatedAt: expect.any(Date) });
+    expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: graph.a.id } })).toEqual(foreignOrder);
+    expect(await db.inspectionInterest.findUniqueOrThrow({ where: { id: foreign.id } })).toEqual(foreign);
+    expect(await db.diagnosticIdentityRecord.findMany({ where: { orderId: { in: [graph.a.id,graph.b.id] } },orderBy: { id: "asc" } })).toEqual(rawBefore);
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: graph.released.id } })).toEqual(reportBefore);
+    expect(await db.diagnosticSourceCommand.count()).toBe(0);
+  });
+
   it.each(["ordinary", "material"].flatMap(opposition => (opposition === "material" ? ["proof"] : ["report", "proof"]).flatMap(edge => [false, true].map(writerFirst => ({ opposition, edge, writerFirst })))))("NEW $edge edge versus $opposition enters the actual rediscovered graph, writerFirst=$writerFirst", async ({ opposition, edge, writerFirst }) => {
     const graph = await unusedProof();
     const beforeRaw = await db.diagnosticIdentityRecord.findMany({ where: { orderId: { in: [graph.a.id, graph.b.id] } }, orderBy: { id: "asc" } });
@@ -418,10 +472,9 @@ describe("B1 disposal of lawful persisted ownership and consumed retry graphs", 
     const disposedEpoch=randomUUID();
     const reader = await db.$transaction(async tx => {
       if(opposition==="material") {
-        const material=await source(tx,"diagnostic_identity_provenance",graph.a.provenanceId),proof=await source(tx,"diagnostic_continuity_proofs",graph.proof.id);
+        const material=await source(tx,"diagnostic_identity_provenance",graph.a.provenanceId);
         return {operation:"identity_material_change",roots:[{table:"diagnostic_identity_provenance",key:{id:graph.a.provenanceId}}],rows:[
           {table:"diagnostic_identity_provenance",key:{id:graph.a.provenanceId},verb:"update",expected:{source:material},next:{...material,state:"cleanup_pending",epoch:disposedEpoch,rights:null,cleanupRequestedAt:now.toISOString(),erasedAt:now.toISOString()}},
-          {table:"diagnostic_continuity_proofs",key:{id:graph.proof.id},verb:"delete",expected:{source:proof},next:null},
         ],actorUserId:null,sessionId:null,cutoff:now,campaign:null} as DiagnosticSourceCommand;
       }
       const old = await source(tx,"users",suite.id("sellerA"));
@@ -439,6 +492,9 @@ describe("B1 disposal of lawful persisted ownership and consumed retry graphs", 
     }
     async function oppose(tx:Tx) {
       if(opposition!=="material")return;
+      // Proof disposal belongs to the server-derived union, never caller intent.
+      const [receipt] = await tx.$queryRaw<{ effects: unknown[] }[]>`SELECT effects FROM diagnostic_source_commands WHERE backend_pid=pg_backend_pid() AND full_transaction_id=pg_current_xact_id()::text`;
+      expect(present(receipt).effects).toContainEqual(expect.objectContaining({ table: "diagnostic_continuity_proofs",key: { id: graph.proof.id },verb: "delete",derived: "purge" }));
       await tx.diagnosticContinuityProof.delete({where:{id:graph.proof.id}});
       await tx.diagnosticIdentityProvenance.update({where:{id:graph.a.provenanceId},data:{state:"cleanup_pending",epoch:disposedEpoch,rights:Prisma.DbNull,cleanupRequestedAt:now,erasedAt:now}});
     }

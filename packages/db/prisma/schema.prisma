@@ -2104,3 +2104,5 @@ model CampaignPreparation {
 // Dormant finite intake/bootstrap/audit effect inventory: 20261024040000_diagnostic_intake_effects.
 
 // Retained finite source invariant checkpoint 20261024050000. No data backfill.
+
+// Dormant source correction inventory: 20261024060000_diagnostic_source_correction.

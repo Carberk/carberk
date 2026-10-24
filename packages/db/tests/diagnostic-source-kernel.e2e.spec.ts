@@ -281,18 +281,26 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     const later = await observe(a, oid, { ...vehicle, mileageKm: 101 }); await finish(a, later.receipt); await a.query("COMMIT");
     expect(await anchor(oid)).toMatchObject({ state: "unavailable", firstRecordId: first.rawId });
   });
-  it("BOTH unavailable first captures stay unavailable after later genuine consent and same-identity available observations",async()=>{
+  it("BOTH unavailable first captures reject late genuine grants and later observations never repin",async()=>{
     const a=await connect();
     for(let visit=0;visit<2;visit++){
       const oid=await newOrder(a,{audience:"listing_public",listingId});
       const vehicle={method:"vin",vin:"AAA",mileageKm:100,observedAt:"2026-10-23T12:00:00Z"};
       const first=await observe(a,oid,vehicle);await finish(a,first.receipt);await a.query("COMMIT");
       const original=await prisma.diagnosticIdentityRecord.findUniqueOrThrow({where:{id:first.rawId}});
-      const grant=await ownershipGrant(a,oid);
-      const later=await observe(a,oid,{...vehicle,mileageKm:101,observedAt:"2026-10-23T12:01:00Z"},true,grant);
+      const orderBefore = await prisma.inspectionOrder.findUniqueOrThrow({ where: { id: oid } });
+      await expect(ownershipGrant(a,oid)).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
+      expect(await prisma.diagnosticOwnershipGrant.count({ where: { orderId: oid } })).toBe(0);
+      expect(await prisma.inspectionOrder.findUniqueOrThrow({ where: { id: oid } })).toEqual(orderBefore);
+      // Bypass no owner: direct prepared INSERT must also meet the original SQL guard.
+      const refused = await grantFixture(a,oid);
+      await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx,refused.c,async () => {
+        await tx.$executeRaw`INSERT INTO diagnostic_ownership_grants SELECT (jsonb_populate_record(NULL::diagnostic_ownership_grants,${JSON.stringify(refused.grant)}::jsonb)).*`;
+      }))).rejects.toThrow("diagnostic_ownership_grant_source");
+      const later=await observe(a,oid,{...vehicle,mileageKm:101,observedAt:"2026-10-23T12:01:00Z"});
       await finish(a,later.receipt);await a.query("COMMIT");
       expect(await anchor(oid)).toMatchObject({state:"unavailable",firstRecordId:first.rawId});
-      expect(await prisma.diagnosticOwnershipComponent.findUniqueOrThrow({where:{identityRecordId:later.rawId}})).toMatchObject({state:"available",grantId:grant["id"]});
+      expect(await prisma.diagnosticOwnershipComponent.findUniqueOrThrow({where:{identityRecordId:later.rawId}})).toMatchObject({state:"unavailable",grantId:null});
       expect(await prisma.diagnosticOwnershipComponent.findUniqueOrThrow({where:{identityRecordId:first.rawId}})).toMatchObject({state:"unavailable",grantId:null});
       expect(await prisma.diagnosticIdentityRecord.findUniqueOrThrow({where:{id:first.rawId}})).toEqual(original);
     }
@@ -871,6 +879,23 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     const message = await prisma.message.create({ data: { conversationId: conversation.id, senderId: foreign, kind: "text", body: "Scoped cascade fixture" } });
     const support = await prisma.supportCase.create({ data: { customerId: foreign, sourceListingId: listingId } });
     const history = await prisma.vehicleHistoryRequest.create({ data: { customerId: foreign, sourceListingId: listingId, proposedVin: "FOREIGN-RETAINED" } });
+    const oid = await newOrder(a, { audience: "listing_public", listingId });
+    const grant = await ownershipGrant(a,oid);
+    const capture = await observe(a,oid,{ method: "vin", vin: "AAA" },true,grant);
+    await finish(a,capture.receipt); await a.query("COMMIT");
+    const interest = await prisma.inspectionInterest.create({ data: { listingId, requesterUserId: foreign, side: "buyer" } });
+    const listingData = await prisma.listing.findUniqueOrThrow({ where: { id: listingId } });
+    const foreignListingId = randomUUID();
+    const foreignListing = await prisma.$transaction(async tx => withDiagnosticSourceCommand(tx,sourceCommand("listing_create",[{
+      table: "listings", key: { id: foreignListingId }, verb: "insert", expected: "absent",
+      next: await projection(a,"listings",{ ...listingData,id: foreignListingId }),
+    }]),() => tx.listing.create({ data: { ...listingData,id: foreignListingId,publicNumber: undefined } })));
+    const foreignOrderId = await newOrder(a,{ audience: "listing_public", listingId: foreignListing.id });
+    const foreignOrder = await prisma.inspectionOrder.findUniqueOrThrow({ where: { id: foreignOrderId } });
+    const foreignInterest = await prisma.inspectionInterest.create({ data: { listingId: foreignListing.id, requesterUserId: foreign, side: "buyer" } });
+    const orderBefore = await prisma.inspectionOrder.findUniqueOrThrow({ where: { id: oid } });
+    const rawBefore = await prisma.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: capture.rawId } });
+    const anchorBefore = await anchor(oid);
     const foreignBefore = await prisma.user.findUniqueOrThrow({ where: { id: foreign } });
     const before = await source(a, "listings", { id: listingId });
     const c = sourceCommand("listing_delete", [{ table: "listings", key: { id: listingId }, verb: "delete", expected: { source: before }, next: null }]);
@@ -879,21 +904,48 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
       await tx.listing.delete({ where: { id: listingId } });
       throw new Error("Listing cascade rollback sentinel");
     }))).rejects.toThrow("Listing cascade rollback sentinel");
+    expect(await prisma.inspectionOrder.findUniqueOrThrow({ where: { id: oid } })).toEqual(orderBefore);
+    expect(await prisma.inspectionInterest.findUniqueOrThrow({ where: { id: interest.id } })).toEqual(interest);
+    expect(await anchor(oid)).toEqual(anchorBefore);
     expect(await prisma.favorite.findUniqueOrThrow({ where: { id: favorite.id } })).toEqual(favorite);
     expect(await prisma.listingMedia.findUniqueOrThrow({ where: { id: media.id } })).toEqual(media);
     expect(await prisma.message.findUniqueOrThrow({ where: { id: message.id } })).toEqual(message);
     expect(await prisma.supportCase.findUniqueOrThrow({ where: { id: support.id } })).toEqual(support);
     expect(await prisma.vehicleHistoryRequest.findUniqueOrThrow({ where: { id: history.id } })).toEqual(history);
+    async function assertDeletionUnion(tx: Prisma.TransactionClient, receiptId: string) {
+      const [receipt] = await tx.$queryRaw<{ scope: { table: string; key: Row }[]; effects: Row[]; lock_keys: { namespace: number; key: number }[] }[]>`SELECT scope,effects,lock_keys FROM diagnostic_source_commands WHERE id=${receiptId}::uuid`;
+      expect(present(receipt).effects).toEqual(expect.arrayContaining([
+        expect.objectContaining({ table: "inspection_orders", key: { id: oid }, verb: "update", derived: "purge", next: expect.objectContaining({ listingId: null }) }),
+        expect.objectContaining({ table: "inspection_interests", key: { id: interest.id }, verb: "delete", expected: { source: expect.objectContaining({ id: interest.id, listing_id: listingId, requester_user_id: foreign, side: "buyer", willingness_to_pay_tmt: null }) } }),
+      ]));
+      // Preparation already owns dependency keys and rows, before the FK writes.
+      for (const [table,key] of [["inspection_orders",{ id: oid }],["inspection_interests",{ id: interest.id }],["diagnostic_source_anchors",{ orderId: oid }]] as const) {
+        expect(present(receipt).scope).toContainEqual(expect.objectContaining({ table,key }));
+        const [held] = await tx.$queryRaw<{ held: boolean }[]>`SELECT EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=pg_backend_pid() AND l.locktype='advisory' AND l.granted AND l.classid=(diagnostic_source_meta(${table})->>'namespace')::oid) held`;
+        expect(present(held).held).toBe(true);
+      }
+    }
     await prisma.$transaction(async tx => {
       // Direct DELETE and exported finish use the same completion triggers. The
       // direct form is deliberately followed by no wrapper finish a second time.
       if (mode === "delete") {
         const [receipt] = await tx.$queryRaw<{ id: string }[]>`SELECT diagnostic_prepare_source(${JSON.stringify(c)}::jsonb)::text id`;
+        await assertDeletionUnion(tx,present(receipt).id);
         await tx.listing.delete({ where: { id: listingId } });
         await tx.$executeRaw`DELETE FROM diagnostic_source_commands WHERE id=${present(receipt).id}::uuid`;
-      } else await withDiagnosticSourceCommand(tx, c, () => tx.listing.delete({ where: { id: listingId } }));
+      } else await withDiagnosticSourceCommand(tx, c, async receipt => {
+        await assertDeletionUnion(tx,receipt.receiptId);
+        await tx.listing.delete({ where: { id: listingId } });
+      });
     });
     expect(await prisma.listing.findUnique({ where: { id: listingId } })).toBeNull();
+    expect(await prisma.inspectionOrder.findUniqueOrThrow({ where: { id: oid } })).toEqual({ ...orderBefore,listingId: null });
+    expect(await prisma.inspectionInterest.findUnique({ where: { id: interest.id } })).toBeNull();
+    expect(await anchor(oid)).toEqual({ ...anchorBefore,state: "changed" });
+    expect(await prisma.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: capture.rawId } })).toEqual(rawBefore);
+    expect(await prisma.inspectionOrder.findUniqueOrThrow({ where: { id: foreignOrder.id } })).toEqual(foreignOrder);
+    expect(await prisma.inspectionInterest.findUniqueOrThrow({ where: { id: foreignInterest.id } })).toEqual(foreignInterest);
+    expect(await prisma.listing.findUniqueOrThrow({ where: { id: foreignListing.id } })).toEqual(foreignListing);
     expect(await prisma.favorite.findUnique({ where: { id: favorite.id } })).toBeNull();
     expect(await prisma.listingMedia.findUnique({ where: { id: media.id } })).toBeNull();
     expect(await prisma.conversation.findUnique({ where: { id: conversation.id } })).toBeNull();
@@ -955,10 +1007,16 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     for (const status of ["suspended", "active"]) {
       const plan = await update(a, "dealership_members", { id: member }, { status });
       await prisma.$transaction(tx => withDiagnosticSourceCommand(tx, sourceCommand("member_eligibility", [plan]), () => tx.dealershipMember.update({ where: { id: member }, data: { status } })));
+      for (let i=0; i<visits.length; i++) {
+        expect(await anchor(present(visits[i]))).toMatchObject({ state: phase === "captured" ? "unchanged" : "pending", firstRecordId: rawIds[i], source: { memberId: member } });
+        const [current] = (await pool.query<{ current: boolean }>("SELECT diagnostic_ownership_grant_current(g,clock_timestamp() AT TIME ZONE 'UTC') current FROM diagnostic_ownership_grants g WHERE id=$1",[present(grants[i])["id"]])).rows;
+        expect(present(current).current).toBe(status === "active");
+      }
     }
     for (const role of ["sales", "owner"] as const) {
       const plan = await update(a, "dealership_members", { id: member }, { role });
       await prisma.$transaction(tx => withDiagnosticSourceCommand(tx, sourceCommand("member_eligibility", [plan]), () => tx.dealershipMember.update({ where: { id: member }, data: { role } })));
+      for (let i=0; i<visits.length; i++) expect(await anchor(present(visits[i]))).toMatchObject({ state: phase === "captured" ? "unchanged" : "pending", firstRecordId: rawIds[i], source: { memberId: member } });
       for (const grant of grants) {
         const [current] = (await pool.query<{ current: boolean }>("SELECT diagnostic_ownership_grant_current(g,clock_timestamp() AT TIME ZONE 'UTC') current FROM diagnostic_ownership_grants g WHERE id=$1",[grant["id"]])).rows;
         expect(present(current).current).toBe(role === "owner");
@@ -1177,18 +1235,22 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     await guards(true);
     const scheduledAt = new Date("2030-01-01Z"), plan = await update(a,"users",{ id: userId },{ deletionScheduledAt: scheduledAt.toISOString() });
     const c = sourceCommand("account_schedule",[plan]);
-    async function schedulingWrites(tx: Prisma.TransactionClient, omitBaseline = false) {
+    async function schedulingWrites(tx: Prisma.TransactionClient, omitBaseline = false, repeated = false, omitAudit: "membership" | "staff" | null = null) {
       await tx.user.update({ where: { id: userId }, data: { deletionScheduledAt: scheduledAt } });
       await tx.dealershipMember.delete({ where: { id: member } });
       await tx.dealership.update({ where: { id: business }, data: { status: "recovery" } });
-      const [ids] = await tx.$queryRaw<{ member: string; staff: string }[]>`SELECT diagnostic_intake_uuid(${'diagnostic-source:account_schedule:'+userId+':membership'}) member,diagnostic_intake_uuid(${'diagnostic-source:account_schedule:'+userId+':staff'}) staff`;
-      await tx.auditLog.create({ data: { id: present(ids).member, actorId: userId, action: "BUSINESS_MEMBERSHIP_ENDED_FOR_DELETION", targetType: "Dealership", targetId: business, details: { role: "owner", recoveryRequired: true } } });
+      const [ids] = await tx.$queryRaw<{ member: string; staff: string }[]>`SELECT diagnostic_source_account_audit_id(${userId},'membership') member,diagnostic_source_account_audit_id(${userId},'staff') staff`;
+      if (omitAudit !== "membership") await tx.auditLog.create({ data: { id: present(ids).member, actorId: userId, action: "BUSINESS_MEMBERSHIP_ENDED_FOR_DELETION", targetType: "Dealership", targetId: business, details: { role: "owner", recoveryRequired: true } } });
       if (!omitBaseline) await tx.measurementState.delete({ where: { key: baselineKey } });
       await tx.measurementInvestigationExport.deleteMany();
-      await tx.measurementPrincipal.delete({ where: { id: principal } });
-      await tx.dealershipInvitation.delete({ where: { id: invitation } });
+      if (!repeated) {
+        await tx.measurementPrincipal.delete({ where: { id: principal } });
+        await tx.dealershipInvitation.delete({ where: { id: invitation } });
+      }
       await tx.$executeRaw`UPDATE staff_grants SET "revokedAt"=CURRENT_TIMESTAMP WHERE "userId"=${userId} AND "revokedAt" IS NULL`;
-      await tx.auditLog.create({ data: { id: present(ids).staff, actorId: userId, action: "STAFF_AUTHORITY_REVOKED_FOR_DELETION", targetType: "User", targetId: userId, details: { reason: "Account deletion scheduled", capabilities: ["support.operations"] } } });
+      if (omitAudit !== "staff") await tx.auditLog.create({ data: { id: present(ids).staff, actorId: userId, action: "STAFF_AUTHORITY_REVOKED_FOR_DELETION", targetType: "User", targetId: userId, details: { reason: "Account deletion scheduled", capabilities: ["support.operations"] } } });
+      const [target] = await tx.$queryRaw<{ stamp: Date }[]>`SELECT diagnostic_source_staff_revocation_timestamp(transaction_timestamp()) stamp`;
+      expect((await tx.staffGrant.findUniqueOrThrow({ where: { userId_capability: { userId, capability: "support.operations" } } })).revokedAt).toEqual(present(target).stamp);
       await tx.listing.update({ where: { id: listingId }, data: { status: "archived", archivedByDeletion: true } });
     }
     await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx,c,() => schedulingWrites(tx,true)))).rejects.toThrow("diagnostic_source_final_effect");
@@ -1220,6 +1282,67 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     expect(await prisma.measurementPrincipal.findUnique({ where: { id: principal } })).toBeNull();
     expect(await prisma.staffGrant.findUniqueOrThrow({ where: { userId_capability: { userId, capability: "support.operations" } } })).toEqual(revoked);
     expect(await prisma.measurementVisit.findUniqueOrThrow({ where: { id: unlinked } })).toEqual(before.guestVisit);
+    const firstAudits = await prisma.auditLog.findMany({ where: { actorId: userId }, orderBy: { action: "asc" } });
+    expect(firstAudits.map(row => row.action)).toEqual(["BUSINESS_MEMBERSHIP_ENDED_FOR_DELETION","STAFF_AUTHORITY_REVOKED_FOR_DELETION"]);
+    // A fresh, explicit source command models lawful authority reacquisition.
+    // Restoration itself revived neither family. These are new member/staff
+    // transitions, not ownership consent, bootstrap or production caller proof.
+    const memberNext = { id: member,userId,dealershipId: business,role: "owner",status: "active" } as const;
+    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx,sourceCommand("member_create",[{
+      table: "dealership_members",key: { id: member },verb: "insert",expected: "absent",next: memberNext,
+    }]),async () => {
+      await tx.dealershipMember.create({ data: memberNext });
+      await tx.dealership.update({ where: { id: business },data: { status: "active" } });
+    }));
+    const regrantedAt = new Date();
+    const regrant = await update(a,"staff_grants",{ userId,capability: "support.operations" },{ revokedAt: null,grantedAt: regrantedAt.toISOString() });
+    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx,sourceCommand("staff_eligibility",[regrant]),() =>
+      tx.staffGrant.update({ where: { userId_capability: { userId,capability: "support.operations" } },data: { revokedAt: null,grantedAt: regrantedAt } })));
+    const reacquiredMember = await prisma.dealershipMember.findUniqueOrThrow({ where: { id: member } });
+    const reacquiredStaff = await prisma.staffGrant.findUniqueOrThrow({ where: { userId_capability: { userId,capability: "support.operations" } } });
+    const restoredUser = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    // Reusing the exact same schedule date must still create a second event.
+    const second = sourceCommand("account_schedule",[await update(a,"users",{ id: userId },{ deletionScheduledAt: scheduledAt.toISOString() })]);
+    await prisma.measurementState.create({ data: { key: baselineKey,epoch: collectorEpoch } });
+    for (const family of ["membership","staff"] as const) {
+      await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx,second,() => schedulingWrites(tx,false,true,family)))).rejects.toThrow("diagnostic_source_final_effect");
+      expect(await prisma.auditLog.findMany({ where: { actorId: userId },orderBy: { action: "asc" } })).toEqual(firstAudits);
+      expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(restoredUser);
+      expect(await prisma.dealershipMember.findUniqueOrThrow({ where: { id: member } })).toEqual(reacquiredMember);
+      expect(await prisma.staffGrant.findUniqueOrThrow({ where: { userId_capability: { userId,capability: "support.operations" } } })).toEqual(reacquiredStaff);
+      expect(await prisma.measurementState.findUnique({ where: { key: baselineKey } })).not.toBeNull();
+    }
+    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx,second,() => schedulingWrites(tx,false,true)));
+    const allAudits = await prisma.auditLog.findMany({ where: { actorId: userId } });
+    expect(allAudits).toHaveLength(4);
+    for (const first of firstAudits) {
+      expect(allAudits).toContainEqual(first);
+      const events = allAudits.filter(row => row.action === first.action);
+      expect(events).toHaveLength(2);
+      expect(new Set(events.map(row => row.id)).size).toBe(2);
+      expect(events.map(row => ({ ...row,id: first.id,createdAt: first.createdAt }))).toEqual([first,first]);
+    }
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toMatchObject({ deletionScheduledAt: scheduledAt });
+    expect(await prisma.dealershipMember.findUnique({ where: { id: member } })).toBeNull();
+    expect((await prisma.staffGrant.findUniqueOrThrow({ where: { userId_capability: { userId,capability: "support.operations" } } })).revokedAt).not.toBeNull();
+    expect(await prisma.measurementVisit.findUniqueOrThrow({ where: { id: unlinked } })).toEqual(before.guestVisit);
+    expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
+  });
+
+  it.each(["2026-10-24T12:00:00.123400Z","2026-10-24T12:00:00.123600Z"])("staff revocation uses exact physical TIMESTAMP(3) rounding for %s",async instant => {
+    const a = await connect();
+    await a.query("SET TIME ZONE 'UTC'");
+    const expected = instant.includes("123600") ? "2026-10-24T12:00:00.124" : "2026-10-24T12:00:00.123";
+    const [rounded] = (await a.query<{ stamp: string }>("SELECT to_char(diagnostic_source_staff_revocation_timestamp($1::timestamptz),'YYYY-MM-DD\"T\"HH24:MI:SS.MS') stamp",[instant])).rows;
+    expect(present(rounded).stamp).toBe(expected);
+    const next = await projection(a,"staff_grants",{ userId,capability: "support.operations",grantedAt: "2026-10-24T11:00:00",revokedAt: null });
+    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx,sourceCommand("staff_eligibility",[{
+      table: "staff_grants",key: { userId,capability: "support.operations" },verb: "insert",expected: "absent",next,
+    }]),() => tx.staffGrant.create({ data: { userId,capability: "support.operations",grantedAt: new Date("2026-10-24T11:00:00Z") } })));
+    const plan = await update(a,"staff_grants",{ userId,capability: "support.operations" },{ revokedAt: expected });
+    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx,sourceCommand("staff_eligibility",[plan]),() =>
+      tx.$executeRaw`UPDATE staff_grants SET "revokedAt"=${instant}::timestamptz AT TIME ZONE 'UTC' WHERE "userId"=${userId} AND capability='support.operations'`));
+    expect((await prisma.staffGrant.findUniqueOrThrow({ where: { userId_capability: { userId,capability: "support.operations" } } })).revokedAt).toEqual(new Date(expected+"Z"));
     expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
   });
 
