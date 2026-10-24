@@ -50,7 +50,7 @@ export class DeleteMe {
     );
 
     await this.sessionRepo.deleteAllByUserId(input.userId);
-    await this.unitOfWork.run(async (writes) => {
+    await this.unitOfWork.run({ userId: input.userId, deletionScheduledAt }, async (writes) => {
       await writes.scheduleDeletion(input.userId, deletionScheduledAt);
       await writes.archiveActiveListings(input.userId);
     });

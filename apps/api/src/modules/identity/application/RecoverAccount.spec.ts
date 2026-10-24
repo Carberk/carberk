@@ -93,12 +93,16 @@ class FakeAccountRestoreUnitOfWork implements AccountRestoreUnitOfWork {
 
   constructor(private readonly store: InMemoryAccountStore) {}
 
-  async run<T>(work: (writes: AccountRestoreWrites) => Promise<T>): Promise<T> {
+  async run<T>(command: { readonly userId: string }, work: (writes: AccountRestoreWrites) => Promise<T>): Promise<T | undefined> {
     this.runs += 1;
     const before = this.store.snapshot();
+    if (this.store.users.get(command.userId)?.deletionScheduledAt === null) return undefined;
+    let republished = false;
+    let cleared = false;
     try {
-      return await work({
+      const result = await work({
         republishListingsArchivedByDeletion: async (sellerId) => {
+          if (sellerId !== command.userId || republished || cleared) throw new Error("account_restore_target");
           for (const listing of this.store.listings) {
             if (
               listing.sellerId === sellerId &&
@@ -109,16 +113,21 @@ class FakeAccountRestoreUnitOfWork implements AccountRestoreUnitOfWork {
               listing.archivedByDeletion = false;
             }
           }
+          republished = true;
           this.failIfAsked("republishListingsArchivedByDeletion");
         },
         clearDeletionSchedule: async (userId) => {
+          if (userId !== command.userId || !republished || cleared) throw new Error("account_restore_target");
           const user = this.store.users.get(userId);
           if (user) {
             this.store.users.set(userId, { ...user, deletionScheduledAt: null });
           }
+          cleared = true;
           this.failIfAsked("clearDeletionSchedule");
         },
       });
+      if (!republished || !cleared) throw new Error("account_restore_incomplete");
+      return result;
     } catch (error) {
       this.store.restore(before);
       throw error;

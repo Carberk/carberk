@@ -12,3 +12,5 @@ export {
   type DiagnosticSourceTable, type PreparedDiagnosticSource,
 } from "./diagnostic-source-command";
 export { withCampaignPreparation, type CampaignMutation } from "./campaign-preparation";
+
+export { accountSourceCommand, type AccountSourceInput } from "./account-source-command";

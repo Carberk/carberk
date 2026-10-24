@@ -175,15 +175,29 @@ class FakeDeletionUnitOfWork implements AccountDeletionUnitOfWork {
 
   constructor(private readonly users: FakeUsers) {}
 
-  run<T>(work: (writes: AccountDeletionWrites) => Promise<T>): Promise<T> {
-    return work({
-      scheduleDeletion: async (userId, deletionScheduledAt) => {
-        this.users.scheduled.set(userId, deletionScheduledAt);
-      },
-      archiveActiveListings: async (sellerId) => {
-        this.archivedFor.push(sellerId);
-      },
-    });
+  async run<T>(command: { readonly userId: string; readonly deletionScheduledAt: Date }, work: (writes: AccountDeletionWrites) => Promise<T>): Promise<T> {
+    const before = new Map(this.users.scheduled), archivedBefore = [...this.archivedFor];
+    let scheduled = false, archived = false;
+    try {
+      const result = await work({
+        scheduleDeletion: async (userId, deletionScheduledAt) => {
+          if (userId !== command.userId || deletionScheduledAt.getTime() !== command.deletionScheduledAt.getTime() || scheduled || archived) throw new Error("account_deletion_target");
+          this.users.scheduled.set(userId, deletionScheduledAt);
+          scheduled = true;
+        },
+        archiveActiveListings: async (sellerId) => {
+          if (sellerId !== command.userId || !scheduled || archived) throw new Error("account_deletion_target");
+          this.archivedFor.push(sellerId);
+          archived = true;
+        },
+      });
+      if (!scheduled || !archived) throw new Error("account_deletion_incomplete");
+      return result;
+    } catch (error) {
+      this.users.scheduled = before;
+      this.archivedFor = archivedBefore;
+      throw error;
+    }
   }
 }
 

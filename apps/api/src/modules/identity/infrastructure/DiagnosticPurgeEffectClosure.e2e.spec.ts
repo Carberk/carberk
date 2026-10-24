@@ -26,6 +26,15 @@ import { diagnosticRuntime } from "../../diagnostics/infrastructure/diagnosticRu
 import { DiagnosticReport, type DiagnosticReportState } from "../../diagnostics/domain/DiagnosticReport";
 import type { DiagnosticSubject } from "../../diagnostics/domain/ports/DiagnosticIntakePort";
 
+import { DeleteMe } from "../application/DeleteMe";
+import { RecoverAccount } from "../application/RecoverAccount";
+import type { AccountDeletionUnitOfWork } from "../domain/ports/AccountDeletionUnitOfWork";
+import { PrismaAccountDeletionUnitOfWork } from "./PrismaAccountDeletionUnitOfWork";
+import { PrismaAccountRestoreUnitOfWork } from "./PrismaAccountRestoreUnitOfWork";
+import { PrismaSessionRepository } from "./PrismaSessionRepository";
+import { PrismaUserRepository } from "./PrismaUserRepository";
+import { BcryptHasherAdapter } from "./BcryptHasherAdapter";
+
 const suite = defineE2eSuite("b1-purge-effect-closure");
 const people = ["sellerA", "sellerB", "technician", "reviewer", "predecessorReviewer", "reception", "outsider"] as const;
 const localized = { en: "Synthetic", ru: "Synthetic", tk: "Synthetic" };
@@ -795,6 +804,60 @@ describe("B1 disposal of lawful persisted ownership and consumed retry graphs", 
     expect(await db.diagnosticSourceCommand.count()).toBe(0);
   });
 
+  it("real DeleteMe and RecoverAccount retain a genuinely consumed request/report binding and foreign ownership material", async () => {
+    const graph = await unusedProof();
+    await guards(false);
+    const actor = subject("technician");
+    const request = await proofs.prepareRequest(actor, graph.b.id, { kind: "consume" });
+    const input = D.DiagnosticContinuityRequestExecuteSchema.parse({ kind: "consume", command: {
+      proofId: graph.proof.id, reportId: randomUUID(), expectedOrderVersion: graph.orderB.version,
+      reason: "Synthetic actual account scheduling retention",
+    } });
+    await proofs.executeRequest(actor, graph.b.id, request.requestId, input);
+    const report = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { continuityRequestId: request.requestId } });
+    const consumed = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: graph.proof.id } });
+    expect(consumed).toMatchObject({ consumedReportId: report.id, consumedAt: expect.any(Date), invalidatedAt: null });
+    expect(report).toMatchObject({ continuityRequestId: request.requestId, continuityRequestSessionId: actor.sessionId, continuityProofId: consumed.id, reinspectionOrderVersion: graph.orderB.version });
+    const foreign = await db.listing.findUniqueOrThrow({ where: { id: graph.a.listingId } });
+    const anchors = await db.diagnosticSourceAnchor.findMany({ where: { orderId: { in: [graph.a.id, graph.b.id] } }, orderBy: { orderId: "asc" } });
+    const raw = await db.diagnosticIdentityRecord.findMany({ where: { orderId: { in: [graph.a.id, graph.b.id] } }, orderBy: { id: "asc" } });
+    const originalSessions = await db.session.findMany({ where: { userId: actor.userId } });
+    const originalGrants = await db.staffGrant.findMany({ where: { userId: actor.userId } });
+    const users = new PrismaUserRepository(db), sessions = new PrismaSessionRepository(db, new BcryptHasherAdapter());
+    const schedule = new PrismaAccountDeletionUnitOfWork(db), restore = new PrismaAccountRestoreUnitOfWork(db);
+    await guards(true);
+    const failing: AccountDeletionUnitOfWork = { run: (command, work) => schedule.run(command, writes => work({ ...writes,
+      archiveActiveListings: async id => { await writes.archiveActiveListings(id); throw new Error("actual account archive rollback"); },
+    })) };
+    await expect(new DeleteMe(users, sessions, failing, clock).execute({ userId: actor.userId })).rejects.toThrow("actual account archive rollback");
+    // Revoke-first is a separately committed production Session transaction.
+    expect(await db.session.findUnique({ where: { id: actor.sessionId } })).toBeNull();
+    expect(await db.diagnosticContinuityRequest.findUnique({ where: { id: request.requestId } })).toBeNull();
+    expect((await db.user.findUniqueOrThrow({ where: { id: actor.userId } })).deletionScheduledAt).toBeNull();
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: report.id } })).toEqual(report);
+    expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: consumed.id } })).toEqual(consumed);
+    expect(await db.diagnosticSourceCommand.count()).toBe(0);
+    await new DeleteMe(users, sessions, schedule, clock).execute({ userId: actor.userId });
+    expect((await db.user.findUniqueOrThrow({ where: { id: actor.userId } })).deletionScheduledAt).not.toBeNull();
+    await new RecoverAccount(users, restore).execute({ userId: actor.userId });
+    expect((await db.user.findUniqueOrThrow({ where: { id: actor.userId } })).deletionScheduledAt).toBeNull();
+    expect(await db.session.count({ where: { userId: actor.userId } })).toBe(0);
+    expect(await db.staffGrant.count({ where: { userId: actor.userId, revokedAt: null } })).toBe(0);
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: report.id } })).toEqual(report);
+    expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: consumed.id } })).toEqual(consumed);
+    expect(await db.diagnosticSourceAnchor.findMany({ where: { orderId: { in: [graph.a.id, graph.b.id] } }, orderBy: { orderId: "asc" } })).toEqual(anchors);
+    expect(await db.diagnosticIdentityRecord.findMany({ where: { orderId: { in: [graph.a.id, graph.b.id] } }, orderBy: { id: "asc" } })).toEqual(raw);
+    expect(await db.listing.findUniqueOrThrow({ where: { id: foreign.id } })).toEqual(foreign);
+    await expect(proofs.executeRequest(actor, graph.b.id, request.requestId, input)).rejects.toThrow();
+    expect(await db.diagnosticSourceCommand.count()).toBe(0);
+    // Preactivation fixture repair for this existing sequential suite's later
+    // worker-purge attack. Production restore above revived none of these rows.
+    await guards(false);
+    for (const session of originalSessions) await db.session.create({ data: session });
+    for (const grant of originalGrants) await db.staffGrant.update({ where: { userId_capability: { userId: grant.userId, capability: grant.capability } }, data: { revokedAt: grant.revokedAt } });
+    await guards(true);
+  });
+
   it("deletes consumed proof/issue request while preserving B's report retry minimum and foreign snapshot", async () => {
     const a = await visit("sellerA"), b = await visit("sellerB"); await guards(false);
     const orderA = await db.inspectionOrder.findUniqueOrThrow({ where: { id: a.id } });
@@ -850,5 +913,8 @@ describe("B1 disposal of lawful persisted ownership and consumed retry graphs", 
     await expect(proofs.executeRequest(subject("technician"), b.id, consumeRequest.requestId, consume)).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
 
   });
+
+
+
 
 });

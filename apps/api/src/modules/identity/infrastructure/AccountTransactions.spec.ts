@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { PrismaService } from "@auto-tm/db";
 import { PrismaAccountDeletionUnitOfWork } from "./PrismaAccountDeletionUnitOfWork";
 import { PrismaAccountRestoreUnitOfWork } from "./PrismaAccountRestoreUnitOfWork";
+import { PrismaUserRepository } from "./PrismaUserRepository";
+import { PrismaSessionRepository } from "./PrismaSessionRepository";
+import { BcryptHasherAdapter } from "./BcryptHasherAdapter";
+import { DeleteMe } from "../application/DeleteMe";
+import { RecoverAccount } from "../application/RecoverAccount";
 
 const date = new Date("2026-11-24T12:00:00.000Z");
 const stamp = new Date("2026-10-24T12:00:00.124Z");
@@ -10,7 +15,8 @@ const stamp = new Date("2026-10-24T12:00:00.124Z");
 // supplies server-owned values. CRUD predicates and rollback act on stored rows.
 function boundary(role: "owner" | "sales" = "owner", businessStatus = "active") {
   let state = {
-    user: { id: "user", deletionScheduledAt: null as Date | null },
+    user: { id: "user", phone: "+99361234567", phoneVerifiedAt: stamp, email: null, emailVerifiedAt: null, deletionScheduledAt: null as Date | null },
+    sessions: [{ id: "session", userId: "user", expiresAt: date, adminTotpExpiresAt: null }, { id: "foreign-session", userId: "foreign", expiresAt: date, adminTotpExpiresAt: null }],
     member: { id: "member", userId: "user", dealershipId: "business", role } as { id: string; userId: string; dealershipId: string; role: string } | null,
     business: { id: "business", status: businessStatus },
     listings: [
@@ -30,8 +36,10 @@ function boundary(role: "owner" | "sales" = "owner", businessStatus = "active") 
   const tx = {
     $queryRaw: async (sql: TemplateStringsArray, ...values: unknown[]) => {
       const query = sql.join("?");
+      if (query.includes("diagnostic_source_read") && values[0] !== "user") return [{ source: null }];
       if (query.includes("diagnostic_source_read")) return [{ source: { id: "user", deletionScheduledAt: state.user.deletionScheduledAt?.toISOString() ?? null }, next: { id: "user", deletionScheduledAt: (values[1] as Date | null)?.toISOString() ?? null }, membershipAuditId: "membership-xid", staffAuditId: "staff-xid", timestamp: stamp }];
       if (query.includes("diagnostic_prepare_source")) { prepared = true; state.receipts.push("receipt"); return [{ receipt: "receipt" }]; }
+      if (query.includes("diagnostic_assert_source")) return [];
       if (query.includes("diagnostic_finish_source")) { state.receipts = []; return []; }
       if (query.includes("measurement_state")) return collectorPresent ? [{ epoch: "epoch" }] : [];
       if (query.includes('UPDATE "staff_grants"')) { write(); const active = state.grants.filter(g => !g.revokedAt); active.forEach(g => { g.revokedAt = values[0] as Date; }); return active; }
@@ -40,7 +48,15 @@ function boundary(role: "owner" | "sales" = "owner", businessStatus = "active") 
     },
     user: {
       findUniqueOrThrow: async () => ({ ...state.user }),
+      findUnique: async ({ where }: { where: { id: string } }) => where.id === state.user.id ? { ...state.user } : null,
       update: async ({ data }: { data: { deletionScheduledAt: Date | null } }) => { write(); Object.assign(state.user, data); },
+    },
+    session: {
+      findMany: async ({ where }: { where: { userId: string } }) => state.sessions.filter(s => s.userId === where.userId),
+      deleteMany: async ({ where }: { where: { userId: string } }) => {
+        write(); const count = state.sessions.filter(s => s.userId === where.userId).length;
+        state.sessions = state.sessions.filter(s => s.userId !== where.userId); return { count };
+      },
     },
     dealershipMember: {
       findUnique: async () => state.member,
@@ -56,11 +72,11 @@ function boundary(role: "owner" | "sales" = "owner", businessStatus = "active") 
       write(); for (const listing of state.listings) if (Object.entries(where).every(([key, value]) => listing[key as keyof typeof listing] === value)) Object.assign(listing, data);
     } },
   };
-  const db = { $transaction: async (work: (transaction: typeof tx) => Promise<unknown>) => {
+  const db = { ...tx, $transaction: async (work: (transaction: typeof tx) => Promise<unknown>) => {
     const before = structuredClone(state); prepared = false;
     try { return await work(tx); } catch (error) { state = before; throw error; }
   } } as unknown as PrismaService;
-  return { deletion: new PrismaAccountDeletionUnitOfWork(db), restore: new PrismaAccountRestoreUnitOfWork(db), state: () => structuredClone(state), writes: () => writes, withoutCollector: () => { collectorPresent = false; } };
+  return { db, deletion: new PrismaAccountDeletionUnitOfWork(db), restore: new PrismaAccountRestoreUnitOfWork(db), state: () => structuredClone(state), writes: () => writes, withoutCollector: () => { collectorPresent = false; } };
 }
 
 async function schedule(b: ReturnType<typeof boundary>) {
@@ -71,6 +87,28 @@ async function schedule(b: ReturnType<typeof boundary>) {
 }
 
 describe("actual account adapters", () => {
+  it("keeps actual Session revocation committed when later deletion fails, then retries through DeleteMe and restores through RecoverAccount", async () => {
+    const b = boundary();
+    const users = new PrismaUserRepository(b.db);
+    const sessions = new PrismaSessionRepository(b.db, new BcryptHasherAdapter());
+    const clock = { now: () => new Date("2026-10-25T12:00:00.000Z") };
+    const failing = new DeleteMe(users, sessions, {
+      run: (command, work) => b.deletion.run(command, writes => work({
+        ...writes, archiveActiveListings: async id => { await writes.archiveActiveListings(id); throw new Error("after archive"); },
+      })),
+    }, clock);
+    await expect(failing.execute({ userId: "user" })).rejects.toThrow("after archive");
+    expect(b.state().sessions.map(s => s.id)).toEqual(["foreign-session"]);
+    expect(b.state().user.deletionScheduledAt).toBeNull();
+    expect(b.state().listings[0]?.status).toBe("active");
+    expect(b.state().audits).toEqual([]);
+    await new DeleteMe(users, sessions, b.deletion, clock).execute({ userId: "user" });
+    expect(b.state().user.deletionScheduledAt).toEqual(date);
+    await new RecoverAccount(users, b.restore).execute({ userId: "user" });
+    expect(b.state().user.deletionScheduledAt).toBeNull();
+    expect(b.state().sessions.map(s => s.id)).toEqual(["foreign-session"]);
+  });
+
   it.each([["owner", "active", "recovery"], ["owner", "suspended", "suspended"], ["sales", "active", "active"]] as const)("schedules %s in %s atomically", async (role, status, expected) => {
     const b = boundary(role, status);
     await schedule(b);
@@ -125,6 +163,15 @@ describe("actual account adapters", () => {
     expect(restored.grants.every(g => g.revokedAt !== null)).toBe(true);
     await b.restore.run({ userId: "user" }, async () => { throw new Error("no-op callback ran"); });
     expect(b.state()).toEqual(restored);
+  });
+
+  it("refuses unknown Users and restore target mismatches without writes", async () => {
+    const b = boundary();
+    await expect(b.restore.run({ userId: "missing" }, async () => undefined)).rejects.toThrow("User not found");
+    expect(b.writes()).toBe(0);
+    await schedule(b); const before = b.state();
+    await expect(b.restore.run({ userId: "user" }, writes => writes.republishListingsArchivedByDeletion("foreign"))).rejects.toThrow("account_restore_target");
+    expect(b.state()).toEqual(before);
   });
 
   it("rolls back partial restore and restores with an absent collector/baseline", async () => {

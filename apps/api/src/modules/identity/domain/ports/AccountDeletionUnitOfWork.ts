@@ -7,10 +7,11 @@ export interface AccountDeletionWrites {
 
 /**
  * Runs the deletion writes in one transaction: they all commit, or, when the
- * work throws, none of them does.
+ * work throws, none of them does. Both helpers must complete, in order,
+ * for the declared User and schedule. Mismatches and omissions roll back.
  */
 export interface AccountDeletionUnitOfWork {
-  run<T>(work: (writes: AccountDeletionWrites) => Promise<T>): Promise<T>;
+  run<T>(command: { readonly userId: string; readonly deletionScheduledAt: Date }, work: (writes: AccountDeletionWrites) => Promise<T>): Promise<T>;
 }
 
 export const ACCOUNT_DELETION_UNIT_OF_WORK = Symbol("AccountDeletionUnitOfWork");
