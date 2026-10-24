@@ -68,6 +68,40 @@ it("requires B intention review and sends only the explicit B command", async ()
  fireEvent.click(within(final).getByRole("button", { name: c.consume })); await screen.findAllByRole("button", { name: c.result });
  expect(writes.at(-1)?.body).toEqual({ kind: "consume", command: { proofId, reportId: expect.any(String), expectedOrderVersion: 7, reason: "My intended physical visit" } });
 });
+it.each([
+ ["en", "observation"], ["en", "authorization"],
+ ["ru", "observation"], ["ru", "authorization"],
+ ["tk", "observation"], ["tk", "authorization"],
+] as const)("explains unavailable B %s %s and refreshes the current visit before review", async (locale, missing) => {
+ if (missing === "observation") context.order.observedVehicle = null;
+ else { context.order.physicalAuthorized = false; context.order.physicalAuthorization = null; }
+ setup(proofId, locale); const copy = continuityCopy[locale];
+ expect(await screen.findByRole("alert")).toHaveProperty("textContent", copy.bUnavailable);
+ expect(screen.queryByRole("button", { name: copy.reviewB })).toBeNull();
+ expect(screen.queryByRole("button", { name: copy.consume })).toBeNull();
+ const summary = screen.getByRole("heading", { name: copy.current }).closest("section")!;
+ expect(within(summary).getByText(copy.physicalAuthorization, { exact: false }).textContent).toBe(`${copy.physicalAuthorization}: ${missing === "authorization" ? copy.notEstablished : diagnosticCopy[locale].saved}`);
+ // Refresh B re-reads the parent context and the exact handle, without preparing an operation.
+ context.order = { ...context.order, observedVehicle: observation, physicalAuthorized: true, physicalAuthorization: { authorityReference: "Synthetic", recordedBy: actor, recordedAt: observation.observedAt } };
+ pages = 4;
+ fireEvent.click(screen.getByRole("button", { name: copy.refreshB }));
+ await screen.findByRole("button", { name: copy.reviewB });
+ expect(fetches.filter(path => path.endsWith("/workspace"))).toHaveLength(2);
+ expect(screen.queryByText(copy.bUnavailable)).toBeNull(); expect(writes).toEqual([]);
+ fireEvent.click(screen.getByRole("button", { name: copy.return }));
+ expect(screen.getByRole("button", { name: copy.visit }).getAttribute("aria-current")).toBe("step");
+});
+it.each(["en", "ru", "tk"] as const)("keeps physical authorization visible in the persistent B summary across panels in %s", async locale => {
+ setup(undefined, locale); const copy = continuityCopy[locale];
+ const summary = (await screen.findByRole("heading", { name: copy.current })).closest("section")!;
+ expect(within(summary).getByText(`${copy.physicalAuthorization}: ${diagnosticCopy[locale].saved}`)).toBeTruthy();
+ for (const panel of [copy.visit, copy.link, diagnosticCopy[locale].reports]) {
+  fireEvent.click(screen.getByRole("button", { name: panel }));
+  expect(summary.isConnected).toBe(true); expect(summary.closest("[hidden]")).toBeNull();
+  expect(within(summary).getByText(`${copy.physicalAuthorization}: ${diagnosticCopy[locale].saved}`)).toBeTruthy();
+ }
+ expect(writes).toEqual([]);
+});
 it("checks uncertain execution status before enabling exact unchanged retry", async () => {
  loseExecute = true; setup(proofId); fireEvent.change(await screen.findByRole("textbox", { name: `${base.reason} · ${c.required}` }), { target: { value: "Original exact reason" } }); fireEvent.click(screen.getByRole("button", { name: c.reviewB })); fireEvent.click(screen.getByRole("button", { name: c.consume }));
  await screen.findByText(c.uncertain); expect(screen.queryByRole("button", { name: c.retryExact })).toBeNull();
@@ -117,7 +151,7 @@ it("uploads no bytes before classification and records a complete correction usi
  fireEvent.change(screen.getByLabelText(`${c.location} · ${c.required}`), { target: { value: "New complete physical plate" } }); fireEvent.change(screen.getByLabelText(`${c.value} · ${c.required}`), { target: { value: "New physical value" } });
  expect(screen.getByRole("button", { name: c.capture }).getAttribute("aria-disabled")==="true").toBe(true);
  fireEvent.click(screen.getByRole("button", { name: c.stage }));
- const support = await screen.findByRole("checkbox", { name: `${c.verified} 2` }); fireEvent.click(support);
+ const support = await screen.findByRole("checkbox", { name: `${c.verified} 2` }); expect(support.getAttribute("aria-required")).toBe("true"); expect(support.hasAttribute("required")).toBe(false); fireEvent.click(support);
  const capture = screen.getByRole("button", { name: c.capture }); await waitFor(() => expect(capture.getAttribute("aria-disabled")==="true").toBe(false)); fireEvent.click(capture); fireEvent.click(screen.getByRole("button",{name:c.reviewCorrection})); await screen.findByText(base.saved);
  const staged = writes.find(item => item.path.endsWith("/identity-provenance"))?.body as D.DiagnosticIdentityProvenanceStage;
  const appended = writes.find(item => item.path.endsWith("/identity-evidence"))?.body as D.DiagnosticIdentityEvidenceCapture;
@@ -303,7 +337,8 @@ it.each(["en","ru","tk"] as const)("names material controls with their localized
 it.each(["purpose","basis","provenance","scheduleReason"] as const)("preserves the mounted %s classification textarea and selection through EN RU TK",async(key)=>{
  setup();fireEvent.click(await screen.findByRole("button",{name:c.visit}));fireEvent.click(screen.getByRole("button",{name:c.loadIdentity}));fireEvent.click(await screen.findByRole("button",{name:c.correction}));fireEvent.click(screen.getByRole("button",{name:c.replacement}));
  const input=screen.getByLabelText(`${c[key]} · ${c.required}`) as HTMLTextAreaElement;fireEvent.change(input,{target:{value:"Keep this private string"}});input.focus();input.setSelectionRange(2,9,"backward");
- for(const locale of ["ru","tk","en"] as const){fireEvent.change(screen.getAllByRole("combobox")[0],{target:{value:locale}});expect(screen.getByLabelText(`${continuityCopy[locale][key]} · ${continuityCopy[locale].required}`)).toBe(input);expect(document.activeElement).toBe(input);expect([input.selectionStart,input.selectionEnd,input.selectionDirection]).toEqual([2,9,"backward"]);expect(input.value).toBe("Keep this private string");}
+ const language=screen.getByRole("combobox",{name:"Language"});
+ for(const locale of ["ru","tk","en"] as const){fireEvent.change(language,{target:{value:locale}});expect(screen.getByLabelText(`${continuityCopy[locale][key]} · ${continuityCopy[locale].required}`)).toBe(input);expect(document.activeElement).toBe(input);expect([input.selectionStart,input.selectionEnd,input.selectionDirection]).toEqual([2,9,"backward"]);expect(input.value).toBe("Keep this private string");}
  expect(writes).toEqual([]);
 });
 it("keeps missing-successor status unestablished while allowing deliberate server-checked correction",async()=>{
@@ -322,14 +357,50 @@ it("shows all returned comparison bindings and evidence audit facts without chan
  expect(audits).toContainEqual({orderId,orderVersion:7,identityRecordId:uuid(21),identityRecordHash:"d".repeat(64),evidenceGeneration:19,correctionHeadHash:hash,evidenceId:uuid(31)});
  expect(audits).toContainEqual(expect.objectContaining({id:uuid(30),orderId,orderVersion:7,observationHash:hash,recordHash:hash,identityRecordId:uuid(21),provenance:[{id:uuid(100),sha256:hash,mime:"image/webp",sizeBytes:4}]}));expect(writes).toEqual([]);
 });
-it("recovers lost reviewer-only issue preparation through authorized status reads without a technician handoff",async()=>{
- context.capabilities=["diagnostics.reviewer"];const real=fetch;let losePrepare=true;
- vi.stubGlobal("fetch",async(...args:Parameters<typeof fetch>)=>{const path=new URL(String(args[0]),"http://localhost").pathname;if(path.endsWith("/continuity-handoffs"))return Response.json({}, {status:403});if(path.endsWith("/continuity-requests")&&args[1]?.method==="POST"&&losePrepare){losePrepare=false;receipt={requestId,kind:"issue",state:"pending_input"};throw new TypeError("Lost issue prepare reply");}return real(...args);});
+it.each(["unchanged", "actor", "order", "capability", "version"] as const)("holds reviewer-only lost-prepare recovery until the authorized workspace recheck returns: %s",async change=>{
+ context.capabilities=["diagnostics.reviewer"];const real=fetch;let losePrepare=true,checking=false;let release=()=>{};const gate=new Promise<void>(resolve=>{release=resolve;});
+ vi.stubGlobal("fetch",async(...args:Parameters<typeof fetch>)=>{
+  const path=new URL(String(args[0]),"http://localhost").pathname;
+  if(path.endsWith("/continuity-handoffs"))throw new Error("Reviewer must never read technician handoffs");
+  if(path.endsWith("/continuity-requests")&&args[1]?.method==="POST"&&losePrepare){losePrepare=false;receipt={requestId,kind:"issue",state:"pending_input"};throw new TypeError("Lost issue prepare reply");}
+  if(path.endsWith("/workspace")&&!losePrepare){checking=true;await gate;const response=await real(...args);const current=await response.json() as D.DiagnosticWorkspace;
+   if(change==="actor")current.actorId=uuid(800);
+   if(change==="order")current.order.id=uuid(801);
+   if(change==="capability")current.capabilities=["diagnostics.technician"];
+   if(change==="version")current.order.version=8;
+   return Response.json(current);
+  }
+  return real(...args);
+ });
  setup();await compare();fireEvent.click(screen.getByRole("button",{name:c.technicians}));await screen.findByRole("option",{name:"Distinct Technician"});fireEvent.change(screen.getByRole("combobox",{name:`${c.select} · ${c.required}`}),{target:{value:technicianId}});fireEvent.change(screen.getByRole("textbox",{name:`${base.reason} · ${c.required}`}),{target:{value:"Reviewer-only deliberate comparison"}});fireEvent.click(screen.getByRole("button",{name:new RegExp(`^${c.reviewImage}`)}));fireEvent.load(await screen.findByRole("img"));fireEvent.click(screen.getByRole("checkbox",{name:new RegExp(`^${c.ack}`)}));fireEvent.click(screen.getByRole("checkbox",{name:`${c.same} · ${c.required}`}));fireEvent.click(screen.getByRole("button",{name:c.review}));fireEvent.click(screen.getByRole("button",{name:c.issue}));await screen.findByText(c.uncertain);
- fireEvent.click(screen.getByRole("button",{name:c.status}));const restart=await screen.findByRole("button",{name:c.restartComparison});await waitFor(()=>expect(restart.hasAttribute("disabled")).toBe(false));
- expect(screen.queryByText(base.denied)).toBeNull();expect(screen.queryByRole("button",{name:c.check})).toBeNull();expect(fetches.filter(path=>path.endsWith("/continuity-handoffs"))).toEqual([]);expect(fetches.filter(path=>path.endsWith("/workspace"))).toHaveLength(2);expect(writes.filter(item=>item.path.endsWith("/execute"))).toEqual([]);expect(screen.queryByRole("button",{name:c.retryExact})).toBeNull();
- fireEvent.click(restart);await screen.findByRole("button",{name:c.compare});expect(screen.queryByDisplayValue("Reviewer-only deliberate comparison")).toBeNull();expect(context.capabilities).toEqual(["diagnostics.reviewer"]);
+ await waitFor(()=>expect(screen.getByRole("button",{name:c.status}).hasAttribute("disabled")).toBe(false));
+ fireEvent.click(screen.getByRole("button",{name:c.status}));await waitFor(()=>expect(checking).toBe(true));
+ expect(screen.getByText(c.uncertain)).toBeTruthy();expect(screen.getByRole("button",{name:c.status}).hasAttribute("disabled")).toBe(true);
+ expect(screen.queryByRole("button",{name:c.restartComparison})).toBeNull();release();
+ if(change==="actor"||change==="order"||change==="capability"){
+  await screen.findByText(base.denied);expect(screen.queryByDisplayValue("Reviewer-only deliberate comparison")).toBeNull();expect(screen.queryByText("Restricted A identity")).toBeNull();
+ }else{
+  const restart=await screen.findByRole("button",{name:c.restartComparison});
+  await waitFor(()=>expect(screen.queryByText(c.uncertain)).toBeNull());
+  expect(restart.hasAttribute("disabled")).toBe(change==="version");
+  if(change==="unchanged"){fireEvent.click(restart);await screen.findByRole("button",{name:c.compare});expect(screen.queryByDisplayValue("Reviewer-only deliberate comparison")).toBeNull();}
+ }
+ expect(fetches.filter(path=>path.endsWith("/continuity-handoffs"))).toEqual([]);expect(fetches.filter(path=>path.endsWith("/workspace"))).toHaveLength(2);expect(writes.filter(item=>item.path.endsWith("/execute"))).toEqual([]);expect(screen.queryByRole("button",{name:c.retryExact})).toBeNull();
 });
 it("hides technician handoff controls and navigation reads from a reviewer-only exact link",async()=>{
  context.capabilities=["diagnostics.reviewer"];setup(proofId);await screen.findByRole("button",{name:c.status});expect(screen.queryByRole("button",{name:c.check})).toBeNull();expect(fetches.filter(path=>path.endsWith("/continuity-handoffs"))).toEqual([]);expect(writes).toEqual([]);
+});
+it.each(["en","ru","tk"] as const)("marks the authorization reference visibly and semantically required in %s",async locale=>{
+ context.capabilities=["diagnostics.reception"];setup(undefined,locale);const copy=diagnosticCopy[locale];
+ fireEvent.click(await screen.findByRole("button",{name:continuityCopy[locale].visit}));
+ const reference=screen.getByRole("textbox",{name:`${copy.authorization} · ${copy.required}`});
+ expect(reference.hasAttribute("required")).toBe(true);expect(reference.getAttribute("aria-required")).toBe("true");expect(writes).toEqual([]);
+});
+it.each(["en","ru","tk"] as const)("exposes required semantics on each support checkbox while accepting any selected support in %s",async locale=>{
+ setup(undefined,locale);const copy=continuityCopy[locale];
+ fireEvent.click(await screen.findByRole("button",{name:copy.visit}));fireEvent.click(screen.getByRole("button",{name:copy.loadIdentity}));fireEvent.click(await screen.findByRole("button",{name:copy.correction}));fireEvent.click(screen.getByRole("button",{name:copy.replacement}));
+ const support=screen.getByRole("checkbox",{name:`${copy.verified} 1`});expect(support.getAttribute("aria-required")).toBe("true");
+ expect(support.hasAttribute("required")).toBe(false);fireEvent.click(support);expect((support as HTMLInputElement).checked).toBe(true);
+ expect(screen.getByText(`${copy.support} · 1/20 · ${copy.required}`,{selector:"legend"})).toBeTruthy();
+ fireEvent.click(support);expect(screen.getByText(`${copy.support} · 0/20 · ${copy.required}`,{selector:"legend"})).toBeTruthy();expect(writes).toEqual([]);
 });
