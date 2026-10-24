@@ -8,6 +8,7 @@ export type DiagnosticSourceOperation =
   | "member_create" | "member_replace" | "member_remove" | "member_eligibility"
   | "business_eligibility" | "account_schedule" | "account_restore" | "account_purge"
   | "order_create" | "order_change" | "observation_append"
+  | "intake_create" | "template_publish" | "center_bootstrap" | "campaign_admit" | "staff_bootstrap"
   | "ownership_grant" | "ownership_revoke" | "ownership_expire"
   | "report_change" | "proof_issue" | "proof_consume" | "proof_expire"
   | "identity_material_change" | "staff_eligibility" | "session_change";
@@ -31,6 +32,8 @@ export interface DiagnosticSourceCommand {
   readonly cutoff: Date | null;
   /** Reservation authority is always resolved from persisted campaign ownership. */
   readonly campaign: null;
+  /** Only finite bootstrap inputs. SQL derives every center, qualification and audit effect. */
+  readonly intent?: Readonly<{ code: string; userId: string; capability: string; qualificationId: string }> | Readonly<{ reason: string }> | Readonly<Record<string, never>>;
 }
 
 declare const prepared: unique symbol;

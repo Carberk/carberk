@@ -12,7 +12,7 @@ const sql = read('../packages/db/prisma/migrations/' + name + '/migration.sql');
 
 test('purge effects add a byte-identical retained migration and preserve the prior inventory', () => {
   assert.equal(sql, read('./testing/retained-schema/' + name + '.sql'));
-  const schema = hash(read('../packages/db/prisma/schema.prisma'));
+  const schema = '89ee14e1d4a2c77154b91615f99b5e281e71957539139e2df6f99d56c8cce71a'; // This test owns its immutable historical snapshot.
   const prior = '6e059c956df99e8e7feeb8dca70b7a27051a8851fde8edf2c5296a5eb6e5819b';
   const candidate = inventoryForSchema(schema, []), main = inventoryForSchema(prior, []);
   assert.deepEqual(candidate.filter(row => row.name !== name), main);

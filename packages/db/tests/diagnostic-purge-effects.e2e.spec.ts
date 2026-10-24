@@ -57,6 +57,14 @@ describe("finite account purge effects on migrated PostgreSQL", () => {
     // account/linked-current-visit payloads. The unrelated guest principal survives.
     await tx.measurementInvestigationExport.deleteMany();
     await tx.measurementPrincipal.deleteMany({ where: { userId: uid } });
+    // Exact existing avatar retirement/cleanup intent, including DO NOTHING replay.
+    await tx.$executeRaw`WITH retired AS (
+      UPDATE media_uploads SET state='RETIRED', "retiredAt"=${cutoff}::timestamp,"claimToken"=NULL,"claimDeadline"=NULL
+      WHERE id=(SELECT "avatarUploadId" FROM users WHERE id=${uid}) AND state NOT IN ('RETIRED','DELETED')
+      RETURNING id,key,"objectKeys","writeProtocol")
+     INSERT INTO media_upload_cleanups("uploadId",key,"objectKeys","writeProtocol",status,"nextAttemptAt")
+     SELECT id,key,"objectKeys","writeProtocol",CASE WHEN "writeProtocol"='conditional-v1' THEN 'PENDING' ELSE 'LEGACY_PENDING' END,${cutoff}::timestamp FROM retired
+     ON CONFLICT ("uploadId") DO NOTHING`;
     await tx.user.update({ where: { id: uid }, data: { phone: null, phoneVerifiedAt: null, email: null, emailVerifiedAt: null, displayName: null,
       avatarKey: null, avatarUploadId: null, avatarUrl: null, deletionScheduledAt: null } });
     await tx.session.deleteMany({ where: { userId: uid } });
@@ -264,6 +272,93 @@ describe("finite account purge effects on migrated PostgreSQL", () => {
     expect(await prisma.user.findUniqueOrThrow({ where: { id: uid } })).toMatchObject({
       displayName: order === "purge-first" ? null : "retained owner", deletionScheduledAt: null,
     });
+  });
+
+  it.each([false, true])("avatar cleanup preserves exact inventory and existing upsert replay=%s", async replay => {
+    await guards(false);
+    const avatar = randomUUID(), key = `profiles/${uid}/${avatar}.webp`;
+    await prisma.mediaUpload.create({ data: { id: avatar, userId: uid, key, kind: "image", contentType: "image/webp", sizeBytes: 72, state: "ADOPTED", writeProtocol: "conditional-v1", objectKeys: [key], claimTargetType: "profile", claimTargetId: uid } });
+    await prisma.user.update({ where: { id: uid }, data: { avatarUploadId: avatar, avatarKey: key, avatarUrl: `https://synthetic.invalid/${avatar}` } });
+    if (replay) await prisma.mediaUploadCleanup.create({ data: { uploadId: avatar, key, objectKeys: [key], writeProtocol: "conditional-v1", status: "PENDING", attempts: 2, nextAttemptAt: cutoff, lastError: "retained retry" } });
+    const prior = await prisma.mediaUploadCleanup.findUnique({ where: { uploadId: avatar } });
+    await guards(true);
+    await expect(prisma.$transaction(async tx => withDiagnosticSourceCommand(tx, await command(tx), async () => {
+      await ownerPurge(tx); throw new Error("avatar rollback sentinel");
+    }))).rejects.toThrow("avatar rollback sentinel");
+    expect(await prisma.mediaUpload.findUniqueOrThrow({ where: { id: avatar } })).toMatchObject({ state: "ADOPTED" });
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: uid } })).toMatchObject({ avatarUploadId: avatar });
+    expect(await prisma.mediaUploadCleanup.findUnique({ where: { uploadId: avatar } })).toEqual(prior);
+    await prisma.$transaction(async tx => withDiagnosticSourceCommand(tx, await command(tx), async () => ownerPurge(tx)));
+    expect(await prisma.mediaUpload.findUniqueOrThrow({ where: { id: avatar } })).toMatchObject({ state: "RETIRED", retiredAt: cutoff, claimToken: null, claimDeadline: null });
+    const cleanup = await prisma.mediaUploadCleanup.findUniqueOrThrow({ where: { uploadId: avatar } });
+    expect(cleanup).toMatchObject({ uploadId: avatar, key, objectKeys: [key], writeProtocol: "conditional-v1", status: "PENDING" });
+    if (replay) expect(cleanup).toEqual(prior);
+  });
+
+  it("Session/device/TOTP cascades are covered and the entire graph rolls back atomically", async () => {
+    await guards(false);
+    const enrollment = randomUUID(), code = randomUUID(), device = randomUUID(), subscription = randomUUID();
+    const otherDevice = randomUUID(), otherSession = randomUUID(), otherSubscription = randomUUID(), deviceSubscription = randomUUID();
+    await prisma.totpEnrollment.create({ data: { id: enrollment, userId: uid, encryptedSecret: "synthetic-encrypted-fixture", verifiedAt: cutoff, backupCodes: { create: { id: code, codeHash: "synthetic-hash" } } } });
+    for (const [id, userId] of [[device, uid], [otherDevice, foreign]] as const) await prisma.fcmDevice.create({ data: { id, userId, token: id, platform: "ios" } });
+    await prisma.session.create({ data: { id: otherSession, userId: foreign, refreshTokenHash: otherSession, expiresAt: new Date("2030-01-01Z") } });
+    for (const [id, sessionId, deviceId] of [[subscription, session, otherDevice], [deviceSubscription, otherSession, device], [otherSubscription, otherSession, otherDevice]] as const) await prisma.servicePushSubscription.create({ data: { id, sessionId, deviceId, conversationId: foreignConversation, lifecycleEpoch: 0 } });
+    const videoGrant = randomUUID();
+    await prisma.videoGrant.create({ data: { id: videoGrant, ownerUserId: uid, ownerSessionId: session, secretHash: videoGrant, listingId: draft, generationId: generation, purpose: "preview", expiresAt: new Date("2030-01-01Z") } });
+    const request = randomUUID();
+    await prisma.diagnosticContinuityRequest.create({ data: { id: request, actorId: uid, sessionId: session, orderId: foreignOrder, kind: "consume" } });
+    await guards(true);
+    await expect(prisma.$transaction(async tx => withDiagnosticSourceCommand(tx, await command(tx), async () => { await ownerPurge(tx); throw new Error("cascade rollback sentinel"); }))).rejects.toThrow("cascade rollback sentinel");
+    expect(await prisma.totpBackupCode.findUnique({ where: { id: code } })).not.toBeNull();
+    expect(await prisma.servicePushSubscription.findUnique({ where: { id: subscription } })).not.toBeNull();
+    expect(await prisma.diagnosticContinuityRequest.findUnique({ where: { id: request } })).not.toBeNull();
+    await prisma.$transaction(async tx => withDiagnosticSourceCommand(tx, await command(tx), async () => {
+      // Exercise real FK actions rather than letting helper DELETEs hide them.
+      await tx.session.delete({ where: { id: session } });
+      await tx.fcmDevice.delete({ where: { id: device } });
+      await tx.totpEnrollment.delete({ where: { id: enrollment } });
+      await ownerPurge(tx);
+    }));
+    expect(await prisma.servicePushSubscription.findUnique({ where: { id: deviceSubscription } })).toBeNull();
+    expect(await prisma.videoGrant.findUnique({ where: { id: videoGrant } })).toBeNull();
+    expect(await prisma.totpEnrollment.findUnique({ where: { id: enrollment } })).toBeNull();
+    expect(await prisma.totpBackupCode.findUnique({ where: { id: code } })).toBeNull();
+    expect(await prisma.fcmDevice.findUnique({ where: { id: device } })).toBeNull();
+    expect(await prisma.servicePushSubscription.findUnique({ where: { id: subscription } })).toBeNull();
+    expect(await prisma.diagnosticContinuityRequest.findUnique({ where: { id: request } })).toBeNull();
+    expect(await prisma.servicePushSubscription.findUnique({ where: { id: otherSubscription } })).not.toBeNull();
+    expect(await prisma.fcmDevice.findUnique({ where: { id: otherDevice } })).not.toBeNull();
+  });
+
+  it("History anonymous knowledge, legal hold and artifact byte boundaries survive the covered union", async () => {
+    await guards(false);
+    const request = randomUUID(), conversation = randomUUID(), quote = randomUUID(), order = randomUUID(), payment = randomUUID();
+    const day = `synthetic-${order}`;
+    await prisma.vehicleHistoryRequest.create({ data: { id: request, customerId: uid, proposedVin: "SYNTHETIC-VIN" } });
+    await prisma.serviceConversation.create({ data: { id: conversation, purpose: "history", historyRequestId: request } });
+    await prisma.historyCapacityDay.create({ data: { day, slotLimit: 2, morningLimit: 1, evidence: "synthetic capacity" } });
+    await prisma.historyQuote.create({ data: { id: quote, requestId: request, providers: [], preflightOutcome: "synthetic", refundRule: "synthetic", windowStart: cutoff, windowEnd: new Date("1980-01-03Z"), feasible: true } });
+    const hold = { until: "2030-01-01T00:00:00.000Z", reason: "Explicit synthetic hold" };
+    await prisma.historyOrder.create({ data: { id: order, requestId: request, quoteId: quote, day, morning: true, holdExpiresAt: cutoff, promiseAt: cutoff, rights: { category: "payment_evidence", hold, schedule: { kind: "until", until: "2030-01-01T00:00:00.000Z" } } } });
+    await prisma.historyPayment.create({ data: { id: payment, orderId: order, clientPaymentId: payment, claim: "held payment", evidence: "held evidence", confirmedById: uid } });
+    const anonymous = randomUUID(), held = randomUUID(), personal = randomUUID();
+    for (const [id, rights] of [[anonymous, { identifiability: "anonymous", schedule: { kind: "permitted_knowledge" }, hold: null }], [held, { identifiability: "personal", hold }], [personal, { identifiability: "personal", hold: null }]] as const) await prisma.serviceAttachment.create({ data: { id, conversationId: conversation, uploaderId: uid, lifecycleEpoch: 0, category: "vehicle_observation", visibility: "customer", state: "ready", stagingKey: `staging/${id}`, objectKey: `history/${id}`, contentType: "application/pdf", expectedBytes: 1, filename: "synthetic", rights, expiresAt: new Date("2030-01-01Z") } });
+    const retainedArtifact = randomUUID(), privateArtifact = randomUUID();
+    for (const [id, anonymous] of [[retainedArtifact, true], [privateArtifact, false]] as const) await prisma.historyArtifact.create({ data: { id, provider: "synthetic", originalDate: cutoff, objectKey: `history-artifact/${id}`, sha256: "a".repeat(64), sizeBytes: 1, expectedPages: 1, rights: { identifiability: anonymous ? "anonymous" : "personal", use: ["archive", "redistribute"] }, acquiredForOrderId: order, vehicleIdentity: "synthetic identity", mileageValue: 100, mileageUnit: "km", mileageObservedAt: cutoff, state: "verified", verifiedById: uid, provenance: "private acquisition" } });
+    await guards(true);
+    await expect(prisma.$transaction(async tx => withDiagnosticSourceCommand(tx, await command(tx), async () => {
+      await tx.historyArtifact.delete({ where: { id: retainedArtifact } });
+    }))).rejects.toThrow("diagnostic_source_effect_mismatch");
+    await prisma.$transaction(async tx => withDiagnosticSourceCommand(tx, await command(tx), async () => ownerPurge(tx)));
+    expect(await prisma.serviceAttachment.findUniqueOrThrow({ where: { id: anonymous } })).toMatchObject({ state: "ready", uploaderId: null, objectKey: `history/${anonymous}` });
+    expect(await prisma.serviceAttachment.findUniqueOrThrow({ where: { id: held } })).toMatchObject({ state: "ready", uploaderId: null, objectKey: `history/${held}` });
+    expect(await prisma.serviceAttachment.findUniqueOrThrow({ where: { id: personal } })).toMatchObject({ state: "removed", uploaderId: null });
+    expect(await prisma.serviceErasureFence.findUniqueOrThrow({ where: { conversationId: conversation } })).toMatchObject({ objectKeys: [`history/${personal}`] });
+    expect(await prisma.historyPayment.findUniqueOrThrow({ where: { id: payment } })).toMatchObject({ claim: "held payment", evidence: "held evidence", confirmedById: null });
+    expect(await prisma.historyArtifact.findUniqueOrThrow({ where: { id: retainedArtifact } })).toMatchObject({ state: "verified", vehicleIdentity: "synthetic identity", mileageValue: 100, acquiredForOrderId: null, provenance: null, verifiedById: null });
+    expect(await prisma.historyArtifact.findUniqueOrThrow({ where: { id: privateArtifact } })).toMatchObject({ state: "restricted", vehicleIdentity: null, mileageValue: null, objectKey: `history-artifact/${privateArtifact}`, acquiredForOrderId: null });
+    expect(await prisma.historyArtifactCleanup.count({ where: { artifactId: { in: [retainedArtifact, privateArtifact] } } })).toBe(0);
+
   });
 
 });
