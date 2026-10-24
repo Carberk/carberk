@@ -2106,3 +2106,5 @@ model CampaignPreparation {
 // Retained finite source invariant checkpoint 20261024050000. No data backfill.
 
 // Dormant source correction inventory: 20261024060000_diagnostic_source_correction.
+
+// Dormant finite moderation inventory: 20261024070000_diagnostic_user_eligibility.

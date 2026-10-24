@@ -1427,7 +1427,7 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
   it.each(["finish", "delete"] as const)("User moderation %s requires every actual Session deletion and rolls back the whole command", async mode => {
     const a = await connect(), extra = randomUUID(), foreign = randomUUID(), foreignSession = randomUUID();
     await prisma.user.create({ data: { id: foreign, email: `${foreign}@moderation.invalid` } });
-    for (const [id, uid] of [[extra, userId], [foreignSession, foreign]]) await prisma.session.create({ data: {
+    for (const [id, uid] of [[extra, userId], [foreignSession, foreign]] as const) await prisma.session.create({ data: {
       id, userId: uid, refreshTokenHash: id, expiresAt: new Date(Date.now()+600_000),
     } });
     const before = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
@@ -1482,7 +1482,7 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     if (kind === "Session row") rows = [...rows, { table: "sessions", key: { id: sessionId }, verb: "delete", expected: { source: await source(a, "sessions", { id: sessionId }) }, next: null }];
     if (kind === "wrong root") roots = [{ table: "users", key: { id: foreign } }];
     const before = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
-    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx, { ...m.c, roots, rows } as DiagnosticSourceCommand, async () => {
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx, { ...sourceCommand("user_eligibility", rows), actorUserId: m.c.actorUserId, roots }, async () => {
       throw new Error("invalid moderation reached work");
     }))).rejects.toThrow(kind === "Session row" ? "diagnostic_source_row" : "diagnostic_source_moderation_intent");
     expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(before);
@@ -1576,6 +1576,63 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     expect(await prisma.diagnosticIdentityRecord.count({ where: { orderId: oid } })).toBe(captureFirst ? 1 : 0);
     expect(await prisma.session.count({ where: { userId } })).toBe(captureFirst ? 1 : 0);
     expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toMatchObject({ suspendedAt: captureFirst ? null : expect.any(Date) });
+    expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
+  });
+
+
+  it("suspension predeclares actual Session FK children while retaining foreign authority and service content", async () => {
+    const a = await connect(), oid = await newOrder(a), foreign = randomUUID(), sid = randomUUID();
+    await prisma.user.create({ data: { id: foreign } });
+    await prisma.session.create({ data: { id: sid, userId: foreign, refreshTokenHash: sid, expiresAt: new Date(Date.now()+600_000) } });
+    const support = await prisma.supportCase.create({ data: { customerId: userId } });
+    const conversation = await prisma.serviceConversation.create({ data: { purpose: "support", supportCaseId: support.id } });
+    const device = await prisma.fcmDevice.create({ data: { userId, token: randomUUID(), platform: "android" } });
+    const subscription = await prisma.servicePushSubscription.create({ data: { sessionId, deviceId: device.id, conversationId: conversation.id, lifecycleEpoch: 0 } });
+    const foreignDevice = await prisma.fcmDevice.create({ data: { userId: foreign, token: randomUUID(), platform: "android" } });
+    const foreignSubscription = await prisma.servicePushSubscription.create({ data: { sessionId: sid, deviceId: foreignDevice.id, conversationId: conversation.id, lifecycleEpoch: 0 } });
+    const grant = await prisma.videoGrant.create({ data: { ownerUserId: userId, ownerSessionId: sessionId, secretHash: randomUUID(), listingId, generationId: randomUUID(), purpose: "upload", expiresAt: new Date(Date.now()+600_000) } });
+    const foreignGrant = await prisma.videoGrant.create({ data: { ownerUserId: foreign, ownerSessionId: sid, secretHash: randomUUID(), listingId, generationId: randomUUID(), purpose: "upload", expiresAt: new Date(Date.now()+600_000) } });
+    const requestId = randomUUID(), request = await projection(a,"diagnostic_continuity_requests",{ id: requestId, actorId: userId, sessionId, orderId: oid, kind: "issue", createdAt: new Date().toISOString() });
+    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx,sourceCommand("proof_issue",[{
+      table: "diagnostic_continuity_requests",key: { id: requestId },verb: "insert",expected: "absent",next: request,
+    }]),() => tx.$executeRaw`INSERT INTO diagnostic_continuity_requests SELECT (jsonb_populate_record(NULL::diagnostic_continuity_requests,${JSON.stringify(request)}::jsonb)).*`));
+    const m = await moderationPlan(a,new Date());
+    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx,m.c,async receipt => {
+      const [prepared] = await tx.$queryRaw<{ effects: unknown[]; scope: unknown[] }[]>`SELECT effects,scope FROM diagnostic_source_commands WHERE id=${receipt.receiptId}::uuid`;
+      for (const [table,id] of [["sessions",sessionId],["video_grants",grant.id],["service_push_subscriptions",subscription.id],["diagnostic_continuity_requests",requestId]]) {
+        expect(present(prepared).effects).toContainEqual(expect.objectContaining({ table,key: { id },verb: "delete",derived: "purge" }));
+        expect(present(prepared).scope).toContainEqual(expect.objectContaining({ table,key: { id } }));
+      }
+      await m.write(tx);
+    }));
+    expect(await prisma.session.findUnique({ where: { id: sessionId } })).toBeNull();
+    expect(await prisma.videoGrant.findUnique({ where: { id: grant.id } })).toBeNull();
+    expect(await prisma.servicePushSubscription.findUnique({ where: { id: subscription.id } })).toBeNull();
+    expect(await prisma.diagnosticContinuityRequest.findUnique({ where: { id: requestId } })).toBeNull();
+    expect(await prisma.videoGrant.findUniqueOrThrow({ where: { id: foreignGrant.id } })).toEqual(foreignGrant);
+    expect(await prisma.servicePushSubscription.findUniqueOrThrow({ where: { id: foreignSubscription.id } })).toEqual(foreignSubscription);
+    expect(await prisma.serviceConversation.findUniqueOrThrow({ where: { id: conversation.id } })).toEqual(conversation);
+    expect(await prisma.supportCase.findUniqueOrThrow({ where: { id: support.id } })).toEqual(support);
+    expect(await prisma.fcmDevice.findUniqueOrThrow({ where: { id: device.id } })).toEqual(device);
+    expect(await prisma.session.findUnique({ where: { id: sid } })).not.toBeNull();
+    expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
+  });
+
+  it("unfinished moderation cannot commit and a finished receipt cannot authorize a later write in the same transaction", async () => {
+    const a = await connect(), m = await moderationPlan(a,new Date());
+    const before = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    await expect(prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT diagnostic_prepare_source(${JSON.stringify(m.c)}::jsonb)`;
+      await m.write(tx);
+    })).rejects.toThrow("diagnostic_source_unfinished");
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(before);
+    expect(await prisma.session.count({ where: { userId } })).toBe(1);
+    await expect(prisma.$transaction(async tx => {
+      await withDiagnosticSourceCommand(tx,m.c,() => m.write(tx));
+      await tx.user.update({ where: { id: userId }, data: { suspendedAt: null, suspendedById: null, suspensionReason: null } });
+    })).rejects.toThrow("diagnostic_source_unprepared");
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(before);
+    expect(await prisma.session.count({ where: { userId } })).toBe(1);
     expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
   });
 

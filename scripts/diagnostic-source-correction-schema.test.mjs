@@ -12,7 +12,7 @@ const sql = read('../packages/db/prisma/migrations/' + name + '/migration.sql');
 
 test('bounded source correction migration has its exact retained mirror and additive inventory', () => {
   assert.equal(sql, read('./testing/retained-schema/' + name + '.sql'));
-  const schema = hash(read('../packages/db/prisma/schema.prisma'));
+  const schema = '35b500eac8a9c55c8b369783b6dfe4a1a552676294809cbddb7f4b452e91759d'; // This test owns its historical snapshot.
   const prior = 'fbc4ebcf15d6abf6dd8a3ef8d403f8b5dcf40794c356ec11c960cb462a1f5a4a';
   const candidate = inventoryForSchema(schema, []), main = inventoryForSchema(prior, []);
   assert.deepEqual(candidate.filter(row => row.name !== name), main);

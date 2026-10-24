@@ -365,6 +365,118 @@ describe("B1 disposal of lawful persisted ownership and consumed retry graphs", 
     }
   });
 
+
+  it.each(["sellerA", "sellerB", "reviewer"] as const)("%s suspension deletes actual Sessions but preserves both first anchors and permanent unused-proof invalidation", async who => {
+    const graph = await unusedProof(), uid = suite.id(who), actor = suite.id("outsider");
+    const beforeUser = await db.user.findUniqueOrThrow({ where: { id: uid } });
+    const beforeSessions = await db.session.findMany({ where: { userId: uid }, orderBy: { id: "asc" } });
+    const foreignSessions = await db.session.findMany({ where: { userId: actor }, orderBy: { id: "asc" } });
+    const orders = [graph.a.id, graph.b.id];
+    const anchors = await db.diagnosticSourceAnchor.findMany({ where: { orderId: { in: orders } }, orderBy: { orderId: "asc" } });
+    expect(anchors).toHaveLength(2);
+    expect(anchors.every(a => a.state === "unchanged")).toBe(true);
+    const raws = await db.diagnosticIdentityRecord.findMany({ where: { orderId: { in: orders } }, orderBy: { id: "asc" } });
+    const report = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: graph.released.id } });
+    const suspendedAt = new Date();
+    const makeCommand = (at: Date | null) => db.$transaction(async tx => {
+      const old = await source(tx, "users", uid);
+      return { operation: "user_eligibility", roots: [{ table: "users", key: { id: uid } }], rows: [{ table: "users", key: { id: uid }, verb: "update", expected: { source: old },
+        next: { ...old, suspendedAt: at?.toISOString() ?? null, suspendedById: at ? actor : null, suspensionReason: at ? "Explicit moderation scenario" : null } }],
+      actorUserId: actor, sessionId: subject("outsider").sessionId, cutoff: null, campaign: null } as DiagnosticSourceCommand;
+    });
+    const c = await makeCommand(suspendedAt);
+    async function suspend(tx: Tx, receiptId: string) {
+      const [prepared] = await tx.$queryRaw<{ effects: { table: string; key: { id?: string } }[]; scope: unknown[] }[]>`SELECT effects,scope FROM diagnostic_source_commands WHERE id=${receiptId}::uuid`;
+      expect(present(prepared).effects).toContainEqual(expect.objectContaining({ table: "diagnostic_continuity_proofs", key: { id: graph.proof.id }, derived: "invalidation", required: true }));
+      expect(present(prepared).effects.filter(e => e.table === "sessions").map(e => e.key.id).sort()).toEqual(beforeSessions.map(s => s.id).sort());
+      for (const orderId of orders) expect(present(prepared).scope).toContainEqual(expect.objectContaining({ table: "diagnostic_source_anchors", key: { orderId } }));
+      const locks = () => tx.$queryRaw`SELECT classid::text,objid::text,objsubid,mode FROM pg_locks WHERE pid=pg_backend_pid() AND locktype='advisory' ORDER BY classid,objid,objsubid,mode`;
+      const held = await locks();
+      await tx.user.update({ where: { id: uid, suspendedAt: null }, data: { suspendedAt, suspendedById: actor, suspensionReason: "Explicit moderation scenario" } });
+      await tx.session.deleteMany({ where: { userId: uid } });
+      expect(await locks()).toEqual(held);
+    }
+    await expect(db.$transaction(tx => withDiagnosticSourceCommand(tx, c, async receipt => {
+      await suspend(tx, receipt.receiptId); throw new Error("moderation proof rollback");
+    }))).rejects.toThrow("moderation proof rollback");
+    expect(await db.user.findUniqueOrThrow({ where: { id: uid } })).toEqual(beforeUser);
+    expect(await db.session.findMany({ where: { userId: uid }, orderBy: { id: "asc" } })).toEqual(beforeSessions);
+    expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: graph.proof.id } })).toEqual(graph.proof);
+    await db.$transaction(tx => withDiagnosticSourceCommand(tx, c, async receipt => {
+      await assertDiagnosticSourceCommand(tx, receipt, "user_eligibility");
+      await suspend(tx, receipt.receiptId);
+    }));
+    expect(await db.session.count({ where: { userId: uid } })).toBe(0);
+    expect(await db.user.findUniqueOrThrow({ where: { id: uid } })).toMatchObject({ suspendedAt, suspendedById: actor, suspensionReason: "Explicit moderation scenario" });
+    if (who !== "reviewer") {
+      const grantId = who === "sellerA" ? graph.a.grantId : graph.b.grantId;
+      const [current] = await db.$queryRaw<{ valid: boolean }[]>`SELECT diagnostic_ownership_grant_current(g,clock_timestamp() AT TIME ZONE 'UTC') valid FROM diagnostic_ownership_grants g WHERE id=${grantId}`;
+      expect(present(current).valid).toBe(false);
+    }
+    const invalidated = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: graph.proof.id } });
+    expect(invalidated).toEqual({ ...graph.proof, invalidatedAt: expect.any(Date) });
+    const restore = await makeCommand(null);
+    await db.$transaction(tx => withDiagnosticSourceCommand(tx, restore, () => tx.user.update({ where: { id: uid, suspendedAt: { not: null } }, data: { suspendedAt: null, suspendedById: null, suspensionReason: null } })));
+    expect(await db.session.count({ where: { userId: uid } })).toBe(0);
+    expect(await db.user.findUniqueOrThrow({ where: { id: uid } })).toMatchObject({ suspendedAt: null, suspendedById: null, suspensionReason: null });
+    expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: graph.proof.id } })).toEqual(invalidated);
+    expect(await db.diagnosticSourceAnchor.findMany({ where: { orderId: { in: orders } }, orderBy: { orderId: "asc" } })).toEqual(anchors);
+    expect(await db.diagnosticIdentityRecord.findMany({ where: { orderId: { in: orders } }, orderBy: { id: "asc" } })).toEqual(raws);
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: graph.released.id } })).toEqual(report);
+    expect(await db.session.findMany({ where: { userId: actor }, orderBy: { id: "asc" } })).toEqual(foreignSessions);
+    expect(await db.diagnosticSourceCommand.count()).toBe(0);
+    // Restore this suite's preactivation Session fixture for subsequent actual
+    // API journeys. Unsuspend above demonstrably restored no revoked Session.
+    await guards(false);
+    for (const session of beforeSessions) await db.session.create({ data: session });
+    await guards(true);
+    if (who !== "reviewer") {
+      const grantId = who === "sellerA" ? graph.a.grantId : graph.b.grantId;
+      const [current] = await db.$queryRaw<{ valid: boolean }[]>`SELECT diagnostic_ownership_grant_current(g,clock_timestamp() AT TIME ZONE 'UTC') valid FROM diagnostic_ownership_grants g WHERE id=${grantId}`;
+      expect(present(current).valid).toBe(true);
+    }
+  });
+
+
+  it("moderation deletes a consumed request's actual Session FK but preserves its surviving report and proof retry minima", async () => {
+    const graph = await unusedProof();
+    await guards(false);
+    const actor = subject("technician"), moderator = subject("outsider"), uid = actor.userId;
+    const request = await proofs.prepareRequest(actor,graph.b.id,{ kind: "consume" });
+    const input = D.DiagnosticContinuityRequestExecuteSchema.parse({ kind: "consume",command: { proofId: graph.proof.id,reportId: randomUUID(),expectedOrderVersion: graph.orderB.version,reason: "Synthetic moderation request closure" } });
+    await proofs.executeRequest(actor,graph.b.id,request.requestId,input);
+    const report = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { continuityRequestId: request.requestId } });
+    const proof = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: graph.proof.id } });
+    const sessions = await db.session.findMany({ where: { userId: uid } });
+    const anchors = await db.diagnosticSourceAnchor.findMany({ where: { orderId: { in: [graph.a.id,graph.b.id] } },orderBy: { orderId: "asc" } });
+    await guards(true);
+    for (const suspendedAt of [new Date(),null]) {
+      const c = await db.$transaction(async tx => {
+        const old = await source(tx,"users",uid);
+        return { operation: "user_eligibility",roots: [{ table: "users",key: { id: uid } }],rows: [{ table: "users",key: { id: uid },verb: "update",expected: { source: old },next: {
+          ...old,suspendedAt: suspendedAt?.toISOString() ?? null,suspendedById: suspendedAt ? moderator.userId : null,suspensionReason: suspendedAt ? "Synthetic moderation" : null,
+        } }],actorUserId: moderator.userId,sessionId: moderator.sessionId,cutoff: null,campaign: null } as DiagnosticSourceCommand;
+      });
+      await db.$transaction(tx => withDiagnosticSourceCommand(tx,c,async receipt => {
+        const [prepared] = await tx.$queryRaw<{ effects: { table: string; key: { id?: string } }[] }[]>`SELECT effects FROM diagnostic_source_commands WHERE id=${receipt.receiptId}::uuid`;
+        if (suspendedAt) expect(present(prepared).effects).toContainEqual(expect.objectContaining({ table: "diagnostic_continuity_requests",key: { id: request.requestId },verb: "delete" }));
+        expect(present(prepared).effects.filter(e => e.table === "diagnostic_reports")).toEqual([]);
+        await tx.user.update({ where: { id: uid },data: { suspendedAt,suspendedById: suspendedAt ? moderator.userId : null,suspensionReason: suspendedAt ? "Synthetic moderation" : null } });
+        if (suspendedAt) await tx.session.deleteMany({ where: { userId: uid } });
+      }));
+      expect(await db.diagnosticContinuityRequest.findUnique({ where: { id: request.requestId } })).toBeNull();
+      expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: report.id } })).toEqual(report);
+      expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proof.id } })).toEqual(proof);
+      expect(await db.diagnosticSourceAnchor.findMany({ where: { orderId: { in: [graph.a.id,graph.b.id] } },orderBy: { orderId: "asc" } })).toEqual(anchors);
+      expect(await db.session.count({ where: { userId: uid } })).toBe(0);
+    }
+    await expect(proofs.executeRequest(actor,graph.b.id,request.requestId,input)).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
+    expect(await db.diagnosticSourceCommand.count()).toBe(0);
+    await guards(false);
+    for (const session of sessions) await db.session.create({ data: session });
+    await guards(true);
+  });
+
   // Actor erasure is last: the worker database retains this suite's graph.
   function signal() {
     let release: () => void = () => { throw new Error("missing SQL barrier"); };

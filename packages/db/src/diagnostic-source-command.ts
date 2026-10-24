@@ -6,7 +6,7 @@ export type { DiagnosticSourceKeys, DiagnosticSourceTable } from "./diagnostic-s
 export type DiagnosticSourceOperation =
   | "listing_create" | "listing_change" | "listing_delete"
   | "member_create" | "member_replace" | "member_remove" | "member_eligibility"
-  | "business_eligibility" | "account_schedule" | "account_restore" | "account_purge"
+  | "business_eligibility" | "user_eligibility" | "account_schedule" | "account_restore" | "account_purge"
   | "order_create" | "order_change" | "observation_append"
   | "intake_create" | "template_publish" | "center_bootstrap" | "campaign_admit" | "staff_bootstrap"
   | "ownership_grant" | "ownership_revoke" | "ownership_expire"
