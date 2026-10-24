@@ -1,0 +1,164 @@
+// @vitest-environment happy-dom
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { DiagnosticSchemas as D } from "@auto-tm/contracts";
+
+import { DiagnosticWorkspace } from "./DiagnosticWorkspace";
+import { continuityCopy } from "./continuity-copy";
+import { diagnosticCopy } from "./copy";
+
+import { AdminLanguageSwitch, AdminLocaleProvider } from "@/lib/i18n";
+
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: "synthetic-access" }) }), headers: async () => new Headers({ origin: "http://localhost", host: "localhost" }) }));
+vi.mock("next/navigation", () => ({ redirect: (url: string) => { throw new Error(url); }, unstable_rethrow: () => {} }));
+const uuid = (n: number) => `11111111-1111-4111-8111-${String(n).padStart(12, "0")}`;
+const orderId = uuid(1), actor = uuid(2), proofId = uuid(3), reportId = uuid(4), requestId = uuid(5), predecessorId = uuid(6), technicianId = uuid(7), hash = "a".repeat(64);
+const text = { en: "Synthetic template", ru: "Синтетический шаблон", tk: "Emeli nusga" };
+const observation = { observedAt: "2026-10-24T10:00:00.000Z", mileageKm: 129000, method: "manual" as const, vin: null, manualReference: "Authorized physical visit B" };
+const rights: D.DiagnosticIdentityRights = { category: "vehicle_observation", purpose: "Synthetic review", basis: "Synthetic authority", provenance: "Synthetic physical observation", identifiability: "personal", use: ["service"], schedule: { kind: "until", until: "2027-10-24T10:00:00.000Z", reason: "Synthetic retention" }, supplierRestrictions: "", hold: null };
+const definition = { title: text, limitations: text, syntheticNotice: text, checks: [{ id: "brakes", label: text, required: true, evidenceRequired: false, measurement: null }], panels: [] };
+function contextFixture(): D.DiagnosticWorkspace { return { actorId: actor, order: { id: orderId, centerId: uuid(10), templateVersionId: uuid(11), audience: "buyer_private", listingId: null, status: "arrived", version: 7, synthetic: true, createdAt: observation.observedAt, physicalAuthorized: true, publicationAuthorized: false, vehicleMatched: false, physicalAuthorization: { authorityReference: "Synthetic", recordedBy: actor, recordedAt: observation.observedAt }, publicationAuthorization: null, observedVehicle: observation, events: [] }, template: { id: uuid(11), centerId: uuid(10), version: 2, definition, synthetic: true, publishedAt: observation.observedAt }, capabilities: ["diagnostics.technician", "diagnostics.reviewer"], assignments: [], staffChoices: [] }; }
+function evidenceFixture(id: string, imageIds: string[]): D.DiagnosticIdentityEvidence { return { id, orderId, orderVersion: 7, identityRecordId: uuid(21), observationHash: hash, observation, identifiers: Array.from({length: Math.ceil(imageIds.length / 20)}, (_, n) => ({ kind: "manufacturer_plate", location: `Physical plate ${n}`, value: "Observed B value", provenanceIds: imageIds.slice(n * 20, n * 20 + 20) })), provenance: imageIds.map(imageId => ({ id: imageId, sha256: hash, mime: "image/webp", sizeBytes: 4 })), rights, correction: null, recordHash: hash, recordedBy: actor, recordedAt: observation.observedAt }; }
+let context: D.DiagnosticWorkspace, materials: number, pages: number, denied: boolean, writes: { path: string; body: unknown }[], receipt: D.DiagnosticContinuityRequest, loseExecute: boolean, proofReadDenied: boolean, names: { userId: string; name: string }[], fetches: string[];
+function comparison() { return { predecessor: { reportId: predecessorId, reportVersion: 3, snapshotHash: hash, identityRecordId: uuid(20), identityRecordHash: hash, identity: { observation: { ...observation, manualReference: "Restricted A identity" }, evidence: evidenceFixture(uuid(30), Array.from({ length: materials }, (_, n) => uuid(100 + n))), corrections: [], evidenceGeneration: 1, correctionHeadHash: hash } }, candidate: { orderId, orderVersion: 7, identityRecordId: uuid(21), identityRecordHash: hash, identity: { observation, evidence: evidenceFixture(uuid(31), [uuid(100)]), corrections: [], evidenceGeneration: 1, correctionHeadHash: hash } } }; }
+function setup(handoff?: string, locale: "en" | "ru" | "tk" = "en") { return render(<AdminLocaleProvider initialLocale={locale}><AdminLanguageSwitch/><DiagnosticWorkspace initialOrder={orderId} {...(handoff ? { handoff } : {})}/></AdminLocaleProvider>); }
+const c = continuityCopy.en, base = diagnosticCopy.en;
+async function link() { fireEvent.click(await screen.findByRole("button", { name: c.link })); }
+async function compare() { await link(); fireEvent.click(screen.getByRole("button", { name: c.search })); fireEvent.click(await screen.findByRole("button", { name: c.compare })); await screen.findByRole("button", { name: c.technicians }); }
+beforeEach(() => {
+ context = contextFixture(); materials = 1; pages = 0; denied = false; writes = []; loseExecute = false; proofReadDenied = false; fetches = []; names = [{ userId: technicianId, name: "Distinct Technician" }]; receipt = { requestId, kind: "consume", state: "pending_input" };
+ vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+  const parsed = new URL(String(url), "http://localhost"), path = parsed.pathname; fetches.push(path);
+  if (denied) return Response.json({}, { status: 403 });
+  if (init?.method === "POST") writes.push({ path, body: JSON.parse(String(init.body)) });
+  if (path.endsWith("/workspace")) return Response.json(context);
+  if (path.endsWith("/reports")) return Response.json([]);
+  if (path.endsWith("/continuity-handoffs")) { pages++; return Response.json({ handoffs: pages === 5 ? [{ proofId, status: "usable", expectedOrderVersion: 7 }] : pages === 2 ? [] : Array.from({ length: 20 }, (_, n) => ({ proofId: uuid(300 + pages * 20 + n), status: "usable", expectedOrderVersion: 7 })), result: null, nextCursor: pages < 5 ? `page-${pages}` : null, scope: "current_b_owned_handoffs" }); }
+  if (path.endsWith("/predecessor-candidates")) return Response.json({ candidates: [{ reportId: predecessorId, observedAt: observation.observedAt, mileageKm: 120000 }], nextCursor: null, exhausted: true, scope: "currently_authorized_retained_predecessors" });
+  if (path.endsWith("/reinspection-comparison")) return Response.json(comparison());
+  if (path.endsWith("/linking-technicians")) return Response.json({ technicians: names });
+  if (path.endsWith("/continuity-requests") && init?.method === "POST") { const kind = JSON.parse(String(init.body)).kind; receipt = { requestId, kind, state: "pending_input" }; return Response.json(receipt); }
+  if (path.endsWith("/execute")) { const input = JSON.parse(String(init?.body)) as D.DiagnosticContinuityRequestExecute; if (loseExecute) { loseExecute = false; throw new TypeError("Connection lost"); } receipt = input.kind === "issue" ? { requestId, kind: "issue", state: "completed", proofId, usability: "historical" } : { requestId, kind: "consume", state: "completed", result: { proofId, reportId } }; return Response.json(receipt); }
+  if (path.endsWith(`/continuity-requests/${requestId}`)) return Response.json(receipt);
+  if (path.endsWith("/continuity-requests")) return Response.json({ requests: [receipt], nextCursor: null });
+  if (path.endsWith(`/continuity-proofs/${proofId}`)) { if (proofReadDenied) return Response.json({}, { status: 403 }); return Response.json({ proofId, policyVersion: "ADR-0108", predecessor: { reportId: predecessorId, reportVersion: 3, snapshotHash: hash, identityRecordId: uuid(20), identityRecordHash: hash }, candidate: { orderId, orderVersion: 7, identityRecordId: uuid(21), identityRecordHash: hash }, linkingTechnicianId: technicianId, method: "comparative_attestation", result: "same_vehicle", rationale: "Restricted recorded rationale", provenanceRecordIds: [uuid(100)], issuedBy: actor, issuedAt: observation.observedAt }); }
+  if (path.endsWith("/identity-records")) return Response.json([{ id: uuid(21), orderId, orderVersion: 7, observationHash: hash, observation, recordedBy: actor, recordedAt: observation.observedAt }]);
+  if (path.endsWith("/identity-evidence") && init?.method === "POST") { const input = JSON.parse(String(init.body)); return Response.json({ ...evidenceFixture(input.id, input.identifiers.flatMap((item: {provenanceIds: string[]}) => item.provenanceIds)), identifiers: input.identifiers, rights: input.rights, correction: input.correction }); }
+  if (path.endsWith("/identity-evidence") && init?.method !== "POST") return Response.json([evidenceFixture(uuid(31), [uuid(100)])]);
+  if (path.endsWith("/identity-provenance") && init?.method === "POST") { const input = JSON.parse(String(init.body)); return Response.json({ id: input.id, state: "staged" }); }
+  if (init?.method === "PUT") return Response.json({ id: path.split("/").at(-1), state: "verified", sha256: hash, sizeBytes: 4, mime: "image/webp" });
+  if (path.includes("/provenance/") || path.includes("/identity-provenance/")) return new Response(new Uint8Array([1, 2, 3, 4]), { headers: { "Content-Type": "image/webp" } });
+  return Response.json(null);
+ });
+ vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:protected-synthetic"); vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+});
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+it.each(["en", "ru", "tk"] as const)("opens the exact B handoff across empty and 61+ handles without mutation or A disclosure in %s", async locale => {
+ context.capabilities = ["diagnostics.technician"];
+ setup(proofId, locale); const copy = continuityCopy[locale];
+ expect(await screen.findByRole("button", { name: copy.reviewB })).toBeTruthy();
+ expect(pages).toBe(5); expect(writes).toEqual([]); expect(fetches.some(path => path.includes("comparison") || path.includes("continuity-proofs"))).toBe(false);
+ expect(screen.queryByText("Restricted A identity")).toBeNull(); expect(screen.queryByText(proofId)).toBeNull();
+});
+it("requires B intention review and sends only the explicit B command", async () => {
+ setup(proofId); const review = await screen.findByRole("button", { name: c.reviewB }); expect(review.hasAttribute("disabled")).toBe(true);
+ fireEvent.change(screen.getByRole("textbox", { name: `${base.reason} · ${c.required}` }), { target: { value: "My intended physical visit" } }); fireEvent.click(review);
+ const final = screen.getByRole("button", { name: c.consume }).closest("section") as HTMLElement;
+ expect(final.textContent).toContain("Authorized physical visit B"); expect(final.textContent).toContain("129,000"); expect(final.textContent).toContain("Synthetic template"); expect(final.textContent).toContain("Buyer private"); expect(writes).toEqual([]);
+ fireEvent.click(within(final).getByRole("button", { name: c.consume })); await screen.findAllByRole("button", { name: c.result });
+ expect(writes.at(-1)?.body).toEqual({ kind: "consume", command: { proofId, reportId: expect.any(String), expectedOrderVersion: 7, reason: "My intended physical visit" } });
+});
+it("checks uncertain execution status before enabling exact unchanged retry", async () => {
+ loseExecute = true; setup(proofId); fireEvent.change(await screen.findByRole("textbox", { name: `${base.reason} · ${c.required}` }), { target: { value: "Original exact reason" } }); fireEvent.click(screen.getByRole("button", { name: c.reviewB })); fireEvent.click(screen.getByRole("button", { name: c.consume }));
+ await screen.findByText(c.uncertain); expect(screen.queryByRole("button", { name: c.retryExact })).toBeNull();
+ await waitFor(() => expect(screen.getByRole("button", { name: c.status }).hasAttribute("disabled")).toBe(false)); fireEvent.click(screen.getByRole("button", { name: c.status }));
+ fireEvent.click(await screen.findByRole("button", { name: c.retryExact })); await screen.findAllByRole("button", { name: c.result });
+ const commands = writes.filter(item => item.path.endsWith("/execute")); expect(commands).toHaveLength(2); expect(commands[1]).toEqual(commands[0]);
+});
+it("renders all 41 bound materials and removes issuance controls", async () => {
+ materials = 41; setup(); await link(); fireEvent.click(screen.getByRole("button", { name: c.search })); fireEvent.click(await screen.findByRole("button", { name: c.compare })); await screen.findByText(c.overCap);
+ expect(screen.getAllByRole("button", { name: c.reviewImage })).toHaveLength(41); expect(screen.queryByRole("button", { name: c.technicians })).toBeNull(); expect(screen.queryByRole("button", { name: c.review })).toBeNull(); expect(writes).toEqual([]);
+});
+it("keeps colliding names unselectable while retaining distinguishable people", async () => {
+ names = [{ userId: uuid(41), name: " Same Name " }, { userId: uuid(42), name: "same  name" }, { userId: technicianId, name: "Distinct Technician" }]; setup(); await compare(); fireEvent.click(screen.getByRole("button", { name: c.technicians })); await screen.findByText(c.collision);
+ expect(within(screen.getByRole("combobox", { name: `${c.select} · ${c.required}` })).getAllByRole("option").map(item => item.textContent)).toEqual([c.select, "Distinct Technician"]);
+});
+it("does not allow image acknowledgment until protected image read succeeds", async () => {
+ setup(); await compare(); const checkbox = screen.getByRole("checkbox", { name: `${c.ack} · ${c.required}` }); expect(checkbox.hasAttribute("disabled")).toBe(true);
+ fireEvent.click(screen.getByRole("button", { name: c.reviewImage })); fireEvent.load(await screen.findByRole("img")); await waitFor(() => expect(checkbox.hasAttribute("disabled")).toBe(false)); expect((checkbox as HTMLInputElement).checked).toBe(false);
+});
+it("denial of any nested protected read removes the whole workspace and its inputs", async () => {
+ setup(); await compare(); fireEvent.change(screen.getByRole("textbox", { name: `${base.reason} · ${c.required}` }), { target: { value: "Private unsent rationale" } }); denied = true;
+ fireEvent.click(screen.getByRole("button", { name: c.reviewImage })); await screen.findByText(base.denied);
+ expect(screen.queryByText("Restricted A identity")).toBeNull(); expect(screen.queryByDisplayValue("Private unsent rationale")).toBeNull(); expect(screen.queryByText("Authorized physical visit B")).toBeNull();
+});
+it("requires restricted inspection of each historical issue before exposing its handoff link", async () => {
+ receipt = { requestId, kind: "issue", state: "completed", proofId, usability: "historical" }; setup(); await link(); fireEvent.click(screen.getByRole("button", { name: c.status }));
+ const inspect = await screen.findByRole("button", { name: c.inspect }); expect(screen.queryByRole("link", { name: c.openLink })).toBeNull(); fireEvent.click(inspect);
+ expect(await screen.findByRole("link", { name: c.openLink })).toHaveProperty("href", `http://localhost:3000/diagnostics?order=${orderId}&handoff=${proofId}`);
+});
+it("discovered pending input has no execute control and no saved command", async () => {
+ setup(); await link(); fireEvent.click(screen.getByRole("button", { name: c.status })); await screen.findByText(c.pending);
+ expect(screen.queryByRole("button", { name: c.retryExact })).toBeNull(); expect(writes).toEqual([]);
+});
+it("preserves a reason across locale changes and offers an explicit dirty leave choice", async () => {
+ setup(proofId); const input = await screen.findByRole("textbox", { name: `${base.reason} · ${c.required}` }); fireEvent.change(input, { target: { value: "Unsent private reason" } });
+ fireEvent.click(screen.getByRole("button", { name: base.refresh })); await screen.findByRole("region", { name: c.leave }); expect(screen.getByDisplayValue("Unsent private reason")).toBeTruthy(); fireEvent.click(screen.getByRole("button", { name: c.keep }));
+ fireEvent.change(screen.getByRole("combobox", { name: "Language" }), { target: { value: "ru" } }); expect(screen.getByDisplayValue("Unsent private reason")).toBeTruthy();
+});
+it("uploads no bytes before classification and records a complete correction using genuinely new verified support", async () => {
+ setup(); fireEvent.click(await screen.findByRole("button", { name: c.visit })); fireEvent.click(screen.getByRole("button", { name: c.loadIdentity }));
+ fireEvent.click(await screen.findByRole("button", { name: c.correction }));
+ const file = new File([new Uint8Array([1, 2, 3, 4])], "synthetic-private.png", { type: "image/png" });
+ fireEvent.change(screen.getByLabelText(c.file), { target: { files: [file] } });
+ expect(screen.getByRole("button", { name: c.stage }).hasAttribute("disabled")).toBe(true); expect(writes).toEqual([]);
+ for (const [label, value] of [[c.purpose, "Physical review"], [c.basis, "Authorized synthetic source"], [c.provenance, "Physical plate capture"], [c.scheduleReason, "Authorized retention"], [base.explanation, "Complete supported replacement"]]) fireEvent.change(screen.getByLabelText(`${label} · ${c.required}`), { target: { value } });
+ fireEvent.change(screen.getByLabelText(`${c.until} · ${c.required}`), { target: { value: "2027-10-24T10:00" } });
+ fireEvent.change(screen.getByLabelText(`${c.location} · ${c.required}`), { target: { value: "New complete physical plate" } }); fireEvent.change(screen.getByLabelText(`${c.value} · ${c.required}`), { target: { value: "New physical value" } });
+ expect(screen.getByRole("button", { name: c.capture }).hasAttribute("disabled")).toBe(true);
+ fireEvent.click(screen.getByRole("button", { name: c.stage }));
+ const support = await screen.findByRole("checkbox", { name: `${c.verified} 2` }); fireEvent.click(support);
+ const capture = screen.getByRole("button", { name: c.capture }); await waitFor(() => expect(capture.hasAttribute("disabled")).toBe(false)); fireEvent.click(capture); await screen.findByText(base.saved);
+ const staged = writes.find(item => item.path.endsWith("/identity-provenance"))?.body as D.DiagnosticIdentityProvenanceStage;
+ const appended = writes.find(item => item.path.endsWith("/identity-evidence"))?.body as D.DiagnosticIdentityEvidenceCapture;
+ expect(staged.rights).toEqual({ ...rights, purpose: "Physical review", basis: "Authorized synthetic source", provenance: "Physical plate capture", schedule: { kind: "until", until: "2027-10-24T10:00:00.000Z", reason: "Authorized retention" } });
+ expect(appended).toEqual({ id: expect.any(String), expectedOrderVersion: 7, identityRecordId: uuid(21), correction: { supersedesId: uuid(31), explanation: "Complete supported replacement" }, rights: staged.rights, identifiers: [{ kind: "vin_stamp", location: "New complete physical plate", value: "New physical value", provenanceIds: [staged.id] }] });
+});
+it("issues the complete comparative command only after explicit material and same-vehicle review", async () => {
+ setup(); await compare(); fireEvent.click(screen.getByRole("button", { name: c.technicians })); await screen.findByRole("option", { name: "Distinct Technician" });
+ fireEvent.change(screen.getByRole("combobox", { name: `${c.select} · ${c.required}` }), { target: { value: technicianId } });
+ fireEvent.change(screen.getByRole("textbox", { name: `${base.reason} · ${c.required}` }), { target: { value: "Complete deliberate comparison" } });
+ const review = screen.getByRole("button", { name: c.review }); expect(review.hasAttribute("disabled")).toBe(true);
+ fireEvent.click(screen.getByRole("button", { name: c.reviewImage })); const ack = screen.getByRole("checkbox", { name: `${c.ack} · ${c.required}` }); fireEvent.load(await screen.findByRole("img")); await waitFor(() => expect(ack.hasAttribute("disabled")).toBe(false)); fireEvent.click(ack); fireEvent.click(screen.getByRole("checkbox", { name: `${c.same} · ${c.required}` })); fireEvent.click(review);
+ expect(writes).toEqual([]); fireEvent.click(screen.getByRole("button", { name: c.issue })); await screen.findByRole("button", { name: c.inspect });
+ expect(writes.at(-1)?.body).toEqual({ kind: "issue", command: { predecessorId, expectedPredecessorVersion: 3, expectedOrderVersion: 7, predecessorIdentityRecordId: uuid(20), candidateIdentityRecordId: uuid(21), linkingTechnicianId: technicianId, method: "comparative_attestation", rationale: "Complete deliberate comparison", provenanceRecordIds: [uuid(100)] } }); expect(screen.queryByRole("link", { name: c.openLink })).toBeNull();
+});
+it("stops a repeated handoff cursor and offers an explicit restart without choosing an alternative", async () => {
+ const real = fetch;
+ vi.stubGlobal("fetch", async (...args: Parameters<typeof fetch>) => String(args[0]).includes("continuity-handoffs") ? Response.json({ handoffs: [], result: null, nextCursor: "same-cursor", scope: "current_b_owned_handoffs" }) : real(...args));
+ setup(proofId); await screen.findByText(c.unavailable); expect(screen.queryByRole("button", { name: c.reviewB })).toBeNull(); expect(writes).toEqual([]); expect(screen.getByRole("button", { name: c.check }).hasAttribute("disabled")).toBe(false);
+});
+it("opens an existing B result before checking the supplied proof and preserves ordinary report recovery", async () => {
+ const real = fetch;
+ vi.stubGlobal("fetch", async (...args: Parameters<typeof fetch>) => String(args[0]).includes("continuity-handoffs") ? Response.json({ handoffs: [], result: { proofId: uuid(999), reportId }, nextCursor: "unused-continuation", scope: "current_b_owned_handoffs" }) : real(...args));
+ setup(proofId); await screen.findByRole("button", { name: c.result }); expect(screen.queryByRole("button", { name: c.consume })).toBeNull(); expect(screen.queryByRole("button", { name: c.reviewB })).toBeNull(); expect(writes).toEqual([]);
+});
+it("does not render a protected late comparison after the user leaves the workspace", async () => {
+ let release: (()=>void) | undefined; const gate=new Promise<void>(resolve=>{release=resolve;}); const real=fetch;
+ vi.stubGlobal("fetch",async(...args:Parameters<typeof fetch>)=>{if(String(args[0]).includes("reinspection-comparison"))await gate;return real(...args);});
+ const view=setup(); await link(); fireEvent.click(screen.getByRole("button",{name:c.search})); fireEvent.click(await screen.findByRole("button",{name:c.compare})); view.unmount(); release?.();
+ await Promise.resolve(); expect(screen.queryByText("Restricted A identity")).toBeNull();
+});
+it("image decode failure blocks acknowledgment and issuance", async()=>{
+ setup();await compare();fireEvent.click(screen.getByRole("button",{name:c.reviewImage}));fireEvent.error(await screen.findByRole("img"));
+ expect(screen.getByRole("checkbox",{name:`${c.ack} · ${c.required}`}).hasAttribute("disabled")).toBe(true);expect(screen.getByRole("button",{name:c.review}).hasAttribute("disabled")).toBe(true);expect(writes).toEqual([]);
+});
+it("keeps reviewer receipt proof-read and copy controls absent for a B-only technician",async()=>{
+ context.capabilities=["diagnostics.technician"];receipt={requestId,kind:"issue",state:"completed",proofId,usability:"historical"};setup(proofId);await screen.findByRole("button",{name:c.reviewB});fireEvent.click(screen.getByRole("button",{name:c.status}));await screen.findByText(c.recorded);
+ expect(screen.queryByRole("button",{name:c.inspect})).toBeNull();expect(screen.queryByRole("button",{name:c.copy})).toBeNull();expect(fetches.some(path=>path.includes("continuity-proofs"))).toBe(false);
+});
+it("discarding classification input clears the real form rather than only its dirty indicator",async()=>{
+ setup();fireEvent.click(await screen.findByRole("button",{name:c.visit}));fireEvent.click(screen.getByRole("button",{name:c.loadIdentity}));fireEvent.click(await screen.findByRole("button",{name:c.correction}));
+ fireEvent.change(screen.getByLabelText(`${c.purpose} · ${c.required}`),{target:{value:"Private unsent classification"}});fireEvent.click(screen.getByRole("button",{name:c.link}));await screen.findByRole("region",{name:c.leave});fireEvent.click(screen.getByRole("button",{name:c.discard}));
+ expect(screen.queryByDisplayValue("Private unsent classification")).toBeNull();expect(screen.getByRole("button",{name:c.search})).toBeTruthy();
+});
