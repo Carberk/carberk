@@ -1930,6 +1930,91 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
   });
 
+  async function suspendedRestoreEnquiries(scheduled = false) {
+    await guards(false);
+    await prisma.user.update({ where: { id: userId }, data: {
+      suspendedAt: new Date("2026-01-01Z"), deletionScheduledAt: scheduled ? new Date("2030-01-01Z") : null,
+    } });
+    await guards(true);
+    const f = await enquiryFixture(), a = await connect();
+    const c = sourceCommand("account_restore", [await update(a,"users",{ id: userId },{ deletionScheduledAt: null })]);
+    return { f,c,beforeUser: await prisma.user.findUniqueOrThrow({ where: { id: userId } }),
+      beforeListing: await prisma.listing.findUniqueOrThrow({ where: { id: listingId } }),
+      beforeMember: await prisma.dealershipMember.findUniqueOrThrow({ where: { id: f.member } }) };
+  }
+
+  it.each(["untouched","same-value","changed"] as const)("suspended restore %s retains full discovery and exact whole enquiry effects", async mode => {
+    const { f,c,beforeUser,beforeListing,beforeMember } = await suspendedRestoreEnquiries(mode === "changed");
+    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx,c,async receipt => {
+      const [r] = await tx.$queryRaw<{ effects: { table: string; next: Row; enquiry?: boolean; enquiryOptional?: boolean }[]; scope: { table: string; key: { id: string } }[]; keys: { namespace: number; key: number }[] }[]>`SELECT effects,scope,lock_keys keys FROM diagnostic_source_commands WHERE id=${receipt.receiptId}::uuid`;
+      const prepared = present(r), effects = prepared.effects.filter(e => e.enquiry);
+      expect(effects).toHaveLength(4);
+      expect(effects.every(e => e.enquiryOptional === (mode !== "changed"))).toBe(true);
+      for (const id of [f.business,f.otherBusiness]) expect(prepared.scope).toContainEqual(expect.objectContaining({ table: "dealerships",key: { id } }));
+      expect(prepared.keys).toEqual([...prepared.keys].sort((l,r) => l.namespace-r.namespace || l.key-r.key));
+      if (mode !== "untouched") await tx.$executeRaw`UPDATE users SET "deletionScheduledAt"=NULL WHERE id=${userId}`;
+      for (const effect of effects.filter(e => e.table === "business_enquiry_audits")) {
+        const [actual] = await tx.$queryRaw<{ row: Row }[]>`SELECT diagnostic_source_project(to_jsonb(a),diagnostic_source_meta('business_enquiry_audits')->'fields') row FROM business_enquiry_audits a WHERE id=${String(effect.next["id"])}`;
+        if (mode === "untouched") expect(actual).toBeUndefined();
+        else expect(present(actual).row).toEqual(effect.next);
+      }
+    }));
+    if (mode === "untouched") expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(beforeUser);
+    else expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toMatchObject({ deletionScheduledAt: null,suspendedAt: beforeUser.suspendedAt });
+    for (const before of [f.own,f.other]) {
+      const actual = await prisma.conversation.findUniqueOrThrow({ where: { id: before.id } });
+      if (mode === "untouched") expect(actual).toEqual(before);
+      else expect(actual).toMatchObject({ assigneeId: null,version: before.version+1,enquiryState: before.enquiryState });
+    }
+    expect(await prisma.businessEnquiryAudit.count({ where: { conversationId: { in: [f.own.id,f.other.id] } } })).toBe(mode === "untouched" ? 0 : 2);
+    expect(await prisma.listing.findUniqueOrThrow({ where: { id: listingId } })).toEqual(beforeListing);
+    expect(await prisma.dealershipMember.findUniqueOrThrow({ where: { id: f.member } })).toEqual(beforeMember);
+    expect(await prisma.conversation.findUniqueOrThrow({ where: { id: f.foreign.id } })).toEqual(f.foreign);
+    expect(await prisma.businessEnquiryAudit.findUniqueOrThrow({ where: { id: f.foreignAudit.id } })).toEqual(f.foreignAudit);
+    expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
+  });
+
+  it.each(["both","one-conversation","audit"] as const)("actual same-value User UPDATE refuses suppressed %s requeue effects atomically", async missing => {
+    const { f,c,beforeUser,beforeListing,beforeMember } = await suspendedRestoreEnquiries();
+    // Authored fault injection only. A BEFORE trigger suppresses a real nested
+    // effect without disabling the actual User requeue trigger or source guards.
+    await pool.query(`CREATE FUNCTION public.noop_enquiry_suppress() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NULL; END $$`);
+    const table = missing === "audit" ? "business_enquiry_audits" : "conversations";
+    const event = missing === "audit" ? "INSERT" : "UPDATE";
+    const when = missing === "one-conversation" ? ` WHEN (OLD.id='${f.own.id}')` : "";
+    await pool.query(`CREATE TRIGGER aa_noop_enquiry_suppress BEFORE ${event} ON public.${table} FOR EACH ROW${when} EXECUTE FUNCTION public.noop_enquiry_suppress()`);
+    try {
+      await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx,c,() =>
+        tx.$executeRaw`UPDATE users SET "deletionScheduledAt"=NULL WHERE id=${userId}`,
+      ))).rejects.toThrow("diagnostic_source_enquiry_effect_missing");
+    } finally {
+      await pool.query(`DROP TRIGGER aa_noop_enquiry_suppress ON public.${table}`);
+      await pool.query("DROP FUNCTION public.noop_enquiry_suppress()");
+    }
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(beforeUser);
+    expect(await prisma.listing.findUniqueOrThrow({ where: { id: listingId } })).toEqual(beforeListing);
+    expect(await prisma.dealershipMember.findUniqueOrThrow({ where: { id: f.member } })).toEqual(beforeMember);
+    for (const row of [f.own,f.other,f.foreign]) expect(await prisma.conversation.findUniqueOrThrow({ where: { id: row.id } })).toEqual(row);
+    expect(await prisma.businessEnquiryAudit.count({ where: { conversationId: { in: [f.own.id,f.other.id] } } })).toBe(0);
+    expect(await prisma.businessEnquiryAudit.findUniqueOrThrow({ where: { id: f.foreignAudit.id } })).toEqual(f.foreignAudit);
+    expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
+  });
+
+  it.each(["requeue","audit"] as const)("an unchanged restore receipt refuses a caller-forged %s", async forged => {
+    const { f,c,beforeUser } = await suspendedRestoreEnquiries();
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx,c,async receipt => {
+      if (forged === "requeue") await tx.conversation.update({ where: { id: f.own.id },data: { assigneeId: null,version: 4 } });
+      else {
+        const [e] = await tx.$queryRaw<{ next: Row }[]>`SELECT e->'next' next FROM diagnostic_source_commands r,LATERAL jsonb_array_elements(r.effects) e WHERE r.id=${receipt.receiptId}::uuid AND e->>'table'='business_enquiry_audits' LIMIT 1`;
+        await tx.$executeRaw`INSERT INTO business_enquiry_audits SELECT (jsonb_populate_record(NULL::business_enquiry_audits,${JSON.stringify(present(e).next)}::jsonb)).*`;
+      }
+    }))).rejects.toThrow("diagnostic_source_enquiry_effect_mismatch");
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(beforeUser);
+    for (const row of [f.own,f.other,f.foreign]) expect(await prisma.conversation.findUniqueOrThrow({ where: { id: row.id } })).toEqual(row);
+    expect(await prisma.businessEnquiryAudit.count({ where: { conversationId: { in: [f.own.id,f.other.id] } } })).toBe(0);
+    expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
+  });
+
   it.each(["insert","update"] as const)("prepared departure fences a concurrent ordinary assignment %s without reverse-order waiting", async mode => {
     const f = await enquiryFixture(false), m = await adminModeration("direct"), b = await connect();
     await prisma.$transaction(tx => withDiagnosticSourceCommand(tx,m.c,async () => {
