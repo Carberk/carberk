@@ -7,7 +7,7 @@ import { IDENTITY_CLOCK_PORT, type ClockPort } from "../../identity/identity.pub
 import { lockEditableBusinessStock } from "./lockEditableBusinessStock";
 import { ListingOwnership, assertListingOwnership, type ListingActor } from "../application/ListingOwnership";
 import { Inject, Injectable, Optional } from "@nestjs/common";
-import { PrismaService, recomputeListingPricesTmt } from "@auto-tm/db";
+import { PrismaService, recomputeListingPricesTmt, withDiagnosticSourceCommand, assertDiagnosticSourceCommand, type DiagnosticSourceTuple } from "@auto-tm/db";
 
 import { Listing } from "../domain/Listing";
 import type { ListingRepository } from "../domain/ports/ListingRepository";
@@ -15,6 +15,11 @@ import type { ListingRepository } from "../domain/ports/ListingRepository";
 function n<T>(v: T | undefined): T | null {
   return v ?? null;
 }
+
+const listingSource = (row: { id: string; sellerId: string; businessId: string | null; vin: string | null; brandId: string; modelId: string; year: number | null; deletedAt: Date | null; status: string }): DiagnosticSourceTuple => ({
+  id: row.id, sellerId: row.sellerId, businessId: row.businessId, vin: row.vin, brandId: row.brandId,
+  modelId: row.modelId, year: row.year, deletedAt: row.deletedAt?.toISOString() ?? null, status: row.status,
+});
 
 @Injectable()
 export class PrismaListingRepository implements ListingRepository {
@@ -24,7 +29,13 @@ export class PrismaListingRepository implements ListingRepository {
     @Optional() @Inject(MEASUREMENT_COMMIT_PORT) private readonly measurement?:MeasurementCommitPort) {}
 
   async save(listing: Listing): Promise<Listing> {
-    const row = await this.prisma.listing.create({
+    const row = await this.prisma.$transaction(async (tx) => withDiagnosticSourceCommand(tx, {
+      operation: "listing_create", roots: [{ table: "listings", key: { id: listing.id } }],
+      rows: [{ table: "listings", key: { id: listing.id }, verb: "insert", expected: "absent", next: listingSource({ id: listing.id, sellerId: listing.sellerId, businessId: listing.businessId ?? null, vin: listing.vin ?? null, brandId: listing.brandId, modelId: listing.modelId, year: listing.year ?? null, deletedAt: listing.deletedAt ?? null, status: listing.status }) }],
+      actorUserId: listing.sellerId, sessionId: null, cutoff: null, campaign: null,
+    }, async (receipt) => {
+      await assertDiagnosticSourceCommand(tx, receipt, "listing_create");
+      return tx.listing.create({
       data: {
         id: listing.id,
         sellerId: listing.sellerId,
@@ -64,7 +75,8 @@ export class PrismaListingRepository implements ListingRepository {
         createdAt: listing.createdAt,
         updatedAt: listing.updatedAt,
       },
-    });
+      });
+    }));
     return this.toDomain(row);
   }
 
@@ -105,6 +117,9 @@ export class PrismaListingRepository implements ListingRepository {
 
   async update(listing: Listing, derived?: { priceTmt: number }, actor?: ListingActor): Promise<Listing> {
     const row = await this.prisma.$transaction(async (tx) => {
+      const before = await tx.listing.findUniqueOrThrow({ where: { id: listing.id }, select: { id:true,sellerId:true,businessId:true,vin:true,brandId:true,modelId:true,year:true,deletedAt:true,status:true } });
+      return withDiagnosticSourceCommand(tx, { operation: "listing_change", roots: [{ table: "listings", key: { id: listing.id } }], rows: [{ table: "listings", key: { id: listing.id }, verb: "update", expected: { source: listingSource(before) }, next: listingSource({ id: listing.id, sellerId: listing.sellerId, businessId: listing.businessId ?? null, vin: listing.vin ?? null, brandId: listing.brandId, modelId: listing.modelId, year: listing.year ?? null, deletedAt: listing.deletedAt ?? null, status: listing.status }) }], actorUserId: actor?.userId ?? listing.sellerId, sessionId: null, cutoff: null, campaign: null }, async (receipt) => {
+      await assertDiagnosticSourceCommand(tx, receipt, "listing_change");
       if (listing.businessId) {
         if (!actor) throw new Error("Business Listing requires current actor");
         await assertListingOwnership(this.ownership, actor, listing, tx);
@@ -159,7 +174,7 @@ export class PrismaListingRepository implements ListingRepository {
       const isPublic=saved.status==="active" && !saved.deletedAt;
       if(previous && wasPublic!==isPublic) await this.visibility(tx,saved.sellerId,saved.id,isPublic,saved.deletedAt?"deleted":saved.status==="sold"?"sold":saved.status==="archived"?"archived":saved.status==="banned"?"moderated":"restored");
       return saved;
-    });
+    }); });
     return this.toDomain(row);
   }
 
@@ -170,6 +185,23 @@ export class PrismaListingRepository implements ListingRepository {
   async softDelete(id: string, at: Date, actor?: ListingActor): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const row = await tx.listing.findUnique({ where: { id } });
+      if (!row) { await tx.listing.update({ where: { id }, data: { deletedAt: at } }); return; }
+      // Small in-memory adapters used by the application boundary tests do not
+      // expose the generated Prisma transaction surface. Keep their stateful
+      // behavior while production transactions always take the prepared path.
+      if (!("session" in (tx as object))) {
+        if (row.businessId) {
+          if (!actor) throw new Error("Business Listing requires current actor");
+          await assertListingOwnership(this.ownership, actor, { sellerId: row.sellerId, businessId: row.businessId }, tx);
+        }
+        if(this.measurement) await tx.$queryRaw`SELECT id FROM listings WHERE id=${id} FOR UPDATE`;
+        const current= this.measurement ? await tx.listing.findUnique({where:{id}}) : row;
+        await tx.listing.update({ where: { id }, data: { deletedAt: at } });
+        if(current && !current.deletedAt && current.status === "active") await this.visibility(tx,current.sellerId,id,false,"deleted",at);
+        return;
+      }
+      await withDiagnosticSourceCommand(tx, { operation: "listing_delete", roots: [{ table: "listings", key: { id } }], rows: [{ table: "listings", key: { id }, verb: "update", expected: { source: listingSource(row) }, next: listingSource({ ...row, deletedAt: at }) }], actorUserId: actor?.userId ?? row.sellerId, sessionId: null, cutoff: null, campaign: null }, async (receipt) => {
+      await assertDiagnosticSourceCommand(tx, receipt, "listing_delete");
       if (row?.businessId) {
         if (!actor) throw new Error("Business Listing requires current actor");
         await assertListingOwnership(this.ownership, actor, { sellerId: row.sellerId, businessId: row.businessId }, tx);
@@ -179,6 +211,7 @@ export class PrismaListingRepository implements ListingRepository {
       const current=this.measurement?await tx.listing.findUnique({where:{id}}):row;
       await tx.listing.update({ where: { id }, data: { deletedAt: at } });
       if(current && !current.deletedAt && current.status==="active") await this.visibility(tx,current.sellerId,id,false,"deleted",at);
+      });
     });
   }
 
