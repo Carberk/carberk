@@ -1,0 +1,704 @@
+[
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 197,
+    "count": 1,
+    "title": "\"direct INSERT discards forged identity/graph/effects and direct DELETE requires actual final effects\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 209,
+    "count": 1,
+    "title": "\"finish deletes the live receipt so deferred completion accepts, and subsequent protected writes refuse\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 217,
+    "count": 1,
+    "title": "\"unclosed receipt fails at COMMIT using final live state\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 222,
+    "count": 1,
+    "title": "\"foreign backend, forged GUC, unknown fields, receipt UPDATE and TRUNCATE cannot authorize writes\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 233,
+    "count": 11,
+    "title": "\"a pre-held %s locking statement refuses preparation before source writes\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 238,
+    "count": 1,
+    "title": "\"unprepared bulk source UPDATE refuses before scanning, scalar UPDATE remains ordinary\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 243,
+    "count": 1,
+    "title": "\"an effective source change made by a BEFORE trigger is caught for a scalar statement\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 250,
+    "count": 1,
+    "title": "\"reversed overlapping root input produces one physical sequence and serializes without deadlock\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 262,
+    "count": 1,
+    "title": "\"an order inserted after discovery is found by actual post-lock database rediscovery\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 273,
+    "count": 1,
+    "title": "\"no-grant first capture is unavailable, later same-identity captures never repin, and rollback leaves no claim\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 284,
+    "count": 1,
+    "title": "\"BOTH unavailable first captures reject late genuine grants and later observations never repin\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 309,
+    "count": 1,
+    "title": "\"a missing finish-time first seal fails atomically, legacy shells cannot be backfilled\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 316,
+    "count": 1,
+    "title": "\"order commissioner ABA before capture is sticky, including restore to the exact original values\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 328,
+    "count": 1,
+    "title": "\"fresh persisted seller grants allow BOTH first captures, and date/mileage changes preserve the immutable slots\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 341,
+    "count": 1,
+    "title": "\"Listing VIN ABA before first capture is sticky despite restored values and a compatible persisted grant\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 352,
+    "count": 1,
+    "title": "\"eligibility suspend/restore does not invent ownership history\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 364,
+    "count": 1,
+    "title": "\"distinct resource hashes collide within one class, serialize, and never widen row coverage\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 387,
+    "count": 1,
+    "title": "\"component erasure clears the first anchor and grant payload without altering raw date/mileage\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 405,
+    "count": 1,
+    "title": "\"the exported transaction interface commits the declared source effect and closes its receipt\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 418,
+    "count": 1,
+    "title": "\"the exported interface rolls back callback failures and omitted mandatory effects\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 433,
+    "count": 1,
+    "title": "\"exported receipt assertions reject another operation, a finished transaction, and nested preparation\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 451,
+    "count": 1,
+    "title": "\"the exported first-observation seal claims BOTH granted visits without repinning\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 478,
+    "count": 1,
+    "title": "\"ordinary Session creation works while its authority changes require a source command\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 485,
+    "count": 1,
+    "title": "\"ordinary Listing counters and derived price updates need no ownership receipt\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 490,
+    "count": 1,
+    "title": "\"equal projected target writes still require exact row coverage\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 498,
+    "count": 1,
+    "title": "\"effective primary-key changes introduced by a scalar BEFORE trigger refuse\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 506,
+    "count": 1,
+    "title": "\"normalized VIN formatting preserves identity while raw source writes remain covered\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 522,
+    "count": 2,
+    "title": "\"observed identity ABA on visit %s stays changed and preserves the other first slot\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 539,
+    "count": 1,
+    "title": "\"identity provenance leases stay ordinary while material transitions remain guarded\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 555,
+    "count": 2,
+    "title": "\"a new OWNER edge after discovery aborts the opposing absent-member command, reversed=%s\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 576,
+    "count": 1,
+    "title": "\"same resource hashes in disjoint source classes and campaign key space cannot alias\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 591,
+    "count": 1,
+    "title": "\"a preheld persisted campaign namespace lock refuses source preparation\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 602,
+    "count": 1,
+    "title": "\"an uncovered User-to-Session FK cascade refuses atomically and preserves foreign rows\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 620,
+    "count": 40,
+    "title": "\"visit $visit $phase $field ABA remains sticky while the other visit and raw facts survive\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 676,
+    "count": 2,
+    "title": "\"membership deletion/recreation before visit %s capture never restores the pending identity\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 703,
+    "count": 2,
+    "title": "\"a missing NEW %s physical key serializes opposing INSERTs and preserves the winning graph\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 725,
+    "count": 1,
+    "title": "\"an overlimit closure refuses before source mutation and leaves the entire persisted graph intact\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 742,
+    "count": 2,
+    "title": "\"a sealed anchor cannot regress to %s through a valid unrelated receipt\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 757,
+    "count": 6,
+    "title": "\"NEW $edge graph edge respects discovery/locking with writerFirst=$writerFirst\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 825,
+    "count": 2,
+    "title": "\"a genuine grant expiring before %s cannot leave an available first witness\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 858,
+    "count": 2,
+    "title": "\"a %s Session cannot turn a source receipt into seller permission\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 872,
+    "count": 2,
+    "title": "\"%s completes actual Listing cascades/SET NULL effects while foreign records survive\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 960,
+    "count": 1,
+    "title": "\"a later BEFORE mutator cannot use a guard's reserved name as an exemption\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 980,
+    "count": 2,
+    "title": "\"current OWNER consent covers BOTH %s visits; eligibility restoration cannot undo member recreation\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 1042,
+    "count": 1,
+    "title": "\"every finite table and incoming FK relation rejects preheld DML locks before preparation\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 1063,
+    "count": 1,
+    "title": "\"all 77 physical classes have a total suborder and final guards never add resource locks\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 1089,
+    "count": 1,
+    "title": "\"savepoint rollback removes both an uncommitted receipt and its locks; a fresh first command may follow\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 1103,
+    "count": 2,
+    "title": "\"grant revocation versus first capture serializes the complete retained graph, captureFirst=%s\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 1158,
+    "count": 2,
+    "title": "\"owner %s derives the exact Business and collector-baseline effects before locks\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 1200,
+    "count": 1,
+    "title": "\"every selective protected target refuses before an empty scan while dependency-only empty statements remain ordinary\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 1213,
+    "count": 1,
+    "title": "\"account scheduling/restoration completes its exact membership, inventory and measurement effects without reviving erased authority\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 1332,
+    "count": 2,
+    "title": "\"staff revocation uses exact physical TIMESTAMP(3) rounding for %s\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 1349,
+    "count": 2,
+    "title": "\"Business recovery removal versus ordinary capture with suspended grant preserves retained member/Listing references, captureFirst=%s\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 1427,
+    "count": 2,
+    "title": "\"User moderation %s requires every actual Session deletion and rolls back the whole command\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 1471,
+    "count": 10,
+    "title": "\"moderation refuses %s intent before work\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 1493,
+    "count": 3,
+    "title": "\"a live moderation receipt refuses an actual %s effect\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 1508,
+    "count": 1,
+    "title": "\"moderation rejects naked fields, missing/foreign/finished receipts and second or late preparation\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 1534,
+    "count": 2,
+    "title": "\"suspension versus first capture holds the same graph before effects, captureFirst=%s\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 1583,
+    "count": 1,
+    "title": "\"suspension predeclares actual Session FK children while retaining foreign authority and service content\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 1621,
+    "count": 1,
+    "title": "\"unfinished moderation cannot commit and a finished receipt cannot authorize a later write in the same transaction\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 1680,
+    "count": 10,
+    "title": "\"complete %s moderation via %s keeps original audit content and all required transaction effects\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 1709,
+    "count": 2,
+    "title": "\"%s rejects omitted admin audit and report and rolls back all moderation writes\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 1727,
+    "count": 9,
+    "title": "\"wrong %s effect refuses the complete moderation transaction\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+    "line": 1753,
+    "count": 5,
+    "title": "\"invalid %s moderation intent fails before mutation\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-purge-effects.e2e.spec.ts",
+    "line": 181,
+    "count": 1,
+    "title": "\"commits the covered service/video/measurement union while retaining foreign bodies, bytes and unlinked guest history\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-purge-effects.e2e.spec.ts",
+    "line": 201,
+    "count": 2,
+    "title": "\"%s refuses a missing effect and rolls back the User/Session writes\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-purge-effects.e2e.spec.ts",
+    "line": 210,
+    "count": 1,
+    "title": "\"direct receipt INSERT replaces forged effects and direct DELETE accepts the same real completed union\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-purge-effects.e2e.spec.ts",
+    "line": 220,
+    "count": 1,
+    "title": "\"caller-declared foreign effects and forged derived state refuse without changing foreign content\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-purge-effects.e2e.spec.ts",
+    "line": 230,
+    "count": 1,
+    "title": "\"a forged final attribution and unselected foreign deletion refuse\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-purge-effects.e2e.spec.ts",
+    "line": 238,
+    "count": 1,
+    "title": "\"refuses malformed video inventory before any erasure or cleanup intent\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-purge-effects.e2e.spec.ts",
+    "line": 244,
+    "count": 2,
+    "title": "\"%s uses a real collector barrier, with the source prefix before measurement\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-purge-effects.e2e.spec.ts",
+    "line": 269,
+    "count": 2,
+    "title": "\"%s rechecks the due User after the opposing transaction commits\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-purge-effects.e2e.spec.ts",
+    "line": 315,
+    "count": 2,
+    "title": "\"avatar cleanup preserves exact inventory and existing upsert replay=%s\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-purge-effects.e2e.spec.ts",
+    "line": 336,
+    "count": 1,
+    "title": "\"Session/device/TOTP cascades are covered and the entire graph rolls back atomically\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-purge-effects.e2e.spec.ts",
+    "line": 371,
+    "count": 1,
+    "title": "\"History anonymous knowledge, legal hold and artifact byte boundaries survive the covered union\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-purge-effects.e2e.spec.ts",
+    "line": 402,
+    "count": 4,
+    "title": "\"distinct staff $action versus customer purge, serviceFirst=$serviceFirst\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-purge-effects.e2e.spec.ts",
+    "line": 472,
+    "count": 8,
+    "title": "\"actual staff $action versus $boundary cleanup, serviceFirst=$serviceFirst\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-purge-effects.e2e.spec.ts",
+    "line": 550,
+    "count": 2,
+    "title": "\"actual measurement bootstrap versus account scheduling, bootstrapFirst=%s\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-purge-effects.e2e.spec.ts",
+    "line": 604,
+    "count": 2,
+    "title": "\"actual video completion versus deletion scheduling and subsequent purge, completionFirst=%s\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-purge-effects.e2e.spec.ts",
+    "line": 654,
+    "count": 6,
+    "title": "\"actual service creation versus $boundary, createFirst=$createFirst\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-intake-effects.e2e.spec.ts",
+    "line": 51,
+    "count": 2,
+    "title": "\"%s requires the exact operator center/qualification/audits and rolls back an omitted audit\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-intake-effects.e2e.spec.ts",
+    "line": 64,
+    "count": 2,
+    "title": "\"%s bootstrap wins the absent center/qualification slots before the opposing writer\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-intake-effects.e2e.spec.ts",
+    "line": 106,
+    "count": 1,
+    "title": "\"publication derives its audit, fences absent version keys, refuses a forged audit and enforces direct DELETE\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-intake-effects.e2e.spec.ts",
+    "line": 127,
+    "count": 2,
+    "title": "\"%s requires the staff operator audit and preserves an active replay\""
+  },
+  {
+    "file": "packages/db/tests/diagnostic-intake-effects.e2e.spec.ts",
+    "line": 169,
+    "count": 1,
+    "title": "\"actual campaign first admission derives center/two qualifications/three audits and never renews its hashed authority\""
+  },
+  {
+    "file": "packages/db/tests/campaign-preparation.e2e.spec.ts",
+    "line": 147,
+    "count": 4,
+    "title": "`${operation} ordinary/source ordering ${ordinaryFirst ? \"ordinary first\" : \"source first\"} waits at the namespace before mutation`"
+  },
+  {
+    "file": "packages/db/tests/campaign-preparation.e2e.spec.ts",
+    "line": 201,
+    "count": 1,
+    "title": "\"ordinary v3 settings and invitations use the fence without an ownership receipt\""
+  },
+  {
+    "file": "packages/db/tests/campaign-preparation.e2e.spec.ts",
+    "line": 214,
+    "count": 1,
+    "title": "\"campaign preparation does not authorize private diagnostic or unsupported media admission\""
+  },
+  {
+    "file": "packages/db/tests/campaign-preparation.e2e.spec.ts",
+    "line": 225,
+    "count": 1,
+    "title": "\"ordinary rollback restores the User and campaign journal and leaves no preparation payload\""
+  },
+  {
+    "file": "packages/db/tests/campaign-preparation.e2e.spec.ts",
+    "line": 236,
+    "count": 1,
+    "title": "\"ordinary non-campaign scalar writes need no source or campaign receipt\""
+  },
+  {
+    "file": "packages/db/tests/campaign-preparation.e2e.spec.ts",
+    "line": 242,
+    "count": 1,
+    "title": "\"missing preparation rejects a campaign scalar atomically\""
+  },
+  {
+    "file": "packages/db/tests/campaign-preparation.e2e.spec.ts",
+    "line": 248,
+    "count": 1,
+    "title": "\"OLD and proposed NEW references resolve both namespaces, while a missed NEW namespace is rejected before insert\""
+  },
+  {
+    "file": "packages/db/tests/campaign-preparation.e2e.spec.ts",
+    "line": 263,
+    "count": 2,
+    "title": "`reset table prelude opposition ${preparationFirst ? \"preparation first\" : \"table first\"} serializes before the namespace`"
+  },
+  {
+    "file": "packages/db/tests/campaign-preparation.e2e.spec.ts",
+    "line": 277,
+    "count": 1,
+    "title": "\"legacy v1 reset order contention refuses before namespace acquisition without retry\""
+  },
+  {
+    "file": "packages/db/tests/campaign-preparation.e2e.spec.ts",
+    "line": 285,
+    "count": 1,
+    "title": "\"reverse multi-namespace inputs acquire the same sorted complete set\""
+  },
+  {
+    "file": "packages/db/tests/campaign-preparation.e2e.spec.ts",
+    "line": 301,
+    "count": 1,
+    "title": "\"a moved Session reference discovers OLD and NEW namespaces and retains the existing transfer refusal\""
+  },
+  {
+    "file": "packages/db/tests/campaign-preparation.e2e.spec.ts",
+    "line": 315,
+    "count": 1,
+    "title": "\"forged GUC, copied foreign receipt, preheld campaign lock and nested source entry cannot prepare\""
+  },
+  {
+    "file": "packages/db/tests/campaign-preparation.e2e.spec.ts",
+    "line": 332,
+    "count": 11,
+    "title": "`refuses late preparation after a ${table} dependency table lock`"
+  },
+  {
+    "file": "packages/db/tests/campaign-preparation.e2e.spec.ts",
+    "line": 339,
+    "count": 1,
+    "title": "\"preheld campaign metadata locks refuse entry and a fence receipt cannot authorize protected source DML\""
+  },
+  {
+    "file": "packages/db/tests/campaign-preparation.e2e.spec.ts",
+    "line": 347,
+    "count": 1,
+    "title": "\"direct INSERT cannot forge scope or backend identity, UPDATE cannot extend it, and rollback leaves no payload\""
+  },
+  {
+    "file": "packages/db/tests/campaign-preparation.e2e.spec.ts",
+    "line": 356,
+    "count": 1,
+    "title": "\"TRUNCATE cannot bypass campaign journaling or transient-state completion\""
+  },
+  {
+    "file": "packages/db/tests/campaign-preparation.e2e.spec.ts",
+    "line": 363,
+    "count": 1,
+    "title": "\"unfinished preparation fails commit and a forged receipt cannot finish another transaction\""
+  },
+  {
+    "file": "packages/db/tests/campaign-preparation.e2e.spec.ts",
+    "line": 369,
+    "count": 1,
+    "title": "\"admitted-business foreign media references retain the original tracker and the cleaning ledger fence\""
+  },
+  {
+    "file": "packages/db/tests/campaign-preparation.e2e.spec.ts",
+    "line": 431,
+    "count": 2,
+    "title": "\"complete campaign moderation %s preserves the existing policy refusal atomically\""
+  },
+  {
+    "file": "apps/api/src/modules/identity/infrastructure/DiagnosticPurgeEffectClosure.e2e.spec.ts",
+    "line": 176,
+    "count": 1,
+    "title": "\"disposes available grants/components/first anchors and retains immutable raw and foreign material\""
+  },
+  {
+    "file": "apps/api/src/modules/identity/infrastructure/DiagnosticPurgeEffectClosure.e2e.spec.ts",
+    "line": 194,
+    "count": 1,
+    "title": "\"retains OLD Listing selectors after a real source transfer, without changing foreign Listing or repinning\""
+  },
+  {
+    "file": "apps/api/src/modules/identity/infrastructure/DiagnosticPurgeEffectClosure.e2e.spec.ts",
+    "line": 232,
+    "count": 4,
+    "title": "\"valid unused proof invalidates on visit $visit $kind UPDATE-OF without inventing an ownership transition\""
+  },
+  {
+    "file": "apps/api/src/modules/identity/infrastructure/DiagnosticPurgeEffectClosure.e2e.spec.ts",
+    "line": 259,
+    "count": 2,
+    "title": "\"%s checks real execution-time expiry after preparation without accepting the earlier source timestamp\""
+  },
+  {
+    "file": "apps/api/src/modules/identity/infrastructure/DiagnosticPurgeEffectClosure.e2e.spec.ts",
+    "line": 310,
+    "count": 2,
+    "title": "\"Session %s discovers its incoming valid proof and finishes invalidation without a late resource lock\""
+  },
+  {
+    "file": "apps/api/src/modules/identity/infrastructure/DiagnosticPurgeEffectClosure.e2e.spec.ts",
+    "line": 343,
+    "count": 2,
+    "title": "\"a %s selector covers its incoming proof before revocation; restoring eligibility leaves that proof invalidated\""
+  },
+  {
+    "file": "apps/api/src/modules/identity/infrastructure/DiagnosticPurgeEffectClosure.e2e.spec.ts",
+    "line": 369,
+    "count": 3,
+    "title": "\"%s suspension deletes actual Sessions but preserves both first anchors and permanent unused-proof invalidation\""
+  },
+  {
+    "file": "apps/api/src/modules/identity/infrastructure/DiagnosticPurgeEffectClosure.e2e.spec.ts",
+    "line": 441,
+    "count": 1,
+    "title": "\"moderation deletes a consumed request's actual Session FK but preserves its surviving report and proof retry minima\""
+  },
+  {
+    "file": "apps/api/src/modules/identity/infrastructure/DiagnosticPurgeEffectClosure.e2e.spec.ts",
+    "line": 503,
+    "count": 2,
+    "title": "\"Listing physical %s predeclares both FK targets and invalidates a genuine unused proof\""
+  },
+  {
+    "file": "apps/api/src/modules/identity/infrastructure/DiagnosticPurgeEffectClosure.e2e.spec.ts",
+    "line": 557,
+    "count": 6,
+    "title": "\"NEW $edge edge versus $opposition enters the actual rediscovered graph, writerFirst=$writerFirst\""
+  },
+  {
+    "file": "apps/api/src/modules/identity/infrastructure/DiagnosticPurgeEffectClosure.e2e.spec.ts",
+    "line": 649,
+    "count": 4,
+    "title": "\"$disposed expiry versus proof use, useFirst=$useFirst preserves the complete committed result\""
+  },
+  {
+    "file": "apps/api/src/modules/identity/infrastructure/DiagnosticPurgeEffectClosure.e2e.spec.ts",
+    "line": 748,
+    "count": 2,
+    "title": "\"Session deletion %s removes the consumed request and retains the immutable report pair and retry minimum\""
+  },
+  {
+    "file": "apps/api/src/modules/identity/infrastructure/DiagnosticPurgeEffectClosure.e2e.spec.ts",
+    "line": 798,
+    "count": 1,
+    "title": "\"deletes consumed proof/issue request while preserving B's report retry minimum and foreign snapshot\""
+  }
+]
