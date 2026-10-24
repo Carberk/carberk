@@ -9,7 +9,7 @@ class MinimalTombstoneDecoderTest {
     private fun key(number: Int) = varint((number shl 3 or 2).toLong())
     private fun field(number: Int, value: ByteArray) = key(number) + varint(value.size.toLong()) + value
     private fun scalar(number: Int, value: Long) = varint((number shl 3).toLong()) + varint(value)
-    private fun frame() = field(1, varint(0x1234)) + field(6, "/app/libcar.so".toByteArray()) + field(8, "0123456789abcdef".toByteArray())
+    private fun frame() = scalar(1, 0x1234) + field(6, "/app/libcar.so".toByteArray()) + field(8, "0123456789abcdef".toByteArray())
     private fun fixture(rootTid: Long = 7, mapKey: Long = 7, threadId: Long = 7, extra: ByteArray = byteArrayOf()): ByteArray {
         val thread = scalar(1, threadId) + field(4, frame())
         val entry = scalar(1, mapKey) + field(2, thread)
@@ -48,7 +48,9 @@ class MinimalTombstoneDecoderTest {
         val overflowLength = ByteArray(9) { 0x80.toByte() } + byteArrayOf(0x01)
         // This is the first signal_info field, so its length reaches bytes() directly.
         val known = scalar(1, 1) + scalar(6, 7) + key(10) + overflowLength
-        val skipped = fixture(extra = key(99) + overflowLength)
+        val validPrefix = fixture()
+        assertEquals("1234", MinimalTombstoneDecoder.decode(validPrefix, manifest)?.frames?.single()?.relativePc)
+        val skipped = validPrefix + key(99) + overflowLength
         assertNull(MinimalTombstoneDecoder.decode(known, manifest))
         assertNull(MinimalTombstoneDecoder.decode(skipped, manifest))
     }
