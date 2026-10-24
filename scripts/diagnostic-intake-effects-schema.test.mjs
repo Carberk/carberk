@@ -12,7 +12,8 @@ const sql = read('../packages/db/prisma/migrations/' + name + '/migration.sql');
 
 test('intake closure adds exactly its retained migration to the prior profile', () => {
   assert.equal(sql, read('./testing/retained-schema/' + name + '.sql'));
-  const schema = hash(read('../packages/db/prisma/schema.prisma'));
+  // This test owns the held intake snapshot; the invariant test owns current.
+  const schema = 'e40cc31cfa68c532d63b70b11704e2d14e4d4b59c22412438a98dc8b5a82f06a';
   const prior = '89ee14e1d4a2c77154b91615f99b5e281e71957539139e2df6f99d56c8cce71a';
   const candidate = inventoryForSchema(schema, []), main = inventoryForSchema(prior, []);
   assert.deepEqual(candidate.filter(row => row.name !== name), main);

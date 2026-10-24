@@ -30,6 +30,14 @@ const cutoff = new Date("1980-01-02T00:00:00Z");
 describe("finite account purge effects on migrated PostgreSQL", () => {
   let container: StartedPostgreSqlContainer, pool: Pool, prisma: PrismaClient;
   let diagnostic: OwnerWrites, service: OwnerWrites, video: OwnerWrites;
+  type Messaging = {
+    open(subject: { userId: string; sessionId: string }, purpose: "history",sourceListingId?:string): Promise<{ id: string; resourceId: string }>;
+    read(subject: { userId: string; sessionId: string }, id: string, after: number, limit: number): Promise<unknown>;
+    send(subject: { userId: string; sessionId: string }, id: string, message: { clientMessageId: string; visibility: "customer"; body: string }): Promise<unknown>;
+  };
+  let messaging: (staffId: string) => Messaging;
+  let bootstrap: (userId: string) => Promise<unknown>;
+  let completeVideo: (id: string,userId: string,sessionId: string,fence: string) => Promise<unknown>;
   let uid: string, foreign: string, session: string, ownConversation: string, foreignConversation: string;
   let attachment: string, ownAttachment: string, foreignMessage: string, ownMessage: string;
   let ownOrder: string, foreignOrder: string, ownRaw: string, foreignRaw: string;
@@ -93,6 +101,36 @@ describe("finite account purge effects on migrated PostgreSQL", () => {
     diagnostic = present((await load("../../../apps/worker/src/jobs/diagnosticAccountErasure.ts"))["diagnosticAccountErasureWrites"]);
     service = present((await load("../../../apps/worker/src/jobs/serviceAccountErasure.ts"))["serviceAccountErasureWrites"]);
     video = present((await load("../../../apps/worker/src/jobs/video/videoAccountErasure.ts"))["videoAccountErasureWrites"]);
+    const api = async (path: string) => import(/* @vite-ignore */ fileURLToPath(new URL("../../../apps/api/src/modules/"+path, import.meta.url))) as Promise<Record<string, new (...args: unknown[]) => unknown>>;
+    const Messaging = present((await api("service-messaging/infrastructure/PrismaServiceMessaging.ts"))["PrismaServiceMessaging"]);
+    const Staff = present((await api("identity/application/CheckStaffAuthority.ts"))["CheckStaffAuthority"]);
+    const Repository = present((await api("identity/infrastructure/PrismaStaffAuthority.ts"))["PrismaStaffAuthority"]);
+    const Campaign = present((await api("service-messaging/infrastructure/campaignServiceAdmission.ts"))["CampaignServiceAdmission"]);
+    const { serviceRuntime } = await import(/* @vite-ignore */ fileURLToPath(new URL("../../../apps/api/src/modules/service-messaging/infrastructure/serviceRuntime.ts", import.meta.url))) as { serviceRuntime(config: unknown): unknown };
+    const Store = present((await api("measurement/infrastructure/PrismaMeasurementStore.ts"))["PrismaMeasurementStore"]);
+    bootstrap = id => (new Store(prisma,{ epoch: "purge-effects",environment: "test",population: "synthetic" }) as { bootstrap(input: { authenticatedUserId: string }): Promise<unknown> }).bootstrap({ authenticatedUserId: id });
+    const BusinessRepository=present((await api("identity/infrastructure/PrismaBusinessAuthority.ts"))["PrismaBusinessAuthority"]);
+    const Business=present((await api("identity/application/CheckBusinessAuthority.ts"))["CheckBusinessAuthority"]);
+    const Ownership=present((await api("listings/application/ListingOwnership.ts"))["ListingOwnership"]);
+    const Eligibility=present((await api("listings/application/VideoEligibility.ts"))["VideoEligibility"]);
+    const Claims=present((await api("listings/infrastructure/PrismaUploadClaims.ts"))["PrismaUploadClaims"]);
+    const Ledger=present((await api("listings/infrastructure/PrismaOwnedVideoSessionLedger.ts"))["PrismaOwnedVideoSessionLedger"]);
+    completeVideo=(id,userId,sessionId,fence)=>{
+      const clock={now:()=>new Date()},authority=new Business(new BusinessRepository(prisma),clock),ownership=new Ownership(authority);
+      const values: Record<string,unknown>={VIDEO_ROLLOUT_ENABLED:true,VIDEO_UPLOADS_ENABLED:true,VIDEO_TESTER_USER_IDS:[userId]};
+      const eligibility=new Eligibility({get:(key:string)=>values[key]});
+      const ledger=new Ledger(prisma,authority,ownership,clock,eligibility,new Claims(prisma,clock,ownership),randomUUID) as {commitCompletion(actor:{userId:string;sessionId:string},id:string,fence:string):Promise<unknown>};
+      return ledger.commitCompletion({userId,sessionId},id,fence);
+    };
+    messaging = staffId => {
+      const values: Record<string, unknown> = { SERVICE_SYNTHETIC_ENABLED: true, SERVICE_SYNTHETIC_USER_IDS: [staffId] };
+      const config = { get: (key: string, fallback: unknown) => values[key] ?? fallback };
+      return new Messaging(prisma, new Staff(new Repository(prisma), { now: () => new Date() }), {
+        putImmutable: async () => { throw new Error("text scenario must not store files"); },
+        get: async () => { throw new Error("text scenario must not read files"); }, remove: async () => { throw new Error("text scenario must not erase files"); },
+      }, serviceRuntime(config), new Campaign(config)) as Messaging;
+    };
+
   });
   beforeEach(async () => {
     // Fixture construction precedes activation; no anchors/grants/proofs or
@@ -104,7 +142,7 @@ describe("finite account purge effects on migrated PostgreSQL", () => {
     ownConversation = randomUUID(); foreignConversation = randomUUID();
     for (const [id, customerId] of [[ownConversation, uid], [foreignConversation, foreign]] as const) {
       const support = await prisma.supportCase.create({ data: { customerId } });
-      await prisma.serviceConversation.create({ data: { id, purpose: "support", supportCaseId: support.id } });
+      await prisma.serviceConversation.create({ data: { id, purpose: "support", supportCaseId: support.id, lastSequence: 1 } });
     }
     ownMessage = randomUUID(); foreignMessage = randomUUID();
     for (const [id, conversationId] of [[ownMessage, ownConversation], [foreignMessage, foreignConversation]] as const) {
@@ -359,6 +397,300 @@ describe("finite account purge effects on migrated PostgreSQL", () => {
     expect(await prisma.historyArtifact.findUniqueOrThrow({ where: { id: privateArtifact } })).toMatchObject({ state: "restricted", vehicleIdentity: null, mileageValue: null, objectKey: `history-artifact/${privateArtifact}`, acquiredForOrderId: null });
     expect(await prisma.historyArtifactCleanup.count({ where: { artifactId: { in: [retainedArtifact, privateArtifact] } } })).toBe(0);
 
+  });
+
+  it.each(["read", "send"].flatMap(action => [false, true].map(serviceFirst => ({ action, serviceFirst }))))("distinct staff $action versus customer purge, serviceFirst=$serviceFirst", async ({ action, serviceFirst }) => {
+    await guards(false);
+    const staffId = randomUUID(), staffSession = randomUUID();
+    await prisma.user.create({ data: { id: staffId, email: `${staffId}@synthetic.invalid` } });
+    await prisma.session.create({ data: { id: staffSession, userId: staffId, refreshTokenHash: staffSession, expiresAt: new Date(Date.now()+600_000), adminTotpExpiresAt: new Date(Date.now()+600_000) } });
+    await prisma.staffGrant.create({ data: { userId: staffId, capability: "support.operations" } });
+    const conversation = await prisma.serviceConversation.findUniqueOrThrow({ where: { id: ownConversation } });
+    const support = present(conversation.supportCaseId);
+    await prisma.supportCase.update({ where: { id: support }, data: { assigneeId: staffId } });
+    const foreignBefore = await prisma.serviceMessage.findUniqueOrThrow({ where: { id: foreignMessage } });
+    await guards(true);
+    const actor = { userId: staffId, sessionId: staffSession }, owner = messaging(staffId);
+    // Prove the persisted actor's real authority before installing either barrier.
+    await owner.read(actor, ownConversation, 0, 20);
+    const perform = () => action === "read" ? owner.read(actor, ownConversation, 0, 20) : owner.send(actor, ownConversation, {
+      clientMessageId: randomUUID(), visibility: "customer", body: "Explicit synthetic staff reply",
+    });
+    async function waiter(blocker: number) {
+      const deadline = Date.now()+5000;
+      while (Date.now()<deadline) {
+        const { rows } = await pool.query<{ pid: number }>("SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND $1::int=ANY(pg_blocking_pids(pid)) ORDER BY pid", [blocker]);
+        if (rows[0]) return rows[0].pid;
+      }
+      throw new Error("expected actual service/source backend barrier");
+    }
+    const prepared = signal(), release = signal();
+    let sourcePid = 0;
+    let ordinary: Promise<unknown>;
+    let blocker: PoolClient | undefined;
+    if (serviceFirst) {
+      blocker = await pool.connect(); clients.push(blocker);
+      await blocker.query("BEGIN");
+      const blockerPid = present((await blocker.query<{ pid: number }>("SELECT pg_backend_pid() pid")).rows[0]).pid;
+      await blocker.query('SELECT id FROM support_cases WHERE id=$1 FOR UPDATE', [support]);
+      ordinary = perform().then(value => ({ value }), (error: unknown) => ({ error }));
+      const servicePid = await waiter(blockerPid);
+      const source = prisma.$transaction(async tx => {
+        sourcePid = present((await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() pid`)[0]).pid;
+        const c = await command(tx); prepared.release();
+        await withDiagnosticSourceCommand(tx, c, () => ownerPurge(tx));
+      }).then(() => null, (error: unknown) => error);
+      await prepared.promise;
+      try { expect(await waiter(servicePid)).toBe(sourcePid); }
+      finally { await blocker.query("ROLLBACK"); }
+      expect(await ordinary).toHaveProperty("value");
+      const refused = await source;
+      // Read adds a selected service audit; send changes selected parent/message
+      // rows. Neither may be erased from an old pre-lock inventory.
+      expect(refused).toBeInstanceOf(Error);
+      expect((refused as Error).message).toContain("diagnostic_source_graph_changed");
+      expect(await prisma.user.findUniqueOrThrow({ where: { id: uid } })).toMatchObject({ displayName: "retained owner" });
+      expect(await prisma.serviceConversation.findUniqueOrThrow({ where: { id: ownConversation } })).toMatchObject({ erasedAt: null });
+    } else {
+      const source = prisma.$transaction(async tx => {
+        sourcePid = present((await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() pid`)[0]).pid;
+        await withDiagnosticSourceCommand(tx, await command(tx), async () => { prepared.release(); await release.promise; await ownerPurge(tx); });
+      });
+      await prepared.promise;
+      ordinary = perform().then(value => ({ value }), (error: unknown) => ({ error }));
+      try { await waiter(sourcePid); } finally { release.release(); }
+      await source;
+      expect(await ordinary).toHaveProperty("error");
+      expect(await prisma.serviceConversation.findUniqueOrThrow({ where: { id: ownConversation } })).toMatchObject({ erasedAt: cutoff });
+    }
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: staffId } })).toMatchObject({ deletionScheduledAt: null });
+    expect(await prisma.session.findUniqueOrThrow({ where: { id: staffSession } })).toMatchObject({ userId: staffId });
+    expect(await prisma.serviceMessage.findUniqueOrThrow({ where: { id: foreignMessage } })).toEqual(serviceFirst ? foreignBefore : { ...foreignBefore, senderId: null });
+    expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
+  });
+
+  it.each(["session", "listing"].flatMap(boundary => ["read", "send"].flatMap(action => [false, true].map(serviceFirst => ({ boundary, action, serviceFirst })))))("actual staff $action versus $boundary cleanup, serviceFirst=$serviceFirst", async ({ boundary, action, serviceFirst }) => {
+    await guards(false);
+    const staffId = randomUUID(), staffSession = randomUUID();
+    await prisma.user.create({ data: { id: staffId, email: `${staffId}@synthetic.invalid` } });
+    await prisma.session.create({ data: { id: staffSession, userId: staffId, refreshTokenHash: staffSession, expiresAt: new Date(Date.now()+600_000), adminTotpExpiresAt: new Date(Date.now()+600_000) } });
+    await prisma.staffGrant.create({ data: { userId: staffId, capability: "support.operations" } });
+    const support = present((await prisma.serviceConversation.findUniqueOrThrow({ where: { id: ownConversation } })).supportCaseId);
+    await prisma.supportCase.update({ where: { id: support }, data: { assigneeId: staffId } });
+    const listing=randomUUID();
+    if(boundary==="listing") {
+      const brand=randomUUID(),model=randomUUID(),region=randomUUID(),city=randomUUID();
+      for(const [table,id] of [["brands",brand],["regions",region]])await pool.query(`INSERT INTO ${table}(id,slug,"nameRu","nameTk","nameEn","updatedAt") VALUES($1,$1,'synthetic','synthetic','synthetic',clock_timestamp())`,[id]);
+      await pool.query(`INSERT INTO models(id,"brandId",slug,"nameRu","nameTk","nameEn","updatedAt") VALUES($1,$2,$1,'synthetic','synthetic','synthetic',clock_timestamp())`,[model,brand]);
+      await pool.query(`INSERT INTO cities(id,"regionId",slug,"nameRu","nameTk","nameEn","updatedAt") VALUES($1,$2,$1,'synthetic','synthetic','synthetic',clock_timestamp())`,[city,region]);
+      await pool.query(`INSERT INTO listings(id,"sellerId","brandId","modelId","cityId","priceAmount","updatedAt") VALUES($1,$2,$3,$4,$5,1,clock_timestamp())`,[listing,foreign,brand,model,city]);
+      await prisma.supportCase.update({where:{id:support},data:{sourceListingId:listing}});
+    }
+    await guards(true);
+    const owner = messaging(staffId), actor = { userId: staffId, sessionId: staffSession };
+    await owner.read(actor,ownConversation,0,20);
+    const before = await prisma.serviceMessage.findMany({ where: { conversationId: ownConversation }, orderBy: { id: "asc" } });
+    const foreignBefore = await prisma.serviceMessage.findUniqueOrThrow({ where: { id: foreignMessage } });
+    const perform = () => action === "read" ? owner.read(actor,ownConversation,0,20) : owner.send(actor,ownConversation,{ clientMessageId: randomUUID(), visibility: "customer", body: "Synthetic Session race" });
+    async function waitingOn(pid: number) {
+      const end = Date.now()+5000;
+      while (Date.now()<end) {
+        const r = await pool.query<{ pid: number }>("SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND $1::int=ANY(pg_blocking_pids(pid))",[pid]);
+        if (r.rows[0]) return r.rows[0].pid;
+      }
+      throw new Error("actual Session/service barrier not reached");
+    }
+    const entered = signal(), release = signal(); let sourcePid = 0;
+    let blocker: PoolClient | undefined, operation: Promise<unknown> | undefined;
+    if (serviceFirst) {
+      blocker = await pool.connect(); clients.push(blocker); await blocker.query("BEGIN");
+      await blocker.query('SELECT id FROM support_cases WHERE id=$1 FOR UPDATE',[support]);
+      const pid = present((await blocker.query<{ pid: number }>("SELECT pg_backend_pid() pid")).rows[0]).pid;
+      operation = perform().then(value => ({ value }), (error: unknown) => ({ error }));
+      await waitingOn(pid);
+    }
+    const source = prisma.$transaction(async tx => {
+      const [r] = await tx.$queryRaw<{ source: DiagnosticSourceTuple }[]>`SELECT diagnostic_source_project(to_jsonb(s),diagnostic_source_meta('sessions')->'fields') source FROM sessions s WHERE id=${staffSession}`;
+      let prior = present(r).source;
+      if(boundary==="listing"){const [l]=await tx.$queryRaw<{source:DiagnosticSourceTuple}[]>`SELECT diagnostic_source_project(to_jsonb(l),diagnostic_source_meta('listings')->'fields') source FROM listings l WHERE id=${listing}`;prior=present(l).source;}
+      const c: DiagnosticSourceCommand = { operation: boundary==="listing"?"listing_delete":"session_change", roots: [{ table: boundary==="listing"?"listings":"sessions", key: { id: boundary==="listing"?listing:staffSession } }], rows: [{ table: boundary==="listing"?"listings":"sessions", key: { id: boundary==="listing"?listing:staffSession }, verb: "delete", expected: { source: prior }, next: null }], actorUserId: null, sessionId: null, cutoff: null, campaign: null };
+      sourcePid = present((await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() pid`)[0]).pid;
+      if (serviceFirst) entered.release();
+      await withDiagnosticSourceCommand(tx,c,async () => { if (!serviceFirst) { entered.release(); await release.promise; } if(boundary==="session")await tx.session.delete({ where: { id: staffSession } });else await tx.listing.delete({where:{id:listing}}); });
+    }).then(()=>null,(error:unknown)=>error);
+    await entered.promise;
+    if (serviceFirst) {
+      try {
+        const end = Date.now()+5000; let blocked = false;
+        while (Date.now()<end) { const r = await pool.query<{ blocked: boolean }>("SELECT cardinality(pg_blocking_pids($1))>0 blocked",[sourcePid]); if (r.rows[0]?.blocked) { blocked = true; break; } }
+        expect(blocked).toBe(true);
+      } finally { await present(blocker).query("ROLLBACK"); }
+      expect(await operation).toHaveProperty("value");
+    } else {
+      operation = perform().then(value => ({ value }), (error: unknown) => ({ error }));
+      try { await waitingOn(sourcePid); } finally { release.release(); }
+      expect(await operation).toHaveProperty(boundary==="session"?"error":"value");
+    }
+    const sourceResult=await source;
+    if(boundary==="listing" && serviceFirst && action==="send"){
+      expect(sourceResult).toBeInstanceOf(Error);expect((sourceResult as Error).message).toContain("diagnostic_source_graph_changed");
+      expect(await prisma.listing.findUnique({where:{id:listing}})).not.toBeNull();
+    }else{
+      expect(sourceResult).toBeNull();
+      if(boundary==="listing"){expect(await prisma.listing.findUnique({where:{id:listing}})).toBeNull();expect(await prisma.supportCase.findUniqueOrThrow({where:{id:support}})).toMatchObject({sourceListingId:null});}
+    }
+    if(boundary==="session")expect(await prisma.session.findUnique({ where: { id: staffSession } })).toBeNull();
+    else expect(await prisma.session.findUniqueOrThrow({where:{id:staffSession}})).toMatchObject({userId:staffId});
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: uid } })).toMatchObject({ displayName: "retained owner" });
+    expect(await prisma.serviceMessage.findUniqueOrThrow({ where: { id: foreignMessage } })).toEqual(foreignBefore);
+    expect(await prisma.serviceMessage.count({ where: { conversationId: ownConversation } })).toBe(before.length+((serviceFirst || boundary==="listing") && action === "send" ? 1 : 0));
+    expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
+  });
+
+  it.each([false,true])("actual measurement bootstrap versus account scheduling, bootstrapFirst=%s", async bootstrapFirst => {
+    await guards(false); await prisma.user.update({ where: { id: uid },data: { deletionScheduledAt: null } }); await guards(true);
+    const before = await prisma.measurementVisit.findUniqueOrThrow({ where: { id: retained } });
+    const entered=signal(),release=signal(); let sourcePid=0;
+    let blocker: PoolClient | undefined, operation: Promise<unknown> | undefined;
+    async function waiter(pid: number) {
+      const end=Date.now()+1000;
+      while (Date.now()<end) {
+        const r=await pool.query<{ pid: number }>("SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND $1::int=ANY(pg_blocking_pids(pid))",[pid]);
+        if(r.rows[0])return r.rows[0].pid;
+      }
+      throw new Error("measurement/source barrier not observed within existing bootstrap budget");
+    }
+    if(bootstrapFirst) {
+      blocker=await pool.connect();clients.push(blocker);await blocker.query("BEGIN");
+      await blocker.query('SELECT id FROM measurement_principals WHERE id=$1 FOR UPDATE',[accountPrincipal]);
+      const pid=present((await blocker.query<{ pid: number }>("SELECT pg_backend_pid() pid")).rows[0]).pid;
+      operation=bootstrap(uid).then(value=>({value}),(error: unknown)=>({error})); await waiter(pid);
+    }
+    const source=prisma.$transaction(async tx=>{
+      const [r]=await tx.$queryRaw<{ source: DiagnosticSourceTuple }[]>`SELECT diagnostic_source_project(to_jsonb(u),diagnostic_source_meta('users')->'fields') source FROM users u WHERE id=${uid}`;
+      const prior=present(r).source,scheduledAt=new Date("2030-01-01Z");
+      const c: DiagnosticSourceCommand={ operation: "account_schedule",roots: [{table: "users",key: {id: uid}}],rows: [{table: "users",key: {id: uid},verb: "update",expected: {source: prior},next: {...prior,deletionScheduledAt: scheduledAt.toISOString()}}],actorUserId: null,sessionId: null,cutoff: null,campaign: null };
+      sourcePid=present((await tx.$queryRaw<{pid:number}[]>`SELECT pg_backend_pid() pid`)[0]).pid;
+      if(bootstrapFirst)entered.release();
+      await withDiagnosticSourceCommand(tx,c,async()=>{
+        if(!bootstrapFirst){entered.release();await release.promise;}
+        await tx.user.update({where:{id:uid},data:{deletionScheduledAt:scheduledAt}});
+        await tx.measurementInvestigationExport.deleteMany();
+        await tx.measurementPrincipal.delete({where:{id:accountPrincipal}});
+      });
+    }).then(()=>null,(error:unknown)=>error);
+    await entered.promise;
+    if(bootstrapFirst){
+      try {
+        const end=Date.now()+1000;let observed=false;
+        while(Date.now()<end)if(present((await pool.query<{blocked:boolean}>("SELECT cardinality(pg_blocking_pids($1))>0 blocked",[sourcePid])).rows[0]).blocked){observed=true;break;}
+        expect(observed).toBe(true);
+      } finally { await present(blocker).query("ROLLBACK"); }
+      expect(await operation).toHaveProperty("value");
+      const error=await source;expect(error).toBeInstanceOf(Error);expect((error as Error).message).toContain("diagnostic_source_graph_changed");
+      expect(await prisma.user.findUniqueOrThrow({where:{id:uid}})).toMatchObject({deletionScheduledAt:null});
+      expect(await prisma.measurementPrincipal.findUnique({where:{id:accountPrincipal}})).not.toBeNull();
+    } else {
+      operation=bootstrap(uid).then(value=>({value}),(error:unknown)=>({error}));
+      try{await waiter(sourcePid);}finally{release.release();}
+      expect(await source).toBeNull();expect(await operation).toEqual({value:null});
+      expect(await prisma.measurementPrincipal.findUnique({where:{id:accountPrincipal}})).toBeNull();
+      expect(await prisma.measurementVisit.findUnique({where:{id:linked}})).toBeNull();
+    }
+    expect(await prisma.measurementVisit.findUniqueOrThrow({where:{id:retained}})).toEqual(before);
+    expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
+  });
+
+  it.each([false,true])("actual video completion versus deletion scheduling and subsequent purge, completionFirst=%s",async completionFirst=>{
+    const fence=randomUUID();
+    await guards(false);
+    await prisma.user.update({where:{id:uid},data:{deletionScheduledAt:null}});
+    await prisma.mediaUpload.update({where:{id:upload},data:{claimToken:generation,claimTargetType:"video_session",claimTargetId:generation}});
+    await prisma.videoUploadSession.update({where:{id:generation},data:{state:"COMPLETING",completionFence:fence,sizeBytes:1000,expiresAt:new Date(Date.now()+600_000)}});
+    await prisma.videoGeneration.update({where:{id:generation},data:{state:"UPLOADING",completionFence:fence}});
+    await prisma.videoProcessWork.delete({where:{generationId:generation}});
+    const foreignBefore=await prisma.diagnosticIdentityRecord.findUniqueOrThrow({where:{id:foreignRaw}});
+    await guards(true);
+    async function waiter(pid:number){const end=Date.now()+1500;while(Date.now()<end){const r=await pool.query<{pid:number}>("SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND $1::int=ANY(pg_blocking_pids(pid))",[pid]);if(r.rows[0])return r.rows[0].pid;}throw new Error("video/source barrier not observed");}
+    let blocker:PoolClient|undefined,operation:Promise<unknown>|undefined;
+    if(completionFirst){
+      blocker=await pool.connect();clients.push(blocker);await blocker.query("BEGIN");await blocker.query('SELECT id FROM listing_drafts WHERE id=$1 FOR UPDATE',[draft]);
+      const pid=present((await blocker.query<{pid:number}>("SELECT pg_backend_pid() pid")).rows[0]).pid;
+      operation=completeVideo(generation,uid,session,fence).then(value=>({value}),(error:unknown)=>({error}));await waiter(pid);
+    }
+    const entered=signal(),release=signal();let sourcePid=0;
+    const source=prisma.$transaction(async tx=>{
+      const [r]=await tx.$queryRaw<{source:DiagnosticSourceTuple}[]>`SELECT diagnostic_source_project(to_jsonb(u),diagnostic_source_meta('users')->'fields') source FROM users u WHERE id=${uid}`;
+      const prior=present(r).source;
+      const c:DiagnosticSourceCommand={operation:"account_schedule",roots:[{table:"users",key:{id:uid}},{table:"media_uploads",key:{id:upload}},{table:"video_upload_sessions",key:{id:generation}},{table:"video_generations",key:{id:generation}},{table:"video_process_work",key:{generationId:generation}}],rows:[{table:"users",key:{id:uid},verb:"update",expected:{source:prior},next:{...prior,deletionScheduledAt:"1980-01-01T00:00:00.000Z"}}],actorUserId:null,sessionId:null,cutoff:null,campaign:null};
+      sourcePid=present((await tx.$queryRaw<{pid:number}[]>`SELECT pg_backend_pid() pid`)[0]).pid;
+      if(completionFirst)entered.release();
+      await withDiagnosticSourceCommand(tx,c,async()=>{
+        if(!completionFirst){entered.release();await release.promise;}
+        await tx.user.update({where:{id:uid},data:{deletionScheduledAt:new Date("1980-01-01Z")}});
+        await tx.measurementInvestigationExport.deleteMany();await tx.measurementPrincipal.delete({where:{id:accountPrincipal}});
+      });
+    }).then(()=>null,(error:unknown)=>error);
+    await entered.promise;
+    if(completionFirst){
+      try{const end=Date.now()+1500;let observed=false;while(Date.now()<end)if(present((await pool.query<{blocked:boolean}>("SELECT cardinality(pg_blocking_pids($1))>0 blocked",[sourcePid])).rows[0]).blocked){observed=true;break;}expect(observed).toBe(true);}finally{await present(blocker).query("ROLLBACK");}
+      expect(await operation).toHaveProperty("value");const error=await source;expect(error).toBeInstanceOf(Error);expect((error as Error).message).toContain("diagnostic_source_graph_changed");
+      expect(await prisma.videoUploadSession.findUniqueOrThrow({where:{id:generation}})).toMatchObject({state:"PROCESSING",cancelledAt:null});
+      expect(await prisma.videoProcessWork.findUniqueOrThrow({where:{generationId:generation}})).toMatchObject({completionFence:fence,state:"PENDING"});
+      expect(await prisma.user.findUniqueOrThrow({where:{id:uid}})).toMatchObject({deletionScheduledAt:null});
+      expect(await prisma.videoCleanupWork.findUnique({where:{id:`session:${generation}`}})).toBeNull();
+    }else{
+      operation=completeVideo(generation,uid,session,fence).then(value=>({value}),(error:unknown)=>({error}));try{await waiter(sourcePid);}finally{release.release();}
+      expect(await source).toBeNull();expect(await operation).toHaveProperty("error");
+      await prisma.$transaction(async tx=>withDiagnosticSourceCommand(tx,await command(tx),()=>ownerPurge(tx)));
+      expect(await prisma.videoUploadSession.findUniqueOrThrow({where:{id:generation}})).toMatchObject({state:"CLEANUP_PENDING",cancelledAt:cutoff});
+      expect(await prisma.videoProcessWork.findUnique({where:{generationId:generation}})).toBeNull();
+      expect(await prisma.videoCleanupWork.findUniqueOrThrow({where:{id:`session:${generation}`}})).toMatchObject({state:"PENDING",objectKeys:[`video/v1/${upload}/${generation}/poster.jpg`]});
+    }
+    expect(await prisma.diagnosticIdentityRecord.findUniqueOrThrow({where:{id:foreignRaw}})).toEqual(completionFirst?foreignBefore:{...foreignBefore,recordedById:null});
+    expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
+  });
+
+  it.each(["session","purge","listing"].flatMap(boundary=>[false,true].map(createFirst=>({boundary,createFirst}))))("actual service creation versus $boundary, createFirst=$createFirst",async ({boundary,createFirst})=>{
+    const actorSession=randomUUID(),actor={userId:foreign,sessionId:actorSession};
+    await prisma.session.create({data:{id:actorSession,userId:foreign,refreshTokenHash:actorSession,expiresAt:new Date(Date.now()+600_000)}});
+    let listing:string|undefined;
+    if(boundary==="listing"){
+      await guards(false);listing=randomUUID();const brand=randomUUID(),model=randomUUID(),region=randomUUID(),city=randomUUID();
+      for(const [table,id]of [["brands",brand],["regions",region]])await pool.query(`INSERT INTO ${table}(id,slug,"nameRu","nameTk","nameEn","updatedAt") VALUES($1,$1,'synthetic','synthetic','synthetic',clock_timestamp())`,[id]);
+      await pool.query(`INSERT INTO models(id,"brandId",slug,"nameRu","nameTk","nameEn","updatedAt") VALUES($1,$2,$1,'synthetic','synthetic','synthetic',clock_timestamp())`,[model,brand]);
+      await pool.query(`INSERT INTO cities(id,"regionId",slug,"nameRu","nameTk","nameEn","updatedAt") VALUES($1,$2,$1,'synthetic','synthetic','synthetic',clock_timestamp())`,[city,region]);
+      await pool.query(`INSERT INTO listings(id,"sellerId","brandId","modelId","cityId","priceAmount","updatedAt") VALUES($1,$2,$3,$4,$5,1,clock_timestamp())`,[listing,foreign,brand,model,city]);await guards(true);
+    }
+    const owner=messaging(foreign),before=await prisma.vehicleHistoryRequest.findMany({where:{customerId:foreign},orderBy:{id:"asc"}});
+    const entered=signal(),release=signal();let sourcePid=0,blocker:PoolClient|undefined,creation:Promise<{value?:{id:string;resourceId:string};error?:unknown}>|undefined;
+    async function waiter(pid:number){const end=Date.now()+5000;while(Date.now()<end){const r=await pool.query<{pid:number}>("SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND $1::int=ANY(pg_blocking_pids(pid))",[pid]);if(r.rows[0])return r.rows[0].pid;}throw new Error("service creation barrier not observed");}
+    if(createFirst){blocker=await pool.connect();clients.push(blocker);await blocker.query("BEGIN");await blocker.query("LOCK vehicle_history_requests IN SHARE MODE");const pid=present((await blocker.query<{pid:number}>("SELECT pg_backend_pid() pid")).rows[0]).pid;creation=owner.open(actor,"history",listing).then(value=>({value}),(error:unknown)=>({error}));await waiter(pid);}
+    const source=prisma.$transaction(async tx=>{
+      const [r]=await tx.$queryRaw<{source:DiagnosticSourceTuple}[]>`SELECT diagnostic_source_project(to_jsonb(s),diagnostic_source_meta('sessions')->'fields') source FROM sessions s WHERE id=${actorSession}`;
+      let c:DiagnosticSourceCommand={operation:"session_change",roots:[{table:"sessions",key:{id:actorSession}}],rows:[{table:"sessions",key:{id:actorSession},verb:"delete",expected:{source:present(r).source},next:null}],actorUserId:null,sessionId:null,cutoff:null,campaign:null};
+      if(boundary==="purge")c=await command(tx);
+      if(boundary==="listing"){
+        const [l]=await tx.$queryRaw<{source:DiagnosticSourceTuple}[]>`SELECT diagnostic_source_project(to_jsonb(l),diagnostic_source_meta('listings')->'fields') source FROM listings l WHERE id=${listing}`;
+        c={...c,operation:"listing_delete",roots:[{table:"listings",key:{id:present(listing)}},{table:"users",key:{id:foreign}}],rows:[{table:"listings",key:{id:present(listing)},verb:"delete",expected:{source:present(l).source},next:null}]};
+      }
+      sourcePid=present((await tx.$queryRaw<{pid:number}[]>`SELECT pg_backend_pid() pid`)[0]).pid;if(createFirst)entered.release();
+      await withDiagnosticSourceCommand(tx,c,async()=>{if(!createFirst){entered.release();await release.promise;}if(boundary==="session")await tx.session.delete({where:{id:actorSession}});else if(boundary==="purge")await ownerPurge(tx);else await tx.listing.delete({where:{id:listing}});});
+    }).then(()=>null,(error:unknown)=>error);
+    await entered.promise;
+    if(createFirst){try{const end=Date.now()+5000;let observed=false;while(Date.now()<end)if(present((await pool.query<{blocked:boolean}>("SELECT cardinality(pg_blocking_pids($1))>0 blocked",[sourcePid])).rows[0]).blocked){observed=true;break;}expect(observed).toBe(true);}finally{await present(blocker).query("ROLLBACK");}}
+    else{creation=owner.open(actor,"history",listing).then(value=>({value}),(error:unknown)=>({error}));try{await waiter(sourcePid);}finally{release.release();}}
+    const sourceResult=await source,result=await creation;
+    if(boundary==="listing"&&createFirst){expect(sourceResult).toBeInstanceOf(Error);expect((sourceResult as Error).message).toContain("diagnostic_source_graph_changed");expect(await prisma.listing.findUnique({where:{id:listing}})).not.toBeNull();}
+    else expect(sourceResult).toBeNull();
+    if(createFirst||boundary==="purge"){expect(result).toHaveProperty("value");expect(await prisma.serviceConversation.findUniqueOrThrow({where:{id:present(result?.value).id}})).toMatchObject({erasedAt:null});}
+    else expect(result).toHaveProperty("error");
+    const after=await prisma.vehicleHistoryRequest.findMany({where:{customerId:foreign},orderBy:{id:"asc"}});
+    expect(after.filter(row=>before.some(old=>old.id===row.id))).toEqual(before);expect(after.length).toBe(before.length+(createFirst||boundary==="purge"?1:0));
+    if(boundary==="session")expect(await prisma.session.findUnique({where:{id:actorSession}})).toBeNull();
+    else expect(await prisma.session.findUniqueOrThrow({where:{id:actorSession}})).toMatchObject({userId:foreign});
+    if(boundary==="purge")expect(await prisma.user.findUniqueOrThrow({where:{id:uid}})).toMatchObject({displayName:null});
+    expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
   });
 
 });

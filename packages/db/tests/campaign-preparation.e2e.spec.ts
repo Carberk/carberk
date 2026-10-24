@@ -35,6 +35,7 @@ describe("campaign preparation with existing campaign authority", () => {
   let pool: Pool;
   let prisma: PrismaClient;
   let businessPrelude: string;
+  let admittedBusinessId: string;
   const clients: PoolClient[] = [];
   const reservations = ["a".repeat(32), "b".repeat(32)];
   const businessReservation = "d".repeat(32);
@@ -91,6 +92,38 @@ describe("campaign preparation with existing campaign authority", () => {
       }
       await pool.query(setup);
     }
+    // Genuine preactivation business fixture through existing owner repositories.
+    // The original tracker, authority, hashes and admission slot stay installed.
+    const load = async (file: string) => import(/* @vite-ignore */ fileURLToPath(new URL("../../../apps/api/src/modules/identity/infrastructure/"+file, import.meta.url))) as Promise<Record<string, new (...args: unknown[]) => unknown>>;
+    const Totp = present((await load("PrismaTotpEnrollmentRepository.ts"))["PrismaTotpEnrollmentRepository"]);
+    const Staff = present((await load("PrismaStaffAuthority.ts"))["PrismaStaffAuthority"]);
+    const Business = present((await load("PrismaBusinessRepository.ts"))["PrismaBusinessRepository"]);
+    const totp = new Totp(prisma) as {
+      createPending(userId: string, secret: string): Promise<{ id: string }>;
+      completeFirstVerification(input: { userId: string; enrollmentId: string; verifiedAt: Date; codeHashes: string[]; sessionId: string; adminTotpExpiresAt: Date }): Promise<void>;
+    };
+    const staff = new Staff(prisma) as { change(input: { userId: string; sessionId: string; targetUserId: string; capability: string; grant: boolean; reason: string }, now: Date): Promise<void> };
+    const business = new Business(prisma) as {
+      admit(input: { userId: string; sessionId: string; name: string; slug: string; ownerUserId: string; mode: string; evidence: string; reason: string; tokenHash: string; expiresAt: Date }, now: Date): Promise<{ businessId: string }>;
+      redeem(input: { userId: string; sessionId: string; tokenHash: string }, now: Date): Promise<unknown>;
+    };
+    const coordinator = businessUser("coordinator"), founder = businessUser("support"), owner = businessUser("buyer-a");
+    const sessions = new Map<string,string>();
+    for (const userId of [coordinator,founder,owner]) {
+      const id = randomUUID(); sessions.set(userId,id);
+      await prisma.session.create({ data: { id,userId,refreshTokenHash: id,expiresAt: new Date(Date.now()+3600_000) } });
+    }
+    async function elevate(userId: string) {
+      const enrollment = await totp.createPending(userId,"encrypted-synthetic-preactivation-secret");
+      await totp.completeFirstVerification({ userId,enrollmentId: enrollment.id,verifiedAt: new Date(),codeHashes: Array.from({ length: 10 },() => randomUUID()),sessionId: present(sessions.get(userId)),adminTotpExpiresAt: new Date(Date.now()+3600_000) });
+    }
+    await elevate(coordinator);
+    await staff.change({ userId: coordinator,sessionId: present(sessions.get(coordinator)),targetUserId: founder,capability: "founder.admission",grant: true,reason: "Explicit synthetic campaign business fixture" },new Date());
+    await elevate(founder);
+    const tokenHash = randomUUID();
+    const admitted = await business.admit({ userId: founder,sessionId: present(sessions.get(founder)),name: "Synthetic admitted media business",slug: `campaign897-${businessReservation}-${candidate.slice(0,12)}-admitted`,ownerUserId: owner,mode: "synthetic",evidence: "Fictional reservation-owned business only",reason: "Authored finite preparation fixture",tokenHash,expiresAt: new Date(Date.now()+3600_000) },new Date());
+    admittedBusinessId=admitted.businessId;
+    await business.redeem({ userId: owner,sessionId: present(sessions.get(owner)),tokenHash },new Date());
     await enable();
     // The barrier is AFTER the row and FK effects, before campaign AFTER tracking.
     // Its advisory class is outside production rank and campaign key spaces.
@@ -327,4 +360,61 @@ describe("campaign preparation with existing campaign authority", () => {
     await c.query("BEGIN");
     await expect(c.query("SELECT campaign_finish($1)", [randomUUID()])).rejects.toThrow("campaign_preparation_receipt");
   });
+  it("admitted-business foreign media references retain the original tracker and the cleaning ledger fence", async () => {
+    const id=randomUUID(), directory=`pending/${id}/`, key=directory+"original.webp";
+    const objectKeys=[key,...["thumbnail","list","detail","fullscreen"].map(name => directory+name+".webp")];
+    const owner=businessUser("buyer-a"), outsider=randomUUID(), draft=randomUUID();
+    const [manifest] = (await pool.query<{ tracking_hash: string }>(`SELECT tracking_hash FROM "${businessNamespace}".campaign_manifest`)).rows;
+    await prisma.$transaction(tx => withCampaignPreparation(tx,[{ table: "media_uploads",key: { id },verb: "insert",next: { userId: owner,businessId: admittedBusinessId,key,objectKeys } }],
+      () => tx.mediaUpload.create({ data: { id,userId: owner,businessId: admittedBusinessId,key,objectKeys,kind: "image",contentType: "image/webp",sizeBytes: 64,writeProtocol: "conditional-v1",state: "AVAILABLE" } })));
+    const [owned] = (await pool.query<{ row_hash: string; actual: string }>(`SELECT r.row_hash,md5(to_jsonb(u)::text) actual FROM "${businessNamespace}".campaign_records r JOIN media_uploads u ON r.row_key=jsonb_build_object('id',u.id) WHERE r.table_name='media_uploads' AND u.id=$1`,[id])).rows;
+    expect(present(owned).row_hash).toBe(present(owned).actual);
+    await prisma.user.create({ data: { id: outsider,email: `${outsider}@foreign-media.invalid` } });
+    await prisma.listingDraft.create({ data: { id: draft,userId: outsider,payload: {} } });
+    const foreignMutations: CampaignMutation[] = [
+      { table: "users",key: { id: outsider },verb: "update",next: { avatarUploadId: id,avatarKey: key } },
+      { table: "listing_drafts",key: { id: draft },verb: "update",next: { payload: { uploadId: id,key } } },
+    ];
+    await prisma.$transaction(tx => withCampaignPreparation(tx,foreignMutations,async () => {
+      const [receipt]=await tx.$queryRaw<{ namespaces: string[] }[]>`SELECT scope->'namespaces' namespaces FROM campaign_preparations WHERE backend_pid=pg_backend_pid()`;
+      expect(present(receipt).namespaces).toEqual([businessNamespace]);
+      await tx.user.update({ where: { id: outsider },data: { avatarUploadId: id,avatarKey: key } });
+      await tx.listingDraft.update({ where: { id: draft },data: { payload: { uploadId: id,key } } });
+    }));
+    expect((await pool.query(`SELECT 1 FROM "${businessNamespace}".campaign_records WHERE (table_name='users' AND row_key=jsonb_build_object('id',$1::text)) OR (table_name='listing_drafts' AND row_key=jsonb_build_object('id',$2::text))`,[outsider,draft])).rowCount).toBe(0);
+    await prisma.$transaction(tx => withCampaignPreparation(tx,[
+      { table: "users",key: { id: outsider },verb: "update",next: { avatarUploadId: null,avatarKey: null } },
+      { table: "listing_drafts",key: { id: draft },verb: "update",next: { payload: {} } },
+    ],async () => {
+      await tx.user.update({ where: { id: outsider },data: { avatarUploadId: null,avatarKey: null } });
+      await tx.listingDraft.update({ where: { id: draft },data: { payload: {} } });
+    }));
+    // Model the preactivation interrupted-cleaning graph with the original
+    // reset table/FK/namespace prefix and original ledger/hash expression.
+    // No reset command, storage/queue action or guard exemption is tested here.
+    // The tested foreign writes below run only after every guard is restored.
+    const triggers=await pool.query<{ table: string; name: string }>("SELECT c.relname table,t.tgname name FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid WHERE t.tgname LIKE 'zz_diagnostic_source_%' OR t.tgname LIKE 'zzzz_campaign_preparation%' OR t.tgname='diagnostic_source_no_truncate'");
+    try {
+      for (const trigger of triggers.rows) await pool.query(`ALTER TABLE public."${trigger.table}" DISABLE TRIGGER "${trigger.name}"`);
+      await pool.query(`BEGIN; ${businessPrelude}
+        INSERT INTO "${businessNamespace}".campaign_object_ledger(object_key,upload_id,bucket) SELECT unnest("objectKeys"),id,'listing-photos' FROM media_uploads WHERE id='${id}';
+        UPDATE "${businessNamespace}".campaign_manifest SET object_hash=(SELECT md5(coalesce(jsonb_agg(jsonb_build_object('object_key',l.object_key,'upload_id',l.upload_id,'bucket',l.bucket) ORDER BY l.object_key),'[]'::jsonb)::text) FROM "${businessNamespace}".campaign_object_ledger l),state='cleaning';
+        DELETE FROM media_uploads WHERE id='${id}'; COMMIT;`);
+    } finally { await enable(); }
+    const foreignBefore=await prisma.user.findUniqueOrThrow({ where: { id: outsider } });
+    const draftBefore=await prisma.listingDraft.findUniqueOrThrow({ where: { id: draft } });
+    const before=(await pool.query(`SELECT to_jsonb(m) manifest,(SELECT jsonb_agg(to_jsonb(l) ORDER BY object_key) FROM "${businessNamespace}".campaign_object_ledger l) ledger FROM "${businessNamespace}".campaign_manifest m`)).rows;
+    for (const mutation of foreignMutations) await expect(prisma.$transaction(tx => withCampaignPreparation(tx,[mutation],async () => {
+      if (mutation.table === "users") await tx.user.update({ where: { id: outsider },data: { avatarKey: key } });
+      else await tx.listingDraft.update({ where: { id: draft },data: { payload: { uploadId: id,key } } });
+    }))).rejects.toThrow("Campaign media reference fenced");
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: outsider } })).toEqual(foreignBefore);
+    expect(await prisma.listingDraft.findUniqueOrThrow({ where: { id: draft } })).toEqual(draftBefore);
+    expect(await prisma.mediaUpload.findUnique({ where: { id } })).toBeNull();
+    expect((await pool.query(`SELECT to_jsonb(m) manifest,(SELECT jsonb_agg(to_jsonb(l) ORDER BY object_key) FROM "${businessNamespace}".campaign_object_ledger l) ledger FROM "${businessNamespace}".campaign_manifest m`)).rows).toEqual(before);
+    const [current]=(await pool.query<{ intact: boolean }>(`SELECT tracking_hash=$1 AND tracking_hash=md5(pg_get_functiondef('"${businessNamespace}".track_business()'::regprocedure)) intact FROM "${businessNamespace}".campaign_manifest`,[present(manifest).tracking_hash])).rows;
+    expect(present(current).intact).toBe(true);
+    expect((await pool.query(`SELECT count(*)::int count FROM "${businessNamespace}".campaign_object_ledger`)).rows).toEqual([{ count: 5 }]);
+  });
+
 });
