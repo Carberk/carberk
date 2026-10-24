@@ -119,10 +119,8 @@ export class PrismaSessionRepository implements SessionRepository {
   }
 
   async deleteAllByUserId(userId: string): Promise<number> {
-    // Discover the complete deletion set before entering the prepared
-    // transaction. The source command then rechecks every row while holding
-    // the kernel's ordered locks, so a concurrent session create or change
-    // cannot be silently omitted.
+    // Declare deletion effects from an unlocked inventory. Preparation checks
+    // protected tuples; the locked ownership set must still match below.
     const sessions = await this.prisma.session.findMany({
       where: { userId },
       select: { id: true, userId: true, expiresAt: true, adminTotpExpiresAt: true },
@@ -145,8 +143,8 @@ export class PrismaSessionRepository implements SessionRepository {
     return this.prisma.$transaction((tx) => withDiagnosticSourceCommand(tx, {
       operation: "session_change",
       // The User is the ownership root for the complete Session inventory.
-      // Keeping it in the prepared graph makes a Session committed after the
-      // unlocked inventory read part of the post-wait discovery/fence.
+      // Discovery includes every owned Session, but only rows declared above
+      // have deletion effects. Graph changes during locking refuse in SQL.
       // Session rows are already roots for their own projections; keeping the
       // ownership root separate also stays within the kernel's 100-root cap.
       roots: [{ table: "users" as const, key: { id: userId } }],
@@ -157,9 +155,20 @@ export class PrismaSessionRepository implements SessionRepository {
       campaign: null,
     }, async (receipt) => {
       await assertDiagnosticSourceCommand(tx, receipt, "session_change");
-      // Preparation has taken the User fence and rediscovered its complete
-      // locked Session set. Delete by the ownership predicate so the final
-      // mutation cannot fall back to the unlocked inventory's stale IDs.
+      // The User fence stabilizes the complete owned set. A Session committed
+      // before preparation may be discovered and locked without a declared
+      // delete effect. Refuse that stale inventory before attempting any write;
+      // neither extend the receipt nor retry implicitly.
+      const lockedSessions = await tx.session.findMany({
+        where: { userId },
+        select: { id: true },
+      });
+      const declaredSessionIds = new Set(rows.map((row) => row.key.id));
+      if (lockedSessions.length !== declaredSessionIds.size ||
+          lockedSessions.some((session) => !declaredSessionIds.has(session.id))) {
+        throw new Error("diagnostic_source_graph_changed");
+      }
+      // Exact coverage now permits deleting the complete ownership set.
       const result = await tx.session.deleteMany({ where: { userId } });
       return result.count;
     }));

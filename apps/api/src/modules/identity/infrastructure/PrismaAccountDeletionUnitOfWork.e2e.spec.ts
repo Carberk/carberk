@@ -20,7 +20,7 @@ import {
 } from "../../../../test/helpers/e2eSuite";
 
 const suite = defineE2eSuite("account-deletion-atomicity");
-const SUITE_USERS = ["member"] as const;
+const SUITE_USERS = ["member", "session-foreign"] as const;
 const USER_ID = suite.id("member");
 const NOW = new Date("2026-10-06T12:00:00Z");
 const SCHEDULED_AT = new Date(NOW.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -149,6 +149,45 @@ describe("PrismaAccountDeletionUnitOfWork e2e", () => {
       where: { id: selfArchivedId },
     });
     expect(selfArchived).toMatchObject({ status: "archived", archivedByDeletion: false });
+  });
+
+  // Authored only in the Session coverage repair. Uses the real caller and
+  // receipt path; the query extension commits S2 after the unlocked inventory
+  // returns, before preparation starts. This is not a lock-wait simulation.
+  it("refuses an uncovered committed Session before account scheduling and leaves no receipt", async () => {
+    const foreignId = suite.id("session-foreign");
+    await prisma.user.create({ data: { id: foreignId, phone: suite.phone("session-foreign") } });
+    const firstId = suite.id("coverage-session-1");
+    const secondId = suite.id("coverage-session-2");
+    const foreignSessionId = suite.id("coverage-session-foreign");
+    const addSession = (id: string, userId: string) => prisma.session.create({ data: {
+      id, userId, refreshTokenHash: `fixture-${id}`, expiresAt: SCHEDULED_AT,
+    } });
+    await addSession(firstId, USER_ID);
+    await addSession(foreignSessionId, foreignId);
+    let inserted = false;
+    const intercepted = prisma.$extends({ query: { session: {
+      async findMany({ args, query }) {
+        const result = await query(args);
+        if (!inserted) {
+          inserted = true;
+          await addSession(secondId, USER_ID);
+        }
+        return result;
+      },
+    } } });
+    const racingSessions = new PrismaSessionRepository(intercepted as unknown as PrismaService, new BcryptHasherAdapter());
+    const caller = new DeleteMe(userRepo, racingSessions, unitOfWork, clock);
+
+    await expect(caller.execute({ userId: USER_ID })).rejects.toThrow("diagnostic_source_graph_changed");
+    expect(await readState()).toEqual(untouched);
+    expect(await prisma.session.findMany({
+      where: { userId: { in: [USER_ID, foreignId] } },
+      select: { id: true }, orderBy: { id: "asc" },
+    })).toEqual([firstId, secondId, foreignSessionId].sort().map((id) => ({ id })));
+    expect(await prisma.$queryRaw<{ count: bigint }[]>`
+      SELECT count(*) AS count FROM public.diagnostic_source_commands
+    `).toEqual([{ count: 0n }]);
   });
 
   it("invalidates synthetic inventory evidence atomically without publishing an erased actor fact",async()=>{

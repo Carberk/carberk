@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { withDiagnosticSourceCommand } from "@auto-tm/db";
 import { PrismaSessionRepository } from "./PrismaSessionRepository";
 
 type SessionRow = {
@@ -178,6 +179,47 @@ describe("PrismaSessionRepository.deleteAllByUserId", () => {
     const db = new SessionDatabase([session, second, foreign]);
     db.failAfterDelete = true;
     await expect(db.repository().deleteAllByUserId("user-1")).rejects.toThrow("delete_failed");
+    expect(db.ids()).toEqual(["foreign-session", "session-1", "session-2"]);
+    expect(db.activeReceipts).toBe(0);
+  });
+});
+
+// Validate the boundary's two critical failure modes independently of the
+// production recheck, which prevents either invalid mutation from being issued.
+describe("Session database boundary effects", () => {
+  function command(rows: SessionRow[]) {
+    return {
+      operation: "session_change" as const,
+      roots: [{ table: "users" as const, key: { id: "user-1" } }],
+      rows: rows.map((row) => ({
+        table: "sessions" as const, key: { id: row.id }, verb: "delete" as const,
+        expected: { source: { id: row.id, userId: row.userId,
+          expiresAt: row.expiresAt.toISOString(), adminTotpExpiresAt: null } },
+        next: null,
+      })),
+      actorUserId: "user-1", sessionId: null, cutoff: null, campaign: null,
+    };
+  }
+  type Writes = { session: { deleteMany: (args: { where: SessionWhere }) => Promise<{ count: number }> } };
+
+  it("rejects an uncovered owned Session and rolls back an earlier covered deletion", async () => {
+    const db = new SessionDatabase([session, second, foreign]);
+    await expect(db.$transaction((tx) => withDiagnosticSourceCommand(tx as never, command([session]),
+      () => (tx as Writes).session.deleteMany({ where: { userId: "user-1" } }))))
+      .rejects.toThrow("diagnostic_source_uncovered_effect");
+    expect(db.ids()).toEqual(["foreign-session", "session-1", "session-2"]);
+    expect(db.activeReceipts).toBe(0);
+  });
+
+  it("honors both ownership and IDs, then refuses completion with a declared Session left behind", async () => {
+    const db = new SessionDatabase([session, second, foreign]);
+    await expect(db.$transaction((tx) => withDiagnosticSourceCommand(tx as never, command([session, second]), async () => {
+      const result = await (tx as Writes).session.deleteMany({
+        where: { userId: "user-1", id: { in: ["session-1", "foreign-session"] } },
+      });
+      expect(result.count).toBe(1);
+      return result;
+    }))).rejects.toThrow("incomplete_effects");
     expect(db.ids()).toEqual(["foreign-session", "session-1", "session-2"]);
     expect(db.activeReceipts).toBe(0);
   });
