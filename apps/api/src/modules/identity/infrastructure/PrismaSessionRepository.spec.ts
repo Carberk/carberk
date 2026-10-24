@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { PrismaSessionRepository } from "./PrismaSessionRepository";
 
 const session = {
@@ -10,33 +10,64 @@ const session = {
 
 describe("PrismaSessionRepository.deleteAllByUserId", () => {
   it("returns zero without opening a source transaction when the User has no sessions", async () => {
-    const transaction = vi.fn();
-    const prisma = { session: { findMany: vi.fn().mockResolvedValue([]) }, $transaction: transaction } as never;
-    const repository = new PrismaSessionRepository(prisma, {} as never);
-
-    await expect(repository.deleteAllByUserId("user-1")).resolves.toBe(0);
-    expect(transaction).not.toHaveBeenCalled();
-  });
-
-  it("prepares and asserts one receipt before deleting the discovered rows", async () => {
-    const sql: string[] = [];
-    const tx = {
-      $queryRaw: vi.fn(async (strings: TemplateStringsArray) => {
-        sql.push(strings[0] ?? "");
-        if ((strings[0] ?? "").includes("diagnostic_prepare_source")) return [{ receipt: "receipt-1" }];
-        return [];
-      }),
-      session: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
-    };
+    let opened = false;
     const prisma = {
-      session: { findMany: vi.fn().mockResolvedValue([session]) },
-      $transaction: vi.fn(async (work: (value: typeof tx) => Promise<number>) => work(tx)),
+      session: { findMany: async () => [] },
+      $transaction: async () => { opened = true; return 0; },
     } as never;
     const repository = new PrismaSessionRepository(prisma, {} as never);
 
-    await expect(repository.deleteAllByUserId("user-1")).resolves.toBe(1);
-    expect(sql.findIndex((query) => query.includes("diagnostic_prepare_source"))).toBeGreaterThanOrEqual(0);
-    expect(sql.findIndex((query) => query.includes("diagnostic_assert_source"))).toBeGreaterThan(0);
-    expect(tx.session.deleteMany).toHaveBeenCalledWith({ where: { id: { in: ["session-1"] }, userId: "user-1" } });
+    await expect(repository.deleteAllByUserId("user-1")).resolves.toBe(0);
+    expect(opened).toBe(false);
+  });
+
+  it("revokes a session committed during preparation while preserving foreign sessions", async () => {
+    const sessions = new Map([
+      ["session-1", session],
+      ["foreign-session", { ...session, id: "foreign-session", userId: "user-2" }],
+    ]);
+    const prisma = {
+      session: { findMany: async () => [sessions.get("session-1")] },
+      $transaction: async (work: (value: {
+        $queryRaw: (...args: unknown[]) => Promise<unknown[]>;
+        session: {
+          deleteMany: (args: { where: { userId: string } }) => Promise<{ count: number }>;
+        };
+      }) => Promise<number>) => {
+        const tx = {
+          $queryRaw: async (...args: unknown[]) => {
+            const sql = String((args[0] as TemplateStringsArray | undefined)?.[0] ?? "");
+            if (sql.includes("diagnostic_prepare_source")) {
+              const command = JSON.parse(String(args[1]));
+              if (!command.roots.some((root: { table: string; key: { id: string } }) => root.table === "users" && root.key.id === "user-1")) {
+                throw new Error("missing_user_root");
+              }
+              // A same-user Session committed while the User fence was being
+              // acquired is visible to the locked post-prepare discovery.
+              sessions.set("session-2", { ...session, id: "session-2" });
+              return [{ receipt: "receipt-1" }];
+            }
+            return [];
+          },
+          session: {
+            deleteMany: async ({ where }: { where: { userId: string } }) => {
+              let count = 0;
+              for (const [id, row] of sessions) {
+                if (row.userId === where.userId) {
+                  sessions.delete(id);
+                  count += 1;
+                }
+              }
+              return { count };
+            },
+          },
+        };
+        return work(tx);
+      },
+    } as never;
+    const repository = new PrismaSessionRepository(prisma, {} as never);
+
+    await expect(repository.deleteAllByUserId("user-1")).resolves.toBe(2);
+    expect([...sessions.values()].map(({ id }) => id)).toEqual(["foreign-session"]);
   });
 });

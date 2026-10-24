@@ -144,7 +144,12 @@ export class PrismaSessionRepository implements SessionRepository {
     }));
     return this.prisma.$transaction((tx) => withDiagnosticSourceCommand(tx, {
       operation: "session_change",
-      roots: sessions.map(({ id }) => ({ table: "sessions" as const, key: { id } })),
+      // The User is the ownership root for the complete Session inventory.
+      // Keeping it in the prepared graph makes a Session committed after the
+      // unlocked inventory read part of the post-wait discovery/fence.
+      // Session rows are already roots for their own projections; keeping the
+      // ownership root separate also stays within the kernel's 100-root cap.
+      roots: [{ table: "users" as const, key: { id: userId } }],
       rows,
       actorUserId: userId,
       sessionId: null,
@@ -152,7 +157,10 @@ export class PrismaSessionRepository implements SessionRepository {
       campaign: null,
     }, async (receipt) => {
       await assertDiagnosticSourceCommand(tx, receipt, "session_change");
-      const result = await tx.session.deleteMany({ where: { id: { in: sessions.map(({ id }) => id) }, userId } });
+      // Preparation has taken the User fence and rediscovered its complete
+      // locked Session set. Delete by the ownership predicate so the final
+      // mutation cannot fall back to the unlocked inventory's stale IDs.
+      const result = await tx.session.deleteMany({ where: { userId } });
       return result.count;
     }));
   }
