@@ -1,4 +1,5 @@
 import type { Prisma } from "../generated/prisma/client/client";
+
 import type { DiagnosticSourceKeys, DiagnosticSourceTable } from "./diagnostic-source-tables";
 
 export type { DiagnosticSourceKeys, DiagnosticSourceTable } from "./diagnostic-source-tables";

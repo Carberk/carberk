@@ -1,10 +1,15 @@
 import { execFileSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { Pool, type PoolClient } from "pg";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+function present<T>(value: T | null | undefined): T {
+  if (value === null || value === undefined) throw new Error("expected SQL fixture row");
+  return value;
+}
 
 type Row = Record<string, unknown>;
 type Plan = { table: string; key: Row; verb: string; expected: unknown; next: Row | null };
@@ -19,26 +24,30 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
   const pids = new Map<PoolClient, number>();
   let userId: string;
   let baseOrder: Row;
+  let listingId: string;
+  let sessionId: string;
+  let brandId: string;
+  let modelId: string;
 
   async function connect() {
     const client = await pool.connect(); clients.push(client);
-    pids.set(client, (await client.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]!.pid);
+    pids.set(client, present((await client.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]).pid);
     await client.query("SET statement_timeout='5s'");
     await client.query("SET lock_timeout='5s'");
     return client;
   }
   async function guards(enabled: boolean) {
-    const tables = await pool.query<{ table: string }>("SELECT value->>'table' AS table FROM jsonb_array_elements(diagnostic_source_registry())");
+    const tables = await pool.query<{ table: string }>("SELECT value->>'table' AS table FROM jsonb_array_elements(diagnostic_source_registry()) WHERE value->>'table'<>'diagnostic_source_anchors'");
     for (const { table } of tables.rows) for (const name of ["diagnostic_source_presence", "diagnostic_source_effective", "diagnostic_source_no_truncate"]) {
       await pool.query(`ALTER TABLE public."${table}" ${enabled ? "ENABLE" : "DISABLE"} TRIGGER ${name}`);
     }
   }
   async function source(client: PoolClient, table: string, key: Row): Promise<Row> {
     const result = await client.query<{ source: Row }>("SELECT diagnostic_source_project(diagnostic_source_read($1,$2::jsonb),diagnostic_source_meta($1)->'fields') AS source", [table, JSON.stringify(key)]);
-    return result.rows[0]!.source;
+    return present(result.rows[0]).source;
   }
   async function projection(client: PoolClient, table: string, row: Row): Promise<Row> {
-    return (await client.query<{ source: Row }>("SELECT diagnostic_source_project($2::jsonb,diagnostic_source_meta($1)->'fields') AS source", [table, JSON.stringify(row)])).rows[0]!.source;
+    return present((await client.query<{ source: Row }>("SELECT diagnostic_source_project($2::jsonb,diagnostic_source_meta($1)->'fields') AS source", [table, JSON.stringify(row)])).rows[0]).source;
   }
   async function update(client: PoolClient, table: string, key: Row, change: Row): Promise<Plan> {
     const prior = await source(client, table, key);
@@ -48,19 +57,19 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     return { operation, roots, rows, actorUserId: null, sessionId: null, cutoff: operation.endsWith("expire") || operation === "account_purge" ? new Date().toISOString() : null, campaign: null };
   }
   async function prepare(client: PoolClient, c: unknown) {
-    return (await client.query<{ id: string }>("SELECT diagnostic_prepare_source($1::jsonb) AS id", [JSON.stringify(c)])).rows[0]!.id;
+    return present((await client.query<{ id: string }>("SELECT diagnostic_prepare_source($1::jsonb) AS id", [JSON.stringify(c)])).rows[0]).id;
   }
   async function finish(client: PoolClient, id: string) { await client.query("SELECT diagnostic_finish_source($1::uuid)", [id]); }
   async function begin(client: PoolClient) { await client.query("BEGIN"); }
-  async function cloneOrder(client: PoolClient): Promise<Plan> {
+  async function cloneOrder(client: PoolClient, change: Row = {}): Promise<Plan> {
     const id = randomUUID();
-    return { table: "inspection_orders", key: { id }, verb: "insert", expected: "absent", next: await projection(client, "inspection_orders", { ...baseOrder, id, requestKey: randomUUID() }) };
+    return { table: "inspection_orders", key: { id }, verb: "insert", expected: "absent", next: await projection(client, "inspection_orders", { ...baseOrder, ...change, id, requestKey: randomUUID() }) };
   }
   async function insertOrder(client: PoolClient, p: Plan) {
     await client.query("INSERT INTO inspection_orders SELECT (jsonb_populate_record(NULL::inspection_orders,$1::jsonb)).*", [JSON.stringify(p.next)]);
   }
-  async function newOrder(client: PoolClient) {
-    const p = await cloneOrder(client); await begin(client);
+  async function newOrder(client: PoolClient, change: Row = {}) {
+    const p = await cloneOrder(client, change); await begin(client);
     const receipt = await prepare(client, command("order_create", [p]));
     await insertOrder(client, p); await finish(client, receipt); await client.query("COMMIT");
     return p.key["id"] as string;
@@ -75,13 +84,16 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     }
     throw new Error("expected PostgreSQL lock barrier was not reached within 5s");
   }
-  async function observe(client: PoolClient, oid: string, vehicle: Row, seal = true) {
+  async function observe(client: PoolClient, oid: string, vehicle: Row, seal = true, grant: Row | null = null) {
     const order = await update(client, "inspection_orders", { id: oid }, { observedVehicle: vehicle });
-    order.next!["version"] = Number(order.next!["version"]) + 1;
+    present(order.next)["version"] = Number(present(order.next)["version"]) + 1;
     const rawId = randomUUID();
-    const raw = await projection(client, "diagnostic_identity_records", { id: rawId, orderId: oid, orderVersion: order.next!["version"], observation: vehicle,
+    const raw = await projection(client, "diagnostic_identity_records", { id: rawId, orderId: oid, orderVersion: present(order.next)["version"], observation: vehicle,
       observationHash: "a".repeat(64), recordedById: userId, recordedAt: new Date().toISOString(), erasedAt: null });
-    const component = await projection(client, "diagnostic_ownership_components", { identityRecordId: rawId, orderId: oid, orderVersion: order.next!["version"], state: "unavailable" });
+    const component = await projection(client, "diagnostic_ownership_components", { identityRecordId: rawId, orderId: oid, orderVersion: present(order.next)["version"], state: grant ? "available" : "unavailable",
+      ...(grant ? { grantId: grant["id"], scope: "diagnostic_ownership_continuity", sourceListingId: grant["listingId"], identityDigest: grant["identityDigest"],
+        sellerId: grant["sellerId"], commissionerId: grant["commissionerId"], businessId: grant["businessId"], membershipId: grant["membershipId"],
+        rights: grant["rights"], rightsUntil: grant["rightsUntil"], declaredById: userId, declaredAt: raw["recordedAt"] } : {}) });
     const plans: Plan[] = [order, { table: "diagnostic_identity_records", key: { id: rawId }, verb: "insert", expected: "absent", next: raw },
       { table: "diagnostic_ownership_components", key: { identityRecordId: rawId }, verb: "insert", expected: "absent", next: component }];
     await begin(client); const receipt = await prepare(client, command("observation_append", plans));
@@ -93,6 +105,20 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
   }
   async function anchor(oid: string) { return (await pool.query('SELECT state,"firstRecordId",source FROM diagnostic_source_anchors WHERE "orderId"=$1', [oid])).rows[0] as Row; }
 
+  async function ownershipGrant(client: PoolClient, oid: string) {
+    const until = new Date(Date.now() + 600_000).toISOString();
+    const rights = { category: "vehicle_observation", purpose: "continuity", basis: "SQL scenario declaration", provenance: "SQL fixture seller Session",
+      identifiability: "personal", use: ["service"], schedule: { kind: "until", until, reason: "bounded SQL fixture" }, supplierRestrictions: "", hold: null };
+    const grant = await projection(client, "diagnostic_ownership_grants", { id: randomUUID(), orderId: oid, state: "available", listingId,
+      identityDigest: createHash("sha256").update(JSON.stringify([listingId, userId, null, "AAA", brandId, modelId, null])).digest("hex"),
+      sellerId: userId, commissionerId: userId, grantorId: userId, sessionId, rights, rightsUntil: until.replace("Z", ""), declaredAt: new Date().toISOString().replace("Z", "") });
+    const p: Plan = { table: "diagnostic_ownership_grants", key: { id: grant["id"] }, verb: "insert", expected: "absent", next: grant };
+    await begin(client); const receipt = await prepare(client, command("ownership_grant", [p]));
+    await client.query("INSERT INTO diagnostic_ownership_grants SELECT (jsonb_populate_record(NULL::diagnostic_ownership_grants,$1::jsonb)).*", [JSON.stringify(grant)]);
+    await finish(client, receipt); await client.query("COMMIT");
+    return grant;
+  }
+
   beforeAll(async () => {
     container = await new PostgreSqlContainer("postgres:17-alpine").start();
     const url = container.getConnectionUri();
@@ -102,12 +128,22 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
   beforeEach(async () => {
     await guards(false);
     userId = randomUUID();
-    await pool.query('INSERT INTO users(id,"updatedAt") VALUES($1,clock_timestamp())', [userId]);
+    await pool.query('INSERT INTO users(id,email,"emailVerifiedAt","updatedAt") VALUES($1,$2,clock_timestamp(),clock_timestamp())', [userId, `${userId}@kernel.invalid`]);
+    sessionId = randomUUID();
+    await pool.query(`INSERT INTO sessions(id,"userId","refreshTokenHash","expiresAt") VALUES($1,$2,$1,clock_timestamp()+interval '1 hour')`, [sessionId, userId]);
+    brandId = randomUUID(); modelId = randomUUID(); listingId = randomUUID();
+    const region = randomUUID(), city = randomUUID();
+    for (const [table, id] of [["brands", brandId], ["regions", region]]) {
+      await pool.query(`INSERT INTO ${table}(id,slug,"nameRu","nameTk","nameEn","updatedAt") VALUES($1,$1,'kernel','kernel','kernel',clock_timestamp())`, [id]);
+    }
+    await pool.query(`INSERT INTO models(id,"brandId",slug,"nameRu","nameTk","nameEn","updatedAt") VALUES($1,$2,$1,'kernel','kernel','kernel',clock_timestamp())`, [modelId, brandId]);
+    await pool.query(`INSERT INTO cities(id,"regionId",slug,"nameRu","nameTk","nameEn","updatedAt") VALUES($1,$2,$1,'kernel','kernel','kernel',clock_timestamp())`, [city, region]);
+    await pool.query(`INSERT INTO listings(id,"sellerId","brandId","modelId","cityId","priceAmount",vin,"updatedAt") VALUES($1,$2,$3,$4,$5,1,'AAA',clock_timestamp())`, [listingId, userId, brandId, modelId, city]);
     const center = randomUUID(), template = randomUUID(), oid = randomUUID();
     await pool.query('INSERT INTO diagnostic_centers(id,code,names) VALUES($1,$1,\'{}\')', [center]);
     await pool.query('INSERT INTO diagnostic_template_versions(id,"centerId",version,definition) VALUES($1,$2,1,\'{}\')', [template, center]);
     await pool.query('INSERT INTO inspection_orders(id,"centerId","templateVersionId","commissionerId","requestKey",audience,epoch,"updatedAt") VALUES($1,$2,$3,$4,$1,\'buyer_private\',$1,clock_timestamp())', [oid, center, template, userId]);
-    baseOrder = (await pool.query("SELECT to_jsonb(o) AS row FROM inspection_orders o WHERE id=$1", [oid])).rows[0]!["row"] as Row;
+    baseOrder = present((await pool.query("SELECT to_jsonb(o) AS row FROM inspection_orders o WHERE id=$1", [oid])).rows[0])["row"] as Row;
     await guards(true);
   });
   afterEach(async () => { for (const client of clients.splice(0)) { await client.query("ROLLBACK"); client.release(); } await guards(false); });
@@ -118,19 +154,19 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     await begin(a);
     const result = await a.query<{ id: string; backend_pid: number; effects: Plan[] }>(`INSERT INTO diagnostic_source_commands(id,backend_pid,full_transaction_id,command,scope,effects)
       VALUES($1,0,'forged',$2::jsonb,'[]','[]') RETURNING id,backend_pid,effects`, ["00000000-0000-0000-0000-000000000000", JSON.stringify(command("account_schedule", [p]))]);
-    expect(result.rows[0]!.id).not.toBe("00000000-0000-0000-0000-000000000000");
-    expect(result.rows[0]!.backend_pid).toBe(pids.get(a));
-    expect(result.rows[0]!.effects[0]!.key).toEqual({ id: userId });
-    await expect(a.query("DELETE FROM diagnostic_source_commands WHERE id=$1", [result.rows[0]!.id])).rejects.toThrow("diagnostic_source_final_effect");
+    expect(present(result.rows[0]).id).not.toBe("00000000-0000-0000-0000-000000000000");
+    expect(present(result.rows[0]).backend_pid).toBe(pids.get(a));
+    expect(present(present(result.rows[0]).effects[0]).key).toEqual({ id: userId });
+    await expect(a.query("DELETE FROM diagnostic_source_commands WHERE id=$1", [present(result.rows[0]).id])).rejects.toThrow("diagnostic_source_final_effect");
     await a.query("ROLLBACK");
-    expect((await pool.query('SELECT "deletionScheduledAt" FROM users WHERE id=$1', [userId])).rows[0]!["deletionScheduledAt"]).toBeNull();
+    expect(present((await pool.query('SELECT "deletionScheduledAt" FROM users WHERE id=$1', [userId])).rows[0])["deletionScheduledAt"]).toBeNull();
   });
   it("finish deletes the live receipt so deferred completion accepts, and subsequent protected writes refuse", async () => {
     const a = await connect(); const p = await update(a, "users", { id: userId }, { deletionScheduledAt: "2030-01-01T00:00:00" });
     await begin(a); const receipt = await prepare(a, command("account_schedule", [p]));
     await a.query('UPDATE users SET "deletionScheduledAt"=\'2030-01-01\' WHERE id=$1', [userId]);
     await finish(a, receipt); await a.query("COMMIT");
-    expect((await pool.query("SELECT count(*)::int AS n FROM diagnostic_source_commands")).rows[0]!["n"]).toBe(0);
+    expect(present((await pool.query("SELECT count(*)::int AS n FROM diagnostic_source_commands")).rows[0])["n"]).toBe(0);
     await expect(a.query('UPDATE users SET "deletionScheduledAt"=NULL WHERE id=$1', [userId])).rejects.toThrow("diagnostic_source_unprepared");
   });
   it("unclosed receipt fails at COMMIT using final live state", async () => {
@@ -157,25 +193,25 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
   it("unprepared bulk source UPDATE refuses before scanning, scalar UPDATE remains ordinary", async () => {
     await expect(pool.query('UPDATE users SET "deletionScheduledAt"=NULL WHERE false')).rejects.toThrow("diagnostic_source_unprepared");
     await pool.query('UPDATE users SET "displayName"=\'ordinary\' WHERE id=$1', [userId]);
-    expect((await pool.query('SELECT "displayName" FROM users WHERE id=$1', [userId])).rows[0]!["displayName"]).toBe("ordinary");
+    expect(present((await pool.query('SELECT "displayName" FROM users WHERE id=$1', [userId])).rows[0])["displayName"]).toBe("ordinary");
   });
   it("an effective source change made by a BEFORE trigger is caught for a scalar statement", async () => {
     await pool.query(`CREATE FUNCTION kernel_inject_source() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN NEW."deletionScheduledAt":='2030-01-01'; RETURN NEW; END $$`);
     await pool.query("CREATE TRIGGER kernel_inject_source BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION kernel_inject_source()");
     try { await expect(pool.query('UPDATE users SET "displayName"=\'ordinary\' WHERE id=$1', [userId])).rejects.toThrow("diagnostic_source_unprepared"); }
     finally { await pool.query("DROP TRIGGER kernel_inject_source ON users"); await pool.query("DROP FUNCTION kernel_inject_source()"); }
-    expect((await pool.query('SELECT "displayName" FROM users WHERE id=$1', [userId])).rows[0]!["displayName"]).toBeNull();
+    expect(present((await pool.query('SELECT "displayName" FROM users WHERE id=$1', [userId])).rows[0])["displayName"]).toBeNull();
   });
   it("reversed overlapping root input produces one physical sequence and serializes without deadlock", async () => {
     const a = await connect(), b = await connect(), observer = await connect();
     const p = await update(a, "users", { id: userId }, { deletionScheduledAt: null });
     const roots = [{ table: "inspection_orders", key: { id: baseOrder["id"] } }, { table: "users", key: { id: userId } }];
     await begin(a); const first = await prepare(a, command("account_restore", [p], roots));
-    const keysA = (await a.query("SELECT lock_keys FROM diagnostic_source_commands WHERE id=$1", [first])).rows[0]!["lock_keys"];
+    const keysA = present((await a.query("SELECT lock_keys FROM diagnostic_source_commands WHERE id=$1", [first])).rows[0])["lock_keys"];
     await begin(b); const pending = prepare(b, command("account_restore", [p], [...roots].reverse()));
     await waitBlocked(observer, b, a); await finish(a, first); await a.query("COMMIT");
     const second = await pending;
-    expect((await b.query("SELECT lock_keys FROM diagnostic_source_commands WHERE id=$1", [second])).rows[0]!["lock_keys"]).toEqual(keysA);
+    expect(present((await b.query("SELECT lock_keys FROM diagnostic_source_commands WHERE id=$1", [second])).rows[0])["lock_keys"]).toEqual(keysA);
     await finish(b, second); await b.query("COMMIT");
   });
   it("an order inserted after discovery is found by actual post-lock database rediscovery", async () => {
@@ -187,7 +223,7 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     const outcome = pending.then(() => "unexpected success", error => (error as Error).message);
     await waitBlocked(observer, a, b); await insertOrder(b, p); await finish(b, receiptB); await b.query("COMMIT");
     expect(await outcome).toContain("diagnostic_source_graph_changed"); await a.query("ROLLBACK");
-    expect((await pool.query('SELECT "deletionScheduledAt" FROM users WHERE id=$1', [userId])).rows[0]!["deletionScheduledAt"]).toBeNull();
+    expect(present((await pool.query('SELECT "deletionScheduledAt" FROM users WHERE id=$1', [userId])).rows[0])["deletionScheduledAt"]).toBeNull();
   });
   it("no-grant first capture is unavailable, later same-identity captures never repin, and rollback leaves no claim", async () => {
     const a = await connect(); const oid = await newOrder(a);
@@ -219,4 +255,75 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     const observation = await observe(a, oid, { method: "vin", vin: "AAA" }); await finish(a, observation.receipt); await a.query("COMMIT");
     expect(await anchor(oid)).toMatchObject({ state: "changed", firstRecordId: observation.rawId });
   });
+  it("fresh persisted seller grants allow BOTH first captures, and date/mileage changes preserve the immutable slots", async () => {
+    const a = await connect();
+    for (let visit = 0; visit < 2; visit++) {
+      const oid = await newOrder(a, { audience: "listing_public", listingId });
+      const grant = await ownershipGrant(a, oid);
+      const vehicle = { method: "vin", vin: "AAA", observedAt: "2026-10-23T12:00:00.000Z", mileageKm: 100 };
+      const first = await observe(a, oid, vehicle, true, grant); await finish(a, first.receipt); await a.query("COMMIT");
+      expect(await anchor(oid)).toMatchObject({ state: "unchanged", firstRecordId: first.rawId });
+      const later = await observe(a, oid, { ...vehicle, observedAt: "2026-10-23T12:01:00.000Z", mileageKm: 101 }, true, grant);
+      await finish(a, later.receipt); await a.query("COMMIT");
+      expect(await anchor(oid)).toMatchObject({ state: "unchanged", firstRecordId: first.rawId });
+    }
+  });
+  it("Listing VIN ABA before first capture is sticky despite restored values and a compatible persisted grant", async () => {
+    const a = await connect(); const oid = await newOrder(a, { audience: "listing_public", listingId });
+    const grant = await ownershipGrant(a, oid);
+    for (const vin of ["BBB", "AAA"]) {
+      const p = await update(a, "listings", { id: listingId }, { vin }); await begin(a);
+      const receipt = await prepare(a, command("listing_change", [p]));
+      await a.query("UPDATE listings SET vin=$2 WHERE id=$1", [listingId, vin]); await finish(a, receipt); await a.query("COMMIT");
+    }
+    const first = await observe(a, oid, { method: "vin", vin: "AAA" }, true, grant); await finish(a, first.receipt); await a.query("COMMIT");
+    expect(await anchor(oid)).toMatchObject({ state: "changed", firstRecordId: first.rawId });
+  });
+  it("eligibility suspend/restore does not invent ownership history", async () => {
+    const a = await connect(); const oid = await newOrder(a, { audience: "listing_public", listingId });
+    const grant = await ownershipGrant(a, oid);
+    const first = await observe(a, oid, { method: "vin", vin: "AAA" }, true, grant); await finish(a, first.receipt); await a.query("COMMIT");
+    for (const deletionScheduledAt of ["2030-01-01T00:00:00", null]) {
+      const p = await update(a, "users", { id: userId }, { deletionScheduledAt }); await begin(a);
+      const receipt = await prepare(a, command(deletionScheduledAt ? "account_schedule" : "account_restore", [p]));
+      await a.query('UPDATE users SET "deletionScheduledAt"=$2::timestamp WHERE id=$1', [userId, deletionScheduledAt]);
+      await finish(a, receipt); await a.query("COMMIT");
+    }
+    expect(await anchor(oid)).toMatchObject({ state: "unchanged", firstRecordId: first.rawId });
+  });
+  it("a held physical advisory key serializes preparation while coverage remains target-specific", async () => {
+    const a = await connect(), b = await connect(), observer = await connect();
+    const p = await update(b, "users", { id: userId }, { deletionScheduledAt: null });
+    const c = command("account_restore", [p]);
+    const keys = present((await b.query("SELECT diagnostic_source_lock_keys(diagnostic_source_scope($1::jsonb),$1::jsonb) AS keys", [JSON.stringify(c)])).rows[0])["keys"] as { namespace: number; key: number }[];
+    const first = present(keys[0]); await begin(a);
+    // Hold exactly the physical key; this models an in-class hash collision without changing the hash implementation.
+    await a.query("SELECT pg_advisory_xact_lock($1::int,$2::int)", [first.namespace, first.key]);
+    await begin(b); const pending = prepare(b, c); await waitBlocked(observer, b, a); await a.query("COMMIT");
+    const receipt = await pending;
+    const physical = present((await b.query("SELECT lock_keys FROM diagnostic_source_commands WHERE id=$1", [receipt])).rows[0])["lock_keys"] as { namespace: number; key: number }[];
+    expect(new Set(physical.map(k => `${k.namespace}:${k.key}`)).size).toBe(physical.length);
+    await expect(b.query('UPDATE users SET "deletionScheduledAt"=\'2040-01-01\' WHERE id<>$1', [userId])).rejects.toThrow("diagnostic_source_uncovered_effect");
+  });
+  it("component erasure clears the first anchor and grant payload without altering raw date/mileage", async () => {
+    const a = await connect(); const oid = await newOrder(a, { audience: "listing_public", listingId });
+    const grant = await ownershipGrant(a, oid);
+    const first = await observe(a, oid, { method: "vin", vin: "AAA", observedAt: "2026-10-23T12:00:00.000Z", mileageKm: 100 }, true, grant);
+    await finish(a, first.receipt); await a.query("COMMIT");
+    const rawBefore = await source(a, "diagnostic_identity_records", { id: first.rawId });
+    const erasedAt = new Date().toISOString().replace("Z", "");
+    const component = await update(a, "diagnostic_ownership_components", { identityRecordId: first.rawId }, { state: "erased", grantId: null, scope: null,
+      sourceListingId: null, identityDigest: null, sellerId: null, commissionerId: null, businessId: null, membershipId: null, rights: null,
+      rightsUntil: null, declaredById: null, declaredAt: null, erasedAt });
+    const erasedGrant = await update(a, "diagnostic_ownership_grants", { id: grant["id"] }, { state: "erased", listingId: null, identityDigest: null,
+      sellerId: null, commissionerId: null, businessId: null, membershipId: null, grantorId: null, grantorMembershipId: null, sessionId: null,
+      rights: null, rightsUntil: null, declaredAt: null, erasedAt });
+    await begin(a); const receipt = await prepare(a, command("ownership_revoke", [component, erasedGrant]));
+    await a.query("SELECT diagnostic_dispose_ownership_scope(NULL,$1::timestamp,$2)", [erasedAt, grant["id"]]);
+    await finish(a, receipt); await a.query("COMMIT");
+    expect(await anchor(oid)).toEqual({ state: "erased", firstRecordId: null, source: null });
+    expect(await source(a, "diagnostic_identity_records", { id: first.rawId })).toEqual(rawBefore);
+    expect((await source(a, "diagnostic_ownership_grants", { id: grant["id"] }))["rights"]).toBeNull();
+  });
+
 });

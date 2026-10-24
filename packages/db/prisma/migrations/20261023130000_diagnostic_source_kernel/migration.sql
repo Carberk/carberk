@@ -25,6 +25,7 @@ LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public AS $registry$
   {"table":"diagnostic_identity_provenance","pk":["id"],"fields":["id","orderId","contentType","declaredSizeBytes","rights","rightsUntil","objectKey","sha256","sizeBytes","mime","state","epoch","writeLeaseUntil","cleanupLeaseUntil","cleanupAttempts","cleanupFailureCode","createdById","createdAt","verifiedAt","cleanupRequestedAt","cleanupCompletedAt","erasedAt"],"unique":[["objectKey"]],"refs":[{"table":"inspection_orders","columns":["orderId"],"target":["id"]},{"table":"users","columns":["createdById"],"target":["id"]}],"rank":9,"namespace":897902},
   {"table":"diagnostic_ownership_grants","pk":["id"],"fields":["id","orderId","state","listingId","identityDigest","sellerId","commissionerId","businessId","membershipId","grantorId","grantorMembershipId","sessionId","rights","rightsUntil","declaredAt","erasedAt"],"unique":[["orderId"]],"refs":[{"table":"inspection_orders","columns":["orderId"],"target":["id"]},{"table":"listings","columns":["listingId"],"target":["id"]},{"table":"users","columns":["sellerId"],"target":["id"]},{"table":"users","columns":["commissionerId"],"target":["id"]},{"table":"users","columns":["grantorId"],"target":["id"]},{"table":"dealerships","columns":["businessId"],"target":["id"]},{"table":"dealership_members","columns":["membershipId"],"target":["id"]},{"table":"dealership_members","columns":["grantorMembershipId"],"target":["id"]},{"table":"sessions","columns":["sessionId"],"target":["id"]}],"rank":9,"namespace":897903},
   {"table":"diagnostic_ownership_components","pk":["identityRecordId"],"fields":["grantId","identityRecordId","orderId","orderVersion","state","scope","sourceListingId","identityDigest","sellerId","commissionerId","businessId","membershipId","rights","rightsUntil","declaredById","declaredAt","erasedAt"],"unique":[["orderId","orderVersion"]],"refs":[{"table":"diagnostic_ownership_grants","columns":["grantId"],"target":["id"]},{"table":"diagnostic_identity_records","columns":["identityRecordId"],"target":["id"]},{"table":"inspection_orders","columns":["orderId"],"target":["id"]},{"table":"listings","columns":["sourceListingId"],"target":["id"]},{"table":"users","columns":["sellerId"],"target":["id"]},{"table":"users","columns":["commissionerId"],"target":["id"]},{"table":"dealerships","columns":["businessId"],"target":["id"]},{"table":"dealership_members","columns":["membershipId"],"target":["id"]},{"table":"users","columns":["declaredById"],"target":["id"]}],"rank":9,"namespace":897904},
+  {"table":"diagnostic_source_anchors","pk":["orderId"],"fields":["orderId","state","firstRecordId","source","createdTransaction"],"unique":[],"refs":[{"table":"inspection_orders","columns":["orderId"],"target":["id"]},{"table":"diagnostic_identity_records","columns":["firstRecordId"],"target":["id"]}],"rank":9,"namespace":897905},
   {"table":"support_cases","pk":["id"],"fields":["id","customerId","assigneeId","assignmentVersion","sourceListingId","status","closedAt","unansweredSince","awaitingCustomerSince","priority","investigationState","escalatedAt","mode","createdAt","updatedAt"],"unique":[["customerId"]],"refs":[{"table":"users","columns":["customerId"],"target":["id"]},{"table":"users","columns":["assigneeId"],"target":["id"]},{"table":"listings","columns":["sourceListingId"],"target":["id"]}],"rank":10,"namespace":898000},
   {"table":"vehicle_history_requests","pk":["id"],"fields":["id","customerId","assigneeId","assignmentVersion","sourceListingId","proposedVin","confirmedVin","status","mode","createdAt","updatedAt"],"unique":[],"refs":[{"table":"users","columns":["customerId"],"target":["id"]},{"table":"users","columns":["assigneeId"],"target":["id"]},{"table":"listings","columns":["sourceListingId"],"target":["id"]}],"rank":10,"namespace":898001},
   {"table":"service_conversations","pk":["id"],"fields":["id","purpose","supportCaseId","historyRequestId","lifecycleEpoch","lastSequence","erasedAt","createdAt"],"unique":[["supportCaseId"],["historyRequestId"]],"refs":[{"table":"support_cases","columns":["supportCaseId"],"target":["id"]},{"table":"vehicle_history_requests","columns":["historyRequestId"],"target":["id"]}],"rank":10,"namespace":898002},
@@ -130,7 +131,7 @@ LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public AS $$
  WHEN 'account_restore' THEN t='users' AND v='update'
  WHEN 'account_purge' THEN
   (v='insert' AND t IN ('video_cleanup_work','media_upload_cleanups','service_erasure_fences','history_artifact_cleanup'))
-  OR (v='update' AND public.diagnostic_source_meta(t) IS NOT NULL AND t NOT IN ('measurement_state','staff_grants','diagnostic_continuity_requests'))
+  OR (v='update' AND public.diagnostic_source_meta(t) IS NOT NULL AND t NOT IN ('measurement_state','staff_grants','diagnostic_continuity_requests','diagnostic_source_anchors'))
   OR (v='delete' AND t IN ('users','sessions','staff_grants','dealership_members','dealership_invitations','owned_vehicles','blocked_users','favorites','saved_searches','conversation_participants','fcm_devices','notification_history','notification_preferences','verified_contact_phones','otp_requests','media_uploads','listing_media','listing_drafts','video_grants','totp_enrollments','totp_backup_codes','measurement_principals','measurement_visits','measurement_records','measurement_outbox','measurement_investigation_exports','diagnostic_continuity_proofs','diagnostic_continuity_requests','diagnostic_order_assignments','diagnostic_center_assignments'))
  WHEN 'order_create' THEN t IN ('inspection_orders','diagnostic_audits','diagnostic_centers','diagnostic_template_versions','diagnostic_center_assignments') AND v='insert'
  WHEN 'order_change' THEN t IN ('inspection_orders','diagnostic_order_assignments','diagnostic_audits') AND v IN ('insert','update','delete')
@@ -147,12 +148,22 @@ LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public AS $$
  WHEN 'session_change' THEN t IN ('sessions','totp_enrollments','totp_backup_codes') AND v IN ('insert','update','delete')
  ELSE false END
 $$;
+CREATE FUNCTION public.diagnostic_source_normalize(t text,r jsonb) RETURNS jsonb
+LANGUAGE plpgsql VOLATILE SET search_path = pg_catalog, public AS $$
+DECLARE normalized jsonb;
+BEGIN
+ IF public.diagnostic_source_meta(t) IS NULL THEN RAISE EXCEPTION 'diagnostic_source_table'; END IF;
+ EXECUTE format('SELECT public.diagnostic_source_project(to_jsonb(jsonb_populate_record(NULL::public.%I,$1)),public.diagnostic_source_meta($2)->''fields'')',t) INTO normalized USING r,t;
+ RETURN normalized;
+END $$;
 CREATE FUNCTION public.diagnostic_source_parse(c jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SET search_path = pg_catalog, public AS $$
-DECLARE r jsonb; m jsonb; old_source jsonb; k jsonb; root jsonb; seen jsonb:='[]'; op text:=c->>'operation';
+DECLARE r jsonb; m jsonb; old_source jsonb; k jsonb; root jsonb; seen jsonb:='[]'; parsed_rows jsonb:='[]'; op text:=c->>'operation';
 BEGIN
  IF jsonb_typeof(c) IS DISTINCT FROM 'object' OR c-ARRAY['operation','roots','rows','actorUserId','sessionId','cutoff','campaign']<>'{}'
   OR NOT c ?& ARRAY['operation','roots','rows','actorUserId','sessionId','cutoff','campaign']
+  OR jsonb_typeof(c->'operation') IS DISTINCT FROM 'string'
+  OR jsonb_typeof(c->'actorUserId') NOT IN ('string','null') OR jsonb_typeof(c->'sessionId') NOT IN ('string','null')
   OR jsonb_typeof(c->'roots') IS DISTINCT FROM 'array' OR jsonb_typeof(c->'rows') IS DISTINCT FROM 'array'
   OR jsonb_array_length(c->'roots') NOT BETWEEN 1 AND 100 OR jsonb_array_length(c->'rows') NOT BETWEEN 1 AND 100
  THEN RAISE EXCEPTION 'diagnostic_source_command'; END IF;
@@ -161,7 +172,7 @@ BEGIN
  -- Campaign selectors are never accepted as authority from JSON.
  IF c->'campaign'<>'null' THEN RAISE EXCEPTION 'diagnostic_source_campaign_resolved_only'; END IF;
  FOR root IN SELECT value FROM jsonb_array_elements(c->'roots') LOOP
-  IF root-ARRAY['table','key']<>'{}' OR public.diagnostic_source_meta(root->>'table') IS NULL
+  IF root-ARRAY['table','key']<>'{}' OR NOT root ?& ARRAY['table','key'] OR root->'key'='{}' OR jsonb_typeof(root->'key') IS DISTINCT FROM 'object' OR public.diagnostic_source_meta(root->>'table') IS NULL
    OR public.diagnostic_source_key(root->>'table',root->'key') IS DISTINCT FROM root->'key'
    OR EXISTS (SELECT 1 FROM jsonb_each(root->'key') x WHERE jsonb_typeof(x.value)<>'string') THEN RAISE EXCEPTION 'diagnostic_source_root'; END IF;
  END LOOP;
@@ -169,11 +180,16 @@ BEGIN
   m:=public.diagnostic_source_meta(r->>'table'); k:=r->'key';
   IF r-ARRAY['table','key','verb','expected','next']<>'{}' OR NOT r ?& ARRAY['table','key','verb','expected','next']
    OR public.diagnostic_source_allows(op,r->>'table',r->>'verb') IS NOT TRUE
-   OR m IS NULL OR k IS NULL OR k='{}' OR public.diagnostic_source_key(r->>'table',k) IS DISTINCT FROM k
+   OR m IS NULL OR r->>'table'='diagnostic_source_anchors' OR k IS NULL OR k='{}' OR public.diagnostic_source_key(r->>'table',k) IS DISTINCT FROM k
    OR EXISTS (SELECT 1 FROM jsonb_each(k) x WHERE jsonb_typeof(x.value)<>'string')
    OR seen @> jsonb_build_array(jsonb_build_object('table',r->>'table','key',k))
   THEN RAISE EXCEPTION 'diagnostic_source_row'; END IF;
   seen:=seen||jsonb_build_array(jsonb_build_object('table',r->>'table','key',k));
+  IF r->>'verb'<>'insert' AND jsonb_typeof(r->'expected'->'source')='object' THEN
+   IF public.diagnostic_source_project(r->'expected'->'source',m->'fields') IS DISTINCT FROM r->'expected'->'source'
+    OR NOT (r->'expected'->'source') ?& ARRAY(SELECT jsonb_array_elements_text(m->'fields')) THEN RAISE EXCEPTION 'diagnostic_source_expected_fields'; END IF;
+   r:=jsonb_set(r,'{expected,source}',public.diagnostic_source_normalize(r->>'table',r->'expected'->'source'));
+  END IF;
   old_source:=public.diagnostic_source_project(public.diagnostic_source_read(r->>'table',k),m->'fields');
   IF r->>'verb'='insert' THEN
    IF r->'expected'<>'"absent"' OR old_source IS NOT NULL THEN RAISE EXCEPTION 'diagnostic_source_expected_absent'; END IF;
@@ -187,20 +203,29 @@ BEGIN
    OR NOT (r->'next') ?& ARRAY(SELECT jsonb_array_elements_text(m->'fields'))
    OR public.diagnostic_source_key(r->>'table',r->'next') IS DISTINCT FROM k
   THEN RAISE EXCEPTION 'diagnostic_source_next'; END IF;
+  IF r->>'verb'<>'delete' THEN r:=jsonb_set(r,'{next}',public.diagnostic_source_normalize(r->>'table',r->'next')); END IF;
+  parsed_rows:=parsed_rows||jsonb_build_array(r);
   IF op IN ('account_schedule','account_restore') AND
    ((r->'expected'->'source')-'deletionScheduledAt') IS DISTINCT FROM ((r->'next')-'deletionScheduledAt') THEN RAISE EXCEPTION 'diagnostic_source_account_fields'; END IF;
  END LOOP;
- RETURN c;
+ RETURN c||jsonb_build_object('rows',parsed_rows);
 END $$;
 
 -- Discover from persisted rows on each invocation. No receipt/temp snapshot is read here.
 CREATE FUNCTION public.diagnostic_source_scope(c jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SET search_path = pg_catalog, public AS $$
 DECLARE s jsonb:='{}'; prior jsonb; root jsonb; m jsonb; r jsonb; ref jsonb; k jsonb; n jsonb; t text; q text;
- disposal jsonb; subjects jsonb:='[]'; inventory jsonb:='[]'; current_rows jsonb; step integer:=0;
+ disposal jsonb; subjects jsonb:='[]'; selectors jsonb:='{}'; inventory jsonb:='[]'; current_rows jsonb; step integer:=0;
 BEGIN
  FOR root IN SELECT value FROM jsonb_array_elements(c->'roots') UNION ALL SELECT value FROM jsonb_array_elements(c->'rows') LOOP
   s:=public.diagnostic_source_add(s,root->>'table',root->'key');
+  selectors:=public.diagnostic_source_add(selectors,root->>'table',root->'key');
+  IF root->>'table'='dealership_members' THEN
+   r:=public.diagnostic_source_read('dealership_members',root->'key');
+   IF r->>'userId' IS NOT NULL THEN subjects:=subjects||jsonb_build_array(r->>'userId'); END IF;
+   IF root->'next'->>'userId' IS NOT NULL THEN subjects:=subjects||jsonb_build_array(root->'next'->>'userId'); END IF;
+  END IF;
+  IF root->>'table'='inspection_orders' THEN s:=public.diagnostic_source_add(s,'diagnostic_source_anchors',jsonb_build_object('orderId',root->'key'->'id')); END IF;
   IF root->>'table'='users' THEN subjects:=subjects||jsonb_build_array(root->'key'->>'id'); END IF;
   -- NEW references are discovered before any locks, including absent endpoints.
   FOR ref IN SELECT value FROM jsonb_array_elements(public.diagnostic_source_meta(root->>'table')->'refs') LOOP
@@ -231,17 +256,24 @@ BEGIN
    t:=m->>'table';
    -- Only explicit root subjects expand inventory. Discovered participants never do.
    q:='false';
+   IF t='diagnostic_source_anchors' THEN
+    q:=q||' OR to_jsonb(x)->''source''->>''commissionerId'' IN (SELECT jsonb_array_elements_text($2)) OR to_jsonb(x)->''source''->''listing''->>''sellerId'' IN (SELECT jsonb_array_elements_text($2))
+     OR to_jsonb(x)->''source''->>''memberUserId'' IN (SELECT jsonb_array_elements_text($2))
+     OR EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE($1->''listings'',''[]'')) z WHERE z->>''id''=to_jsonb(x)->''source''->>''listingId'')
+     OR EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE($1->''dealership_members'',''[]'')) z WHERE z->>''id''=to_jsonb(x)->''source''->>''memberId'')';
+   END IF;
    FOR ref IN SELECT value FROM jsonb_array_elements(m->'refs') WHERE jsonb_array_length(value->'columns')=1 LOOP
     IF ref->>'table'='users' AND (c->>'operation'='account_purge' OR (m->>'rank')::int<=9) THEN
      q:=q||format(' OR to_jsonb(x)->>%L IN (SELECT jsonb_array_elements_text($2))',ref->'columns'->>0);
+    ELSIF ref->>'table' IN ('listings','dealerships','dealership_members') AND (m->>'rank')::int BETWEEN 3 AND 9 THEN
+     q:=q||format(' OR EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE($3->%L,''[]'')) z WHERE z->>%L=to_jsonb(x)->>%L)',ref->>'table',ref->'target'->>0,ref->'columns'->>0);
     ELSIF ref->>'table' IN ('inspection_orders','diagnostic_reports','diagnostic_identity_records','diagnostic_continuity_proofs')
-     OR (ref->>'table' IN ('listings','dealerships','dealership_members') AND (m->>'rank')::int BETWEEN 3 AND 9)
      OR (c->>'operation'='account_purge' AND ref->>'table' IN ('support_cases','vehicle_history_requests','service_conversations','history_orders','history_artifacts','media_uploads','video_upload_sessions','video_generations','measurement_principals','measurement_visits','sessions','totp_enrollments')) THEN
      q:=q||format(' OR EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE($1->%L,''[]'')) z WHERE z->>%L=to_jsonb(x)->>%L)',ref->>'table',ref->'target'->>0,ref->'columns'->>0);
     END IF;
    END LOOP;
    EXECUTE format('SELECT COALESCE(jsonb_agg(to_jsonb(x)),''[]'') FROM public.%I x WHERE %s OR EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE($1->%L,''[]'')) z WHERE to_jsonb(x) @> z)',t,q,t)
-    INTO current_rows USING s,subjects;
+    INTO current_rows USING s,subjects,selectors;
    FOR r IN SELECT value FROM jsonb_array_elements(current_rows) LOOP
     s:=public.diagnostic_source_add(s,t,public.diagnostic_source_key(t,r));
     FOR ref IN SELECT value FROM jsonb_array_elements(m->'refs') LOOP
@@ -252,6 +284,13 @@ BEGIN
      END LOOP;
      s:=public.diagnostic_source_add(s,ref->>'table',k);
     END LOOP;
+    IF t='diagnostic_source_anchors' THEN
+     s:=public.diagnostic_source_add(s,'listings',jsonb_build_object('id',r->'source'->>'listingId'));
+     s:=public.diagnostic_source_add(s,'users',jsonb_build_object('id',r->'source'->>'commissionerId'));
+     s:=public.diagnostic_source_add(s,'users',jsonb_build_object('id',r->'source'->'listing'->>'sellerId'));
+     s:=public.diagnostic_source_add(s,'dealership_members',jsonb_build_object('id',r->'source'->>'memberId'));
+     s:=public.diagnostic_source_add(s,'dealerships',jsonb_build_object('id',r->'source'->>'memberBusinessId'));
+    END IF;
     -- Retained proof JSON may still name a Listing no longer on either order.
     IF t='diagnostic_continuity_proofs' THEN
      FOR n IN SELECT r->'bindings'->'predecessor' UNION ALL SELECT r->'bindings'->'candidate' LOOP
@@ -385,7 +424,7 @@ DECLARE before_scope jsonb; after_scope jsonb; c jsonb; keys jsonb; campaigns js
 BEGIN
  IF EXISTS (SELECT 1 FROM jsonb_array_elements(public.diagnostic_source_registry()) m
   CROSS JOIN (VALUES ('diagnostic_source_presence'),('diagnostic_source_effective'),('diagnostic_source_no_truncate')) names(name)
-  WHERE NOT EXISTS (SELECT 1 FROM pg_trigger t WHERE t.tgrelid=to_regclass('public.'||(m->>'table')) AND t.tgname=names.name AND t.tgenabled='O')) THEN
+  WHERE m->>'table'<>'diagnostic_source_anchors' AND NOT EXISTS (SELECT 1 FROM pg_trigger t WHERE t.tgrelid=to_regclass('public.'||(m->>'table')) AND t.tgname=names.name AND t.tgenabled='O')) THEN
   RAISE EXCEPTION 'diagnostic_source_dormant';
  END IF;
  IF current_setting('transaction_isolation')<>'read committed' THEN RAISE EXCEPTION 'diagnostic_source_isolation'; END IF;
@@ -665,6 +704,7 @@ DECLARE m jsonb; t text; columns text;
 BEGIN
  FOR m IN SELECT value FROM jsonb_array_elements(public.diagnostic_source_registry()) LOOP
   t:=m->>'table';
+  IF t='diagnostic_source_anchors' THEN CONTINUE; END IF;
   SELECT string_agg(format('%I',value),',') INTO columns FROM jsonb_array_elements_text(m->'fields');
   EXECUTE format('CREATE TRIGGER diagnostic_source_presence BEFORE INSERT OR DELETE OR UPDATE OF %s ON public.%I FOR EACH STATEMENT EXECUTE FUNCTION public.diagnostic_source_statement_guard()',columns,t);
   -- AFTER ROW observes effective NEW after every BEFORE trigger, including changes

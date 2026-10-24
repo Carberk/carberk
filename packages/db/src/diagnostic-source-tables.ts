@@ -1,5 +1,6 @@
 // Physical primary keys. Kept in agreement with the forward SQL registry.
 export interface DiagnosticSourceKeys {
+  "diagnostic_source_anchors": { "orderId": string };
   "users": { "id": string };
   "dealerships": { "id": string };
   "dealership_members": { "id": string };
