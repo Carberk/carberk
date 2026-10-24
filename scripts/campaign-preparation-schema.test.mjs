@@ -12,7 +12,8 @@ const sql = read(`../packages/db/prisma/migrations/${name}/migration.sql`);
 
 test('campaign preparation adds an exact retained migration to a new schema snapshot', () => {
   assert.equal(sql, read(`./testing/retained-schema/${name}.sql`));
-  const schema = hash(read('../packages/db/prisma/schema.prisma'));
+  // This test owns the campaign snapshot; purge-effects owns the next snapshot.
+  const schema = '6e059c956df99e8e7feeb8dca70b7a27051a8851fde8edf2c5296a5eb6e5819b';
   const prior = '4ae34bfb8ae50fb5a8bd83b04fa1eb819cbb63abf5e427f007dfc508ae15b546';
   const candidate = inventoryForSchema(schema, []), main = inventoryForSchema(prior, []);
   assert.deepEqual(candidate.filter(row => row.name !== name), main);

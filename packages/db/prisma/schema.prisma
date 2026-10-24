@@ -2098,3 +2098,5 @@ model CampaignPreparation {
   @@unique([backend_pid, full_transaction_id])
   @@map("campaign_preparations")
 }
+
+// Forward SQL effect inventory: 20261024030000_diagnostic_purge_effects.
