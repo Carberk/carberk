@@ -12,7 +12,7 @@ import { useAdminLocale } from "@/lib/i18n";
 
 type Comparison = Extract<Awaited<ReturnType<typeof actions.diagnosticReinspectionComparison>>, { ok: true }>["data"];
 type Attempt = { requestId: string; input: D.DiagnosticContinuityRequestExecute; pending: boolean };
-export function DiagnosticContinuity({ context, handoff, denied, onDirty, onLock, onResult, returnToVisit, coordinateAssignments }: { context: D.DiagnosticWorkspace; handoff?: string | undefined; denied(): void; onDirty(value: boolean): void; onLock(value: boolean): void; onResult(reportId: string): void; returnToVisit(): void; coordinateAssignments?: (()=>void) | undefined }) {
+export function DiagnosticContinuity({ context, handoff, denied, onDirty, onLock, onResult, returnToVisit, refreshB, coordinateAssignments }: { context: D.DiagnosticWorkspace; handoff?: string | undefined; denied(): void; onDirty(value: boolean): void; onLock(value: boolean): void; onResult(reportId: string): void; returnToVisit(): void; refreshB(): void; coordinateAssignments?: (()=>void) | undefined }) {
  const { locale } = useAdminLocale(), c = continuityCopy[locale], base = diagnosticCopy[locale], order = context.order;
  const [activity,setActivity]=useState<"preparing"|"issuing"|"creating"|null>(null);
  const [busy, setBusy] = useState(false), [error, setError] = useState(false), [blocked, setBlocked] = useState(false), [uncertain, setUncertain] = useState(false);
@@ -106,30 +106,31 @@ export function DiagnosticContinuity({ context, handoff, denied, onDirty, onLock
   if (attempt.current) { const frozen = attempt.current; const result = await read(() => actions.diagnosticRecoverContinuityRequest(order.id, frozen.requestId)); if (result) { recorded(result); if (result.state === "pending_input") setRetryReady(true); } }
   else {
    const result=await read(async()=>{
-    const requests:D.DiagnosticContinuityRequest[]=[],seen=new Set<string>();let cursor:string|undefined;
+    const requests:D.DiagnosticContinuityRequest[]=[],seen=new Set<string>();let cursor:string|undefined,nextCursor:string|null=null;
     while(alive.current){
      const response=await actions.diagnosticContinuityRequests(order.id,cursor?{cursor}:{});if(!response.ok)return response;
-     requests.push(...response.data.requests);
-     if(!uncertain||response.data.nextCursor===null)return {ok:true as const,data:{requests,nextCursor:response.data.nextCursor}};
-     if(seen.has(response.data.nextCursor))throw new Error("Repeated receipt continuation");
-     seen.add(response.data.nextCursor);cursor=response.data.nextCursor;
+     requests.push(...response.data.requests);nextCursor=response.data.nextCursor;
+     if(!uncertain||nextCursor===null)break;
+     if(seen.has(nextCursor))throw new Error("Repeated receipt continuation");
+     seen.add(nextCursor);cursor=nextCursor;
     }
-    throw new Error("Workspace closed");
+    if(!alive.current)throw new Error("Workspace closed");
+    // The recovery read already owns the fence. Dispatch the reviewer-authorized recheck directly.
+    const workspace=uncertain&&lostPrepareKind.current==="issue"&&dualReviewer?await actions.diagnosticWorkspace(order.id):null;
+    if(workspace&&!workspace.ok)return workspace;
+    return {ok:true as const,data:{requests,nextCursor,workspace:workspace?.data}};
    });
    if(result){setReceipts(result.requests);setStatusRead(true);receiptSeen.current.clear();if(result.nextCursor)receiptSeen.current.add(result.nextCursor);setReceiptCursor(result.nextCursor);
     if(uncertain){
-     // Issue discovery is reviewer-authorized. Handoff discovery requires a technician.
      // Never attach unsent input to a discovered preparation, even of the same kind.
      const kind=lostPrepareKind.current;
      let currentResult=false;
      if(kind==="consume" && canConsume) currentResult=await checkHandoff();
-     else if(kind==="issue" && dualReviewer){
-      const workspace=await read(()=>actions.diagnosticWorkspace(order.id));
-      if(workspace){
-       if(workspace.context.actorId!==context.actorId || workspace.context.order.id!==order.id || !workspace.context.capabilities.includes("diagnostics.reviewer")){alive.current=false;lostPrepareKind.current=null;denied();return;}
-       if(workspace.context.order.version!==order.version || workspace.reports.length){clearReview();setBlocked(true);}
-       currentResult=true;
-      }
+     else if(kind==="issue" && dualReviewer && result.workspace){
+      const workspace=result.workspace;
+      if(workspace.context.actorId!==context.actorId || workspace.context.order.id!==order.id || !workspace.context.capabilities.includes("diagnostics.reviewer")){alive.current=false;lostPrepareKind.current=null;denied();return;}
+      if(workspace.context.order.version!==order.version || workspace.reports.length){clearReview();setBlocked(true);}
+      currentResult=true;
      }
      if(alive.current&&currentResult){lostPrepareKind.current=null;setUncertain(false);setReview(false);setReviewB(false);setAck([]);setSame(false);}
     }
@@ -170,6 +171,7 @@ export function DiagnosticContinuity({ context, handoff, denied, onDirty, onLock
  </section>
  {canConsume && <section className="space-y-4"><h3>{c.handoff}</h3>{!handoff && <p>{c.missing}</p>}<button className={button} disabled={busy || frozen} onClick={() => void checkHandoff()}>{c.check}</button>{existing ? <button className={button} disabled={busy} onClick={() => onResult(existing)}>{c.result}</button> : checked && !handle ? <p role="status">{c.missing}</p> : null}
  {handle && !existing && order.observedVehicle && order.physicalAuthorized && <><VisitFacts observation={order.observedVehicle} c={base} locale={locale}/><p>{base.template}: {context.template.definition.title[locale]} · {context.template.version}</p><p>{base.audience}: {base[order.audience]}</p><label className="block">{base.reason} · {c.required}<textarea {...reasonValidation.props("reason",`${base.reason} · ${c.required}`)} className={field} aria-required="true" required maxLength={1000} disabled={busy || frozen} value={reason} onChange={e => { setReason(e.target.value); setReviewB(false); }}/>{reasonValidation.feedback("reason",`${reason.length}/1000`)}</label>{reasonValidation.summary(c.invalidFields)}{!reviewB ? <button className={primary} disabled={busy} aria-disabled={frozen||blocked||!reasonValidation.valid} onClick={() => { if(frozen||blocked||!reasonValidation.validate())return;setReviewB(true); }}>{c.reviewB}</button> : <section role="region" aria-label={c.reviewB} className="space-y-3 border border-border p-4"><h3 ref={reviewBHeading} tabIndex={-1}>{c.reviewB}</h3><VisitFacts observation={order.observedVehicle} c={base} locale={locale}/><p>{base.template}: {context.template.definition.title[locale]} · {context.template.version}</p><p>{base.audience}: {base[order.audience]}</p><p className="whitespace-pre-wrap break-words">{reason}</p><p>{c.physicalCue}</p><button className={primary} disabled={busy || frozen} onClick={() => {if(!reasonValidation.valid||!reviewB)return;void start({ kind: "consume", command: { proofId: handle.proofId, reportId: crypto.randomUUID(), expectedOrderVersion: handle.expectedOrderVersion, reason } });}}>{c.consume}</button><button className={button} disabled={busy || frozen} onClick={() => {setReviewB(false);document.getElementById(reasonValidation.props("reason",`${base.reason} · ${c.required}`).id)?.focus();}}>{c.edit}</button></section>}</>}
+ {handle && !existing && (!order.observedVehicle || !order.physicalAuthorized) && <><p role="alert">{c.bUnavailable}</p><button className={button} disabled={busy || frozen} onClick={refreshB}>{c.refreshB}</button></>}
  <button className={button} disabled={busy || frozen} onClick={returnToVisit}>{c.return}</button></section>}
  {!handoff && dualReviewer && !frozen && !blocked && <section className="space-y-4"><h3 ref={pageHeading} tabIndex={-1}>{c.search}</h3><button className={button} disabled={busy} onClick={() => void discover()}>{c.search}</button>{page && <><ul>{page.candidates.map(candidate => <li className="min-h-14 space-y-2 border-b border-border py-3" key={candidate.reportId}><p>{new Date(candidate.observedAt).toLocaleString(locale==="tk"?"tk-TM":locale==="ru"?"ru-RU":"en-GB", { timeZone: "UTC" })} UTC · {candidate.mileageKm.toLocaleString(locale)} km</p><button className={button} disabled={busy} onClick={() => void compare(candidate.reportId)}>{c.compare}</button></li>)}</ul>{page.nextCursor && <button className={button} disabled={busy} onClick={() => void discover(page.nextCursor ?? undefined)}>{c.continue}</button>}{page.exhausted && <p>{c.exhausted}</p>}</>}
  {pair && <><h3 ref={pairHeading} tabIndex={-1}>{c.compare}</h3><button className={button} disabled={busy} onClick={()=>{clearReview();if(compareInvoker.current?.isConnected)compareInvoker.current.focus();else pageHeading.current?.focus();}}>{base.back}</button><IdentityComparison comparison={pair} c={c} base={base}/>

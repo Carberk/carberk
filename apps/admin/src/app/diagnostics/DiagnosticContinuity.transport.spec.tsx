@@ -79,7 +79,8 @@ it.each([
  expect(await screen.findByRole("alert")).toHaveProperty("textContent", copy.bUnavailable);
  expect(screen.queryByRole("button", { name: copy.reviewB })).toBeNull();
  expect(screen.queryByRole("button", { name: copy.consume })).toBeNull();
- const summary = screen.getByRole("heading", { name: copy.current }).closest("section")!;
+ const summary = screen.getByRole("heading", { name: copy.current }).closest("section");
+ if (!summary) throw new Error("Persistent B summary missing");
  expect(within(summary).getByText(copy.physicalAuthorization, { exact: false }).textContent).toBe(`${copy.physicalAuthorization}: ${missing === "authorization" ? copy.notEstablished : diagnosticCopy[locale].saved}`);
  // Refresh B re-reads the parent context and the exact handle, without preparing an operation.
  context.order = { ...context.order, observedVehicle: observation, physicalAuthorized: true, physicalAuthorization: { authorityReference: "Synthetic", recordedBy: actor, recordedAt: observation.observedAt } };
@@ -93,7 +94,8 @@ it.each([
 });
 it.each(["en", "ru", "tk"] as const)("keeps physical authorization visible in the persistent B summary across panels in %s", async locale => {
  setup(undefined, locale); const copy = continuityCopy[locale];
- const summary = (await screen.findByRole("heading", { name: copy.current })).closest("section")!;
+ const summary = (await screen.findByRole("heading", { name: copy.current })).closest("section");
+ if (!summary) throw new Error("Persistent B summary missing");
  expect(within(summary).getByText(`${copy.physicalAuthorization}: ${diagnosticCopy[locale].saved}`)).toBeTruthy();
  for (const panel of [copy.visit, copy.link, diagnosticCopy[locale].reports]) {
   fireEvent.click(screen.getByRole("button", { name: panel }));
@@ -357,13 +359,13 @@ it("shows all returned comparison bindings and evidence audit facts without chan
  expect(audits).toContainEqual({orderId,orderVersion:7,identityRecordId:uuid(21),identityRecordHash:"d".repeat(64),evidenceGeneration:19,correctionHeadHash:hash,evidenceId:uuid(31)});
  expect(audits).toContainEqual(expect.objectContaining({id:uuid(30),orderId,orderVersion:7,observationHash:hash,recordHash:hash,identityRecordId:uuid(21),provenance:[{id:uuid(100),sha256:hash,mime:"image/webp",sizeBytes:4}]}));expect(writes).toEqual([]);
 });
-it.each(["unchanged", "actor", "order", "capability", "version"] as const)("holds reviewer-only lost-prepare recovery until the authorized workspace recheck returns: %s",async change=>{
+it.each(["unchanged", "actor", "order", "capability", "denied", "version"] as const)("holds reviewer-only lost-prepare recovery until the authorized workspace recheck returns: %s",async change=>{
  context.capabilities=["diagnostics.reviewer"];const real=fetch;let losePrepare=true,checking=false;let release=()=>{};const gate=new Promise<void>(resolve=>{release=resolve;});
  vi.stubGlobal("fetch",async(...args:Parameters<typeof fetch>)=>{
   const path=new URL(String(args[0]),"http://localhost").pathname;
   if(path.endsWith("/continuity-handoffs"))throw new Error("Reviewer must never read technician handoffs");
   if(path.endsWith("/continuity-requests")&&args[1]?.method==="POST"&&losePrepare){losePrepare=false;receipt={requestId,kind:"issue",state:"pending_input"};throw new TypeError("Lost issue prepare reply");}
-  if(path.endsWith("/workspace")&&!losePrepare){checking=true;await gate;const response=await real(...args);const current=await response.json() as D.DiagnosticWorkspace;
+  if(path.endsWith("/workspace")&&!losePrepare){checking=true;await gate;const response=await real(...args);if(change==="denied")return Response.json({}, {status:403});const current=await response.json() as D.DiagnosticWorkspace;
    if(change==="actor")current.actorId=uuid(800);
    if(change==="order")current.order.id=uuid(801);
    if(change==="capability")current.capabilities=["diagnostics.technician"];
@@ -377,7 +379,7 @@ it.each(["unchanged", "actor", "order", "capability", "version"] as const)("hold
  fireEvent.click(screen.getByRole("button",{name:c.status}));await waitFor(()=>expect(checking).toBe(true));
  expect(screen.getByText(c.uncertain)).toBeTruthy();expect(screen.getByRole("button",{name:c.status}).hasAttribute("disabled")).toBe(true);
  expect(screen.queryByRole("button",{name:c.restartComparison})).toBeNull();release();
- if(change==="actor"||change==="order"||change==="capability"){
+ if(change==="actor"||change==="order"||change==="capability"||change==="denied"){
   await screen.findByText(base.denied);expect(screen.queryByDisplayValue("Reviewer-only deliberate comparison")).toBeNull();expect(screen.queryByText("Restricted A identity")).toBeNull();
  }else{
   const restart=await screen.findByRole("button",{name:c.restartComparison});
