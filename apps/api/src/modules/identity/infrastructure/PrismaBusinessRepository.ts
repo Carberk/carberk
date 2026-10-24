@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { PrismaService, type Prisma } from "@auto-tm/db";
+import { PrismaService, type Prisma, withDiagnosticSourceCommand, type DiagnosticSourceTuple } from "@auto-tm/db";
 import type { BusinessSchemas } from "@auto-tm/contracts";
 import { BusinessAuthorityDenied, type BusinessSubject } from "../domain/ports/BusinessAuthorityPort";
 import type { BusinessRepository, NewBusinessInvitation } from "../domain/ports/BusinessRepository";
@@ -106,13 +106,25 @@ export class PrismaBusinessRepository implements BusinessRepository {
  }
  async changeMember(input: BusinessSubject & BusinessSchemas.BusinessMembershipChangeInput & { businessId: string }, now: Date) {
   await this.prisma.$transaction(async (tx) => {
-   await this.locks(tx, input, input.targetUserId, input.businessId); await this.owner(tx, input, now);
-   const target = await tx.dealershipMember.findUnique({ where: { userId: input.targetUserId } });
+   // Discover the target without locks, then reserve the exact member change
+   // before taking the User/Business locks. The prepared receipt is asserted
+   // again immediately before the ordinary mutation.
+   const discovered = await tx.dealershipMember.findUnique({ where: { userId: input.targetUserId } });
+   const target = discovered;
    if (!target || target.dealershipId !== input.businessId) throw new BusinessAuthorityDenied("MEMBERSHIP_REQUIRED");
-   if (target.role === "owner") throw new BusinessAuthorityDenied("SOLE_OWNER");
-   if (input.action === "remove") await tx.dealershipMember.delete({ where: { id: target.id } });
-   else await tx.dealershipMember.update({ where: { id: target.id }, data: { status: input.action === "suspend" ? "suspended" : "active" } });
+   const tuple = (row: typeof target): DiagnosticSourceTuple => ({ id: row.id, userId: row.userId, dealershipId: row.dealershipId, role: row.role, status: row.status });
+   const operation = input.action === "remove" ? "member_remove" : "member_eligibility";
+   const next = input.action === "remove" ? null : tuple({ ...target, status: input.action === "suspend" ? "suspended" : "active" });
+   await withDiagnosticSourceCommand(tx, { operation, roots: [{ table: "dealership_members", key: { id: target.id } }], rows: [{ table: "dealership_members", key: { id: target.id }, verb: input.action === "remove" ? "delete" : "update", expected: { source: tuple(target) }, next } as never], actorUserId: input.userId, sessionId: input.sessionId, cutoff: null, campaign: null }, async (receipt) => {
+   await tx.$queryRaw`SELECT public.diagnostic_assert_source(${receipt.receiptId}::uuid,${operation})`;
+   await this.locks(tx, input, input.targetUserId, input.businessId); await this.owner(tx, input, now);
+   const lockedTarget = await tx.dealershipMember.findUnique({ where: { userId: input.targetUserId } });
+   if (!lockedTarget || lockedTarget.dealershipId !== input.businessId) throw new BusinessAuthorityDenied("MEMBERSHIP_REQUIRED");
+   if (lockedTarget.role === "owner") throw new BusinessAuthorityDenied("SOLE_OWNER");
+   if (input.action === "remove") await tx.dealershipMember.delete({ where: { id: lockedTarget.id } });
+   else await tx.dealershipMember.update({ where: { id: lockedTarget.id }, data: { status: input.action === "suspend" ? "suspended" : "active" } });
    await this.audit(tx, input.userId, input.businessId, "BUSINESS_MEMBERSHIP_CHANGED", { targetUserId: target.userId, action: input.action });
+   });
   });
  }
  async settings(input: BusinessSubject & BusinessSchemas.BusinessSettingsInput & { businessId: string }, now: Date) {
