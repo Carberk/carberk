@@ -11,3 +11,4 @@ export {
   type DiagnosticSourceRow, type DiagnosticSourceTuple, type DiagnosticSourceKeys,
   type DiagnosticSourceTable, type PreparedDiagnosticSource,
 } from "./diagnostic-source-command";
+export { withCampaignPreparation, type CampaignMutation } from "./campaign-preparation";

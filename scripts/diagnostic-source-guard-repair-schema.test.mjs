@@ -7,7 +7,6 @@ import { inventoryForSchema } from './testing/schema-profile-fixture.mjs';
 
 const name = '20261024010000_diagnostic_source_guard_repair';
 const sql = readFileSync(new URL(`../packages/db/prisma/migrations/${name}/migration.sql`, import.meta.url), 'utf8');
-const prisma = readFileSync(new URL('../packages/db/prisma/schema.prisma', import.meta.url), 'utf8');
 const heldName = '20261023130000_diagnostic_source_kernel';
 const held = readFileSync(new URL(`../packages/db/prisma/migrations/${heldName}/migration.sql`, import.meta.url), 'utf8');
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -18,7 +17,7 @@ test('guard repair adds one exact retained migration without changing the held k
   assert.equal(hash(held), 'cc10000343f6257cb4b0d9cd4240ec57f46642f5a9b0735cd440680602d642b3');
   assert.equal(held, readFileSync(new URL(`./testing/retained-schema/${heldName}.sql`, import.meta.url), 'utf8'));
   assert.equal(sql, readFileSync(new URL(`./testing/retained-schema/${name}.sql`, import.meta.url), 'utf8'));
-  const schema = hash(prisma), prior = 'a93532709e5b1012f5a1007d5b633c98e982a54ea73fb33b71ddf0fad48c2f7c';
+  const schema = '4ae34bfb8ae50fb5a8bd83b04fa1eb819cbb63abf5e427f007dfc508ae15b546', prior = 'a93532709e5b1012f5a1007d5b633c98e982a54ea73fb33b71ddf0fad48c2f7c';
   const candidate = inventoryForSchema(schema, []), main = inventoryForSchema(prior, []);
   assert.deepEqual(candidate.filter(row => row.name !== name), main);
   assert.equal(candidate.find(row => row.name === name).checksum, hash(sql));

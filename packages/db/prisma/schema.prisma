@@ -2085,3 +2085,16 @@ model DiagnosticSourceAnchor {
 }
 
 // Forward SQL guard inventory: 20261024010000_diagnostic_source_guard_repair.
+
+/// Transient campaign fence preparation, independent of source ownership receipts.
+/// SQL derives identity/scope on INSERT and requires DELETE before transaction commit.
+model CampaignPreparation {
+  id                  String @id @db.Uuid
+  backend_pid         Int
+  full_transaction_id String
+  mutations           Json
+  scope               Json
+
+  @@unique([backend_pid, full_transaction_id])
+  @@map("campaign_preparations")
+}

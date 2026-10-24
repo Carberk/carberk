@@ -46,7 +46,7 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
   }
   async function guards(enabled: boolean) {
     const triggers = await pool.query<{ table: string; name: string }>(
-      "SELECT c.relname AS table,t.tgname AS name FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND (t.tgname LIKE 'zz_diagnostic_source_%' OR t.tgname='diagnostic_source_no_truncate')",
+      "SELECT c.relname AS table,t.tgname AS name FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND (t.tgname LIKE 'zz_diagnostic_source_%' OR t.tgname='diagnostic_source_no_truncate' OR t.tgname LIKE 'zzzz_campaign_preparation%')",
     );
     for (const { table, name } of triggers.rows) {
       await pool.query(`ALTER TABLE public."${table}" ${enabled ? "ENABLE" : "DISABLE"} TRIGGER "${name}"`);
