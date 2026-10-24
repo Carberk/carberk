@@ -12,3 +12,7 @@ This module prepares explicit controlled JS diagnostic capture through the first
 - [Shared minimized event builder](../../../../packages/contracts/src/schemas/diagnostic-telemetry.ts)
 - [First-party relay boundary](../../../api/src/modules/telemetry-diagnostics/CONTEXT.md)
 - [Native evidence gaps](../../../../docs/evidence/issue-919/native-diagnostics-research.md)
+
+## Native source checkpoint
+
+`modules/native-diagnostic-decoder` contains a pure Android API 31+ tombstone wire decoder and authored Kotlin adversarial tests. It is not registered or activated. The decoder only emits crashing-thread relative PCs plus aliases and verified ELF build IDs from an actual protected manifest. The strict native contract lives in `packages/contracts/src/schemas/native-diagnostic-telemetry.ts`; the existing JavaScript event schema remains unchanged. Host admission, bounded native cache/receiver, lifecycle erasure, symbolication and runtime evidence are later integration work. Sentry remains absent and unqualified.

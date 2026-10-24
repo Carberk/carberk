@@ -53,3 +53,4 @@ export * as ImprovementSchemas from "./schemas/improvement";
 export * as OperationsSchemas from "./schemas/operations";
 
 export * as DiagnosticTelemetrySchemas from "./schemas/diagnostic-telemetry";
+export * as NativeDiagnosticTelemetrySchemas from "./schemas/native-diagnostic-telemetry";
