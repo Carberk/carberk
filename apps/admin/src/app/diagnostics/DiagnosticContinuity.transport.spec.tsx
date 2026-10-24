@@ -211,3 +211,46 @@ it("reports duplicate kind and location beside both unsent identifiers",async()=
  setup();fireEvent.click(await screen.findByRole("button",{name:c.visit}));fireEvent.click(screen.getByRole("button",{name:c.loadIdentity}));fireEvent.click(await screen.findByRole("button",{name:c.correction}));fireEvent.click(screen.getByRole("button",{name:c.replacement}));fireEvent.click(screen.getByRole("button",{name:c.add}));
  const fields=screen.getAllByLabelText(`${c.location} · ${c.required}`);for(const input of fields){fireEvent.change(input,{target:{value:"Same physical plate"}});fireEvent.blur(input);}expect(fields.map(input=>input.getAttribute("aria-invalid"))).toEqual(["true","true"]);expect(screen.getAllByText(c.duplicate)).toHaveLength(2);expect(writes).toEqual([]);
 });
+
+it("clears all protected content on image denial while another child read is pending",async()=>{
+ setup();await compare();const real=fetch;let release:()=>void=()=>{};const gate=new Promise<void>(resolve=>{release=resolve;});
+ vi.stubGlobal("fetch",async(...args:Parameters<typeof fetch>)=>{const path=String(args[0]);if(path.includes("linking-technicians")){await gate;return Response.json({technicians:[{userId:technicianId,name:"Late protected technician"}]});}if(path.includes("/provenance/"))return Response.json({}, {status:403});return real(...args);});
+ fireEvent.click(screen.getByRole("button",{name:c.technicians}));fireEvent.click(screen.getByRole("button",{name:c.reviewImage}));await screen.findByText(base.denied);release();await new Promise(resolve=>setTimeout(resolve,0));
+ expect(screen.queryByText("Late protected technician")).toBeNull();expect(screen.queryByText("Restricted A identity")).toBeNull();expect(screen.queryByText("Authorized physical visit B")).toBeNull();expect(writes).toEqual([]);
+});
+it("fences a late comparison when navigation selects a different order and actor",async()=>{
+ setup();await link();fireEvent.click(screen.getByRole("button",{name:c.search}));const real=fetch;let release:()=>void=()=>{};const gate=new Promise<void>(resolve=>{release=resolve;});
+ vi.stubGlobal("fetch",async(...args:Parameters<typeof fetch>)=>{const path=String(args[0]);if(path.includes("reinspection-comparison")){const old=comparison();await gate;return Response.json(old);}if(path.endsWith("/workspace"))return Response.json({...context,actorId:uuid(800),capabilities:["diagnostics.technician"],order:{...context.order,id:uuid(801),observedVehicle:{...observation,manualReference:"New actor current order"}}});return real(...args);});
+ fireEvent.click(await screen.findByRole("button",{name:c.compare}));
+ // Prop navigation models the route's new exact order, independent of locked local controls.
+ cleanup();const view=render(<AdminLocaleProvider initialLocale="en"><DiagnosticWorkspace initialOrder={uuid(801)}/></AdminLocaleProvider>);await view.findByText("New actor current order");release();await new Promise(resolve=>setTimeout(resolve,0));
+ expect(screen.queryByText("Restricted A identity")).toBeNull();expect(screen.queryByRole("button",{name:c.issue})).toBeNull();expect(writes).toEqual([]);
+});
+it("a new Session with no receipts still checks the current B result without claiming cancellation",async()=>{
+ const real=fetch;vi.stubGlobal("fetch",async(...args:Parameters<typeof fetch>)=>String(args[0]).includes("continuity-requests")?Response.json({requests:[],nextCursor:null}):String(args[0]).includes("continuity-handoffs")?Response.json({handoffs:[],result:{proofId:uuid(999),reportId},nextCursor:null,scope:"current_b_owned_handoffs"}):real(...args));
+ context.capabilities=["diagnostics.technician"];setup(proofId);await screen.findByRole("button",{name:c.result});fireEvent.click(screen.getByRole("button",{name:c.status}));await screen.findAllByText(c.sessionAbsence);expect(screen.getByRole("button",{name:c.result})).toBeTruthy();expect(screen.queryByRole("button",{name:c.consume})).toBeNull();expect(writes).toEqual([]);
+});
+it("clears a forbidden historical decision after current role loss",async()=>{
+ receipt={requestId,kind:"issue",state:"completed",proofId,usability:"historical"};setup();await link();fireEvent.click(screen.getByRole("button",{name:c.status}));fireEvent.click(await screen.findByRole("button",{name:c.inspect}));await screen.findByText("Restricted recorded rationale");fireEvent.click(within(screen.getByRole("region",{name:c.recorded})).getByRole("button",{name:base.back}));proofReadDenied=true;fireEvent.click(screen.getByRole("button",{name:c.inspect}));await screen.findByText(base.denied);
+ expect(screen.queryByRole("link",{name:c.openLink})).toBeNull();expect(screen.queryByText("Restricted recorded rationale")).toBeNull();expect(screen.queryByText("Authorized physical visit B")).toBeNull();
+});
+async function replacementInput(){
+ fireEvent.click(await screen.findByRole("button",{name:c.visit}));fireEvent.click(screen.getByRole("button",{name:c.loadIdentity}));fireEvent.click(await screen.findByRole("button",{name:c.correction}));fireEvent.click(screen.getByRole("button",{name:c.replacement}));
+ for(const [label,value] of [[c.purpose,"Physical review"],[c.basis,"Synthetic authority"],[c.provenance,"Physical plate"],[c.scheduleReason,"Authorized retention"],[base.explanation,"Complete replacement rationale"],[c.location,"Physical B plate"],[c.value,"Replacement B"]])fireEvent.change(screen.getByLabelText(`${label} · ${c.required}`),{target:{value}});
+ fireEvent.change(screen.getByLabelText(`${c.until} · ${c.required}`),{target:{value:"2027-10-24T10:00"}});fireEvent.change(screen.getByLabelText(`${c.file} · ${c.optional}`),{target:{files:[new File([new Uint8Array([1,2,3,4])],"synthetic.png",{type:"image/png"})]}});fireEvent.click(screen.getByRole("button",{name:c.stage}));fireEvent.click(await screen.findByRole("checkbox",{name:`${c.verified} 2`}));fireEvent.click(screen.getByRole("button",{name:c.capture}));
+}
+it("a concurrent correction winner clears retry readiness and never retargets the complete replacement",async()=>{
+ setup();await replacementInput();const real=fetch;let rejected=0;vi.stubGlobal("fetch",async(...args:Parameters<typeof fetch>)=>{if(String(args[0]).endsWith("/identity-evidence")&&args[1]?.method==="POST"){rejected++;return Response.json({}, {status:409});}return real(...args);});
+ fireEvent.click(screen.getByRole("button",{name:c.reviewCorrection}));await screen.findAllByText(base.refresh);expect(screen.getByRole("button",{name:c.capture}).getAttribute("aria-disabled")).toBe("true");fireEvent.click(screen.getByRole("button",{name:c.capture}));fireEvent.click(screen.getByRole("button",{name:c.reviewCorrection}));expect(rejected).toBe(1);expect(screen.getByDisplayValue("Replacement B")).toBeTruthy();expect(screen.queryByRole("button",{name:base.retry})).toBeNull();
+});
+it("a recorded complete replacement refreshes and focuses the returned immutable record",async()=>{
+ setup();await replacementInput();const real=fetch;let appended:D.DiagnosticIdentityEvidence|undefined;
+ vi.stubGlobal("fetch",async(...args:Parameters<typeof fetch>)=>{const path=String(args[0]);if(path.endsWith("/identity-evidence")&&args[1]?.method==="POST"){const response=await real(...args);appended=await response.clone().json();return response;}if(path.endsWith("/identity-evidence")&&appended)return Response.json([evidenceFixture(uuid(31),[uuid(100)]),appended]);return real(...args);});
+ fireEvent.click(screen.getByRole("button",{name:c.reviewCorrection}));await screen.findByText(base.saved);await waitFor(()=>expect(document.activeElement?.getAttribute("data-record")).toBe(appended?.id));expect(screen.queryByDisplayValue("Replacement B")).toBeNull();
+});
+it("checks every receipt page after a lost prepare and never attaches unsent input to a discovered preparation",async()=>{
+ const real=fetch;let receiptPages=0;
+ vi.stubGlobal("fetch",async(...args:Parameters<typeof fetch>)=>{const path=String(args[0]);if(path.endsWith("/continuity-requests")&&args[1]?.method==="POST")throw new TypeError("Lost prepare reply");if(path.includes("continuity-requests")){receiptPages++;return Response.json({requests:receiptPages===3?[{requestId,kind:"consume",state:"pending_input"}]:[],nextCursor:receiptPages<3?`recovery-${receiptPages}`:null});}return real(...args);});
+ setup(proofId);fireEvent.change(await screen.findByRole("textbox",{name:`${base.reason} · ${c.required}`}),{target:{value:"Never bind this reason to discovered input"}});fireEvent.click(screen.getByRole("button",{name:c.reviewB}));fireEvent.click(screen.getByRole("button",{name:c.consume}));await screen.findByText(c.uncertain);await waitFor(()=>expect(screen.getByRole("button",{name:c.status}).hasAttribute("disabled")).toBe(false));fireEvent.click(screen.getByRole("button",{name:c.status}));await screen.findByText(c.pending);
+ expect(receiptPages).toBe(3);expect(screen.queryByRole("button",{name:c.retryExact})).toBeNull();expect(writes.filter(item=>item.path.endsWith("/execute"))).toEqual([]);
+});
