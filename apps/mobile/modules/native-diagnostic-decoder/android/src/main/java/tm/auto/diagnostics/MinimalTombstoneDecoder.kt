@@ -25,28 +25,30 @@ object MinimalTombstoneDecoder {
     data class Frame(val module: String, val relativePc: String)
     data class Result(val architecture: String, val signalNumber: Int, val signalCode: Int, val crashingTid: Long, val modules: List<ModuleReference>, val frames: List<Frame>)
 
-    fun decode(input: InputStream, manifest: Manifest): Result? = try {
-        if (!validManifest(manifest)) return null
-        val limited = CountingInput(input)
-        val root = Message(limited, 0).parseRoot()
-        val tid = root.tid ?: return null
-        val archValue = root.arch ?: return null
-        if (limited.count > MAX_BYTES || tid == 0UL || tid > MAX_UINT32 || root.signalNumber == null || root.signalCode == null || root.signalNumber!! !in 1..64) return null
-        val arch = mapOf(0UL to "armeabi-v7a", 1UL to "arm64-v8a", 2UL to "x86", 3UL to "x86_64")[archValue] ?: return null
-        if (arch != manifest.abi || root.threads[tid] == null) return null
-        val thread = root.threads[tid]!!
-        val byPath = manifest.modules.associateBy { it.path }
-        val used = linkedMapOf<String, ModuleReference>()
-        val frames = ArrayList<Frame>()
-        for (raw in thread.frames) {
-            val module = byPath[raw.path] ?: continue
-            if (!module.appOwned || module.buildId != raw.buildId) continue
-            if (used.putIfAbsent(module.alias, ModuleReference(module.alias, module.buildId)) == null && used.size > MAX_MODULES) return null
-            if (frames.size < MAX_FRAMES) frames += Frame(module.alias, raw.relativePc)
-        }
-        if (frames.isEmpty() || used.isEmpty()) return null
-        Result(arch, root.signalNumber!!, root.signalCode!!, tid.toLong(), used.values.toList(), frames)
-    } catch (_: ParseFailure) { null }
+    fun decode(input: InputStream, manifest: Manifest): Result? {
+        return try {
+            if (!validManifest(manifest)) return null
+            val limited = CountingInput(input)
+            val root = Message(limited, 0).parseRoot()
+            val tid = root.tid ?: return null
+            val archValue = root.arch ?: return null
+            if (limited.count > MAX_BYTES || tid == 0UL || tid > MAX_UINT32 || root.signalNumber == null || root.signalCode == null || root.signalNumber!! !in 1..64) return null
+            val arch = mapOf(0UL to "armeabi-v7a", 1UL to "arm64-v8a", 2UL to "x86", 3UL to "x86_64")[archValue] ?: return null
+            if (arch != manifest.abi || root.threads[tid] == null) return null
+            val thread = root.threads[tid]!!
+            val byPath = manifest.modules.associateBy { it.path }
+            val used = linkedMapOf<String, ModuleReference>()
+            val frames = ArrayList<Frame>()
+            for (raw in thread.frames) {
+                val module = byPath[raw.path] ?: continue
+                if (!module.appOwned || module.buildId != raw.buildId) continue
+                if (used.putIfAbsent(module.alias, ModuleReference(module.alias, module.buildId)) == null && used.size > MAX_MODULES) return null
+                if (frames.size < MAX_FRAMES) frames += Frame(module.alias, raw.relativePc)
+            }
+            if (frames.isEmpty() || used.isEmpty()) return null
+            Result(arch, root.signalNumber!!, root.signalCode!!, tid.toLong(), used.values.toList(), frames)
+        } catch (_: ParseFailure) { null }
+    }
 
     fun decode(bytes: ByteArray, manifest: Manifest): Result? = decode(ByteArrayInputStream(bytes), manifest)
 
