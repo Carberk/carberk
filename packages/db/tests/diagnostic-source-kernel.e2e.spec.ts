@@ -2191,4 +2191,127 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     expect(await prisma.inspectionOrder.findUnique({ where: { id: String(f.p.key["id"]) } })).toBeNull();
   });
 
+
+  // App-role coverage is fixture-local. These grants do not describe hosted roles.
+  async function userInsertRole() {
+    const role = `b1_user_insert_${randomUUID().replaceAll("-", "")}`;
+    await pool.query(`CREATE ROLE ${role} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT`);
+    await pool.query(`GRANT USAGE ON SCHEMA public TO ${role}`);
+    // The kernel discovers the complete graph and SELECT FOR UPDATE requires
+    // UPDATE as well as SELECT on its dependencies. No ownership/DDL/TRIGGER.
+    await pool.query(`GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO ${role}`);
+    await pool.query(`GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO ${role}`);
+    await pool.query(`GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO ${role}`);
+    return role;
+  }
+  async function userInsertBegin(client: PoolClient, role: string) {
+    await begin(client); await client.query(`SET LOCAL ROLE ${role}`);
+    expect(present((await client.query<{ name: string; elevated: boolean; trigger: boolean }>(
+      "SELECT current_user AS name,rolsuper OR rolcreaterole OR rolcreatedb AS elevated,has_table_privilege(current_user,'public.users','TRIGGER') AS trigger FROM pg_roles WHERE rolname=current_user",
+    )).rows[0])).toEqual({ name: role,elevated: false,trigger: false });
+  }
+  async function insertedSignInWriter(tx: Prisma.TransactionClient) {
+    const path = fileURLToPath(new URL("../../../apps/api/src/modules/identity/infrastructure/PrismaUserRepository.ts", import.meta.url));
+    const { PrismaUserRepository: Repository } = await import(/* @vite-ignore */ path) as {
+      PrismaUserRepository: new (db: Prisma.TransactionClient) => {
+        create(methods: { phone: string | null; phoneVerifiedAt: Date | null; email: string | null; emailVerifiedAt: Date | null }, identity: { nameNumber: number; avatarIndex: number }): Promise<{ id: string }>;
+      };
+    };
+    return new Repository(tx);
+  }
+  async function insertOpposingUser(client: PoolClient, id: string, channel: "phone" | "email", destination: string, stamp: Date, suspender = userId) {
+    // Real unique index insertion precedes the immediate AFTER-row self-FK.
+    // Both columns are finite fixture identifiers, never request interpolation.
+    return client.query(`INSERT INTO users(id,"${channel}","${channel}VerifiedAt","suspendedAt","suspendedById","suspensionReason","updatedAt") VALUES($1,$2,$3,CURRENT_TIMESTAMP,$4,'SQL fixture suspension',CURRENT_TIMESTAMP)`,[id,destination,stamp,suspender]);
+  }
+  function insertDestination(channel: "phone" | "email") {
+    return channel === "phone" ? `+99365${String(Math.floor(Math.random()*1_000_000)).padStart(6,"0")}` : `${randomUUID()}@insert-fence.invalid`;
+  }
+
+  it.each(["phone","email"] as const)("app-role %s INSERT refuses a prepared destination before its unique entry/FK, while a different destination can wait on the genuine FK", async channel => {
+    const role = await userInsertRole(), a = await connect(), b = await connect(), observer = await connect();
+    const destination = insertDestination(channel), otherDestination = insertDestination(channel), stamp = new Date(), rejected = randomUUID(), unrelated = randomUUID();
+    const before = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const foreignId = randomUUID(); await prisma.user.create({ data: { id: foreignId,email: `${foreignId}@foreign.invalid`,emailVerifiedAt: stamp } });
+    const foreign = await prisma.user.findUniqueOrThrow({ where: { id: foreignId } });
+    const c = { ...sourceCommand("sign_in_method_change",[await update(a,"users",{ id: userId },{ [channel]: destination,[`${channel}VerifiedAt`]: stamp.toISOString() })]),actorUserId: userId };
+    await userInsertBegin(a,role); const receipt = await prepare(a,c);
+    await userInsertBegin(b,role);
+    await expect(insertOpposingUser(b,rejected,channel,destination,stamp)).rejects.toMatchObject({ code: "40001",message: "diagnostic_source_user_insert_busy" });
+    await b.query("ROLLBACK");
+    expect(await prisma.user.findUnique({ where: { id: rejected } })).toBeNull();
+    // This INSERT holds its distinct index entry, then really waits on U's FK.
+    // T1 needs neither that entry nor its distinct destination advisory key.
+    await userInsertBegin(b,role);
+    const inserting = insertOpposingUser(b,unrelated,channel,otherDestination,stamp);
+    await waitBlocked(observer,b,a);
+    expect(present((await observer.query<{ locktype: string }>("SELECT locktype FROM pg_locks WHERE pid=$1 AND NOT granted",[pids.get(b)])).rows[0]).locktype).toBe("transactionid");
+    await a.query(`UPDATE users SET "${channel}"=$1,"${channel}VerifiedAt"=$2 WHERE id=$3`,[destination,stamp,userId]);
+    await finish(a,receipt); await a.query("COMMIT");
+    await inserting; await b.query("COMMIT");
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toMatchObject({ [channel]: destination,[`${channel}VerifiedAt`]: stamp });
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: unrelated } })).toMatchObject({ [channel]: otherDestination,suspendedById: userId });
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: foreignId } })).toEqual(foreign);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: userId } })).suspendedAt).toEqual(before.suspendedAt);
+    expect(await pool.query("SELECT id FROM diagnostic_source_commands").then(result => result.rows)).toEqual([]);
+  });
+
+  it.each(["phone","email"] as const)("app-role %s INSERT-first commit serializes preparation before User rows and preserves unique errors and foreign retention", async channel => {
+    const role = await userInsertRole(), a = await connect(), b = await connect(), observer = await connect();
+    const id = randomUUID(), destination = insertDestination(channel), stamp = new Date();
+    const before = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const c = { ...sourceCommand("sign_in_method_change",[await update(a,"users",{ id: userId },{ [channel]: destination,[`${channel}VerifiedAt`]: stamp.toISOString() })]),actorUserId: userId };
+    await userInsertBegin(b,role); await insertOpposingUser(b,id,channel,destination,stamp);
+    await userInsertBegin(a,role);
+    const preparing = prepare(a,c).then(() => null,(error: unknown) => error);
+    await waitBlocked(observer,a,b);
+    expect(present((await observer.query<{ locktype: string }>("SELECT locktype FROM pg_locks WHERE pid=$1 AND NOT granted",[pids.get(a)])).rows[0]).locktype).toBe("advisory");
+    await b.query("COMMIT");
+    // The committed new suspendedById edge changes the full graph. Never extend
+    // it after waiting; fresh outer preparation sees the real retained edge.
+    expect(String(await preparing)).toContain("diagnostic_source_graph_changed"); await a.query("ROLLBACK");
+    const inserted = await prisma.user.findUniqueOrThrow({ where: { id } });
+    await expect(prisma.$transaction(async tx => {
+      await tx.$executeRawUnsafe(`SET LOCAL ROLE ${role}`);
+      return withDiagnosticSourceCommand(tx,c,async () => (await signInWriter(tx)).replaceSignInMethod({ userId,channel,destination,verifiedAt: stamp }));
+    })).rejects.toMatchObject({ code: "SIGN_IN_METHOD_TAKEN" });
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(before);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id } })).toEqual(inserted);
+    await userInsertBegin(b,role);
+    await expect(insertOpposingUser(b,randomUUID(),channel,destination,stamp)).rejects.toMatchObject({ code: "23505",constraint: `users_${channel}_key` });
+    await b.query("ROLLBACK");
+    expect(await pool.query("SELECT id FROM diagnostic_source_commands").then(result => result.rows)).toEqual([]);
+  });
+
+  it.each(["phone","email"] as const)("app-role %s INSERT-first rollback releases destination and FK so the prepared exact replacement completes", async channel => {
+    const role = await userInsertRole(), a = await connect(), b = await connect(), observer = await connect();
+    const id = randomUUID(), destination = insertDestination(channel), stamp = new Date();
+    const c = { ...sourceCommand("sign_in_method_change",[await update(a,"users",{ id: userId },{ [channel]: destination,[`${channel}VerifiedAt`]: stamp.toISOString() })]),actorUserId: userId };
+    await userInsertBegin(b,role); await insertOpposingUser(b,id,channel,destination,stamp);
+    await userInsertBegin(a,role); const preparing = prepare(a,c); await waitBlocked(observer,a,b);
+    await b.query("ROLLBACK"); const receipt = await preparing;
+    await a.query(`UPDATE users SET "${channel}"=$1,"${channel}VerifiedAt"=$2 WHERE id=$3`,[destination,stamp,userId]);
+    await finish(a,receipt); await a.query("COMMIT");
+    expect(await prisma.user.findUnique({ where: { id } })).toBeNull();
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toMatchObject({ [channel]: destination,[`${channel}VerifiedAt`]: stamp });
+    expect(await pool.query("SELECT id FROM diagnostic_source_commands").then(result => result.rows)).toEqual([]);
+  });
+
+  it.each(["phone","email"] as const)("ordinary app-role repository %s creation needs no receipt, retains rollback and rejects duplicates and invalid FKs", async channel => {
+    const role = await userInsertRole(), destination = insertDestination(channel), stamp = new Date(), a = await connect();
+    const methods = { phone: channel === "phone" ? destination : null,phoneVerifiedAt: channel === "phone" ? stamp : null,email: channel === "email" ? destination : null,emailVerifiedAt: channel === "email" ? stamp : null };
+    const create = async (tx: Prisma.TransactionClient) => {
+      await tx.$executeRawUnsafe(`SET LOCAL ROLE ${role}`);
+      return (await insertedSignInWriter(tx)).create(methods,{ nameNumber: 1234,avatarIndex: 2 });
+    };
+    await expect(prisma.$transaction(async tx => { await create(tx); throw new Error("ordinary creation rollback"); })).rejects.toThrow("ordinary creation rollback");
+    expect(await prisma.user.findFirst({ where: { [channel]: destination } })).toBeNull();
+    const created = await prisma.$transaction(create);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: created.id } })).toMatchObject({ ...methods,nameNumber: 1234,avatarIndex: 2 });
+    await expect(prisma.$transaction(create)).rejects.toMatchObject({ code: "P2002" });
+    await userInsertBegin(a,role);
+    await expect(insertOpposingUser(a,randomUUID(),channel,insertDestination(channel),stamp,randomUUID())).rejects.toMatchObject({ code: "23503",constraint: "users_suspendedById_fkey" });
+    await a.query("ROLLBACK");
+    expect(await pool.query("SELECT id FROM diagnostic_source_commands").then(result => result.rows)).toEqual([]);
+  });
 });
