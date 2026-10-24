@@ -2000,6 +2000,22 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
   });
 
+  it("a disabled real User requeue trigger cannot turn an actual write into an optional no-op", async () => {
+    const { f,c,beforeUser } = await suspendedRestoreEnquiries();
+    await pool.query("ALTER TABLE public.users DISABLE TRIGGER business_enquiry_user_revocation");
+    try {
+      await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx,c,() =>
+        tx.$executeRaw`UPDATE users SET "deletionScheduledAt"=NULL WHERE id=${userId}`,
+      ))).rejects.toThrow("diagnostic_source_dormant");
+    } finally {
+      await pool.query("ALTER TABLE public.users ENABLE TRIGGER business_enquiry_user_revocation");
+    }
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(beforeUser);
+    for (const row of [f.own,f.other,f.foreign]) expect(await prisma.conversation.findUniqueOrThrow({ where: { id: row.id } })).toEqual(row);
+    expect(await prisma.businessEnquiryAudit.count({ where: { conversationId: { in: [f.own.id,f.other.id] } } })).toBe(0);
+    expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
+  });
+
   it.each(["requeue","audit"] as const)("an unchanged restore receipt refuses a caller-forged %s", async forged => {
     const { f,c,beforeUser } = await suspendedRestoreEnquiries();
     await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx,c,async receipt => {

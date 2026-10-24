@@ -850,6 +850,55 @@ describe("B1 disposal of lawful persisted ownership and consumed retry graphs", 
     expect(await db.listing.findUniqueOrThrow({ where: { id: foreign.id } })).toEqual(foreign);
     await expect(proofs.executeRequest(actor, graph.b.id, request.requestId, input)).rejects.toThrow();
     expect(await db.diagnosticSourceCommand.count()).toBe(0);
+    // Extend the genuine consumed graph with the accepted suspended no-op
+    // counterexample. This direct adapter call must skip all callback writes.
+    await guards(false);
+    await db.user.update({ where: { id: actor.userId }, data: { suspendedAt: new Date("2026-01-01Z") } });
+    const businessId = randomUUID();
+    await db.dealership.create({ data: { id: businessId, slug: businessId, name: "Consumed restore assignment" } });
+    const enquiry = await db.conversation.create({ data: { listingId: foreign.id, buyerId: actor.userId,
+      sellerId: foreign.sellerId, businessId, assigneeId: actor.userId, version: 11 } });
+    const inactive = await db.user.findUniqueOrThrow({ where: { id: actor.userId } });
+    const beforeAudits = await db.auditLog.findMany({ orderBy: { id: "asc" } });
+    await guards(true);
+    expect(await restore.run({ userId: actor.userId }, async () => {
+      throw new Error("already-clear suspended restore entered callback");
+    })).toBeUndefined();
+    expect(await db.user.findUniqueOrThrow({ where: { id: actor.userId } })).toEqual(inactive);
+    expect(await db.conversation.findUniqueOrThrow({ where: { id: enquiry.id } })).toEqual(enquiry);
+    expect(await db.businessEnquiryAudit.count({ where: { conversationId: enquiry.id } })).toBe(0);
+    expect(await db.auditLog.findMany({ orderBy: { id: "asc" } })).toEqual(beforeAudits);
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: report.id } })).toEqual(report);
+    expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: consumed.id } })).toEqual(consumed);
+    expect(await db.diagnosticSourceAnchor.findMany({ where: { orderId: { in: [graph.a.id, graph.b.id] } }, orderBy: { orderId: "asc" } })).toEqual(anchors);
+    expect(await db.diagnosticIdentityRecord.findMany({ where: { orderId: { in: [graph.a.id, graph.b.id] } }, orderBy: { id: "asc" } })).toEqual(raw);
+    expect(await db.listing.findUniqueOrThrow({ where: { id: foreign.id } })).toEqual(foreign);
+    expect(await db.diagnosticSourceCommand.count()).toBe(0);
+    // The same source tuple with a real UPDATE OF must instead requeue exactly
+    // once while retaining the genuine consumed binding and foreign snapshots.
+    await db.$transaction(async tx => {
+      const old = await source(tx,"users",actor.userId);
+      await withDiagnosticSourceCommand(tx,{ operation: "account_restore", roots: [{ table: "users",key: { id: actor.userId } }],
+        rows: [{ table: "users",key: { id: actor.userId },verb: "update",expected: { source: old },next: old }],
+        actorUserId: actor.userId,sessionId: null,cutoff: null,campaign: null },
+      () => tx.$executeRaw`UPDATE users SET "deletionScheduledAt"=NULL WHERE id=${actor.userId}`);
+    });
+    expect(await db.conversation.findUniqueOrThrow({ where: { id: enquiry.id } })).toMatchObject({ assigneeId: null,version: 12 });
+    expect(await db.businessEnquiryAudit.findMany({ where: { conversationId: enquiry.id } })).toMatchObject([
+      { previousAssigneeId: actor.userId,assigneeId: null,action: "user_inactive",version: 12 },
+    ]);
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: report.id } })).toEqual(report);
+    expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: consumed.id } })).toEqual(consumed);
+    expect(await db.diagnosticSourceAnchor.findMany({ where: { orderId: { in: [graph.a.id, graph.b.id] } }, orderBy: { orderId: "asc" } })).toEqual(anchors);
+    expect(await db.diagnosticIdentityRecord.findMany({ where: { orderId: { in: [graph.a.id, graph.b.id] } }, orderBy: { id: "asc" } })).toEqual(raw);
+    expect(await db.listing.findUniqueOrThrow({ where: { id: foreign.id } })).toEqual(foreign);
+    expect(await db.diagnosticSourceCommand.count()).toBe(0);
+    // Undo only the authored fixture extension before restoring the existing
+    // sequential suite's staff/session setup. No production repair occurs.
+    await guards(false);
+    await db.conversation.delete({ where: { id: enquiry.id } });
+    await db.dealership.delete({ where: { id: businessId } });
+    await db.user.update({ where: { id: actor.userId }, data: { suspendedAt: null } });
     // Preactivation fixture repair for this existing sequential suite's later
     // worker-purge attack. Production restore above revived none of these rows.
     await guards(false);

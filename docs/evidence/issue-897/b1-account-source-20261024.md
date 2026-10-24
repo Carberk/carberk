@@ -32,3 +32,7 @@ Full caller migration, fixture/bootstrap closure, guard/admission activation, ho
 - Initial DB typecheck failed because its existing Redis-fixture imports name worker dependency links that were not materialized in this new worktree. Running the configured worker check populated the unchanged lockfile's cached dependencies, after which both DB compilers passed. An initial DB lint warning about import-group spacing was corrected. All failed-run logs remain in `/tmp/897-account-*` alongside the later passing logs.
 
 Authoring and compilation are the only evidence for the new SQL cases. No SQL, HTTP, services, Docker, browser/device, native build, deployment, reset, reseed, bootstrap, collector activation or hosted CI ran. No migration, mirror, dependency/configuration, Session/measurement repair or B5 source changed.
+
+## Subsequent bounded correction
+
+The [forward suspended no-op correction](b1-account-noop-enquiry-correction-20261024.md) supersedes the source mismatch described above. It preserves this checkpoint and the original direct-UoW regression intact. Its SQL scenarios remain authored only, ZERO executed; parent account review and acceptance remain pending.
