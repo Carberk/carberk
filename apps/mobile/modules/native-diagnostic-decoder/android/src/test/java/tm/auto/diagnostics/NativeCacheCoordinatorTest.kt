@@ -1,7 +1,6 @@
 package tm.auto.diagnostics
 
 import java.io.ByteArrayInputStream
-import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -18,49 +17,13 @@ class NativeCacheCoordinatorTest {
         "1970-01-01T00:16:39Z", "synthetic", "r1", "42", "a".repeat(64), "arm64-v8a",
         NativeSignal(11, -1), 7, listOf(NativeModule("car", "0123456789abcdef")), listOf(NativeFrame("car", "1234")))
 
-    private class Platform : ExitInfoPlatform {
-        override val apiLevel = 31
-        var onHistory: (() -> Unit)? = null
-        var onRead: (() -> Unit)? = null
-        var onClose: (() -> Unit)? = null
-        var failRead = false
-        var failClose = false
-        var closed = false
-        var queries = 0
-        var death = 999_000L
-        override fun currentProcess() = ExitProcess("tm.auto.app", "tm.auto.app", 123)
-        override fun history(packageName: String, maxRecords: Int): List<ExitRecord> {
-            queries++
-            onHistory?.invoke()
-            return listOf(object : ExitRecord {
-                override val nativeCrash = true
-                override val timestampMs = death
-                override val processName = "tm.auto.app"
-                override val realUid = 123
-                override val packageUid = 123
-                override fun openTrace() = object : ByteArrayInputStream(fixture()) {
-                    override fun read(): Int {
-                        onRead?.invoke()
-                        if (failRead) throw IOException("RAW_CANARY")
-                        return super.read()
-                    }
-                    override fun close() {
-                        closed = true
-                        onClose?.invoke()
-                        if (failClose) throw IOException("CLOSE_CANARY")
-                        super.close()
-                    }
-                }
-            })
-        }
-    }
-    private fun owner(disk: NativeCacheTestFiles, platform: Platform = Platform(), now: () -> Long = { 1_000_000L }) =
+    private fun owner(disk: NativeCacheTestFiles, platform: ExitInfoTestPlatform = ExitInfoTestPlatform(null, true), now: () -> Long = { 1_000_000L }) =
         NativeCacheCoordinator.forSourceTests(platform, OneSlotNativeCacheStorage(disk), build, now).also { it.replaceSourceTestAuthority(admission) }
     private fun encoded(value: MinimizedNativeExit = event) = NativeCacheCodec.encode(value, admission)!!
 
     @Test fun `real host codec and coordinator persist one minimized event and restart readout`() {
         val disk = NativeCacheTestFiles()
-        val platform = Platform()
+        val platform = ExitInfoTestPlatform(null, true)
         val first = owner(disk, platform)
         assertTrue(first.capture())
         assertTrue(platform.closed)
@@ -142,7 +105,7 @@ class NativeCacheCoordinatorTest {
             assertNull(disk.bytes)
         }
         val disk = NativeCacheTestFiles().apply { bytes = encoded() }
-        val closed = NativeCacheCoordinator.dormant(Platform(), OneSlotNativeCacheStorage(disk))
+        val closed = NativeCacheCoordinator.dormant(ExitInfoTestPlatform(null, true), OneSlotNativeCacheStorage(disk))
         closed.replaceSourceTestAuthority(admission)
         assertFalse(closed.capture())
         assertNull(closed.readout())
@@ -172,7 +135,7 @@ class NativeCacheCoordinatorTest {
     @Test fun `revocation during history stream close and disk commit cannot leave an event`() {
         for (phase in 0..3) {
             val disk = NativeCacheTestFiles()
-            val platform = Platform()
+            val platform = ExitInfoTestPlatform(null, true)
             val cache = owner(disk, platform)
             val revoke = { cache.invalidate(NativeCacheInvalidation.AUTHORITY_LOSS); Unit }
             when (phase) {
@@ -190,7 +153,7 @@ class NativeCacheCoordinatorTest {
     @Test fun `each destructive lifecycle transition erases and rejects old late completion`() {
         for (reason in NativeCacheInvalidation.values()) {
             val disk = NativeCacheTestFiles()
-            val platform = Platform()
+            val platform = ExitInfoTestPlatform(null, true)
             val cache = owner(disk, platform)
             platform.onRead = {
                 cache.invalidate(reason)
@@ -204,7 +167,7 @@ class NativeCacheCoordinatorTest {
 
     @Test fun `generation change uses same gate and invalidates blocked OS work`() {
         val disk = NativeCacheTestFiles()
-        val platform = Platform()
+        val platform = ExitInfoTestPlatform(null, true)
         val cache = owner(disk, platform)
         val entered = CountDownLatch(1)
         val resume = CountDownLatch(1)
@@ -224,7 +187,7 @@ class NativeCacheCoordinatorTest {
 
     @Test fun `old completion cannot erase a separately admitted newer crash`() {
         val disk = NativeCacheTestFiles()
-        val platform = Platform()
+        val platform = ExitInfoTestPlatform(null, true)
         val cache = owner(disk, platform)
         val entered = CountDownLatch(1)
         val resume = CountDownLatch(1)
@@ -252,7 +215,7 @@ class NativeCacheCoordinatorTest {
     @Test fun `read write close delete failures refuse and failed erase poisons owner`() {
         for (phase in 0..4) {
             val disk = NativeCacheTestFiles()
-            val platform = Platform()
+            val platform = ExitInfoTestPlatform(null, true)
             val cache = owner(disk, platform)
             when (phase) {
                 0 -> disk.failRead = true
@@ -281,7 +244,7 @@ class NativeCacheCoordinatorTest {
             val oldBytes = disk.bytes!!.copyOf()
             assertTrue(first.invalidate(reason))
             assertNull(disk.bytes)
-            val restarted = NativeCacheCoordinator.forSourceTests(Platform(), OneSlotNativeCacheStorage(disk), build) { 1_000_000L }
+            val restarted = NativeCacheCoordinator.forSourceTests(ExitInfoTestPlatform(null, true), OneSlotNativeCacheStorage(disk), build) { 1_000_000L }
             restarted.replaceSourceTestAuthority(admission.copy(generation = 8, epoch = "e".repeat(64)))
             disk.bytes = oldBytes // A custom restore must still be fenced by current authority.
             assertNull(restarted.readout())
@@ -339,7 +302,7 @@ class NativeCacheCoordinatorTest {
     @Test fun `corrupt cache drops and refuses instead of falling back to OS`() {
         for (bytes in listOf(byteArrayOf(1), ByteArray(16_385), encoded().apply { this[0] = 0 })) {
             val disk = NativeCacheTestFiles()
-            val platform = Platform()
+            val platform = ExitInfoTestPlatform(null, true)
             val cache = owner(disk, platform)
             disk.bytes = bytes
             assertFalse(cache.capture())
@@ -348,28 +311,6 @@ class NativeCacheCoordinatorTest {
         }
     }
 
-    companion object {
-        private fun varint(value: Long): ByteArray {
-            var remaining = value
-            val bytes = ArrayList<Byte>()
-            do {
-                var next = (remaining and 127).toInt()
-                remaining = remaining ushr 7
-                if (remaining != 0L) next = next or 128
-                bytes += next.toByte()
-            } while (remaining != 0L)
-            return bytes.toByteArray()
-        }
-        private fun scalar(field: Int, value: Long) = varint((field shl 3).toLong()) + varint(value)
-        private fun field(field: Int, bytes: ByteArray) = varint((field shl 3 or 2).toLong()) + varint(bytes.size.toLong()) + bytes
-        private fun fixture(): ByteArray {
-            val frame = scalar(1, 0x1234) + field(6, "/private/PATH_CANARY.so".toByteArray()) + field(8, "0123456789abcdef".toByteArray())
-            return scalar(1, 1) + scalar(6, 7) + field(10, scalar(1, 11) + scalar(3, 0)) +
-                field(16, scalar(1, 7) + field(2, scalar(1, 7) + field(4, frame))) +
-                field(99, "MESSAGE_CANARY CONTACT_CANARY TOKEN_CANARY SESSION_CANARY ACTOR_CANARY".toByteArray())
-        }
-    }
-}
 
 /** Test-only wire offsets, independent of decoder internals. */
 private object NativeCacheCodecTestOffsets {
