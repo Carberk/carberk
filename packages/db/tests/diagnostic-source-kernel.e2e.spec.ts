@@ -1636,4 +1636,119 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
   });
 
+
+  // Full existing admin transaction, independently authored audit content. Unlike
+  // moderationPlan above, these cases require audit and optional report effects.
+  async function adminModeration(kind: "direct" | "report" | "message" | "snapshot" | "unsuspend") {
+    const client = await connect(), actor = randomUUID(), auditId = randomUUID(), reportId = randomUUID(), messageId = randomUUID();
+    const stamp = new Date(), reason = kind === "unsuspend" ? "Appeal accepted" : "Confirmed abuse";
+    await prisma.user.create({ data: { id: actor, role: "admin" } });
+    if (kind === "unsuspend") {
+      await guards(false);
+      await prisma.user.update({ where: { id: userId }, data: { suspendedAt: stamp, suspendedById: actor, suspensionReason: "Prior moderation reason" } });
+      await guards(true);
+    }
+    const prior = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const suspendedAt = kind === "unsuspend" ? null : stamp;
+    const before = { suspendedAt: prior.suspendedAt?.toISOString() ?? null, suspendedById: prior.suspendedById, suspensionReason: prior.suspensionReason };
+    const after = { suspendedAt: suspendedAt?.toISOString() ?? null, suspendedById: suspendedAt ? actor : null, suspensionReason: suspendedAt ? reason : null };
+    const backed = kind === "report" || kind === "message" || kind === "snapshot";
+    const message = kind === "message" || kind === "snapshot";
+    if (kind === "message") {
+      const conversation = await prisma.conversation.create({ data: { listingId, buyerId: actor, sellerId: userId } });
+      await prisma.message.create({ data: { id: messageId, conversationId: conversation.id, senderId: userId, kind: "text", body: "Reported message" } });
+    }
+    if (backed) await prisma.contentReport.create({ data: { id: reportId, reporterUserId: actor, targetType: message ? "message" : "user", targetId: message ? messageId : userId,
+      reason: "abuse", messageContext: message ? { messageId, senderId: userId } : Prisma.JsonNull } });
+    const details = { reason, before: { ...before, ...(backed ? { reportStatus: "pending" } : {}) }, after: { ...after, ...(backed ? { reportStatus: "actioned" } : {}) },
+      ...(backed ? { reportId } : {}), ...(message ? { messageId } : {}) };
+    const audit = { id: auditId, actorId: actor, action: kind === "unsuspend" ? "USER_UNSUSPEND" : "USER_SUSPEND", targetType: "user", targetId: userId, details };
+    const plan = await update(client, "users", { id: userId }, after);
+    const c = { ...sourceCommand("user_eligibility", [plan]), actorUserId: actor,
+      intent: { auditId, reason, ...(backed ? { report: { id: reportId, reviewedAt: stamp.toISOString() } } : {}) } };
+    const userWrite = async (tx: Prisma.TransactionClient) => {
+      await tx.user.update({ where: { id: userId }, data: { suspendedAt, suspendedById: after.suspendedById, suspensionReason: after.suspensionReason } });
+      if (suspendedAt) await tx.session.deleteMany({ where: { userId } });
+    };
+    const reportWrite = (tx: Prisma.TransactionClient) => tx.contentReport.update({ where: { id: reportId }, data: { status: "actioned", reviewedById: actor, reviewedAt: stamp } });
+    const write = async (tx: Prisma.TransactionClient) => {
+      await userWrite(tx); if (backed) await reportWrite(tx); await tx.auditLog.create({ data: audit });
+    };
+    return { c, actor, audit, prior, after, reportId, stamp, userWrite, reportWrite, write };
+  }
+
+  it.each(["direct", "report", "message", "snapshot", "unsuspend"] as const)("complete %s moderation keeps original audit content and all required transaction effects", async kind => {
+    const f = await adminModeration(kind);
+    const sessions = await prisma.session.findMany({ where: { userId } });
+    const foreign = await prisma.user.findUniqueOrThrow({ where: { id: f.actor } });
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx, f.c, async () => {
+      await f.write(tx); throw new Error("complete moderation rollback");
+    }))).rejects.toThrow("complete moderation rollback");
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(f.prior);
+    expect(await prisma.session.findMany({ where: { userId } })).toEqual(sessions);
+    expect(await prisma.auditLog.findUnique({ where: { id: f.audit.id } })).toBeNull();
+    if ("report" in f.c.intent) expect(await prisma.contentReport.findUniqueOrThrow({ where: { id: f.reportId } })).toMatchObject({ status: "pending", reviewedAt: null });
+    await prisma.$transaction(tx => withDiagnosticSourceCommand(tx, f.c, () => f.write(tx)));
+    expect(await prisma.auditLog.findUniqueOrThrow({ where: { id: f.audit.id } })).toMatchObject(f.audit);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toMatchObject({ suspendedAt: kind === "unsuspend" ? null : f.stamp, suspendedById: f.after.suspendedById, suspensionReason: f.after.suspensionReason });
+    expect(await prisma.session.findMany({ where: { userId } })).toEqual(kind === "unsuspend" ? sessions : []);
+    if ("report" in f.c.intent) expect(await prisma.contentReport.findUniqueOrThrow({ where: { id: f.reportId } })).toMatchObject({ status: "actioned", reviewedById: f.actor, reviewedAt: f.stamp });
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: f.actor } })).toEqual(foreign);
+    expect(await prisma.diagnosticSourceCommand.count()).toBe(0);
+  });
+
+  it.each(["finish", "delete"] as const)("%s rejects omitted admin audit and report and rolls back all moderation writes", async mode => {
+    const f = await adminModeration("report");
+    for (const omitted of ["audit", "report"] as const) {
+      await expect(prisma.$transaction(async tx => {
+        const [r] = await tx.$queryRaw<{ id: string }[]>`SELECT diagnostic_prepare_source(${JSON.stringify(f.c)}::jsonb)::text id`;
+        await f.userWrite(tx);
+        if (omitted !== "report") await f.reportWrite(tx);
+        if (omitted !== "audit") await tx.auditLog.create({ data: f.audit });
+        if (mode === "finish") await tx.$queryRaw`SELECT diagnostic_finish_source(${present(r).id}::uuid)`;
+        else await tx.$executeRaw`DELETE FROM diagnostic_source_commands WHERE id=${present(r).id}::uuid`;
+      })).rejects.toThrow("diagnostic_source_final_effect");
+      expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(f.prior);
+      expect(await prisma.session.findUnique({ where: { id: sessionId } })).not.toBeNull();
+      expect(await prisma.auditLog.findUnique({ where: { id: f.audit.id } })).toBeNull();
+      expect(await prisma.contentReport.findUniqueOrThrow({ where: { id: f.reportId } })).toMatchObject({ status: "pending", reviewedAt: null });
+    }
+  });
+
+  it.each(["actor", "target", "reason", "action", "message", "audit-id", "report-actor", "report-time", "report-id"] as const)("wrong %s effect refuses the complete moderation transaction", async fault => {
+    const f = await adminModeration("snapshot");
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx, f.c, async () => {
+      await f.userWrite(tx);
+      if (fault.startsWith("report-")) {
+        await tx.contentReport.update({ where: { id: fault === "report-id" ? randomUUID() : f.reportId }, data: {
+          status: "actioned", reviewedById: fault === "report-actor" ? userId : f.actor, reviewedAt: fault === "report-time" ? new Date(0) : f.stamp,
+        } });
+      } else await f.reportWrite(tx);
+      const audit = { ...f.audit, details: { ...f.audit.details } };
+      if (fault === "actor") audit.actorId = userId;
+      if (fault === "target") audit.targetId = f.actor;
+      if (fault === "reason") audit.details.reason = "Different reason";
+      if (fault === "action") audit.action = "USER_UNSUSPEND";
+      if (fault === "message") audit.details.messageId = randomUUID();
+      if (fault === "audit-id") audit.id = randomUUID();
+      await tx.auditLog.create({ data: audit });
+    }))).rejects.toThrow();
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(f.prior);
+    expect(await prisma.session.findUnique({ where: { id: sessionId } })).not.toBeNull();
+    expect(await prisma.auditLog.findUnique({ where: { id: f.audit.id } })).toBeNull();
+    expect(await prisma.contentReport.findUniqueOrThrow({ where: { id: f.reportId } })).toMatchObject({ status: "pending", reviewedAt: null });
+  });
+
+  it.each(["target", "resolved", "snapshot", "reason", "extra"] as const)("invalid %s moderation intent fails before mutation", async fault => {
+    const f = await adminModeration("snapshot");
+    if (fault === "target" || fault === "resolved" || fault === "snapshot") await prisma.contentReport.update({ where: { id: f.reportId }, data: {
+      ...(fault === "target" ? { targetType: "user", targetId: f.actor } : {}),
+      ...(fault === "resolved" ? { status: "actioned" } : {}),
+      ...(fault === "snapshot" ? { messageContext: { messageId: randomUUID(), senderId: userId } } : {}),
+    } });
+    const c = { ...f.c, intent: { ...f.c.intent, ...(fault === "reason" ? { reason: "Wrong reason" } : {}), ...(fault === "extra" ? { arbitraryWrites: [] } : {}) } };
+    await expect(prisma.$transaction(tx => withDiagnosticSourceCommand(tx, c, () => f.write(tx)))).rejects.toThrow("diagnostic_source_moderation_intent");
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(f.prior);
+    expect(await prisma.auditLog.findUnique({ where: { id: f.audit.id } })).toBeNull();
+  });
 });
