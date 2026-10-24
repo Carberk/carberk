@@ -4,7 +4,7 @@ Scoped implementation and executable-scenario authoring are complete for parent 
 
 ## Ownership and base
 
-Sole writer in `/Users/bagtyyar/.t3/worktrees/carberk/t3-3194556c`, new branch `agent/897-b1-campaign-preparation-20261024`. Initial clean HEAD was accepted `9bcbf1e6f325a9a36cba98fa6e8c796b4e67a408` on host scaffold `t3/3194556c`. That scaffold is preserved. The owned branch was created directly from held `38ec27961fc827491c0374c079bb7d613dfc6e2c`, tree `143b1fe73d21f78f51c930506403c266de545ea7`, retaining all `66aaa39c` prerequisites. Final SHA/tree are in `/tmp/897-b1-campaign-preparation-20261024-handoff.md` after commit.
+Sole writer in `/Users/bagtyyar/.t3/worktrees/carberk/t3-3194556c`, new branch `agent/897-b1-campaign-preparation-20261024`. Initial clean HEAD was accepted `9bcbf1e6f325a9a36cba98fa6e8c796b4e67a408` on host scaffold `t3/3194556c`. That scaffold is preserved. The owned branch was created directly from held `38ec27961fc827491c0374c079bb7d613dfc6e2c`, tree `143b1fe73d21f78f51c930506403c266de545ea7`, retaining all `66aaa39c` prerequisites. Implementation checkpoint is `8eda5fbdd3e5006066cdcea1d751512fb6e1ad44`, tree `bad819d646e0608e128e4042413c471677d490eb`. Final receipt SHA/tree are in `/tmp/897-b1-campaign-preparation-20261024-handoff.md` after commit.
 
 Read the supplied authority/recovery artifacts, overriding architecture audit, parent inspection and read-only parent ledger. Verified contract SHA256 `c15455516d773fe55d5151035b4afceef9348099c60d51578826c38b5eac3725`.
 
@@ -53,7 +53,7 @@ PASS, offline only:
 - Dummy-URL `pnpm --filter @auto-tm/db exec prisma validate`.
 - `pnpm check:runtime-imports` and a Node check that the compiled DB package exports `withCampaignPreparation`. Contracts JavaScript now exists; the prior unbuilt-contracts lint/runtime setup gap is resolved here.
 - Offline pglast grammar: 25 migration statements, 19 PL/pgSQL functions/blocks, all SQL-language bodies, 74 rendered guard trigger definitions. Existing generated v1 setup: 35 statements/5 PL/pgSQL bodies; v3: 84/9.
-- Node syntax checks, `git diff --check`, 116 historical SQL byte comparisons, and unchanged app/CI/config/lockfile/operational-script boundary checks.
+- Node syntax checks, `git diff --check`, 116 historical-file byte comparisons, comprising 115 SQL files and migration_lock.toml, and unchanged app/CI/config/lockfile/operational-script boundary checks.
 
 Setup corrections before final checks: initial Prisma generation lacked the required dummy DATABASE_URL; initial new suite typing/non-null assertions were corrected; the first fixture generator let the original program print its diagnostic receipt or reach a readback. The final generator captures setup immediately and emits SQL only. `python` was unavailable, so offline helper scripts use `python3`. These were setup/authoring corrections, not SQL or parent acceptance outcomes.
 
