@@ -281,3 +281,55 @@ it("reviews an out-of-order correction graph with its returned pin and issues th
 it("offers only existing authorized assignment coordination when no technician name is usable",async()=>{
  names=[{userId:uuid(71),name:"Same name"},{userId:uuid(72),name:"same name"}];context.capabilities.push("diagnostics.reception");setup();await compare();fireEvent.click(screen.getByRole("button",{name:c.technicians}));await screen.findByText(c.noTechnician);expect(screen.getByRole("button",{name:c.review}).getAttribute("aria-disabled")).toBe("true");fireEvent.click(screen.getByRole("button",{name:c.coordinate}));await waitFor(()=>expect(screen.getByText(base.intake).closest("details")?.open).toBe(true));expect(document.activeElement?.textContent).toBe(base.intake);expect(writes).toEqual([]);
 });
+
+
+it("keeps the collapsed intake summary in native keyboard navigation", async () => {
+ setup(); fireEvent.click(await screen.findByRole("button", {name:c.visit}));
+ const summary=screen.getByText(base.intake,{selector:"summary"});
+ expect(summary.closest("details")?.open).toBe(false);
+ expect(summary.getAttribute("tabindex")).not.toBe("-1");
+ summary.focus(); expect(document.activeElement).toBe(summary);
+});
+it.each(["en","ru","tk"] as const)("names material controls with their localized side, record role, ordinal and location in %s",async(locale)=>{
+ materials=2;setup(undefined,locale);const copy=continuityCopy[locale];
+ fireEvent.click(await screen.findByRole("button",{name:copy.link}));fireEvent.click(screen.getByRole("button",{name:copy.search}));fireEvent.click(await screen.findByRole("button",{name:copy.compare}));
+ const caption=`${copy.materials} 2 · ${copy.previous}: ${copy.root} · ${copy.manufacturer_plate} · Physical plate 0 · Observed B value`;
+ const opener=await screen.findByRole("button",{name:`${copy.reviewImage} ${caption}`});
+ const ack=screen.getByRole("checkbox",{name:`${copy.ack} · ${copy.required} ${caption}`});
+ expect(ack.hasAttribute("disabled")).toBe(true);const association=opener.getAttribute("aria-labelledby");
+ fireEvent.click(opener);fireEvent.load(await within(opener.closest("li")!).findByRole("img"));await waitFor(()=>expect(ack.hasAttribute("disabled")).toBe(false));
+ expect(opener.getAttribute("aria-labelledby")).toBe(association);expect(writes).toEqual([]);
+});
+it.each(["purpose","basis","provenance","scheduleReason"] as const)("preserves the mounted %s classification textarea and selection through EN RU TK",async(key)=>{
+ setup();fireEvent.click(await screen.findByRole("button",{name:c.visit}));fireEvent.click(screen.getByRole("button",{name:c.loadIdentity}));fireEvent.click(await screen.findByRole("button",{name:c.correction}));fireEvent.click(screen.getByRole("button",{name:c.replacement}));
+ const input=screen.getByLabelText(`${c[key]} · ${c.required}`) as HTMLTextAreaElement;fireEvent.change(input,{target:{value:"Keep this private string"}});input.focus();input.setSelectionRange(2,9,"backward");
+ for(const locale of ["ru","tk","en"] as const){fireEvent.change(screen.getByRole("combobox",{name:"Language"}),{target:{value:locale}});expect(screen.getByLabelText(`${continuityCopy[locale][key]} · ${continuityCopy[locale].required}`)).toBe(input);expect(document.activeElement).toBe(input);expect([input.selectionStart,input.selectionEnd,input.selectionDirection]).toEqual([2,9,"backward"]);expect(input.value).toBe("Keep this private string");}
+ expect(writes).toEqual([]);
+});
+it("keeps missing-successor status unestablished while allowing deliberate server-checked correction",async()=>{
+ setup();fireEvent.click(await screen.findByRole("button",{name:c.visit}));fireEvent.click(screen.getByRole("button",{name:c.loadIdentity}));const correction=await screen.findByRole("button",{name:c.correction});
+ expect(screen.queryByText(c.currentLeaf)).toBeNull();fireEvent.click(correction);
+ const prerequisites=screen.getByRole("region",{name:c.prerequisites});const parent=within(prerequisites).getByText(c.parent,{selector:"dt"});expect(parent.nextElementSibling?.textContent).toBe(c.notEstablished);
+ expect(within(prerequisites).getByRole("button",{name:c.replacement}).getAttribute("aria-disabled")).toBe("false");fireEvent.click(within(prerequisites).getByRole("button",{name:c.replacement}));expect(screen.getByLabelText(`${base.explanation} · ${c.required}`)).toBeTruthy();expect(writes).toEqual([]);
+});
+it("does not certify a comparison record as a leaf when no successor was returned",async()=>{
+ setup();await compare();expect(screen.queryByText(c.currentLeaf)).toBeNull();expect(screen.getAllByText(c.notEstablished).length).toBeGreaterThanOrEqual(2);expect(screen.getByRole("button",{name:c.review})).toBeTruthy();
+});
+it("shows all returned comparison bindings and evidence audit facts without changing issuance pins",async()=>{
+ const real=fetch;vi.stubGlobal("fetch",async(...args:Parameters<typeof fetch>)=>{if(new URL(String(args[0]),"http://localhost").pathname.endsWith("/reinspection-comparison")){const data=comparison();data.predecessor.snapshotHash="b".repeat(64);data.predecessor.identityRecordHash="c".repeat(64);data.candidate.identityRecordHash="d".repeat(64);data.predecessor.identity.evidenceGeneration=12;data.candidate.identity.evidenceGeneration=19;data.predecessor.identity.correctionHeadHash="e".repeat(64);return Response.json(data);}return real(...args);});
+ setup();await compare();const audits=Array.from(document.querySelectorAll("details pre")).map(node=>JSON.parse(node.textContent??"null"));
+ expect(audits).toContainEqual({reportId:predecessorId,reportVersion:3,snapshotHash:"b".repeat(64),identityRecordId:uuid(20),identityRecordHash:"c".repeat(64),evidenceGeneration:12,correctionHeadHash:"e".repeat(64),evidenceId:uuid(30)});
+ expect(audits).toContainEqual({orderId,orderVersion:7,identityRecordId:uuid(21),identityRecordHash:"d".repeat(64),evidenceGeneration:19,correctionHeadHash:hash,evidenceId:uuid(31)});
+ expect(audits).toContainEqual(expect.objectContaining({id:uuid(30),orderId,orderVersion:7,observationHash:hash,recordHash:hash,identityRecordId:uuid(21),provenance:[{id:uuid(100),sha256:hash,mime:"image/webp",sizeBytes:4}]}));expect(writes).toEqual([]);
+});
+it("recovers lost reviewer-only issue preparation through authorized status reads without a technician handoff",async()=>{
+ context.capabilities=["diagnostics.reviewer"];const real=fetch;let losePrepare=true;
+ vi.stubGlobal("fetch",async(...args:Parameters<typeof fetch>)=>{const path=new URL(String(args[0]),"http://localhost").pathname;if(path.endsWith("/continuity-handoffs"))return Response.json({}, {status:403});if(path.endsWith("/continuity-requests")&&args[1]?.method==="POST"&&losePrepare){losePrepare=false;receipt={requestId,kind:"issue",state:"pending_input"};throw new TypeError("Lost issue prepare reply");}return real(...args);});
+ setup();await compare();fireEvent.click(screen.getByRole("button",{name:c.technicians}));await screen.findByRole("option",{name:"Distinct Technician"});fireEvent.change(screen.getByRole("combobox",{name:`${c.select} · ${c.required}`}),{target:{value:technicianId}});fireEvent.change(screen.getByRole("textbox",{name:`${base.reason} · ${c.required}`}),{target:{value:"Reviewer-only deliberate comparison"}});fireEvent.click(screen.getByRole("button",{name:c.reviewImage}));fireEvent.load(await screen.findByRole("img"));fireEvent.click(screen.getByRole("checkbox",{name:`${c.ack} · ${c.required}`}));fireEvent.click(screen.getByRole("checkbox",{name:`${c.same} · ${c.required}`}));fireEvent.click(screen.getByRole("button",{name:c.review}));fireEvent.click(screen.getByRole("button",{name:c.issue}));await screen.findByText(c.uncertain);
+ fireEvent.click(screen.getByRole("button",{name:c.status}));const restart=await screen.findByRole("button",{name:c.restartComparison});await waitFor(()=>expect(restart.hasAttribute("disabled")).toBe(false));
+ expect(screen.queryByText(base.denied)).toBeNull();expect(screen.queryByRole("button",{name:c.check})).toBeNull();expect(fetches.filter(path=>path.endsWith("/continuity-handoffs"))).toEqual([]);expect(fetches.filter(path=>path.endsWith("/workspace"))).toHaveLength(2);expect(writes.filter(item=>item.path.endsWith("/execute"))).toEqual([]);expect(screen.queryByRole("button",{name:c.retryExact})).toBeNull();
+ fireEvent.click(restart);await screen.findByRole("button",{name:c.compare});expect(screen.queryByDisplayValue("Reviewer-only deliberate comparison")).toBeNull();expect(context.capabilities).toEqual(["diagnostics.reviewer"]);
+});
+it("hides technician handoff controls and navigation reads from a reviewer-only exact link",async()=>{
+ context.capabilities=["diagnostics.reviewer"];setup(proofId);await screen.findByRole("button",{name:c.status});expect(screen.queryByRole("button",{name:c.check})).toBeNull();expect(fetches.filter(path=>path.endsWith("/continuity-handoffs"))).toEqual([]);expect(writes).toEqual([]);
+});
