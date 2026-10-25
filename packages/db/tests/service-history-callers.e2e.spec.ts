@@ -69,6 +69,7 @@ type SessionWriter = {
  rotateRefreshToken(id: string, oldHash: string, newHash: string, lastSeen: Date, expires: Date): Promise<boolean>;
  updateAdminTotpExpiresAt(id: string, until: Date | null): Promise<void>;
 };
+type SuspensionWriter = { execute(input: { userId: string; adminUserId: string; reason: string }): Promise<{ targetId: string; targetState: { suspendedAt: Date; suspendedById: string; suspensionReason: string }; auditLogId: string }> };
 type GrantWriter = { change(input: Subject & { targetUserId: string; capability: string; grant: boolean; reason: string }, at: Date): Promise<void> };
 type DeletionWriter = { run(input: { userId: string; deletionScheduledAt: Date }, work: (writes: { scheduleDeletion(id: string, at: Date): Promise<void>; archiveActiveListings(id: string): Promise<void> }) => Promise<void>): Promise<void> };
 const rights: S.ServiceRights = { category: "payment_evidence", purpose: "History order", basis: "consent", provenance: "disposable fixture", identifiability: "personal", use: ["service"], schedule: { kind: "until", until: "2027-01-01T00:00:00Z", reason: "fixture retention" }, supplierRestrictions: "", hold: null };
@@ -83,6 +84,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
  let construct: (database: unknown, enabled: boolean, store?: PrivateStore, campaign?: boolean, clock?: () => Date) => Caller;
  let sessionWriter: (database: unknown) => SessionWriter;
  let grantWriter: (database: unknown) => GrantWriter;
+ let suspensionWriter: (database: unknown) => SuspensionWriter;
  let deletionWriter: (database: unknown) => DeletionWriter;
  let pdf: () => Promise<Uint8Array>;
  let image: () => Promise<Uint8Array>;
@@ -116,6 +118,15 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   const { CampaignServiceAdmission } = await load("service-messaging/infrastructure/campaignServiceAdmission") as { CampaignServiceAdmission: new (config: unknown) => unknown };
   const { PrismaSessionRepository } = await load("identity/infrastructure/PrismaSessionRepository") as { PrismaSessionRepository: new (database: unknown, hasher: unknown) => SessionWriter };
   const { PrismaAccountDeletionUnitOfWork } = await load("identity/infrastructure/PrismaAccountDeletionUnitOfWork") as { PrismaAccountDeletionUnitOfWork: new (database: unknown) => DeletionWriter };
+  const { SuspendUser } = await load("admin/application/SuspendUser") as { SuspendUser: new (database: unknown, identityRead: unknown, identityAdmin: unknown, reports: unknown, audits: unknown, messages: unknown) => SuspensionWriter };
+  const { PrismaIdentityReadAdapter } = await load("identity/infrastructure/PrismaIdentityReadAdapter") as { PrismaIdentityReadAdapter: new (database: unknown) => unknown };
+  const { PrismaIdentityAdminRepository } = await load("identity/infrastructure/PrismaIdentityAdminRepository") as { PrismaIdentityAdminRepository: new (database: unknown) => unknown };
+  const { PrismaContentReportRepository } = await load("admin/infrastructure/PrismaContentReportRepository") as { PrismaContentReportRepository: new (database: unknown) => unknown };
+  const { PrismaAuditLogRepository } = await load("admin/infrastructure/PrismaAuditLogRepository") as { PrismaAuditLogRepository: new (database: unknown) => unknown };
+  const { PrismaConversationRepository } = await load("conversations/infrastructure/PrismaConversationRepository") as { PrismaConversationRepository: new (database: unknown) => unknown };
+  // The outer owner receives the instrumented transaction boundary. Its real
+  // read adapters use this case's database; mutation/audit use the owner's tx.
+  suspensionWriter = database => new SuspendUser(database, new PrismaIdentityReadAdapter(db), new PrismaIdentityAdminRepository(db), new PrismaContentReportRepository(db), new PrismaAuditLogRepository(db), new PrismaConversationRepository(db));
   sessionWriter = database => new PrismaSessionRepository(database, { compare: async () => { throw new Error("unexpected password comparison"); } });
   grantWriter = database => new PrismaStaffAuthority(database) as GrantWriter;
   deletionWriter = database => new PrismaAccountDeletionUnitOfWork(database);
@@ -578,6 +589,54 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   };
   await expect(work()).rejects.toMatchObject({ code: "NO_ACCESS" });
   expect(await transactionalState()).toEqual(before);
+ });
+
+ it.each((["customer", "staff"] as const).flatMap(audience => (["writer", "service"] as const).map(first => ({ audience, first }))))(
+  "$first first: $audience read opposes actual SuspendUser outer transaction", async ({ audience, first }) => {
+  const f = await fixture(), subject = audience === "customer" ? f.owner : f.staff;
+  const admin = await principal();
+  await db.user.update({ where: { id: admin.userId }, data: { role: "admin" } });
+  const secondSession = await db.session.create({ data: { id: fixtureId(), userId: subject.userId, refreshTokenHash: fixtureId(), createdAt: now, expiresAt: future } });
+  const beforeUser = await db.user.findUniqueOrThrow({ where: { id: subject.userId } });
+  expect(beforeUser).toMatchObject({ suspendedAt: null, suspendedById: null, suspensionReason: null });
+  expect(await db.session.findMany({ where: { userId: subject.userId }, select: { id: true }, orderBy: { id: "asc" } })).toEqual([{ id: subject.sessionId }, { id: secondSession.id }]);
+  const reportsBefore = await db.contentReport.findMany({ orderBy: { id: "asc" } });
+  const reason = "R6a original M2 actual suspension";
+  const a = caller({ hold: first === "service" }), b = caller({ hold: first === "writer" });
+  const suspend = () => suspensionWriter(b.database).execute({ userId: subject.userId, adminUserId: admin.userId, reason });
+  const read = () => a.service.read(subject, f.id, 0, 20);
+  // Register both outcomes immediately. afterEach releases every latch and
+  // drains both even when ready/barrier/assertions fail, preserving that error.
+  const lead = observe<unknown>(first === "writer" ? suspend() : read());
+  let trail: typeof lead | undefined;
+  try {
+   // A pre-transaction owner refusal must retain its original error rather
+   // than wait for a readiness latch that the transaction never reached.
+   await Promise.race([(first === "writer" ? b.ready : a.ready), lead.then(outcome => { if (!outcome.ok) throw outcome.error; })]);
+   trail = observe<unknown>(first === "writer" ? read() : suspend());
+   await Promise.race([(first === "writer" ? a.started : b.started), trail.then(outcome => { if (!outcome.ok) throw outcome.error; })]);
+   await blocked(first === "writer" ? a.pid() : b.pid(), first === "writer" ? b.pid() : a.pid());
+  } finally {
+   a.release(); b.release();
+   await Promise.allSettled([lead, ...(trail ? [trail] : [])]);
+  }
+  const leading = await lead, trailing = await present(trail);
+  const write = first === "writer" ? leading : trailing, readResult = first === "writer" ? trailing : leading;
+  expect(write.ok, "actual SuspendUser outer transaction commits").toBe(true);
+  if (!write.ok) throw write.error;
+  expect(write.value).toEqual({ targetId: subject.userId, targetState: { suspendedAt: now, suspendedById: admin.userId, suspensionReason: reason }, reportId: undefined, reportStatus: undefined, auditLogId: expect.any(String) });
+  expect(readResult.ok, "one read decision at the real suspension barrier").toBe(first === "service");
+  if (!readResult.ok) expect(readResult.error).toMatchObject({ code: "NO_ACCESS" });
+  else expect(readResult.value).toMatchObject({ id: f.id, resourceId: f.resource, assignmentVersion: 1, messages: [], lastSequence: 8, readThrough: 0, unread: 0, hasMore: false });
+  expect(await db.user.findUniqueOrThrow({ where: { id: subject.userId } })).toEqual({ ...beforeUser, suspendedAt: now, suspendedById: admin.userId, suspensionReason: reason });
+  expect(await db.session.findMany({ where: { userId: subject.userId } }), "all target Sessions revoked").toEqual([]);
+  expect(await db.session.findUnique({ where: { id: admin.sessionId } }), "admin Session survives target suspension").not.toBeNull();
+  const moderation = await db.auditLog.findMany({ orderBy: { id: "asc" }, select: { id: true, actorId: true, action: true, targetType: true, targetId: true, details: true } });
+  expect(moderation, "exact owner-written moderation audit").toEqual([{ id: (write.value as { auditLogId: string }).auditLogId, actorId: admin.userId, action: "USER_SUSPEND", targetType: "user", targetId: subject.userId, details: { reason, before: { suspendedAt: null, suspendedById: null, suspensionReason: null }, after: { suspendedAt: now.toISOString(), suspendedById: admin.userId, suspensionReason: reason } } }]);
+  expect(await db.contentReport.findMany({ orderBy: { id: "asc" } }), "direct suspension leaves reports unchanged").toEqual(reportsBefore);
+  expect(await audit(f.resource), "only successful staff read emits SERVICE_READ").toEqual(first === "service" && audience === "staff" ? [{ action: "SERVICE_READ", actorId: subject.userId, assignmentVersion: 1 }] : []);
+  expect(await effects(f.id), "refused read leaves no service residue").toEqual({ messages: 0, outbox: 0, reads: 0, subscriptions: 0 });
+  expect(await db.serviceConversation.findUnique({ where: { id: f.id } })).toMatchObject({ lastSequence: 8, lifecycleEpoch: 0 });
  });
 
  const lifecycleChanges = ["schedule", "expire", "revoke", "elevation", "grantRevoke", "grantInsert"] as const;
