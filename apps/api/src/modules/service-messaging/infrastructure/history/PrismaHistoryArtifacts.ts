@@ -1,3 +1,4 @@
+import { assertServicePrepared } from "../ServicePreparation";
 import type { Prisma } from "@auto-tm/db";
 import { ServiceMessagingSchemas as S } from "@auto-tm/contracts";
 import { ServiceDenied, type ServiceScope } from "../../domain/serviceAccess";
@@ -16,6 +17,7 @@ export function approvedReportLink(link: string): boolean {
  try { const url = new URL(link); return url.protocol === "https:" && !url.username && !url.password && (url.hostname === "example.invalid" || ["carfax.com", "autocheck.com"].some(host => url.hostname === host || url.hostname.endsWith(`.${host}`))); } catch { return false; }
 }
 export async function historyArtifactCommand({ tx, scope, subject, audience, runtime }: Context, command: S.HistoryArtifactCommand): Promise<void> {
+ assertServicePrepared(tx);
  if (scope.purpose !== "history" || audience !== "staff") throw new ServiceDenied("NO_ACCESS");
  if (scope.assignmentVersion !== command.expectedAssignmentVersion) throw new ServiceDenied("STALE_ASSIGNMENT");
  const now = runtime.now(), order = await tx.historyOrder.findUnique({ where: { id: command.orderId }, include: { quote: true, purchase: true } });

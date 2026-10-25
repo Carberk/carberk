@@ -1,3 +1,4 @@
+import { assertServicePrepared } from "../ServicePreparation";
 import type { Prisma } from "@auto-tm/db";
 import { ServiceMessagingSchemas } from "@auto-tm/contracts";
 import { StaffAuthorityDenied, type StaffAuthorityPort } from "../../../identity/identity.public";
@@ -15,7 +16,9 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 /** Called only while the shared service principal, owner and conversation locks
  * are held. Cross-request capacity also locks its named day/provider rows. */
 export async function historyCommand(context: Context, command: ServiceMessagingSchemas.HistoryCommand): Promise<void> {
- const { tx, scope, subject, audience, runtime, staff } = context, now = runtime.now();
+ const { tx, scope, subject, audience, runtime, staff } = context;
+ assertServicePrepared(tx);
+ const now = runtime.now();
  if (scope.purpose !== "history") throw new ServiceDenied("NO_ACCESS");
  const customer = ["accept", "payment", "recovery"].includes(command.kind);
  if ((customer && audience !== "customer") || (!customer && audience !== "staff")) throw new ServiceDenied("NO_ACCESS");
