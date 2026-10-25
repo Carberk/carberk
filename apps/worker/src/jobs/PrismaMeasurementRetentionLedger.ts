@@ -10,6 +10,13 @@ export class PrismaMeasurementRetentionLedger implements MeasurementRetentionLed
  async deleteExpired(now: Date, limit: number): Promise<number> {
   return this.prisma.$transaction(async (tx) => {
    await tx.$executeRaw`SET LOCAL statement_timeout = '2000ms'`;
+   // Collector writers/readers and prepared account purge take this row before
+   // principals, visits and facts. Serialize the whole sweep before deleting any
+   // child, so its later parent cascades cannot invert purge's row-lock order.
+   const collector = await tx.$queryRaw<{ epoch: string }[]>`SELECT "epoch" FROM "measurement_state" WHERE "key" = 'collector' FOR UPDATE`;
+   // Bootstrap does not create the collector. Only restore-epoch initialization
+   // does; an absent row cannot fence that path, so leave all expiry work pending.
+   if (!collector[0]) throw new Error("Measurement collector unavailable");
    const raw = await tx.$executeRaw`WITH due AS (SELECT "id" FROM "measurement_records" WHERE "expiresAt" <= ${now} ORDER BY "expiresAt", "id" LIMIT ${limit} FOR UPDATE SKIP LOCKED)
     DELETE FROM "measurement_records" AS item USING due WHERE item."id" = due."id"`;
    const outbox = await tx.$executeRaw`WITH due AS (SELECT "id" FROM "measurement_outbox" WHERE "expiresAt" <= ${now} ORDER BY "expiresAt", "id" LIMIT ${limit} FOR UPDATE SKIP LOCKED)

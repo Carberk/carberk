@@ -7,7 +7,10 @@ type Row = { id: string; dueAt: Date; locked?: boolean };
 /** Offline database boundary. Models transaction rollback and bounded due-row
  * deletion, not PostgreSQL's lock manager, triggers or FK cascades. */
 export class MeasurementRetentionDatabase {
- readonly rows: Record<Table, Row[]> = Object.fromEntries(tables.map(table => [table, []])) as Record<Table, Row[]>;
+ readonly rows: Record<Table, Row[]> = {
+  measurement_records: [], measurement_outbox: [], measurement_principals: [],
+  measurement_visits: [], measurement_rollups: [], measurement_investigation_exports: [],
+ };
  collectorEpoch: string | null = "current-external-epoch";
  collectorBusy = false;
  failAt: Table | null = null;
