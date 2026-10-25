@@ -67,8 +67,22 @@ export class PrismaStaffAuthority implements StaffAuthorityRepository {
           if (!target || (input.grant && (target.suspendedAt || target.deletionScheduledAt))) throw new StaffAuthorityDenied("GRANT_FORBIDDEN");
           const locked = await tx.staffGrant.findUnique({ where: { userId_capability: { userId: input.targetUserId, capability: input.capability } } });
           if (input.grant === (!!locked && locked.revokedAt === null)) throw staffNoChange;
-          if (input.grant) await tx.staffGrant.upsert({ where: { userId_capability: { userId: input.targetUserId, capability: input.capability } }, create: { userId: input.targetUserId, capability: input.capability, grantedAt: now }, update: { revokedAt: null, grantedAt: now } });
-          else await tx.staffGrant.updateMany({ where: { userId: input.targetUserId, capability: input.capability, revokedAt: null }, data: { revokedAt: now } });
+          if (input.grant) {
+            if (locked) {
+              // A native upsert fires the INSERT trigger before its conflict
+              // UPDATE. Use the prepared verb explicitly for existing grants.
+              await tx.staffGrant.update({
+                where: { userId_capability: { userId: input.targetUserId, capability: input.capability } },
+                data: { revokedAt: null, grantedAt: now },
+              });
+            } else {
+              await tx.staffGrant.create({
+                data: { userId: input.targetUserId, capability: input.capability, grantedAt: now },
+              });
+            }
+          } else {
+            await tx.staffGrant.updateMany({ where: { userId: input.targetUserId, capability: input.capability, revokedAt: null }, data: { revokedAt: now } });
+          }
           await tx.auditLog.create({ data: { actorId: input.userId, action: input.grant ? "STAFF_CAPABILITY_GRANTED" : "STAFF_CAPABILITY_REVOKED", targetType: "User", targetId: input.targetUserId,
             details: { capability: input.capability, reason: input.reason.trim(), previouslyActive: !!existing && !existing.revokedAt } } });
         });

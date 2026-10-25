@@ -86,7 +86,10 @@ class IdentityDatabase {
         create: async (args: Args) => { write();
           if (name === "totpEnrollment" && state[name].some(row => row.userId === (args.data as Row).userId)) throw { code: "P2002" };
           const row = { revokedAt: null, attempts: 0, verifiedAt: null, id: `generated-${state[name]!.length}`, createdAt: now, updatedAt: now, ...args.data }; state[name]!.push(row); return row; },
-        upsert: async (args: Args & { create: Row; update: Row }) => { write(); const row = find(args)[0]; if (row) { Object.assign(row, args.update); return row; } const created = { revokedAt: null, ...args.create }; state[name].push(created); return created; },
+        upsert: async (args: Args & { create: Row; update: Row }) => { write(); const row = find(args)[0];
+          if (row && name === "staffGrant") throw new Error("diagnostic_source_uncovered_effect");
+          if (row) { Object.assign(row, args.update); return row; }
+          const created = { revokedAt: null, ...args.create }; state[name].push(created); return created; },
         createMany: async (args: Args) => { write(); state[name]!.push(...args.data as Row[]); return { count: (args.data as Row[]).length }; },
         updateMany: async (args: Args) => { write(); const rows = find(args); rows.forEach(row => Object.assign(row, args.data)); return { count: rows.length }; },
         update: async (args: Args) => { write(); const row = find(args)[0]; if (!row) throw new Error("P2025"); if (name === "user") {
@@ -124,7 +127,8 @@ class IdentityDatabase {
 }
 function fixture() {
   const db = new IdentityDatabase();
-  db.rows.user!.push({ id: "u", role: "admin", phone: null, phoneVerifiedAt: null, email: "old@example.test", emailVerifiedAt: now, suspendedAt: null, deletionScheduledAt: null });
+  db.rows.user!.push({ id: "u", role: "admin", phone: null, phoneVerifiedAt: null, email: "old@example.test", emailVerifiedAt: now, suspendedAt: null, deletionScheduledAt: null,
+      displayName: "Profile", avatarKey: "avatar-key", avatarUploadId: "upload-id", avatarUrl: "https://avatar.invalid/profile" });
   db.rows.session!.push({ id: "s", userId: "u", refreshTokenHash: "old", expiresAt: later, adminTotpExpiresAt: null, createdAt: now });
   db.rows.totpEnrollment!.push({ id: "e", userId: "u", encryptedSecret: "encrypted", verifiedAt: null, createdAt: now, updatedAt: now });
   return db;
@@ -190,6 +194,7 @@ describe("Identity authority callers prepare their own transactions", () => {
     const db = fixture(); const repo = new PrismaUserRepository(db.service);
     const user = await repo.replaceSignInMethod({ userId: "u", channel: "phone", destination: "+99361111111", verifiedAt: now });
     expect(user.phone).toBe("+99361111111"); expect(user.email).toBe("old@example.test");
+    expect(db.rows.user[0]).toMatchObject({ displayName: "Profile", avatarKey: "avatar-key", avatarUploadId: "upload-id", avatarUrl: "https://avatar.invalid/profile" });
     expect(db.rows.session![0]!.adminTotpExpiresAt).toBeNull(); expect(user.role).toBe("admin");
   });
   it("fails closed on the unused raw User erasure methods", async () => {
