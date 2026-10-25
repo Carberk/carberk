@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { Pool } from "pg";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { PrismaClient } from "../generated/prisma/client/client";
 import { trackPoolClientEnds } from "../tests/helpers/track-pool-client-ends";
@@ -43,9 +43,21 @@ describe("diagnostics:bootstrap-synthetic command — disposable migrated Postgr
   let pool: Pool;
   let waitForClientEnds: (() => Promise<void>) | undefined;
   let db: PrismaClient;
+  let control: Pool;
+  let databaseName: string;
+  let guardsActive = false;
+
+  async function activateSourceGuards() {
+    if (guardsActive) return;
+    const triggers = await pool.query<{ table: string; name: string }>(`SELECT c.relname AS table,t.tgname AS name FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND (t.tgname LIKE 'zz_diagnostic_source_%' OR t.tgname LIKE 'zzzz_campaign_preparation%' OR t.tgname='diagnostic_source_no_truncate')`);
+    for (const row of triggers.rows) await pool.query(`ALTER TABLE public."${row.table}" ENABLE TRIGGER "${row.name}"`);
+    expect((await pool.query("SELECT diagnostic_source_guards_ready() AS ready")).rows).toEqual([{ ready: true }]);
+    guardsActive = true;
+  }
 
   /** Gate variables are set explicitly per call; `undefined` removes one from the inherited environment. */
   async function bootstrap(overrides: Env, ...args: string[]): Promise<{ code: number; output: string }> {
+    await activateSourceGuards();
     const merged: Env = { ...process.env, DATABASE_URL: databaseUrl, APP_ENV: undefined, DIAGNOSTIC_SYNTHETIC_ENABLED: undefined, DIAGNOSTIC_SYNTHETIC_USER_IDS: undefined, ...overrides };
     const env = Object.fromEntries(Object.entries(merged).filter((entry): entry is [string, string] => entry[1] !== undefined));
     try {
@@ -103,27 +115,29 @@ describe("diagnostics:bootstrap-synthetic command — disposable migrated Postgr
 
   beforeAll(async () => {
     container = await new PostgreSqlContainer("postgres:16-alpine").withUsername("auto_tm").withPassword("auto_tm_test").withDatabase("synthetic_center_test").start();
-    databaseUrl = container.getConnectionUri();
+    control = new Pool({ connectionString: container.getConnectionUri() });
+  });
+
+  afterEach(async () => {
+    await db?.$disconnect();
+    await pool?.end();
+    await waitForClientEnds?.();
+    if (databaseName) await control.query(`DROP DATABASE "${databaseName}"`);
+  });
+  afterAll(async () => { await control?.end(); await container?.stop(); });
+
+  beforeEach(async () => {
+    // A fresh migrated database per case keeps fixture construction preactivation.
+    // Strict/integrity guards are never disabled or bypassed for cleanup/fixtures.
+    databaseName = `r7f_cli_${randomUUID().replaceAll("-", "")}`;
+    await control.query(`CREATE DATABASE "${databaseName}"`);
+    const url = new URL(container.getConnectionUri()); url.pathname = `/${databaseName}`;
+    databaseUrl = url.toString();
     await run(`${packageDir}node_modules/.bin/prisma`, ["migrate", "deploy"], { cwd: packageDir, env: { ...process.env, DATABASE_URL: databaseUrl } });
     pool = new Pool({ connectionString: databaseUrl });
     waitForClientEnds = trackPoolClientEnds(pool);
     db = new PrismaClient({ adapter: new PrismaPg(pool) });
-  });
-
-  afterAll(async () => {
-    await db?.$disconnect();
-    await pool?.end();
-    await waitForClientEnds?.();
-    await container?.stop();
-  });
-
-  beforeEach(async () => {
-    await db.diagnosticAudit.deleteMany();
-    await db.diagnosticCenterAssignment.deleteMany();
-    await db.diagnosticCenter.deleteMany();
-    await db.session.deleteMany();
-    await db.staffGrant.deleteMany();
-    await db.user.deleteMany();
+    guardsActive = false;
     // Another real, approved center and its qualified staff member must survive every run untouched.
     const userId = await staffUser(["diagnostics.templates", "diagnostics.reception"]);
     await db.session.create({ data: { userId, refreshTokenHash: "fixture-hash:bystander", expiresAt: FUTURE } });

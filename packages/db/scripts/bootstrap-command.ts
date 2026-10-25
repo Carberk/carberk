@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { Prisma, PrismaClient } from "../generated/prisma/client/client";
+import { Prisma, type PrismaClient } from "../generated/prisma/client/client";
 import { assertDiagnosticSourceCommand, withDiagnosticSourceCommand } from "../src/diagnostic-source-command";
 import type { DiagnosticSourceCommand, DiagnosticSourceTuple } from "../src/diagnostic-source-command";
 
@@ -109,7 +109,10 @@ export async function bootstrapSyntheticCenter(
     actorUserId: null, sessionId: null, cutoff: null, campaign: null,
     intent: { code: centerCode, userId, capability, qualificationId },
   };
-  return withDiagnosticSourceCommand(tx, command, async receipt => {
+  let workStarted = false;
+  try {
+    return await withDiagnosticSourceCommand(tx, command, async receipt => {
+    workStarted = true;
     await assertDiagnosticSourceCommand(tx, receipt, "center_bootstrap");
     await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`diagnostics:bootstrap-synthetic:${centerCode}`}, 0))`;
     await tx.$queryRaw`SELECT "id" FROM "users" WHERE "id" = ${userId} FOR UPDATE`;
@@ -129,10 +132,49 @@ export async function bootstrapSyntheticCenter(
       await tx.diagnosticAudit.create({ data: { ...effect.next, createdAt: date(effect.next["createdAt"]) } as Prisma.DiagnosticAuditUncheckedCreateInput });
     }
     return "Synthetic center and qualification created";
-  });
+    });
+  } catch (error) {
+    if (!workStarted && preparationConflict(error)) throw new CenterPreparationConflict(error, before.center?.id ?? null);
+    throw error;
+  }
 }
 
 /** Owns the operator command transaction; the CLI supplies the connected client. */
 export async function runSyntheticCenterBootstrap(db: Pick<PrismaClient, "$transaction">, values: CenterBootstrapValues): Promise<string> {
-  return db.$transaction(tx => bootstrapSyntheticCenter(tx, values));
+  try {
+    return await db.$transaction(tx => bootstrapSyntheticCenter(tx, values));
+  } catch (error) {
+    if (!(error instanceof CenterPreparationConflict)) throw error;
+    // $transaction has rejected: its original transaction has rolled back.
+    // Recognition is a new, bounded read-only snapshot, never a command replay.
+    try {
+      return await db.$transaction(async tx => {
+        await tx.$executeRaw`SET TRANSACTION READ ONLY`;
+        const current = await centerState(tx, values);
+        if (!current.center || !current.assignment || (error.knownCenterId !== null && error.knownCenterId !== current.center.id)) throw error.original;
+        return "Already bootstrapped; no change";
+      }, { isolationLevel: "RepeatableRead" });
+    } catch {
+      throw error.original;
+    }
+  }
+}
+
+
+class CenterPreparationConflict extends Error {
+  constructor(readonly original: unknown, readonly knownCenterId: string | null) {
+    super("Synthetic bootstrap preparation conflict", { cause: original });
+  }
+}
+
+/** adapter-pg 7.8 raw RAISE EXCEPTION shape. No message substring fallback:
+ * assertions/mutations/finish share P2010 but cannot create this stage marker. */
+function preparationConflict(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2010") return false;
+  const adapter = error.meta?.["driverAdapterError"];
+  if (!adapter || typeof adapter !== "object" || !("cause" in adapter)) return false;
+  const cause = adapter.cause;
+  return !!cause && typeof cause === "object" && "originalCode" in cause && cause.originalCode === "P0001"
+    && "originalMessage" in cause && typeof cause.originalMessage === "string"
+    && ["diagnostic_source_graph_changed", "diagnostic_intake_operator_center", "diagnostic_intake_operator_qualification"].includes(cause.originalMessage);
 }
