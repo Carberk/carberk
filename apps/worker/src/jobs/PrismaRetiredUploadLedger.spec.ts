@@ -25,6 +25,7 @@ class CleanupDatabase {
   receipt = false;
   coverage: Row[] = [];
   refuseFinish = false;
+  contention = false;
   afterPrepare: (() => void) | undefined;
   keySlots: Row[] = [];
   row(table: string, key: Row) { return this.rows[table]?.find(row => Object.entries(key).every(([k, v]) => row[k] === v)); }
@@ -49,6 +50,34 @@ class CleanupDatabase {
   async $queryRaw(first: TemplateStringsArray | Prisma.Sql, ...args: unknown[]): Promise<unknown> {
     const sql = Array.isArray(first) ? Prisma.sql(first as TemplateStringsArray, ...args) : first as Prisma.Sql;
     const text = sql.text; const values = sql.values;
+    if (text.includes('SELECT upload.id FROM media_uploads upload')) {
+      return (this.rows["media_uploads"] ?? []).filter(r => r["state"] === "PREPARING" && r["writeProtocol"] !== "video-v1" &&
+        Date.parse(String(r["claimDeadline"])) < (values[0] as Date).getTime()).slice(0, Number(values[1])).map(r => ({ id: r["id"] }));
+    }
+    if (text.includes('SELECT "uploadId" AS id FROM media_upload_cleanups')) {
+      return (this.rows["media_upload_cleanups"] ?? []).filter(r => r["status"] === "PENDING" &&
+        Date.parse(String(r["nextAttemptAt"])) <= (values[0] as Date).getTime()).slice(0, Number(values[1])).map(r => ({ id: r["uploadId"] }));
+    }
+    if (text.includes('WITH stranded AS')) {
+      let recovered = 0;
+      for (const id of values[0] as string[]) {
+        const upload = this.row("media_uploads", { id }); if (!upload) continue;
+        this.assertWrite("media_uploads", { id });
+        const mutation = this.coverage.find(m => m["table"] === "media_uploads" && (m["key"] as Row)["id"] === id);
+        Object.assign(upload, mutation?.["next"]); recovered++;
+        const cleanup = this.coverage.find(m => m["table"] === "media_upload_cleanups" && m["verb"] === "insert" && (m["key"] as Row)["uploadId"] === id);
+        if (cleanup) this.rows["media_upload_cleanups"]?.push({ ...cleanup["next"] as Row });
+      }
+      return [{ recovered: BigInt(recovered) }];
+    }
+    if (text.includes('UPDATE media_upload_cleanups AS work')) {
+      const leased: Row[] = [];
+      for (const mutation of this.coverage.filter(m => m["table"] === "media_upload_cleanups" && m["verb"] === "update")) {
+        const key = mutation["key"] as Row; const row = this.row("media_upload_cleanups", key);
+        if (row) { this.assertWrite("media_upload_cleanups", key); Object.assign(row, mutation["next"]); leased.push({ ...row }); }
+      }
+      return leased;
+    }
     if (text.includes("public.campaign_prepare(")) {
       this.coverage = JSON.parse(String(values[0])) as Row[];
       this.receipt = true; this.afterPrepare?.(); return [{ receipt: "receipt" }];
@@ -63,6 +92,7 @@ class CleanupDatabase {
       return [{ keys: slots.map((slot, key) => ({ namespace: metas[String(slot["table"])]?.namespace ?? 899000, key })) }];
     }
     if (text.includes("diagnostic_source_meta")) return [metas[String(values[0])] ?? { namespace: 899000, refs: [] }];
+    if (text.includes("pg_try_advisory_xact_lock")) return [{ locked: !this.contention }];
     if (text.includes("pg_advisory_xact_lock")) { if (!this.receipt) throw new Error("late preparation"); return []; }
     if (text.includes("SELECT to_jsonb(s) AS row")) {
       const table = /FROM public\.([a-z_]+)/.exec(text)?.[1] ?? "";
@@ -71,7 +101,7 @@ class CleanupDatabase {
     }
     if (text.includes("FOR UPDATE")) { if (!this.receipt) throw new Error("late preparation"); return [{ locked: 1 }]; }
     if (text.includes("SELECT 'users' AS table")) {
-      const id = values[0]; const directory = String(values[2]);
+      const id = values[0]; const directory = String(values[1]);
       return [
         ...(this.rows["users"] ?? []).filter(r => r["avatarUploadId"] === id || typeof r["avatarKey"] === "string" && r["avatarKey"].startsWith(directory)).map(r => ({ table: "users", id: r["id"] })),
         ...(this.rows["listing_media"] ?? []).filter(r => r["uploadId"] === id || [r["key"], r["posterKey"]].some(k => typeof k === "string" && k.startsWith(directory))).map(r => ({ table: "listing_media", id: r["id"] })),
@@ -83,6 +113,41 @@ class CleanupDatabase {
 }
 
 describe("retired upload transaction preparation", () => {
+  it.each(["publish", "attach", "profile", "legacy"])("recovers an expired %s preparation with its original cleanup policy", async kind => {
+    const db = new CleanupDatabase(); db.rows["media_upload_cleanups"] = [];
+    Object.assign(db.row("media_uploads", { id: "upload" }) ?? {}, { state: "PREPARING", claimToken: "held", claimDeadline: "2000-01-01T00:00:00.000Z", claimTargetType: kind === "profile" ? "profile" : "listing", claimTargetId: kind === "profile" ? "owner" : "target", retiredAt: null,
+      writeProtocol: kind === "legacy" ? "legacy" : "conditional-v1" });
+    if (kind !== "publish" && kind !== "profile") db.rows["listings"]?.push({ id: "target", sellerId: "owner" });
+    expect(await db.ledger().retireExpiredPreparations(NOW, 10)).toBe(1);
+    const upload = db.row("media_uploads", { id: "upload" });
+    expect(upload).toMatchObject({ state: kind === "publish" ? "AVAILABLE" : "RETIRED", claimToken: null, claimDeadline: null });
+    if (kind === "publish") {
+      expect(upload).toMatchObject({ claimTargetType: null, claimTargetId: null });
+      expect(db.rows["media_upload_cleanups"]).toEqual([]);
+    } else expect(db.row("media_upload_cleanups", { uploadId: "upload" })).toMatchObject({ status: kind === "legacy" ? "LEGACY_PENDING" : "PENDING", key: KEY, nextAttemptAt: "2000-01-01T00:00:00.000Z" });
+  });
+  it("does not recover not-due or video preparations", async () => {
+    for (const patch of [{ claimDeadline: "2000-01-03T00:00:00Z" }, { writeProtocol: "video-v1" }]) {
+      const db = new CleanupDatabase();
+      Object.assign(db.row("media_uploads", { id: "upload" }) ?? {}, { state: "PREPARING", claimDeadline: "2000-01-01T00:00:00Z" }, patch);
+      expect(await db.ledger().retireExpiredPreparations(NOW, 10)).toBe(0);
+      expect(db.row("media_uploads", { id: "upload" })?.["state"]).toBe("PREPARING");
+    }
+  });
+  it("leases only due PENDING work and saves its retry before returning", async () => {
+    const db = new CleanupDatabase();
+    Object.assign(db.row("media_upload_cleanups", { uploadId: "upload" }) ?? {}, { nextAttemptAt: "2000-01-01T00:00:00Z", attempts: 0 });
+    db.rows["media_upload_cleanups"]?.push({ uploadId: "legacy", status: "LEGACY_PENDING", nextAttemptAt: "2000-01-01T00:00:00Z" }, { uploadId: "future", status: "PENDING", nextAttemptAt: "2000-01-03T00:00:00Z" });
+    expect(await db.ledger().lease(NOW, 1)).toMatchObject([{ uploadId: "upload", attempts: 1 }]);
+    expect(db.row("media_upload_cleanups", { uploadId: "upload" })).toMatchObject({ nextAttemptAt: "2000-01-02T00:01:00.000Z", status: "PENDING" });
+    expect(await db.ledger().lease(NOW, 10)).toEqual([]);
+  });
+  it("leaves contended batch work untouched", async () => {
+    const db = new CleanupDatabase(); db.contention = true;
+    Object.assign(db.row("media_upload_cleanups", { uploadId: "upload" }) ?? {}, { nextAttemptAt: "2000-01-01T00:00:00Z" });
+    expect(await db.ledger().lease(NOW, 1)).toEqual([]);
+    expect(db.row("media_upload_cleanups", { uploadId: "upload" })?.["attempts"]).toBe(1);
+  });
   it("completes cleanup and a retired upload together", async () => {
     const db = new CleanupDatabase();
     await db.ledger().complete("upload", NOW);
@@ -107,19 +172,19 @@ describe("retired upload transaction preparation", () => {
     expect(db.row("media_uploads", { id: "upload" })?.["state"]).toBe("RETIRED");
   });
   it("refuses completion when a post-wait upload target changes", async () => {
-    const db = new CleanupDatabase(); db.afterPrepare = () => { db.rows["media_uploads"]![0]!["claimTargetId"] = "unrelated"; };
+    const db = new CleanupDatabase(); db.afterPrepare = () => { Object.assign(db.row("media_uploads", { id: "upload" }) ?? {}, { claimTargetId: "unrelated" }); };
     await expect(db.ledger().complete("upload", NOW)).rejects.toThrow("retired_upload_scope_changed");
     expect(db.row("media_upload_cleanups", { uploadId: "upload" })?.["status"]).toBe("PENDING");
   });
   it.each(["avatar", "media", "poster"])("refuses completion for a legacy %s key reference", async kind => {
     const db = new CleanupDatabase();
-    if (kind === "avatar") db.rows["users"]!.push({ id: "legacy", avatarKey: KEY, avatarUploadId: null });
-    else db.rows["listing_media"]!.push({ id: "legacy", [kind === "poster" ? "posterKey" : "key"]: KEY, uploadId: null });
+    if (kind === "avatar") db.rows["users"]?.push({ id: "legacy", avatarKey: KEY, avatarUploadId: null });
+    else db.rows["listing_media"]?.push({ id: "legacy", [kind === "poster" ? "posterKey" : "key"]: KEY, uploadId: null });
     await expect(db.ledger().complete("upload", NOW)).rejects.toThrow("retired_upload_live_reference");
     expect(db.row("media_upload_cleanups", { uploadId: "upload" })?.["status"]).toBe("PENDING");
   });
   it("refuses completion for an adopted upload", async () => {
-    const db = new CleanupDatabase(); db.rows["media_uploads"]![0]!["state"] = "ADOPTED";
+    const db = new CleanupDatabase(); Object.assign(db.row("media_uploads", { id: "upload" }) ?? {}, { state: "ADOPTED" });
     await expect(db.ledger().complete("upload", NOW)).rejects.toThrow("retired_upload_live_reference");
     expect(db.row("media_upload_cleanups", { uploadId: "upload" })?.["status"]).toBe("PENDING");
   });
