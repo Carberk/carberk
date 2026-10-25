@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   Inject,
   Injectable,
@@ -6,7 +7,7 @@ import {
   ConflictException,
   ForbiddenException,
 } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { PrismaService, userEligibilitySourceCommand, withDiagnosticSourceCommand } from "@auto-tm/db";
 import { AdminSchemas } from "@auto-tm/contracts";
 
 import {
@@ -155,12 +156,22 @@ export class SuspendUser {
     }
 
     // 4. Execute mutation + audit in one transaction
+    const auditId = randomUUID(), reviewedAt = new Date();
     const result = await this.prisma.$transaction(async (tx) => {
+      const command = await userEligibilitySourceCommand(tx, { userId: input.userId, actorUserId: input.adminUserId,
+        suspendedAt: reviewedAt, reason: input.reason,
+        intent: { auditId, reason: input.reason, ...(report ? { report: { id: report.id, reviewedAt: reviewedAt.toISOString() } } : {}) } });
+      return withDiagnosticSourceCommand(tx, command, async receipt => {
+        const locked = await tx.user.findUnique({ where: { id: input.userId } });
+        if (!locked || locked.role !== user.role || locked.suspendedAt?.getTime() !== user.suspendedAt?.getTime()
+          || locked.suspendedById !== user.suspendedById || locked.suspensionReason !== user.suspensionReason) throw new Error("diagnostic_source_graph_changed");
       const suspendResult = await this.identityAdmin.suspendUser(
         input.userId,
         input.adminUserId,
         input.reason,
         tx,
+        receipt,
+        reviewedAt,
       );
 
       // Action the report if provided
@@ -171,7 +182,7 @@ export class SuspendUser {
           {
             status: "actioned",
             reviewedById: input.adminUserId,
-            reviewedAt: new Date(),
+            reviewedAt,
           },
           tx,
         );
@@ -201,6 +212,7 @@ export class SuspendUser {
 
       const auditRow = await this.auditRepo.create(
         {
+          id: auditId,
           actorId: input.adminUserId,
           action: AdminSchemas.AdminAuditAction.UserSuspend,
           targetType: "user",
@@ -221,6 +233,7 @@ export class SuspendUser {
         reportStatus,
         auditLogId: auditRow.id,
       };
+      });
     });
 
     return result;

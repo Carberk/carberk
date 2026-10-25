@@ -5,6 +5,8 @@ export interface IdentityAdminPort {
     adminUserId: string,
     reason: string,
     tx?: unknown,
+    receipt?: unknown,
+    suspendedAt?: Date,
   ): Promise<{
     suspendedAt: Date;
     suspendedById: string;
@@ -14,6 +16,7 @@ export interface IdentityAdminPort {
   unsuspendUser(
     userId: string,
     tx?: unknown,
+    receipt?: unknown,
   ): Promise<{
     suspendedAt: null;
     suspendedById: null;

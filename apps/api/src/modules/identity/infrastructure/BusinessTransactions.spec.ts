@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { BusinessTransactionDatabase } from "../application/testing/BusinessTransactionDatabase";
+import { PreparedTransactionDatabase } from "../../../common/application/testing/PreparedTransactionDatabase";
 import { PrismaBusinessRepository } from "./PrismaBusinessRepository";
 
 const now = new Date("2026-10-24T12:00:00.000Z"), future = new Date("2026-10-25T12:00:00.000Z");
 const founder = { userId: "founder", sessionId: "founder-session" }, owner = { userId: "owner", sessionId: "owner-session" }, sales = { userId: "sales", sessionId: "sales-session" };
 const invitation = { tokenHash: "token", expiresAt: future };
 function fixture(status = "active") {
- const memory = new BusinessTransactionDatabase();
+ const memory = new PreparedTransactionDatabase();
  for (const userId of ["founder", "owner", "sales", "recipient", "foreign"]) {
   memory.seed("user", { id: userId, role: userId === "founder" ? "admin" : "seller", suspendedAt: null, deletionScheduledAt: null });
   memory.seed("session", { id: `${userId}-session`, userId, expiresAt: future, adminTotpExpiresAt: future });

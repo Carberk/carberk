@@ -7,16 +7,25 @@ import { Message } from "../domain/Message";
 import { PrismaConversationRepository } from "./PrismaConversationRepository";
 
 // External database boundary only. Real repository, domain and emission port are exercised.
-function database() {
+function database(options: { deletionScheduledAt?: Date; failMessage?: boolean } = {}) {
  let conversation:Record<string,unknown>|null=null;
  const messages:Record<string,unknown>[]=[];
+ let prepared = false, userFenced = false;
  const tx={
-  $queryRaw:async()=>[],
+  $queryRaw:async(parts: TemplateStringsArray, ...values: unknown[])=>{
+   const sql = parts.join("?");
+   if (sql.includes("campaign_prepare")) { prepared = true; return [{receipt:"00000000-0000-4000-8000-000000000001"}]; }
+   if (sql.includes("campaign_finish")) { prepared = false; return []; }
+   if (sql.includes("FOR UPDATE") && !prepared) throw new Error("lock_before_preparation");
+   if (sql.includes('FROM "users"')) { userFenced = true; return [{ id: values[0], deletionScheduledAt: options.deletionScheduledAt ?? null }]; }
+   if (sql.includes("FOR UPDATE") && !userFenced) throw new Error("user_fence_required");
+   return [];
+  },
   $executeRaw:async()=>0,
-  conversation:{create:async({data}:{data:Record<string,unknown>})=>{conversation={...data};return conversation;},
+  conversation:{create:async({data}:{data:Record<string,unknown>})=>{if (!prepared || !userFenced) throw new Error("user_fence_required"); conversation={...data};return conversation;},
    findUnique:async()=>conversation,findUniqueOrThrow:async()=>conversation,update:async({data}:{data:Record<string,unknown>})=>{conversation={...conversation,...data};return conversation;}},
   conversationParticipant:{create:async()=>({})},
-  message:{create:async({data}:{data:Record<string,unknown>})=>{messages.push({...data});return data;},
+  message:{create:async({data}:{data:Record<string,unknown>})=>{if (!userFenced) throw new Error("user_fence_required"); if (options.failMessage) throw new Error("message_failed"); messages.push({...data});return data;},
    findUnique:async({where}:{where:{id:string}})=>messages.find(row=>row["id"]===where.id)??null,
    findFirst:async({where}:{where:{id?:{not:string};senderId?:string|{not:string};conversationId:string;createdAt?:{gte:Date}}})=>messages.filter(row=>row["conversationId"]===where.conversationId
     && (!where.id?.not||row["id"]!==where.id.not)

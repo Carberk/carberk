@@ -22,15 +22,13 @@ export class PrismaMeasurementCommit {
    await tx.$executeRaw`SAVEPOINT measurement_capture`; savepoint = true;
    const previous = await tx.$queryRaw<{ statement: string; lock: string }[]>`SELECT current_setting('statement_timeout') AS statement, current_setting('lock_timeout') AS lock`;
    await tx.$queryRaw`SELECT set_config('statement_timeout', '50ms', true), set_config('lock_timeout', '10ms', true)`;
-   // Keep the lock order explicit. The enclosing source mutation owns the
-   // User lock before capture; capture itself takes collector and principal
-   // without joining the locks into one opaque query. This keeps the guest
-   // path free of a User lock and leaves account eligibility to the source
-   // transaction that owns the User lock.
+   // Callers establish the User fence before their resource locks. This is an
+   // unlocked recheck of that fenced row, never a late User lock after collector.
    const collectors = await tx.$queryRaw<{ epoch: string }[]>`SELECT "epoch" FROM "measurement_state" WHERE "key" = 'collector' FOR KEY SHARE`;
    const rows = await tx.$queryRaw<{ id: string; generation: string; epoch: string; userId: string | null }[]>`SELECT "id", "generation", "epoch", "userId" FROM "measurement_principals" WHERE "userId" = ${userId} FOR KEY SHARE`;
    const principal = rows[0];
-   if (collectors[0]?.epoch !== this.epoch || !principal || principal.epoch !== this.epoch || principal.userId !== userId) {
+   const users = await tx.$queryRaw<{ deletionScheduledAt: Date | null }[]>`SELECT "deletionScheduledAt" FROM "users" WHERE "id" = ${userId}`;
+   if (!users[0] || users[0].deletionScheduledAt || collectors[0]?.epoch !== this.epoch || !principal || principal.epoch !== this.epoch || principal.userId !== userId) {
     await tx.$queryRaw`SELECT set_config('statement_timeout', ${previous[0]?.statement ?? "0"}, true), set_config('lock_timeout', ${previous[0]?.lock ?? "0"}, true)`;
     await tx.$executeRaw`RELEASE SAVEPOINT measurement_capture`;
     return "disabled";
