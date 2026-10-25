@@ -99,13 +99,13 @@ describe("R7b real publication finite transaction closure", { concurrent: false 
 
  const capture = new PrismaMeasurementCommit({ enabled: true, environment: "test", purposes: ["product_improvement"], evidenceRef: "r7b-round1-isolated", realCollectionApproved: false }, epoch, () => now);
  const photos = (n: number) => [1, 2, 3].map(k => ({ photoId: id(n, `photo-${k}`), key: `${suite.slug}/${n}/${k}/original.webp`, sortOrder: k - 1 }));
- function publisher(client = db, measurement = capture) {
+ function publisher(client = db, measurement = capture, preparation?: { arrived: ReturnType<typeof gate>; resume: ReturnType<typeof gate> }) {
   return new PublishListing(new PrismaListingDraftRepository(client), client, new PrismaExchangeRateRepository(client), new EventEmitterListingEventPublisher(new EventEmitter2()),
-   { generate: async key => ({ variants: { thumbnail: key, list: key, detail: key, fullscreen: key }, thumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" }) },
+   { generate: async key => { if(preparation) { preparation.arrived.release(); await preparation.resume.promise; } return { variants: { thumbnail: key, list: key, detail: key, fullscreen: key }, thumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" }; } },
    new UploadAdoptionGuard(new PrismaMediaUploadRepository(client), { inspect: async () => ({ contentType: "image/webp", sizeBytes: 1024 }) }),
    new ContactPhonePolicy(identity.check, new PrismaVerifiedContactPhoneRepository(client)), clock, new PrismaUploadClaims(client, clock), undefined, measurement);
  }
- const publish = (n: number, client = db, measurement = capture) => publisher(client, measurement).execute({ userId: id(n, "owner"), draftId: id(n, "draft") });
+ const publish = (n: number, client = db, measurement = capture, preparation?: { arrived: ReturnType<typeof gate>; resume: ReturnType<typeof gate> }) => publisher(client, measurement, preparation).execute({ userId: id(n, "owner"), draftId: id(n, "draft") });
  async function snapshot(n: number) {
   return { listings: await db.listing.findMany({ where: { sellerId: id(n, "owner") } }), media: await db.listingMedia.findMany({ where: { id: { in: photos(n).map(p => p.photoId) } } }),
    draft: await db.listingDraft.findUnique({ where: { id: id(n, "draft") } }), audit: await db.auditLog.findMany({ where: { actorId: id(n, "owner") } }),
@@ -249,14 +249,22 @@ describe("R7b real publication finite transaction closure", { concurrent: false 
   const first = instrument(a, publicationFirst ? "after-source" : "transaction-end"), second = instrument(b, "transaction-end"); second.resume.release();
   const videoFirst = await opponents(first.client), videoSecond = await opponents(second.client);
   const cancel = (video: PrismaOwnedVideoSessionLedger) => video.change({ userId: id(n,"owner"), sessionId: id(n,"session") }, id(n,"video"), "cancel");
-  const started: Promise<unknown>[] = [];
-  const one = (publicationFirst ? publish(n, first.client) : cancel(videoFirst.video)).then(value => ({value}), error => ({error})); started.push(one);
+  const started: Promise<unknown>[] = [], preparation = {arrived:gate(),resume:gate()};
+  // Reserve photos through the real caller, then hold external variant work.
+  // The video writer can now win before the publication outer receipt, rather
+  // than merely blocking the separate photo-reservation transaction.
+  const preparedPublication = publicationFirst ? undefined : publish(n,second.client,capture,preparation).then(value=>({value}),error=>({error}));
+  if(preparedPublication) started.push(preparedPublication);
   try {
+   if(preparedPublication) await reached(preparation.arrived.promise,preparedPublication);
+   const one = (publicationFirst ? publish(n, first.client) : cancel(videoFirst.video)).then(value => ({value}), error => ({error})); started.push(one);
    await reached(first.arrived.promise, one);
-   const two = (publicationFirst ? cancel(videoSecond.video) : publish(n, second.client)).then(value => ({value}), error => ({error})); started.push(two);
+   preparation.resume.release();
+   const two = publicationFirst ? cancel(videoSecond.video).then(value=>({value}),error=>({error})) : preparedPublication!; started.push(two);
    await waiting(db, second.pid, first.pid); first.resume.release();
    expect(await one).toHaveProperty("value");
-   expect(await two).toMatchObject({ error: { message: publicationFirst ? "VIDEO_SESSION_UNAVAILABLE" : "diagnostic_source_graph_changed" } });
+   if(publicationFirst) expect(await two).toMatchObject({error:{message:"VIDEO_SESSION_UNAVAILABLE"}});
+   else expect(await two).toMatchObject({error:{code:"P2010",meta:{driverAdapterError:{cause:{originalCode:"P0001",originalMessage:"listing_publication_video_binding"}}}}});
    const state = await snapshot(n); expect(state.listings).toHaveLength(publicationFirst ? 1 : 0);
    expect(state.media).toHaveLength(publicationFirst ? 3 : 0); expect(state.outbox).toHaveLength(publicationFirst ? 2 : 0);
    const session = await db.videoUploadSession.findUniqueOrThrow({ where: { id: id(n,"video") } });
@@ -275,7 +283,7 @@ describe("R7b real publication finite transaction closure", { concurrent: false 
     expect(await db.mediaUploadCleanup.findUnique({where:{uploadId:id(n,"video-upload")}})).toMatchObject({writeProtocol:"video-v1",status:"LEGACY_PENDING"});
    }
    expect(await snapshot(24)).toEqual(foreign);
-  } finally { first.resume.release(); second.resume.release(); await Promise.allSettled(started); }
+  } finally { first.resume.release(); second.resume.release(); preparation.resume.release(); await Promise.allSettled(started); }
  });
  it.each([true, false])("serializes account scheduling with publication-first=%s", async publicationFirst => {
   const scheduledAt = new Date("2026-10-26T12:00:00Z");
