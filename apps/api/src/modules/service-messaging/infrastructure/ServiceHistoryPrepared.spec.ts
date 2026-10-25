@@ -13,15 +13,18 @@ function database() {
  const owner = { id: "case", customerId: "customer", assigneeId: "staff", assignmentVersion: 1, sourceListingId: "listing", status: "open" };
  const conversation = { id: "conversation", purpose: "support", supportCaseId: "case", historyRequestId: null, supportCase: owner, historyRequest: null, erasedAt: null, lifecycleEpoch: 0, lastSequence: 8, createdAt: now };
  const state = { readThrough: 0, audits: [] as Data[], subscriptions: [] as Data[] };
- const control = { afterWait: undefined as (() => void) | undefined, refuseFinish: false, sessionValid: true, capable: true, preparations: 0, scopes: [] as unknown[] };
+ const control = { afterWait: undefined as (() => void) | undefined, refuseFinish: false, sessionValid: true, capable: true, discovery: "valid" as "valid" | "missing-selection" | "missing-source" | "oversized", preparations: 0, scopes: [] as unknown[] };
  const db = { $transaction: async <T>(work: (tx: unknown) => Promise<T>) => {
   const draft = structuredClone(state); let prepared = false;
   const query = async (strings: TemplateStringsArray | string, ...values: unknown[]) => {
    const sql = typeof strings === "string" ? strings : strings.join("?");
+   if (sql.includes("service retained selection") && control.discovery === "missing-selection") return [];
    if (sql.includes("service retained selection")) return [{ roots: [], fingerprint: { assignmentVersion: owner.assignmentVersion, assigneeId: owner.assigneeId, epoch: conversation.lifecycleEpoch } }];
    if (sql.includes("diagnostic_source_scope")) {
     const command = JSON.parse(values[0] as string) as Data;
     control.scopes.push(command);
+    if (control.discovery === "missing-source") return [];
+    if (control.discovery === "oversized") return [{ scope: Array.from({ length: 1001 }, () => ({ table: "users", key: { id: "customer" } })), keys: [], campaigns: [], mutations: [] }];
     return [{ scope: [], keys: [], campaigns: [], mutations: [] }];
    }
    if (sql.includes("diagnostic_source_registry")) return [{ table: "users", namespace: 897100 }];
@@ -54,6 +57,13 @@ function database() {
 }
 
 describe("service outer entry owns its complete preparation", () => {
+ it.each(["missing-selection", "missing-source", "oversized"] as const)("refuses %s discovery before any watermark, subscription or staff audit", async discovery => {
+  const h = database(); h.control.discovery = discovery;
+  h.owner.customerId = "someone-else"; h.owner.assigneeId = "customer";
+  await expect(h.service.markRead(subject, "conversation", 5)).rejects.toMatchObject({ code: "NO_ACCESS" });
+  expect(h.state).toEqual({ readThrough: 0, audits: [], subscriptions: [] });
+  expect(h.control.preparations).toBe(0);
+ });
  it("commits the customer watermark through the existing public entry", async () => {
   const h = database(); await h.service.markRead(subject, "conversation", 99);
   expect(h.state.readThrough).toBe(8); expect(h.state.audits).toEqual([]);
