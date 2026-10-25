@@ -2122,3 +2122,5 @@ model CampaignPreparation {
 // Snapshot: 20261024130000_diagnostic_intake_campaign_composition.
 
 // Snapshot: 20261025010000_diagnostic_report_source_effects.
+
+// Runtime source/preparation grouping corrections: 20261025015000_diagnostic_runtime_transport_corrections.

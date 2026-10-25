@@ -61,7 +61,7 @@ export async function withDiagnosticSourceCommand<T>(
   if (!row?.receipt) throw new Error("diagnostic_source_receipt");
   const receipt = Object.freeze({ receiptId: row.receipt }) as PreparedDiagnosticSource;
   const result = await work(receipt);
-  await tx.$queryRaw`SELECT public.diagnostic_finish_source(${receipt.receiptId}::uuid)`;
+  await tx.$queryRaw`SELECT public.diagnostic_finish_source(${receipt.receiptId}::uuid)::text`;
   return result;
 }
 
@@ -71,7 +71,7 @@ export async function assertDiagnosticSourceCommand(
   receipt: PreparedDiagnosticSource,
   operation: DiagnosticSourceOperation,
 ): Promise<void> {
-  await tx.$queryRaw`SELECT public.diagnostic_assert_source(${receipt.receiptId}::uuid,${operation})`;
+  await tx.$queryRaw`SELECT public.diagnostic_assert_source(${receipt.receiptId}::uuid,${operation})::text`;
 }
 
 export async function sealDiagnosticFirstObservation(
@@ -80,5 +80,5 @@ export async function sealDiagnosticFirstObservation(
   orderId: string,
   rawId: string,
 ): Promise<void> {
-  await tx.$queryRaw`SELECT public.diagnostic_seal_first_observation(${receipt.receiptId}::uuid,${orderId},${rawId})`;
+  await tx.$queryRaw`SELECT public.diagnostic_seal_first_observation(${receipt.receiptId}::uuid,${orderId},${rawId})::text`;
 }
