@@ -34,6 +34,11 @@ function makeFakePrisma() {
     notificationPreferences: [] as Array<{ id: string; userId: string }>,
     savedSearches: [] as Array<{ id: string; userId: string }>,
     favorites: [] as Array<{ id: string; userId: string }>,
+    measurementPrincipals: [] as Array<{ id: string; userId: string | null }>,
+    measurementVisits: [] as Array<{ id: string; principalId: string; linkedAccountId: string | null }>,
+    measurementRecords: [] as Array<{ id: string; principalId: string; visitId: string | null }>,
+    measurementOutbox: [] as Array<{ id: string; principalId: string }>,
+    measurementExports: [] as Array<{ id: string; actorId: string }>,
     ownedVehicles: [] as Array<{ id: string; userId: string }>,
     blockedUsers: [] as Array<{ id: string; blockerId: string; blockedId: string }>,
     dealershipMembers: [] as Array<{ id: string; userId: string }>,
@@ -78,7 +83,7 @@ function makeFakePrisma() {
     $queryRaw: (strings: TemplateStringsArray, ...values: unknown[]) => {
       const sql = strings.join("?");
       state.raw.push({ sql, values });
-      if (sql.includes("to_jsonb(u) AS row")) {
+      if (sql.includes("AS row FROM users")) {
         state.beforeRediscovery?.();
         const userId = values[0];
         const user = state.users.find((candidate) => candidate.id === userId);
@@ -262,6 +267,26 @@ function makeFakePrisma() {
         })()),
     },
 
+    measurementInvestigationExport: {
+      deleteMany: () => labelled("measurementInvestigationExport.deleteMany", (async () => {
+        const count = state.measurementExports.length;
+        state.measurementExports.splice(0);
+        return { count };
+      })()),
+    },
+    measurementPrincipal: {
+      deleteMany: (args: { where: { userId: string } }) => labelled("measurementPrincipal.deleteMany", (async () => {
+        const removed = state.measurementPrincipals.filter(row => row.userId === args.where.userId).map(row => row.id);
+        const visits = state.measurementVisits.filter(row => removed.includes(row.principalId) || (row.linkedAccountId !== null && removed.includes(row.linkedAccountId))).map(row => row.id);
+        const keep = <T>(rows: T[], predicate: (row: T) => boolean) => { const retained = rows.filter(predicate); rows.splice(0, rows.length, ...retained); };
+        keep(state.measurementRecords, row => !removed.includes(row.principalId) && (row.visitId === null || !visits.includes(row.visitId)));
+        keep(state.measurementVisits, row => !visits.includes(row.id));
+        keep(state.measurementOutbox, row => !removed.includes(row.principalId));
+        keep(state.measurementPrincipals, row => !removed.includes(row.id));
+        return { count: removed.length };
+      })()),
+    },
+
     $transaction: async <T>(callback: (tx: unknown) => Promise<T>): Promise<T> => {
       const operations: string[] = [];
       state.transactions.push(operations);
@@ -305,7 +330,8 @@ describe("PurgeExpiredAccounts", () => {
     fake.users.push({ id: "stale", phone: "+99360000000", email: "original@example.com", displayName: "Keep", avatarUrl: null, deletionScheduledAt: NOW });
     fake.sessions.push({ id: "keep-session", userId: "stale" });
     fake.beforeRediscovery = () => {
-      const user = fake.users[0]!;
+      const user = fake.users[0];
+      if (!user) throw new Error("Missing stale scheduler fixture");
       if (change === "future") user.deletionScheduledAt = new Date(NOW.getTime() + 1);
       if (change === "cleared") user.deletionScheduledAt = null;
       if (change === "phone") user.phone = "+99361111111";
@@ -328,6 +354,27 @@ describe("PurgeExpiredAccounts", () => {
     const preparation = fake.raw.find((statement) => statement.sql.includes("diagnostic_prepare_source"));
     expect(Object.keys(JSON.parse(String(preparation?.values[0])) as object).sort())
       .toEqual(["actorUserId", "campaign", "cutoff", "operation", "roots", "rows", "sessionId"]);
+  });
+
+  it("erases account measurement and all restricted exports, preserving independent guest and foreign data", async () => {
+    fake.users.push({ id: "due", phone: null, email: null, displayName: "Due", avatarUrl: null, deletionScheduledAt: NOW });
+    fake.measurementPrincipals.push({ id: "account", userId: "due" }, { id: "guest", userId: null }, { id: "foreign", userId: "other" });
+    fake.measurementVisits.push({ id: "account-visit", principalId: "account", linkedAccountId: null },
+      { id: "linked", principalId: "guest", linkedAccountId: "account" }, { id: "independent", principalId: "guest", linkedAccountId: null },
+      { id: "foreign-visit", principalId: "foreign", linkedAccountId: null });
+    fake.measurementRecords.push(...fake.measurementVisits.map(row => ({ id: row.id, principalId: row.principalId, visitId: row.id })));
+    fake.measurementOutbox.push({ id: "own", principalId: "account" }, { id: "guest-queue", principalId: "guest" }, { id: "foreign-queue", principalId: "foreign" });
+    fake.measurementExports.push({ id: "own-export", actorId: "due" }, { id: "foreign-export", actorId: "other" });
+
+    expect(await job.execute({ now: NOW })).toEqual({ purgedCount: 1 });
+
+    expect(fake.measurementPrincipals.map(row => row.id)).toEqual(["guest", "foreign"]);
+    expect(fake.measurementVisits.map(row => row.id)).toEqual(["independent", "foreign-visit"]);
+    expect(fake.measurementRecords.map(row => row.id)).toEqual(["independent", "foreign-visit"]);
+    expect(fake.measurementOutbox.map(row => row.id)).toEqual(["guest-queue", "foreign-queue"]);
+    expect(fake.measurementExports).toEqual([]);
+    expect(fake.transactions).toHaveLength(1);
+    expect(fake.transactions[0]).toEqual(expect.arrayContaining(["measurementInvestigationExport.deleteMany", "measurementPrincipal.deleteMany", "user.update"]));
   });
 
   it("uses one interactive prepared-source transaction and asserts the live receipt", async () => {

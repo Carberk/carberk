@@ -39,6 +39,27 @@ export function retentionConnection(db: PrismaService, name: string, after: (sql
     const observed = new Proxy(tx, {
      get(transaction, key) {
       const value: unknown = Reflect.get(transaction, key);
+      if (key === "measurementPrincipal" || key === "measurementInvestigationExport" || key === "user") {
+       return new Proxy(value as object, {
+        get(model, method) {
+         const operation: unknown = Reflect.get(model, method);
+         if (method !== "deleteMany" && method !== "update") return typeof operation === "function" ? operation.bind(model) : operation;
+         return (...args: unknown[]) => {
+          const query = Reflect.apply(operation as (...args: unknown[]) => unknown, model, args) as Promise<unknown>;
+          let executed: Promise<unknown> | undefined;
+          const execute = () => executed ??= query.then(async result => { await after(`${String(key)}.${String(method)}`, tx); return result; });
+          return new Proxy(query, {
+           get(promise, member) {
+            if (member === "then" || member === "catch" || member === "finally") {
+             return (...values: unknown[]) => Reflect.apply(Reflect.get(execute(), member) as (...values: unknown[]) => unknown, execute(), values);
+            }
+            return Reflect.get(promise, member);
+           },
+          });
+         };
+        },
+       });
+      }
       if (key === "$queryRaw" || key === "$executeRaw") {
        return (parts: TemplateStringsArray, ...values: unknown[]) => {
         const query = Reflect.apply(value as (...args: unknown[]) => unknown, transaction, [parts, ...values]) as Promise<unknown>;

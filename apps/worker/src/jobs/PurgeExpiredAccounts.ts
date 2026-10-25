@@ -50,17 +50,20 @@ export class PurgeExpiredAccounts {
     return this.prisma.$transaction(async (tx) => {
       // Rediscover the due user and PII immediately before preparation. A stale
       // scheduler snapshot becomes a truthful no-op instead of erasing a new account.
-      const [fresh] = await tx.$queryRaw<{ row: Record<string, unknown> | null }[]>`SELECT to_jsonb(u) AS row FROM users u WHERE u.id = ${userId}`;
+      // Compare in SQL. to_jsonb's timestamp has no zone and JavaScript would
+      // otherwise interpret an exact UTC cutoff in the worker's local timezone.
+      const [fresh] = await tx.$queryRaw<{ row: Record<string, unknown> | null }[]>`SELECT public.diagnostic_source_project(
+        to_jsonb(u), public.diagnostic_source_meta('users')->'fields') AS row FROM users u
+        WHERE u.id = ${userId} AND u."deletionScheduledAt" <= ${now}::timestamp`;
       const row = fresh?.row;
-      if (!row || row["deletionScheduledAt"] == null || new Date(String(row["deletionScheduledAt"])) > now ||
-          row["phone"] !== selected.phone || row["email"] !== selected.email) return false;
+      if (!row || row["phone"] !== selected.phone || row["email"] !== selected.email) return false;
       const source = JSON.parse(JSON.stringify(row)) as Record<string, unknown>;
       const next = { ...source, phone: null, phoneVerifiedAt: null, email: null, emailVerifiedAt: null,
         displayName: null, avatarKey: null, avatarUploadId: null, avatarUrl: null, deletionScheduledAt: null };
       const command = {
         operation: "account_purge", roots: [{ table: "users", key: { id: userId } }],
         rows: [{ table: "users", key: { id: userId }, verb: "update", expected: { source }, next }],
-        actorUserId: null, sessionId: null, cutoff: now, campaign: null, intent: { reason: "expired account purge" },
+        actorUserId: null, sessionId: null, cutoff: now, campaign: null,
       } as DiagnosticSourceCommand;
       return withDiagnosticSourceCommand(tx, command, async (receipt) => {
         const codeRequestMatches = [
@@ -74,6 +77,12 @@ export class PurgeExpiredAccounts {
           ...serviceAccountErasureWrites(tx, userId, now, receipt),
           ...videoAccountErasureWrites(tx, userId, now, receipt),
           ...diagnosticAccountErasureWrites(tx, userId, now, receipt),
+
+      // Match account scheduling's erasure policy. Restricted exports have no
+      // reverse subject map, so invalidate all. Principal FKs erase its facts
+      // and linked guest visits, preserving independent guest/foreign data.
+      tx.measurementInvestigationExport.deleteMany(),
+      tx.measurementPrincipal.deleteMany({ where: { userId } }),
 
       // Retire the Profile Photo's upload and record its storage deletion, in
       // the transaction that clears the photo below. The API's claim does the
