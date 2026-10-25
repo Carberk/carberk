@@ -81,7 +81,7 @@ describe("R1 actual Listing/publication/admin/conversation PostgreSQL outcomes",
   await db.listingDraft.create({ data: { id: id("draft"), userId: seller, payload: { brandId: suite.catalog.brandId, modelId: suite.catalog.modelId, cityId: suite.catalog.cityId, regionId: suite.catalog.regionId, year: 2020, vin: "WVWZZZ1JZXW000001", priceAmount: 1000, priceCurrency: "TMT", contactPhone: suite.phone("seller"), condition: "used", mileageKm: 1000, description: "Checked test car", allowCalls: true, allowChat: true, conditionDisclosure: { damaged: false }, photos } } });
   if (video !== "none") {
    const sourceKey = `video/v1/${id("video-upload")}/${id("video")}/source.mp4`;
-   await db.mediaUpload.create({ data: { id: id("video-upload"), userId: seller, key: sourceKey, kind: "video", contentType: "video/mp4", sizeBytes: 1024, writeProtocol: "video-v1", state: "PREPARING", claimToken: id("video"), claimTargetType: "video_session", claimTargetId: id("video") } });
+   await db.mediaUpload.create({ data: { id: id("video-upload"), userId: seller, key: sourceKey, kind: "video", contentType: "video/mp4", sizeBytes: 1024, writeProtocol: "video-v1", state: "PREPARING", claimToken: id("video"), claimTargetType: "video_session", claimTargetId: id("video"), claimDeadline: new Date("2026-11-01T00:00:00Z"), objectKeys: [sourceKey] } });
    await db.videoUploadSession.create({ data: { id: id("video"), userId: seller, uploadId: id("video-upload"), sourceKey, protocolVersion: 1, targetKind: "draft", targetId: id("draft"), targetRevision: 1, state: video === "ready" ? "READY" : "PROCESSING", expiresAt: new Date("2026-11-01T00:00:00Z") } });
    await db.videoGeneration.create({ data: { id: id("video"), sessionId: id("video"), uploadId: id("video-upload"), listingId: id("draft"), targetRevision: 1, state: video === "ready" ? "READY" : "PROCESSING", ...(video === "ready" ? { readyAt: now, durationMs: 1000, posterKey: `video/v1/${id("video-upload")}/${id("video")}/poster.jpg`, manifest: { version: 1 } } : {}) } });
   }
@@ -96,7 +96,7 @@ describe("R1 actual Listing/publication/admin/conversation PostgreSQL outcomes",
  it.each(["none", "ready", "pending"] as const)("publishes the real draft/photos with %s video and exact persisted source defaults", async video => {
   await preparePublication(video); const { listing: published } = await publisher().execute({ userId: seller, draftId: id("draft") });
   const stored = await db.listing.findUniqueOrThrow({ where: { id: published.id } });
-  expect(stored).toMatchObject({ sellerId: seller, status: "active", contactPhone: suite.phone("seller"), archivedByDeletion: false, activeVideoRevision: video === "ready" ? 1 : 0,
+  expect(stored).toMatchObject({ sellerId: seller, status: "active", contactPhone: suite.phone("seller"), archivedByDeletion: false, activeVideoRevision: video === "none" ? 0 : 1,
    activeVideoGenerationId: video === "ready" ? id("video") : null, pendingVideoGenerationId: video === "pending" ? id("video") : null });
   expect(await db.listingMedia.count({ where: { listingId: published.id } })).toBe(3);
   expect(await db.mediaUpload.count({ where: { userId: seller, kind: "image", state: "ADOPTED", claimTargetId: published.id } })).toBe(3);

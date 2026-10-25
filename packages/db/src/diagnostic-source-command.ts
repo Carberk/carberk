@@ -15,10 +15,10 @@ export type DiagnosticSourceOperation =
 export type DiagnosticSourceTuple = Readonly<Record<string, Prisma.InputJsonValue | null>>;
 export type ListingPublicationIntent = Readonly<{
   draftId: string;
-  photoIds: readonly string[];
-  uploadIds: readonly string[];
+  photos: readonly Readonly<{ photoId: string; uploadId: string; key: string; sortOrder: number; thumbHash: string | null }>[];
   auditId: string;
-  measurement?: Readonly<{ eventIds: readonly string[]; environment: "test" | "staging" | "production"; createdAt: Readonly<Record<string, string>>; expiresAt: Readonly<Record<string, string>> }>;
+  at: string;
+  measurement?: Readonly<{ events: readonly Prisma.InputJsonValue[]; principalId: string; generation: string; epoch: string; environment: "test" | "staging" | "production"; createdAt: Readonly<Record<string, string>>; expiresAt: Readonly<Record<string, string>> }>;
 }>;
 export type DiagnosticSourceRoot = {
   [T in DiagnosticSourceTable]: { readonly table: T; readonly key: Readonly<DiagnosticSourceKeys[T]> }
@@ -68,7 +68,7 @@ export async function withDiagnosticSourceCommand<T>(
   if (!row?.receipt) throw new Error("diagnostic_source_receipt");
   const receipt = Object.freeze({ receiptId: row.receipt }) as PreparedDiagnosticSource;
   const result = await work(receipt);
-  await tx.$queryRaw`SELECT public.diagnostic_finish_source(${receipt.receiptId}::uuid)`;
+  await tx.$queryRaw`SELECT public.diagnostic_finish_source(${receipt.receiptId}::uuid)::text`;
   return result;
 }
 
@@ -78,7 +78,7 @@ export async function assertDiagnosticSourceCommand(
   receipt: PreparedDiagnosticSource,
   operation: DiagnosticSourceOperation,
 ): Promise<void> {
-  await tx.$queryRaw`SELECT public.diagnostic_assert_source(${receipt.receiptId}::uuid,${operation})`;
+  await tx.$queryRaw`SELECT public.diagnostic_assert_source(${receipt.receiptId}::uuid,${operation})::text`;
 }
 
 export async function sealDiagnosticFirstObservation(
@@ -87,5 +87,5 @@ export async function sealDiagnosticFirstObservation(
   orderId: string,
   rawId: string,
 ): Promise<void> {
-  await tx.$queryRaw`SELECT public.diagnostic_seal_first_observation(${receipt.receiptId}::uuid,${orderId},${rawId})`;
+  await tx.$queryRaw`SELECT public.diagnostic_seal_first_observation(${receipt.receiptId}::uuid,${orderId},${rawId})::text`;
 }

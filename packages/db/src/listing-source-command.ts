@@ -7,7 +7,6 @@ export interface ListingSourceInput {
  readonly listingId: string; readonly actorUserId: string; readonly sessionId?: string | undefined;
  readonly changes: DiagnosticSourceTuple; readonly roots: readonly DiagnosticSourceRoot[];
  readonly publication?: ListingPublicationIntent;
- readonly publicationRows?: readonly DiagnosticSourceRow[];
 }
 
 /** Unlocked discovery; SQL owns the protected projection and normalization. */
@@ -28,7 +27,7 @@ export async function listingSourceCommand(tx: Prisma.TransactionClient, input: 
   rows.push({ table: "listings", key: { id: input.listingId }, verb: "update", expected: { source: row.source }, next: row.next });
  }
  const intent = input.publication ? { publication: input.publication } : undefined;
- return { operation: input.operation, roots: [{ table: "listings", key: { id: input.listingId } }, ...input.roots], rows: [...rows, ...(input.publicationRows ?? [])],
+ return { operation: input.operation, roots: [{ table: "listings", key: { id: input.listingId } }, ...input.roots], rows,
   ...(intent ? { intent } : {}),
   actorUserId: input.actorUserId, sessionId: input.sessionId ?? null, cutoff: null, campaign: null };
 }

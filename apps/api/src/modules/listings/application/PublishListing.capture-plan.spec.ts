@@ -11,12 +11,24 @@ const event: MeasurementSchemas.MeasurementEvent = {
   payload: { listingId: "00000000-0000-4000-8000-000000000002", cityId: "00000000-0000-4000-8000-000000000003" },
 };
 function captureTransaction() {
+  const statements: { sql: string; values: unknown[] }[] = [];
+  let failRead = false;
+  let aborted = false;
   const outbox: Record<string, unknown>[] = [];
   return {
-    outbox,
-    $executeRaw: async () => 0,
-    $queryRaw: async (strings: TemplateStringsArray) => {
-      const sql = strings.join("?");
+    outbox, statements,
+    failNextRead: () => { failRead = true; },
+    usable: () => !aborted,
+    $executeRaw: async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      const sql = strings.join("?"); statements.push({ sql, values });
+      if (sql.includes("ROLLBACK TO SAVEPOINT")) aborted = false;
+      if (aborted) throw new Error("transaction_aborted");
+      return 0;
+    },
+    $queryRaw: async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      const sql = strings.join("?"); statements.push({ sql, values });
+      if (aborted) throw new Error("transaction_aborted");
+      if (failRead && sql.includes('FROM "measurement_state"')) { failRead = false; aborted = true; throw new Error("collector_unavailable"); }
       if (sql.includes("current_setting")) return [{ statement: "0", lock: "0" }];
       if (sql.includes('FROM "measurement_state"')) return [{ epoch: "epoch-1" }];
       if (sql.includes('FROM "measurement_principals"')) return [{ id: "principal-1", generation: "generation-1", epoch: "epoch-1", userId: "owner" }];
@@ -59,4 +71,36 @@ describe("publication capture plan counterexample", () => {
     expect(await new PrismaMeasurementCommit({ ...activation, enabled: false }, "epoch-1", now).capture(disabled, "owner", event)).toBe("disabled");
     expect(disabled.outbox).toEqual([]);
   });
+  it("discovers without managed locks and recovers failed planning reads before returning optional absence", async () => {
+    const tx = captureTransaction(), commit = new PrismaMeasurementCommit(activation, "epoch-1");
+    tx.failNextRead();
+    expect(await commit.preparePublication(tx, "owner", [event])).toBeNull();
+    expect(tx.usable()).toBe(true);
+    expect(tx.statements.map(row => row.sql).join("\n")).not.toMatch(/FOR (KEY SHARE|UPDATE)/);
+    expect(tx.statements.slice(-2).map(row => row.sql)).toEqual(["ROLLBACK TO SAVEPOINT measurement_publication_plan", "RELEASE SAVEPOINT measurement_publication_plan"]);
+    expect(await commit.preparePublication(tx, "owner", [event])).not.toBeNull();
+  });
+
+  it.each(["environment", "principalId", "generation", "epoch", "missing-event"])("leaves source timeouts and savepoints intact after %s plan refusal", async field => {
+    const tx = captureTransaction(), commit = new PrismaMeasurementCommit(activation, "epoch-1");
+    const plan = await commit.preparePublication(tx, "owner", [event]);
+    if (!plan) throw new Error("plan_required");
+    const invalid = field === "missing-event" ? { ...plan, expiresAt: {} } : { ...plan, [field]: "stale" };
+    expect(await commit.capture(tx, "owner", event, undefined, invalid as typeof plan)).toBe("disabled");
+    expect(tx.outbox).toEqual([]); expect(tx.usable()).toBe(true);
+    expect(tx.statements.slice(-2)).toEqual([
+      { sql: "SELECT set_config('statement_timeout', ?, true), set_config('lock_timeout', ?, true)", values: ["0", "0"] },
+      { sql: "RELEASE SAVEPOINT measurement_capture", values: [] },
+    ]);
+  });
+
+  it("rolls capture back to its savepoint on collector failure without aborting publication", async () => {
+    const tx = captureTransaction(), commit = new PrismaMeasurementCommit(activation, "epoch-1");
+    const plan = await commit.preparePublication(tx, "owner", [event]);
+    tx.failNextRead();
+    expect(await commit.capture(tx, "owner", event, undefined, plan ?? undefined)).toBe("unavailable");
+    expect(tx.usable()).toBe(true); expect(tx.outbox).toEqual([]);
+    expect(tx.statements.slice(-2).map(row => row.sql)).toEqual(["ROLLBACK TO SAVEPOINT measurement_capture", "RELEASE SAVEPOINT measurement_capture"]);
+  });
+
 });

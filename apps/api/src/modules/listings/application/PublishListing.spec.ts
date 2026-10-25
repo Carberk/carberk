@@ -1,3 +1,4 @@
+import type { DiagnosticSourceCommand } from "@auto-tm/db";
 import { FakeMeasurementCommit } from "../../measurement/application/testing/FakeMeasurementCommit";
 import { describe, it, expect, beforeEach } from "vitest";
 import {
@@ -19,6 +20,8 @@ import { PublishListing } from "./PublishListing";
 import { UploadAdoptionGuard } from "./UploadAdoptionGuard";
 import { InMemoryContactPhones } from "./testing/InMemoryContactPhones";
 import { InMemoryMediaWorld } from "./testing/InMemoryMediaWorld";
+
+type ListingPublicationIntent = Extract<NonNullable<DiagnosticSourceCommand["intent"]>, { publication: unknown }>["publication"];
 
 /** The media world the next `makeUseCase()` reads uploads and storage from. */
 let world = new InMemoryMediaWorld();
@@ -145,19 +148,38 @@ class FakePrisma {
     this.auditLogs = [];
   }
 
+  publication: ListingPublicationIntent | undefined;
+  omitMedia = false;
   private prepared = false;
   beforePrepared: (() => void) | undefined;
   failAudit = false;
   $queryRaw = async (parts: TemplateStringsArray, ...values: unknown[]) => {
     const sql = parts.join("?");
     if (sql.includes("WITH target AS")) return [{ source: null, next: JSON.parse(String(values.at(-1))) }];
-    if (sql.includes("diagnostic_source_read")) {
-      const verb = values.find(value => value === "insert" || value === "update" || value === "delete");
-      return [{ source: verb === "insert" ? null : { id: "source-fixture" }, next: JSON.parse(String(values.at(-1))) }];
+    if (sql.includes("diagnostic_prepare_source")) {
+      const command = JSON.parse(String(values[0])) as { operation: string; rows: { table: string; next: Record<string, unknown> }[]; intent: { publication: ListingPublicationIntent } };
+      const plan = command.intent.publication;
+      if (command.operation !== "listing_create" || command.rows.length !== 1 || command.rows[0]?.table !== "listings") throw new Error("publication_command_shape");
+      const draft = this.draftRows.find(row => row.id === plan.draftId);
+      if (!draft || draft.userId !== command.rows[0].next["sellerId"]) throw new Error("publication_draft_owner");
+      const photos = (draft.payload as { photos: { photoId: string; key: string; sortOrder: number }[] }).photos.filter(photo => photo.key);
+      expect(plan.photos.map(({ photoId, key, sortOrder }) => ({ photoId, key, sortOrder }))).toEqual(photos);
+      expect(new Set(plan.photos.map(photo => photo.uploadId)).size).toBe(photos.length);
+      this.publication = plan;
+      this.beforePrepared?.(); this.prepared = true;
+      return [{ receipt: "00000000-0000-4000-8000-000000000001" }];
     }
-    if (sql.includes("diagnostic_prepare_source")) { this.beforePrepared?.(); this.prepared = true; return [{ receipt: "00000000-0000-4000-8000-000000000001" }]; }
     if (sql.includes("diagnostic_assert_source")) { if (!this.prepared) throw new Error("receipt_required"); return []; }
-    if (sql.includes("diagnostic_finish_source")) { this.prepared = false; return []; }
+    if (sql.includes("diagnostic_finish_source")) {
+      const plan = this.publication;
+      if (!plan || this.createdListings.length !== 1 || this.createdMedia.length !== plan.photos.length || this.auditLogs.length !== 1 || !this.deletedDrafts.includes(plan.draftId)) throw new Error("publication_final_effect");
+      for (const photo of plan.photos) {
+        const actual = this.createdMedia.find(row => row["id"] === photo.photoId);
+        expect(actual).toMatchObject({ listingId: this.createdListings[0]?.["id"], key: photo.key, sortOrder: photo.sortOrder, uploadId: photo.uploadId, thumbHash: photo.thumbHash, createdAt: new Date(plan.at) });
+      }
+      expect(this.auditLogs[0]).toMatchObject({ id: plan.auditId, targetId: this.createdListings[0]?.["id"], createdAt: new Date(plan.at) });
+      this.prepared = false; return [];
+    }
     if (sql.includes("FOR UPDATE") && !this.prepared) throw new Error("lock_before_preparation");
     return [{ id: "locked-fixture", deletionScheduledAt: null }];
   };
@@ -227,7 +249,7 @@ class FakePrisma {
 
   listingMedia = {
     create: async ({ data }: { data: Record<string, unknown> }) => {
-      this.createdMedia.push(data);
+      if (!this.omitMedia) this.createdMedia.push(data);
       return data;
     },
   };
@@ -537,6 +559,13 @@ describe("PublishListing", () => {
     const measurement = new FakeMeasurementCommit(); measurement.unavailable = true;
     expect((await makeUseCase(draftRepo, prisma, exchangeRates, events, variantGenerator, measurement).execute({ draftId: "draft-1", userId: "user-1" })).listing.status).toBe("active");
   });
+  it("refuses a missing mandatory media effect at finish and rolls back the caller writes", async () => {
+    seedDraft(draftRepo, validPayload); prisma.omitMedia = true;
+    await expect(makeUseCase(draftRepo, prisma, exchangeRates, events, variantGenerator).execute({ draftId: "draft-1", userId: "user-1" })).rejects.toThrow("publication_final_effect");
+    expect(prisma.createdListings).toEqual([]); expect(prisma.createdMedia).toEqual([]);
+    expect(prisma.deletedDrafts).toEqual([]); expect(prisma.auditLogs).toEqual([]); expect(events.events).toEqual([]);
+  });
+
   it("publishes a valid draft", async () => {
     seedDraft(draftRepo, validPayload);
 

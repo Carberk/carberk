@@ -329,7 +329,7 @@ export class PrismaUploadClaims implements UploadClaimPort {
       const keys = await this.keys(tx, before);
       for (const namespace of [...new Set(keys.map(key => key.namespace))].sort((a,b) => a-b)) {
         for (const key of keys.filter(key => key.namespace === namespace).sort((a,b) => a.key-b.key)) {
-          await tx.$queryRaw`SELECT pg_advisory_xact_lock(${namespace}::int,${key.key}::int)`;
+          await tx.$queryRaw`SELECT pg_advisory_xact_lock(${namespace}::int,${key.key}::int)::text`;
         }
         for (const slot of before.slots.filter(slot => !slot.uniqueOnly && slot.row).sort((a,b) => canonical(a.key).localeCompare(canonical(b.key)))) {
           const [meta] = await tx.$queryRaw<{ namespace: number }[]>`

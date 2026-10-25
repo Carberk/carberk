@@ -16,6 +16,7 @@ export class ClaimDatabase {
     $queryRaw: async (query: TemplateStringsArray | { strings: readonly string[]; values: unknown[] }, ...args: unknown[]): Promise<unknown[]> => {
       const sql = "strings" in query ? query.strings.join("?") : query.join("?");
       const values = "strings" in query ? query.values : args;
+      if ((sql.includes("pg_advisory_xact_lock(") || sql.includes("campaign_finish(")) && !sql.trimEnd().endsWith("::text")) throw new Error("unsupported_void_result");
       if (sql.includes("campaign_prepare(")) {
         if (this.receipt) throw new Error("nested_preparation");
         this.receipt = true;
