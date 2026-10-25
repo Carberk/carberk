@@ -50,14 +50,14 @@ describe.skipIf(!database)("retired upload prepared PostgreSQL callers", () => {
   }
   function runtime(): PrismaService {
     return new Proxy(db, { get(target, property) {
-      if (property === "$transaction") return async <T>(run: (tx: Prisma.TransactionClient) => Promise<T>) => {
+      if (property === "$transaction") return async <T>(run: (tx: Prisma.TransactionClient) => Promise<T>, options?: Parameters<PrismaService["$transaction"]>[1]) => {
         activation ??= activate(); await activation;
         return target.$transaction(async tx => {
           await tx.$executeRawUnsafe(`SET LOCAL ROLE "${role}"`);
           const [actual] = await tx.$queryRaw<{ name: string; superuser: boolean; owns: boolean }[]>`SELECT current_user AS name,r.rolsuper AS superuser,pg_has_role(current_user,c.relowner,'USAGE') AS owns FROM pg_roles r JOIN pg_class c ON c.oid='public.media_uploads'::regclass WHERE r.rolname=current_user`;
           expect(actual).toEqual({ name: role, superuser: false, owns: false });
           return run(tx);
-        });
+        }, options);
       };
       const value: unknown = Reflect.get(target, property); return typeof value === "function" ? value.bind(target) : value;
     } });
@@ -163,7 +163,7 @@ describe.skipIf(!database)("retired upload prepared PostgreSQL callers", () => {
     const gate = new Promise<void>(resolve => { release = resolve; });
     let used = false;
     const client = new Proxy(runtime(), { get(target, property) {
-      if (property === "$transaction") return <T>(run: (tx: Prisma.TransactionClient) => Promise<T>) => target.$transaction(tx => run(new Proxy(tx, { get(connection, key) {
+      if (property === "$transaction") return <T>(run: (tx: Prisma.TransactionClient) => Promise<T>, options?: Parameters<PrismaService["$transaction"]>[1]) => target.$transaction(tx => run(new Proxy(tx, { get(connection, key) {
         if (key === "$queryRaw") return async (first: TemplateStringsArray | Prisma.Sql, ...values: unknown[]) => {
           const result: unknown = await Reflect.apply(connection.$queryRaw, connection, [first, ...values]);
           const text = Array.isArray(first) ? first.join("") : (first as Prisma.Sql).text;
@@ -176,7 +176,7 @@ describe.skipIf(!database)("retired upload prepared PostgreSQL callers", () => {
           return result;
         };
         const value: unknown = Reflect.get(connection, key); return typeof value === "function" ? value.bind(connection) : value;
-      } })));
+      } })), options);
       const value: unknown = Reflect.get(target, property); return typeof value === "function" ? value.bind(target) : value;
     } });
     return { client, entered, release };
@@ -222,7 +222,12 @@ describe.skipIf(!database)("retired upload prepared PostgreSQL callers", () => {
       if (first === "purge") { b = ledger.lease(NOW, 1); expect(await b).toEqual([]); }
       else { b = outcome(new PurgeExpiredAccounts(runtime()).execute({ now: NOW })); await blockedBy(pid); }
     } finally { held.release(); await Promise.allSettled([a, ...(b ? [b] : [])]); }
-    expect((await a).ok).toBe(true); if (b && first === "lease") expect(await b).toMatchObject({ ok: true, value: { purgedCount: 1 } });
+    expect((await a).ok).toBe(true);
+    if (b && first === "lease") {
+      const answer = await b as Awaited<ReturnType<typeof outcome>>;
+      if (!answer.ok) throw answer.error;
+      expect(answer).toMatchObject({ ok: true, value: { purgedCount: 1 } });
+    }
     expect(await db.user.findUnique({ where: { id: userId } })).toMatchObject({ avatarUploadId: null, avatarKey: null });
     const pending = await db.mediaUploadCleanup.findUniqueOrThrow({ where: { uploadId: row.id } });
     expect(pending).toMatchObject({ status: "PENDING", completedAt: null, objectKeys: row.objectKeys, attempts: first === "lease" ? 1 : 0 });
@@ -415,14 +420,14 @@ describe.skipIf(!database)("retired upload prepared PostgreSQL callers", () => {
     const ready = new Promise<void>(resolve => { prepared = resolve; });
     const gate = new Promise<void>(resolve => { release = resolve; });
     const delayed = new Proxy(runtime(), { get(target, property) {
-      if (property === "$transaction") return (run: (tx: Prisma.TransactionClient) => Promise<unknown>) => target.$transaction(tx => run(new Proxy(tx, { get(transaction, key) {
+      if (property === "$transaction") return (run: (tx: Prisma.TransactionClient) => Promise<unknown>, options?: Parameters<PrismaService["$transaction"]>[1]) => target.$transaction(tx => run(new Proxy(tx, { get(transaction, key) {
         if (key === "$queryRaw") return async (first: TemplateStringsArray, ...values: unknown[]) => {
           const result = await transaction.$queryRaw(first, ...values);
           if (Array.isArray(first) && first.join("").includes("public.campaign_prepare(")) { prepared(); await gate; }
           return result;
         };
         const value: unknown = Reflect.get(transaction, key); return typeof value === "function" ? value.bind(transaction) : value;
-      } })));
+      } })), options);
       const value: unknown = Reflect.get(target, property); return typeof value === "function" ? value.bind(target) : value;
     } });
     const pending = new PrismaRetiredUploadLedger(delayed).lease(NOW, 1);
