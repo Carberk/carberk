@@ -2,7 +2,7 @@ name: B1 bounded PostgreSQL diagnostic only
 
 on:
   push:
-    branches: [agent/issue-897-r2-verification-assembly-20261025]
+    branches: [agent/issue-897-r2-corrected-diagnostic-20261025]
 
 permissions:
   contents: read
@@ -12,7 +12,7 @@ jobs:
     if: >-
       github.repository == 'Carberk/carberk' &&
       github.event_name == 'push' &&
-      github.ref == 'refs/heads/agent/issue-897-r2-verification-assembly-20261025' &&
+      github.ref == 'refs/heads/agent/issue-897-r2-corrected-diagnostic-20261025' &&
       github.run_attempt == 1 &&
       vars.R2_DIAGNOSTIC_AUTHORIZED_SHA != '' &&
       vars.R2_DIAGNOSTIC_AUTHORIZED_SHA == github.sha

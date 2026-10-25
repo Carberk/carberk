@@ -6,7 +6,7 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 const base = '0efe627ce6be4c97679a1b888f5a5c003f3b4f10';
-const ref = 'refs/heads/agent/issue-897-r2-verification-assembly-20261025';
+const ref = 'refs/heads/agent/issue-897-r2-corrected-diagnostic-20261025';
 const suite = 'apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.e2e.spec.ts';
 const evidence = 'diagnostic-evidence';
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
@@ -34,11 +34,15 @@ const migrations = readdirSync(migrationRoot, { withFileTypes: true })
 
 switch (process.argv[2]) {
   case 'source': {
-    const pin = JSON.parse(readFileSync('docs/evidence/issue-897/r2-verification-assembly-20261025-source.json', 'utf8'));
+    const pin = JSON.parse(readFileSync('docs/evidence/issue-897/r2-corrected-diagnostic-20261025-source.json', 'utf8'));
     for (const [path, expected] of Object.entries(pin.sourceHashes)) assert.equal(hash(path), expected, path);
     for (const path of pin.r2Paths) assert.equal(git('rev-parse', `HEAD:${path}`), git('rev-parse', `${base}:${path}`), path);
+    for (const [path, expected] of Object.entries(pin.fixtureProvenance.exactCopiedBlobs)) {
+      assert.equal(git('rev-parse', `HEAD:${path}`), expected, path);
+      assert.equal(git('rev-parse', `${pin.fixtureProvenance.acceptedSource}:${path}`), expected, path);
+    }
     assert.equal(git('status', '--porcelain', '--untracked-files=no'), '');
-    assert.equal(hash(suite), pin.sourceHashes[suite], 'Parent-authorized drain-only fixture revision');
+    assert.equal(hash(suite), pin.sourceHashes[suite], 'Parent-authorized uniqueness and protected-entry drain composition');
     record('source', {
       purpose: 'DIAGNOSTIC ONLY; no B1 or G3 acceptance or release verdict',
       sha: process.env.GITHUB_SHA, tree: git('rev-parse', 'HEAD^{tree}'), base,
