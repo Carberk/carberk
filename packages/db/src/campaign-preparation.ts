@@ -21,6 +21,6 @@ export async function withCampaignPreparation<T>(
   `;
   if (!row?.receipt) throw new Error("campaign_preparation_receipt");
   const result = await work();
-  await tx.$queryRaw`SELECT public.campaign_finish(${row.receipt}::uuid)`;
+  await tx.$queryRaw`SELECT public.campaign_finish(${row.receipt}::uuid)::text`;
   return result;
 }
