@@ -67,7 +67,11 @@ export class PrismaUserRepository implements UserRepository, SignInMethodReposit
         const source = { id: current.id, phone: current.phone, phoneVerifiedAt: current.phoneVerifiedAt?.toISOString() ?? null,
           email: current.email, emailVerifiedAt: current.emailVerifiedAt?.toISOString() ?? null, role: current.role,
           suspendedAt: current.suspendedAt?.toISOString() ?? null, suspendedById: current.suspendedById,
-          suspensionReason: current.suspensionReason, deletionScheduledAt: current.deletionScheduledAt?.toISOString() ?? null };
+          suspensionReason: current.suspensionReason, deletionScheduledAt: current.deletionScheduledAt?.toISOString() ?? null,
+          // The retained users source contract includes the complete persisted
+          // profile projection, even though this mutation changes one sign-in method.
+          avatarKey: current.avatarKey, avatarUploadId: current.avatarUploadId,
+          avatarUrl: current.avatarUrl, displayName: current.displayName };
         const data = input.channel === SIGN_IN_CODE_CHANNELS.PHONE
           ? { phone: input.destination, phoneVerifiedAt: input.verifiedAt }
           : { email: input.destination, emailVerifiedAt: input.verifiedAt };
