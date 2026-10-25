@@ -144,15 +144,19 @@ export class PrismaRetiredUploadLedger implements RetiredUploadLedger {
     } else ids = [selection.uploadId];
     const slots: Slot[] = [];
     const references: { table: string; id: string }[] = [];
-    const add = async (table: string, id: unknown): Promise<void> => {
+    const edges = new Map<string, Set<string>>();
+    const reverse = new Map<string, string[]>();
+    const add = async (table: string, id: unknown): Promise<string | undefined> => {
       if (typeof id !== "string") return;
       if (!TABLES.includes(table)) throw new Error("retired_upload_reference_table");
       const key = table === "media_upload_cleanups" ? { uploadId: id } : { id };
-      if (slots.some(s => s.table === table && same(s.key, key))) return;
+      const identity = slotIdentity({ table, key });
+      if (slots.some(s => s.table === table && same(s.key, key))) return identity;
       if (slots.length >= 1000) throw new Error("retired_upload_scope_limit");
       const [found] = await tx.$queryRaw<{ row: Row }[]>(Prisma.sql`
         SELECT to_jsonb(s) AS row FROM public.${Prisma.raw(table)} s WHERE to_jsonb(s) @> ${JSON.stringify(key)}::jsonb`);
       slots.push({ table, key, row: found?.row ?? null });
+      return identity;
     };
     for (const id of ids) { await add("media_uploads", id); await add("media_upload_cleanups", id); }
     // Both reverse UNIQUE keys are needed even when there is no adopter yet.
@@ -169,7 +173,10 @@ export class PrismaRetiredUploadLedger implements RetiredUploadLedger {
         UNION ALL SELECT 'listing_media',id FROM listing_media WHERE "uploadId"=${id}
           OR starts_with(key,${directory}) OR starts_with("posterKey",${directory}) ORDER BY 1,2 LIMIT 1001`;
       references.push(...found);
-      for (const ref of found) await add(ref.table, ref.id);
+      for (const ref of found) {
+        const identity = await add(ref.table, ref.id);
+        if (identity) reverse.set(id, [...(reverse.get(id) ?? []), identity]);
+      }
     }
     // Follow the metadata's actual stored FK endpoints recursively. The cleanup
     // registry edge is a lock dependency only: its table deliberately has no FK.
@@ -179,15 +186,19 @@ export class PrismaRetiredUploadLedger implements RetiredUploadLedger {
       const [meta] = await tx.$queryRaw<Meta[]>`SELECT (public.diagnostic_source_meta(${slot.table})->>'namespace')::int AS namespace,
         public.diagnostic_source_meta(${slot.table})->'refs' AS refs`;
       if (!meta) throw new Error("retired_upload_metadata");
+      const targets = new Set<string>();
+      const link = async (table: string, id: unknown) => { const identity = await add(table, id); if (identity) targets.add(identity); };
       for (const ref of meta.refs) {
         if (ref.columns.length !== 1 || ref.target.length !== 1 || ref.target[0] !== "id") throw new Error("retired_upload_reference_key");
-        await add(ref.table, slot.row[ref.columns[0] ?? ""]);
+        await link(ref.table, slot.row[ref.columns[0] ?? ""]);
       }
-      if (slot.table !== "media_uploads") continue;
-      const type = slot.row["claimTargetType"], target = slot.row["claimTargetId"];
-      if (type === "listing") await add("listings", target);
-      if (type === "profile") await add("users", target);
-      if (type === "video_session") await add("video_upload_sessions", target);
+      if (slot.table === "media_uploads") {
+        const type = slot.row["claimTargetType"], target = slot.row["claimTargetId"];
+        if (type === "listing") await link("listings", target);
+        if (type === "profile") await link("users", target);
+        if (type === "video_session") await link("video_upload_sessions", target);
+      }
+      edges.set(slotIdentity(slot), targets);
     }
     const mutations: CampaignMutation[] = [];
     for (const id of ids) {
@@ -216,7 +227,17 @@ export class PrismaRetiredUploadLedger implements RetiredUploadLedger {
       }
       if (selection.kind === "failure") mutations.push({ table: "media_upload_cleanups", key: { uploadId: id }, verb: "update", next: { lastError: selection.reason } });
     }
-    return { ids, slots, references, mutations };
+    const rootSlots: Record<string, string[]> = {};
+    for (const id of ids) {
+      const reached = new Set([
+        slotIdentity({ table: "media_uploads", key: { id } }),
+        slotIdentity({ table: "media_upload_cleanups", key: { uploadId: id } }),
+        ...(reverse.get(id) ?? []),
+      ]);
+      for (const identity of reached) for (const target of edges.get(identity) ?? []) reached.add(target);
+      rootSlots[id] = [...reached].sort();
+    }
+    return { ids, slots, references, mutations, rootSlots };
   }
 
   private async prepared<T>(tx: Prisma.TransactionClient, selection: Selection, skipped: T, work: (plan: Plan) => Promise<T>): Promise<T> {
@@ -227,26 +248,36 @@ export class PrismaRetiredUploadLedger implements RetiredUploadLedger {
       coverage.push({ table: slot.table, key: slot.key, verb: "update", next: {} });
     }
     return withCampaignPreparation(tx, coverage, async () => {
-      const unique = before.ids.flatMap(id => [
-        { table: "users", row: { avatarUploadId: id } }, { table: "listing_media", row: { uploadId: id } },
-      ]);
-      const [derived] = await tx.$queryRaw<{ keys: { namespace: number; key: number }[] }[]>`
-        SELECT public.diagnostic_source_lock_keys_before_intake(${JSON.stringify(before.slots)}::jsonb,
-          ${JSON.stringify({ rows: before.mutations })}::jsonb) || coalesce((
-          SELECT jsonb_agg(DISTINCT jsonb_build_object('namespace',(public.diagnostic_source_meta(s->>'table')->>'namespace')::int,
-            'key',hashtext(jsonb_build_array('unique',fields,public.diagnostic_source_project(s->'row',fields))::text)))
-          FROM jsonb_array_elements(${JSON.stringify(unique)}::jsonb) s
-          CROSS JOIN LATERAL jsonb_array_elements(public.diagnostic_source_meta(s->>'table')->'unique') fields
-          WHERE NOT EXISTS (SELECT 1 FROM jsonb_each(public.diagnostic_source_project(s->'row',fields)) e WHERE e.value='null')
-        ),'[]'::jsonb) AS keys`;
-      if (!derived) throw new Error("retired_upload_lock_keys");
-      const keys = [...new Map(derived.keys.map(k => [`${k.namespace}:${k.key}`, k])).values()].sort((a,b) => a.namespace-b.namespace || a.key-b.key);
+      const ownedKeys = new Map<string, { namespace: number; key: number; roots: Set<string> }>();
+      for (const id of before.ids) {
+        const unique = [
+          { table: "users", row: { avatarUploadId: id } }, { table: "listing_media", row: { uploadId: id } },
+        ];
+        const [derived] = await tx.$queryRaw<{ keys: { namespace: number; key: number }[] }[]>`
+          SELECT public.diagnostic_source_lock_keys_before_intake(${JSON.stringify(before.slots.filter(slot => before.rootSlots[id]?.includes(slotIdentity(slot))))}::jsonb,
+            ${JSON.stringify({ rows: before.mutations.filter(m => m.key["id"] === id || m.key["uploadId"] === id) })}::jsonb) || coalesce((
+            SELECT jsonb_agg(DISTINCT jsonb_build_object('namespace',(public.diagnostic_source_meta(s->>'table')->>'namespace')::int,
+              'key',hashtext(jsonb_build_array('unique',fields,public.diagnostic_source_project(s->'row',fields))::text)))
+            FROM jsonb_array_elements(${JSON.stringify(unique)}::jsonb) s
+            CROSS JOIN LATERAL jsonb_array_elements(public.diagnostic_source_meta(s->>'table')->'unique') fields
+            WHERE NOT EXISTS (SELECT 1 FROM jsonb_each(public.diagnostic_source_project(s->'row',fields)) e WHERE e.value='null')
+          ),'[]'::jsonb) AS keys`;
+        if (!derived) throw new Error("retired_upload_lock_keys");
+        for (const key of derived.keys) {
+          const identity = `${key.namespace}:${key.key}`;
+          const existing = ownedKeys.get(identity);
+          if (existing) existing.roots.add(id);
+          else ownedKeys.set(identity, { ...key, roots: new Set([id]) });
+        }
+      }
+      const keys = [...ownedKeys.values()].sort((a,b) => a.namespace-b.namespace || a.key-b.key);
       const batch = selection.kind === "recover" || selection.kind === "lease";
+      const blocked = new Set<string>();
       for (const namespace of [...new Set(keys.map(k => k.namespace))]) {
         for (const key of keys.filter(k => k.namespace === namespace)) {
           if (batch) {
             const [locked] = await tx.$queryRaw<{ locked: boolean }[]>`SELECT pg_try_advisory_xact_lock(${namespace}::int,${key.key}::int) AS locked`;
-            if (!locked?.locked) return skipped;
+            if (!locked?.locked) for (const id of key.roots) blocked.add(id);
           } else await tx.$queryRaw`SELECT pg_advisory_xact_lock(${namespace}::int,${key.key}::int)::text AS locked`;
         }
         for (const slot of before.slots.filter(s => s.row).sort((a,b) => canonical(a.key).localeCompare(canonical(b.key)))) {
@@ -255,11 +286,13 @@ export class PrismaRetiredUploadLedger implements RetiredUploadLedger {
           const rows = await tx.$queryRaw<{ locked: number }[]>(Prisma.sql`
             SELECT 1 AS locked FROM public.${Prisma.raw(slot.table)} s WHERE to_jsonb(s) @> ${JSON.stringify(slot.key)}::jsonb
             FOR UPDATE ${Prisma.raw(batch ? "SKIP LOCKED" : "")}`);
-          if (batch && !rows.length) return skipped;
+          if (batch && !rows.length) for (const id of before.ids) if (before.rootSlots[id]?.includes(slotIdentity(slot))) blocked.add(id);
         }
       }
+      const active = before.ids.filter(id => !blocked.has(id));
+      if (!active.length) return skipped;
       if (!same(before, await this.discover(tx, selection))) throw new Error("retired_upload_scope_changed");
-      return work(before);
+      return work({ ...before, ids: active });
     });
   }
 }
@@ -268,7 +301,7 @@ const TABLES: readonly string[] = ["users", "dealerships", "dealership_members",
 type Row = Record<string, Prisma.InputJsonValue | null>;
 interface Slot { table: string; key: Record<string, string>; row: Row | null }
 interface Meta { namespace: number; refs: { table: string; columns: string[]; target: string[] }[] }
-interface Plan { ids: string[]; slots: Slot[]; references: { table: string; id: string }[]; mutations: CampaignMutation[] }
+interface Plan { rootSlots: Record<string, string[]>; ids: string[]; slots: Slot[]; references: { table: string; id: string }[]; mutations: CampaignMutation[] }
 type Selection = { kind: "recover"; now: Date; limit: number }
   | { kind: "lease"; now: Date; limit: number }
   | { kind: "complete"; uploadId: string; now: Date }
@@ -279,3 +312,5 @@ const canonical = (value: unknown): string => {
   return JSON.stringify(value);
 };
 const same = (a: unknown, b: unknown) => canonical(a) === canonical(b);
+
+const slotIdentity = (slot: Pick<Slot, "table" | "key">) => canonical([slot.table, slot.key]);
