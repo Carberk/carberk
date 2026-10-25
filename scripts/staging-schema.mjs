@@ -2,6 +2,7 @@
 export const retainedSchemaProfile = {
   baseline: '7af49d4c1474b2c3d841b14736c4ef59ce155a4e',
   schemaHashes: [
+    'f1fcdd418dad583b377b340403817863c727aea6452d5505fe3294db60094b54',
     '65fa18b9cc593e87fde12c2bf78e3013a0cc58d5d3b4755068d21479d2e6d658',
     '7ce808a1af40f4f85c340526ca8ea3bced18e99155282d41b610aca9e85cfc72',
     'a313d359e8ea440c3b026f2de4c4b292b61c8bd2f60b786b85a5d9902e1d6642',
@@ -112,6 +113,7 @@ export const retainedSchemaProfile = {
     'e601862966c5b8ed74b11f8fb2dacac3f358fdc4a0ad7d06a9908d6e09dcefc0': ['20261015003500_listing_view_counts', '20261015010000_staff_capabilities', '20261015020000_business_membership', '20261015030000_business_inventory', '20261015040000_first_party_measurement', '20261015050000_service_foundations', '20261015060000_business_enquiries', '20261015070000_diagnostic_intake', '20261015080000_service_push_subscriptions'],
   },
   additions: [
+    { name: '20261025015000_diagnostic_runtime_transport_corrections', checksum: '520c94deedd51c039f82b396b6bf08acd551838bc37698ca0a345aa92a165424' },
     { name: '20261025010000_diagnostic_report_source_effects', checksum: 'a21407fdf8025b6672656cb678ff34bbd3e05c97594c95e971fb801e66811fb9' },
     { name: '20261024130000_diagnostic_intake_campaign_composition', checksum: '974217c5ec0f68426429e2a37120b0e9b419817dbea16ffd5cb8362ca3e118ed' },
     { name: '20261024120000_diagnostic_account_noop_enquiry', checksum: 'aa41c4e37f8bb267f10bf3d55e70abd0e3d4b87ce8260ba6e882bd8635959d0f' },
