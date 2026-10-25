@@ -54,6 +54,19 @@ export class AvatarContactDatabase {
       return [{ receipt: "receipt" }];
     }
     if (text.includes("campaign_finish(")) { this.boundary("finish"); this.prepared = false; return []; }
+    // R7c supplied receipt/coverage query is a distinct SQL result boundary.
+    // This finite success value proves adapter composition, not pg_locks or
+    // campaign_preparation_scope semantics (those need authored SQL evidence).
+    if (text.includes("campaign_preparations") && text.includes("diagnostic_source_commands")) {
+      return this.prepared ? [{ covered: true }] : [];
+    }
+    if (text.includes("to_jsonb(s) AS row")) {
+      const table = text.match(/FROM public\.(\w+)/)?.[1];
+      if (!table || !(table in namespaces)) throw new Error(`unsupported claim table:${table}`);
+      const key = JSON.parse(String(values[0])) as Row;
+      return this.rows(table).filter(row => Object.entries(key).every(([k, v]) => row[k] === v))
+        .map(row => ({ row: json(row) }));
+    }
     if (text.includes("FROM public.campaign_preparations")) return this.prepared ? [{ ...this.receiptIdentity, mutations: this.mutations }] : [];
     if (text.includes("diagnostic_source_read")) {
       const key = JSON.parse(String(values[1])) as Row;
@@ -62,7 +75,9 @@ export class AvatarContactDatabase {
     if (text.includes("diagnostic_source_lock_keys(")) throw new Error("diagnostic_intake_reception_selection");
     if (text.includes("diagnostic_source_lock_keys_before_intake(")) {
       const slots = JSON.parse(String(values[0])) as { table: string; key: { id?: string } }[];
-      for (const id of this.requiredInitialUsers) {
+      // The enclosing avatar union includes admin dependencies. R7c later
+      // checks its smaller supplied sub-union; it need not repeat that union.
+      for (const id of text.includes("coalesce(") ? [] : this.requiredInitialUsers) {
         if (!slots.some(s => s.table === "users" && s.key.id === id)) throw new Error(`missing initial User dependency:${id}`);
       }
       return [{ keys: [...new Set(slots.map(s => namespaces[s.table]))].map(namespace => ({ namespace, key: 1 })) }];
@@ -78,8 +93,8 @@ export class AvatarContactDatabase {
     if (text.includes("FOR UPDATE") || text.includes("pg_advisory_xact_lock")) this.boundary("lock");
     if (text.includes("SELECT 1 FROM public.") || text.includes("pg_advisory_xact_lock")) return [];
     if (text.includes("UNION ALL SELECT 'listing_media'")) return [
-      ...this.rows("users").filter(r => r["avatarUploadId"] === values[0]).map(r => ({ table: "users", id: r["id"], listingId: null })),
-      ...this.rows("listing_media").filter(r => r["uploadId"] === values[1]).map(r => ({ table: "listing_media", id: r["id"], listingId: r["listingId"] })),
+      ...this.rows("users").filter(r => (Array.isArray(values[0]) ? values[0].includes(r["avatarUploadId"]) : r["avatarUploadId"] === values[0])).map(r => ({ table: "users", id: r["id"], listingId: null })),
+      ...this.rows("listing_media").filter(r => (Array.isArray(values[0]) ? values[0].includes(r["uploadId"]) : r["uploadId"] === values[1])).map(r => ({ table: "listing_media", id: r["id"], listingId: r["listingId"] })),
     ];
     if (text.includes("AS total")) {
       const ids = values[0] as string[];

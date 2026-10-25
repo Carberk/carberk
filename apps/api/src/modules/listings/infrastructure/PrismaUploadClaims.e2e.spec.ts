@@ -3,83 +3,105 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { PrismaService } from "@auto-tm/db";
+import { PrismaService, type Prisma, withCampaignPreparation } from "@auto-tm/db";
 
-import {
-  cleanSuiteFixtures,
-  defineE2eSuite,
-  seedSuiteCatalog,
-} from "../../../../test/helpers/e2eSuite";
+import { withFixtureCallerDrain } from "../../../../test/helpers/fixtureCallerDrain";
+import { PrismaProfilePhotoLink } from "./PrismaProfilePhotoLink";
 import { ListingMedia } from "../domain/ListingMedia";
 import { imageUploadObjectKeys } from "../domain/imageUploadObjectKeys";
 import type { UploadClaimTarget } from "../domain/ports/UploadClaimPort";
 import { PrismaListingMediaRepository } from "./PrismaListingMediaRepository";
 import { PrismaUploadClaims } from "./PrismaUploadClaims";
 
-// Issue #721 / ADR-0088 against the hosted disposable Postgres: the row lock on
-// the upload record, not two unique columns or a preflight read, decides the
-// single adopter across Listing media and Profile Photos.
+// AUTHORED ONLY: parent installs upload-claims-existing-r7c-20261025.sql
+// before matching activation on its disposable candidate. No seed/cleanup writes
+// run under active guards. Parent owns fixture teardown with that database.
+// Production633f/677ea remain read-only; media caller compatibility is R7b-owned.
+const fixture = (n: number) => `r7c-existing-20261025-${n}`;
+let OWNER: string, STRANGER: string, LISTING: string, OTHER_LISTING: string;
+let listingTarget: UploadClaimTarget, profileTarget: UploadClaimTarget;
+// Stable graph selection also supports individual tests and name filters.
+const fixtureCaseNames = [
+  "Listing first: the overlapping Profile Photo claim is refused and adopts nothing",
+  "Profile Photo first: the overlapping Listing claim is refused and writes no media row",
+  "lets one of two Listings adopt when both hold the same upload",
+  "reserves all of a publication's uploads or none",
+  "keeps provenance checks: another User's upload and an unknown upload are not available",
+  "joins the in-flight reservation and returns the one committed row to both",
+  "rolls the adoption back with the transaction that carried it",
+  "writes the claim deadline and retirement time from the injected UTC clock",
+  "releases the Listing row, closes adoption and records the exact manifest in one transaction",
+  "keeps a legacy upload's physical cleanup explicitly pending",
+  "never lets a RETIRED upload be adopted again",
+  "never lets a DELETED upload be adopted again",
+  "keeps the adopter and records no work when the releasing transaction fails",
+  "records one piece of work when the same upload is retired concurrently",
+  "retires an abandoned preparation and refuses its late finalization",
+  "refuses a new row whose poster upload was retired",
+  "release returns every held upload to AVAILABLE without recording work, and a retry can reserve them again",
+  "release touches nothing a committed attempt holds",
+  "settle retires exactly one held upload with its manifest and releases the rest",
+  "settle is false and retires nothing once the attempt no longer holds the upload",
+  "pre-reserve retirement refuses another User's upload and existing Listing/Profile adopters under the lock",
+  "keeps the row locked during reinspection and refuses retirement when the object is now valid",
+  "retireUnclaimed retires an AVAILABLE upload but never an adopted or held one",
+  "replaces the real profile, preserves foreign bytes and makes an adopted retry unchanged",
+  "unbinds a real legacy profile with the exact manifest and leaves foreign rows unchanged",
+  "the migration backfill marks an existing Listing claim adopted and leaves unclaimed uploads alone"
+] as const;
 
-const suite = defineE2eSuite("upload-claims");
-const USERS = ["owner", "stranger"] as const;
-const OWNER = suite.id("owner");
-const LISTING = suite.id("listing");
-const OTHER_LISTING = suite.id("listing-2");
-const listingTarget: UploadClaimTarget = { type: "listing", id: LISTING };
-const profileTarget: UploadClaimTarget = { type: "profile", id: OWNER };
 
-describe("common upload claim on Postgres (#721)", () => {
+describe("common upload claim on Postgres (#721)", { concurrent: false }, () => {
   let prisma: PrismaService;
   let claims: PrismaUploadClaims;
   let mediaRepo: PrismaListingMediaRepository;
-  const cleanupIds: string[] = [];
+  let profileLink: PrismaProfilePhotoLink;
+  let graph = 0;
+  const allocated = new Map<string, number>();
 
-  async function clean(): Promise<void> {
-    await prisma.user.updateMany({
-      where: { id: { in: USERS.map((alias) => suite.id(alias)) } },
-      data: { avatarUploadId: null, avatarKey: null },
-    });
-    await prisma.mediaUploadCleanup.deleteMany({ where: { uploadId: { in: cleanupIds } } });
-    cleanupIds.length = 0;
-    await cleanSuiteFixtures(prisma, suite, { userAliases: USERS });
-  }
-
-  beforeAll(() => {
+  beforeAll(async () => {
     prisma = new PrismaService();
+    const [ready] = await prisma.$queryRaw<{ source: boolean; campaign: boolean }[]>`
+      SELECT public.diagnostic_source_guards_ready() AS source, public.campaign_preparation_ready() AS campaign`;
+    expect(ready).toEqual({ source: true, campaign: true });
+    // Assert complete preactivation fixture reachability before any negatives.
+    for (let n = 1; n <= 26; n++) {
+      const p = fixture(n);
+      expect(await prisma.user.count({ where: { id: { in: [`${p}-owner`, `${p}-stranger`] } } })).toBe(2);
+      expect(await prisma.listing.count({ where: { id: { in: [`${p}-listing`, `${p}-listing-2`] } } })).toBe(2);
+      const uploads = await prisma.mediaUpload.findMany({ where: { id: { startsWith: `${p}-upload-` } } });
+      expect(uploads).toHaveLength(32);
+      expect(uploads.every(u => u.state === "AVAILABLE" && u.claimToken === null &&
+        (u.writeProtocol === "legacy" ? u.objectKeys.length === 0 :
+          JSON.stringify(u.objectKeys) === JSON.stringify(imageUploadObjectKeys(u.key))))).toBe(true);
+      expect(await prisma.mediaUploadCleanup.count({ where: { uploadId: { startsWith: `${p}-upload-` } } })).toBe(0);
+    }
+  });
+
+  afterAll(async () => { if (prisma) await prisma.onModuleDestroy(); });
+
+  beforeEach(({ task }) => {
+    graph = fixtureCaseNames.findIndex(name => name === task.name) + 1;
+    if (!graph) throw new Error("upload_claim_fixture_graph_missing");
+    const p = fixture(graph);
+    OWNER = `${p}-owner`; STRANGER = `${p}-stranger`;
+    LISTING = `${p}-listing`; OTHER_LISTING = `${p}-listing-2`;
+    listingTarget = { type: "listing", id: LISTING };
+    profileTarget = { type: "profile", id: OWNER };
+    allocated.clear();
     claims = new PrismaUploadClaims(prisma, { now: () => new Date() });
     mediaRepo = new PrismaListingMediaRepository(prisma, claims);
-  });
-
-  afterAll(async () => {
-    await clean();
-    await prisma.onModuleDestroy();
-  });
-
-  beforeEach(async () => {
-    await clean();
-    await seedSuiteCatalog(prisma, suite);
-    for (const alias of USERS) {
-      await prisma.user.create({
-        data: { id: suite.id(alias), phone: suite.phone(alias), phoneVerifiedAt: new Date(), role: "buyer" },
-      });
-    }
-    for (const id of [LISTING, OTHER_LISTING]) {
-      await prisma.listing.create({ data: {
-        id, sellerId: OWNER, status: "active", brandId: suite.catalog.brandId,
-        modelId: suite.catalog.modelId, cityId: suite.catalog.cityId,
-        priceAmount: 100000, priceCurrency: "TMT", publishedAt: new Date(),
-      } });
-    }
+    profileLink = new PrismaProfilePhotoLink(prisma, claims);
   });
 
   async function presigned(protocol: "legacy" | "conditional-v1" = "legacy", userId = OWNER) {
-    const key = `pending/${randomUUID()}/original.webp`;
-    const upload = await prisma.mediaUpload.create({ data: {
-      userId, key, kind: "image", contentType: "image/webp", sizeBytes: 2048,
-      writeProtocol: protocol,
-      objectKeys: protocol === "conditional-v1" ? imageUploadObjectKeys(key) : [],
-    } });
-    cleanupIds.push(upload.id);
+    const alias = userId === OWNER ? "owner" : userId === STRANGER ? "stranger" : undefined;
+    if (!alias) throw new Error("upload_claim_fixture_owner");
+    const pool = `${alias}-${protocol}`;
+    const index = allocated.get(pool) ?? 0;
+    allocated.set(pool, index + 1);
+    const upload = await prisma.mediaUpload.findUniqueOrThrow({ where: { id: `${fixture(graph)}-upload-${pool}-${index}` } });
+    expect(upload).toMatchObject({ userId, writeProtocol: protocol, state: "AVAILABLE", claimToken: null });
     return upload;
   }
 
@@ -96,52 +118,83 @@ describe("common upload claim on Postgres (#721)", () => {
     return reservation.token;
   }
 
-  /** What profile infrastructure (#642) does with the same claim. */
-  async function adoptAsProfile(upload: { id: string; key: string }, token: string) {
-    return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM users WHERE id = ${OWNER} FOR UPDATE`;
-      const outcome = await claims.finalize(tx, { token, uploadIds: [upload.id], target: profileTarget });
-      await tx.user.update({ where: { id: OWNER }, data: { avatarUploadId: upload.id, avatarKey: upload.key } });
-      return outcome;
-    });
+  // This proxy only pauses a completed production statement or fails the real
+  // User write. PID discovery runs before the callback, never behind its wait.
+  function instrument(pausePrefix = false, failUserWrite = false) {
+    let pid = 0, release!: () => void, reached!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    const entered = new Promise<void>(resolve => { reached = resolve; });
+    const service = new Proxy(prisma, { get(target, name) {
+      if (name !== "$transaction") {
+        const value: unknown = Reflect.get(target, name);
+        return typeof value === "function" ? value.bind(target) : value;
+      }
+      return <T>(work: (tx: Prisma.TransactionClient) => Promise<T>) => target.$transaction(async tx => {
+        pid = (await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`)[0]?.pid ?? 0;
+        return work(new Proxy(tx, { get(client, property) {
+          const value: unknown = Reflect.get(client, property);
+          if (property === "user" && failUserWrite) return new Proxy(client.user, { get(model, method) {
+            if (method !== "update") return Reflect.get(model, method);
+            return async (...args: unknown[]) => {
+              await Reflect.apply(model.update, model, args);
+              throw new Error("the adopter's own write failed");
+            };
+          } });
+          if (property !== "$queryRaw" || typeof value !== "function") return typeof value === "function" ? value.bind(client) : value;
+          return async (...args: unknown[]) => {
+            const result: unknown = await Reflect.apply(value, client, args);
+            const query = args[0] as TemplateStringsArray | { sql: string };
+            const text = Array.isArray(query) ? query.join("?") : (query as { sql: string }).sql;
+            if (pausePrefix && text.includes("SELECT pg_advisory_xact_lock(")) { reached(); await held; }
+            return result;
+          };
+        } }));
+      }, { timeout: 30_000 });
+    } });
+    return { service, release, entered, pid: () => pid };
   }
 
-  /** Sessions of this database blocked on a lock while claiming an upload. */
-  async function waitingClaimants(expected: number): Promise<void> {
-    for (let attempt = 0; attempt < 200; attempt += 1) {
-      const [row] = await prisma.$queryRaw<{ waiting: bigint }[]>`
-        SELECT count(*) AS waiting FROM pg_stat_activity
-        WHERE datname = current_database() AND wait_event_type = 'Lock'
-          AND query ILIKE '%media_uploads%FOR UPDATE%'`;
-      if (Number(row?.waiting ?? 0) >= expected) return;
-      await new Promise((done) => setTimeout(done, 25));
+  async function boundedEntry(entered: Promise<void>, caller: Promise<unknown>) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([entered, caller.then(result => {
+          if (result && typeof result === "object" && "error" in result) throw result.error;
+          throw new Error("upload_claim_prefix_not_reached");
+        }),
+        new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error("upload_claim_prefix_timeout")), 5000); })]);
+    } finally { if (timer) clearTimeout(timer); }
+  }
+
+  async function waitingClaimant(waiter: () => number, holder: () => number, running: Promise<unknown>) {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const [row] = await prisma.$queryRaw<{ blocked: boolean }[]>`
+        SELECT ${holder()}::int = ANY(pg_blocking_pids(${waiter()}::int)) AS blocked`;
+      if (waiter() && holder() && row?.blocked) return;
+      await Promise.race([new Promise(resolve => setTimeout(resolve, 25)),
+        running.then(result => {
+          if (result && typeof result === "object" && "error" in result) throw result.error;
+          throw new Error("upload_claim_contender_finished_without_wait");
+        })]);
     }
-    throw new Error(`Expected ${expected} claimants to wait on the upload lock`);
+    throw new Error("Expected claimant to wait on the metadata key prefix");
   }
 
-  /**
-   * Holds the upload's row lock, queues `first` and then `second` behind it, and
-   * releases. Postgres grants a row lock to its waiters in arrival order, so the
-   * overlap is forced and its winner is known.
-   */
-  async function overlap<A, B>(uploadId: string, first: () => Promise<A>, second: () => Promise<B>) {
-    let release!: () => void;
-    const held = new Promise<void>((resolveHeld) => { release = resolveHeld; });
-    let locked!: () => void;
-    const lockTaken = new Promise<void>((resolveLocked) => { locked = resolveLocked; });
-    const barrier = prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM media_uploads WHERE id = ${uploadId} FOR UPDATE`;
-      locked();
-      await held;
-    }, { timeout: 30_000 });
-    await lockTaken;
-    const firstResult = first().then((value) => ({ value }), (error: unknown) => ({ error }));
-    await waitingClaimants(1);
-    const secondResult = second().then((value) => ({ value }), (error: unknown) => ({ error }));
-    await waitingClaimants(2);
-    release();
-    await barrier;
-    return [await firstResult, await secondResult] as const;
+  /** Actual first reserve owns the first metadata key after its campaign prefix;
+   * second reserve waits on that same key.
+   * The stale-discovery/public-error mismatch is reported to parent, with the
+   * original literal assertions below preserved. No test translates the error. */
+  async function overlap<A, B>(_uploadId: string, first: (claims: PrismaUploadClaims) => Promise<A>, second: (claims: PrismaUploadClaims) => Promise<B>) {
+    const holder = instrument(true), waiter = instrument();
+    return withFixtureCallerDrain(holder.release, async start => {
+      const firstResult = start(() => first(new PrismaUploadClaims(holder.service, { now: () => new Date() }))
+        .then(value => ({ value }), (error: unknown) => ({ error })));
+      await boundedEntry(holder.entered, firstResult);
+      const secondResult = start(() => second(new PrismaUploadClaims(waiter.service, { now: () => new Date() }))
+        .then(value => ({ value }), (error: unknown) => ({ error })));
+      await waitingClaimant(waiter.pid, holder.pid, secondResult);
+      holder.release();
+      return [await firstResult, await secondResult] as const;
+    });
   }
 
   describe("one adopter across Listing media and Profile Photos", () => {
@@ -150,8 +203,8 @@ describe("common upload claim on Postgres (#721)", () => {
 
       const [listing, profile] = await overlap(
         upload.id,
-        () => claims.reserve({ userId: OWNER, uploadIds: [upload.id], target: listingTarget }),
-        () => claims.reserve({ userId: OWNER, uploadIds: [upload.id], target: profileTarget }),
+        contender => contender.reserve({ userId: OWNER, uploadIds: [upload.id], target: listingTarget }),
+        contender => contender.reserve({ userId: OWNER, uploadIds: [upload.id], target: profileTarget }),
       );
 
       expect(profile).toMatchObject({ error: { code: "UPLOAD_ALREADY_ATTACHED" } });
@@ -171,13 +224,13 @@ describe("common upload claim on Postgres (#721)", () => {
 
       const [profile, listing] = await overlap(
         upload.id,
-        () => claims.reserve({ userId: OWNER, uploadIds: [upload.id], target: profileTarget }),
-        () => claims.reserve({ userId: OWNER, uploadIds: [upload.id], target: listingTarget }),
+        contender => contender.reserve({ userId: OWNER, uploadIds: [upload.id], target: profileTarget }),
+        contender => contender.reserve({ userId: OWNER, uploadIds: [upload.id], target: listingTarget }),
       );
 
       expect(listing).toMatchObject({ error: { code: "UPLOAD_ALREADY_ATTACHED" } });
       if (!("value" in profile)) throw profile.error;
-      expect(await adoptAsProfile(upload, await tokenOf(profile.value))).toBe("adopted");
+      await expect(profileLink.bind({ userId: OWNER, uploadId: upload.id, key: upload.key, token: await tokenOf(profile.value) })).resolves.toBeUndefined();
       // A Listing row cannot be forced in beside the Profile Photo, even with a stolen token.
       await expect(mediaRepo.save(mediaFor(upload), { token: await tokenOf(profile.value) }))
         .rejects.toMatchObject({ code: "UPLOAD_ALREADY_ATTACHED" });
@@ -208,7 +261,7 @@ describe("common upload claim on Postgres (#721)", () => {
     });
 
     it("keeps provenance checks: another User's upload and an unknown upload are not available", async () => {
-      const foreign = await presigned("legacy", suite.id("stranger"));
+      const foreign = await presigned("legacy", STRANGER);
 
       for (const id of [foreign.id, randomUUID()]) {
         await expect(claims.reserve({ userId: OWNER, uploadIds: [id], target: listingTarget }))
@@ -225,12 +278,14 @@ describe("common upload claim on Postgres (#721)", () => {
       const retry = await tokenOf(await claims.reserve({ userId: OWNER, uploadIds: [upload.id], target: listingTarget }));
       expect(retry).toBe(first);
 
-      const [one, two] = await Promise.all([
+      const [one, two] = await Promise.allSettled([
         mediaRepo.save(mediaFor(upload), { token: first }),
         mediaRepo.save(mediaFor(upload), { token: retry }),
       ]);
 
-      expect(one.id).toBe(two.id);
+      if (one.status === "rejected") throw one.reason;
+      if (two.status === "rejected") throw two.reason;
+      expect(one.value.id).toBe(two.value.id);
       expect(await prisma.listingMedia.count({ where: { uploadId: upload.id } })).toBe(1);
       expect(await claims.reserve({ userId: OWNER, uploadIds: [upload.id], target: listingTarget }))
         .toEqual({ alreadyAdopted: true });
@@ -240,11 +295,11 @@ describe("common upload claim on Postgres (#721)", () => {
       const upload = await presigned();
       const token = await tokenOf(await claims.reserve({ userId: OWNER, uploadIds: [upload.id], target: profileTarget }));
 
-      await expect(prisma.$transaction(async (tx) => {
-        await claims.finalize(tx, { token, uploadIds: [upload.id], target: profileTarget });
-        await tx.user.update({ where: { id: OWNER }, data: { avatarUploadId: upload.id } });
-        throw new Error("the adopter's own write failed");
-      })).rejects.toThrow("the adopter's own write failed");
+      const fault = instrument(false, true);
+      const failingClaims = new PrismaUploadClaims(fault.service, { now: () => new Date() });
+      const failingLink = new PrismaProfilePhotoLink(fault.service, failingClaims);
+      await expect(failingLink.bind({ userId: OWNER, uploadId: upload.id, key: upload.key, token }))
+        .rejects.toThrow("the adopter's own write failed");
 
       expect(await stateOf(upload.id)).toBe("PREPARING");
       expect((await prisma.user.findUniqueOrThrow({ where: { id: OWNER } })).avatarUploadId).toBeNull();
@@ -262,6 +317,8 @@ describe("common upload claim on Postgres (#721)", () => {
       const reserved = await prisma.mediaUpload.findUniqueOrThrow({ where: { id: upload.id } });
       expect(reserved.claimDeadline?.getTime()).toBe(at.getTime() + 10 * 60 * 1000);
 
+      // Original supplied-retire contract retained: exact upfront fixture
+      // preparation needs parent disposition; do not replace it with abandon.
       await prisma.$transaction((tx) => timed.retire(tx, upload.id));
       const retired = await prisma.mediaUpload.findUniqueOrThrow({ where: { id: upload.id } });
       expect(retired.retiredAt?.getTime()).toBe(at.getTime());
@@ -303,7 +360,9 @@ describe("common upload claim on Postgres (#721)", () => {
     it.each(["RETIRED", "DELETED"])("never lets a %s upload be adopted again", async (state) => {
       const { upload, media } = await adopted("conditional-v1");
       await mediaRepo.deleteReleasingUpload(media.id);
-      await prisma.mediaUpload.update({ where: { id: upload.id }, data: { state } });
+      // Test-only fixture state fault, not a competing production caller.
+      await prisma.$transaction(tx => withCampaignPreparation(tx, [{ table: "media_uploads", key: { id: upload.id }, verb: "update", next: { state } }],
+        () => tx.mediaUpload.update({ where: { id: upload.id }, data: { state } })));
 
       for (const target of [listingTarget, profileTarget]) {
         await expect(claims.reserve({ userId: OWNER, uploadIds: [upload.id], target }))
@@ -317,11 +376,27 @@ describe("common upload claim on Postgres (#721)", () => {
     it("keeps the adopter and records no work when the releasing transaction fails", async () => {
       const { upload, media } = await adopted("conditional-v1");
 
-      await expect(prisma.$transaction(async (tx) => {
-        await tx.listingMedia.delete({ where: { id: media.id } });
-        expect(await claims.retire(tx, upload.id)).toBe(true);
-        throw new Error("release failed");
-      })).rejects.toThrow("release failed");
+      // Fault the enclosing transaction after the real media release returns;
+      // this is driver-failure evidence, never a handwritten opposing command.
+      let retired = false;
+      const observedClaims = new Proxy(claims, { get(target, name) {
+        if (name === "retire") return async (tx: unknown, id: string) => {
+          const result = await target.retire(tx, id); retired = result; return result;
+        };
+        const value: unknown = Reflect.get(target, name);
+        return typeof value === "function" ? value.bind(target) : value;
+      } });
+      const failingService = new Proxy(prisma, { get(target, name) {
+        if (name === "$transaction") return <T>(work: (tx: Prisma.TransactionClient) => Promise<T>) => target.$transaction(async tx => {
+          await work(tx);
+          expect(retired).toBe(true);
+          throw new Error("release failed");
+        });
+        const value: unknown = Reflect.get(target, name);
+        return typeof value === "function" ? value.bind(target) : value;
+      } });
+      await expect(new PrismaListingMediaRepository(failingService, observedClaims).deleteReleasingUpload(media.id))
+        .rejects.toThrow("release failed");
 
       expect(await stateOf(upload.id)).toBe("ADOPTED");
       expect(await prisma.listingMedia.count({ where: { id: media.id } })).toBe(1);
@@ -331,8 +406,11 @@ describe("common upload claim on Postgres (#721)", () => {
     it("records one piece of work when the same upload is retired concurrently", async () => {
       const { upload } = await adopted("conditional-v1");
 
-      const outcomes = await Promise.all([1, 2, 3].map(() =>
+      // Original supplied concurrent-retirement outcomes remain literal. The
+      // parent must disposition their enclosing complete initial union.
+      const settled = await Promise.allSettled([1, 2, 3].map(() =>
         prisma.$transaction((tx) => claims.retire(tx, upload.id))));
+      const outcomes = settled.map(result => { if (result.status === "rejected") throw result.reason; return result.value; });
 
       expect(outcomes.filter(Boolean)).toHaveLength(1);
       expect(await prisma.mediaUploadCleanup.count({ where: { uploadId: upload.id } })).toBe(1);
@@ -432,10 +510,10 @@ describe("common upload claim on Postgres (#721)", () => {
     it("pre-reserve retirement refuses another User's upload and existing Listing/Profile adopters under the lock", async () => {
       const [foreign, listed, profile] = [await presigned(), await presigned(), await presigned()];
       // Legacy references can predate claim-state backfill and still authorize no retirement.
-      await prisma.listingMedia.create({ data: { listingId: LISTING, kind: "image", key: listed.key, uploadId: listed.id, sortOrder: 0 } });
-      await prisma.user.update({ where: { id: OWNER }, data: { avatarUploadId: profile.id, avatarKey: profile.key } });
+      expect(await prisma.listingMedia.findUniqueOrThrow({ where: { uploadId: listed.id } })).toMatchObject({ listingId: LISTING, key: listed.key });
+      expect(await prisma.user.findUniqueOrThrow({ where: { id: OWNER } })).toMatchObject({ avatarUploadId: profile.id, avatarKey: profile.key });
       const retire = claims.retireUnclaimed.bind(claims);
-      expect(await retire(foreign.id, suite.id("stranger"), async () => true)).toBe(false);
+      expect(await retire(foreign.id, STRANGER, async () => true)).toBe(false);
       expect(await retire(listed.id, OWNER, async () => true)).toBe(false);
       expect(await retire(profile.id, OWNER, async () => true)).toBe(false);
       for (const upload of [foreign, listed, profile]) {
@@ -476,12 +554,46 @@ describe("common upload claim on Postgres (#721)", () => {
     });
   });
 
+  it("replaces the real profile, preserves foreign bytes and makes an adopted retry unchanged", async () => {
+    const [old, next, foreign] = [await presigned("conditional-v1"), await presigned("conditional-v1"), await presigned("conditional-v1", STRANGER)];
+    const bind = async (upload: { id: string; key: string }) => {
+      const token = await tokenOf(await claims.reserve({ userId: OWNER, uploadIds: [upload.id], target: profileTarget }));
+      await profileLink.bind({ userId: OWNER, uploadId: upload.id, key: upload.key, token });
+      return token;
+    };
+    await bind(old);
+    const foreignBefore = await prisma.mediaUpload.findUniqueOrThrow({ where: { id: foreign.id } });
+    const token = await bind(next);
+    expect(await stateOf(old.id)).toBe("RETIRED");
+    expect(await stateOf(next.id)).toBe("ADOPTED");
+    expect(await prisma.mediaUploadCleanup.findUniqueOrThrow({ where: { uploadId: old.id } })).toMatchObject({ key: old.key, objectKeys: old.objectKeys, writeProtocol: "conditional-v1", status: "PENDING" });
+    const before = await prisma.user.findUniqueOrThrow({ where: { id: OWNER } });
+    await profileLink.bind({ userId: OWNER, uploadId: next.id, key: next.key, token });
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: OWNER } })).toEqual(before);
+    expect(await prisma.mediaUpload.findUniqueOrThrow({ where: { id: foreign.id } })).toEqual(foreignBefore);
+    expect(await profileLink.unbind(OWNER)).toBe(next.key);
+    expect(await profileLink.unbind(OWNER)).toBeNull();
+    expect(await stateOf(next.id)).toBe("RETIRED");
+    expect(await prisma.mediaUploadCleanup.count({ where: { uploadId: { in: [old.id, next.id] } } })).toBe(2);
+  });
+
+  it("unbinds a real legacy profile with the exact manifest and leaves foreign rows unchanged", async () => {
+    const upload = await presigned();
+    const foreign = await presigned("legacy", STRANGER);
+    const before = await prisma.mediaUpload.findUniqueOrThrow({ where: { id: foreign.id } });
+    const token = await tokenOf(await claims.reserve({ userId: OWNER, uploadIds: [upload.id], target: profileTarget }));
+    await profileLink.bind({ userId: OWNER, uploadId: upload.id, key: upload.key, token });
+    expect(await profileLink.unbind(OWNER)).toBe(upload.key);
+    expect(await profileLink.unbind(OWNER)).toBeNull();
+    expect(await stateOf(upload.id)).toBe("RETIRED");
+    expect(await prisma.mediaUploadCleanup.findUniqueOrThrow({ where: { uploadId: upload.id } })).toMatchObject({ key: upload.key, objectKeys: [], writeProtocol: "legacy", status: "LEGACY_PENDING" });
+    expect(await prisma.mediaUpload.findUniqueOrThrow({ where: { id: foreign.id } })).toEqual(before);
+  });
+
   it("the migration backfill marks an existing Listing claim adopted and leaves unclaimed uploads alone", async () => {
     // Rows as they stand between the additive migration and its backfill.
     const [claimed, unclaimed] = [await presigned(), await presigned()];
-    await prisma.listingMedia.create({ data: {
-      listingId: LISTING, kind: "image", key: claimed.key, sortOrder: 0, uploadId: claimed.id,
-    } });
+    expect(await prisma.listingMedia.findUniqueOrThrow({ where: { uploadId: claimed.id } })).toMatchObject({ listingId: LISTING, key: claimed.key });
     // The migration ships in every checkout (implementation commit 6161871b),
     // so there is no existsSync guard. Its UPDATE is scoped to this test's
     // rows: the database is shared with other suites, and an unscoped backfill
@@ -492,7 +604,8 @@ describe("common upload claim on Postgres (#721)", () => {
     const sql = readFileSync(file, "utf8")
       .replace(`u."state" = 'AVAILABLE'`, `u."state" = 'AVAILABLE'${scope}`);
     expect(sql).toContain(scope.trim());
-    await prisma.$executeRawUnsafe(sql);
+    await prisma.$transaction(tx => withCampaignPreparation(tx, [{ table: "media_uploads", key: { id: claimed.id }, verb: "update",
+      next: { state: "ADOPTED", claimTargetType: "listing", claimTargetId: LISTING } }], () => tx.$executeRawUnsafe(sql)));
 
     expect(await prisma.mediaUpload.findUniqueOrThrow({ where: { id: claimed.id } })).toMatchObject({
       state: "ADOPTED", claimTargetType: "listing", claimTargetId: LISTING, writeProtocol: "legacy",
