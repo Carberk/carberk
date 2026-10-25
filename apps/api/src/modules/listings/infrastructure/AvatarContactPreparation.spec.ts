@@ -1,3 +1,4 @@
+import { withAvatarPreparation } from "../../../common/avatar-contact-preparation";
 import { describe, expect, it } from "vitest";
 import { withCampaignPreparation, type Prisma } from "@auto-tm/db";
 import { PrismaVerifiedContactPhoneRepository } from "./PrismaVerifiedContactPhoneRepository";
@@ -97,6 +98,24 @@ describe("real profile link and upload claim integration at the database boundar
     await expect(db.$transaction(tx => withCampaignPreparation(tx as unknown as Prisma.TransactionClient,
       [{ table: "users", key: { id: "seller" }, verb: "update", next: { avatarUploadId: null, avatarKey: null } }],
       () => linkFor(db).unbind("seller", tx)))).rejects.toThrow("avatar_release_preparation_uncovered");
+    expect(db.tables).toEqual(before);
+  });
+  it("refuses complete mutation intent without completed avatar dependency preparation", async () => {
+    const db = avatarDatabase(); const before = structuredClone(db.tables);
+    const mutations = [
+      { table: "media_uploads", key: { id: "old" }, verb: "update" as const, next: { state: "RETIRED", claimToken: null, claimDeadline: null } },
+      { table: "media_upload_cleanups", key: { uploadId: "old" }, verb: "insert" as const,
+        next: { uploadId: "old", key: "old.webp", objectKeys: ["old.webp", "old-thumb.webp"], writeProtocol: "conditional-v1", status: "PENDING" } },
+      { table: "users", key: { id: "seller" }, verb: "update" as const, next: { avatarUploadId: null, avatarKey: null } },
+    ];
+    await expect(db.$transaction(tx => withCampaignPreparation(tx as unknown as Prisma.TransactionClient, mutations,
+      () => linkFor(db).unbind("seller", tx)))).rejects.toThrow("avatar_release_dependencies_unprepared");
+    expect(db.tables).toEqual(before);
+  });
+  it("rejects a copied transaction object even with a live receipt", async () => {
+    const db = avatarDatabase(); const before = structuredClone(db.tables);
+    await expect(db.$transaction(tx => withAvatarPreparation(tx as unknown as Prisma.TransactionClient, "seller", undefined, undefined,
+      () => linkFor(db).unbind("seller", new Proxy(tx, {}))))).rejects.toThrow("avatar_release_dependencies_unprepared");
     expect(db.tables).toEqual(before);
   });
   it("refuses a finished receipt before any supplied release write", async () => {
