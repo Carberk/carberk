@@ -6,7 +6,7 @@ import { Pool } from "pg";
 
 import { PrismaClient } from "../generated/prisma/client/client";
 
-import { bootstrapSyntheticCenter } from "./bootstrap-command";
+import { runSyntheticCenterBootstrap } from "./bootstrap-command";
 
 
 // Explicit operator authority only. Never invoked by an API, seed or migration; no dotenv fallback.
@@ -47,9 +47,7 @@ async function main() {
   const pool = new Pool({ connectionString: process.env["DATABASE_URL"] });
   const db = new PrismaClient({ adapter: new PrismaPg(pool) });
   try {
-    const result = await db.$transaction(async tx => {
-      return bootstrapSyntheticCenter(tx, values);
-    });
+    const result = await runSyntheticCenterBootstrap(db, values);
     console.log(result);
   } finally { await db.$disconnect(); await pool.end(); }
 }

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { Prisma } from "../generated/prisma/client/client";
+import type { Prisma, PrismaClient } from "../generated/prisma/client/client";
 import { assertDiagnosticSourceCommand, withDiagnosticSourceCommand } from "../src/diagnostic-source-command";
 import type { DiagnosticSourceCommand, DiagnosticSourceTuple } from "../src/diagnostic-source-command";
 
@@ -130,4 +130,9 @@ export async function bootstrapSyntheticCenter(
     }
     return "Synthetic center and qualification created";
   });
+}
+
+/** Owns the operator command transaction; the CLI supplies the connected client. */
+export async function runSyntheticCenterBootstrap(db: Pick<PrismaClient, "$transaction">, values: CenterBootstrapValues): Promise<string> {
+  return db.$transaction(tx => bootstrapSyntheticCenter(tx, values));
 }
