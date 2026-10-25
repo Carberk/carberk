@@ -9,10 +9,17 @@ permissions:
 
 jobs:
   diagnostic:
-    if: false # Source preparation only. Parent must authorize a new exact diagnostic.
+    if: >-
+      github.repository == 'Carberk/carberk' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/agent/issue-897-r2-verification-assembly-20261025' &&
+      github.run_attempt == 1 &&
+      vars.R2_DIAGNOSTIC_AUTHORIZED_SHA != '' &&
+      vars.R2_DIAGNOSTIC_AUTHORIZED_SHA == github.sha
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
+      R2_DIAGNOSTIC_AUTHORIZED_SHA: ${{ vars.R2_DIAGNOSTIC_AUTHORIZED_SHA }}
       NODE_ENV: test
       APP_ENV: test
       # Use the one fresh base DB directly; no per-worker database cloning.
