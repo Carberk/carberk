@@ -17,10 +17,10 @@ const audit = { id: "44444444-4444-4444-a444-444444444444", actorId: null, actio
 
 // Database boundary only. Real source prepare/assert/finish functions execute;
 // this fake records committed rows and refuses pre-prefix locks or writes.
-function database(options: { failure?: unknown; failAt?: "prepare" | "assert" | "write" | "finish"; active?: boolean; dryAbsent?: boolean; invalidUser?: boolean; missingGrant?: boolean; finish?: boolean; write?: boolean; changed?: boolean; existingAssignment?: boolean; expired?: boolean; revoked?: boolean; conflict?: boolean; approved?: boolean } = {}) {
+function database(options: { failure?: unknown; failAt?: "prepare" | "assert" | "write" | "finish"; active?: boolean; dryAbsent?: boolean; invalidUser?: boolean; missingGrant?: boolean; finish?: boolean; write?: boolean; changed?: boolean; knownCenter?: boolean; sqlUnapproved?: boolean; approvedAfterPrepare?: boolean; existingAssignment?: boolean; expired?: boolean; revoked?: boolean; conflict?: boolean; approved?: boolean } = {}) {
   const state = { prepared: false, committed: [] as unknown[], pending: [] as unknown[], command: null as Record<string, unknown> | null, locks: [] as string[] };
   const grant = options.dryAbsent ? null : { ...source, revokedAt: options.active ? null : source.revokedAt };
-  const center = options.existingAssignment || options.conflict || options.approved ? { id: centerId, code: values["center-code"], planCode: "standard", names: { en: "Carberk synthetic diagnostics", ru: "Carberk synthetic diagnostics", tk: "Carberk synthetic diagnostics" }, operationalApproval: options.approved ? {} : null } : null;
+  const center = options.knownCenter || options.existingAssignment || options.conflict || options.approved ? { id: centerId, code: values["center-code"], planCode: "standard", names: { en: "Carberk synthetic diagnostics", ru: "Carberk synthetic diagnostics", tk: "Carberk synthetic diagnostics" }, operationalApproval: options.approved ? {} : null } : null;
   const assignment = options.existingAssignment ? { id: qualificationId, centerId, userId, capability, assignedAt: stamp, qualifiedUntil: new Date("2026-10-25T14:00:00Z"), revokedAt: options.revoked ? stamp : null } : null;
   const effects = [
     { table: "diagnostic_centers", verb: "insert", next: { id: centerId, code: values["center-code"], planCode: "standard", names: { en: "Carberk synthetic diagnostics", ru: "Carberk synthetic diagnostics", tk: "Carberk synthetic diagnostics" }, operationalApproval: null, createdAt: stamp.toISOString() } },
@@ -47,7 +47,10 @@ function database(options: { failure?: unknown; failAt?: "prepare" | "assert" | 
     if (sql.includes("FOR UPDATE") || sql.includes("pg_advisory")) { if (!state.prepared) throw new Error("lock before preparation"); state.locks.push(sql); }
     if (sql.includes('FROM "users"')) return options.invalidUser ? [] : [{ id: userId, phoneVerifiedAt: stamp, emailVerifiedAt: null, suspendedAt: null, deletionScheduledAt: null }];
     if (sql.includes('"qualifiedUntil" > clock_timestamp()')) return [{ active: !options.expired }];
-    if (sql.includes('operationalApproval')) return [{ unapproved: !options.approved }];
+    if (sql.includes('operationalApproval')) {
+      if (!sql.includes('IS NULL') || params[0] !== centerId) throw new Error("wrong approval boundary");
+      return [{ unapproved: options.approvedAfterPrepare && state.prepared ? false : options.sqlUnapproved ?? !options.approved }];
+    }
     if (sql.includes("clock_timestamp")) return [{ timestamp: stamp }];
     return [];
   };
@@ -57,7 +60,7 @@ function database(options: { failure?: unknown; failAt?: "prepare" | "assert" | 
     auditLog: { create: async (a: unknown) => write(a) },
     diagnosticCenter: { findUnique: async () => center, create: async (a: unknown) => { await write(a); return { id: centerId }; } },
     diagnosticCenterAssignment: { findUnique: async () => assignment, create: async (a: unknown) => { if (options.write) throw new Error("bootstrap_assignment_write_sentinel"); return write(a); } },
-    diagnosticAudit: { findMany: async (a: { where: { action: string } }) => options.conflict ? [] : [{ details: a.where.action === "CENTER_SYNTHETIC_BOOTSTRAPPED" ? { command: "diagnostics:bootstrap-synthetic" } : { command: "diagnostics:bootstrap-synthetic", userId, capability } }], create: async (a: unknown) => write(a) },
+    diagnosticAudit: { findMany: async (a: { where: { action: string } }) => options.conflict || (a.where.action === "CENTER_QUALIFICATION_SYNTHETIC" && !options.existingAssignment) ? [] : [{ details: a.where.action === "CENTER_SYNTHETIC_BOOTSTRAPPED" ? { command: "diagnostics:bootstrap-synthetic" } : { command: "diagnostics:bootstrap-synthetic", userId, capability } }], create: async (a: unknown) => write(a) },
   } as unknown as Prisma.TransactionClient;
   return { state, tx, async run(work: () => Promise<string>) { try { const result = await work(); state.committed = [...state.pending]; return result; } catch (error) { state.pending = []; throw error; } } };
 }
@@ -95,6 +98,18 @@ describe("operator bootstrap source preparation", () => {
       expect(h.state).toMatchObject({ command: null, committed: [], locks: [] });
     }
   });
+
+  it.each(["write", "dry-run", "no-op"])("refuses hydrated JSON null approval before %s without preparing or writing", async mode => {
+    const h = database({ active: true, knownCenter: true, sqlUnapproved: false, existingAssignment: mode === "no-op" });
+    await expect(h.run(() => bootstrapSyntheticCenter(h.tx, { ...values, "dry-run": mode === "dry-run" }))).rejects.toThrow("Refused: center-approved");
+    expect(h.state).toMatchObject({ command: null, committed: [], locks: [] });
+  });
+  it("rechecks the SQL approval boolean after preparation and legacy waits before writing", async () => {
+    const h = database({ active: true, knownCenter: true, sqlUnapproved: true, approvedAfterPrepare: true });
+    await expect(h.run(() => bootstrapSyntheticCenter(h.tx, values))).rejects.toThrow("Refused: center-approved");
+    expect(h.state.command).toMatchObject({ operation: "center_bootstrap" });
+    expect(h.state.committed).toEqual([]);
+  });
   it.each(["finish", "write", "changed"] as const)("rolls back all caller writes on %s refusal", async failure => {
     const h = database({ active: true, [failure]: true });
     await expect(h.run(() => bootstrapSyntheticCenter(h.tx, values, { centerId, qualificationId }))).rejects.toThrow(failure === "finish" ? "diagnostic_source_final_effect" : failure === "write" ? "bootstrap_assignment_write_sentinel" : "diagnostic_source_graph_changed");
@@ -131,7 +146,7 @@ function commandDatabase(first: ReturnType<typeof database>, second = database({
         events.push("read-only"); return 0;
       };
       if (index === 1 && prop === "$queryRaw") return async (strings: TemplateStringsArray, ...params: unknown[]) => {
-        if (strings.join("").includes("diagnostic_") && !strings.join("").includes("diagnostic_center_assignments")) throw new Error("reconciliation prepared or locked");
+        if (strings.join("").includes("diagnostic_") && !strings.join("").includes("diagnostic_center_assignments") && !strings.join("").includes('"operationalApproval" IS NULL AS unapproved FROM diagnostic_centers')) throw new Error("reconciliation prepared or locked");
         if (!events.includes("read-only")) throw new Error("data before read-only");
         return target.$queryRaw(strings, ...params);
       };
@@ -177,7 +192,7 @@ describe("post-rollback synthetic no-op recognition", () => {
   });
   it.each([
     { active: true, invalidUser: true }, { active: true, missingGrant: true }, { active: false, existingAssignment: true },
-    { active: true, approved: true }, { active: true, conflict: true }, { active: true, existingAssignment: true, expired: true },
+    { active: true, approved: true }, { active: true, existingAssignment: true, sqlUnapproved: false }, { active: true, conflict: true }, { active: true, existingAssignment: true, expired: true },
     { active: true, existingAssignment: true, revoked: true }, { active: true },
   ])("preserves the original cause if the snapshot cannot prove the complete no-op: %s", async options => {
     const failure = preparationError();

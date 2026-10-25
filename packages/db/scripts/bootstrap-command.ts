@@ -76,7 +76,9 @@ async function centerState(tx: Prisma.TransactionClient, values: CenterBootstrap
   if (!grant || grant.revokedAt) refuse("grant");
   const center = await tx.diagnosticCenter.findUnique({ where: { code: centerCode } });
   if (!center) return { center: null, assignment: null };
-  if (center.operationalApproval !== null) refuse("center-approved");
+  // Nullable JSON hydrates SQL NULL and JSON null identically in Prisma.
+  const approval = await tx.$queryRaw<{ unapproved: boolean }[]>`SELECT "operationalApproval" IS NULL AS unapproved FROM diagnostic_centers WHERE id = ${center.id}`;
+  if (!approval[0]?.unapproved) refuse("center-approved");
   if (center.planCode !== "standard" || !detailsMatch(center.names, NAMES)) refuse("center-conflict");
   const centerAudits = await tx.diagnosticAudit.findMany({ where: { centerId: center.id, action: "CENTER_SYNTHETIC_BOOTSTRAPPED", actorId: null, orderId: null } });
   if (!centerAudits.some(row => detailsMatch(row.details, { command: COMMAND }))) refuse("center-conflict");
