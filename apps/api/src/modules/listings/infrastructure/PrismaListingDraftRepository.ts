@@ -202,7 +202,7 @@ export class PrismaListingDraftRepository implements ListingDraftRepository {
       if (tables.some(table => !metadata.some(meta => meta.table === table)) || namespaces.some(namespace => !metadata.some(meta => meta.namespace === namespace))) throw new Error("draft_dependency_table");
       for (const meta of metadata) {
         for (const key of before.keys.filter(key => key.namespace === meta.namespace)) {
-          await tx.$queryRaw`SELECT pg_advisory_xact_lock(${key.namespace}::int,${key.key}::int)`;
+          await tx.$queryRaw`SELECT pg_advisory_xact_lock(${key.namespace}::int,${key.key}::int)::text`;
         }
         // The relation comes exclusively from the accepted SQL registry.
         const table = Prisma.raw(`"${meta.table.replaceAll('"', '""')}"`);
