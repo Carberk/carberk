@@ -17,7 +17,7 @@ export function diagnosticAccountErasureWrites(db: Prisma.TransactionClient, use
     JOIN inspection_orders ao ON ao.id=a."orderId"
     WHERE b."orderId"=o.id AND ao."commissionerId"=${userId} AND ao."erasedAt" IS NULL))`;
  return [
-  db.$queryRaw`SELECT public.diagnostic_assert_source(${receipt.receiptId}::uuid, 'account_purge')`,
+  db.$queryRaw`SELECT public.diagnostic_assert_source(${receipt.receiptId}::uuid, 'account_purge')::text`,
   // These personal Listings are updated later by account purge. Take their locks
   // before orders, as publisher writers do. No surviving B Listing is mutated.
   db.$queryRaw`SELECT id FROM listings WHERE "sellerId"=${userId} AND "businessId" IS NULL ORDER BY id FOR UPDATE`,
