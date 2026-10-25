@@ -38,7 +38,7 @@ switch (process.argv[2]) {
     for (const [path, expected] of Object.entries(pin.sourceHashes)) assert.equal(hash(path), expected, path);
     for (const path of pin.r2Paths) assert.equal(git('rev-parse', `HEAD:${path}`), git('rev-parse', `${base}:${path}`), path);
     assert.equal(git('status', '--porcelain', '--untracked-files=no'), '');
-    assert.equal(hash(suite), createHash('sha256').update(execFileSync('git', ['show', `${base}:${suite}`])).digest('hex'));
+    assert.equal(hash(suite), pin.sourceHashes[suite], 'Parent-authorized drain-only fixture revision');
     record('source', {
       purpose: 'DIAGNOSTIC ONLY; no B1 or G3 acceptance or release verdict',
       sha: process.env.GITHUB_SHA, tree: git('rev-parse', 'HEAD^{tree}'), base,

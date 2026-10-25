@@ -41,7 +41,6 @@
     "apps/api/src/modules/identity/domain/ports/UserRepository.ts",
     "apps/api/src/modules/identity/infrastructure/AccountTransactions.spec.ts",
     "apps/api/src/modules/identity/infrastructure/DiagnosticPurgeEffectClosure.e2e.spec.ts",
-    "apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.e2e.spec.ts",
     "apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts",
     "apps/api/src/modules/identity/infrastructure/PrismaAccountDeletionUnitOfWork.e2e.spec.ts",
     "apps/api/src/modules/identity/infrastructure/PrismaAccountDeletionUnitOfWork.ts",
@@ -87,12 +86,28 @@
     "scripts/testing/retained-schema/20261024030000_diagnostic_purge_effects.sql": "23d894c79c5927d7d976c79e4cbe958af83725ccf172208b7f4d6132e0d3d4ba",
     "scripts/testing/retained-schema/20261024130000_diagnostic_intake_campaign_composition.sql": "974217c5ec0f68426429e2a37120b0e9b419817dbea16ffd5cb8362ca3e118ed",
     ".github/workflows/b1-diagnostic.yml": "b1a6fa03df3a935148aa109527bf47ad1fe5dd4012c0126bf97fd25cca453d28",
-    "scripts/diagnostics/b1-diagnostic.mjs": "bab1831fb2177f6bf31d101fda018c5d8d655ae893ae1d822a14de8763c4bf20",
-    "apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.e2e.spec.ts": "76fab16a0cb76f4eee5b6591c5b58ae4459a12abe7f149b84f477765ffee7ae4"
+    "scripts/diagnostics/b1-diagnostic.mjs": "a9694322aba78cc649900395f819188c0aae0f492eb093a90df2afebf588b38b",
+    "apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.e2e.spec.ts": "ccf96d9adfcb7230c0c7a24784a06260c7b1b8f58676ed9431b944d1accc437d",
+    "apps/api/test/helpers/fixtureCallerDrain.ts": "e96450cf4762e03fdb8b4f0a9f1b8c6b439eaf5f61f8fe4297ed4dbedfeb03eb",
+    "apps/api/test/helpers/fixtureCallerDrain.spec.ts": "3fa425234d2596c44b19329b1f04455df020e021c2c23da2c6f60d567bb1b564"
   },
   "excluded": "All R3 application caller paths and optional campaignAdmission TS intent widening; no R4/R5/R6/R7/R8 source",
   "suiteCases": 22,
   "executed": 0,
   "B5": "DISABLED_UNUSED",
-  "status": "HOLD_FIXTURE_DRAIN_AND_COVERAGE_DECISION_NO_RUNTIME_AUTHORITY"
+  "status": "DRAIN_ATTEMPT1_SOURCE_CORRECTED_PENDING_PARENT_REACHABILITY_INSPECTION_NO_RUNTIME_AUTHORITY",
+  "originalSuiteSha256": "76fab16a0cb76f4eee5b6591c5b58ae4459a12abe7f149b84f477765ffee7ae4",
+  "fixtureChanges": [
+    "apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.e2e.spec.ts",
+    "apps/api/test/helpers/fixtureCallerDrain.ts",
+    "apps/api/test/helpers/fixtureCallerDrain.spec.ts"
+  ],
+  "correction": {
+    "attempt": 1,
+    "decision": "/tmp/897-r2-assembly-parent-disposition-20261025.md",
+    "decisionSha256": "26862646e754324c921bcb19c5a78f1c5686d315224cd84fc795c814c276e3f3",
+    "priorCheckpoint": "fbcd8e7ad201bf84390179b1b97950c24c15c2d0",
+    "preserves": "production bytes, existing22 assertions, timeouts, zero retries, seeds, setup and cleanup semantics",
+    "coverage": "existing22 identity-authority/cascade diagnostic only; issued-proof invalidation/campaign opposition remain G1/G3"
+  }
 }
