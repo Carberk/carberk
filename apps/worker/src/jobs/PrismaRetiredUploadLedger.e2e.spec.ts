@@ -214,27 +214,56 @@ describe.skipIf(!database)("retired upload prepared PostgreSQL callers", () => {
   it.each(["purge", "lease"])("composition race: actual purge and due cleanup with %s holding its real prefix", async first => {
     const row = await upload({ retired: true }); await work(row.id);
     await db.user.update({ where: { id: userId }, data: { avatarUploadId: row.id, avatarKey: row.key, deletionScheduledAt: NOW } });
-    const held = pause(first === "purge" ? "diagnostic_prepare_source" : "pg_try_advisory_xact_lock");
-    const a = outcome<unknown>(first === "purge" ? new PurgeExpiredAccounts(held.client).execute({ now: NOW }) : new PrismaRetiredUploadLedger(held.client).lease(NOW, 1));
-    let b: Promise<unknown> | undefined;
+    const foreignId = randomUUID();
+    await db.user.create({ data: { id: foreignId, phone: "+99360000901", email: "foreign-race@example.test", emailVerifiedAt: DUE, phoneVerifiedAt: DUE, displayName: "Foreign retained" } });
+    await db.user.update({ where: { id: userId }, data: { phone: "+99360000902", email: "purge-race@example.test", emailVerifiedAt: DUE, phoneVerifiedAt: DUE, displayName: "Purge subject" } });
+    const foreignListing = await db.listing.create({ data: { sellerId: foreignId, status: "active", brandId: catalog.brandId, modelId: catalog.modelId, cityId: catalog.cityId, priceAmount: 200000 } });
+    const snapshot = async () => ({
+      user: await db.user.findUniqueOrThrow({ where: { id: userId } }),
+      upload: await db.mediaUpload.findUniqueOrThrow({ where: { id: row.id } }),
+      cleanup: await db.mediaUploadCleanup.findUniqueOrThrow({ where: { uploadId: row.id } }),
+      foreignUser: await db.user.findUniqueOrThrow({ where: { id: foreignId } }),
+      foreignListing: await db.listing.findUniqueOrThrow({ where: { id: foreignListing.id } }),
+    });
+    const before = await snapshot();
     try {
-      const pid = await Promise.race([held.entered, a.then(answer => { throw new Error(`holder exited before prefix: ${answer.ok ? JSON.stringify(answer.value) : String(answer.error)}`); })]);
-      if (first === "purge") { b = ledger.lease(NOW, 1); expect(await b).toEqual([]); }
-      else { b = outcome(new PurgeExpiredAccounts(runtime()).execute({ now: NOW })); await blockedBy(pid); }
-    } finally { held.release(); await Promise.allSettled([a, ...(b ? [b] : [])]); }
-    expect((await a).ok).toBe(true);
-    if (b && first === "lease") {
-      const answer = await b as Awaited<ReturnType<typeof outcome>>;
-      if (!answer.ok) throw answer.error;
-      expect(answer).toMatchObject({ ok: true, value: { purgedCount: 1 } });
+      const held = pause(first === "purge" ? "diagnostic_prepare_source" : "pg_try_advisory_xact_lock");
+      const a = outcome<unknown>(first === "purge" ? new PurgeExpiredAccounts(held.client).execute({ now: NOW }) : new PrismaRetiredUploadLedger(held.client).lease(NOW, 1));
+      let b: Promise<unknown> | undefined;
+      try {
+        const pid = await Promise.race([held.entered, a.then(answer => { throw new Error(`holder exited before prefix: ${answer.ok ? JSON.stringify(answer.value) : String(answer.error)}`); })]);
+        if (first === "purge") { b = ledger.lease(NOW, 1); expect(await b).toEqual([]); }
+        else { b = outcome(new PurgeExpiredAccounts(runtime()).execute({ now: NOW })); await blockedBy(pid); }
+      } finally { held.release(); await Promise.allSettled([a, ...(b ? [b] : [])]); }
+      expect((await a).ok).toBe(true);
+      if (b && first === "lease") {
+        const answer = await b as Awaited<ReturnType<typeof outcome>>;
+        expect(answer).toMatchObject({ ok: false, error: { code: "P2010", meta: { driverAdapterError: { cause: {
+          originalCode: "P0001", originalMessage: "diagnostic_source_graph_changed",
+        } } } } });
+        expect(await a).toMatchObject({ ok: true, value: [{ uploadId: row.id, attempts: 1 }] });
+        const after = await snapshot();
+        expect(after).toEqual({ ...before, cleanup: { ...before.cleanup, attempts: 1, nextAttemptAt: new Date("2000-01-02T00:01:00Z") } });
+        expect(await db.$queryRaw<{ count: number }[]>`SELECT count(*)::int AS count FROM diagnostic_source_commands`).toEqual([{ count: 0 }]);
+        console.info("[897-purge-stale-evidence]", JSON.stringify({ before, after }));
+        // A separate actual caller discovers fresh OLD facts. No production retry.
+        expect(await new PurgeExpiredAccounts(runtime()).execute({ now: NOW })).toEqual({ purgedCount: 1 });
+      }
+      expect(await db.user.findUnique({ where: { id: userId } })).toMatchObject({ avatarUploadId: null, avatarKey: null });
+      const pending = await db.mediaUploadCleanup.findUniqueOrThrow({ where: { uploadId: row.id } });
+      expect(pending).toMatchObject({ status: "PENDING", completedAt: null, objectKeys: row.objectKeys, attempts: first === "lease" ? 1 : 0 });
+      const objects = new Set(row.objectKeys);
+      const clean = new CleanRetiredUploads(ledger, { deleteAndVerify: async keys => { expect(keys).toEqual(row.objectKeys); for (const key of keys) objects.delete(key); expect(objects.size).toBe(0); } });
+      expect(await clean.execute({ now: first === "lease" ? pending.nextAttemptAt : NOW, limit: 1 })).toEqual({ cancelledPreparations: 0, deleted: 1, waiting: 0 });
+      expect(await db.mediaUploadCleanup.findUnique({ where: { uploadId: row.id } })).toMatchObject({ status: "DONE", objectKeys: row.objectKeys });
+      const final = await snapshot();
+      expect(final.foreignUser).toEqual(before.foreignUser);
+      expect(final.foreignListing).toEqual(before.foreignListing);
+    } finally {
+      await guards(false); activation = undefined;
+      await db.listing.delete({ where: { id: foreignListing.id } });
+      await db.user.delete({ where: { id: foreignId } });
     }
-    expect(await db.user.findUnique({ where: { id: userId } })).toMatchObject({ avatarUploadId: null, avatarKey: null });
-    const pending = await db.mediaUploadCleanup.findUniqueOrThrow({ where: { uploadId: row.id } });
-    expect(pending).toMatchObject({ status: "PENDING", completedAt: null, objectKeys: row.objectKeys, attempts: first === "lease" ? 1 : 0 });
-    const objects = new Set(row.objectKeys);
-    const clean = new CleanRetiredUploads(ledger, { deleteAndVerify: async keys => { expect(keys).toEqual(row.objectKeys); for (const key of keys) objects.delete(key); expect(objects.size).toBe(0); } });
-    expect(await clean.execute({ now: first === "lease" ? pending.nextAttemptAt : NOW, limit: 1 })).toEqual({ cancelledPreparations: 0, deleted: 1, waiting: 0 });
-    expect(await db.mediaUploadCleanup.findUnique({ where: { uploadId: row.id } })).toMatchObject({ status: "DONE", objectKeys: row.objectKeys });
   });
   it.each(["finalize", "recovery"])("composition: actual profile finalization and recovery serialize with %s first", async first => {
     const row = await upload({ target: { type: "profile", id: userId } });
