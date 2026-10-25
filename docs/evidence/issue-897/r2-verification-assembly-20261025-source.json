@@ -85,7 +85,7 @@
     "scripts/testing/retained-schema/20261023130000_diagnostic_source_kernel.sql": "b9b2d465c04cc34693e5774d12910a33bb29b39d8452f5a2862dc24b667f4fbf",
     "scripts/testing/retained-schema/20261024030000_diagnostic_purge_effects.sql": "23d894c79c5927d7d976c79e4cbe958af83725ccf172208b7f4d6132e0d3d4ba",
     "scripts/testing/retained-schema/20261024130000_diagnostic_intake_campaign_composition.sql": "974217c5ec0f68426429e2a37120b0e9b419817dbea16ffd5cb8362ca3e118ed",
-    ".github/workflows/b1-diagnostic.yml": "5cf28aca477242fb239b7001d562a352162b468a26befd618c112d630249f9ec",
+    ".github/workflows/b1-diagnostic.yml": "42dedfbbb29f7c3bf8e2e9fdf566a6950df5bbaa17c11cdd7ca2f103c36d4b61",
     "scripts/diagnostics/b1-diagnostic.mjs": "a9694322aba78cc649900395f819188c0aae0f492eb093a90df2afebf588b38b",
     "apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.e2e.spec.ts": "ccf96d9adfcb7230c0c7a24784a06260c7b1b8f58676ed9431b944d1accc437d",
     "apps/api/test/helpers/fixtureCallerDrain.ts": "e96450cf4762e03fdb8b4f0a9f1b8c6b439eaf5f61f8fe4297ed4dbedfeb03eb",
@@ -95,7 +95,7 @@
   "suiteCases": 22,
   "executed": 0,
   "B5": "DISABLED_UNUSED",
-  "status": "PROSPECTIVE_CONDITIONAL_GATE_LOCAL_HOLD_CHECKOUT_ANCESTRY_PENDING_PARENT_REVIEW",
+  "status": "PROPOSED_EXECUTABLE_SOURCE_PENDING_FINAL_PARENT_INSPECTION_AND_FOUNDER_EXECUTION_AUTHORIZATION",
   "originalSuiteSha256": "76fab16a0cb76f4eee5b6591c5b58ae4459a12abe7f149b84f477765ffee7ae4",
   "fixtureChanges": [
     "apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.e2e.spec.ts",
@@ -116,7 +116,15 @@
     "literalDisabledPrior": "f6000b30f58029d0b07f8c306afbda5d27740e23",
     "authority": "external repo variable must match exact github.sha and is forwarded to helper; no repo variable read/write or push performed",
     "sourceOnly": true,
-    "mechanismBlocker": "checkout fetch-depth2 omits accepted R2 ancestor/blobs required by helper; prospective depth4 remedy is reported, not silently included",
+    "mechanismBlocker": "Historical checkout-depth2 defect corrected under parent disposition; prior gate-only and disabled checkpoints preserved",
+    "runtimeAuthorized": false
+  },
+  "checkoutDepthCorrection": {
+    "attempt": 1,
+    "base": "b84addbfccc2e6255849f6d51b232f9d12e6b8d6",
+    "decision": "/tmp/897-r2-checkout-depth-parent-disposition-20261025.md",
+    "decisionSha256": "bcddaa1434097631d9011b2cc3e053faba9512acae777cd1be45a44dd8bca94d",
+    "change": "fetch-depth:0; preserve exact-SHA checkout, persist-credentials:false and all source assertions",
     "runtimeAuthorized": false
   }
 }
