@@ -29,6 +29,14 @@ function captureTransaction() {
 const activation = { enabled: true, environment: "test" as const, purposes: ["product_improvement" as const], evidenceRef: "r7b-finite-plan-counterexample", realCollectionApproved: false };
 
 describe("publication capture plan counterexample", () => {
+  it("binds activation and expiry to a finite plan reused by capture", async () => {
+    const commit = new PrismaMeasurementCommit(activation, "epoch-1", () => new Date("2026-10-25T12:00:01.123Z"));
+    const plan = commit.preparePublication([event]);
+    expect(plan?.environment).toBe("test");
+    expect(await commit.capture(captureTransaction(), "owner", event, undefined, plan ?? undefined)).toBe("captured");
+    expect(plan?.expiresAt[event.eventId]).toBe("2026-11-01T12:00:01.123Z");
+  });
+
   it("writes different protected expiresAt values for identical caller and database inputs", async () => {
     const first = captureTransaction(), second = captureTransaction();
     const early = new Date("2026-10-25T12:00:01.123Z"), late = new Date("2026-10-25T12:00:04.789Z");

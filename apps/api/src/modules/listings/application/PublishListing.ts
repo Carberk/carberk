@@ -327,6 +327,15 @@ export class PublishListing {
       // The Listing, its media, the draft removal, the audit entry and the
       // adoption of every upload commit together or not at all.
       const auditId = randomUUID(), publishedEventId = randomUUID(), visibilityEventId = randomUUID();
+      const publicationEvents = [
+        { version: 1 as const, eventId: publishedEventId, occurredAt: now.toISOString(), purpose: "product_improvement" as const,
+          eventName: "listing_published" as const, context: { platform: "server" as const, release: "server", build: "server", locale: "ru" as const }, payload: { listingId, cityId: payload.cityId, draftId: input.draftId } },
+        { version: 1 as const, eventId: visibilityEventId, occurredAt: now.toISOString(), purpose: "product_improvement" as const,
+          eventName: "listing_visibility_changed" as const, context: { platform: "server" as const, release: "server", build: "server", locale: "ru" as const }, payload: { listingId, visibility: "public" as const, reason: "published" as const } },
+      ];
+      const [publicationEvent, visibilityEvent] = publicationEvents;
+      if (!publicationEvent || !visibilityEvent) throw new Error("listing_publication_events");
+      const measurementPlan = this.measurement?.preparePublication?.(publicationEvents);
       const listingRow = await this.prisma.$transaction(async (tx) => {
         const initialDraft = await tx.listingDraft.findUnique({ where: { id: draft.id } });
         if (!initialDraft || initialDraft.userId !== draft.userId || (initialDraft.businessId ?? null) !== (draft.businessId ?? null)
@@ -338,8 +347,10 @@ export class PublishListing {
           { table: "users", key: { id: input.userId } },
           { table: "listing_drafts", key: { id: draft.id } },
           { table: "audit_logs", key: { id: auditId } },
-          { table: "measurement_outbox", key: { id: publishedEventId } },
-          { table: "measurement_outbox", key: { id: visibilityEventId } },
+          ...(measurementPlan ? [
+            { table: "measurement_outbox" as const, key: { id: publishedEventId } },
+            { table: "measurement_outbox" as const, key: { id: visibilityEventId } },
+          ] : []),
           ...attachedPhotos.map(photo => ({ table: "listing_media" as const, key: { id: photo.photoId } })),
           ...uploads.map(upload => ({ table: "media_uploads" as const, key: { id: upload.id } })),
           ...(initialVideo ? [
@@ -349,6 +360,8 @@ export class PublishListing {
           ] : []),
         ];
         const command = await listingSourceCommand(tx, { operation: "listing_create", listingId, actorUserId: input.userId, sessionId: input.sessionId,
+          publication: { draftId: draft.id, photoIds: attachedPhotos.map(photo => photo.photoId as string), uploadIds: uploads.map(upload => upload.id), auditId,
+            ...(measurementPlan ? { measurement: { eventIds: publicationEvents.map(event => event.eventId), environment: measurementPlan.environment, expiresAt: measurementPlan.expiresAt } } : {}) },
           roots, changes: { id: listingId, sellerId: input.userId, businessId: draft.businessId ?? null, vin: payload.vin ?? null,
             brandId: payload.brandId, modelId: payload.modelId, year: payload.year ?? null, deletedAt: null, status: "active", contactPhone: payload.contactPhone ?? null,
             activeVideoGenerationId: plannedVideo.activeVideoGenerationId ?? null, pendingVideoGenerationId: plannedVideo.pendingVideoGenerationId ?? null,
@@ -434,10 +447,8 @@ export class PublishListing {
           },
         });
         try {
-          if (captureEligible) await this.measurement?.capture(tx, input.userId, { version: 1, eventId: publishedEventId, occurredAt: now.toISOString(), purpose: "product_improvement",
-            eventName: "listing_published", context: { platform: "server", release: "server", build: "server", locale: "ru" }, payload: { listingId, cityId: payload.cityId, draftId: input.draftId },
-          });
-          if (captureEligible) await this.measurement?.capture(tx,input.userId,{version:1,eventId:visibilityEventId,occurredAt:now.toISOString(),purpose:"product_improvement",eventName:"listing_visibility_changed",context:{platform:"server",release:"server",build:"server",locale:"ru"},payload:{listingId,visibility:"public",reason:"published"}});
+          if (captureEligible) await this.measurement?.capture(tx, input.userId, publicationEvent, { conversionEligible: true }, measurementPlan ?? undefined);
+          if (captureEligible) await this.measurement?.capture(tx, input.userId, visibilityEvent, { conversionEligible: true }, measurementPlan ?? undefined);
         } catch { /* Measurement outage never rolls back the core publication. */ }
         return created;
         });

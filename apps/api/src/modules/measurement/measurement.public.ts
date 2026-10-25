@@ -26,10 +26,15 @@ export interface MeasurementSessionPort {
 }
 
 export const MEASUREMENT_COMMIT_PORT = Symbol("MeasurementCommitPort");
+export interface MeasurementPublicationPlan {
+  readonly environment: "test" | "staging" | "production";
+  readonly expiresAt: Readonly<Record<string, string>>;
+}
 /** Infrastructure passes its existing source transaction as an opaque context.
  * Domain/application callers do not inspect collector persistence or await transport. */
 export interface MeasurementCommitPort {
- capture(transaction: object, userId: string, event: MeasurementSchemas.MeasurementEvent, classification?: { conversionEligible: boolean }): Promise<"captured" | "disabled" | "unavailable">;
+ preparePublication?(events: readonly MeasurementSchemas.MeasurementEvent[]): MeasurementPublicationPlan | null;
+ capture(transaction: object, userId: string, event: MeasurementSchemas.MeasurementEvent, classification?: { conversionEligible: boolean }, plan?: MeasurementPublicationPlan): Promise<"captured" | "disabled" | "unavailable">;
 }
 
 export const MEASUREMENT_CONVERSION_PORT=Symbol("MeasurementConversionPort");

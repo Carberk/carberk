@@ -13,6 +13,13 @@ export type DiagnosticSourceOperation =
   | "report_change" | "proof_issue" | "proof_consume" | "proof_expire"
   | "identity_material_change" | "staff_eligibility" | "session_change";
 export type DiagnosticSourceTuple = Readonly<Record<string, Prisma.InputJsonValue | null>>;
+export type ListingPublicationIntent = Readonly<{
+  draftId: string;
+  photoIds: readonly string[];
+  uploadIds: readonly string[];
+  auditId: string;
+  measurement?: Readonly<{ eventIds: readonly string[]; environment: "test" | "staging" | "production"; expiresAt: Readonly<Record<string, string>> }>;
+}>;
 export type DiagnosticSourceRoot = {
   [T in DiagnosticSourceTable]: { readonly table: T; readonly key: Readonly<DiagnosticSourceKeys[T]> }
 }[DiagnosticSourceTable];
@@ -39,7 +46,7 @@ export type DiagnosticSourceCommand = DiagnosticSourceCommandFields & (
     auditId: string; reason: string; report?: Readonly<{ id: string; reviewedAt: string }>;
   }> }
   | { readonly operation: Exclude<DiagnosticSourceOperation, "user_eligibility">;
-    readonly intent?: Readonly<{ receptionQualificationIds: readonly string[]; campaignAdmission?: true }> | Readonly<{ campaignAdmission: true }> | Readonly<{ code: string; userId: string; capability: string; qualificationId: string }> | Readonly<{ reason: string }> | Readonly<Record<string, never>> }
+    readonly intent?: Readonly<{ receptionQualificationIds: readonly string[]; campaignAdmission?: true }> | Readonly<{ campaignAdmission: true }> | Readonly<{ code: string; userId: string; capability: string; qualificationId: string }> | Readonly<{ reason: string }> | Readonly<{ publication: ListingPublicationIntent }> | Readonly<Record<string, never>> }
 );
 
 declare const prepared: unique symbol;
