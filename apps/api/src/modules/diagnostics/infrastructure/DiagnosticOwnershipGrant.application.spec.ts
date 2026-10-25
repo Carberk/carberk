@@ -63,7 +63,7 @@ describe("execution deadlines after source preparation through production intake
   });
   it.each([-1, 0, 1])("checks classification at execution offset %s with atomic refusal and immutable planned stamps", async offset => {
     const h = harness();
-    h.row.audience = "buyer_private";
+    h.row.audience = "buyer_private"; h.row.listingId = "00000000-0000-4000-8000-000000000004";
     h.executeAt(new Date(deadline.getTime() + offset));
     const result = h.intake.observeVehicle(h.subject("technician"), h.row.id, { expectedVersion: 0,
       method: "vin", vin: "WVWZZZ1JZXW000001", manualReference: null, mileageKm: 120000,
