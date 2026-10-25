@@ -48,6 +48,7 @@ class IdentityDatabase {
     let finished = false;
     const query = async (strings: TemplateStringsArray, ...values: unknown[]) => {
       const sql = strings.join("?");
+      if (sql.startsWith("SET LOCAL lock_timeout")) return []; // No resource lock.
       if (sql.includes("prepare")) {
         this.beforePrepare?.();
         prepared = true;
