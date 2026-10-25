@@ -12,6 +12,8 @@ const namespaces: Record<string, number> = { users: 897100, dealerships: 897200,
 export class AvatarContactDatabase {
   tables: Record<string, Row[]> = Object.fromEntries(Object.keys(namespaces).map(t => [t, []]));
   mutations: Row[] | undefined;
+  requiredInitialUsers: string[] = [];
+  receiptIdentity = { id: "receipt", backend_pid: 1, full_transaction_id: "transaction" };
   failAt: string | undefined;
   afterPreparation: (() => void) | undefined;
   private prepared = false;
@@ -42,21 +44,37 @@ export class AvatarContactDatabase {
       if (this.prepared) throw new Error("campaign_preparation_nested");
       this.prepared = true;
       this.mutations = JSON.parse(String(values[0])) as Row[];
+      if (!this.mutations.length) throw new Error("campaign_preparation_shape");
+      for (const mutation of this.mutations) {
+        const key = mutation["key"] as Row;
+        const exists = this.rows(String(mutation["table"])).some(r => Object.entries(key).every(([k, v]) => r[k] === v));
+        if ((mutation["verb"] === "insert") === exists) throw new Error("campaign_preparation_stale");
+      }
       this.afterPreparation?.();
       return [{ receipt: "receipt" }];
     }
     if (text.includes("campaign_finish(")) { this.boundary("finish"); this.prepared = false; return []; }
-    if (text.includes("FROM public.campaign_preparations")) return this.prepared ? [{ mutations: this.mutations }] : [];
+    if (text.includes("FROM public.campaign_preparations")) return this.prepared ? [{ ...this.receiptIdentity, mutations: this.mutations }] : [];
     if (text.includes("diagnostic_source_read")) {
       const key = JSON.parse(String(values[1])) as Row;
       return [{ row: json(this.rows(String(values[0])).find(r => Object.entries(key).every(([k, v]) => r[k] === v)) ?? null) }];
     }
     if (text.includes("diagnostic_source_lock_keys(")) throw new Error("diagnostic_intake_reception_selection");
     if (text.includes("diagnostic_source_lock_keys_before_intake(")) {
-      const slots = JSON.parse(String(values[0])) as { table: string }[];
+      const slots = JSON.parse(String(values[0])) as { table: string; key: { id?: string } }[];
+      for (const id of this.requiredInitialUsers) {
+        if (!slots.some(s => s.table === "users" && s.key.id === id)) throw new Error(`missing initial User dependency:${id}`);
+      }
       return [{ keys: [...new Set(slots.map(s => namespaces[s.table]))].map(namespace => ({ namespace, key: 1 })) }];
     }
-    if (text.includes("diagnostic_source_meta")) return [{ namespace: namespaces[String(values[0])] }];
+    if (text.includes("diagnostic_source_meta")) {
+      const refs: Record<string, { table: string; columns: string[]; target: string[] }[]> = {
+        users: [{ table: "users", columns: ["suspendedById"], target: ["id"] }, { table: "media_uploads", columns: ["avatarUploadId"], target: ["id"] }],
+        media_uploads: [{ table: "users", columns: ["userId"], target: ["id"] }, { table: "dealerships", columns: ["businessId"], target: ["id"] }],
+        listings: [{ table: "users", columns: ["sellerId"], target: ["id"] }],
+      };
+      return [{ namespace: namespaces[String(values[0])], refs: refs[String(values[0])] ?? [] }];
+    }
     if (text.includes("FOR UPDATE") || text.includes("pg_advisory_xact_lock")) this.boundary("lock");
     if (text.includes("SELECT 1 FROM public.") || text.includes("pg_advisory_xact_lock")) return [];
     if (text.includes("UNION ALL SELECT 'listing_media'")) return [

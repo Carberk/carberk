@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import "reflect-metadata";
 import { PrismaService, type Prisma } from "@auto-tm/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -80,7 +81,7 @@ describe("R7d real production opposition on parent activated disposable candidat
     const [ready] = await db.$queryRaw<{ source: boolean; campaign: boolean }[]>`
       SELECT public.diagnostic_source_guards_ready() AS source,public.campaign_preparation_ready() AS campaign`;
     expect(ready).toEqual({ source: true, campaign: true });
-    for (let n = 1; n <= 10; n++) {
+    for (let n = 1; n <= 11; n++) {
       const s = await state(db, n);
       expect(s.uploads).toHaveLength(4);
       expect(s.uploads.every(u => u.objectKeys.length === 5 && u.objectKeys.includes(u.key))).toBe(true);
@@ -91,6 +92,25 @@ describe("R7d real production opposition on parent activated disposable candidat
     }
   });
   afterAll(async () => { await Promise.all([db.onModuleDestroy(), a.onModuleDestroy(), b.onModuleDestroy()]); });
+
+  it("derives ordinary contact PK/unique keys through the retained pure boundary and commits the real caller", async () => {
+    const sellerId = `${prefix(11)}-seller`;
+    const id = "e9d00011-0000-4000-8000-000000000001";
+    const confirmation = VerifiedContactPhone.create({ sellerId, phone: "+99361000000", confirmedAt: new Date("2026-10-25T00:00:00Z") });
+    const [derived] = await db.$queryRaw<{ keys: { namespace: number; key: number }[]; pk: number; compound_key: number }[]>`
+      SELECT public.diagnostic_source_lock_keys_before_intake(
+        jsonb_build_array(jsonb_build_object('table','verified_contact_phones','key',jsonb_build_object('id',${id}),'row',NULL)),
+        jsonb_build_object('rows',jsonb_build_array(jsonb_build_object('table','verified_contact_phones',
+          'key',jsonb_build_object('id',${id}),'verb','insert','next',
+          jsonb_build_object('id',${id},'sellerId',${sellerId},'phone','+99361000000','confirmedAt','2026-10-25T00:00:00.000Z'))))) AS keys,
+        hashtext(jsonb_build_array('pk',jsonb_build_object('id',${id}))::text) AS pk,
+        hashtext(jsonb_build_array('unique','["sellerId","phone"]'::jsonb,jsonb_build_object('sellerId',${sellerId},'phone','+99361000000'))::text) AS compound_key`;
+    expect(derived?.keys).toContainEqual({ namespace: 898314, key: derived?.pk });
+    expect(derived?.keys).toContainEqual({ namespace: 898314, key: derived?.compound_key });
+    await expect(new PrismaVerifiedContactPhoneRepository(db, () => id).record(confirmation)).resolves.toEqual(confirmation);
+    expect(await db.verifiedContactPhone.findUniqueOrThrow({ where: { id } })).toMatchObject({ sellerId, phone: confirmation.phone, confirmedAt: confirmation.confirmedAt });
+    expect(await db.$queryRaw`SELECT 1 FROM public.campaign_preparations WHERE backend_pid=pg_backend_pid()`).toEqual([]);
+  });
 
   it.each([true, false])("serializes real bind against actual suspension, avatarFirst=%s", async avatarFirst => {
     const n = avatarFirst ? 1 : 2;
@@ -195,12 +215,12 @@ describe("R7d real production opposition on parent activated disposable candidat
   it.each([9, 10])("refuses stale absent contact insertion by the other real repository, case %s", async n => {
     const first = instrument(a, "SELECT 1 FROM public.users"); const second = instrument(b);
     const confirmation = VerifiedContactPhone.create({ sellerId: `${prefix(n)}-seller`, phone: "+99361000000", confirmedAt: clock.now() });
-    const held = new PrismaVerifiedContactPhoneRepository(first.service).record(confirmation).then(() => ({ ok: true }), error => ({ ok: false, error }));
+    const held = new PrismaVerifiedContactPhoneRepository(first.service, randomUUID).record(confirmation).then(() => ({ ok: true }), error => ({ ok: false, error }));
     let followed: Promise<{ ok: boolean; error?: unknown }> | undefined;
     let failure: unknown;
     try {
       await entered(first.reached.promise, held);
-      followed = new PrismaVerifiedContactPhoneRepository(second.service).record(confirmation).then(() => ({ ok: true }), error => ({ ok: false, error }));
+      followed = new PrismaVerifiedContactPhoneRepository(second.service, randomUUID).record(confirmation).then(() => ({ ok: true }), error => ({ ok: false, error }));
       await blocked(db, second.pid, first.pid);
     } catch (error) { failure = error; }
     finally {

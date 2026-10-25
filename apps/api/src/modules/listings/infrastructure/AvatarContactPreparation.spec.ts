@@ -9,10 +9,10 @@ import { VerifiedContactPhone } from "../domain/VerifiedContactPhone";
 describe("contact confirmation transaction admission", () => {
   it("stores the exact confirmation only after ordinary preparation and finish", async () => {
     const db = avatarDatabase();
-    const repo = new PrismaVerifiedContactPhoneRepository(db.service);
+    const repo = new PrismaVerifiedContactPhoneRepository(db.service, () => "contact-id");
     const confirmation = VerifiedContactPhone.create({ sellerId: "seller", phone: "+99361000000", confirmedAt: new Date("2026-10-25T00:00:00Z") });
     await expect(repo.record(confirmation)).resolves.toEqual(confirmation);
-    expect(db.rows("verified_contact_phones")[0]).toMatchObject({ sellerId: "seller", phone: "+99361000000", confirmedAt: new Date("2026-10-25T00:00:00Z") });
+    expect(db.rows("verified_contact_phones")[0]).toMatchObject({ id: "contact-id", sellerId: "seller", phone: "+99361000000", confirmedAt: new Date("2026-10-25T00:00:00Z") });
     expect(await repo.find("seller", confirmation.phone)).toEqual(confirmation);
   });
 });
@@ -118,6 +118,14 @@ describe("real profile link and upload claim integration at the database boundar
       () => linkFor(db).unbind("seller", new Proxy(tx, {}))))).rejects.toThrow("avatar_release_dependencies_unprepared");
     expect(db.tables).toEqual(before);
   });
+  it.each(["id", "backend_pid", "full_transaction_id"] as const)("refuses a substituted live receipt %s", async field => {
+    const db = avatarDatabase(); const before = structuredClone(db.tables);
+    await expect(db.$transaction(tx => withAvatarPreparation(tx as unknown as Prisma.TransactionClient, "seller", undefined, undefined, async () => {
+      Object.assign(db.receiptIdentity, { [field]: field === "backend_pid" ? 2 : "foreign" });
+      return linkFor(db).unbind("seller", tx);
+    }))).rejects.toThrow("avatar_release_dependencies_unprepared");
+    expect(db.tables).toEqual(before);
+  });
   it("refuses a finished receipt before any supplied release write", async () => {
     const db = avatarDatabase(); const before = structuredClone(db.tables);
     await expect(db.$transaction(async tx => {
@@ -141,7 +149,7 @@ describe("real contact repositories at the database boundary", () => {
     const db = avatarDatabase();
     db.seed("verified_contact_phones", { id: "existing", sellerId: "seller", phone: confirmation.phone, confirmedAt: new Date("2026-01-01Z") });
     db.seed("verified_contact_phones", { id: "other", sellerId: "seller", phone: "+99361000001", confirmedAt: new Date("2026-02-01Z") });
-    const repo = new PrismaVerifiedContactPhoneRepository(db.service);
+    const repo = new PrismaVerifiedContactPhoneRepository(db.service, () => "allocated-contact");
     expect(await repo.record(confirmation)).toEqual(confirmation);
     expect(db.rows("verified_contact_phones")).toHaveLength(2);
     expect(db.row("verified_contact_phones", "existing")).toMatchObject({ confirmedAt: NOW });
@@ -151,7 +159,7 @@ describe("real contact repositories at the database boundary", () => {
   });
   it.each(["prepare", "verified_contact_phones", "finish"])("leaves no confirmation on %s refusal", async failAt => {
     const db = avatarDatabase(); const before = structuredClone(db.tables); db.failAt = failAt;
-    await expect(new PrismaVerifiedContactPhoneRepository(db.service).record(confirmation)).rejects.toThrow(`refused:${failAt}`);
+    await expect(new PrismaVerifiedContactPhoneRepository(db.service, () => "allocated-contact").record(confirmation)).rejects.toThrow(`refused:${failAt}`);
     expect(db.tables).toEqual(before);
   });
   const business = () => {
@@ -180,6 +188,14 @@ describe("real contact repositories at the database boundary", () => {
     const { db, repo } = business(); db.row(String(table), String(id))![String(field)] = value;
     const before = structuredClone(db.tables);
     await expect(repo.record(businessConfirmation, actor)).rejects.toMatchObject({ reason });
+    expect(db.tables).toEqual(before);
+  });
+  it("returns MEMBERSHIP_REQUIRED for a lawful live Session naming a missing Business, with no residue", async () => {
+    const { db, repo } = business();
+    db.tables["dealership_members"] = [];
+    db.tables["dealerships"] = [];
+    const before = structuredClone(db.tables);
+    await expect(repo.record(businessConfirmation, actor)).rejects.toMatchObject({ reason: "MEMBERSHIP_REQUIRED" });
     expect(db.tables).toEqual(before);
   });
   it("refuses an omitted Session before any transaction", async () => {

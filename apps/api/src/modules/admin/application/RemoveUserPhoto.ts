@@ -1,5 +1,4 @@
-import { randomUUID } from "node:crypto";
-import { withAvatarPreparation } from "../../../common/avatar-contact-preparation";
+import { withAvatarPreparation, AvatarContactScopeChanged, AVATAR_CONTACT_UUID_FACTORY } from "../../../common/avatar-contact-preparation";
 
 import {
   BadRequestException,
@@ -13,6 +12,8 @@ import { PrismaService } from "@auto-tm/db";
 import { AdminSchemas } from "@auto-tm/contracts";
 
 import {
+  IDENTITY_CLOCK_PORT,
+  type ClockPort,
   IDENTITY_READ_PORT,
   PROFILE_PHOTO_PORT,
   type IdentityReadPort,
@@ -58,6 +59,8 @@ export class RemoveUserPhoto {
     private readonly reportRepo: ContentReportRepository,
     @Inject(AUDIT_LOG_REPOSITORY)
     private readonly auditRepo: AuditLogRepository,
+    @Inject(IDENTITY_CLOCK_PORT) private readonly clock: ClockPort,
+    @Inject(AVATAR_CONTACT_UUID_FACTORY) private readonly uuid: () => string,
   ) {}
 
   async execute(input: RemoveUserPhotoInput): Promise<RemoveUserPhotoResult> {
@@ -119,9 +122,9 @@ export class RemoveUserPhoto {
       });
     if (user.avatarKey === null) throw noPhoto();
 
-    const reviewedAt = new Date();
+    const reviewedAt = this.clock.now();
     const audit = {
-      id: randomUUID(),
+      id: this.uuid(),
       actorId: input.adminUserId,
       action: AdminSchemas.AdminAuditAction.UserPhotoRemove,
       targetType: "user",
@@ -134,55 +137,60 @@ export class RemoveUserPhoto {
         after: { avatarKey: null, ...(report ? { reportStatus: "actioned" } : {}) },
       }),
     };
-    return this.prisma.$transaction(async (tx) => withAvatarPreparation(tx, input.userId, undefined, {
-      audit, report: report ? { id: report.id, reviewedAt } : undefined,
-    }, async (present) => {
-      if (!present) throw noPhoto();
-      const currentUser = await tx.user.findUnique({ where: { id: input.userId } });
-      if (currentUser?.role === "admin") {
-        throw new ForbiddenException({ code: "FORBIDDEN", message: "Admin targets cannot be moderated",
-          details: { reason: AdminSchemas.AdminErrorReason.AdminTargetNotModeratable } });
-      }
-      if (report) {
-        const currentReport = await tx.contentReport.findUnique({ where: { id: report.id } });
-        if (!currentReport) throw new NotFoundException({ code: "NOT_FOUND", message: "Report not found" });
-        if (currentReport.targetType !== "user" || currentReport.targetId !== input.userId) {
-          throw new BadRequestException({ code: "VALIDATION_FAILED", message: "Report does not match the target user",
-            details: { reason: AdminSchemas.AdminErrorReason.ReportTargetMismatch } });
+    try {
+      return await this.prisma.$transaction(async (tx) => withAvatarPreparation(tx, input.userId, undefined, {
+        audit, report: report ? { id: report.id, reviewedAt } : undefined,
+      }, async (present) => {
+        if (!present) throw noPhoto();
+        const currentUser = await tx.user.findUnique({ where: { id: input.userId } });
+        if (currentUser?.role === "admin") {
+          throw new ForbiddenException({ code: "FORBIDDEN", message: "Admin targets cannot be moderated",
+            details: { reason: AdminSchemas.AdminErrorReason.AdminTargetNotModeratable } });
         }
-        if (currentReport.status !== "pending") {
-          throw new ConflictException({ code: "CONFLICT", message: "Report has already been resolved",
-            details: { reason: AdminSchemas.AdminErrorReason.ReportAlreadyResolved, reportStatus: currentReport.status } });
+        if (report) {
+          const currentReport = await tx.contentReport.findUnique({ where: { id: report.id } });
+          if (!currentReport) throw new NotFoundException({ code: "NOT_FOUND", message: "Report not found" });
+          if (currentReport.targetType !== "user" || currentReport.targetId !== input.userId) {
+            throw new BadRequestException({ code: "VALIDATION_FAILED", message: "Report does not match the target user",
+              details: { reason: AdminSchemas.AdminErrorReason.ReportTargetMismatch } });
+          }
+          if (currentReport.status !== "pending") {
+            throw new ConflictException({ code: "CONFLICT", message: "Report has already been resolved",
+              details: { reason: AdminSchemas.AdminErrorReason.ReportAlreadyResolved, reportStatus: currentReport.status } });
+          }
         }
-      }
-      // The release takes the User's row lock, so it sees the photo as it is
-      // now. If the owner removed it since the read above, nothing was done
-      // and the throw rolls this transaction back with no audit entry.
-      const { removedKey } = await this.photos.release(input.userId, tx);
-      if (removedKey === null) throw noPhoto();
+        // The release takes the User's row lock, so it sees the photo as it is
+        // now. If the owner removed it since the read above, nothing was done
+        // and the throw rolls this transaction back with no audit entry.
+        const { removedKey } = await this.photos.release(input.userId, tx);
+        if (removedKey === null) throw noPhoto();
 
-      let reportStatus: "actioned" | undefined;
-      if (report) {
-        await this.reportRepo.updateStatus(
-          report.id,
-          { status: "actioned", reviewedById: input.adminUserId, reviewedAt },
+        let reportStatus: "actioned" | undefined;
+        if (report) {
+          await this.reportRepo.updateStatus(
+            report.id,
+            { status: "actioned", reviewedById: input.adminUserId, reviewedAt },
+            tx,
+          );
+          reportStatus = "actioned";
+        }
+
+        const auditRow = await this.auditRepo.create(
+          { ...audit, details: audit.details(removedKey) },
           tx,
         );
-        reportStatus = "actioned";
-      }
 
-      const auditRow = await this.auditRepo.create(
-        { ...audit, details: audit.details(removedKey) },
-        tx,
-      );
-
-      return {
-        targetId: input.userId,
-        targetState: { avatarKey: null, avatarIndex: user.avatarIndex },
-        reportId: report ? report.id : undefined,
-        reportStatus,
-        auditLogId: auditRow.id,
-      };
-    }));
+        return {
+          targetId: input.userId,
+          targetState: { avatarKey: null, avatarIndex: user.avatarIndex },
+          reportId: report ? report.id : undefined,
+          reportStatus,
+          auditLogId: auditRow.id,
+        };
+      }));
+    } catch (error) {
+      if (error instanceof AvatarContactScopeChanged && error.removedUserId === input.userId) throw noPhoto();
+      throw error;
+    }
   }
 }

@@ -91,7 +91,7 @@ describe("R1 actual Listing/publication/admin/conversation PostgreSQL outcomes",
   const objects = { inspect: async () => ({ contentType: "image/webp", sizeBytes: 1024 }) };
   const generator = { generate: async (key: string) => ({ variants: { thumbnail: key, list: key, detail: key, fullscreen: key }, thumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" }) };
   return new PublishListing(new PrismaListingDraftRepository(client), client, new PrismaExchangeRateRepository(client), new EventEmitterListingEventPublisher(new EventEmitter2()), generator,
-   new UploadAdoptionGuard(uploads, objects), new ContactPhonePolicy(identity.check, new PrismaVerifiedContactPhoneRepository(client)), clock, new PrismaUploadClaims(client, clock), undefined, capture);
+   new UploadAdoptionGuard(uploads, objects), new ContactPhonePolicy(identity.check, new PrismaVerifiedContactPhoneRepository(client, randomUUID)), clock, new PrismaUploadClaims(client, clock), undefined, capture);
  }
  it.each(["none", "ready", "pending"] as const)("publishes the real draft/photos with %s video and exact persisted source defaults", async video => {
   await preparePublication(video); const { listing: published } = await publisher().execute({ userId: seller, draftId: id("draft") });

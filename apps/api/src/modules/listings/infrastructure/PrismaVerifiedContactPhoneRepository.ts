@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService } from "@auto-tm/db";
 
-import { withVerifiedContactPreparation } from "../../../common/avatar-contact-preparation";
+import { withVerifiedContactPreparation, AVATAR_CONTACT_UUID_FACTORY } from "../../../common/avatar-contact-preparation";
 
 import { VerifiedContactPhone } from "../domain/VerifiedContactPhone";
 import type { VerifiedContactPhoneRepository } from "../domain/ports/VerifiedContactPhoneRepository";
@@ -10,7 +10,8 @@ type Row = { sellerId: string; phone: string; confirmedAt: Date };
 
 @Injectable()
 export class PrismaVerifiedContactPhoneRepository implements VerifiedContactPhoneRepository {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(AVATAR_CONTACT_UUID_FACTORY) private readonly uuid: () => string) {}
 
   async find(sellerId: string, phone: string): Promise<VerifiedContactPhone | null> {
     const row = await this.prisma.verifiedContactPhone.findUnique({
@@ -21,7 +22,8 @@ export class PrismaVerifiedContactPhoneRepository implements VerifiedContactPhon
 
   async record(confirmation: VerifiedContactPhone): Promise<VerifiedContactPhone> {
     const { sellerId, phone, confirmedAt } = confirmation;
-    const row = await this.prisma.$transaction(tx => withVerifiedContactPreparation(tx, confirmation, id => tx.verifiedContactPhone.upsert({
+    const allocatedId = this.uuid();
+    const row = await this.prisma.$transaction(tx => withVerifiedContactPreparation(tx, confirmation, allocatedId, id => tx.verifiedContactPhone.upsert({
       where: { sellerId_phone: { sellerId, phone } },
       create: { id, sellerId, phone, confirmedAt },
       update: { confirmedAt },

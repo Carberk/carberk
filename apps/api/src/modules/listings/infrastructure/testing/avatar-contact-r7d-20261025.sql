@@ -1,12 +1,12 @@
 -- AUTHORED ONLY. Parent installs in an isolated disposable database before
 -- matched guard activation. Never run against staging. No activation/DDL here.
--- Ten disjoint graphs, each consumed once by AvatarContactPreparation.e2e.spec.
+-- Eleven disjoint graphs, ten races plus one ordinary-key positive, each consumed once by AvatarContactPreparation.e2e.spec.
 -- No diagnostic grant/proof/report pin is seeded. Existing User FK endpoints
 -- precede Session, Business/member, Upload and avatar pointer records.
 DO $fixture$
 DECLARE n integer; p text; u text; k text; upload text;
 BEGIN
- FOR n IN 1..10 LOOP
+ FOR n IN 1..11 LOOP
   p:='r7d-20261025-'||n;
   FOREACH u IN ARRAY ARRAY['seller','admin','foreign'] LOOP
    INSERT INTO public.users(id,email,"emailVerifiedAt",role,"nameNumber","avatarIndex","updatedAt")
