@@ -335,7 +335,6 @@ export class PublishListing {
       ];
       const [publicationEvent, visibilityEvent] = publicationEvents;
       if (!publicationEvent || !visibilityEvent) throw new Error("listing_publication_events");
-      const measurementPlan = this.measurement?.preparePublication?.(publicationEvents);
       const listingRow = await this.prisma.$transaction(async (tx) => {
         const initialDraft = await tx.listingDraft.findUnique({ where: { id: draft.id } });
         if (!initialDraft || initialDraft.userId !== draft.userId || (initialDraft.businessId ?? null) !== (draft.businessId ?? null)
@@ -343,6 +342,7 @@ export class PublishListing {
           || JSON.stringify(initialDraft.payload) !== JSON.stringify(draft.payload)) throw new Error("diagnostic_source_graph_changed");
         const initialVideo = await this.discoverDraftVideo(tx, draft.id);
         const plannedVideo = this.draftVideoBinding(initialVideo, draft.id, draft.businessId ?? null, now);
+        const measurementPlan = await this.measurement?.preparePublication?.(tx, input.userId, publicationEvents);
         const roots: DiagnosticSourceRoot[] = [
           { table: "users", key: { id: input.userId } },
           { table: "listing_drafts", key: { id: draft.id } },
@@ -447,8 +447,8 @@ export class PublishListing {
           },
         });
         try {
-          if (captureEligible) await this.measurement?.capture(tx, input.userId, publicationEvent, { conversionEligible: true }, measurementPlan ?? undefined);
-          if (captureEligible) await this.measurement?.capture(tx, input.userId, visibilityEvent, { conversionEligible: true }, measurementPlan ?? undefined);
+          if (captureEligible && measurementPlan) await this.measurement?.capture(tx, input.userId, publicationEvent, { conversionEligible: true }, measurementPlan);
+          if (captureEligible && measurementPlan) await this.measurement?.capture(tx, input.userId, visibilityEvent, { conversionEligible: true }, measurementPlan);
         } catch { /* Measurement outage never rolls back the core publication. */ }
         return created;
         });

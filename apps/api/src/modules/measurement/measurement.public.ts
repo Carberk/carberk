@@ -29,11 +29,14 @@ export const MEASUREMENT_COMMIT_PORT = Symbol("MeasurementCommitPort");
 export interface MeasurementPublicationPlan {
   readonly environment: "test" | "staging" | "production";
   readonly expiresAt: Readonly<Record<string, string>>;
+  readonly principalId: string;
+  readonly generation: string;
+  readonly epoch: string;
 }
 /** Infrastructure passes its existing source transaction as an opaque context.
  * Domain/application callers do not inspect collector persistence or await transport. */
 export interface MeasurementCommitPort {
- preparePublication?(events: readonly MeasurementSchemas.MeasurementEvent[]): MeasurementPublicationPlan | null;
+ preparePublication?(transaction: object, userId: string, events: readonly MeasurementSchemas.MeasurementEvent[]): Promise<MeasurementPublicationPlan | null>;
  capture(transaction: object, userId: string, event: MeasurementSchemas.MeasurementEvent, classification?: { conversionEligible: boolean }, plan?: MeasurementPublicationPlan): Promise<"captured" | "disabled" | "unavailable">;
 }
 

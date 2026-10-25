@@ -31,9 +31,11 @@ const activation = { enabled: true, environment: "test" as const, purposes: ["pr
 describe("publication capture plan counterexample", () => {
   it("binds activation and expiry to a finite plan reused by capture", async () => {
     const commit = new PrismaMeasurementCommit(activation, "epoch-1", () => new Date("2026-10-25T12:00:01.123Z"));
-    const plan = commit.preparePublication([event]);
+    const tx = captureTransaction();
+    const plan = await commit.preparePublication(tx, "owner", [event]);
     expect(plan?.environment).toBe("test");
-    expect(await commit.capture(captureTransaction(), "owner", event, undefined, plan ?? undefined)).toBe("captured");
+    expect(plan).toMatchObject({ principalId: "principal-1", generation: "generation-1", epoch: "epoch-1" });
+    expect(await commit.capture(tx, "owner", event, undefined, plan ?? undefined)).toBe("captured");
     expect(plan?.expiresAt[event.eventId]).toBe("2026-11-01T12:00:01.123Z");
   });
 
