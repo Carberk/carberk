@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { resolve } from "node:path";
 
 import { PrismaService, withCampaignPreparation, type Prisma } from "@auto-tm/db";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -143,12 +144,12 @@ describe.skipIf(!database)("retired upload prepared PostgreSQL callers", () => {
    * import keeps the private video helper absent at de80 a named runtime
    * prerequisite instead of copying it or fabricating an opposing command. */
   async function claims(): Promise<Claims> {
-    const path = "../../../api/src/modules/listings/infrastructure/PrismaUploadClaims.ts";
+    const path = resolve(__dirname, "../../../api/src/modules/listings/infrastructure/PrismaUploadClaims.ts");
     const module = await import(/* @vite-ignore */ path) as { PrismaUploadClaims: new (db: PrismaService, clock: { now(): Date }) => Claims };
     return new module.PrismaUploadClaims(runtime(), { now: () => DUE });
   }
   async function finalize(row: Awaited<ReturnType<typeof upload>>, claim: Claims, client = runtime()) {
-    const path = "./video/VideoTransactionPreparation.ts";
+    const path = resolve(__dirname, "video/VideoTransactionPreparation.ts");
     const module = await import(/* @vite-ignore */ path) as { preparedVideo<T>(tx: Prisma.TransactionClient, selection: { uploadId: string; target: { kind: string; id: string } }, work: () => Promise<T>): Promise<T> };
     return client.$transaction(tx => module.preparedVideo(tx, { uploadId: row.id, target: { kind: "profile", id: userId } }, async () => {
       const result = await claim.finalize(tx, { token: row.claimToken ?? "missing", uploadIds: [row.id], target: { type: "profile", id: userId } });
@@ -196,7 +197,7 @@ describe.skipIf(!database)("retired upload prepared PostgreSQL callers", () => {
     const a = outcome<unknown>(first === "finalize" ? finalize(row, claim, held.client) : new PrismaRetiredUploadLedger(held.client).retireExpiredPreparations(NOW, 1));
     let b: Promise<unknown> | undefined;
     try {
-      const pid = await Promise.race([held.entered, a.then(answer => { throw new Error(`holder exited before its real lock: ${JSON.stringify(answer)}`); })]);
+      const pid = await Promise.race([held.entered, a.then(answer => { throw new Error(`holder exited before its real lock: ${answer.ok ? JSON.stringify(answer.value) : String(answer.error)}`); })]);
       if (first === "finalize") {
         b = ledger.retireExpiredPreparations(NOW, 1);
         expect(await b).toBe(0); // Real nonblocking SKIP LOCKED path.
@@ -217,7 +218,7 @@ describe.skipIf(!database)("retired upload prepared PostgreSQL callers", () => {
     const a = outcome<unknown>(first === "purge" ? new PurgeExpiredAccounts(held.client).execute({ now: NOW }) : new PrismaRetiredUploadLedger(held.client).lease(NOW, 1));
     let b: Promise<unknown> | undefined;
     try {
-      const pid = await Promise.race([held.entered, a.then(answer => { throw new Error(`holder exited before prefix: ${JSON.stringify(answer)}`); })]);
+      const pid = await Promise.race([held.entered, a.then(answer => { throw new Error(`holder exited before prefix: ${answer.ok ? JSON.stringify(answer.value) : String(answer.error)}`); })]);
       if (first === "purge") { b = ledger.lease(NOW, 1); expect(await b).toEqual([]); }
       else { b = outcome(new PurgeExpiredAccounts(runtime()).execute({ now: NOW })); await blockedBy(pid); }
     } finally { held.release(); await Promise.allSettled([a, ...(b ? [b] : [])]); }
@@ -361,6 +362,23 @@ describe.skipIf(!database)("retired upload prepared PostgreSQL callers", () => {
       expect(await db.mediaUploadCleanup.findUnique({ where: { uploadId: row.id } })).toMatchObject({ attempts: 0, nextAttemptAt: DUE });
     } finally { release(); await owner; }
     expect(await ledger.lease(NOW, 1)).toMatchObject([{ uploadId: row.id, attempts: 1 }]);
+  });
+  it("leases an unlocked selected root while another cleanup row is held", async () => {
+    const heldRow = await upload({ retired: true }); await work(heldRow.id);
+    const freeRow = await upload({ retired: true }); await work(freeRow.id);
+    let release = () => {}; let ready = () => {};
+    const held = new Promise<void>(resolve => { ready = resolve; });
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const owner = runtime().$transaction(tx => withCampaignPreparation(tx, [{ table: "media_upload_cleanups", key: { uploadId: heldRow.id }, verb: "update", next: {} }], async () => {
+      await tx.$queryRaw`SELECT 1 FROM media_upload_cleanups WHERE "uploadId"=${heldRow.id} FOR UPDATE`;
+      ready(); await gate;
+    }));
+    try {
+      await Promise.race([held, owner.then(() => { throw new Error("Lock owner ended before barrier"); })]);
+      expect(await ledger.lease(NOW, 2)).toMatchObject([{ uploadId: freeRow.id, attempts: 1 }]);
+      expect(await db.mediaUploadCleanup.findUnique({ where: { uploadId: heldRow.id } })).toMatchObject({ attempts: 0, nextAttemptAt: DUE });
+    } finally { release(); await owner; }
+    expect(await ledger.lease(NOW, 2)).toMatchObject([{ uploadId: heldRow.id, attempts: 1 }]);
   });
   it("rolls back retirement and cleanup when the transaction cannot commit", async () => {
     const row = await upload({ target: { type: "profile", id: userId } });
