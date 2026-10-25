@@ -1,0 +1,121 @@
+name: B1 bounded PostgreSQL diagnostic only
+
+on:
+  push:
+    branches: [agent/issue-897-r2-verification-assembly-20261025]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    if: false # Source preparation only. Parent must authorize a new exact diagnostic.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      NODE_ENV: test
+      APP_ENV: test
+      # Use the one fresh base DB directly; no per-worker database cloning.
+      AUTO_TM_TEST_DATABASES: "off"
+      DATABASE_URL: postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:1/auto_tm_ci
+      REDIS_URL: redis://127.0.0.1:1
+      MINIO_ENDPOINT: http://127.0.0.1:1
+      MINIO_PUBLIC_URL: http://127.0.0.1:1
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Record exact source and authorized context
+        shell: bash
+        run: |
+          mkdir -p diagnostic-evidence
+          node scripts/diagnostics/b1-diagnostic.mjs source 2>&1 | tee diagnostic-evidence/source.log
+
+      - uses: pnpm/action-setup@v6.1.0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install workspace dependencies
+        shell: bash
+        run: pnpm install --frozen-lockfile 2>&1 | tee diagnostic-evidence/install.log
+
+      - name: Generate client and build only contracts and db
+        shell: bash
+        run: |
+          pnpm --filter @auto-tm/db generate 2>&1 | tee diagnostic-evidence/generate.log
+          pnpm --filter @auto-tm/contracts build 2>&1 | tee diagnostic-evidence/contracts-build.log
+          pnpm --filter @auto-tm/db build 2>&1 | tee diagnostic-evidence/db-build.log
+
+      - name: Start fresh disposable services
+        shell: bash
+        run: bash scripts/ci-services.sh up 2>&1 | tee diagnostic-evidence/services-up.log
+
+      - name: Prove empty database before migrations
+        shell: bash
+        run: node scripts/diagnostics/b1-diagnostic.mjs empty 2>&1 | tee diagnostic-evidence/empty.log
+
+      - name: Apply committed migrations
+        shell: bash
+        run: pnpm db:migrate:deploy 2>&1 | tee diagnostic-evidence/migration-deploy.log
+
+      - name: Bootstrap disposable media buckets
+        shell: bash
+        run: pnpm minio:bootstrap 2>&1 | tee diagnostic-evidence/media-bootstrap.log
+
+      - name: Record database and migration state before suite execution
+        shell: bash
+        run: node scripts/diagnostics/b1-diagnostic.mjs migrated 2>&1 | tee diagnostic-evidence/migrated.log
+
+      - name: Execute the one unchanged 22-case diagnostic suite once
+        shell: bash
+        run: |
+          pnpm --filter @auto-tm/api exec vitest run src/modules/identity/infrastructure/IdentityAuthorityPrepared.e2e.spec.ts \
+            --maxWorkers=1 --no-file-parallelism --retry=0 --passWithNoTests=false \
+            --reporter=default --reporter=json --reporter=junit \
+            --outputFile.json="$GITHUB_WORKSPACE/diagnostic-evidence/vitest.json" \
+            --outputFile.junit="$GITHUB_WORKSPACE/diagnostic-evidence/junit.xml" \
+            2>&1 | tee diagnostic-evidence/test.log
+
+      - name: Verify diagnostic report count
+        shell: bash
+        run: node scripts/diagnostics/b1-diagnostic.mjs results 2>&1 | tee diagnostic-evidence/results.log
+
+      - name: Retain service logs on failure
+        if: failure()
+        shell: bash
+        run: bash scripts/ci-services.sh logs 2>&1 | tee diagnostic-evidence/services-failure.log
+
+      - name: Remove services and record cleanup boundary
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p diagnostic-evidence
+          project="auto_tm_ci_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          set +e
+          bash scripts/ci-services.sh down > diagnostic-evidence/cleanup.log 2>&1
+          down_status=$?
+          cat diagnostic-evidence/cleanup.log
+          remaining=0
+          for resource in container network volume; do
+            docker "$resource" ls -q --filter "label=com.docker.compose.project=$project" > "diagnostic-evidence/remaining-$resource.txt"
+            list_status=$?
+            if [ "$list_status" -ne 0 ] || [ -s "diagnostic-evidence/remaining-$resource.txt" ]; then remaining=1; fi
+          done
+          printf '{"project":"%s","downExitCode":%s,"remainingOrInspectionFailure":%s,"boundary":"run-scoped Compose containers, network and volumes; hosted runner discarded"}\n' \
+            "$project" "$down_status" "$remaining" > diagnostic-evidence/cleanup.json
+          test "$down_status" -eq 0 && test "$remaining" -eq 0
+
+      - name: Retain diagnostic and cleanup evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: diagnostic-only-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: diagnostic-evidence/
+          if-no-files-found: error
+          retention-days: 14
