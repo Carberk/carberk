@@ -150,7 +150,11 @@ class FakePrisma {
   failAudit = false;
   $queryRaw = async (parts: TemplateStringsArray, ...values: unknown[]) => {
     const sql = parts.join("?");
-    if (sql.includes("diagnostic_source_read")) return [{ source: null, next: JSON.parse(String(values.at(-1))) }];
+    if (sql.includes("WITH target AS")) return [{ source: null, next: JSON.parse(String(values.at(-1))) }];
+    if (sql.includes("diagnostic_source_read")) {
+      const verb = values.find(value => value === "insert" || value === "update" || value === "delete");
+      return [{ source: verb === "insert" ? null : { id: "source-fixture" }, next: JSON.parse(String(values.at(-1))) }];
+    }
     if (sql.includes("diagnostic_prepare_source")) { this.beforePrepared?.(); this.prepared = true; return [{ receipt: "00000000-0000-4000-8000-000000000001" }]; }
     if (sql.includes("diagnostic_assert_source")) { if (!this.prepared) throw new Error("receipt_required"); return []; }
     if (sql.includes("diagnostic_finish_source")) { this.prepared = false; return []; }

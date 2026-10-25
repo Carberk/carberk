@@ -18,7 +18,7 @@ export type ListingPublicationIntent = Readonly<{
   photoIds: readonly string[];
   uploadIds: readonly string[];
   auditId: string;
-  measurement?: Readonly<{ eventIds: readonly string[]; environment: "test" | "staging" | "production"; expiresAt: Readonly<Record<string, string>> }>;
+  measurement?: Readonly<{ eventIds: readonly string[]; environment: "test" | "staging" | "production"; createdAt: Readonly<Record<string, string>>; expiresAt: Readonly<Record<string, string>> }>;
 }>;
 export type DiagnosticSourceRoot = {
   [T in DiagnosticSourceTable]: { readonly table: T; readonly key: Readonly<DiagnosticSourceKeys[T]> }

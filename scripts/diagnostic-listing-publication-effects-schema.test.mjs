@@ -9,7 +9,7 @@ test('R7b publication migration is registered and its retained mirror is byte-id
   const mirror = await readFile(`scripts/testing/retained-schema/${name}.sql`, 'utf8');
   assert.equal(migration, mirror);
   assert.deepEqual(retainedSchemaProfile.additions.find(entry => entry.name === name), {
-    name, checksum: '62cf69772f5c2492cc4afce24bdc1c936c9c6a1e93ec1322a8b7a92fff5740fd',
+    name, checksum: '108eb593ad6292cf96ec0106e1fdd5e2eb45c38ea9a4a4fe2e04e96b6a6d87c8',
   });
   assert.match(migration, /listing_publication_intent_missing/);
   assert.match(migration, /jsonb_object_length\(publication->'measurement'->'expiresAt'\)/);

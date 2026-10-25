@@ -29,6 +29,7 @@ export const MEASUREMENT_COMMIT_PORT = Symbol("MeasurementCommitPort");
 export interface MeasurementPublicationPlan {
   readonly environment: "test" | "staging" | "production";
   readonly expiresAt: Readonly<Record<string, string>>;
+  readonly createdAt: Readonly<Record<string, string>>;
   readonly principalId: string;
   readonly generation: string;
   readonly epoch: string;

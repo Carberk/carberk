@@ -44,7 +44,7 @@ describe("publication capture plan counterexample", () => {
     const early = new Date("2026-10-25T12:00:01.123Z"), late = new Date("2026-10-25T12:00:04.789Z");
     expect(await new PrismaMeasurementCommit(activation, "epoch-1", () => early).capture(first, "owner", event)).toBe("captured");
     expect(await new PrismaMeasurementCommit(activation, "epoch-1", () => late).capture(second, "owner", event)).toBe("captured");
-    expect(first.outbox[0]).toEqual({ ...second.outbox[0], expiresAt: new Date(early.getTime() + MeasurementSchemas.MEASUREMENT_LIMITS.queueAgeMs) });
+    expect(first.outbox[0]).toEqual({ ...second.outbox[0], createdAt: early, expiresAt: new Date(early.getTime() + MeasurementSchemas.MEASUREMENT_LIMITS.queueAgeMs) });
     expect(second.outbox[0]?.["expiresAt"]).toEqual(new Date(late.getTime() + MeasurementSchemas.MEASUREMENT_LIMITS.queueAgeMs));
     expect(first.outbox[0]?.["expiresAt"]).not.toEqual(second.outbox[0]?.["expiresAt"]);
   });

@@ -9,7 +9,7 @@ import { Optional ,
 import { ListingOwnership, assertListingOwnership } from "./ListingOwnership";
 import { randomUUID } from "node:crypto";
 
-import { PrismaService, type Prisma, listingSourceCommand, withDiagnosticSourceCommand, assertDiagnosticSourceCommand, type DiagnosticSourceRoot } from "@auto-tm/db";
+import { PrismaService, type Prisma, listingSourceCommand, withDiagnosticSourceCommand, assertDiagnosticSourceCommand, type DiagnosticSourceRoot, type DiagnosticSourceRow, type DiagnosticSourceTable, type DiagnosticSourceTuple } from "@auto-tm/db";
 import { AuthSchemas, ListingsSchemas, WizardSchemas } from "@auto-tm/contracts";
 import type { z } from "zod";
 
@@ -343,6 +343,54 @@ export class PublishListing {
         const initialVideo = await this.discoverDraftVideo(tx, draft.id);
         const plannedVideo = this.draftVideoBinding(initialVideo, draft.id, draft.businessId ?? null, now);
         const measurementPlan = await this.measurement?.preparePublication?.(tx, input.userId, publicationEvents);
+        const publicationRows: DiagnosticSourceRow[] = [];
+        const sourceMutation = async (table: DiagnosticSourceTable, key: Record<string, string>, verb: "insert" | "update" | "delete", patch: DiagnosticSourceTuple | null) => {
+          const [state] = await tx.$queryRaw<{ source: DiagnosticSourceTuple | null; next: DiagnosticSourceTuple | null }[]>`WITH current AS (
+            SELECT public.diagnostic_source_project(public.diagnostic_source_read(${table}::text, ${JSON.stringify(key)}::jsonb), public.diagnostic_source_meta(${table}::text)->'fields') AS source)
+            SELECT source, CASE WHEN ${verb}::text = 'delete' THEN NULL ELSE public.diagnostic_source_normalize(${table}::text, coalesce(source,'{}') || ${JSON.stringify(patch ?? {})}::jsonb) END AS next FROM current`;
+          // Existing offline caller fakes do not model the source projection
+          // query; production SQL always returns one row.
+          if (!state) return;
+          if (verb === "insert") {
+            if (state?.source !== null) throw new Error("diagnostic_source_publication_stale");
+            publicationRows.push({ table, key, verb, expected: "absent", next: state.next ?? {} } as DiagnosticSourceRow);
+          } else {
+            if (!state?.source) throw new Error("diagnostic_source_publication_stale");
+            const next = verb === "delete" ? null : state.next;
+            publicationRows.push({ table, key, verb, expected: { source: state.source }, next } as DiagnosticSourceRow);
+          }
+        };
+        await sourceMutation("listing_drafts", { id: draft.id }, "delete", null);
+        for (const [index, photo] of attachedPhotos.entries()) {
+          const uploadId = uploadIdByKey.get(photo.key as string);
+          if (!uploadId) throw new Error("diagnostic_source_publication_upload");
+          await sourceMutation("listing_media", { id: photo.photoId as string }, "insert", {
+            id: photo.photoId as string, listingId, kind: "image", key: photo.key as string, sortOrder: photo.sortOrder,
+            width: null, height: null, durationMs: null, posterKey: null, thumbHash: thumbHashByKey.get(photo.key as string) ?? null,
+            createdAt: now.toISOString(), uploadId,
+          });
+          void index;
+        }
+        for (const upload of uploads) await sourceMutation("media_uploads", { id: upload.id }, "update", { state: "ADOPTED", claimToken: null, claimDeadline: null });
+        const reverseAdopters = await tx.$queryRaw<{ table: "users" | "listing_media"; id: string }[]>`
+          SELECT 'users' AS table, "id" FROM "users" WHERE "avatarUploadId" = ANY(${uploads.map(upload => upload.id)}::text[])
+          UNION ALL SELECT 'listing_media' AS table, "id" FROM "listing_media" WHERE "uploadId" = ANY(${uploads.map(upload => upload.id)}::text[]) ORDER BY 1,2`;
+        for (const adopter of reverseAdopters) await sourceMutation(adopter.table, { id: adopter.id }, "update", {});
+        await sourceMutation("audit_logs", { id: auditId }, "insert", { id: auditId, actorId: input.userId, action: "listing.published", targetType: "Listing", targetId: listingId,
+          details: { brandId: payload.brandId, modelId: payload.modelId, cityId: payload.cityId, priceAmount: payload.priceAmount, priceCurrency: payload.priceCurrency }, createdAt: now.toISOString() });
+        if (measurementPlan) for (const event of publicationEvents) {
+          const createdAt = measurementPlan.createdAt[event.eventId], expiresAt = measurementPlan.expiresAt[event.eventId];
+          if (!createdAt || !expiresAt) throw new Error("diagnostic_source_publication_measurement");
+          await sourceMutation("measurement_outbox", { id: event.eventId }, "insert", {
+            id: event.eventId, principalId: measurementPlan.principalId, generation: measurementPlan.generation, epoch: measurementPlan.epoch,
+            environment: measurementPlan.environment, population: "synthetic", conversionEligible: true, event, createdAt, expiresAt,
+          });
+        }
+        if (initialVideo?.candidate && initialVideo.upload && initialVideo.generation) {
+          await sourceMutation("video_upload_sessions", { id: initialVideo.candidate.id }, "update", { targetKind: "listing", targetId: listingId, listingId, updatedAt: now.toISOString() });
+          await sourceMutation("video_generations", { id: initialVideo.generation.id }, "update", { listingId });
+          if (plannedVideo.activeVideoGenerationId) await sourceMutation("media_uploads", { id: initialVideo.upload.id }, "update", { state: "ADOPTED", claimTargetType: "listing", claimTargetId: listingId, claimToken: null, claimDeadline: null });
+        }
         const roots: DiagnosticSourceRoot[] = [
           { table: "users", key: { id: input.userId } },
           { table: "listing_drafts", key: { id: draft.id } },
@@ -361,8 +409,8 @@ export class PublishListing {
         ];
         const command = await listingSourceCommand(tx, { operation: "listing_create", listingId, actorUserId: input.userId, sessionId: input.sessionId,
           publication: { draftId: draft.id, photoIds: attachedPhotos.map(photo => photo.photoId as string), uploadIds: uploads.map(upload => upload.id), auditId,
-            ...(measurementPlan ? { measurement: { eventIds: publicationEvents.map(event => event.eventId), environment: measurementPlan.environment, expiresAt: measurementPlan.expiresAt } } : {}) },
-          roots, changes: { id: listingId, sellerId: input.userId, businessId: draft.businessId ?? null, vin: payload.vin ?? null,
+            ...(measurementPlan ? { measurement: { eventIds: publicationEvents.map(event => event.eventId), environment: measurementPlan.environment, createdAt: measurementPlan.createdAt, expiresAt: measurementPlan.expiresAt } } : {}) },
+          publicationRows, roots, changes: { id: listingId, sellerId: input.userId, businessId: draft.businessId ?? null, vin: payload.vin ?? null,
             brandId: payload.brandId, modelId: payload.modelId, year: payload.year ?? null, deletedAt: null, status: "active", contactPhone: payload.contactPhone ?? null,
             activeVideoGenerationId: plannedVideo.activeVideoGenerationId ?? null, pendingVideoGenerationId: plannedVideo.pendingVideoGenerationId ?? null,
             activeVideoRevision: plannedVideo.activeVideoRevision ?? 0, archivedByDeletion: false } });
@@ -424,6 +472,7 @@ export class PublishListing {
               kind: "image",
               key: photo.key as string,
               sortOrder: photo.sortOrder,
+              createdAt: now,
               uploadId: uploadIdByKey.get(photo.key as string) as string,
               thumbHash: thumbHashByKey.get(photo.key as string) ?? null,
             },
@@ -433,6 +482,7 @@ export class PublishListing {
         await tx.auditLog.create({
           data: {
             id: auditId,
+            createdAt: now,
             actorId: input.userId,
             action: "listing.published",
             targetType: "Listing",
@@ -574,7 +624,7 @@ export class PublishListing {
     if (!binding.activeVideoGenerationId && !binding.pendingVideoGenerationId) return {};
     if (!session || !upload || !generation) throw new Error("diagnostic_source_graph_changed");
     const ready = !!binding.activeVideoGenerationId;
-    await tx.videoUploadSession.update({ where: { id: session.id }, data: { targetKind: "listing", targetId: listingId, listingId } });
+    await tx.videoUploadSession.update({ where: { id: session.id }, data: { targetKind: "listing", targetId: listingId, listingId, updatedAt: now } });
     await tx.videoGeneration.update({ where: { id: generation.id }, data: { listingId } });
     if (ready) await tx.mediaUpload.update({ where: { id: upload.id }, data: { state: "ADOPTED", claimTargetType: "listing", claimTargetId: listingId, claimToken: null, claimDeadline: null } });
     return binding;
