@@ -348,7 +348,20 @@ describe("complete initial discovery pages", () => {
 
 describe("finite proof preparation refusals at the public adapter boundary", () => {
   const raw = (message: string, code = "P2010", sqlCode = "P0001") => new Prisma.PrismaClientKnownRequestError("restricted database detail", {
-    code, clientVersion: "r5-offline", meta: { code: sqlCode, message },
+    code, clientVersion: "r5-offline", meta: { driverAdapterError: { name: "DriverAdapterError", cause: { originalCode: sqlCode, originalMessage: message, kind: "postgres", code: sqlCode, severity: "ERROR", message } } },
+  });
+  it("maps installed adapter-pg raw-query refusal at the public request boundary", async () => {
+    const h = reportPreparedHarness();
+    const error = raw("diagnostic_source_stale");
+    // Configured adapter-pg's enumerable name/cause survive Prisma metadata JSON serialization.
+    expect(JSON.parse(JSON.stringify(error)).meta).toEqual({ driverAdapterError: { name: "DriverAdapterError", cause: {
+      originalCode: "P0001", originalMessage: "diagnostic_source_stale", kind: "postgres", code: "P0001", severity: "ERROR", message: "diagnostic_source_stale",
+    } } });
+    h.failPrefix(error);
+    const refused = h.proofs.prepareRequest(h.subject, h.orderId, { kind: "issue" });
+    await expect(refused).rejects.toBeInstanceOf(DiagnosticRuleError);
+    await expect(refused).rejects.toMatchObject({ code: "DIAGNOSTIC_NO_ACCESS", message: "DIAGNOSTIC_NO_ACCESS" });
+    expect(await h.db.diagnosticContinuityRequest.count()).toBe(0);
   });
   it("replays generated proof, audit, PDF and epoch identities with distinct fixture UUIDs", async () => {
     const left = await privatePair(), right = await privatePair();
@@ -377,7 +390,7 @@ describe("finite proof preparation refusals at the public adapter boundary", () 
     ];
     const before = await Promise.all([h.db.diagnosticContinuityProof.findMany(), h.db.diagnosticReportRecord.findMany(), h.db.diagnosticAudit.findMany(), h.db.diagnosticContinuityRequest.findMany()]);
     for (const call of calls) {
-      h.failPrefix(raw(`ERROR: ${cause}`));
+      h.failPrefix(raw(cause));
       const refused = call();
       await expect(refused).rejects.toBeInstanceOf(DiagnosticRuleError);
       await expect(refused).rejects.toMatchObject({ code: "DIAGNOSTIC_NO_ACCESS", message: "DIAGNOSTIC_NO_ACCESS" });
@@ -387,12 +400,23 @@ describe("finite proof preparation refusals at the public adapter boundary", () 
   it("preserves unexpected error identity and rejects lookalike messages/codes", async () => {
     const h = await privatePair();
     const request = await h.proofs.prepareRequest(h.subject, h.b, { kind: "issue" });
-    for (const error of [new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION"), new Error("diagnostic_source_stale"), raw("ERROR: diagnostic_source_final_effect"), raw("ERROR: diagnostic_source_stale details"), raw("ERROR: diagnostic_source_stale", "P2028"), raw("ERROR: diagnostic_source_stale", "P2010", "40001"), { code: "P2010", meta: { code: "P0001", message: "diagnostic_source_stale" } }]) {
+    const consumeRequest = await h.proofs.prepareRequest(h.technician, h.b, { kind: "consume" });
+    const malformed = [undefined, null, {}, { cause: null }, { cause: { originalCode: "P0001" } }].map(driverAdapterError =>
+      new Prisma.PrismaClientKnownRequestError("restricted detail", { code: "P2010", clientVersion: "7.8.0", meta: { driverAdapterError } }));
+    const legacy = new Prisma.PrismaClientKnownRequestError("restricted detail", {
+      code: "P2010", clientVersion: "7.8.0", meta: { code: "P0001", message: "ERROR: diagnostic_source_stale" },
+    });
+    for (const error of [new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION"), new Error("diagnostic_source_stale"),
+      raw("diagnostic_source_final_effect"), raw("diagnostic_source_stale details"), raw("ERROR: diagnostic_source_stale"), raw("diagnostic_source_stale\n"),
+      raw("diagnostic_source_stale", "P2028"), raw("diagnostic_source_stale", "P1001"), raw("diagnostic_source_stale", "P2010", "40001"),
+      raw("diagnostic_source_stale", "P2010", "57014"), raw("diagnostic_source_stale", "P2010", "08006"),
+      legacy, ...malformed, { code: "P2010", meta: raw("diagnostic_source_stale").meta }]) {
       for (const call of [
         () => h.proofs.issue(h.subject, h.b, h.issuance),
         () => h.proofs.consume(h.technician, h.b, h.input),
         () => h.proofs.useHandoff(h.technician, h.b, h.proofId, h.input),
         () => h.proofs.executeRequest(h.subject, h.b, request.requestId, { kind: "issue", command: h.issuance }),
+        () => h.proofs.executeRequest(h.technician, h.b, consumeRequest.requestId, { kind: "consume", command: h.input }),
         () => h.proofs.prepareRequest(h.subject, h.b, { kind: "issue" }),
         () => h.proofs.recoverRequest(h.subject, h.b, request.requestId),
         () => h.proofs.discoverRequests(h.subject, h.b, {}),

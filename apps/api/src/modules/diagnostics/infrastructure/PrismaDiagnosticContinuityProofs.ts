@@ -302,9 +302,14 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
   /** A prepared loser may discover an already committed exact request result.
    * Only these SQL planning conflicts permit a fresh read, never another write. */
   private requestRace(error: unknown): boolean {
-    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2010" &&
-      error.meta?.["code"] === "P0001" && typeof error.meta["message"] === "string" &&
-      /^(?:ERROR: )?diagnostic_source_(?:graph_changed|stale|expected_absent)$/.test(error.meta["message"]);
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2010") return false;
+    // Prisma adapter-pg retains the driver cause here, including after metadata JSON serialization.
+    const adapter = error.meta?.["driverAdapterError"];
+    if (typeof adapter !== "object" || adapter === null || !("cause" in adapter)) return false;
+    const cause = adapter.cause;
+    return typeof cause === "object" && cause !== null && "originalCode" in cause && cause.originalCode === "P0001" &&
+      "originalMessage" in cause && (cause.originalMessage === "diagnostic_source_graph_changed" ||
+        cause.originalMessage === "diagnostic_source_stale" || cause.originalMessage === "diagnostic_source_expected_absent");
   }
   async executeRequest(subject: DiagnosticSubject, orderId: string, requestId: string, input: D.DiagnosticContinuityRequestExecute): Promise<D.DiagnosticContinuityRequest> {
     return this.proofBoundary(async () => {

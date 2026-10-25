@@ -57,7 +57,7 @@ export function reportPreparedHarness() {
       }
       if (sql.includes("diagnostic_prepare_source")) {
         if (requestWinner) { const message = requestWinner.message; requestWinner = undefined;
-          throw new Prisma.PrismaClientKnownRequestError(message, { code: "P2010", clientVersion: "r5-offline", meta: { code: "P0001", message: `ERROR: ${message}` } });
+          throw new Prisma.PrismaClientKnownRequestError(message, { code: "P2010", clientVersion: "r5-offline", meta: { driverAdapterError: { name: "DriverAdapterError", cause: { originalCode: "P0001", originalMessage: message, kind: "postgres", code: "P0001", severity: "ERROR", message } } } });
         }
         command = JSON.parse(String(values[0])) as DiagnosticSourceCommand; commands.push(command); prefix = true; if (preparedHook) { const hook = preparedHook; preparedHook = undefined; await hook(); } return [{ receipt: "r5-receipt" }]; }
       if (sql.includes("diagnostic_assert_source")) { if (values[0] !== "r5-receipt" || values[1] !== command?.operation) throw new Error("diagnostic_source_receipt"); return []; }
