@@ -19,6 +19,7 @@ function repository(marker: string, admitted = true, lookupError?: Error) {
     $executeRaw: async () => 0,
     $queryRaw: async (query: TemplateStringsArray) => {
       const sql = query.join("");
+      if (sql.includes("campaign_prepare")) return [{ receipt: "ordinary-prelude" }];
       if (sql.includes("set_config")) { setting = ""; return []; }
       if (sql.includes("current_setting")) return [{ binding: setting }];
       return [];
