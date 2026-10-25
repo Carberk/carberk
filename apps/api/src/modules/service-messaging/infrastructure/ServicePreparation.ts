@@ -114,7 +114,7 @@ export async function withServicePreparation<T>(tx: Tx, subject: ServiceSubject,
   return { selected, source };
  };
  const before = await discover();
- if (!before) return work(ids);
+ if (!before) throw deny();
  const tables = await tx.$queryRaw<{ table: string; namespace: number }[]>`
   SELECT m->>'table' AS table,(m->>'namespace')::int AS namespace FROM jsonb_array_elements(public.diagnostic_source_registry()) m ORDER BY (m->>'namespace')::int
  `;

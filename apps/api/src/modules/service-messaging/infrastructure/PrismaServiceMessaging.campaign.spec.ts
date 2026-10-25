@@ -24,7 +24,14 @@ function harness(options: { ordinary?: boolean; enabled?: boolean; begin?: Campa
   if (!/^find/.test(method)) writes.push(`${name}.${method}`);
   return reads[`${name}.${method}`] ?? { count: 0 };
  } });
- const tx = new Proxy({ $queryRaw: async () => [], $executeRaw: async () => 0 } as Record<string, unknown>, { get: (target, key: string) => key in target ? target[key] : model(key) });
+ const query = async (strings: TemplateStringsArray) => {
+  const sql = strings.join("?");
+  if (sql.includes("service retained selection")) return [{ roots: [], fingerprint: [] }];
+  if (sql.includes("diagnostic_source_scope")) return [{ scope: [], keys: [], campaigns: [], mutations: [] }];
+  if (sql.includes("campaign_prepare")) return [{ receipt: "receipt" }];
+  return [];
+ };
+ const tx = new Proxy({ $queryRaw: query, $executeRaw: async () => 0 } as Record<string, unknown>, { get: (target, key: string) => key in target ? target[key] : model(key) });
  const db = { $transaction: async (work: (client: unknown) => Promise<unknown>) => work(tx) };
  const staff = { authorize: async () => { throw new StaffAuthorityDenied("CAPABILITY_REQUIRED"); } };
  const runtime: ServiceRuntime = { now: () => new Date(), id: () => conversationId, syntheticEnabled: () => options.enabled ?? false, syntheticSubjectAllowed: () => options.ordinary ?? false };
@@ -75,7 +82,7 @@ describe("campaign Support text admission at the service boundary", () => {
    service.supportCommand(subject, conversationId, { kind: "investigate" }),
    service.historySnapshot(subject, conversationId),
   ];
-  for (const attempt of attempts) expect(await code(attempt)).toBe("COLLECTION_DISABLED");
+  expect(await Promise.all(attempts.map(code))).toEqual(Array(9).fill("COLLECTION_DISABLED"));
   expect(campaign).toEqual([]);
   expect(writes).toEqual([]);
  });
