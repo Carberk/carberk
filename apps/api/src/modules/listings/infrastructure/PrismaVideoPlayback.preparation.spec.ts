@@ -24,8 +24,8 @@ function fixture() {
   const clock = { now: () => now };
   // Compose the actual providers exposed by Identity's Nest composition module.
   // This avoids an internal cross-context import or a fake authorization policy.
-  const providers = Reflect.getMetadata("providers", IdentityModule) as { name?: string }[];
-  const Repository = providers.find(p => p.name === "PrismaBusinessAuthority") as unknown as new (db: PrismaService) => unknown;
+  const providers = Reflect.getMetadata("providers", IdentityModule) as { name?: string; useClass?: { name: string } }[];
+  const Repository = providers.find(p => p.useClass?.name === "PrismaBusinessAuthority")?.useClass as unknown as new (db: PrismaService) => unknown;
   const Authority = providers.find(p => p.name === "CheckBusinessAuthority") as unknown as new (repository: unknown, clock: ClockPort) => BusinessAuthorityPort;
   const identity = new Authority(new Repository(db.prisma), clock);
   const service = new PrismaVideoPlayback(db.prisma, identity, { isEligible: () => true }, clock, () => secret);
