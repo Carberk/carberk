@@ -6,7 +6,7 @@ import { ListingMedia } from "../domain/ListingMedia";
 
 const now = new Date("2026-10-25T12:00:00Z");
 const media = (id = "photo", uploadId: string | null = "upload-1") => ListingMedia.create({ id, listingId: "listing", kind: "image", key: "pending/upload-1/original.webp", sortOrder: 0, createdAt: now, ...(uploadId ? { uploadId } : {}) });
-function setup() {
+function setup(retirementInstant = now) {
   const db = new ClaimDatabase();
   db.tables["listings"] = [{ id: "listing", sellerId: "owner", businessId: null, status: "active" }];
   const query = db.tx.$queryRaw;
@@ -20,6 +20,14 @@ function setup() {
   };
   const delegate = {
     findUnique: async ({ where }: { where: Row }) => db.tables["listing_media"]?.find(row => Object.entries(where).every(([key, value]) => row[key] === value)) ?? null,
+    findMany: async ({ where }: { where: Row }) => (db.tables["listing_media"] ?? []).filter(row => row["listingId"] === where["listingId"] && row["kind"] === where["kind"]),
+    count: async ({ where }: { where: { listingId: string; kind: string; id: { not: string } } }) => (db.tables["listing_media"] ?? []).filter(row => row["listingId"] === where.listingId && row["kind"] === where.kind && row["id"] !== where.id.not).length,
+    deleteMany: async ({ where }: { where: Row }) => {
+      if (!db.receipt) throw new Error("media_write_before_preparation");
+      const rows = db.tables["listing_media"] ?? [];
+      db.tables["listing_media"] = rows.filter(row => row["id"] !== where["id"]);
+      return { count: rows.length - db.tables["listing_media"].length };
+    },
     create: async ({ data }: { data: Row }) => {
       if (!db.receipt) throw new Error("media_write_before_preparation");
       db.tables["listing_media"]?.push(data); return data;
@@ -37,9 +45,10 @@ function setup() {
       Object.assign(row, data); return row;
     },
   };
-  Object.assign(db.tx, { listingMedia: delegate, listing: { findUnique: async ({ where }: { where: Row }) => db.tables["listings"]?.find(row => row["id"] === where["id"]) ?? null } });
+  Object.assign(db.tx, { listingMedia: delegate, listing: { findUnique: async ({ where }: { where: Row }) => db.tables["listings"]?.find(row => row["id"] === where["id"]) ?? null },
+    mediaUpload: { findUnique: async ({ where }: { where: Row }) => db.tables["media_uploads"]?.find(row => row["id"] === where["id"]) ?? null } });
   Object.assign(db.prisma, { listingMedia: delegate });
-  const claims = new PrismaUploadClaims(db.prisma, { now: () => now });
+  const claims = new PrismaUploadClaims(db.prisma, { now: () => retirementInstant });
   return { db, repository: new PrismaListingMediaRepository(db.prisma, claims) };
 }
 const reserve = { state: "PREPARING", claimToken: "token", claimTargetType: "listing", claimTargetId: "listing" };
@@ -82,5 +91,40 @@ describe("media caller preparation", () => {
     db.tables["listing_media"] = [{ id: "photo", listingId: "listing", sortOrder: 1 }, { id: "foreign", listingId: "other", sortOrder: 2 }];
     await expect(repository.updateSortOrder("listing", [{ mediaId: "photo", sortOrder: 4 }, { mediaId: "foreign", sortOrder: 5 }])).rejects.toMatchObject({ code: "P2025" });
     expect(db.tables["listing_media"]?.map(row => row["sortOrder"])).toEqual([1, 2]);
+  });
+
+  it("releases media and records exact cleanup with the unchanged helper's later instant", async () => {
+    const actual = new Date("2026-10-25T12:00:03.789Z");
+    const { db, repository } = setup(actual); db.upload("upload-1", { ...reserve, state: "ADOPTED" });
+    db.tables["listing_media"] = [{ id: "photo", listingId: "listing", kind: "image", key: "pending/upload-1/original.webp", uploadId: "upload-1" }];
+    expect(await repository.deleteReleasingUpload("photo", 0)).toEqual({ removed: true });
+    expect(db.tables["listing_media"]).toEqual([]);
+    expect(db.tables["media_uploads"]?.[0]).toMatchObject({ state: "RETIRED", retiredAt: actual, claimToken: null });
+    expect(db.tables["media_upload_cleanups"]).toEqual([{ uploadId: "upload-1", key: "pending/upload-1/original.webp", objectKeys: ["pending/upload-1/original.webp"], writeProtocol: "conditional-v1", status: "PENDING" }]);
+    expect(db.prepared).toContainEqual({ table: "media_uploads", key: { id: "upload-1" }, verb: "update", next: { state: "RETIRED", claimToken: null, claimDeadline: null } });
+  });
+
+  it("rolls back media deletion and retirement when cleanup fails after a distinct clock instant", async () => {
+    const { db, repository } = setup(new Date("2026-10-25T12:00:05.123Z")); db.upload("upload-1", { ...reserve, state: "ADOPTED" });
+    db.tables["listing_media"] = [{ id: "photo", listingId: "listing", kind: "image", key: "pending/upload-1/original.webp", uploadId: "upload-1" }];
+    const before = structuredClone(db.tables); db.failWrite = 2;
+    await expect(repository.deleteReleasingUpload("photo", 0)).rejects.toThrow("claim_write_sentinel");
+    expect(db.tables).toEqual(before);
+  });
+
+  it("preserves the photo floor before deleting or retiring anything", async () => {
+    const { db, repository } = setup(); db.upload("upload-1", { ...reserve, state: "ADOPTED" });
+    db.tables["listing_media"] = [{ id: "photo", listingId: "listing", kind: "image", key: "pending/upload-1/original.webp", uploadId: "upload-1" }];
+    const before = structuredClone(db.tables);
+    await expect(repository.deleteReleasingUpload("photo", 1)).rejects.toMatchObject({ code: "PHOTO_MINIMUM_REQUIRED" });
+    expect(db.tables).toEqual(before);
+  });
+
+  it.each([null, "mismatched-key"])("removes %s legacy provenance without retirement", async key => {
+    const { db, repository } = setup(); db.upload("upload-1", { ...reserve, state: "ADOPTED" });
+    db.tables["listing_media"] = [{ id: "photo", listingId: "listing", kind: "image", key: key ?? "legacy.webp", uploadId: key ? "upload-1" : null }];
+    expect(await repository.deleteReleasingUpload("photo", 0)).toEqual({ removed: true });
+    expect(db.tables["media_upload_cleanups"]).toEqual([]);
+    expect(db.tables["media_uploads"]?.[0]).toMatchObject({ state: "ADOPTED" });
   });
 });
