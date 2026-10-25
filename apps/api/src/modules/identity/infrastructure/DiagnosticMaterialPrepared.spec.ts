@@ -58,6 +58,21 @@ describe("material adapters at their actual outer entry", () => {
     await expect(h.identity.upload(h.subject, h.orderId, input.id, { expectedOrderVersion: 1, mime: input.contentType, bytes: h.bytes })).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
     expect(await h.db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: input.id } })).toMatchObject({ epoch: "replacement", state: "staged", cleanupRequestedAt: null });
   });
+  it("preserves a renewal committed between cleanup's initial and planning reads", async () => {
+    const h = materialHarness(), input = h.stage(); await h.identity.stage(h.subject, h.orderId, input);
+    let original: unknown;
+    h.failPut();
+    h.onPut(async () => {
+      original = await h.db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: input.id } });
+      h.replaceEpochBeforeCleanupPlan(input.id, "replacement-between-reads");
+    });
+    await expect(h.identity.upload(h.subject, h.orderId, input.id, { expectedOrderVersion: 1, mime: input.contentType, bytes: h.bytes })).rejects.toThrow();
+    const replacement = await h.db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: input.id } });
+    expect(replacement).toEqual({ ...original as object, epoch: "replacement-between-reads" });
+    expect(replacement).toMatchObject({ state: "staged", cleanupRequestedAt: null });
+    expect(h.stored.has(replacement.objectKey!)).toBe(true);
+    expect(await h.db.diagnosticAudit.count()).toBe(0);
+  });
   it("uploads and abandons ordinary finding evidence without a source mutation receipt", async () => {
     const h = materialHarness(), evidenceId = h.id(12);
     expect(await h.evidence.upload(h.subject, { reportId: h.reportId, evidenceId, findingId: "brakes", expectedVersion: 1, mime: "image/png", bytes: h.bytes })).toMatchObject({ id: evidenceId, sizeBytes: 3 });

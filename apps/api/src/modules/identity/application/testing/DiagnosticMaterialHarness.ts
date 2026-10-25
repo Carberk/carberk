@@ -27,14 +27,21 @@ const delegate = (memory: DiagnosticMemoryDatabase, model: Model) => memory.clie
 export function materialHarness() {
   let memory = new DiagnosticMemoryDatabase(), clock = new Date("2026-10-25T12:00:00Z"), active = false;
   const subject = { userId: id(1), sessionId: id(2) }, orderId = id(3), reportId = id(4), rawId = id(5);
+  let cleanupReplacement: { id: string; epoch: string } | undefined;
   let afterPrepare: (() => Promise<void>) | undefined, finishFailure = false;
   const commands: DiagnosticSourceCommand[] = [];
   const seed = (model: Model, row: Row) => memory.seed(model, row);
   const scope = (roots: unknown[]) => [...roots, { table: "diagnostic_centers", key: { id: id(6) } }];
   const modelFor = (table: string) => Object.entries(tables).find(([, value]) => value === table)?.[0] as Model;
-  const query = async (sql: string, values: unknown[], state: { prefix: boolean; command?: DiagnosticSourceCommand; discovered?: unknown[] }) => {
+  const query = async (sql: string, values: unknown[], state: { prefix: boolean; command?: DiagnosticSourceCommand; discovered?: unknown[]; committedReplacement?: { id: string; epoch: string } }) => {
     if (sql.includes("diagnostic_source_project")) {
       const table = String(values[0]), key = JSON.parse(String(values[1])) as Row;
+      // Simulate one separately committed renewal exactly after cleanup's first
+      // read and before its planning read. Preserve it across caller rollback.
+      if (table === "diagnostic_identity_provenance" && JSON.parse(String(values.at(-1))).state === "cleanup_pending" && cleanupReplacement) {
+        state.committedReplacement = cleanupReplacement; cleanupReplacement = undefined;
+        await memory.client.diagnosticIdentityProvenance.update({ where: { id: state.committedReplacement.id }, data: { epoch: state.committedReplacement.epoch } });
+      }
       const source = await delegate(memory, modelFor(table)).findUnique({ where: key });
       return [{ source, next: { ...source as object, ...JSON.parse(String(values.at(-1))) } }];
     }
@@ -62,7 +69,7 @@ export function materialHarness() {
   };
   const transaction = async <T>(work: (tx: Prisma.TransactionClient) => Promise<T>) => {
     const snapshot = await Promise.all(Object.keys(tables).map(async name => [name, await delegate(memory, name as Model).findMany()] as const));
-    const state = { prefix: false };
+    const state: { prefix: boolean; committedReplacement?: { id: string; epoch: string } } = { prefix: false };
     const tx = new Proxy(memory.client, { get(target, property) {
       if (property === "$queryRaw") return (parts: TemplateStringsArray, ...values: unknown[]) => query(parts.join("?"), values, state);
       if (property === "$queryRawUnsafe") return (sql: string, ...values: unknown[]) => query(sql, values, state);
@@ -79,7 +86,7 @@ export function materialHarness() {
     } });
     active = true;
     try { return await work(tx); }
-    catch (error) { memory = new DiagnosticMemoryDatabase(); for (const [name, rows] of snapshot) for (const row of rows) memory.seed(name, row as Row); throw error; }
+    catch (error) { memory = new DiagnosticMemoryDatabase(); for (const [name, rows] of snapshot) for (const row of rows) memory.seed(name, row as Row); if (state.committedReplacement) await memory.client.diagnosticIdentityProvenance.update({ where: { id: state.committedReplacement.id }, data: { epoch: state.committedReplacement.epoch } }); throw error; }
     finally { active = false; }
   };
   const db = new Proxy({} as PrismaService, { get(_target, property) { return property === "$transaction" ? transaction : Reflect.get(memory.client, property); } });
@@ -108,6 +115,7 @@ export function materialHarness() {
   const bytes = new Uint8Array([1, 2, 3]);
   const stage = (provenanceId = id(11)) => ({ id: provenanceId, expectedOrderVersion: 1, contentType: "image/png" as const, sizeBytes: bytes.length, rights });
   return { db, identity, evidence, subject, orderId, reportId, rawId, bytes, stored, commands, seed, stage, rights, id,
+    replaceEpochBeforeCleanupPlan: (id: string, epoch: string) => { cleanupReplacement = { id, epoch }; },
     clock: (now: Date) => { clock = now; }, afterPrepare: (fn?: () => Promise<void>) => { afterPrepare = fn; }, failFinish: () => { finishFailure = true; },
     onPut: (fn?: () => Promise<void>) => { onPut = fn; }, onRead: (fn?: () => Promise<void>) => { onRead = fn; }, failPut: () => { putFailure = true; } };
 }
