@@ -16,16 +16,16 @@ export const DiagnosticOwnershipCapture = {
     return parsed.data;
   },
   async data(tx: Tx, row: Order, rawId: string, version: number, actorId: string, now: Date,
-    classification: DiagnosticSchemas.DiagnosticOwnershipClassification | undefined, grantId?: string): Promise<Prisma.DiagnosticOwnershipComponentUncheckedCreateInput> {
-    if (classification && new Date(classification.rights.schedule.until) <= now) throw new DiagnosticRuleError("DIAGNOSTIC_INVALID_INPUT");
+    classification: DiagnosticSchemas.DiagnosticOwnershipClassification | undefined, grantId?: string, validationNow = now): Promise<Prisma.DiagnosticOwnershipComponentUncheckedCreateInput> {
+    if (classification && new Date(classification.rights.schedule.until) <= validationNow) throw new DiagnosticRuleError("DIAGNOSTIC_INVALID_INPUT");
     const unavailable = { identityRecordId: rawId, orderId: row.id, orderVersion: version, state: "unavailable" as const };
     if (!grantId || row.audience !== "listing_public" || !row.listingId || !row.commissionerId) {
       return unavailable;
     }
-    const grant = await DiagnosticOwnershipGrants.compatible(tx, row, grantId, now);
+    const grant = await DiagnosticOwnershipGrants.compatible(tx, row, grantId, validationNow);
     const earlier = await tx.diagnosticIdentityRecord.findMany({ where: { orderId: row.id, orderVersion: { lt: version } }, include: { ownership: true } });
     // No repin, backfill or resurrection, including a legacy raw that has no component row.
-    if (earlier.some(raw => raw.ownership?.state !== "available" || !raw.ownership.rightsUntil || raw.ownership.rightsUntil <= now)) {
+    if (earlier.some(raw => raw.ownership?.state !== "available" || !raw.ownership.rightsUntil || raw.ownership.rightsUntil <= validationNow)) {
       return unavailable;
     }
     const rights = DiagnosticSchemas.DiagnosticIdentityRightsSchema.parse(grant.rights);
@@ -41,7 +41,7 @@ export const DiagnosticOwnershipCapture = {
     };
   },
   async append(tx: Tx, row: Order, rawId: string, version: number, actorId: string, now: Date,
-    classification: DiagnosticSchemas.DiagnosticOwnershipClassification | undefined, grantId?: string): Promise<void> {
-    await tx.diagnosticOwnershipComponent.create({ data: await this.data(tx, row, rawId, version, actorId, now, classification, grantId) });
+    classification: DiagnosticSchemas.DiagnosticOwnershipClassification | undefined, grantId?: string, validationNow = now): Promise<void> {
+    await tx.diagnosticOwnershipComponent.create({ data: await this.data(tx, row, rawId, version, actorId, now, classification, grantId, validationNow) });
   }
 };

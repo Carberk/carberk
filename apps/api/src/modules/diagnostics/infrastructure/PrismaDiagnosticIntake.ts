@@ -293,7 +293,7 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
       return diagnosticMutation(tx, this.command(subject, "ownership_grant", [plan], [id]), async () => {
         await this.publicBindings.lock(tx, [id], [subject.userId]); await this.current(tx, subject);
         const current = await tx.inspectionOrder.findUnique({ where: { id } }); if (!current) throw denial();
-        return DiagnosticOwnershipGrants.create(tx, current, subject, input, now, grantId);
+        return DiagnosticOwnershipGrants.create(tx, current, subject, input, now, grantId, this.runtime.now());
       });
     }).catch(DiagnosticOwnershipGrants.refuse);
   }
@@ -351,9 +351,13 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
         this.version(current, expectedVersion);
         if (current.status !== "arrived") throw new DiagnosticRuleError("DIAGNOSTIC_OBSERVATION_DENIED");
         if (input.ownershipGrantId) await DiagnosticOwnershipGrants.compatible(tx, current, input.ownershipGrantId, this.runtime.now());
+        // Planned stamps are part of the receipt hash. Validate with the clock
+        // after preparation/authority waits without changing those source tuples.
+        const validationNow = this.runtime.now();
+        DiagnosticOwnershipCapture.classification(classification, validationNow);
         const next = await tx.inspectionOrder.update({ where: { id }, data });
         await tx.diagnosticIdentityRecord.create({ data: raw });
-        await DiagnosticOwnershipCapture.append(tx, current, rawId, data.version, subject.userId, recordedAt, classification, input.ownershipGrantId);
+        await DiagnosticOwnershipCapture.append(tx, current, rawId, data.version, subject.userId, recordedAt, classification, input.ownershipGrantId, validationNow);
         await sealDiagnosticFirstObservation(tx, receipt, id, rawId);
         await tx.diagnosticAudit.create({ data: audit.data }); return this.dto(tx, next, true);
       });

@@ -31,7 +31,7 @@ type Person = typeof people[number];
 describe("real prepared intake, ownership collection and first capture", () => {
   let module: TestingModule, db: PrismaService, pool: Pool, intake: DiagnosticIntakePort;
   let sequence = 0, centerId: string, listingId: string;
-  const allowed = new Set<string>(), userIds: string[] = [], centers: string[] = [], namespaces: string[] = [];
+  const allowed = new Set<string>(), userIds: string[] = [], businesses: string[] = [], centers: string[] = [], namespaces: string[] = [];
   const id = (alias: string) => suite.id(`${sequence}-${alias}`);
   const subject = (who: Person) => ({ userId: id(who), sessionId: id(`${who}-session`) });
   const rights = (): D.DiagnosticIdentityRights => ({ category: "vehicle_observation", purpose: "Restricted visit comparison", basis: "Authenticated seller declaration",
@@ -73,6 +73,8 @@ describe("real prepared intake, ownership collection and first capture", () => {
     if (pool) {
       await guards(false);
       for (const ns of namespaces) await pool.query(`DROP SCHEMA "${ns}" CASCADE`);
+      await db.dealershipMember.deleteMany({ where: { dealershipId: { in: businesses } } });
+      await db.dealership.deleteMany({ where: { id: { in: businesses } } });
       const orders = await db.inspectionOrder.findMany({ where: { centerId: { in: centers } }, select: { id: true } });
       const orderIds = orders.map(order => order.id);
       await db.diagnosticOwnershipComponent.deleteMany({ where: { orderId: { in: orderIds } } });
@@ -354,11 +356,56 @@ describe("real prepared intake, ownership collection and first capture", () => {
         if (change === "hash") await tx.$executeRawUnsafe(`UPDATE "${ns}".campaign_manifest SET diagnostic_contract_hash='stale'`);
         else if (change === "candidate") await tx.$executeRawUnsafe(`UPDATE "${ns}".campaign_manifest SET candidate=repeat('0',40)`);
         else await tx.$executeRaw`UPDATE sessions SET "expiresAt"=transaction_timestamp()-interval '1 minute' WHERE id=${sessionId}`;
-        if (completion === "finish") await tx.$queryRaw`SELECT diagnostic_finish_source(${prepared.receipt}::uuid)`;
-        else await tx.$executeRaw`DELETE FROM diagnostic_source_commands WHERE id=${prepared.receipt}::uuid`;
+        const completionAttempt = completion === "finish"
+          ? tx.$queryRaw`SELECT diagnostic_finish_source(${prepared.receipt}::uuid)`
+          : tx.$executeRaw`DELETE FROM diagnostic_source_commands WHERE id=${prepared.receipt}::uuid`;
+        await expect(completionAttempt).rejects.toThrow(change === "dependency" ? "diagnostic_intake_dependency_changed" : "diagnostic_intake_campaign_unadmitted");
       })).rejects.toThrow();
     }
     expect(await db.diagnosticTemplateVersion.count({ where: { centerId: center.id } })).toBe(before);
     // This refusal is a preserved negative; it is not the automatic public 201 proof.
   });
+  it("authored reception revalidation opposition refuses stale qualification atomically", async () => {
+    const visit = await readyVisit();
+    const reception = id("reception");
+    await db.diagnosticCenterAssignment.update({ where: { centerId_userId_capability: { centerId, userId: reception, capability: "diagnostics.reception" } }, data: { revokedAt: new Date() } });
+    const before = await db.inspectionOrder.count({ where: { centerId } });
+    await expect(intake.create(subject("seller"), { requestKey: randomUUID(), centerId, templateVersionId: visit.templateVersionId, audience: "buyer_private", synthetic: true })).rejects.toThrow("DIAGNOSTIC_SERVICE_UNAVAILABLE");
+    expect(await db.inspectionOrder.count({ where: { centerId } })).toBe(before);
+    await db.diagnosticCenterAssignment.update({ where: { centerId_userId_capability: { centerId, userId: reception, capability: "diagnostics.reception" } }, data: { revokedAt: null } });
+  });
+
+  it("authored cross-visit A/B listing and member mutate-restore stays changed before either first capture", async () => {
+    const a = await readyVisit();
+    const template = await db.diagnosticTemplateVersion.findFirstOrThrow({ where: { centerId } });
+    const b = await intake.create(subject("seller"), { requestKey: randomUUID(), centerId, templateVersionId: template.id, audience: "listing_public", listingId, synthetic: true });
+    await listingChange("WVWZZZ1JZXW000002"); await listingChange(vin);
+    const businessId = randomUUID(); businesses.push(businessId);
+    await db.dealership.create({ data: { id: businessId, slug: `r3-${businessId}`, name: "R3 authored business", status: "active", admissionMode: "synthetic" } });
+    const member = await db.dealershipMember.create({ data: { dealershipId: businessId, userId: id("seller"), role: "owner", status: "active" } });
+    await db.listing.update({ where: { id: listingId }, data: { businessId } });
+    await db.dealershipMember.update({ where: { id: member.id }, data: { status: "inactive" } });
+    await db.dealershipMember.update({ where: { id: member.id }, data: { status: "active" } });
+    for (const visit of [a, b]) {
+      const grant = await intake.grantOwnership(subject("seller"), visit.id, { rights: rights() });
+      await expect(observe(visit, grant.id)).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
+      expect((await anchor(visit.id))?.state).toBe("changed");
+    }
+  });
+
+  it("authored stored-expired grant is refused uniformly before raw or component writes", async () => {
+    const visit = await readyVisit();
+    const grant = await intake.grantOwnership(subject("seller"), visit.id, { rights: rights() });
+    await db.diagnosticOwnershipGrant.update({ where: { id: grant.id }, data: { rightsUntil: new Date(Date.now() - 1000) } });
+    const before = await Promise.all([db.diagnosticIdentityRecord.count({ where: { orderId: visit.id } }), db.diagnosticOwnershipComponent.count({ where: { orderId: visit.id } })]);
+    await expect(observe(visit, grant.id)).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
+    expect(await Promise.all([db.diagnosticIdentityRecord.count({ where: { orderId: visit.id } }), db.diagnosticOwnershipComponent.count({ where: { orderId: visit.id } })])).toEqual(before);
+  });
+
+  it("authored first unbound intake with absent template refuses without campaign or center effects", async () => {
+    const before = await Promise.all([db.inspectionOrder.count({ where: { centerId } }), db.diagnosticCenterAssignment.count({ where: { centerId } }), db.diagnosticAudit.count({ where: { centerId } })]);
+    await expect(intake.create(subject("seller"), { requestKey: randomUUID(), centerId, templateVersionId: randomUUID(), audience: "buyer_private", synthetic: true })).rejects.toThrow("DIAGNOSTIC_TEMPLATE_UNAVAILABLE");
+    expect(await Promise.all([db.inspectionOrder.count({ where: { centerId } }), db.diagnosticCenterAssignment.count({ where: { centerId } }), db.diagnosticAudit.count({ where: { centerId } })])).toEqual(before);
+  });
+
 });
