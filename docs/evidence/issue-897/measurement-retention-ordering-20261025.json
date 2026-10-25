@@ -1,0 +1,823 @@
+{
+  "status": "IMPLEMENTATION_CHECKPOINT_PARENT_SOURCE_INSPECTION_PENDING_SHARED_EFFECTS_CORRECTION",
+  "role": "sole implementation sub-agent; no nested agents",
+  "branch": "agent/issue-897-measurement-retention-20261025",
+  "scaffoldRef": "t3/433c86f9",
+  "base": "de80c7b572a8e2b5df832774bef751a6e299fc4f",
+  "baseTree": "8190e99411eadb4904c9187b2fc31555f4cdc9e5",
+  "sourceHead": "2bd93f388053188f8e804adc26203a6ca41b69a5",
+  "sourceTree": "f72dfae5f0490be6ec12f9920e07213a59feaa2c",
+  "redHead": "bc6fab896a0743cf132d79ce9a7fa6446bc41b6f",
+  "redTree": "de45814ad9575ea005c150e0b0c5deb5ef9877d9",
+  "dependency": {
+    "head": "311637ca601780fdcffb74def6e88ce473aba339",
+    "tree": "322437213c9e3db5fe379d04ff65994d2e291f39",
+    "merge": "eb54e756d33014662abe6116804257763e24eb72",
+    "receipt": "/tmp/897-r6c-parent-source-acceptance-20261025.json",
+    "handoff": "/tmp/897-r6c-account-purge-20261025-handoff.md",
+    "files": [
+      {
+        "path": "apps/worker/src/jobs/PurgeExpiredAccounts.spec.ts",
+        "sha256": "e39e2dddbc7636f72dd32d55bf87f625e86ba3ab5eb4588b028f186224f363e2",
+        "gitBlob": "16e9a81527f091531de1c8f856c7a9c5e0113763"
+      },
+      {
+        "path": "apps/worker/src/jobs/PurgeExpiredAccounts.ts",
+        "sha256": "21db23db29df4668404a79a12f86f0e8936a00ef47acff88c9a0a530dd96c63b",
+        "gitBlob": "cc4c157dfbd7d4c47605ebdf6be61b66216ee3a1"
+      },
+      {
+        "path": "apps/worker/src/jobs/diagnosticAccountErasure.ts",
+        "sha256": "e3d0bcbb5dd872567b1659f4199e245e1f40ed89990a878df9b1637a95473fa9",
+        "gitBlob": "332b006971dd25bcf87063f68f63d944cc65d48e"
+      },
+      {
+        "path": "apps/worker/src/jobs/serviceAccountErasure.ts",
+        "sha256": "35c8e73694ac252796743c0786f61b07d745637b1287f54fd7c07618b50c71ca",
+        "gitBlob": "64f1f42b858041f41d18ed4dffc56c3f30bf727d"
+      },
+      {
+        "path": "apps/worker/src/jobs/video/videoAccountErasure.ts",
+        "sha256": "28290d2549ad775919b0acfd1520f220d5f00800dad3ef641853cf67ee6b759b",
+        "gitBlob": "f12b7d59378a0e0ae4a0b63ba0acf2f53c66abdc"
+      }
+    ],
+    "status": "Historical source acceptance; affected caller assumptions withdrawn by parent and now corrected under narrow ownership."
+  },
+  "files": [
+    {
+      "path": "apps/worker/src/jobs/MeasurementRetentionOrdering.e2e.spec.ts",
+      "sha256": "29d2488ea636a018a7f171a6f7975d808e11e61a11717934c7b9a84b0bc83c50",
+      "gitBlob": "974611d4863141a19e84e5644b1c45e3f738d5ae"
+    },
+    {
+      "path": "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.e2e.spec.ts",
+      "sha256": "ae3a7bd1d570edcd4f64947fd38bd7a7b9219b8d876073c6f0c0cef4c95e928f",
+      "gitBlob": "4de5f2ea20775af5f15eebef78c9162d408af9fe"
+    },
+    {
+      "path": "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.spec.ts",
+      "sha256": "53c57dd6a005fea4167ee5744363303e928b4ec695947fd381bd512c69f2b794",
+      "gitBlob": "6c7b3ca349a32fe7b6c6f3c74e5dde55cdb52a30"
+    },
+    {
+      "path": "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.ts",
+      "sha256": "8d1b872dc72f3ad238d0232cbfd62af692a60bf0eaefcdb94f48e100bf8f7bc3",
+      "gitBlob": "4647660bad3a721e45794c3d17e0f52e34f72a1a"
+    },
+    {
+      "path": "apps/worker/src/jobs/PurgeExpiredAccounts.spec.ts",
+      "sha256": "ddc9a2faec05e93d97cb20366dd4768e91f2893587f7518b8e2771ab58cfd354",
+      "gitBlob": "640aa67c88dd4b6fec3d6b994dd03ddb8ca94aa3"
+    },
+    {
+      "path": "apps/worker/src/jobs/PurgeExpiredAccounts.ts",
+      "sha256": "40049f67159f309662c80d18e476940f95f8219741021d30d02af84d13b78581",
+      "gitBlob": "8588e524ebbd948ecffe71704f95b51ee2ea4c4a"
+    },
+    {
+      "path": "apps/worker/src/jobs/application/testing/MeasurementRetentionDatabase.ts",
+      "sha256": "faed8c142c49c6250f9549cb6f977df9bc351a5e9e5447a1d64426441c93978d",
+      "gitBlob": "b5e721a0e8bd0f4e6a9a728421e5465f9c97105a"
+    },
+    {
+      "path": "apps/worker/src/jobs/application/testing/MeasurementRetentionPostgresFixture.ts",
+      "sha256": "a32f80457250e5a73b2ecfd02a8f60ea5d29630953ac8cea8e63547b929c7ffc",
+      "gitBlob": "6e157d24e59b26feab0d04584dd4ffbc230ddee7"
+    },
+    {
+      "path": "apps/worker/src/jobs/diagnosticAccountErasure.ts",
+      "sha256": "f54c5f55171694f030ff105bc9114319e16fd7b50ca6acfffb620fa1651779cf",
+      "gitBlob": "3d7ccadc481bf59edfdd217e421d0b7114f0b3fe"
+    },
+    {
+      "path": "apps/worker/src/jobs/serviceAccountErasure.ts",
+      "sha256": "61eaa717162555a1249cc1a2bc6b51adfe1fbd170632601b5dc95d4d4af14570",
+      "gitBlob": "f5676704b516a06078a18c25cb07e3965860f8ef"
+    },
+    {
+      "path": "apps/worker/src/jobs/video/videoAccountErasure.ts",
+      "sha256": "54149d179d55b98959b78dfc97ba22688920c1830e6ab6589265e43c901551d8",
+      "gitBlob": "7507862b1e46f2c47de2da61b73dd66117ee7265"
+    }
+  ],
+  "unchanged": [
+    {
+      "path": "apps/worker/src/jobs/ExpireMeasurement.ts",
+      "sha256": "0167ee8385a3286ecf76446ba7ceb8e5c500dfb0bb9e1555ef056de51d17b5fe"
+    },
+    {
+      "path": "apps/worker/src/jobs/PrismaListingViewRetentionLedger.ts",
+      "sha256": "88c47c3975e4e283a0a0bcdc7c7b73b2643d8d375c4da50c28824e1d72a7a1e6"
+    },
+    {
+      "path": "apps/worker/src/jobs/ExpireListingViewFingerprints.ts",
+      "sha256": "449c8806da9939789e9027bfb0f3856bcbe90cec40e028bdabc7c49960c8efbf"
+    }
+  ],
+  "checks": [
+    {
+      "label": "install",
+      "command": "pnpm install --frozen-lockfile --ignore-scripts --offline",
+      "commandSha256": "9d4beeb6bb0c6029f228a1f6f7c73d2563f92595a0194aa3c2b70d60a2835d99",
+      "exitCode": 0,
+      "log": "/tmp/897-retention-install.log",
+      "logSha256": "012655c7e984a091c2815c594bc59f6df75eb4c01c65a75b5722e3cb34cc995f"
+    },
+    {
+      "label": "contracts-build",
+      "command": "DATABASE_URL=postgresql://nonconnecting:nonconnecting@127.0.0.1:1/retention_generation pnpm --filter @auto-tm/contracts build",
+      "commandSha256": "5a86894f2bc458e6083e5f50650d6978615337d30da18822311ed369b5826417",
+      "exitCode": 0,
+      "log": "/tmp/897-retention-contracts-build.log",
+      "logSha256": "b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616"
+    },
+    {
+      "label": "db-build",
+      "command": "DATABASE_URL=postgresql://nonconnecting:nonconnecting@127.0.0.1:1/retention_generation pnpm --filter @auto-tm/db build",
+      "commandSha256": "f9ab9d2a132cfe7af2a638eac120444fdbcc718b42b5df2ed8ae268d0ce93c3a",
+      "exitCode": 0,
+      "log": "/tmp/897-retention-db-build.log",
+      "logSha256": "412c1914338b1832371587e324be19188e5b0199ca93ef42d2042316486118d8"
+    },
+    {
+      "label": "red",
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run src/jobs/PrismaMeasurementRetentionLedger.spec.ts src/jobs/ExpireMeasurement.spec.ts --exclude '**/*.e2e.spec.ts'",
+      "commandSha256": "28ed226188c15d7d23bc86003657a4b967e30b5b16e9ffb793eb8458a0e154d6",
+      "exitCode": 1,
+      "log": "/tmp/897-retention-red.log",
+      "logSha256": "ec9f4740d1de1763982bc677228d135a5f766ab86a85b4f93af092496e9e7afd"
+    },
+    {
+      "label": "green",
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run src/jobs/PrismaMeasurementRetentionLedger.spec.ts src/jobs/ExpireMeasurement.spec.ts --exclude '**/*.e2e.spec.ts'",
+      "commandSha256": "28ed226188c15d7d23bc86003657a4b967e30b5b16e9ffb793eb8458a0e154d6",
+      "exitCode": 0,
+      "log": "/tmp/897-retention-green.log",
+      "logSha256": "f3845d43befde904830f4c670ef1055502e279ede88b7acd0d140d3473835e84"
+    },
+    {
+      "label": "initial-typecheck",
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker typecheck",
+      "commandSha256": "4d3fef049c0a904d570a2d5d6852a63d0fd4289332fd18f535faa560e2f40586",
+      "exitCode": 1,
+      "log": "/tmp/897-retention-typecheck.log",
+      "logSha256": "d2a4c631e8edfb411684f86fe9a5b53c36a359992150a932b2d8318d3c2d5a6d"
+    },
+    {
+      "label": "intermediate-typecheck",
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker typecheck",
+      "commandSha256": "4d3fef049c0a904d570a2d5d6852a63d0fd4289332fd18f535faa560e2f40586",
+      "exitCode": 0,
+      "log": "/tmp/897-retention-typecheck2.log",
+      "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "label": "initial-lint",
+      "command": "pnpm --filter @auto-tm/worker lint",
+      "commandSha256": "639cc44db158c197fab8bdce22796b5500b32889398066c448882e798e7603ad",
+      "exitCode": 1,
+      "log": "/tmp/897-retention-lint.log",
+      "logSha256": "43c500322b37dada4c38ea7a443e09b5d5f41d4bd86c7dfc1ace40eaabd19265"
+    },
+    {
+      "label": "offline-worker-unit",
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker test:unit",
+      "commandSha256": "1016a59500f650d66d2cf7b27b11bce0a95bda3d88b1f5f699f16fd6bfbee0f7",
+      "exitCode": 0,
+      "log": "/tmp/897-retention-unit-final.log",
+      "logSha256": "6b6d6f2f6a5b3785b9bc10b138bd5559fbd5a8d26cf25b4eeef8f5a7d1fe2055"
+    },
+    {
+      "label": "typecheck",
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker typecheck",
+      "commandSha256": "4d3fef049c0a904d570a2d5d6852a63d0fd4289332fd18f535faa560e2f40586",
+      "exitCode": 0,
+      "log": "/tmp/897-retention-typecheck-final2.log",
+      "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "label": "typescript6",
+      "command": "pnpm --filter @auto-tm/worker exec tsc6 --noEmit",
+      "commandSha256": "8bc1674c4db64662a7f65690600d03e7f1152884d92ccc2d77443d9ce32832b7",
+      "exitCode": 0,
+      "log": "/tmp/897-retention-ts6-final2.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "lint",
+      "command": "pnpm --filter @auto-tm/worker lint",
+      "commandSha256": "639cc44db158c197fab8bdce22796b5500b32889398066c448882e798e7603ad",
+      "exitCode": 0,
+      "log": "/tmp/897-retention-lint-final2.log",
+      "logSha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632"
+    },
+    {
+      "label": "worker-build",
+      "command": "pnpm --filter @auto-tm/worker build",
+      "commandSha256": "c4299d3e7d5b3a090edea43f948773a6068d98a92c484d64df169394a73f562b",
+      "exitCode": 0,
+      "log": "/tmp/897-retention-build-final2.log",
+      "logSha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538"
+    },
+    {
+      "label": "offline-worker-unit-final",
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker test:unit",
+      "commandSha256": "1016a59500f650d66d2cf7b27b11bce0a95bda3d88b1f5f699f16fd6bfbee0f7",
+      "exitCode": 0,
+      "log": "/tmp/897-retention-unit-final3.log",
+      "logSha256": "b7be04f037f5585f78a8dc2b22899a79207b200db83950c67e420a3a612288f8"
+    },
+    {
+      "label": "typecheck-final",
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker typecheck",
+      "commandSha256": "4d3fef049c0a904d570a2d5d6852a63d0fd4289332fd18f535faa560e2f40586",
+      "exitCode": 0,
+      "log": "/tmp/897-retention-typecheck-final3.log",
+      "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "label": "typescript6-final",
+      "command": "pnpm --filter @auto-tm/worker exec tsc6 --noEmit",
+      "commandSha256": "8bc1674c4db64662a7f65690600d03e7f1152884d92ccc2d77443d9ce32832b7",
+      "exitCode": 0,
+      "log": "/tmp/897-retention-ts6-final3.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "lint-final",
+      "command": "pnpm --filter @auto-tm/worker lint",
+      "commandSha256": "639cc44db158c197fab8bdce22796b5500b32889398066c448882e798e7603ad",
+      "exitCode": 0,
+      "log": "/tmp/897-retention-lint-final3.log",
+      "logSha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632"
+    },
+    {
+      "label": "postgres-initial-fixture-failure",
+      "command": "GITHUB_ACTIONS=true CI=true DATABASE_URL=postgresql://postgres:retention_disposable_only@127.0.0.1:50373/postgres pnpm --filter @auto-tm/worker exec vitest run src/jobs/MeasurementRetentionOrdering.e2e.spec.ts src/jobs/PrismaMeasurementRetentionLedger.e2e.spec.ts --reporter=verbose",
+      "commandSha256": "1da08df2a0b5bdea23c43d1fd7e12348d3febc58061a649b4052a9a8c0cc7a02",
+      "exitCode": 1,
+      "log": "/tmp/897-retention-postgres-run1.log",
+      "logSha256": "06af70fbe1d7f9d4ecb6d1afb6c70ff4f5a7a787de87840214d7498addc562dd"
+    },
+    {
+      "label": "postgres-first-reached-run",
+      "command": "GITHUB_ACTIONS=true CI=true DATABASE_URL=postgresql://postgres:retention_disposable_only@127.0.0.1:50373/postgres pnpm --filter @auto-tm/worker exec vitest run src/jobs/MeasurementRetentionOrdering.e2e.spec.ts src/jobs/PrismaMeasurementRetentionLedger.e2e.spec.ts --reporter=verbose",
+      "commandSha256": "1da08df2a0b5bdea23c43d1fd7e12348d3febc58061a649b4052a9a8c0cc7a02",
+      "exitCode": 1,
+      "log": "/tmp/897-retention-postgres-run2.log",
+      "logSha256": "afa9819502ab459bb67674ea60f0e97c7ce93cf6febea43d382d9302231c35f0"
+    },
+    {
+      "label": "postgres-purge-overdue-diagnostic",
+      "command": "GITHUB_ACTIONS=true CI=true DATABASE_URL=postgresql://postgres:retention_disposable_only@127.0.0.1:50373/postgres pnpm --filter @auto-tm/worker exec vitest run src/jobs/MeasurementRetentionOrdering.e2e.spec.ts -t 'purge' --reporter=verbose",
+      "commandSha256": "86b1d299399d50bcf2a1b673ba36e13f54370fba1058847854d6b1dce65cc8d3",
+      "exitCode": 1,
+      "log": "/tmp/897-retention-postgres-purge-run3.log",
+      "logSha256": "98c1f6942acf14250376533e4a9e763bfa4c2918eb1fb0e0d88493499145eeca"
+    },
+    {
+      "label": "postgres-purge-refusal-diagnostic",
+      "command": "GITHUB_ACTIONS=true CI=true DATABASE_URL=postgresql://postgres:retention_disposable_only@127.0.0.1:50373/postgres pnpm --filter @auto-tm/worker exec vitest run src/jobs/MeasurementRetentionOrdering.e2e.spec.ts -t 'records current production purge intent refusal' --reporter=verbose",
+      "commandSha256": "46f7507f0f8d2e7120be3abd254ba6724a25c2b55bd664b90d793a4fbafaeded",
+      "exitCode": 0,
+      "log": "/tmp/897-retention-postgres-purge-diagnosis4.log",
+      "logSha256": "467648209a44ab1402d6b965125b55a4f2f494af67c31bbe443ec4a864a058f1"
+    },
+    {
+      "label": "postgres-direct-final-known-purge-failures-excluded",
+      "command": "GITHUB_ACTIONS=true CI=true DATABASE_URL=postgresql://postgres:retention_disposable_only@127.0.0.1:50373/postgres pnpm --filter @auto-tm/worker exec vitest run src/jobs/MeasurementRetentionOrdering.e2e.spec.ts src/jobs/PrismaMeasurementRetentionLedger.e2e.spec.ts -t '^(?!.*(orders the exact production purge|drains actual collector, purge|allows the real prepared purge)).*$' --reporter=verbose",
+      "commandSha256": "76b1cb247bec92cf22b1f18137f09f8a57f81348af4e29c6e8f163fead934b9a",
+      "exitCode": 0,
+      "log": "/tmp/897-retention-postgres-direct-final.log",
+      "logSha256": "7a75e4c5231d09bcc1b5eb5eca7ac8de7c89936a59a7b508a4746e2650cd34ba"
+    },
+    {
+      "label": "purge-boundary-red",
+      "command": "TZ=America/New_York AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run src/jobs/PurgeExpiredAccounts.spec.ts -t 'exact UTC boundary|scheduler snapshot'",
+      "commandSha256": "ffb12753c1fe77f0a78a80953d6b3e31f8611f504901f2283de5dd6a0f9ec840",
+      "exitCode": 1,
+      "log": "/tmp/897-purge-correction-red.log",
+      "logSha256": "3e530bbd16e12aa0eaf9ba2af8b81d026ff11d43ed7aa302eb2a690114ac4bfb",
+      "sourceHead": "Historical bounded working-tree correction; next committed checkpoint7427c8a/6a42352 retains source."
+    },
+    {
+      "label": "purge-boundary-intent-red",
+      "command": "TZ=America/New_York AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run src/jobs/PurgeExpiredAccounts.spec.ts -t 'exact UTC boundary|scheduler snapshot|unused intent'",
+      "commandSha256": "cd4fb1b62c9e00bdbc26c17407c5761a75cce96a62c81f1b01d9fb64f96f1f0a",
+      "exitCode": 1,
+      "log": "/tmp/897-purge-correction-red2.log",
+      "logSha256": "7c075f240e3038ae51e35b95ca5a30ac7a17f2cf341c5344173fa227fb4b8d06",
+      "sourceHead": "Historical bounded working-tree correction; next committed checkpoint7427c8a/6a42352 retains source."
+    },
+    {
+      "label": "purge-first-green",
+      "command": "TZ=America/New_York AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run src/jobs/PurgeExpiredAccounts.spec.ts src/jobs/PrismaMeasurementRetentionLedger.spec.ts src/jobs/ExpireMeasurement.spec.ts",
+      "commandSha256": "bf36d98cdf36df865be66b1d33cd1de21c73420627d95693d18f9db0e31d6feb",
+      "exitCode": 0,
+      "log": "/tmp/897-purge-correction-green.log",
+      "logSha256": "9b69760e1ff0d73e436fc6f1f634e11e54b2dc16c7c9c07c4ecff62ea29d2581",
+      "sourceHead": "Historical bounded working-tree correction; next committed checkpoint7427c8a/6a42352 retains source."
+    },
+    {
+      "label": "purge-erasure-red",
+      "command": "TZ=America/New_York AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run src/jobs/PurgeExpiredAccounts.spec.ts -t 'erases account measurement'",
+      "commandSha256": "c54a17ff350aecf193f94cf4dafab8e40744cd82e8d96b7a8ecf180b9481b989",
+      "exitCode": 1,
+      "log": "/tmp/897-purge-measurement-red.log",
+      "logSha256": "2160dd7f35bc5f906673c84e55ea84d56acaa0ab8aa4984ff61ff9a041184412",
+      "sourceHead": "Historical bounded working-tree correction; next committed checkpoint7427c8a/6a42352 retains source."
+    },
+    {
+      "label": "purge-erasure-green",
+      "command": "TZ=America/New_York AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run src/jobs/PurgeExpiredAccounts.spec.ts src/jobs/PrismaMeasurementRetentionLedger.spec.ts src/jobs/ExpireMeasurement.spec.ts",
+      "commandSha256": "bf36d98cdf36df865be66b1d33cd1de21c73420627d95693d18f9db0e31d6feb",
+      "exitCode": 0,
+      "log": "/tmp/897-purge-measurement-green.log",
+      "logSha256": "581969d90163e74e15e7289ef256a92b752178c400ea0177da89636b09c8d7b9",
+      "sourceHead": "Historical bounded working-tree correction; next committed checkpoint7427c8a/6a42352 retains source."
+    },
+    {
+      "label": "purge-projection-offline-green",
+      "command": "TZ=America/New_York AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run src/jobs/PurgeExpiredAccounts.spec.ts src/jobs/PrismaMeasurementRetentionLedger.spec.ts src/jobs/ExpireMeasurement.spec.ts",
+      "commandSha256": "bf36d98cdf36df865be66b1d33cd1de21c73420627d95693d18f9db0e31d6feb",
+      "exitCode": 0,
+      "log": "/tmp/897-purge-measurement-green2.log",
+      "logSha256": "9ad99b98d4c69a8a0df44a1c106ab715fedbb6ce26b15085453ca069ec53d259",
+      "sourceHead": "Historical bounded working-tree correction; next committed checkpoint7427c8a/6a42352 retains source."
+    },
+    {
+      "label": "purge-initial-lint-failure",
+      "command": "pnpm --filter @auto-tm/worker lint",
+      "commandSha256": "639cc44db158c197fab8bdce22796b5500b32889398066c448882e798e7603ad",
+      "exitCode": 1,
+      "log": "/tmp/897-purge-correction-lint2.log",
+      "logSha256": "c6cac1e05fa71bf311b04d4bc705654585dff5edcee03aa4e38189269fa58773",
+      "sourceHead": "Historical bounded working-tree correction; next committed checkpoint7427c8a/6a42352 retains source."
+    },
+    {
+      "label": "purge-worker-unit-before-erasure",
+      "command": "TZ=America/New_York AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker test:unit",
+      "commandSha256": "204d60fcf49c31e9059a7f8fdb65045e0ca3b5edb86aa39b0e62f228757f9971",
+      "exitCode": 0,
+      "log": "/tmp/897-purge-correction-worker-unit.log",
+      "logSha256": "056556e8d4066d967374488b997ac975a1206dc7258df4df2f55459ec78f98ab",
+      "sourceHead": "Historical bounded working-tree correction; next committed checkpoint7427c8a/6a42352 retains source."
+    },
+    {
+      "label": "purge-final-before-core-unit",
+      "command": "TZ=America/New_York AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker test:unit",
+      "commandSha256": "204d60fcf49c31e9059a7f8fdb65045e0ca3b5edb86aa39b0e62f228757f9971",
+      "exitCode": 0,
+      "log": "/tmp/897-purge-final-unit.log",
+      "logSha256": "7d26735ec1556596273ad8eb1e0c612d475e5dbf3e433052fdb395b25242b78e",
+      "sourceHead": "Historical bounded working-tree correction; next committed checkpoint7427c8a/6a42352 retains source."
+    },
+    {
+      "label": "core150-db-build",
+      "command": "DATABASE_URL=postgresql://nonconnecting:nonconnecting@127.0.0.1:1/retention_generation pnpm --filter @auto-tm/db build",
+      "commandSha256": "f9ab9d2a132cfe7af2a638eac120444fdbcc718b42b5df2ed8ae268d0ce93c3a",
+      "exitCode": 0,
+      "log": "/tmp/897-purge-core150-db-build.log",
+      "logSha256": "5288950624a7ed1837ef25595019bc266a118448466eefdabb890e3778f20a85",
+      "sourceHead": "2bd93f388053188f8e804adc26203a6ca41b69a5"
+    },
+    {
+      "label": "purge-postgres-stale-fixture-failure",
+      "command": "TZ=America/New_York GITHUB_ACTIONS=true CI=true DATABASE_URL=postgresql://postgres:retention_disposable_only@127.0.0.1:52014/postgres pnpm --filter @auto-tm/worker exec vitest run src/jobs/MeasurementRetentionOrdering.e2e.spec.ts -t 'stale purge snapshot' --reporter=verbose",
+      "commandSha256": "f19dc75ef62e7793920d566736989231ba8249a1de46275e9b3597858faa61ad",
+      "exitCode": 1,
+      "log": "/tmp/897-purge-correction-postgres-noop.log",
+      "logSha256": "8a30a46d2cbea99f3fe5d416b22e41cc59d32014412bc9709d89a29c4d93a371",
+      "sourceHead": "Historical bounded working-tree correction; next committed checkpoint7427c8a/6a42352 retains source."
+    },
+    {
+      "label": "purge-postgres-stale-pass-positive-projection-failure",
+      "command": "TZ=America/New_York GITHUB_ACTIONS=true CI=true DATABASE_URL=postgresql://postgres:retention_disposable_only@127.0.0.1:52014/postgres pnpm --filter @auto-tm/worker exec vitest run src/jobs/MeasurementRetentionOrdering.e2e.spec.ts -t 'stale purge snapshot|allows the real prepared purge' --reporter=verbose",
+      "commandSha256": "eae28ed21ba225747525e44fc35294c9cd0ce2b23602b97d08789efb0bc0ed28",
+      "exitCode": 1,
+      "log": "/tmp/897-purge-correction-postgres-noop2.log",
+      "logSha256": "a409a9dfb8a292c210976167728f521da152c627b099cb6eff00321e256892cf",
+      "sourceHead": "Historical bounded working-tree correction; next committed checkpoint7427c8a/6a42352 retains source."
+    },
+    {
+      "label": "purge-postgres-projection-reaches-known42725",
+      "command": "TZ=America/New_York GITHUB_ACTIONS=true CI=true DATABASE_URL=postgresql://postgres:retention_disposable_only@127.0.0.1:52014/postgres pnpm --filter @auto-tm/worker exec vitest run src/jobs/MeasurementRetentionOrdering.e2e.spec.ts -t 'allows the real prepared purge' --reporter=verbose",
+      "commandSha256": "7efb53c2586ae8c4bdf39df1e4e8aa2e4a1cf3f4ba4092b7c6e732c640bb4bbc",
+      "exitCode": 1,
+      "log": "/tmp/897-purge-correction-postgres-projection3.log",
+      "logSha256": "efdbfc79a6d638249408c4fcd725efc65fe8dd6236c90bbc5eea6abcb2d1e0a5",
+      "sourceHead": "Historical bounded working-tree correction; next committed checkpoint7427c8a/6a42352 retains source."
+    },
+    {
+      "label": "core150-full-postgres-next42702",
+      "command": "TZ=America/New_York GITHUB_ACTIONS=true CI=true DATABASE_URL=postgresql://postgres:retention_disposable_only@127.0.0.1:52014/postgres pnpm --filter @auto-tm/worker exec vitest run src/jobs/MeasurementRetentionOrdering.e2e.spec.ts src/jobs/PrismaMeasurementRetentionLedger.e2e.spec.ts --reporter=verbose",
+      "commandSha256": "422dd2328442a49c69cb4ae3ceb4fd539d8f5c5ca7682bd5a50a33f1bfcbb364",
+      "exitCode": 1,
+      "log": "/tmp/897-purge-core150-full.log",
+      "logSha256": "3c8c32e9e69cecd28cf64573408a22f7b3d0e6bb172e702f0f36f95f88da8c5a",
+      "sourceHead": "2bd93f388053188f8e804adc26203a6ca41b69a5"
+    },
+    {
+      "label": "core150-final-worker-unit",
+      "command": "TZ=America/New_York AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker test:unit",
+      "commandSha256": "204d60fcf49c31e9059a7f8fdb65045e0ca3b5edb86aa39b0e62f228757f9971",
+      "exitCode": 0,
+      "log": "/tmp/897-purge-core150-unit.log",
+      "logSha256": "6e65bcf6bd32f87af6ebe0de7359afad19672bdbc94057cfa2cfbc97130244f0",
+      "sourceHead": "2bd93f388053188f8e804adc26203a6ca41b69a5"
+    },
+    {
+      "label": "core150-final-typecheck",
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker typecheck",
+      "commandSha256": "4d3fef049c0a904d570a2d5d6852a63d0fd4289332fd18f535faa560e2f40586",
+      "exitCode": 0,
+      "log": "/tmp/897-purge-core150-typecheck.log",
+      "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "sourceHead": "2bd93f388053188f8e804adc26203a6ca41b69a5"
+    },
+    {
+      "label": "core150-final-typescript6",
+      "command": "pnpm --filter @auto-tm/worker exec tsc6 --noEmit",
+      "commandSha256": "8bc1674c4db64662a7f65690600d03e7f1152884d92ccc2d77443d9ce32832b7",
+      "exitCode": 0,
+      "log": "/tmp/897-purge-core150-ts6.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sourceHead": "2bd93f388053188f8e804adc26203a6ca41b69a5"
+    },
+    {
+      "label": "core150-final-lint",
+      "command": "pnpm --filter @auto-tm/worker lint",
+      "commandSha256": "639cc44db158c197fab8bdce22796b5500b32889398066c448882e798e7603ad",
+      "exitCode": 0,
+      "log": "/tmp/897-purge-core150-lint.log",
+      "logSha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "sourceHead": "2bd93f388053188f8e804adc26203a6ca41b69a5"
+    },
+    {
+      "label": "core150-final-worker-build",
+      "command": "pnpm --filter @auto-tm/worker build",
+      "commandSha256": "c4299d3e7d5b3a090edea43f948773a6068d98a92c484d64df169394a73f562b",
+      "exitCode": 0,
+      "log": "/tmp/897-purge-core150-build.log",
+      "logSha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538",
+      "sourceHead": "2bd93f388053188f8e804adc26203a6ca41b69a5"
+    }
+  ],
+  "staticAudit": {
+    "path": "/tmp/897-retention-static-audit.log",
+    "sha256": "328535f6c31494b454aa524d32b831f5df8e6d9ab58e876876c4f371a22a881b",
+    "scope": "Historical pre-runtime static audit. Its authored/executed count footer predates superseding authority and the additional diagnosis case."
+  },
+  "counts": {
+    "offlineRed": {
+      "files": 2,
+      "passed": 4,
+      "failed": 2
+    },
+    "offlineGreen": {
+      "files": 2,
+      "passed": 6
+    },
+    "workerOfflineFinal": {
+      "files": 43,
+      "passed": 311,
+      "skipped": 0
+    },
+    "postgresAuthoredNew": 33,
+    "postgresExistingRetained": 1,
+    "postgresAuthoredTotal": 34,
+    "postgresUniqueCasesAttempted": 34,
+    "postgresUniqueCasesPassed": 25,
+    "postgresUniqueCasesStillFailing": 9,
+    "postgresCaseAttempts": 121,
+    "postgresPassAttempts": 76,
+    "postgresFailAttempts": 45,
+    "postgresNotSelectedAcrossFilteredRuns": 127,
+    "sqlSuiteRuns": 9,
+    "e2eImported": true,
+    "httpExecuted": 0,
+    "raceCasesAuthored": 12,
+    "raceCasesAttempted": 12,
+    "raceCasesPassed": 9,
+    "raceCasesBlockedBeforeOpposition": 3,
+    "servicesStarted": 2,
+    "servicesStopped": 2,
+    "sharedStagingMutations": 0,
+    "parentDiagnosticRuns": 0,
+    "postgresCurrentSuiteSource": "2bd93f388053188f8e804adc26203a6ca41b69a5",
+    "postgresHistoricalRetiredDiagnosisCases": 1,
+    "retentionRollbackCasesPassed": 6,
+    "purgeRollbackCasesAuthoredAttempted": 4,
+    "purgeRollbackCasesMasked": 4
+  },
+  "gates": {
+    "parentSourceInspection": "pending",
+    "runtime": "Partial isolated local PostgreSQL: latest25 pass/9 fail, all9 at shared42702 before purge preparation completes.",
+    "sourceAcceptance": "not claimed; parent inspection pending",
+    "G1Acceptance": "not claimed",
+    "guardActivation": "only task-local fixture DDL, restored per case; operationally closed",
+    "admission": "closed",
+    "historicalFocusedAcceptanceCorrectionsUsed": 0,
+    "currentAuthority": "supersedes prior attempt/observation caps; all historical records retained"
+  },
+  "docs": "not applicable: internal ordering correction, no external dependency/API/version change",
+  "historicalPreRuntimeSnapshot": {
+    "path": "/tmp/897-measurement-retention-manifest-20261025.json",
+    "sha256": "6a21c9c1033f4cce1d7046b490b53a4a126aa4d47698a6807a59e12e1c63a990",
+    "authority": "original no-runtime brief; preserved as history, superseded by founder pointer"
+  },
+  "authority": {
+    "current": "/tmp/897-founder-autonomous-candidate-authority-20261025.md",
+    "sha256": "a7a11b7266943f09d3760951215f50411a03096213de349d919615b2d2c0444f",
+    "sharedResourcesUsed": false,
+    "parentDiagnosticDuplicated": false,
+    "historicalCountersReset": false,
+    "noNestedAgents": true,
+    "addedOwnedPaths": {
+      "purgeCallerAndDirectTests": "Parent disposition /tmp/897-runtime-dependency-parent-disposition-20261025.md plus subsequent explicit user grants for existing measurement erasure and protected User projection",
+      "erasureHelpers": "Only the three existing diagnostic_assert_source query result casts, explicitly granted by user after parent inspection; all other bytes match311637ca"
+    }
+  },
+  "runtimeRuns": [
+    {
+      "log": "/tmp/897-retention-postgres-run1.log",
+      "passed": 1,
+      "failed": 24,
+      "notSelected": 0,
+      "disposition": "fixture setup type char unsupported; fixed cast to text"
+    },
+    {
+      "log": "/tmp/897-retention-postgres-run2.log",
+      "passed": 21,
+      "failed": 4,
+      "notSelected": 0,
+      "disposition": "four actual purge callers return zero before preparation due timestamp parse"
+    },
+    {
+      "log": "/tmp/897-retention-postgres-purge-run3.log",
+      "passed": 0,
+      "failed": 4,
+      "notSelected": 20,
+      "disposition": "lawful one-day-overdue purge fixtures; all blocked by parser diagnostic_source_command"
+    },
+    {
+      "log": "/tmp/897-retention-postgres-purge-diagnosis4.log",
+      "passed": 1,
+      "failed": 0,
+      "notSelected": 24,
+      "disposition": "new explicit diagnosis proves exact production intent refusal preserves all own/foreign data and no receipt"
+    },
+    {
+      "log": "/tmp/897-retention-postgres-direct-final.log",
+      "passed": 22,
+      "failed": 0,
+      "notSelected": 4,
+      "disposition": "final source remaining direct matrix; four known purge gates expressly excluded, not green"
+    },
+    {
+      "log": "/tmp/897-purge-correction-postgres-noop.log",
+      "passed": 2,
+      "failed": 2,
+      "notSelected": 24,
+      "disposition": "Future/cleared pass, new phone/email fixture violates verified pair constraints; corrected fixture only"
+    },
+    {
+      "log": "/tmp/897-purge-correction-postgres-noop2.log",
+      "passed": 4,
+      "failed": 1,
+      "notSelected": 23,
+      "disposition": "Four real stale snapshots pass, positive reveals full User JSON violates exact source projection"
+    },
+    {
+      "log": "/tmp/897-purge-correction-postgres-projection3.log",
+      "passed": 0,
+      "failed": 1,
+      "notSelected": 32,
+      "disposition": "Projected actual exact-boundary caller now reaches shared parser42725"
+    },
+    {
+      "log": "/tmp/897-purge-core150-full.log",
+      "passed": 25,
+      "failed": 9,
+      "notSelected": 0,
+      "sourceHead": "2bd93f388053188f8e804adc26203a6ca41b69a5",
+      "sourceTree": "f72dfae5f0490be6ec12f9920e07213a59feaa2c",
+      "disposition": "Full latest34-case matrix: shared effects local e ambiguity42702 masks all9 purge preparation/completion/rollback gates"
+    }
+  ],
+  "remainingDefects": [
+    {
+      "id": "shared-source-effects-e-ambiguity",
+      "status": "runtime observed after committed core150",
+      "owned": false,
+      "owner": "R7b",
+      "function": "diagnostic_source_effects_before_intake(jsonb,jsonb)",
+      "sqlState": "42702",
+      "evidence": "/tmp/897-purge-core150-full.log",
+      "detail": "Local e conflicts with final jsonb_array_elements(effects) e reference. Nine purge gates fail before completed preparation."
+    }
+  ],
+  "artifactHashes": [
+    {
+      "path": "/tmp/897-retention-isolated-resources-20261025.json",
+      "sha256": "e08463356c98e5cfe879aa8e681d94ac8956bd6c813261d187fabba081f79259"
+    },
+    {
+      "path": "/tmp/897-retention-postgres-container.txt",
+      "sha256": "96e6ba4d3327dc596386a837ec26c5d6fbd9427fa188d8cae0e292a4778f207b"
+    },
+    {
+      "path": "/tmp/897-retention-postgres-stop.log",
+      "sha256": "30fb3a75d34f6681d1788860382efa05cf1889ebb65b6902d4cffa774caf068b"
+    },
+    {
+      "path": "/tmp/897-retention-purge-timezone-counterexample.json",
+      "sha256": "41b772a7e4dc349a6d83dcabe5596b0ad5f98052ba1724f43c60da84a37dc5df"
+    },
+    {
+      "path": "/tmp/897-r6c-parent-source-acceptance-20261025.json",
+      "sha256": "77aedf50c630e32cedf4d16d0afe05a270f27afeee03fcc7ddf16a9a70d45a6d"
+    },
+    {
+      "path": "/tmp/897-r6c-account-purge-20261025-handoff.md",
+      "sha256": "758ed8ac82e82e6b18f8cbb2c86e3cd18a43ad30d9a29d49e50f8965b4c703dd"
+    },
+    {
+      "path": "/tmp/897-b1-prepared-source-command-contract-20261023.md",
+      "sha256": "c15455516d773fe55d5151035b4afceef9348099c60d51578826c38b5eac3725"
+    },
+    {
+      "path": "/tmp/897-adjacent-retention-parent-disposition-20261025.md",
+      "sha256": "2d91c973dacce1d75fa984c8842aac99c7dfcd553db57139fef6fc4d40c9cb6f"
+    },
+    {
+      "path": "/tmp/897-runtime-dependency-parent-disposition-20261025.md",
+      "sha256": "95106ebfa4f895c33b773d1dc230a663e17c538a4e1c82112414ea69e168afc5"
+    },
+    {
+      "path": "/tmp/897-purge-correction-resources.json",
+      "sha256": "aa7273d5da943b65ef9a784c5fd0eb8fa9889d1db196c23f876cee92f36c6515"
+    },
+    {
+      "path": "/tmp/897-purge-correction-container.txt",
+      "sha256": "4e716f1da395ee046816d37855eb92631fe1491d238c85679bfc7b02d22480f4"
+    },
+    {
+      "path": "/tmp/897-purge-effect-inventory-core150.json",
+      "sha256": "16c8ca9b87be137dd7ed8b522116d4934161ffbcbd1f58f5a5ef38a36fc1534a"
+    },
+    {
+      "path": "/tmp/897-purge-inventory-migrate.log",
+      "sha256": "391f77e964887109be15ef7e64a94371cfffc7a2cd22e9d9f1b25549454bccbd"
+    },
+    {
+      "path": "/tmp/897-purge-inventory-core150-migrate.log",
+      "sha256": "9033d8953a327e5605396b49a2adc2bfc45789e1182135e9a6c083344c1279ce"
+    },
+    {
+      "path": "/tmp/897-purge-correction-cleanup.log",
+      "sha256": "188e200bd9b1b66eb790a2d59dd18dd56fa925aa6ba9d0f678a3e8c145a76b6a"
+    },
+    {
+      "path": "/tmp/897-purge-correction-container-removed.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "purgeCorrectionRedHead": "7082b9bc78370793ca7c80b821f486a0a1d61697",
+  "purgeCallerHead": "7427c8a76cd5deb9490b38897a9c1c230fb0fba0",
+  "purgeAssertionTransportHead": "6a42352dfe311d361fbf10d27ddfab5d2e058865",
+  "sharedRuntimeDependency": {
+    "head": "30f93f05ebc672a99038d70cf2b2955613262667",
+    "tree": "cd9825f208665de63609adb51aae67c5474633c5",
+    "parent": "de80c7b572a8e2b5df832774bef751a6e299fc4f",
+    "merge": "2bd93f388053188f8e804adc26203a6ca41b69a5",
+    "migrationMirrorSha256": "520c94deedd51c039f82b396b6bf08acd551838bc37698ca0a345aa92a165424",
+    "files": [
+      {
+        "path": "docs/evidence/issue-897/runtime-transport-dependency-20261025.md",
+        "sha256": "acd5e7218ab5e79ae749d8a272b149d281208db5921c82749696a7127872d34e",
+        "gitBlob": "2777d73259549ef337f0a7290d592bdaf2bd5331"
+      },
+      {
+        "path": "packages/db/prisma/migrations/20261025015000_diagnostic_runtime_transport_corrections/migration.sql",
+        "sha256": "520c94deedd51c039f82b396b6bf08acd551838bc37698ca0a345aa92a165424",
+        "gitBlob": "c80bcaf2db52992a4d5322900d4496bc93219f0f"
+      },
+      {
+        "path": "packages/db/prisma/schema.prisma",
+        "sha256": "f1fcdd418dad583b377b340403817863c727aea6452d5505fe3294db60094b54",
+        "gitBlob": "741712e096d6d3f6f817a2a9e808dd4391f7b338"
+      },
+      {
+        "path": "packages/db/src/campaign-preparation.ts",
+        "sha256": "0b047bd812bfa6190bf44a6ddaafbf92206296bc2704e8b3c235a5f3b6801181",
+        "gitBlob": "95235086aebab0c41c65362e04d378b62784aa9e"
+      },
+      {
+        "path": "packages/db/src/diagnostic-source-command.ts",
+        "sha256": "d8cc1db636b920d2600ac84eb815d4864d132b91806549df606976f99c8ce8a3",
+        "gitBlob": "c8f92bafe9c5b0c6742e83ae87fd357e4dc1c17b"
+      },
+      {
+        "path": "scripts/diagnostic-runtime-transport-corrections-schema.test.mjs",
+        "sha256": "d0a3a3fac533014bfa32a418a2228e753895d154f67f64b8ca45358367e8be00",
+        "gitBlob": "585fee149ce4590879ba50084e219371bc7daea8"
+      },
+      {
+        "path": "scripts/staging-schema.mjs",
+        "sha256": "ae21c9a7e675a29e2239d6690a80eeccb6fbacaf2b3074ca1b77c80c8250ba4b",
+        "gitBlob": "8366f6be14c4be5e6dff007f4a7c362203eed108"
+      },
+      {
+        "path": "scripts/testing/retained-schema/20261025015000_diagnostic_runtime_transport_corrections.sql",
+        "sha256": "520c94deedd51c039f82b396b6bf08acd551838bc37698ca0a345aa92a165424",
+        "gitBlob": "c80bcaf2db52992a4d5322900d4496bc93219f0f"
+      }
+    ],
+    "claimsTransportConsumed": false,
+    "publicationAncestryConsumed": false,
+    "uncommittedFragmentsApplied": false
+  },
+  "historicalPrePurgeSnapshot": {
+    "path": "/tmp/897-measurement-retention-pre-purge-manifest-20261025.json",
+    "sha256": "934a344624aab44d5a00ea80de11623ef04b9ab8a6a05051bb9b9715a947331b",
+    "countsCorrectedBeforeSnapshot": "Original runtime aggregate corrected from80/35 to77/32 by summing retained per-run rows, no historical run discarded."
+  },
+  "correctedButRuntimeOpen": [
+    {
+      "id": "purge-local-time-parse",
+      "correction": "SQL due comparison, exact boundary restored; nonUTC caller now reaches42702",
+      "historicalEvidence": "/tmp/897-retention-postgres-run2.log"
+    },
+    {
+      "id": "purge-intent-parser",
+      "correction": "Removed unconsumed reason intent, seven-key shape; now reaches42702",
+      "historicalEvidence": "/tmp/897-retention-postgres-purge-run3.log"
+    },
+    {
+      "id": "purge-source-projection",
+      "correction": "Use existing server users meta.fields projection; now reaches42702",
+      "historicalEvidence": "/tmp/897-purge-correction-postgres-noop2.log"
+    },
+    {
+      "id": "purge-missing-measurement-erasure",
+      "correction": "Same-transaction global restricted exports delete and exact user principal delete; linked guest/foreign/rollback fixtures authored",
+      "status": "Originally static masked counterexample, actual erasure/completion remains masked at42702"
+    },
+    {
+      "id": "purge-helper-void-transport",
+      "correction": "Only three existing assertion SELECT results cast to text",
+      "status": "Source and offline verified, actual receipt assertion sites remain masked by preparation42702"
+    }
+  ],
+  "resourcesHistory": [
+    {
+      "owner": "agent/issue-897-measurement-retention-20261025",
+      "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-433c86f9",
+      "container": "carberk897-retention-20261025-t3433c86f9",
+      "containerId": "e35ad6ff794869b7bc15aae73bd57c81d73a2dca9c4e1585c3b0db684be87c6e",
+      "host": "127.0.0.1",
+      "port": 50373,
+      "database": "postgres",
+      "sharedResourcesUsed": false,
+      "parentDiagnosticDuplicated": false,
+      "authority": "/tmp/897-founder-autonomous-candidate-authority-20261025.md",
+      "stopped": true,
+      "removedByDockerRm": true,
+      "remainingWorkerDatabasesBeforeStop": 0
+    }
+  ],
+  "resources": {
+    "owner": "agent/issue-897-measurement-retention-20261025",
+    "container": "carberk897-retention-purge-20261025-t3433c86f9",
+    "containerId": "0bed3c000fb82371aacb11fcbcf72428a6d9a8824b207da6f448062530e1254a",
+    "host": "127.0.0.1",
+    "port": 52014,
+    "sharedResourcesUsed": false,
+    "parentDiagnosticDuplicated": false,
+    "authority": "/tmp/897-runtime-dependency-parent-disposition-20261025.md",
+    "stopped": true,
+    "inventoryDatabase": "retention_inventory",
+    "workerDatabasesDroppedByGlobalSetup": true,
+    "removedByDockerRm": true,
+    "remainingWorkerDatabasesBeforeStop": 0,
+    "remainingInventoryDatabasesBeforeStop": 0
+  },
+  "effectInventory": {
+    "path": "docs/evidence/issue-897/measurement-retention-effects-20261025.json",
+    "sha256": "981341e99d3f5e67cfe6298dd791c5e7ad4e756ce67d1f92b84c4fe2273cd415",
+    "physicalForeignKeys": 45,
+    "triggerDefinitions": 300,
+    "query": "/tmp/897-purge-effect-inventory.sql",
+    "querySha256": "82a4f062df3a2accaddd68ab0979978be7999337bd86b4cd61a408fa17cfb72c",
+    "provenance": "Exact core150 migration deploy in task-only retention_inventory; all45 FK entries and300 relevant trigger definitions captured, then DB dropped and container stopped/removed."
+  },
+  "historicalCountersReset": false,
+  "sourceAuditFinal": {
+    "path": "/tmp/897-retention-source-audit-final.log",
+    "sha256": "0191b728b28c89ba5a955856aa8fbf9030dc828c0ebabcecde12698113705d6d",
+    "script": "/tmp/897-retention-source-audit.py",
+    "scriptSha256": "d3e5e8b932303185612f0ac2cb9a3ca36062e03bd7558d485bd836ec374bc125"
+  }
+}
