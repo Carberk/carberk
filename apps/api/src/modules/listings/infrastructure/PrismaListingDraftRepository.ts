@@ -102,7 +102,11 @@ export class PrismaListingDraftRepository implements ListingDraftRepository {
   ): Promise<T> {
     // PostgreSQL cancels waits before Prisma's transaction deadline.
     await tx.$executeRaw`SET LOCAL statement_timeout = '4s'`;
-    const stored = await tx.listingDraft.findUnique({ where: { id } });
+    // A required read preserves Prisma's native P2025 without issuing DML,
+    // entering campaign preparation, or acquiring managed locks for absence.
+    const stored = verb === "insert"
+      ? await tx.listingDraft.findUnique({ where: { id } })
+      : await tx.listingDraft.findUniqueOrThrow({ where: { id } });
     if (verb === "update" && stored && draft && (stored.userId !== draft.userId || stored.businessId !== (draft.businessId ?? null))) {
       throw new Error("draft_owner_changed");
     }
@@ -111,12 +115,10 @@ export class PrismaListingDraftRepository implements ListingDraftRepository {
       payload: draft.payload as Prisma.InputJsonValue,
       createdAt: (verb === "update" && stored ? stored.createdAt : draft.createdAt).toISOString(), updatedAt: draft.updatedAt.toISOString(),
     } : null;
-    // Missing UPDATE/DELETE still reaches Prisma's existing P2025 behavior.
-    const mutations: CampaignMutation[] = stored || verb === "insert"
-      // An occupied create slot still reaches Prisma's P2002. Campaign
-      // preparation covers its OLD/attempted NEW namespaces as an overlay.
-      ? [{ table: "listing_drafts", key: { id }, verb: verb === "insert" && stored ? "update" : verb, next }]
-      : [];
+    // An occupied create slot still reaches Prisma's P2002. Campaign
+    // preparation covers its OLD/attempted NEW namespaces as an overlay.
+    const mutations: CampaignMutation[] = [{ table: "listing_drafts", key: { id },
+      verb: verb === "insert" && stored ? "update" : verb, next }];
     const discover = async () => {
       const [result] = await tx.$queryRaw<{ scope: DraftDependency[]; keys: DraftKey[] }[]>`
         WITH RECURSIVE
@@ -153,6 +155,10 @@ export class PrismaListingDraftRepository implements ListingDraftRepository {
             WHERE m."userId" IN (SELECT id FROM subjects)
               OR (m.role='owner' AND m."dealershipId" IN (SELECT id FROM businesses))
           UNION SELECT 'video_upload_sessions',jsonb_build_object('id',id) FROM videos
+          -- V1 reserves generation.id=session.id. Fence the known PK even
+          -- when its row is absent; outgoing FK closure cannot discover it.
+          UNION SELECT 'video_generations',jsonb_build_object('id',s.id) FROM public.video_upload_sessions s
+            JOIN videos v ON v.id=s.id WHERE s."protocolVersion"=1
           UNION SELECT 'video_generations',jsonb_build_object('id',g.id) FROM public.video_generations g, input i
             WHERE g."listingId"=i.id OR g."sessionId" IN (SELECT id FROM videos) OR g.id IN (SELECT id FROM payload_ids)
         ),

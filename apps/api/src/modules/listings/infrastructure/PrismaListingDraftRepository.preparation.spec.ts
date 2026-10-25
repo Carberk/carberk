@@ -12,7 +12,10 @@ describe("draft preparation boundary", () => {
       const mutate = async () => { writes++; return draft; };
       const tx = {
         listingDraft: { findUniqueOrThrow: async () => ({ ...draft, businessId: null }), findUnique: async () => ({ ...draft, businessId: null }), create: mutate, update: mutate, delete: mutate },
-        $executeRaw: async () => 0,
+        $executeRaw: async (parts: TemplateStringsArray) => {
+      if (parts.join("") !== "SET LOCAL statement_timeout = '4s'") throw new Error("unexpected raw mutation");
+      return 0;
+    },
         $queryRaw: async (parts: TemplateStringsArray) => {
           const sql = parts.join("?");
           if (sql.includes("campaign_prepare(")) throw new Error("prefix refused");
@@ -52,7 +55,10 @@ function boundary(options: { changed?: boolean; finishFails?: boolean; initial?:
       },
       delete: async () => { if (!prepared) throw new Error("write before prefix"); const row = stored; stored = null; return row; },
     },
-    $executeRaw: async () => 0,
+    $executeRaw: async (parts: TemplateStringsArray) => {
+      if (parts.join("") !== "SET LOCAL statement_timeout = '4s'") throw new Error("unexpected raw mutation");
+      return 0;
+    },
     $queryRaw: async (parts: TemplateStringsArray | { sql: string }, ...values: unknown[]) => {
       const sql = Array.isArray(parts) ? parts.join("?") : (parts as { sql: string }).sql;
       if (sql.includes("WITH RECURSIVE")) {
@@ -68,12 +74,14 @@ function boundary(options: { changed?: boolean; finishFails?: boolean; initial?:
         return [{ scope: [{ table: "listing_drafts", key: { id: "draft" }, row: options.changed && discoveries > 1 ? { userId: "changed" } : null }], keys: [{ namespace: 897401, key: 7 }] }];
       }
       if (sql.includes("campaign_prepare(")) {
-        const mutations = JSON.parse(String(values[0])) as Array<Record<string, unknown>>;
-        // Match the real parser's nonempty finite array/entry contract. An
-        // invalid request must never be made successful by this boundary.
-        if (!Array.isArray(mutations) || mutations.length < 1 || mutations.length > 1000 || mutations.some(m =>
-          Object.keys(m).sort().join(",") !== "key,next,table,verb" || !["insert", "update", "delete"].includes(String(m.verb)) ||
-          typeof m.key !== "object" || m.key === null)) throw new Error("campaign_preparation_shape");
+        const mutations: unknown = JSON.parse(String(values[0]));
+        const object = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+        // The real parser requires a nonempty finite array with exact object
+        // entries, object keys and object NEW rows (null for DELETE).
+        if (!Array.isArray(mutations) || mutations.length < 1 || mutations.length > 1000 || mutations.some((m: unknown) =>
+          !object(m) || Object.keys(m).sort().join(",") !== "key,next,table,verb" ||
+          !["insert", "update", "delete"].includes(String(m["verb"])) || !object(m["key"]) ||
+          (m["verb"] === "delete" ? m["next"] !== null : !object(m["next"])))) throw new Error("campaign_preparation_shape");
         events.push("prepare"); prepared = true; return [{ receipt: "boundary-receipt" }]; }
       if (sql.includes("campaign_finish(")) { if (options.finishFails) throw new Error("finish refused"); return []; }
       if (sql.includes("diagnostic_source_registry")) return options.generationAppears !== undefined ? [{ table: "video_generations", namespace: 898102 }] : [{ table: "listing_drafts", namespace: 897401 }];
