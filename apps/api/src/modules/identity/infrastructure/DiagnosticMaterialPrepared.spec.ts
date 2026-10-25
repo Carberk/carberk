@@ -83,6 +83,8 @@ describe("material adapters at their actual outer entry", () => {
   it("appends an immutable record and explicit correction with exact retries, version, generation and audits", async () => {
     const h = materialHarness(), p = await verified(h), input = capture(h, p);
     const raw = await h.db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: h.rawId } });
+    const report = await h.db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: h.reportId } });
+    expect(report).toMatchObject({ identityRecordId: raw.id, identityRecordHash: raw.observationHash });
     const first = await h.identity.append(h.subject, h.orderId, input);
     expect(first).toMatchObject({ orderVersion: 2, identityRecordId: h.rawId, observationHash: raw.observationHash });
     expect(await h.identity.append(h.subject, h.orderId, input)).toEqual(first);
@@ -92,7 +94,7 @@ describe("material adapters at their actual outer entry", () => {
     expect(await h.db.inspectionOrder.findUniqueOrThrow({ where: { id: h.orderId } })).toMatchObject({ version: 3, identityEvidenceGeneration: 2 });
     expect(await h.db.diagnosticAudit.count()).toBe(2);
     expect(await h.db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: h.rawId } })).toEqual(raw);
-    expect(await h.db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: h.reportId } })).toMatchObject({ version: 1 });
+    expect(await h.db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: h.reportId } })).toEqual(report);
   });
   it.each(["stale-version", "foreign-provenance", "foreign-raw", "superseded-raw"] as const)("refuses %s append without version, evidence or audit changes", async defect => {
     const h = materialHarness(), p = await verified(h), input = capture(h, p);

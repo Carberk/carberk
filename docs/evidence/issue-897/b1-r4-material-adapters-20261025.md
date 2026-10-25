@@ -81,3 +81,59 @@ SHA-256 values identify the local logs. Empty logs correspond to successful quie
 | `/tmp/r4-authored-final-lint.log` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
 | `/tmp/r4-diff-check.log` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
 | `/tmp/r4-preservation.json` | `0b2285cc378e35de212329932f6c1d72c6caa565dc4ecdf4f64f3911027b90b0` |
+
+
+## One focused correction round, 2026-10-25
+
+This section supersedes the earlier source-correctness and authored-reachability claims above. Parent accepted all four findings in `/tmp/897-r4-focused-source-assessment-20261025.md` after source inspection. Correction base is the entire original R4 checkpoint `5fa15dae7b6a5952783b361214a1259a427b1166`, tree `3d5acaf2413b2b63ee1a72c1ca1ccef1256bb4c3`. The owned host scaffold was clean at `9bcbf1e6f325a9a36cba98fa6e8c796b4e67a408`. Its branch remains preserved. The reservation was pushed before edits on `agent/issue-897-r4-material-correction-20261025` in `/Users/bagtyyar/.t3/worktrees/carberk/t3-29e187f3`. No other checkout or integration branch was written.
+
+| Finding | Correction and evidence | Status |
+| --- | --- | --- |
+| R4-S1 P1 | Cleanup rereads id/order/requested epoch/staged state inside the prepared callback before UPDATE. Mismatch throws and rolls back, with no renewal deletion, retry, nested receipt or scope extension. Deterministic offline boundary replacement occurs after the initial cleanup read and before planning; the separate committed epoch survives the fake caller rollback. Existing exact matching cleanup cases remain. | Offline red then green; real SQL counterpart authored only |
+| R4-S2 P1 | SQL setup queries the selected unerased raw row and supplies its actual id/hash to the report INSERT. The legacy raw-pin trigger stays active and has an explicit enabled assertion. Raw/report preservation assertions remain through append/correction. Offline fixture now carries a concrete pin and asserts full report preservation. | Static source correction; SQL reachability unexecuted |
+| R4-S3 P2 | AFTER INSERT rollback must reject with `r4_rollback`; an earlier generic failure fails the case. Complete order/evidence/audit restoration remains, with additional provenance/raw/report equality. | Authored only |
+| R4-S4 P2 | Opponent calls unchanged production `PrismaDiagnosticIntake.assign`, renewing the existing technician assignment under real current reception and technician grants, qualifications, order assignments and elevated Session. Real effect triggers pause order UPDATE or provenance INSERT. Backend PID and `pg_blocking_pids` prove both waits, then explicit release and awaited outcomes drain both calls. Source-first requires `DIAGNOSTIC_STALE_VERSION` from staging; material-first requires current `diagnostic_source_graph_changed` from intake. Complete order/assignment/raw/report/evidence/audit assertions discriminate success and rollback. | Authored only; no production opponent edits |
+
+Red checkpoint `41807e76826d93d30e241a881349a588533b64d1` was committed and pushed before production changes. Its genuine offline run had 28 passes and one failure: replacement E2 became `cleanup_pending` with `cleanupRequestedAt` set. Green ran the same file plus the three original adjacent R3 files, with all 48 cases passing, 29 R4 and 19 R3. This is application protocol/state evidence with boundary fakes, not PostgreSQL concurrency proof.
+
+Commands run were the original focused four-file offline Vitest command above with `AUTO_TM_TEST_DATABASES=off`, API `tsc6 --noEmit --pretty false`, configured API `typecheck`, ESLint on the original seven source/test paths with `--max-warnings 0`, and `git diff --check`. All affected final checks passed. The SQL file was parsed statically by compilers and lint only, never imported, collected or executed. No broad repository/service gate was run under this bounded authorization.
+
+The fresh scaffold required `pnpm install --offline --frozen-lockfile`, then configured contracts/db builds. The first DB generation lacked DATABASE_URL and the first test attempt failed package resolution before collecting any tests. Those are setup failures, not behavioral red. DB generation/build then succeeded with the deliberately unreachable `postgresql://offline:offline@127.0.0.1:1/offline` configuration. No database connection or service was started. Docs: not applicable, internal source/test correction without dependency changes.
+
+### Authored SQL and remaining matrix gaps
+
+There are 16 expanded SQL cases, all unexecuted. The original 15 cases and their acceptance assertions remain, strengthened as above; one cleanup/renewal case was added. The new case pauses only the real database query boundary immediately before cleanup's planning query, runs a second production upload after lease expiry, waits for its committed replacement intent, holds its storage completion, then asserts cleanup refuses without changing the exact replacement row. It releases and awaits renewal verification. Real queries, commands and authority still run unchanged. The offline fake models one explicit committed replacement, not arbitrary interleavings.
+
+Source inspection removes the demonstrated null-pin setup blocker: exactly one unerased raw row exists at report creation, its orderVersion is 1, and its selected id/hash satisfy the legacy binding trigger. That trigger is outside the unchanged dormant-source guard selection. The added reception fixture supplies the actual intake assignment capability path. Physical authorization now includes recordedBy/recordedAt so the real intake DTO schema can parse it. Readiness and enabled-trigger assertions are authored and remain unexecuted. Directly seeded material fixtures are not the genuine grant/automatic admission journey. No workaround changed kernel, migrations, original integrity triggers, timeouts or assertions.
+
+| Matrix | Offline executed | Real SQL authored | Remaining gap |
+| --- | --- | --- | --- |
+| Stage/upload/append/correction/exact retry, raw/report pin preservation | Yes | Yes | SQL guards, effects, role and storage behavior unproved |
+| Stale/foreign material/raw/order refusals | Yes | Stale, absent raw, foreign order | Retained foreign-raw SQL case absent |
+| Actual INSERT rollback and atomic version/generation/evidence/audit | Fake finish rollback | Named `r4_rollback` plus complete snapshots | Actual trigger firing and rollback unproved |
+| Revoke/rights expiry/disposal/epoch/storage between phases | Yes | Yes | Disposal helper is not full account purge; no general phase-by-phase concurrency matrix |
+| Exact cleanup and epoch replacement | Yes, including between initial/planning reads | Matching cleanup plus production renewal after lease expiry at that boundary | New SQL race is authored only; no other renewal schedule claimed |
+| Both-order source/material opposition | Boundary protocol only | Real intake assignment versus staging, both observed waits and exact refusal assertions | Actual lock/rediscovery outcomes unproved |
+| Cross-owner object-id opposition | Boundary coverage | Sequential both directions | Concurrent collision race absent |
+| Post-read delivery reauthorization | Epoch/rights/erasure/permission | Epoch replacement | SQL post-read permission/rights/erasure absent; SQL storage fake does not validate expected size/hash |
+| Campaign/restricted role, complete R5 pair/page, genuine automatic201 | No new evidence | Not established here | Parent/R5/full assembled runtime acceptance remains required |
+
+`40177598331` remains the sole prior diagnostic, failed in kernel migration before any cases. No retry, CI dispatch/rerun, SQL/E2E collection, live HTTP, Docker/local DB, Railway, deployment/reset, device/native/screenshot/artifact/signing/store work occurred. B5 is UNUSED, admission CLOSED, guards dormant. Shared helpers, kernel/SQL/mirrors/schema/profile/index, R5 source, R6a and R7a remain unchanged. No API or dependency request outside the eight owned paths was needed.
+
+The correction is one finite batch. Parent owns its source gate and any later assembly/R5/runtime acceptance. No further reviewer/fixer loop or release verdict is claimed. Exact correction base/head/tree, changed and owned source hashes, log hashes, preservation evidence and next read-only command are in `/tmp/897-r4-material-correction-20261025-handoff.md` and `/tmp/897-r4-material-correction-20261025-manifest.json`.
+
+### Correction log hashes
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `/tmp/897-r4-correction-red-behavior.log` | `ee29bdaaa4934215029cac8809967b7409822985b11eaf302d0da63def5f5d41` |
+| `/tmp/897-r4-correction-green.log` | `b42d333f16f6b30266505a0ee5306ce65150c245da81b6ee6facdf35a3779a96` |
+| `/tmp/897-r4-correction-typecheck6.log` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `/tmp/897-r4-correction-typecheck-configured.log` | `8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92` |
+| `/tmp/897-r4-correction-lint.log` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `/tmp/897-r4-correction-diff-check.log` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `/tmp/897-r4-correction-install.log` | `2e35663b40ee50694ec941e347595e4942ae8fe3eb4f19a473a6d4b0c31dbf1d` |
+| `/tmp/897-r4-correction-contracts-build.log` | `b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616` |
+| `/tmp/897-r4-correction-db-build.log` | `4c2c2a367f0bf19229411e7e6a51065375d2a2599af35f65286635d5f0e5b1a3` |
+| `/tmp/897-r4-correction-red.log` | `862fc213d49b65794b11490f78e04594fc84b2c239f6ad295fb751950cc25641` |
+| `/tmp/897-r4-correction-preservation.json` | `2a66ec493d4b6bcadb1d019cfdba9f2f4ee613579556bc72bddb1ab22d44c12f` |

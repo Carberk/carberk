@@ -83,6 +83,10 @@ export class PrismaDiagnosticIdentityEvidence implements DiagnosticIdentityEvide
       const row = await diagnosticPlannedRow(tx, this.provenanceRoot(id), next);
       await diagnosticMutation(tx, { operation: "identity_material_change", roots: this.roots(subject, orderId, [this.provenanceRoot(id)]), rows: [row],
         actorUserId: subject.userId, sessionId: subject.sessionId, cutoff: null, campaign: null }, async () => {
+        // The planning read may have captured a renewal committed after the
+        // initial read. Preparation protects that tuple, not our requested epoch.
+        const retained = await tx.diagnosticIdentityProvenance.findUnique({ where: { id } });
+        if (!retained || retained.id !== id || retained.orderId !== orderId || retained.epoch !== epoch || retained.state !== "staged") throw denied();
         await tx.diagnosticIdentityProvenance.update({ where: { id }, data: next });
       });
     });

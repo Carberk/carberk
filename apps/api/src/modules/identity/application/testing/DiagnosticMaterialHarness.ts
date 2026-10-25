@@ -109,7 +109,7 @@ export function materialHarness() {
   seed("diagnosticOrderAssignment", { id: id(8), orderId, userId: subject.userId, capability: "diagnostics.technician", revokedAt: null });
   seed("inspectionOrder", { id: orderId, centerId: id(6), templateVersionId: id(9), status: "arrived", physicalAuthorization: {}, version: 1, identityEvidenceGeneration: 0, synthetic: true, erasedAt: null, listingId: null, audience: "buyer_private", commissionerId: id(10) });
   seed("diagnosticIdentityRecord", { id: rawId, orderId, orderVersion: 1, observation: { method: "manual", vin: null, manualReference: "Synthetic plate", mileageKm: 100, observedAt: "2026-10-25T11:00:00.000Z" }, observationHash: "a".repeat(64), erasedAt: null });
-  seed("diagnosticReportRecord", { id: reportId, orderId, version: 1, erasedAt: null, snapshot: null, audience: "buyer_private", state: { status: "draft", authorId: subject.userId, findings: [] } });
+  seed("diagnosticReportRecord", { id: reportId, orderId, identityRecordId: rawId, identityRecordHash: "a".repeat(64), version: 1, erasedAt: null, snapshot: null, audience: "buyer_private", state: { status: "draft", authorId: subject.userId, findings: [] } });
   const identity: DiagnosticIdentityEvidencePort = new PrismaDiagnosticIdentityEvidence(db, authority, objects, runtime);
   const evidence: DiagnosticEvidencePort = new PrismaDiagnosticEvidence(db, new DiagnosticReportAccess(authority, runtime), objects, runtime);
   const bytes = new Uint8Array([1, 2, 3]);
