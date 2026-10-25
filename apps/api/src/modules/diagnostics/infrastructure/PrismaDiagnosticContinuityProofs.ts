@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { Inject, Injectable } from "@nestjs/common";
 import { DiagnosticSchemas as D } from "@auto-tm/contracts";
-import { PrismaService, type Prisma } from "@auto-tm/db";
+import { PrismaService, type PreparedDiagnosticSource, type DiagnosticSourceRoot, type Prisma } from "@auto-tm/db";
 import { STAFF_BINDING_PORT, StaffAuthorityDenied, type StaffBinding, type StaffBindingPort, type PublisherParticipants } from "../../identity/identity.public";
 import type { DiagnosticContinuityProofsPort } from "../application/ports/DiagnosticContinuityProofsPort";
 import { DiagnosticRuleError } from "../domain/InspectionOrder";
@@ -16,11 +16,14 @@ import { DiagnosticAuthority } from "./DiagnosticAuthority";
 import { canonical, PrismaDiagnosticIdentityEvidence } from "./PrismaDiagnosticIdentityEvidence";
 import { PrismaDiagnosticReports } from "./PrismaDiagnosticReports";
 
+import { diagnosticMutation, diagnosticPlannedRow, diagnosticReadPrefix, diagnosticRoots, diagnosticReceiptPrefix } from "./DiagnosticPreparedIntake";
+
 const denied = () => new DiagnosticRuleError("DIAGNOSTIC_NO_ACCESS");
 const hash = (value: unknown) => createHash("sha256").update(canonical(JSON.parse(JSON.stringify(value)))).digest("hex");
 const json = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 type Tx = Prisma.TransactionClient;
 type Order = Prisma.InspectionOrderGetPayload<object>;
+type ConsumptionPlan = { receipt: PreparedDiagnosticSource; report: Awaited<ReturnType<PrismaDiagnosticReports["reinspectionProposal"]>>; consumedAt: Date; audit: Prisma.DiagnosticAuditUncheckedCreateInput };
 type Pair = Awaited<ReturnType<PrismaDiagnosticReports["compared"]>>;
 
 /** Pair-bound private/public issuance and consumption transactions. Neither issuance nor a read creates a report or successor. */
@@ -35,6 +38,39 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
     @Inject(DiagnosticPublicBindings) private readonly publicBindings: DiagnosticPublicBindings,
     @Inject(DIAGNOSTIC_RUNTIME) private readonly runtime: DiagnosticRuntime) {}
 
+  private proofRoot(id: string): DiagnosticSourceRoot { return { table: "diagnostic_continuity_proofs", key: { id } }; }
+  private requestRoot(id: string): DiagnosticSourceRoot { return { table: "diagnostic_continuity_requests", key: { id } }; }
+  private reportRoot(id: string): DiagnosticSourceRoot { return { table: "diagnostic_reports", key: { id } }; }
+  /** All selectors, including absent destinations, are known before preparation.
+   * The post-wait admission still checks every permission and retained binding. */
+  private async consumption<T>(tx: Tx, subject: DiagnosticSubject, orderId: string, proofId: string, input: D.DiagnosticContinuityCommand,
+    work: (plan?: ConsumptionPlan) => Promise<T>, requestId?: string) {
+    const roots = [...diagnosticRoots(subject, [orderId]), this.reportRoot(input.reportId), ...(requestId ? [this.requestRoot(requestId)] : [])];
+    const existing = await tx.diagnosticReportRecord.findUnique({ where: { id: input.reportId } });
+    if (existing) { await diagnosticReadPrefix(tx, roots); return work(); }
+    const proof = await tx.diagnosticContinuityProof.findUnique({ where: { id: proofId } });
+    const order = await tx.inspectionOrder.findUnique({ where: { id: orderId } });
+    const prior = proof?.predecessorReportId ? await tx.diagnosticReportRecord.findUnique({ where: { id: proof.predecessorReportId } }) : null;
+    if (!proof || !prior || !order || !proof.issuerId || !proof.issuerSessionId) {
+      await diagnosticReadPrefix(tx, [...roots, this.proofRoot(proofId)]);
+      await this.authority.order(tx, subject, orderId, "diagnostics.technician"); throw denied();
+    }
+    roots.push(this.proofRoot(proofId), this.reportRoot(prior.id), ...diagnosticRoots({ userId: proof.issuerId, sessionId: proof.issuerSessionId }, [prior.orderId]),
+      ...(proof.linkingTechnicianId ? [{ table: "users" as const, key: { id: proof.linkingTechnicianId } }] : []));
+    const bound = { ...input, proofId, predecessorId: prior.id };
+    let report;
+    try { report = await this.reports.reinspectionProposal(tx, subject, order, prior, bound, proofId, requestId); }
+    catch (error) { await diagnosticReadPrefix(tx, roots); await this.authority.order(tx, subject, orderId, "diagnostics.technician"); throw error; }
+    const consumedAt = this.runtime.now();
+    const audit = { id: order.audience === "listing_public" ? input.reportId : this.runtime.id(), centerId: order.centerId, orderId,
+      actorId: subject.userId, action: "CONTINUITY_PROOF_CONSUMED", details: { reportId: input.reportId }, createdAt: consumedAt };
+    const rows = [await diagnosticPlannedRow(tx, this.proofRoot(proofId), { consumedReportId: input.reportId, consumedAt }),
+      await diagnosticPlannedRow(tx, this.reportRoot(input.reportId), report.data, true),
+      await diagnosticPlannedRow(tx, { table: "diagnostic_audits", key: { id: report.audit.id } }, report.audit, true),
+      await diagnosticPlannedRow(tx, { table: "diagnostic_audits", key: { id: audit.id } }, audit, true)];
+    return diagnosticMutation(tx, { operation: "proof_consume", roots, rows, actorUserId: subject.userId, sessionId: subject.sessionId, cutoff: null, campaign: null },
+      receipt => work({ receipt, report, consumedAt, audit }));
+  }
   /** Under the order locks: the issuer/technician pair's current assignments and qualifications,
    * with the linking technician's current B assignment and qualification. */
   private async staffing(tx: Tx, issuerId: string, technicianId: string, { order: b, priorOrder: ao }: Pair) {
@@ -174,17 +210,23 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
   }
   async prepareRequest(subject: DiagnosticSubject, orderId: string, input: D.DiagnosticContinuityRequestPrepare): Promise<D.DiagnosticContinuityRequest> {
     return this.db.$transaction(async tx => {
-      await this.publicBindings.lock(tx, [orderId], [subject.userId]);
-      await this.requestAuthority(tx, subject, orderId, input.kind);
       const requestId = this.runtime.id();
-      await tx.diagnosticContinuityRequest.create({ data: { id: requestId, actorId: subject.userId, sessionId: subject.sessionId, orderId, kind: input.kind, createdAt: this.runtime.now() } });
-      return D.DiagnosticContinuityRequestSchema.parse({ requestId, kind: input.kind, state: "pending_input" });
+      const data = { id: requestId, actorId: subject.userId, sessionId: subject.sessionId, orderId, kind: input.kind, createdAt: this.runtime.now() };
+      const row = await diagnosticPlannedRow(tx, this.requestRoot(requestId), data, true);
+      return diagnosticMutation(tx, { operation: input.kind === "issue" ? "proof_issue" : "proof_consume", roots: [...diagnosticRoots(subject, [orderId]), this.requestRoot(requestId)], rows: [row],
+        actorUserId: subject.userId, sessionId: subject.sessionId, cutoff: null, campaign: null }, async () => {
+        await this.publicBindings.lock(tx, [orderId], [subject.userId]);
+        await this.requestAuthority(tx, subject, orderId, input.kind);
+        await tx.diagnosticContinuityRequest.create({ data });
+        return D.DiagnosticContinuityRequestSchema.parse({ requestId, kind: input.kind, state: "pending_input" });
+      });
     });
   }
   /** All lock targets are discovered before the complete User/Business/Listing/order prefix.
    * Completed B requests deliberately discover no A/issuer target. */
   private async requestLocks(tx: Tx, subject: DiagnosticSubject, orderId: string, requestIds: string[]) {
     const proofs = await tx.diagnosticContinuityProof.findMany({ where: { requestId: { in: requestIds }, issuerId: subject.userId, issuerSessionId: subject.sessionId, candidateOrderId: orderId } });
+    await diagnosticReadPrefix(tx, [...diagnosticRoots(subject, [orderId]), ...requestIds.map(id => this.requestRoot(id)), ...proofs.map(proof => this.proofRoot(proof.id))]);
     await this.publicBindings.lock(tx, [orderId, ...new Set(proofs.flatMap(p => p.predecessorOrderId ? [p.predecessorOrderId] : []))],
       [subject.userId, ...proofs.flatMap(p => p.linkingTechnicianId ? [p.linkingTechnicianId] : [])]);
     const current = await tx.diagnosticContinuityProof.findMany({ where: { requestId: { in: requestIds }, issuerId: subject.userId, issuerSessionId: subject.sessionId, candidateOrderId: orderId } });
@@ -225,7 +267,7 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
     });
   }
   async discoverRequests(subject: DiagnosticSubject, orderId: string, query: D.DiagnosticPredecessorQuery): Promise<D.DiagnosticContinuityRequests> {
-    await this.db.$transaction(tx => this.requestAuthority(tx, subject, orderId));
+    await this.db.$transaction(async tx => { await diagnosticReadPrefix(tx, diagnosticRoots(subject, [orderId])); return this.requestAuthority(tx, subject, orderId); });
     const position = this.cursors.open(query.cursor, subject, orderId, this.runtime.now(), "requests-v1");
     const rows = await this.db.diagnosticContinuityRequest.findMany({ where: { actorId: subject.userId, sessionId: subject.sessionId, orderId,
       createdAt: { lte: new Date(position.until) }, ...(position.after ? { id: { gt: position.after.id } } : {}) }, orderBy: { id: "asc" }, take: 21 });
@@ -263,11 +305,10 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
       if (!row || row.kind !== "consume" || row.actorId !== subject.userId || row.sessionId !== subject.sessionId || row.orderId !== orderId) throw denied();
       const completed = await tx.diagnosticReportRecord.findUnique({ where: { continuityRequestId: requestId } });
       if (completed && completed.id !== input.command.reportId) {
-        await this.publicBindings.lock(tx, [orderId], [subject.userId]);
+        await diagnosticReadPrefix(tx, [...diagnosticRoots(subject, [orderId]), this.requestRoot(requestId), this.reportRoot(completed.id)]);
         await this.requestAuthority(tx, subject, orderId, "consume");
         throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
       }
-      if (completed) await this.publicBindings.lock(tx, [orderId], [subject.userId]);
       await this.useHandoffIn(tx, subject, orderId, input.command.proofId, input.command, requestId);
       return this.requestOutcome(tx, subject, orderId, requestId);
     });
@@ -280,7 +321,7 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
       const completed = await this.db.diagnosticReportRecord.findUnique({ where: { continuityRequestId: requestId } });
       if (!completed) throw error;
       return this.db.$transaction(async tx => {
-        await this.publicBindings.lock(tx, [orderId], [subject.userId]);
+        await diagnosticReadPrefix(tx, [...diagnosticRoots(subject, [orderId]), this.requestRoot(requestId), this.reportRoot(completed.id)]);
         await this.requestAuthority(tx, subject, orderId, "consume");
         if (completed.id !== input.command.reportId) throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
         await this.useHandoffIn(tx, subject, orderId, input.command.proofId, input.command, requestId);
@@ -293,6 +334,12 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
     return this.db.$transaction(tx => this.issueIn(tx, subject, orderId, input));
   }
   private async issueIn(tx: Tx, subject: DiagnosticSubject, orderId: string, input: D.DiagnosticContinuityProofIssuance, requestId?: string) {
+      // Issuance's material planner is a shared dependency still requiring an
+      // unlocked projection from R4. Until supplied, keep the original writer
+      // under the complete read prefix; strict activation remains blocked.
+      await diagnosticReadPrefix(tx, [...diagnosticRoots(subject, [orderId]), this.reportRoot(input.predecessorId),
+        { table: "users", key: { id: input.linkingTechnicianId } }, ...input.provenanceRecordIds.map(id => ({ table: "diagnostic_identity_provenance" as const, key: { id } })),
+        ...(requestId ? [this.requestRoot(requestId)] : [])]);
       // Lock every actor/publisher User before Business and feature locks. The held Users
       // also serialize subsequent staff Session/grant checks with authority writers.
       const participants = await this.publicBindings.pairLocks(tx, orderId, input.predecessorId, [subject.userId, input.linkingTechnicianId]);
@@ -351,7 +398,7 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
    * the issuance lock order. An existing report id is an exact retry: it returns the authorized
    * result or conflicts and never reruns admission, so later A changes cannot block B. */
   async consume(subject: DiagnosticSubject, orderId: string, input: D.DiagnosticReinspection & { proofId: string }) {
-    return this.db.$transaction(async tx => {
+    return this.db.$transaction(tx => this.consumption(tx, subject, orderId, input.proofId, input, async plan => {
       // Unlocked discovery selects the path and the issuer's identity lock targets only.
       if (await tx.diagnosticReportRecord.findUnique({ where: { id: input.reportId }, select: { id: true } })) {
         await this.reports.reinspectionLocks(tx, subject, orderId, input.predecessorId);
@@ -361,8 +408,8 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
       }
       const admitted = await this.admit(tx, subject, orderId, input.proofId, input.predecessorId, input);
       if (admitted.retried) return admitted.retried;
-      return this.createFromAdmission(tx, subject, input, admitted);
-    });
+      return this.createFromAdmission(tx, subject, input, admitted, plan);
+    }));
   }
 
   /** The same locked, read-only current admission drives discovery and first consumption. */
@@ -430,13 +477,13 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
     return { proof, b, a, now, retried: null };
   }
 
-  private async createFromAdmission(tx: Tx, subject: DiagnosticSubject, input: D.DiagnosticReinspection & { proofId: string }, admitted: { proof: Prisma.DiagnosticContinuityProofGetPayload<object>; b: Order; a: Prisma.DiagnosticReportRecordGetPayload<object>; now: Date }, requestId?: string) {
-    const { proof, b, a, now } = admitted;
-    await tx.diagnosticContinuityProof.update({ where: { id: proof.id }, data: { consumedReportId: input.reportId, consumedAt: now } });
-    const created = await this.reports.openReinspection(tx, subject, b, a, input, proof.id, requestId);
-    // Like issuance, the audit holds no rationale, provenance, personal linkage or identity hashes.
-    await tx.diagnosticAudit.create({ data: { id: b.audience === "listing_public" ? created.id : this.runtime.id(), centerId: b.centerId, orderId: b.id, actorId: subject.userId,
-      action: "CONTINUITY_PROOF_CONSUMED", details: { reportId: created.id }, createdAt: now } });
+  private async createFromAdmission(tx: Tx, subject: DiagnosticSubject, input: D.DiagnosticReinspection & { proofId: string }, admitted: { proof: Prisma.DiagnosticContinuityProofGetPayload<object>; b: Order; a: Prisma.DiagnosticReportRecordGetPayload<object>; now: Date }, plan: ConsumptionPlan | undefined, requestId?: string) {
+    const { proof, b, a } = admitted;
+    if (!plan) throw denied();
+    await diagnosticReceiptPrefix(tx, plan.receipt, "proof_consume");
+    await tx.diagnosticContinuityProof.update({ where: { id: proof.id }, data: { consumedReportId: input.reportId, consumedAt: plan.consumedAt } });
+    const created = await this.reports.openReinspection(tx, subject, b, a, input, proof.id, plan.receipt, plan.report, requestId);
+    await tx.diagnosticAudit.create({ data: plan.audit });
     return created;
   }
 
@@ -449,13 +496,14 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
 
   async handoffs(subject: DiagnosticSubject, orderId: string, query: D.DiagnosticPredecessorQuery): Promise<D.DiagnosticContinuityHandoffs> {
     // Authorize B before cursor parsing/scan. A result is B-owned, even if erasure deleted its proof.
-    await this.db.$transaction(tx => this.authority.order(tx, subject, orderId, "diagnostics.technician"));
+    await this.db.$transaction(async tx => { await diagnosticReadPrefix(tx, diagnosticRoots(subject, [orderId])); return this.authority.order(tx, subject, orderId, "diagnostics.technician"); });
     const position = this.cursors.open(query.cursor, subject, orderId, this.runtime.now(), "b-handoffs-v1");
     const rows = await this.db.diagnosticContinuityProof.findMany({ where: { candidateOrderId: orderId, linkingTechnicianId: subject.userId,
       consumedReportId: null, issuedAt: { lte: new Date(position.until) }, ...(position.after ? { id: { gt: position.after.id } } : {}) },
       orderBy: { id: "asc" }, take: 21, select: { id: true, predecessorReportId: true, issuerId: true, issuedAt: true } });
     const page = rows.slice(0, 20);
     return this.db.$transaction(async tx => {
+      await diagnosticReadPrefix(tx, [...diagnosticRoots(subject, [orderId]), ...page.map(row => this.proofRoot(row.id))]);
       // Discover targets only; hold the full page's actor/order union before admitting any pair.
       const predecessors = await tx.diagnosticReportRecord.findMany({ where: { id: { in: page.flatMap(row => row.predecessorReportId ? [row.predecessorReportId] : []) } }, select: { orderId: true } });
       await this.publicBindings.lock(tx, [orderId, ...new Set(predecessors.map(row => row.orderId))],
@@ -480,6 +528,7 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
     return this.db.$transaction(tx => this.useHandoffIn(tx, subject, orderId, proofId, input));
   }
   private async useHandoffIn(tx: Tx, subject: DiagnosticSubject, orderId: string, proofId: string, input: D.DiagnosticContinuityCommand, requestId?: string): Promise<{ reportId: string }> {
+    return this.consumption(tx, subject, orderId, proofId, input, async plan => {
       const existing = await tx.diagnosticReportRecord.findUnique({ where: { id: input.reportId } });
       if (existing) {
         await this.reports.reinspectionLocks(tx, subject, orderId, "");
@@ -501,14 +550,16 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
       let admitted;
       try { admitted = await this.admit(tx, subject, orderId, proofId, initial.predecessorReportId, bound, requestId); }
       catch (error) { if (error instanceof DiagnosticRuleError) throw denied(); throw error; }
-      const report = admitted.retried ?? await this.createFromAdmission(tx, subject, bound, admitted, requestId);
+      const report = admitted.retried ?? await this.createFromAdmission(tx, subject, bound, admitted, plan, requestId);
       return { reportId: report.id };
+    }, requestId);
   }
 
   async read(subject: DiagnosticSubject, orderId: string, proofId: string): Promise<D.DiagnosticContinuityProof> {
     return this.db.$transaction(tx => this.readIn(tx, subject, orderId, proofId));
   }
   private async readIn(tx: Tx, subject: DiagnosticSubject, orderId: string, proofId: string): Promise<D.DiagnosticContinuityProof> {
+      await diagnosticReadPrefix(tx, [...diagnosticRoots(subject, [orderId]), this.proofRoot(proofId)]);
       await this.authority.current(tx, subject);
       const initial = await tx.diagnosticContinuityProof.findUnique({ where: { id: proofId } });
       if (!initial || initial.candidateOrderId !== orderId || !initial.predecessorOrderId) throw denied();

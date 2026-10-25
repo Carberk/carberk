@@ -6,12 +6,15 @@ import { DIAGNOSTIC_RUNTIME, type DiagnosticRuntime, type DiagnosticSubject } fr
 import { DiagnosticAuthority } from "./DiagnosticAuthority";
 import { diagnosticListingDigest } from "./PrismaDiagnosticIntake";
 
+import { diagnosticReadPrefix, diagnosticRoots } from "./DiagnosticPreparedIntake";
+
 type Report = Prisma.DiagnosticReportRecordGetPayload<{ include: { order: true } }>;
 @Injectable()
 export class DiagnosticReportAccess {
   constructor(@Inject(DiagnosticAuthority) private readonly authority: DiagnosticAuthority,
     @Inject(DIAGNOSTIC_RUNTIME) private readonly runtime: DiagnosticRuntime) {}
   async load(tx: Prisma.TransactionClient, subject: DiagnosticSubject, id: string, capability?: DiagnosticSchemas.DiagnosticCapability) {
+    await diagnosticReadPrefix(tx, [...diagnosticRoots(subject), { table: "diagnostic_reports", key: { id } }]);
     const found = await tx.diagnosticReportRecord.findUnique({ where: { id } });
     if (!found) throw new DiagnosticRuleError("DIAGNOSTIC_NO_ACCESS");
     const scope = await this.authority.order(tx, subject, found.orderId, capability);
@@ -24,6 +27,8 @@ export class DiagnosticReportAccess {
   async loadPublic(tx: Prisma.TransactionClient, id: string) {
     const denied = () => new DiagnosticRuleError("DIAGNOSTIC_PUBLIC_UNAVAILABLE");
     if (!this.runtime.publicSyntheticAllowed?.()) throw denied();
+    try { await diagnosticReadPrefix(tx, [{ table: "diagnostic_reports", key: { id } }]); }
+    catch (error) { if (error instanceof DiagnosticRuleError) throw denied(); throw error; }
     const found = await tx.diagnosticReportRecord.findFirst({ where: { id, audience: "listing_public" }, include: { order: true } });
     if (!found || !found.order.listingId) throw denied();
     await tx.$queryRaw`SELECT id FROM listings WHERE id=${found.order.listingId} FOR SHARE`;
@@ -34,8 +39,7 @@ export class DiagnosticReportAccess {
     if (order.listingId !== found.order.listingId || !await this.publiclyAvailable(tx, row)) throw denied();
     return { row, order, staff: false };
   }
-  /** The current public gate without locks. Callers either hold Listing -> order -> report
-   * locks (loadPublic) or only decide whether to disclose a linked report id. */
+  /** Current public permission under the outer retained graph prefix. */
   private async publiclyAvailable(tx: Prisma.TransactionClient, row: Report): Promise<boolean> {
     const order = row.order;
     if (!this.runtime.publicSyntheticAllowed?.()) return false;
@@ -48,8 +52,9 @@ export class DiagnosticReportAccess {
   /** Released successor id and kind for a reader of `predecessor`. A same-order correction follows the
    * predecessor's audience. A reinspection lives on another order, so its id is disclosed only to
    * that order's own commissioner or while it is independently publicly available; predecessor
-   * staff gain nothing. Drafts are never disclosed. Unlocked: this never grants a read. */
+   * staff gain nothing. Drafts are never disclosed. This never grants a read. */
   async successor(tx: Prisma.TransactionClient, predecessor: { id: string; orderId: string }, viewerId: string | null): Promise<{ supersededBy: string | null; successorKind?: "correction" | "reinspection" }> {
+    await diagnosticReadPrefix(tx, [{ table: "diagnostic_reports", key: { id: predecessor.id } }]);
     const successor = await tx.diagnosticReportRecord.findFirst({ where: { predecessorId: predecessor.id, snapshotHash: { not: null }, erasedAt: null }, include: { order: true } });
     if (!successor) return { supersededBy: null };
     const projection = { supersededBy: successor.id, successorKind: successor.reinspection ? "reinspection" as const : "correction" as const };

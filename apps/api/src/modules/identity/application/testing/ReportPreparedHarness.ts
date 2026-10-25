@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { randomUUID } from "node:crypto";
 import { ConfigService } from "@nestjs/config";
 import { DiagnosticMemoryDatabase, diagnosticTestId as id, diagnosticTestSha as sha } from "@auto-tm/db/testing";
-import type { DiagnosticSourceCommand, Prisma, PrismaService } from "@auto-tm/db";
+import { Prisma, type DiagnosticSourceCommand, type PrismaService } from "@auto-tm/db";
 import { CheckBusinessAuthority } from "../CheckBusinessAuthority";
 import { CheckStaffAuthority } from "../CheckStaffAuthority";
 import { PrismaBusinessAuthority } from "../../infrastructure/PrismaBusinessAuthority";
@@ -40,7 +40,9 @@ export function reportPreparedHarness() {
     let prefix = false, command: DiagnosticSourceCommand | undefined;
     const query = async (sql: string, values: unknown[]) => {
       if (sql.includes("diagnostic_source_project")) {
-        const model = Object.entries(tables).find(([, table]) => table === values[0])![0] as Model;
+        const entry = Object.entries(tables).find(([, table]) => table === values[0]);
+        if (!entry) throw new Error("r5_unknown_planned_table");
+        const model = entry[0] as Model;
         const source = await (memory.client[model] as unknown as Delegate).findUnique({ where: JSON.parse(String(values[1])) as Row });
         return [{ source, next: { ...source, ...JSON.parse(String(values.at(-1))) } }];
       }
@@ -52,11 +54,14 @@ export function reportPreparedHarness() {
       if (sql.includes("diagnostic_source_registry")) return [];
       if (sql.includes("campaign_prepare")) return [{ receipt: "ordinary-campaign" }];
       if (/FOR (UPDATE|SHARE)/.test(sql) && !prefix) throw new Error("r5_outer_prefix_required");
+      if (sql.includes('SELECT id,"orderId","userId"')) return memory.client.diagnosticOrderAssignment.findMany({ where: { orderId: { in: values.slice(0, 2) as string[] }, userId: { in: values.slice(2) as string[] } }, orderBy: { id: "asc" } });
+      if (sql.includes('SELECT id,"centerId","userId"')) return memory.client.diagnosticCenterAssignment.findMany({ where: { centerId: { in: values.slice(0, 2) as string[] }, userId: { in: values.slice(2) as string[] } }, orderBy: { id: "asc" } });
       return [];
     };
     const tx = new Proxy(memory.client, { get(target, property) {
       if (property === "$queryRaw") return (parts: TemplateStringsArray, ...values: unknown[]) => query(parts.join("?"), values);
       if (property === "$queryRawUnsafe") return query;
+      if (property === "diagnosticOwnershipGrant") return { findMany: async () => [] };
       const value = Reflect.get(target, property);
       if (!(typeof property === "string" && property in tables)) return value;
       return new Proxy(value as object, { get(model, method) {
@@ -64,9 +69,11 @@ export function reportPreparedHarness() {
         if (!["create", "update", "updateMany"].includes(String(method))) return fn;
         return async (args: unknown) => {
           if (!prefix) throw new Error("r5_outer_prefix_required");
-          const input = args as { data: Row };
+          const input = args as { data: Row; include?: Row };
+          if (input.data?.["snapshot"] === Prisma.DbNull) input.data["snapshot"] = null;
           const result = await fn(property === "diagnosticReportRecord" && method === "create" ? { ...input, data: { predecessorId: null, reinspection: false, identityEvidenceId: null, identityEvidenceHash: null, ...input.data } } : args);
           if (writeFailure === property) throw new Error("r5_actual_write_rollback");
+          if (method === "create" && input.include) return (value as { findUnique(args: { where: Row; include: Row }): Promise<unknown> }).findUnique({ where: { id: (result as Row)["id"] }, include: input.include });
           return result;
         };
       } });
@@ -99,6 +106,6 @@ export function reportPreparedHarness() {
   const observation = { method: "manual", vin: null, manualReference: "Synthetic plate", mileageKm: 100, observedAt: "2026-10-25T11:00:00.000Z" };
   seed("inspectionOrder", { id: orderId, centerId, templateVersionId: id(9), status: "arrived", physicalAuthorization: {}, version: 1, identityEvidenceGeneration: 0, synthetic: true, erasedAt: null, listingId: null, audience: "buyer_private", commissionerId: subject.userId, observedVehicle: observation });
   seed("diagnosticIdentityRecord", { id: id(5), orderId, orderVersion: 1, observation, observationHash: "a".repeat(64), erasedAt: null });
-  return { db, reports, proofs, documents, access, subject, orderId, reportId, seed, commands, stored, id, sha,
+  return { db, reports, proofs, documents, access, identity: evidence, subject, orderId, reportId, seed, commands, stored, id, sha,
     clock: (now: Date) => { clock = now; }, onRead: (fn?: () => Promise<void>) => { onRead = fn; }, failFinish: () => { finishFailure = true; }, failWrite: (model: Model) => { writeFailure = model; } };
 }
