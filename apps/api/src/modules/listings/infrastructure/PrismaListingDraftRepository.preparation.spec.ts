@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PrismaService } from "@auto-tm/db";
+import { Prisma, PrismaService } from "@auto-tm/db";
 import { ListingDraft } from "../domain/ListingDraft";
 import { PrismaListingDraftRepository } from "./PrismaListingDraftRepository";
 
@@ -11,7 +11,7 @@ describe("draft preparation boundary", () => {
       let writes = 0;
       const mutate = async () => { writes++; return draft; };
       const tx = {
-        listingDraft: { findUnique: async () => ({ ...draft, businessId: null }), create: mutate, update: mutate, delete: mutate },
+        listingDraft: { findUniqueOrThrow: async () => ({ ...draft, businessId: null }), findUnique: async () => ({ ...draft, businessId: null }), create: mutate, update: mutate, delete: mutate },
         $executeRaw: async () => 0,
         $queryRaw: async (parts: TemplateStringsArray) => {
           const sql = parts.join("?");
@@ -33,13 +33,16 @@ describe("draft preparation boundary", () => {
 
 // This boundary models transaction rollback and protocol refusals. It does not
 // model PostgreSQL snapshots, advisory locks, FK behavior or concurrent clients.
-function boundary(options: { changed?: boolean; finishFails?: boolean; initial?: ListingDraft; count?: number } = {}) {
+function boundary(options: { changed?: boolean; finishFails?: boolean; initial?: ListingDraft; count?: number; generationAppears?: boolean } = {}) {
   let stored = options.initial ? { ...options.initial, businessId: options.initial.businessId ?? null } : null;
   let prepared = false, discoveries = 0;
+  const events: string[] = [];
+  const missing = () => new Prisma.PrismaClientKnownRequestError("No record was found for a query.", { code: "P2025", clientVersion: "boundary" });
   const data = () => stored;
   const tx = {
     listingDraft: {
       findUnique: async () => stored,
+      findUniqueOrThrow: async () => { events.push("read-required"); if (!stored) throw missing(); return stored; },
       count: async () => { if (!prepared) throw new Error("count before prefix"); return options.count ?? (stored ? 1 : 0); },
       create: async ({ data: row }: { data: NonNullable<typeof stored> }) => { if (!prepared) throw new Error("write before prefix"); stored = row; return row; },
       update: async ({ data: patch }: { data: Partial<NonNullable<typeof stored>> }) => {
@@ -50,17 +53,33 @@ function boundary(options: { changed?: boolean; finishFails?: boolean; initial?:
       delete: async () => { if (!prepared) throw new Error("write before prefix"); const row = stored; stored = null; return row; },
     },
     $executeRaw: async () => 0,
-    $queryRaw: async (parts: TemplateStringsArray | { sql: string }) => {
+    $queryRaw: async (parts: TemplateStringsArray | { sql: string }, ...values: unknown[]) => {
       const sql = Array.isArray(parts) ? parts.join("?") : (parts as { sql: string }).sql;
       if (sql.includes("WITH RECURSIVE")) {
         discoveries++;
+        events.push("discovery");
+        if (options.generationAppears !== undefined) {
+          // Query-contract check at the DB boundary, not a PostgreSQL emulator.
+          // Existing-row discovery alone cannot represent this absent V1 slot.
+          if (!/SELECT 'video_generations',jsonb_build_object\('id',s.id\) FROM public.video_upload_sessions s\s+JOIN videos v ON v.id=s.id WHERE s."protocolVersion"=1/.test(sql)) throw new Error("missing V1 generation root");
+          if (!sql.includes('g."sessionId" IN (SELECT id FROM videos)')) throw new Error("lost retained generation roots");
+          return [{ scope: [{ table: "video_generations", key: { id: "session" }, row: options.generationAppears && discoveries > 1 ? { id: "session", sessionId: "session" } : null }], keys: [{ namespace: 898102, key: 41 }] }];
+        }
         return [{ scope: [{ table: "listing_drafts", key: { id: "draft" }, row: options.changed && discoveries > 1 ? { userId: "changed" } : null }], keys: [{ namespace: 897401, key: 7 }] }];
       }
-      if (sql.includes("campaign_prepare(")) { prepared = true; return [{ receipt: "boundary-receipt" }]; }
+      if (sql.includes("campaign_prepare(")) {
+        const mutations = JSON.parse(String(values[0])) as Array<Record<string, unknown>>;
+        // Match the real parser's nonempty finite array/entry contract. An
+        // invalid request must never be made successful by this boundary.
+        if (!Array.isArray(mutations) || mutations.length < 1 || mutations.length > 1000 || mutations.some(m =>
+          Object.keys(m).sort().join(",") !== "key,next,table,verb" || !["insert", "update", "delete"].includes(String(m.verb)) ||
+          typeof m.key !== "object" || m.key === null)) throw new Error("campaign_preparation_shape");
+        events.push("prepare"); prepared = true; return [{ receipt: "boundary-receipt" }]; }
       if (sql.includes("campaign_finish(")) { if (options.finishFails) throw new Error("finish refused"); return []; }
-      if (sql.includes("diagnostic_source_registry")) return [{ table: "listing_drafts", namespace: 897401 }];
+      if (sql.includes("diagnostic_source_registry")) return options.generationAppears !== undefined ? [{ table: "video_generations", namespace: 898102 }] : [{ table: "listing_drafts", namespace: 897401 }];
       if (sql.includes("pg_advisory_xact_lock") || sql.includes("FOR UPDATE")) {
         if (!prepared) throw new Error("lock before prefix");
+        events.push(sql.includes("pg_advisory_xact_lock") ? `key:${values.join(":")}` : "row");
         return [];
       }
       throw new Error(`Unexpected database boundary statement: ${sql}`);
@@ -71,7 +90,7 @@ function boundary(options: { changed?: boolean; finishFails?: boolean; initial?:
     try { return await work(tx); } catch (error) { stored = original; throw error; }
     finally { prepared = false; }
   } };
-  return { repo: new PrismaListingDraftRepository(db as unknown as PrismaService), data };
+  return { repo: new PrismaListingDraftRepository(db as unknown as PrismaService), data, events };
 }
 
 describe("draft transaction outcomes at the offline boundary", () => {
@@ -89,6 +108,25 @@ describe("draft transaction outcomes at the offline boundary", () => {
         expect(db.data()).toEqual(initial ? { ...initial, businessId: null } : null);
       });
     }
+  }
+  for (const operation of ["update", "delete"] as const) {
+    it(`returns native P2025 for absent ${operation} without preparation, locks or DML`, async () => {
+      const db = boundary();
+      const result = operation === "delete" ? db.repo.delete(draft.id) : db.repo.update(draft);
+      await expect(result).rejects.toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+      await expect(result).rejects.toMatchObject({ code: "P2025" });
+      expect(db.events).toEqual(["read-required"]);
+      expect(db.data()).toBeNull();
+    });
+  }
+  for (const generationAppears of [false, true]) {
+    it(`${generationAppears ? "refuses a newly present" : "fences an absent"} V1 generation slot without extending the lock set`, async () => {
+      const db = boundary({ generationAppears });
+      if (generationAppears) await expect(db.repo.save(draft)).rejects.toThrow("draft_dependencies_changed");
+      else expect(await db.repo.save(draft)).toEqual(draft);
+      expect(db.events).toEqual(["discovery", "prepare", "key:898102:41", "row", "discovery"]);
+      expect(db.data()).toEqual(generationAppears ? null : { ...draft, businessId: null });
+    });
   }
   it("returns null at the limit without changing payload or dates", async () => {
     const db = boundary({ count: 5 });
