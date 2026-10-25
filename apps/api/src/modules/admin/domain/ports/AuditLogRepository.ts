@@ -19,6 +19,7 @@ export interface AuditLogRepository {
   }): Promise<{ items: AuditLogRow[]; total: number }>;
   create(
     data: {
+      id?: string;
       actorId: string | null;
       action: string;
       targetType: string;

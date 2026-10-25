@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable, Optional } from "@nestjs/common";
-import { PrismaService,type Prisma, withDiagnosticSourceCommand, assertDiagnosticSourceCommand, type DiagnosticSourceTuple } from "@auto-tm/db";
+import { PrismaService,type Prisma, withDiagnosticSourceCommand, assertDiagnosticSourceCommand, listingSourceCommand, type PreparedDiagnosticSource } from "@auto-tm/db";
 
 import { MEASUREMENT_COMMIT_PORT,type MeasurementCommitPort } from "../../measurement/measurement.public";
 import type { ListingsAdminPort } from "../domain/ports/ListingsAdminPort";
@@ -10,33 +10,36 @@ export class PrismaListingsAdminRepository implements ListingsAdminPort {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService,
     @Optional() @Inject(MEASUREMENT_COMMIT_PORT) private readonly measurement?:MeasurementCommitPort) {}
 
-  banActiveListing(listingId: string, tx?: unknown): Promise<{ status: string }> {
-    return this.transition(listingId,"active","banned",tx);
+  banActiveListing(listingId: string, tx?: unknown, receipt?: unknown): Promise<{ status: string }> {
+    return this.transition(listingId,"active","banned",tx,receipt);
   }
 
-  unbanBannedListing(listingId: string, tx?: unknown): Promise<{ status: string }> {
-    return this.transition(listingId,"banned","active",tx);
+  unbanBannedListing(listingId: string, tx?: unknown, receipt?: unknown): Promise<{ status: string }> {
+    return this.transition(listingId,"banned","active",tx,receipt);
   }
 
-  private async transition(listingId:string,from:"active"|"banned",to:"active"|"banned",transaction?:unknown):Promise<{status:string}> {
+  private async transition(listingId:string,from:"active"|"banned",to:"active"|"banned",transaction?:unknown,suppliedReceipt?:unknown):Promise<{status:string}> {
     const change=async(tx:Prisma.TransactionClient)=>{
-      const initial=await tx.listing.findUnique({where:{id:listingId},select:{businessId:true}});
-      const source=await tx.listing.findUnique({where:{id:listingId},select:{id:true,sellerId:true,businessId:true,vin:true,brandId:true,modelId:true,year:true,deletedAt:true,status:true}});
+      const source=await tx.listing.findUnique({where:{id:listingId},select:{sellerId:true,businessId:true}});
       if (!source) throw new Error("LISTING_NOT_FOUND");
-      const tuple=(row:typeof source): DiagnosticSourceTuple=>({id:row.id,sellerId:row.sellerId,businessId:row.businessId,vin:row.vin,brandId:row.brandId,modelId:row.modelId,year:row.year,deletedAt:row.deletedAt?.toISOString()??null,status:row.status});
-      const run=async(receipt?:Parameters<typeof assertDiagnosticSourceCommand>[1])=>{
-      if (receipt) await assertDiagnosticSourceCommand(tx,receipt,"listing_change");
+      const run=async(receipt:PreparedDiagnosticSource)=>{
+      if (!receipt || typeof receipt.receiptId !== "string") throw new Error("diagnostic_source_receipt_required");
+      await assertDiagnosticSourceCommand(tx,receipt,"listing_change");
+      const users = await tx.$queryRaw<{ deletionScheduledAt: Date | null }[]>`SELECT "deletionScheduledAt" FROM "users" WHERE "id"=${source.sellerId} FOR UPDATE`;
+      const eligible = !!users[0] && !users[0].deletionScheduledAt;
       // Business state controls public inventory. Preserve business -> Listing lock order.
-      if(initial?.businessId)await tx.$queryRaw`SELECT "id" FROM "dealerships" WHERE "id"=${initial.businessId} FOR UPDATE`;
+      if(source.businessId)await tx.$queryRaw`SELECT "id" FROM "dealerships" WHERE "id"=${source.businessId} FOR UPDATE`;
       await tx.$queryRaw`SELECT "id" FROM "listings" WHERE "id"=${listingId} FOR UPDATE`;
       const row=await tx.listing.update({where:{id:listingId,status:from},data:{status:to},include:{business:{select:{status:true}}}});
-      if(!row.deletedAt && (!row.businessId||row.business?.status==="active")){
+      if(eligible && !row.deletedAt && (!row.businessId||row.business?.status==="active")){
         try{await this.measurement?.capture(tx,row.sellerId,{version:1,eventId:randomUUID(),occurredAt:new Date().toISOString(),purpose:"product_improvement",eventName:"listing_visibility_changed",context:{platform:"server",release:"server",build:"server",locale:"ru"},payload:{listingId,visibility:to==="active"?"public":"hidden",reason:to==="active"?"restored":"moderated"}});}catch{/* Core moderation survives collection outage. */}
       }
       return {status:row.status};
       };
-      if (transaction) return run();
-      return withDiagnosticSourceCommand(tx,{operation:"listing_change",roots:[{table:"listings",key:{id:listingId}}],rows:[{table:"listings",key:{id:listingId},verb:"update",expected:{source:tuple(source)},next:tuple({...source,status:to})}],actorUserId:source.sellerId,sessionId:null,cutoff:null,campaign:null},run);
+      if (transaction) return run(suppliedReceipt as PreparedDiagnosticSource);
+      const command = await listingSourceCommand(tx, { operation: "listing_change", listingId, actorUserId: source.sellerId,
+        roots: [{table:"users",key:{id:source.sellerId}}], changes: { status: to } });
+      return withDiagnosticSourceCommand(tx, command, run);
     };
     return transaction?change(transaction as Prisma.TransactionClient):this.prisma.$transaction(change);
   }

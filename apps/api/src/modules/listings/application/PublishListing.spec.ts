@@ -145,7 +145,18 @@ class FakePrisma {
     this.auditLogs = [];
   }
 
-  $queryRaw = async () => [{ id: "locked-fixture" }];
+  private prepared = false;
+  beforePrepared: (() => void) | undefined;
+  failAudit = false;
+  $queryRaw = async (parts: TemplateStringsArray, ...values: unknown[]) => {
+    const sql = parts.join("?");
+    if (sql.includes("diagnostic_source_read")) return [{ source: null, next: JSON.parse(String(values.at(-1))) }];
+    if (sql.includes("diagnostic_prepare_source")) { this.beforePrepared?.(); this.prepared = true; return [{ receipt: "00000000-0000-4000-8000-000000000001" }]; }
+    if (sql.includes("diagnostic_assert_source")) { if (!this.prepared) throw new Error("receipt_required"); return []; }
+    if (sql.includes("diagnostic_finish_source")) { this.prepared = false; return []; }
+    if (sql.includes("FOR UPDATE") && !this.prepared) throw new Error("lock_before_preparation");
+    return [{ id: "locked-fixture", deletionScheduledAt: null }];
+  };
   videoUploadSession = { findFirst: async () => null };
 
   $transaction = async <T>(work: Promise<T>[] | ((tx: FakePrisma) => Promise<T>)): Promise<T | T[]> => {
@@ -153,6 +164,7 @@ class FakePrisma {
       try {
         // An interactive transaction is atomic, so a failure adopts nothing:
         // the in-memory claim is not reached rather than undone.
+        this.prepared = false;
         if (this.failTransaction) throw this.failTransaction();
         return await work(this);
       } catch (err) {
@@ -216,7 +228,9 @@ class FakePrisma {
     },
   };
 
+  draftRows: ListingDraft[] = [];
   listingDraft = {
+    findUnique: async ({ where }: { where: { id: string } }) => this.draftRows.find(row => row.id === where.id) ?? null,
     delete: async ({ where }: { where: { id: string } }) => {
       this.deletedDrafts.push(where.id);
     },
@@ -224,6 +238,7 @@ class FakePrisma {
 
   auditLog = {
     create: async ({ data }: { data: unknown }) => {
+      if (this.failAudit) throw new Error("audit_failed");
       this.auditLogs.push(data as FakePrisma["auditLogs"][number]);
     },
   };
@@ -237,9 +252,12 @@ function makeUseCase(
   variantGenerator?: FakeImageVariantGenerator,
   measurement?: FakeMeasurementCommit,
 ) {
+  const drafts = draftRepo ?? new FakeListingDraftRepository();
+  const database = prisma ?? new FakePrisma();
+  database.draftRows = drafts.drafts;
   return new PublishListing(
-    draftRepo ?? new FakeListingDraftRepository(),
-    (prisma ?? new FakePrisma()) as unknown as ConstructorParameters<typeof PublishListing>[1],
+    drafts,
+    database as unknown as ConstructorParameters<typeof PublishListing>[1],
     exchangeRates ?? new FakeExchangeRatePort(),
     events ?? new FakeEventPublisher(),
     variantGenerator ?? new FakeImageVariantGenerator(),

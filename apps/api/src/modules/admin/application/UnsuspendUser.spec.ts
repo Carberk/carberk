@@ -1,3 +1,4 @@
+import { PreparedTransactionDatabase } from "../../../common/application/testing/PreparedTransactionDatabase";
 import { describe, it, expect, beforeEach } from "vitest";
 import { NotFoundException, ConflictException, ForbiddenException } from "@nestjs/common";
 
@@ -125,8 +126,11 @@ class FakeIdentityAdminPort implements IdentityAdminPort {
 }
 
 class FakePrismaService {
+  fixtures: () => Record<string, Record<string, unknown>[]> = () => ({});
   async $transaction<T>(fn: (tx: unknown) => Promise<T>): Promise<T> {
-    return fn(undefined);
+    const memory = new PreparedTransactionDatabase();
+    for (const [table, rows] of Object.entries(this.fixtures())) memory.seed(table, ...rows);
+    return memory.client.$transaction(tx => fn(tx));
   }
 }
 
@@ -136,6 +140,9 @@ function makeUseCase(
   identityAdmin?: FakeIdentityAdminPort,
   auditRepo?: FakeAuditLogRepository,
 ) {
+  if (prisma instanceof FakePrismaService) prisma.fixtures = () => ({
+    user: Object.values(identityRead?.users ?? {}).map(row => ({ ...row })),
+  });
   return new UnsuspendUser(
     (prisma ?? new FakePrismaService()) as unknown as ConstructorParameters<typeof UnsuspendUser>[0],
     identityRead ?? new FakeIdentityReadPort(),
