@@ -36,7 +36,7 @@ describe("draft preparation boundary", () => {
 
 // This boundary models transaction rollback and protocol refusals. It does not
 // model PostgreSQL snapshots, advisory locks, FK behavior or concurrent clients.
-function boundary(options: { changed?: boolean; finishFails?: boolean; initial?: ListingDraft; count?: number; generationAppears?: boolean } = {}) {
+function boundary(options: { changed?: boolean; finishFails?: boolean; initial?: ListingDraft; count?: number; generationAppears?: boolean; rejectCommandAwareKeys?: boolean } = {}) {
   let stored = options.initial ? { ...options.initial, businessId: options.initial.businessId ?? null } : null;
   let prepared = false, discoveries = 0;
   const events: string[] = [];
@@ -64,6 +64,12 @@ function boundary(options: { changed?: boolean; finishFails?: boolean; initial?:
       if (sql.includes("WITH RECURSIVE")) {
         discoveries++;
         events.push("discovery");
+        if (options.rejectCommandAwareKeys && sql.includes("diagnostic_source_lock_keys(scope")) {
+          throw new Error("diagnostic_intake_reception_selection");
+        }
+        if (options.rejectCommandAwareKeys && !sql.includes("diagnostic_source_lock_keys_before_intake(scope")) {
+          throw new Error("missing pure source key primitive");
+        }
         if (options.generationAppears !== undefined) {
           // Query-contract check at the DB boundary, not a PostgreSQL emulator.
           // Existing-row discovery alone cannot represent this absent V1 slot.
@@ -127,6 +133,12 @@ describe("draft transaction outcomes at the offline boundary", () => {
       expect(db.data()).toBeNull();
     });
   }
+  it("uses the immutable pure key encoder without intake admission", async () => {
+    const db = boundary({ rejectCommandAwareKeys: true });
+    expect(await db.repo.save(draft)).toEqual(draft);
+    expect(db.data()).toEqual({ ...draft, businessId: null });
+  });
+
   for (const generationAppears of [false, true]) {
     it(`${generationAppears ? "refuses a newly present" : "fences an absent"} V1 generation slot without extending the lock set`, async () => {
       const db = boundary({ generationAppears });

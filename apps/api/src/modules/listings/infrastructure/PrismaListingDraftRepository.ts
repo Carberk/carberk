@@ -177,7 +177,7 @@ export class PrismaListingDraftRepository implements ListingDraftRepository {
         keys AS (
           -- Empty rows is deliberate: use the accepted key encoding only, with
           -- no source mutation or invented diagnostic operation/receipt.
-          SELECT value key FROM inventory, LATERAL jsonb_array_elements(public.diagnostic_source_lock_keys(scope,'{"rows":[]}'::jsonb))
+          SELECT value key FROM inventory, LATERAL jsonb_array_elements(public.diagnostic_source_lock_keys_before_intake(scope,'{"rows":[]}'::jsonb))
           UNION SELECT jsonb_build_object('namespace',897300,'key',hashtext(jsonb_build_array('unique',
             jsonb_build_array('userId'),jsonb_build_object('userId',id))::text)) FROM subjects WHERE id IS NOT NULL
           UNION SELECT jsonb_build_object('namespace',897300,'key',hashtext(jsonb_build_array('owner',id)::text)) FROM businesses WHERE id IS NOT NULL
