@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto";
+import { withAvatarPreparation } from "../../../common/avatar-contact-preparation";
+
 import {
   BadRequestException,
   ConflictException,
@@ -116,7 +119,42 @@ export class RemoveUserPhoto {
       });
     if (user.avatarKey === null) throw noPhoto();
 
-    return this.prisma.$transaction(async (tx) => {
+    const reviewedAt = new Date();
+    const audit = {
+      id: randomUUID(),
+      actorId: input.adminUserId,
+      action: AdminSchemas.AdminAuditAction.UserPhotoRemove,
+      targetType: "user",
+      targetId: input.userId,
+      details: (removedKey: string | null) => ({
+        reason: input.reason,
+        avatarIndex: user.avatarIndex,
+        ...(report ? { reportId: report.id } : {}),
+        before: { avatarKey: removedKey, ...(report ? { reportStatus: "pending" } : {}) },
+        after: { avatarKey: null, ...(report ? { reportStatus: "actioned" } : {}) },
+      }),
+    };
+    return this.prisma.$transaction(async (tx) => withAvatarPreparation(tx, input.userId, undefined, {
+      audit, report: report ? { id: report.id, reviewedAt } : undefined,
+    }, async (present) => {
+      if (!present) throw noPhoto();
+      const currentUser = await tx.user.findUnique({ where: { id: input.userId } });
+      if (currentUser?.role === "admin") {
+        throw new ForbiddenException({ code: "FORBIDDEN", message: "Admin targets cannot be moderated",
+          details: { reason: AdminSchemas.AdminErrorReason.AdminTargetNotModeratable } });
+      }
+      if (report) {
+        const currentReport = await tx.contentReport.findUnique({ where: { id: report.id } });
+        if (!currentReport) throw new NotFoundException({ code: "NOT_FOUND", message: "Report not found" });
+        if (currentReport.targetType !== "user" || currentReport.targetId !== input.userId) {
+          throw new BadRequestException({ code: "VALIDATION_FAILED", message: "Report does not match the target user",
+            details: { reason: AdminSchemas.AdminErrorReason.ReportTargetMismatch } });
+        }
+        if (currentReport.status !== "pending") {
+          throw new ConflictException({ code: "CONFLICT", message: "Report has already been resolved",
+            details: { reason: AdminSchemas.AdminErrorReason.ReportAlreadyResolved, reportStatus: currentReport.status } });
+        }
+      }
       // The release takes the User's row lock, so it sees the photo as it is
       // now. If the owner removed it since the read above, nothing was done
       // and the throw rolls this transaction back with no audit entry.
@@ -127,26 +165,14 @@ export class RemoveUserPhoto {
       if (report) {
         await this.reportRepo.updateStatus(
           report.id,
-          { status: "actioned", reviewedById: input.adminUserId, reviewedAt: new Date() },
+          { status: "actioned", reviewedById: input.adminUserId, reviewedAt },
           tx,
         );
         reportStatus = "actioned";
       }
 
       const auditRow = await this.auditRepo.create(
-        {
-          actorId: input.adminUserId,
-          action: AdminSchemas.AdminAuditAction.UserPhotoRemove,
-          targetType: "user",
-          targetId: input.userId,
-          details: {
-            reason: input.reason,
-            avatarIndex: user.avatarIndex,
-            ...(report ? { reportId: report.id } : {}),
-            before: { avatarKey: removedKey, ...(report ? { reportStatus: "pending" } : {}) },
-            after: { avatarKey: null, ...(report ? { reportStatus: "actioned" } : {}) },
-          },
-        },
+        { ...audit, details: audit.details(removedKey) },
         tx,
       );
 
@@ -157,6 +183,6 @@ export class RemoveUserPhoto {
         reportStatus,
         auditLogId: auditRow.id,
       };
-    });
+    }));
   }
 }

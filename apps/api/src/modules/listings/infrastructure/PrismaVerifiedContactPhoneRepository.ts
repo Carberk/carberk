@@ -1,6 +1,8 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService } from "@auto-tm/db";
 
+import { withVerifiedContactPreparation } from "../../../common/avatar-contact-preparation";
+
 import { VerifiedContactPhone } from "../domain/VerifiedContactPhone";
 import type { VerifiedContactPhoneRepository } from "../domain/ports/VerifiedContactPhoneRepository";
 
@@ -19,11 +21,11 @@ export class PrismaVerifiedContactPhoneRepository implements VerifiedContactPhon
 
   async record(confirmation: VerifiedContactPhone): Promise<VerifiedContactPhone> {
     const { sellerId, phone, confirmedAt } = confirmation;
-    const row = await this.prisma.verifiedContactPhone.upsert({
+    const row = await this.prisma.$transaction(tx => withVerifiedContactPreparation(tx, confirmation, id => tx.verifiedContactPhone.upsert({
       where: { sellerId_phone: { sellerId, phone } },
-      create: { sellerId, phone, confirmedAt },
+      create: { id, sellerId, phone, confirmedAt },
       update: { confirmedAt },
-    });
+    })));
     return this.toDomain(row);
   }
 
