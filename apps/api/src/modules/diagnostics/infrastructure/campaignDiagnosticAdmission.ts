@@ -7,8 +7,6 @@ type Tx = Prisma.TransactionClient;
 export interface CampaignDiagnosticScope { namespace: string; candidate: string }
 export interface CampaignDiagnosticGraph { centerId?: string; templateVersionId?: string; orderId?: string; peerId?: string }
 const roster = /^(buyer-a|buyer-b|owner|sales-a|sales-b|coordinator|support|history-fulfiller|payment-verifier|reception-steward|technician|independent-reviewer|private-reviewer|aggregate-viewer|investigator)\.([a-f0-9]{32})\.([a-f0-9]{12})@campaign897\.invalid$/;
-// Reset's sorted SHARE ROW EXCLUSIVE order. Table locks precede the namespace fence, as in reset.
-const diagnosticTables = ["diagnostic_audits", "diagnostic_center_assignments", "diagnostic_centers", "diagnostic_order_assignments", "diagnostic_template_versions", "inspection_orders"];
 const authority = (namespace: string) => `"${namespace}".campaign_diagnostic_authority(text,text,text,text,text,text,text)`;
 
 /** Full-v3 first diagnostics slice admission: template publication, private intake and their reads.
@@ -21,6 +19,7 @@ const authority = (namespace: string) => `"${namespace}".campaign_diagnostic_aut
 export class CampaignDiagnosticAdmission {
   constructor(@Inject(ConfigService) private readonly config: ConfigService) {}
 
+  /** Unlocked scope discovery. The outer source command owns table/namespace preparation. */
   async begin(tx: Tx, subject: DiagnosticSubject): Promise<CampaignDiagnosticScope | null> {
     const user = await tx.user.findUnique({ where: { id: subject.userId }, select: { email: true } });
     const match = user?.email ? roster.exec(user.email) : null;
@@ -28,9 +27,6 @@ export class CampaignDiagnosticAdmission {
     if (!match?.[2] || !match[3] || this.config.get("APP_ENV") === "production" || typeof candidate !== "string" ||
       !/^[a-f0-9]{40}$/.test(candidate) || !candidate.startsWith(match[3])) return null;
     const namespace = `cf_${match[2]}`;
-    await tx.$executeRawUnsafe("SET LOCAL lock_timeout='5s'");
-    await tx.$executeRawUnsafe(`LOCK TABLE ${diagnosticTables.map(table => `public.${table}`).join(",")} IN ROW EXCLUSIVE MODE`);
-    await tx.$queryRawUnsafe("SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended($1,0))", namespace);
     const [contract] = await tx.$queryRawUnsafe<{ present: boolean }[]>("SELECT to_regprocedure($1) IS NOT NULL AS present", authority(namespace));
     return contract?.present === true ? { namespace, candidate } : null;
   }

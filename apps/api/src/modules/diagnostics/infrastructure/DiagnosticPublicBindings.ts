@@ -5,6 +5,8 @@ import { BusinessAuthorityDenied, PUBLISHER_BINDING_PORT, type PublisherBindingP
 import { DiagnosticRuleError } from "../domain/InspectionOrder";
 import { diagnosticListingDigest } from "./diagnosticListingDigest";
 
+import { diagnosticReadPrefix } from "./DiagnosticPreparedIntake";
+
 type Tx = Prisma.TransactionClient;
 type Order = Prisma.InspectionOrderGetPayload<object>;
 const listingBinding = z.object({ id: z.string(), sellerId: z.string(), businessId: z.string().nullable(), identityDigest: z.string().regex(/^[a-f0-9]{64}$/),
@@ -29,6 +31,7 @@ export class DiagnosticPublicBindings {
    * Changed targets refuse without extending locks or retrying. No authority is inferred here. */
   async lock(tx: Tx, ids: string[], actorIds: string[]): Promise<PublisherParticipants> {
     const orderIds = [...new Set(ids)].sort();
+    await diagnosticReadPrefix(tx, [...orderIds.map(id => ({ table: "inspection_orders" as const, key: { id } })), ...actorIds.map(id => ({ table: "users" as const, key: { id } }))]);
     const discovered = await this.targets(tx, orderIds);
     const grants = await tx.diagnosticOwnershipGrant.findMany({ where: { orderId: { in: orderIds }, state: "available" }, orderBy: { id: "asc" } });
     let locked: PublisherParticipants;

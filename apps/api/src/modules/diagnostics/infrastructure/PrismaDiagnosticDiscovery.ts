@@ -5,6 +5,7 @@ import { STAFF_BINDING_PORT, type StaffBindingPort } from "../../identity/identi
 import type { DiagnosticDiscoveryPort } from "../application/ports/DiagnosticDiscoveryPort";
 import { DiagnosticRuleError } from "../domain/InspectionOrder";
 import { DIAGNOSTIC_RUNTIME, type DiagnosticRuntime, type DiagnosticSubject } from "../domain/ports/DiagnosticIntakePort";
+import { diagnosticReadPrefix, diagnosticRoots } from "./DiagnosticPreparedIntake";
 import { DiagnosticAuthority } from "./DiagnosticAuthority";
 import { DiagnosticPublicBindings } from "./DiagnosticPublicBindings";
 import { PrismaDiagnosticContinuityProofs } from "./PrismaDiagnosticContinuityProofs";
@@ -59,6 +60,7 @@ export class PrismaDiagnosticDiscovery implements DiagnosticDiscoveryPort {
     // Lock discovery only. Identity owns names, active User/grant facts and their locks.
     const discovered = await this.db.diagnosticOrderAssignment.findMany({ where: { orderId, capability: "diagnostics.technician", revokedAt: null }, orderBy: { userId: "asc" } });
     return this.db.$transaction(async tx => {
+      await diagnosticReadPrefix(tx, [...diagnosticRoots(subject, [orderId]), ...discovered.map(row => ({ table: "users" as const, key: { id: row.userId } }))]);
       const names = await this.staff.eligibleNames([
         { ...subject, capability: "diagnostics.reviewer" },
         ...discovered.map(row => ({ userId: row.userId, capability: "diagnostics.technician" })),

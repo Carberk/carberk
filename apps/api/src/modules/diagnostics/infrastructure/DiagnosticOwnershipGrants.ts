@@ -30,13 +30,16 @@ export const DiagnosticOwnershipGrants = {
     return { id, active: !!user && !user.suspendedAt && !user.deletionScheduledAt && !!(user.phoneVerifiedAt || user.emailVerifiedAt),
       membership: member ? { id: member.id, businessId: member.dealershipId, role: member.role, active: member.status === "active", businessActive: member.dealership.status === "active" } : null };
   },
-  async create(tx: Tx, row: Order, subject: { userId: string; sessionId: string }, input: D.DiagnosticOwnershipGrant, now: Date, id: string): Promise<{ id: string }> {
+  async data(tx: Tx, row: Order, subject: { userId: string; sessionId: string }, input: D.DiagnosticOwnershipGrant, now: Date, id: string) {
     const source = await this.source(tx, row); const actor = await this.actor(tx, subject.userId);
     if (!ownershipGrantAuthority(actor, source) || new Date(input.rights.schedule.until) <= now ||
       await tx.diagnosticIdentityRecord.findFirst({ where: { orderId: row.id } }) || await tx.diagnosticOwnershipGrant.findUnique({ where: { orderId: row.id } })) throw denied();
-    await tx.diagnosticOwnershipGrant.create({ data: { id, orderId: row.id, state: "available", ...source,
+    return { id, orderId: row.id, state: "available", ...source,
       grantorId: actor.id, grantorMembershipId: source.businessId ? actor.membership?.id ?? null : null, sessionId: subject.sessionId,
-      rights: input.rights, rightsUntil: new Date(input.rights.schedule.until), declaredAt: now } });
+      rights: input.rights, rightsUntil: new Date(input.rights.schedule.until), declaredAt: now };
+  },
+  async create(tx: Tx, row: Order, subject: { userId: string; sessionId: string }, input: D.DiagnosticOwnershipGrant, now: Date, id: string): Promise<{ id: string }> {
+    await tx.diagnosticOwnershipGrant.create({ data: await this.data(tx, row, subject, input, now, id) });
     return { id };
   },
   async compatible(tx: Tx, row: Order, id: string, now: Date): Promise<Prisma.DiagnosticOwnershipGrantGetPayload<object>> {
