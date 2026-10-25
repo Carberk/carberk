@@ -1,39 +1,54 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { accountSourceCommand, withDiagnosticSourceCommand, PrismaService } from "@auto-tm/db";
 import type {
   AccountRestoreUnitOfWork,
   AccountRestoreWrites,
 } from "../domain/ports/AccountRestoreUnitOfWork";
 
-/**
- * Runs the restore writes in one interactive Prisma transaction, so the
- * republished Listings and the cleared deletion schedule commit together or
- * roll back together when the work throws.
- */
+/** Restores personal inventory and the User schedule in one prepared transaction. */
 @Injectable()
 export class PrismaAccountRestoreUnitOfWork implements AccountRestoreUnitOfWork {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
-  run<T>(work: (writes: AccountRestoreWrites) => Promise<T>): Promise<T> {
-    return this.prisma.$transaction(async (tx) =>
-      work({
-        // Each Listing keeps its first publishedAt: a restore is no bump to the
-        // top of Newest (#871), the same rule as an owner's relist.
-        republishListingsArchivedByDeletion: async (sellerId) => {
-          const collector=await tx.$queryRaw<{epoch:string}[]>`SELECT "epoch" FROM "measurement_state" WHERE "key"='collector' FOR UPDATE`;
-          if(collector[0])await tx.measurementState.deleteMany({where:{key:`inventory_baseline:${collector[0].epoch}`}});
-          await tx.listing.updateMany({
-            where: { sellerId, businessId: null, status: "archived", archivedByDeletion: true },
-            data: { status: "active", archivedByDeletion: false },
-          });
-        },
-        clearDeletionSchedule: async (userId) => {
-          await tx.user.update({
-            where: { id: userId },
-            data: { deletionScheduledAt: null },
-          });
-        },
-      }),
-    );
+  run<T>(
+    command: { readonly userId: string },
+    work: (writes: AccountRestoreWrites) => Promise<T>,
+  ): Promise<T | undefined> {
+    const userId = command.userId;
+    return this.prisma.$transaction(async (tx) => {
+      const prepared = await accountSourceCommand(tx, { operation: "account_restore", userId });
+      return withDiagnosticSourceCommand(tx, prepared.command, async () => {
+        // Preparation holds the User fence. A stale discovered graph refuses
+        // in SQL; an already-clear account never runs callback mutations.
+        const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
+        if (user.deletionScheduledAt === null) return undefined;
+        let republished = false;
+        let cleared = false;
+        const result = await work({
+          republishListingsArchivedByDeletion: async (sellerId) => {
+            if (sellerId !== userId || republished || cleared) throw new Error("account_restore_target");
+            const collector = await tx.$queryRaw<{ epoch: string }[]>`
+              SELECT "epoch" FROM "measurement_state" WHERE "key"='collector' FOR UPDATE`;
+            if (collector[0]) {
+              await tx.measurementState.deleteMany({ where: { key: `inventory_baseline:${collector[0].epoch}` } });
+            }
+            // Restore preserves first publishedAt. It cannot bump Newest or
+            // revive Business stock, membership, grants, Sessions or telemetry.
+            await tx.listing.updateMany({
+              where: { sellerId, businessId: null, status: "archived", archivedByDeletion: true },
+              data: { status: "active", archivedByDeletion: false },
+            });
+            republished = true;
+          },
+          clearDeletionSchedule: async (targetId) => {
+            if (targetId !== userId || !republished || cleared) throw new Error("account_restore_target");
+            await tx.user.update({ where: { id: userId }, data: { deletionScheduledAt: null } });
+            cleared = true;
+          },
+        });
+        if (!republished || !cleared) throw new Error("account_restore_incomplete");
+        return result;
+      });
+    });
   }
 }

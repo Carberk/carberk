@@ -1,0 +1,272 @@
+{
+  "base": "05e716762eed822df3aa8c49beb01b7ff10489f4",
+  "baseTree": "8e94b66f0b518a03596098b80997d30f5c8b5d7d",
+  "authoredTestCheckpoint": "de4c42fe",
+  "inputs": [
+    {
+      "path": "/tmp/897-b1-five-corrections-source-assessment-20261024.md",
+      "sha256": "94dc63d8cc0fe0aae12a6b96cfba1542cca1fe627992f2b4c06c54d490bff90e"
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-parent-decision-20261024.json",
+      "sha256": "bcc38b6cac7c1841c18c52bc13577b61e89227ace3424098f79b8b28b77171e6"
+    },
+    {
+      "path": "/tmp/897-b1-message-fence-20261024-handoff.md",
+      "sha256": "ae56c07fb32a0a5599e4c6ab7c8b874a10a2dd5120084628e1b3c318dcc00f4d"
+    },
+    {
+      "path": "/tmp/897-b1-prepared-source-command-contract-20261023.md",
+      "sha256": "c15455516d773fe55d5151035b4afceef9348099c60d51578826c38b5eac3725"
+    },
+    {
+      "path": "/tmp/897-b1-independent-architecture-audit-20261023.md",
+      "sha256": "df7000fcdf79ab8fd8f91ab3212255ea6eb63755167fab64cae5a24c803a82f8"
+    },
+    {
+      "path": "/tmp/897-b1-complexity-parent-decision-20261024.json",
+      "sha256": "5e318d211b0bb699d6232dbe0350eb18353e8f7be827a79aaa5654252a7303c4"
+    },
+    {
+      "path": "/tmp/897-b1-callers-complete-transaction-map-20261024.md",
+      "sha256": "2fe08a6b22570864080e9571f192486810ed0f66882b92c60328fe1445e24e1a"
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-preserve.py",
+      "sha256": "32932295a55cbe3b901e87bd05cebadd14dbb1d7e45fdf536ca8acc5f3d30f9a"
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-author.py",
+      "sha256": "86b9cf3bfcc7796f434b29296c826f468aa2a45cb7ca6c86deb46aedd3765287"
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-profile.py",
+      "sha256": "b30e7b361fcd1e3e602486e7f90eedf8d376b91e105eefbf888ec9b9b4703cd2"
+    }
+  ],
+  "sourceFilesExceptThisManifest": [
+    {
+      "path": "docs/evidence/issue-897/b1-user-insert-fence-20261024.md",
+      "sha256": "0cc36c3e912b9c75aefd692223e24caa75a1f1724691bea92ec3361c85e9086e",
+      "bytes": 8572
+    },
+    {
+      "path": "docs/evidence/issue-897/b1-user-insert-fence-preservation-20261024.json",
+      "sha256": "dd7a1be01b4cf10e3c1b8dce8d125b5c510c489a16ac00a350b4403fe58ae9ea",
+      "bytes": 58178
+    },
+    {
+      "path": "packages/db/CONTEXT.md",
+      "sha256": "f82402dd098edd758f6f49a60f1ce5c4c42f194f65e210d5c66a59d2e6805da7",
+      "bytes": 23407
+    },
+    {
+      "path": "packages/db/prisma/migrations/20261024110000_diagnostic_user_insert_fence/migration.sql",
+      "sha256": "bad49d6a7a1329f7a5d7e63b4780a1edd53bb466693ab9605920b54641f3f271",
+      "bytes": 2050
+    },
+    {
+      "path": "packages/db/prisma/schema.prisma",
+      "sha256": "dbba552039b0a52ef425912681b00deca5b97005348d6fff82fe886e1fe48fa8",
+      "bytes": 70285
+    },
+    {
+      "path": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+      "sha256": "da077808d186e56a84c4d4439134da9b8b58a16fa9938e986da3bd55d2b1154e",
+      "bytes": 198417
+    },
+    {
+      "path": "scripts/diagnostic-signin-intake-object-schema.test.mjs",
+      "sha256": "aed2fb3e718ebf03a25f3bf1811a9243f76bb00a9a2ce2653b797882fc263d75",
+      "bytes": 1644
+    },
+    {
+      "path": "scripts/diagnostic-user-insert-fence-schema.test.mjs",
+      "sha256": "874874110ffac3f005d54faa6deedf519899e439c377f8c09d8a90d94cf505e3",
+      "bytes": 1542
+    },
+    {
+      "path": "scripts/staging-schema.mjs",
+      "sha256": "6878199ace268a04903ec071ec615ecdb9cffa2c3dfb16be7e49ade30cf1ac43",
+      "bytes": 69361
+    },
+    {
+      "path": "scripts/testing/retained-schema/20261024110000_diagnostic_user_insert_fence.sql",
+      "sha256": "bad49d6a7a1329f7a5d7e63b4780a1edd53bb466693ab9605920b54641f3f271",
+      "bytes": 2050
+    }
+  ],
+  "logs": [
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/agent-docs-final.log",
+      "sha256": "8f5507ea6fcde992f7d6733d113abc538ae4957b777bc97cadd580f651c93b20",
+      "bytes": 122,
+      "command": "pnpm check:agent-docs",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/agent-docs.log",
+      "sha256": "8f5507ea6fcde992f7d6733d113abc538ae4957b777bc97cadd580f651c93b20",
+      "bytes": 122,
+      "command": "pnpm check:agent-docs",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/contracts-build.log",
+      "sha256": "b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616",
+      "bytes": 25,
+      "command": "pnpm --filter @auto-tm/contracts build",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/db-build.log",
+      "sha256": "fd6897a3f4c71dfaf7c3922a6975961626ab82486855e5f01035683166cc54b0",
+      "bytes": 194,
+      "command": "DATABASE_URL=postgresql://offline:offline@127.0.0.1:1/offline pnpm --filter @auto-tm/db build",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/db-lint-final.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "bytes": 28,
+      "command": "pnpm --filter @auto-tm/db lint",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/db-lint-final2.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "bytes": 28,
+      "command": "pnpm --filter @auto-tm/db lint",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/db-lint.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "bytes": 28,
+      "command": "pnpm --filter @auto-tm/db lint",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/db-ts6-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "command": "pnpm --filter @auto-tm/db exec tsc6 --noEmit",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/db-ts6-final2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "command": "pnpm --filter @auto-tm/db exec tsc6 --noEmit",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/db-ts6.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "command": "pnpm --filter @auto-tm/db exec tsc6 --noEmit",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/db-ts7-final.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "bytes": 15,
+      "command": "pnpm --filter @auto-tm/db typecheck",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/db-ts7-final2.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "bytes": 15,
+      "command": "pnpm --filter @auto-tm/db typecheck",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/db-ts7.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "bytes": 15,
+      "command": "pnpm --filter @auto-tm/db typecheck",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/diff-check-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "command": "git diff --check",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/diff-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "command": "git diff --check",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/install-offline.log",
+      "sha256": "215f38fed07cda9861bac4e356d6c1a0a7458575e0f3a4b4e9af3701807b7f31",
+      "bytes": 932,
+      "command": "pnpm install --offline --frozen-lockfile --ignore-scripts",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/preservation-final.log",
+      "sha256": "a4b86409387ededd542704f59896f0be42b2e527e4a18b30d612ebdfccbe3091",
+      "bytes": 145,
+      "command": "python3 /tmp/897-b1-user-insert-preserve.py",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/preservation.log",
+      "sha256": "a4b86409387ededd542704f59896f0be42b2e527e4a18b30d612ebdfccbe3091",
+      "bytes": 145,
+      "command": "python3 /tmp/897-b1-user-insert-preserve.py",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/prisma-validate.log",
+      "sha256": "f42be55724289534e6fab7707bf97c906b59b2a65578449f3fbabc739f5b0606",
+      "bytes": 1010,
+      "command": "DATABASE_URL=postgresql://offline:offline@127.0.0.1:1/offline pnpm --filter @auto-tm/db exec prisma validate",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/schema-profile-final.log",
+      "sha256": "e9f9b58b194bc7a3ca7152fb9db898b26bc674385b31e16eb206b54f95d08991",
+      "bytes": 2607,
+      "command": "node --test scripts/diagnostic-*-schema.test.mjs scripts/campaign-preparation-schema.test.mjs scripts/business-enquiries-schema.test.mjs",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/schema-profile.log",
+      "sha256": "ffc8f060d835d717c39fae1672d6604706b3257cd5363a0dd8cb07812b24a8e6",
+      "bytes": 2603,
+      "command": "node --test scripts/diagnostic-*-schema.test.mjs scripts/campaign-preparation-schema.test.mjs scripts/business-enquiries-schema.test.mjs",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-b1-user-insert-fence-20261024-logs/sql-grammar.log",
+      "sha256": "242e87fa58de7bba6181d3a04e97accc16220ec73c574aab521e1e0c635eeb99",
+      "bytes": 30,
+      "command": "PYTHONPATH=/tmp/897-sql-parser python3 (pglast.parse_sql + parse_plpgsql on new forward SQL; 5 statements, 2 parsed function entries)",
+      "exitCode": 0
+    }
+  ],
+  "failuresThisCheckpoint": [],
+  "historicalFailures": "All inherited evidence remains immutable. This checkpoint does not reset implementation history or the B5 remedy cap.",
+  "offlineResults": "25 schema/profile cases pass; both DB configured compilers and lint pass; codegen/build pass; inert Prisma validation, grammar, policy and preservation pass.",
+  "evidenceBoundary": {
+    "executedSql": 0,
+    "executedHttp": 0,
+    "importedE2eModules": 0,
+    "authoredAdditionalSqlCases": 8,
+    "applicationRoleRuntimeEvidence": "AUTHORED ONLY; fixture-local GRANT/SET LOCAL ROLE, hosted grants unproven",
+    "nestedAgents": 0,
+    "fullCI": false,
+    "services": false,
+    "devices": false,
+    "activation": false,
+    "automaticAdmission": "CLOSED",
+    "sourceAcceptance": "PARENT PENDING"
+  }
+}

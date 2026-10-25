@@ -1,13 +1,17 @@
+import { PreparedTransactionDatabase } from "../../../common/application/testing/PreparedTransactionDatabase";
 import { expect,it } from "vitest";
 
 import { FakeMeasurementCommit } from "../../measurement/application/testing/FakeMeasurementCommit";
 
 import { PrismaListingRepository } from "./PrismaListingRepository";
 function persistence(archiveBeforeLock=false){
- let row={id:"listing",sellerId:"seller",businessId:null,status:"active",deletedAt:null as Date|null};const calls:string[]=[];
- const tx={$queryRaw:async()=>{calls.push("lock");if(archiveBeforeLock)row={...row,status:"archived"};return[];},listing:{findUnique:async()=>{calls.push("read");return {...row};},update:async({data}:{data:{deletedAt:Date}})=>{calls.push("delete");row={...row,...data};return {...row};}}};
- return {calls,db:{$transaction:async(operation:(transaction:typeof tx)=>Promise<void>)=>operation(tx)}};
+ const memory = new PreparedTransactionDatabase();
+ memory.seed("user", { id: "seller", deletionScheduledAt: null });
+ memory.seed("listing", {id:"listing",sellerId:"seller",businessId:null,status:"active",deletedAt:null});
+ if (archiveBeforeLock) memory.beforePrepared = () => { memory.rows("listing")[0]!["status"] = "archived"; };
+ return { db: memory.client };
 }
+
 it("uses the current locked visibility when a concurrent archive wins before deletion",async()=>{
  const {db}=persistence(true),measurement=new FakeMeasurementCommit();
  await new PrismaListingRepository(db as never,undefined,undefined,undefined,measurement).softDelete("listing",new Date("2026-10-18T00:00:00Z"));

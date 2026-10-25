@@ -7,7 +7,7 @@ import { IDENTITY_CLOCK_PORT, type ClockPort } from "../../identity/identity.pub
 import { lockEditableBusinessStock } from "./lockEditableBusinessStock";
 import { ListingOwnership, assertListingOwnership, type ListingActor } from "../application/ListingOwnership";
 import { Inject, Injectable, Optional } from "@nestjs/common";
-import { PrismaService, recomputeListingPricesTmt } from "@auto-tm/db";
+import { PrismaService, recomputeListingPricesTmt, withDiagnosticSourceCommand, assertDiagnosticSourceCommand, listingSourceCommand } from "@auto-tm/db";
 
 import { Listing } from "../domain/Listing";
 import type { ListingRepository } from "../domain/ports/ListingRepository";
@@ -24,7 +24,14 @@ export class PrismaListingRepository implements ListingRepository {
     @Optional() @Inject(MEASUREMENT_COMMIT_PORT) private readonly measurement?:MeasurementCommitPort) {}
 
   async save(listing: Listing): Promise<Listing> {
-    const row = await this.prisma.listing.create({
+    const row = await this.prisma.$transaction(async (tx) => withDiagnosticSourceCommand(tx,
+      await listingSourceCommand(tx, { operation: "listing_create", listingId: listing.id, actorUserId: listing.sellerId, roots: [],
+        changes: { id: listing.id, sellerId: listing.sellerId, businessId: listing.businessId ?? null, vin: listing.vin ?? null,
+          brandId: listing.brandId, modelId: listing.modelId, year: listing.year ?? null, deletedAt: listing.deletedAt?.toISOString() ?? null, status: listing.status,
+          contactPhone: listing.contactPhone ?? null, activeVideoGenerationId: null, pendingVideoGenerationId: null, activeVideoRevision: 0, archivedByDeletion: false } }),
+    async (receipt) => {
+      await assertDiagnosticSourceCommand(tx, receipt, "listing_create");
+      return tx.listing.create({
       data: {
         id: listing.id,
         sellerId: listing.sellerId,
@@ -64,7 +71,8 @@ export class PrismaListingRepository implements ListingRepository {
         createdAt: listing.createdAt,
         updatedAt: listing.updatedAt,
       },
-    });
+      });
+    }));
     return this.toDomain(row);
   }
 
@@ -105,6 +113,14 @@ export class PrismaListingRepository implements ListingRepository {
 
   async update(listing: Listing, derived?: { priceTmt: number }, actor?: ListingActor): Promise<Listing> {
     const row = await this.prisma.$transaction(async (tx) => {
+      const command = await listingSourceCommand(tx, { operation: "listing_change", listingId: listing.id, actorUserId: actor?.userId ?? listing.sellerId, sessionId: actor?.sessionId, roots: [],
+        changes: { id: listing.id, sellerId: listing.sellerId, businessId: listing.businessId ?? null, vin: listing.vin ?? null,
+          brandId: listing.brandId, modelId: listing.modelId, year: listing.year ?? null, deletedAt: listing.deletedAt?.toISOString() ?? null, status: listing.status,
+          contactPhone: listing.contactPhone ?? null } });
+      return withDiagnosticSourceCommand(tx, command, async (receipt) => {
+      await assertDiagnosticSourceCommand(tx, receipt, "listing_change");
+      const users = await tx.$queryRaw<{ deletionScheduledAt: Date | null }[]>`SELECT "deletionScheduledAt" FROM "users" WHERE "id"=${listing.sellerId} FOR UPDATE`;
+      const captureEligible = !!users[0] && !users[0].deletionScheduledAt;
       if (listing.businessId) {
         if (!actor) throw new Error("Business Listing requires current actor");
         await assertListingOwnership(this.ownership, actor, listing, tx);
@@ -157,9 +173,9 @@ export class PrismaListingRepository implements ListingRepository {
     });
       const wasPublic=previous?.status==="active" && !previous.deletedAt;
       const isPublic=saved.status==="active" && !saved.deletedAt;
-      if(previous && wasPublic!==isPublic) await this.visibility(tx,saved.sellerId,saved.id,isPublic,saved.deletedAt?"deleted":saved.status==="sold"?"sold":saved.status==="archived"?"archived":saved.status==="banned"?"moderated":"restored");
+      if(captureEligible && previous && wasPublic!==isPublic) await this.visibility(tx,saved.sellerId,saved.id,isPublic,saved.deletedAt?"deleted":saved.status==="sold"?"sold":saved.status==="archived"?"archived":saved.status==="banned"?"moderated":"restored");
       return saved;
-    });
+    }); });
     return this.toDomain(row);
   }
 
@@ -170,6 +186,12 @@ export class PrismaListingRepository implements ListingRepository {
   async softDelete(id: string, at: Date, actor?: ListingActor): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const row = await tx.listing.findUnique({ where: { id } });
+      if (!row) throw new Error("LISTING_NOT_FOUND");
+      const command = await listingSourceCommand(tx, { operation: "listing_delete", listingId: id, actorUserId: actor?.userId ?? row.sellerId, sessionId: actor?.sessionId, roots: [], changes: { deletedAt: at.toISOString() } });
+      await withDiagnosticSourceCommand(tx, command, async (receipt) => {
+      await assertDiagnosticSourceCommand(tx, receipt, "listing_delete");
+      const users = await tx.$queryRaw<{ deletionScheduledAt: Date | null }[]>`SELECT "deletionScheduledAt" FROM "users" WHERE "id"=${row.sellerId} FOR UPDATE`;
+      const captureEligible = !!users[0] && !users[0].deletionScheduledAt;
       if (row?.businessId) {
         if (!actor) throw new Error("Business Listing requires current actor");
         await assertListingOwnership(this.ownership, actor, { sellerId: row.sellerId, businessId: row.businessId }, tx);
@@ -178,7 +200,8 @@ export class PrismaListingRepository implements ListingRepository {
       if(this.measurement)await tx.$queryRaw`SELECT id FROM listings WHERE id=${id} FOR UPDATE`;
       const current=this.measurement?await tx.listing.findUnique({where:{id}}):row;
       await tx.listing.update({ where: { id }, data: { deletedAt: at } });
-      if(current && !current.deletedAt && current.status==="active") await this.visibility(tx,current.sellerId,id,false,"deleted",at);
+      if(captureEligible && current && !current.deletedAt && current.status==="active") await this.visibility(tx,current.sellerId,id,false,"deleted",at);
+      });
     });
   }
 

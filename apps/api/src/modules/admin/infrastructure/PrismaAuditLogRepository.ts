@@ -52,6 +52,7 @@ export class PrismaAuditLogRepository implements AuditLogRepository {
 
   async create(
     data: {
+      id?: string;
       actorId: string | null;
       action: string;
       targetType: string;
@@ -63,6 +64,7 @@ export class PrismaAuditLogRepository implements AuditLogRepository {
     const client = (tx as PrismaService | undefined) ?? this.prisma;
     const row = await client.auditLog.create({
       data: {
+        ...(data.id ? { id: data.id } : {}),
         actorId: data.actorId,
         action: data.action,
         targetType: data.targetType,

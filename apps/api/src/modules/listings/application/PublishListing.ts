@@ -9,7 +9,7 @@ import { Optional ,
 import { ListingOwnership, assertListingOwnership } from "./ListingOwnership";
 import { randomUUID } from "node:crypto";
 
-import { PrismaService, type Prisma } from "@auto-tm/db";
+import { PrismaService, type Prisma, listingSourceCommand, withDiagnosticSourceCommand, assertDiagnosticSourceCommand, type DiagnosticSourceRoot } from "@auto-tm/db";
 import { AuthSchemas, ListingsSchemas, WizardSchemas } from "@auto-tm/contracts";
 import type { z } from "zod";
 
@@ -326,14 +326,45 @@ export class PublishListing {
 
       // The Listing, its media, the draft removal, the audit entry and the
       // adoption of every upload commit together or not at all.
+      const auditId = randomUUID(), publishedEventId = randomUUID(), visibilityEventId = randomUUID();
       const listingRow = await this.prisma.$transaction(async (tx) => {
-        await tx.$queryRaw`SELECT "id" FROM "users" WHERE "id" = ${input.userId} FOR UPDATE`;
+        const initialDraft = await tx.listingDraft.findUnique({ where: { id: draft.id } });
+        if (!initialDraft || initialDraft.userId !== draft.userId || (initialDraft.businessId ?? null) !== (draft.businessId ?? null)
+          || initialDraft.updatedAt.getTime() !== draft.updatedAt.getTime()
+          || JSON.stringify(initialDraft.payload) !== JSON.stringify(draft.payload)) throw new Error("diagnostic_source_graph_changed");
+        const initialVideo = await this.discoverDraftVideo(tx, draft.id);
+        const plannedVideo = this.draftVideoBinding(initialVideo, draft.id, draft.businessId ?? null, now);
+        const roots: DiagnosticSourceRoot[] = [
+          { table: "users", key: { id: input.userId } },
+          { table: "listing_drafts", key: { id: draft.id } },
+          { table: "audit_logs", key: { id: auditId } },
+          { table: "measurement_outbox", key: { id: publishedEventId } },
+          { table: "measurement_outbox", key: { id: visibilityEventId } },
+          ...attachedPhotos.map(photo => ({ table: "listing_media" as const, key: { id: photo.photoId } })),
+          ...uploads.map(upload => ({ table: "media_uploads" as const, key: { id: upload.id } })),
+          ...(initialVideo ? [
+            { table: "video_upload_sessions" as const, key: { id: initialVideo.candidate.id } },
+            { table: "media_uploads" as const, key: { id: initialVideo.candidate.uploadId } },
+            { table: "video_generations" as const, key: { id: initialVideo.candidate.id } },
+          ] : []),
+        ];
+        const command = await listingSourceCommand(tx, { operation: "listing_create", listingId, actorUserId: input.userId, sessionId: input.sessionId,
+          roots, changes: { id: listingId, sellerId: input.userId, businessId: draft.businessId ?? null, vin: payload.vin ?? null,
+            brandId: payload.brandId, modelId: payload.modelId, year: payload.year ?? null, deletedAt: null, status: "active", contactPhone: payload.contactPhone ?? null,
+            activeVideoGenerationId: plannedVideo.activeVideoGenerationId ?? null, pendingVideoGenerationId: plannedVideo.pendingVideoGenerationId ?? null,
+            activeVideoRevision: plannedVideo.activeVideoRevision ?? 0, archivedByDeletion: false } });
+        return withDiagnosticSourceCommand(tx, command, async receipt => {
+        await assertDiagnosticSourceCommand(tx, receipt, "listing_create");
+        const eligibleUsers = await tx.$queryRaw<{ deletionScheduledAt: Date | null }[]>`SELECT "deletionScheduledAt" FROM "users" WHERE "id" = ${input.userId} FOR UPDATE`;
+        const captureEligible = !!eligibleUsers[0] && !eligibleUsers[0].deletionScheduledAt;
         await assertListingOwnership(this.ownership, input, draft, tx);
         if (draft.businessId) {
           const rejection = contactPhoneRejection(await this.contactPhones.standing(input.userId, payload.contactPhone, this.clock.now(), draft.businessId, tx));
           if (rejection) throw rejection;
         }
-        const video = await this.bindDraftVideo(tx, draft.id, listingId, draft.businessId ?? null, now);
+        const video = await this.bindDraftVideo(tx, draft.id, listingId, draft.businessId ?? null, now, initialVideo);
+        const lockedDraft = await tx.listingDraft.findUnique({ where: { id: draft.id } });
+        if (JSON.stringify(lockedDraft) !== JSON.stringify(initialDraft)) throw new Error("diagnostic_source_graph_changed");
         await this.claims.finalize(tx, { token: reservation.token, ...claim });
         const created = await tx.listing.create({
           data: {
@@ -388,6 +419,7 @@ export class PublishListing {
         await tx.listingDraft.delete({ where: { id: draft.id } });
         await tx.auditLog.create({
           data: {
+            id: auditId,
             actorId: input.userId,
             action: "listing.published",
             targetType: "Listing",
@@ -402,12 +434,13 @@ export class PublishListing {
           },
         });
         try {
-          await this.measurement?.capture(tx, input.userId, { version: 1, eventId: randomUUID(), occurredAt: now.toISOString(), purpose: "product_improvement",
+          if (captureEligible) await this.measurement?.capture(tx, input.userId, { version: 1, eventId: publishedEventId, occurredAt: now.toISOString(), purpose: "product_improvement",
             eventName: "listing_published", context: { platform: "server", release: "server", build: "server", locale: "ru" }, payload: { listingId, cityId: payload.cityId, draftId: input.draftId },
           });
-          await this.measurement?.capture(tx,input.userId,{version:1,eventId:randomUUID(),occurredAt:now.toISOString(),purpose:"product_improvement",eventName:"listing_visibility_changed",context:{platform:"server",release:"server",build:"server",locale:"ru"},payload:{listingId,visibility:"public",reason:"published"}});
+          if (captureEligible) await this.measurement?.capture(tx,input.userId,{version:1,eventId:visibilityEventId,occurredAt:now.toISOString(),purpose:"product_improvement",eventName:"listing_visibility_changed",context:{platform:"server",release:"server",build:"server",locale:"ru"},payload:{listingId,visibility:"public",reason:"published"}});
         } catch { /* Measurement outage never rolls back the core publication. */ }
         return created;
+        });
       });
 
       const listing = Listing.create({
@@ -493,12 +526,31 @@ export class PublishListing {
       throw claimRejection(err instanceof UnusablePhotoError ? err.cause : err);
     }
   }
+  private async discoverDraftVideo(tx: Prisma.TransactionClient, draftId: string) {
+    const candidate = await tx.videoUploadSession.findFirst({ where: { protocolVersion: 1, targetKind: "draft", targetId: draftId }, orderBy: [{ targetRevision: "desc" }, { id: "desc" }] });
+    if (!candidate) return null;
+    const [upload, generation] = await Promise.all([
+      tx.mediaUpload.findUnique({ where: { id: candidate.uploadId } }), tx.videoGeneration.findUnique({ where: { id: candidate.id } }),
+    ]);
+    return { candidate, upload, generation };
+  }
+
+  private draftVideoBinding(initial: Awaited<ReturnType<PublishListing["discoverDraftVideo"]>>, draftId: string, businessId: string | null, now: Date): { activeVideoGenerationId?: string; pendingVideoGenerationId?: string; activeVideoRevision?: number } {
+    const session = initial?.candidate, upload = initial?.upload, generation = initial?.generation;
+    if (!session || !upload || !generation || session.cancelledAt || session.expiresAt <= now || !session.targetRevision || session.targetId !== draftId || session.targetKind !== "draft" || session.uploadId !== upload.id || upload.businessId !== businessId || upload.userId !== session.userId || upload.writeProtocol !== "video-v1" || upload.kind !== "video" || upload.state !== "PREPARING" || upload.claimToken !== session.id || upload.claimTargetType !== "video_session" || upload.claimTargetId !== session.id || upload.key !== session.sourceKey || session.sourceKey !== `video/v1/${upload.id}/${session.id}/source.mp4` || generation.sessionId !== session.id || generation.uploadId !== upload.id || generation.listingId !== draftId || generation.targetRevision !== session.targetRevision || generation.retiredAt) return {};
+    const ready = session.state === "READY" && generation.state === "READY" && !!generation.readyAt && !!generation.durationMs && generation.durationMs <= 90000 && generation.posterKey === `video/v1/${upload.id}/${generation.id}/poster.jpg` && generation.manifest !== null;
+    const pending = ["INITIALIZING", "UPLOADING", "PAUSED", "COMPLETING", "PROCESSING"].includes(session.state) && ["UPLOADING", "PROCESSING"].includes(generation.state);
+    if (!ready && !pending) return {};
+    return { activeVideoRevision: session.targetRevision, ...(ready ? { activeVideoGenerationId: generation.id } : { pendingVideoGenerationId: generation.id }) };
+  }
+
   /** Publication, video rebinding and photo adoption share this transaction.
    * Owner/business locks precede the draft and every upload lock. */
-  private async bindDraftVideo(tx: Prisma.TransactionClient, draftId: string, listingId: string, businessId: string | null, now: Date): Promise<{ activeVideoGenerationId?: string; pendingVideoGenerationId?: string; activeVideoRevision?: number }> {
+  private async bindDraftVideo(tx: Prisma.TransactionClient, draftId: string, listingId: string, businessId: string | null, now: Date, initial: Awaited<ReturnType<PublishListing["discoverDraftVideo"]>>): Promise<{ activeVideoGenerationId?: string; pendingVideoGenerationId?: string; activeVideoRevision?: number }> {
     const locked = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "listing_drafts" WHERE "id" = ${draftId} FOR UPDATE`;
     if (!locked.length) throw new ConflictException("Draft is no longer available");
     const candidate = await tx.videoUploadSession.findFirst({ where: { protocolVersion: 1, targetKind: "draft", targetId: draftId }, orderBy: [{ targetRevision: "desc" }, { id: "desc" }] });
+    if (candidate?.id !== initial?.candidate.id) throw new Error("diagnostic_source_graph_changed");
     if (!candidate) return {};
     await tx.$queryRaw`SELECT "id" FROM "media_uploads" WHERE "id" = ${candidate.uploadId} FOR UPDATE`;
     await tx.$queryRaw`SELECT "id" FROM "video_upload_sessions" WHERE "id" = ${candidate.id} FOR UPDATE`;
@@ -506,14 +558,15 @@ export class PublishListing {
     const [session, upload, generation] = await Promise.all([
       tx.videoUploadSession.findUnique({ where: { id: candidate.id } }), tx.mediaUpload.findUnique({ where: { id: candidate.uploadId } }), tx.videoGeneration.findUnique({ where: { id: candidate.id } }),
     ]);
-    if (!session || !upload || !generation || session.cancelledAt || session.expiresAt <= now || !session.targetRevision || session.targetId !== draftId || session.targetKind !== "draft" || session.uploadId !== upload.id || upload.businessId !== businessId || upload.userId !== session.userId || upload.writeProtocol !== "video-v1" || upload.kind !== "video" || upload.state !== "PREPARING" || upload.claimToken !== session.id || upload.claimTargetType !== "video_session" || upload.claimTargetId !== session.id || upload.key !== session.sourceKey || session.sourceKey !== `video/v1/${upload.id}/${session.id}/source.mp4` || generation.sessionId !== session.id || generation.uploadId !== upload.id || generation.listingId !== draftId || generation.targetRevision !== session.targetRevision || generation.retiredAt) return {};
-    const ready = session.state === "READY" && generation.state === "READY" && !!generation.readyAt && !!generation.durationMs && generation.durationMs <= 90000 && generation.posterKey === `video/v1/${upload.id}/${generation.id}/poster.jpg` && generation.manifest !== null;
-    const pending = ["INITIALIZING", "UPLOADING", "PAUSED", "COMPLETING", "PROCESSING"].includes(session.state) && ["UPLOADING", "PROCESSING"].includes(generation.state);
-    if (!ready && !pending) return {};
+    if (JSON.stringify({ candidate: session, upload, generation }) !== JSON.stringify(initial)) throw new Error("diagnostic_source_graph_changed");
+    const binding = this.draftVideoBinding(session ? { candidate: session, upload, generation } : null, draftId, businessId, now);
+    if (!binding.activeVideoGenerationId && !binding.pendingVideoGenerationId) return {};
+    if (!session || !upload || !generation) throw new Error("diagnostic_source_graph_changed");
+    const ready = !!binding.activeVideoGenerationId;
     await tx.videoUploadSession.update({ where: { id: session.id }, data: { targetKind: "listing", targetId: listingId, listingId } });
     await tx.videoGeneration.update({ where: { id: generation.id }, data: { listingId } });
     if (ready) await tx.mediaUpload.update({ where: { id: upload.id }, data: { state: "ADOPTED", claimTargetType: "listing", claimTargetId: listingId, claimToken: null, claimDeadline: null } });
-    return { activeVideoRevision: session.targetRevision, ...(ready ? { activeVideoGenerationId: generation.id } : { pendingVideoGenerationId: generation.id }) };
+    return binding;
   }
 
 }

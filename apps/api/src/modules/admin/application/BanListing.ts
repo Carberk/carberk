@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   Inject,
   Injectable,
@@ -5,7 +6,7 @@ import {
   BadRequestException,
   ConflictException,
 } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { PrismaService, listingSourceCommand, withDiagnosticSourceCommand } from "@auto-tm/db";
 import { AdminSchemas } from "@auto-tm/contracts";
 import type { ListingsReadPort } from "../../listings/domain/ports/ListingsReadPort";
 import { LISTINGS_READ_PORT } from "../../listings/domain/ports/ListingsReadPort";
@@ -119,11 +120,39 @@ export class BanListing {
     }
 
     // 3. Execute mutation + audit in one transaction
+    const auditId = randomUUID();
+    const reviewedAt = new Date();
     const result = await this.prisma.$transaction(async (tx) => {
+      const source = await tx.listing.findUnique({ where: { id: input.listingId }, select: { sellerId: true } });
+      if (!source) throw new NotFoundException({ code: "NOT_FOUND", message: "Listing not found" });
+      const command = await listingSourceCommand(tx, { operation: "listing_change", listingId: input.listingId, actorUserId: input.adminUserId,
+        changes: { status: "banned" }, roots: [
+          { table: "users", key: { id: source.sellerId } },
+          { table: "audit_logs", key: { id: auditId } },
+          ...(report ? [{ table: "content_reports" as const, key: { id: report.id } }] : []),
+        ] });
+      return withDiagnosticSourceCommand(tx, command, async receipt => {
+      if (report) {
+        await tx.$queryRaw`SELECT "id" FROM "content_reports" WHERE "id"=${report.id} FOR UPDATE`;
+        const locked = await tx.contentReport.findUnique({ where: { id: report.id } });
+        if (!locked || locked.status !== "pending" || locked.targetType !== "listing" || locked.targetId !== input.listingId) {
+          throw new ConflictException({ code: "CONFLICT", message: "Report has already been resolved", details: { reason: AdminSchemas.AdminErrorReason.ReportAlreadyResolved } });
+        }
+      }
+
+      const lockedListing = await tx.listing.findUnique({ where: { id: input.listingId } });
+      if (!lockedListing) throw new NotFoundException({ code: "NOT_FOUND", message: "Listing not found" });
+      if (lockedListing.status !== "active") {
+        throw new ConflictException({ code: "CONFLICT", message: report ? "Report target is no longer actionable" : "Listing is not in a state that can be banned",
+          details: { reason: report ? AdminSchemas.AdminErrorReason.ReportTargetNotActionable : AdminSchemas.AdminErrorReason.ModerationTargetStateConflict,
+            targetState: { status: lockedListing.status } } });
+      }
+
       // Ban the listing
       const banResult = await this.listingsAdmin.banActiveListing(
         input.listingId,
         tx,
+        receipt,
       );
 
       // Action the report if provided
@@ -134,7 +163,7 @@ export class BanListing {
           {
             status: "actioned",
             reviewedById: input.adminUserId,
-            reviewedAt: new Date(),
+            reviewedAt,
           },
           tx,
         );
@@ -155,6 +184,7 @@ export class BanListing {
 
       const auditRow = await this.auditRepo.create(
         {
+          id: auditId,
           actorId: input.adminUserId,
           action: AdminSchemas.AdminAuditAction.ListingBan,
           targetType: "listing",
@@ -171,6 +201,7 @@ export class BanListing {
         reportStatus,
         auditLogId: auditRow.id,
       };
+      });
     });
 
     return result;

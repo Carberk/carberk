@@ -1,0 +1,185 @@
+{
+  "sourceCheckpoint": "10602f3e53a35b24ca7ebe2ef09fb6f9bf9974f0",
+  "sourceTree": "4a5e4f1d7e04fa3a6ce4f686e194000d13d0e1ba",
+  "checks": [
+    {
+      "command": "node --test scripts/diagnostic-user-eligibility-schema.test.mjs",
+      "exitCode": 1,
+      "log": "/tmp/897-b1-moderation-intent-20261024-red.log",
+      "sha256": "025ab57618f7494b038808bf56a75b1ed868eef6d4a421e58b9391676e4608c1",
+      "note": "Expected missing reviewed migration inventory, 0 != 1. SQL scenarios not executed."
+    },
+    {
+      "command": "pnpm --filter @auto-tm/contracts build",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-contracts-build.log",
+      "sha256": "ab0ce6d507eea0e4897fcc5c64ecda5ab07a556406fafde9cec52a9f5dfbf0e7",
+      "note": ""
+    },
+    {
+      "command": "pnpm --filter @auto-tm/db build",
+      "exitCode": 1,
+      "log": "/tmp/897-b1-moderation-intent-20261024-db-build.log",
+      "sha256": "ea14abcc2ac0a81fc16c50f3a6943ba2bedf4d12b03f0c2d999c213353cc2518",
+      "note": "Prisma config requires DATABASE_URL; no database connection or SQL execution."
+    },
+    {
+      "command": "DATABASE_URL=postgresql://offline:offline@127.0.0.1:1/offline pnpm --filter @auto-tm/db build",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-db-build-configured.log",
+      "sha256": "28295dffd8f40972a24ab56111e53d4afe331ffb2ddc637b13b83a3c7cfe0203",
+      "note": "Ignored Prisma generation and TypeScript emit only."
+    },
+    {
+      "command": "pnpm --filter @auto-tm/worker exec node --version",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-worker-dependencies.log",
+      "sha256": "da85ca056bc4dfbcc7ece3789fda63465af1039032ad218edbf9f16d8aa17f33",
+      "note": "Populates ignored worker dependencies needed by inherited DB typecheck imports; runs Node version only."
+    },
+    {
+      "command": "pnpm --filter @auto-tm/db typecheck",
+      "exitCode": 1,
+      "log": "/tmp/897-b1-moderation-intent-20261024-db-ts7.log",
+      "sha256": "b29cfa7ccbf3c08ce94e350f7e667e71ecfb59487f52b5577125bc7aec7dbebb",
+      "note": "Initial missing ignored worker dependencies and two new fixture typing errors; retained original failure log."
+    },
+    {
+      "command": "pnpm --filter @auto-tm/db typecheck",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-db-ts7-final.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "note": ""
+    },
+    {
+      "command": "pnpm --filter @auto-tm/db exec tsc6 --noEmit",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-db-ts6.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "note": ""
+    },
+    {
+      "command": "pnpm --filter @auto-tm/api build",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-api-build.log",
+      "sha256": "f703bbf8abb9c20a13ac4d100502cd2a9d6af4640c391644fe1bcd50648f7162",
+      "note": ""
+    },
+    {
+      "command": "pnpm --filter @auto-tm/api typecheck",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-api-ts7.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "note": ""
+    },
+    {
+      "command": "pnpm --filter @auto-tm/api exec tsc6 --noEmit",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-api-ts6.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "note": ""
+    },
+    {
+      "command": "pnpm --filter @auto-tm/db lint",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-db-lint.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "note": "Full workspace lint, zero warnings."
+    },
+    {
+      "command": "pnpm --filter @auto-tm/api lint",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-api-lint.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "note": "Full workspace lint, zero warnings."
+    },
+    {
+      "command": "DATABASE_URL=postgresql://offline:offline@127.0.0.1:1/offline pnpm --filter @auto-tm/db exec prisma validate",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-prisma-validate.log",
+      "sha256": "f42be55724289534e6fab7707bf97c906b59b2a65578449f3fbabc739f5b0606",
+      "note": "Schema validation only; no database connection."
+    },
+    {
+      "command": "node --test 'scripts/diagnostic*schema.test.mjs'",
+      "exitCode": 1,
+      "log": "/tmp/897-b1-moderation-intent-20261024-schema-static.log",
+      "sha256": "b70a5163576b68d53a2a3d8530d9c7ec839b83da171c8ae7f5328512c57234b5",
+      "note": "18 pass, inherited request-only snapshot used current schema and failed. Pinned original snapshot, keeping every assertion."
+    },
+    {
+      "command": "node --test 'scripts/diagnostic*schema.test.mjs' scripts/campaign-preparation-schema.test.mjs",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-schema-static-final.log",
+      "sha256": "ef5e85833e645ead774e0e8f2fa76c760fee691ff79aeb6c6f5886ecb01814e0",
+      "note": "20 static tests passed."
+    },
+    {
+      "command": "PYTHONPATH=/tmp/897-b1-source-correction-python python3 /tmp/897-b1-moderation-intent-20261024-grammar.py",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-grammar.log",
+      "sha256": "f3786f442bc6463d7e8e647aae1a5da41fcfc796eba21e8a7e83015d0e6c3597",
+      "note": "12 SQL statements,3 PLpgSQL functions,3 SQL bodies and1 DO body parsed. Grammar only; zero SQL executed."
+    },
+    {
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/api exec vitest run src/modules/admin/application/SuspendUser.spec.ts src/modules/admin/application/UnsuspendUser.spec.ts src/modules/identity/infrastructure/PrismaIdentityAdminRepository.spec.ts src/modules/diagnostics/domain/ContinuityPublicOwnership.spec.ts src/modules/diagnostics/infrastructure/DiagnosticOwnershipGrant.application.spec.ts",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-offline-policy.log",
+      "sha256": "cce2f88c0fdd0cb6031cd3a58f4b75544399a27f9d0a4e541b5d81f09b6bea19",
+      "note": "63 passed in 5 files. Database setup disabled, no e2e module import."
+    },
+    {
+      "command": "pnpm --filter @auto-tm/db test:offline",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-db-offline.log",
+      "sha256": "1e59dcbb621c9901b41825e62515733fb0fe18e27f527024b3ff9ff029a9c462",
+      "note": "5 process-lifetime harness cases passed, fake subprocess resources only, no live SQL/services."
+    },
+    {
+      "command": "pnpm check:runtime-imports",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-runtime.log",
+      "sha256": "2920e5c9967fdaf4eb831dfb48e054ff0bd4262a1ef314658ceca54821fa5d97",
+      "note": "Built DB/contracts imports only, no e2e module import."
+    },
+    {
+      "command": "pnpm check:agent-docs",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-agent-docs.log",
+      "sha256": "8f5507ea6fcde992f7d6733d113abc538ae4957b777bc97cadd580f651c93b20",
+      "note": ""
+    },
+    {
+      "command": "node /tmp/897-b1-moderation-intent-20261024-count-scenarios.cjs",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-scenarios.log",
+      "sha256": "bcfba75bb936763b03bc0ce87b20d181befa187797b05e8d952cdabcca2ede38",
+      "note": "Static AST enumeration:112 declarations/248 authored cases, all103 original declarations byte-exact. No e2e module import."
+    },
+    {
+      "command": "python3 /tmp/897-b1-moderation-intent-20261024-static-audit.py",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-static-audit.log",
+      "sha256": "b94d12015e8c6d6953e9be0001e83ec5ce3c62d7ec3aadc896b304a93f03ddaa",
+      "note": "4338 inherited tracked files,125 inherited SQL/mirror blobs unchanged;4 B5 module hashes unchanged."
+    },
+    {
+      "command": "node /tmp/897-b1-moderation-intent-20261024-profile-audit.mjs",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-profile-audit.log",
+      "sha256": "2b682da609a5d5a719fc6dbdb98ef4687937859802ae363f9f7fcdb6858f4b1c",
+      "note": "All prior schema hashes/inventories/checksums unchanged; exactly one additive inventory."
+    },
+    {
+      "command": "pnpm check:agent-docs",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-intent-20261024-agent-docs-final.log",
+      "sha256": "8f5507ea6fcde992f7d6733d113abc538ae4957b777bc97cadd580f651c93b20",
+      "note": "Final receipt and evidence links included."
+    }
+  ],
+  "sqlScenariosAuthored": 248,
+  "sqlScenariosExecuted": 0,
+  "e2eModulesImported": 0,
+  "fullCiRuns": 0
+}

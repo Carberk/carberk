@@ -1403,6 +1403,7 @@ model DiagnosticTemplateVersion {
 }
 
 model InspectionOrder {
+  sourceAnchor DiagnosticSourceAnchor?
   ownershipGrant DiagnosticOwnershipGrant?
   continuityRequests DiagnosticContinuityRequest[]
   id String @id @default(uuid())
@@ -2057,3 +2058,63 @@ model DiagnosticOwnershipGrant {
   @@index([rightsUntil, state])
   @@map("diagnostic_ownership_grants")
 }
+
+/// Transient preparation only. Finish deletes it; deferred SQL rejects a live receipt at commit.
+model DiagnosticSourceCommand {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  backend_pid Int @default(dbgenerated("pg_backend_pid()"))
+  full_transaction_id String @default(dbgenerated("(pg_current_xact_id())::text"))
+  command Json
+  scope Json @default("[]")
+  lock_keys Json @default("[]")
+  effects Json @default("[]")
+  campaigns Json @default("[]")
+  @@unique([backend_pid, full_transaction_id])
+  @@map("diagnostic_source_commands")
+}
+
+/// Created for prepared NEW orders only. Missing historical shells stay unavailable.
+model DiagnosticSourceAnchor {
+  orderId String @id
+  order InspectionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  state String
+  firstRecordId String?
+  source Json?
+  createdTransaction String
+  @@map("diagnostic_source_anchors")
+}
+
+// Forward SQL guard inventory: 20261024010000_diagnostic_source_guard_repair.
+
+/// Transient campaign fence preparation, independent of source ownership receipts.
+/// SQL derives identity/scope on INSERT and requires DELETE before transaction commit.
+model CampaignPreparation {
+  id                  String @id @db.Uuid
+  backend_pid         Int
+  full_transaction_id String
+  mutations           Json
+  scope               Json
+
+  @@unique([backend_pid, full_transaction_id])
+  @@map("campaign_preparations")
+}
+
+// Forward SQL effect inventory: 20261024030000_diagnostic_purge_effects.
+
+// Dormant finite intake/bootstrap/audit effect inventory: 20261024040000_diagnostic_intake_effects.
+
+// Retained finite source invariant checkpoint 20261024050000. No data backfill.
+
+// Dormant source correction inventory: 20261024060000_diagnostic_source_correction.
+
+// Dormant finite moderation inventory: 20261024070000_diagnostic_user_eligibility.
+
+// Dormant complete moderation effects: 20261024080000_diagnostic_moderation_complete_effects.
+
+// Dormant Message absence and Business enquiry effects: 20261024090000_diagnostic_message_enquiry_fences.
+
+// Dormant Sign-in Method, intake selection and object ownership: 20261024100000_diagnostic_signin_intake_object_owners.
+
+// Dormant ordinary User INSERT destination fence: 20261024110000_diagnostic_user_insert_fence.
+
+// Dormant exact restore no-op enquiry alternatives: 20261024120000_diagnostic_account_noop_enquiry.

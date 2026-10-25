@@ -120,7 +120,11 @@ describe("current staff authority on real HTTP and disposable PostgreSQL", () =>
   await prisma.user.update({ where: { id: suite.id("staff") }, data: { suspendedAt: new Date() } });
   expect((await get("/test/current-staff", "staff").expect(403)).body.details.reason).toBe("USER_INACTIVE");
   await prisma.user.update({ where: { id: suite.id("staff") }, data: { suspendedAt: null } });
-  await new PrismaAccountDeletionUnitOfWork(prisma).run(async (writes) => { await writes.scheduleDeletion(suite.id("staff"), new Date(Date.now() + 86400000)); });
+  const deletionScheduledAt = new Date(Date.now() + 86400000);
+  await new PrismaAccountDeletionUnitOfWork(prisma).run({ userId: suite.id("staff"), deletionScheduledAt }, async (writes) => {
+    await writes.scheduleDeletion(suite.id("staff"), deletionScheduledAt);
+    await writes.archiveActiveListings(suite.id("staff"));
+  });
   expect((await get("/test/current-staff", "staff").expect(403)).body.details.reason).toBe("USER_INACTIVE");
   await request.post("/api/v1/auth/admin/totp/enroll").set("authorization", `Bearer ${token("staff")}`).expect(403);
   expect((await prisma.staffGrant.findUnique({ where: { userId_capability: { userId: suite.id("staff"), capability: "support.operations" } } }))?.revokedAt).not.toBeNull();

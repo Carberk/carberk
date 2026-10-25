@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { PrismaService, assertDiagnosticSourceCommand, withDiagnosticSourceCommand } from "@auto-tm/db";
 import type { Session } from "../domain/Session";
 import type { SessionRepository, SessionLookupResult } from "../domain/ports/SessionRepository";
 import type { PasswordHasherPort } from "../domain/ports/PasswordHasherPort";
@@ -119,10 +119,59 @@ export class PrismaSessionRepository implements SessionRepository {
   }
 
   async deleteAllByUserId(userId: string): Promise<number> {
-    const result = await this.prisma.session.deleteMany({
+    // Declare deletion effects from an unlocked inventory. Preparation checks
+    // protected tuples; the locked ownership set must still match below.
+    const sessions = await this.prisma.session.findMany({
       where: { userId },
+      select: { id: true, userId: true, expiresAt: true, adminTotpExpiresAt: true },
     });
-    return result.count;
+    if (!sessions.length) return 0;
+    const rows = sessions.map((session) => ({
+      table: "sessions" as const,
+      key: { id: session.id },
+      verb: "delete" as const,
+      expected: {
+        source: {
+          id: session.id,
+          userId: session.userId,
+          expiresAt: session.expiresAt.toISOString(),
+          adminTotpExpiresAt: session.adminTotpExpiresAt?.toISOString() ?? null,
+        },
+      },
+      next: null,
+    }));
+    return this.prisma.$transaction((tx) => withDiagnosticSourceCommand(tx, {
+      operation: "session_change",
+      // The User is the ownership root for the complete Session inventory.
+      // Discovery includes every owned Session, but only rows declared above
+      // have deletion effects. Graph changes during locking refuse in SQL.
+      // Session rows are already roots for their own projections; keeping the
+      // ownership root separate also stays within the kernel's 100-root cap.
+      roots: [{ table: "users" as const, key: { id: userId } }],
+      rows,
+      actorUserId: userId,
+      sessionId: null,
+      cutoff: null,
+      campaign: null,
+    }, async (receipt) => {
+      await assertDiagnosticSourceCommand(tx, receipt, "session_change");
+      // The User fence stabilizes the complete owned set. A Session committed
+      // before preparation may be discovered and locked without a declared
+      // delete effect. Refuse that stale inventory before attempting any write;
+      // neither extend the receipt nor retry implicitly.
+      const lockedSessions = await tx.session.findMany({
+        where: { userId },
+        select: { id: true },
+      });
+      const declaredSessionIds = new Set(rows.map((row) => row.key.id));
+      if (lockedSessions.length !== declaredSessionIds.size ||
+          lockedSessions.some((session) => !declaredSessionIds.has(session.id))) {
+        throw new Error("diagnostic_source_graph_changed");
+      }
+      // Exact coverage now permits deleting the complete ownership set.
+      const result = await tx.session.deleteMany({ where: { userId } });
+      return result.count;
+    }));
   }
 
   private toDomain(

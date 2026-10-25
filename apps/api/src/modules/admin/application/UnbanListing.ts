@@ -1,10 +1,11 @@
+import { randomUUID } from "node:crypto";
 import {
   Inject,
   Injectable,
   NotFoundException,
   ConflictException,
 } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { PrismaService, listingSourceCommand, withDiagnosticSourceCommand } from "@auto-tm/db";
 import { AdminSchemas } from "@auto-tm/contracts";
 
 import type { ListingsReadPort } from "../../listings/domain/ports/ListingsReadPort";
@@ -65,14 +66,32 @@ export class UnbanListing {
     }
 
     // 2. Execute mutation + audit in one transaction
+    const auditId = randomUUID();
     const result = await this.prisma.$transaction(async (tx) => {
+      const source = await tx.listing.findUnique({ where: { id: input.listingId }, select: { sellerId: true } });
+      if (!source) throw new NotFoundException({ code: "NOT_FOUND", message: "Listing not found" });
+      const command = await listingSourceCommand(tx, { operation: "listing_change", listingId: input.listingId, actorUserId: input.adminUserId,
+        changes: { status: "active" }, roots: [
+          { table: "users", key: { id: source.sellerId } },
+          { table: "audit_logs", key: { id: auditId } },
+        ] });
+      return withDiagnosticSourceCommand(tx, command, async receipt => {
+      const lockedListing = await tx.listing.findUnique({ where: { id: input.listingId } });
+      if (!lockedListing) throw new NotFoundException({ code: "NOT_FOUND", message: "Listing not found" });
+      if (lockedListing.status !== "banned") {
+        throw new ConflictException({ code: "CONFLICT", message: "Listing is not in a state that can be unbanned",
+          details: { reason: AdminSchemas.AdminErrorReason.ModerationTargetStateConflict, targetState: { status: lockedListing.status } } });
+      }
+
       const unbanResult = await this.listingsAdmin.unbanBannedListing(
         input.listingId,
         tx,
+        receipt,
       );
 
       const auditRow = await this.auditRepo.create(
         {
+          id: auditId,
           actorId: input.adminUserId,
           action: AdminSchemas.AdminAuditAction.ListingUnban,
           targetType: "listing",
@@ -91,6 +110,7 @@ export class UnbanListing {
         targetState: { status: unbanResult.status },
         auditLogId: auditRow.id,
       };
+      });
     });
 
     return result;
