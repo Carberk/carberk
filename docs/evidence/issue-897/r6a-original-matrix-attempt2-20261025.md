@@ -95,3 +95,50 @@ The newer parent disposition reports diagnostic40188183964 at exact08551e0d SPEN
 - `pnpm --filter @auto-tm/api build`: PASS; `/tmp/897-r6a-attempt2-r1-api-build.log`, SHA-256 `9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538`.
 - `pnpm check:runtime-imports`: PASS; `/tmp/897-r6a-attempt2-r1-runtime-imports.log`, SHA-256 `2920e5c9967fdaf4eb831dfb48e054ff0bd4262a1ef314658ceca54821fa5d97`.
 - `git diff --check`: PASS; `/tmp/897-r6a-attempt2-r1-diff-check.log`, SHA-256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+
+## Attempt3/max3 combined parent fixture correction
+
+Parent findings at exact `18018fc4099ef20ed4399c75e86fca279ec931f5`, tree `984d73b1d7a1609885fe6a176bdcc54491a790b1`, demonstrated two authored-source defects, not executed runtime failures. This is the last same-root original fixture-completeness/reachability repair, attempt3/max3. No cap reset, new task/root, independent review or diagnostic retry is asserted. The prior premature/retracted acceptance, correctionround1/fallback fix, b5c return and R1-dependent M2 completion remain history. The attempt2 statements above describe their checkpoints and are superseded by this section for current M1/M7 authoring.
+
+Before edits, the exact18018fc4 handoff/manifest were copied byte-for-byte into `/tmp/897-r6a-18018fc4-before-attempt3-20261025/`, SHA-256 `aab424c7a8169d40f32ac7de1599e341dbb9a4d12c4539085d8cbe2f227ef1d0` and `4aebd4e88be35ff71add69c5852dac233bc59c71da8c997846362b910e2a0049`. Original canonical attempt2 receipts are also left unchanged. Prior held561, b5c and accepted R1 refs/blobs are retained. All 33 accepted R1 blobs and the actual SuspendUser M2 block are unchanged. No parent assembly merge or production/SQL/schema/registry/helper/export/port/activation/admission edit occurred.
+
+M1 now chooses a lawful customer or appropriately granted/elevated assigned staff actor for each entry. Objects are real valid persisted targets, including owned devices, production-staged/uploaded/adopted images, paid recipient/donor archive pairs and production-staged/uploaded/verified/delivered PDFs. Actual production results and in-transaction readbacks are asserted before the control's outer rollback. Image upload completes both production transactions, then its uploaded target remains valid for an idempotent same-input repeat. Every refusal uses the same actor/target/command after actual SessionRepository.delete. Exact NO_ACCESS, full transactional-state preservation and unchanged external byte contents/read/write/removal attempts are asserted. A generic rejected promise does not establish a positive control or finish behavior.
+
+| Entry | Lawful actor | Valid target or command | Named live assertion |
+|---|---|---|---|
+| openSupport | customer with live Session | new Support owner/conversation | returned IDs and exact purpose/customer/version0; outer rollback |
+| openHistory | customer with live Session | new History owner/conversation | returned IDs and exact purpose/customer/version0; outer rollback |
+| read | owning customer | existing assigned History conversation | exact conversation/resource/assignment/sequence/readThrough/empty messages |
+| send | owning customer | existing History conversation; new client message ID | message sequence9/sender/body and one message outbox |
+| assign | assigned history.fulfilment staff, current TOTP | existing History owner, lawful distinct granted peer, version1 | assignee peer/version2; SERVICE_ASSIGN/HANDOVER and handover outbox9 |
+| supportCommand | assigned support.operations staff, current TOTP | open Support case with null unansweredSince/no investigation | closed at fixed now; SERVICE_NOTE and SUPPORT_CLOSE_RESOLVED |
+| markRead | owning customer | existing conversation lastSequence8 | exact User watermark5 |
+| subscribePush | owning customer | valid owned noninvalidated PushToken/device and existing conversation | exact Session/device/conversation/epoch subscription |
+| mine | owning customer | one populated owned History conversation | exact one-row page identity/purpose/time |
+| queue | history.fulfilment staff, current TOTP | one populated History queue owner | exact conversation/resource/assignment/time page |
+| stage | owning customer | existing History conversation; valid image/rights | actual new staged attachment with owner/epoch/metadata and null locator/size |
+| upload | owning customer/uploader | actual production-staged image attachment; valid WebP | both production transactions, committed locator/hash, actual bytes and size; same valid idempotent input on refusal |
+| file | owning customer | actual production-staged/uploaded/adopted image with stored bytes | exact released bytes/contentType/filename |
+| historyCommand | owning customer | actual available quote/day/provider allowance, exact accept command | held order/version0, accepted quote and HISTORY_ACCEPT |
+| historyArtifactCommand | assigned history.fulfilment staff, current TOTP | valid paid recipient and distinct verified reusable donor; exact archive command | completed source purchase and fulfilling order/version1 |
+| historyArtifactUpload | assigned history.fulfilment staff, current TOTP | actual production-staged acquired PDF under a completed purchase | exact external PDF object and unchanged staged acquisition |
+| historyReportFile | owning customer | actual PDF stage/upload/verify/deliver with exact order/delivery | exact private bytes/application-pdf/filename for delivered audience |
+| historyReports | owning customer | actual PDF stage/upload/verify/deliver | one exact delivered verified artifact; empty archive/staged |
+| historyPrevious | owning customer | actual PDF delivered order with matching VIN | exact one-row conversation/VIN |
+| historySnapshot | owning customer | existing available quote on own History request | exact quote identity/VIN/providers, null order, empty payments |
+
+The private-file race previously submitted a waiting UPDATE then enqueued PID SELECT on the same pg client. Installed pg8.20.0 client.js queues that SELECT until the UPDATE ends, preventing intended barrier observation/release. It now retrieves backend PID while idle before either branch, reserves another connection for pg_blocking_pids, and retains both-order current byte-audience assertions. Finally releases the service hold, rolls back the raw writer before draining, and settles all observed outcomes even after barrier/assertion failure. Rollback errors are additional evidence; the original error is retained.
+
+A complete source audit of same-client queued PID/COMMIT/ROLLBACK ordering covered the six raw opposing-query sites: User suspension, donor artifact restriction, whole-page Listing/order faults, private-file restriction, previous-page Listing mutation and attachment rights mutation. The other five already capture PID before enqueueing; their commits/rollbacks follow release and settlement. Writer-first raw barriers do not enqueue an opposing query on the blocker before PID lookup. Production caller pid() reads stored instrumentation, without submitting a queued query. Global teardown releases all latches before raw rollback and caller draining. No additional same-client PID defect was found. This audit is source reasoning, not an observed PostgreSQL wait.
+
+DB TS6/TS7, focused fixture lint, existing AST parse/inventory and 12 existing ServiceHistoryPrepared offline boundary unit tests pass. Initial TS checks caught two nullable locator accesses in new assertions; corrected without weakening the assertions. Those authoring logs are retained. No E2E import/collection/execution or SQL/application HTTP occurred. No source behavior changed, so unrelated unit suites/builds were not repeated. All eight original runtime rows remain OPEN. Both diagnostics remain SPENT; B5 UNUSED; activation/admission CLOSED.
+
+Canonical attempt3 handoff and manifest are `/tmp/897-r6a-original-matrix-attempt3-20261025-handoff.md` and `-manifest.json`, with exact base/head/tree/path/input/log/source hashes and both finding dispositions. Stop for parent accept-or-stop. No automatic further fix/review loop or runtime authority follows this checkpoint.
+
+- `pnpm --filter @auto-tm/db typecheck`: PASS; `/tmp/897-r6a-attempt3-db-ts7.log`, SHA-256 `8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92`.
+- `pnpm --filter @auto-tm/db exec tsc6 --noEmit`: PASS; `/tmp/897-r6a-attempt3-db-ts6.log`, SHA-256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+- `pnpm --filter @auto-tm/db exec eslint tests/service-history-callers.e2e.spec.ts --max-warnings 0`: PASS; `/tmp/897-r6a-attempt3-db-lint.log`, SHA-256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+- `node /tmp/897-r6a-attempt2-static-inventory.cjs`: PASS; `/tmp/897-r6a-attempt3-parse.log`, SHA-256 `c00b99ac679037a49170fe4e25bae63c19f089866da857c077e806560cc8e17b`.
+- `AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/api exec vitest run src/modules/service-messaging/infrastructure/ServiceHistoryPrepared.spec.ts --exclude '**/*.e2e.spec.ts'`: PASS; `/tmp/897-r6a-attempt3-prepared-unit.log`, SHA-256 `e23654b603c140f664d63237e13ea74f13d9627343522487651107116cf82e67`.
+- `git diff --check`: PASS; `/tmp/897-r6a-attempt3-diff-check.log`, SHA-256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.

@@ -179,10 +179,10 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   return client;
  }
  async function pid(client: PoolClient) { return present((await client.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]).pid; }
- async function blocked(waiter: number, blocker: number) {
+ async function blocked(waiter: number, blocker: number, observer: Pool | PoolClient = pool) {
   const deadline = performance.now() + 5000;
   while (performance.now() < deadline) {
-   const row = present((await pool.query<{ pids: number[] }>("SELECT pg_blocking_pids($1::int) AS pids", [waiter])).rows[0]);
+   const row = present((await observer.query<{ pids: number[] }>("SELECT pg_blocking_pids($1::int) AS pids", [waiter])).rows[0]);
    if (row.pids.includes(blocker)) {
     console.info("service-history PostgreSQL barrier", { waiter, blocker, blockingPids: row.pids });
     return;
@@ -193,7 +193,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
  }
  // The facade owns only transaction instrumentation. Every query and public
  // caller, retained-selection query, authority check and receipt is production.
- function caller(options: { hold?: boolean; rollback?: boolean; enabled?: boolean; store?: PrivateStore; campaign?: boolean; clock?: () => Date; holdFailure?: boolean; finishRefusal?: (tx: Prisma.TransactionClient) => Promise<void> } = {}) {
+ function caller(options: { hold?: boolean; rollback?: boolean; enabled?: boolean; store?: PrivateStore; campaign?: boolean; clock?: () => Date; holdFailure?: boolean; finishRefusal?: (tx: Prisma.TransactionClient) => Promise<void>; inspect?: (tx: Prisma.TransactionClient, result: unknown) => Promise<void> } = {}) {
   const ready = latch(), finish = latch(), started = latch();
   releases.push(finish.release);
   let backend = 0;
@@ -219,6 +219,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
    let result: T;
    try { result = await work(instrumented); }
    catch (error) { ready.release(); if (options.holdFailure) await finish.promise; throw error; }
+   await options.inspect?.(tx, result);
    ready.release();
    if (options.hold) await finish.promise;
    if (options.rollback) throw new Error("caller outer rollback");
@@ -559,36 +560,151 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   }));
  }
  const publicEntries = ["openSupport", "openHistory", "read", "send", "assign", "supportCommand", "markRead", "subscribePush", "mine", "queue", "stage", "upload", "file", "historyCommand", "historyArtifactCommand", "historyArtifactUpload", "historyReportFile", "historyReports", "historyPrevious", "historySnapshot"] as const;
- it.each(publicEntries)("%s refuses a revoked real Session with no transactional residue", async entry => {
-  const f = await history(), support = await fixture("support", f.owner);
-  await sessionWriter(caller().database).delete(f.owner.sessionId);
-  const before = await transactionalState(), service = caller().service, id = fixtureId();
-  const work = () => {
+ it.each(publicEntries)("%s reaches its lawful live outcome, then refuses the same actor's revoked Session without residue", async entry => {
+  // Every refusal reuses the actor, target and command that reached production
+  // work with a live Session. Staff-only entries never borrow a customer actor.
+  const archive = entry === "historyArtifactCommand" ? await pair() : undefined;
+  const artifact = (["historyArtifactUpload", "historyReportFile", "historyReports", "historyPrevious"] as readonly string[]).includes(entry) ? await stagedArtifact() : undefined;
+  const f = archive?.f ?? artifact?.f ?? await history();
+  const support = entry === "supportCommand" ? await fixture("support", f.owner) : undefined;
+  const subject = support?.staff ?? (["assign", "queue", "historyArtifactCommand", "historyArtifactUpload"].includes(entry) ? f.staff : f.owner);
+  const storage = artifact?.storage ?? byteStore(), bytes = artifact?.bytes ?? await image();
+  const messageId = fixtureId(), deviceId = fixtureId(), token = `r6a-m1-${fixtureId()}`;
+  const upload: S.ServiceStageAttachment = { category: "history_communication", visibility: "customer", contentType: "image/webp", sizeBytes: bytes.length, filename: "fixture.webp", rights: { ...rights, category: "history_communication" } };
+  let attachmentId: string | undefined, fileBytes: Uint8Array | undefined;
+  if (entry === "upload" || entry === "file") {
+   const setup = caller({ store: storage.store }).service;
+   attachmentId = (await setup.stage(subject, f.id, upload)).id;
+   if (entry === "file") {
+    await setup.upload(subject, f.id, attachmentId, bytes);
+    await setup.send(subject, f.id, { clientMessageId: fixtureId(), attachmentId, visibility: "customer" });
+    const attachment = await db.serviceAttachment.findUniqueOrThrow({ where: { id: attachmentId } });
+    expect(attachment).toMatchObject({ state: "adopted", uploaderId: subject.userId, conversationId: f.id, lifecycleEpoch: 0 });
+    fileBytes = present(storage.objects.get(present(attachment.objectKey ?? undefined)));
+   }
+  }
+  if (entry === "subscribePush") await caller().run(tx => saveDevice(tx, { id: deviceId, token, userId: subject.userId, invalidatedAt: null }));
+  if (artifact && entry !== "historyArtifactUpload") {
+   const setup = caller({ store: storage.store }).service;
+   await setup.historyArtifactUpload(f.staff, f.id, artifact.artifactId, bytes);
+   await setup.historyArtifactCommand(f.staff, f.id, { kind: "verify", orderId: artifact.order.id, artifactId: artifact.artifactId, expectedAssignmentVersion: 1, vin, originalDate: now.toISOString(), readablePages: 1, readable: true });
+   await setup.historyArtifactCommand(f.staff, f.id, { kind: "deliver", orderId: artifact.order.id, artifactId: artifact.artifactId, expectedAssignmentVersion: 1, expectedVersion: 0, sharedLink: "https://example.invalid/m1-report", linkMatches: true, linkChecked: true });
+   expect(await db.historyDelivery.findMany({ where: { orderId: artifact.order.id }, select: { artifactId: true } })).toEqual([{ artifactId: artifact.artifactId }]);
+  }
+  const work = (service: Caller): Promise<unknown> => {
    switch (entry) {
-    case "openSupport": return service.open(f.owner, "support");
-    case "openHistory": return service.open(f.owner, "history");
-    case "read": return service.read(f.owner, f.id, 0, 20);
-    case "send": return service.send(f.owner, f.id, { clientMessageId: id, body: "refused", visibility: "customer" });
-    case "assign": return service.assign(f.owner, f.id, 1);
-    case "supportCommand": return service.supportCommand(f.owner, support.id, { kind: "close_resolved" });
-    case "markRead": return service.markRead(f.owner, f.id, 5);
-    case "subscribePush": return service.subscribePush(f.owner, f.id, id);
-    case "mine": return service.mine(f.owner);
-    case "queue": return service.queue(f.owner, "history");
-    case "stage": return service.stage(f.owner, f.id, { category: "history_communication", visibility: "customer", contentType: "image/webp", sizeBytes: 3, filename: "fixture.webp", rights: { ...rights, category: "history_communication" } });
-    case "upload": return service.upload(f.owner, f.id, id, new Uint8Array([1, 2, 3]));
-    case "file": return service.file(f.owner, f.id, id);
-    case "historyCommand": return service.historyCommand(f.owner, f.id, f.accept);
-    case "historyArtifactCommand": return service.historyArtifactCommand(f.owner, f.id, { kind: "archive", orderId: id, artifactId: id, expectedAssignmentVersion: 1, expectedVersion: 0 });
-    case "historyArtifactUpload": return service.historyArtifactUpload(f.owner, f.id, id, new Uint8Array([1, 2, 3]));
-    case "historyReportFile": return service.historyReportFile(f.owner, f.id, id);
-    case "historyReports": return service.historyReports(f.owner, f.id);
-    case "historyPrevious": return service.historyPrevious(f.owner, vin);
-    case "historySnapshot": return service.historySnapshot(f.owner, f.id);
+    case "openSupport": return service.open(subject, "support");
+    case "openHistory": return service.open(subject, "history");
+    case "read": return service.read(subject, f.id, 0, 20);
+    case "send": return service.send(subject, f.id, { clientMessageId: messageId, body: "M1 lawful message", visibility: "customer" });
+    case "assign": return service.assign(subject, f.id, 1, f.peer.userId);
+    case "supportCommand": return service.supportCommand(subject, present(support).id, { kind: "close_resolved" });
+    case "markRead": return service.markRead(subject, f.id, 5);
+    case "subscribePush": return service.subscribePush(subject, f.id, token);
+    case "mine": return service.mine(subject);
+    case "queue": return service.queue(subject, "history");
+    case "stage": return service.stage(subject, f.id, upload);
+    case "upload": return service.upload(subject, f.id, present(attachmentId), bytes);
+    case "file": return service.file(subject, f.id, present(attachmentId));
+    case "historyCommand": return service.historyCommand(subject, f.id, f.accept);
+    case "historyArtifactCommand": return service.historyArtifactCommand(subject, f.id, present(archive).archive);
+    case "historyArtifactUpload": return service.historyArtifactUpload(subject, f.id, present(artifact).artifactId, bytes);
+    case "historyReportFile": return service.historyReportFile(subject, f.id, present(artifact).artifactId);
+    case "historyReports": return service.historyReports(subject, f.id);
+    case "historyPrevious": return service.historyPrevious(subject, vin);
+    case "historySnapshot": return service.historySnapshot(subject, f.id);
    }
   };
-  await expect(work()).rejects.toMatchObject({ code: "NO_ACCESS" });
-  expect(await transactionalState()).toEqual(before);
+  let reached = 0;
+  const inspect = async (tx: Prisma.TransactionClient, result: unknown) => {
+   // This observes the real completed callback before optional outer rollback.
+   // A generic rejected promise cannot satisfy these entry-specific controls.
+   switch (entry) {
+    case "openSupport": case "openHistory": {
+     const opened = result as { id: string; resourceId: string }, purpose = entry === "openSupport" ? "support" : "history";
+     expect(opened).toEqual({ id: expect.any(String), resourceId: expect.any(String) });
+     expect(await tx.serviceConversation.findUnique({ where: { id: opened.id } })).toMatchObject({ purpose, lastSequence: 0, lifecycleEpoch: 0, ...(purpose === "support" ? { supportCaseId: opened.resourceId } : { historyRequestId: opened.resourceId }) });
+     const owner = purpose === "support" ? await tx.supportCase.findUnique({ where: { id: opened.resourceId } }) : await tx.vehicleHistoryRequest.findUnique({ where: { id: opened.resourceId } });
+     expect(owner).toMatchObject({ customerId: subject.userId, assignmentVersion: 0, mode: "synthetic" }); break;
+    }
+    case "read": expect(result).toMatchObject({ id: f.id, resourceId: f.resource, messages: [], assignmentVersion: 1, lastSequence: 8, readThrough: 0, unread: 0 }); break;
+    case "send":
+     expect(result).toMatchObject({ clientMessageId: messageId, sequence: 9, body: "M1 lawful message", visibility: "customer", sender: "customer" });
+     expect(await tx.serviceMessage.findMany({ where: { conversationId: f.id }, select: { sequence: true, senderId: true, clientMessageId: true } })).toEqual([{ sequence: 9, senderId: subject.userId, clientMessageId: messageId }]);
+     expect(await tx.serviceOutbox.findMany({ where: { conversationId: f.id }, select: { sequence: true, eventType: true } })).toEqual([{ sequence: 9, eventType: "message" }]); break;
+    case "assign":
+     expect(result).toBeUndefined();
+     expect(await tx.vehicleHistoryRequest.findUnique({ where: { id: f.resource } })).toMatchObject({ assigneeId: f.peer.userId, assignmentVersion: 2 });
+     expect(await tx.serviceAudit.findMany({ where: { resourceId: f.resource }, select: { action: true, actorId: true, targetStaffId: true, assignmentVersion: true }, orderBy: { action: "asc" } })).toEqual([{ action: "SERVICE_ASSIGN", actorId: subject.userId, targetStaffId: null, assignmentVersion: 1 }, { action: "SERVICE_HANDOVER", actorId: subject.userId, targetStaffId: f.peer.userId, assignmentVersion: 2 }]);
+     expect(await tx.serviceOutbox.findMany({ where: { conversationId: f.id }, select: { eventType: true, sequence: true } })).toEqual([{ eventType: "handover", sequence: 9 }]); break;
+    case "supportCommand":
+     expect(result).toBeUndefined();
+     expect(await tx.supportCase.findUnique({ where: { id: present(support).resource } })).toMatchObject({ status: "closed", closedAt: now, assignmentVersion: 1 });
+     expect(await tx.serviceAudit.findMany({ where: { resourceId: present(support).resource }, select: { action: true, actorId: true }, orderBy: { action: "asc" } })).toEqual([{ action: "SERVICE_NOTE", actorId: subject.userId }, { action: "SUPPORT_CLOSE_RESOLVED", actorId: subject.userId }]); break;
+    case "markRead":
+     expect(result).toBeUndefined();
+     expect(await tx.serviceReadState.findMany({ where: { conversationId: f.id }, select: { userId: true, lastSequence: true } })).toEqual([{ userId: subject.userId, lastSequence: 5 }]); break;
+    case "subscribePush":
+     expect(result).toBeUndefined();
+     expect(await tx.servicePushSubscription.findMany({ where: { conversationId: f.id }, select: { sessionId: true, deviceId: true, conversationId: true, lifecycleEpoch: true } })).toEqual([{ sessionId: subject.sessionId, deviceId, conversationId: f.id, lifecycleEpoch: 0 }]); break;
+    case "mine": expect(result).toEqual([{ id: f.id, purpose: "history", createdAt: now.toISOString() }]); break;
+    case "queue": expect(result).toEqual([{ id: f.id, resourceId: f.resource, assigned: true, assignmentVersion: 1, createdAt: now.toISOString() }]); break;
+    case "stage": {
+     const staged = result as { id: string }; expect(staged).toEqual({ id: expect.any(String) });
+     expect(await tx.serviceAttachment.findUnique({ where: { id: staged.id } })).toMatchObject({ conversationId: f.id, uploaderId: subject.userId, lifecycleEpoch: 0, state: "staged", expectedBytes: bytes.length, contentType: "image/webp", filename: "fixture.webp", objectKey: null, sizeBytes: null }); break;
+    }
+    case "upload": {
+     const row = await tx.serviceAttachment.findUniqueOrThrow({ where: { id: present(attachmentId) } });
+     expect(row).toMatchObject({ conversationId: f.id, uploaderId: subject.userId, state: "staged", sha256: expect.stringMatching(/^[a-f0-9]{64}$/), objectKey: `service-private/${f.id}/${present(attachmentId)}/${row.sha256}` });
+     if (reached === 0) {
+      expect(result).toMatchObject({ key: row.objectKey, sha256: row.sha256, contentType: "image/webp", epoch: 0 });
+      expect(row.sizeBytes).toBeNull(); expect(storage.objects.size).toBe(0);
+     } else {
+      expect(result).toBeUndefined(); const stored = present(storage.objects.get(present(row.objectKey ?? undefined)));
+      expect(row.sizeBytes).toBe(stored.length); expect(row.sha256).toBe(createHash("sha256").update(stored).digest("hex"));
+     }
+     break;
+    }
+    case "file": expect(result).toEqual({ bytes: present(fileBytes), contentType: "image/webp", filename: "fixture.webp" }); break;
+    case "historyCommand":
+     expect(result).toBeUndefined();
+     expect(await tx.historyOrder.findUnique({ where: { requestId: f.resource } })).toMatchObject({ quoteId: f.quote.id, state: "held", day: f.day, version: 0 });
+     expect(await tx.historyQuote.findUnique({ where: { id: f.quote.id } })).toMatchObject({ acceptedAt: now });
+     expect(await tx.serviceAudit.findMany({ where: { resourceId: f.resource }, select: { action: true, actorId: true } })).toEqual([{ action: "HISTORY_ACCEPT", actorId: subject.userId }]); break;
+    case "historyArtifactCommand":
+     expect(result).toBeUndefined();
+     expect(await tx.historyPurchaseIntent.findUnique({ where: { orderId: present(archive).order.id } })).toMatchObject({ sourceArtifactId: present(archive).artifact.id, createdById: subject.userId, state: "completed" });
+     expect(await tx.historyOrder.findUnique({ where: { id: present(archive).order.id } })).toMatchObject({ state: "fulfilling", version: 1 }); break;
+    case "historyArtifactUpload":
+     expect(result).toBeUndefined(); expect(storage.objects.get(present(artifact).key)).toEqual(bytes);
+     expect(await tx.historyArtifact.findUnique({ where: { id: present(artifact).artifactId } })).toMatchObject({ state: "staged", acquiredForOrderId: present(artifact).order.id, objectKey: present(artifact).key }); break;
+    case "historyReportFile": expect(result).toEqual({ bytes, contentType: "application/pdf", filename: `carfax-${vin}.pdf` }); break;
+    case "historyReports": expect(result).toMatchObject({ delivered: [{ id: present(artifact).artifactId, state: "verified", sharedLink: "https://example.invalid/m1-report" }], archive: [], staged: [] }); break;
+    case "historyPrevious": expect(result).toEqual([{ conversationId: f.id, vin }]); break;
+    case "historySnapshot": expect(result).toMatchObject({ synthetic: true, quotes: [{ id: f.quote.id, vin, providers: ["carfax"], feasible: true, acceptedAt: null }], order: null, payments: [] }); break;
+   }
+   reached++;
+  };
+  const beforeControl = await transactionalState();
+  // upload owns two transactions, so it must finish both. Its now-uploaded
+  // target lawfully supports an idempotent repeat with the same bytes/command.
+  const commitsControl = entry === "upload";
+  const control = caller({ store: storage.store, rollback: !commitsControl, inspect });
+  if (commitsControl) await expect(work(control.service)).resolves.toBeUndefined();
+  else await expect(work(control.service)).rejects.toThrow("caller outer rollback");
+  expect(reached, `${entry} reached its named lawful production outcome`).toBe(commitsControl ? 2 : 1);
+  if (!commitsControl) expect(await transactionalState(), "positive control outer rollback is complete").toEqual(beforeControl);
+  const sessionsBefore = await db.session.findMany({ where: { userId: subject.userId } });
+  expect(sessionsBefore.map(row => row.id)).toEqual([subject.sessionId]);
+  await sessionWriter(caller().database).delete(subject.sessionId);
+  expect(await db.session.findUnique({ where: { id: subject.sessionId } })).toBeNull();
+  const before = await transactionalState();
+  const bytesBefore = [...storage.objects].map(([key, value]) => [key, Buffer.from(value).toString("hex")]);
+  const ioBefore = { reads: [...storage.released], writes: [...storage.written], removals: [...storage.removed] };
+  await expect(work(caller({ store: storage.store }).service)).rejects.toMatchObject({ code: "NO_ACCESS" });
+  expect(await transactionalState(), "revoked Session refuses without transactional residue").toEqual(before);
+  expect([...storage.objects].map(([key, value]) => [key, Buffer.from(value).toString("hex")])).toEqual(bytesBefore);
+  expect({ reads: storage.released, writes: storage.written, removals: storage.removed }, "revoked Session causes no external byte I/O").toEqual(ioBefore);
  });
 
  it.each((["customer", "staff"] as const).flatMap(audience => (["writer", "service"] as const).map(first => ({ audience, first }))))(
@@ -839,19 +955,21 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
  });
 
  function byteStore() {
-  const objects = new Map<string, Uint8Array>(), released: string[] = [];
+  const objects = new Map<string, Uint8Array>(), released: string[] = [], written: string[] = [], removed: string[] = [];
   const store: PrivateStore = {
    async putImmutable(key, bytes) {
+    written.push(key);
     const prior = objects.get(key); if (prior && !Buffer.from(prior).equals(Buffer.from(bytes))) throw new Error("immutable fixture object conflict");
     objects.set(key, Uint8Array.from(bytes));
    },
    async get(key, maxBytes) {
+    released.push(key);
     const bytes = objects.get(key); if (!bytes || bytes.length > maxBytes) throw new Error("missing or oversized fixture object");
-    released.push(key); return Uint8Array.from(bytes);
+    return Uint8Array.from(bytes);
    },
-   async remove(key) { objects.delete(key); },
+   async remove(key) { removed.push(key); objects.delete(key); },
   };
-  return { store, objects, released };
+  return { store, objects, released, written, removed };
  }
  async function stagedArtifact() {
   const f = await history(), bytes = await pdf(), storage = byteStore();
@@ -891,23 +1009,42 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   expect(p.storage.released).toEqual([]); expect(p.storage.objects.get(p.key)).toEqual(p.bytes);
  });
 
- it.each(["writer", "service"] as const)("%s first fences private file bytes against a persisted rights restriction", async first => {
+ it.each(["writer", "service"] as const)("%s first private-file restriction has one current byte audience and drains", async first => {
   const p = await stagedArtifact(), a = caller({ store: p.storage.store, hold: first === "service" });
   await caller({ store: p.storage.store }).service.historyArtifactUpload(p.f.staff, p.f.id, p.artifactId, p.bytes);
   const b = await connection(); await b.query("BEGIN");
-  if (first === "writer") {
-   await b.query('UPDATE history_artifacts SET "restrictedAt"=$1 WHERE id=$2', [now, p.artifactId]);
-   const result = observe(a.service.historyReportFile(p.f.staff, p.f.id, p.artifactId)); await a.started;
-   await blocked(a.pid(), await pid(b)); await b.query("COMMIT");
-   const outcome = await result; expect(outcome.ok).toBe(false); if (!outcome.ok) expect(outcome.error).toMatchObject({ code: "NO_ACCESS" });
-   expect(p.storage.released).toEqual([]);
-  } else {
-   const result = observe(a.service.historyReportFile(p.f.staff, p.f.id, p.artifactId)); await a.ready;
-   const update = observe(b.query('UPDATE history_artifacts SET "restrictedAt"=$1 WHERE id=$2', [now, p.artifactId]));
-   await blocked(await pid(b), a.pid()); a.release();
-   expect(await result).toMatchObject({ ok: true, value: { bytes: p.bytes } });
-   expect((await update).ok).toBe(true); await b.query("COMMIT"); expect(p.storage.released).toEqual([p.key]);
+  // pg serializes queries on one PoolClient. Capture PID while it is idle,
+  // before enqueueing any opposing UPDATE that can wait for the service.
+  const backend = await pid(b), observer = await connection();
+  const outcomes: Promise<unknown>[] = [];
+  let failure: { error: unknown } | undefined;
+  try {
+   if (first === "writer") {
+    await b.query('UPDATE history_artifacts SET "restrictedAt"=$1 WHERE id=$2', [now, p.artifactId]);
+    const result = observe(a.service.historyReportFile(p.f.staff, p.f.id, p.artifactId)); outcomes.push(result); await a.started;
+    await blocked(a.pid(), backend, observer); await b.query("COMMIT");
+    const outcome = await result; expect(outcome.ok).toBe(false); if (!outcome.ok) expect(outcome.error).toMatchObject({ code: "NO_ACCESS" });
+    expect(p.storage.released).toEqual([]);
+   } else {
+    const result = observe(a.service.historyReportFile(p.f.staff, p.f.id, p.artifactId)); outcomes.push(result); await a.ready;
+    const update = observe(b.query('UPDATE history_artifacts SET "restrictedAt"=$1 WHERE id=$2', [now, p.artifactId])); outcomes.push(update);
+    // The reserved observer is separate from the waiting client b.
+    await blocked(backend, a.pid(), observer); a.release();
+    expect(await result).toMatchObject({ ok: true, value: { bytes: p.bytes } });
+    expect((await update).ok).toBe(true); await b.query("COMMIT"); expect(p.storage.released).toEqual([p.key]);
+   }
+  } catch (error) { failure = { error }; }
+  finally {
+   a.release();
+   // Release the raw writer too before draining a writer-first blocked read.
+   try { await b.query("ROLLBACK"); }
+   catch (error) {
+    if (failure) console.error("R6a private-file rollback failed after original error", error);
+    else failure = { error };
+   }
+   await Promise.allSettled(outcomes);
   }
+  if (failure) throw failure.error;
  });
 
  it.each(["payment", "refund", "delivery"] as const)("a real newly appearing %s edge refuses the whole waiting artifact view", async edge => {
