@@ -2124,3 +2124,5 @@ model CampaignPreparation {
 // Snapshot: 20261025010000_diagnostic_report_source_effects.
 
 // Runtime source/preparation grouping corrections: 20261025015000_diagnostic_runtime_transport_corrections.
+
+// Effect scope alias correction: 20261025017500_diagnostic_effect_scope_alias_correction.
