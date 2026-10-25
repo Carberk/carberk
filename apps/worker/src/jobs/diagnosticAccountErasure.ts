@@ -1,10 +1,10 @@
-import { Prisma, type PrismaService } from "@auto-tm/db";
+import { Prisma, type PreparedDiagnosticSource } from "@auto-tm/db";
 
 /** Runs after the User lock in the account purge transaction. Report writes
  * must precede intake erasure: their identity trigger requires a live order.
  * Historical snapshots stay immutable; current access and exact private object
  * intents are fenced without imposing a new retention timer on observations. */
-export function diagnosticAccountErasureWrites(db: PrismaService, userId: string, now: Date): Prisma.PrismaPromise<unknown>[] {
+export function diagnosticAccountErasureWrites(db: Prisma.TransactionClient, userId: string, now: Date, receipt: PreparedDiagnosticSource): Prisma.PrismaPromise<unknown>[] {
  // The User lock serializes public first consumption involving this commissioner.
  // Predecessor/order bindings are immutable. Discover the entire direct-reader
  // union before taking any order/report lock; never add B locks after locking A.
@@ -17,6 +17,7 @@ export function diagnosticAccountErasureWrites(db: PrismaService, userId: string
     JOIN inspection_orders ao ON ao.id=a."orderId"
     WHERE b."orderId"=o.id AND ao."commissionerId"=${userId} AND ao."erasedAt" IS NULL))`;
  return [
+  db.$queryRaw`SELECT public.diagnostic_assert_source(${receipt.receiptId}::uuid, 'account_purge')`,
   // These personal Listings are updated later by account purge. Take their locks
   // before orders, as publisher writers do. No surviving B Listing is mutated.
   db.$queryRaw`SELECT id FROM listings WHERE "sellerId"=${userId} AND "businessId" IS NULL ORDER BY id FOR UPDATE`,

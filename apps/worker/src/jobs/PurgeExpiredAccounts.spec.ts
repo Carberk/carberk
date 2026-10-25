@@ -43,10 +43,12 @@ function makeFakePrisma() {
     listings: [] as Array<{ id: string; sellerId: string; contactPhone: string | null; businessId?: string | null }>,
     /** Operations passed to each `$transaction`, by the label their delegate gave them. */
     transactions: [] as string[][],
+    activeTransaction: null as string[] | null,
   };
 
   /** Labels a pending operation so a test can see which transaction carried it. */
   function labelled<T>(label: string, op: Promise<T>): Promise<T> {
+    if (state.activeTransaction && label !== "raw.query") state.activeTransaction.push(label);
     return Object.assign(op, { label });
   }
 
@@ -75,6 +77,14 @@ function makeFakePrisma() {
     $queryRaw: (strings: TemplateStringsArray, ...values: unknown[]) => {
       const sql = strings.join("?");
       state.raw.push({ sql, values });
+      if (sql.includes("to_jsonb(u) AS row")) {
+        const userId = values[0];
+        const user = state.users.find((candidate) => candidate.id === userId);
+        return labelled("raw.query", Promise.resolve(user ? [{ row: { ...user } }] : []));
+      }
+      if (sql.includes("diagnostic_prepare_source")) {
+        return labelled("raw.query", Promise.resolve([{ receipt: "00000000-0000-0000-0000-000000000001" }]));
+      }
       return labelled(/FROM users[\s\S]*FOR UPDATE/.test(sql) ? "user.lock" : "raw.query", Promise.resolve([]));
     },
 
@@ -245,9 +255,15 @@ function makeFakePrisma() {
         })()),
     },
 
-    $transaction: async (ops: Array<Promise<unknown>>) => {
-      state.transactions.push(ops.map((op) => (op as { label?: string }).label ?? "other"));
-      await Promise.all(ops);
+    $transaction: async <T>(callback: (tx: unknown) => Promise<T>): Promise<T> => {
+      const operations: string[] = [];
+      state.transactions.push(operations);
+      state.activeTransaction = operations;
+      try {
+        return await callback(prismaLike);
+      } finally {
+        state.activeTransaction = null;
+      }
     },
   };
 
@@ -261,6 +277,18 @@ describe("PurgeExpiredAccounts", () => {
   beforeEach(() => {
     fake = makeFakePrisma();
     job = new PurgeExpiredAccounts(fake.prisma);
+  });
+
+  it("uses one interactive prepared-source transaction and asserts the live receipt", async () => {
+    fake.users.push({ id: "receipt-user", phone: "+99360000000", displayName: "Name", avatarUrl: null, deletionScheduledAt: new Date(NOW.getTime() - 1) });
+
+    const result = await job.execute({ now: NOW });
+
+    expect(result.purgedCount).toBe(1);
+    expect(fake.transactions).toHaveLength(1);
+    expect(fake.raw.filter((statement) => statement.sql.includes("diagnostic_prepare_source"))).toHaveLength(1);
+    expect(fake.raw.filter((statement) => statement.sql.includes("diagnostic_assert_source"))).toHaveLength(3);
+    expect(fake.raw.filter((statement) => statement.sql.includes("diagnostic_finish_source"))).toHaveLength(1);
   });
 
   it("preserves business-owned drafts and contact while purging the creator's personal inventory data", async () => {
