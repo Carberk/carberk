@@ -112,26 +112,26 @@ export async function bootstrapSyntheticCenter(
   let workStarted = false;
   try {
     return await withDiagnosticSourceCommand(tx, command, async receipt => {
-    workStarted = true;
-    await assertDiagnosticSourceCommand(tx, receipt, "center_bootstrap");
-    await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`diagnostics:bootstrap-synthetic:${centerCode}`}, 0))`;
-    await tx.$queryRaw`SELECT "id" FROM "users" WHERE "id" = ${userId} FOR UPDATE`;
-    await tx.$queryRaw`SELECT "userId" FROM staff_grants WHERE "userId" = ${userId} AND capability = ${capability} FOR UPDATE`;
-    await tx.$queryRaw`SELECT id FROM diagnostic_centers WHERE id = ${centerId} FOR UPDATE`;
-    await tx.$queryRaw`SELECT id FROM diagnostic_center_assignments WHERE "centerId" = ${centerId} AND "userId" = ${userId} AND capability = ${capability} FOR UPDATE`;
-    const current = await centerState(tx, values);
-    // A changed graph cannot be adopted by this receipt, even after legacy waits.
-    if (current.center?.id !== before.center?.id || current.assignment) throw new Error("diagnostic_source_graph_changed");
-    const planned = await effects(tx, receipt.receiptId);
-    const center = planned.find(e => e.table === "diagnostic_centers" && e.verb === "insert")?.next;
-    if (center) await tx.diagnosticCenter.create({ data: { ...center, operationalApproval: undefined, createdAt: date(center["createdAt"]) } as Prisma.DiagnosticCenterUncheckedCreateInput });
-    const assignment = planned.find(e => e.table === "diagnostic_center_assignments" && e.verb === "insert")?.next;
-    if (!assignment) throw new Error("diagnostic_bootstrap_assignment_effect");
-    await tx.diagnosticCenterAssignment.create({ data: { ...assignment, assignedAt: date(assignment["assignedAt"]), qualifiedUntil: date(assignment["qualifiedUntil"]) } as Prisma.DiagnosticCenterAssignmentUncheckedCreateInput });
-    for (const effect of planned.filter(e => e.table === "diagnostic_audits" && e.verb === "insert")) {
-      await tx.diagnosticAudit.create({ data: { ...effect.next, createdAt: date(effect.next["createdAt"]) } as Prisma.DiagnosticAuditUncheckedCreateInput });
-    }
-    return "Synthetic center and qualification created";
+      workStarted = true;
+      await assertDiagnosticSourceCommand(tx, receipt, "center_bootstrap");
+      await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`diagnostics:bootstrap-synthetic:${centerCode}`}, 0))`;
+      await tx.$queryRaw`SELECT "id" FROM "users" WHERE "id" = ${userId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT "userId" FROM staff_grants WHERE "userId" = ${userId} AND capability = ${capability} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM diagnostic_centers WHERE id = ${centerId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM diagnostic_center_assignments WHERE "centerId" = ${centerId} AND "userId" = ${userId} AND capability = ${capability} FOR UPDATE`;
+      const current = await centerState(tx, values);
+      // A changed graph cannot be adopted by this receipt, even after legacy waits.
+      if (current.center?.id !== before.center?.id || current.assignment) throw new Error("diagnostic_source_graph_changed");
+      const planned = await effects(tx, receipt.receiptId);
+      const center = planned.find(e => e.table === "diagnostic_centers" && e.verb === "insert")?.next;
+      if (center) await tx.diagnosticCenter.create({ data: { ...center, operationalApproval: undefined, createdAt: date(center["createdAt"]) } as Prisma.DiagnosticCenterUncheckedCreateInput });
+      const assignment = planned.find(e => e.table === "diagnostic_center_assignments" && e.verb === "insert")?.next;
+      if (!assignment) throw new Error("diagnostic_bootstrap_assignment_effect");
+      await tx.diagnosticCenterAssignment.create({ data: { ...assignment, assignedAt: date(assignment["assignedAt"]), qualifiedUntil: date(assignment["qualifiedUntil"]) } as Prisma.DiagnosticCenterAssignmentUncheckedCreateInput });
+      for (const effect of planned.filter(e => e.table === "diagnostic_audits" && e.verb === "insert")) {
+        await tx.diagnosticAudit.create({ data: { ...effect.next, createdAt: date(effect.next["createdAt"]) } as Prisma.DiagnosticAuditUncheckedCreateInput });
+      }
+      return "Synthetic center and qualification created";
     });
   } catch (error) {
     if (!workStarted && preparationConflict(error)) throw new CenterPreparationConflict(error, before.center?.id ?? null);

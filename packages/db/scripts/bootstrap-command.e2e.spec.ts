@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -9,15 +10,14 @@ import { Pool } from "pg";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { PrismaClient, Prisma } from "../generated/prisma/client/client";
-import { withDiagnosticSourceCommand, type DiagnosticSourceCommand, type DiagnosticSourceTuple } from "../src/diagnostic-source-command";
+import { withDiagnosticSourceCommand, type DiagnosticSourceTuple } from "../src/diagnostic-source-command";
 import { trackPoolClientEnds } from "../tests/helpers/track-pool-client-ends";
 
-import { bootstrapStaff, bootstrapSyntheticCenter, runSyntheticCenterBootstrap, type CenterBootstrapValues } from "./bootstrap-command";
+import { bootstrapStaff, runSyntheticCenterBootstrap, type CenterBootstrapValues } from "./bootstrap-command";
 
 // AUTHORED ONLY. No imports of other E2E files, no CLI main, no role/trigger bypass.
-// Only the two bootstrap production entrypoints are owned here. The SQL revoke
-// opponent exercises the accepted source boundary, NOT production Identity revoke
-// or the separately owned worker purge/User-cascade integration.
+// The unchanged accepted R2 production revoke adapter is dynamically loaded below.
+// Worker purge/User-cascade integration remains separately owned and uncovered.
 const run = promisify(execFile);
 const packageDir = fileURLToPath(new URL("..", import.meta.url));
 const names = { en: "Carberk synthetic diagnostics", ru: "Carberk synthetic diagnostics", tk: "Carberk synthetic diagnostics" };
@@ -39,8 +39,12 @@ describe("bootstrap callers with actual prepared PostgreSQL transactions", () =>
   let drainOwner: () => Promise<void>, drainApp: () => Promise<void>;
   let databaseName: string, role: string, password: string, userId: string;
   let values: CenterBootstrapValues;
+  let managerId: string, sessionId: string;
+  let Staff: new (client: Client) => { change(input: { userId: string; sessionId: string; targetUserId: string; capability: string; reason: string; grant: boolean }, at: Date): Promise<void> };
   const staff = () => ({ targetUserId: userId, capability, reason: "explicit disposable operator fixture" });
   beforeAll(async () => {
+    const path = fileURLToPath(new URL("../../../apps/api/src/modules/identity/infrastructure/PrismaStaffAuthority.ts", import.meta.url));
+    Staff = (await import(/* @vite-ignore */ path) as { PrismaStaffAuthority: typeof Staff }).PrismaStaffAuthority;
     container = await new PostgreSqlContainer("postgres:17-alpine").start();
     control = new Pool({ connectionString: container.getConnectionUri() });
     role = `r7f_${randomUUID().replaceAll("-", "")}`; password = randomUUID();
@@ -78,9 +82,16 @@ describe("bootstrap callers with actual prepared PostgreSQL transactions", () =>
     expect((await observer.query("SELECT diagnostic_source_guards_ready() AS ready")).rows).toEqual([{ ready: true }]);
     expect((await appPool.query("SELECT rolsuper,rolcreaterole,rolcreatedb FROM pg_roles WHERE rolname=current_user")).rows).toEqual([{ rolsuper: false, rolcreaterole: false, rolcreatedb: false }]);
   }
+  async function manager() {
+    managerId = randomUUID(); sessionId = randomUUID();
+    await owner.user.create({ data: { id: managerId, email: `${managerId}@r7f.invalid`, emailVerifiedAt: new Date() } });
+    await owner.staffGrant.create({ data: { userId: managerId, capability: "staff.manage" } });
+    const until = new Date(Date.now() + 3600_000);
+    await owner.session.create({ data: { id: sessionId, userId: managerId, refreshTokenHash: sessionId, expiresAt: until, adminTotpExpiresAt: until } });
+  }
   async function grant(revokedAt: Date | null = null) { await owner.staffGrant.create({ data: { userId, capability, revokedAt } }); }
   async function seedCenter(options: { audit?: boolean; qualification?: boolean; qualificationAudit?: boolean; qualifiedUntil?: Date | null; revokedAt?: Date | null; approved?: boolean; badNames?: boolean; badPlan?: boolean } = {}) {
-    const center = await owner.diagnosticCenter.create({ data: { code: values["center-code"]!, names: options.badNames ? { en: "foreign" } : names, planCode: options.badPlan ? "foreign" : "standard", operationalApproval: options.approved ? { approved: true } : Prisma.DbNull } });
+    const center = await owner.diagnosticCenter.create({ data: { code: must(values["center-code"]), names: options.badNames ? { en: "foreign" } : names, planCode: options.badPlan ? "foreign" : "standard", operationalApproval: options.approved ? { approved: true } : Prisma.DbNull } });
     if (options.audit !== false) await owner.diagnosticAudit.create({ data: { centerId: center.id, action: "CENTER_SYNTHETIC_BOOTSTRAPPED", details: { command } } });
     if (options.qualification) {
       await owner.diagnosticCenterAssignment.create({ data: { centerId: center.id, userId, capability, qualifiedUntil: options.qualifiedUntil === undefined ? new Date(Date.now() + 3600_000) : options.qualifiedUntil, revokedAt: options.revokedAt ?? null } });
@@ -95,6 +106,11 @@ describe("bootstrap callers with actual prepared PostgreSQL transactions", () =>
       audits: await owner.diagnosticAudit.findMany({ orderBy: { id: "asc" } }), staffAudits: await owner.auditLog.findMany({ orderBy: { id: "asc" } }),
       receipts: await owner.$queryRaw`SELECT id FROM diagnostic_source_commands`, campaigns: await owner.$queryRaw`SELECT id FROM campaign_preparations`,
     };
+  }
+  async function pidReady(pids: number[]): Promise<number> {
+    const deadline = Date.now() + 2000;
+    while (pids.length === 0 && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 5));
+    return must(pids[0]);
   }
   async function blocked(waiter: number, blocker: number) {
     const deadline = Date.now() + 2000;
@@ -112,8 +128,8 @@ describe("bootstrap callers with actual prepared PostgreSQL transactions", () =>
   // Scheduling/fault hooks at the DB boundary preserve every real SQL result.
   // Only the explicitly named missing-audit test suppresses one write to prove
   // the real finish function detects that missing effect and rolls back.
-  function observed(hooks: { ready?: ReturnType<typeof gate>; hold?: ReturnType<typeof gate>; beforePrepare?: () => Promise<void>; afterSnapshotUser?: (tx: Tx) => Promise<void>; omitQualificationAudit?: boolean } = {}) {
-    const pids: number[] = [], errors: unknown[] = [], modes: { readOnly: string; isolation: string }[] = [];
+  function observed(hooks: { ready?: ReturnType<typeof gate>; hold?: ReturnType<typeof gate>; beforePrepare?: () => Promise<void>; afterSnapshotUser?: (tx: Tx) => Promise<void>; omitQualificationAudit?: boolean; omitStaffAudit?: boolean; afterRollback?: () => Promise<void>; assertionLookalike?: boolean } = {}) {
+    const pids: number[] = [], errors: unknown[] = [], sqlErrors: unknown[] = [], modes: { readOnly: string; isolation: string }[] = [];
     let transactions = 0;
     const client = { $transaction: async (work: (tx: Tx) => Promise<string>, options?: { isolationLevel?: Prisma.TransactionIsolationLevel }) => {
       transactions++;
@@ -126,7 +142,8 @@ describe("bootstrap callers with actual prepared PostgreSQL transactions", () =>
             if (prop === "$queryRaw") return async (strings: TemplateStringsArray, ...params: unknown[]) => {
               const sql = strings.join("?");
               if (sql.includes("diagnostic_prepare_source")) await hooks.beforePrepare?.();
-              const result = await target.$queryRaw(strings, ...params);
+              const result = await target.$queryRaw(strings, ...params).catch(error => { sqlErrors.push(error); throw error; });
+              if (hooks.assertionLookalike && sql.includes("diagnostic_assert_source")) await target.$queryRaw`SELECT r7f_preparation_lookalike()`;
               if (options?.isolationLevel === "RepeatableRead" && !userRead && sql.includes('FROM "users"')) { userRead = true; await hooks.afterSnapshotUser?.(target); }
               return result;
             };
@@ -138,6 +155,10 @@ describe("bootstrap callers with actual prepared PostgreSQL transactions", () =>
               }
               return result;
             };
+            if (prop === "auditLog" && hooks.omitStaffAudit) return new Proxy(target.auditLog, { get(model, method) {
+              if (method === "create") return async (args: Prisma.AuditLogCreateArgs) => args.data.action === "STAFF_CAPABILITY_BOOTSTRAP" ? args.data : model.create(args);
+              return Reflect.get(model, method);
+            } });
             if (prop === "diagnosticAudit" && hooks.omitQualificationAudit) return new Proxy(target.diagnosticAudit, { get(model, method) {
               if (method === "create") return async (args: Prisma.DiagnosticAuditCreateArgs) => args.data.action === "CENTER_QUALIFICATION_SYNTHETIC" ? args.data : model.create(args);
               return Reflect.get(model, method);
@@ -148,9 +169,9 @@ describe("bootstrap callers with actual prepared PostgreSQL transactions", () =>
           hooks.ready?.release(); await hooks.hold?.promise;
           return result;
         }, options);
-      } catch (error) { errors.push(error); throw error; }
+      } catch (error) { errors.push(error); if (transactions === 1) await hooks.afterRollback?.(); throw error; }
     } } as unknown as Client;
-    return { client, pids, errors, modes, transactions: () => transactions };
+    return { client, pids, errors, sqlErrors, modes, transactions: () => transactions };
   }
 
   it.each(["absent", "revoked"])("staff bootstrap grants the exact %s slot with one actorless audit, then never renews it", async state => {
@@ -214,7 +235,7 @@ describe("bootstrap callers with actual prepared PostgreSQL transactions", () =>
   it("rolls back the actual caller's center/assignment/audit writes when the named qualification audit is missing at SQL finish", async () => {
     await grant(); await activate(); const before = await snapshot(); const h = observed({ omitQualificationAudit: true });
     const result = await runSyntheticCenterBootstrap(h.client, values).catch(error => error);
-    expect(String(result)).toContain("diagnostic_source_final_effect");
+    expect(driverCause(result)).toMatchObject({ originalCode: "P0001", originalMessage: "diagnostic_source_final_effect" });
     expect(h.transactions()).toBe(1); expect(h.modes).toEqual([]);
     expect(await snapshot()).toEqual(before); await drained(h.pids);
   });
@@ -228,13 +249,39 @@ describe("bootstrap callers with actual prepared PostgreSQL transactions", () =>
     expect(await snapshot()).toEqual(before);
   });
 
-  // Genuine SQL eligibility transition at the shared source boundary. This is
-  // explicitly NOT claimed as PrismaStaffAuthority.change production coverage.
-  async function revoke(tx: Tx) {
-    const key = { userId, capability };
-    const row = must((await tx.$queryRaw<{ source: DiagnosticSourceTuple; next: DiagnosticSourceTuple }[]>`SELECT diagnostic_source_project(diagnostic_source_read('staff_grants',${JSON.stringify(key)}::jsonb),diagnostic_source_meta('staff_grants')->'fields') AS source,diagnostic_source_normalize('staff_grants',diagnostic_source_read('staff_grants',${JSON.stringify(key)}::jsonb)||jsonb_build_object('revokedAt',clock_timestamp()::timestamp(3))) AS next`)[0]);
-    const c: DiagnosticSourceCommand = { operation: "staff_eligibility", roots: [{ table: "users", key: { id: userId } }], rows: [{ table: "staff_grants", key, verb: "update", expected: { source: row.source }, next: row.next }], actorUserId: null, sessionId: null, cutoff: null, campaign: null };
-    await withDiagnosticSourceCommand(tx, c, () => tx.staffGrant.update({ where: { userId_capability: key }, data: { revokedAt: new Date(`${row.next["revokedAt"]}Z`) } }));
+  it("rolls back the actual staff grant at SQL finish if its exact bootstrap audit is missing", async () => {
+    await activate(); const before = await snapshot(); const h = observed({ omitStaffAudit: true });
+    const error = await h.client.$transaction(tx => bootstrapStaff(tx, staff())).catch(error => error);
+    expect(driverCause(error)).toMatchObject({ originalCode: "P0001", originalMessage: "diagnostic_source_final_effect" });
+    expect(h.transactions()).toBe(1); expect(await snapshot()).toEqual(before); await drained(h.pids);
+  });
+  it("rolls back center and assignment work at the actual named assignment write sentinel", async () => {
+    await grant();
+    await observer.query(`CREATE FUNCTION r7f_assignment_write_sentinel() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'r7f_assignment_write_sentinel'; END $$`);
+    await observer.query(`CREATE TRIGGER a_r7f_assignment_write_sentinel BEFORE INSERT ON diagnostic_center_assignments FOR EACH ROW EXECUTE FUNCTION r7f_assignment_write_sentinel()`);
+    await activate(); const before = await snapshot(); const h = observed();
+    await expect(runSyntheticCenterBootstrap(h.client, values)).rejects.toThrow("r7f_assignment_write_sentinel");
+    expect(h.transactions()).toBe(1); expect(h.modes).toEqual([]); expect(await snapshot()).toEqual(before); await drained(h.pids);
+  });
+  it.each(["left", "right"])("serializes exact absent staff slots when %s owns the first write without replay", async winner => {
+    await activate(); const ready = gate(), hold = gate();
+    const left = observed(winner === "left" ? { ready, hold } : {}), right = observed(winner === "right" ? { ready, hold } : {});
+    const first = winner === "left" ? left : right, second = winner === "left" ? right : left;
+    const firstRun = first.client.$transaction(tx => bootstrapStaff(tx, staff()));
+    await Promise.race([ready.promise, firstRun.then(() => { throw new Error("missing held owner"); })]);
+    const secondRun = second.client.$transaction(tx => bootstrapStaff(tx, staff())); const outcomes = Promise.allSettled([firstRun, secondRun]);
+    try { await blocked(await pidReady(second.pids), must(first.pids[0])); } finally { hold.release(); }
+    const results = await outcomes;
+    expect(results[0]).toEqual({ status: "fulfilled", value: "Named capability granted with bootstrap audit" });
+    expect(results[1]?.status).toBe("rejected");
+    if (results[1]?.status === "rejected") expect(driverCause(results[1].reason).originalMessage).toMatch(/^diagnostic_source_(graph_changed|expected_absent)$/);
+    expect(second.transactions()).toBe(1); expect(second.modes).toEqual([]);
+    const after = await snapshot(); expect(after.grants).toHaveLength(1);
+    expect(after.staffAudits.map(row => row.action)).toEqual(["STAFF_CAPABILITY_BOOTSTRAP"]);
+    expect(after.receipts).toEqual([]); expect(after.campaigns).toEqual([]); await drained([...first.pids, ...second.pids]);
+  });
+  async function revoke(client: Client) {
+    await new Staff(client).change({ userId: managerId, sessionId, targetUserId: userId, capability, grant: false, reason: "explicit disposable revoke opposition" }, new Date());
     return "revoked";
   }
   it.each(["left", "right"])("both production callers succeed when %s wins the concurrent absent center slot", async winner => {
@@ -247,27 +294,25 @@ describe("bootstrap callers with actual prepared PostgreSQL transactions", () =>
     const secondRun = runSyntheticCenterBootstrap(second.client, values);
     const outcomes = Promise.allSettled([firstRun, secondRun]);
     try {
-      while (second.pids.length === 0) await new Promise(resolve => setTimeout(resolve, 5));
-      await blocked(must(second.pids[0]), must(first.pids[0]));
+      await blocked(await pidReady(second.pids), must(first.pids[0]));
     } finally { hold.release(); }
     expect(await outcomes).toEqual([{ status: "fulfilled", value: "Synthetic center and qualification created" }, { status: "fulfilled", value: "Already bootstrapped; no change" }]);
     expect(second.transactions()).toBe(2);
-    expect(driverCause(second.errors[0])).toMatchObject({ originalCode: "P0001" });
-    expect(driverCause(second.errors[0]).originalMessage).toMatch(/^diagnostic_(source_graph_changed|intake_operator_center|intake_operator_qualification)$/);
+    expect(driverCause(second.sqlErrors[0])).toMatchObject({ originalCode: "P0001" });
+    expect(driverCause(second.sqlErrors[0]).originalMessage).toMatch(/^diagnostic_(source_graph_changed|intake_operator_center|intake_operator_qualification)$/);
     expect(second.modes).toEqual([{ readOnly: "on", isolation: "repeatable read" }]);
     const result = await snapshot(); expect(result.centers).toHaveLength(1); expect(result.assignments).toHaveLength(1);
     expect(result.audits.map(a => a.action).sort()).toEqual(["CENTER_QUALIFICATION_SYNTHETIC", "CENTER_SYNTHETIC_BOOTSTRAPPED"]);
     expect(result.receipts).toEqual([]); expect(result.campaigns).toEqual([]); await drained([...first.pids, ...second.pids]);
   });
-  it.each(["center", "revoke"])("serializes %s first against the SQL revoke boundary with real PID blockers and complete drain", async firstOperation => {
-    await grant(); await activate(); const ready = gate(), hold = gate(); const first = observed({ ready, hold }), second = observed();
-    const firstRun = firstOperation === "center" ? runSyntheticCenterBootstrap(first.client, values) : first.client.$transaction(revoke);
+  it.each(["center", "revoke"])("serializes %s first against the accepted production revoke caller with real PID blockers and complete drain", async firstOperation => {
+    await grant(); await manager(); await activate(); const ready = gate(), hold = gate(); const first = observed({ ready, hold }), second = observed();
+    const firstRun = firstOperation === "center" ? runSyntheticCenterBootstrap(first.client, values) : revoke(first.client);
     await Promise.race([ready.promise, firstRun.then(() => { throw new Error("missing held owner"); })]);
-    const secondRun = firstOperation === "center" ? second.client.$transaction(revoke) : runSyntheticCenterBootstrap(second.client, values);
+    const secondRun = firstOperation === "center" ? revoke(second.client) : runSyntheticCenterBootstrap(second.client, values);
     const outcomes = Promise.allSettled([firstRun, secondRun]);
     try {
-      while (second.pids.length === 0) await new Promise(resolve => setTimeout(resolve, 5));
-      await blocked(must(second.pids[0]), must(first.pids[0]));
+      await blocked(await pidReady(second.pids), must(first.pids[0]));
     } finally { hold.release(); }
     const results = await outcomes;
     expect(results[0]).toMatchObject({ status: "fulfilled" });
@@ -279,24 +324,24 @@ describe("bootstrap callers with actual prepared PostgreSQL transactions", () =>
     const current = await snapshot();
     expect(current.centers).toHaveLength(firstOperation === "center" ? 1 : 0);
     expect(current.assignments).toHaveLength(firstOperation === "center" ? 1 : 0);
-    expect(current.grants[0]?.revokedAt === null).toBe(firstOperation === "center");
+    expect(current.grants.find(row => row.userId === userId)?.revokedAt === null).toBe(firstOperation === "center");
     expect(current.receipts).toEqual([]); expect(current.campaigns).toEqual([]); await drained([...first.pids, ...second.pids]);
   });
 
   it("recognition keeps one READ ONLY snapshot across a concurrent revoke and uses PostgreSQL read-only enforcement", async () => {
-    await grant(); await activate();
+    await grant(); await manager(); await activate();
     const prepared = gate(), continuePrepare = gate(), snapshotRead = gate(), continueSnapshot = gate();
     let pause = true;
     const h = observed({ beforePrepare: async () => { if (pause) { pause = false; prepared.release(); await continuePrepare.promise; } }, afterSnapshotUser: async () => { snapshotRead.release(); await continueSnapshot.promise; } });
     const waiting = runSyntheticCenterBootstrap(h.client, values); const result = Promise.allSettled([waiting]);
     try {
-      await prepared.promise;
+      await Promise.race([prepared.promise, result.then(() => { throw new Error("caller completed before preparation pause"); })]);
       await runSyntheticCenterBootstrap(db, values); continuePrepare.release();
-      await snapshotRead.promise;
-      await db.$transaction(revoke); continueSnapshot.release();
+      await Promise.race([snapshotRead.promise, result.then(() => { throw new Error("caller completed before snapshot pause"); })]);
+      await revoke(db); continueSnapshot.release();
       expect(await result).toEqual([{ status: "fulfilled", value: "Already bootstrapped; no change" }]);
       expect(h.modes).toEqual([{ readOnly: "on", isolation: "repeatable read" }]);
-      expect((await snapshot()).grants[0]?.revokedAt).toBeInstanceOf(Date);
+      expect((await snapshot()).grants.find(row => row.userId === userId)?.revokedAt).toBeInstanceOf(Date);
       await expect(runSyntheticCenterBootstrap(db, values)).rejects.toThrow("Refused: grant");
       expect(h.transactions()).toBe(2); await drained(h.pids);
     } finally { continuePrepare.release(); continueSnapshot.release(); await result; }
@@ -310,12 +355,66 @@ describe("bootstrap callers with actual prepared PostgreSQL transactions", () =>
     } });
     const waiting = runSyntheticCenterBootstrap(h.client, values); const result = Promise.allSettled([waiting]);
     try {
-      await prepared.promise; await runSyntheticCenterBootstrap(db, values); const before = await snapshot(); continuePrepare.release();
+      await Promise.race([prepared.promise, result.then(() => { throw new Error("caller completed before preparation pause"); })]); await runSyntheticCenterBootstrap(db, values); const before = await snapshot(); continuePrepare.release();
       const [outcome] = await result;
       expect(outcome?.status).toBe("rejected");
-      if (outcome?.status === "rejected") expect(outcome.reason).toBe(h.errors[0]);
+      if (outcome?.status === "rejected") expect(outcome.reason).toBe(h.sqlErrors[0]);
       expect(driverCause(readOnlyFailure)).toMatchObject({ originalCode: "25006" });
       expect(await snapshot()).toEqual(before); expect(h.transactions()).toBe(2); await drained(h.pids);
     } finally { continuePrepare.release(); await result; }
   });
+  it.each(["grant-revoked", "qualification-revoked", "qualification-expired", "missing-center-audit", "missing-qualification-audit"])("preserves the original preparation cause when recognition observes %s", async invalid => {
+    await grant(); await manager(); await activate();
+    const prepared = gate(), continuePrepare = gate(); let pause = true; let beforeRecognition: Awaited<ReturnType<typeof snapshot>> | undefined;
+    const h = observed({
+      beforePrepare: async () => { if (pause) { pause = false; prepared.release(); await continuePrepare.promise; } },
+      afterRollback: async () => {
+        // The original transaction has rejected before any fixture transition.
+        if (invalid === "grant-revoked") await revoke(db);
+        else await db.$transaction(async tx => {
+          const assignment = await tx.diagnosticCenterAssignment.findFirstOrThrow({ where: { userId, capability } });
+          if (invalid === "qualification-revoked" || invalid === "qualification-expired") {
+            const patch = invalid === "qualification-revoked" ? { revokedAt: new Date() } : { qualifiedUntil: new Date("2020-01-01T00:00:00Z") };
+            const key = { id: assignment.id };
+            const plan = must((await tx.$queryRaw<{ source: DiagnosticSourceTuple; next: DiagnosticSourceTuple }[]>`SELECT diagnostic_source_project(diagnostic_source_read('diagnostic_center_assignments',${JSON.stringify(key)}::jsonb),diagnostic_source_meta('diagnostic_center_assignments')->'fields') AS source,diagnostic_source_normalize('diagnostic_center_assignments',diagnostic_source_read('diagnostic_center_assignments',${JSON.stringify(key)}::jsonb)||${JSON.stringify(patch)}::jsonb) AS next`)[0]);
+            await withDiagnosticSourceCommand(tx, { operation: "staff_eligibility", roots: [{ table: "users", key: { id: userId } }], rows: [{ table: "diagnostic_center_assignments", key, verb: "update", expected: { source: plan.source }, next: plan.next }], actorUserId: null, sessionId: null, cutoff: null, campaign: null }, () => tx.diagnosticCenterAssignment.update({ where: key, data: patch }));
+          } else {
+            const action = invalid === "missing-center-audit" ? "CENTER_SYNTHETIC_BOOTSTRAPPED" : "CENTER_QUALIFICATION_SYNTHETIC";
+            const audit = await tx.diagnosticAudit.findFirstOrThrow({ where: { centerId: assignment.centerId, action } }); const key = { id: audit.id };
+            const plan = must((await tx.$queryRaw<{ source: DiagnosticSourceTuple }[]>`SELECT diagnostic_source_project(diagnostic_source_read('diagnostic_audits',${JSON.stringify(key)}::jsonb),diagnostic_source_meta('diagnostic_audits')->'fields') AS source`)[0]);
+            await withDiagnosticSourceCommand(tx, { operation: "order_change", roots: [{ table: "diagnostic_centers", key: { id: assignment.centerId } }], rows: [{ table: "diagnostic_audits", key, verb: "delete", expected: { source: plan.source }, next: null }], actorUserId: null, sessionId: null, cutoff: null, campaign: null }, () => tx.diagnosticAudit.delete({ where: key }));
+          }
+        });
+        // Qualification/audit changes above are declared SQL fixture transitions,
+        // not coverage for an unowned production qualification/provenance writer.
+        beforeRecognition = await snapshot();
+      },
+    });
+    const waiting = runSyntheticCenterBootstrap(h.client, values); const outcome = Promise.allSettled([waiting]);
+    try {
+      await Promise.race([prepared.promise, outcome.then(() => { throw new Error("caller completed before preparation pause"); })]); await runSyntheticCenterBootstrap(db, values); continuePrepare.release();
+      const [result] = await outcome; expect(result?.status).toBe("rejected");
+      if (result?.status === "rejected") expect(result.reason).toBe(h.sqlErrors[0]);
+      expect(driverCause(h.sqlErrors[0]).originalMessage).toMatch(/^diagnostic_(source_graph_changed|intake_operator_center|intake_operator_qualification)$/);
+      expect(h.transactions()).toBe(2); expect(h.modes).toEqual([{ readOnly: "on", isolation: "repeatable read" }]);
+      expect(await snapshot()).toEqual(must(beforeRecognition)); await drained(h.pids);
+    } finally { continuePrepare.release(); await outcome; }
+  });
+  it("never recognizes a preparation-lookalike SQL error from the receipt callback's assertion stage", async () => {
+    await grant();
+    await observer.query(`CREATE FUNCTION r7f_preparation_lookalike() RETURNS boolean LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'diagnostic_source_graph_changed'; END $$`);
+    await activate(); const before = await snapshot(); const h = observed({ assertionLookalike: true });
+    const failure = await runSyntheticCenterBootstrap(h.client, values).catch(error => error);
+    expect(driverCause(failure)).toMatchObject({ originalCode: "P0001", originalMessage: "diagnostic_source_graph_changed" });
+    expect(h.transactions()).toBe(1); expect(h.modes).toEqual([]); expect(await snapshot()).toEqual(before); await drained(h.pids);
+  });
+  it("never recognizes a preparation-lookalike deferred commit error after complete writes and finish", async () => {
+    await grant();
+    await observer.query(`CREATE FUNCTION r7f_commit_lookalike() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'diagnostic_source_graph_changed'; END $$`);
+    await observer.query(`CREATE CONSTRAINT TRIGGER r7f_commit_lookalike AFTER INSERT ON diagnostic_audits DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION r7f_commit_lookalike()`);
+    await activate(); const before = await snapshot(); const h = observed();
+    await expect(runSyntheticCenterBootstrap(h.client, values)).rejects.toThrow("diagnostic_source_graph_changed");
+    expect(h.transactions()).toBe(1); expect(h.modes).toEqual([]); expect(await snapshot()).toEqual(before); await drained(h.pids);
+  });
+
 });

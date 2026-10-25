@@ -45,14 +45,15 @@ describe("diagnostics:bootstrap-synthetic command — disposable migrated Postgr
   let db: PrismaClient;
   let control: Pool;
   let databaseName: string;
-  let guardsActive = false;
+  let guardActivation: Promise<void> | undefined;
 
-  async function activateSourceGuards() {
-    if (guardsActive) return;
-    const triggers = await pool.query<{ table: string; name: string }>(`SELECT c.relname AS table,t.tgname AS name FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND (t.tgname LIKE 'zz_diagnostic_source_%' OR t.tgname LIKE 'zzzz_campaign_preparation%' OR t.tgname='diagnostic_source_no_truncate')`);
-    for (const row of triggers.rows) await pool.query(`ALTER TABLE public."${row.table}" ENABLE TRIGGER "${row.name}"`);
-    expect((await pool.query("SELECT diagnostic_source_guards_ready() AS ready")).rows).toEqual([{ ready: true }]);
-    guardsActive = true;
+  function activateSourceGuards(): Promise<void> {
+    guardActivation ??= (async () => {
+      const triggers = await pool.query<{ table: string; name: string }>(`SELECT c.relname AS table,t.tgname AS name FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND (t.tgname LIKE 'zz_diagnostic_source_%' OR t.tgname LIKE 'zzzz_campaign_preparation%' OR t.tgname='diagnostic_source_no_truncate')`);
+      for (const row of triggers.rows) await pool.query(`ALTER TABLE public."${row.table}" ENABLE TRIGGER "${row.name}"`);
+      expect((await pool.query("SELECT diagnostic_source_guards_ready() AS ready")).rows).toEqual([{ ready: true }]);
+    })();
+    return guardActivation;
   }
 
   /** Gate variables are set explicitly per call; `undefined` removes one from the inherited environment. */
@@ -137,7 +138,7 @@ describe("diagnostics:bootstrap-synthetic command — disposable migrated Postgr
     pool = new Pool({ connectionString: databaseUrl });
     waitForClientEnds = trackPoolClientEnds(pool);
     db = new PrismaClient({ adapter: new PrismaPg(pool) });
-    guardsActive = false;
+    guardActivation = undefined;
     // Another real, approved center and its qualified staff member must survive every run untouched.
     const userId = await staffUser(["diagnostics.templates", "diagnostics.reception"]);
     await db.session.create({ data: { userId, refreshTokenHash: "fixture-hash:bystander", expiresAt: FUTURE } });

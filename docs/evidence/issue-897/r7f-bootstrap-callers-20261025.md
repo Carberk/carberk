@@ -1,3 +1,48 @@
+# R7f bootstrap callers, bounded source handoff, 2026-10-25
+
+Status: IMPLEMENTED_FOR_PARENT_SOURCE_GATE. The initial semantic stop below is resolved by the parent's explicit concurrent no-op disposition. This is the same bounded implementation continuation before its first source gate. No review, correction, execution or remedy cap has reset. No candidate, runtime or final acceptance is claimed.
+
+## Authorized continuation and exact dependencies
+
+Read `/tmp/897-r7f-concurrent-noop-parent-decision-20261025.md` completely and continued from exact checkpoint `86d7f21e63d8a1ad26d81cbac2c91c9dd1dc141d`, tree `68742d00d530ea950b988820b392a3e36de936b8`. Its original handoff/manifest are retained as `/tmp/897-r7f-bootstrap-callers-20261025-initial-checkpoint-handoff.md` and `...-initial-checkpoint-manifest.json`; the original source/evidence remains in that commit.
+
+The center command now recognizes a completed no-op only after a precisely classified preparation-stage failure and complete transaction rollback. The allowlist is exactly PostgreSQL P0001 messages `diagnostic_source_graph_changed`, `diagnostic_intake_operator_center` and `diagnostic_intake_operator_qualification`, carried by Prisma P2010 and `meta.driverAdapterError.cause.originalCode/originalMessage`. This shape was inspected in installed Prisma/adapter-pg 7.8 source; actual runtime shape assertions are authored but unexecuted. No substring or generic-error recovery exists. The marker can be created only before the receipt work callback starts. Assertion, writes, finish and deferred commit errors cannot enter recognition.
+
+Recognition opens at most one REPEATABLE READ transaction, executes real `SET TRANSACTION READ ONLY` before its first data query, then uses the same full User, exact active grant, center identity/code/names/plan/approval, bootstrap audit and qualification identity/provenance/revocation/fresh-clock expiry validation. A previously known center ID must remain identical. Only a complete current no-op returns `Already bootstrapped; no change`. Failure preserves the original preparation error. No command replay, source preparation, new receipt, advisory/row lock or write occurs in recognition. Staff behavior remains unchanged by this disposition. Original CLI argument/environment/allowlist/privacy/operator gates and messages are retained.
+
+After the parent supplied the accepted revoke dependency, preserved partial source as `f33e97ea288705a1e26272df8ea6c7b5c4eefefa` and mechanically merged exact R2 `0efe627ce6be4c97679a1b888f5a5c003f3b4f10`, tree `395d32bdc02d7a926219e7c15f12291609b62629`. Merge `cc6c6f76c3ee17149f7df4f707495dc0c5b9ff01`, tree `7842e30c7a27271c613d4e29cfcd6bdd66d0f55e`, has parents that partial checkpoint and accepted R2. Merge base is `77492d6c6096d65460403128c25384053551a28f`. There were no conflicts or semantic resolutions. All nine incoming R2 paths are byte-exact; accepted f2338add physical mapping, profile and archive bytes remain exact. `/tmp/897-r7f-r2-merge-provenance-20261025.json` records each path/blob comparison. R2 implementation and suites were not edited. The parent's minimal assembler did not write this checkout.
+
+## Verification and authored coverage
+
+| Behavior | Executed evidence | PostgreSQL evidence |
+|---|---|---|
+| Exact staff absent/revoked slot, stable normalized OLD/NEW, audit, preparation before legacy locks | Focused offline pass | First/repeat/no-renewal authored |
+| Center first/known/absent identity, assignment, exact two-hour deadline and audits | Focused offline pass | First/known/repeat authored |
+| No-op and dry-run perform no write preparation, locks or mutation | Focused offline pass | Zero-write snapshots authored for both callers; CLI dry-run/second-capability behavior retained |
+| User/grant/center/qualification/provenance refusals | Listed offline cases pass | Missing/unverified/suspended/deleting User, missing/revoked grant, approved/foreign/unaudited center, unaudited assignment/orphan audit, expired/null/revoked qualification authored |
+| Narrow post-rollback recognition and original-error preservation | Continuation RED 11 failed/25 passed, GREEN 36 passed | Exact real preparation-error shape, winner recognition, invalid authority/provenance/deadline, snapshot consistency and SQLSTATE25006 enforcement authored |
+| Write/assertion/finish/commit failures cannot reconcile | Offline refusal/rollback pass | Named staff/assignment write sentinels, actual staff/center SQL finish missing-audit effects, assertion-stage and deferred-commit lookalike errors authored |
+| Concurrent absent slots, both owners first | Offline tests establish no write replay only | Staff stale waiter refuses; center waiter recognizes valid winner; actual PID blockers, both outcomes and lock/activity drain authored |
+| Center vs revoke in both orders | No runtime execution | Actual accepted R2 `PrismaStaffAuthority.change`, real PID blockers/drain/outcomes authored, including snapshot vs revoke |
+| Qualification/provenance invalidation during recognition | Offline refusal pass | Explicit declared source-boundary fixture transitions, not production writer coverage |
+| Full production purge/User cascade opposition | None | External parent/worker integration gap; no hand-written purge opponent counted |
+
+The new direct `bootstrap-command.e2e.spec.ts` uses a restricted non-superuser app role, complete current guards, preactivation fixture authority, a fresh migrated database per case and connection drain before dropping it. Missing-effect fault hooks suppress only the named required audit to exercise the actual SQL finish check. Other scheduling/fault hooks retain real SQL results. The production revoke source is loaded from the exact accepted dependency, not replaced by a hand-written opposing command. These are authored cases, not runtime proof. Retained-proof/campaign closure, migration reachability, real driver error shape and all PostgreSQL outcomes still require the parent-owned SQL gate.
+
+The existing synthetic CLI E2E remains authored, unimported, uncollected and unexecuted. Only fixture lifecycle/guard activation changed. TypeScript AST inspection retained all 42 original assertion statements, including concurrent `[0, 0]`; one added assertion checks complete guard readiness. No assertion was weakened or timeout increased.
+
+Final focused offline suite: 36 passed. TS7, TS6, six-file ESLint, configured contracts and DB builds, runtime-import boundary check, static parsing of all six owned TS files, original E2E assertion preservation and diff check passed. TypeScript/static parsing read authored E2E source without importing or collecting it. Builds/generation used only the dummy non-routable DB URL and made no connection. Detailed commands/results/log SHA-256 values and exact source pins are in the final external manifest.
+
+Continuation logs use `/tmp/897-r7f-continuation-*` and `/tmp/897-r7f-source-final-*`. The initial continuation lint attempt found two unused imports and one forbidden non-null assertion in the new SQL spec; the focused correction passed. The first static assertion-inspection script failed with `ERR_INVALID_ARG_TYPE` because execFileSync received a string options argument; the retained attempt log precedes the corrected passing AST check. Earlier failed attempts listed in the historical checkpoint are preserved. Additional read-only setup misses were a nonexistent `packages/db/vitest.config.ts` and an unmatched `/tmp/897-r7f*checkpoint*` listing before archive creation; no bypass or mutation followed those misses.
+
+SQL requests 0; HTTP requests 0; SQL/E2E imports, collections and executions 0; CLI main invocations 0; operational Users/grants/qualifications created 0; nested agents 0. No services, Docker, hosted CI, strict/automatic activation or deployment occurred. Branch push is permitted by the inspected workflow triggers and creates no PR. Parent checkout/ledger remains untouched. PR904 is the sole registered parent-owned PR.
+
+Historical diagnostic40177598331 remains failed P3018/42703 before 0/22 cases, cleanup success, NO RETRY AUTHORIZED. B5 UNUSED, cause UNKNOWN, remedy cap exhausted. Source gate, PostgreSQL acceptance, candidate and final acceptance remain parent-owned and open.
+
+## Preserved initial incomplete checkpoint
+
+The text below records the original stop and verification at 86d7f21e. Its pending question and missing authored cases are historical, superseded by the authorized continuation above.
+
 # R7f bootstrap caller checkpoint, 2026-10-25
 
 Status: BLOCKED_SEMANTIC_DISPOSITION_REQUIRED. This is an incomplete implementation checkpoint for parent PR904, not a candidate, runtime acceptance or completed R7f delivery.
