@@ -46,3 +46,38 @@ describe("grant collection and first observation through the intake boundary", (
     }
   });
 });
+
+const deadline = new Date("2026-11-23T12:00:00.000Z");
+describe("execution deadlines after source preparation through production intake", () => {
+  it.each([-1, 0, 1])("checks seller rights at execution offset %s without restamping the planned grant", async offset => {
+    const h = harness(); h.executeAt(new Date(deadline.getTime() + offset));
+    const result = h.intake.grantOwnership(h.subject(), h.row.id, { rights });
+    if (offset < 0) {
+      await expect(result).resolves.toEqual({ id: "grant" });
+      expect(h.grants[0]).toMatchObject({ declaredAt: now, rightsUntil: deadline, rights });
+    } else {
+      await expect(result).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
+      expect(h.grants).toEqual([]);
+    }
+    expect(h.protocol.command()?.rows[0]?.next).toMatchObject({ declaredAt: now.toISOString(), rightsUntil: deadline.toISOString(), rights });
+  });
+  it.each([-1, 0, 1])("checks classification at execution offset %s with atomic refusal and immutable planned stamps", async offset => {
+    const h = harness();
+    h.row.audience = "buyer_private"; h.row.listingId = "00000000-0000-4000-8000-000000000004";
+    h.executeAt(new Date(deadline.getTime() + offset));
+    const result = h.intake.observeVehicle(h.subject("technician"), h.row.id, { expectedVersion: 0,
+      method: "vin", vin: "WVWZZZ1JZXW000001", manualReference: null, mileageKm: 120000,
+      observedAt: "2026-10-23T11:59:00.000Z", ownershipClassification: { rights } });
+    if (offset < 0) {
+      await expect(result).resolves.toMatchObject({ version: 1 });
+      expect(h.raws[0]).toMatchObject({ recordedAt: now });
+      expect(h.row.updatedAt).toEqual(now);
+    } else {
+      await expect(result).rejects.toThrow("DIAGNOSTIC_INVALID_INPUT");
+      expect(h.row.version).toBe(0); expect(h.raws).toEqual([]);
+      expect(h.components).toEqual([]); expect(h.audits).toEqual([]);
+    }
+    expect(h.protocol.command()?.rows.find(row => row.table === "diagnostic_identity_records")?.next).toMatchObject({ recordedAt: now.toISOString() });
+    expect(h.protocol.command()?.rows.find(row => row.table === "inspection_orders")?.next).toMatchObject({ updatedAt: now.toISOString() });
+  });
+});

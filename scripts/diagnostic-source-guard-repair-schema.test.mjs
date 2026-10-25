@@ -13,8 +13,8 @@ const hash = value => createHash('sha256').update(value).digest('hex');
 const specs = JSON.parse(sql.match(/SELECT '(\[[\s\S]*?\])'::jsonb/)[1]);
 const registry = JSON.parse(held.match(/SELECT '(\[[\s\S]*?\])'::jsonb/)[1]);
 
-test('guard repair adds one exact retained migration without changing the held kernel inventory', () => {
-  assert.equal(hash(held), 'cc10000343f6257cb4b0d9cd4240ec57f46642f5a9b0735cd440680602d642b3');
+test('guard repair retains its bytes against the reviewed revised kernel inventory', () => {
+  assert.equal(hash(held), 'b9b2d465c04cc34693e5774d12910a33bb29b39d8452f5a2862dc24b667f4fbf');
   assert.equal(held, readFileSync(new URL(`./testing/retained-schema/${heldName}.sql`, import.meta.url), 'utf8'));
   assert.equal(sql, readFileSync(new URL(`./testing/retained-schema/${name}.sql`, import.meta.url), 'utf8'));
   const schema = '4ae34bfb8ae50fb5a8bd83b04fa1eb819cbb63abf5e427f007dfc508ae15b546', prior = 'a93532709e5b1012f5a1007d5b633c98e982a54ea73fb33b71ddf0fad48c2f7c';

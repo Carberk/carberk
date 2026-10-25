@@ -7,9 +7,11 @@ import { DIAGNOSTIC_RUNTIME, type DiagnosticSubject, type DiagnosticRuntime } fr
 import type { DiagnosticEvidencePort } from "../domain/ports/DiagnosticEvidencePort";
 import { DIAGNOSTIC_OBJECTS, type DiagnosticObjects } from "../domain/ports/DiagnosticObjects";
 import { DiagnosticReportAccess } from "./DiagnosticReportAccess";
+import { diagnosticReadPrefix, diagnosticRoots } from "./DiagnosticPreparedIntake";
 
 type Tx = Prisma.TransactionClient;
 type Upload = Parameters<DiagnosticEvidencePort["upload"]>[1];
+type Root = Parameters<typeof diagnosticReadPrefix>[1][number];
 const denied = () => new DiagnosticRuleError("DIAGNOSTIC_NO_ACCESS");
 @Injectable()
 export class PrismaDiagnosticEvidence implements DiagnosticEvidencePort {
@@ -17,6 +19,12 @@ export class PrismaDiagnosticEvidence implements DiagnosticEvidencePort {
     @Inject(DiagnosticReportAccess) private readonly access: DiagnosticReportAccess,
     @Inject(DIAGNOSTIC_OBJECTS) private readonly objects: DiagnosticObjects,
     @Inject(DIAGNOSTIC_RUNTIME) private readonly runtime: DiagnosticRuntime) {}
+  private async prefix(tx: Tx, subject: DiagnosticSubject, reportId: string, evidenceId?: string): Promise<void> {
+    const report = await tx.diagnosticReportRecord.findUnique({ where: { id: reportId }, select: { id: true, orderId: true } });
+    const roots: Root[] = [...diagnosticRoots(subject, report?.orderId ? [report.orderId] : []), { table: "diagnostic_reports", key: { id: reportId } }];
+    if (evidenceId) roots.push({ table: "diagnostic_evidence", key: { id: evidenceId } }, { table: "diagnostic_identity_provenance", key: { id: evidenceId } });
+    await diagnosticReadPrefix(tx, roots);
+  }
   private async author(tx: Tx, subject: DiagnosticSubject, reportId: string, expectedVersion?: number) {
     const scope = await this.access.load(tx, subject, reportId, "diagnostics.technician");
     const state = scope.row.state as unknown as DiagnosticReportState;
@@ -25,10 +33,11 @@ export class PrismaDiagnosticEvidence implements DiagnosticEvidencePort {
     return scope;
   }
   async upload(subject: DiagnosticSubject, input: Upload) {
-    await this.db.$transaction(tx => this.author(tx, subject, input.reportId, input.expectedVersion));
+    await this.db.$transaction(async tx => { await this.prefix(tx, subject, input.reportId, input.evidenceId); await this.author(tx, subject, input.reportId, input.expectedVersion); });
     const clean = await this.objects.sanitize(input.bytes, input.mime);
     const hash = createHash("sha256").update(clean.bytes).digest("hex");
     const intent = await this.db.$transaction(async tx => {
+      await this.prefix(tx, subject, input.reportId, input.evidenceId);
       await this.author(tx, subject, input.reportId, input.expectedVersion);
       const prior = await tx.diagnosticEvidence.findUnique({ where: { id: input.evidenceId } });
       if (prior) {
@@ -46,15 +55,17 @@ export class PrismaDiagnosticEvidence implements DiagnosticEvidencePort {
         objectKey: `diagnostic-evidence/${input.evidenceId}/${hash}`, sha256: hash, sizeBytes: clean.bytes.byteLength, mime: clean.mime, createdById: subject.userId, writeLeaseUntil: new Date(this.runtime.now().getTime() + 120_000) } });
     });
     if (intent.state === "verified") return { id: intent.id, findingId: intent.findingId, mime: intent.mime, sizeBytes: intent.sizeBytes };
-    await this.db.$transaction(async tx => {
-      await this.author(tx, subject, input.reportId, input.expectedVersion);
-      const current = await tx.diagnosticEvidence.findUnique({ where: { id: intent.id } });
-      if (!current || current.epoch !== intent.epoch || current.cleanupRequestedAt || !current.writeLeaseUntil || current.writeLeaseUntil <= this.runtime.now()) throw denied();
-    });
-    await this.objects.put(intent.objectKey, clean.bytes, clean.mime);
-    await this.objects.read(intent.objectKey, intent.sizeBytes, intent.sha256);
     try {
+      await this.db.$transaction(async tx => {
+        await this.prefix(tx, subject, input.reportId, input.evidenceId);
+        await this.author(tx, subject, input.reportId, input.expectedVersion);
+        const current = await tx.diagnosticEvidence.findUnique({ where: { id: intent.id } });
+        if (!current || current.epoch !== intent.epoch || current.cleanupRequestedAt || !current.writeLeaseUntil || current.writeLeaseUntil <= this.runtime.now()) throw denied();
+      });
+      await this.objects.put(intent.objectKey, clean.bytes, clean.mime);
+      await this.objects.read(intent.objectKey, intent.sizeBytes, intent.sha256);
       return await this.db.$transaction(async tx => {
+        await this.prefix(tx, subject, input.reportId, input.evidenceId);
         await this.author(tx, subject, input.reportId, input.expectedVersion);
         await tx.$queryRaw`SELECT id FROM diagnostic_evidence WHERE id=${intent.id} FOR UPDATE`;
         const current = await tx.diagnosticEvidence.findUnique({ where: { id: intent.id } });
@@ -63,7 +74,11 @@ export class PrismaDiagnosticEvidence implements DiagnosticEvidencePort {
         return { id: current.id, findingId: current.findingId, mime: current.mime, sizeBytes: current.sizeBytes };
       });
     } catch (error) {
-      await this.db.diagnosticEvidence.updateMany({ where: { id: intent.id, epoch: intent.epoch, state: "staged" }, data: { cleanupRequestedAt: this.runtime.now(), state: "cleanup_pending" } });
+      await this.db.$transaction(async tx => {
+        await this.prefix(tx, subject, input.reportId, input.evidenceId);
+        await tx.diagnosticEvidence.updateMany({ where: { id: intent.id, reportId: input.reportId, epoch: intent.epoch, state: "staged" },
+          data: { cleanupRequestedAt: this.runtime.now(), state: "cleanup_pending" } });
+      });
       throw error;
     }
   }
@@ -77,17 +92,21 @@ export class PrismaDiagnosticEvidence implements DiagnosticEvidencePort {
     return row;
   }
   async read(subject: DiagnosticSubject, reportId: string, evidenceId: string) {
-    const row = await this.db.$transaction(tx => this.readable(tx, subject, reportId, evidenceId));
-    const bytes = await this.objects.read(row.objectKey, row.sizeBytes, row.sha256);
+    const row = await this.db.$transaction(async tx => { await this.prefix(tx, subject, reportId, evidenceId); return this.readable(tx, subject, reportId, evidenceId); });
+    let bytes: Uint8Array | null = null;
+    try { bytes = await this.objects.read(row.objectKey, row.sizeBytes, row.sha256); } catch { bytes = null; }
     // Reauthorize after the asynchronous object read, immediately before delivery.
     await this.db.$transaction(async tx => {
+      await this.prefix(tx, subject, reportId, evidenceId);
       const current = await this.readable(tx, subject, reportId, evidenceId);
       if (current.epoch !== row.epoch) throw denied();
     });
+    if (!bytes) throw new DiagnosticRuleError("DIAGNOSTIC_EVIDENCE_UNAVAILABLE");
     return { bytes, mime: row.mime };
   }
   async abandon(subject: DiagnosticSubject, reportId: string, evidenceId: string): Promise<void> {
     await this.db.$transaction(async tx => {
+      await this.prefix(tx, subject, reportId, evidenceId);
       const scope = await this.author(tx, subject, reportId);
       const state = scope.row.state as unknown as DiagnosticReportState;
       if (state.findings.some(finding => finding.evidenceIds.includes(evidenceId))) throw new DiagnosticRuleError("REPORT_EVIDENCE_IN_USE");

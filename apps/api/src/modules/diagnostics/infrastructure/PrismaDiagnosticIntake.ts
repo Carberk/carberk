@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
-import { PrismaService, type Prisma } from "@auto-tm/db";
+import { PrismaService, sealDiagnosticFirstObservation, type DiagnosticSourceCommand, type DiagnosticSourceRow, Prisma } from "@auto-tm/db";
 import { DiagnosticSchemas } from "@auto-tm/contracts";
 import { BUSINESS_AUTHORITY_PORT, type BusinessAuthorityPort } from "../../identity/identity.public";
 import { InspectionOrder, DiagnosticRuleError, type InspectionOrderState } from "../domain/InspectionOrder";
 import { DIAGNOSTIC_RUNTIME, type DiagnosticIntakePort, type DiagnosticRuntime, type DiagnosticSubject } from "../domain/ports/DiagnosticIntakePort";
+
+import { diagnosticMutation, diagnosticPlannedRow, diagnosticReadPrefix, diagnosticRoots } from "./DiagnosticPreparedIntake";
 
 import { DiagnosticAuthority } from "./DiagnosticAuthority";
 
@@ -33,6 +35,14 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
     @Inject(DiagnosticPublicBindings) private readonly publicBindings: DiagnosticPublicBindings,
     @Inject(DIAGNOSTIC_RUNTIME) private readonly runtime: DiagnosticRuntime) {}
 
+  private command(subject: DiagnosticSubject, operation: Exclude<DiagnosticSourceCommand["operation"], "user_eligibility">, rows: DiagnosticSourceRow[], ids: string[], cutoff: Date | null = null): Exclude<DiagnosticSourceCommand, { operation: "user_eligibility" }> {
+    return { operation, roots: diagnosticRoots(subject, ids), rows, actorUserId: subject.userId, sessionId: subject.sessionId, cutoff, campaign: null };
+  }
+  private async plannedAudit(tx: Tx, subject: DiagnosticSubject, row: Pick<Order, "id" | "centerId">, action: string, details: Prisma.InputJsonValue = {}) {
+    const data = { id: this.runtime.id(), centerId: row.centerId, orderId: row.id, actorId: subject.userId, action, details, createdAt: this.runtime.now() };
+    const plan = await diagnosticPlannedRow(tx, { table: "diagnostic_audits", key: { id: data.id } }, data, true);
+    return { data, plan };
+  }
   private current(tx: Tx, subject: DiagnosticSubject): Promise<void> { return this.authority.current(tx, subject); }
   private centerAuthority(tx: Tx, subject: DiagnosticSubject, centerId: string, capability: DiagnosticSchemas.DiagnosticCapability): Promise<void> { return this.authority.center(tx, subject, centerId, capability); }
   private scope(tx: Tx, subject: DiagnosticSubject, id: string, capability?: DiagnosticSchemas.DiagnosticCapability): Promise<{ row: Order; staff: boolean }> { return this.authority.order(tx, subject, id, capability); }
@@ -58,48 +68,78 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
   }
   async create(subject: DiagnosticSubject, input: DiagnosticSchemas.DiagnosticCreate): Promise<DiagnosticSchemas.DiagnosticOrder> {
     return this.db.$transaction(async tx => {
-      const campaign = await this.authority.admitted(tx, subject, {}, "DIAGNOSTIC_SERVICE_UNAVAILABLE");
       const prior = await tx.inspectionOrder.findUnique({ where: { commissionerId_requestKey: { commissionerId: subject.userId, requestKey: input.requestKey } } });
       if (prior) {
+        await this.authority.admitted(tx, subject, { centerId: input.centerId, orderId: prior.id });
         if (prior.centerId !== input.centerId || prior.templateVersionId !== input.templateVersionId || prior.audience !== input.audience || prior.listingId !== (input.listingId ?? null)) throw new DiagnosticRuleError("DIAGNOSTIC_IDEMPOTENCY_CONFLICT");
-        if (prior.erasedAt) throw denial();
-        // A reservation replay reads back only an order its own journal recorded.
-        if (campaign && !await this.authority.owned(tx, campaign, subject, { orderId: prior.id })) throw denial();
-        return this.dto(tx, prior, false);
+        const current = await tx.inspectionOrder.findUnique({ where: { id: prior.id } });
+        if (!current || current.erasedAt || current.commissionerId !== subject.userId || current.requestKey !== input.requestKey) throw denial();
+        if (current.centerId !== input.centerId || current.templateVersionId !== input.templateVersionId || current.audience !== input.audience || current.listingId !== (input.listingId ?? null)) throw new DiagnosticRuleError("DIAGNOSTIC_IDEMPOTENCY_CONFLICT");
+        const campaign = await this.authority.admissionScope(tx, subject);
+        if (campaign && !await this.authority.owned(tx, campaign, subject, { orderId: current.id })) throw denial();
+        return this.dto(tx, current, false);
       }
-      // The first full-v3 slice admits buyer-private intake only; Listing-linked orders are a later slice.
+      const campaign = await this.authority.admissionScope(tx, subject);
+      if (!campaign && !this.runtime.syntheticAllowed(subject)) throw new DiagnosticRuleError("DIAGNOSTIC_SERVICE_UNAVAILABLE");
       if (campaign && (input.audience !== "buyer_private" || input.listingId)) throw denial();
-      await tx.$queryRaw`SELECT id FROM diagnostic_centers WHERE id=${input.centerId} FOR UPDATE`;
-      const template = await tx.diagnosticTemplateVersion.findUnique({ where: { id: input.templateVersionId } });
-      if (!template || template.centerId !== input.centerId || !template.synthetic) throw new DiagnosticRuleError("DIAGNOSTIC_TEMPLATE_UNAVAILABLE");
-      if (campaign && !await this.authority.owned(tx, campaign, subject, { centerId: input.centerId, templateVersionId: input.templateVersionId })) throw denial();
-      if (input.listingId) {
-        const listing = await tx.listing.findUnique({ where: { id: input.listingId }, select: { businessId: true, sellerId: true, status: true, deletedAt: true } });
-        if (!listing || listing.deletedAt || !["active", "sold", "paused"].includes(listing.status)) throw denial();
-        if (input.audience === "listing_public") {
-          if (listing.businessId) await this.business.authorize({ ...subject, businessId: listing.businessId }, tx);
-          else if (listing.sellerId !== subject.userId) throw denial();
-        }
-      }
       const reception = await tx.diagnosticCenterAssignment.findMany({ where: { centerId: input.centerId, capability: "diagnostics.reception", revokedAt: null, qualifiedUntil: { gt: this.runtime.now() }, user: { suspendedAt: null, deletionScheduledAt: null, staffGrants: { some: { capability: "diagnostics.reception", revokedAt: null } } } } });
-      // A reservation assigns only its own journaled, qualified reception peers; no Session is invented for them.
-      const assigned: typeof reception = [];
-      for (const item of reception) {
-        if (campaign ? await this.authority.owned(tx, campaign, subject, { centerId: input.centerId, peerId: item.userId }) : this.runtime.syntheticAllowed({ userId: item.userId, sessionId: "" })) assigned.push(item);
+      let selected: { id: string; userId: string; capability: string }[] = reception.filter(item => this.runtime.syntheticAllowed({ userId: item.userId, sessionId: "" }));
+      if (campaign) {
+        const admission = { operation: "campaign_admit", roots: [{ table: "diagnostic_centers", key: { id: input.centerId } }], rows: [], actorUserId: subject.userId, sessionId: subject.sessionId, cutoff: null, campaign: null, intent: {} };
+        const [discovery] = await tx.$queryRaw<{ contract: { reception: string; effects: { table: string; next: { id: string; userId: string; capability: string } }[] } }[]>`
+          SELECT public.diagnostic_campaign_intake(${JSON.stringify(admission)}::jsonb) AS contract
+        `;
+        if (!discovery) throw denial();
+        selected = reception.filter(item => item.userId === discovery.contract.reception);
+        selected.push(...discovery.contract.effects.filter(effect => effect.table === "diagnostic_center_assignments" && effect.next.capability === "diagnostics.reception").map(effect => effect.next));
       }
-      if (!assigned.length) throw new DiagnosticRuleError("DIAGNOSTIC_SERVICE_UNAVAILABLE");
-      const row = await tx.inspectionOrder.create({ data: { id: this.runtime.id(), centerId: input.centerId, templateVersionId: input.templateVersionId,
-        commissionerId: subject.userId, requestKey: input.requestKey, audience: input.audience, listingId: input.listingId ?? null, synthetic: true,
-        assignments: { create: assigned.map(item => ({ userId: item.userId, capability: item.capability })) } } });
-      await this.audit(tx, subject, row, "INTAKE_CREATED", { audience: input.audience, templateVersionId: input.templateVersionId, synthetic: true });
-      return this.dto(tx, row, false);
+      if (!selected.length) throw new DiagnosticRuleError("DIAGNOSTIC_SERVICE_UNAVAILABLE");
+      const id = this.runtime.id();
+      const [companions] = await tx.$queryRaw<{ auditId: string; at: Date; assignments: { id: string; userId: string; capability: string }[] }[]>`
+        SELECT public.diagnostic_intake_uuid(${'diagnostic-source:intake_create:' + id}) AS "auditId",transaction_timestamp()::timestamp(3) AS at,
+          (SELECT jsonb_agg(jsonb_build_object('id',public.diagnostic_intake_uuid(${'diagnostic-source:intake-assignment:' + id + ':'}||(q->>'id')),'userId',q->>'userId','capability',q->>'capability')) FROM jsonb_array_elements(${JSON.stringify(selected)}::jsonb) q) AS assignments
+      `;
+      if (!companions) throw denial();
+      const data = { id, centerId: input.centerId, templateVersionId: input.templateVersionId, commissionerId: subject.userId, requestKey: input.requestKey,
+        audience: input.audience, listingId: input.listingId ?? null, synthetic: true, status: "requested", version: 0, epoch: this.runtime.id(),
+        physicalAuthorization: null, publicationAuthorization: null, observedVehicle: null, listingIdentityDigest: null, associationValidatedAt: null,
+        identityEvidenceGeneration: 0, createdAt: companions.at, updatedAt: companions.at, erasedAt: null };
+      const plan = await diagnosticPlannedRow(tx, { table: "inspection_orders", key: { id } }, data, true);
+      return diagnosticMutation(tx, { ...this.command(subject, "intake_create", [plan], []),
+        intent: { receptionQualificationIds: selected.map(item => item.id), ...(campaign ? { campaignAdmission: true as const } : {}) } }, async () => {
+        const scope = await this.authority.admitted(tx, subject, { centerId: input.centerId }, "DIAGNOSTIC_SERVICE_UNAVAILABLE");
+        const template = await tx.diagnosticTemplateVersion.findUnique({ where: { id: input.templateVersionId } });
+        if (!template || template.centerId !== input.centerId || !template.synthetic) throw new DiagnosticRuleError("DIAGNOSTIC_TEMPLATE_UNAVAILABLE");
+        if (scope && !await this.authority.owned(tx, scope, subject, { centerId: input.centerId, templateVersionId: input.templateVersionId })) throw denial();
+        const replay = await tx.inspectionOrder.findUnique({ where: { commissionerId_requestKey: { commissionerId: subject.userId, requestKey: input.requestKey } } });
+        if (replay) throw new DiagnosticRuleError("DIAGNOSTIC_IDEMPOTENCY_CONFLICT");
+        if (input.listingId) {
+          const listing = await tx.listing.findUnique({ where: { id: input.listingId } });
+          if (!listing || listing.deletedAt || !["active", "sold", "paused"].includes(listing.status)) throw denial();
+          if (input.audience === "listing_public") {
+            if (listing.businessId) await this.business.authorize({ ...subject, businessId: listing.businessId }, tx);
+            else if (listing.sellerId !== subject.userId) throw denial();
+          }
+        }
+        for (const peer of selected) {
+          const qualification = await tx.diagnosticCenterAssignment.findUnique({ where: { id: peer.id } });
+          const user = await tx.user.findUnique({ where: { id: peer.userId }, include: { staffGrants: { where: { capability: "diagnostics.reception", revokedAt: null } } } });
+          if (!qualification || qualification.centerId !== input.centerId || qualification.userId !== peer.userId || qualification.capability !== "diagnostics.reception" || qualification.revokedAt || !qualification.qualifiedUntil || qualification.qualifiedUntil <= this.runtime.now() || !user || user.suspendedAt || user.deletionScheduledAt || !user.staffGrants.length) throw denial();
+          if (scope ? !await this.authority.owned(tx, scope, subject, { centerId: input.centerId, peerId: peer.userId }) : !this.runtime.syntheticAllowed({ userId: peer.userId, sessionId: "" })) throw denial();
+        }
+        const row = await tx.inspectionOrder.create({ data: { ...data, physicalAuthorization: Prisma.DbNull, publicationAuthorization: Prisma.DbNull, observedVehicle: Prisma.DbNull,
+          assignments: { create: companions.assignments.map(item => ({ ...item, assignedAt: companions.at })) } } });
+        await tx.diagnosticAudit.create({ data: { id: companions.auditId, centerId: input.centerId, orderId: id, actorId: subject.userId, action: "INTAKE_CREATED", details: { audience: input.audience, templateVersionId: input.templateVersionId, synthetic: true }, createdAt: companions.at } });
+        return this.dto(tx, row, false);
+      });
     });
   }
   private staffScope(tx: Tx, subject: DiagnosticSubject, id: string) { return this.authority.staffed(tx, subject, id); }
   async assigned(subject: DiagnosticSubject): Promise<DiagnosticSchemas.DiagnosticOrder[]> {
     return this.db.$transaction(async tx => {
-      await this.current(tx, subject);
       const rows = await tx.inspectionOrder.findMany({ where: { synthetic: true, erasedAt: null, assignments: { some: { userId: subject.userId, revokedAt: null } } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 50 });
+      await diagnosticReadPrefix(tx, diagnosticRoots(subject, rows.map(row => row.id)));
+      await this.current(tx, subject);
       const result: DiagnosticSchemas.DiagnosticOrder[] = [];
       for (const row of rows) {
         try { const scope = await this.staffScope(tx, subject, row.id); if (scope.staff) result.push(await this.dto(tx, scope.row, true)); }
@@ -165,22 +205,35 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
   }
   async publishTemplate(subject: DiagnosticSubject, centerId: string, input: DiagnosticSchemas.PublishDiagnosticTemplate): Promise<DiagnosticSchemas.DiagnosticTemplate> {
     return this.db.$transaction(async tx => {
-      await this.authority.admitted(tx, subject, { centerId }); await this.centerAuthority(tx, subject, centerId, "diagnostics.templates");
-      await tx.$queryRaw`SELECT id FROM diagnostic_centers WHERE id=${centerId} FOR UPDATE`;
-      const latest = await tx.diagnosticTemplateVersion.findFirst({ where: { centerId }, orderBy: { version: "desc" } });
-      if ((latest?.version ?? 0) !== input.expectedVersion) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
-      const row = await tx.diagnosticTemplateVersion.create({ data: { id: this.runtime.id(), centerId, version: input.expectedVersion + 1, definition: json(input.definition), synthetic: true, publishedById: subject.userId, publishedAt: this.runtime.now() } });
-      await tx.diagnosticAudit.create({ data: { centerId, actorId: subject.userId, action: "TEMPLATE_PUBLISHED", details: { templateVersionId: row.id, version: row.version, synthetic: true } } });
-      return this.template(row);
+      const campaign = await this.authority.admissionScope(tx, subject);
+      const id = this.runtime.id();
+      const [companion] = await tx.$queryRaw<{ auditId: string; at: Date }[]>`SELECT public.diagnostic_intake_uuid(${'diagnostic-source:template_publish:' + id}) AS "auditId",transaction_timestamp()::timestamp(3) AS at`;
+      if (!companion) throw denial();
+      const data = { id, centerId, version: input.expectedVersion + 1, definition: json(input.definition), synthetic: true, publishedById: subject.userId, publishedAt: companion.at };
+      const plan = await diagnosticPlannedRow(tx, { table: "diagnostic_template_versions", key: { id } }, data, true);
+      return diagnosticMutation(tx, { ...this.command(subject, "template_publish", [plan], []), ...(campaign ? { intent: { campaignAdmission: true as const } } : {}) }, async () => {
+        await this.authority.admitted(tx, subject, { centerId }); await this.centerAuthority(tx, subject, centerId, "diagnostics.templates");
+        const latest = await tx.diagnosticTemplateVersion.findFirst({ where: { centerId }, orderBy: { version: "desc" } });
+        if ((latest?.version ?? 0) !== input.expectedVersion) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
+        const row = await tx.diagnosticTemplateVersion.create({ data });
+        await tx.diagnosticAudit.create({ data: { id: companion.auditId, centerId, actorId: subject.userId, action: "TEMPLATE_PUBLISHED", details: { templateVersionId: id, version: data.version, synthetic: true }, createdAt: companion.at } });
+        return this.template(row);
+      });
     });
   }
   async authorize(subject: DiagnosticSubject, id: string, input: DiagnosticSchemas.DiagnosticAuthorization): Promise<DiagnosticSchemas.DiagnosticOrder> {
     return this.db.$transaction(async tx => {
-      const { row } = await this.scope(tx, subject, id, "diagnostics.reception"); this.version(row, input.expectedVersion);
-      const state = this.order(row).authorize(input.kind, { authorityReference: input.authorityReference, recordedBy: subject.userId, recordedAt: this.runtime.now().toISOString() }).state;
-      const next = await tx.inspectionOrder.update({ where: { id }, data: { version: { increment: 1 }, ...(input.kind === "physical" ? { physicalAuthorization: json(state.physicalAuthorization) } : { publicationAuthorization: json(state.publicationAuthorization) }) } });
-      await this.audit(tx, subject, row, input.kind === "physical" ? "PHYSICAL_AUTHORIZATION_RECORDED" : "PUBLICATION_CONSENT_RECORDED");
-      return this.dto(tx, next, true);
+      const discovered = await tx.inspectionOrder.findUnique({ where: { id } }); if (!discovered) throw denial();
+      this.version(discovered, input.expectedVersion);
+      const state = this.order(discovered).authorize(input.kind, { authorityReference: input.authorityReference, recordedBy: subject.userId, recordedAt: this.runtime.now().toISOString() }).state;
+      const data = { version: input.expectedVersion + 1, updatedAt: this.runtime.now(), ...(input.kind === "physical" ? { physicalAuthorization: json(state.physicalAuthorization) } : { publicationAuthorization: json(state.publicationAuthorization) }) };
+      const plan = await diagnosticPlannedRow(tx, { table: "inspection_orders", key: { id } }, data);
+      const audit = await this.plannedAudit(tx, subject, discovered, input.kind === "physical" ? "PHYSICAL_AUTHORIZATION_RECORDED" : "PUBLICATION_CONSENT_RECORDED");
+      return diagnosticMutation(tx, this.command(subject, "order_change", [plan, audit.plan], [id]), async () => {
+        const { row } = await this.scope(tx, subject, id, "diagnostics.reception"); this.version(row, input.expectedVersion);
+        const next = await tx.inspectionOrder.update({ where: { id }, data });
+        await tx.diagnosticAudit.create({ data: audit.data }); return this.dto(tx, next, true);
+      });
     });
   }
   private order(row: Order): InspectionOrder {
@@ -190,55 +243,82 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
   }
   async appointment(subject: DiagnosticSubject, id: string, input: DiagnosticSchemas.DiagnosticAppointmentChange): Promise<DiagnosticSchemas.DiagnosticOrder> {
     return this.db.$transaction(async tx => {
-      const scoped = await this.scope(tx, subject, id, input.state === "cancelled" ? undefined : "diagnostics.reception");
-      this.version(scoped.row, input.expectedVersion);
-      const nextState = this.order(scoped.row).transition(input.state, subject.userId, this.runtime.now()).state;
-      if (nextState.status === scoped.row.status) return this.dto(tx, scoped.row, scoped.staff);
-      const next = await tx.inspectionOrder.update({ where: { id }, data: { status: nextState.status, version: { increment: 1 } } });
-      await this.audit(tx, subject, next, "APPOINTMENT_CHANGED", { state: nextState.status }); return this.dto(tx, next, scoped.staff);
+      const row = await tx.inspectionOrder.findUnique({ where: { id } }); if (!row) throw denial();
+      this.version(row, input.expectedVersion);
+      const state = this.order(row).transition(input.state, subject.userId, this.runtime.now()).state;
+      // A real no-op remains a read and still proves the current caller's authority.
+      if (state.status === row.status) {
+        const scoped = await this.scope(tx, subject, id, input.state === "cancelled" ? undefined : "diagnostics.reception");
+        this.version(scoped.row, input.expectedVersion); return this.dto(tx, scoped.row, scoped.staff);
+      }
+      const data = { status: state.status, version: input.expectedVersion + 1, updatedAt: this.runtime.now() };
+      const plan = await diagnosticPlannedRow(tx, { table: "inspection_orders", key: { id } }, data);
+      const audit = await this.plannedAudit(tx, subject, row, "APPOINTMENT_CHANGED", { state: state.status });
+      return diagnosticMutation(tx, this.command(subject, "order_change", [plan, audit.plan], [id]), async () => {
+        const scoped = await this.scope(tx, subject, id, input.state === "cancelled" ? undefined : "diagnostics.reception");
+        this.version(scoped.row, input.expectedVersion);
+        const next = await tx.inspectionOrder.update({ where: { id }, data });
+        await tx.diagnosticAudit.create({ data: audit.data }); return this.dto(tx, next, scoped.staff);
+      });
     });
   }
   async assign(subject: DiagnosticSubject, id: string, input: DiagnosticSchemas.DiagnosticAssignmentChange): Promise<DiagnosticSchemas.DiagnosticOrder> {
     return this.db.$transaction(async tx => {
-      await tx.$queryRaw`SELECT id FROM users WHERE id IN (${subject.userId},${input.userId}) ORDER BY id FOR UPDATE`;
+      const discovered = await tx.inspectionOrder.findUnique({ where: { id } }); if (!discovered) throw denial();
+      this.version(discovered, input.expectedVersion);
+      const existing = await tx.diagnosticOrderAssignment.findUnique({ where: { orderId_userId_capability: { orderId: id, userId: input.userId, capability: input.capability } } });
+      const data = { id: existing?.id ?? this.runtime.id(), orderId: id, userId: input.userId, capability: input.capability, assignedAt: existing?.assignedAt ?? this.runtime.now(), revokedAt: input.active ? null : this.runtime.now() };
+      const assignmentPlan = await diagnosticPlannedRow(tx, { table: "diagnostic_order_assignments", key: { id: data.id } }, data, !existing);
+      const orderData = { version: input.expectedVersion + 1, updatedAt: this.runtime.now() };
+      const plan = await diagnosticPlannedRow(tx, { table: "inspection_orders", key: { id } }, orderData);
+      const audit = await this.plannedAudit(tx, subject, discovered, "ORDER_ASSIGNMENT_CHANGED", { targetUserId: input.userId, capability: input.capability, active: input.active });
+      return diagnosticMutation(tx, this.command(subject, "order_change", [plan, assignmentPlan, audit.plan], [id]), async () => {
       const { row } = await this.scope(tx, subject, id, "diagnostics.reception"); this.version(row, input.expectedVersion);
       const target = await tx.user.findUnique({ where: { id: input.userId }, select: { suspendedAt: true, deletionScheduledAt: true, staffGrants: { where: { capability: input.capability, revokedAt: null } } } });
       const assignment = await tx.diagnosticCenterAssignment.findUnique({ where: { centerId_userId_capability: { centerId: row.centerId, userId: input.userId, capability: input.capability } } });
       if (input.active && (!target || target.suspendedAt || target.deletionScheduledAt || !target.staffGrants.length || !assignment || assignment.revokedAt || !assignment.qualifiedUntil || assignment.qualifiedUntil <= this.runtime.now() || !this.runtime.syntheticAllowed({ userId: input.userId, sessionId: "" }))) throw denial();
       if (!input.active && input.userId === subject.userId && input.capability === "diagnostics.reception") throw new DiagnosticRuleError("DIAGNOSTIC_HANDOVER_REQUIRED");
-      await tx.diagnosticOrderAssignment.upsert({ where: { orderId_userId_capability: { orderId: id, userId: input.userId, capability: input.capability } }, create: { orderId: id, userId: input.userId, capability: input.capability, revokedAt: input.active ? null : this.runtime.now() }, update: { revokedAt: input.active ? null : this.runtime.now() } });
-      const next = await tx.inspectionOrder.update({ where: { id }, data: { version: { increment: 1 } } });
-      await this.audit(tx, subject, row, "ORDER_ASSIGNMENT_CHANGED", { targetUserId: input.userId, capability: input.capability, active: input.active }); return this.dto(tx, next, true);
+      await tx.diagnosticOrderAssignment.upsert({ where: { orderId_userId_capability: { orderId: id, userId: input.userId, capability: input.capability } }, create: data, update: { revokedAt: data.revokedAt } });
+      const next = await tx.inspectionOrder.update({ where: { id }, data: orderData });
+      await tx.diagnosticAudit.create({ data: audit.data }); return this.dto(tx, next, true);
+      });
     });
   }
   async grantOwnership(subject: DiagnosticSubject, id: string, input: DiagnosticSchemas.DiagnosticOwnershipGrant): Promise<{ id: string }> {
     return this.db.$transaction(async tx => {
-      await this.publicBindings.lock(tx, [id], [subject.userId]); await this.current(tx, subject);
-      const row = await tx.inspectionOrder.findUnique({ where: { id } });
-      if (!row) throw denial();
-      return DiagnosticOwnershipGrants.create(tx, row, subject, input, this.runtime.now(), this.runtime.id());
+      const row = await tx.inspectionOrder.findUnique({ where: { id } }); if (!row) throw denial();
+      const now = this.runtime.now(), grantId = this.runtime.id();
+      const data = await DiagnosticOwnershipGrants.data(tx, row, subject, input, now, grantId);
+      const plan = await diagnosticPlannedRow(tx, { table: "diagnostic_ownership_grants", key: { id: grantId } }, data, true);
+      return diagnosticMutation(tx, this.command(subject, "ownership_grant", [plan], [id]), async () => {
+        await this.publicBindings.lock(tx, [id], [subject.userId]); await this.current(tx, subject);
+        const current = await tx.inspectionOrder.findUnique({ where: { id } }); if (!current) throw denial();
+        return DiagnosticOwnershipGrants.create(tx, current, subject, input, now, grantId, this.runtime.now());
+      });
     }).catch(DiagnosticOwnershipGrants.refuse);
   }
   async revokeOwnership(subject: DiagnosticSubject, id: string, grantId: string): Promise<{ id: string }> {
     return this.db.$transaction(async tx => {
       const now = this.runtime.now();
-      const discovered = await tx.diagnosticOwnershipGrant.findUnique({ where: { id: grantId } });
-      if (!discovered || discovered.orderId !== id || discovered.grantorId !== subject.userId) throw denial();
-      // Complete graph locks precede even the current Session/identity check. Discovery is never authority.
-      await tx.$queryRaw`SELECT diagnostic_lock_ownership_disposal(NULL::text,${now}::timestamp,${grantId}::text)`;
-      await this.current(tx, subject);
       const grant = await tx.diagnosticOwnershipGrant.findUnique({ where: { id: grantId } });
       if (!grant || grant.orderId !== id || grant.state !== "available" || grant.grantorId !== subject.userId) throw denial();
-      await tx.$queryRaw`SELECT diagnostic_dispose_ownership_scope(NULL::text,${now}::timestamp,${grantId}::text)`;
-      return { id: grantId };
+      const plan = await diagnosticPlannedRow(tx, { table: "diagnostic_ownership_grants", key: { id: grantId } }, {
+        state: "erased", listingId: null, identityDigest: null, sellerId: null, commissionerId: null, businessId: null, membershipId: null,
+        grantorId: null, grantorMembershipId: null, sessionId: null, rights: null, rightsUntil: null, declaredAt: null, erasedAt: now,
+      });
+      return diagnosticMutation(tx, this.command(subject, "ownership_revoke", [plan], [id], now), async () => {
+        await this.current(tx, subject);
+        const current = await tx.diagnosticOwnershipGrant.findUnique({ where: { id: grantId } });
+        if (!current || current.orderId !== id || current.state !== "available" || current.grantorId !== subject.userId) throw denial();
+        await tx.$queryRaw`SELECT diagnostic_dispose_ownership_scope(NULL::text,${now}::timestamp,${grantId}::text)`;
+        return { id: grantId };
+      });
     }).catch(DiagnosticOwnershipGrants.refuse);
   }
   async observeVehicle(subject: DiagnosticSubject, id: string, input: DiagnosticSchemas.DiagnosticVehicleObservationRequest): Promise<DiagnosticSchemas.DiagnosticOrder> {
     const classification = DiagnosticOwnershipCapture.classification(input.ownershipClassification, this.runtime.now());
     return this.db.$transaction(async tx => {
-      // Listing mutations acquire Listing before order. Never wait for a Listing under an order lock.
-      await this.publicBindings.lock(tx, [id], [subject.userId]);
-      const { row } = await this.scope(tx, subject, id, "diagnostics.technician");
+      const row = await tx.inspectionOrder.findUnique({ where: { id } }); if (!row) throw denial();
       if (input.ownershipGrantId) await DiagnosticOwnershipGrants.compatible(tx, row, input.ownershipGrantId, this.runtime.now());
       const { expectedVersion } = input;
       const observed = DiagnosticSchemas.DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true }).parse({
@@ -249,20 +329,38 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
       let identityDigest: string | null = null;
       if (row.audience === "listing_public") {
         if (!row.listingId || !row.publicationAuthorization || !row.physicalAuthorization) throw new DiagnosticRuleError("PUBLICATION_AUTHORIZATION_REQUIRED");
-        await tx.$queryRaw`SELECT id FROM listings WHERE id=${row.listingId} FOR SHARE`;
         const listing = await tx.listing.findUnique({ where: { id: row.listingId } });
         if (!listing || listing.deletedAt) throw denial();
         if (input.method === "vin" && (!listing.vin || listing.vin.trim().toUpperCase() !== input.vin?.trim().toUpperCase())) throw new DiagnosticRuleError("DIAGNOSTIC_VEHICLE_MISMATCH");
         identityDigest = diagnosticListingDigest(listing);
       }
-      const next = await tx.inspectionOrder.update({ where: { id }, data: { observedVehicle: json(observed), listingIdentityDigest: identityDigest, associationValidatedAt: row.audience === "listing_public" ? this.runtime.now() : null, version: { increment: 1 } } });
-      // Appended under the same order lock and bound to the resulting version; the order keeps only the newest observation.
-      const rawId = this.runtime.id();
-      const recordedAt = this.runtime.now();
-      await tx.diagnosticIdentityRecord.create({ data: { id: rawId, orderId: id, orderVersion: next.version, observation: json(observed),
-        observationHash: diagnosticObservationHash(id, next.version, observed), recordedById: subject.userId, recordedAt } });
-      await DiagnosticOwnershipCapture.append(tx, row, rawId, next.version, subject.userId, recordedAt, classification, input.ownershipGrantId);
-      await this.audit(tx, subject, row, "VEHICLE_OBSERVED", { method: input.method }); return this.dto(tx, next, true);
+      const recordedAt = this.runtime.now(), rawId = this.runtime.id();
+      const data = { observedVehicle: json(observed), listingIdentityDigest: identityDigest, associationValidatedAt: row.audience === "listing_public" ? recordedAt : null, version: expectedVersion + 1, updatedAt: recordedAt };
+      const raw = { id: rawId, orderId: id, orderVersion: data.version, observation: json(observed),
+        observationHash: diagnosticObservationHash(id, data.version, observed), recordedById: subject.userId, recordedAt };
+      const component = await DiagnosticOwnershipCapture.data(tx, row, rawId, data.version, subject.userId, recordedAt, classification, input.ownershipGrantId);
+      const plans = [
+        await diagnosticPlannedRow(tx, { table: "inspection_orders", key: { id } }, data),
+        await diagnosticPlannedRow(tx, { table: "diagnostic_identity_records", key: { id: rawId } }, raw, true),
+        await diagnosticPlannedRow(tx, { table: "diagnostic_ownership_components", key: { identityRecordId: rawId } }, component, true),
+      ];
+      const audit = await this.plannedAudit(tx, subject, row, "VEHICLE_OBSERVED", { method: input.method });
+      return diagnosticMutation(tx, this.command(subject, "observation_append", [...plans, audit.plan], [id]), async receipt => {
+        await this.publicBindings.lock(tx, [id], [subject.userId]);
+        const current = (await this.scope(tx, subject, id, "diagnostics.technician")).row;
+        this.version(current, expectedVersion);
+        if (current.status !== "arrived") throw new DiagnosticRuleError("DIAGNOSTIC_OBSERVATION_DENIED");
+        if (input.ownershipGrantId) await DiagnosticOwnershipGrants.compatible(tx, current, input.ownershipGrantId, this.runtime.now());
+        // Planned stamps are part of the receipt hash. Validate with the clock
+        // after preparation/authority waits without changing those source tuples.
+        const validationNow = this.runtime.now();
+        DiagnosticOwnershipCapture.classification(classification, validationNow);
+        const next = await tx.inspectionOrder.update({ where: { id }, data });
+        await tx.diagnosticIdentityRecord.create({ data: raw });
+        await DiagnosticOwnershipCapture.append(tx, current, rawId, data.version, subject.userId, recordedAt, classification, input.ownershipGrantId, validationNow);
+        await sealDiagnosticFirstObservation(tx, receipt, id, rawId);
+        await tx.diagnosticAudit.create({ data: audit.data }); return this.dto(tx, next, true);
+      });
     }).catch(DiagnosticOwnershipGrants.refuse);
   }
   /** Single-visit history. Commissioner, marketplace admin and center staff not assigned here receive the uniform denial. */

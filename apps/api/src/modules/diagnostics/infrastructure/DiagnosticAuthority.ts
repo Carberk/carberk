@@ -6,6 +6,8 @@ import { DiagnosticRuleError } from "../domain/InspectionOrder";
 import { DIAGNOSTIC_RUNTIME, type DiagnosticRuntime, type DiagnosticSubject } from "../domain/ports/DiagnosticIntakePort";
 import { CampaignDiagnosticAdmission, type CampaignDiagnosticGraph, type CampaignDiagnosticScope } from "./campaignDiagnosticAdmission";
 
+import { diagnosticReadPrefix, diagnosticRoots, diagnosticHasPrefix, diagnosticMutation } from "./DiagnosticPreparedIntake";
+
 type Tx = Prisma.TransactionClient;
 const denied = () => new DiagnosticRuleError("DIAGNOSTIC_NO_ACCESS");
 /** Current identity, qualification and assignment are checked inside the owning transaction. */
@@ -16,24 +18,42 @@ export class DiagnosticAuthority {
     @Inject(DIAGNOSTIC_RUNTIME) private readonly runtime: DiagnosticRuntime,
     @Inject(CampaignDiagnosticAdmission) private readonly campaign: CampaignDiagnosticAdmission) {}
   async current(tx: Tx, subject: DiagnosticSubject): Promise<void> {
+    await diagnosticReadPrefix(tx, diagnosticRoots(subject));
     if (!this.runtime.syntheticAllowed(subject)) throw denied();
     try { await this.business.resolve(subject, tx); } catch { throw denied(); }
+  }
+  /** Unlocked persisted scope discovery for planning the outer command. */
+  async admissionScope(tx: Tx, subject: DiagnosticSubject): Promise<CampaignDiagnosticScope | null> {
+    return this.runtime.syntheticAllowed(subject) ? null : this.campaign.begin(tx, subject);
   }
   /** Template publication and private intake only: the ordinary runtime gate, otherwise the full-v3
    * reservation authority for this exact principal, Session and requested graph. The current Session
    * check always follows; grants, qualifications and assignments remain separate checks. */
   async admitted(tx: Tx, subject: DiagnosticSubject, graph: CampaignDiagnosticGraph = {}, refusal = "DIAGNOSTIC_NO_ACCESS"): Promise<CampaignDiagnosticScope | null> {
-    if (this.runtime.syntheticAllowed(subject)) { await this.current(tx, subject); return null; }
+    if (this.runtime.syntheticAllowed(subject)) {
+      await diagnosticReadPrefix(tx, [...diagnosticRoots(subject, graph.orderId ? [graph.orderId] : []),
+        ...(graph.centerId ? [{ table: "diagnostic_centers" as const, key: { id: graph.centerId } }] : []),
+        ...(graph.templateVersionId ? [{ table: "diagnostic_template_versions" as const, key: { id: graph.templateVersionId } }] : [])]);
+      await this.current(tx, subject); return null;
+    }
     const scope = await this.campaign.begin(tx, subject);
-    if (!scope || !await this.campaign.admit(tx, scope, subject, graph)) throw new DiagnosticRuleError(refusal);
-    try { await this.business.resolve(subject, tx); } catch { throw denied(); }
-    return scope;
+    if (!scope || !graph.centerId) throw new DiagnosticRuleError(refusal);
+    const admit = async () => {
+      if (!await this.campaign.admit(tx, scope, subject, graph)) throw new DiagnosticRuleError(refusal);
+      try { await this.business.resolve(subject, tx); } catch { throw denied(); }
+      return scope;
+    };
+    if (diagnosticHasPrefix(tx)) return admit();
+    return diagnosticMutation(tx, { operation: "campaign_admit", roots: [{ table: "diagnostic_centers", key: { id: graph.centerId } }], rows: [],
+      actorUserId: subject.userId, sessionId: subject.sessionId, cutoff: null, campaign: null, intent: {} }, admit);
   }
+
   /** Proves more of the same reservation's graph inside an already admitted transaction. */
   async owned(tx: Tx, scope: CampaignDiagnosticScope, subject: DiagnosticSubject, graph: CampaignDiagnosticGraph): Promise<boolean> {
     return this.campaign.admit(tx, scope, subject, graph);
   }
   async center(tx: Tx, subject: DiagnosticSubject, centerId: string, capability: DiagnosticSchemas.DiagnosticCapability): Promise<void> {
+    await diagnosticReadPrefix(tx, [...diagnosticRoots(subject), { table: "diagnostic_centers", key: { id: centerId } }]);
     try { await this.staff.authorize({ ...subject, capability }, tx); }
     catch (error) { if (error instanceof StaffAuthorityDenied) throw denied(); throw error; }
     await tx.$queryRaw`SELECT id FROM diagnostic_center_assignments WHERE "centerId"=${centerId} AND "userId"=${subject.userId} AND capability=${capability} FOR SHARE`;
@@ -41,6 +61,7 @@ export class DiagnosticAuthority {
     if (!assignment || assignment.revokedAt || !assignment.qualifiedUntil || assignment.qualifiedUntil <= this.runtime.now()) throw denied();
   }
   async order(tx: Tx, subject: DiagnosticSubject, id: string, capability?: DiagnosticSchemas.DiagnosticCapability): Promise<{ row: Prisma.InspectionOrderGetPayload<object>; staff: boolean }> {
+    await diagnosticReadPrefix(tx, diagnosticRoots(subject, [id]));
     await this.current(tx, subject);
     const initial = await tx.inspectionOrder.findUnique({ where: { id } });
     if (!initial) throw denied();

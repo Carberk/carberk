@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { DiagnosticSchemas as D } from "@auto-tm/contracts";
 import { PrismaService, diagnosticReaderProjection, DIAGNOSTIC_PDF_RENDERERS, type Prisma } from "@auto-tm/db";
@@ -46,14 +47,15 @@ export class PrismaDiagnosticDocuments implements DiagnosticDocumentsPort {
   }
   async download(subject: Subject, reportId: string, locale: "tk" | "ru" | "en"): Promise<Uint8Array> {
     const artifact = await this.db.$transaction(tx => this.ready(tx, subject, reportId, locale));
-    let bytes: Uint8Array;
+    let bytes: Uint8Array | null = null;
     try { bytes = await this.objects.read(artifact.objectKey, artifact.sizeBytes, artifact.sha256); }
-    catch { throw new DiagnosticRuleError("DIAGNOSTIC_PDF_UNAVAILABLE"); }
+    catch { bytes = null; }
     // Current permissions, public identity and artifact epoch must still match after I/O.
     await this.db.$transaction(async tx => {
       const current = await this.ready(tx, subject, reportId, locale);
-      if (current.id !== artifact.id || current.epoch !== artifact.epoch || current.sha256 !== artifact.sha256 || current.sizeBytes !== artifact.sizeBytes) throw unavailable();
+      if (current.id !== artifact.id || current.epoch !== artifact.epoch || current.sha256 !== artifact.sha256 || current.sizeBytes !== artifact.sizeBytes || current.objectKey !== artifact.objectKey || current.snapshotHash !== artifact.snapshotHash || current.rendererVersion !== artifact.rendererVersion || current.generation !== artifact.generation) throw unavailable();
     });
+    if (!bytes || bytes.byteLength !== artifact.sizeBytes || createHash("sha256").update(bytes).digest("hex") !== artifact.sha256) throw new DiagnosticRuleError("DIAGNOSTIC_PDF_UNAVAILABLE");
     return bytes;
   }
 }

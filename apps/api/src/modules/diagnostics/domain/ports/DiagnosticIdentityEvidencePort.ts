@@ -2,7 +2,9 @@ import type { DiagnosticSchemas as D } from "@auto-tm/contracts";
 import type { DiagnosticSubject } from "./DiagnosticIntakePort";
 export const DIAGNOSTIC_IDENTITY_EVIDENCE_PORT = "DIAGNOSTIC_IDENTITY_EVIDENCE_PORT";
 /** Order-owned restricted identity evidence. The assigned technician captures; current
- * staff on that order read. No report, commissioner or public reader authority applies. */
+ * staff on that order read. No report, commissioner or public reader authority applies.
+ * Storage phases commit independently. Every phase rechecks current authority,
+ * retained rights and exact epoch; partial bytes remain bound to cleanup metadata. */
 export interface DiagnosticIdentityEvidencePort {
   stage(subject: DiagnosticSubject, orderId: string, input: D.DiagnosticIdentityProvenanceStage): Promise<D.DiagnosticIdentityProvenanceStaged>;
   /** `bytes` is null when the request carried no binary body; refused after authorization. */

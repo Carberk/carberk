@@ -39,7 +39,7 @@ export type DiagnosticSourceCommand = DiagnosticSourceCommandFields & (
     auditId: string; reason: string; report?: Readonly<{ id: string; reviewedAt: string }>;
   }> }
   | { readonly operation: Exclude<DiagnosticSourceOperation, "user_eligibility">;
-    readonly intent?: Readonly<{ receptionQualificationIds: readonly string[] }> | Readonly<{ code: string; userId: string; capability: string; qualificationId: string }> | Readonly<{ reason: string }> | Readonly<Record<string, never>> }
+    readonly intent?: Readonly<{ receptionQualificationIds: readonly string[]; campaignAdmission?: true }> | Readonly<{ campaignAdmission: true }> | Readonly<{ code: string; userId: string; capability: string; qualificationId: string }> | Readonly<{ reason: string }> | Readonly<Record<string, never>> }
 );
 
 declare const prepared: unique symbol;
