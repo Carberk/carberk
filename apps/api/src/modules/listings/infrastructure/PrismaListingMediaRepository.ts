@@ -1,12 +1,23 @@
 import { lockEditableBusinessStock } from "./lockEditableBusinessStock";
 import { ListingOwnership, assertListingOwnership, type ListingActor } from "../application/ListingOwnership";
 import { Inject, Injectable, Optional } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { Prisma, PrismaService, withCampaignPreparation, type CampaignMutation } from "@auto-tm/db";
 
 import { ListingMedia } from "../domain/ListingMedia";
 import { DomainError, LISTING_ERROR_CODES } from "../domain/types";
 import type { ListingMediaClaim, ListingMediaRepository } from "../domain/ports/ListingMediaRepository";
 import { UPLOAD_CLAIM_PORT, type UploadClaimPort } from "../domain/ports/UploadClaimPort";
+
+const mediaTables = ["users", "dealerships", "dealership_members", "sessions", "listings", "media_uploads", "listing_media", "media_upload_cleanups", "video_upload_sessions", "video_generations"] as const;
+type MediaTable = typeof mediaTables[number];
+type MediaRow = Record<string, Prisma.InputJsonValue | null>;
+interface MediaSlot { table: MediaTable; key: Record<string, string>; row: MediaRow | null; uniqueOnly?: boolean }
+interface MediaSelection { mediaIds: string[]; listingIds: string[]; uploadIds?: string[]; referencedUploadIds?: string[]; actor?: ListingActor | undefined }
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`;
+  return JSON.stringify(value);
+}
 
 @Injectable()
 export class PrismaListingMediaRepository implements ListingMediaRepository {
@@ -32,12 +43,15 @@ export class PrismaListingMediaRepository implements ListingMediaRepository {
       thumbHash: media.thumbHash ?? null,
     };
     const uploadId = media.uploadId;
-    if (!uploadId) return this.toDomain(await this.prisma.listingMedia.create({ data }));
-    if (!claim) throw new Error("An adopting media row needs its reservation");
+    if (uploadId && !claim) throw new Error("An adopting media row needs its reservation");
 
     // The row and the adoption commit together (ADR-0088). Listing before
     // upload is the lock order removal uses too.
     return this.prisma.$transaction(async (tx) => {
+      const mutations: CampaignMutation[] = [{ table: "listing_media", key: { id: media.id }, verb: "insert", next: { ...data, createdAt: data.createdAt.toISOString() } }];
+      return this.preparedMedia(tx, { mediaIds: [media.id], listingIds: [media.listingId],
+        uploadIds: uploadId ? [uploadId] : [], referencedUploadIds: claim?.posterUploadId ? [claim.posterUploadId] : [], actor: claim?.actor }, mutations, async () => {
+      if (!uploadId || !claim) return this.toDomain(await tx.listingMedia.create({ data }));
       const listing = await tx.listing.findUnique({ where: { id: media.listingId } });
       if (listing?.businessId) {
         if (!claim.actor) throw new Error("Business media needs current actor");
@@ -61,6 +75,7 @@ export class PrismaListingMediaRepository implements ListingMediaRepository {
         );
       }
       return this.toDomain(await tx.listingMedia.create({ data }));
+      });
     });
   }
 
@@ -78,7 +93,10 @@ export class PrismaListingMediaRepository implements ListingMediaRepository {
   }
 
   async delete(id: string): Promise<void> {
-    await this.prisma.listingMedia.delete({ where: { id } });
+    await this.prisma.$transaction(async tx => this.preparedMedia(tx, { mediaIds: [id], listingIds: [] },
+      [{ table: "listing_media", key: { id }, verb: "delete", next: null }], async () => {
+        await tx.listingMedia.delete({ where: { id } });
+      }));
   }
 
   async deleteReleasingUpload(id: string, minimumPhotos?: number, actor?: ListingActor): Promise<{ removed: boolean }> {
@@ -125,6 +143,8 @@ export class PrismaListingMediaRepository implements ListingMediaRepository {
 
   async updateSortOrder(listingId: string, orders: { mediaId: string; sortOrder: number }[], actor?: ListingActor): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
+      await this.preparedMedia(tx, { mediaIds: orders.map(order => order.mediaId), listingIds: [listingId], actor },
+        orders.map(order => ({ table: "listing_media", key: { id: order.mediaId }, verb: "update", next: { sortOrder: order.sortOrder } })), async () => {
       const listing = await tx.listing.findUnique({ where: { id: listingId } });
       if (listing?.businessId) {
         if (!actor) throw new Error("Business media needs current actor");
@@ -132,6 +152,108 @@ export class PrismaListingMediaRepository implements ListingMediaRepository {
         await lockEditableBusinessStock(tx, listing.id);
       }
       for (const order of orders) await tx.listingMedia.update({ where: { id: order.mediaId, listingId }, data: { sortOrder: order.sortOrder } });
+      });
+    });
+  }
+
+  private async mediaScope(tx: Prisma.TransactionClient, selection: MediaSelection) {
+    const slots: MediaSlot[] = [];
+    const add = async (table: MediaTable, id: unknown) => {
+      if (typeof id !== "string") return;
+      const key = table === "media_upload_cleanups" ? { uploadId: id } : { id };
+      if (slots.some(slot => !slot.uniqueOnly && slot.table === table && canonical(slot.key) === canonical(key))) return;
+      if (slots.length >= 1000) throw new Error("media_caller_scope_limit");
+      const [found] = await tx.$queryRaw<{ row: MediaRow }[]>(Prisma.sql`
+        SELECT to_jsonb(s) AS row FROM public.${Prisma.raw(table)} s WHERE to_jsonb(s) @> ${JSON.stringify(key)}::jsonb`);
+      slots.push({ table, key, row: found?.row ?? null });
+    };
+    for (const id of [...new Set(selection.mediaIds)].sort()) await add("listing_media", id);
+    for (const id of [...new Set(selection.listingIds)].sort()) await add("listings", id);
+    const ids = [...new Set([...(selection.uploadIds ?? []), ...(selection.referencedUploadIds ?? [])])].sort();
+    for (const id of ids) {
+      await add("media_uploads", id);
+      slots.push({ table: "users", key: { avatarUploadId: id }, row: { avatarUploadId: id }, uniqueOnly: true });
+      slots.push({ table: "listing_media", key: { uploadId: id }, row: { uploadId: id }, uniqueOnly: true });
+    }
+    if (ids.length) {
+      const adopters = await tx.$queryRaw<{ table: "users" | "listing_media"; id: string; listingId: string | null }[]>`
+        SELECT 'users' AS table, id, NULL::text AS "listingId" FROM users WHERE "avatarUploadId" = ANY(${ids}::text[])
+        UNION ALL SELECT 'listing_media', id, "listingId" FROM listing_media WHERE "uploadId" = ANY(${ids}::text[]) ORDER BY 1,2`;
+      for (const adopter of adopters) { await add(adopter.table, adopter.id); await add("listings", adopter.listingId); }
+    }
+    await add("users", selection.actor?.userId);
+    await add("sessions", selection.actor?.sessionId);
+    await add("dealerships", selection.actor?.businessId);
+    if (selection.actor?.businessId) {
+      const members = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM dealership_members WHERE "userId" = ${selection.actor.userId}
+          OR ("dealershipId" = ${selection.actor.businessId} AND role = 'owner') ORDER BY id`;
+      for (const member of members) await add("dealership_members", member.id);
+      slots.push({ table: "dealership_members", key: { userId: selection.actor.userId },
+        row: { userId: selection.actor.userId, dealershipId: selection.actor.businessId }, uniqueOnly: true });
+    }
+    for (let index = 0; index < slots.length; index++) {
+      if (slots.length > 1000) throw new Error("media_caller_scope_limit");
+      const slot = slots[index];
+      if (!slot?.row || slot.uniqueOnly) continue;
+      if (slot.table === "media_uploads") {
+        const type = slot.row["claimTargetType"], id = slot.row["claimTargetId"];
+        if (type === "profile") await add("users", id);
+        if (type === "listing") await add("listings", id);
+        if (type === "video_session") await add("video_upload_sessions", id);
+      }
+      const [meta] = await tx.$queryRaw<{ refs: { table: MediaTable; columns: string[]; target: string[] }[] }[]>`
+        SELECT public.diagnostic_source_meta(${slot.table}::text)->'refs' AS refs`;
+      for (const ref of meta?.refs ?? []) {
+        const column = ref.columns[0];
+        if (ref.columns.length === 1 && column && ref.target[0] === "id" && mediaTables.includes(ref.table)) await add(ref.table, slot.row[column]);
+      }
+    }
+    const mutations: CampaignMutation[] = [];
+    for (const id of ids) if (slots.some(slot => !slot.uniqueOnly && slot.table === "media_uploads" && slot.key["id"] === id && slot.row)) {
+      mutations.push({ table: "media_uploads", key: { id }, verb: "update", next: selection.uploadIds?.includes(id) ? { state: "ADOPTED", claimToken: null, claimDeadline: null } : {} });
+    }
+    return { slots, mutations };
+  }
+
+  /** Ordinary media only. Source publication retains its source-command owner. */
+  private async preparedMedia<T>(tx: Prisma.TransactionClient, selection: MediaSelection, writes: CampaignMutation[], work: () => Promise<T>): Promise<T> {
+    const before = await this.mediaScope(tx, selection);
+    const mutations = [...writes, ...before.mutations];
+    const coverage = [...mutations];
+    for (const slot of before.slots) if (slot.row && !slot.uniqueOnly && !coverage.some(row => row.table === slot.table && canonical(row.key) === canonical(slot.key))) {
+      coverage.push({ table: slot.table, key: slot.key, verb: "update", next: {} });
+    }
+    return withCampaignPreparation(tx, coverage, async () => {
+      const [derived] = await tx.$queryRaw<{ keys: { namespace: number; key: number }[] }[]>`
+        SELECT public.diagnostic_source_lock_keys_before_intake(${JSON.stringify(before.slots.filter(slot => !slot.uniqueOnly))}::jsonb,
+          ${JSON.stringify({ rows: mutations })}::jsonb) || coalesce((
+          SELECT jsonb_agg(DISTINCT jsonb_build_object(
+            'namespace',(public.diagnostic_source_meta(s->>'table')->>'namespace')::int,
+            'key',hashtext(jsonb_build_array('unique',fields,public.diagnostic_source_project(s->'row',fields))::text)))
+          FROM jsonb_array_elements(${JSON.stringify(before.slots.filter(slot => slot.uniqueOnly))}::jsonb) s
+          CROSS JOIN LATERAL jsonb_array_elements(public.diagnostic_source_meta(s->>'table')->'unique') fields
+          WHERE NOT EXISTS (SELECT 1 FROM jsonb_each(public.diagnostic_source_project(s->'row',fields)) e WHERE e.value='null')
+        ),'[]'::jsonb) || coalesce((
+          SELECT jsonb_agg(DISTINCT jsonb_build_object(
+            'namespace',(public.diagnostic_source_meta('dealership_members')->>'namespace')::int,
+            'key',hashtext(jsonb_build_array('owner',s->'row'->'dealershipId')::text)))
+          FROM jsonb_array_elements(${JSON.stringify(before.slots.filter(slot => slot.uniqueOnly && slot.table === "dealership_members"))}::jsonb) s
+        ),'[]'::jsonb) AS keys`;
+      if (!derived) throw new Error("media_caller_lock_keys");
+      const keys = [...new Map(derived.keys.map(key => [`${key.namespace}:${key.key}`, key])).values()]
+        .sort((a, b) => a.namespace - b.namespace || a.key - b.key);
+      for (const namespace of [...new Set(keys.map(key => key.namespace))]) {
+        for (const key of keys.filter(key => key.namespace === namespace)) await tx.$queryRaw`SELECT pg_advisory_xact_lock(${namespace}::int,${key.key}::int)`;
+        for (const slot of before.slots.filter(slot => slot.row && !slot.uniqueOnly).sort((a, b) => canonical(a.key).localeCompare(canonical(b.key)))) {
+          const [meta] = await tx.$queryRaw<{ namespace: number }[]>`
+            SELECT (public.diagnostic_source_meta(${slot.table}::text)->>'namespace')::int AS namespace`;
+          if (meta?.namespace === namespace) await tx.$queryRaw(Prisma.sql`
+            SELECT 1 FROM public.${Prisma.raw(slot.table)} s WHERE to_jsonb(s) @> ${JSON.stringify(slot.key)}::jsonb FOR UPDATE`);
+        }
+      }
+      if (canonical(before) !== canonical(await this.mediaScope(tx, selection))) throw new Error("media_caller_scope_changed");
+      return work();
     });
   }
 

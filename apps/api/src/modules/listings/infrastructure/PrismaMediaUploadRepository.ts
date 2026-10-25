@@ -64,10 +64,10 @@ export class PrismaMediaUploadRepository implements MediaUploadRepository {
           }
         }
         if (canonical(before) !== canonical(await this.registrationScope(tx, upload, actor))) throw new Error("media_registration_scope_changed");
-      if (upload.businessId) {
-        if (!actor) throw new Error("Business upload requires current actor");
-        await assertListingOwnership(this.ownership, actor, upload, tx);
-      }
+        if (upload.businessId) {
+          if (!actor) throw new Error("Business upload requires current actor");
+          await assertListingOwnership(this.ownership, actor, upload, tx);
+        }
         await tx.mediaUpload.create({ data });
       });
     });

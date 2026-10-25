@@ -58,7 +58,7 @@ describe("media caller preparation", () => {
     expect(db.finished).toBe(1);
   });
   it("returns the committed adopter for a joined retry", async () => {
-    const { db, repository } = setup(); db.upload("upload-1", { ...reserve, state: "ADOPTED" });
+    const { db, repository } = setup(); db.upload("upload-1", reserve);
     await repository.save(media(), { token: "token" });
     expect((await repository.save(media("retry"), { token: "token" })).id).toBe("photo");
     expect(db.tables["listing_media"]).toHaveLength(1);
