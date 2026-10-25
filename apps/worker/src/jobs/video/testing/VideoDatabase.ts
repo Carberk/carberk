@@ -87,7 +87,12 @@ export class VideoDatabase {
     if (sql.includes("campaign_finish(")) return [];
     if (sql.includes("diagnostic_source_lock_keys_before_intake")) return [{ keys: [{ namespace: 200, key: 9 }, { namespace: 100, key: -1 }, { namespace: 200, key: 9 }] }];
     if (sql.includes("diagnostic_source_meta")) return [{ namespace: 100, refs: (refs[String(values[0])] ?? []).map(([table, column]) => ({ table, columns: [column], target: ["id"] })) }];
-    if (sql.includes("pg_advisory_xact_lock")) { if (!this.prepared) throw new Error("FAKE_PREPARATION_REQUIRED"); return []; }
+    if (sql.includes("pg_advisory_xact_lock")) {
+      if (!this.prepared) throw new Error("FAKE_PREPARATION_REQUIRED");
+      // Prisma 7 cannot deserialize the advisory function's native void result.
+      if (!/pg_advisory_xact_lock\([^)]*\)::text\b/.test(sql)) throw new Error("FAKE_PRISMA_UNSUPPORTED_VOID");
+      return [];
+    }
     if (/FOR (UPDATE|SHARE)/.test(sql)) {
       if (!this.prepared) throw new Error("FAKE_PREPARATION_REQUIRED"); this.locked = true;
       if (!this.changed && this.changeAfterLocks) { this.changed = true; this.changeAfterLocks(); }
