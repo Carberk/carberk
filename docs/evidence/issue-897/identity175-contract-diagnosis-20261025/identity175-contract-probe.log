@@ -1,0 +1,26 @@
+BEGIN
+CREATE TABLE
+CREATE TABLE
+CREATE FUNCTION
+CREATE TRIGGER
+INSERT 0 1
+TRUNCATE TABLE
+INSERT 0 1
+ native_upsert_before_trigger_order 
+------------------------------------
+ {INSERT,UPDATE}
+(1 row)
+
+TRUNCATE TABLE
+UPDATE 1
+ explicit_update_before_trigger_order 
+--------------------------------------
+ {UPDATE}
+(1 row)
+
+                  missing_caller_old_fields                  
+-------------------------------------------------------------
+ ["avatarKey", "avatarUploadId", "avatarUrl", "displayName"]
+(1 row)
+
+ROLLBACK
