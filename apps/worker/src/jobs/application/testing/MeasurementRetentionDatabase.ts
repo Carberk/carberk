@@ -14,6 +14,7 @@ export class MeasurementRetentionDatabase {
  collectorEpoch: string | null = "current-external-epoch";
  collectorBusy = false;
  failAt: Table | null = null;
+ readonly attemptedDeletes: Table[] = [];
  readonly options: { timeout: number; maxWait: number }[] = [];
 
  asPrisma(): PrismaService { return this as unknown as PrismaService; }
@@ -39,6 +40,7 @@ export class MeasurementRetentionDatabase {
     if (sql === "SET LOCAL statement_timeout = '2000ms'") return 0;
     const table = tables.find(name => sql.includes(`DELETE FROM "${name}"`));
     if (!table) throw new Error(`Unexpected database write: ${sql}`);
+    this.attemptedDeletes.push(table);
     if (this.failAt === table) throw new Error("injected database failure");
     const cutoff = values[0] as Date, limit = values[1] as number;
     const selected = draft[table].filter(row => !row.locked && row.dueAt <= cutoff)

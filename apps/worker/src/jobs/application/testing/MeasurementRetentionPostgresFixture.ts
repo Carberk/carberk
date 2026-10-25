@@ -86,7 +86,7 @@ export class MeasurementRetentionPostgresFixture {
   this.disposable = true;
   const namespaces = await this.db.$queryRaw<{ name: string }[]>`SELECT nspname AS name FROM pg_namespace WHERE nspname ~ '^cf_[a-f0-9]{32}$'`;
   if (namespaces.length) throw new Error("Retention fixture must not share a campaign namespace");
-  this.triggers = await this.db.$queryRaw<typeof this.triggers>`SELECT c.relname AS table, t.tgname AS name, t.tgenabled AS enabled
+  this.triggers = await this.db.$queryRaw<typeof this.triggers>`SELECT c.relname AS table, t.tgname AS name, t.tgenabled::text AS enabled
    FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace
    WHERE n.nspname='public' AND (t.tgname LIKE 'zz_diagnostic_source_%' OR t.tgname LIKE 'zzzz_campaign_preparation%' OR t.tgname='diagnostic_source_no_truncate')`;
   // Setup/cleanup DDL belongs only to this disposable fixture, never a runtime role.

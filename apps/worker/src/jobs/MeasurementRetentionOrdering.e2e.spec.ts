@@ -10,15 +10,18 @@ import { MeasurementRetentionPostgresFixture, retentionConnection, retentionStor
 
 const DAY = 86400000;
 const now = new Date("1980-05-01T00:00:00Z");
+const purgeDueAt = new Date(now.getTime() - DAY);
 const oldVisit = new Date(now.getTime() - 90 * DAY);
 const fresh = new Date(now.getTime() + DAY);
 const collectorLock = (sql: string) => sql.includes('FROM "measurement_state"') && sql.includes("FOR UPDATE");
 
-/** Authored, NOT executed in this checkpoint. test:unit excludes this file.
+/** Direct PostgreSQL suite; test:unit excludes this file. Exact run receipts
+ * distinguish executed cases from the still-failing purge dependency gates.
  * Missing hosted disposable isolation fails explicitly, never silently skips.
  * Purge opponent is exactly dependency 311637ca, not a source-command facsimile.
- * Its current measurement final-effect refusal is asserted, not relabeled as
- * successful erasure. Positive nonempty-graph purge remains a dependency gate. */
+ * Intended post-preparation outcomes stay asserted even when an earlier
+ * dependency defect prevents reaching the lock barrier. No erased-source
+ * command is written by a test to substitute for this production opponent. */
 describe("G1 adjacent measurement retention on real PostgreSQL", () => {
  let f: MeasurementRetentionPostgresFixture;
  beforeEach(async () => { f = new MeasurementRetentionPostgresFixture(now); await f.open(); });
@@ -40,7 +43,7 @@ describe("G1 adjacent measurement retention on real PostgreSQL", () => {
   const account = await f.account(f.user, oldVisit);
   const raw = await f.raw(account.principal.id, account.visit);
   const queued = await f.outbox(account.principal.id);
-  await f.db.user.update({ where: { id: f.user }, data: { deletionScheduledAt: now } });
+  await f.db.user.update({ where: { id: f.user }, data: { deletionScheduledAt: purgeDueAt } });
   return { ...account, raw, queued };
  }
  async function collect(db = f.db, event = f.event(), account?: Awaited<ReturnType<typeof f.account>>) {
@@ -49,11 +52,11 @@ describe("G1 adjacent measurement retention on real PostgreSQL", () => {
    epoch: principal.epoch, environment: "test", population: "synthetic", conversionEligible: false });
  }
  async function refusedPurge(task: Promise<unknown>, reason = "diagnostic_source_final_effect") {
-  // The accepted caller omits the kernel-derived measurement erasures. This
-  // literal outcome keeps that READ ONLY dependency limitation visible.
+  // Static expectation once the accepted caller can reach preparation. Its
+  // unrecognized intent currently refuses earlier; keep the later gate visible.
   await expect(task).rejects.toThrow(reason);
   expect(await f.db.user.findUniqueOrThrow({ where: { id: f.user }, select: { displayName: true, deletionScheduledAt: true } }))
-   .toEqual({ displayName: "Synthetic due account", deletionScheduledAt: now });
+   .toEqual({ displayName: "Synthetic due account", deletionScheduledAt: purgeDueAt });
  }
 
  it("keeps six independent limits, inclusive boundaries, cascade counts and backlog", async () => {
@@ -248,7 +251,7 @@ describe("G1 adjacent measurement retention on real PostgreSQL", () => {
 
  it("allows the real prepared purge to complete for an already-erased measurement account beside foreign retention", async () => {
   const foreign = await f.account(f.foreignUser), raw = await f.raw(foreign.principal.id, null);
-  await f.db.user.update({ where: { id: f.user }, data: { deletionScheduledAt: now } });
+  await f.db.user.update({ where: { id: f.user }, data: { deletionScheduledAt: purgeDueAt } });
   await f.guards(true);
   expect(await new PurgeExpiredAccounts(f.db).execute({ now })).toEqual({ purgedCount: 1 });
   expect(await ledger().deleteExpired(now, 1)).toBe(1);
@@ -256,6 +259,22 @@ describe("G1 adjacent measurement retention on real PostgreSQL", () => {
    .toEqual({ displayName: null, deletionScheduledAt: null });
   expect(await f.db.measurementPrincipal.findUnique({ where: { id: foreign.principal.id } })).not.toBeNull();
   expect(await f.db.measurementRecord.findUnique({ where: { id: raw.id } })).toBeNull();
+ });
+
+ it("records current production purge intent refusal with atomic preservation before the ordering gate", async () => {
+  const account = await dueAccount(), foreign = await f.guest();
+  const retained = await f.raw(foreign.principal.id, foreign.visit, fresh);
+  await f.guards(true);
+  // A diagnosis of exact311637ca, not acceptance of this caller's behavior.
+  await expect(new PurgeExpiredAccounts(f.db).execute({ now })).rejects.toThrow("diagnostic_source_command");
+  expect(await f.db.user.findUniqueOrThrow({ where: { id: f.user }, select: { displayName: true, deletionScheduledAt: true } }))
+   .toEqual({ displayName: "Synthetic due account", deletionScheduledAt: purgeDueAt });
+  expect(await f.db.measurementPrincipal.findUnique({ where: { id: account.principal.id } })).not.toBeNull();
+  expect(await f.db.measurementVisit.findUnique({ where: { id: account.visit } })).not.toBeNull();
+  expect(await f.db.measurementRecord.findUnique({ where: { id: account.raw.id } })).not.toBeNull();
+  expect(await f.db.measurementOutbox.findUnique({ where: { id: account.queued.id } })).not.toBeNull();
+  expect(await f.db.measurementRecord.findUnique({ where: { id: retained.id } })).not.toBeNull();
+  expect(await f.db.diagnosticSourceCommand.count()).toBe(0);
  });
 
  it.each(["guest-first", "retention-first"])("preserves foreign guest data during actual guest erasure in %s order", async order => {

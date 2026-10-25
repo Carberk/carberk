@@ -13,6 +13,7 @@ describe("measurement retention collector coordination", () => {
   db.rows.measurement_records.push({ id: "due", dueAt: now });
   const worker = new ExpireMeasurement(new PrismaMeasurementRetentionLedger(db.asPrisma()));
   await expect(worker.execute(now)).rejects.toThrow("Measurement retention unavailable");
+  expect(db.attemptedDeletes).toEqual([]);
   expect(db.rows.measurement_records).toEqual([{ id: "due", dueAt: now }]);
  });
 
@@ -20,6 +21,7 @@ describe("measurement retention collector coordination", () => {
   const db = new MeasurementRetentionDatabase(); db.collectorEpoch = null;
   db.rows.measurement_records.push({ id: "restored-old-epoch", dueAt: now });
   await expect(new PrismaMeasurementRetentionLedger(db.asPrisma()).deleteExpired(now, 1)).rejects.toThrow("Measurement collector unavailable");
+  expect(db.attemptedDeletes).toEqual([]);
   expect(db.collectorEpoch).toBeNull();
   expect(db.rows.measurement_records).toEqual([{ id: "restored-old-epoch", dueAt: now }]);
  });
