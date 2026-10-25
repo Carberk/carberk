@@ -1,0 +1,895 @@
+{
+  "base": "de80c7b572a8e2b5df832774bef751a6e299fc4f",
+  "branch": "agent/issue-897-b5-timing-diagnosis-20261025",
+  "authority": "/tmp/897-founder-autonomous-candidate-authority-20261025.md",
+  "runtime": {
+    "node": "24.13.0",
+    "pnpm": "12.11.2",
+    "vitest": "5.0.4",
+    "pdf-lib": "1.17.1",
+    "fontkit": "1.1.1",
+    "platform": "darwin-arm64",
+    "availableParallelism": 10,
+    "configuredMaxWorkers": 4,
+    "hosted": false
+  },
+  "commands": [
+    {
+      "command": "pnpm install --frozen-lockfile",
+      "log": "/tmp/897-b5-install-20261025.log",
+      "sha256": "8e8cb91b9facb1905d34100dc5c8acfe360c55e489d969da0cd309735b4418b4",
+      "exitCode": 0
+    },
+    {
+      "command": "DATABASE_URL=postgresql://unused:unused@127.0.0.1:1/unused pnpm --filter @auto-tm/contracts build",
+      "log": "/tmp/897-b5-contracts-build.log",
+      "sha256": "b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616",
+      "exitCode": 0
+    },
+    {
+      "command": "DATABASE_URL=postgresql://unused:unused@127.0.0.1:1/unused pnpm --filter @auto-tm/db build",
+      "log": "/tmp/897-b5-db-build.log",
+      "sha256": "b8924dbc517d55b7dda2514c72fb8540f82f6b6d9c1036e1070441bf91346e09",
+      "exitCode": 0
+    },
+    {
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run src/jobs/diagnostics/SafeReplacementScheduling.spec.ts",
+      "log": "/tmp/897-b5-observed-local-20261025.log",
+      "sha256": "f613774f20c7b083962388ebb502428a02d6b63362e0810c4138991297b1d64b",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm --filter @auto-tm/worker test:unit",
+      "log": "/tmp/897-b5-worker-unit-observed-20261025.log",
+      "sha256": "ccd536877f738c41164be093dd612bd81b41a77d2714095ee6b40942aa8df22a",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm --filter @auto-tm/worker lint",
+      "log": "/tmp/897-b5-worker-lint-20261025.log",
+      "sha256": "96331b63d1c9584fecbc212e78713518f4dce142a44c21abf9871126515910ea",
+      "exitCode": 1
+    },
+    {
+      "command": "pnpm --filter @auto-tm/worker typecheck",
+      "log": "/tmp/897-b5-worker-typecheck-20261025.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "exitCode": 0
+    },
+    {
+      "command": "node --test apps/worker/test/b5-observation.check.mjs",
+      "log": "/tmp/897-b5-observer-check-20261025.log",
+      "sha256": "c429baf6e56ff9f44365f65ae2e231dc1ac8f7ffd3d76bd0296f0d75d0e0d9e1",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm --filter @auto-tm/worker lint",
+      "log": "/tmp/897-b5-worker-lint-corrected-20261025.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm --filter @auto-tm/worker exec tsc6 --noEmit",
+      "log": "/tmp/897-b5-worker-tsc6-20261025.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0
+    },
+    {
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run --config /tmp/897-b5-diagnosis-20261025/known-red.config.mts src/jobs/diagnostics/SafeReplacementScheduling.spec.ts",
+      "log": "/tmp/897-b5-known-scheduler-red-20261025.log",
+      "sha256": "7dccaaca2cec3951507443974784e2bdb73def521f2ce28fa69c80edff495b8e",
+      "exitCode": 1
+    },
+    {
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run --config /tmp/897-b5-diagnosis-20261025/timeout.config.mts",
+      "log": "/tmp/897-b5-timeout-freeze-20261025.log",
+      "sha256": "18ed372e5c1c3ce932cb78394c104d61cf1e9d3ac27f3008b9962bdbf0e9b307",
+      "exitCode": 1
+    },
+    {
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run src/jobs/diagnostics/SafeReplacementScheduling.spec.ts",
+      "log": "/tmp/897-b5-observed-corrected-20261025.log",
+      "sha256": "20a4252cbe9307b6951a232f4925dbb2e573d1114eacad368cc910117acd0f03",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm check:agent-docs",
+      "log": "/tmp/897-b5-agent-docs-20261025.log",
+      "sha256": "8f5507ea6fcde992f7d6733d113abc538ae4957b777bc97cadd580f651c93b20",
+      "exitCode": 0
+    }
+  ],
+  "failures": [
+    "Initial lint: import/order warning in vitest.config.mts; corrected with one blank line.",
+    "Initial typecheck: TS7016 missing b5-observation-plugin.mjs declaration; corrected with b5-observation-plugin.d.mts. Initial raw typecheck log was overwritten by the corrected run; the tool output retains the exact diagnostic. No runtime observation was overwritten.",
+    "Known scheduler RED: three pending-versus-ready assertion failures, expected.",
+    "Observer-only timeout RED: unchanged 5000ms, expected; not a B5 reproduction."
+  ],
+  "sourcePins": {
+    "apps/worker/src/jobs/diagnostics/SafeReplacementScheduling.spec.ts": "d6cf8dc5e5bcd293776bb78b0f445ba29a0c02b1c846bbb93493f7bc8e1f5f94",
+    "apps/worker/src/jobs/diagnostics/DiagnosticArtifactWorker.ts": "1eb1f632eb592d16073d78eaff36c4ccefa04878e08e66412aad75635daad102",
+    "apps/worker/src/jobs/diagnostics/DiagnosticPdfRenderer.ts": "f10b795606fcf5a2dd50a5fd32039b251881cd885d70ae34deec9f317911ec54",
+    "apps/worker/src/jobs/diagnostics/testing/readDiagnosticPdfText.ts": "247d1c3367983a5bb6bc406d8cf9a530b5d53e662060303bf4367e3b56e2d083"
+  },
+  "harnessFiles": {
+    "/tmp/897-b5-diagnosis-20261025/worker-scheduler-red.ts": "89c8707755ba4e2e20314c81b87e2d49fa5a01fafb2e46ec1cbf322e14e23b76",
+    "/tmp/897-b5-diagnosis-20261025/timeout.spec.ts": "596bf574f67883d48fb89128f44c76f6e0bebdf1340472ff19553106a38898cc",
+    "/tmp/897-b5-diagnosis-20261025/timeout.config.mts": "390840d42a60e9f40a10c9f16000a8314a6a326d82d72d52359cc72c758f61fd",
+    "/tmp/897-b5-diagnosis-20261025/known-red.config.mts": "f171400da4020288d719047d91e73d6ecc99da246fddd674add4554a1186393e"
+  },
+  "observations": {
+    "/tmp/897-b5-observed-local-20261025.log": [
+      {
+        "version": 1,
+        "locale": "tk",
+        "outcome": "success",
+        "invalid": false,
+        "elapsedMs": 483.4,
+        "completedOuterMs": {
+          "fixture-fonts": 2.2,
+          "issued-generation": 78.7,
+          "issued-read-parse": 4.2,
+          "backlog-erasure": 0.3,
+          "pending-locales": 93.4,
+          "maintenance": 193.2,
+          "replacement-preservation": 23.3,
+          "ordinary-drain": 88
+        },
+        "outerActiveName": null,
+        "outerActiveMs": 0,
+        "inner": {
+          "render-create": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 1.6
+          },
+          "render-fonts": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 13.7
+          },
+          "render-layout": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 339.3
+          },
+          "render-save": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 86.8
+          },
+          "parse-load": {
+            "started": 4,
+            "completed": 4,
+            "failed": 0,
+            "completedMs": 3.7
+          },
+          "parse-font-maps": {
+            "started": 12,
+            "completed": 12,
+            "failed": 0,
+            "completedMs": 4.4
+          },
+          "parse-content": {
+            "started": 12,
+            "completed": 12,
+            "failed": 0,
+            "completedMs": 0.9
+          },
+          "worker-current": {
+            "started": 35,
+            "completed": 35,
+            "failed": 0,
+            "completedMs": 5.5
+          },
+          "worker-cleanup": {
+            "started": 2,
+            "completed": 2,
+            "failed": 0,
+            "completedMs": 0.5
+          }
+        },
+        "active": []
+      },
+      {
+        "version": 1,
+        "locale": "ru",
+        "outcome": "success",
+        "invalid": false,
+        "elapsedMs": 414.8,
+        "completedOuterMs": {
+          "fixture-fonts": 0.2,
+          "issued-generation": 39,
+          "issued-read-parse": 1.6,
+          "backlog-erasure": 0.2,
+          "pending-locales": 69,
+          "maintenance": 207.4,
+          "replacement-preservation": 21.2,
+          "ordinary-drain": 76.1
+        },
+        "outerActiveName": null,
+        "outerActiveMs": 0,
+        "inner": {
+          "render-create": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 0.4
+          },
+          "render-fonts": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 7.7
+          },
+          "render-layout": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 305.1
+          },
+          "render-save": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 72.1
+          },
+          "parse-load": {
+            "started": 4,
+            "completed": 4,
+            "failed": 0,
+            "completedMs": 1.4
+          },
+          "parse-font-maps": {
+            "started": 12,
+            "completed": 12,
+            "failed": 0,
+            "completedMs": 3
+          },
+          "parse-content": {
+            "started": 12,
+            "completed": 12,
+            "failed": 0,
+            "completedMs": 0.7
+          },
+          "worker-current": {
+            "started": 35,
+            "completed": 35,
+            "failed": 0,
+            "completedMs": 2.7
+          },
+          "worker-cleanup": {
+            "started": 2,
+            "completed": 2,
+            "failed": 0,
+            "completedMs": 0.3
+          }
+        },
+        "active": []
+      },
+      {
+        "version": 1,
+        "locale": "en",
+        "outcome": "success",
+        "invalid": false,
+        "elapsedMs": 442.4,
+        "completedOuterMs": {
+          "fixture-fonts": 0.2,
+          "issued-generation": 36.2,
+          "issued-read-parse": 1.2,
+          "backlog-erasure": 0.2,
+          "pending-locales": 70.5,
+          "maintenance": 242.2,
+          "replacement-preservation": 17.2,
+          "ordinary-drain": 74.7
+        },
+        "outerActiveName": null,
+        "outerActiveMs": 0,
+        "inner": {
+          "render-create": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 0.4
+          },
+          "render-fonts": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 7.4
+          },
+          "render-layout": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 333.2
+          },
+          "render-save": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 76
+          },
+          "parse-load": {
+            "started": 4,
+            "completed": 4,
+            "failed": 0,
+            "completedMs": 1.1
+          },
+          "parse-font-maps": {
+            "started": 12,
+            "completed": 12,
+            "failed": 0,
+            "completedMs": 2.8
+          },
+          "parse-content": {
+            "started": 12,
+            "completed": 12,
+            "failed": 0,
+            "completedMs": 0.7
+          },
+          "worker-current": {
+            "started": 35,
+            "completed": 35,
+            "failed": 0,
+            "completedMs": 2.9
+          },
+          "worker-cleanup": {
+            "started": 2,
+            "completed": 2,
+            "failed": 0,
+            "completedMs": 0.3
+          }
+        },
+        "active": []
+      }
+    ],
+    "/tmp/897-b5-worker-unit-observed-20261025.log": [
+      {
+        "version": 1,
+        "locale": "tk",
+        "outcome": "success",
+        "invalid": false,
+        "elapsedMs": 570.3,
+        "completedOuterMs": {
+          "fixture-fonts": 2.2,
+          "issued-generation": 86,
+          "issued-read-parse": 5.5,
+          "backlog-erasure": 0.5,
+          "pending-locales": 113.6,
+          "maintenance": 246.2,
+          "replacement-preservation": 27.1,
+          "ordinary-drain": 89
+        },
+        "outerActiveName": null,
+        "outerActiveMs": 0,
+        "inner": {
+          "render-create": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 1.3
+          },
+          "render-fonts": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 15.6
+          },
+          "render-layout": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 402.4
+          },
+          "render-save": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 103.3
+          },
+          "parse-load": {
+            "started": 4,
+            "completed": 4,
+            "failed": 0,
+            "completedMs": 4.3
+          },
+          "parse-font-maps": {
+            "started": 12,
+            "completed": 12,
+            "failed": 0,
+            "completedMs": 5
+          },
+          "parse-content": {
+            "started": 12,
+            "completed": 12,
+            "failed": 0,
+            "completedMs": 1
+          },
+          "worker-current": {
+            "started": 35,
+            "completed": 35,
+            "failed": 0,
+            "completedMs": 5.6
+          },
+          "worker-cleanup": {
+            "started": 2,
+            "completed": 2,
+            "failed": 0,
+            "completedMs": 0.5
+          }
+        },
+        "active": []
+      },
+      {
+        "version": 1,
+        "locale": "ru",
+        "outcome": "success",
+        "invalid": false,
+        "elapsedMs": 578.8,
+        "completedOuterMs": {
+          "fixture-fonts": 0.3,
+          "issued-generation": 50.2,
+          "issued-read-parse": 1.7,
+          "backlog-erasure": 0.2,
+          "pending-locales": 112.2,
+          "maintenance": 254.3,
+          "replacement-preservation": 43.8,
+          "ordinary-drain": 116
+        },
+        "outerActiveName": null,
+        "outerActiveMs": 0,
+        "inner": {
+          "render-create": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 0.6
+          },
+          "render-fonts": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 9
+          },
+          "render-layout": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 424.5
+          },
+          "render-save": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 91.7
+          },
+          "parse-load": {
+            "started": 4,
+            "completed": 4,
+            "failed": 0,
+            "completedMs": 1.5
+          },
+          "parse-font-maps": {
+            "started": 12,
+            "completed": 12,
+            "failed": 0,
+            "completedMs": 3.9
+          },
+          "parse-content": {
+            "started": 12,
+            "completed": 12,
+            "failed": 0,
+            "completedMs": 0.9
+          },
+          "worker-current": {
+            "started": 35,
+            "completed": 35,
+            "failed": 0,
+            "completedMs": 2.7
+          },
+          "worker-cleanup": {
+            "started": 2,
+            "completed": 2,
+            "failed": 0,
+            "completedMs": 0.4
+          }
+        },
+        "active": []
+      },
+      {
+        "version": 1,
+        "locale": "en",
+        "outcome": "success",
+        "invalid": false,
+        "elapsedMs": 728.4,
+        "completedOuterMs": {
+          "fixture-fonts": 0.5,
+          "issued-generation": 65,
+          "issued-read-parse": 1.3,
+          "backlog-erasure": 0.2,
+          "pending-locales": 204.5,
+          "maintenance": 319.3,
+          "replacement-preservation": 30.3,
+          "ordinary-drain": 107.2
+        },
+        "outerActiveName": null,
+        "outerActiveMs": 0,
+        "inner": {
+          "render-create": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 0.6
+          },
+          "render-fonts": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 12.2
+          },
+          "render-layout": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 545.4
+          },
+          "render-save": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 125.8
+          },
+          "parse-load": {
+            "started": 4,
+            "completed": 4,
+            "failed": 0,
+            "completedMs": 1.5
+          },
+          "parse-font-maps": {
+            "started": 12,
+            "completed": 12,
+            "failed": 0,
+            "completedMs": 4.5
+          },
+          "parse-content": {
+            "started": 12,
+            "completed": 12,
+            "failed": 0,
+            "completedMs": 1.1
+          },
+          "worker-current": {
+            "started": 35,
+            "completed": 35,
+            "failed": 0,
+            "completedMs": 4.2
+          },
+          "worker-cleanup": {
+            "started": 2,
+            "completed": 2,
+            "failed": 0,
+            "completedMs": 0.6
+          }
+        },
+        "active": []
+      }
+    ],
+    "/tmp/897-b5-timeout-freeze-20261025.log": [
+      {
+        "version": 1,
+        "locale": "tk",
+        "outcome": "failure",
+        "invalid": false,
+        "elapsedMs": 5004.5,
+        "completedOuterMs": {
+          "fixture-fonts": 0,
+          "issued-generation": 0,
+          "issued-read-parse": 0,
+          "backlog-erasure": 0,
+          "pending-locales": 0,
+          "maintenance": 0,
+          "replacement-preservation": 0,
+          "ordinary-drain": 0
+        },
+        "outerActiveName": "fixture-fonts",
+        "outerActiveMs": 5004.5,
+        "inner": {
+          "render-create": {
+            "started": 0,
+            "completed": 0,
+            "failed": 0,
+            "completedMs": 0
+          },
+          "render-fonts": {
+            "started": 0,
+            "completed": 0,
+            "failed": 0,
+            "completedMs": 0
+          },
+          "render-layout": {
+            "started": 0,
+            "completed": 0,
+            "failed": 0,
+            "completedMs": 0
+          },
+          "render-save": {
+            "started": 1,
+            "completed": 0,
+            "failed": 0,
+            "completedMs": 0
+          },
+          "parse-load": {
+            "started": 0,
+            "completed": 0,
+            "failed": 0,
+            "completedMs": 0
+          },
+          "parse-font-maps": {
+            "started": 0,
+            "completed": 0,
+            "failed": 0,
+            "completedMs": 0
+          },
+          "parse-content": {
+            "started": 0,
+            "completed": 0,
+            "failed": 0,
+            "completedMs": 0
+          },
+          "worker-current": {
+            "started": 0,
+            "completed": 0,
+            "failed": 0,
+            "completedMs": 0
+          },
+          "worker-cleanup": {
+            "started": 0,
+            "completed": 0,
+            "failed": 0,
+            "completedMs": 0
+          }
+        },
+        "active": [
+          {
+            "name": "render-save",
+            "elapsedMs": 5004.4
+          }
+        ]
+      }
+    ],
+    "/tmp/897-b5-observed-corrected-20261025.log": [
+      {
+        "version": 1,
+        "locale": "tk",
+        "outcome": "success",
+        "invalid": false,
+        "elapsedMs": 489,
+        "completedOuterMs": {
+          "fixture-fonts": 1.7,
+          "issued-generation": 64.4,
+          "issued-read-parse": 4.1,
+          "backlog-erasure": 0.3,
+          "pending-locales": 126.1,
+          "maintenance": 190.5,
+          "replacement-preservation": 24,
+          "ordinary-drain": 77.9
+        },
+        "outerActiveName": null,
+        "outerActiveMs": 0,
+        "inner": {
+          "render-create": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 1
+          },
+          "render-fonts": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 10.6
+          },
+          "render-layout": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 353.1
+          },
+          "render-save": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 84.9
+          },
+          "parse-load": {
+            "started": 4,
+            "completed": 4,
+            "failed": 0,
+            "completedMs": 3.8
+          },
+          "parse-font-maps": {
+            "started": 12,
+            "completed": 12,
+            "failed": 0,
+            "completedMs": 4.2
+          },
+          "parse-content": {
+            "started": 12,
+            "completed": 12,
+            "failed": 0,
+            "completedMs": 0.8
+          },
+          "worker-current": {
+            "started": 35,
+            "completed": 35,
+            "failed": 0,
+            "completedMs": 4.1
+          },
+          "worker-cleanup": {
+            "started": 2,
+            "completed": 2,
+            "failed": 0,
+            "completedMs": 0.5
+          }
+        },
+        "active": []
+      },
+      {
+        "version": 1,
+        "locale": "ru",
+        "outcome": "success",
+        "invalid": false,
+        "elapsedMs": 400.6,
+        "completedOuterMs": {
+          "fixture-fonts": 0.2,
+          "issued-generation": 40.9,
+          "issued-read-parse": 1.8,
+          "backlog-erasure": 0.2,
+          "pending-locales": 69.6,
+          "maintenance": 186.9,
+          "replacement-preservation": 25.4,
+          "ordinary-drain": 75.4
+        },
+        "outerActiveName": null,
+        "outerActiveMs": 0,
+        "inner": {
+          "render-create": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 0.4
+          },
+          "render-fonts": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 6.3
+          },
+          "render-layout": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 281.5
+          },
+          "render-save": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 79
+          },
+          "parse-load": {
+            "started": 4,
+            "completed": 4,
+            "failed": 0,
+            "completedMs": 3
+          },
+          "parse-font-maps": {
+            "started": 12,
+            "completed": 12,
+            "failed": 0,
+            "completedMs": 5.4
+          },
+          "parse-content": {
+            "started": 12,
+            "completed": 12,
+            "failed": 0,
+            "completedMs": 1.1
+          },
+          "worker-current": {
+            "started": 35,
+            "completed": 35,
+            "failed": 0,
+            "completedMs": 2.3
+          },
+          "worker-cleanup": {
+            "started": 2,
+            "completed": 2,
+            "failed": 0,
+            "completedMs": 0.3
+          }
+        },
+        "active": []
+      },
+      {
+        "version": 1,
+        "locale": "en",
+        "outcome": "success",
+        "invalid": false,
+        "elapsedMs": 485.2,
+        "completedOuterMs": {
+          "fixture-fonts": 0.2,
+          "issued-generation": 37.3,
+          "issued-read-parse": 1.7,
+          "backlog-erasure": 0.2,
+          "pending-locales": 70.9,
+          "maintenance": 280.2,
+          "replacement-preservation": 17.8,
+          "ordinary-drain": 76.9
+        },
+        "outerActiveName": null,
+        "outerActiveMs": 0,
+        "inner": {
+          "render-create": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 0.4
+          },
+          "render-fonts": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 8.1
+          },
+          "render-layout": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 365.7
+          },
+          "render-save": {
+            "started": 10,
+            "completed": 10,
+            "failed": 0,
+            "completedMs": 83.4
+          },
+          "parse-load": {
+            "started": 4,
+            "completed": 4,
+            "failed": 0,
+            "completedMs": 2
+          },
+          "parse-font-maps": {
+            "started": 12,
+            "completed": 12,
+            "failed": 0,
+            "completedMs": 3.1
+          },
+          "parse-content": {
+            "started": 12,
+            "completed": 12,
+            "failed": 0,
+            "completedMs": 0.7
+          },
+          "worker-current": {
+            "started": 35,
+            "completed": 35,
+            "failed": 0,
+            "completedMs": 3.6
+          },
+          "worker-cleanup": {
+            "started": 2,
+            "completed": 2,
+            "failed": 0,
+            "completedMs": 0.3
+          }
+        },
+        "active": []
+      }
+    ]
+  }
+}
