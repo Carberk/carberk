@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+
 import type { Prisma } from "../generated/prisma/client/client";
+
 import { bootstrapStaff, bootstrapSyntheticCenter } from "./bootstrap-command";
 
 const userId = "11111111-1111-4111-a111-111111111111";
@@ -27,7 +29,6 @@ function database(options: { active?: boolean; dryAbsent?: boolean; invalidUser?
   ];
   const write = async (data: unknown) => {
     if (!state.prepared) throw new Error("write before preparation");
-    if (options.write) throw new Error("bootstrap_assignment_write_sentinel");
     state.pending.push(data); return data;
   };
   const raw = async (strings: TemplateStringsArray, ...params: unknown[]) => {
@@ -39,7 +40,7 @@ function database(options: { active?: boolean; dryAbsent?: boolean; invalidUser?
     }
     if (sql.includes("diagnostic_assert_source")) { if (!state.prepared || params[0] !== "owned-receipt") throw new Error("diagnostic_source_receipt"); return []; }
     if (sql.includes("diagnostic_finish_source")) { if (options.finish) throw new Error("diagnostic_source_final_effect"); return []; }
-    if (sql.includes("diagnostic_source_commands")) return [{ effects: state.command?.operation === "staff_bootstrap" ? [{ table: "audit_logs", verb: "insert", next: audit }] : effects }];
+    if (sql.includes("diagnostic_source_commands")) return [{ effects: state.command?.["operation"] === "staff_bootstrap" ? [{ table: "audit_logs", verb: "insert", next: audit }] : effects }];
     if (sql.includes("diagnostic_source_normalize")) return [{ source: grant, next, timestamp: stamp }];
     if (sql.includes("FOR UPDATE") || sql.includes("pg_advisory")) { if (!state.prepared) throw new Error("lock before preparation"); state.locks.push(sql); }
     if (sql.includes('FROM "users"')) return options.invalidUser ? [] : [{ id: userId, phoneVerifiedAt: stamp, emailVerifiedAt: null, suspendedAt: null, deletionScheduledAt: null }];
@@ -53,7 +54,7 @@ function database(options: { active?: boolean; dryAbsent?: boolean; invalidUser?
     staffGrant: { findUnique: async () => options.missingGrant ? null : grant, upsert: async (a: { create: unknown; update: unknown }) => write(a), create: async (a: unknown) => write(a), update: async (a: unknown) => write(a) },
     auditLog: { create: async (a: unknown) => write(a) },
     diagnosticCenter: { findUnique: async () => center, create: async (a: unknown) => { await write(a); return { id: centerId }; } },
-    diagnosticCenterAssignment: { findUnique: async () => assignment, create: async (a: unknown) => write(a) },
+    diagnosticCenterAssignment: { findUnique: async () => assignment, create: async (a: unknown) => { if (options.write) throw new Error("bootstrap_assignment_write_sentinel"); return write(a); } },
     diagnosticAudit: { findMany: async (a: { where: { action: string } }) => options.conflict ? [] : [{ details: a.where.action === "CENTER_SYNTHETIC_BOOTSTRAPPED" ? { command: "diagnostics:bootstrap-synthetic" } : { command: "diagnostics:bootstrap-synthetic", userId, capability } }], create: async (a: unknown) => write(a) },
   } as unknown as Prisma.TransactionClient;
   return { state, tx, async run(work: () => Promise<string>) { try { const result = await work(); state.committed = [...state.pending]; return result; } catch (error) { state.pending = []; throw error; } } };
@@ -80,8 +81,8 @@ describe("operator bootstrap source preparation", () => {
   });
   it("creates the exact center, two-hour assignment and audits under one source owner", async () => {
     const h = database({ active: true });
-    expect(await h.run(() => bootstrapSyntheticCenter(h.tx, values))).toBe("Synthetic center and qualification created");
-    expect(h.state.command).toMatchObject({ operation: "center_bootstrap", rows: [], intent: { code: "synthetic-offline", userId, capability } });
+    expect(await h.run(() => bootstrapSyntheticCenter(h.tx, values, { centerId, qualificationId }))).toBe("Synthetic center and qualification created");
+    expect(h.state.command).toMatchObject({ operation: "center_bootstrap", roots: [{ table: "diagnostic_centers", key: { id: centerId } }], rows: [], intent: { code: "synthetic-offline", userId, capability, qualificationId } });
     expect(h.state.committed).toContainEqual({ data: { id: qualificationId, centerId, userId, capability, assignedAt: stamp, qualifiedUntil: new Date("2026-10-25T14:00:00Z"), revokedAt: null } });
     expect(h.state.committed).toHaveLength(4);
   });
@@ -94,7 +95,7 @@ describe("operator bootstrap source preparation", () => {
   });
   it.each(["finish", "write", "changed"] as const)("rolls back all caller writes on %s refusal", async failure => {
     const h = database({ active: true, [failure]: true });
-    await expect(h.run(() => bootstrapSyntheticCenter(h.tx, values))).rejects.toThrow(failure === "finish" ? "diagnostic_source_final_effect" : failure === "write" ? "bootstrap_assignment_write_sentinel" : "diagnostic_source_graph_changed");
+    await expect(h.run(() => bootstrapSyntheticCenter(h.tx, values, { centerId, qualificationId }))).rejects.toThrow(failure === "finish" ? "diagnostic_source_final_effect" : failure === "write" ? "bootstrap_assignment_write_sentinel" : "diagnostic_source_graph_changed");
     expect(h.state.committed).toEqual([]);
   });
   it.each([
@@ -102,7 +103,7 @@ describe("operator bootstrap source preparation", () => {
     [{ existingAssignment: true, revoked: true }, "qualification-revoked"], [{ existingAssignment: true, expired: true }, "qualification-expired"],
   ] as const)("refuses invalid authority or provenance without writes: %s", async (options, reason) => {
     const h = database({ active: true, ...options });
-    await expect(h.run(() => bootstrapSyntheticCenter(h.tx, values))).rejects.toThrow(`Refused: ${reason}`);
+    await expect(h.run(() => bootstrapSyntheticCenter(h.tx, values, { centerId, qualificationId }))).rejects.toThrow(`Refused: ${reason}`);
     expect(h.state.committed).toEqual([]);
   });
 });

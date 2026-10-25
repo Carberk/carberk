@@ -4,9 +4,10 @@ import { parseArgs } from "node:util";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
+import { PrismaClient } from "../generated/prisma/client/client";
+
 import { bootstrapSyntheticCenter } from "./bootstrap-command";
 
-import { PrismaClient } from "../generated/prisma/client/client";
 
 // Explicit operator authority only. Never invoked by an API, seed or migration; no dotenv fallback.
 const CAPABILITIES = new Set(["diagnostics.reception", "diagnostics.technician", "diagnostics.reviewer", "diagnostics.templates"]);

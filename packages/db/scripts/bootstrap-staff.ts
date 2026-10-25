@@ -4,9 +4,10 @@ import { parseArgs } from "node:util";
 
 import { StaffSchemas } from "@auto-tm/contracts";
 
+import { PrismaService } from "../src/prisma.service";
+
 import { bootstrapStaff } from "./bootstrap-command";
 
-import { PrismaService } from "../src/prisma.service";
 
 // Explicit operator authority only. Never invoked by an API, seed or migration.
 async function main() {
