@@ -174,7 +174,7 @@ describe("R7c parent activated disposable claim transactions", { concurrent: fal
       ];
       await withCampaignPreparation(tx,[mutation,{table:"users",key:{id:`${prefix(n)}-owner`},verb:"update",next:{avatarUploadId:`${prefix(n)}-one`,avatarKey:`${prefix(n)}/one/original.webp`}}],async()=>{
         const [derived]=await tx.$queryRaw<{keys:{namespace:number;key:number}[]}[]>`
-          SELECT public.diagnostic_source_lock_keys(${JSON.stringify(slots)}::jsonb,${JSON.stringify({rows:[mutation]})}::jsonb) AS keys`;
+          SELECT public.diagnostic_source_lock_keys_before_intake(${JSON.stringify(slots)}::jsonb,${JSON.stringify({rows:[mutation]})}::jsonb) AS keys`;
         if(!derived)throw new Error("r7c_reuse_keys_missing");
         for(const key of derived.keys)await tx.$queryRaw`SELECT pg_advisory_xact_lock(${key.namespace}::int,${key.key}::int)`;
         await tx.$queryRaw`SELECT id FROM public.users WHERE id=${`${prefix(n)}-owner`} FOR UPDATE`;

@@ -15,6 +15,14 @@ describe("upload claim transaction preparation", () => {
     expect(db.tables["media_uploads"]!.map(r => [r["state"], r["claimDeadline"]])).toEqual([["PREPARING", new Date("2026-10-25T12:10:00Z")], ["PREPARING", new Date("2026-10-25T12:10:00Z")]]);
     expect(db.finished).toBe(1);
   });
+  it("prepares recursive target User endpoints before reserving", async () => {
+    const { db, claims } = setup(); db.upload();
+    db.tables["users"]?.push({ id: "target", avatarUploadId: null, suspendedById: "suspender" },
+      { id: "suspender", avatarUploadId: null });
+    await claims.reserve({ userId: "owner", uploadIds: ["upload-1"], target: { type: "profile", id: "target" } });
+    expect(db.prepared).toContainEqual({ table: "users", key: { id: "suspender" }, verb: "update", next: {} });
+    expect(db.finished).toBe(1);
+  });
   it("abandons all token rows with their exact independent manifests", async () => {
     const { db, claims } = setup(); db.upload("upload-1", held); db.upload("upload-2", { ...held, writeProtocol: "legacy", objectKeys: ["legacy/exact"] }); db.upload("foreign", { ...held, claimToken: "foreign" });
     await claims.abandon("token");

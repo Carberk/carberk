@@ -289,9 +289,11 @@ export class PrismaUploadClaims implements UploadClaimPort {
     return { slots, uploads, mutations };
   }
 
+  // Ordinary plans use the retained metadata-only function; source-command
+  // wrappers require an operation and expand effects outside this finite plan.
   private async keys(db: Tx, plan: Plan): Promise<LockKey[]> {
     const [derived] = await db.$queryRaw<{ keys: LockKey[] }[]>`
-      SELECT public.diagnostic_source_lock_keys(${JSON.stringify(plan.slots.filter(slot => !slot.uniqueOnly))}::jsonb,
+      SELECT public.diagnostic_source_lock_keys_before_intake(${JSON.stringify(plan.slots.filter(slot => !slot.uniqueOnly))}::jsonb,
         ${JSON.stringify({ rows: plan.mutations })}::jsonb) || coalesce((
           SELECT jsonb_agg(DISTINCT jsonb_build_object(
             'namespace',(public.diagnostic_source_meta(s->>'table')->>'namespace')::int,

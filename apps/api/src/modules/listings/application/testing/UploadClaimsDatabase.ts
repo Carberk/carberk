@@ -26,9 +26,10 @@ export class ClaimDatabase {
       if (sql.includes("campaign_preparations") && sql.includes("diagnostic_source_commands")) {
         return this.supplied || this.receipt ? [{ covered: this.covered }] : [];
       }
-      if (sql.includes("diagnostic_source_lock_keys")) return [{ keys: [{ namespace: 897100, key: 1 }, { namespace: 898100, key: 2 }] }];
+      if (sql.includes("public.diagnostic_source_lock_keys(")) throw new Error("unsupported_command_aware_rows_only_keys");
+      if (sql.includes("public.diagnostic_source_lock_keys_before_intake(")) return [{ keys: [{ namespace: 897100, key: 1 }, { namespace: 898100, key: 2 }] }];
       if (sql.includes("diagnostic_source_meta")) {
-        const refs: Record<string, string[][]> = { media_uploads: [["users", "userId"], ["dealerships", "businessId"]], users: [["media_uploads", "avatarUploadId"]], sessions: [["users", "userId"]], listings: [["users", "sellerId"], ["dealerships", "businessId"]], dealership_members: [["users", "userId"], ["dealerships", "dealershipId"]] };
+        const refs: Record<string, string[][]> = { media_uploads: [["users", "userId"], ["dealerships", "businessId"]], users: [["media_uploads", "avatarUploadId"], ["users", "suspendedById"]], sessions: [["users", "userId"]], listings: [["users", "sellerId"], ["dealerships", "businessId"]], dealership_members: [["users", "userId"], ["dealerships", "dealershipId"]] };
         return [{ namespace: values[0] === "users" ? 897100 : 898100, refs: (refs[String(values[0])] ?? []).map(([table, column]) => ({ table, columns: [column], target: ["id"] })) }];
       }
       if (sql.includes("pg_advisory_xact_lock") || sql.includes("FOR UPDATE")) {
