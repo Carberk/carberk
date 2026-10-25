@@ -5,6 +5,7 @@ import { z } from "zod";
 import { BUSINESS_AUTHORITY_PORT, IDENTITY_CLOCK_PORT, type BusinessAuthorityPort, type ClockPort } from "../../identity/identity.public";
 import type { VideoPlaybackAuthority, VideoGrantIssuer, VideoDescriptorReader } from "../application/VideoPlaybackPorts";
 import { VideoManifestGateway } from "./VideoManifestGateway";
+import { preparedVideo } from "./VideoTransactionPreparation";
 
 export const VIDEO_GRANT_SECRET_FACTORY = Symbol("VideoGrantSecretFactory");
 export const VIDEO_PLAYBACK_ELIGIBILITY = Symbol("VideoPlaybackEligibility");
@@ -19,10 +20,12 @@ export class PrismaVideoPlayback implements VideoPlaybackAuthority, VideoGrantIs
     try {
       return await this.prisma.$transaction(async tx => {
         await tx.$executeRaw`SET LOCAL statement_timeout = '500ms'`;
+        return preparedVideo(tx, { userId: input.userId, sessionId: input.sessionId, target: { kind: "listing", id: input.listingId } }, async () => {
         const current = await this.current(tx, input, input.listingId);
         if (!current || !current.durationMs || !Number.isSafeInteger(current.durationMs) || current.durationMs > 90000 || !current.assets.some(asset => asset.path === "poster.jpg" && asset.purpose === "poster")) return null;
         const renditions = [240, 360, 720].filter(height => current.assets.some(asset => asset.path === `${height}/index.m3u8` && asset.purpose === "playback"));
         return renditions.length ? { generationId: current.generationId, durationMs: current.durationMs, renditions } : null;
+        });
       }, { maxWait: 250, timeout: 1500 });
     } catch { return null; }
   }
@@ -32,6 +35,7 @@ export class PrismaVideoPlayback implements VideoPlaybackAuthority, VideoGrantIs
     try {
       return await this.prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SET LOCAL statement_timeout = '500ms'`;
+        return preparedVideo(tx, { grantHash: secretHash }, async () => {
         const locks = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "video_grants" WHERE "secretHash" = ${secretHash} FOR SHARE`;
         if (!locks.length) return null;
         const grant = await tx.videoGrant.findUnique({ where: { secretHash } });
@@ -39,23 +43,29 @@ export class PrismaVideoPlayback implements VideoPlaybackAuthority, VideoGrantIs
         const current = await this.current(tx, { userId: grant.ownerUserId, sessionId: grant.ownerSessionId }, grant.listingId, grant.generationId);
         if (!current) return null;
         return { purpose: grant.purpose as "poster" | "playback", assets: current.assets };
+        });
       }, { maxWait: 250, timeout: 1500 });
     } catch { return null; }
   }
   async issue(input: Parameters<VideoGrantIssuer["issue"]>[0]): ReturnType<VideoGrantIssuer["issue"]> {
     if (!input.userId || !input.sessionId || !["poster", "playback"].includes(input.purpose)) return null;
     try {
+      const secret = this.newSecret();
+      if (!/^[A-Za-z0-9_-]{43}$/.test(secret)) return null;
+      const secretHash = createHash("sha256").update(secret).digest("hex");
       return await this.prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SET LOCAL statement_timeout = '500ms'`;
+        return preparedVideo(tx, { userId: input.userId, sessionId: input.sessionId, target: { kind: "listing", id: input.listingId }, inserts: [
+          { table: "video_grants", key: { id: secretHash }, verb: "insert", next: { id: secretHash, secretHash, ownerUserId: input.userId, ownerSessionId: input.sessionId, listingId: input.listingId } },
+        ] }, async () => {
         const current = await this.current(tx, input, input.listingId);
         if (!current) return null;
         const asset = current.assets.find((entry) => entry.purpose === input.purpose && (input.purpose === "poster" || entry.path === "master.m3u8"));
         if (!asset) return null;
-        const secret = this.newSecret();
-        if (!/^[A-Za-z0-9_-]{43}$/.test(secret)) return null;
         const expiresAt = new Date(this.clock.now().getTime() + (input.purpose === "poster" ? 60_000 : 300_000));
-        await tx.videoGrant.create({ data: { secretHash: createHash("sha256").update(secret).digest("hex"), ownerUserId: input.userId, ownerSessionId: input.sessionId, listingId: input.listingId, generationId: current.generationId, purpose: input.purpose, expiresAt } });
+        await tx.videoGrant.create({ data: { id: secretHash, secretHash, ownerUserId: input.userId, ownerSessionId: input.sessionId, listingId: input.listingId, generationId: current.generationId, purpose: input.purpose, expiresAt } });
         return { url: `/video-grants/${secret}/${asset.path}`, generationId: current.generationId, expiresAt };
+        });
       }, { maxWait: 250, timeout: 1500 });
     } catch { return null; }
   }

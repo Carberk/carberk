@@ -1,9 +1,7 @@
 import "reflect-metadata";
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { IdentityModule } from "../../identity/identity.module";
-import type { BusinessAuthorityPort, ClockPort } from "../../identity/identity.public";
-import type { PrismaService } from "@auto-tm/db";
+import { videoAuthority } from "./testing/VideoAuthority";
 import { PrismaVideoPlayback } from "./PrismaVideoPlayback";
 import { VideoDatabase } from "./testing/VideoDatabase";
 
@@ -22,12 +20,7 @@ function fixture() {
   const hash = createHash("sha256").update(secret).digest("hex");
   db.put("video_grants", { id: "grant", secretHash: hash, ownerUserId: "viewer", ownerSessionId: "session", listingId: "listing", generationId: "generation", purpose: "playback", expiresAt: new Date("2026-10-26"), revokedAt: null });
   const clock = { now: () => now };
-  // Compose the actual providers exposed by Identity's Nest composition module.
-  // This avoids an internal cross-context import or a fake authorization policy.
-  const providers = Reflect.getMetadata("providers", IdentityModule) as { name?: string; useClass?: { name: string } }[];
-  const Repository = providers.find(p => p.useClass?.name === "PrismaBusinessAuthority")?.useClass as unknown as new (db: PrismaService) => unknown;
-  const Authority = providers.find(p => p.name === "CheckBusinessAuthority") as unknown as new (repository: unknown, clock: ClockPort) => BusinessAuthorityPort;
-  const identity = new Authority(new Repository(db.prisma), clock);
+  const { authority: identity } = videoAuthority(db.prisma, clock);
   const service = new PrismaVideoPlayback(db.prisma, identity, { isEligible: () => true }, clock, () => secret);
   return { db, service };
 }

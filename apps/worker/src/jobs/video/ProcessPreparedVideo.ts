@@ -50,8 +50,10 @@ export class ProcessPreparedVideo {
       await this.ledger.fail(lease, code, this.now());
       return "failed";
     } finally {
-      await output?.dispose();
-      await source?.dispose();
+      // Disposal is a boundary obligation. A failed output cleanup must not
+      // skip source cleanup, and neither error changes the durable ledger result.
+      const disposals = [output?.dispose(), source?.dispose()].filter((promise): promise is Promise<void> => !!promise);
+      await Promise.allSettled(disposals);
     }
   }
 
