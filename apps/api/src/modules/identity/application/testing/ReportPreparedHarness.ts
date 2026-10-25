@@ -1,5 +1,4 @@
 import "reflect-metadata";
-import { randomUUID } from "node:crypto";
 import { ConfigService } from "@nestjs/config";
 import { DiagnosticMemoryDatabase, diagnosticTestId as id, diagnosticTestSha as sha } from "@auto-tm/db/testing";
 import { Prisma, type DiagnosticSourceCommand, type PrismaService } from "@auto-tm/db";
@@ -31,6 +30,7 @@ type Delegate = { findUnique(args: { where: Row }): Promise<Row | null>; findMan
 export function reportPreparedHarness() {
   let memory = new DiagnosticMemoryDatabase(), clock = new Date("2026-10-25T12:00:00Z"), active = false;
   let finishFailure = false, writeFailure: Model | undefined, onRead: (() => Promise<void>) | undefined;
+  let queryFailure: unknown, hasQueryFailure = false;
   const commands: DiagnosticSourceCommand[] = [];
   const queries: string[] = [];
   let preparedHook: (() => Promise<void>) | undefined;
@@ -45,6 +45,9 @@ export function reportPreparedHarness() {
     let prefix = false, command: DiagnosticSourceCommand | undefined;
     const query = async (sql: string, values: unknown[]) => {
       queries.push(sql);
+      if (hasQueryFailure && (sql.includes("diagnostic_prepare_source") || sql.includes("diagnostic_source_scope"))) {
+        hasQueryFailure = false; throw queryFailure;
+      }
       if (sql.includes("diagnostic_source_project")) {
         const entry = Object.entries(tables).find(([, table]) => table === values[0]);
         if (!entry) throw new Error("r5_unknown_planned_table");
@@ -100,7 +103,8 @@ export function reportPreparedHarness() {
     finally { active = false; }
   };
   const db = new Proxy({} as PrismaService, { get(_target, property) { return property === "$transaction" ? transaction : Reflect.get(memory.client, property); } });
-  const runtime = { now: () => new Date(clock), id: randomUUID, syntheticAllowed: () => true, publicSyntheticAllowed: () => false };
+  let generatedId = 0;
+  const runtime = { now: () => new Date(clock), id: () => `22222222-2222-4222-8222-${String(++generatedId).padStart(12, "0")}`, syntheticAllowed: () => true, publicSyntheticAllowed: () => false };
   const authority = new DiagnosticAuthority(new CheckStaffAuthority(new PrismaStaffAuthority(db), runtime), new CheckBusinessAuthority(new PrismaBusinessAuthority(db), runtime), runtime, new CampaignDiagnosticAdmission(new ConfigService()));
   const bindings = new DiagnosticPublicBindings(new PrismaPublisherBindings()), access = new DiagnosticReportAccess(authority, runtime);
   const stored = new Map<string, Uint8Array>();
@@ -125,6 +129,7 @@ export function reportPreparedHarness() {
   seed("diagnosticIdentityRecord", { id: id(5), orderId, orderVersion: 1, observation, observationHash: "a".repeat(64), erasedAt: null });
   return { db, reports, proofs, documents, uploads, access, identity: evidence, subject, orderId, reportId, seed, commands, queries, stored, id, sha,
     requestWinnerConflict: (kind: "issue" | "consume", reportId: string, message = "diagnostic_source_graph_changed") => { requestWinner = { kind, reportId, message }; },
+    failPrefix: (error: unknown) => { queryFailure = error; hasQueryFailure = true; },
     afterPrepare: (hook: () => Promise<void>) => { preparedHook = hook; },
     compareIdentity: (order: Prisma.InspectionOrderGetPayload<object>, observation: Parameters<PrismaDiagnosticIdentityEvidence["identity"]>[2], pin: { id: string; hash: string }) => db.$transaction(async tx => {
       const start = queries.length;

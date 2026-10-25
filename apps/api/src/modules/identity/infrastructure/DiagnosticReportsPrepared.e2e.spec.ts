@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { ConfigService } from "@nestjs/config";
 import { DiagnosticSchemas as D } from "@auto-tm/contracts";
 import { PrismaService, withDiagnosticSourceCommand, type Prisma, type DiagnosticSourceCommand } from "@auto-tm/db";
@@ -37,7 +37,7 @@ const text = { en: "Synthetic", ru: "Synthetic", tk: "Synthetic" };
 describe("real prepared R5 report, proof, request and document adapters", () => {
   let db: PrismaService, pool: Pool, intake: PrismaDiagnosticIntake, authority: DiagnosticAuthority, identity: DiagnosticIdentityEvidencePort, evidence: DiagnosticEvidencePort;
   let reports: PrismaDiagnosticReports, documents: PrismaDiagnosticDocuments, proofs: PrismaDiagnosticContinuityProofs;
-  let sequence = 0, orderId: string, rawId: string, reportId: string, centerId: string;
+  let generatedId = 0, sequence = 0, orderId: string, rawId: string, reportId: string, centerId: string;
   let clock: Date, putFailure: boolean, afterPut: (() => Promise<void>) | undefined, afterRead: (() => Promise<void>) | undefined;
   const stored = new Map<string, Uint8Array>(), bytes = new Uint8Array([1, 2, 3]);
   const id = (name: string) => suite.id(`${sequence}-${name}`);
@@ -60,7 +60,7 @@ describe("real prepared R5 report, proof, request and document adapters", () => 
   };
   beforeAll(async () => {
     db = new PrismaService(); pool = new Pool({ connectionString: process.env["DATABASE_URL"] });
-    const runtime = { now: () => new Date(clock), id: randomUUID, syntheticAllowed: () => true, publicSyntheticAllowed: () => false };
+    const runtime = { now: () => new Date(clock), id: () => id(`generated-${++generatedId}`), syntheticAllowed: () => true, publicSyntheticAllowed: () => false };
     const business = new CheckBusinessAuthority(new PrismaBusinessAuthority(db), runtime);
     authority = new DiagnosticAuthority(new CheckStaffAuthority(new PrismaStaffAuthority(db), runtime), business, runtime, new CampaignDiagnosticAdmission(new ConfigService()));
     intake = new PrismaDiagnosticIntake(db, authority, business, new DiagnosticPublicBindings(new PrismaPublisherBindings()), runtime);
@@ -72,7 +72,7 @@ describe("real prepared R5 report, proof, request and document adapters", () => 
     proofs = new PrismaDiagnosticContinuityProofs(new DiagnosticDiscoveryCursor(Buffer.alloc(32, 5)), db, authority, new PrismaStaffBindings(), reports, identity as PrismaDiagnosticIdentityEvidence, bindings, runtime);
   });
   beforeEach(async () => {
-    await guards(false); sequence++; clock = new Date(); putFailure = false; afterPut = undefined; afterRead = undefined; stored.clear();
+    await guards(false); sequence++; generatedId = 0; clock = new Date(); putFailure = false; afterPut = undefined; afterRead = undefined; stored.clear();
     centerId = id("center"); orderId = id("order"); rawId = id("raw"); reportId = id("report");
     const templateId = id("template"), userId = subject().userId;
     await db.user.create({ data: { id: userId } });
@@ -308,27 +308,37 @@ describe("real prepared R5 report, proof, request and document adapters", () => 
   const outcome = <T>(p: Promise<T>) => p.then(value => ({ ok: true as const, value }), (error: unknown) => ({ ok: false as const, error }));
   /** Both calls are real outer production entrypoints. The gate pauses actual
    * first DML after its source locks; opposing preparation must wait on its PID. */
-  async function opposing(first: () => Promise<unknown>, second: () => Promise<unknown>, table: string, event: string, key = "orderId", secondSucceeds = false) {
+  async function opposing(first: () => Promise<unknown>, second: () => Promise<unknown>, table: string, event: string, key = "orderId", secondSucceeds = false, secondRefusal = "diagnostic_source_graph_changed") {
     const gate = await pool.connect();
     let a: ReturnType<typeof outcome> | undefined, b: ReturnType<typeof outcome> | undefined;
-    await gate.query("SELECT pg_advisory_lock(18975,hashtext($1))", [orderId]);
-    const gatePid = (await gate.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]!.pid;
-    await pool.query(`CREATE FUNCTION diagnostic_r5_gate() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_advisory_xact_lock(18975,hashtext('${orderId}')); RETURN NEW; END $$;
-      CREATE TRIGGER diagnostic_r5_gate BEFORE ${event} ON ${table} FOR EACH ROW WHEN (NEW."${key}"='${orderId}') EXECUTE FUNCTION diagnostic_r5_gate()`);
+    let failed = false, failure: unknown, installed = false;
     try {
+      await gate.query("SELECT pg_advisory_lock(18975,hashtext($1))", [orderId]);
+      const gatePid = (await gate.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]!.pid;
+      await pool.query(`CREATE FUNCTION diagnostic_r5_gate() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_advisory_xact_lock(18975,hashtext('${orderId}')); RETURN NEW; END $$;
+        CREATE TRIGGER diagnostic_r5_gate BEFORE ${event} ON ${table} FOR EACH ROW WHEN (NEW."${key}"='${orderId}') EXECUTE FUNCTION diagnostic_r5_gate()`);
+      installed = true;
       a = outcome(first());
       const holder = await blockedBy(gatePid, `%${event}%${table}%`);
       b = outcome(second());
       await blockedBy(holder, "%diagnostic_prepare_source%");
-    } finally {
-      await gate.query("SELECT pg_advisory_unlock(18975,hashtext($1))", [orderId]); gate.release();
-      await Promise.all([a, b]);
-      await pool.query(`DROP TRIGGER diagnostic_r5_gate ON ${table}; DROP FUNCTION diagnostic_r5_gate()`);
+    } catch (error) { failed = true; failure = error; }
+    finally {
+      try { await gate.query("SELECT pg_advisory_unlock(18975,hashtext($1))", [orderId]); }
+      catch (error) { if (!failed) { failed = true; failure = error; } }
+      finally {
+        try { gate.release(true); }
+        catch (error) { if (!failed) { failed = true; failure = error; } }
+        finally { await Promise.all([a, b]); }
+      }
+      try { if (installed) await pool.query(`DROP TRIGGER diagnostic_r5_gate ON ${table}; DROP FUNCTION diagnostic_r5_gate()`); }
+      catch (error) { if (!failed) { failed = true; failure = error; } }
     }
+    if (failed) throw failure;
     const firstResult = await a!, secondResult = await b!;
     expect(firstResult.ok).toBe(true);
     expect(secondResult.ok).toBe(secondSucceeds);
-    if (!secondResult.ok) expect(() => { throw secondResult.error; }).toThrow("diagnostic_source_graph_changed");
+    if (!secondResult.ok) expect(() => { throw secondResult.error; }).toThrow(secondRefusal);
     return { firstResult, secondResult };
   }
   it.each(["save", "assignment"] as const)("actual save/assignment serialize with %s first", async first => {
@@ -345,14 +355,14 @@ describe("real prepared R5 report, proof, request and document adapters", () => 
     const command = await pair();
     const issue = () => proofs.issue(subject(), id("b"), command);
     const assign = () => intake.assign(subject(), orderId, { expectedVersion: 2, userId: subject().userId, capability: "diagnostics.technician", active: true });
-    await opposing(first === "proof" ? issue : assign, first === "proof" ? assign : issue, first === "proof" ? "diagnostic_continuity_proofs" : "inspection_orders", first === "proof" ? "INSERT" : "UPDATE", first === "proof" ? "predecessorOrderId" : "id");
+    await opposing(first === "proof" ? issue : assign, first === "proof" ? assign : issue, first === "proof" ? "diagnostic_continuity_proofs" : "inspection_orders", first === "proof" ? "INSERT" : "UPDATE", first === "proof" ? "predecessorOrderId" : "id", false, first === "proof" ? "diagnostic_source_graph_changed" : "DIAGNOSTIC_NO_ACCESS");
     expect(await db.diagnosticContinuityProof.count({ where: { candidateOrderId: id("b") } })).toBe(first === "proof" ? 1 : 0);
     expect(await db.diagnosticAudit.count({ where: { orderId: id("b"), action: "CONTINUITY_PROOF_ISSUED" } })).toBe(first === "proof" ? 1 : 0);
   });
   it.each(["left", "right"] as const)("same proof duplicate consume with %s winning leaves one B draft and exact retry", async winner => {
     const command = await pair(), { proofId } = await proofs.issue(subject(), id("b"), command), input = consumption(proofId);
     const other = { ...input, reportId: id("other-b-report") }, firstInput = winner === "left" ? input : other, secondInput = winner === "left" ? other : input;
-    await opposing(() => proofs.consume(linker(), id("b"), firstInput), () => proofs.consume(linker(), id("b"), secondInput), "diagnostic_continuity_proofs", "UPDATE", "predecessorOrderId");
+    await opposing(() => proofs.consume(linker(), id("b"), firstInput), () => proofs.consume(linker(), id("b"), secondInput), "diagnostic_continuity_proofs", "UPDATE", "predecessorOrderId", false, "DIAGNOSTIC_NO_ACCESS");
     expect(await db.diagnosticReportRecord.findUnique({ where: { id: secondInput.reportId } })).toBeNull();
     expect(await proofs.consume(linker(), id("b"), firstInput)).toMatchObject({ id: firstInput.reportId });
     expect(await db.diagnosticAudit.count({ where: { orderId: id("b"), action: "CONTINUITY_PROOF_CONSUMED" } })).toBe(1);
@@ -372,11 +382,12 @@ describe("real prepared R5 report, proof, request and document adapters", () => 
     });
     const command = await pair(), before = await state(), gate = await pool.connect();
     // Lock-only test barrier, not a source mutation or a production opponent.
-    await gate.query("BEGIN");
-    await gate.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [subject().userId]);
-    const gatePid = (await gate.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]!.pid;
     let issued: ReturnType<typeof outcome> | undefined;
+    let failed = false, failure: unknown;
     try {
+      await gate.query("BEGIN");
+      await gate.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [subject().userId]);
+      const gatePid = (await gate.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]!.pid;
       issued = outcome(proofs.issue(subject(), id("b"), command));
       await blockedBy(gatePid, "%diagnostic_prepare_source%");
       if (defect === "rights") clock = new Date(clock.getTime() + 3600_000);
@@ -388,7 +399,18 @@ describe("real prepared R5 report, proof, request and document adapters", () => 
       expect(session.expiresAt > clock).toBe(defect !== "session");
       expect(qualification.qualifiedUntil! > clock).toBe(defect !== "qualification");
       expect(provenance.rightsUntil! > clock).toBe(defect !== "rights");
-    } finally { await gate.query("ROLLBACK"); gate.release(); }
+    } catch (error) { failed = true; failure = error; }
+    finally {
+      try { await gate.query("ROLLBACK"); }
+      catch (error) { if (!failed) { failed = true; failure = error; } }
+      finally {
+        // Destroying the barrier connection also releases its locks if ROLLBACK failed.
+        try { gate.release(true); }
+        catch (error) { if (!failed) { failed = true; failure = error; } }
+        finally { await issued; }
+      }
+    }
+    if (failed) throw failure;
     const result = await issued!;
     expect(result.ok).toBe(false);
     if (!result.ok) expect(() => { throw result.error; }).toThrow("DIAGNOSTIC_NO_ACCESS");
@@ -443,7 +465,7 @@ describe("real prepared R5 report, proof, request and document adapters", () => 
     const correct = () => reports.correct(subject(), reportId, { successorId: id("correction"), expectedVersion: 2, reason: "Same visit correction" });
     const consume = () => proofs.consume(linker(), id("b"), consumption(proofId));
     await opposing(first === "correction" ? correct : consume, first === "correction" ? consume : correct,
-      first === "correction" ? "diagnostic_reports" : "diagnostic_continuity_proofs", first === "correction" ? "INSERT" : "UPDATE", first === "correction" ? "orderId" : "predecessorOrderId");
+      first === "correction" ? "diagnostic_reports" : "diagnostic_continuity_proofs", first === "correction" ? "INSERT" : "UPDATE", first === "correction" ? "orderId" : "predecessorOrderId", false, first === "correction" ? "DIAGNOSTIC_NO_ACCESS" : "diagnostic_source_graph_changed");
     expect(await db.diagnosticReportRecord.count({ where: { predecessorId: reportId } })).toBe(1);
     expect(await db.diagnosticReportRecord.findUnique({ where: { id: first === "correction" ? id("b-report") : id("correction") } })).toBeNull();
   });

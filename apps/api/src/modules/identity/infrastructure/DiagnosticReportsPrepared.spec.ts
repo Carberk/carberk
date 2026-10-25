@@ -1,3 +1,5 @@
+import { Prisma } from "@auto-tm/db";
+import { DiagnosticRuleError } from "../../diagnostics/domain/InspectionOrder";
 import type { DiagnosticSchemas as D } from "@auto-tm/contracts";
 import { describe, expect, it } from "vitest";
 import { reportPreparedHarness } from "../application/testing/ReportPreparedHarness";
@@ -311,7 +313,7 @@ describe("request-result atomic rollback", () => {
 });
 
 describe("request planning-conflict recovery protocol", () => {
-  it.each(["issue", "consume"] as const)("recovers only the exact committed %s winner without another mutation", async kind => {
+  it.each((["issue", "consume"] as const).flatMap(kind => ["diagnostic_source_graph_changed", "diagnostic_source_stale", "diagnostic_source_expected_absent"].map(cause => ({ kind, cause }))))("recovers only the exact committed $kind winner after $cause without another mutation", async ({ kind, cause }) => {
     const h = await privatePair(undefined, true), actor = kind === "issue" ? h.subject : h.technician;
     const proof = await h.db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: h.proofId } });
     const requestId = kind === "issue" ? proof.requestId! : (await h.proofs.prepareRequest(actor, h.b, { kind })).requestId;
@@ -320,7 +322,7 @@ describe("request planning-conflict recovery protocol", () => {
     const winner = await h.proofs.executeRequest(actor, h.b, requestId, input), audits = await h.db.diagnosticAudit.findMany(), commands = h.commands.length;
     // Simulates stale proposal reads followed by the exact PostgreSQL protocol error.
     // Real backend blocking and concurrency are asserted only in authored SQL source.
-    h.requestWinnerConflict(kind, h.input.reportId);
+    h.requestWinnerConflict(kind, h.input.reportId, cause);
     expect(await h.proofs.executeRequest(actor, h.b, requestId, input)).toEqual(winner);
     expect(h.commands).toHaveLength(commands);
     expect(await h.db.diagnosticAudit.findMany()).toEqual(audits);
@@ -340,5 +342,66 @@ describe("complete initial discovery pages", () => {
     const requests = await h.proofs.discoverRequests(h.technician, h.b, {});
     expect(requests.requests.map(item => item.requestId).sort()).toEqual([one.requestId, two.requestId].sort());
     expect(h.commands).toHaveLength(commands);
+  });
+});
+
+
+describe("finite proof preparation refusals at the public adapter boundary", () => {
+  const raw = (message: string, code = "P2010", sqlCode = "P0001") => new Prisma.PrismaClientKnownRequestError("restricted database detail", {
+    code, clientVersion: "r5-offline", meta: { code: sqlCode, message },
+  });
+  it("replays generated proof, audit, PDF and epoch identities with distinct fixture UUIDs", async () => {
+    const left = await privatePair(), right = await privatePair();
+    const generated = async (h: typeof left) => ({ proof: (await h.db.diagnosticContinuityProof.findMany()).map(r => ({ id: r.id })), audits: (await h.db.diagnosticAudit.findMany()).map(r => ({ id: r.id })), pdfs: (await h.db.diagnosticPdfArtifact.findMany()).map(r => ({ id: r.id, epoch: r.epoch })) });
+    expect(await generated(left)).toEqual(await generated(right));
+    const rows = await generated(left);
+    const ids = [...rows.proof.map(r => r.id), ...rows.audits.map(r => r.id), ...rows.pdfs.flatMap(r => [r.id, r.epoch])];
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids.every(value => /^22222222-2222-4222-8222-[0-9]{12}$/.test(value))).toBe(true);
+  });
+  it.each(["diagnostic_source_graph_changed", "diagnostic_source_stale", "diagnostic_source_expected_absent"])("maps exact %s through every owning entrypoint without partial writes", async cause => {
+    const h = await privatePair();
+    const request = await h.proofs.prepareRequest(h.subject, h.b, { kind: "issue" });
+    const consumeRequest = await h.proofs.prepareRequest(h.technician, h.b, { kind: "consume" });
+    const calls = [
+      () => h.proofs.issue(h.subject, h.b, h.issuance),
+      () => h.proofs.consume(h.technician, h.b, h.input),
+      () => h.proofs.useHandoff(h.technician, h.b, h.proofId, h.input),
+      () => h.proofs.prepareRequest(h.subject, h.b, { kind: "issue" }),
+      () => h.proofs.executeRequest(h.subject, h.b, request.requestId, { kind: "issue", command: h.issuance }),
+      () => h.proofs.executeRequest(h.technician, h.b, consumeRequest.requestId, { kind: "consume", command: h.input }),
+      () => h.proofs.recoverRequest(h.subject, h.b, request.requestId),
+      () => h.proofs.discoverRequests(h.subject, h.b, {}),
+      () => h.proofs.read(h.subject, h.b, h.proofId),
+      () => h.proofs.handoffs(h.technician, h.b, {}),
+    ];
+    const before = await Promise.all([h.db.diagnosticContinuityProof.findMany(), h.db.diagnosticReportRecord.findMany(), h.db.diagnosticAudit.findMany(), h.db.diagnosticContinuityRequest.findMany()]);
+    for (const call of calls) {
+      h.failPrefix(raw(`ERROR: ${cause}`));
+      const refused = call();
+      await expect(refused).rejects.toBeInstanceOf(DiagnosticRuleError);
+      await expect(refused).rejects.toMatchObject({ code: "DIAGNOSTIC_NO_ACCESS", message: "DIAGNOSTIC_NO_ACCESS" });
+      expect(await Promise.all([h.db.diagnosticContinuityProof.findMany(), h.db.diagnosticReportRecord.findMany(), h.db.diagnosticAudit.findMany(), h.db.diagnosticContinuityRequest.findMany()])).toEqual(before);
+    }
+  });
+  it("preserves unexpected error identity and rejects lookalike messages/codes", async () => {
+    const h = await privatePair();
+    const request = await h.proofs.prepareRequest(h.subject, h.b, { kind: "issue" });
+    for (const error of [new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION"), new Error("diagnostic_source_stale"), raw("ERROR: diagnostic_source_final_effect"), raw("ERROR: diagnostic_source_stale details"), raw("ERROR: diagnostic_source_stale", "P2028"), raw("ERROR: diagnostic_source_stale", "P2010", "40001"), { code: "P2010", meta: { code: "P0001", message: "diagnostic_source_stale" } }]) {
+      for (const call of [
+        () => h.proofs.issue(h.subject, h.b, h.issuance),
+        () => h.proofs.consume(h.technician, h.b, h.input),
+        () => h.proofs.useHandoff(h.technician, h.b, h.proofId, h.input),
+        () => h.proofs.executeRequest(h.subject, h.b, request.requestId, { kind: "issue", command: h.issuance }),
+        () => h.proofs.prepareRequest(h.subject, h.b, { kind: "issue" }),
+        () => h.proofs.recoverRequest(h.subject, h.b, request.requestId),
+        () => h.proofs.discoverRequests(h.subject, h.b, {}),
+        () => h.proofs.read(h.subject, h.b, h.proofId),
+        () => h.proofs.handoffs(h.technician, h.b, {}),
+      ]) {
+        h.failPrefix(error);
+        await expect(call()).rejects.toBe(error);
+      }
+    }
   });
 });
