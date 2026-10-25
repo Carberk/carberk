@@ -1,0 +1,36 @@
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-8c41fd9a/apps/api
+
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > publishes exact photos/audit/capture with absent, READY, pending or invalid video graph 1 1390ms
+(node:89927) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > publishes exact photos/audit/capture with absent, READY, pending or invalid video graph 2 1844ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > publishes exact photos/audit/capture with absent, READY, pending or invalid video graph 3 1792ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > publishes exact photos/audit/capture with absent, READY, pending or invalid video graph 4 1572ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > publishes exact photos/audit/capture with absent, READY, pending or invalid video graph 5 1528ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > commits publication when optional capture is disabled after planning 1125ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > preserves optional absence when capture activation changes after the source receipt 1389ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > commits core publication after the actual capture savepoint rolls an outbox failure back 1345ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > retains ordinary nonpublication listing_create and listing_change 455ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > rolls back publication on the omit-audit source completion attack 1425ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > rolls back publication on the corrupt-photo source completion attack 1440ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > serializes the real publish and draft update in publication-first=true order 2553ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > serializes the real publish and draft update in publication-first=false order 1188ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > permits only one real publication adopter in original-draft-first=true order 1570ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > permits only one real publication adopter in original-draft-first=false order 1551ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > serializes actual video cancellation with publication-first=true 2138ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > serializes actual video cancellation with publication-first=false 1542ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > serializes account scheduling with publication-first=true 2753ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > serializes account scheduling with publication-first=false 575ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > commits optional capture around actual principal bootstrap publication-first=true 1190ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > commits optional capture around actual principal bootstrap publication-first=false 1528ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > serializes actual due account purge with publication-first=true 3461ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > serializes actual due account purge with publication-first=false 1220ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > serializes collector epoch rotation with publication-first=true 1822ms
+ ✓ src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts > R7b real publication finite transaction closure > serializes collector epoch rotation with publication-first=false 1315ms
+
+ Test Files  1 passed (1)
+      Tests  25 passed (25)
+   Start at  19:02:04
+   Duration  41.39s (tests 99%, import 1%, transform 1%)
+
