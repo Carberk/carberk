@@ -9,12 +9,11 @@ import { PrismaStaffAuthority } from "./PrismaStaffAuthority";
 import { PrismaUserRepository } from "./PrismaUserRepository";
 import { PrismaOtpRequestRepository } from "./PrismaOtpRequestRepository";
 import { BcryptHasherAdapter } from "./BcryptHasherAdapter";
+import { identityAuthorityPreparedFixtures, identityAuthorityRefusals, refusalFixtureKey } from "../application/testing/IdentityAuthorityPreparedFixtures";
 import { signInCodeDestination } from "../domain/SignInCodeDestination";
 
 const suite = defineE2eSuite("identity-authority-prepared-r2");
 const role = `r2_identity_${suite.id("role").replaceAll("-", "")}`;
-const families = ["refresh", "first", "backup", "revoke", "delete", "destination", "otp", "cascade", "noop", "expired"] as const;
-const cases = families.flatMap(family => ["left", "right"].map(order => `${family}-${order}`));
 const at = new Date();
 const end = new Date(at.getTime() + 3600_000);
 const expired = new Date(at.getTime() - 3600_000);
@@ -40,7 +39,12 @@ const outcome = async <T>(work: Promise<T>) => work.then(value => ({ ok: true as
 describe("Identity caller-owned preparation under PostgreSQL opposition", { concurrent: false }, () => {
   const db = new PrismaService();
   const hasher = new BcryptHasherAdapter();
-  let oldHash: string;
+  let fixtures: Awaited<ReturnType<typeof identityAuthorityPreparedFixtures>>;
+  const fixture = (key: string) => {
+    const row = fixtures.get(key);
+    if (!row) throw new Error(`missing identity fixture ${key}`);
+    return row;
+  };
   let roleCreated = false;
   let guardState: { table: string; name: string; enabled: string }[] = [];
 
@@ -121,7 +125,7 @@ describe("Identity caller-owned preparation under PostgreSQL opposition", { conc
     const a = outcome(first(runtime(gate)));
     const pid = await Promise.race([gate.entered.promise, a.then(result => { throw new Error(`first caller exited before barrier: ${JSON.stringify(result)}`); })]);
     const b = outcome(second(runtime()));
-    try { await blockedBy(pid); } finally { gate.release.resolve(undefined); }
+    try { await blockedBy(pid); } finally { gate.release.resolve(undefined); await Promise.all([a, b]); }
     return Promise.all([a, b]);
   }
   const sessions = (client: PrismaService) => new PrismaSessionRepository(client, hasher);
@@ -135,23 +139,16 @@ describe("Identity caller-owned preparation under PostgreSQL opposition", { conc
     expect(guardState.length).toBeGreaterThan(0);
     // Preactivation fixtures only. Automatic ownership admission remains CLOSED.
     await guards(false);
-    oldHash = await hasher.hash("old-refresh");
-    for (const key of cases) {
-      for (const who of ["staff", "manager", "other"]) {
-        expect(await db.user.findUnique({ where: { id: id(key, who) } })).toBeNull();
-        await db.user.create({ data: { id: id(key, who), email: `${id(key, who)}@identity.invalid`, emailVerifiedAt: at } });
+    fixtures = await identityAuthorityPreparedFixtures(label => suite.id(label), at, end, plaintext => hasher.hash(plaintext));
+    for (const row of fixtures.values()) {
+      for (const user of row.users) {
+        expect(await db.user.findUnique({ where: { id: user.id } })).toBeNull();
+        await db.user.create({ data: user });
       }
-      await db.staffGrant.createMany({ data: [
-        { userId: id(key, "staff"), capability: "diagnostics.technician" },
-        { userId: id(key, "manager"), capability: "staff.manage" },
-        { userId: id(key, "manager"), capability: "founder.control" },
-      ] });
-      await db.session.createMany({ data: [
-        { id: id(key, "session"), userId: id(key, "staff"), refreshTokenHash: oldHash, expiresAt: end },
-        { id: id(key, "manager-session"), userId: id(key, "manager"), refreshTokenHash: oldHash, expiresAt: end, adminTotpExpiresAt: end },
-      ] });
-      await db.totpEnrollment.create({ data: { id: id(key, "enrollment"), userId: id(key, "staff"), encryptedSecret: "synthetic-encrypted", verifiedAt: key.startsWith("first-") ? null : at } });
-      if (!key.startsWith("first-")) await db.totpBackupCode.create({ data: { id: id(key, "backup"), totpEnrollmentId: id(key, "enrollment"), codeHash: "one-use" } });
+      await db.staffGrant.createMany({ data: row.grants });
+      await db.session.createMany({ data: [row.staffSession, row.managerSession] });
+      await db.totpEnrollment.create({ data: row.enrollment });
+      if (row.backup) await db.totpBackupCode.create({ data: row.backup });
     }
     // Minimal relational pending-request fixtures, not issued proofs/reports.
     // Their FK deletion is exercised through the unwrapped Session caller below.
@@ -194,9 +191,9 @@ describe("Identity caller-owned preparation under PostgreSQL opposition", { conc
 
   it.each(["left", "right"])("refresh CAS has one winner and false loser, %s begins first", async order => {
     const key = `refresh-${order}`;
-    const firstHash = `${order}-winner`;
+    const { oldHash, winner: firstHash, loser } = fixture(key).refresh;
     const results = await oppose("source", client => sessions(client).rotateRefreshToken(id(key, "session"), oldHash, firstHash, at, end),
-      client => sessions(client).rotateRefreshToken(id(key, "session"), oldHash, "loser", at, end));
+      client => sessions(client).rotateRefreshToken(id(key, "session"), oldHash, loser, at, end));
     expect(results).toEqual([{ ok: true, value: true }, { ok: true, value: false }]);
     expect((await db.session.findUniqueOrThrow({ where: { id: id(key, "session") } })).refreshTokenHash).toBe(firstHash);
   });
@@ -233,10 +230,10 @@ describe("Identity caller-owned preparation under PostgreSQL opposition", { conc
   });
   it.each(["left", "right"])("logout and Session creation never delete the incoming Session, %s", async order => {
     const key = `delete-${order}`;
-    const create = (client: PrismaService) => sessions(client).create({ userId: id(key, "staff"), refreshTokenHash: "incoming", deviceLabel: null, userAgent: null, expiresAt: end });
+    const create = (client: PrismaService) => sessions(client).create({ userId: id(key, "staff"), refreshTokenHash: fixture(key).tokens.incoming, deviceLabel: null, userAgent: null, expiresAt: end });
     const remove = (client: PrismaService) => sessions(client).deleteOldestByUserId(id(key, "staff"));
     const results = order === "left" ? await oppose("source", remove, create) : await oppose("session.create", create, remove);
-    const incoming = await db.session.findFirst({ where: { userId: id(key, "staff"), refreshTokenHash: "incoming" } });
+    const incoming = await db.session.findFirst({ where: { userId: id(key, "staff"), refreshTokenHash: fixture(key).tokens.incoming } });
     expect(incoming).not.toBeNull(); expect(results[0].ok).toBe(true);
     if (order === "left") expect(results[1].ok).toBe(true);
     else expect(results[1]).toMatchObject({ ok: false, error: expect.stringMatching(/diagnostic_source_(stale|graph_changed)/) });
@@ -252,7 +249,7 @@ describe("Identity caller-owned preparation under PostgreSQL opposition", { conc
         // INSERT's nonblocking destination fence MUST refuse before its index/FK.
         const second = await outcome(create(runtime()));
         expect(second).toMatchObject({ ok: false, error: expect.stringContaining("diagnostic_source_user_insert_busy") });
-      } finally { gate.release.resolve(undefined); }
+      } finally { gate.release.resolve(undefined); await first; }
       expect((await first).ok).toBe(true);
     } else {
       const results = await oppose("user.create", create, replacement);
@@ -293,8 +290,8 @@ describe("Identity caller-owned preparation under PostgreSQL opposition", { conc
   });
   it("expired pruning rechecks the selector and retains new and foreign live Sessions", async () => {
     const key = "expired-left"; const repo = sessions(runtime());
-    expect(await repo.rotateRefreshToken(id(key, "session"), oldHash, "expired", at, expired)).toBe(true);
-    const live = await repo.create({ userId: id(key, "staff"), refreshTokenHash: "live", deviceLabel: null, userAgent: null, expiresAt: end });
+    expect(await repo.rotateRefreshToken(id(key, "session"), fixture(key).refresh.oldHash, fixture(key).tokens.expired, at, expired)).toBe(true);
+    const live = await repo.create({ userId: id(key, "staff"), refreshTokenHash: fixture(key).tokens.live, deviceLabel: null, userAgent: null, expiresAt: end });
     const foreign = await db.session.findUniqueOrThrow({ where: { id: id(key, "manager-session") } });
     expect(await repo.deleteExpiredByUserId(id(key, "staff"))).toBe(1);
     expect(await repo.findById(id(key, "session"))).toBeNull();
@@ -315,14 +312,14 @@ describe("Identity caller-owned preparation under PostgreSQL opposition", { conc
     expect((await db.totpBackupCode.findUniqueOrThrow({ where: { id: id(unusedKey, "backup") } })).usedAt).toBeNull();
     expect((await db.session.findUniqueOrThrow({ where: { id: unused.sessionId } })).adminTotpExpiresAt).toBeNull();
   });
-  it.each(["missing", "foreign", "expired", "inactive"])("refused %s Session does not verify enrollment or create backup codes", async kind => {
-    const key = "revoke-right"; const subject = elevation(key);
+  it.each(identityAuthorityRefusals)("refused %s Session does not verify enrollment or create backup codes", async kind => {
+    const key = refusalFixtureKey(kind); const subject = elevation(key);
     // Make a fresh lawful pending enrollment through the actual ordinary caller.
     const other = id(key, "other"); const enrollment = await totp(runtime()).createPending(other, "synthetic");
-    const good = await sessions(runtime()).create({ userId: other, refreshTokenHash: "unused", deviceLabel: null, userAgent: null, expiresAt: end });
+    const good = await sessions(runtime()).create({ userId: other, refreshTokenHash: fixture(key).tokens.unused, deviceLabel: null, userAgent: null, expiresAt: end });
     await new PrismaStaffAuthority(runtime()).change({ ...manage(key, kind !== "inactive"), targetUserId: other }, at);
     const sessionId = kind === "missing" ? randomUUID() : kind === "foreign" ? subject.sessionId : good.id;
-    if (kind === "expired") await sessions(runtime()).rotateRefreshToken(good.id, "unused", "expired", at, expired);
+    if (kind === "expired") await sessions(runtime()).rotateRefreshToken(good.id, fixture(key).tokens.unused, fixture(key).tokens.expired, at, expired);
     await expect(totp(runtime()).completeFirstVerification({ userId: other, enrollmentId: enrollment.id, sessionId, verifiedAt: at, codeHashes: [randomUUID()], adminTotpExpiresAt: end })).rejects.toThrow("SESSION_NOT_FOUND");
     expect((await db.totpEnrollment.findUniqueOrThrow({ where: { id: enrollment.id } })).verifiedAt).toBeNull();
     expect(await db.totpBackupCode.count({ where: { totpEnrollmentId: enrollment.id } })).toBe(0);
