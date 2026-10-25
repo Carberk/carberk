@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { PrismaService, type Prisma } from "@auto-tm/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { defineE2eSuite } from "../../../../test/helpers/e2eSuite";
+import { withFixtureCallerDrain } from "../../../../test/helpers/fixtureCallerDrain";
 import { PrismaSessionRepository } from "./PrismaSessionRepository";
 import { PrismaTotpEnrollmentRepository } from "./PrismaTotpEnrollmentRepository";
 import { PrismaStaffAuthority } from "./PrismaStaffAuthority";
@@ -122,11 +123,15 @@ describe("Identity caller-owned preparation under PostgreSQL opposition", { conc
   }
   async function oppose<A, B>(event: string, first: (client: PrismaService) => Promise<A>, second: (client: PrismaService) => Promise<B>) {
     const gate = pause(event);
-    const a = outcome(first(runtime(gate)));
-    const pid = await Promise.race([gate.entered.promise, a.then(result => { throw new Error(`first caller exited before barrier: ${JSON.stringify(result)}`); })]);
-    const b = outcome(second(runtime()));
-    try { await blockedBy(pid); } finally { gate.release.resolve(undefined); await Promise.all([a, b]); }
-    return Promise.all([a, b]);
+    return withFixtureCallerDrain(() => gate.release.resolve(undefined), async start => {
+      const a = start(() => outcome(first(runtime(gate))));
+      const pid = await Promise.race([gate.entered.promise, a.then(result => { throw new Error(`first caller exited before barrier: ${JSON.stringify(result)}`); })]);
+      const b = start(() => outcome(second(runtime())));
+      await blockedBy(pid);
+      // Release before awaiting outcomes: the holder is still paused here.
+      gate.release.resolve(undefined);
+      return Promise.all([a, b]);
+    });
   }
   const sessions = (client: PrismaService) => new PrismaSessionRepository(client, hasher);
   const totp = (client: PrismaService) => new PrismaTotpEnrollmentRepository(client);
@@ -243,14 +248,16 @@ describe("Identity caller-owned preparation under PostgreSQL opposition", { conc
     const replacement = (client: PrismaService) => new PrismaUserRepository(client).replaceSignInMethod({ userId: id(key, "staff"), channel: "email", destination: email, verifiedAt: at });
     const create = (client: PrismaService) => new PrismaUserRepository(client).create({ phone: null, phoneVerifiedAt: null, email, emailVerifiedAt: at }, { nameNumber: 1234, avatarIndex: 1 });
     if (order === "left") {
-      const gate = pause("source"); const first = outcome(replacement(runtime(gate)));
-      await Promise.race([gate.entered.promise, first.then(result => { throw new Error(JSON.stringify(result)); })]);
-      try {
+      const gate = pause("source");
+      await withFixtureCallerDrain(() => gate.release.resolve(undefined), async start => {
+        const first = start(() => outcome(replacement(runtime(gate))));
+        await Promise.race([gate.entered.promise, first.then(result => { throw new Error(JSON.stringify(result)); })]);
         // INSERT's nonblocking destination fence MUST refuse before its index/FK.
-        const second = await outcome(create(runtime()));
+        const second = await start(() => outcome(create(runtime())));
         expect(second).toMatchObject({ ok: false, error: expect.stringContaining("diagnostic_source_user_insert_busy") });
-      } finally { gate.release.resolve(undefined); await first; }
-      expect((await first).ok).toBe(true);
+        gate.release.resolve(undefined);
+        expect((await first).ok).toBe(true);
+      });
     } else {
       const results = await oppose("user.create", create, replacement);
       expect(results[0].ok).toBe(true);
