@@ -198,6 +198,55 @@ describe("real contact repositories at the database boundary", () => {
     await expect(repo.record(businessConfirmation, actor)).rejects.toMatchObject({ reason: "MEMBERSHIP_REQUIRED" });
     expect(db.tables).toEqual(before);
   });
+  it("observes only real dependency PKs through preparation before missing-Business authority", async () => {
+    const { db, repo } = business();
+    db.tables["dealership_members"] = []; db.tables["dealerships"] = [];
+    db.afterPreparation = () => {
+      expect(db.mutations).toEqual(expect.arrayContaining([
+        { table: "users", key: { id: "seller" }, verb: "update", next: {} },
+        { table: "sessions", key: { id: "session" }, verb: "update", next: {} },
+        { table: "media_uploads", key: { id: "old" }, verb: "update", next: {} },
+      ]));
+      expect(db.mutations?.every(m => m["verb"] === "update" && Object.keys(m["next"] as object).length === 0 &&
+        typeof (m["key"] as Record<string, unknown>)["id"] === "string")).toBe(true);
+      expect(db.mutations?.some(m => m["table"] === "dealerships" || m["table"] === "dealership_members")).toBe(false);
+    };
+    db.failAt = "dealerships";
+    const before = structuredClone(db.tables);
+    await expect(repo.record(businessConfirmation, actor)).rejects.toMatchObject({ reason: "MEMBERSHIP_REQUIRED" });
+    expect(db.tables).toEqual(before);
+  });
+  it("retains actual membership and other Business observations for a missing requested Business", async () => {
+    const { db, repo } = business();
+    const missing = VerifiedContactPhone.create({ sellerId: "missing-business", phone: "+99361000000", confirmedAt: NOW });
+    db.afterPreparation = () => {
+      expect(db.mutations).toEqual(expect.arrayContaining([
+        { table: "dealerships", key: { id: "business" }, verb: "update", next: {} },
+        { table: "dealership_members", key: { id: "member" }, verb: "update", next: {} },
+      ]));
+    };
+    const before = structuredClone(db.tables);
+    await expect(repo.record(missing, { ...actor, businessId: "missing-business" })).rejects.toMatchObject({ reason: "MEMBERSHIP_REQUIRED" });
+    expect(db.tables).toEqual(before);
+  });
+  it("preserves preparation refusal on the missing-Business read path without residue", async () => {
+    const { db, repo } = business();
+    db.tables["dealership_members"] = []; db.tables["dealerships"] = []; db.failAt = "prepare";
+    const before = structuredClone(db.tables);
+    await expect(repo.record(businessConfirmation, actor)).rejects.toThrow("refused:prepare");
+    expect(db.tables).toEqual(before);
+  });
+  it.each(["business appears", "membership changes"])("refuses stale missing-Business observation when %s without extending or writing", async change => {
+    const { db, repo } = business();
+    db.tables["dealership_members"] = []; db.tables["dealerships"] = [];
+    const before = structuredClone(db.tables);
+    db.afterPreparation = () => {
+      db.seed("dealerships", { id: change === "business appears" ? "business" : "other", status: "active" });
+      if (change === "membership changes") db.seed("dealership_members", { id: "new-member", userId: "seller", dealershipId: "other", role: "owner", status: "active" });
+    };
+    await expect(repo.record(businessConfirmation, actor)).rejects.toThrow("avatar_contact_scope_changed");
+    expect(db.tables).toEqual(before);
+  });
   it("refuses an omitted Session before any transaction", async () => {
     const { db, repo } = business(); const before = structuredClone(db.tables);
     await expect(repo.record(businessConfirmation, { userId: "seller", businessId: "business" })).rejects.toThrow("Business contact requires explicit current actor");

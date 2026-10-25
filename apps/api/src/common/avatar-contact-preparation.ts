@@ -226,7 +226,7 @@ export function withBusinessContactPreparation<T>(tx: Tx, input: { userId: strin
     await add(tx, slots, "users", input.userId);
     const session = await add(tx, slots, "sessions", input.sessionId);
     await add(tx, slots, "users", session?.row?.["userId"]);
-    await add(tx, slots, "dealerships", input.businessId);
+    const business = await add(tx, slots, "dealerships", input.businessId);
     const members = await tx.$queryRaw<{ id: string; userId: string; dealershipId: string }[]>`
       SELECT id,"userId","dealershipId" FROM dealership_members WHERE "userId"=${input.userId}
         OR ("dealershipId"=${input.businessId} AND role='owner') ORDER BY id`;
@@ -236,9 +236,17 @@ export function withBusinessContactPreparation<T>(tx: Tx, input: { userId: strin
       await add(tx, slots, "dealership_members", member.id);
     }
     // Current-owner and absent unique-user keys use the existing source protocol.
-    slots.push({ table: "dealership_members", key: { userId: input.userId }, row: { userId: input.userId, dealershipId: input.businessId } });
-    return { slots, mutations: [update("dealerships", { id: input.businessId }, {
+    const absentMember: Slot = { table: "dealership_members", key: { userId: input.userId },
+      row: { userId: input.userId, dealershipId: input.businessId } };
+    slots.push(absentMember);
+    const plan = await closeReferences(tx, { slots, mutations: [] });
+    // A missing Business is an authority refusal, not a proposed write to an
+    // absent row. Observe actual dependencies through the ordinary campaign
+    // prefix while retaining the complete negative-key scope for revalidation.
+    plan.mutations = business?.row ? [update("dealerships", { id: input.businessId }, {
       contactPhone: input.phone, contactConfirmedAt: input.confirmedAt.toISOString(),
-    })] };
+    })] : plan.slots.filter(slot => slot.row && slot !== absentMember)
+      .map(slot => update(slot.table, slot.key, {}));
+    return plan;
   }, work);
 }
