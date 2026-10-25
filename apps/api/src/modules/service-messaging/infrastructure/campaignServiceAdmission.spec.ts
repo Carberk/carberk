@@ -40,18 +40,11 @@ describe("campaign Support text admission", () => {
    expect(calls.map(call => call.sql)).toEqual(["user.email"]);
   }
  });
- it("derives the reservation server-side and takes table locks in reset order before the namespace fence", async () => {
+ it("derives the reservation server-side and checks the persisted contract after the outer boundary owns locks", async () => {
   const { tx, calls } = fakeTx(roster);
   expect(await admission().begin(tx as never, subject)).toEqual({ namespace, candidate });
-  expect(calls.map(call => call.sql)).toEqual([
-   "user.email",
-   "SET LOCAL lock_timeout='5s'",
-   "LOCK TABLE public.service_audits,public.service_conversations,public.service_messages,public.service_outbox,public.service_read_states,public.support_cases IN ROW EXCLUSIVE MODE",
-   "SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended($1,0))",
-   "SELECT to_regprocedure($1) IS NOT NULL AS present",
-  ]);
-  expect(calls[3]?.values).toEqual([namespace]);
-  expect(calls[4]?.values).toEqual([authority]);
+  expect(calls.map(call => call.sql)).toEqual(["user.email", "SELECT to_regprocedure($1) IS NOT NULL AS present"]);
+  expect(calls[1]?.values).toEqual([authority]);
  });
  it("closes a namespace without the service authority contract", async () => {
   const { tx } = fakeTx(roster, { present: false });

@@ -6,9 +6,6 @@ import type { ServiceSubject } from "../domain/ports/ServiceMessagingPort";
 type Tx = Prisma.TransactionClient;
 export interface CampaignServiceScope { namespace: string; candidate: string }
 const roster = /^(buyer-a|buyer-b|owner|sales-a|sales-b|coordinator|support|history-fulfiller|payment-verifier|reception-steward|technician|independent-reviewer|private-reviewer|aggregate-viewer|investigator)\.([a-f0-9]{32})\.([a-f0-9]{12})@campaign897\.invalid$/;
-// Reset's sorted SHARE ROW EXCLUSIVE order. Table locks precede the namespace fence, as in reset.
-const textTables = ["service_audits", "service_conversations", "service_messages", "service_outbox", "service_read_states", "support_cases"];
-
 /** Full-v3 synthetic Support text admission. The reservation is derived only from the
  * principal's stored roster email and the serving candidate; the namespace authority then
  * proves current journal ownership of the principal, its Session and any requested graph.
@@ -24,9 +21,8 @@ export class CampaignServiceAdmission {
   if (!match?.[2] || !match[3] || this.config.get("APP_ENV") === "production" || typeof candidate !== "string" ||
     !/^[a-f0-9]{40}$/.test(candidate) || !candidate.startsWith(match[3])) return null;
   const namespace = `cf_${match[2]}`;
-  await tx.$executeRawUnsafe("SET LOCAL lock_timeout='5s'");
-  await tx.$executeRawUnsafe(`LOCK TABLE ${textTables.map(table => `public.${table}`).join(",")} IN ROW EXCLUSIVE MODE`);
-  await tx.$queryRawUnsafe("SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended($1,0))", namespace);
+  // The outer service boundary already owns the complete persisted namespace
+  // union and reset table/dependency prelude. Admission grants no lock coverage.
   const [contract] = await tx.$queryRawUnsafe<{ present: boolean }[]>("SELECT to_regprocedure($1) IS NOT NULL AS present", `"${namespace}".campaign_service_authority(text,text,text,text,text)`);
   return contract?.present === true ? { namespace, candidate } : null;
  }
