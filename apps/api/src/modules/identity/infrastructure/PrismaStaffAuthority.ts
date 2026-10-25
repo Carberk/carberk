@@ -59,10 +59,11 @@ export class PrismaStaffAuthority implements StaffAuthorityRepository {
           const session = sessions[0];
           if (!user || !session) throw new StaffAuthorityDenied("SESSION_REQUIRED");
           const grants = await tx.staffGrant.findMany({ where: { userId: input.userId, revokedAt: null } });
+          // Caller time stamps the declared mutation; authority expires at execution.
           assertStaffGrantChange({ userId: user.id, sessionUserId: session.userId, role: user.role,
             suspended: !!user.suspendedAt, deleting: !!user.deletionScheduledAt,
             expiresAt: session.expiresAt, elevatedUntil: session.adminTotpExpiresAt,
-            capabilities: grants.map((grant) => grant.capability) }, input, now);
+            capabilities: grants.map((grant) => grant.capability) }, input, new Date());
           if (!target || (input.grant && (target.suspendedAt || target.deletionScheduledAt))) throw new StaffAuthorityDenied("GRANT_FORBIDDEN");
           const locked = await tx.staffGrant.findUnique({ where: { userId_capability: { userId: input.targetUserId, capability: input.capability } } });
           if (input.grant === (!!locked && locked.revokedAt === null)) throw staffNoChange;

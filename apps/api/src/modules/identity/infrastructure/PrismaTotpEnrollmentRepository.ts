@@ -124,14 +124,14 @@ export class PrismaTotpEnrollmentRepository implements TotpEnrollmentRepository 
             data: { verifiedAt: input.verifiedAt, updatedAt: input.verifiedAt } });
           if (marked.count !== 1) throw new Error("TOTP_ENROLLMENT_NOT_PENDING");
           if (codes.length) await tx.totpBackupCode.createMany({ data: codes });
-          await this.elevate(tx, input.userId, input.sessionId, input.verifiedAt, input.adminTotpExpiresAt);
+          await this.elevate(tx, input.userId, input.sessionId, input.adminTotpExpiresAt);
         }, input.sessionId);
       });
     } catch (error) {
       if (String(error).includes("diagnostic_source_stale") || String(error).includes("diagnostic_source_graph_changed")) {
         const current = await this.prisma.totpEnrollment.findUnique({ where: { id: input.enrollmentId } });
         if (!current || current.userId !== input.userId || current.verifiedAt) throw new Error("TOTP_ENROLLMENT_NOT_PENDING");
-        await this.assertCurrentElevationSession(input.userId, input.sessionId, input.verifiedAt);
+        await this.assertCurrentElevationSession(input.userId, input.sessionId);
       }
       throw error;
     }
@@ -156,7 +156,7 @@ export class PrismaTotpEnrollmentRepository implements TotpEnrollmentRepository 
           if (lockedCodes.length !== 1 || !lockedCode || lockedCode.id !== code.id || lockedCode.usedAt !== null) throw backupLost;
           const consumed = await tx.totpBackupCode.updateMany({ where: { id: code.id, usedAt: null }, data: { usedAt: input.usedAt } });
           if (consumed.count !== 1) throw backupLost;
-          await this.elevate(tx, input.userId, input.sessionId, input.usedAt, input.adminTotpExpiresAt);
+          await this.elevate(tx, input.userId, input.sessionId, input.adminTotpExpiresAt);
           return true;
         }, input.sessionId);
       });
@@ -164,7 +164,7 @@ export class PrismaTotpEnrollmentRepository implements TotpEnrollmentRepository 
       if (error === backupLost) return false;
       if (String(error).includes("diagnostic_source_stale") || String(error).includes("diagnostic_source_graph_changed")) {
         if (!await this.prisma.totpBackupCode.findFirst({ where: { totpEnrollmentId: input.enrollmentId, codeHash: input.codeHash, usedAt: null } })) return false;
-        await this.assertCurrentElevationSession(input.userId, input.sessionId, input.usedAt);
+        await this.assertCurrentElevationSession(input.userId, input.sessionId);
       }
       throw error;
     }
@@ -209,17 +209,19 @@ export class PrismaTotpEnrollmentRepository implements TotpEnrollmentRepository 
       rows, actorUserId: userId, sessionId, cutoff: null, campaign: null }, work);
   }
 
-  private async assertCurrentElevationSession(userId: string, sessionId: string, now: Date): Promise<void> {
+  private async assertCurrentElevationSession(userId: string, sessionId: string): Promise<void> {
     // Preserve the original caller error when concurrent source rediscovery
     // observes a lost Session/authority. This is a fresh read, never a retry.
-    const session = await this.prisma.session.findFirst({ where: { id: sessionId, userId, expiresAt: { gt: now },
+    const session = await this.prisma.session.findFirst({ where: { id: sessionId, userId, expiresAt: { gt: new Date() },
       user: { suspendedAt: null, deletionScheduledAt: null,
         OR: [{ role: "admin" }, { staffGrants: { some: { revokedAt: null } } }] } } });
     if (!session) throw new Error("SESSION_NOT_FOUND");
   }
 
-  private async elevate(tx: Prisma.TransactionClient, userId: string, sessionId: string, now: Date, adminTotpExpiresAt: Date) {
-    const elevated = await tx.session.updateMany({ where: { id: sessionId, userId, expiresAt: { gt: now },
+  private async elevate(tx: Prisma.TransactionClient, userId: string, sessionId: string, adminTotpExpiresAt: Date) {
+    // Code/enrollment stamps were declared before preparation. Only the live
+    // authorization deadline uses this post-preparation execution clock.
+    const elevated = await tx.session.updateMany({ where: { id: sessionId, userId, expiresAt: { gt: new Date() },
       user: { suspendedAt: null, deletionScheduledAt: null,
         OR: [{ role: "admin" }, { staffGrants: { some: { revokedAt: null } } }] } }, data: { adminTotpExpiresAt } });
     if (elevated.count !== 1) throw new Error("SESSION_NOT_FOUND");

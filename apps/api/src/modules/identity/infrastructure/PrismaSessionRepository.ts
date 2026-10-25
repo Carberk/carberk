@@ -92,6 +92,11 @@ export class PrismaSessionRepository implements SessionRepository {
         const row = await tx.session.findUnique({ where: { id } });
         if (!row || row.refreshTokenHash !== oldHash) return false;
         return this.change(tx, row.userId, [this.update(row, { expiresAt })], async () => {
+          const current = await tx.session.findUnique({ where: { id } });
+          if (!current || current.refreshTokenHash !== oldHash) throw refreshLost;
+          // Preparation owns the locks. Sample after its waits, independently
+          // of the already declared lastSeenAt/expiresAt mutation stamps.
+          if (current.expiresAt <= new Date()) throw new Error("Session expired");
           const result = await tx.session.updateMany({ where: { id, refreshTokenHash: oldHash },
             data: { refreshTokenHash: newHash, lastSeenAt, expiresAt } });
           if (result.count !== 1) throw refreshLost;
@@ -121,23 +126,23 @@ export class PrismaSessionRepository implements SessionRepository {
     adminTotpExpiresAt: Date | null,
     currentStaff?: { userId: string; now: Date },
   ): Promise<void> {
-    const where: Prisma.SessionWhereInput = { id, ...(currentStaff ? {
-      userId: currentStaff.userId, expiresAt: { gt: currentStaff.now },
+    const liveWhere = (): Prisma.SessionWhereInput => ({ id, ...(currentStaff ? {
+      userId: currentStaff.userId, expiresAt: { gt: new Date() },
       user: { suspendedAt: null, deletionScheduledAt: null,
         OR: [{ role: "admin" }, { staffGrants: { some: { revokedAt: null } } }] },
-    } : {}) };
+    } : {}) });
     try {
       await this.prisma.$transaction(async (tx) => {
         const row = await tx.session.findUnique({ where: { id } });
         if (!row) throw new Error("SESSION_NOT_FOUND");
         await this.change(tx, row.userId, [this.update(row, { adminTotpExpiresAt })], async () => {
-          const updated = await tx.session.updateMany({ where, data: { adminTotpExpiresAt } });
+          const updated = await tx.session.updateMany({ where: liveWhere(), data: { adminTotpExpiresAt } });
           if (updated.count !== 1) throw new Error("SESSION_NOT_FOUND");
         });
       });
     } catch (error) {
       if (currentStaff && (String(error).includes("diagnostic_source_stale") || String(error).includes("diagnostic_source_graph_changed")) &&
-        !await this.prisma.session.findFirst({ where })) throw new Error("SESSION_NOT_FOUND");
+        !await this.prisma.session.findFirst({ where: liveWhere() })) throw new Error("SESSION_NOT_FOUND");
       throw error;
     }
   }

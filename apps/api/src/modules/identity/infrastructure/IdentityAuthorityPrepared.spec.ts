@@ -1,7 +1,7 @@
 import { JwtService } from "@nestjs/jwt";
 import { RefreshSession } from "../application/RefreshSession";
 import { InMemoryIdentityCheck } from "../application/testing/InMemoryIdentityCheck";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Prisma, type PrismaService } from "@auto-tm/db";
 import { PrismaSessionRepository } from "./PrismaSessionRepository";
 import { PrismaTotpEnrollmentRepository } from "./PrismaTotpEnrollmentRepository";
@@ -12,6 +12,9 @@ import { PrismaUserRepository } from "./PrismaUserRepository";
 
 const now = new Date("2026-10-24T12:00:00Z");
 const later = new Date("2027-01-01T00:00:00Z");
+// All lifecycle fixtures, including pruning, use an explicit clock restored per test.
+beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(now); });
+afterEach(() => { vi.useRealTimers(); });
 type Row = Record<string, unknown> & {
   id?: unknown; userId?: unknown; role?: unknown; suspendedAt?: unknown; deletionScheduledAt?: unknown;
   refreshTokenHash?: unknown; expiresAt?: unknown; adminTotpExpiresAt?: unknown; createdAt?: unknown;
@@ -23,7 +26,8 @@ type Args = { where?: Row; data?: Row | Row[]; include?: Row };
  * This does not model PostgreSQL discovery, trigger effects or lock modes. */
 class IdentityDatabase {
   rows: State = { session: [], user: [], totpEnrollment: [], totpBackupCode: [], staffGrant: [], auditLog: [], otpRequest: [] };
-  beforePrepare?: () => void;
+  beforePrepare?: () => void | Promise<void>;
+  afterSessionLock?: () => void | Promise<void>;
   afterPreparation?: (state: State) => void;
   refuseFinish = false;
   private transactionTail: Promise<void> = Promise.resolve();
@@ -50,7 +54,7 @@ class IdentityDatabase {
       const sql = strings.join("?");
       if (sql.startsWith("SET LOCAL lock_timeout")) return []; // No resource lock.
       if (sql.includes("prepare")) {
-        this.beforePrepare?.();
+        await this.beforePrepare?.();
         prepared = true;
         this.afterPreparation?.(state);
         return [{ receipt: "receipt" }];
@@ -61,7 +65,10 @@ class IdentityDatabase {
         finished = true;
       }
       if (sql.includes('FROM "users"')) return state.user.filter(row => values.includes(row.id));
-      if (sql.includes('FROM "sessions"')) return state.session.filter(row => row.id === values[0]);
+      if (sql.includes('FROM "sessions"')) {
+        await this.afterSessionLock?.();
+        return state.session.filter(row => row.id === values[0]);
+      }
       if (sql.includes("current_setting")) return [{ binding: "" }];
       return [];
     };
@@ -332,5 +339,88 @@ describe("remaining Identity lifecycle outcomes", () => {
     const repo = new PrismaTotpEnrollmentRepository(db.service);
     expect(await repo.consumeBackupCodeAndElevate({ userId: "u", enrollmentId: "e", sessionId: "s", codeHash: "same", usedAt: now, adminTotpExpiresAt: later })).toBe(false);
     expect(db.rows.totpBackupCode.every(code => code.usedAt === null)).toBe(true); expect(db.rows.session[0]!.adminTotpExpiresAt).toBeNull();
+  });
+});
+
+
+// Boundary substitution pauses a real repository at its database preparation or
+// resource-lock await. It proves clock orchestration/rollback, not SQL locking.
+async function afterWait<T>(db: IdentityDatabase, executionTime: Date, work: () => Promise<T>, atLock = false): Promise<T> {
+  let entered!: () => void;
+  let release!: () => void;
+  const waiting = new Promise<void>(resolve => { entered = resolve; });
+  const resumed = new Promise<void>(resolve => { release = resolve; });
+  const gate = async () => { entered(); await resumed; };
+  if (atLock) db.afterSessionLock = gate;
+  else db.beforePrepare = gate;
+  const result = work();
+  await waiting;
+  vi.setSystemTime(executionTime);
+  release();
+  return result;
+}
+
+const deadline = new Date("2026-10-24T12:00:01.000Z");
+const boundaries = [
+  { label: "just before", at: new Date("2026-10-24T12:00:00.999Z"), allowed: true },
+  { label: "exactly at", at: deadline, allowed: false },
+  { label: "after", at: new Date("2026-10-24T12:00:01.001Z"), allowed: false },
+];
+describe.each(boundaries)("execution $label expiry after preparation waits", ({ at, allowed }) => {
+  it("refresh preserves the original token and expiry on refusal", async () => {
+    const db = fixture(); db.rows.session[0]!.expiresAt = deadline;
+    const result = afterWait(db, at, () => new PrismaSessionRepository(db.service, hasher).rotateRefreshToken("s", "old", "new", now, later));
+    if (allowed) await expect(result).resolves.toBe(true);
+    else await expect(result).rejects.toThrow("Session expired");
+    expect(db.rows.session[0]).toMatchObject(allowed
+      ? { refreshTokenHash: "new", expiresAt: later, lastSeenAt: now }
+      : { refreshTokenHash: "old", expiresAt: deadline });
+    if (!allowed) expect(db.rows.session[0]!["lastSeenAt"]).toBeUndefined();
+  });
+  it.each(["elevate", "first verification", "backup code"])("%s preserves all state on refusal", async kind => {
+    const db = fixture(); db.rows.session[0]!.expiresAt = deadline;
+    if (kind === "backup code") {
+      db.rows.totpEnrollment[0]!.verifiedAt = now;
+      db.rows.totpBackupCode.push({ id: "b", totpEnrollmentId: "e", codeHash: "one", usedAt: null });
+    }
+    const original = structuredClone(db.rows);
+    const totp = new PrismaTotpEnrollmentRepository(db.service);
+    const result = afterWait(db, at, () => kind === "elevate"
+      ? new PrismaSessionRepository(db.service, hasher).updateAdminTotpExpiresAt("s", later, { userId: "u", now })
+      : kind === "first verification"
+        ? totp.completeFirstVerification({ userId: "u", enrollmentId: "e", sessionId: "s", verifiedAt: now, adminTotpExpiresAt: later, codeHashes: ["one", "two"] })
+        : totp.consumeBackupCodeAndElevate({ userId: "u", enrollmentId: "e", sessionId: "s", usedAt: now, adminTotpExpiresAt: later, codeHash: "one" }).then(value => { expect(value).toBe(true); }));
+    if (!allowed) {
+      await expect(result).rejects.toThrow("SESSION_NOT_FOUND");
+      expect(db.rows).toEqual(original);
+    } else {
+      await result;
+      expect(db.rows.session[0]!.adminTotpExpiresAt).toEqual(later);
+      if (kind === "first verification") {
+        expect(db.rows.totpEnrollment[0]!.verifiedAt).toEqual(now);
+        expect(db.rows.totpBackupCode.map(code => code["codeHash"])).toEqual(["one", "two"]);
+      }
+      if (kind === "backup code") expect(db.rows.totpBackupCode[0]!.usedAt).toEqual(now);
+    }
+  });
+  describe.each([false, true])("staff grant=%s", grant => {
+    it.each(["Session", "elevation", "elevation after resource lock"])("checks %s and preserves grants/audit on refusal", async expiry => {
+      const db = fixture();
+      db.rows.user.push({ id: "target", role: "user", suspendedAt: null, deletionScheduledAt: null });
+      db.rows.staffGrant.push({ userId: "u", capability: "staff.manage", grantedAt: now, revokedAt: null });
+      if (!grant) db.rows.staffGrant.push({ userId: "target", capability: "diagnostics.technician", grantedAt: now, revokedAt: null });
+      db.rows.session[0]!.expiresAt = expiry === "Session" ? deadline : later;
+      db.rows.session[0]!.adminTotpExpiresAt = expiry === "Session" ? later : deadline;
+      const original = structuredClone(db.rows);
+      const result = afterWait(db, at, () => new PrismaStaffAuthority(db.service).change({ userId: "u", sessionId: "s", targetUserId: "target", capability: "diagnostics.technician", reason: "Approved", grant }, now), expiry.includes("resource lock"));
+      if (!allowed) {
+        await expect(result).rejects.toThrow(expiry === "Session" ? "SESSION_REQUIRED" : "ELEVATION_REQUIRED");
+        expect(db.rows).toEqual(original);
+      } else {
+        await result;
+        expect(db.rows.auditLog).toHaveLength(1);
+        expect(db.rows.staffGrant.find(row => row.userId === "target")).toMatchObject({ grantedAt: now, revokedAt: grant ? null : now });
+      }
+    });
   });
 });
