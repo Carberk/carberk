@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { retainedSchemaProfile } from './staging-schema.mjs';
+import { retainedSchemaProfile, evaluateSchemaPlan } from './staging-schema.mjs';
+import { inventoryForSchema } from './testing/schema-profile-fixture.mjs';
+import { retainedSchemaProfile as archivedProfile } from '../docs/evidence/issue-897/kernel-physical-columns-20261025/original/scripts/staging-schema.mjs';
 
 const revision = [
   {
@@ -105,3 +107,58 @@ for (const item of revision) {
     assertPhysicalColumns(read(`../${item.migration}`));
   });
 }
+
+test('original source, assertions, mirrors and all 52 exact inventories remain independently verifiable', () => {
+  assert.equal(hash(read(`${archive}/original-profile-inventories.json`)), '6e4c5a8bfce75fc3c8c77505316df23c5a6eae9a42d42fd8fe640c01a590a6b7');
+  const snapshot = JSON.parse(read(`${archive}/original-profile-inventories.json`));
+  assert.equal(snapshot.sourceCommit, 'f375cb4ae6c363e5a724d92ecc7c9f4af5cc5520');
+  assert.equal(hash(read('../packages/db/prisma/schema.prisma')), '7ce808a1af40f4f85c340526ca8ea3bced18e99155282d41b610aca9e85cfc72');
+  const originalProfileSource = read(`${archive}/original/scripts/staging-schema.mjs`);
+  assert.equal(hash(originalProfileSource), '1072783155c77779a755d59b9cb32385554b06c7f2cc1b756d742038978501ce');
+  let restoredProfileSource = read('./staging-schema.mjs');
+  for (const item of revision) restoredProfileSource = restoredProfileSource.replace(item.proposedSha256, item.oldSha256);
+  assert.equal(restoredProfileSource, originalProfileSource, 'Only the two checksum literals change in the complete active module');
+  assert.deepEqual(snapshot.additions, archivedProfile.additions);
+  assert.deepEqual(snapshot.schemaHashes, archivedProfile.schemaHashes);
+  assert.deepEqual(snapshot.schemaMigrations, archivedProfile.schemaMigrations);
+  assert.equal(Object.keys(snapshot.exactHistoricalInventories).length, 52);
+  assert.deepEqual(new Set(Object.keys(snapshot.exactHistoricalInventories)), new Set(archivedProfile.schemaHashes));
+  for (const schema of archivedProfile.schemaHashes) {
+    const expected = archivedProfile.schemaMigrations[schema].map(name => archivedProfile.additions.find(row => row.name === name));
+    assert.deepEqual(snapshot.exactHistoricalInventories[schema], expected, schema);
+    for (const row of expected) assert.equal(hash(read(`./testing/retained-schema/${row.name}.sql`)),
+      revision.find(item => item.name === row.name)?.proposedSha256 ?? row.checksum, row.name);
+  }
+  for (const item of revision) {
+    assert.equal(hash(read(`${archive}/original/scripts/testing/retained-schema/${item.name}.sql`)), item.oldSha256);
+    assert.throws(() => assertPhysicalColumns(read(`${archive}/original/${item.migration}`)), /inspection_interests.fields: listingId is not a physical column/);
+  }
+  const assertions = {
+    'diagnostic-intake-campaign-composition-schema.test.mjs': 'a8becb064c3ee754062bcf62d8d2275e7db616dcfd6ab8b524991deafb5563c0',
+    'diagnostic-purge-effects-schema.test.mjs': '8b15b52e5ddcb5ed939cff7bb602e3fa5e73795533080a2212c0f3a26f72f86e',
+    'diagnostic-source-guard-repair-schema.test.mjs': '45d1025b4216d43b224bbe67beb11279678931f0da17588a6be9641ae3691405',
+    'diagnostic-source-kernel-schema.test.mjs': '349c861e3c8ca2c363b690552d3ed5323f51c5b1f7e9c405ec9dbff907e25076',
+  };
+  for (const [file, checksum] of Object.entries(assertions)) assert.equal(hash(read(`${archive}/original/scripts/${file}`)), checksum, file);
+});
+
+test('active planning accepts revised exact inventories and refuses old or mixed checksums in every affected snapshot', () => {
+  const snapshot = JSON.parse(read(`${archive}/original-profile-inventories.json`));
+  const emptySchema = '3cf9a92dc50367112d7e41cfadaf9e3199e0000ef75a7181861c09ebe9d7e51d';
+  for (const schema of retainedSchemaProfile.schemaHashes) {
+    const current = inventoryForSchema(schema, []);
+    const original = snapshot.exactHistoricalInventories[schema];
+    const plan = { baseline: [], candidate: current, main: [], candidateSchema: schema, mainSchema: emptySchema };
+    const verdict = evaluateSchemaPlan(plan);
+    assert.deepEqual(verdict.migrations, [...current].sort((a, b) => a.name.localeCompare(b.name)));
+    for (const item of revision.filter(item => original.some(row => row.name === item.name))) {
+      const mixed = current.map(row => row.name === item.name ? { ...row, checksum: item.oldSha256 } : row);
+      assert.throws(() => evaluateSchemaPlan({ ...plan, candidate: mixed }), /checksum drift refused/, `${schema} ${item.name} candidate`);
+      assert.throws(() => evaluateSchemaPlan({ ...plan, main: mixed, mainSchema: schema }), /checksum drift refused/, `${schema} ${item.name} main`);
+      assert.throws(() => evaluateSchemaPlan({ ...plan, retained: mixed }), /checksum drift refused/, `${schema} ${item.name} retained`);
+    }
+    if (original.some(row => revision.some(item => item.name === row.name))) {
+      assert.throws(() => evaluateSchemaPlan({ ...plan, candidate: original }), /checksum drift refused/, schema);
+    }
+  }
+});
