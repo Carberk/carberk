@@ -13,11 +13,12 @@ export interface UserRepository {
   create(signInMethods: SignInMethods, identity: GeneratedIdentity): Promise<User>;
   /** Stores the User's own name. Writes nothing else on the User. */
   updateDisplayName(userId: string, displayName: string): Promise<void>;
+  /** Unsupported raw erasure. Production callers must use the account UoW. */
   delete(id: string): Promise<void>;
   findUsersWithExpiredDeletionGrace(now: Date): Promise<User[]>;
   /**
-   * Day-30 purge of the User row: frees both Sign-in Methods and clears the
-   * name and photo. The name number and avatar index stay; they identify nobody.
+   * Unsupported raw retained-User scrub. It is not the physical account purge
+   * and must refuse; production erasure belongs to the complete account UoW.
    */
   purgePersonalData(userId: string): Promise<void>;
 }
