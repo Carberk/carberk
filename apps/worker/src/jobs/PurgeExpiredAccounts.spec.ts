@@ -44,6 +44,7 @@ function makeFakePrisma() {
     /** Operations passed to each `$transaction`, by the label their delegate gave them. */
     transactions: [] as string[][],
     activeTransaction: null as string[] | null,
+    beforeRediscovery: null as (() => void) | null,
   };
 
   /** Labels a pending operation so a test can see which transaction carried it. */
@@ -57,7 +58,7 @@ function makeFakePrisma() {
       findMany: async (args: { where: { deletionScheduledAt?: { lte?: Date } } }) => {
         const lte = args.where.deletionScheduledAt?.lte;
         if (lte) {
-          return state.users.filter((u) => u.deletionScheduledAt && u.deletionScheduledAt <= lte);
+          return state.users.filter((u) => u.deletionScheduledAt && u.deletionScheduledAt <= lte).map((u) => ({ ...u }));
         }
         return state.users;
       },
@@ -78,9 +79,15 @@ function makeFakePrisma() {
       const sql = strings.join("?");
       state.raw.push({ sql, values });
       if (sql.includes("to_jsonb(u) AS row")) {
+        state.beforeRediscovery?.();
         const userId = values[0];
         const user = state.users.find((candidate) => candidate.id === userId);
-        return labelled("raw.query", Promise.resolve(user ? [{ row: { ...user } }] : []));
+        const cutoff = values[1] as Date | undefined;
+        const due = !cutoff || (user?.deletionScheduledAt != null && user.deletionScheduledAt <= cutoff);
+        // PostgreSQL to_jsonb(timestamp without time zone) has no trailing Z.
+        return labelled("raw.query", Promise.resolve(user && due ? [{ row: { ...user,
+          deletionScheduledAt: user.deletionScheduledAt?.toISOString().replace(/Z$/, "") ?? null,
+        } }] : []));
       }
       if (sql.includes("diagnostic_prepare_source")) {
         return labelled("raw.query", Promise.resolve([{ receipt: "00000000-0000-0000-0000-000000000001" }]));
@@ -267,7 +274,7 @@ function makeFakePrisma() {
     },
   };
 
-  return { ...state, prisma: prismaLike as unknown as PrismaService };
+  return Object.assign(state, { prisma: prismaLike as unknown as PrismaService });
 }
 
 describe("PurgeExpiredAccounts", () => {
@@ -277,6 +284,50 @@ describe("PurgeExpiredAccounts", () => {
   beforeEach(() => {
     fake = makeFakePrisma();
     job = new PurgeExpiredAccounts(fake.prisma);
+  });
+
+  it("purges the exact UTC boundary from timezone-free database JSON and sends only consumed command fields", async () => {
+    fake.users.push({ id: "exact-due", phone: null, email: null, displayName: "Exact due", avatarUrl: null, deletionScheduledAt: NOW });
+
+    expect(await job.execute({ now: NOW })).toEqual({ purgedCount: 1 });
+
+    const preparation = fake.raw.find((statement) => statement.sql.includes("diagnostic_prepare_source"));
+    const command = JSON.parse(String(preparation?.values[0])) as Record<string, unknown>;
+    expect(Object.keys(command).sort()).toEqual(["actorUserId", "campaign", "cutoff", "operation", "roots", "rows", "sessionId"]);
+    expect(command).toMatchObject({ operation: "account_purge", cutoff: NOW.toISOString(),
+      roots: [{ table: "users", key: { id: "exact-due" } }],
+      rows: [{ expected: { source: { deletionScheduledAt: NOW.toISOString().replace(/Z$/, "") } }, next: { deletionScheduledAt: null } }],
+    });
+    expect(fake.users[0]?.displayName).toBeNull();
+  });
+
+  it.each(["future", "cleared", "phone", "email"])("refuses a scheduler snapshot after %s changes before rediscovery", async change => {
+    fake.users.push({ id: "stale", phone: "+99360000000", email: "original@example.com", displayName: "Keep", avatarUrl: null, deletionScheduledAt: NOW });
+    fake.sessions.push({ id: "keep-session", userId: "stale" });
+    fake.beforeRediscovery = () => {
+      const user = fake.users[0]!;
+      if (change === "future") user.deletionScheduledAt = new Date(NOW.getTime() + 1);
+      if (change === "cleared") user.deletionScheduledAt = null;
+      if (change === "phone") user.phone = "+99361111111";
+      if (change === "email") user.email = "changed@example.com";
+    };
+
+    expect(await job.execute({ now: NOW })).toEqual({ purgedCount: 0 });
+
+    expect(fake.users[0]?.displayName).toBe("Keep");
+    expect(fake.sessions).toEqual([{ id: "keep-session", userId: "stale" }]);
+    expect(fake.raw.some((statement) => statement.sql.includes("diagnostic_prepare_source"))).toBe(false);
+  });
+
+  it("does not send unused intent metadata to the seven-field account purge parser", async () => {
+    fake.users.push({ id: "overdue", phone: null, email: null, displayName: "Overdue", avatarUrl: null,
+      deletionScheduledAt: new Date(NOW.getTime() - 86400000) });
+
+    expect(await job.execute({ now: NOW })).toEqual({ purgedCount: 1 });
+
+    const preparation = fake.raw.find((statement) => statement.sql.includes("diagnostic_prepare_source"));
+    expect(Object.keys(JSON.parse(String(preparation?.values[0])) as object).sort())
+      .toEqual(["actorUserId", "campaign", "cutoff", "operation", "roots", "rows", "sessionId"]);
   });
 
   it("uses one interactive prepared-source transaction and asserts the live receipt", async () => {
