@@ -2126,3 +2126,5 @@ model CampaignPreparation {
 // Runtime source/preparation grouping corrections: 20261025015000_diagnostic_runtime_transport_corrections.
 
 // Effect scope alias correction: 20261025017500_diagnostic_effect_scope_alias_correction.
+
+// User INSERT refusal error transport: 20261025019000_diagnostic_user_insert_error_transport.

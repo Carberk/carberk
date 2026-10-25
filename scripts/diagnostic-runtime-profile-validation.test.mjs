@@ -22,4 +22,8 @@ test('actual runtime schema snapshots pass the retained validator with exact inv
   assert.throws(() => evaluateSchemaPlan({ ...args, candidateSchema: prior, candidate, profile: withoutMap }), /Schema snapshot and migration inventory mismatch/);
   assert.throws(() => evaluateSchemaPlan({ ...args, candidate: actual.filter(x => !x.name.startsWith('20261025017500')) }), /Schema snapshot and migration inventory mismatch/);
   assert.throws(() => evaluateSchemaPlan({ ...args, candidate: actual.map(x => x.name.startsWith('20261025017500') ? { ...x, checksum: 'drift' } : x) }), /Unreviewed migration or checksum drift/);
+  assert.throws(() => evaluateSchemaPlan({ ...args, candidate: actual.filter(x => !x.name.startsWith('20261025019000')) }), /Schema snapshot and migration inventory mismatch/);
+  assert.throws(() => evaluateSchemaPlan({ ...args, candidate: actual.map(x => x.name.startsWith('20261025019000') ? { ...x, checksum: 'drift' } : x) }), /Unreviewed migration or checksum drift/);
+  const withoutCurrentMap = { ...profile, schemaMigrations: { ...profile.schemaMigrations, [candidateSchema]: undefined } };
+  assert.throws(() => evaluateSchemaPlan({ ...args, profile: withoutCurrentMap }), /Schema snapshot and migration inventory mismatch/);
 });
