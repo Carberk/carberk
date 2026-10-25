@@ -169,7 +169,7 @@ export async function preparedVideo<T>(tx: Prisma.TransactionClient, selection: 
     if (!derived) throw new Error("VIDEO_PREPARATION_KEYS");
     const keys = [...new Map(derived.keys.map(k => [`${k.namespace}:${k.key}`, k])).values()].sort((a,b) => a.namespace-b.namespace || a.key-b.key);
     for (const namespace of [...new Set(keys.map(k => k.namespace))]) {
-      for (const key of keys.filter(k => k.namespace === namespace)) await tx.$queryRaw`SELECT pg_advisory_xact_lock(${namespace}::int,${key.key}::int)`;
+      for (const key of keys.filter(k => k.namespace === namespace)) await tx.$queryRaw`SELECT pg_advisory_xact_lock(${namespace}::int,${key.key}::int)::text`;
       for (const slot of before.slots.filter(s => !s.uniqueOnly && s.row)) {
         const [meta] = await tx.$queryRaw<{ namespace: number }[]>`SELECT (public.diagnostic_source_meta(${slot.table})->>'namespace')::int AS namespace`;
         if (meta?.namespace === namespace) await tx.$queryRaw(Prisma.sql`SELECT 1 FROM public.${Prisma.raw(slot.table)} s WHERE to_jsonb(s) @> ${JSON.stringify(slot.key)}::jsonb FOR UPDATE`);
