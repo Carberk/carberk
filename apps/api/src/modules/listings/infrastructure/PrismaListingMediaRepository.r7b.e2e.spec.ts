@@ -22,7 +22,7 @@ async function reservation(db: PrismaService, n: number) {
 async function state(db: PrismaService, n: number) {
   return { uploads: await db.mediaUpload.findMany({ where: { userId: `${p(n)}-owner` }, orderBy: { id: "asc" } }),
     media: await db.listingMedia.findMany({ where: { listingId: { in: [`${p(n)}-listing`, `${p(n)}-other`] } }, orderBy: { id: "asc" } }),
-    cleanup: await db.mediaUploadCleanup.findMany({ where: { uploadId: `${p(n)}-upload` } }) };
+    cleanup: await db.mediaUploadCleanup.findMany({ where: { uploadId: { in: [`${p(n)}-upload`, `${p(n)}-second-upload`] } }, orderBy: { uploadId: "asc" } }) };
 }
 function gate() {
   let release: () => void = () => undefined;
@@ -75,7 +75,7 @@ describe("R7b disposable production media callers", { concurrent: false }, () =>
   beforeAll(async () => {
     const [ready] = await db.$queryRaw<{ source: boolean; campaign: boolean }[]>`SELECT public.diagnostic_source_guards_ready() AS source, public.campaign_preparation_ready() AS campaign`;
     expect(ready).toEqual({ source: true, campaign: true });
-    for (let n = 1; n <= 8; n++) {
+    for (let n = 1; n <= 13; n++) {
       expect(await db.listing.count({ where: { id: { in: [`${p(n)}-listing`, `${p(n)}-other`] }, sellerId: `${p(n)}-owner`, status: "active" } })).toBe(2);
       expect((await state(db, n)).cleanup).toEqual([]);
     }
@@ -83,6 +83,7 @@ describe("R7b disposable production media callers", { concurrent: false }, () =>
   afterAll(async () => { await Promise.all([db.onModuleDestroy(), a.onModuleDestroy(), b.onModuleDestroy()]); });
   it("adopts and joins idempotently through the actual repository", async () => {
     const claim = await reservation(db, 1);
+    expect((await repository(db).save(media(1), claim)).id).toBe(`${p(1)}-photo`);
     expect((await repository(db).save(media(1), claim)).id).toBe(`${p(1)}-photo`);
     expect((await repository(db).save(media(1, "retry"), claim)).id).toBe(`${p(1)}-photo`);
     const after = await state(db, 1);
@@ -138,4 +139,48 @@ describe("R7b disposable production media callers", { concurrent: false }, () =>
     await repository(db).save(media(8, "legacy", false)); await repository(db).delete(`${p(8)}-legacy`);
     expect(await state(db, 8)).toEqual({ uploads: [], media: [], cleanup: [] });
   });
+  it("retires through the actual supplied helper and persists its exact clock and cleanup", async () => {
+    const actual = new Date("2026-10-25T12:00:03.789Z");
+    const caller = new PrismaListingMediaRepository(db, new PrismaUploadClaims(db, { now: () => actual }));
+    expect(await caller.deleteReleasingUpload(`${p(9)}-upload-photo`, 1)).toEqual({ removed: true });
+    const after = await state(db, 9);
+    expect(after.media.map(row => row.id)).toEqual([`${p(9)}-second-upload-photo`]);
+    expect(after.uploads.find(row => row.id === `${p(9)}-upload`)).toMatchObject({ state: "RETIRED", retiredAt: actual, claimToken: null, claimDeadline: null });
+    expect(after.cleanup).toHaveLength(1);
+    expect(after.cleanup[0]).toMatchObject({ uploadId: `${p(9)}-upload`, key: `${p(9)}/upload/original.webp`, writeProtocol: "conditional-v1", status: "PENDING",
+      objectKeys: ["original", "sm", "md", "lg", "thumb"].map(name => `${p(9)}/upload/${name}.webp`) });
+  });
+  it("rolls back media, retirement and cleanup on an explicit finish fault", async () => {
+    const before = await state(db, 10), fault = instrument(a, true);
+    const caller = new PrismaListingMediaRepository(fault.service, new PrismaUploadClaims(fault.service, { now: () => new Date("2026-10-25T12:00:05.123Z") }));
+    await expect(caller.deleteReleasingUpload(`${p(10)}-upload-photo`, 1)).rejects.toThrow("r7b_finish_fault_injection");
+    expect(await state(db, 10)).toEqual(before);
+  });
+  it("refuses the photo floor without deleting or retiring", async () => {
+    const before = await state(db, 11);
+    await expect(repository(db).deleteReleasingUpload(`${p(11)}-upload-photo`, 2)).rejects.toMatchObject({ code: "PHOTO_MINIMUM_REQUIRED" });
+    expect(await state(db, 11)).toEqual(before);
+  });
+  it.each([{ n: 12, firstSuffix: "upload", secondSuffix: "second-upload" }, { n: 13, firstSuffix: "second-upload", secondSuffix: "upload" }])(
+    "serializes distinct-photo floor opponents with $firstSuffix first", async ({ n, firstSuffix, secondSuffix }) => {
+      const first = instrument(a), second = instrument(b), started: Promise<unknown>[] = [];
+      const one = repository(first.service).deleteReleasingUpload(`${p(n)}-${firstSuffix}-photo`, 1).then(value => ({ value }), error => ({ error })); started.push(one);
+      let two: Promise<unknown> | undefined;
+      try {
+        await held(first.reached.promise, one);
+        two = repository(second.service).deleteReleasingUpload(`${p(n)}-${secondSuffix}-photo`, 1).then(value => ({ value }), error => ({ error })); started.push(two);
+        await blocked(db, second.pid, first.pid);
+      } finally {
+        first.release.release(); second.release.release(); await Promise.allSettled(started);
+      }
+      expect(await one).toEqual({ value: { removed: true } });
+      if (!two) throw new Error("r7b_opponent_not_started");
+      expect(await two).toMatchObject({ error: { code: "PHOTO_MINIMUM_REQUIRED" } });
+      const after = await state(db, n);
+      expect(after.media.map(row => row.id)).toEqual([`${p(n)}-${secondSuffix}-photo`]);
+      expect(after.uploads.find(row => row.id === `${p(n)}-${firstSuffix}`)).toMatchObject({ state: "RETIRED" });
+      expect(after.uploads.find(row => row.id === `${p(n)}-${secondSuffix}`)).toMatchObject({ state: "ADOPTED", retiredAt: null });
+      expect(after.cleanup.map(row => row.uploadId)).toEqual([`${p(n)}-${firstSuffix}`]);
+    });
+
 });

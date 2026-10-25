@@ -1,3 +1,10 @@
+import { PrismaService } from "@auto-tm/db";
+import { Test } from "@nestjs/testing";
+import { MODULE_METADATA } from "@nestjs/common/constants";
+import type { Provider } from "@nestjs/common";
+import { IdentityModule } from "../../identity/identity.module";
+import { BUSINESS_AUTHORITY_PORT, IDENTITY_CLOCK_PORT, type BusinessAuthorityPort } from "../../identity/identity.public";
+import { ListingOwnership } from "../application/ListingOwnership";
 import { describe, expect, it } from "vitest";
 import { ClaimDatabase, type Row } from "../application/testing/UploadClaimsDatabase";
 import { PrismaListingMediaRepository } from "./PrismaListingMediaRepository";
@@ -6,7 +13,7 @@ import { ListingMedia } from "../domain/ListingMedia";
 
 const now = new Date("2026-10-25T12:00:00Z");
 const media = (id = "photo", uploadId: string | null = "upload-1") => ListingMedia.create({ id, listingId: "listing", kind: "image", key: "pending/upload-1/original.webp", sortOrder: 0, createdAt: now, ...(uploadId ? { uploadId } : {}) });
-function setup(retirementInstant = now) {
+function setup(retirementInstant = now, ownership?: ListingOwnership) {
   const db = new ClaimDatabase();
   db.tables["listings"] = [{ id: "listing", sellerId: "owner", businessId: null, status: "active" }];
   const query = db.tx.$queryRaw;
@@ -14,6 +21,14 @@ function setup(retirementInstant = now) {
     const text = "strings" in sql ? sql.strings.join("?") : sql.join("?");
     if (text.includes("SELECT id FROM listings") && text.includes("FOR UPDATE")) {
       if (!db.receipt) throw new Error("media_lock_before_preparation");
+      return [];
+    }
+    if (text.includes('SELECT "status", "deletedAt" FROM "listings"')) {
+      if (!db.receipt) throw new Error("stock_lock_before_preparation");
+      return db.tables["listings"] ?? [];
+    }
+    if (text.includes('SELECT "id" FROM "users"') || text.includes('SELECT "id" FROM "dealerships"')) {
+      if (!db.receipt) throw new Error("authority_lock_before_preparation");
       return [];
     }
     return query(sql, ...args);
@@ -49,7 +64,7 @@ function setup(retirementInstant = now) {
     mediaUpload: { findUnique: async ({ where }: { where: Row }) => db.tables["media_uploads"]?.find(row => row["id"] === where["id"]) ?? null } });
   Object.assign(db.prisma, { listingMedia: delegate });
   const claims = new PrismaUploadClaims(db.prisma, { now: () => retirementInstant });
-  return { db, repository: new PrismaListingMediaRepository(db.prisma, claims) };
+  return { db, repository: new PrismaListingMediaRepository(db.prisma, claims, ownership) };
 }
 const reserve = { state: "PREPARING", claimToken: "token", claimTargetType: "listing", claimTargetId: "listing" };
 
@@ -127,4 +142,80 @@ describe("media caller preparation", () => {
     expect(db.tables["media_upload_cleanups"]).toEqual([]);
     expect(db.tables["media_uploads"]?.[0]).toMatchObject({ state: "ADOPTED" });
   });
+  it("returns the same adopter for a retry using the same media ID", async () => {
+    const { db, repository } = setup(); db.upload("upload-1", reserve);
+    await repository.save(media(), { token: "token" });
+    expect((await repository.save(media(), { token: "token" })).id).toBe("photo");
+    expect(db.tables["listing_media"]).toHaveLength(1);
+  });
+
+  it("reports missing direct deletion using the original Prisma error", async () => {
+    const { db, repository } = setup();
+    await expect(repository.delete("missing")).rejects.toMatchObject({ code: "P2025" });
+    expect(db.finished).toBe(0);
+  });
+
+  it("returns removed false when another removal wins during preparation", async () => {
+    const { db, repository } = setup();
+    db.tables["listing_media"] = [{ id: "photo", listingId: "listing", kind: "image", key: "legacy" }];
+    db.afterWait = () => { db.tables["listing_media"] = []; };
+    expect(await repository.deleteReleasingUpload("photo", 0)).toEqual({ removed: false });
+    expect(db.tables["media_upload_cleanups"]).toEqual([]);
+  });
+
+  it("refuses a newly violated photo floor after waiting without retiring the selected upload", async () => {
+    const { db, repository } = setup(); db.upload("upload-1", { ...reserve, state: "ADOPTED" });
+    db.tables["listing_media"] = [{ id: "photo", listingId: "listing", kind: "image", key: "pending/upload-1/original.webp", uploadId: "upload-1" },
+      { id: "opponent", listingId: "listing", kind: "image", key: "legacy" }];
+    db.afterWait = () => { db.tables["listing_media"] = db.tables["listing_media"]!.filter(row => row["id"] !== "opponent"); };
+    await expect(repository.deleteReleasingUpload("photo", 1)).rejects.toMatchObject({ code: "PHOTO_MINIMUM_REQUIRED" });
+    expect(db.tables["media_uploads"]?.[0]).toMatchObject({ state: "ADOPTED" });
+    expect(db.tables["media_upload_cleanups"]).toEqual([]);
+  });
+
+  it("records legacy cleanup with the actual manifest and preserves existing cleanup", async () => {
+    const { db, repository } = setup(); db.upload("upload-1", { ...reserve, state: "ADOPTED", writeProtocol: null, objectKeys: [] });
+    db.tables["listing_media"] = [{ id: "photo", listingId: "listing", kind: "image", key: "pending/upload-1/original.webp", uploadId: "upload-1" }];
+    await repository.deleteReleasingUpload("photo");
+    expect(db.tables["media_upload_cleanups"]).toEqual([{ uploadId: "upload-1", key: "pending/upload-1/original.webp", objectKeys: [], writeProtocol: null, status: "LEGACY_PENDING" }]);
+    const existing = structuredClone(db.tables["media_upload_cleanups"]);
+    db.tables["listing_media"] = [{ id: "retry", listingId: "listing", kind: "image", key: "pending/upload-1/original.webp", uploadId: "upload-1" }];
+    await repository.deleteReleasingUpload("retry");
+    expect(db.tables["media_upload_cleanups"]).toEqual(existing);
+  });
+
+  it.each(["active", "revoked", "banned"] as const)("uses production Business authority for %s stock retirement", async status => {
+    const configured = Reflect.getMetadata(MODULE_METADATA.PROVIDERS, IdentityModule) as Provider[];
+    const authorityProviders = configured.filter(provider => typeof provider === "function"
+      ? ["CheckBusinessAuthority", "SystemClockAdapter"].includes(provider.name)
+      : typeof provider === "object" && provider !== null && "provide" in provider &&
+        [BUSINESS_AUTHORITY_PORT, IDENTITY_CLOCK_PORT, "IDENTITY_BUSINESS_AUTHORITY_REPOSITORY"].includes(String(provider.provide)));
+    expect(authorityProviders).toHaveLength(5);
+    const authorityModule = await Test.createTestingModule({ providers: [{ provide: PrismaService, useValue: {} }, ...authorityProviders] }).compile();
+    try {
+      const ownership = new ListingOwnership(authorityModule.get<BusinessAuthorityPort>(BUSINESS_AUTHORITY_PORT));
+      const { db, repository } = setup(now, ownership);
+      db.tables["listings"] = [{ id: "listing", sellerId: "owner", businessId: "business", status: status === "banned" ? "banned" : "active", deletedAt: null }];
+      db.tables["dealerships"] = [{ id: "business", status: "active" }];
+      db.tables["dealership_members"] = [{ id: "member", userId: "owner", dealershipId: "business", role: "owner", status: status === "revoked" ? "revoked" : "active" }];
+      db.tables["sessions"] = [{ id: "session", userId: "owner", expiresAt: new Date("2099-01-01") }];
+      Object.assign(db.tx, {
+        dealershipMember: { findUnique: async () => db.tables["dealership_members"]?.[0] },
+        session: { findUnique: async () => ({ ...db.tables["sessions"]?.[0], user: { ...db.tables["users"]?.[0], dealershipMemberships: [{ ...db.tables["dealership_members"]?.[0], dealership: db.tables["dealerships"]?.[0] }] } }) },
+      });
+      db.upload("upload-1", { ...reserve, state: "ADOPTED", businessId: "business" });
+      db.tables["listing_media"] = [{ id: "photo", listingId: "listing", kind: "image", key: "pending/upload-1/original.webp", uploadId: "upload-1" }];
+      const before = structuredClone(db.tables);
+      const operation = repository.deleteReleasingUpload("photo", 0, { userId: "owner", businessId: "business", sessionId: "session" });
+      if (status === "active") {
+        expect(await operation).toEqual({ removed: true });
+        expect(db.tables["media_uploads"]?.[0]).toMatchObject({ state: "RETIRED" });
+        expect(db.tables["media_upload_cleanups"]).toHaveLength(1);
+      } else {
+        await expect(operation).rejects.toMatchObject({ response: { code: "FORBIDDEN", details: { reason: status === "revoked" ? "MEMBERSHIP_REQUIRED" : "MODERATION_BLOCKED" } } });
+        expect(db.tables).toEqual(before);
+      }
+    } finally { await authorityModule.close(); }
+  });
+
 });

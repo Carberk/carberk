@@ -12,7 +12,10 @@ const mediaTables = ["users", "dealerships", "dealership_members", "sessions", "
 type MediaTable = typeof mediaTables[number];
 type MediaRow = Record<string, Prisma.InputJsonValue | null>;
 interface MediaSlot { table: MediaTable; key: Record<string, string>; row: MediaRow | null; uniqueOnly?: boolean }
-interface MediaSelection { mediaIds: string[]; listingIds: string[]; uploadIds?: string[]; referencedUploadIds?: string[]; actor?: ListingActor | undefined }
+interface MediaSelection {
+  mediaIds: string[]; listingIds: string[]; uploadIds?: string[]; referencedUploadIds?: string[];
+  retiringUploadIds?: string[]; floorListingId?: string; actor?: ListingActor | undefined;
+}
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (value && typeof value === "object") return `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`;
@@ -93,51 +96,70 @@ export class PrismaListingMediaRepository implements ListingMediaRepository {
   }
 
   async delete(id: string): Promise<void> {
-    await this.prisma.$transaction(async tx => this.preparedMedia(tx, { mediaIds: [id], listingIds: [] },
+    await this.prisma.$transaction(async tx => {
+      if (!await tx.listingMedia.findUnique({ where: { id } })) throw this.missingMedia();
+      return this.preparedMedia(tx, { mediaIds: [id], listingIds: [] },
       [{ table: "listing_media", key: { id }, verb: "delete", next: null }], async () => {
         await tx.listingMedia.delete({ where: { id } });
-      }));
+      });
+    });
   }
 
   async deleteReleasingUpload(id: string, minimumPhotos?: number, actor?: ListingActor): Promise<{ removed: boolean }> {
     return this.prisma.$transaction(async (tx) => {
-      let row = await tx.listingMedia.findUnique({ where: { id } });
+      const row = await tx.listingMedia.findUnique({ where: { id } });
       if (!row) return { removed: false };
+      const initial = row;
+      const upload = row.uploadId ? await tx.mediaUpload.findUnique({ where: { id: row.uploadId } }) : null;
+      const retiringUploadIds = upload?.key === row.key && row.uploadId ? [row.uploadId] : [];
+      return this.preparedMedia(tx, { mediaIds: [id], listingIds: [row.listingId], retiringUploadIds, actor,
+        ...(minimumPhotos !== undefined ? { floorListingId: row.listingId } : {}) },
+      [{ table: "listing_media", key: { id }, verb: "delete", next: null }], async () => {
+        let current = initial;
+        const listing = await tx.listing.findUnique({ where: { id: current.listingId } });
+        if (listing?.businessId) {
+          if (!actor) throw new Error("Business media needs current actor");
+          await assertListingOwnership(this.ownership, actor, { sellerId: listing.sellerId, businessId: listing.businessId }, tx);
+          await lockEditableBusinessStock(tx, listing.id);
+        }
+        if (minimumPhotos !== undefined) {
+          // All removals of one Listing serialize, including distinct media IDs.
+          await tx.$queryRaw`SELECT id FROM listings WHERE id = ${current.listingId} FOR UPDATE`;
+          // The ID read above can precede a competing delete. Re-read after the
+          // Listing lock so a lost same-ID removal is 404 before any floor check.
+          const refreshed = await tx.listingMedia.findUnique({ where: { id } });
+          if (!refreshed) return { removed: false };
+          current = refreshed;
+          const remaining = await tx.listingMedia.count({ where: {
+            listingId: current.listingId, kind: "image", id: { not: id },
+          } });
+          if (remaining < minimumPhotos) throw new DomainError("PHOTO_MINIMUM_REQUIRED", `At least ${minimumPhotos} photos are required`);
+        }
 
-      const listing = await tx.listing.findUnique({ where: { id: row.listingId } });
-      if (listing?.businessId) {
-        if (!actor) throw new Error("Business media needs current actor");
-        await assertListingOwnership(this.ownership, actor, { sellerId: listing.sellerId, businessId: listing.businessId }, tx);
-        await lockEditableBusinessStock(tx, listing.id);
-      }
-      if (minimumPhotos !== undefined) {
-        // All removals of one Listing serialize, including distinct media IDs.
-        await tx.$queryRaw`SELECT id FROM listings WHERE id = ${row.listingId} FOR UPDATE`;
-        // The ID read above can precede a competing delete. Re-read after the
-        // Listing lock so a lost same-ID removal is 404 before any floor check.
-        row = await tx.listingMedia.findUnique({ where: { id } });
-        if (!row) return { removed: false };
-        const remaining = await tx.listingMedia.count({ where: {
-          listingId: row.listingId, kind: "image", id: { not: id },
-        } });
-        if (remaining < minimumPhotos) throw new DomainError("PHOTO_MINIMUM_REQUIRED", `At least ${minimumPhotos} photos are required`);
-      }
+        // deleteMany reports whether this caller won; a concurrent remove sees 0.
+        const { count } = await tx.listingMedia.deleteMany({ where: { id } });
+        if (count === 0) return { removed: false };
+        if (!current.uploadId) return { removed: true };
 
-      // deleteMany reports whether this caller won; a concurrent remove sees 0.
-      const { count } = await tx.listingMedia.deleteMany({ where: { id } });
-      if (count === 0) return { removed: false };
-      if (!row.uploadId) return { removed: true };
-
-      // Releasing the adopter retires its upload in this transaction: the key
-      // can never be adopted again, and deletion work is recorded for the
-      // worker, which alone decides whether the bytes may go. A row whose key
-      // is not its upload's key retires nothing.
-      const upload = await tx.mediaUpload.findUnique({
-        where: { id: row.uploadId },
-        select: { key: true },
+        // Releasing the adopter retires its upload in this transaction: the key
+        // can never be adopted again, and deletion work is recorded for the
+        // worker, which alone decides whether the bytes may go. A row whose key
+        // is not its upload's key retires nothing.
+        const currentUpload = await tx.mediaUpload.findUnique({
+          where: { id: current.uploadId },
+          select: { key: true },
+        });
+        if (currentUpload?.key === current.key) await this.claims.retire(tx, current.uploadId);
+        return { removed: true };
+      }, async () => {
+        // Preserve the original losing-delete and floor refusals without
+        // proceeding with a changed graph or extending any prepared keys.
+        if (!await tx.listingMedia.findUnique({ where: { id } })) return { removed: false };
+        if (minimumPhotos !== undefined && await tx.listingMedia.count({ where: {
+          listingId: initial.listingId, kind: "image", id: { not: id },
+        } }) < minimumPhotos) throw new DomainError("PHOTO_MINIMUM_REQUIRED", `At least ${minimumPhotos} photos are required`);
+        throw new Error("media_caller_scope_changed");
       });
-      if (upload?.key === row.key) await this.claims.retire(tx, row.uploadId);
-      return { removed: true };
     });
   }
 
@@ -168,10 +190,15 @@ export class PrismaListingMediaRepository implements ListingMediaRepository {
       slots.push({ table, key, row: found?.row ?? null });
     };
     for (const id of [...new Set(selection.mediaIds)].sort()) await add("listing_media", id);
+    if (selection.floorListingId) {
+      const photos = await tx.listingMedia.findMany({ where: { listingId: selection.floorListingId, kind: "image" }, orderBy: { id: "asc" }, select: { id: true } });
+      for (const photo of photos) await add("listing_media", photo.id);
+    }
     for (const id of [...new Set(selection.listingIds)].sort()) await add("listings", id);
-    const ids = [...new Set([...(selection.uploadIds ?? []), ...(selection.referencedUploadIds ?? [])])].sort();
+    const ids = [...new Set([...(selection.uploadIds ?? []), ...(selection.referencedUploadIds ?? []), ...(selection.retiringUploadIds ?? [])])].sort();
     for (const id of ids) {
       await add("media_uploads", id);
+      if (selection.retiringUploadIds?.includes(id)) await add("media_upload_cleanups", id);
       slots.push({ table: "users", key: { avatarUploadId: id }, row: { avatarUploadId: id }, uniqueOnly: true });
       slots.push({ table: "listing_media", key: { uploadId: id }, row: { uploadId: id }, uniqueOnly: true });
     }
@@ -211,19 +238,37 @@ export class PrismaListingMediaRepository implements ListingMediaRepository {
     }
     const mutations: CampaignMutation[] = [];
     for (const id of ids) if (slots.some(slot => !slot.uniqueOnly && slot.table === "media_uploads" && slot.key["id"] === id && slot.row)) {
-      mutations.push({ table: "media_uploads", key: { id }, verb: "update", next: selection.uploadIds?.includes(id) ? { state: "ADOPTED", claimToken: null, claimDeadline: null } : {} });
+      const retiring = selection.retiringUploadIds?.includes(id);
+      // retiredAt is allocated by the unchanged supplied helper. It has no
+      // namespace, FK or unique projection in ordinary campaign preparation.
+      mutations.push({ table: "media_uploads", key: { id }, verb: "update", next: retiring ? { state: "RETIRED", claimToken: null, claimDeadline: null }
+        : selection.uploadIds?.includes(id) ? { state: "ADOPTED", claimToken: null, claimDeadline: null } : {} });
+      const upload = slots.find(slot => !slot.uniqueOnly && slot.table === "media_uploads" && slot.key["id"] === id)?.row;
+      if (retiring && upload && upload["state"] !== "RETIRED" && upload["state"] !== "DELETED"
+        && !slots.find(slot => slot.table === "media_upload_cleanups" && slot.key["uploadId"] === id)?.row) {
+        mutations.push({ table: "media_upload_cleanups", key: { uploadId: id }, verb: "insert", next: {
+          uploadId: id, key: upload["key"] ?? null, objectKeys: upload["objectKeys"] ?? [], writeProtocol: upload["writeProtocol"] ?? null,
+          status: upload["writeProtocol"] === "conditional-v1" ? "PENDING" : "LEGACY_PENDING",
+        } });
+      }
     }
     return { slots, mutations };
   }
 
   /** Ordinary media only. Source publication retains its source-command owner. */
-  private async preparedMedia<T>(tx: Prisma.TransactionClient, selection: MediaSelection, writes: CampaignMutation[], work: () => Promise<T>): Promise<T> {
+  private async preparedMedia<T>(tx: Prisma.TransactionClient, selection: MediaSelection, writes: CampaignMutation[], work: () => Promise<T>, changed?: () => Promise<T>): Promise<T> {
     const before = await this.mediaScope(tx, selection);
     const mutations = [...writes, ...before.mutations];
-    const coverage = [...mutations];
+    const coverage = mutations.map(mutation => {
+      const existing = before.slots.some(slot => !slot.uniqueOnly && slot.table === mutation.table && canonical(slot.key) === canonical(mutation.key) && slot.row);
+      if (mutation.verb === "insert" && existing) return { ...mutation, verb: "update" as const, next: {} };
+      if (mutation.verb !== "insert" && !existing) throw this.missingMedia();
+      return mutation;
+    });
     for (const slot of before.slots) if (slot.row && !slot.uniqueOnly && !coverage.some(row => row.table === slot.table && canonical(row.key) === canonical(slot.key))) {
       coverage.push({ table: slot.table, key: slot.key, verb: "update", next: {} });
     }
+    if (!coverage.length) return work();
     return withCampaignPreparation(tx, coverage, async () => {
       const [derived] = await tx.$queryRaw<{ keys: { namespace: number; key: number }[] }[]>`
         SELECT public.diagnostic_source_lock_keys_before_intake(${JSON.stringify(before.slots.filter(slot => !slot.uniqueOnly))}::jsonb,
@@ -252,9 +297,16 @@ export class PrismaListingMediaRepository implements ListingMediaRepository {
             SELECT 1 FROM public.${Prisma.raw(slot.table)} s WHERE to_jsonb(s) @> ${JSON.stringify(slot.key)}::jsonb FOR UPDATE`);
         }
       }
-      if (canonical(before) !== canonical(await this.mediaScope(tx, selection))) throw new Error("media_caller_scope_changed");
+      if (canonical(before) !== canonical(await this.mediaScope(tx, selection))) {
+        if (changed) return changed();
+        throw new Error("media_caller_scope_changed");
+      }
       return work();
     });
+  }
+
+  private missingMedia(): Error {
+    return new Prisma.PrismaClientKnownRequestError("Listing media record not found", { code: "P2025", clientVersion: Prisma.prismaVersion.client });
   }
 
   private toDomain(row: {
