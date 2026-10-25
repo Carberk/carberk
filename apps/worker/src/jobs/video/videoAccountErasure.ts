@@ -1,9 +1,10 @@
-import type { Prisma, PrismaService } from "@auto-tm/db";
+import { type Prisma, type PreparedDiagnosticSource } from "@auto-tm/db";
 
 /** After the User lock, retain exact cleanup before personal targets disappear.
  * Business stock belongs to the business and survives its creator's purge. */
-export function videoAccountErasureWrites(db: PrismaService, userId: string, now: Date): Prisma.PrismaPromise<unknown>[] {
+export function videoAccountErasureWrites(db: Prisma.TransactionClient, userId: string, now: Date, receipt: PreparedDiagnosticSource): Prisma.PrismaPromise<unknown>[] {
  return [
+  db.$queryRaw`SELECT public.diagnostic_assert_source(${receipt.receiptId}::uuid, 'account_purge')`,
   db.$queryRaw`SELECT id FROM listings WHERE "sellerId"=${userId} AND "businessId" IS NULL ORDER BY id FOR UPDATE`,
   db.$queryRaw`SELECT id FROM listing_drafts WHERE "userId"=${userId} AND "businessId" IS NULL ORDER BY id FOR UPDATE`,
   db.$queryRaw`SELECT id FROM media_uploads WHERE "userId"=${userId} AND "businessId" IS NULL AND "writeProtocol"='video-v1' ORDER BY id FOR UPDATE`,
