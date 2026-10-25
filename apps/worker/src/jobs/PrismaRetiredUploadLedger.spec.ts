@@ -26,6 +26,7 @@ class CleanupDatabase {
   coverage: Row[] = [];
   refuseFinish = false;
   contention = false;
+  scalarOnly = false;
   afterPrepare: (() => void) | undefined;
   keySlots: Row[] = [];
   row(table: string, key: Row) { return this.rows[table]?.find(row => Object.entries(key).every(([k, v]) => row[k] === v)); }
@@ -50,6 +51,20 @@ class CleanupDatabase {
   async $queryRaw(first: TemplateStringsArray | Prisma.Sql, ...args: unknown[]): Promise<unknown> {
     const sql = Array.isArray(first) ? Prisma.sql(first as TemplateStringsArray, ...args) : first as Prisma.Sql;
     const text = sql.text; const values = sql.values;
+    if (this.scalarOnly && /diagnostic_source_meta|diagnostic_source_lock_keys|pg_(try_)?advisory|SELECT to_jsonb\(s\)/.test(text)) throw new Error("scalar lease sought source dependency");
+    if (text.includes("SELECT to_jsonb(work) AS row")) {
+      const ids = values.find(Array.isArray) as string[] | undefined;
+      let rows = this.rows["media_upload_cleanups"] ?? [];
+      if (ids) rows = rows.filter(r => ids.includes(String(r["uploadId"])));
+      else rows = rows.filter(r => r["status"] === "PENDING" && Date.parse(String(r["nextAttemptAt"])) <= (values[0] as Date).getTime()).slice(0, Number(values[1]));
+      return rows.map(row => ({ row: structuredClone(row) }));
+    }
+    if (text.includes('SELECT "uploadId" AS selected')) {
+      if (!this.receipt) throw new Error("late preparation");
+      if (this.contention) return [];
+      const ids = values[0] as string[], now = values[1] as Date;
+      return (this.rows["media_upload_cleanups"] ?? []).filter(r => ids.includes(String(r["uploadId"])) && r["status"] === "PENDING" && Date.parse(String(r["nextAttemptAt"])) <= now.getTime()).slice(0, Number(values[2])).map(r => ({ selected: r["uploadId"] }));
+    }
     if (text.includes('SELECT upload.id FROM media_uploads upload')) {
       return (this.rows["media_uploads"] ?? []).filter(r => r["state"] === "PREPARING" && r["writeProtocol"] !== "video-v1" &&
         Date.parse(String(r["claimDeadline"])) < (values[0] as Date).getTime()).slice(0, Number(values[1])).map(r => ({ id: r["id"] }));
@@ -74,7 +89,8 @@ class CleanupDatabase {
       const leased: Row[] = [];
       for (const mutation of this.coverage.filter(m => m["table"] === "media_upload_cleanups" && m["verb"] === "update")) {
         const key = mutation["key"] as Row; const row = this.row("media_upload_cleanups", key);
-        if (row) { this.assertWrite("media_upload_cleanups", key); Object.assign(row, mutation["next"]); leased.push({ ...row }); }
+        const ids = values.find(Array.isArray) as string[];
+        if (row && ids.includes(String(key["uploadId"]))) { this.assertWrite("media_upload_cleanups", key); Object.assign(row, mutation["next"]); leased.push({ ...row }); }
       }
       return leased;
     }
@@ -147,6 +163,25 @@ describe("retired upload transaction preparation", () => {
     Object.assign(db.row("media_upload_cleanups", { uploadId: "upload" }) ?? {}, { nextAttemptAt: "2000-01-01T00:00:00Z" });
     expect(await db.ledger().lease(NOW, 1)).toEqual([]);
     expect(db.row("media_upload_cleanups", { uploadId: "upload" })?.["attempts"]).toBe(1);
+  });
+  it("leases scalar retry work without seeking upload or source dependencies", async () => {
+    const db = new CleanupDatabase(); db.scalarOnly = true;
+    Object.assign(db.row("media_upload_cleanups", { uploadId: "upload" }) ?? {}, { nextAttemptAt: "2000-01-01T00:00:00Z", attempts: 0 });
+    expect(await db.ledger().lease(NOW, 1)).toMatchObject([{ uploadId: "upload", attempts: 1 }]);
+  });
+  it.each([[2, 4], [600, 1000]])("bounds candidate pool for output limit %s", async (limit, pool) => {
+    const db = new CleanupDatabase(); db.scalarOnly = true;
+    db.rows["media_upload_cleanups"] = Array.from({ length: 1002 }, (_, i) => ({ uploadId: `root-${i}`, status: "PENDING", attempts: 0, nextAttemptAt: "2000-01-01T00:00:00Z" }));
+    const result = await db.ledger().lease(NOW, limit);
+    expect(result).toHaveLength(limit);
+    expect(db.coverage).toHaveLength(pool);
+    expect(db.rows["media_upload_cleanups"].filter(r => r["attempts"] === 1)).toHaveLength(limit);
+  });
+  it("rolls back scalar lease backoff if receipt finish refuses", async () => {
+    const db = new CleanupDatabase(); db.refuseFinish = true;
+    Object.assign(db.row("media_upload_cleanups", { uploadId: "upload" }) ?? {}, { nextAttemptAt: "2000-01-01T00:00:00Z", attempts: 0 });
+    await expect(db.ledger().lease(NOW, 1)).rejects.toThrow("campaign_preparation_receipt");
+    expect(db.row("media_upload_cleanups", { uploadId: "upload" })).toMatchObject({ attempts: 0, nextAttemptAt: "2000-01-01T00:00:00Z" });
   });
   it("completes cleanup and a retired upload together", async () => {
     const db = new CleanupDatabase();
