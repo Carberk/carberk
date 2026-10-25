@@ -1,3 +1,4 @@
+import { AVATAR_CONTACT_UUID_FACTORY } from "../../common/avatar-contact-preparation";
 import { PublicMarketplaceController } from "./presentation/PublicMarketplaceController";
 import { PrismaPublicMarketplaceReadRepository } from "./infrastructure/PrismaPublicMarketplaceReadRepository";
 import { PUBLIC_MARKETPLACE_READ_PORT } from "./domain/ports/PublicMarketplaceReadPort";
@@ -126,6 +127,7 @@ import { LISTING_VIEWS_PORT } from "./domain/ports/ListingViewsPort";
   imports: [PrismaModule, EventEmitterModule, IdentityModule, MeasurementModule],
   controllers: [PublicMarketplaceController, BusinessInventoryController, ListingViewsController, ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController, VideoUploadController, ListingVideoRemovalController, VideoTargetController, VideoCapabilitiesController, VideoGrantController, VideoDescriptorController, VideoPlaybackController],
   providers: [
+    { provide: AVATAR_CONTACT_UUID_FACTORY, useValue: randomUUID },
     { provide: PUBLIC_MARKETPLACE_READ_PORT, useClass: PrismaPublicMarketplaceReadRepository },
     { provide: BUSINESS_INVENTORY_REPOSITORY, useClass: PrismaBusinessInventoryRepository },
     { provide: BUSINESS_CONTACT_PHONE_REPOSITORY, useClass: PrismaBusinessContactPhoneRepository },

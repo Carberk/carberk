@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { AVATAR_CONTACT_UUID_FACTORY } from "../../common/avatar-contact-preparation";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 import { Module } from "@nestjs/common";
 
@@ -35,6 +37,7 @@ import { AUDIT_LOG_REPOSITORY } from "./domain/ports/AuditLogRepository";
   imports: [EventEmitterModule, ListingsModule, IdentityModule, ConversationsModule],
   controllers: [AdminContextController, AdminController, ReportsController, AuditController, AdminModerationController, ConfigController],
   providers: [
+    { provide: AVATAR_CONTACT_UUID_FACTORY, useValue: randomUUID },
     { provide: ADMIN_CONTEXT_READ_PORT, useClass: PrismaAdminContextReader },
     PrismaContentReportRepository,
     {
