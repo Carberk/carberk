@@ -1,17 +1,20 @@
 import { execFileSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
+import { createRequire } from "node:module";
+import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 
 import type { ServiceMessagingSchemas as S } from "@auto-tm/contracts";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { Pool, type PoolClient } from "pg";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PrismaClient } from "../generated/prisma/client/client";
-import type { Prisma } from "../src/index";
+import { withCampaignPreparation, type Prisma } from "../src/index";
 
-// Authored only in R6a. Parent must review and run on its disposable lane.
+// R6a original matrix continuation, attempt 2. Authored source only.
+// Parent owns source disposition and separately authorized disposable execution.
 // This file never accepts a DATABASE_URL: it migrates only its own container.
 // Strict source guards remain dormant. Ordinary FK/check triggers stay enabled.
 type Subject = { userId: string; sessionId: string };
@@ -24,10 +27,16 @@ interface Caller {
  supportCommand(subject: Subject, id: string, command: S.SupportCommand): Promise<void>;
  subscribePush(subject: Subject, id: string, token: string): Promise<void>;
  mine(subject: Subject): Promise<{ id: string }[]>;
- queue(subject: Subject, purpose: "support" | "history", sourceListingId?: string): Promise<{ id: string }[]>;
+ queue(subject: Subject, purpose: "support" | "history"): Promise<{ id: string }[]>;
  historyCommand(subject: Subject, id: string, command: S.HistoryCommand): Promise<void>;
  historyArtifactCommand(subject: Subject, id: string, command: S.HistoryArtifactCommand): Promise<void>;
  historyPrevious(subject: Subject, vin: string): Promise<{ conversationId: string; vin: string }[]>;
+ stage(subject: Subject, id: string, upload: S.ServiceStageAttachment): Promise<{ id: string }>;
+ upload(subject: Subject, id: string, attachmentId: string, bytes: Uint8Array): Promise<void>;
+ file(subject: Subject, id: string, attachmentId: string): Promise<{ bytes: Uint8Array }>;
+ historyArtifactUpload(subject: Subject, id: string, artifactId: string, bytes: Uint8Array): Promise<void>;
+ historyReportFile(subject: Subject, id: string, artifactId: string): Promise<{ bytes: Uint8Array }>;
+ historySnapshot(subject: Subject, id: string): Promise<S.HistorySnapshot>;
  historyReports(subject: Subject, id: string): Promise<S.HistoryReports>;
 }
 function present<T>(value: T | undefined): T {
@@ -43,13 +52,41 @@ const now = new Date("2026-10-25T08:00:00Z");
 const future = new Date("2026-10-26T08:00:00Z");
 let vin = "10000000000000000";
 let scenario = 0;
+let identity = 0;
+function fixtureId() { return `89760000-0000-4000-8000-${String(++identity).padStart(12, "0")}`; }
+interface PrivateStore {
+ get(key: string, maxBytes: number): Promise<Uint8Array>;
+ putImmutable(key: string, bytes: Uint8Array, contentType: string): Promise<void>;
+ remove(key: string): Promise<void>;
+}
+const closedStore: PrivateStore = {
+ get: async () => { throw new Error("unexpected external byte read"); },
+ putImmutable: async () => { throw new Error("unexpected external byte write"); },
+ remove: async () => { throw new Error("unexpected external byte removal"); },
+};
+type SessionWriter = {
+ delete(id: string): Promise<void>;
+ rotateRefreshToken(id: string, oldHash: string, newHash: string, lastSeen: Date, expires: Date): Promise<boolean>;
+ updateAdminTotpExpiresAt(id: string, until: Date | null): Promise<void>;
+};
+type GrantWriter = { change(input: Subject & { targetUserId: string; capability: string; grant: boolean; reason: string }, at: Date): Promise<void> };
+type DeletionWriter = { run(input: { userId: string; deletionScheduledAt: Date }, work: (writes: { scheduleDeletion(id: string, at: Date): Promise<void>; archiveActiveListings(id: string): Promise<void> }) => Promise<void>): Promise<void> };
 const rights: S.ServiceRights = { category: "payment_evidence", purpose: "History order", basis: "consent", provenance: "disposable fixture", identifiability: "personal", use: ["service"], schedule: { kind: "until", until: "2027-01-01T00:00:00Z", reason: "fixture retention" }, supplierRestrictions: "", hold: null };
 
 describe("real Service and History callers on disposable restricted PostgreSQL", () => {
  let container: StartedPostgreSqlContainer;
  let pool: Pool;
+ let adminPool: Pool;
+ let template: string;
+ let scenarioDatabase: string;
  let db: PrismaClient;
- let construct: (database: unknown, enabled: boolean) => Caller;
+ let construct: (database: unknown, enabled: boolean, store?: PrivateStore, campaign?: boolean, clock?: () => Date) => Caller;
+ let sessionWriter: (database: unknown) => SessionWriter;
+ let grantWriter: (database: unknown) => GrantWriter;
+ let deletionWriter: (database: unknown) => DeletionWriter;
+ let pdf: () => Promise<Uint8Array>;
+ let image: () => Promise<Uint8Array>;
+ let saveDevice: (tx: Prisma.TransactionClient, input: { id: string; userId: string; token: string; invalidatedAt: Date | null }) => Promise<void>;
  const clients: PoolClient[] = [];
  const pending: Promise<unknown>[] = [];
  const releases: (() => void)[] = [];
@@ -66,6 +103,10 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   await pool.query(`GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO ${role}`);
   await pool.query(`GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO ${role}`);
   await pool.query(`GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO ${role}`);
+  template = container.getDatabase();
+  await db.$disconnect(); await pool.end();
+  const adminUrl = new URL(url); adminUrl.pathname = "/postgres";
+  adminPool = new Pool({ connectionString: adminUrl.href });
   // Runtime imports follow the existing DB caller suite pattern. Do not import
   // API source into the DB compiler's rootDir or replace production authority.
   const load = async (path: string) => import(/* @vite-ignore */ fileURLToPath(new URL(`../../../apps/api/src/modules/${path}.ts`, import.meta.url)));
@@ -73,20 +114,54 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   const { PrismaStaffAuthority } = await load("identity/infrastructure/PrismaStaffAuthority") as { PrismaStaffAuthority: new (database: unknown) => unknown };
   const { CheckStaffAuthority } = await load("identity/application/CheckStaffAuthority") as { CheckStaffAuthority: new (repository: unknown, clock: unknown) => unknown };
   const { CampaignServiceAdmission } = await load("service-messaging/infrastructure/campaignServiceAdmission") as { CampaignServiceAdmission: new (config: unknown) => unknown };
-  construct = (database, enabled) => new PrismaServiceMessaging(database,
-   new CheckStaffAuthority(new PrismaStaffAuthority(database), { now: () => now }),
-   { get: async () => { throw new Error("unexpected external byte read"); }, putImmutable: async () => { throw new Error("unexpected external byte write"); }, remove: async () => { throw new Error("unexpected external byte removal"); } },
-   { now: () => now, id: randomUUID, syntheticEnabled: () => enabled, syntheticSubjectAllowed: () => enabled },
-   new CampaignServiceAdmission({ get: () => undefined }));
+  const { PrismaSessionRepository } = await load("identity/infrastructure/PrismaSessionRepository") as { PrismaSessionRepository: new (database: unknown, hasher: unknown) => SessionWriter };
+  const { PrismaAccountDeletionUnitOfWork } = await load("identity/infrastructure/PrismaAccountDeletionUnitOfWork") as { PrismaAccountDeletionUnitOfWork: new (database: unknown) => DeletionWriter };
+  sessionWriter = database => new PrismaSessionRepository(database, { compare: async () => { throw new Error("unexpected password comparison"); } });
+  grantWriter = database => new PrismaStaffAuthority(database) as GrantWriter;
+  deletionWriter = database => new PrismaAccountDeletionUnitOfWork(database);
+  const { PrismaPushTokenRepository } = await load("notifications/infrastructure/PrismaPushTokenRepository") as { PrismaPushTokenRepository: new (database: unknown) => { save(token: unknown): Promise<void> } };
+  const { PushToken } = await load("notifications/domain/PushToken") as { PushToken: { create(data: unknown): unknown } };
+  saveDevice = (tx, input) => new PrismaPushTokenRepository(tx).save(PushToken.create({ ...input, platform: "android", deviceId: null, createdAt: now, updatedAt: now, lastSeenAt: now }));
+  const sharp = createRequire(fileURLToPath(new URL("../../../apps/api/package.json", import.meta.url)))("sharp") as (input: unknown) => { webp(): { toBuffer(): Promise<Buffer> } };
+  image = () => sharp({ create: { width: 1, height: 1, channels: 3, background: { r: 255, g: 255, b: 255 } } }).webp().toBuffer();
+  const pdfModule = createRequire(fileURLToPath(new URL("../../../apps/api/package.json", import.meta.url)))("pdf-lib") as { PDFDocument: { create(): Promise<{ addPage(): void; setCreationDate(at: Date): void; setModificationDate(at: Date): void; save(): Promise<Uint8Array> }> } };
+  pdf = async () => { const document = await pdfModule.PDFDocument.create(); document.addPage(); document.setCreationDate(now); document.setModificationDate(now); return document.save(); };
+  construct = (database, enabled, store = closedStore, campaign = false, clock = () => now) => new PrismaServiceMessaging(database,
+   new CheckStaffAuthority(new PrismaStaffAuthority(database), { now: clock }),
+   store,
+   { now: clock, id: fixtureId, syntheticEnabled: () => enabled, syntheticSubjectAllowed: () => enabled },
+   new CampaignServiceAdmission({ get: (key: string) => campaign ? ({ AUTOTM_COMMIT_SHA: "c".repeat(40), APP_ENV: "test" } as Record<string, string>)[key] : undefined }));
  });
- beforeEach(() => { vin = String(10000000000000000n + BigInt(++scenario)); });
- afterEach(async () => {
+ beforeEach(async () => {
+  vin = String(10000000000000000n + BigInt(++scenario));
+  scenarioDatabase = `r6a_attempt2_${scenario}`;
+  // A database per case keeps global production queues, FIFO and day accounting
+  // exact, without adding test filters to production or deleting other cases.
+  await adminPool.query(`CREATE DATABASE "${scenarioDatabase}" TEMPLATE "${template}"`);
+  const url = new URL(container.getConnectionUri()); url.pathname = `/${scenarioDatabase}`;
+  pool = new Pool({ connectionString: url.href });
+  db = new PrismaClient({ adapter: new PrismaPg(pool) });
+  vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(now);
+ });
+ afterEach(async context => {
   for (const release of releases.splice(0)) release();
-  for (const client of clients) await client.query("ROLLBACK");
+  const cleanup: PromiseSettledResult<unknown>[] = await Promise.allSettled(clients.map(client => client.query("ROLLBACK")));
+  // Drain even if a barrier, assertion or rollback failed. Preserve the test's
+  // original error; cleanup failures are additional evidence, never its replacement.
   await Promise.allSettled(pending.splice(0));
-  for (const client of clients.splice(0)) client.release();
+  vi.useRealTimers();
+  for (const client of clients.splice(0)) {
+   try { client.release(); } catch (error) { cleanup.push({ status: "rejected", reason: error }); }
+  }
+  cleanup.push(...await Promise.allSettled([db.$disconnect(), pool.end()]));
+  cleanup.push(...await Promise.allSettled([adminPool.query(`DROP DATABASE "${scenarioDatabase}"`)]));
+  const failures = cleanup.flatMap(result => result.status === "rejected" ? [result.reason as unknown] : []);
+  if (failures.length) {
+   if (context.task.result?.errors?.length) console.error("R6a cleanup failures after original test error", failures);
+   else throw new AggregateError(failures, "R6a fixture cleanup failed");
+  }
  });
- afterAll(async () => { await db?.$disconnect(); await pool?.end(); await container?.stop(); });
+ afterAll(async () => { await adminPool?.end(); await container?.stop(); });
  async function connection() {
   const client = await pool.connect(); clients.push(client);
   await client.query("SET statement_timeout='8s'");
@@ -94,8 +169,8 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
  }
  async function pid(client: PoolClient) { return present((await client.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]).pid; }
  async function blocked(waiter: number, blocker: number) {
-  const deadline = Date.now() + 5000;
-  while (Date.now() < deadline) {
+  const deadline = performance.now() + 5000;
+  while (performance.now() < deadline) {
    const row = present((await pool.query<{ pids: number[] }>("SELECT pg_blocking_pids($1::int) AS pids", [waiter])).rows[0]);
    if (row.pids.includes(blocker)) {
     console.info("service-history PostgreSQL barrier", { waiter, blocker, blockingPids: row.pids });
@@ -107,7 +182,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
  }
  // The facade owns only transaction instrumentation. Every query and public
  // caller, retained-selection query, authority check and receipt is production.
- function caller(options: { hold?: boolean; rollback?: boolean; enabled?: boolean } = {}) {
+ function caller(options: { hold?: boolean; rollback?: boolean; enabled?: boolean; store?: PrivateStore; campaign?: boolean; clock?: () => Date; holdFailure?: boolean; finishRefusal?: (tx: Prisma.TransactionClient) => Promise<void> } = {}) {
   const ready = latch(), finish = latch(), started = latch();
   releases.push(finish.release);
   let backend = 0;
@@ -116,34 +191,51 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
    const [identity] = await tx.$queryRaw<{ pid: number; elevated: boolean; trigger: boolean }[]>`SELECT pg_backend_pid() AS pid,rolsuper OR rolcreatedb OR rolcreaterole AS elevated,has_table_privilege(current_user,'users','TRIGGER') AS trigger FROM pg_roles WHERE rolname=current_user`;
    expect(identity).toMatchObject({ elevated: false, trigger: false });
    backend = present(identity).pid; started.release();
-   const result = await work(tx); ready.release();
+   const instrumented = options.finishRefusal ? new Proxy(tx, { get(target, key) {
+    if (key === "$queryRaw") return async (strings: TemplateStringsArray, ...values: unknown[]) => {
+     if (strings.join("?").includes("public.campaign_finish")) {
+      await options.finishRefusal?.(tx);
+      // Database-boundary fault: consume the real receipt, then submit the
+      // original finish statement. The second real campaign_finish must raise
+      // campaign_preparation_receipt after the observed production writes.
+      await target.$queryRaw(strings, ...values);
+     }
+     return target.$queryRaw(strings, ...values);
+    };
+    const value: unknown = Reflect.get(target, key);
+    return typeof value === "function" ? value.bind(target) : value;
+   } }) : tx;
+   let result: T;
+   try { result = await work(instrumented); }
+   catch (error) { ready.release(); if (options.holdFailure) await finish.promise; throw error; }
+   ready.release();
    if (options.hold) await finish.promise;
    if (options.rollback) throw new Error("caller outer rollback");
    return result;
   }, { timeout: 20000 }) };
-  return { service: construct(database, options.enabled ?? true), started: started.promise, ready: ready.promise, release: finish.release, pid: () => backend };
+  return { database, run: database.$transaction, service: construct(database, options.enabled ?? true, options.store, options.campaign, options.clock), started: started.promise, ready: ready.promise, release: finish.release, pid: () => backend };
  }
  function observe<T>(promise: Promise<T>) {
   const result = promise.then(value => ({ ok: true as const, value }), (error: unknown) => ({ ok: false as const, error }));
   pending.push(result); return result;
  }
  async function principal(staff = false) {
-  const user = await db.user.create({ data: {} });
-  const session = await db.session.create({ data: { userId: user.id, refreshTokenHash: randomUUID(), expiresAt: future, adminTotpExpiresAt: future } });
-  if (staff) for (const capability of ["support.operations", "history.fulfilment"]) await db.staffGrant.create({ data: { userId: user.id, capability } });
+  const user = await db.user.create({ data: { id: fixtureId(), email: `${fixtureId()}@example.invalid`, emailVerifiedAt: now, nameNumber: 1234, avatarIndex: 0, createdAt: now } });
+  const session = await db.session.create({ data: { id: fixtureId(), createdAt: now, userId: user.id, refreshTokenHash: fixtureId(), expiresAt: future, adminTotpExpiresAt: future } });
+  if (staff) for (const capability of ["support.operations", "history.fulfilment"]) await db.staffGrant.create({ data: { userId: user.id, capability, grantedAt: now } });
   return { userId: user.id, sessionId: session.id };
  }
  async function fixture(purpose: "support" | "history" = "support", customer?: Subject) {
   const owner = customer ?? await principal(), staff = await principal(true), peer = await principal(true);
-  const data = { customerId: owner.userId, assigneeId: staff.userId, assignmentVersion: 1 };
+  const data = { id: fixtureId(), createdAt: now, customerId: owner.userId, assigneeId: staff.userId, assignmentVersion: 1 };
   const resource = purpose === "support" ? await db.supportCase.create({ data }) : await db.vehicleHistoryRequest.create({ data });
-  const conversation = await db.serviceConversation.create({ data: { purpose, lastSequence: 8, ...(purpose === "support" ? { supportCaseId: resource.id } : { historyRequestId: resource.id }) } });
+  const conversation = await db.serviceConversation.create({ data: { id: fixtureId(), createdAt: now, purpose, lastSequence: 8, ...(purpose === "support" ? { supportCaseId: resource.id } : { historyRequestId: resource.id }) } });
   return { owner, staff, peer, resource: resource.id, id: conversation.id };
  }
  async function effects(id: string) {
   return { messages: await db.serviceMessage.count({ where: { conversationId: id } }), outbox: await db.serviceOutbox.count({ where: { conversationId: id } }), reads: await db.serviceReadState.count({ where: { conversationId: id } }), subscriptions: await db.servicePushSubscription.count({ where: { conversationId: id } }) };
  }
- async function audit(resourceId: string) { return db.serviceAudit.findMany({ where: { resourceId }, select: { action: true, actorId: true, assignmentVersion: true }, orderBy: { createdAt: "asc" } }); }
+ async function audit(resourceId: string) { return db.serviceAudit.findMany({ where: { resourceId }, select: { action: true, actorId: true, assignmentVersion: true }, orderBy: [{ action: "asc" }, { assignmentVersion: "asc" }] }); }
  async function actorBarrier(subject: Subject) {
   const b = await connection(); await b.query("BEGIN");
   await b.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [subject.userId]);
@@ -152,8 +244,16 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
  async function refusalAfter(subject: Subject, mutate: (b: PoolClient) => Promise<unknown>, work: (service: Caller) => Promise<unknown>) {
   const b = await actorBarrier(subject), a = caller();
   const result = observe(work(a.service)); await a.started;
+  let failure: { error: unknown } | undefined;
   try { await blocked(a.pid(), await pid(b)); await mutate(b); await b.query("COMMIT"); }
-  finally { await b.query("ROLLBACK"); }
+  catch (error) { failure = { error }; }
+  try { await b.query("ROLLBACK"); }
+  catch (error) {
+   if (failure) console.error("R6a rollback failed after original barrier error", error);
+   else failure = { error };
+  }
+  await result;
+  if (failure) throw failure.error;
   const outcome = await result; expect(outcome.ok).toBe(false);
   if (!outcome.ok) expect(outcome.error).toMatchObject({ code: "NO_ACCESS" });
  }
@@ -211,7 +311,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
  });
  it("commits text sequence and outbox before a blocked handover proceeds", async () => {
   const f = await fixture(), a = caller({ hold: true }), b = caller();
-  const send = observe(a.service.send(f.owner, f.id, { clientMessageId: randomUUID(), body: "customer text", visibility: "customer" })); await a.ready;
+  const send = observe(a.service.send(f.owner, f.id, { clientMessageId: fixtureId(), body: "customer text", visibility: "customer" })); await a.ready;
   const assign = observe(b.service.assign(f.staff, f.id, 1, f.peer.userId)); await b.started;
   await blocked(b.pid(), a.pid()); a.release(); expect((await send).ok).toBe(true);
   // The waiting handover discovered the old message inventory, so it refuses atomically.
@@ -237,14 +337,14 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   expect((await db.supportCase.findUniqueOrThrow({ where: { id: f.resource } })).status).toBe("open"); expect(await audit(f.resource)).toEqual([]);
  });
  it.each(["new", "existing"] as const)("binds %s push subscription to exact Session/device/epoch", async existing => {
-  const f = await fixture(), device = await db.fcmDevice.create({ data: { userId: f.owner.userId, token: randomUUID(), platform: "android" } });
-  if (existing === "existing") await db.servicePushSubscription.create({ data: { sessionId: f.owner.sessionId, deviceId: device.id, conversationId: f.id, lifecycleEpoch: 0 } });
+  const f = await fixture(), device = await db.fcmDevice.create({ data: { createdAt: now, id: fixtureId(), userId: f.owner.userId, token: fixtureId(), platform: "android" } });
+  if (existing === "existing") await db.servicePushSubscription.create({ data: { id: fixtureId(), createdAt: now, updatedAt: now, sessionId: f.owner.sessionId, deviceId: device.id, conversationId: f.id, lifecycleEpoch: 0 } });
   const b = await actorBarrier(f.owner), a = caller(), result = observe(a.service.subscribePush(f.owner, f.id, device.token)); await a.started;
   await blocked(a.pid(), await pid(b)); await b.query("COMMIT"); expect((await result).ok).toBe(true);
   expect(await db.servicePushSubscription.findMany({ where: { conversationId: f.id }, select: { sessionId: true, deviceId: true, conversationId: true, lifecycleEpoch: true } })).toEqual([{ sessionId: f.owner.sessionId, deviceId: device.id, conversationId: f.id, lifecycleEpoch: 0 }]);
  });
  it.each(["owner", "invalidated", "session"] as const)("refuses push after post-wait device/Session %s change", async change => {
-  const f = await fixture(), device = await db.fcmDevice.create({ data: { userId: f.owner.userId, token: randomUUID(), platform: "android" } });
+  const f = await fixture(), device = await db.fcmDevice.create({ data: { createdAt: now, id: fixtureId(), userId: f.owner.userId, token: fixtureId(), platform: "android" } });
   await refusalAfter(f.owner, b => change === "session" ? b.query('DELETE FROM sessions WHERE id=$1', [f.owner.sessionId]) : change === "owner" ? b.query('UPDATE fcm_devices SET "userId"=$1 WHERE id=$2', [f.peer.userId, device.id]) : b.query('UPDATE fcm_devices SET "invalidatedAt"=$1 WHERE id=$2', [now, device.id]), service => service.subscribePush(f.owner, f.id, device.token));
   expect(await effects(f.id)).toEqual({ messages: 0, outbox: 0, reads: 0, subscriptions: 0 }); expect(await audit(f.resource)).toEqual([]);
  });
@@ -258,15 +358,15 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
  });
  async function history(customer?: Subject) {
   const f = await fixture("history", customer), day = "2026-10-25";
-  await db.historyCapacityDay.upsert({ where: { day }, create: { day, slotLimit: 1000, morningLimit: 1000, evidence: "disposable capacity" }, update: { slotLimit: 1000, morningLimit: 1000 } });
+  await db.historyCapacityDay.upsert({ where: { day }, create: { day, createdAt: now, slotLimit: 1000, morningLimit: 1000, evidence: "disposable capacity" }, update: { slotLimit: 1000, morningLimit: 1000 } });
   await db.historyProviderAllowance.upsert({ where: { provider_day: { provider: "carfax", day } }, create: { provider: "carfax", day, allowance: 10000, resetAt: now, evidence: "fixture" }, update: { allowance: 10000, consumed: 0 } });
-  const quote = await db.historyQuote.create({ data: { requestId: f.resource, vin, providers: ["carfax"], preflightOutcome: "available", preflightEvidence: "fixture available", refundRule: "full refund", windowStart: new Date("2026-10-25T09:00:00Z"), windowEnd: new Date("2026-10-25T10:00:00Z"), feasible: true, offeredById: f.staff.userId } });
+  const quote = await db.historyQuote.create({ data: { createdAt: now, id: fixtureId(), requestId: f.resource, vin, providers: ["carfax"], preflightOutcome: "available", preflightEvidence: "fixture available", refundRule: "full refund", windowStart: new Date("2026-10-25T09:00:00Z"), windowEnd: new Date("2026-10-25T10:00:00Z"), feasible: true, offeredById: f.staff.userId } });
   const accept: S.HistoryCommand = { kind: "accept", quoteId: quote.id, vin, providers: ["carfax"], amount: 100, refundRule: "full refund", windowStart: "2026-10-25T09:00:00.000Z", windowEnd: "2026-10-25T10:00:00.000Z", rights };
   return { ...f, day, quote, accept };
  }
  it("accepts a new order after a capacity barrier and expires another request's elapsed hold", async () => {
   const f = await history(), other = await history();
-  const elapsed = await db.historyOrder.create({ data: { requestId: other.resource, quoteId: other.quote.id, day: f.day, morning: false, holdExpiresAt: now, promiseAt: future, rights } });
+  const elapsed = await db.historyOrder.create({ data: { createdAt: now, id: fixtureId(), requestId: other.resource, quoteId: other.quote.id, day: f.day, morning: false, holdExpiresAt: now, promiseAt: future, rights } });
   const b = await connection(); await b.query("BEGIN"); await b.query('SELECT day FROM history_capacity_days WHERE day=$1 FOR UPDATE', [f.day]);
   const a = caller(), result = observe(a.service.historyCommand(f.owner, f.id, f.accept)); await a.started;
   await blocked(a.pid(), await pid(b)); await b.query("COMMIT"); expect((await result).ok).toBe(true);
@@ -304,12 +404,12 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
  });
  async function pair() {
   const f = await history(), donor = await history();
-  const makeOrder = (requestId: string, quoteId: string) => db.historyOrder.create({ data: { requestId, quoteId, day: f.day, morning: false, state: "paid", paidAt: now, receivedAt: now, holdExpiresAt: future, promiseAt: future, rights } });
+  const makeOrder = (requestId: string, quoteId: string) => db.historyOrder.create({ data: { createdAt: now, id: fixtureId(), requestId, quoteId, day: f.day, morning: false, state: "paid", paidAt: now, receivedAt: now, holdExpiresAt: future, promiseAt: future, rights } });
   const order = await makeOrder(f.resource, f.quote.id), donorOrder = await makeOrder(donor.resource, donor.quote.id);
   const listingId = await listing(donor.owner);
   await db.vehicleHistoryRequest.update({ where: { id: donor.resource }, data: { sourceListingId: listingId } });
-  const artifactId = randomUUID();
-  const artifact = await db.historyArtifact.create({ data: { id: artifactId, sourceListingId: listingId, provider: "carfax", vin, originalDate: now, objectKey: `history-artifacts/${artifactId}/${"a".repeat(64)}`, sha256: "a".repeat(64), sizeBytes: 100, expectedPages: 1, verifiedPages: 1, state: "verified", acquiredForOrderId: donorOrder.id, verifiedById: donor.staff.userId, verifiedAt: now, rights: { ...rights, category: "provider_artifact", identifiability: "anonymous", use: ["service", "archive", "redistribute"], supplierRestrictions: "fixture permits reuse" } } });
+  const artifactId = fixtureId();
+  const artifact = await db.historyArtifact.create({ data: { createdAt: now, id: artifactId, sourceListingId: listingId, provider: "carfax", vin, originalDate: now, objectKey: `history-artifacts/${artifactId}/${"a".repeat(64)}`, sha256: "a".repeat(64), sizeBytes: 100, expectedPages: 1, verifiedPages: 1, state: "verified", acquiredForOrderId: donorOrder.id, verifiedById: donor.staff.userId, verifiedAt: now, rights: { ...rights, category: "provider_artifact", identifiability: "anonymous", use: ["service", "archive", "redistribute"], supplierRestrictions: "fixture permits reuse" } } });
   const archive: S.HistoryArtifactCommand = { kind: "archive", expectedAssignmentVersion: 1, expectedVersion: 0, orderId: order.id, artifactId: artifact.id };
   return { f, donor, order, donorOrder, artifact, archive };
  }
@@ -339,21 +439,21 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
  });
  it.each(["support", "history", "push"] as const)("ordinary closed admission refuses %s without transactional effects", async kind => {
   const f = await fixture(kind === "history" ? "history" : "support"), a = caller({ enabled: false });
-  const work = kind === "push" ? a.service.subscribePush(f.owner, f.id, randomUUID()) : a.service.open(f.owner, kind);
+  const work = kind === "push" ? a.service.subscribePush(f.owner, f.id, fixtureId()) : a.service.open(f.owner, kind);
   await expect(work).rejects.toMatchObject({ code: "COLLECTION_DISABLED" });
   expect(await audit(f.resource)).toEqual([]); expect(await effects(f.id)).toEqual({ messages: 0, outbox: 0, reads: 0, subscriptions: 0 });
  });
  it("refuses the real kernel graph limit before watermark or staff audit effects", async () => {
   const f = await fixture();
-  await db.serviceMessage.createMany({ data: Array.from({ length: 1001 }, (_, index) => ({ conversationId: f.id, sequence: index + 1, clientMessageId: randomUUID(), senderId: f.owner.userId, senderKind: "customer", visibility: "customer", body: "retained source", requestHash: "fixture" })) });
+  await db.serviceMessage.createMany({ data: Array.from({ length: 1001 }, (_, index) => ({ id: fixtureId(), createdAt: now, conversationId: f.id, sequence: index + 1, clientMessageId: fixtureId(), senderId: f.owner.userId, senderKind: "customer", visibility: "customer", body: "retained source", requestHash: "fixture" })) });
   await expect(caller().service.markRead(f.staff, f.id, 5)).rejects.toThrow("diagnostic_source_scope_limit");
   expect(await effects(f.id)).toEqual({ messages: 1001, outbox: 0, reads: 0, subscriptions: 0 }); expect(await audit(f.resource)).toEqual([]);
  });
  it("keeps staff notes out of customer reads after a real wait", async () => {
   const f = await fixture();
   await db.serviceMessage.createMany({ data: [
-   { conversationId: f.id, sequence: 1, clientMessageId: randomUUID(), senderId: f.staff.userId, senderKind: "staff", visibility: "staff", body: "private note", requestHash: "private" },
-   { conversationId: f.id, sequence: 2, clientMessageId: randomUUID(), senderId: f.staff.userId, senderKind: "staff", visibility: "customer", body: "public reply", requestHash: "public" },
+   { conversationId: f.id, sequence: 1, clientMessageId: fixtureId(), senderId: f.staff.userId, senderKind: "staff", visibility: "staff", body: "private note", requestHash: "private" },
+   { conversationId: f.id, sequence: 2, clientMessageId: fixtureId(), senderId: f.staff.userId, senderKind: "staff", visibility: "customer", body: "public reply", requestHash: "public" },
   ] });
   const b = await actorBarrier(f.owner), a = caller(), result = observe(a.service.read(f.owner, f.id, 0, 20)); await a.started;
   await blocked(a.pid(), await pid(b)); await b.query("COMMIT");
@@ -362,8 +462,8 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
  });
  it("adopts a real uploaded attachment with the message and rolls adoption back on outer refusal", async () => {
   const f = await fixture("history");
-  const attachment = await db.serviceAttachment.create({ data: { conversationId: f.id, uploaderId: f.owner.userId, lifecycleEpoch: 0, category: "history_communication", visibility: "customer", stagingKey: randomUUID(), objectKey: randomUUID(), contentType: "image/webp", expectedBytes: 3, sizeBytes: 3, sha256: "a".repeat(64), filename: "fixture.webp", rights: { ...rights, category: "history_communication" }, expiresAt: future } });
-  const message = { clientMessageId: randomUUID(), attachmentId: attachment.id, visibility: "customer" as const };
+  const attachment = await uploadedAttachment(f, f.owner);
+  const message = { clientMessageId: fixtureId(), attachmentId: attachment.id, visibility: "customer" as const };
   await expect(caller({ rollback: true }).service.send(f.owner, f.id, message)).rejects.toThrow("caller outer rollback");
   expect((await db.serviceAttachment.findUniqueOrThrow({ where: { id: attachment.id } })).state).toBe("staged");
   expect(await effects(f.id)).toEqual({ messages: 0, outbox: 0, reads: 0, subscriptions: 0 });
@@ -374,9 +474,9 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
  });
  it("rebooks a reviewed order using its verified payment and creates one booking", async () => {
   const f = await history();
-  const old = await db.historyQuote.create({ data: { requestId: f.resource, vin, providers: ["carfax"], preflightOutcome: "available", preflightEvidence: "old quote", refundRule: "full refund", windowStart: new Date("2026-10-25T07:00:00Z"), windowEnd: now, feasible: true, acceptedAt: new Date("2026-10-25T06:00:00Z") } });
-  const order = await db.historyOrder.create({ data: { requestId: f.resource, quoteId: old.id, day: f.day, morning: false, state: "review", holdExpiresAt: new Date("2026-10-25T07:00:00Z"), promiseAt: now, rights } });
-  const payment = await db.historyPayment.create({ data: { orderId: order.id, clientPaymentId: randomUUID(), amount: 100, verifiedFunds: true, receivedAt: new Date("2026-10-25T07:00:00Z"), confirmedAt: new Date("2026-10-25T07:30:00Z"), state: "review", confirmedById: f.staff.userId } });
+  const old = await db.historyQuote.create({ data: { createdAt: now, id: fixtureId(), requestId: f.resource, vin, providers: ["carfax"], preflightOutcome: "available", preflightEvidence: "old quote", refundRule: "full refund", windowStart: new Date("2026-10-25T07:00:00Z"), windowEnd: now, feasible: true, acceptedAt: new Date("2026-10-25T06:00:00Z") } });
+  const order = await db.historyOrder.create({ data: { createdAt: now, id: fixtureId(), requestId: f.resource, quoteId: old.id, day: f.day, morning: false, state: "review", holdExpiresAt: new Date("2026-10-25T07:00:00Z"), promiseAt: now, rights } });
+  const payment = await db.historyPayment.create({ data: { createdAt: now, id: fixtureId(), orderId: order.id, clientPaymentId: fixtureId(), amount: 100, verifiedFunds: true, receivedAt: new Date("2026-10-25T07:00:00Z"), confirmedAt: new Date("2026-10-25T07:30:00Z"), state: "review", confirmedById: f.staff.userId } });
   const b = await actorBarrier(f.owner), a = caller(), result = observe(a.service.historyCommand(f.owner, f.id, f.accept)); await a.started;
   await blocked(a.pid(), await pid(b)); await b.query("COMMIT"); expect((await result).ok).toBe(true);
   expect(await db.historyOrder.findUnique({ where: { id: order.id } })).toMatchObject({ state: "paid", version: 1, paidAt: new Date("2026-10-25T07:30:00Z") });
@@ -385,11 +485,11 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
  });
  it("refuses all previous-history rows when a nonfirst request changes during a wait", async () => {
   const p = await pair(), second = await history(p.f.owner);
-  const order = await db.historyOrder.create({ data: { requestId: second.resource, quoteId: second.quote.id, day: second.day, morning: false, state: "delivered", paidAt: now, receivedAt: now, holdExpiresAt: future, promiseAt: future, rights } });
+  const order = await db.historyOrder.create({ data: { createdAt: now, id: fixtureId(), requestId: second.resource, quoteId: second.quote.id, day: second.day, morning: false, state: "delivered", paidAt: now, receivedAt: now, holdExpiresAt: future, promiseAt: future, rights } });
   for (const target of [p.order, order]) {
    await db.historyOrder.update({ where: { id: target.id }, data: { state: "delivered" } });
-   const purchase = await db.historyPurchaseIntent.create({ data: { orderId: target.id, sourceArtifactId: p.artifact.id, vin, providers: ["carfax"], state: "completed" } });
-   await db.historyDelivery.create({ data: { orderId: target.id, artifactId: p.artifact.id, purchaseIntentId: purchase.id, sharedLink: "https://example.invalid/report", linkApprovedAt: now, deliveredAt: now, deliveredById: p.f.staff.userId } });
+   const purchase = await db.historyPurchaseIntent.create({ data: { createdAt: now, id: fixtureId(), orderId: target.id, sourceArtifactId: p.artifact.id, vin, providers: ["carfax"], state: "completed" } });
+   await db.historyDelivery.create({ data: { id: fixtureId(), orderId: target.id, artifactId: p.artifact.id, purchaseIntentId: purchase.id, sharedLink: "https://example.invalid/report", linkApprovedAt: now, deliveredAt: now, deliveredById: p.f.staff.userId } });
   }
   await db.historyOrder.update({ where: { id: p.order.id }, data: { createdAt: new Date("2026-10-25T07:00:00Z") } });
   await db.historyOrder.update({ where: { id: order.id }, data: { createdAt: new Date("2026-10-25T06:00:00Z") } });
@@ -398,11 +498,11 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
  });
 
  async function listing(owner: Subject) {
-  const brand = randomUUID(), model = randomUUID(), region = randomUUID(), city = randomUUID(), id = randomUUID();
-  for (const [table, key] of [["brands", brand], ["regions", region]]) await pool.query(`INSERT INTO ${table}(id,slug,"nameRu","nameTk","nameEn","updatedAt") VALUES($1,$1,'fixture','fixture','fixture',clock_timestamp())`, [key]);
-  await pool.query(`INSERT INTO models(id,"brandId",slug,"nameRu","nameTk","nameEn","updatedAt") VALUES($1,$2,$1,'fixture','fixture','fixture',clock_timestamp())`, [model, brand]);
-  await pool.query(`INSERT INTO cities(id,"regionId",slug,"nameRu","nameTk","nameEn","updatedAt") VALUES($1,$2,$1,'fixture','fixture','fixture',clock_timestamp())`, [city, region]);
-  await pool.query(`INSERT INTO listings(id,"sellerId","brandId","modelId","cityId","priceAmount","updatedAt") VALUES($1,$2,$3,$4,$5,1,clock_timestamp())`, [id, owner.userId, brand, model, city]);
+  const brand = fixtureId(), model = fixtureId(), region = fixtureId(), city = fixtureId(), id = fixtureId();
+  for (const [table, key] of [["brands", brand], ["regions", region]]) await pool.query(`INSERT INTO ${table}(id,slug,"nameRu","nameTk","nameEn","createdAt","updatedAt") VALUES($1,$1,'fixture','fixture','fixture','2026-10-25T08:00:00Z'::timestamp(3),'2026-10-25T08:00:00Z'::timestamp(3))`, [key]);
+  await pool.query(`INSERT INTO models(id,"brandId",slug,"nameRu","nameTk","nameEn","createdAt","updatedAt") VALUES($1,$2,$1,'fixture','fixture','fixture','2026-10-25T08:00:00Z'::timestamp(3),'2026-10-25T08:00:00Z'::timestamp(3))`, [model, brand]);
+  await pool.query(`INSERT INTO cities(id,"regionId",slug,"nameRu","nameTk","nameEn","createdAt","updatedAt") VALUES($1,$2,$1,'fixture','fixture','fixture','2026-10-25T08:00:00Z'::timestamp(3),'2026-10-25T08:00:00Z'::timestamp(3))`, [city, region]);
+  await pool.query(`INSERT INTO listings(id,"sellerId","brandId","modelId","cityId","priceAmount",damaged,"createdAt","updatedAt") VALUES($1,$2,$3,$4,$5,1,false,'2026-10-25T08:00:00Z'::timestamp(3),'2026-10-25T08:00:00Z'::timestamp(3))`, [id, owner.userId, brand, model, city]);
   return id;
  }
  it.each(["support", "history"] as const)("prepares a supplied Listing before first %s open", async purpose => {
@@ -418,7 +518,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
  it("handover committed first refuses a stale customer send with no message or extra outbox", async () => {
   const f = await fixture(), a = caller({ hold: true }), b = caller();
   const assign = observe(a.service.assign(f.staff, f.id, 1, f.peer.userId)); await a.ready;
-  const send = observe(b.service.send(f.owner, f.id, { clientMessageId: randomUUID(), body: "after handover", visibility: "customer" })); await b.started;
+  const send = observe(b.service.send(f.owner, f.id, { clientMessageId: fixtureId(), body: "after handover", visibility: "customer" })); await b.started;
   await blocked(b.pid(), a.pid()); a.release(); expect((await assign).ok).toBe(true); expect((await send).ok).toBe(false);
   expect(await db.supportCase.findUnique({ where: { id: f.resource } })).toMatchObject({ assigneeId: f.peer.userId, assignmentVersion: 2 });
   expect(await effects(f.id)).toEqual({ messages: 0, outbox: 1, reads: 0, subscriptions: 0 });
@@ -426,7 +526,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
  it.each(["accept", "purchase"] as const)("%s first releases a shared provider before the opposing real caller completes", async first => {
   const f = await history(), other = await history();
   const paidAt = new Date("2000-01-01T08:00:00Z");
-  const order = await db.historyOrder.create({ data: { requestId: other.resource, quoteId: other.quote.id, day: other.day, morning: false, state: "paid", paidAt, receivedAt: paidAt, holdExpiresAt: future, promiseAt: future, rights } });
+  const order = await db.historyOrder.create({ data: { createdAt: now, id: fixtureId(), requestId: other.resource, quoteId: other.quote.id, day: other.day, morning: false, state: "paid", paidAt, receivedAt: paidAt, holdExpiresAt: future, promiseAt: future, rights } });
   const purchase: S.HistoryCommand = { kind: "purchase", orderId: order.id, expectedAssignmentVersion: 1, expectedVersion: 0, reason: "fixture FIFO purchase" };
   const a = caller({ hold: true }), b = caller();
   const leading = observe(first === "accept" ? a.service.historyCommand(f.owner, f.id, f.accept) : a.service.historyCommand(other.staff, other.id, purchase)); await a.ready;
@@ -437,5 +537,580 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   expect(await db.historyPurchaseIntent.findUnique({ where: { orderId: order.id } })).toMatchObject({ state: "prepared", createdById: other.staff.userId });
   expect((await db.historyProviderAllowance.findUniqueOrThrow({ where: { provider_day: { provider: "carfax", day: f.day } } })).consumed).toBe(1);
  });
+
+ // Snapshot only this case's isolated database. Receipts must be empty after
+ // each committed/refused entry; external bytes are asserted separately.
+ async function transactionalState() {
+  const tables = ["support_cases", "vehicle_history_requests", "service_conversations", "service_messages", "service_attachments", "service_audits", "service_outbox", "service_read_states", "service_push_subscriptions", "history_quotes", "history_orders", "history_payments", "history_purchase_intents", "history_refunds", "history_bookings", "history_artifacts", "history_deliveries", "campaign_preparations", "diagnostic_source_commands"];
+  return Promise.all(tables.map(async table => {
+   const rows = await pool.query<{ rows: unknown }>(`SELECT coalesce(jsonb_agg(to_jsonb(r) ORDER BY to_jsonb(r)::text),'[]') AS rows FROM public.${table} r`);
+   return { table, rows: present(rows.rows[0]).rows };
+  }));
+ }
+ const publicEntries = ["openSupport", "openHistory", "read", "send", "assign", "supportCommand", "markRead", "subscribePush", "mine", "queue", "stage", "upload", "file", "historyCommand", "historyArtifactCommand", "historyArtifactUpload", "historyReportFile", "historyReports", "historyPrevious", "historySnapshot"] as const;
+ it.each(publicEntries)("%s refuses a revoked real Session with no transactional residue", async entry => {
+  const f = await history(), support = await fixture("support", f.owner);
+  await sessionWriter(caller().database).delete(f.owner.sessionId);
+  const before = await transactionalState(), service = caller().service, id = fixtureId();
+  const work = () => {
+   switch (entry) {
+    case "openSupport": return service.open(f.owner, "support");
+    case "openHistory": return service.open(f.owner, "history");
+    case "read": return service.read(f.owner, f.id, 0, 20);
+    case "send": return service.send(f.owner, f.id, { clientMessageId: id, body: "refused", visibility: "customer" });
+    case "assign": return service.assign(f.owner, f.id, 1);
+    case "supportCommand": return service.supportCommand(f.owner, support.id, { kind: "close_resolved" });
+    case "markRead": return service.markRead(f.owner, f.id, 5);
+    case "subscribePush": return service.subscribePush(f.owner, f.id, id);
+    case "mine": return service.mine(f.owner);
+    case "queue": return service.queue(f.owner, "history");
+    case "stage": return service.stage(f.owner, f.id, { category: "history_communication", visibility: "customer", contentType: "image/webp", sizeBytes: 3, filename: "fixture.webp", rights: { ...rights, category: "history_communication" } });
+    case "upload": return service.upload(f.owner, f.id, id, new Uint8Array([1, 2, 3]));
+    case "file": return service.file(f.owner, f.id, id);
+    case "historyCommand": return service.historyCommand(f.owner, f.id, f.accept);
+    case "historyArtifactCommand": return service.historyArtifactCommand(f.owner, f.id, { kind: "archive", orderId: id, artifactId: id, expectedAssignmentVersion: 1, expectedVersion: 0 });
+    case "historyArtifactUpload": return service.historyArtifactUpload(f.owner, f.id, id, new Uint8Array([1, 2, 3]));
+    case "historyReportFile": return service.historyReportFile(f.owner, f.id, id);
+    case "historyReports": return service.historyReports(f.owner, f.id);
+    case "historyPrevious": return service.historyPrevious(f.owner, vin);
+    case "historySnapshot": return service.historySnapshot(f.owner, f.id);
+   }
+  };
+  await expect(work()).rejects.toMatchObject({ code: "NO_ACCESS" });
+  expect(await transactionalState()).toEqual(before);
+ });
+
+ const lifecycleChanges = ["schedule", "expire", "revoke", "elevation", "grantRevoke", "grantInsert"] as const;
+ it.each(lifecycleChanges.flatMap(change => (["customer", "staff"] as const).flatMap(audience => (["writer", "service"] as const).map(first => ({ change, audience, first })))))(
+  "$first first: $audience read opposes real $change lifecycle entry", async ({ change, audience, first }) => {
+  const f = await fixture(), subject = audience === "customer" ? f.owner : f.staff;
+  const manager = await principal(true);
+  await db.staffGrant.create({ data: { userId: manager.userId, capability: "staff.manage", grantedAt: now } });
+  const targetCapability = "support.operations";
+  if (audience === "customer" && change === "grantRevoke") await db.staffGrant.create({ data: { userId: subject.userId, capability: targetCapability, grantedAt: now } });
+  if (change === "grantInsert") await db.staffGrant.deleteMany({ where: { userId: subject.userId, capability: targetCapability } });
+  const a = caller({ hold: first === "service", holdFailure: first === "service" }), b = caller({ hold: first === "writer" });
+  const old = await db.session.findUniqueOrThrow({ where: { id: subject.sessionId } });
+  const mutate = async () => {
+   if (change === "revoke") return sessionWriter(b.database).delete(subject.sessionId);
+   if (change === "expire") { expect(await sessionWriter(b.database).rotateRefreshToken(subject.sessionId, old.refreshTokenHash, fixtureId(), now, now)).toBe(true); return; }
+   if (change === "elevation") return sessionWriter(b.database).updateAdminTotpExpiresAt(subject.sessionId, now);
+   if (change === "grantRevoke" || change === "grantInsert") return grantWriter(b.database).change({ ...manager, targetUserId: subject.userId, capability: targetCapability, grant: change === "grantInsert", reason: "R6a real lifecycle opposition" }, now);
+   return deletionWriter(b.database).run({ userId: subject.userId, deletionScheduledAt: now }, async writes => {
+    await writes.scheduleDeletion(subject.userId, now); await writes.archiveActiveListings(subject.userId);
+   });
+  };
+  const lead = observe<unknown>(first === "writer" ? mutate() : a.service.read(subject, f.id, 0, 20));
+  await (first === "writer" ? b.ready : a.ready);
+  const trail = observe<unknown>(first === "writer" ? a.service.read(subject, f.id, 0, 20) : mutate());
+  await (first === "writer" ? a.started : b.started);
+  await blocked(first === "writer" ? a.pid() : b.pid(), first === "writer" ? b.pid() : a.pid());
+  (first === "writer" ? b : a).release();
+  const leading = await lead, trailing = await trail;
+  const write = first === "writer" ? leading : trailing, read = first === "writer" ? trailing : leading;
+  expect(write.ok).toBe(true); if (!write.ok) throw write.error;
+  const initiallyDenied = audience === "staff" && change === "grantInsert";
+  // Writer-first graph changes refuse once before actor work, even when the
+  // newly granted capability would authorize an independent subsequent call.
+  expect(read.ok).toBe(first === "service" && !initiallyDenied);
+  if (!read.ok) expect(read.error).toMatchObject({ code: "NO_ACCESS" });
+  expect(await audit(f.resource)).toEqual(first === "service" && audience === "staff" && !initiallyDenied ? [{ action: "SERVICE_READ", actorId: subject.userId, assignmentVersion: 1 }] : []);
+  expect(await effects(f.id)).toEqual({ messages: 0, outbox: 0, reads: 0, subscriptions: 0 });
+  if (change === "revoke") expect(await db.session.findUnique({ where: { id: subject.sessionId } })).toBeNull();
+  if (change === "expire") expect((await db.session.findUniqueOrThrow({ where: { id: subject.sessionId } })).expiresAt).toEqual(now);
+  if (change === "elevation") expect((await db.session.findUniqueOrThrow({ where: { id: subject.sessionId } })).adminTotpExpiresAt).toEqual(now);
+  if (change === "schedule") expect((await db.user.findUniqueOrThrow({ where: { id: subject.userId } })).deletionScheduledAt).toEqual(now);
+ });
+
+ it("commits the exact monotonic watermark after a real wait without a customer audit", async () => {
+  const f = await fixture(), b = await actorBarrier(f.owner), a = caller();
+  const result = observe(a.service.markRead(f.owner, f.id, 5)); await a.started;
+  await blocked(a.pid(), await pid(b)); await b.query("COMMIT"); expect((await result).ok).toBe(true);
+  await a.service.markRead(f.owner, f.id, 3); await a.service.markRead(f.owner, f.id, 99);
+  expect(await db.serviceReadState.findMany({ where: { conversationId: f.id }, select: { userId: true, lastSequence: true } })).toEqual([{ userId: f.owner.userId, lastSequence: 8 }]);
+  expect(await audit(f.resource)).toEqual([]); expect(await effects(f.id)).toEqual({ messages: 0, outbox: 0, reads: 1, subscriptions: 0 });
+ });
+
+ it.each(["writer", "service"] as const)("%s first Support close opposes real peer handover", async first => {
+  const f = await fixture(), a = caller({ hold: true }), b = caller();
+  const close = (service: Caller) => service.supportCommand(f.staff, f.id, { kind: "close_resolved" });
+  const handover = (service: Caller) => service.assign(f.staff, f.id, 1, f.peer.userId);
+  const lead = observe(first === "writer" ? handover(a.service) : close(a.service)); await a.ready;
+  const trail = observe(first === "writer" ? close(b.service) : handover(b.service)); await b.started;
+  await blocked(b.pid(), a.pid()); a.release(); expect((await lead).ok).toBe(true);
+  const refused = await trail; expect(refused.ok).toBe(false); if (!refused.ok) expect(refused.error).toMatchObject({ code: "NO_ACCESS" });
+  expect(await db.supportCase.findUnique({ where: { id: f.resource } })).toMatchObject(first === "writer" ? { status: "open", assigneeId: f.peer.userId, assignmentVersion: 2 } : { status: "closed", closedAt: now, assigneeId: f.staff.userId, assignmentVersion: 1 });
+  expect(await effects(f.id)).toEqual({ messages: 0, outbox: first === "writer" ? 1 : 0, reads: 0, subscriptions: 0 });
+ });
+
+ it.each((["mine", "queue"] as const).flatMap(page => (["listing", "order"] as const).map(change => ({ page, change }))))("stable whole $page page holds distinct retained Listings before $change mutation", async ({ page, change }) => {
+  const owner = await principal(), first = await fixture("history", owner), second = await fixture("history", page === "mine" ? owner : undefined);
+  const one = await listing(owner), two = await listing(second.owner);
+  await db.vehicleHistoryRequest.update({ where: { id: first.resource }, data: { sourceListingId: one, createdAt: new Date("2026-10-25T06:00:00Z") } });
+  await db.vehicleHistoryRequest.update({ where: { id: second.resource }, data: { sourceListingId: two, createdAt: new Date("2026-10-25T07:00:00Z") } });
+  await db.serviceConversation.update({ where: { id: first.id }, data: { createdAt: new Date("2026-10-25T07:00:00Z") } });
+  await db.serviceConversation.update({ where: { id: second.id }, data: { createdAt: new Date("2026-10-25T06:00:00Z") } });
+  const subject = page === "mine" ? owner : first.staff, a = caller({ hold: true }), b = await connection();
+  const read = observe(page === "mine" ? a.service.mine(subject) : a.service.queue(subject, "history")); await a.ready;
+  await b.query("BEGIN"); const waiter = await pid(b);
+  // Controlled retained-Listing mutation, explicitly fault injection, not a
+  // claimed production Listing opponent. Both page references are locked.
+  const update = observe(change === "listing" ? b.query('UPDATE listings SET "priceAmount"=2 WHERE id=$1', [two]) : page === "mine" ? b.query('UPDATE service_conversations SET "createdAt"=$1 WHERE id=$2', [now, second.id]) : b.query('UPDATE vehicle_history_requests SET "createdAt"=$1 WHERE id=$2', [new Date("2026-10-25T05:00:00Z"), second.resource]));
+  await blocked(waiter, a.pid()); a.release();
+  expect(await read).toMatchObject({ ok: true, value: [{ id: first.id }, { id: second.id }] });
+  expect((await update).ok).toBe(true); await b.query("COMMIT");
+  expect(await audit(first.resource)).toEqual([]); expect(await audit(second.resource)).toEqual([]);
+ });
+
+ it.each(["mine", "queue" ] as const)("refuses the entire %s membership when real first-open commits during discovery wait", async page => {
+  const owner = await principal(), first = await fixture("history", owner), staff = first.staff;
+  const a = caller({ hold: true }), b = caller();
+  // open has already inserted the new member but it is invisible to the page's
+  // unlocked selection. Page then waits on the same actor, and must rediscover.
+  const opened = observe(a.service.open(owner, "history")); await a.ready;
+  const read = observe(page === "mine" ? b.service.mine(owner) : b.service.queue(staff, "history")); await b.started;
+  await blocked(b.pid(), a.pid()); a.release(); expect((await opened).ok).toBe(true);
+  const result = await read; expect(result.ok).toBe(false); if (!result.ok) expect(result.error).toMatchObject({ code: "NO_ACCESS" });
+  expect(await audit(first.resource)).toEqual([]);
+  expect((page === "mine" ? await caller().service.mine(owner) : await caller().service.queue(staff, "history"))).toHaveLength(2);
+ });
+
+ it.each(([false, true] as const).flatMap(existing => (["owner", "invalidated", "session"] as const).flatMap(change => (["writer", "service"] as const).map(first => ({ existing, change, first })))))(
+  "$first first: existing=$existing push opposes actual $change writer", async ({ existing, change, first }) => {
+  const f = await fixture(), device = await db.fcmDevice.create({ data: { id: fixtureId(), userId: f.owner.userId, token: fixtureId(), platform: "android", createdAt: now, updatedAt: now, lastUsedAt: now } });
+  if (existing) await db.servicePushSubscription.create({ data: { id: fixtureId(), sessionId: f.owner.sessionId, deviceId: device.id, conversationId: f.id, lifecycleEpoch: 0, createdAt: now, updatedAt: now } });
+  const a = caller({ hold: first === "service" }), b = caller({ hold: first === "writer" });
+  const mutate = () => change === "session" ? sessionWriter(b.database).delete(f.owner.sessionId) : b.run(tx => saveDevice(tx, { id: device.id, token: device.token, userId: change === "owner" ? f.peer.userId : f.owner.userId, invalidatedAt: change === "invalidated" ? now : null }));
+  const lead = observe(first === "writer" ? mutate() : a.service.subscribePush(f.owner, f.id, device.token)); await (first === "writer" ? b.ready : a.ready);
+  const trail = observe(first === "writer" ? a.service.subscribePush(f.owner, f.id, device.token) : mutate()); await (first === "writer" ? a.started : b.started);
+  await blocked(first === "writer" ? a.pid() : b.pid(), first === "writer" ? b.pid() : a.pid()); (first === "writer" ? b : a).release();
+  const leading = await lead, trailing = await trail, subscribed = first === "writer" ? trailing : leading, written = first === "writer" ? leading : trailing;
+  expect(written.ok).toBe(true); if (!written.ok) throw written.error;
+  expect(subscribed.ok).toBe(first === "service"); if (!subscribed.ok) expect(subscribed.error).toMatchObject({ code: "NO_ACCESS" });
+  // Device reassignment/invalidation does not itself erase subscriptions. A
+  // refused existing upsert preserves its exact prior row; Session DELETE cascades.
+  const expected = change === "session" ? [] : existing || first === "service" ? [{ sessionId: f.owner.sessionId, deviceId: device.id, conversationId: f.id, lifecycleEpoch: 0 }] : [];
+  expect(await db.servicePushSubscription.findMany({ where: { conversationId: f.id }, select: { sessionId: true, deviceId: true, conversationId: true, lifecycleEpoch: true } })).toEqual(expected);
+  expect(await audit(f.resource)).toEqual([]);
+ });
+
+ it.each(["rights", "adoption"] as const)("refuses attachment send after post-wait %s change, without message/outbox effects", async change => {
+  const f = await fixture("history");
+  const attachment = await uploadedAttachment(f, f.owner);
+  const message: S.ServiceSend = { clientMessageId: fixtureId(), attachmentId: attachment.id, visibility: "customer" };
+  if (change === "adoption") {
+   // Production send owns the first adoption. The second request selected the
+   // old attachment inventory and must fail rather than adopt twice.
+   const a = caller({ hold: true }), b = caller();
+   const first = observe(a.service.send(f.owner, f.id, message)); await a.ready;
+   const second = observe(b.service.send(f.owner, f.id, { ...message, clientMessageId: fixtureId() })); await b.started;
+   await blocked(b.pid(), a.pid()); a.release(); expect((await first).ok).toBe(true);
+   const outcome = await second; expect(outcome.ok).toBe(false); if (!outcome.ok) expect(outcome.error).toMatchObject({ code: "NO_ACCESS" });
+   expect(await effects(f.id)).toEqual({ messages: 1, outbox: 1, reads: 0, subscriptions: 0 });
+  } else {
+   // There is no public service rights editor. This is a controlled persisted
+   // rights fault, not a production opposing command.
+   await refusalAfter(f.owner, b => b.query('UPDATE service_attachments SET rights=$1::jsonb WHERE id=$2', [JSON.stringify({ ...rights, category: "history_communication", schedule: { kind: "until", until: now.toISOString(), reason: "expired" } }), attachment.id]), service => service.send(f.owner, f.id, message));
+   expect(await effects(f.id)).toEqual({ messages: 0, outbox: 0, reads: 0, subscriptions: 0 });
+   expect((await db.serviceAttachment.findUniqueOrThrow({ where: { id: attachment.id } })).state).toBe("staged");
+  }
+  expect(await audit(f.resource)).toEqual([]);
+ });
+
+ it.each(["writer", "service"] as const)("%s first serializes the real capacity edit against acceptance", async first => {
+  const f = await history(), other = await fixture("history"), a = caller({ hold: true }), b = caller();
+  const capacity = (service: Caller) => service.historyCommand(other.staff, other.id, { kind: "capacity", expectedAssignmentVersion: 1, day: f.day, slotLimit: 0, morningLimit: 0, evidence: "no remaining slots", providers: [{ provider: "carfax", allowance: 10000, consumed: 0, resetAt: now.toISOString(), evidence: "unchanged allowance" }] });
+  const lead = observe(first === "writer" ? capacity(a.service) : a.service.historyCommand(f.owner, f.id, f.accept)); await a.ready;
+  const trail = observe(first === "writer" ? b.service.historyCommand(f.owner, f.id, f.accept) : capacity(b.service)); await b.started;
+  await blocked(b.pid(), a.pid()); a.release(); expect((await lead).ok).toBe(true);
+  const result = await trail; expect(result.ok).toBe(first === "service"); if (!result.ok) expect(result.error).toMatchObject({ code: "INVALID_MESSAGE" });
+  expect(await db.historyOrder.count({ where: { requestId: f.resource, state: "held" } })).toBe(first === "service" ? 1 : 0);
+  expect((await db.historyQuote.findUniqueOrThrow({ where: { id: f.quote.id } })).acceptedAt).toEqual(first === "service" ? now : null);
+  expect(await db.historyPayment.count()).toBe(0); expect(await db.historyRefund.count()).toBe(0); expect(await db.historyBooking.count()).toBe(0);
+  expect((await db.historyProviderAllowance.findUniqueOrThrow({ where: { provider_day: { day: f.day, provider: "carfax" } } })).consumed).toBe(0);
+ });
+
+ it.each((["carfax", "autocheck"] as const).flatMap(provider => (["accept", "purchase"] as const).map(first => ({ provider, first }))))("$first first preserves accounting with $provider opposing provider", async ({ provider, first }) => {
+  const f = await history(), other = await history();
+  if (provider === "autocheck") {
+   // Immutable quote facts require a distinct quote, never an UPDATE bypass.
+   const quote = await db.historyQuote.create({ data: { id: fixtureId(), requestId: other.resource, vin, providers: [provider], preflightOutcome: "available", preflightEvidence: "disjoint provider", refundRule: "full refund", windowStart: new Date("2026-10-25T09:00:00Z"), windowEnd: new Date("2026-10-25T10:00:00Z"), feasible: true, createdAt: now } });
+   other.quote = quote;
+   await db.historyProviderAllowance.create({ data: { provider, day: f.day, allowance: 10, consumed: 0, resetAt: now, evidence: "disjoint" } });
+  }
+  const order = await db.historyOrder.create({ data: { id: fixtureId(), requestId: other.resource, quoteId: other.quote.id, day: f.day, morning: false, state: "paid", paidAt: now, receivedAt: now, holdExpiresAt: future, promiseAt: future, rights, createdAt: now } });
+  const a = caller({ hold: true }), b = caller();
+  const purchase = (service: Caller) => service.historyCommand(other.staff, other.id, { kind: "purchase", orderId: order.id, expectedAssignmentVersion: 1, expectedVersion: 0, reason: "real provider opposition" });
+  const lead = observe(first === "purchase" ? purchase(a.service) : a.service.historyCommand(f.owner, f.id, f.accept)); await a.ready;
+  const trail = observe(first === "purchase" ? b.service.historyCommand(f.owner, f.id, f.accept) : purchase(b.service)); await b.started;
+  if (provider === "carfax") { await blocked(b.pid(), a.pid()); a.release(); }
+  else {
+   await b.ready;
+   expect(present((await pool.query<{ pids: number[] }>("SELECT pg_blocking_pids($1) AS pids", [b.pid()])).rows[0]).pids).toEqual([]);
+   expect((await trail).ok).toBe(true); a.release();
+  }
+  expect((await lead).ok).toBe(true); expect((await trail).ok).toBe(true);
+  expect(await db.historyOrder.count({ where: { day: f.day, state: { in: ["held", "purchasing"] } } })).toBe(2);
+  expect(await db.historyPurchaseIntent.findMany({ select: { orderId: true, state: true, providers: true } })).toEqual([{ orderId: order.id, state: "prepared", providers: [provider] }]);
+  expect((await db.historyProviderAllowance.findUniqueOrThrow({ where: { provider_day: { day: f.day, provider } } })).consumed).toBe(1);
+  if (provider === "autocheck") expect((await db.historyProviderAllowance.findUniqueOrThrow({ where: { provider_day: { day: f.day, provider: "carfax" } } })).consumed).toBe(0);
+  expect(await db.historyPayment.count()).toBe(0); expect(await db.historyRefund.count()).toBe(0); expect(await db.historyBooking.count()).toBe(0);
+ });
+
+ it("accounts for real payment, verification, purchase no-data and approved executed refund exactly once", async () => {
+  const f = await history(), service = caller().service;
+  for (const capability of ["history.payment.verify", "founder.refund.approve"]) await db.staffGrant.create({ data: { userId: f.staff.userId, capability, grantedAt: now } });
+  await service.historyCommand(f.owner, f.id, f.accept);
+  const order = await db.historyOrder.findUniqueOrThrow({ where: { requestId: f.resource } });
+  const clientPaymentId = fixtureId();
+  await service.historyCommand(f.owner, f.id, { kind: "payment", orderId: order.id, clientPaymentId, claim: "synthetic receipt" });
+  const payment = await db.historyPayment.findUniqueOrThrow({ where: { orderId_clientPaymentId: { orderId: order.id, clientPaymentId } } });
+  await service.historyCommand(f.staff, f.id, { kind: "verify", orderId: order.id, paymentId: payment.id, expectedAssignmentVersion: 1, expectedVersion: 0, amount: 100, receivedAt: now.toISOString(), verifiedFunds: true, evidence: "synthetic confirmed funds" });
+  await service.historyCommand(f.staff, f.id, { kind: "purchase", orderId: order.id, expectedAssignmentVersion: 1, expectedVersion: 1, reason: "synthetic purchase" });
+  await service.historyCommand(f.staff, f.id, { kind: "purchase_no_data", orderId: order.id, expectedAssignmentVersion: 1, expectedVersion: 2, reason: "provider returned no data" });
+  await service.historyCommand(f.staff, f.id, { kind: "refund_approve", orderId: order.id, expectedAssignmentVersion: 1, expectedVersion: 3, reason: "no data refund" });
+  await service.historyCommand(f.staff, f.id, { kind: "refund_execute", orderId: order.id, expectedAssignmentVersion: 1, expectedVersion: 4, reason: "synthetic returned funds", reference: "fixture-refund-897" });
+  expect(await db.historyOrder.findUnique({ where: { id: order.id } })).toMatchObject({ state: "refunded", version: 5, paidAt: now, receivedAt: now });
+  expect(await db.historyPayment.findMany({ select: { amount: true, state: true, verifiedFunds: true } })).toEqual([{ amount: 100, state: "confirmed", verifiedFunds: true }]);
+  expect(await db.historyRefund.findMany({ select: { state: true, executionReference: true, approvedById: true, executedById: true } })).toEqual([{ state: "executed", executionReference: "fixture-refund-897", approvedById: f.staff.userId, executedById: f.staff.userId }]);
+  expect(await db.historyPurchaseIntent.findMany({ select: { state: true } })).toEqual([{ state: "no_data" }]);
+  expect((await db.historyProviderAllowance.findUniqueOrThrow({ where: { provider_day: { day: f.day, provider: "carfax" } } })).consumed).toBe(1);
+  expect(await db.historyBooking.count()).toBe(0); expect(await db.historyDelivery.count()).toBe(0);
+  expect((await audit(f.resource)).filter(row => row.action.startsWith("HISTORY_")).map(row => row.action).sort()).toEqual(["HISTORY_ACCEPT", "HISTORY_PAYMENT", "HISTORY_PURCHASE", "HISTORY_PURCHASE_NO_DATA", "HISTORY_REFUND_APPROVE", "HISTORY_REFUND_EXECUTE", "HISTORY_VERIFY"]);
+ });
+
+ function byteStore() {
+  const objects = new Map<string, Uint8Array>(), released: string[] = [];
+  const store: PrivateStore = {
+   async putImmutable(key, bytes) {
+    const prior = objects.get(key); if (prior && !Buffer.from(prior).equals(Buffer.from(bytes))) throw new Error("immutable fixture object conflict");
+    objects.set(key, Uint8Array.from(bytes));
+   },
+   async get(key, maxBytes) {
+    const bytes = objects.get(key); if (!bytes || bytes.length > maxBytes) throw new Error("missing or oversized fixture object");
+    released.push(key); return Uint8Array.from(bytes);
+   },
+   async remove(key) { objects.delete(key); },
+  };
+  return { store, objects, released };
+ }
+ async function stagedArtifact() {
+  const f = await history(), bytes = await pdf(), storage = byteStore();
+  const order = await db.historyOrder.create({ data: { id: fixtureId(), requestId: f.resource, quoteId: f.quote.id, day: f.day, morning: false, state: "fulfilling", paidAt: now, receivedAt: now, holdExpiresAt: future, promiseAt: future, rights, createdAt: now } });
+  await db.historyPurchaseIntent.create({ data: { id: fixtureId(), orderId: order.id, vin, providers: ["carfax"], state: "completed", createdById: f.staff.userId, reconciledAt: now, createdAt: now } });
+  const artifactId = fixtureId(), sha256 = createHash("sha256").update(bytes).digest("hex");
+  const command: S.HistoryArtifactCommand = { kind: "stage", orderId: order.id, artifactId, expectedAssignmentVersion: 1, provider: "carfax", vin, originalDate: now.toISOString(), expectedPages: 1, sizeBytes: bytes.length, sha256, rights: { ...rights, category: "provider_artifact", supplierRestrictions: "synthetic private original" }, provenance: "synthetic original", vehicleIdentity: null, mileage: null, sourceObservations: [] };
+  await caller({ store: storage.store }).service.historyArtifactCommand(f.staff, f.id, command);
+  return { f, order, artifactId, command, bytes, storage, key: `history-artifacts/${artifactId}/${sha256}` };
+ }
+ it("stages, uploads, verifies and delivers original PDF bytes with exact private audience", async () => {
+  const p = await stagedArtifact(), a = caller({ store: p.storage.store });
+  expect(p.storage.objects.size).toBe(0);
+  expect(await db.historyArtifact.findUnique({ where: { id: p.artifactId } })).toMatchObject({ state: "staged", acquiredForOrderId: p.order.id, objectKey: p.key, verifiedAt: null });
+  await a.service.historyArtifactUpload(p.f.staff, p.f.id, p.artifactId, p.bytes);
+  expect(p.storage.objects.get(p.key)).toEqual(p.bytes);
+  await expect(a.service.historyReportFile(p.f.owner, p.f.id, p.artifactId)).rejects.toMatchObject({ code: "NO_ACCESS" });
+  expect(p.storage.released).toEqual([]);
+  await a.service.historyArtifactCommand(p.f.staff, p.f.id, { kind: "verify", orderId: p.order.id, artifactId: p.artifactId, expectedAssignmentVersion: 1, vin, originalDate: now.toISOString(), readablePages: 1, readable: true });
+  expect(await db.historyArtifact.findUnique({ where: { id: p.artifactId } })).toMatchObject({ state: "verified", verifiedAt: now, verifiedById: p.f.staff.userId, verifiedPages: 1 });
+  expect((await a.service.historyReportFile(p.f.staff, p.f.id, p.artifactId)).bytes).toEqual(p.bytes);
+  await a.service.historyArtifactCommand(p.f.staff, p.f.id, { kind: "deliver", orderId: p.order.id, artifactId: p.artifactId, expectedAssignmentVersion: 1, expectedVersion: 0, sharedLink: "https://example.invalid/report", linkMatches: true, linkChecked: true });
+  expect((await a.service.historyReportFile(p.f.owner, p.f.id, p.artifactId)).bytes).toEqual(p.bytes);
+  expect((await a.service.historyReports(p.f.owner, p.f.id)).delivered).toMatchObject([{ id: p.artifactId, state: "verified" }]);
+  expect(await db.historyDelivery.count({ where: { orderId: p.order.id, artifactId: p.artifactId } })).toBe(1);
+  expect((await db.historyOrder.findUniqueOrThrow({ where: { id: p.order.id } })).state).toBe("delivered");
+ });
+
+ it.each(["expiredHold", "privateHold", "restricted"] as const)("%s never releases private artifact bytes to an unentitled customer", async change => {
+  const p = await stagedArtifact(), a = caller({ store: p.storage.store });
+  await a.service.historyArtifactUpload(p.f.staff, p.f.id, p.artifactId, p.bytes);
+  const held = { ...rights, category: "provider_artifact", supplierRestrictions: "synthetic private", hold: { reason: "retain for dispute only", until: future.toISOString() }, ...(change === "expiredHold" ? { schedule: { kind: "until", until: now.toISOString(), reason: "reader rights expired" } } : {}) };
+  // Controlled rights fault. Retention is not a reader grant and no rights
+  // editor is claimed as a production opponent.
+  await db.historyArtifact.update({ where: { id: p.artifactId }, data: { rights: held, ...(change === "restricted" ? { restrictedAt: now } : {}) } });
+  await expect(a.service.historyReportFile(change === "privateHold" ? p.f.owner : p.f.staff, p.f.id, p.artifactId)).rejects.toMatchObject({ code: change === "expiredHold" ? "INVALID_ATTACHMENT" : "NO_ACCESS" });
+  expect(p.storage.released).toEqual([]); expect(p.storage.objects.get(p.key)).toEqual(p.bytes);
+ });
+
+ it.each(["writer", "service"] as const)("%s first fences private file bytes against a persisted rights restriction", async first => {
+  const p = await stagedArtifact(), a = caller({ store: p.storage.store, hold: first === "service" });
+  await caller({ store: p.storage.store }).service.historyArtifactUpload(p.f.staff, p.f.id, p.artifactId, p.bytes);
+  const b = await connection(); await b.query("BEGIN");
+  if (first === "writer") {
+   await b.query('UPDATE history_artifacts SET "restrictedAt"=$1 WHERE id=$2', [now, p.artifactId]);
+   const result = observe(a.service.historyReportFile(p.f.staff, p.f.id, p.artifactId)); await a.started;
+   await blocked(a.pid(), await pid(b)); await b.query("COMMIT");
+   const outcome = await result; expect(outcome.ok).toBe(false); if (!outcome.ok) expect(outcome.error).toMatchObject({ code: "NO_ACCESS" });
+   expect(p.storage.released).toEqual([]);
+  } else {
+   const result = observe(a.service.historyReportFile(p.f.staff, p.f.id, p.artifactId)); await a.ready;
+   const update = observe(b.query('UPDATE history_artifacts SET "restrictedAt"=$1 WHERE id=$2', [now, p.artifactId]));
+   await blocked(await pid(b), a.pid()); a.release();
+   expect(await result).toMatchObject({ ok: true, value: { bytes: p.bytes } });
+   expect((await update).ok).toBe(true); await b.query("COMMIT"); expect(p.storage.released).toEqual([p.key]);
+  }
+ });
+
+ it.each(["payment", "refund", "delivery"] as const)("a real newly appearing %s edge refuses the whole waiting artifact view", async edge => {
+  const p = await pair();
+  await caller().service.historyArtifactCommand(p.f.staff, p.f.id, p.archive);
+  const a = caller({ hold: true }), b = caller();
+  const writer = edge === "payment" ? a.service.historyCommand(p.f.owner, p.f.id, { kind: "payment", orderId: p.order.id, clientPaymentId: fixtureId(), claim: "new receipt" }) : edge === "refund" ? a.service.historyCommand(p.f.staff, p.f.id, { kind: "refund_request", cause: "company_error", expectedAssignmentVersion: 1, expectedVersion: 1, orderId: p.order.id, reason: "new refund edge" }) : a.service.historyArtifactCommand(p.f.staff, p.f.id, { kind: "deliver", expectedAssignmentVersion: 1, expectedVersion: 1, orderId: p.order.id, artifactId: p.artifact.id, sharedLink: "https://example.invalid/new-edge", linkMatches: true, linkChecked: true });
+  const written = observe(writer); await a.ready;
+  const read = observe(b.service.historyReports(p.f.staff, p.f.id)); await b.started;
+  await blocked(b.pid(), a.pid()); a.release(); expect((await written).ok).toBe(true);
+  const outcome = await read; expect(outcome.ok).toBe(false); if (!outcome.ok) expect(outcome.error).toMatchObject({ code: "NO_ACCESS" });
+  expect(await db.historyPayment.count({ where: { orderId: p.order.id } })).toBe(edge === "payment" ? 1 : 0);
+  expect(await db.historyRefund.count({ where: { orderId: p.order.id } })).toBe(edge === "refund" ? 1 : 0);
+  expect(await db.historyDelivery.count({ where: { orderId: p.order.id } })).toBe(edge === "delivery" ? 1 : 0);
+  expect((await audit(p.f.resource)).filter(row => row.action === "SERVICE_READ")).toEqual([]);
+ });
+
+ it.each(["archive", "deliver"] as const)("real campaign_finish refusal rolls back complete pair %s effects", async kind => {
+  const p = await pair();
+  if (kind === "deliver") await caller().service.historyArtifactCommand(p.f.staff, p.f.id, p.archive);
+  const before = await transactionalState(); let reached = false;
+  const a = caller({ finishRefusal: async tx => {
+   reached = true;
+   expect(await tx.historyOrder.findUnique({ where: { id: p.order.id } })).toMatchObject({ state: kind === "archive" ? "fulfilling" : "delivered", version: kind === "archive" ? 1 : 2 });
+   expect(await tx.historyPurchaseIntent.count({ where: { orderId: p.order.id } })).toBe(1);
+   expect(await tx.historyDelivery.count({ where: { orderId: p.order.id } })).toBe(kind === "deliver" ? 1 : 0);
+   expect(await tx.serviceAudit.count({ where: { resourceId: p.f.resource, action: `HISTORY_ARTIFACT_${kind.toUpperCase()}` } })).toBe(1);
+  } });
+  const command: S.HistoryArtifactCommand = kind === "archive" ? p.archive : { kind: "deliver", orderId: p.order.id, artifactId: p.artifact.id, expectedAssignmentVersion: 1, expectedVersion: 1, sharedLink: "https://example.invalid/finish-refused", linkMatches: true, linkChecked: true };
+  await expect(a.service.historyArtifactCommand(p.f.staff, p.f.id, command)).rejects.toThrow("campaign_preparation_receipt");
+  expect(reached).toBe(true); expect(await transactionalState()).toEqual(before);
+  expect(await db.historyArtifact.findUnique({ where: { id: p.artifact.id } })).toMatchObject({ acquiredForOrderId: p.donorOrder.id, verifiedById: p.donor.staff.userId });
+ });
+
+ it("upload finish refusal leaves the immutable external PDF while rolling back its staff audit", async () => {
+  const p = await stagedArtifact(), before = await transactionalState(); let reached = false;
+  const a = caller({ store: p.storage.store, finishRefusal: async tx => {
+   reached = true; expect(p.storage.objects.get(p.key)).toEqual(p.bytes);
+   expect(await tx.serviceAudit.count({ where: { resourceId: p.f.resource, action: "SERVICE_SEND" } })).toBe(2);
+  } });
+  await expect(a.service.historyArtifactUpload(p.f.staff, p.f.id, p.artifactId, p.bytes)).rejects.toThrow("campaign_preparation_receipt");
+  expect(reached).toBe(true); expect(await transactionalState()).toEqual(before);
+  expect(p.storage.objects.get(p.key)).toEqual(p.bytes); expect(p.storage.released).toEqual([]);
+ });
+
+ async function campaignFixture() {
+  const reservation = "e".repeat(32), namespace = `cf_${reservation}`, candidate = "c".repeat(40);
+  // Existing generator produces the real hashed roster, authority and journal.
+  // This executes only inside a separately authorized disposable E2E run.
+  const setup = execFileSync(process.execPath, ["scripts/testing/campaign-preparation-fixture.mjs", "campaign897-full-v3", reservation, candidate], { cwd: fileURLToPath(new URL("../../..", import.meta.url)), encoding: "utf8" });
+  await pool.query(setup);
+  await pool.query(`GRANT USAGE ON SCHEMA "${namespace}" TO ${role}`);
+  await pool.query(`GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA "${namespace}" TO ${role}`);
+  await pool.query(`GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA "${namespace}" TO ${role}`);
+  const user = await db.user.findUniqueOrThrow({ where: { email: `buyer-a.${reservation}.${candidate.slice(0, 12)}@campaign897.invalid` } });
+  const sessionId = fixtureId();
+  await db.$transaction(tx => withCampaignPreparation(tx, [{ table: "sessions", key: { id: sessionId }, verb: "insert", next: { id: sessionId, userId: user.id, expiresAt: future.toISOString() } }], () => tx.session.create({ data: { id: sessionId, userId: user.id, refreshTokenHash: fixtureId(), createdAt: now, expiresAt: future } })));
+  const hash = await pool.query<{ matched: boolean }>(`SELECT service_contract_hash=md5(pg_get_functiondef('"${namespace}".campaign_service_authority(text,text,text,text,text)'::regprocedure)) AS matched FROM "${namespace}".campaign_manifest WHERE candidate=$1 AND state='identities' AND profile='campaign897-full-v3'`, [candidate]);
+  expect(hash.rows).toEqual([{ matched: true }]);
+  return { namespace, subject: { userId: user.id, sessionId } };
+ }
+ it("admits exact persisted hashed Support text while History, attachments and push remain closed", async () => {
+  const f = await campaignFixture(), a = caller({ enabled: false, campaign: true });
+  const opened = await a.service.open(f.subject, "support");
+  await a.service.send(f.subject, opened.id, { clientMessageId: fixtureId(), body: "journal-owned Support text", visibility: "customer" });
+  await a.service.markRead(f.subject, opened.id, 1);
+  expect((await a.service.read(f.subject, opened.id, 0, 20)).messages).toMatchObject([{ body: "journal-owned Support text", sequence: 1 }]);
+  const before = await transactionalState();
+  await expect(a.service.open(f.subject, "history")).rejects.toMatchObject({ code: "COLLECTION_DISABLED" });
+  await expect(a.service.stage(f.subject, opened.id, { category: "support_communication", visibility: "customer", contentType: "image/webp", sizeBytes: 3, filename: "fixture.webp", rights: { ...rights, category: "support_communication", schedule: { kind: "support_case", closedDays: 90, eraseOnAccountDeletion: true } } })).rejects.toMatchObject({ code: "COLLECTION_DISABLED" });
+  await expect(a.service.send(f.subject, opened.id, { clientMessageId: fixtureId(), attachmentId: fixtureId(), visibility: "customer" })).rejects.toMatchObject({ code: "COLLECTION_DISABLED" });
+  await expect(a.service.subscribePush(f.subject, opened.id, fixtureId())).rejects.toMatchObject({ code: "COLLECTION_DISABLED" });
+  expect(await transactionalState()).toEqual(before);
+  const records = await pool.query<{ table_name: string }>(`SELECT table_name FROM "${f.namespace}".campaign_records WHERE NOT deleted AND table_name IN ('support_cases','service_conversations','service_messages','service_outbox','service_read_states') ORDER BY table_name`);
+  expect(records.rows.map(row => row.table_name)).toEqual(["service_conversations", "service_messages", "service_outbox", "service_read_states", "support_cases"]);
+ });
+
+ it.each(["send", "watermark"] as const)("real campaign_finish %s refusal occurs after writes and restores exact transactional state", async kind => {
+  const f = await fixture("history");
+  const attachment = await uploadedAttachment(f, f.staff);
+  const before = await transactionalState(); let reached = false;
+  expect(await db.serviceAudit.count({ where: { resourceId: f.resource } })).toBe(3);
+  const a = caller({ finishRefusal: async tx => {
+   reached = true;
+   expect(await tx.serviceAudit.count({ where: { resourceId: f.resource } })).toBe(4);
+   if (kind === "send") {
+    expect(await tx.serviceAttachment.findUnique({ where: { id: attachment.id } })).toMatchObject({ state: "adopted", adoptedAt: now });
+    expect(await tx.serviceMessage.count({ where: { conversationId: f.id } })).toBe(1);
+    expect(await tx.serviceOutbox.count({ where: { conversationId: f.id } })).toBe(1);
+    expect(await tx.serviceConversation.findUnique({ where: { id: f.id } })).toMatchObject({ lastSequence: 9 });
+   } else expect(await tx.serviceReadState.findUnique({ where: { conversationId_userId: { conversationId: f.id, userId: f.staff.userId } } })).toMatchObject({ lastSequence: 5 });
+  } });
+  await expect(kind === "send" ? a.service.send(f.staff, f.id, { clientMessageId: fixtureId(), attachmentId: attachment.id, visibility: "customer" }) : a.service.markRead(f.staff, f.id, 5)).rejects.toThrow("campaign_preparation_receipt");
+  expect(reached).toBe(true); expect(await transactionalState()).toEqual(before);
+ });
+
+ async function previousPage(deliverSecond = true) {
+  const p = await pair(), second = await history(p.f.owner), secondListing = await listing(p.f.owner), firstListing = await listing(p.f.owner);
+  await db.vehicleHistoryRequest.update({ where: { id: p.f.resource }, data: { sourceListingId: firstListing } });
+  await db.vehicleHistoryRequest.update({ where: { id: second.resource }, data: { sourceListingId: secondListing } });
+  const secondOrder = await db.historyOrder.create({ data: { id: fixtureId(), requestId: second.resource, quoteId: second.quote.id, day: second.day, morning: false, state: "paid", paidAt: now, receivedAt: now, holdExpiresAt: future, promiseAt: future, rights, createdAt: new Date("2026-10-25T06:00:00Z") } });
+  await db.historyOrder.update({ where: { id: p.order.id }, data: { createdAt: new Date("2026-10-25T07:00:00Z") } });
+  const service = caller().service;
+  await service.historyArtifactCommand(p.f.staff, p.f.id, p.archive);
+  await service.historyArtifactCommand(p.f.staff, p.f.id, { kind: "deliver", artifactId: p.artifact.id, orderId: p.order.id, expectedAssignmentVersion: 1, expectedVersion: 1, sharedLink: "https://example.invalid/first", linkMatches: true, linkChecked: true });
+  await service.historyArtifactCommand(second.staff, second.id, { kind: "archive", artifactId: p.artifact.id, orderId: secondOrder.id, expectedAssignmentVersion: 1, expectedVersion: 0 });
+  const deliver: S.HistoryArtifactCommand = { kind: "deliver", artifactId: p.artifact.id, orderId: secondOrder.id, expectedAssignmentVersion: 1, expectedVersion: 1, sharedLink: "https://example.invalid/second", linkMatches: true, linkChecked: true };
+  if (deliverSecond) await service.historyArtifactCommand(second.staff, second.id, deliver);
+  return { p, second, secondOrder, deliver, firstListing, secondListing };
+ }
+ it("returns a stable whole previous-history page including distinct retained Listings", async () => {
+  const f = await previousPage(), a = caller({ hold: true }), b = await connection();
+  const beforeFirst = await audit(f.p.f.resource), beforeSecond = await audit(f.second.resource);
+  const read = observe(a.service.historyPrevious(f.p.f.owner, vin)); await a.ready;
+  await b.query("BEGIN"); const waiter = await pid(b);
+  const update = observe(b.query('UPDATE listings SET "priceAmount"=2 WHERE id=$1', [f.secondListing]));
+  await blocked(waiter, a.pid()); a.release();
+  expect(await read).toEqual({ ok: true, value: [{ conversationId: f.p.f.id, vin }, { conversationId: f.second.id, vin }] });
+  expect((await update).ok).toBe(true); await b.query("COMMIT");
+  expect(await audit(f.p.f.resource)).toEqual(beforeFirst); expect(await audit(f.second.resource)).toEqual(beforeSecond);
+ });
+ it.each(["writer", "service"] as const)("%s first previous-history membership uses a real new delivery", async first => {
+  const f = await previousPage(false), a = caller({ hold: true }), b = caller();
+  const read = (service: Caller) => service.historyPrevious(f.p.f.owner, vin);
+  const deliver = (service: Caller) => service.historyArtifactCommand(f.second.staff, f.second.id, f.deliver);
+  const lead = observe<unknown>(first === "writer" ? deliver(a.service) : read(a.service)); await a.ready;
+  const trail = observe<unknown>(first === "writer" ? read(b.service) : deliver(b.service)); await b.started;
+  await blocked(b.pid(), a.pid()); a.release();
+  const leading = await lead, trailing = await trail; expect(leading.ok).toBe(true);
+  if (first === "writer") { expect(trailing.ok).toBe(false); if (!trailing.ok) expect(trailing.error).toMatchObject({ code: "NO_ACCESS" }); }
+  else { expect(leading).toEqual({ ok: true, value: [{ conversationId: f.p.f.id, vin }] }); expect(trailing.ok).toBe(true); }
+  expect(await caller().service.historyPrevious(f.p.f.owner, vin)).toEqual([{ conversationId: f.p.f.id, vin }, { conversationId: f.second.id, vin }]);
+ });
+ it.each(["mine", "queue"] as const)("stable %s page commits before a real first-open adds a member", async page => {
+  const owner = await principal(), f = await fixture("history", owner), a = caller({ hold: true }), b = caller();
+  const read = observe(page === "mine" ? a.service.mine(owner) : a.service.queue(f.staff, "history")); await a.ready;
+  const open = observe(b.service.open(owner, "history")); await b.started;
+  await blocked(b.pid(), a.pid()); a.release();
+  expect(await read).toMatchObject({ ok: true, value: [{ id: f.id }] }); expect((await open).ok).toBe(true);
+  expect((page === "mine" ? await caller().service.mine(owner) : await caller().service.queue(f.staff, "history"))).toHaveLength(2);
+  expect(await audit(f.resource)).toEqual([]);
+ });
+ it.each(["mine", "queue", "previous"] as const)("%s refuses whole-page reordered membership after a nonfirst ordering fault", async page => {
+  if (page === "previous") {
+   const f = await previousPage(), baseline = await audit(f.second.resource);
+   await refusalAfter(f.p.f.owner, b => b.query('UPDATE history_orders SET "createdAt"=$1 WHERE id=$2', [now, f.secondOrder.id]), service => service.historyPrevious(f.p.f.owner, vin));
+   expect(await audit(f.second.resource)).toEqual(baseline);
+  } else {
+   const owner = await principal(), one = await fixture("history", owner), two = await fixture("history", owner);
+   await db.vehicleHistoryRequest.update({ where: { id: one.resource }, data: { createdAt: new Date("2026-10-25T06:00:00Z") } });
+   await db.vehicleHistoryRequest.update({ where: { id: two.resource }, data: { createdAt: new Date("2026-10-25T07:00:00Z") } });
+   await db.serviceConversation.update({ where: { id: one.id }, data: { createdAt: new Date("2026-10-25T07:00:00Z") } });
+   await db.serviceConversation.update({ where: { id: two.id }, data: { createdAt: new Date("2026-10-25T06:00:00Z") } });
+   const subject = page === "mine" ? owner : one.staff;
+   await refusalAfter(subject, b => page === "mine" ? b.query('UPDATE service_conversations SET "createdAt"=$1 WHERE id=$2', [now, two.id]) : b.query('UPDATE vehicle_history_requests SET "createdAt"=$1 WHERE id=$2', [new Date("2026-10-25T05:00:00Z"), two.resource]), service => page === "mine" ? service.mine(owner) : service.queue(one.staff, "history"));
+   expect(await audit(one.resource)).toEqual([]); expect(await audit(two.resource)).toEqual([]);
+  }
+ });
+
+ it.each(["writer", "service"] as const)("%s first handover opposes the real peer grant revoker", async first => {
+  const f = await fixture(), manager = await principal(true);
+  await db.staffGrant.create({ data: { userId: manager.userId, capability: "staff.manage", grantedAt: now } });
+  const a = caller({ hold: true }), b = caller();
+  const revoke = (database: unknown) => grantWriter(database).change({ ...manager, targetUserId: f.peer.userId, capability: "support.operations", grant: false, reason: "peer authority revoked" }, now);
+  const lead = observe(first === "writer" ? revoke(a.database) : a.service.assign(f.staff, f.id, 1, f.peer.userId)); await a.ready;
+  const trail = observe(first === "writer" ? b.service.assign(f.staff, f.id, 1, f.peer.userId) : revoke(b.database)); await b.started;
+  await blocked(b.pid(), a.pid()); a.release(); expect((await lead).ok).toBe(true);
+  const result = await trail; expect(result.ok).toBe(first === "service"); if (!result.ok) expect(result.error).toMatchObject({ code: "NO_ACCESS" });
+  expect(await db.supportCase.findUnique({ where: { id: f.resource } })).toMatchObject({ assigneeId: first === "writer" ? f.staff.userId : f.peer.userId, assignmentVersion: first === "writer" ? 1 : 2 });
+  expect(await effects(f.id)).toEqual({ messages: 0, outbox: first === "writer" ? 0 : 1, reads: 0, subscriptions: 0 });
+  expect(await audit(f.resource)).toEqual(first === "writer" ? [] : [{ action: "SERVICE_ASSIGN", actorId: f.staff.userId, assignmentVersion: 1 }, { action: "SERVICE_HANDOVER", actorId: f.staff.userId, assignmentVersion: 2 }]);
+  expect((await db.staffGrant.findUniqueOrThrow({ where: { userId_capability: { userId: f.peer.userId, capability: "support.operations" } } })).revokedAt).toEqual(now);
+ });
+
+ it("attachment adoption commits before a waiting rights fault without releasing bytes", async () => {
+  const f = await fixture("history"), a = caller({ hold: true }), b = await connection();
+  const attachment = await uploadedAttachment(f, f.owner);
+  const result = observe(a.service.send(f.owner, f.id, { clientMessageId: fixtureId(), attachmentId: attachment.id, visibility: "customer" })); await a.ready;
+  await b.query("BEGIN"); const waiter = await pid(b);
+  const update = observe(b.query('UPDATE service_attachments SET rights=$1::jsonb WHERE id=$2', [JSON.stringify({ ...rights, category: "history_communication", schedule: { kind: "until", until: now.toISOString(), reason: "expired" } }), attachment.id]));
+  await blocked(waiter, a.pid()); a.release(); expect((await result).ok).toBe(true); expect((await update).ok).toBe(true); await b.query("COMMIT");
+  expect((await db.serviceAttachment.findUniqueOrThrow({ where: { id: attachment.id } })).state).toBe("adopted");
+  expect(await effects(f.id)).toEqual({ messages: 1, outbox: 1, reads: 0, subscriptions: 0 });
+  await expect(caller().service.file(f.owner, f.id, attachment.id)).rejects.toMatchObject({ code: "NO_ACCESS" });
+ });
+
+ it("exact hashed Support journal and text effects roll back at real campaign_finish refusal", async () => {
+  const f = await campaignFixture(), opened = await caller({ enabled: false, campaign: true }).service.open(f.subject, "support");
+  const journal = async () => (await pool.query<{ records: unknown; events: unknown; manifest: unknown }>(`SELECT
+   (SELECT jsonb_agg(to_jsonb(r) ORDER BY table_name,row_key::text) FROM "${f.namespace}".campaign_records r) AS records,
+   (SELECT jsonb_agg(to_jsonb(e) ORDER BY sequence) FROM "${f.namespace}".campaign_events e) AS events,
+   (SELECT to_jsonb(m) FROM "${f.namespace}".campaign_manifest m) AS manifest`)).rows;
+  const before = await transactionalState(), beforeJournal = await journal(); let reached = false;
+  const a = caller({ enabled: false, campaign: true, finishRefusal: async tx => {
+   reached = true;
+   expect(await tx.serviceMessage.count({ where: { conversationId: opened.id } })).toBe(1);
+   expect(await tx.serviceOutbox.count({ where: { conversationId: opened.id } })).toBe(1);
+   expect(await tx.serviceAudit.count({ where: { resourceId: opened.resourceId, action: "SUPPORT_CUSTOMER_MESSAGE" } })).toBe(1);
+  } });
+  await expect(a.service.send(f.subject, opened.id, { clientMessageId: fixtureId(), body: "must roll back with journal", visibility: "customer" })).rejects.toThrow("campaign_preparation_receipt");
+  expect(reached).toBe(true); expect(await transactionalState()).toEqual(before); expect(await journal()).toEqual(beforeJournal);
+ });
+
+ it.each((["purchase", "refund"] as const).flatMap(opponent => (["payment", "opponent"] as const).map(first => ({ opponent, first }))))("same-order $first first payment opposes real $opponent with exact accounting", async ({ opponent, first }) => {
+  const f = await history();
+  const order = await db.historyOrder.create({ data: { id: fixtureId(), requestId: f.resource, quoteId: f.quote.id, day: f.day, morning: false, state: "paid", paidAt: now, receivedAt: now, holdExpiresAt: future, promiseAt: future, rights, createdAt: now } });
+  const a = caller({ hold: true }), b = caller();
+  const payment = (service: Caller) => service.historyCommand(f.owner, f.id, { kind: "payment", orderId: order.id, clientPaymentId: fixtureId(), claim: "same-order new payment" });
+  const opposing = (service: Caller) => service.historyCommand(f.staff, f.id, opponent === "purchase" ? { kind: "purchase", orderId: order.id, expectedAssignmentVersion: 1, expectedVersion: 0, reason: "same-order purchase" } : { kind: "refund_request", cause: "company_error", orderId: order.id, expectedAssignmentVersion: 1, expectedVersion: 0, reason: "same-order refund" });
+  const lead = observe(first === "payment" ? payment(a.service) : opposing(a.service)); await a.ready;
+  const trail = observe(first === "payment" ? opposing(b.service) : payment(b.service)); await b.started;
+  await blocked(b.pid(), a.pid()); a.release(); expect((await lead).ok).toBe(true);
+  const outcome = await trail; expect(outcome.ok).toBe(false); if (!outcome.ok) expect(outcome.error).toMatchObject({ code: "NO_ACCESS" });
+  expect(await db.historyPayment.count({ where: { orderId: order.id } })).toBe(first === "payment" ? 1 : 0);
+  expect(await db.historyPurchaseIntent.count({ where: { orderId: order.id } })).toBe(first === "opponent" && opponent === "purchase" ? 1 : 0);
+  expect(await db.historyRefund.count({ where: { orderId: order.id } })).toBe(first === "opponent" && opponent === "refund" ? 1 : 0);
+  expect(await db.historyOrder.findUnique({ where: { id: order.id } })).toMatchObject({ state: first === "payment" ? "paid" : opponent === "purchase" ? "purchasing" : "refund_pending", version: first === "payment" ? 0 : 1 });
+  expect((await db.historyProviderAllowance.findUniqueOrThrow({ where: { provider_day: { day: f.day, provider: "carfax" } } })).consumed).toBe(first === "opponent" && opponent === "purchase" ? 1 : 0);
+  expect(await db.historyBooking.count()).toBe(0); expect(await db.historyDelivery.count()).toBe(0);
+ });
+
+ it.each(["payment", "refund", "delivery"] as const)("stable artifact view commits before a real new %s edge without widening its result", async edge => {
+  const p = await pair(); await caller().service.historyArtifactCommand(p.f.staff, p.f.id, p.archive);
+  const a = caller({ hold: true }), b = caller();
+  const read = observe(a.service.historyReports(p.f.staff, p.f.id)); await a.ready;
+  const write = observe(edge === "payment" ? b.service.historyCommand(p.f.owner, p.f.id, { kind: "payment", orderId: p.order.id, clientPaymentId: fixtureId(), claim: "new receipt after view" }) : edge === "refund" ? b.service.historyCommand(p.f.staff, p.f.id, { kind: "refund_request", cause: "company_error", expectedAssignmentVersion: 1, expectedVersion: 1, orderId: p.order.id, reason: "new refund after view" }) : b.service.historyArtifactCommand(p.f.staff, p.f.id, { kind: "deliver", expectedAssignmentVersion: 1, expectedVersion: 1, orderId: p.order.id, artifactId: p.artifact.id, sharedLink: "https://example.invalid/new-edge", linkMatches: true, linkChecked: true })); await b.started;
+  await blocked(b.pid(), a.pid()); a.release();
+  expect(await read).toMatchObject({ ok: true, value: { delivered: [], staged: [] } });
+  const outcome = await write; expect(outcome.ok).toBe(false); if (!outcome.ok) expect(outcome.error).toMatchObject({ code: "NO_ACCESS" });
+  expect(await db.historyPayment.count({ where: { orderId: p.order.id } })).toBe(0);
+  expect(await db.historyRefund.count({ where: { orderId: p.order.id } })).toBe(0);
+  expect(await db.historyDelivery.count({ where: { orderId: p.order.id } })).toBe(0);
+  expect((await db.historyOrder.findUniqueOrThrow({ where: { id: p.order.id } })).state).toBe("fulfilling");
+  expect((await audit(p.f.resource)).filter(row => row.action === "SERVICE_READ")).toEqual([{ action: "SERVICE_READ", actorId: p.f.staff.userId, assignmentVersion: 1 }]);
+ });
+
+ it.each(["upload", "verify", "file"] as const)("post-wait rights expiry refuses actual artifact %s with exact byte boundary effects", async phase => {
+  const p = await stagedArtifact();
+  if (phase !== "upload") await caller({ store: p.storage.store }).service.historyArtifactUpload(p.f.staff, p.f.id, p.artifactId, p.bytes);
+  const expires = new Date("2026-10-25T08:01:00Z");
+  await db.historyArtifact.update({ where: { id: p.artifactId }, data: { rights: { ...rights, category: "provider_artifact", supplierRestrictions: "bounded original rights", schedule: { kind: "until", until: expires.toISOString(), reason: "fixture rights end" }, hold: { until: future.toISOString(), reason: "retain without widening readership" } } } });
+  const before = await transactionalState(); let at = now;
+  const b = await actorBarrier(p.f.staff), a = caller({ store: p.storage.store, clock: () => at });
+  const work = phase === "upload" ? a.service.historyArtifactUpload(p.f.staff, p.f.id, p.artifactId, p.bytes) : phase === "verify" ? a.service.historyArtifactCommand(p.f.staff, p.f.id, { kind: "verify", orderId: p.order.id, artifactId: p.artifactId, expectedAssignmentVersion: 1, vin, originalDate: now.toISOString(), readablePages: 1, readable: true }) : a.service.historyReportFile(p.f.staff, p.f.id, p.artifactId);
+  const result = observe<unknown>(work); await a.started;
+  await blocked(a.pid(), await pid(b)); at = expires; await b.query("COMMIT");
+  const outcome = await result; expect(outcome.ok).toBe(false); if (!outcome.ok) expect(outcome.error).toMatchObject({ code: "INVALID_ATTACHMENT" });
+  expect(await transactionalState()).toEqual(before);
+  // Verification fetches the original before its helper's rights check. That
+  // internal fetch is observable storage I/O despite transactional rollback;
+  // upload/file refuse before a store effect. No bytes are returned to caller.
+  expect(p.storage.released).toEqual(phase === "verify" ? [p.key] : []);
+  expect(p.storage.objects.size).toBe(phase === "upload" ? 0 : 1);
+ });
+
+ async function uploadedAttachment(f: { id: string; owner: Subject }, uploader: Subject) {
+  const storage = byteStore(), bytes = await image(), service = caller({ store: storage.store }).service;
+  const attachment = await service.stage(uploader, f.id, { category: "history_communication", visibility: "customer", contentType: "image/webp", sizeBytes: bytes.length, filename: "fixture.webp", rights: { ...rights, category: "history_communication" } });
+  await service.upload(uploader, f.id, attachment.id, bytes);
+  expect(storage.objects.size).toBe(1);
+  expect(await db.serviceAttachment.findUnique({ where: { id: attachment.id } })).toMatchObject({ state: "staged", uploaderId: uploader.userId, lifecycleEpoch: 0 });
+  return { ...attachment, storage };
+ }
 
 });
