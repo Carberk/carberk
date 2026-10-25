@@ -197,7 +197,7 @@ describe("G1 adjacent measurement retention on real PostgreSQL", () => {
    await f.reached(held, first);
    const next = retentionConnection(f.db, "second");
    second = f.start<unknown>(order === "purge-first" ? new PrismaMeasurementRetentionLedger(next).deleteExpired(now, 1) : new PurgeExpiredAccounts(next).execute({ now }));
-   await f.blocked("second", "first");
+   await f.blocked("second", "first", second);
   } finally { release.release(); await Promise.allSettled([first, ...(second ? [second] : [])]); }
   if (!second) throw new Error("Missing actual production opponent");
   if (order === "purge-first") expect(await first).toEqual({ purgedCount: 1 });
@@ -223,9 +223,11 @@ describe("G1 adjacent measurement retention on real PostgreSQL", () => {
   try {
    await f.reached(held, collector);
    purge = f.start(new PurgeExpiredAccounts(retentionConnection(f.db, "purge")).execute({ now }));
-   await f.blocked("purge", "collector");
+   await f.blocked("purge", "collector", purge);
    sweep = f.start(new PrismaMeasurementRetentionLedger(retentionConnection(f.db, "retention")).deleteExpired(now, 1));
-   await f.blocked("retention", "collector");
+   // PostgreSQL queues this tuple lock behind purge, which is already waiting
+   // on collector. Assert both queue edges, not an invented direct blocker.
+   await f.blocked("retention", "purge");
   } finally { release.release(); await Promise.allSettled([collector, ...(purge ? [purge] : []), ...(sweep ? [sweep] : [])]); }
   if (!purge || !sweep) throw new Error("Missing three-way production opposition");
   expect(await collector).toBe("accepted"); expect(await purge).toEqual({ purgedCount: 1 }); expect(await sweep).toBe(0);

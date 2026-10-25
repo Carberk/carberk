@@ -181,9 +181,14 @@ export class MeasurementRetentionPostgresFixture {
   await Promise.race([gate.promise, task.then(() => { throw new Error("Production caller finished before its expected lock barrier"); })]);
  }
 
- async blocked(waiter: string, holder: string) {
+ async blocked(waiter: string, holder: string, caller?: Promise<unknown>) {
   const deadline = performance.now() + 300;
-  while (performance.now() < deadline) {
+  let settled = false, outcome: unknown;
+  // Preparation computes its real scope before reaching the collector lock.
+  // Observe that caller until it blocks or settles under its existing Prisma
+  // transaction bound, rather than assuming preparation finishes within 300ms.
+  void caller?.then(value => { settled = true; outcome = value; }, error => { settled = true; outcome = String(error); });
+  while (caller ? !settled : performance.now() < deadline) {
    const [row] = await this.db.$queryRaw<{ blocked: boolean }[]>`SELECT EXISTS (
     SELECT 1 FROM pg_stat_activity w JOIN pg_stat_activity h ON h.pid=ANY(pg_blocking_pids(w.pid))
     WHERE w.application_name=${waiter} AND h.application_name=${holder} AND w.wait_event_type='Lock'
@@ -191,7 +196,9 @@ export class MeasurementRetentionPostgresFixture {
    if (row?.blocked) return;
    await new Promise(resolve => setTimeout(resolve, 5));
   }
-  throw new Error(`Expected PostgreSQL lock wait ${waiter} -> ${holder}`);
+  const activity = await this.db.$queryRaw<Record<string, unknown>[]>`SELECT application_name, state, wait_event_type, wait_event,
+   query, pg_blocking_pids(pid) AS blockers FROM pg_stat_activity WHERE application_name IN (${waiter}, ${holder})`;
+  throw new Error(`Expected PostgreSQL lock wait ${waiter} -> ${holder}: ${JSON.stringify({ activity, settled, outcome })}`);
  }
 
  async close() {
