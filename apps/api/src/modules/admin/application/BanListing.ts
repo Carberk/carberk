@@ -140,6 +140,14 @@ export class BanListing {
         }
       }
 
+      const lockedListing = await tx.listing.findUnique({ where: { id: input.listingId } });
+      if (!lockedListing) throw new NotFoundException({ code: "NOT_FOUND", message: "Listing not found" });
+      if (lockedListing.status !== "active") {
+        throw new ConflictException({ code: "CONFLICT", message: report ? "Report target is no longer actionable" : "Listing is not in a state that can be banned",
+          details: { reason: report ? AdminSchemas.AdminErrorReason.ReportTargetNotActionable : AdminSchemas.AdminErrorReason.ModerationTargetStateConflict,
+            targetState: { status: lockedListing.status } } });
+      }
+
       // Ban the listing
       const banResult = await this.listingsAdmin.banActiveListing(
         input.listingId,

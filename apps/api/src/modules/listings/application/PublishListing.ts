@@ -326,7 +326,7 @@ export class PublishListing {
 
       // The Listing, its media, the draft removal, the audit entry and the
       // adoption of every upload commit together or not at all.
-      const auditId = randomUUID();
+      const auditId = randomUUID(), publishedEventId = randomUUID(), visibilityEventId = randomUUID();
       const listingRow = await this.prisma.$transaction(async (tx) => {
         const initialDraft = await tx.listingDraft.findUnique({ where: { id: draft.id } });
         if (!initialDraft || initialDraft.userId !== draft.userId || (initialDraft.businessId ?? null) !== (draft.businessId ?? null)
@@ -338,6 +338,8 @@ export class PublishListing {
           { table: "users", key: { id: input.userId } },
           { table: "listing_drafts", key: { id: draft.id } },
           { table: "audit_logs", key: { id: auditId } },
+          { table: "measurement_outbox", key: { id: publishedEventId } },
+          { table: "measurement_outbox", key: { id: visibilityEventId } },
           ...attachedPhotos.map(photo => ({ table: "listing_media" as const, key: { id: photo.photoId } })),
           ...uploads.map(upload => ({ table: "media_uploads" as const, key: { id: upload.id } })),
           ...(initialVideo ? [
@@ -432,10 +434,10 @@ export class PublishListing {
           },
         });
         try {
-          if (captureEligible) await this.measurement?.capture(tx, input.userId, { version: 1, eventId: randomUUID(), occurredAt: now.toISOString(), purpose: "product_improvement",
+          if (captureEligible) await this.measurement?.capture(tx, input.userId, { version: 1, eventId: publishedEventId, occurredAt: now.toISOString(), purpose: "product_improvement",
             eventName: "listing_published", context: { platform: "server", release: "server", build: "server", locale: "ru" }, payload: { listingId, cityId: payload.cityId, draftId: input.draftId },
           });
-          if (captureEligible) await this.measurement?.capture(tx,input.userId,{version:1,eventId:randomUUID(),occurredAt:now.toISOString(),purpose:"product_improvement",eventName:"listing_visibility_changed",context:{platform:"server",release:"server",build:"server",locale:"ru"},payload:{listingId,visibility:"public",reason:"published"}});
+          if (captureEligible) await this.measurement?.capture(tx,input.userId,{version:1,eventId:visibilityEventId,occurredAt:now.toISOString(),purpose:"product_improvement",eventName:"listing_visibility_changed",context:{platform:"server",release:"server",build:"server",locale:"ru"},payload:{listingId,visibility:"public",reason:"published"}});
         } catch { /* Measurement outage never rolls back the core publication. */ }
         return created;
         });

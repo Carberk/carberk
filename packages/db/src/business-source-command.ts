@@ -39,7 +39,7 @@ export async function businessSourceCommand(tx: Prisma.TransactionClient, input:
   const { source,next } = await read("dealerships",input.businessId,{ status: input.status });
   if (!source) throw new Error("diagnostic_source_stale");
   rows.push({ table: "dealerships", key: { id: input.businessId }, verb: "update", expected: { source }, next });
- } else {
+ } else if (input.operation === "member_create" || input.operation === "member_replace") {
   if (input.removedMemberId) await remove(input.removedMemberId);
   if (input.member) {
    const { source,next } = await read("dealership_members",input.member.id,{ ...input.member, dealershipId: input.businessId, status: "active" });

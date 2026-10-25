@@ -76,7 +76,7 @@ export class PrismaIdentityAdminRepository implements IdentityAdminPort {
     };
     if (tx) return run(tx as Prisma.TransactionClient, receipt as PreparedDiagnosticSource);
     return this.prisma.$transaction(async client => withDiagnosticSourceCommand(client,
-      await userEligibilitySourceCommand(client, { userId, actorUserId: null, suspendedAt: null, reason: null }), prepared => run(client, prepared)));
+      await userEligibilitySourceCommand(client, { userId, actorUserId: userId, suspendedAt: null, reason: null }), prepared => run(client, prepared)));
   }
 
   async isSuspended(userId: string): Promise<boolean> {

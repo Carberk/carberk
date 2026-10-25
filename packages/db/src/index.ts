@@ -16,5 +16,5 @@ export { withCampaignPreparation, type CampaignMutation } from "./campaign-prepa
 export { accountSourceCommand, type AccountSourceInput } from "./account-source-command";
 export { businessSourceCommand, type BusinessSourceInput } from "./business-source-command";
 
-export { listingSourceCommand } from "./listing-source-command";
-export { userEligibilitySourceCommand } from "./user-eligibility-source-command";
+export { listingSourceCommand, type ListingSourceInput } from "./listing-source-command";
+export { userEligibilitySourceCommand, type UserEligibilitySourceInput } from "./user-eligibility-source-command";

@@ -4,7 +4,7 @@ import type { PrismaService } from "@auto-tm/db";
 type Row = Record<string, unknown>;
 type Args = { where?: Row; data?: Row; include?: Row; select?: Row; orderBy?: Row };
 const tableNames = { users: "user", sessions: "session", dealership_members: "dealershipMember", dealerships: "dealership", dealership_invitations: "dealershipInvitation", audit_logs: "auditLog", measurement_state: "measurementState", listings: "listing", content_reports: "contentReport", measurement_outbox: "measurementOutbox" } as const;
-const fields: Record<string, string[]> = { users: ["id", "phone", "phoneVerifiedAt", "email", "emailVerifiedAt", "role", "suspendedAt", "suspendedById", "suspensionReason", "deletionScheduledAt"], listings: ["id", "sellerId", "businessId", "vin", "brandId", "modelId", "year", "deletedAt", "status"], dealership_members: ["id", "userId", "dealershipId", "role", "status"], dealerships: ["id", "status", "admissionMode", "admittedAt"] };
+const fields: Record<string, string[]> = { users: ["id", "phone", "phoneVerifiedAt", "email", "emailVerifiedAt", "role", "suspendedAt", "suspendedById", "suspensionReason", "deletionScheduledAt"], listings: ["id", "sellerId", "businessId", "vin", "brandId", "modelId", "year", "deletedAt", "status", "contactPhone", "activeVideoGenerationId", "pendingVideoGenerationId", "activeVideoRevision", "archivedByDeletion"], dealership_members: ["id", "userId", "dealershipId", "role", "status"], dealerships: ["id", "status", "admissionMode", "admittedAt"] };
 function matches(row: Row, where: Row = {}): boolean {
  return Object.entries(where).every(([key, expected]) => {
   const value = row[key];
@@ -59,6 +59,10 @@ export class PreparedTransactionDatabase {
    }
    if (sql.includes("diagnostic_prepare_source") || sql.includes("campaign_prepare")) {
     if (this.prepared) throw new Error("nested_preparation");
+    if (sql.includes("diagnostic_prepare_source")) {
+     const command = JSON.parse(String(values[0])) as { operation: string; actorUserId: string | null };
+     if (command.operation === "user_eligibility" && !command.actorUserId) throw new Error("diagnostic_source_moderation_intent");
+    }
     this.beforePrepared?.(); this.beforePrepared = undefined;
     this.prepared = true; this.receipt = randomUUID();
     this.operation = sql.includes("diagnostic_prepare_source") ? (JSON.parse(String(values[0])) as {operation:string}).operation : null;

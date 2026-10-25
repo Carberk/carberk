@@ -32,7 +32,7 @@ function database(options: { deletionScheduledAt?: Date; failMessage?: boolean }
     && (typeof where.senderId==="string"?row["senderId"]===where.senderId:where.senderId?row["senderId"]!==where.senderId.not:true)
     && (!where.createdAt?.gte || (row["createdAt"] as Date)>=where.createdAt.gte)).sort((a,b)=>(a["createdAt"] as Date).getTime()-(b["createdAt"] as Date).getTime())[0]??null},
  };
- return {...tx,$transaction:async(operation:((value:typeof tx)=>Promise<unknown>)|Promise<unknown>[])=>typeof operation==="function"?operation(tx):Promise.all(operation)};
+ return {...tx, messages, $transaction:async(operation:((value:typeof tx)=>Promise<unknown>)|Promise<unknown>[])=>typeof operation==="function"?operation(tx):Promise.all(operation)};
 }
 const conversation=()=>Conversation.create({id:"conversation",listingId:"listing",buyerId:"buyer",sellerId:"seller",createdAt:new Date("2026-10-01T00:00:00Z")});
 describe("canonical committed Conversation measurement",()=>{
@@ -52,4 +52,20 @@ describe("canonical committed Conversation measurement",()=>{
   const repo=new PrismaConversationRepository(database() as never,undefined,measurement);
   await expect(repo.save(conversation())).resolves.toBeUndefined();
  });
+ it("keeps a scheduled User's chat outcome but emits no new conversion facts",async()=>{
+  const db=database({deletionScheduledAt:new Date("2026-10-01T00:00:00Z")}),measurement=new FakeMeasurementCommit();
+  const repo=new PrismaConversationRepository(db as never,undefined,measurement);
+  await repo.save(conversation());
+  await repo.saveMessage(Message.createText({id:"scheduled-message",conversationId:"conversation",senderId:"buyer",text:"retained core outcome",createdAt:new Date("2026-10-01T01:00:00Z")}));
+  expect(db.messages).toMatchObject([{id:"scheduled-message",body:"retained core outcome"}]);
+  expect(measurement.facts).toEqual([]);
+ });
+ it("does not emit an accepted Message fact when the Message cannot commit",async()=>{
+  const db=database({failMessage:true}),measurement=new FakeMeasurementCommit();
+  const repo=new PrismaConversationRepository(db as never,undefined,measurement);
+  await repo.save(conversation());
+  await expect(repo.saveMessage(Message.createText({id:"failed",conversationId:"conversation",senderId:"buyer",text:"unsaved",createdAt:new Date("2026-10-01T01:00:00Z")}))).rejects.toThrow("message_failed");
+  expect(db.messages).toEqual([]);expect(measurement.facts.map(fact=>fact.event.eventName)).toEqual(["conversation_created"]);
+ });
+
 });

@@ -77,4 +77,18 @@ describe("Business transaction entry and ordinary outcomes", () => {
   await expect(repository.recover({ ...founder, ...invitation, businessId: "business", ownerUserId: "recipient", evidence: "evidence", reason: "Recovery" }, now)).rejects.toMatchObject({ reason: "BUSINESS_INACTIVE" });
   expect(memory.rows("auditLog")).toEqual([]); expect(memory.rows("dealershipMember")).toEqual(before["dealershipMember"]);
  });
+ it("recovers an absent owner without fabricating membership or deleting foreign baseline state", async () => {
+  const { memory, repository } = fixture("recovery"); memory.rows("dealershipMember").splice(0, 1);
+  memory.seed("measurementState", { key: "inventory_baseline:foreign", epoch: "foreign" });
+  await repository.recover({ ...founder, ...invitation, businessId: "business", ownerUserId: "recipient", evidence: "checked recovery", reason: "Recovery" }, now);
+  expect(memory.rows("dealershipMember").map(m => m["userId"])).toEqual(["sales"]);
+  expect(memory.rows("dealershipInvitation")).toMatchObject([{ role: "owner", redeemedAt: null }]);
+  expect(memory.rows("measurementState").map(r => r["key"])).toEqual(["collector", "inventory_baseline:foreign"]);
+ });
+ it("refuses an owner suspended after discovery without changing settings", async () => {
+  const { memory, repository } = fixture(); memory.beforePrepared = () => { memory.rows("user").find(u => u["id"] === "owner")!["suspendedAt"] = now; };
+  await expect(repository.settings({ ...owner, businessId: "business", name: "Renamed" }, now)).rejects.toMatchObject({ reason: "USER_INACTIVE" });
+  expect(memory.rows("dealership")[0]?.["name"]).toBe("Business"); expect(memory.rows("auditLog")).toEqual([]);
+ });
+
 });

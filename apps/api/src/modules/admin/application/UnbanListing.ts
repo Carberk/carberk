@@ -74,10 +74,14 @@ export class UnbanListing {
         changes: { status: "active" }, roots: [
           { table: "users", key: { id: source.sellerId } },
           { table: "audit_logs", key: { id: auditId } },
-
         ] });
       return withDiagnosticSourceCommand(tx, command, async receipt => {
-
+      const lockedListing = await tx.listing.findUnique({ where: { id: input.listingId } });
+      if (!lockedListing) throw new NotFoundException({ code: "NOT_FOUND", message: "Listing not found" });
+      if (lockedListing.status !== "banned") {
+        throw new ConflictException({ code: "CONFLICT", message: "Listing is not in a state that can be unbanned",
+          details: { reason: AdminSchemas.AdminErrorReason.ModerationTargetStateConflict, targetState: { status: lockedListing.status } } });
+      }
 
       const unbanResult = await this.listingsAdmin.unbanBannedListing(
         input.listingId,
