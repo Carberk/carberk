@@ -9,7 +9,7 @@ export class ClaimDatabase {
   covered = true;
   prepared: Row[] = [];
   finished = 0;
-  afterWait?: () => void;
+  afterWait: (() => void) | undefined;
   failWrite?: number;
   private writes = 0;
   readonly tx = {
@@ -27,15 +27,18 @@ export class ClaimDatabase {
         return this.supplied || this.receipt ? [{ covered: this.covered }] : [];
       }
       if (sql.includes("diagnostic_source_lock_keys")) return [{ keys: [{ namespace: 897100, key: 1 }, { namespace: 898100, key: 2 }] }];
-      if (sql.includes("diagnostic_source_meta")) return [{ namespace: values[0] === "users" ? 897100 : 898100 }];
+      if (sql.includes("diagnostic_source_meta")) {
+        const refs: Record<string, string[][]> = { media_uploads: [["users", "userId"], ["dealerships", "businessId"]], users: [["media_uploads", "avatarUploadId"]], sessions: [["users", "userId"]], listings: [["users", "sellerId"], ["dealerships", "businessId"]], dealership_members: [["users", "userId"], ["dealerships", "dealershipId"]] };
+        return [{ namespace: values[0] === "users" ? 897100 : 898100, refs: (refs[String(values[0])] ?? []).map(([table, column]) => ({ table, columns: [column], target: ["id"] })) }];
+      }
       if (sql.includes("pg_advisory_xact_lock") || sql.includes("FOR UPDATE")) {
         if (!this.receipt && !this.supplied) throw new Error("lock_before_preparation");
         this.afterWait?.(); this.afterWait = undefined;
-        if (sql.includes("SELECT 1")) return [];
+        if (sql.includes("SELECT 1") || sql.includes("pg_advisory_xact_lock")) return [];
       }
       if (sql.includes("to_jsonb(s) AS row")) {
-        const table = String(values[0]);
-        const key = JSON.parse(String(values[1]));
+        const table = sql.match(/FROM public\.(\w+)/)?.[1] ?? "";
+        const key = JSON.parse(String(values[0]));
         return (this.tables[table] ?? []).filter(row => Object.entries(key).every(([k,v]) => row[k] === v)).map(row => ({ row: structuredClone(row) }));
       }
       if (sql.includes("'users' AS table")) {
@@ -62,11 +65,11 @@ export class ClaimDatabase {
       const sql = query.join("?");
       if (sql.includes("INSERT INTO media_upload_cleanups")) {
         const [uploadId, key, objectKeys, writeProtocol, status] = values;
-        if (!this.tables["media_upload_cleanups"]!.some(r => r["uploadId"] === uploadId)) this.tables["media_upload_cleanups"]!.push({ uploadId, key, objectKeys, writeProtocol, status });
+        if (!(this.tables["media_upload_cleanups"] ?? []).some(r => r["uploadId"] === uploadId)) this.tables["media_upload_cleanups"]?.push({ uploadId, key, objectKeys, writeProtocol, status });
       } else {
         const last = values.at(-1);
         const ids = Array.isArray(last) ? last : [last];
-        for (const row of this.tables["media_uploads"]!) if (ids.includes(row["id"])) {
+        for (const row of (this.tables["media_uploads"] ?? [])) if (ids.includes(row["id"])) {
           if (sql.includes("'PREPARING'")) Object.assign(row, { state: "PREPARING", claimToken: values[0], claimTargetType: values[1], claimTargetId: values[2], claimDeadline: values[3] });
           else if (sql.includes("'ADOPTED'")) Object.assign(row, { state: "ADOPTED", claimToken: null, claimDeadline: null });
           else if (sql.includes("'RETIRED'")) Object.assign(row, { state: "RETIRED", retiredAt: values[0], claimToken: null, claimDeadline: null });
@@ -83,7 +86,7 @@ export class ClaimDatabase {
   } } as unknown as PrismaService;
   upload(id = "upload-1", patch: Row = {}): Row {
     const row = { id, userId: "owner", businessId: null, key: `pending/${id}/original.webp`, state: "AVAILABLE", claimToken: null, claimTargetType: null, claimTargetId: null, claimDeadline: null, writeProtocol: "conditional-v1", objectKeys: [`pending/${id}/original.webp`], ...patch };
-    this.tables["media_uploads"]!.push(row);
+    (this.tables["media_uploads"] ?? []).push(row);
     return row;
   }
 }
