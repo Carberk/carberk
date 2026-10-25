@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { evaluateSchemaPlan, retainedSchemaProfile } from './staging-schema.mjs';
+import { evaluateSchemaPlan } from './staging-schema.mjs';
 import { inventoryForSchema } from './testing/schema-profile-fixture.mjs';
+import { retainedSchemaProfile } from '../docs/evidence/issue-897/r5-report-source-effects-20261025/original/scripts/staging-schema.mjs';
 const originalPhysicalColumnChecksums = {
   "20261023130000_diagnostic_source_kernel": "cc10000343f6257cb4b0d9cd4240ec57f46642f5a9b0735cd440680602d642b3",
   "20261024030000_diagnostic_purge_effects": "ccb26627dcee74bf20c01c5e89dba2d6ade4d6644136fd55554c8246fa8f46d0"
@@ -31,7 +32,7 @@ test('naked receipt deletion and finish share unchanged hashed authority complet
 });
 test('composition preserves historical registrations across the explicit unmerged physical-column revision', () => {
   const hash = value => createHash('sha256').update(value).digest('hex');
-  const current = hash(readFileSync(new URL('../packages/db/prisma/schema.prisma', import.meta.url)));
+  const current = hash(readFileSync(new URL('../docs/evidence/issue-897/r5-report-source-effects-20261025/original/packages/db/prisma/schema.prisma', import.meta.url))); // Historical composition snapshot.
   const prior = 'a313d359e8ea440c3b026f2de4c4b292b61c8bd2f60b786b85a5d9902e1d6642';
   assert.equal(current, '7ce808a1af40f4f85c340526ca8ea3bced18e99155282d41b610aca9e85cfc72');
   assert.deepEqual(retainedSchemaProfile.schemaMigrations[current], [...retainedSchemaProfile.schemaMigrations[prior], name]);

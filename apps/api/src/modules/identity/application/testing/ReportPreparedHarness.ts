@@ -15,8 +15,10 @@ import { DiagnosticReportAccess } from "../../../diagnostics/infrastructure/Diag
 import { DiagnosticPublicBindings } from "../../../diagnostics/infrastructure/DiagnosticPublicBindings";
 import { PrismaDiagnosticReports } from "../../../diagnostics/infrastructure/PrismaDiagnosticReports";
 import { PrismaDiagnosticDocuments } from "../../../diagnostics/infrastructure/PrismaDiagnosticDocuments";
+import { PrismaDiagnosticEvidence } from "../../../diagnostics/infrastructure/PrismaDiagnosticEvidence";
 import { PrismaDiagnosticIdentityEvidence } from "../../../diagnostics/infrastructure/PrismaDiagnosticIdentityEvidence";
 import { PrismaDiagnosticContinuityProofs } from "../../../diagnostics/infrastructure/PrismaDiagnosticContinuityProofs";
+import { diagnosticReadPrefix, diagnosticRoots } from "../../../diagnostics/infrastructure/DiagnosticPreparedIntake";
 import { DiagnosticDiscoveryCursor } from "../../../diagnostics/infrastructure/DiagnosticDiscoveryCursor";
 import type { DiagnosticObjects } from "../../../diagnostics/domain/ports/DiagnosticObjects";
 
@@ -30,6 +32,9 @@ export function reportPreparedHarness() {
   let memory = new DiagnosticMemoryDatabase(), clock = new Date("2026-10-25T12:00:00Z"), active = false;
   let finishFailure = false, writeFailure: Model | undefined, onRead: (() => Promise<void>) | undefined;
   const commands: DiagnosticSourceCommand[] = [];
+  const queries: string[] = [];
+  let preparedHook: (() => Promise<void>) | undefined;
+  let requestWinner: { kind: "issue" | "consume"; reportId: string; message: string } | undefined;
   const subject = { userId: id(1), sessionId: id(2) }, orderId = id(3), reportId = id(4), centerId = id(6);
   const seed = (model: Model, row: Row) => memory.seed(model, row);
   const scope = async (roots: unknown[]) => [...roots, ...await Promise.all(Object.entries(tables).flatMap(([model, table]) => [
@@ -39,14 +44,19 @@ export function reportPreparedHarness() {
     const snapshot = await Promise.all(Object.keys(tables).map(async name => [name, await (memory.client[name as Model] as unknown as Delegate).findMany()] as const));
     let prefix = false, command: DiagnosticSourceCommand | undefined;
     const query = async (sql: string, values: unknown[]) => {
+      queries.push(sql);
       if (sql.includes("diagnostic_source_project")) {
         const entry = Object.entries(tables).find(([, table]) => table === values[0]);
         if (!entry) throw new Error("r5_unknown_planned_table");
         const model = entry[0] as Model;
-        const source = await (memory.client[model] as unknown as Delegate).findUnique({ where: JSON.parse(String(values[1])) as Row });
+        const source = requestWinner?.kind === "consume" && model === "diagnosticReportRecord" && JSON.parse(String(values[1]))["id"] === requestWinner.reportId ? null : await (memory.client[model] as unknown as Delegate).findUnique({ where: JSON.parse(String(values[1])) as Row });
         return [{ source, next: { ...source, ...JSON.parse(String(values.at(-1))) } }];
       }
-      if (sql.includes("diagnostic_prepare_source")) { command = JSON.parse(String(values[0])) as DiagnosticSourceCommand; commands.push(command); prefix = true; return [{ receipt: "r5-receipt" }]; }
+      if (sql.includes("diagnostic_prepare_source")) {
+        if (requestWinner) { const message = requestWinner.message; requestWinner = undefined;
+          throw new Prisma.PrismaClientKnownRequestError(message, { code: "P2010", clientVersion: "r5-offline", meta: { code: "P0001", message: `ERROR: ${message}` } });
+        }
+        command = JSON.parse(String(values[0])) as DiagnosticSourceCommand; commands.push(command); prefix = true; if (preparedHook) { const hook = preparedHook; preparedHook = undefined; await hook(); } return [{ receipt: "r5-receipt" }]; }
       if (sql.includes("diagnostic_assert_source")) { if (values[0] !== "r5-receipt" || values[1] !== command?.operation) throw new Error("diagnostic_source_receipt"); return []; }
       if (sql.includes("SELECT scope FROM")) return [{ scope: await scope([...(command?.roots ?? []), ...(command?.rows ?? [])]) }];
       if (sql.includes("diagnostic_finish_source")) { if (finishFailure) throw new Error("r5_finish_rollback"); return []; }
@@ -66,10 +76,16 @@ export function reportPreparedHarness() {
       if (!(typeof property === "string" && property in tables)) return value;
       return new Proxy(value as object, { get(model, method) {
         const fn = Reflect.get(model, method) as (args: unknown) => Promise<unknown>;
+        if (method === "findUnique" && requestWinner) return async (args: { where: Row }) => {
+          if (property === "diagnosticContinuityProof" && requestWinner?.kind === "issue" && args.where["requestId"]) return null;
+          if (property === "diagnosticReportRecord" && requestWinner?.kind === "consume" && (args.where["continuityRequestId"] || args.where["id"] === requestWinner.reportId)) return null;
+          return fn(args);
+        };
         if (!["create", "update", "updateMany"].includes(String(method))) return fn;
         return async (args: unknown) => {
           if (!prefix) throw new Error("r5_outer_prefix_required");
           const input = args as { data: Row; include?: Row };
+          if (property === "diagnosticEvidence" && method === "create") input.data = { state: "staged", ...input.data };
           if (input.data?.["snapshot"] === Prisma.DbNull) input.data["snapshot"] = null;
           const result = await fn(property === "diagnosticReportRecord" && method === "create" ? { ...input, data: { predecessorId: null, reinspection: false, identityEvidenceId: null, identityEvidenceHash: null, ...input.data } } : args);
           if (writeFailure === property) throw new Error("r5_actual_write_rollback");
@@ -93,6 +109,7 @@ export function reportPreparedHarness() {
   const evidence = new PrismaDiagnosticIdentityEvidence(db, authority, objects, runtime);
   const reports = new PrismaDiagnosticReports(db, authority, runtime, access, evidence, bindings);
   const documents = new PrismaDiagnosticDocuments(db, access, objects);
+  const uploads = new PrismaDiagnosticEvidence(db, access, objects, runtime);
   const proofs = new PrismaDiagnosticContinuityProofs(new DiagnosticDiscoveryCursor(Buffer.alloc(32, 7)), db, authority, new PrismaStaffBindings(), reports, evidence, bindings, runtime);
   seed("user", { id: subject.userId, role: "user", suspendedAt: null, deletionScheduledAt: null, dealershipMemberships: [] });
   seed("session", { id: subject.sessionId, userId: subject.userId, expiresAt: new Date("2027-01-01"), adminTotpExpiresAt: new Date("2027-01-01") });
@@ -106,6 +123,15 @@ export function reportPreparedHarness() {
   const observation = { method: "manual", vin: null, manualReference: "Synthetic plate", mileageKm: 100, observedAt: "2026-10-25T11:00:00.000Z" };
   seed("inspectionOrder", { id: orderId, centerId, templateVersionId: id(9), status: "arrived", physicalAuthorization: {}, version: 1, identityEvidenceGeneration: 0, synthetic: true, erasedAt: null, listingId: null, audience: "buyer_private", commissionerId: subject.userId, observedVehicle: observation });
   seed("diagnosticIdentityRecord", { id: id(5), orderId, orderVersion: 1, observation, observationHash: "a".repeat(64), erasedAt: null });
-  return { db, reports, proofs, documents, access, identity: evidence, subject, orderId, reportId, seed, commands, stored, id, sha,
+  return { db, reports, proofs, documents, uploads, access, identity: evidence, subject, orderId, reportId, seed, commands, queries, stored, id, sha,
+    requestWinnerConflict: (kind: "issue" | "consume", reportId: string, message = "diagnostic_source_graph_changed") => { requestWinner = { kind, reportId, message }; },
+    afterPrepare: (hook: () => Promise<void>) => { preparedHook = hook; },
+    compareIdentity: (order: Prisma.InspectionOrderGetPayload<object>, observation: Parameters<PrismaDiagnosticIdentityEvidence["identity"]>[2], pin: { id: string; hash: string }) => db.$transaction(async tx => {
+      const start = queries.length;
+      const proposal = await evidence.identityProposal(tx, order, observation, pin);
+      const unlocked = queries.slice(start);
+      await diagnosticReadPrefix(tx, diagnosticRoots(subject, [order.id]));
+      return { proposal, unlocked, locked: await evidence.identity(tx, order, observation, pin) };
+    }),
     clock: (now: Date) => { clock = now; }, onRead: (fn?: () => Promise<void>) => { onRead = fn; }, failFinish: () => { finishFailure = true; }, failWrite: (model: Model) => { writeFailure = model; } };
 }

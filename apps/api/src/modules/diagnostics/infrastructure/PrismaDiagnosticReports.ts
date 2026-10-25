@@ -134,6 +134,19 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
     const prior = await tx.diagnosticReportRecord.findUnique({ where: { id: predecessorId } });
     if (!prior) throw denied();
     const priorOrder = await staffOrder(prior.orderId);
+    return this.comparisonFacts(tx, order, prior, priorOrder, true);
+  }
+  /** Unlocked proposal, never authorization. The writer compares it to compared
+   * after the sole outer receipt has locked and revalidated the complete graph. */
+  async comparisonProposal(tx: Tx, orderId: string, predecessorId: string) {
+    const order = await tx.inspectionOrder.findUnique({ where: { id: orderId } });
+    const prior = await tx.diagnosticReportRecord.findUnique({ where: { id: predecessorId } });
+    const priorOrder = prior ? await tx.inspectionOrder.findUnique({ where: { id: prior.orderId } }) : null;
+    if (!order || !prior || !priorOrder) throw denied();
+    return this.comparisonFacts(tx, order, prior, priorOrder, false);
+  }
+  private async comparisonFacts(tx: Tx, order: Order, prior: Row, priorOrder: Order, locked: boolean) {
+    const orderId = order.id;
     if (prior.orderId === orderId || prior.erasedAt || !prior.snapshot || !prior.snapshotHash || !prior.identityRecordId || !prior.identityRecordHash ||
       !["finalized", "withdrawn"].includes(prior.status)) throw denied();
     const retained = await tx.diagnosticIdentityRecord.findUnique({ where: { id: prior.identityRecordId } });
@@ -145,8 +158,8 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
     if (!before.success || !current.success) throw denied();
     // A selects its report's immutable pins; B its current raw observation and structured leaf.
     const leaf = await this.evidenceRecords.leaf(tx, orderId);
-    const a = await this.evidenceRecords.identity(tx, priorOrder, before.data, prior.identityEvidenceId && prior.identityEvidenceHash ? { id: prior.identityEvidenceId, hash: prior.identityEvidenceHash } : null);
-    const b = await this.evidenceRecords.identity(tx, order, current.data, leaf && { id: leaf.id, hash: leaf.recordHash ?? "" });
+    const a = await (locked ? this.evidenceRecords.identity.bind(this.evidenceRecords) : this.evidenceRecords.identityProposal.bind(this.evidenceRecords))(tx, priorOrder, before.data, prior.identityEvidenceId && prior.identityEvidenceHash ? { id: prior.identityEvidenceId, hash: prior.identityEvidenceHash } : null);
+    const b = await (locked ? this.evidenceRecords.identity.bind(this.evidenceRecords) : this.evidenceRecords.identityProposal.bind(this.evidenceRecords))(tx, order, current.data, leaf && { id: leaf.id, hash: leaf.recordHash ?? "" });
     const comparison: DiagnosticReinspectionComparison = { predecessor: { reportId: prior.id, reportVersion: prior.version, snapshotHash: prior.snapshotHash,
       identityRecordId: retained.id, identityRecordHash: prior.identityRecordHash, identity: a.identity },
     candidate: { orderId, orderVersion: order.version, identityRecordId: candidate.id, identityRecordHash: candidate.observationHash, identity: b.identity } };
@@ -232,106 +245,85 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
       try { proposed = (await this.model(tx, initial)).upsertFinding(subject.userId, input.finding).state; }
       catch (error) { const { row } = await this.load(tx, subject, reportId, "diagnostics.technician"); this.version(row, input.expectedVersion); throw error; }
       const kept = new Set(proposed.findings.flatMap(finding => finding.evidenceIds));
-      if ((initial.state as unknown as DiagnosticReportState).findings.some(finding => finding.evidenceIds.some(id => !kept.has(id)))) {
-        // Shared report_change currently rejects diagnostic_evidence row plans.
-        // Keep the established behavior until the owner supplies that operation.
-        await diagnosticReadPrefix(tx, roots);
-        return this.saveRetiringEvidenceIn(tx, subject, reportId, input);
-      }
+      const removed = (initial.state as unknown as DiagnosticReportState).findings.flatMap(finding => finding.evidenceIds).filter(id => !kept.has(id));
+      const retired = await tx.diagnosticEvidence.findMany({ where: { id: { in: removed }, reportId, state: "verified" }, orderBy: { id: "asc" } });
       const updatedAt = this.runtime.now();
       const auditOrder = await tx.inspectionOrder.findUnique({ where: { id: initial.orderId } });
       if (!auditOrder) throw denied();
       const audit = this.auditData(subject, auditOrder, reportId, "REPORT_FINDING_SAVED", { findingId: input.finding.id, checkId: input.finding.checkId });
       const rows = [await diagnosticPlannedRow(tx, this.reportRoot(reportId), { state: json(proposed), status: proposed.status, version: initial.version + 1, updatedAt }),
         await diagnosticPlannedRow(tx, { table: "diagnostic_audits", key: { id: audit.id } }, audit, true)];
+      for (const evidence of retired) rows.push(await diagnosticPlannedRow(tx, { table: "diagnostic_evidence", key: { id: evidence.id } }, { state: "cleanup_pending", cleanupRequestedAt: updatedAt }));
       return this.change(tx, subject, roots, rows, async () => {
         const { row } = await this.load(tx, subject, reportId, "diagnostics.technician"); this.version(row, input.expectedVersion);
         const next = (await this.model(tx, row)).upsertFinding(subject.userId, input.finding).state;
         if (canonical(next) !== canonical(proposed)) throw denied();
         await this.evidence(tx, row, next);
         const saved = await this.persist(tx, row, next, updatedAt);
+        for (const evidence of retired) await tx.diagnosticEvidence.update({ where: { id: evidence.id }, data: { state: "cleanup_pending", cleanupRequestedAt: updatedAt } });
         await tx.diagnosticAudit.create({ data: audit });
         return this.dto(tx, saved, subject, true);
       });
     });
   }
-  private async saveRetiringEvidenceIn(tx: Tx, subject: DiagnosticSubject, reportId: string, input: DiagnosticSchemas.DiagnosticFindingSave) {
-      const { row, order } = await this.load(tx, subject, reportId, "diagnostics.technician"); this.version(row, input.expectedVersion);
-      const next = (await this.model(tx, row)).upsertFinding(subject.userId, input.finding).state;
-      await this.evidence(tx, row, next);
-      const saved = await this.persist(tx, row, next);
-      const prior = (row.state as unknown as DiagnosticReportState).findings.flatMap(finding => finding.evidenceIds);
-      const retained = new Set(next.findings.flatMap(finding => finding.evidenceIds));
-      const removed = prior.filter(id => !retained.has(id));
-      if (removed.length) await tx.diagnosticEvidence.updateMany({ where: { id: { in: removed }, reportId: row.id, state: "verified" }, data: { state: "cleanup_pending", cleanupRequestedAt: this.runtime.now() } });
-      await this.audit(tx, subject, order, row.id, "REPORT_FINDING_SAVED", { findingId: input.finding.id, checkId: input.finding.checkId });
-      return this.dto(tx, saved, subject, true);
-  }
   async transition(subject: DiagnosticSubject, reportId: string, input: DiagnosticSchemas.DiagnosticReportTransition) {
-    // Shared report_change does not admit diagnostic_pdf_artifacts INSERT plans.
-    // Finalization retains its current implementation; activation remains blocked.
-    if (input.action === "finalize") return this.transitionWithArtifacts(subject, reportId, input);
     return this.db.$transaction(async tx => {
       const initial = await tx.diagnosticReportRecord.findUnique({ where: { id: reportId } });
       if (!initial) { await this.load(tx, subject, reportId); throw denied(); }
       const order = await tx.inspectionOrder.findUnique({ where: { id: initial.orderId } });
       if (!order) throw denied();
       const now = this.runtime.now(), model = await this.model(tx, initial);
+      const capability = input.action === "submit" ? "diagnostics.technician" : "diagnostics.reviewer";
       const compute = (model: DiagnosticReport) => input.action === "submit" ? model.submit(subject.userId, []).state
         : input.action === "withdraw" ? model.withdraw(subject.userId, input.reason ?? "", now).state
-        : model.review(subject.userId, "return", { now, ...(input.reason ? { reason: input.reason } : {}), privateSelfReviewAuthorized: input.privateSelfReview === true && !!input.reason?.trim() }).state;
+        : model.review(subject.userId, input.action === "return" ? "return" : "finalize", { now, ...(input.reason ? { reason: input.reason } : {}), privateSelfReviewAuthorized: input.privateSelfReview === true && !!input.reason?.trim() }).state;
       let next: DiagnosticReportState;
       try { next = compute(model); }
-      catch (error) { const { row } = await this.load(tx, subject, reportId, input.action === "submit" ? "diagnostics.technician" : "diagnostics.reviewer"); this.version(row, input.expectedVersion); throw error; }
+      catch (error) { const { row } = await this.load(tx, subject, reportId, capability); this.version(row, input.expectedVersion); throw error; }
       const audit = this.auditData(subject, order, reportId, `REPORT_${input.action.toUpperCase()}`, { ...(input.reason ? { reason: input.reason } : {}), privateSelfReview: input.privateSelfReview === true && model.state.authorId === subject.userId });
-      const rows = [await diagnosticPlannedRow(tx, this.reportRoot(reportId), { state: json(next), status: next.status, version: initial.version + 1, updatedAt: now,
-        withdrawnAt: next.withdrawnAt ? new Date(next.withdrawnAt) : null, withdrawalReason: next.withdrawalReason }),
+      const snapshot = input.action === "finalize" ? json({ report: next, template: await this.definition(tx, initial), synthetic: true }) : null;
+      const snapshotHash = snapshot ? createHash("sha256").update(canonical(snapshot)).digest("hex") : null;
+      const final = snapshot && snapshotHash ? { snapshot, snapshotHash, finalizedAt: now } : null;
+      const reportNext = { state: json(next), status: next.status, version: initial.version + 1, updatedAt: now,
+        withdrawnAt: next.withdrawnAt ? new Date(next.withdrawnAt) : null, withdrawalReason: next.withdrawalReason, ...final };
+      const rows = [await diagnosticPlannedRow(tx, this.reportRoot(reportId), reportNext),
         await diagnosticPlannedRow(tx, { table: "diagnostic_audits", key: { id: audit.id } }, audit, true)];
+      const artifacts: Prisma.DiagnosticPdfArtifactUncheckedCreateInput[] = [];
+      if (final) {
+        const { rendererVersion } = await diagnosticReaderProjection(tx, initial, next);
+        for (const locale of ["tk", "ru", "en"]) {
+          const id = this.runtime.id();
+          const data = { id, reportId, snapshotHash: final.snapshotHash, locale, rendererVersion, generation: 1, epoch: this.runtime.id(), state: "pending",
+            objectKey: `diagnostic-pdf/${reportId}/${id}.pdf`, sha256: null, sizeBytes: null, attempts: 0, retryAt: null, failureCode: null, leaseUntil: null,
+            createdAt: now, verifiedAt: null, cleanupRequestedAt: null, cleanupCompletedAt: null };
+          artifacts.push(data); rows.push(await diagnosticPlannedRow(tx, { table: "diagnostic_pdf_artifacts", key: { id } }, data, true));
+        }
+      }
       return this.change(tx, subject, this.roots(subject, order.id, reportId), rows, async () => {
-        const { row, order } = await this.load(tx, subject, reportId, input.action === "submit" ? "diagnostics.technician" : "diagnostics.reviewer");
+        // Receipt already holds the complete participant/FK/absent-artifact union.
+        const participants = final ? await this.publicBindings.lock(tx, [order.id], [subject.userId]) : null;
+        const { row, order: currentOrder } = await this.load(tx, subject, reportId, capability);
         this.version(row, input.expectedVersion);
         const current = compute(await this.model(tx, row));
         if (canonical(current) !== canonical(next)) throw denied();
         if (input.action === "submit") {
-          if (order.status !== "arrived" || !order.physicalAuthorization) throw new DiagnosticRuleError("PHYSICAL_AUTHORIZATION_REQUIRED");
+          if (currentOrder.status !== "arrived" || !currentOrder.physicalAuthorization) throw new DiagnosticRuleError("PHYSICAL_AUTHORIZATION_REQUIRED");
           await this.evidence(tx, row, current);
         }
-        const saved = await this.persist(tx, row, current, now); await tx.diagnosticAudit.create({ data: audit });
+        if (final) {
+          await this.evidence(tx, row, current);
+          if (!participants) throw denied();
+          await this.publicBindings.candidate(tx, currentOrder, participants);
+        }
+        const saved = await tx.diagnosticReportRecord.update({ where: { id: reportId }, data: reportNext });
+        if (final) {
+          const { rendererVersion } = await diagnosticReaderProjection(tx, saved, current);
+          if (artifacts.some(artifact => artifact.rendererVersion !== rendererVersion)) throw denied();
+          for (const artifact of artifacts) await tx.diagnosticPdfArtifact.create({ data: artifact });
+        }
+        await tx.diagnosticAudit.create({ data: audit });
         return this.dto(tx, saved, subject, true);
       });
-    });
-  }
-  private async transitionWithArtifacts(subject: DiagnosticSubject, reportId: string, input: DiagnosticSchemas.DiagnosticReportTransition) {
-    return this.db.$transaction(async tx => {
-      // Discover and lock publishers before load acquires any order/report/acting Business locks.
-      const found = input.action === "finalize" ? await tx.diagnosticReportRecord.findUnique({ where: { id: reportId }, select: { orderId: true } }) : null;
-      const participants = found ? await this.publicBindings.lock(tx, [found.orderId], [subject.userId]) : null;
-      const capability = input.action === "submit" ? "diagnostics.technician" : "diagnostics.reviewer";
-      const { row, order } = await this.load(tx, subject, reportId, capability); this.version(row, input.expectedVersion);
-      const model = await this.model(tx, row);
-      let next: DiagnosticReportState;
-      if (input.action === "submit") {
-        if (order.status !== "arrived" || !order.physicalAuthorization) throw new DiagnosticRuleError("PHYSICAL_AUTHORIZATION_REQUIRED");
-        next = model.submit(subject.userId, []).state; await this.evidence(tx, row, next);
-      } else if (input.action === "withdraw") next = model.withdraw(subject.userId, input.reason ?? "", this.runtime.now()).state;
-      else {
-        if (input.action === "finalize") { await this.evidence(tx, row, model.state); if (!participants) throw denied(); await this.publicBindings.candidate(tx, order, participants); }
-        next = model.review(subject.userId, input.action === "return" ? "return" : "finalize", { now: this.runtime.now(), ...(input.reason ? { reason: input.reason } : {}),
-          privateSelfReviewAuthorized: input.privateSelfReview === true && !!input.reason?.trim() }).state;
-      }
-      let saved: Row;
-      if (input.action === "finalize") {
-        const snapshot = json({ report: next, template: await this.definition(tx, row), synthetic: true });
-        const hash = createHash("sha256").update(canonical(snapshot)).digest("hex");
-        saved = await tx.diagnosticReportRecord.update({ where: { id: row.id }, data: { state: json(next), status: next.status, version: { increment: 1 }, snapshot, snapshotHash: hash, finalizedAt: this.runtime.now() } });
-        const { rendererVersion } = await diagnosticReaderProjection(tx, saved, next);
-        for (const locale of ["tk", "ru", "en"]) {
-          const id = this.runtime.id();
-          await tx.diagnosticPdfArtifact.create({ data: { id, reportId, snapshotHash: hash, locale, rendererVersion, objectKey: `diagnostic-pdf/${reportId}/${id}.pdf` } });
-        }
-      } else saved = await this.persist(tx, row, next);
-      await this.audit(tx, subject, order, row.id, `REPORT_${input.action.toUpperCase()}`, { ...(input.reason ? { reason: input.reason } : {}), privateSelfReview: input.privateSelfReview === true && model.state.authorId === subject.userId });
-      return this.dto(tx, saved, subject, true);
     });
   }
   async correct(subject: DiagnosticSubject, reportId: string, input: DiagnosticSchemas.DiagnosticCorrection) {

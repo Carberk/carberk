@@ -2,9 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { retainedSchemaProfile, evaluateSchemaPlan } from './staging-schema.mjs';
+import { evaluateSchemaPlan } from './staging-schema.mjs';
 import { inventoryForSchema } from './testing/schema-profile-fixture.mjs';
 import { retainedSchemaProfile as archivedProfile } from '../docs/evidence/issue-897/kernel-physical-columns-20261025/original/scripts/staging-schema.mjs';
+
+import { retainedSchemaProfile } from '../docs/evidence/issue-897/r5-report-source-effects-20261025/original/scripts/staging-schema.mjs';
 
 const revision = [
   {
@@ -112,10 +114,10 @@ test('original source, assertions, mirrors and all 52 exact inventories remain i
   assert.equal(hash(read(`${archive}/original-profile-inventories.json`)), '6e4c5a8bfce75fc3c8c77505316df23c5a6eae9a42d42fd8fe640c01a590a6b7');
   const snapshot = JSON.parse(read(`${archive}/original-profile-inventories.json`));
   assert.equal(snapshot.sourceCommit, 'f375cb4ae6c363e5a724d92ecc7c9f4af5cc5520');
-  assert.equal(hash(read('../packages/db/prisma/schema.prisma')), '7ce808a1af40f4f85c340526ca8ea3bced18e99155282d41b610aca9e85cfc72');
+  assert.equal(hash(read('../docs/evidence/issue-897/r5-report-source-effects-20261025/original/packages/db/prisma/schema.prisma')), '7ce808a1af40f4f85c340526ca8ea3bced18e99155282d41b610aca9e85cfc72');
   const originalProfileSource = read(`${archive}/original/scripts/staging-schema.mjs`);
   assert.equal(hash(originalProfileSource), '1072783155c77779a755d59b9cb32385554b06c7f2cc1b756d742038978501ce');
-  let restoredProfileSource = read('./staging-schema.mjs');
+  let restoredProfileSource = read('../docs/evidence/issue-897/r5-report-source-effects-20261025/original/scripts/staging-schema.mjs');
   for (const item of revision) restoredProfileSource = restoredProfileSource.replace(item.proposedSha256, item.oldSha256);
   assert.equal(restoredProfileSource, originalProfileSource, 'Only the two checksum literals change in the complete active module');
   assert.deepEqual(snapshot.additions, archivedProfile.additions);

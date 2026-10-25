@@ -2120,3 +2120,5 @@ model CampaignPreparation {
 // Dormant exact restore no-op enquiry alternatives: 20261024120000_diagnostic_account_noop_enquiry.
 
 // Snapshot: 20261024130000_diagnostic_intake_campaign_composition.
+
+// Snapshot: 20261025010000_diagnostic_report_source_effects.

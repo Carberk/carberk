@@ -112,10 +112,9 @@ describe("report outer source transactions", () => {
 
 });
 
-/** Real production material/issuance entrypoints construct the offline fixture.
- * Issuance currently has the explicit shared projection gap, so this fixture is
- * business-behavior evidence only and does not certify prepared proof_issue. */
-async function privatePair() {
+/** Production material, finalization and prepared issuance construct the fixture.
+ * This fake verifies transaction protocol and business behavior, never SQL locks. */
+async function privatePair(beforeIssue?: (h: ReturnType<typeof reportPreparedHarness>) => Promise<void>, requestIssue = false) {
   const h = reportPreparedHarness(), b = h.id(60), rawB = h.id(61), technician = { userId: h.id(62), sessionId: h.id(63) };
   h.seed("user", { id: technician.userId, role: "user", suspendedAt: null, deletionScheduledAt: null, dealershipMemberships: [] });
   h.seed("session", { id: technician.sessionId, userId: technician.userId, expiresAt: new Date("2027-01-01"), adminTotpExpiresAt: new Date("2027-01-01") });
@@ -140,7 +139,15 @@ async function privatePair() {
   const issuance = { predecessorId: h.reportId, expectedPredecessorVersion: 2, expectedOrderVersion: 2,
     predecessorIdentityRecordId: h.id(5), candidateIdentityRecordId: rawB, linkingTechnicianId: technician.userId,
     method: "comparative_attestation" as const, rationale: "Same physical manufacturer plate", provenanceRecordIds: [h.id(70), h.id(72)] };
-  const { proofId } = await h.proofs.issue(h.subject, b, issuance);
+  if (beforeIssue) await beforeIssue(h);
+  let proofId: string;
+  if (requestIssue) {
+    const request = await h.proofs.prepareRequest(h.subject, b, { kind: "issue" });
+    const issued = await h.proofs.executeRequest(h.subject, b, request.requestId, { kind: "issue", command: issuance });
+    expect(await h.proofs.executeRequest(h.subject, b, request.requestId, { kind: "issue", command: issuance })).toEqual(issued);
+    expect(await h.proofs.recoverRequest(h.subject, b, request.requestId)).toEqual(issued);
+    proofId = (await h.db.diagnosticContinuityProof.findUniqueOrThrow({ where: { requestId: request.requestId } })).id;
+  } else ({ proofId } = await h.proofs.issue(h.subject, b, issuance));
   return { ...h, b, rawB, technician, proofId, issuance, input: { reportId: h.id(80), predecessorId: h.reportId, expectedOrderVersion: 2, proofId, reason: "Fresh independent visit" } };
 }
 
@@ -172,5 +179,166 @@ describe("private proof consumption at the real adapter", () => {
     expect(await h.proofs.read(h.subject, h.b, h.proofId)).toMatchObject({ proofId: h.proofId });
     await expect(h.proofs.consume(h.technician, h.b, h.input)).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
     expect(await h.db.diagnosticReportRecord.count()).toBe(1);
+  });
+});
+
+describe("finite report source effects and unlocked proposal", () => {
+  it.each(["write", "finish"] as const)("restores final snapshot, all pins, intents and audits on %s failure", async failure => {
+    const h = reportPreparedHarness(); await draft(h);
+    await h.reports.transition(h.subject, h.reportId, { expectedVersion: 0, action: "submit" });
+    const before = await h.db.diagnosticReportRecord.findMany(), audits = await h.db.diagnosticAudit.findMany();
+    if (failure === "finish") h.failFinish(); else h.failWrite("diagnosticPdfArtifact");
+    await expect(h.reports.transition(h.subject, h.reportId, { expectedVersion: 1, action: "finalize", privateSelfReview: true, reason: "Private review" })).rejects.toThrow(failure === "finish" ? "r5_finish_rollback" : "r5_actual_write_rollback");
+    expect(await h.db.diagnosticReportRecord.findMany()).toEqual(before);
+    expect(await h.db.diagnosticAudit.findMany()).toEqual(audits);
+    expect(await h.db.diagnosticPdfArtifact.findMany()).toEqual([]);
+    const artifacts = h.commands.at(-1)!.rows.filter(r => r.table === "diagnostic_pdf_artifacts");
+    expect(artifacts).toHaveLength(3);
+    expect(new Set(artifacts.map(r => r.key["id"])).size).toBe(3);
+    expect(artifacts.every(r => r.verb === "insert")).toBe(true);
+  });
+  it("shares complete pinned ancestor/descendant/provenance/rights mapping without proposal locks or mutations", async () => {
+    const h = await privatePair();
+    const order = await h.db.inspectionOrder.findUniqueOrThrow({ where: { id: h.orderId } });
+    const parent = await h.db.diagnosticIdentityEvidence.findUniqueOrThrow({ where: { id: h.id(71) } });
+    const rights = parent.rights as unknown as D.DiagnosticIdentityRights;
+    await h.identity.stage(h.subject, h.orderId, { id: h.id(90), expectedOrderVersion: 2, contentType: "image/png", sizeBytes: 3, rights });
+    await h.identity.upload(h.subject, h.orderId, h.id(90), { expectedOrderVersion: 2, mime: "image/png", bytes: new Uint8Array([4, 5, 6]) });
+    const correction = await h.identity.append(h.subject, h.orderId, { id: h.id(91), identityRecordId: h.id(5), expectedOrderVersion: 2, rights,
+      correction: { supersedesId: parent.id, explanation: "Fresh plate evidence" }, identifiers: [{ kind: "manufacturer_plate", value: "Synthetic plate", location: "engine bay", provenanceIds: [h.id(90)] }] });
+    const current = await h.db.inspectionOrder.findUniqueOrThrow({ where: { id: order.id } });
+    const before = await h.db.diagnosticIdentityEvidence.findMany(), commands = h.commands.length;
+    for (const pin of [{ id: parent.id, hash: parent.recordHash! }, { id: correction.id, hash: correction.recordHash! }]) {
+      const result = await h.compareIdentity(current, current.observedVehicle as Parameters<typeof h.identity.identity>[2], pin);
+      expect(result.proposal).toEqual(result.locked);
+      expect(result.proposal.provenance).toEqual([h.id(70), h.id(90)]);
+      expect(result.proposal.identity.corrections).toHaveLength(1);
+      expect(result.proposal.identity.evidence?.rights).toEqual(rights);
+      expect(result.unlocked.some(q => /FOR (UPDATE|SHARE)|diagnostic_prepare|diagnostic_source_scope/.test(q))).toBe(false);
+    }
+    expect(h.commands).toHaveLength(commands);
+    expect(await h.db.diagnosticIdentityEvidence.findMany()).toEqual(before);
+  });
+  it.each(["write", "finish"] as const)("rolls prepared private issuance and its audit back on %s failure", async failure => {
+    let saved: ReturnType<typeof reportPreparedHarness> | undefined;
+    let beforeAudits: unknown, beforeReports: unknown;
+    await expect(privatePair(async h => { saved = h; beforeAudits = await h.db.diagnosticAudit.findMany(); beforeReports = await h.db.diagnosticReportRecord.findMany();
+      if (failure === "finish") h.failFinish(); else h.failWrite("diagnosticAudit");
+    })).rejects.toThrow(failure === "finish" ? "r5_finish_rollback" : "r5_actual_write_rollback");
+    expect(await saved!.db.diagnosticContinuityProof.findMany()).toEqual([]);
+    expect(await saved!.db.diagnosticAudit.findMany()).toEqual(beforeAudits);
+    expect(await saved!.db.diagnosticReportRecord.findMany()).toEqual(beforeReports);
+    expect(saved!.commands.at(-1)?.operation).toBe("proof_issue");
+  });
+  it("refuses an issuer Session expiring after preparation before actual authority checks", async () => {
+    let saved: ReturnType<typeof reportPreparedHarness> | undefined;
+    await expect(privatePair(async h => { saved = h; h.afterPrepare(async () => { h.clock(new Date("2027-01-02")); }); })).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
+    expect(saved!.commands.at(-1)?.operation).toBe("proof_issue");
+    expect(await saved!.db.diagnosticContinuityProof.count()).toBe(0);
+    expect(await saved!.db.diagnosticAudit.count({ where: { action: "CONTINUITY_PROOF_ISSUED" } })).toBe(0);
+  });
+});
+
+describe("verified report evidence retirement", () => {
+  async function attached() {
+    const h = reportPreparedHarness(); await draft(h);
+    await h.uploads.upload(h.subject, { reportId: h.reportId, evidenceId: h.id(95), findingId: h.id(20), expectedVersion: 0, mime: "image/png", bytes: new Uint8Array([1, 2, 3]) });
+    const finding: D.DiagnosticFinding = { id: h.id(20), checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: [h.id(95)], kind: null, source: null, measurement: null, location: null };
+    await h.reports.save(h.subject, h.reportId, { expectedVersion: 0, finding });
+    return { ...h, finding: { ...finding, evidenceIds: [] } };
+  }
+  it("declares exactly the verified evidence cleanup fields before actual save", async () => {
+    const h = await attached(), before = await h.db.diagnosticEvidence.findUniqueOrThrow({ where: { id: h.id(95) } });
+    await h.reports.save(h.subject, h.reportId, { expectedVersion: 1, finding: h.finding });
+    const row = h.commands.at(-1)!.rows.find(r => r.table === "diagnostic_evidence");
+    expect(row).toMatchObject({ verb: "update", key: { id: before.id }, expected: { source: { state: "verified", cleanupRequestedAt: null } }, next: { state: "cleanup_pending", cleanupRequestedAt: "2026-10-25T12:00:00.000Z" } });
+    expect(await h.db.diagnosticEvidence.findUniqueOrThrow({ where: { id: before.id } })).toEqual({ ...before, state: "cleanup_pending", cleanupRequestedAt: new Date("2026-10-25T12:00:00Z") });
+    expect(h.stored.get(before.objectKey)).toEqual(new Uint8Array([1, 2, 3]));
+  });
+  it.each(["write", "finish"] as const)("restores verified evidence and complete saved state on retirement %s failure", async failure => {
+    const h = await attached(), evidence = await h.db.diagnosticEvidence.findMany(), reports = await h.db.diagnosticReportRecord.findMany(), audits = await h.db.diagnosticAudit.findMany();
+    if (failure === "finish") h.failFinish(); else h.failWrite("diagnosticEvidence");
+    await expect(h.reports.save(h.subject, h.reportId, { expectedVersion: 1, finding: h.finding })).rejects.toThrow(failure === "finish" ? "r5_finish_rollback" : "r5_actual_write_rollback");
+    expect(await h.db.diagnosticEvidence.findMany()).toEqual(evidence);
+    expect(await h.db.diagnosticReportRecord.findMany()).toEqual(reports);
+    expect(await h.db.diagnosticAudit.findMany()).toEqual(audits);
+  });
+});
+
+describe("private request execution", () => {
+  it("executes and recovers both actual request kinds with exact-result retries", async () => {
+    const h = await privatePair(undefined, true), request = await h.proofs.prepareRequest(h.technician, h.b, { kind: "consume" });
+    const command = { proofId: h.proofId, reportId: h.input.reportId, expectedOrderVersion: 2, reason: h.input.reason };
+    const result = await h.proofs.executeRequest(h.technician, h.b, request.requestId, { kind: "consume", command });
+    expect(await h.proofs.executeRequest(h.technician, h.b, request.requestId, { kind: "consume", command })).toEqual(result);
+    expect(await h.proofs.recoverRequest(h.technician, h.b, request.requestId)).toEqual(result);
+    expect(await h.proofs.discoverRequests(h.technician, h.b, {})).toMatchObject({ requests: [result] });
+    await expect(h.proofs.executeRequest(h.technician, h.b, request.requestId, { kind: "consume", command: { ...command, reason: "Different reason" } })).rejects.toThrow("DIAGNOSTIC_REINSPECTION_CONFLICT");
+    expect(await h.db.diagnosticContinuityProof.count()).toBe(1);
+    expect(await h.db.diagnosticReportRecord.count()).toBe(2);
+  });
+});
+
+describe("issuer post-preparation fact revalidation", () => {
+  it.each(["grant", "qualification", "provenance"] as const)("refuses changed %s facts after the offline preparation boundary", async defect => {
+    let saved: ReturnType<typeof reportPreparedHarness> | undefined;
+    // Explicit DB-boundary fault injection, not PostgreSQL opposition evidence.
+    await expect(privatePair(async h => { saved = h; h.afterPrepare(async () => {
+      if (defect === "grant") await h.db.staffGrant.update({ where: { userId_capability: { userId: h.subject.userId, capability: "diagnostics.reviewer" } }, data: { revokedAt: new Date("2026-10-25T12:00:00Z") } });
+      if (defect === "qualification") await h.db.diagnosticCenterAssignment.update({ where: { id: h.id(11) }, data: { qualifiedUntil: new Date("2026-10-25T12:00:00Z") } });
+      if (defect === "provenance") await h.db.diagnosticIdentityProvenance.update({ where: { id: h.id(70) }, data: { state: "cleanup_pending", cleanupRequestedAt: new Date("2026-10-25T12:00:00Z") } });
+    }); })).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
+    expect(saved!.commands.at(-1)?.operation).toBe("proof_issue");
+    expect(await saved!.db.diagnosticContinuityProof.count()).toBe(0);
+    expect(await saved!.db.diagnosticAudit.count({ where: { action: "CONTINUITY_PROOF_ISSUED" } })).toBe(0);
+  });
+});
+
+describe("request-result atomic rollback", () => {
+  it.each(["issue", "consume"] as const)("retains the pending %s request without partial result when finish fails", async kind => {
+    const h = await privatePair(), actor = kind === "issue" ? h.subject : h.technician;
+    const request = await h.proofs.prepareRequest(actor, h.b, { kind });
+    const reports = await h.db.diagnosticReportRecord.findMany(), proofs = await h.db.diagnosticContinuityProof.findMany(), audits = await h.db.diagnosticAudit.findMany();
+    const input: D.DiagnosticContinuityRequestExecute = kind === "issue" ? { kind, command: h.issuance }
+      : { kind, command: { proofId: h.proofId, reportId: h.input.reportId, expectedOrderVersion: 2, reason: h.input.reason } };
+    h.failFinish();
+    await expect(h.proofs.executeRequest(actor, h.b, request.requestId, input)).rejects.toThrow("r5_finish_rollback");
+    expect(await h.proofs.recoverRequest(actor, h.b, request.requestId)).toEqual(request);
+    expect(await h.db.diagnosticReportRecord.findMany()).toEqual(reports);
+    expect(await h.db.diagnosticContinuityProof.findMany()).toEqual(proofs);
+    expect(await h.db.diagnosticAudit.findMany()).toEqual(audits);
+  });
+});
+
+describe("request planning-conflict recovery protocol", () => {
+  it.each(["issue", "consume"] as const)("recovers only the exact committed %s winner without another mutation", async kind => {
+    const h = await privatePair(undefined, true), actor = kind === "issue" ? h.subject : h.technician;
+    const proof = await h.db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: h.proofId } });
+    const requestId = kind === "issue" ? proof.requestId! : (await h.proofs.prepareRequest(actor, h.b, { kind })).requestId;
+    const input: D.DiagnosticContinuityRequestExecute = kind === "issue" ? { kind, command: h.issuance }
+      : { kind, command: { proofId: h.proofId, reportId: h.input.reportId, expectedOrderVersion: 2, reason: h.input.reason } };
+    const winner = await h.proofs.executeRequest(actor, h.b, requestId, input), audits = await h.db.diagnosticAudit.findMany(), commands = h.commands.length;
+    // Simulates stale proposal reads followed by the exact PostgreSQL protocol error.
+    // Real backend blocking and concurrency are asserted only in authored SQL source.
+    h.requestWinnerConflict(kind, h.input.reportId);
+    expect(await h.proofs.executeRequest(actor, h.b, requestId, input)).toEqual(winner);
+    expect(h.commands).toHaveLength(commands);
+    expect(await h.db.diagnosticAudit.findMany()).toEqual(audits);
+    h.requestWinnerConflict(kind, h.input.reportId, "r5_unrelated_database_failure");
+    await expect(h.proofs.executeRequest(actor, h.b, requestId, input)).rejects.toThrow("r5_unrelated_database_failure");
+    expect(await h.db.diagnosticAudit.findMany()).toEqual(audits);
+  });
+});
+
+describe("complete initial discovery pages", () => {
+  it("authorizes every initial handoff/request result without creating another source receipt", async () => {
+    const h = await privatePair(), second = await h.proofs.issue(h.subject, h.b, h.issuance);
+    const one = await h.proofs.prepareRequest(h.technician, h.b, { kind: "consume" }), two = await h.proofs.prepareRequest(h.technician, h.b, { kind: "consume" });
+    const commands = h.commands.length;
+    const page = await h.proofs.handoffs(h.technician, h.b, {});
+    expect(page.handoffs.map(item => item.proofId).sort()).toEqual([h.proofId, second.proofId].sort());
+    const requests = await h.proofs.discoverRequests(h.technician, h.b, {});
+    expect(requests.requests.map(item => item.requestId).sort()).toEqual([one.requestId, two.requestId].sort());
+    expect(h.commands).toHaveLength(commands);
   });
 });

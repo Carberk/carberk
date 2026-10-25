@@ -228,10 +228,12 @@ export class PrismaDiagnosticIdentityEvidence implements DiagnosticIdentityEvide
   }
   /** Records in append order and the ids still permitted: retained content, current rights,
    * retained provenance and a permitted ancestor. No partial chain survives a missing ancestor. */
-  private async graph(tx: Tx, orderId: string) {
-    await tx.$queryRaw`SELECT id FROM diagnostic_identity_records WHERE "orderId"=${orderId} ORDER BY id FOR SHARE`;
-    await tx.$queryRaw`SELECT id FROM diagnostic_identity_evidence WHERE "orderId"=${orderId} ORDER BY id FOR SHARE`;
-    await tx.$queryRaw`SELECT id FROM diagnostic_identity_provenance WHERE "orderId"=${orderId} ORDER BY id FOR SHARE`;
+  private async graph(tx: Tx, orderId: string, locked = true) {
+    if (locked) {
+      await tx.$queryRaw`SELECT id FROM diagnostic_identity_records WHERE "orderId"=${orderId} ORDER BY id FOR SHARE`;
+      await tx.$queryRaw`SELECT id FROM diagnostic_identity_evidence WHERE "orderId"=${orderId} ORDER BY id FOR SHARE`;
+      await tx.$queryRaw`SELECT id FROM diagnostic_identity_provenance WHERE "orderId"=${orderId} ORDER BY id FOR SHARE`;
+    }
     const records = await tx.diagnosticIdentityEvidence.findMany({ where: { orderId }, include: { identityRecord: true }, orderBy: { orderVersion: "asc" } });
     const provenance = new Map((await tx.diagnosticIdentityProvenance.findMany({ where: { orderId } })).map(row => [row.id, row]));
     const usable = new Set<string>();
@@ -325,13 +327,20 @@ export class PrismaDiagnosticIdentityEvidence implements DiagnosticIdentityEvide
   leaf(tx: Tx, orderId: string) {
     return tx.diagnosticIdentityEvidence.findFirst({ where: { orderId, erasedAt: null, successor: { is: null } }, orderBy: { orderVersion: "desc" }, select: { id: true, recordHash: true } });
   }
-  /** One comparison side, called under both order locks after current authority. A pin that is
-   * missing, changed, expired or erased, or any unavailable record on its explicit correction
-   * chain, refuses the whole comparison rather than showing a partial chain. */
+  /** Proposal data only. Ordinary SELECTs share the complete retained graph and
+   * mapping with identity; no authority, prefix, locks, receipt or mutation.
+   * The outer writer must prepare then recompute through locked identity. */
+  identityProposal(tx: Tx, order: Order, observation: Observation, pin: { id: string; hash: string } | null): Promise<{ identity: D.DiagnosticComparisonIdentity; provenance: string[] }> {
+    return this.projectIdentity(tx, order, observation, pin, false);
+  }
+  /** Locked comparison after current authority. Any unavailable pinned chain refuses in full. */
   async identity(tx: Tx, order: Order, observation: Observation, pin: { id: string; hash: string } | null): Promise<{ identity: D.DiagnosticComparisonIdentity; provenance: string[] }> {
+    return this.projectIdentity(tx, order, observation, pin, true);
+  }
+  private async projectIdentity(tx: Tx, order: Order, observation: Observation, pin: { id: string; hash: string } | null, locked: boolean): Promise<{ identity: D.DiagnosticComparisonIdentity; provenance: string[] }> {
     const identity = { observation, evidence: null, corrections: [], evidenceGeneration: order.identityEvidenceGeneration, correctionHeadHash: null };
     if (!pin) return { identity, provenance: [] };
-    const { records, usable } = await this.graph(tx, order.id);
+    const { records, usable } = await this.graph(tx, order.id, locked);
     const pinned = records.find(record => record.id === pin.id);
     if (!pinned || pinned.recordHash !== pin.hash) throw denied();
     // Explicit supersedes edges only; the database guard keeps parents earlier and single-successor.
