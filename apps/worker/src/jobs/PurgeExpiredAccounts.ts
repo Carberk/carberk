@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { PrismaService, withDiagnosticSourceCommand } from "@auto-tm/db";
+import type { DiagnosticSourceCommand } from "@auto-tm/db";
 
 import { diagnosticAccountErasureWrites } from "./diagnosticAccountErasure";
 import { videoAccountErasureWrites } from "./video/videoAccountErasure";
@@ -33,47 +34,62 @@ export class PurgeExpiredAccounts {
       where: { createdAt: { lt: new Date(input.now.getTime() - CODE_REQUEST_RETENTION_MS) } },
     });
 
+    let purgedCount = 0;
     for (const user of expiredUsers) {
-      await this.purgeUser(user, input.now);
+      if (await this.purgeUser(user, input.now)) purgedCount += 1;
     }
 
-    return { purgedCount: expiredUsers.length };
+    return { purgedCount };
   }
 
   private async purgeUser(
-    user: { id: string; phone: string | null; email: string | null },
+    selected: { id: string; phone: string | null; email: string | null },
     now: Date,
-  ): Promise<void> {
-    const userId = user.id;
-    // Code requests are matched by User, and by the purged phone and email
-    // for a request made before sign-in, which carries no User id. A request
-    // another User made to the same number (two sellers may confirm one
-    // contact phone) is theirs and stays until it is 30 days old.
-    const signedOutRequestsTo = [user.phone, user.email].filter(
-      (value): value is string => value !== null,
-    );
-    const codeRequestMatches = [
-      { userId },
-      ...(signedOutRequestsTo.length > 0
-        ? [{ userId: null, destination: { in: signedOutRequestsTo } }]
-        : []),
-    ];
-    await this.prisma.$transaction([
-      // The User row lock comes before any upload lock, the order every writer
-      // of a Profile Photo uses (ADR-0088).
-      this.prisma.$queryRaw`WITH prefix AS MATERIALIZED (
-        SELECT diagnostic_dispose_ownership(${userId}::text,${now}::timestamp)
-      ) SELECT id FROM users CROSS JOIN prefix WHERE id = ${userId} FOR UPDATE OF users`,
-      ...serviceAccountErasureWrites(this.prisma, userId, now),
-      ...videoAccountErasureWrites(this.prisma, userId, now),
-      ...diagnosticAccountErasureWrites(this.prisma, userId, now),
+  ): Promise<boolean> {
+    const userId = selected.id;
+    return this.prisma.$transaction(async (tx) => {
+      // Rediscover the due user and PII immediately before preparation. A stale
+      // scheduler snapshot becomes a truthful no-op instead of erasing a new account.
+      // Compare in SQL. to_jsonb's timestamp has no zone and JavaScript would
+      // otherwise interpret an exact UTC cutoff in the worker's local timezone.
+      const [fresh] = await tx.$queryRaw<{ row: Record<string, unknown> | null }[]>`SELECT public.diagnostic_source_project(
+        to_jsonb(u), public.diagnostic_source_meta('users')->'fields') AS row FROM users u
+        WHERE u.id = ${userId} AND u."deletionScheduledAt" <= ${now}::timestamp`;
+      const row = fresh?.row;
+      if (!row || row["phone"] !== selected.phone || row["email"] !== selected.email) return false;
+      const source = JSON.parse(JSON.stringify(row)) as Record<string, unknown>;
+      const next = { ...source, phone: null, phoneVerifiedAt: null, email: null, emailVerifiedAt: null,
+        displayName: null, avatarKey: null, avatarUploadId: null, avatarUrl: null, deletionScheduledAt: null };
+      const command = {
+        operation: "account_purge", roots: [{ table: "users", key: { id: userId } }],
+        rows: [{ table: "users", key: { id: userId }, verb: "update", expected: { source }, next }],
+        actorUserId: null, sessionId: null, cutoff: now, campaign: null,
+      } as DiagnosticSourceCommand;
+      return withDiagnosticSourceCommand(tx, command, async (receipt) => {
+        const codeRequestMatches = [
+          { userId },
+          ...([selected.phone, selected.email].filter((value): value is string => value !== null).length > 0
+            ? [{ userId: null, destination: { in: [selected.phone, selected.email].filter((value): value is string => value !== null) } }] : []),
+        ];
+        const operations = [
+          tx.$queryRaw`WITH prefix AS MATERIALIZED (SELECT diagnostic_dispose_ownership(${userId}::text,${now}::timestamp))
+            SELECT id FROM users CROSS JOIN prefix WHERE id = ${userId} FOR UPDATE OF users`,
+          ...serviceAccountErasureWrites(tx, userId, now, receipt),
+          ...videoAccountErasureWrites(tx, userId, now, receipt),
+          ...diagnosticAccountErasureWrites(tx, userId, now, receipt),
+
+      // Match account scheduling's erasure policy. Restricted exports have no
+      // reverse subject map, so invalidate all. Principal FKs erase its facts
+      // and linked guest visits, preserving independent guest/foreign data.
+      tx.measurementInvestigationExport.deleteMany(),
+      tx.measurementPrincipal.deleteMany({ where: { userId } }),
 
       // Retire the Profile Photo's upload and record its storage deletion, in
       // the transaction that clears the photo below. The API's claim does the
       // same on removal; the purge runs here, so the rule is repeated. The
       // sweep deletes the bytes of fenced uploads and retries on failure; a
       // legacy upload is recorded and its bytes stay.
-      this.prisma.$executeRaw`
+      tx.$executeRaw`
         WITH retired AS (
           UPDATE media_uploads SET "state" = 'RETIRED', "retiredAt" = ${now}::timestamp,
             "claimToken" = NULL, "claimDeadline" = NULL
@@ -90,7 +106,7 @@ export class PurgeExpiredAccounts {
 
       // Free both Sign-in Methods and clear profile PII (ADR-0054). The name
       // number and avatar index stay; they identify nobody (#638).
-      this.prisma.user.update({
+      tx.user.update({
         where: { id: userId },
         data: {
           phone: null,
@@ -106,49 +122,53 @@ export class PurgeExpiredAccounts {
       }),
 
       // Prune sessions
-      this.prisma.session.deleteMany({ where: { userId } }),
+      tx.session.deleteMany({ where: { userId } }),
 
       // Prune TOTP enrollment (cascades to backup codes)
-      this.prisma.totpEnrollment.deleteMany({ where: { userId } }),
+      tx.totpEnrollment.deleteMany({ where: { userId } }),
 
       // Prune FCM devices
-      this.prisma.fcmDevice.deleteMany({ where: { userId } }),
+      tx.fcmDevice.deleteMany({ where: { userId } }),
 
       // Prune notification history
-      this.prisma.notificationHistory.deleteMany({ where: { userId } }),
+      tx.notificationHistory.deleteMany({ where: { userId } }),
 
       // Prune notification preferences
-      this.prisma.notificationPreference.deleteMany({ where: { userId } }),
+      tx.notificationPreference.deleteMany({ where: { userId } }),
 
       // Prune saved searches
-      this.prisma.savedSearch.deleteMany({ where: { userId } }),
+      tx.savedSearch.deleteMany({ where: { userId } }),
 
       // Prune favorites
-      this.prisma.favorite.deleteMany({ where: { userId } }),
+      tx.favorite.deleteMany({ where: { userId } }),
 
       // Prune owned vehicles (garage)
-      this.prisma.ownedVehicle.deleteMany({ where: { userId } }),
+      tx.ownedVehicle.deleteMany({ where: { userId } }),
 
       // Prune blocked users (both directions)
-      this.prisma.blockedUser.deleteMany({
+      tx.blockedUser.deleteMany({
         where: { OR: [{ blockerId: userId }, { blockedId: userId }] },
       }),
 
       // Prune dealership memberships
-      this.prisma.dealershipMember.deleteMany({ where: { userId } }),
+      tx.dealershipMember.deleteMany({ where: { userId } }),
 
       // Prune listing drafts
-      this.prisma.listingDraft.deleteMany({ where: { userId, businessId: null } }),
+      tx.listingDraft.deleteMany({ where: { userId, businessId: null } }),
 
       // Prune confirmed Listing contact phones (ADR-0081)
-      this.prisma.verifiedContactPhone.deleteMany({ where: { sellerId: userId } }),
+      tx.verifiedContactPhone.deleteMany({ where: { sellerId: userId } }),
 
       // Prune sign-in and contact phone code requests for this User
-      this.prisma.otpRequest.deleteMany({ where: { OR: codeRequestMatches } }),
+      tx.otpRequest.deleteMany({ where: { OR: codeRequestMatches } }),
 
       // Kept Listings stay archived; nobody can reach a purged User, so their
       // contact phone goes too
-      this.prisma.listing.updateMany({ where: { sellerId: userId, businessId: null }, data: { contactPhone: null } }),
-    ]);
+      tx.listing.updateMany({ where: { sellerId: userId, businessId: null }, data: { contactPhone: null } }),
+        ];
+        for (const operation of operations) await operation;
+        return true;
+      });
+    });
   }
 }

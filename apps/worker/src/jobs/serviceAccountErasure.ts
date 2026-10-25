@@ -1,10 +1,11 @@
-import type { Prisma, PrismaService } from "@auto-tm/db";
+import { type Prisma, type PreparedDiagnosticSource } from "@auto-tm/db";
 
 /** Runs after the account User lock, before identity completion, in the same
  * transaction. History's private linkage is removed, without importing the
  * Support 90-day schedule into provider/anonymous retained knowledge. */
-export function serviceAccountErasureWrites(db: PrismaService, userId: string, now: Date): Prisma.PrismaPromise<unknown>[] {
+export function serviceAccountErasureWrites(db: Prisma.TransactionClient, userId: string, now: Date, receipt: PreparedDiagnosticSource): Prisma.PrismaPromise<unknown>[] {
  return [
+  db.$queryRaw`SELECT public.diagnostic_assert_source(${receipt.receiptId}::uuid, 'account_purge')::text`,
   db.$queryRaw`SELECT id FROM support_cases WHERE "customerId"=${userId} ORDER BY id FOR UPDATE`,
   db.$queryRaw`SELECT id FROM vehicle_history_requests WHERE "customerId"=${userId} ORDER BY id FOR UPDATE`,
   db.$executeRaw`
