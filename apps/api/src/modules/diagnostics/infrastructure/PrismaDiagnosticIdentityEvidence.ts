@@ -7,12 +7,14 @@ import { DIAGNOSTIC_RUNTIME, type DiagnosticRuntime, type DiagnosticSubject } fr
 import type { DiagnosticIdentityEvidencePort } from "../domain/ports/DiagnosticIdentityEvidencePort";
 import { DIAGNOSTIC_OBJECTS, type DiagnosticObjects } from "../domain/ports/DiagnosticObjects";
 import { DiagnosticAuthority } from "./DiagnosticAuthority";
+import { diagnosticMutation, diagnosticPlannedRow, diagnosticReadPrefix, diagnosticRoots } from "./DiagnosticPreparedIntake";
 
 type Tx = Prisma.TransactionClient;
 type Order = Prisma.InspectionOrderGetPayload<object>;
 type Provenance = Prisma.DiagnosticIdentityProvenanceGetPayload<object>;
 type Evidence = Prisma.DiagnosticIdentityEvidenceGetPayload<{ include: { identityRecord: true } }>;
 type Observation = D.DiagnosticComparisonIdentity["observation"];
+type Root = Parameters<typeof diagnosticReadPrefix>[1][number];
 // PostgreSQL JSONB can reorder object keys. Content identity must survive readback.
 export const canonical = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
@@ -60,24 +62,63 @@ export class PrismaDiagnosticIdentityEvidence implements DiagnosticIdentityEvide
     return scope.row;
   }
 
+  private roots(subject: DiagnosticSubject, orderId: string, material: Root[] = []): Root[] {
+    return [...diagnosticRoots(subject, [orderId]), ...material];
+  }
+
+  private provenanceRoot(id: string): Root { return { table: "diagnostic_identity_provenance", key: { id } }; }
+  private evidenceRoot(id: string): Root { return { table: "diagnostic_identity_evidence", key: { id } }; }
+  private recordRoot(id: string): Root { return { table: "diagnostic_identity_records", key: { id } }; }
+  private auditRoot(id: string): Root { return { table: "diagnostic_audits", key: { id } }; }
+
+  private async readPrefix(tx: Tx, subject: DiagnosticSubject, orderId: string, material: Root[] = []): Promise<void> {
+    await diagnosticReadPrefix(tx, this.roots(subject, orderId, material));
+  }
+
+  private async cleanup(subject: DiagnosticSubject, orderId: string, id: string, epoch: string): Promise<void> {
+    await this.db.$transaction(async tx => {
+      const current = await tx.diagnosticIdentityProvenance.findUnique({ where: { id } });
+      if (!current || current.orderId !== orderId || current.epoch !== epoch || current.state !== "staged") return;
+      const next = { state: "cleanup_pending", cleanupRequestedAt: this.runtime.now() };
+      const row = await diagnosticPlannedRow(tx, this.provenanceRoot(id), next);
+      await diagnosticMutation(tx, { operation: "identity_material_change", roots: this.roots(subject, orderId, [this.provenanceRoot(id)]), rows: [row],
+        actorUserId: subject.userId, sessionId: subject.sessionId, cutoff: null, campaign: null }, async () => {
+        await tx.diagnosticIdentityProvenance.update({ where: { id }, data: next });
+      });
+    });
+  }
+
   async stage(subject: DiagnosticSubject, orderId: string, input: D.DiagnosticIdentityProvenanceStage): Promise<D.DiagnosticIdentityProvenanceStaged> {
     return this.db.$transaction(async tx => {
-      const order = await this.capturer(tx, subject, orderId);
       const prior = await tx.diagnosticIdentityProvenance.findUnique({ where: { id: input.id } });
       if (prior) {
-        if (prior.orderId !== orderId || prior.erasedAt || prior.cleanupRequestedAt || !this.live(prior.rights, prior.rightsUntil)) throw denied();
-        if (prior.contentType !== input.contentType || prior.declaredSizeBytes !== input.sizeBytes || canonical(prior.rights) !== canonical(input.rights)) throw new DiagnosticRuleError("DIAGNOSTIC_EVIDENCE_CONFLICT");
-        return { id: prior.id, state: prior.state === "verified" ? "verified" : "staged" };
+        await this.readPrefix(tx, subject, orderId, [this.provenanceRoot(input.id), { table: "diagnostic_evidence", key: { id: input.id } }]);
+        await this.capturer(tx, subject, orderId);
+        const retained = await tx.diagnosticIdentityProvenance.findUnique({ where: { id: input.id } });
+        if (!retained) throw denied();
+        if (retained.orderId !== orderId || retained.erasedAt || retained.cleanupRequestedAt || !this.live(retained.rights, retained.rightsUntil)) throw denied();
+        if (retained.contentType !== input.contentType || retained.declaredSizeBytes !== input.sizeBytes || canonical(retained.rights) !== canonical(input.rights)) throw new DiagnosticRuleError("DIAGNOSTIC_EVIDENCE_CONFLICT");
+        return { id: retained.id, state: retained.state === "verified" ? "verified" : "staged" };
       }
       const rightsUntil = new Date(input.rights.schedule.until);
       // Classification is persisted before any byte is accepted; never manufactured.
       if (!this.live(input.rights, rightsUntil)) throw denied();
-      if (order.version !== input.expectedOrderVersion) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
-      if (await tx.diagnosticEvidence.findUnique({ where: { id: input.id } })) throw denied();
-      if (await tx.diagnosticIdentityProvenance.count({ where: { orderId } }) >= 100) throw new DiagnosticRuleError("REPORT_EVIDENCE_LIMIT");
-      await tx.diagnosticIdentityProvenance.create({ data: { id: input.id, orderId, contentType: input.contentType, declaredSizeBytes: input.sizeBytes,
-        rights: json(input.rights), rightsUntil, createdById: subject.userId, createdAt: this.runtime.now() } });
-      return { id: input.id, state: "staged" };
+      const createdAt = this.runtime.now();
+      const next = { id: input.id, orderId, contentType: input.contentType, declaredSizeBytes: input.sizeBytes, rights: json(input.rights), rightsUntil,
+        state: "staged", createdById: subject.userId, createdAt, epoch: this.runtime.id(), cleanupAttempts: 0,
+        objectKey: null, sha256: null, sizeBytes: null, mime: null, writeLeaseUntil: null, cleanupLeaseUntil: null, cleanupFailureCode: null,
+        verifiedAt: null, cleanupRequestedAt: null, cleanupCompletedAt: null, erasedAt: null };
+      const row = await diagnosticPlannedRow(tx, this.provenanceRoot(input.id), next, true);
+      return diagnosticMutation(tx, { operation: "identity_material_change", roots: this.roots(subject, orderId, [this.provenanceRoot(input.id), { table: "diagnostic_evidence", key: { id: input.id } }]), rows: [row],
+        actorUserId: subject.userId, sessionId: subject.sessionId, cutoff: null, campaign: null }, async () => {
+        const order = await this.capturer(tx, subject, orderId);
+        if (!this.live(input.rights, rightsUntil)) throw denied();
+        if (order.version !== input.expectedOrderVersion) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
+        if (await tx.diagnosticEvidence.findUnique({ where: { id: input.id } })) throw denied();
+        if (await tx.diagnosticIdentityProvenance.count({ where: { orderId } }) >= 100) throw new DiagnosticRuleError("REPORT_EVIDENCE_LIMIT");
+        await tx.diagnosticIdentityProvenance.create({ data: next });
+        return { id: input.id, state: "staged" };
+      });
     });
   }
   private async writable(tx: Tx, subject: DiagnosticSubject, orderId: string, id: string, expectedOrderVersion?: number): Promise<Provenance> {
@@ -92,41 +133,71 @@ export class PrismaDiagnosticIdentityEvidence implements DiagnosticIdentityEvide
     return D.DiagnosticIdentityProvenanceSchema.parse({ id: row.id, state: "verified", mime: row.mime, sizeBytes: row.sizeBytes, sha256: row.sha256 });
   }
   async upload(subject: DiagnosticSubject, orderId: string, id: string, input: { expectedOrderVersion: number; mime: string; bytes: Uint8Array | null }) {
-    const staged = await this.db.$transaction(tx => this.writable(tx, subject, orderId, id, input.expectedOrderVersion));
+    const roots = this.roots(subject, orderId, [this.provenanceRoot(id), { table: "diagnostic_evidence", key: { id } }]);
+    const staged = await this.db.$transaction(async tx => {
+      await diagnosticReadPrefix(tx, roots);
+      return this.writable(tx, subject, orderId, id, input.expectedOrderVersion);
+    });
     if (!input.bytes || input.mime !== staged.contentType || input.bytes.byteLength !== staged.declaredSizeBytes) throw new DiagnosticRuleError("REPORT_EVIDENCE_INVALID");
     const clean = await this.objects.sanitize(input.bytes, input.mime);
     const hash = sha(clean.bytes);
     const intent = await this.db.$transaction(async tx => {
-      const row = await this.writable(tx, subject, orderId, id, input.expectedOrderVersion);
-      if (row.sha256 && (row.sha256 !== hash || row.sizeBytes !== clean.bytes.byteLength)) throw new DiagnosticRuleError("DIAGNOSTIC_EVIDENCE_CONFLICT");
-      if (row.state === "verified") return row;
-      if (row.writeLeaseUntil && row.writeLeaseUntil > this.runtime.now()) throw new DiagnosticRuleError("DIAGNOSTIC_EVIDENCE_BUSY");
-      // Commit the exact object descriptor and write lease before any object write can occur.
-      return tx.diagnosticIdentityProvenance.update({ where: { id }, data: { objectKey: `diagnostic-evidence/${id}/${hash}`, sha256: hash, sizeBytes: clean.bytes.byteLength,
-        mime: clean.mime, epoch: this.runtime.id(), writeLeaseUntil: new Date(this.runtime.now().getTime() + LEASE_MS) } });
+      const initial = await tx.diagnosticIdentityProvenance.findUnique({ where: { id } });
+      if (!initial) throw denied();
+      const check = async () => {
+        const row = await this.writable(tx, subject, orderId, id, input.expectedOrderVersion);
+        if (row.sha256 && (row.sha256 !== hash || row.sizeBytes !== clean.bytes.byteLength || row.mime !== clean.mime)) throw new DiagnosticRuleError("DIAGNOSTIC_EVIDENCE_CONFLICT");
+        return row;
+      };
+      if (initial.state === "verified") {
+        await diagnosticReadPrefix(tx, roots);
+        return check();
+      }
+      // Epoch/descriptor changes are material; a lease-only renewal is not invented here.
+      const next = { objectKey: `diagnostic-evidence/${id}/${hash}`, sha256: hash, sizeBytes: clean.bytes.byteLength,
+        mime: clean.mime, epoch: this.runtime.id(), writeLeaseUntil: new Date(this.runtime.now().getTime() + LEASE_MS) };
+      const planned = await diagnosticPlannedRow(tx, this.provenanceRoot(id), next);
+      return diagnosticMutation(tx, { operation: "identity_material_change", roots, rows: [planned], actorUserId: subject.userId,
+        sessionId: subject.sessionId, cutoff: null, campaign: null }, async () => {
+        const row = await check();
+        if (row.writeLeaseUntil && row.writeLeaseUntil > this.runtime.now()) throw new DiagnosticRuleError("DIAGNOSTIC_EVIDENCE_BUSY");
+        if (next.writeLeaseUntil <= this.runtime.now()) throw denied();
+        return tx.diagnosticIdentityProvenance.update({ where: { id }, data: next });
+      });
     });
     if (intent.state === "verified") return this.verified(intent);
     const leased = (row: Provenance) => row.epoch === intent.epoch && !!row.writeLeaseUntil && row.writeLeaseUntil > this.runtime.now();
-    await this.db.$transaction(async tx => { if (!leased(await this.writable(tx, subject, orderId, id))) throw denied(); });
     const object = bound(intent);
-    await this.objects.put(object.key, clean.bytes, clean.mime);
-    await this.objects.read(object.key, object.sizeBytes, object.sha256);
     try {
+      await this.db.$transaction(async tx => {
+        await diagnosticReadPrefix(tx, roots);
+        if (!leased(await this.writable(tx, subject, orderId, id))) throw denied();
+      });
+      await this.objects.put(object.key, clean.bytes, clean.mime);
+      await this.objects.read(object.key, object.sizeBytes, object.sha256);
       return await this.db.$transaction(async tx => {
-        const row = await this.writable(tx, subject, orderId, id);
-        if (!leased(row) || row.state !== "staged") throw denied();
-        return this.verified(await tx.diagnosticIdentityProvenance.update({ where: { id }, data: { state: "verified", verifiedAt: this.runtime.now(), writeLeaseUntil: null } }));
+        const next = { state: "verified", verifiedAt: this.runtime.now(), writeLeaseUntil: null };
+        const planned = await diagnosticPlannedRow(tx, this.provenanceRoot(id), next);
+        return diagnosticMutation(tx, { operation: "identity_material_change", roots, rows: [planned], actorUserId: subject.userId,
+          sessionId: subject.sessionId, cutoff: null, campaign: null }, async () => {
+          const row = await this.writable(tx, subject, orderId, id);
+          if (!leased(row) || row.state !== "staged") throw denied();
+          return this.verified(await tx.diagnosticIdentityProvenance.update({ where: { id }, data: next }));
+        });
       });
     } catch (error) {
-      // A fenced partial object never becomes evidence; exact cleanup follows the write lease.
-      await this.db.diagnosticIdentityProvenance.updateMany({ where: { id, epoch: intent.epoch, state: "staged" }, data: { state: "cleanup_pending", cleanupRequestedAt: this.runtime.now() } });
+      // Cleanup needs no surviving staff authority, but only owns this exact staged epoch.
+      await this.cleanup(subject, orderId, id, intent.epoch);
       throw error;
     }
   }
   /** Delivers retained bytes only while `authorize` admits them before and after storage I/O.
-   * An authorized integrity/storage failure is a generic unavailable result, never upstream detail. */
-  async deliver(id: string, authorize: (tx: Tx) => Promise<(row: Provenance) => boolean>): Promise<{ bytes: Uint8Array; mime: string }> {
+   * An outer pair reader supplies its complete initial roots here, or establishes
+   * that union in `authorize` before locks. This helper never extends that scope.
+   * An authorized integrity/storage failure is generic, never upstream detail. */
+  async deliver(id: string, authorize: (tx: Tx) => Promise<(row: Provenance) => boolean>, roots: Root[] = []): Promise<{ bytes: Uint8Array; mime: string }> {
     const readable = async (tx: Tx) => {
+      if (roots.length) await diagnosticReadPrefix(tx, roots);
       const permitted = await authorize(tx);
       const row = await tx.diagnosticIdentityProvenance.findUnique({ where: { id } });
       if (!row || !permitted(row) || !this.retained(row)) throw denied();
@@ -142,7 +213,7 @@ export class PrismaDiagnosticIdentityEvidence implements DiagnosticIdentityEvide
     return { bytes, mime: object.mime };
   }
   read(subject: DiagnosticSubject, orderId: string, id: string) {
-    return this.deliver(id, async tx => { await this.reader(tx, subject, orderId); return row => row.orderId === orderId; });
+    return this.deliver(id, async tx => { await this.reader(tx, subject, orderId); return row => row.orderId === orderId; }, this.roots(subject, orderId, [this.provenanceRoot(id), this.evidenceRoot(id)]));
   }
 
   private dto(row: Evidence): D.DiagnosticIdentityEvidence {
@@ -171,6 +242,7 @@ export class PrismaDiagnosticIdentityEvidence implements DiagnosticIdentityEvide
   }
   async list(subject: DiagnosticSubject, orderId: string): Promise<D.DiagnosticIdentityEvidence[]> {
     return this.db.$transaction(async tx => {
+      await this.readPrefix(tx, subject, orderId);
       await this.reader(tx, subject, orderId);
       const { records, usable } = await this.graph(tx, orderId);
       return records.filter(record => usable.has(record.id)).map(record => this.dto(record));
@@ -178,53 +250,70 @@ export class PrismaDiagnosticIdentityEvidence implements DiagnosticIdentityEvide
   }
   async append(subject: DiagnosticSubject, orderId: string, input: D.DiagnosticIdentityEvidenceCapture): Promise<D.DiagnosticIdentityEvidence> {
     return this.db.$transaction(async tx => {
-      const order = await this.capturer(tx, subject, orderId);
-      const existing = await tx.diagnosticIdentityEvidence.findUnique({ where: { id: input.id }, include: { identityRecord: true } });
-      // Retry recognition precedes stale-version rejection but never bypasses current rights or erasure.
-      if (existing) {
+      const ids = [...new Set(input.identifiers.flatMap(item => item.provenanceIds))].sort();
+      const roots = this.roots(subject, orderId, [this.evidenceRoot(input.id), this.recordRoot(input.identityRecordId),
+        ...ids.map(id => this.provenanceRoot(id)), ...(input.correction ? [this.evidenceRoot(input.correction.supersedesId)] : [])]);
+      const initial = await tx.diagnosticIdentityEvidence.findUnique({ where: { id: input.id }, include: { identityRecord: true } });
+      if (initial) {
+        await diagnosticReadPrefix(tx, roots);
+        await this.capturer(tx, subject, orderId);
+        const existing = await tx.diagnosticIdentityEvidence.findUnique({ where: { id: input.id }, include: { identityRecord: true } });
+        if (!existing) throw denied();
+        // Retry recognition precedes stale-version rejection, with current retained rights.
         if (existing.orderId !== orderId || existing.erasedAt) throw denied();
         if (existing.identityRecordId !== input.identityRecordId || canonical(existing.identifiers) !== canonical(input.identifiers) || canonical(existing.rights) !== canonical(input.rights) ||
           existing.supersedesId !== (input.correction?.supersedesId ?? null) || existing.explanation !== (input.correction?.explanation ?? null)) throw new DiagnosticRuleError("DIAGNOSTIC_EVIDENCE_CONFLICT");
         if (!(await this.graph(tx, orderId)).usable.has(existing.id)) throw denied();
         return this.dto(existing);
       }
-      const rightsUntil = new Date(input.rights.schedule.until);
-      if (!this.live(input.rights, rightsUntil)) throw denied();
-      const ids = [...new Set(input.identifiers.flatMap(item => item.provenanceIds))].sort();
-      for (const id of ids) await tx.$queryRaw`SELECT id FROM diagnostic_identity_provenance WHERE id=${id} FOR SHARE`;
-      const held = await tx.diagnosticIdentityProvenance.findMany({ where: { id: { in: ids } }, orderBy: { id: "asc" } });
-      if (held.length !== ids.length || held.some(row => row.orderId !== orderId || !this.retained(row))) throw denied();
-      if (order.version !== input.expectedOrderVersion) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
-      const raw = await tx.diagnosticIdentityRecord.findUnique({ where: { id: input.identityRecordId } });
-      if (!raw || raw.orderId !== orderId || raw.erasedAt || !raw.observationHash) throw denied();
-      const current = await tx.diagnosticIdentityRecord.findFirst({ where: { orderId, erasedAt: null }, orderBy: { orderVersion: "desc" } });
-      // The server never infers a correction: a root needs an observation with no structured evidence,
-      // a correction names the retained current leaf and both bind the current raw observation.
-      if (current?.id !== raw.id) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
-      if (!input.correction) {
-        if (await tx.diagnosticIdentityEvidence.count({ where: { identityRecordId: raw.id } })) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
-      } else {
-        const parent = await tx.diagnosticIdentityEvidence.findUnique({ where: { id: input.correction.supersedesId }, include: { successor: true } });
-        if (!parent || parent.orderId !== orderId || parent.erasedAt) throw denied();
-        if (parent.successor) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
-        const { records, usable } = await this.graph(tx, orderId);
-        if (!usable.has(parent.id)) throw denied();
-        // A correction needs at least one supporting reference no earlier record used.
-        const used = new Set(records.flatMap(record => { const items = references.safeParse(record.provenance); return items.success ? items.data.map(item => item.id) : []; }));
-        if (ids.every(id => used.has(id))) throw denied();
-      }
-      const next = await tx.inspectionOrder.update({ where: { id: orderId }, data: { version: { increment: 1 }, identityEvidenceGeneration: { increment: 1 } } });
-      const provenance = held.map(row => { const object = bound(row); return { id: row.id, sha256: object.sha256, mime: object.mime, sizeBytes: object.sizeBytes }; });
-      const recordedAt = this.runtime.now();
-      // Versioned fixed-order binding; object hashes bind the retained sanitized bytes.
-      const recordHash = sha(canonical(["diagnostic-identity-evidence/v1", input.id, orderId, next.version, raw.id, raw.observationHash, input.identifiers,
-        provenance, input.rights, input.correction, subject.userId, recordedAt.toISOString()]));
-      const saved = await tx.diagnosticIdentityEvidence.create({ data: { id: input.id, orderId, orderVersion: next.version, identityRecordId: raw.id, observationHash: raw.observationHash,
-        identifiers: json(input.identifiers), provenance: json(provenance), rights: json(input.rights), rightsUntil, supersedesId: input.correction?.supersedesId ?? null,
-        explanation: input.correction?.explanation ?? null, recordHash, recordedById: subject.userId, recordedAt }, include: { identityRecord: true } });
-      await tx.diagnosticAudit.create({ data: { id: this.runtime.id(), centerId: order.centerId, orderId, actorId: subject.userId,
-        action: input.correction ? "IDENTITY_EVIDENCE_CORRECTED" : "IDENTITY_EVIDENCE_CAPTURED", details: {}, createdAt: recordedAt } });
-      return this.dto(saved);
+      const initialOrder = await tx.inspectionOrder.findUnique({ where: { id: orderId } });
+      const initialRaw = await tx.diagnosticIdentityRecord.findUnique({ where: { id: input.identityRecordId } });
+      const initialHeld = await tx.diagnosticIdentityProvenance.findMany({ where: { id: { in: ids } }, orderBy: { id: "asc" } });
+      if (!initialOrder || !initialRaw) throw denied();
+      const recordedAt = this.runtime.now(), auditId = this.runtime.id(), rightsUntil = new Date(input.rights.schedule.until);
+      const version = initialOrder.version + 1;
+      const provenance = initialHeld.map(row => { const object = bound(row); return { id: row.id, sha256: object.sha256, mime: object.mime, sizeBytes: object.sizeBytes }; });
+      const recordHash = sha(canonical(["diagnostic-identity-evidence/v1", input.id, orderId, version, initialRaw.id, initialRaw.observationHash,
+        input.identifiers, provenance, input.rights, input.correction, subject.userId, recordedAt.toISOString()]));
+      const orderNext = { version, identityEvidenceGeneration: initialOrder.identityEvidenceGeneration + 1, updatedAt: recordedAt };
+      const data = { id: input.id, orderId, orderVersion: version, identityRecordId: initialRaw.id, observationHash: initialRaw.observationHash,
+        identifiers: json(input.identifiers), provenance: json(provenance), rights: json(input.rights), rightsUntil,
+        supersedesId: input.correction?.supersedesId ?? null, explanation: input.correction?.explanation ?? null, recordHash, recordedById: subject.userId, recordedAt, erasedAt: null };
+      const audit = { id: auditId, centerId: initialOrder.centerId, orderId, actorId: subject.userId,
+        action: input.correction ? "IDENTITY_EVIDENCE_CORRECTED" : "IDENTITY_EVIDENCE_CAPTURED", details: {}, createdAt: recordedAt };
+      const rows = [await diagnosticPlannedRow(tx, { table: "inspection_orders", key: { id: orderId } }, orderNext),
+        await diagnosticPlannedRow(tx, this.evidenceRoot(input.id), data, true), await diagnosticPlannedRow(tx, this.auditRoot(auditId), audit, true)];
+      return diagnosticMutation(tx, { operation: "identity_material_change", roots, rows, actorUserId: subject.userId,
+        sessionId: subject.sessionId, cutoff: null, campaign: null }, async () => {
+        const order = await this.capturer(tx, subject, orderId);
+        if (!this.live(input.rights, rightsUntil)) throw denied();
+        for (const id of ids) await tx.$queryRaw`SELECT id FROM diagnostic_identity_provenance WHERE id=${id} FOR SHARE`;
+        const held = await tx.diagnosticIdentityProvenance.findMany({ where: { id: { in: ids } }, orderBy: { id: "asc" } });
+        if (held.length !== ids.length || held.some(row => row.orderId !== orderId || !this.retained(row))) throw denied();
+        if (order.version !== input.expectedOrderVersion || order.version !== initialOrder.version) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
+        const raw = await tx.diagnosticIdentityRecord.findUnique({ where: { id: input.identityRecordId } });
+        if (!raw || raw.orderId !== orderId || raw.erasedAt || !raw.observationHash) throw denied();
+        const current = await tx.diagnosticIdentityRecord.findFirst({ where: { orderId, erasedAt: null }, orderBy: { orderVersion: "desc" } });
+        // The server never infers a correction: a root needs an observation with no structured evidence,
+        // a correction names the retained current leaf and both bind the current raw observation.
+        if (current?.id !== raw.id) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
+        if (!input.correction) {
+          if (await tx.diagnosticIdentityEvidence.count({ where: { identityRecordId: raw.id } })) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
+        } else {
+          const parent = await tx.diagnosticIdentityEvidence.findUnique({ where: { id: input.correction.supersedesId }, include: { successor: true } });
+          if (!parent || parent.orderId !== orderId || parent.erasedAt) throw denied();
+          if (parent.successor) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
+          const { records, usable } = await this.graph(tx, orderId);
+          if (!usable.has(parent.id)) throw denied();
+          // A correction needs at least one supporting reference no earlier record used.
+          const used = new Set(records.flatMap(record => { const items = references.safeParse(record.provenance); return items.success ? items.data.map(item => item.id) : []; }));
+          if (ids.every(id => used.has(id))) throw denied();
+        }
+        await tx.inspectionOrder.update({ where: { id: orderId }, data: orderNext });
+        const saved = await tx.diagnosticIdentityEvidence.create({ data, include: { identityRecord: true } });
+        await tx.diagnosticAudit.create({ data: audit });
+        return this.dto(saved);
+      });
     });
   }
 

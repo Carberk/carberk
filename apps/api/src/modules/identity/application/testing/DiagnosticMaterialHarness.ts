@@ -3,21 +3,25 @@ import { randomUUID } from "node:crypto";
 import { ConfigService } from "@nestjs/config";
 import { DiagnosticMemoryDatabase, diagnosticTestId as id, diagnosticTestSha as sha } from "@auto-tm/db/testing";
 import type { DiagnosticSourceCommand, Prisma, PrismaService } from "@auto-tm/db";
-import { CheckBusinessAuthority } from "../../../identity/application/CheckBusinessAuthority";
-import { CheckStaffAuthority } from "../../../identity/application/CheckStaffAuthority";
-import { PrismaBusinessAuthority } from "../../../identity/infrastructure/PrismaBusinessAuthority";
-import { PrismaStaffAuthority } from "../../../identity/infrastructure/PrismaStaffAuthority";
-import { DiagnosticAuthority } from "../../infrastructure/DiagnosticAuthority";
-import { CampaignDiagnosticAdmission } from "../../infrastructure/campaignDiagnosticAdmission";
-import { DiagnosticReportAccess } from "../../infrastructure/DiagnosticReportAccess";
-import { PrismaDiagnosticEvidence } from "../../infrastructure/PrismaDiagnosticEvidence";
-import { PrismaDiagnosticIdentityEvidence } from "../../infrastructure/PrismaDiagnosticIdentityEvidence";
-import type { DiagnosticObjects } from "../../domain/ports/DiagnosticObjects";
-import { rights } from "./ownershipGrantHarness";
+import { CheckBusinessAuthority } from "../CheckBusinessAuthority";
+import { CheckStaffAuthority } from "../CheckStaffAuthority";
+import { PrismaBusinessAuthority } from "../../infrastructure/PrismaBusinessAuthority";
+import { PrismaStaffAuthority } from "../../infrastructure/PrismaStaffAuthority";
+import { DiagnosticAuthority } from "../../../diagnostics/infrastructure/DiagnosticAuthority";
+import { CampaignDiagnosticAdmission } from "../../../diagnostics/infrastructure/campaignDiagnosticAdmission";
+import { DiagnosticReportAccess } from "../../../diagnostics/infrastructure/DiagnosticReportAccess";
+import { PrismaDiagnosticEvidence } from "../../../diagnostics/infrastructure/PrismaDiagnosticEvidence";
+import { PrismaDiagnosticIdentityEvidence } from "../../../diagnostics/infrastructure/PrismaDiagnosticIdentityEvidence";
+import type { DiagnosticIdentityEvidencePort } from "../../../diagnostics/domain/ports/DiagnosticIdentityEvidencePort";
+import type { DiagnosticEvidencePort } from "../../../diagnostics/domain/ports/DiagnosticEvidencePort";
+import type { DiagnosticObjects } from "../../../diagnostics/domain/ports/DiagnosticObjects";
+import { rights } from "../../../diagnostics/application/testing/ownershipGrantHarness";
 
 type Row = Record<string, unknown>;
 const tables = { user: "users", session: "sessions", staffGrant: "staff_grants", inspectionOrder: "inspection_orders", diagnosticReportRecord: "diagnostic_reports", diagnosticIdentityRecord: "diagnostic_identity_records", diagnosticIdentityEvidence: "diagnostic_identity_evidence", diagnosticIdentityProvenance: "diagnostic_identity_provenance", diagnosticEvidence: "diagnostic_evidence", diagnosticAudit: "diagnostic_audits", diagnosticOrderAssignment: "diagnostic_order_assignments", diagnosticCenterAssignment: "diagnostic_center_assignments", dealershipMember: "dealership_members" };
 type Model = keyof typeof tables;
+type Delegate = { findUnique(args: { where: Row; include?: Row }): Promise<Row | null>; findMany(): Promise<Row[]> };
+const delegate = (memory: DiagnosticMemoryDatabase, model: Model) => memory.client[model] as unknown as Delegate;
 /** CRUD/rollback and finite protocol replies at the database boundary. It does not
  * model SQL closure, locks, trigger effects, collision semantics or concurrency. */
 export function materialHarness() {
@@ -31,7 +35,7 @@ export function materialHarness() {
   const query = async (sql: string, values: unknown[], state: { prefix: boolean; command?: DiagnosticSourceCommand; discovered?: unknown[] }) => {
     if (sql.includes("diagnostic_source_project")) {
       const table = String(values[0]), key = JSON.parse(String(values[1])) as Row;
-      const source = await memory.client[modelFor(table)].findUnique({ where: key as never });
+      const source = await delegate(memory, modelFor(table)).findUnique({ where: key });
       return [{ source, next: { ...source as object, ...JSON.parse(String(values.at(-1))) } }];
     }
     if (sql.includes("diagnostic_prepare_source")) {
@@ -57,7 +61,7 @@ export function materialHarness() {
     return [];
   };
   const transaction = async <T>(work: (tx: Prisma.TransactionClient) => Promise<T>) => {
-    const snapshot = await Promise.all(Object.keys(tables).map(async name => [name, await memory.client[name as Model].findMany()] as const));
+    const snapshot = await Promise.all(Object.keys(tables).map(async name => [name, await delegate(memory, name as Model).findMany()] as const));
     const state = { prefix: false };
     const tx = new Proxy(memory.client, { get(target, property) {
       if (property === "$queryRaw") return (parts: TemplateStringsArray, ...values: unknown[]) => query(parts.join("?"), values, state);
@@ -67,7 +71,10 @@ export function materialHarness() {
       return new Proxy(value as object, { get(model, method) {
         const delegate = Reflect.get(model, method) as (args: unknown) => Promise<unknown>;
         if (method !== "create") return delegate;
-        return (args: { data: Row; include?: Row }) => delegate({ ...args, data: { state: "staged", erasedAt: null, writeLeaseUntil: null, ...args.data } });
+        return async (args: { data: Row; include?: Row }) => {
+          const row = await delegate({ ...args, data: { state: "staged", erasedAt: null, writeLeaseUntil: null, ...args.data } }) as Row;
+          return args.include ? (value as Delegate).findUnique({ where: { id: row["id"] }, include: args.include }) : row;
+        };
       } });
     } });
     active = true;
@@ -96,8 +103,8 @@ export function materialHarness() {
   seed("inspectionOrder", { id: orderId, centerId: id(6), templateVersionId: id(9), status: "arrived", physicalAuthorization: {}, version: 1, identityEvidenceGeneration: 0, synthetic: true, erasedAt: null, listingId: null, audience: "buyer_private", commissionerId: id(10) });
   seed("diagnosticIdentityRecord", { id: rawId, orderId, orderVersion: 1, observation: { method: "manual", vin: null, manualReference: "Synthetic plate", mileageKm: 100, observedAt: "2026-10-25T11:00:00.000Z" }, observationHash: "a".repeat(64), erasedAt: null });
   seed("diagnosticReportRecord", { id: reportId, orderId, version: 1, erasedAt: null, snapshot: null, audience: "buyer_private", state: { status: "draft", authorId: subject.userId, findings: [] } });
-  const identity = new PrismaDiagnosticIdentityEvidence(db, authority, objects, runtime);
-  const evidence = new PrismaDiagnosticEvidence(db, new DiagnosticReportAccess(authority, runtime), objects, runtime);
+  const identity: DiagnosticIdentityEvidencePort = new PrismaDiagnosticIdentityEvidence(db, authority, objects, runtime);
+  const evidence: DiagnosticEvidencePort = new PrismaDiagnosticEvidence(db, new DiagnosticReportAccess(authority, runtime), objects, runtime);
   const bytes = new Uint8Array([1, 2, 3]);
   const stage = (provenanceId = id(11)) => ({ id: provenanceId, expectedOrderVersion: 1, contentType: "image/png" as const, sizeBytes: bytes.length, rights });
   return { db, identity, evidence, subject, orderId, reportId, rawId, bytes, stored, commands, seed, stage, rights, id,
