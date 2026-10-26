@@ -81,7 +81,7 @@ describe("real prepared diagnostic material adapters", () => {
     await db.diagnosticOrderAssignment.create({ data: { id: id("reception-assignment"), orderId, userId, capability: "diagnostics.reception" } });
     await db.diagnosticIdentityRecord.create({ data: { id: rawId, orderId, orderVersion: 1, observation, observationHash: diagnosticObservationHash(orderId, 1, observation), recordedAt: clock, recordedById: userId } });
     const selected = await db.diagnosticIdentityRecord.findFirstOrThrow({ where: { orderId, erasedAt: null }, orderBy: [{ orderVersion: "desc" }, { id: "desc" }] });
-    await db.diagnosticReportRecord.create({ data: { id: reportId, orderId, identityRecordId: selected.id, identityRecordHash: selected.observationHash, templateVersionId: templateId, audience: "buyer_private", state: { status: "draft", authorId: userId, findings: [] } } });
+    await db.diagnosticReportRecord.create({ data: { id: reportId, orderId, identityRecordId: selected.id, identityRecordHash: selected.observationHash, templateVersionId: templateId, audience: "buyer_private", state: { id: reportId, orderId, templateVersionId: templateId, audience: "buyer_private", status: "draft", authorId: userId, findings: [] } } });
     await guards(true);
     expect((await db.$queryRaw<{ ready: boolean }[]>`SELECT diagnostic_source_guards_ready() AS ready`)[0]?.ready).toBe(true);
     expect((await pool.query<{ tgenabled: string }>("SELECT tgenabled FROM pg_trigger WHERE tgrelid='diagnostic_reports'::regclass AND tgname='diagnostic_report_identity_pin'")).rows).toEqual([{ tgenabled: "O" }]);
