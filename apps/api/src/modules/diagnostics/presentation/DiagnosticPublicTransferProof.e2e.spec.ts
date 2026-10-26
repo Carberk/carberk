@@ -24,12 +24,13 @@ import { workerDatabaseName, workerUrls } from "../../../../test/helpers/testDat
 import { GlobalErrorFilter } from "../../../common/error.filter";
 import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
 import { IDENTITY_CLOCK_PORT } from "../../identity/identity.public";
+import { AdminModule } from "../../admin/admin.module";
 import { DiagnosticsModule } from "../diagnostics.module";
 import { DIAGNOSTIC_RUNTIME } from "../domain/ports/DiagnosticIntakePort";
 import { DIAGNOSTIC_OBJECTS, type DiagnosticObjects } from "../domain/ports/DiagnosticObjects";
 
 const suite = defineE2eSuite("diagnostic-public-transfer-proof");
-const people = ["sellerA", "sellerB", "erasureSeller", "erasurePdfSeller", "handoffErasureSeller", "outsider", "reception", "technician", "reviewer"] as const;
+const people = ["sellerA", "sellerB", "erasureSeller", "erasurePdfSeller", "handoffErasureSeller", "outsider", "reception", "technician", "reviewer", "moderator"] as const;
 type Person = typeof people[number];
 const capability: Partial<Record<Person, string>> = {
   reception: "diagnostics.reception", technician: "diagnostics.technician", reviewer: "diagnostics.reviewer",
@@ -187,10 +188,11 @@ describe("public continuity across different sellers and Listings", { concurrent
   // Only this exact product-purged order may have its original ownership severed.
   const erasedOrders = new Map<string, Date>();
   const erasedAuditIds = new Set<string>();
+  const moderationAudits: string[] = [];
   let ownsCenter = false;
   const listings: { id: string; sellerId: string }[] = [];
   let catalogRegistered = false;
-  const headers = (who: Person) => ({ authorization: `Bearer ${jwt.sign({ sub: suite.id(who), sid: suite.id(`${who}-session`), role: "buyer" })}` });
+  const headers = (who: Person) => ({ authorization: `Bearer ${jwt.sign({ sub: suite.id(who), sid: suite.id(`${who}-session`), role: who === "moderator" ? "admin" : "buyer" })}` });
   const runtimeStarted = performance.now();
   const responses: { verb: string; path: string; who: Person; status: number; elapsedMs: number }[] = [];
   const observeResponse = (verb: string, path: string, who: Person) => (response: { status: number }) => {
@@ -203,6 +205,50 @@ describe("public continuity across different sellers and Listings", { concurrent
   const comparisonPath = (b: Order, reportId: string) => `orders/${b.id}/reinspection-comparison?predecessorId=${reportId}`;
   const history = async (o: Order): Promise<Raw[]> => (await get("technician", `orders/${o.id}/identity-records`).expect(200)).body;
   const version = async (o: Order) => (await get("technician", `orders/${o.id}`).expect(200)).body.version as number;
+  async function moderatePersonal(who: "sellerA" | "sellerB", suspended: boolean) {
+    const userId = suite.id(who);
+    const current = await db.user.findUniqueOrThrow({ where: { id: userId } });
+    if (!suspended && !current.suspendedAt) return;
+    const path = `admin/users/${userId}/${suspended ? "suspend" : "unsuspend"}`;
+    const reason = "Synthetic public continuity publisher eligibility transition";
+    if (suspended) {
+      const deniedAdmin = await request.post(`/api/v1/${path}`).set(headers("reviewer")).send({ reason }).expect(403);
+      expect(deniedAdmin.body).toMatchObject({ code: "FORBIDDEN", message: "Admin role required" });
+      expect(await db.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(current);
+    }
+    // The real Admin caller and Prisma's audit default use wall time, as does
+    // PostgreSQL's prepared audit tuple. Keep diagnostic observation time separate.
+    vi.useRealTimers();
+    const started = new Date();
+    let response: supertest.Response;
+    let completed: Date;
+    try {
+      response = await request.post(`/api/v1/${path}`).set(headers("moderator")).send({ reason })
+        .on("response", observeResponse("POST", path, "moderator"));
+      completed = new Date();
+    } finally {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(now);
+    }
+    if (typeof response.body.auditLogId === "string") moderationAudits.push(response.body.auditLogId);
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    expect(response.body).toMatchObject({ targetId: userId, targetState: suspended
+      ? { suspendedAt: expect.any(String), suspendedById: suite.id("moderator"), suspensionReason: reason }
+      : { suspendedAt: null, suspendedById: null, suspensionReason: null } });
+    const audit = await db.auditLog.findUniqueOrThrow({ where: { id: response.body.auditLogId } });
+    expect(audit).toMatchObject({
+      actorId: suite.id("moderator"), targetType: "user", targetId: userId,
+      action: suspended ? "USER_SUSPEND" : "USER_UNSUSPEND", details: { reason } });
+    expect(audit.createdAt.getTime()).toBeGreaterThanOrEqual(started.getTime());
+    expect(audit.createdAt.getTime()).toBeLessThanOrEqual(completed!.getTime());
+    if (suspended) {
+      const persisted = await db.user.findUniqueOrThrow({ where: { id: userId } });
+      expect(persisted.suspendedAt?.toISOString()).toBe(response.body.targetState.suspendedAt);
+      expect(persisted.suspendedAt!.getTime()).toBeGreaterThanOrEqual(started.getTime());
+      expect(persisted.suspendedAt!.getTime()).toBeLessThanOrEqual(completed!.getTime());
+    }
+    expect(await db.session.count({ where: { userId } })).toBe(0);
+  }
   async function teardownOwnedFixtures() {
     if (!db) return;
     // Only request-registered keys, including an upload that wrote bytes before failing.
@@ -278,6 +324,8 @@ describe("public continuity across different sellers and Listings", { concurrent
       for (const user of users) {
         const registered = await db.user.findUniqueOrThrow({ where: { id: user.id }, select: { _count: { select: {
           sessions: { where: { id: { in: owned.sessions } } },
+          auditLogs: { where: { id: { in: moderationAudits }, actorId: suite.id("moderator"), targetType: "user",
+            targetId: { in: [suite.id("sellerA"), suite.id("sellerB")] }, action: { in: ["USER_SUSPEND", "USER_UNSUSPEND"] } } },
           listings: { where: { OR: listings } },
           staffGrants: { where: { OR: owned.grants } },
           diagnosticCenterAssignments: { where: { id: { in: owned.qualifications }, centerId } },
@@ -401,8 +449,9 @@ describe("public continuity across different sellers and Listings", { concurrent
       FROM pg_roles r WHERE rolname=current_user`;
     expect(role).toEqual([{ current_user: fixtureRole, session_user: fixtureRole, privileged: false, owns: false }]);
     console.info("R8 restricted application role", role);
-    const testing = await Test.createTestingModule({ imports: [ConfigModule.forRoot({ isGlobal: true, load: [() => ({ DIAGNOSTIC_PRIVATE_BUCKET: "diagnostic-test-private" })] }),
-      EventEmitterModule.forRoot(), bullTestRoot(), DiagnosticsModule, JwtModule.register({ global: true, secret: "synthetic-diagnostic-test" })] })
+    const testing = await Test.createTestingModule({ imports: [ConfigModule.forRoot({ isGlobal: true, load: [() => ({ DIAGNOSTIC_PRIVATE_BUCKET: "diagnostic-test-private", ADMIN_MODERATION_ACTIONS_ENABLED: true,
+      MINIO_PUBLIC_URL: process.env["MINIO_PUBLIC_URL"] ?? process.env["MINIO_ENDPOINT"], MINIO_REGION: process.env["MINIO_REGION"] ?? "us-east-1" })] }),
+      EventEmitterModule.forRoot(), bullTestRoot(), DiagnosticsModule, AdminModule, JwtModule.register({ global: true, secret: "synthetic-diagnostic-test" })] })
       .overrideProvider(PrismaService).useValue(db)
       .overrideProvider(IDENTITY_CLOCK_PORT).useValue({ now: () => now })
       .overrideProvider(DIAGNOSTIC_RUNTIME).useValue({ now: () => now, id: randomUUID, publicSyntheticAllowed: () => true,
@@ -435,7 +484,7 @@ describe("public continuity across different sellers and Listings", { concurrent
     await seedSuiteCatalog(db, suite);
     for (const who of people) {
       owned.users.push(suite.id(who));
-      await db.user.create({ data: { id: suite.id(who), phone: suite.phone(who), role: "buyer", phoneVerifiedAt: now } });
+      await db.user.create({ data: { id: suite.id(who), phone: suite.phone(who), role: who === "moderator" ? "admin" : "buyer", phoneVerifiedAt: now } });
       owned.sessions.push(suite.id(`${who}-session`));
       await db.session.create({ data: { id: suite.id(`${who}-session`), userId: suite.id(who), refreshTokenHash: suite.id(`${who}-refresh`), expiresAt: future, adminTotpExpiresAt: future } });
       if (capability[who]) {
@@ -896,19 +945,19 @@ describe("public continuity across different sellers and Listings", { concurrent
     return { reportId, predecessorId: p.released.id, expectedOrderVersion: p.b.version, proofId, reason: "Fresh independently authorized public visit" };
   }
 
-  async function automaticPredecessor() {
+  async function automaticPredecessor(requestOwnershipGrant = true) {
     const listingId = await isolatedListing("sellerA");
     const observation: Observation = { observedAt: "2026-10-21T10:00:00.000Z", mileageKm: 123000,
       method: "vin", vin: "syn-vin-041", manualReference: null };
-    const a = await visitOnListing(observation, "sellerA", listingId, "A automatic physical visit", true);
+    const a = await visitOnListing(observation, "sellerA", listingId, "A automatic physical visit", requestOwnershipGrant);
     const [ia] = await history(a); const pa = randomUUID();
     await verified(a, pa, red); const ea = await capture(a, ia!, pa, red);
     const released = await release(a);
     return { listingId, observation, a, ia: ia!, pa, ea, released };
   }
-  async function automaticCandidate(prior: Awaited<ReturnType<typeof automaticPredecessor>>) {
+  async function automaticCandidate(prior: Awaited<ReturnType<typeof automaticPredecessor>>, requestOwnershipGrant = true) {
     const observation: Observation = { ...prior.observation, observedAt: "2026-10-21T11:00:00.000Z", mileageKm: 123100, vin: "SYN-VIN-041" };
-    const b = await visitOnListing(observation, "sellerA", prior.listingId, "B automatic physical visit with own consent", true);
+    const b = await visitOnListing(observation, "sellerA", prior.listingId, "B automatic physical visit with own consent", requestOwnershipGrant);
     const [ib] = await history(b); const pb = randomUUID();
     const classification = { ...rights, provenance: "Independently generated B VIN tile authorized by unchanged seller A for visit B" };
     await verified(b, pb, blue, classification); const eb = await capture(b, ib!, pb, blue, classification);
@@ -1056,6 +1105,85 @@ describe("public continuity across different sellers and Listings", { concurrent
     await denied(await post("technician", `orders/${p.b.id}/reinspections`, input));
     expect(await db.diagnosticReportRecord.count({ where: { predecessorId: p.released.id } })).toBe(0);
     expect(await db.diagnosticAudit.count({ where: { orderId: p.b.id, action: "CONTINUITY_PROOF_CONSUMED" } })).toBe(0);
+  });
+
+  it.each(["A", "B"] as const)("refuses automatic continuity when %s first ownership is unavailable and a late grant cannot repair it", async side => {
+    const p = await automaticCandidate(await automaticPredecessor(side !== "A"), side !== "B");
+    const order = side === "A" ? p.a : p.b;
+    const raw = side === "A" ? p.ia : p.ib;
+    const anchor = await db.diagnosticSourceAnchor.findUniqueOrThrow({ where: { orderId: order.id } });
+    const component = await db.diagnosticOwnershipComponent.findUniqueOrThrow({ where: { identityRecordId: raw.id } });
+    const records = await history(order);
+    const audits = await db.diagnosticAudit.findMany({ where: { orderId: p.b.id }, orderBy: { id: "asc" } });
+    expect(anchor).toMatchObject({ firstRecordId: raw.id, state: "unavailable" });
+    expect(component).toMatchObject({ orderId: order.id, identityRecordId: raw.id, state: "unavailable", grantId: null,
+      sourceListingId: null, sellerId: null, commissionerId: null, rights: null, rightsUntil: null });
+    expect(await db.diagnosticOwnershipGrant.findUnique({ where: { orderId: order.id } })).toBeNull();
+    await denied(await post("sellerA", `orders/${order.id}/ownership-grant`, { rights }));
+    await denied(await post("reviewer", `orders/${p.b.id}/continuity-proofs`, automaticInput(p)));
+    expect(await db.diagnosticOwnershipGrant.findUnique({ where: { orderId: order.id } })).toBeNull();
+    expect(await db.diagnosticSourceAnchor.findUniqueOrThrow({ where: { orderId: order.id } })).toEqual(anchor);
+    expect(await db.diagnosticOwnershipComponent.findUniqueOrThrow({ where: { identityRecordId: raw.id } })).toEqual(component);
+    expect(await history(order)).toEqual(records);
+    expect(await db.diagnosticContinuityProof.count({ where: { candidateOrderId: p.b.id } })).toBe(0);
+    expect(await db.diagnosticReportRecord.count({ where: { orderId: p.b.id } })).toBe(0);
+    expect(await db.diagnosticAudit.findMany({ where: { orderId: p.b.id }, orderBy: { id: "asc" } })).toEqual(audits);
+  });
+
+  it.each(["A", "B"] as const)("serializes automatic consume behind authenticated %s ownership revocation at the real User lock", async side => {
+    const p = await automaticCandidate(await automaticPredecessor());
+    const issued = await post("reviewer", `orders/${p.b.id}/continuity-proofs`, automaticInput(p)).expect(201);
+    const proofId = issued.body.proofId as string; owned.proofs.push(proofId);
+    const input = publicLink(p, proofId);
+    const order = side === "A" ? p.a : p.b;
+    const raw = side === "A" ? p.ia : p.ib;
+    const component = await db.diagnosticOwnershipComponent.findUniqueOrThrow({ where: { identityRecordId: raw.id } });
+    expect(component.grantId).toEqual(expect.stringMatching(uuid));
+    let settled: Promise<PromiseSettledResult<supertest.Response>[]> | undefined;
+    try {
+      await db.$transaction(async tx => {
+        const [holder] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+        // A read-only lock holder is a barrier, never an opposing source mutation.
+        await tx.$queryRaw`SELECT id FROM users WHERE id=${suite.id("sellerA")} FOR UPDATE`;
+        const waitFor = async (count: number) => {
+          for (let attempt = 0; ; attempt++) {
+            const blocked = await db.$queryRaw<{ pid: number; blockers: number[] }[]>`SELECT activity.pid,pg_blocking_pids(activity.pid) AS blockers
+              FROM pg_stat_activity activity WHERE activity.datname=current_database() AND activity.usename=current_user
+              AND (${holder!.pid}::int=ANY(pg_blocking_pids(activity.pid)) OR EXISTS (
+                SELECT 1 FROM pg_stat_activity direct WHERE ${holder!.pid}::int=ANY(pg_blocking_pids(direct.pid))
+                AND direct.pid=ANY(pg_blocking_pids(activity.pid)))) ORDER BY activity.pid`;
+            if (blocked.length === count) {
+              console.info("R8 automatic ownership race PID barrier", { side, holder: holder!.pid, count, blocked });
+              return;
+            }
+            if (attempt === 500) {
+              const graph = await fixtureOwner.query(`SELECT json_build_object(
+                'activity',(SELECT json_agg(a ORDER BY pid) FROM (SELECT pid,usename,state,wait_event_type,wait_event,query,
+                  pg_blocking_pids(pid) AS blockers FROM pg_stat_activity WHERE datname=current_database()) a),
+                'locks',(SELECT json_agg(l ORDER BY pid,locktype,mode) FROM (SELECT pid,locktype,mode,granted,relation::regclass::text,
+                  page,tuple,virtualxid,transactionid::text,classid,objid,objsubid FROM pg_locks
+                  WHERE pid IN (SELECT pid FROM pg_stat_activity WHERE datname=current_database())) l)) AS graph`);
+              console.info("R8 automatic ownership full lock graph", JSON.stringify({ side, holder: holder!.pid, graph: graph.rows[0]?.graph }));
+              throw new Error(`Only ${blocked.length} of ${count} ownership requests reached User lock holder ${holder!.pid}`);
+            }
+          }
+        };
+        const revoked = Promise.resolve(post("sellerA", `orders/${order.id}/ownership-grant/${component.grantId}/revoke`, {}));
+        settled = Promise.allSettled([revoked]);
+        await waitFor(1);
+        const consumed = Promise.resolve(post("technician", `orders/${p.b.id}/reinspections`, input));
+        settled = Promise.allSettled([revoked, consumed]);
+        await waitFor(2);
+      });
+    } catch (error) { await settled; throw error; }
+    const outcomes = await settled!;
+    for (const result of outcomes) if (result.status === "rejected") throw result.reason;
+    const [revoked, consumed] = outcomes.map(result => (result as PromiseFulfilledResult<supertest.Response>).value);
+    expect(revoked!.status, JSON.stringify(revoked!.body)).toBe(201);
+    await denied(consumed!);
+    expect(await db.diagnosticReportRecord.findUnique({ where: { id: input.reportId } })).toBeNull();
+    expect(await db.diagnosticAudit.count({ where: { orderId: p.b.id, action: "CONTINUITY_PROOF_CONSUMED" } })).toBe(0);
+    expect(await db.diagnosticOwnershipGrant.findUniqueOrThrow({ where: { id: component.grantId! } })).toMatchObject({ state: "erased" });
   });
 
   it("links unchanged public Listing identity and ownership by normalized VIN with independent B release", async () => {
@@ -1221,24 +1349,24 @@ describe("public continuity across different sellers and Listings", { concurrent
   it("permanently refuses the SAME unused proof after the personal publisher is suspended then restored", async () => {
     const p = await freshPublicPair(); const proofId = await issuePublic(p); const input = publicLink(p,proofId);
     try {
-      await db.user.update({ where: { id: suite.id("sellerB") }, data: { suspendedAt: initialTime } });
+      await moderatePersonal("sellerB", true);
       const invalid = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
       expect(invalid.invalidatedAt).toBeInstanceOf(Date);
-      await db.user.update({ where: { id: suite.id("sellerB") }, data: { suspendedAt: null } });
+      await moderatePersonal("sellerB", false);
       await denied(await post("technician", `orders/${p.b.id}/reinspections`, input));
       expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).toEqual(invalid);
       expect(await db.diagnosticReportRecord.findUnique({ where: { id: input.reportId } })).toBeNull();
       const replacement = await issuePublic(p);
       expect(replacement).not.toBe(proofId);
       await post("technician", `orders/${p.b.id}/reinspections`, { ...input, proofId: replacement }).expect(201);
-    } finally { await db.user.update({ where: { id: suite.id("sellerB") }, data: { suspendedAt: null } }); }
+    } finally { await moderatePersonal("sellerB", false); }
   });
   it("rechecks B publisher power at independent release while preserving its consumed link and ordinary draft writes", async () => {
     const p = await freshPublicPair(); const proofId = await issuePublic(p); const input = publicLink(p,proofId);
     await post("technician", `orders/${p.b.id}/reinspections`, input).expect(201);
     const consumed = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
     try {
-      await db.user.update({ where: { id: suite.id("sellerB") }, data: { suspendedAt: initialTime } });
+      await moderatePersonal("sellerB", true);
       const finding = { id: randomUUID(), checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: [], kind: null, source: null, measurement: null, location: null };
       owned.findings.push(finding.id);
       await post("technician", `reports/${input.reportId}/findings`, { expectedVersion: 0, finding }).expect(201);
@@ -1246,7 +1374,7 @@ describe("public continuity across different sellers and Listings", { concurrent
       await denied(await post("reviewer", `reports/${input.reportId}/transition`, { expectedVersion: 2, action: "finalize" }));
       expect((await get("reviewer", `reports/${input.reportId}`).expect(200)).body).toMatchObject({ version: 2, status: "submitted", findings: [finding] });
       expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).toEqual(consumed);
-      await db.user.update({ where: { id: suite.id("sellerB") }, data: { suspendedAt: null } });
+      await moderatePersonal("sellerB", false);
       // A changes after consumption; B publication must never re-run A admission.
       await post("reviewer", `reports/${p.released.id}/transition`, { expectedVersion: 3, action: "withdraw", reason: "Independent A history" }).expect(201);
       const finalized = await post("reviewer", `reports/${input.reportId}/transition`, { expectedVersion: 2, action: "finalize" });
@@ -1255,19 +1383,19 @@ describe("public continuity across different sellers and Listings", { concurrent
       for (const row of pdfs) owned.keys.add(`diagnostic-pdf/${input.reportId}/${row.id}.pdf`);
       expect(finalized.status, JSON.stringify(finalized.body)).toBe(201);
       expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).toEqual(consumed);
-    } finally { await db.user.update({ where: { id: suite.id("sellerB") }, data: { suspendedAt: null } }); }
+    } finally { await moderatePersonal("sellerB", false); }
   });
   it("admits retained withdrawn A without requiring its historical personal seller to publish B", async () => {
     const p = await freshPublicPair();
     await post("reviewer", `reports/${p.released.id}/transition`, { expectedVersion: 3, action: "withdraw", reason: "Retained historical predecessor" }).expect(201);
     const historical = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: p.released.id } });
     try {
-      await db.user.update({ where: { id: suite.id("sellerA") }, data: { suspendedAt: initialTime } });
+      await moderatePersonal("sellerA", true);
       const proofId = await issuePublic(p,4); const input = publicLink(p,proofId);
       await post("technician", `orders/${p.b.id}/reinspections`, input).expect(201);
       expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: p.released.id } })).toEqual(historical);
       expect((await get("technician", `reports/${input.reportId}`).expect(200)).body).toMatchObject({ findings: [], orderId: p.b.id, successorOf: p.released.id });
-    } finally { await db.user.update({ where: { id: suite.id("sellerA") }, data: { suspendedAt: null } }); }
+    } finally { await moderatePersonal("sellerA", false); }
   });
   it("permanently invalidates the SAME business publisher proof across membership revoke and restore", async () => {
     const businessId = suite.id("public-transfer-business");
