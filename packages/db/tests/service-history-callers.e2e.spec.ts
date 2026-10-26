@@ -1029,6 +1029,8 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   "$first first: existing=$existing push opposes actual $change writer", async ({ existing, change, first }) => {
   const f = await fixture(), device = await db.fcmDevice.create({ data: { id: fixtureId(), userId: f.owner.userId, token: fixtureId(), platform: "android", createdAt: now, updatedAt: now, lastUsedAt: now } });
   if (existing) await db.servicePushSubscription.create({ data: { id: fixtureId(), sessionId: f.owner.sessionId, deviceId: device.id, conversationId: f.id, lifecycleEpoch: 0, createdAt: now, updatedAt: now } });
+  const foreign = await fixture();
+  await db.fcmDevice.create({ data: { id: fixtureId(), userId: foreign.owner.userId, token: fixtureId(), platform: "android", createdAt: now, updatedAt: now, lastUsedAt: now } });
   const before = await transactionalState();
   const subscriptionsBefore = await db.servicePushSubscription.findMany({ orderBy: { id: "asc" } });
   let serviceState: Awaited<ReturnType<typeof transactionalState>> | undefined;
@@ -1048,7 +1050,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   if (first === "service" && change === "session") {
    expect(subscribed).toEqual({ ok: true, value: undefined });
    expect(written.ok).toBe(false);
-   if (!written.ok) expect(written.error).toMatchObject({ meta: { driverAdapterError: { cause: { originalCode: "P0001", originalMessage: "diagnostic_source_graph_changed" } } } });
+   if (!written.ok) expect(written.error).toMatchObject({ code: "P2010", meta: { driverAdapterError: { cause: { originalCode: "P0001", originalMessage: "diagnostic_source_graph_changed" } } } });
    const after = await transactionalState(), rows = present(serviceSubscriptions), completed = new Date();
    expect(rows).toHaveLength(1);
    const row = present(rows[0]);
