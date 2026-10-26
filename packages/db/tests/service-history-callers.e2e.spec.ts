@@ -16,7 +16,9 @@ import { withCampaignPreparation, type Prisma } from "../src/index";
 // R6a original matrix continuation, attempt 2. Authored source only.
 // Parent owns source disposition and separately authorized disposable execution.
 // This file never accepts a DATABASE_URL: it migrates only its own container.
-// Strict source guards remain dormant. Ordinary FK/check triggers stay enabled.
+// Task-owned fixture facts precede complete local source/campaign activation.
+// Exact inherited trigger modes are restored before each case database is dropped.
+// Automatic admission remains closed; ordinary FK/check triggers stay enabled.
 type Subject = { userId: string; sessionId: string };
 interface Caller {
  open(subject: Subject, purpose: "support" | "history", sourceListingId?: string): Promise<{ id: string; resourceId: string }>;
@@ -93,11 +95,39 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
  const pending: Promise<unknown>[] = [];
  const releases: (() => void)[] = [];
  const role = "r6a_service_caller";
+ type TriggerMode = "D" | "O" | "A" | "R";
+ type TriggerState = { table: string; name: string; enabled: TriggerMode; guard: boolean };
+ let triggerState: TriggerState[] = [];
+ let activation: Promise<void> | undefined;
+ const quoted = (value: string) => `"${value.replaceAll('"', '""')}"`;
+ async function snapshotTriggers() {
+  return (await pool.query<TriggerState>(`SELECT c.relname AS table,t.tgname AS name,t.tgenabled::text AS enabled,
+   (t.tgname LIKE 'zz_diagnostic_source_%' OR t.tgname LIKE 'zzzz_campaign_preparation%' OR t.tgname='diagnostic_source_no_truncate') AS guard
+   FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+   WHERE n.nspname='public' ORDER BY c.relname,t.tgname`)).rows;
+ }
+ async function activate() {
+  for (const row of triggerState.filter(row => row.guard)) await pool.query(`ALTER TABLE public.${quoted(row.table)} ENABLE TRIGGER ${quoted(row.name)}`);
+  const state = await snapshotTriggers();
+  expect(state.filter(row => !row.guard), "ordinary integrity trigger modes unchanged").toEqual(triggerState.filter(row => !row.guard));
+  const ready = present((await pool.query<{ source: boolean; campaign: boolean }>("SELECT diagnostic_source_guards_ready() AS source,campaign_preparation_ready() AS campaign")).rows[0]);
+  expect(ready).toEqual({ source: true, campaign: true });
+  console.info("R6a disposable guards active", { database: scenarioDatabase, guards: state.filter(row => row.guard), ready });
+ }
+ async function restoreTriggers() {
+  for (const row of triggerState) {
+   const mode = { D: "DISABLE", O: "ENABLE", A: "ENABLE ALWAYS", R: "ENABLE REPLICA" }[row.enabled];
+   await pool.query(`ALTER TABLE public.${quoted(row.table)} ${mode} TRIGGER ${quoted(row.name)}`);
+  }
+  expect(await snapshotTriggers(), "exact inherited guard and integrity modes restored").toEqual(triggerState);
+  console.info("R6a disposable triggers restored", { database: scenarioDatabase, count: triggerState.length });
+ }
 
  beforeAll(async () => {
   container = await new PostgreSqlContainer("postgres:17-alpine").start();
+  console.info("R6a disposable PostgreSQL", { id: container.getId(), host: container.getHost(), port: container.getPort(), image: "postgres:17-alpine" });
   const url = container.getConnectionUri();
-  execFileSync("pnpm", ["exec", "prisma", "migrate", "deploy"], { cwd: fileURLToPath(new URL("..", import.meta.url)), env: { ...process.env, DATABASE_URL: url }, stdio: "pipe" });
+  console.info("R6a exact migration deploy", execFileSync("pnpm", ["exec", "prisma", "migrate", "deploy"], { cwd: fileURLToPath(new URL("..", import.meta.url)), env: { ...process.env, DATABASE_URL: url }, encoding: "utf8", stdio: "pipe" }));
   pool = new Pool({ connectionString: url });
   db = new PrismaClient({ adapter: new PrismaPg(pool) });
   await pool.query(`CREATE ROLE ${role} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT`);
@@ -152,6 +182,11 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   const url = new URL(container.getConnectionUri()); url.pathname = `/${scenarioDatabase}`;
   pool = new Pool({ connectionString: url.href });
   db = new PrismaClient({ adapter: new PrismaPg(pool) });
+  triggerState = []; activation = undefined;
+  triggerState = await snapshotTriggers();
+  expect(triggerState.filter(row => row.guard).length).toBeGreaterThan(0);
+  console.info("R6a inherited triggers", { database: scenarioDatabase, triggers: triggerState });
+  for (const row of triggerState.filter(row => row.guard)) await pool.query(`ALTER TABLE public.${quoted(row.table)} DISABLE TRIGGER ${quoted(row.name)}`);
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(now);
  });
  afterEach(async context => {
@@ -164,6 +199,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   for (const client of clients.splice(0)) {
    try { client.release(); } catch (error) { cleanup.push({ status: "rejected", reason: error }); }
   }
+  cleanup.push(...await Promise.allSettled([restoreTriggers()]));
   cleanup.push(...await Promise.allSettled([db.$disconnect(), pool.end()]));
   cleanup.push(...await Promise.allSettled([adminPool.query(`DROP DATABASE "${scenarioDatabase}"`)]));
   const failures = cleanup.flatMap(result => result.status === "rejected" ? [result.reason as unknown] : []);
@@ -172,7 +208,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
    else throw new AggregateError(failures, "R6a fixture cleanup failed");
   }
  });
- afterAll(async () => { await adminPool?.end(); await container?.stop(); });
+ afterAll(async () => { await adminPool?.end(); await container?.stop(); console.info("R6a disposable container removed", { id: container?.getId() }); });
  async function connection() {
   const client = await pool.connect(); clients.push(client);
   await client.query("SET statement_timeout='8s'");
@@ -197,10 +233,12 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   const ready = latch(), finish = latch(), started = latch();
   releases.push(finish.release);
   let backend = 0;
-  const database = { $transaction: <T>(work: (tx: Prisma.TransactionClient) => Promise<T>) => db.$transaction(async tx => {
+  const database = { $transaction: async <T>(work: (tx: Prisma.TransactionClient) => Promise<T>, nativeOptions?: { maxWait?: number; timeout?: number; isolationLevel?: Prisma.TransactionIsolationLevel }) => {
+   activation ??= activate(); await activation;
+   return db.$transaction(async tx => {
    await tx.$executeRawUnsafe(`SET LOCAL ROLE ${role}`);
-   const [identity] = await tx.$queryRaw<{ pid: number; elevated: boolean; trigger: boolean }[]>`SELECT pg_backend_pid() AS pid,rolsuper OR rolcreatedb OR rolcreaterole AS elevated,has_table_privilege(current_user,'users','TRIGGER') AS trigger FROM pg_roles WHERE rolname=current_user`;
-   expect(identity).toMatchObject({ elevated: false, trigger: false });
+   const [identity] = await tx.$queryRaw<{ pid: number; name: string; elevated: boolean; login: boolean; inherit: boolean; owns: boolean; trigger: boolean }[]>`SELECT pg_backend_pid() AS pid,current_user AS name,rolsuper OR rolcreatedb OR rolcreaterole AS elevated,rolcanlogin AS login,rolinherit AS inherit,pg_has_role(current_user,c.relowner,'USAGE') AS owns,has_table_privilege(current_user,'users','TRIGGER') AS trigger FROM pg_roles JOIN pg_class c ON c.oid='public.users'::regclass WHERE rolname=current_user`;
+   expect(identity).toMatchObject({ name: role, elevated: false, login: false, inherit: false, owns: false, trigger: false });
    backend = present(identity).pid; started.release();
    const instrumented = options.finishRefusal ? new Proxy(tx, { get(target, key) {
     if (key === "$queryRaw") return async (strings: TemplateStringsArray, ...values: unknown[]) => {
@@ -224,7 +262,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
    if (options.hold) await finish.promise;
    if (options.rollback) throw new Error("caller outer rollback");
    return result;
-  }, { timeout: 20000 }) };
+  }, nativeOptions); } };
   return { database, run: database.$transaction, service: construct(database, options.enabled ?? true, options.store, options.campaign, options.clock), started: started.promise, ready: ready.promise, release: finish.release, pid: () => backend };
  }
  function observe<T>(promise: Promise<T>) {
