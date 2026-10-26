@@ -1,0 +1,2073 @@
+{
+  "classification": "coherent diagnostic intermediate; no final acceptance",
+  "sourceSHA": "cee68122b4aa0e505dbbc066b8a0f0e651dcd767",
+  "sourceTree": "86e84468edfc9806d96ae95f3df530907b4b87fc",
+  "assemblySHA": "a152a06d6975ed3e1624c88d636158caab61d965",
+  "readPrefixSHA": "38dc76896344125ce9258a9f26b4f8b1598e91fd",
+  "sessionParameterSHA": "cee68122b4aa0e505dbbc066b8a0f0e651dcd767",
+  "base": "ad463b742820dea7f9d7ecf7b4efc105f5856a96",
+  "changedPaths": [
+    "apps/api/src/common/avatar-contact-preparation.ts",
+    "apps/api/src/modules/admin/admin.module.ts",
+    "apps/api/src/modules/admin/application/RemoveUserPhoto.spec.ts",
+    "apps/api/src/modules/admin/application/RemoveUserPhoto.ts",
+    "apps/api/src/modules/diagnostics/infrastructure/DiagnosticPreparedIntake.spec.ts",
+    "apps/api/src/modules/diagnostics/infrastructure/DiagnosticPreparedIntake.ts",
+    "apps/api/src/modules/listings/application/PublishListing.capture-plan.spec.ts",
+    "apps/api/src/modules/listings/application/PublishListing.spec.ts",
+    "apps/api/src/modules/listings/application/PublishListing.ts",
+    "apps/api/src/modules/listings/application/testing/AvatarContactDatabase.ts",
+    "apps/api/src/modules/listings/application/testing/UploadClaimsDatabase.ts",
+    "apps/api/src/modules/listings/infrastructure/AvatarContactPreparation.e2e.spec.ts",
+    "apps/api/src/modules/listings/infrastructure/AvatarContactPreparation.spec.ts",
+    "apps/api/src/modules/listings/infrastructure/PrismaBusinessContactPhoneRepository.ts",
+    "apps/api/src/modules/listings/infrastructure/PrismaListingDraftRepository.preparation.spec.ts",
+    "apps/api/src/modules/listings/infrastructure/PrismaListingDraftRepository.ts",
+    "apps/api/src/modules/listings/infrastructure/PrismaListingMediaRepository.preparation.spec.ts",
+    "apps/api/src/modules/listings/infrastructure/PrismaListingMediaRepository.r7b.e2e.spec.ts",
+    "apps/api/src/modules/listings/infrastructure/PrismaListingMediaRepository.ts",
+    "apps/api/src/modules/listings/infrastructure/PrismaMediaUploadRepository.preparation.spec.ts",
+    "apps/api/src/modules/listings/infrastructure/PrismaMediaUploadRepository.ts",
+    "apps/api/src/modules/listings/infrastructure/PrismaOwnedVideoSessionLedger.preparation.spec.ts",
+    "apps/api/src/modules/listings/infrastructure/PrismaOwnedVideoSessionLedger.ts",
+    "apps/api/src/modules/listings/infrastructure/PrismaProfilePhotoLink.ts",
+    "apps/api/src/modules/listings/infrastructure/PrismaUploadClaims.preparation.e2e.spec.ts",
+    "apps/api/src/modules/listings/infrastructure/PrismaUploadClaims.preparation.spec.ts",
+    "apps/api/src/modules/listings/infrastructure/PrismaUploadClaims.spec.ts",
+    "apps/api/src/modules/listings/infrastructure/PrismaUploadClaims.ts",
+    "apps/api/src/modules/listings/infrastructure/PrismaVerifiedContactPhoneRepository.ts",
+    "apps/api/src/modules/listings/infrastructure/PrismaVideoPlayback.preparation.spec.ts",
+    "apps/api/src/modules/listings/infrastructure/PrismaVideoPlayback.spec.ts",
+    "apps/api/src/modules/listings/infrastructure/PrismaVideoPlayback.ts",
+    "apps/api/src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts",
+    "apps/api/src/modules/listings/infrastructure/R1ListingCallerRecovery897.e2e.spec.ts",
+    "apps/api/src/modules/listings/infrastructure/VideoTransactionPreparation.ts",
+    "apps/api/src/modules/listings/infrastructure/testing/VideoAuthority.ts",
+    "apps/api/src/modules/listings/infrastructure/testing/VideoDatabase.ts",
+    "apps/api/src/modules/listings/infrastructure/testing/avatar-contact-r7d-20261025.sql",
+    "apps/api/src/modules/listings/infrastructure/testing/media-callers-r7b-20261025.sql",
+    "apps/api/src/modules/listings/infrastructure/testing/upload-claims-r7c-20261025.sql",
+    "apps/api/src/modules/listings/listings.module.ts",
+    "apps/api/src/modules/measurement/application/testing/FakeMeasurementCommit.ts",
+    "apps/api/src/modules/measurement/measurement.public.ts",
+    "apps/api/src/modules/service-messaging/infrastructure/ServiceHistoryPrepared.spec.ts",
+    "apps/api/src/modules/service-messaging/infrastructure/ServicePreparation.ts",
+    "apps/worker/src/jobs/MeasurementRetentionOrdering.e2e.spec.ts",
+    "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.e2e.spec.ts",
+    "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.spec.ts",
+    "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.ts",
+    "apps/worker/src/jobs/PurgeExpiredAccounts.spec.ts",
+    "apps/worker/src/jobs/PurgeExpiredAccounts.ts",
+    "apps/worker/src/jobs/application/testing/MeasurementRetentionDatabase.ts",
+    "apps/worker/src/jobs/application/testing/MeasurementRetentionPostgresFixture.ts",
+    "apps/worker/src/jobs/diagnosticAccountErasure.ts",
+    "apps/worker/src/jobs/serviceAccountErasure.ts",
+    "apps/worker/src/jobs/video/PrismaVideoCleanupLedger.ts",
+    "apps/worker/src/jobs/video/PrismaVideoLedgers.preparation.spec.ts",
+    "apps/worker/src/jobs/video/PrismaVideoProcessingLedger.ts",
+    "apps/worker/src/jobs/video/ProcessPreparedVideo.ts",
+    "apps/worker/src/jobs/video/VideoTransactionPreparation.ts",
+    "apps/worker/src/jobs/video/testing/VideoDatabase.ts",
+    "apps/worker/src/jobs/video/videoAccountErasure.ts",
+    "apps/worker/test/b5-observation-plugin.d.mts",
+    "apps/worker/test/b5-observation-plugin.mjs",
+    "apps/worker/test/b5-observation-runtime.mjs",
+    "apps/worker/test/b5-observation.check.mjs",
+    "apps/worker/vitest.config.mts",
+    "docs/evidence/issue-897/b1-r7b-media-publication-20261025.md",
+    "docs/evidence/issue-897/b1-r7c-upload-claims-20261025.md",
+    "docs/evidence/issue-897/b1-r7d-avatar-contact-20261025.md",
+    "docs/evidence/issue-897/b5-observer-preparation-20261023.md",
+    "docs/evidence/issue-897/b5-timing-diagnosis-20261025.json",
+    "docs/evidence/issue-897/b5-timing-diagnosis-20261025.md",
+    "docs/evidence/issue-897/measurement-retention-core175-runtime-20261025.json",
+    "docs/evidence/issue-897/measurement-retention-core175-runtime-20261025.md",
+    "docs/evidence/issue-897/measurement-retention-effects-20261025.json",
+    "docs/evidence/issue-897/measurement-retention-ordering-20261025.json",
+    "docs/evidence/issue-897/measurement-retention-ordering-20261025.md",
+    "docs/evidence/issue-897/r7b-round1-fix-handoff-20261025.md",
+    "docs/evidence/issue-897/r7b-round1-verification-20261025.json",
+    "docs/evidence/issue-897/r7b-runtime-matrix-20261025/full25.txt",
+    "docs/evidence/issue-897/r7b-runtime-matrix-20261025/manifest.json",
+    "docs/evidence/issue-897/r7b-runtime-matrix-20261025/pinned-source-hashes.json",
+    "docs/evidence/issue-897/r7b-runtime-matrix-20261025/post-database.json",
+    "docs/evidence/issue-897/r7b-runtime-matrix-handoff-20261025.md",
+    "packages/db/prisma/migrations/20261025020000_diagnostic_listing_publication_effects/migration.sql",
+    "packages/db/prisma/schema.prisma",
+    "packages/db/src/diagnostic-source-command.ts",
+    "packages/db/src/listing-source-command.ts",
+    "packages/db/src/measurement-capture.ts",
+    "scripts/diagnostic-combined-identity-publication-schema.test.mjs",
+    "scripts/diagnostic-listing-publication-effects-schema.test.mjs",
+    "scripts/diagnostic-report-source-effects-schema.test.mjs",
+    "scripts/diagnostic-user-insert-error-transport-schema.test.mjs",
+    "scripts/staging-schema.mjs",
+    "scripts/testing/retained-schema/20261025020000_diagnostic_listing_publication_effects.sql"
+  ],
+  "provenance": {
+    "base": "ad463b742820dea7f9d7ecf7b4efc105f5856a96",
+    "groups": {
+      "r7a": {
+        "pin": "466297461712a4f3759d1cf2699590fd933fa9a9",
+        "paths": [
+          "apps/api/src/modules/listings/application/PublishListing.spec.ts",
+          "apps/api/src/modules/listings/application/PublishListing.ts",
+          "apps/api/src/modules/listings/domain/ports/ListingsAdminPort.ts",
+          "apps/api/src/modules/listings/infrastructure/ListingVisibilityMeasurement.spec.ts",
+          "apps/api/src/modules/listings/infrastructure/PrismaListingDraftRepository.e2e.spec.ts",
+          "apps/api/src/modules/listings/infrastructure/PrismaListingDraftRepository.preparation.spec.ts",
+          "apps/api/src/modules/listings/infrastructure/PrismaListingDraftRepository.ts",
+          "apps/api/src/modules/listings/infrastructure/PrismaListingRepository.ts",
+          "apps/api/src/modules/listings/infrastructure/PrismaListingsAdminRepository.ts",
+          "apps/api/src/modules/listings/infrastructure/R1ListingCallerRecovery897.e2e.spec.ts"
+        ]
+      },
+      "video": {
+        "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+        "paths": [
+          "apps/api/src/modules/listings/infrastructure/PrismaOwnedVideoSessionLedger.preparation.spec.ts",
+          "apps/api/src/modules/listings/infrastructure/PrismaOwnedVideoSessionLedger.ts",
+          "apps/api/src/modules/listings/infrastructure/PrismaVideoPlayback.preparation.spec.ts",
+          "apps/api/src/modules/listings/infrastructure/PrismaVideoPlayback.spec.ts",
+          "apps/api/src/modules/listings/infrastructure/PrismaVideoPlayback.ts",
+          "apps/api/src/modules/listings/infrastructure/VideoTransactionPreparation.ts",
+          "apps/api/src/modules/listings/infrastructure/testing/VideoAuthority.ts",
+          "apps/api/src/modules/listings/infrastructure/testing/VideoDatabase.ts",
+          "apps/worker/src/jobs/video/PrismaVideoCleanupLedger.ts",
+          "apps/worker/src/jobs/video/PrismaVideoLedgers.preparation.spec.ts",
+          "apps/worker/src/jobs/video/PrismaVideoProcessingLedger.ts",
+          "apps/worker/src/jobs/video/ProcessPreparedVideo.ts",
+          "apps/worker/src/jobs/video/VideoTransactionPreparation.ts",
+          "apps/worker/src/jobs/video/testing/VideoDatabase.ts"
+        ]
+      },
+      "videoTransport": {
+        "pin": "b7ac70a2caca6bee462cb2da3facc8e4236191d9",
+        "paths": [
+          "apps/api/src/modules/listings/infrastructure/VideoTransactionPreparation.ts",
+          "apps/api/src/modules/listings/infrastructure/testing/VideoDatabase.ts",
+          "apps/worker/src/jobs/video/VideoTransactionPreparation.ts",
+          "apps/worker/src/jobs/video/testing/VideoDatabase.ts"
+        ]
+      },
+      "claims": {
+        "pin": "5b34982c0b7e9075227a394157d24561c286103a",
+        "paths": [
+          "apps/api/src/modules/listings/application/testing/UploadClaimsDatabase.ts",
+          "apps/api/src/modules/listings/infrastructure/PrismaUploadClaims.preparation.e2e.spec.ts",
+          "apps/api/src/modules/listings/infrastructure/PrismaUploadClaims.preparation.spec.ts",
+          "apps/api/src/modules/listings/infrastructure/PrismaUploadClaims.spec.ts",
+          "apps/api/src/modules/listings/infrastructure/PrismaUploadClaims.ts",
+          "apps/api/src/modules/listings/infrastructure/testing/upload-claims-r7c-20261025.sql",
+          "docs/evidence/issue-897/b1-r7c-upload-claims-20261025.md"
+        ]
+      },
+      "publication": {
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "paths": [
+          "apps/api/src/modules/listings/application/PublishListing.capture-plan.spec.ts",
+          "apps/api/src/modules/listings/application/PublishListing.spec.ts",
+          "apps/api/src/modules/listings/application/PublishListing.ts",
+          "apps/api/src/modules/listings/infrastructure/DiagnosticRuntimeTransport.r7b.e2e.spec.ts",
+          "apps/api/src/modules/listings/infrastructure/PrismaListingDraftRepository.preparation.spec.ts",
+          "apps/api/src/modules/listings/infrastructure/PrismaListingDraftRepository.ts",
+          "apps/api/src/modules/listings/infrastructure/PrismaListingMediaRepository.preparation.spec.ts",
+          "apps/api/src/modules/listings/infrastructure/PrismaListingMediaRepository.r7b.e2e.spec.ts",
+          "apps/api/src/modules/listings/infrastructure/PrismaListingMediaRepository.ts",
+          "apps/api/src/modules/listings/infrastructure/PrismaMediaUploadRepository.preparation.spec.ts",
+          "apps/api/src/modules/listings/infrastructure/PrismaMediaUploadRepository.ts",
+          "apps/api/src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts",
+          "apps/api/src/modules/listings/infrastructure/R1ListingCallerRecovery897.e2e.spec.ts",
+          "apps/api/src/modules/listings/infrastructure/testing/media-callers-r7b-20261025.sql",
+          "apps/api/src/modules/measurement/application/testing/FakeMeasurementCommit.ts",
+          "apps/api/src/modules/measurement/measurement.public.ts",
+          "packages/db/src/listing-source-command.ts",
+          "packages/db/src/measurement-capture.ts",
+          "packages/db/prisma/migrations/20261025020000_diagnostic_listing_publication_effects/migration.sql",
+          "scripts/testing/retained-schema/20261025020000_diagnostic_listing_publication_effects.sql",
+          "scripts/diagnostic-listing-publication-effects-schema.test.mjs",
+          "docs/evidence/issue-897/b1-r7b-media-publication-20261025.md",
+          "docs/evidence/issue-897/r7b-round1-fix-handoff-20261025.md",
+          "docs/evidence/issue-897/r7b-round1-verification-20261025.json",
+          "docs/evidence/issue-897/r7b-runtime-matrix-20261025/full25.txt",
+          "docs/evidence/issue-897/r7b-runtime-matrix-20261025/manifest.json",
+          "docs/evidence/issue-897/r7b-runtime-matrix-20261025/pinned-source-hashes.json",
+          "docs/evidence/issue-897/r7b-runtime-matrix-20261025/post-database.json",
+          "docs/evidence/issue-897/r7b-runtime-matrix-handoff-20261025.md"
+        ]
+      },
+      "retention": {
+        "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+        "paths": [
+          "apps/worker/src/jobs/MeasurementRetentionOrdering.e2e.spec.ts",
+          "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.e2e.spec.ts",
+          "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.spec.ts",
+          "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.ts",
+          "apps/worker/src/jobs/PurgeExpiredAccounts.spec.ts",
+          "apps/worker/src/jobs/PurgeExpiredAccounts.ts",
+          "apps/worker/src/jobs/application/testing/MeasurementRetentionDatabase.ts",
+          "apps/worker/src/jobs/application/testing/MeasurementRetentionPostgresFixture.ts",
+          "apps/worker/src/jobs/diagnosticAccountErasure.ts",
+          "apps/worker/src/jobs/serviceAccountErasure.ts",
+          "apps/worker/src/jobs/video/videoAccountErasure.ts",
+          "docs/evidence/issue-897/measurement-retention-core175-runtime-20261025.json",
+          "docs/evidence/issue-897/measurement-retention-core175-runtime-20261025.md",
+          "docs/evidence/issue-897/measurement-retention-effects-20261025.json",
+          "docs/evidence/issue-897/measurement-retention-ordering-20261025.json",
+          "docs/evidence/issue-897/measurement-retention-ordering-20261025.md"
+        ]
+      },
+      "observer": {
+        "pin": "c8d01014404d6f796b5feec7ba6abd2b9cace531",
+        "paths": [
+          "apps/worker/test/b5-observation-plugin.d.mts",
+          "apps/worker/test/b5-observation-plugin.mjs",
+          "apps/worker/test/b5-observation-runtime.mjs",
+          "apps/worker/test/b5-observation.check.mjs",
+          "apps/worker/vitest.config.mts",
+          "docs/evidence/issue-897/b5-observer-preparation-20261023.md",
+          "docs/evidence/issue-897/b5-timing-diagnosis-20261025.json",
+          "docs/evidence/issue-897/b5-timing-diagnosis-20261025.md"
+        ]
+      }
+    },
+    "finalAssignments": {
+      "apps/api/src/modules/listings/application/PublishListing.spec.ts": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "530f352e118f7f1246bfc4c16036522d9361cd80c8c8c154fa762e5e6e3edff4",
+        "blob": "a1bc4c38edf31f4f6a65523a22b63ac2571abdf1",
+        "priorBlob": "102eb2aa3b57b624a26b4200f0c7c058f358c66f"
+      },
+      "apps/api/src/modules/listings/application/PublishListing.ts": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "f79abf27f896688ab8070435f429fd0e1f98eedeb140e67e33d6994ca238bea6",
+        "blob": "d2edfd692d757d7b1df96abe641cedbd8395c13f",
+        "priorBlob": "bb351663e735766fb72bde3224a6417a7eca26e4"
+      },
+      "apps/api/src/modules/listings/domain/ports/ListingsAdminPort.ts": {
+        "group": "r7a",
+        "pin": "466297461712a4f3759d1cf2699590fd933fa9a9",
+        "sha256": "41b09e18fedbac14dd4e9318a2969220861b8789f24893fd578b997ac4718c40",
+        "blob": "2ce42e939d2ab61338e6cfc71659bf4f838693d7",
+        "priorBlob": "2ce42e939d2ab61338e6cfc71659bf4f838693d7"
+      },
+      "apps/api/src/modules/listings/infrastructure/ListingVisibilityMeasurement.spec.ts": {
+        "group": "r7a",
+        "pin": "466297461712a4f3759d1cf2699590fd933fa9a9",
+        "sha256": "45e3df4456242576e78d512e6e4751c5a82e1d149c739c358ee9977bff51a964",
+        "blob": "6781d6b53f03955306e836aa9f174ca37743fbb6",
+        "priorBlob": "6781d6b53f03955306e836aa9f174ca37743fbb6"
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaListingDraftRepository.e2e.spec.ts": {
+        "group": "r7a",
+        "pin": "466297461712a4f3759d1cf2699590fd933fa9a9",
+        "sha256": "936299508640de3be7a662de1444550b090e6c325367f27f01ded5cc74020ab4",
+        "blob": "22bed91d9e16a91a84aca9b8558b64786053dc65",
+        "priorBlob": "22bed91d9e16a91a84aca9b8558b64786053dc65"
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaListingDraftRepository.preparation.spec.ts": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "795ef6f49232a58caed2202b28e0f9edc153ab013307ed441d052e0d2f7a0307",
+        "blob": "7785658b1ba83d707180c2c04901b06c359f2452",
+        "priorBlob": "1a06a7399f407ee3254ecdb0db0e0e391ac435d2"
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaListingDraftRepository.ts": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "e55647026fd9f31172ea53dfaae7162ddc2ced5402cfddc0c5705802ff37c1f4",
+        "blob": "4411dac782bdf946ae32ecf823f06de4c2238bd4",
+        "priorBlob": "a11218bcdd9184a26027fc32f53a77ad730d2fb1"
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaListingRepository.ts": {
+        "group": "r7a",
+        "pin": "466297461712a4f3759d1cf2699590fd933fa9a9",
+        "sha256": "1b9c31aaa7b556bfd3f56a2598e4fca7c9d1f159ba0f7d6c53f7db419983529c",
+        "blob": "eaa40db0d1a58e47b175b69b45fa9d581b80791c",
+        "priorBlob": "eaa40db0d1a58e47b175b69b45fa9d581b80791c"
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaListingsAdminRepository.ts": {
+        "group": "r7a",
+        "pin": "466297461712a4f3759d1cf2699590fd933fa9a9",
+        "sha256": "f2f7368166165d47c67a999efababcd1d2962388c47a1863f4905265bc56f0f4",
+        "blob": "1bedd88d5fce65e802653f75f9c6a81cf055a2d1",
+        "priorBlob": "1bedd88d5fce65e802653f75f9c6a81cf055a2d1"
+      },
+      "apps/api/src/modules/listings/infrastructure/R1ListingCallerRecovery897.e2e.spec.ts": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "5e9a1462b7c464ba2e4cab7c96a291d1a0feca8845e895b450d0ca410dcad57a",
+        "blob": "09111a52d6238ff14c4663ef6d19c6a53cef17fd",
+        "priorBlob": "7178d1006d010d0db96194dc6f5f12ed744030b2"
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaOwnedVideoSessionLedger.preparation.spec.ts": {
+        "group": "video",
+        "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+        "sha256": "b43e6e4f369634860377e9fca78c4be7be29bc8589610fea1ff0eb6dd89b8b28",
+        "blob": "119774f534589423cbfb6951270293ccf7c82f9d",
+        "priorBlob": null
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaOwnedVideoSessionLedger.ts": {
+        "group": "video",
+        "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+        "sha256": "0fa1af7745b4febc64f3ea045ccbae0873e93ca09192b81496fee62c1c62bf20",
+        "blob": "db9ec5a9386b2f2eb496e7e5191a111b097f512b",
+        "priorBlob": "506274d5a5c26392105b9bfe0fbe5832299e215d"
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaVideoPlayback.preparation.spec.ts": {
+        "group": "video",
+        "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+        "sha256": "a890b062a90c4176aa4e20c13d79ae4306bbc2b4e2f8b726c860c98e5b57736b",
+        "blob": "3eea9bbc7cc39f2999916b6cd30439df4e507da9",
+        "priorBlob": null
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaVideoPlayback.spec.ts": {
+        "group": "video",
+        "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+        "sha256": "7dc42eed9c1177ffffeccffdcccb813d706d1d531b50ac7880b9856f02a84ddc",
+        "blob": "d15e475ea2fac9e9f9f32e580e70ce99c8e949f1",
+        "priorBlob": "415965aa883787b838fc746658bd8b971f41e6bf"
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaVideoPlayback.ts": {
+        "group": "video",
+        "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+        "sha256": "ee53e912aaf986b2a24a88cabf9c9c16cb0489216d8e1477b1717d8f86c6a39d",
+        "blob": "bb0ff35b7736b2b0be486b79291ad77ddaba2c0b",
+        "priorBlob": "0f6b97c010cbd2b125f80b0e1175aadb21a8dd7f"
+      },
+      "apps/api/src/modules/listings/infrastructure/VideoTransactionPreparation.ts": {
+        "group": "videoTransport",
+        "pin": "b7ac70a2caca6bee462cb2da3facc8e4236191d9",
+        "sha256": "7da45d4ebd2c2ce93607a6de90a31781879a4b0f7b16d0e4d027351ef8ea8524",
+        "blob": "52275d5acee28bddbe07b881bf8f15f52f9318df",
+        "priorBlob": null
+      },
+      "apps/api/src/modules/listings/infrastructure/testing/VideoAuthority.ts": {
+        "group": "video",
+        "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+        "sha256": "e08a888f83735562ceef6f0d9f039888838ba935313ba95b268fa830937a46de",
+        "blob": "1c7ffe2921e7514ff67b34287441dc996f4c6294",
+        "priorBlob": null
+      },
+      "apps/api/src/modules/listings/infrastructure/testing/VideoDatabase.ts": {
+        "group": "videoTransport",
+        "pin": "b7ac70a2caca6bee462cb2da3facc8e4236191d9",
+        "sha256": "4654526718d339d462fcfd4bf45f50257c2b4d54570168d3f919aae23653762a",
+        "blob": "ed098e06e86f1a14657fffa74c9c817a93309ff7",
+        "priorBlob": null
+      },
+      "apps/worker/src/jobs/video/PrismaVideoCleanupLedger.ts": {
+        "group": "video",
+        "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+        "sha256": "131eef5b5ff80fdd3ab051a755e2b1215c18a27c17740ad62f9c3bb62b64a8f6",
+        "blob": "13a5e59ddcefc00fe47436b9848dc5afab8e1afa",
+        "priorBlob": "bbe103d03a3655687b9e4957a95295dca56582f3"
+      },
+      "apps/worker/src/jobs/video/PrismaVideoLedgers.preparation.spec.ts": {
+        "group": "video",
+        "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+        "sha256": "a4aabd0c0cc0a62c215dada2aa4899435b6b6852f5d683f9bc48e26e44901d07",
+        "blob": "77a50f8af7acd1302d14e53e06f7e2e56f5d1869",
+        "priorBlob": null
+      },
+      "apps/worker/src/jobs/video/PrismaVideoProcessingLedger.ts": {
+        "group": "video",
+        "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+        "sha256": "a5890b66eb58115b8b33aa4fd4a07ad2e741c2e773046771b8706a969ceffd99",
+        "blob": "f8de0d407080e425e9ef54fe3c9c135ddd3a66ad",
+        "priorBlob": "30d9dd9051f7a31f91edde78b8af9cd76a5bcc95"
+      },
+      "apps/worker/src/jobs/video/ProcessPreparedVideo.ts": {
+        "group": "video",
+        "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+        "sha256": "cd8dcb136b9c33be7c24785a9bdf5d750df7d740ca2ff9b90ec1337d501092b9",
+        "blob": "0b24b45dace6b1f306590358e3eaf0caa444fa24",
+        "priorBlob": "d52a9b3eb4308ffa1aab347b320b7417a841c299"
+      },
+      "apps/worker/src/jobs/video/VideoTransactionPreparation.ts": {
+        "group": "videoTransport",
+        "pin": "b7ac70a2caca6bee462cb2da3facc8e4236191d9",
+        "sha256": "ffcd595ea23910f51ee6dca6aab4f200f67914766a33a4c12de44853a4f563c7",
+        "blob": "b9ddc7dca9332bdbe1b0e4bcd2c1b218007a2769",
+        "priorBlob": null
+      },
+      "apps/worker/src/jobs/video/testing/VideoDatabase.ts": {
+        "group": "videoTransport",
+        "pin": "b7ac70a2caca6bee462cb2da3facc8e4236191d9",
+        "sha256": "e60f994314a092aeb066dbb92f8497c6e4890d4a5a75298098a2a6d164301409",
+        "blob": "216c2c78fc937460104051ff8158bf4f1da3ccb8",
+        "priorBlob": null
+      },
+      "apps/api/src/modules/listings/application/testing/UploadClaimsDatabase.ts": {
+        "group": "claims",
+        "pin": "5b34982c0b7e9075227a394157d24561c286103a",
+        "sha256": "2cc56345b07dfca86d44f9afef1d9e797103b0663653ff13f9710aeab2daff8c",
+        "blob": "87f2e4725faf94a1a2e375468c02ff01228c8fa6",
+        "priorBlob": null
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaUploadClaims.preparation.e2e.spec.ts": {
+        "group": "claims",
+        "pin": "5b34982c0b7e9075227a394157d24561c286103a",
+        "sha256": "25d951cb66782403e4e6198dffba66117a3eedfb29ecae41ac19f1ddcfcd9970",
+        "blob": "5c76c8baced1392dba6a1c38f72b5022c683e5eb",
+        "priorBlob": null
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaUploadClaims.preparation.spec.ts": {
+        "group": "claims",
+        "pin": "5b34982c0b7e9075227a394157d24561c286103a",
+        "sha256": "758238337f5189ec6e98fa1f493668b98e1c211d4e11772098e9745bcccb8e55",
+        "blob": "daea821795c2f9cdd634e8cb9aead626307d69e0",
+        "priorBlob": null
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaUploadClaims.spec.ts": {
+        "group": "claims",
+        "pin": "5b34982c0b7e9075227a394157d24561c286103a",
+        "sha256": "80ecfb79eb7845d5261f689e1b70c27243b8fbd638b3d1fc7f5219d168f6e5fa",
+        "blob": "d8a5ec1af1f13ad68d5475a52c97fd5d8d0821f1",
+        "priorBlob": "eab3baf14d4cb067577c1d84622f9f52974845f9"
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaUploadClaims.ts": {
+        "group": "claims",
+        "pin": "5b34982c0b7e9075227a394157d24561c286103a",
+        "sha256": "f30f6716d884227291df1a404dea4da5eb07f5557d30fe1d467dbc09e14e59c2",
+        "blob": "dd0fae1a04af9ade0d75f0c72a01b17f37e964be",
+        "priorBlob": "b0a86b544af0b2c570ae046280e0575b4364834b"
+      },
+      "apps/api/src/modules/listings/infrastructure/testing/upload-claims-r7c-20261025.sql": {
+        "group": "claims",
+        "pin": "5b34982c0b7e9075227a394157d24561c286103a",
+        "sha256": "0fa52e164d13a982f317dbabdb7d7f3f927a20f35664e80f9cc07eb6df0fd390",
+        "blob": "0c4daadbb1edeaa7531fc0755330aacba88cc6c6",
+        "priorBlob": null
+      },
+      "docs/evidence/issue-897/b1-r7c-upload-claims-20261025.md": {
+        "group": "claims",
+        "pin": "5b34982c0b7e9075227a394157d24561c286103a",
+        "sha256": "dbbc8cdc641c59103a52abc5b189a98721901d77f7fdf13dd893ba51b510a138",
+        "blob": "93324c338be5733090638812953eca6867af1d90",
+        "priorBlob": null
+      },
+      "apps/api/src/modules/listings/application/PublishListing.capture-plan.spec.ts": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "6d831c587e8a268986f6d5066ae5fa1f4219a897d24229c9600157d848e3f6da",
+        "blob": "a1d38b76a917580930b1807322243d2f5cf1d46b",
+        "priorBlob": null
+      },
+      "apps/api/src/modules/listings/infrastructure/DiagnosticRuntimeTransport.r7b.e2e.spec.ts": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "0f20a9fb821863ad24cb92a71158b075d2adad349c9a4845a90f959769566afa",
+        "blob": "2392105c55dd28ddd69094c940ecc98a6e610344",
+        "priorBlob": "2392105c55dd28ddd69094c940ecc98a6e610344"
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaListingMediaRepository.preparation.spec.ts": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "5cf144098bdd8f7c1c23e52cb33237d7a490dbb1b7d5f1c36704d21d8c024437",
+        "blob": "a23e34321b14353ae7e1f95896aa4a2696ec916c",
+        "priorBlob": null
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaListingMediaRepository.r7b.e2e.spec.ts": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "490ab767d4b1b899a52e6523603ae3bb2276196b9a4edaba1623a1c97f8febf6",
+        "blob": "4cba2162494b9c8caa1986f74089f498edcf29cf",
+        "priorBlob": null
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaListingMediaRepository.ts": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "a6b039b19cea28f38777707ba9aaa7b765c9c140e4fffb3cd90dbc04bbcbb032",
+        "blob": "ae46cd4b2aa006eafa324de3d38667053d032ffa",
+        "priorBlob": "7d29071562e818365ca973a0caab51a9b1192a76"
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaMediaUploadRepository.preparation.spec.ts": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "2b9b1bd3b02d1189af1ef14060989395f225a86ccf8b85b55d239edd26a66624",
+        "blob": "cd8b4ff01fa22cb1e85756b464a38b40d0b8742d",
+        "priorBlob": null
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaMediaUploadRepository.ts": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "80e600bf664e9033eb2d00eeae7a02915cdea672ae24b5caccef20ab249930c6",
+        "blob": "0314fe44e3be395387c7d84442fc49d5ae24e23c",
+        "priorBlob": "e224887f3526f27cb7aa60cc7aa0a7d675aa1a3b"
+      },
+      "apps/api/src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "6148a8f6ef1f963ed7500a17dd4de1b746a58a519c48be564aa654f07ad21c1b",
+        "blob": "7b96e6245aa69279e1107376c3b2841b00e9083c",
+        "priorBlob": null
+      },
+      "apps/api/src/modules/listings/infrastructure/testing/media-callers-r7b-20261025.sql": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "3ec2bb76b45a21137b84c3158f728db51e340575cb016bf32127a57b346cd601",
+        "blob": "cc870c5c43f050654528dc5cb1dcfe755c3253c2",
+        "priorBlob": null
+      },
+      "apps/api/src/modules/measurement/application/testing/FakeMeasurementCommit.ts": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "eb55bef6395f7707a4cade41c481d21d8c184778d337f8d3c37662ba35d8497e",
+        "blob": "fa3e7db6b78203d410856bac5d4df6bf50d53133",
+        "priorBlob": "c9b4c6a54625e53ed17b0b642d1916daad8b49f7"
+      },
+      "apps/api/src/modules/measurement/measurement.public.ts": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "51e51cf31ce8abbb9cd39ac049a88386b9176a7cf50fed8f1e7f73be4181fa77",
+        "blob": "effa61acceccf83c5338048ae35fb0f24f4a1994",
+        "priorBlob": "a13edbe803154f5575a1f6adc04dd2a5c396c098"
+      },
+      "packages/db/src/listing-source-command.ts": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "e7f55f86100c077f666453725e047eee84c37664f82dd9b47ed87cf271820882",
+        "blob": "1fb4d0de2a4995b99e0d9e1e400fab3a1e917cda",
+        "priorBlob": "dbbb870da08715fa3970ee4569f741c3b63079c0"
+      },
+      "packages/db/src/measurement-capture.ts": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "3faa22308227f79103050d19ed5debfef4ea729b94c58cafb990571224497659",
+        "blob": "dad35f98914b56cb2add21109a7d9080526ec0eb",
+        "priorBlob": "4af03a3f5b2a889e2c4a7e347e9bc1e20997b9d5"
+      },
+      "packages/db/prisma/migrations/20261025020000_diagnostic_listing_publication_effects/migration.sql": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "6923b8e4869928d942d909d305a3ef7eebfe166ea82628f313baf665759d0d39",
+        "blob": "80fc7a5178edc25e04f41a64b765e9d4ca93bd2d",
+        "priorBlob": null
+      },
+      "scripts/testing/retained-schema/20261025020000_diagnostic_listing_publication_effects.sql": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "6923b8e4869928d942d909d305a3ef7eebfe166ea82628f313baf665759d0d39",
+        "blob": "80fc7a5178edc25e04f41a64b765e9d4ca93bd2d",
+        "priorBlob": null
+      },
+      "scripts/diagnostic-listing-publication-effects-schema.test.mjs": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "3559f1154cba7b2ea8b46b769f714e1687f10622edec9abe68df7b13c17926aa",
+        "blob": "27925aca2ae3c71a763a5ac74b4e34097b4fcb0e",
+        "priorBlob": null
+      },
+      "docs/evidence/issue-897/b1-r7b-media-publication-20261025.md": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "b4604224f6cc4fde1bc5a7925623b6f2867d8e43edad0582cfe0c0f09577f389",
+        "blob": "551a4abdbec07bcc72809dd1e55bf0f37df1fe2b",
+        "priorBlob": null
+      },
+      "docs/evidence/issue-897/r7b-round1-fix-handoff-20261025.md": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "ba412bcf7475bcd015922c59ca26f3490cbe24fe638cd7834fa47861c0fe74c5",
+        "blob": "e0ecfcc719ef533965a0d65b68772232ed7575f0",
+        "priorBlob": null
+      },
+      "docs/evidence/issue-897/r7b-round1-verification-20261025.json": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "9419fd02eff1b0741304a2d827d4121095ae0659433f5e980635c0c405b7ad71",
+        "blob": "5e79bf1f189062d9c1258b8ef1fe8625b6af2d6c",
+        "priorBlob": null
+      },
+      "docs/evidence/issue-897/r7b-runtime-matrix-20261025/full25.txt": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "c474ec4bda7479047b05d5e13e16622a67d8e86a8dd6011890d4f9b331a9c090",
+        "blob": "4d7972247b835a145feb08ee4f7db7d6beebf8ca",
+        "priorBlob": null
+      },
+      "docs/evidence/issue-897/r7b-runtime-matrix-20261025/manifest.json": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "866431f1d4cfb4b8d29a3990e95846a8ea5a034647dfd52cdd2f90fd1ae30e61",
+        "blob": "8f2390856f8e2d1e877a8f231a3cabe6b3c1db5b",
+        "priorBlob": null
+      },
+      "docs/evidence/issue-897/r7b-runtime-matrix-20261025/pinned-source-hashes.json": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "4ef1dd795520de329f2a02fb9b6998a4174bfc58a36a4c2d95888eb8cc6d73b2",
+        "blob": "bc2e108abf410575e16fe05889b8928ed1161ec1",
+        "priorBlob": null
+      },
+      "docs/evidence/issue-897/r7b-runtime-matrix-20261025/post-database.json": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "e689211df5a204740347aed2cbcbd0d2ba7fd0e0826da8b6328d9d75ab925a85",
+        "blob": "02e0af1a5bb8de73bd0ebc86eaeb89305a729d6e",
+        "priorBlob": null
+      },
+      "docs/evidence/issue-897/r7b-runtime-matrix-handoff-20261025.md": {
+        "group": "publication",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "a5f93dfbf9a8b92c0a3ea694ccdfdb1fc85d9d850b2bda448cd1d1630e9adaae",
+        "blob": "8a580d87f01cfc9cc1ee3c6a060d63b8ed830a28",
+        "priorBlob": null
+      },
+      "apps/worker/src/jobs/MeasurementRetentionOrdering.e2e.spec.ts": {
+        "group": "retention",
+        "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+        "sha256": "00b2a69cb60399025ba81ccc9f1a31f5ec9ea816c98bfe8a7ba6e2f8d22fe871",
+        "blob": "7b8bf85ab0d4d5f160982e69663c2417505bc981",
+        "priorBlob": null
+      },
+      "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.e2e.spec.ts": {
+        "group": "retention",
+        "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+        "sha256": "ae3a7bd1d570edcd4f64947fd38bd7a7b9219b8d876073c6f0c0cef4c95e928f",
+        "blob": "4de5f2ea20775af5f15eebef78c9162d408af9fe",
+        "priorBlob": "0c4a7ada48ae9a2e44058a16ffafd7e0c42d03c8"
+      },
+      "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.spec.ts": {
+        "group": "retention",
+        "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+        "sha256": "53c57dd6a005fea4167ee5744363303e928b4ec695947fd381bd512c69f2b794",
+        "blob": "6c7b3ca349a32fe7b6c6f3c74e5dde55cdb52a30",
+        "priorBlob": null
+      },
+      "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.ts": {
+        "group": "retention",
+        "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+        "sha256": "8d1b872dc72f3ad238d0232cbfd62af692a60bf0eaefcdb94f48e100bf8f7bc3",
+        "blob": "4647660bad3a721e45794c3d17e0f52e34f72a1a",
+        "priorBlob": "5797ec5d9c3d04bddbd12a57d5a86cbef069cb44"
+      },
+      "apps/worker/src/jobs/PurgeExpiredAccounts.spec.ts": {
+        "group": "retention",
+        "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+        "sha256": "ddc9a2faec05e93d97cb20366dd4768e91f2893587f7518b8e2771ab58cfd354",
+        "blob": "640aa67c88dd4b6fec3d6b994dd03ddb8ca94aa3",
+        "priorBlob": "b0d3a121d3ede446b9241263e7f3a6f2cbb38f64"
+      },
+      "apps/worker/src/jobs/PurgeExpiredAccounts.ts": {
+        "group": "retention",
+        "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+        "sha256": "40049f67159f309662c80d18e476940f95f8219741021d30d02af84d13b78581",
+        "blob": "8588e524ebbd948ecffe71704f95b51ee2ea4c4a",
+        "priorBlob": "37b8e7ed5453cb3e50631ccf2e21dda8dd07d913"
+      },
+      "apps/worker/src/jobs/application/testing/MeasurementRetentionDatabase.ts": {
+        "group": "retention",
+        "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+        "sha256": "faed8c142c49c6250f9549cb6f977df9bc351a5e9e5447a1d64426441c93978d",
+        "blob": "b5e721a0e8bd0f4e6a9a728421e5465f9c97105a",
+        "priorBlob": null
+      },
+      "apps/worker/src/jobs/application/testing/MeasurementRetentionPostgresFixture.ts": {
+        "group": "retention",
+        "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+        "sha256": "a8830ef918e69289eb4a8c59c4cd1d0796dd9762f3bccbe1e2b355406274ed4a",
+        "blob": "ebc77369e20b8696ad0d2a5c43a5aaf9d8042493",
+        "priorBlob": null
+      },
+      "apps/worker/src/jobs/diagnosticAccountErasure.ts": {
+        "group": "retention",
+        "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+        "sha256": "f54c5f55171694f030ff105bc9114319e16fd7b50ca6acfffb620fa1651779cf",
+        "blob": "3d7ccadc481bf59edfdd217e421d0b7114f0b3fe",
+        "priorBlob": "8eb9da7645534fc5c5497346649eec0735c78b89"
+      },
+      "apps/worker/src/jobs/serviceAccountErasure.ts": {
+        "group": "retention",
+        "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+        "sha256": "61eaa717162555a1249cc1a2bc6b51adfe1fbd170632601b5dc95d4d4af14570",
+        "blob": "f5676704b516a06078a18c25cb07e3965860f8ef",
+        "priorBlob": "e166bfc854a6f571e687f481e8b1aaf7eac0710e"
+      },
+      "apps/worker/src/jobs/video/videoAccountErasure.ts": {
+        "group": "retention",
+        "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+        "sha256": "54149d179d55b98959b78dfc97ba22688920c1830e6ab6589265e43c901551d8",
+        "blob": "7507862b1e46f2c47de2da61b73dd66117ee7265",
+        "priorBlob": "ae48f836c3956abcc154b38eee4165ea507efc3b"
+      },
+      "docs/evidence/issue-897/measurement-retention-core175-runtime-20261025.json": {
+        "group": "retention",
+        "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+        "sha256": "cf9be620a53cd05111c8490f0c34f7af02491a1d7cefb3cb760ac0102c3e2c54",
+        "blob": "3af0ce38e2182f1ccb6ca35b346f5deb2edac569",
+        "priorBlob": null
+      },
+      "docs/evidence/issue-897/measurement-retention-core175-runtime-20261025.md": {
+        "group": "retention",
+        "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+        "sha256": "cb5b80860a64229b42d287dca6a69a49c81f100497f0a3686a821464e92e5014",
+        "blob": "789c99c92c19240f2a56e4c9d109c3e722538eed",
+        "priorBlob": null
+      },
+      "docs/evidence/issue-897/measurement-retention-effects-20261025.json": {
+        "group": "retention",
+        "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+        "sha256": "981341e99d3f5e67cfe6298dd791c5e7ad4e756ce67d1f92b84c4fe2273cd415",
+        "blob": "f2ab62c8f6b149d347136c394b07dcbf73c2ca4a",
+        "priorBlob": null
+      },
+      "docs/evidence/issue-897/measurement-retention-ordering-20261025.json": {
+        "group": "retention",
+        "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+        "sha256": "1bbb20e57672c85a851f52b33d0e40c32ae4b67e68c82bd7cc161749a7e4a7a7",
+        "blob": "425c7b23a3f5d449d3a5d803d8222c7166256eaf",
+        "priorBlob": null
+      },
+      "docs/evidence/issue-897/measurement-retention-ordering-20261025.md": {
+        "group": "retention",
+        "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+        "sha256": "872761558d0070e9969904c367af794bd464e6899dcec99cd8d18cfc60823379",
+        "blob": "667d3b16082e0fd3d50215253e35138aceadaa96",
+        "priorBlob": null
+      },
+      "apps/worker/test/b5-observation-plugin.d.mts": {
+        "group": "observer",
+        "pin": "c8d01014404d6f796b5feec7ba6abd2b9cace531",
+        "sha256": "1c64f0494420ef61d1bbb1f3838429b39fae7fab358f94987354d2f5c2ae0d2f",
+        "blob": "6d2ba38430e66c97a3b7ce688239d8696c713a70",
+        "priorBlob": null
+      },
+      "apps/worker/test/b5-observation-plugin.mjs": {
+        "group": "observer",
+        "pin": "c8d01014404d6f796b5feec7ba6abd2b9cace531",
+        "sha256": "bb4bbe4421edb7e8a62a32035fe28574832cbea0881ac79774a6396905e2be15",
+        "blob": "8ff91f7103a07238e6062e5bc4efb222fad93c5f",
+        "priorBlob": null
+      },
+      "apps/worker/test/b5-observation-runtime.mjs": {
+        "group": "observer",
+        "pin": "c8d01014404d6f796b5feec7ba6abd2b9cace531",
+        "sha256": "ac77a1f2b89098d3870053d41a4375832b7504ee0e07d26f038f4e31db2e4a9e",
+        "blob": "0f1e87d4840dca5c6686aff3605326ce8fac2f74",
+        "priorBlob": null
+      },
+      "apps/worker/test/b5-observation.check.mjs": {
+        "group": "observer",
+        "pin": "c8d01014404d6f796b5feec7ba6abd2b9cace531",
+        "sha256": "21172a5c972e0a61c16e8453ed40ac906cde5c9681702968fbcd7ae28307fa35",
+        "blob": "7a54f21846f6450a23de8a0865c4ef4de680cd07",
+        "priorBlob": null
+      },
+      "apps/worker/vitest.config.mts": {
+        "group": "observer",
+        "pin": "c8d01014404d6f796b5feec7ba6abd2b9cace531",
+        "sha256": "e6d84e0ab7668e2ca3c23f82fd12c538f01006c145dec896f965bbc0d182a1f7",
+        "blob": "35b3698ce4d13ace22739939b0501e92ab5adf3c",
+        "priorBlob": "cfd2cdafc35bf26989d4ed3628b59d0d667bd32f"
+      },
+      "docs/evidence/issue-897/b5-observer-preparation-20261023.md": {
+        "group": "observer",
+        "pin": "c8d01014404d6f796b5feec7ba6abd2b9cace531",
+        "sha256": "906c087ad60fc87ebdf1976ce2fbc2aaa4c1de3566ca2729891f12b61ce252ee",
+        "blob": "7a852bc84be5a5bfe6a7db28df8f823978382cd0",
+        "priorBlob": null
+      },
+      "docs/evidence/issue-897/b5-timing-diagnosis-20261025.json": {
+        "group": "observer",
+        "pin": "c8d01014404d6f796b5feec7ba6abd2b9cace531",
+        "sha256": "ca9a17e70693d1086f6bd9de93e7e85cfeb5d4eacc991c131dbecb8de250b522",
+        "blob": "ceea4775054953ebd76d3ef8405dade64007db8d",
+        "priorBlob": null
+      },
+      "docs/evidence/issue-897/b5-timing-diagnosis-20261025.md": {
+        "group": "observer",
+        "pin": "c8d01014404d6f796b5feec7ba6abd2b9cace531",
+        "sha256": "1e56eee757f16fa399faf724776f440b3fb081de02f4d98f74b77d8b974bafb2",
+        "blob": "5cb39da415a1e38f58a8d6e5a6c13f0e5baac82c",
+        "priorBlob": null
+      },
+      "packages/db/src/diagnostic-source-command.ts": {
+        "group": "publicationIntentDependency",
+        "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+        "sha256": "37522b517684e4feafd06d0f69a38f6774feae6367ea9794a84a5e16d6171a92",
+        "blob": "87880e98db9b41bb28bfb0fd3c6b56caa172697c"
+      },
+      "apps/api/src/common/avatar-contact-preparation.ts": {
+        "group": "r7d",
+        "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+        "sha256": "6684215e38cb74623681213bf424b4b60f9cc49eab897f72ca77f4ff28953066",
+        "blob": "f51e633964e388ff5ca3a776a0c699cd9e4812d8"
+      },
+      "apps/api/src/modules/admin/admin.module.ts": {
+        "group": "r7d",
+        "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+        "sha256": "5c0e33c9cab6f93991f9b0350badc2946ebf1a6e5e82eff2a585bb8fda6e6757",
+        "blob": "987576952a1535da2d79eeb57b45bb8e95fb9e96"
+      },
+      "apps/api/src/modules/admin/application/RemoveUserPhoto.spec.ts": {
+        "group": "r7d",
+        "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+        "sha256": "fb942fcfafb6934587987a8b4ee46d992f7fc2ae93f7a6f8266bd3be8a63e7e7",
+        "blob": "096a13a197487bc5ff29408cee6323d129fd9ceb"
+      },
+      "apps/api/src/modules/admin/application/RemoveUserPhoto.ts": {
+        "group": "r7d",
+        "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+        "sha256": "e186dc625a885f2d8480cea73aeed9b7abf98e052e672725c77324bcfbe44122",
+        "blob": "8c8763b857f17f33f078960df10744f2d4c2f9d4"
+      },
+      "apps/api/src/modules/listings/application/testing/AvatarContactDatabase.ts": {
+        "group": "r7d",
+        "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+        "sha256": "e9cbf8a5cb21af0c6e2880656115f0ccbd2eb67b5bb3006821e6b9f422efdb55",
+        "blob": "94a3dd344bbfa4de88c04616fc0f7bdc78934256"
+      },
+      "apps/api/src/modules/listings/infrastructure/AvatarContactPreparation.e2e.spec.ts": {
+        "group": "r7d",
+        "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+        "sha256": "52abe6ccd8a21dfa243b8b9468549043a5abeff50d992d801a7d12e033c0111e",
+        "blob": "33beb7721a71b7d39c86ee9260a1c4b37d1614b1"
+      },
+      "apps/api/src/modules/listings/infrastructure/AvatarContactPreparation.spec.ts": {
+        "group": "r7d",
+        "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+        "sha256": "8bad0f93333743e38285a18bd535eee773da2c8a88e2a71059faf69d2ec40ea3",
+        "blob": "fbeeec4d8af422cf2eb2899b595bf1a6b0d9ec18"
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaBusinessContactPhoneRepository.ts": {
+        "group": "r7d",
+        "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+        "sha256": "295e139db353a9d9676b852829d3d99ecc310269b60ad2d3c3fe968108047920",
+        "blob": "edf2efc899e3ef56d2cac8ecefeb9dfb01215257"
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaProfilePhotoLink.ts": {
+        "group": "r7d",
+        "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+        "sha256": "03de95817ebd3994b57b63148da143829e5e7fee8d16b63d62a986a1afae830d",
+        "blob": "6a3a82f247e7f1340b72348bc6db8fed4173a242"
+      },
+      "apps/api/src/modules/listings/infrastructure/PrismaVerifiedContactPhoneRepository.ts": {
+        "group": "r7d",
+        "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+        "sha256": "cf7b24c5f18a9db9460c6090ec89e1583535f3a20e567e63a16abd91a3675bcc",
+        "blob": "251f7c77928a15c288e7712ec6d9080dfc1c7b48"
+      },
+      "apps/api/src/modules/listings/infrastructure/testing/avatar-contact-r7d-20261025.sql": {
+        "group": "r7d",
+        "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+        "sha256": "e9035c2129490d2492808cd54000f2079d654e0378b15f72970702dff0815369",
+        "blob": "60c0753a712c95fae8fff68a6d3f1d6241ca1b10"
+      },
+      "apps/api/src/modules/listings/listings.module.ts": {
+        "group": "r7d",
+        "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+        "sha256": "6a88862f50b264f98e18f410b27e20324662cef4c2ad7c5eaf8f5972c8c06088",
+        "blob": "e555e8c805530623f834c29dcd6688f1757a2526"
+      },
+      "docs/evidence/issue-897/b1-r7d-avatar-contact-20261025.md": {
+        "group": "r7d",
+        "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+        "sha256": "2e9d7cfa62c8d2dd82d6914061ffb880c050682d0def304e7b991c223de015e6",
+        "blob": "0cd1c69d34bc5897aedb22e02fefe37f63da7790"
+      }
+    },
+    "compatibilityEdits": {
+      "apps/api/src/modules/listings/infrastructure/R1ListingCallerRecovery897.e2e.spec.ts": "Exact publication suite plus R7d required randomUUID constructor argument only; retains newer claimDeadline/video expectation."
+    }
+  },
+  "preservation": {
+    "assignedPathsExact": 91,
+    "allOriginalAssignedHashesMatch": true,
+    "observerFourSourcePinsExact": {
+      "apps/worker/src/jobs/diagnostics/SafeReplacementScheduling.spec.ts": "d6cf8dc5e5bcd293776bb78b0f445ba29a0c02b1c846bbb93493f7bc8e1f5f94",
+      "apps/worker/src/jobs/diagnostics/DiagnosticArtifactWorker.ts": "1eb1f632eb592d16073d78eaff36c4ccefa04878e08e66412aad75635daad102",
+      "apps/worker/src/jobs/diagnostics/DiagnosticPdfRenderer.ts": "f10b795606fcf5a2dd50a5fd32039b251881cd885d70ae34deec9f317911ec54",
+      "apps/worker/src/jobs/diagnostics/testing/readDiagnosticPdfText.ts": "247d1c3367983a5bb6bc406d8cf9a530b5d53e662060303bf4367e3b56e2d083"
+    },
+    "historicalFilesExactCount": 91,
+    "identitySuiteExactHistoricalBlob": "414a0a3ec42af405d145b7ae06116044be91aa65",
+    "mechanicalAndSchemaCompatibility": "See schema-composition.json and handoff; retained maps/checksums plus exact combined91 mapping"
+  },
+  "schema": {
+    "hash": "ab369beff6cda4e67243ec90a8f6b1c8c35692bab6c053500f4977a822f09c9d",
+    "identity": "add89ebf10b233e9d85ef5369e9fd426dbe885001bd3efe4bc4ddd6f1c38405d",
+    "publication": "af27b3a499d60733402e23755abc8035cda1a5acfa4f661c38140b288e99338d",
+    "extraHashes": [
+      "1cf0742ba3d69f4d0d13ac801edba81f2dbe68f41c3a54eeff4a90c4a287904b",
+      "4596dca51023d965e8fa88c8e6f7669ec3421b1a5ea4e60cea52fd507f26697c"
+    ],
+    "extraMappings": 2,
+    "additions": [
+      {
+        "name": "20261025020000_diagnostic_listing_publication_effects",
+        "checksum": "6923b8e4869928d942d909d305a3ef7eebfe166ea82628f313baf665759d0d39"
+      }
+    ],
+    "combined": [
+      "20261015003500_listing_view_counts",
+      "20261015010000_staff_capabilities",
+      "20261015020000_business_membership",
+      "20261015030000_business_inventory",
+      "20261015040000_first_party_measurement",
+      "20261015050000_service_foundations",
+      "20261015060000_business_enquiries",
+      "20261015070000_diagnostic_intake",
+      "20261015080000_service_push_subscriptions",
+      "20261015120000_listing_video_foundation",
+      "20261015130000_support_operations",
+      "20261015140000_video_playback_authority",
+      "20261015150000_history_orders",
+      "20261015160000_showroom_public_fields",
+      "20261015170000_video_processing_fences",
+      "20261015180000_history_delivery",
+      "20261015190000_diagnostic_reports",
+      "20261015200000_measurement_insights",
+      "20261015210000_history_recovery_offers",
+      "20261015220000_diagnostic_evidence_leases",
+      "20261015230000_video_claim_target",
+      "20261015240000_history_source_facts",
+      "20261015250000_video_source_manifest",
+      "20261015260000_video_write_protocol",
+      "20261015270000_history_mileage_not_null",
+      "20261015280000_diagnostic_association_invalidation",
+      "20261015290000_conversation_measurement_cohorts",
+      "20261021100000_diagnostic_reinspection_lineage",
+      "20261021110000_diagnostic_identity_records",
+      "20261021120000_diagnostic_report_identity_pin",
+      "20261021130000_diagnostic_identity_evidence",
+      "20261021140000_diagnostic_continuity_proofs",
+      "20261021150000_diagnostic_continuity_proof_consumption",
+      "20261021160000_diagnostic_automatic_vin_proof",
+      "20261022180000_diagnostic_public_continuity",
+      "20261023090000_diagnostic_ownership_components",
+      "20261023100000_diagnostic_ownership_disposal_same_graph",
+      "20261023110000_diagnostic_continuity_requests",
+      "20261023120000_diagnostic_ownership_grants",
+      "20261023130000_diagnostic_source_kernel",
+      "20261024010000_diagnostic_source_guard_repair",
+      "20261024020000_campaign_preparation",
+      "20261024030000_diagnostic_purge_effects",
+      "20261024040000_diagnostic_intake_effects",
+      "20261024050000_diagnostic_kernel_invariants",
+      "20261024060000_diagnostic_source_correction",
+      "20261024070000_diagnostic_user_eligibility",
+      "20261024080000_diagnostic_moderation_complete_effects",
+      "20261024090000_diagnostic_message_enquiry_fences",
+      "20261024100000_diagnostic_signin_intake_object_owners",
+      "20261024110000_diagnostic_user_insert_fence",
+      "20261024120000_diagnostic_account_noop_enquiry",
+      "20261024130000_diagnostic_intake_campaign_composition",
+      "20261025010000_diagnostic_report_source_effects",
+      "20261025015000_diagnostic_runtime_transport_corrections",
+      "20261025017500_diagnostic_effect_scope_alias_correction",
+      "20261025019000_diagnostic_user_insert_error_transport",
+      "20261025020000_diagnostic_listing_publication_effects"
+    ]
+  },
+  "checks": [
+    {
+      "name": "api-lint-composed",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "lint"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/api-lint-composed.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "durationSeconds": 6.48
+    },
+    {
+      "name": "api-lint",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "lint"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/api-lint.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "durationSeconds": 8.32
+    },
+    {
+      "name": "api-ts6-composed",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "tsc6",
+        "--noEmit"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/api-ts6-composed.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "durationSeconds": 9.22
+    },
+    {
+      "name": "api-ts6",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "tsc6",
+        "--noEmit"
+      ],
+      "exitCode": 1,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/api-ts6.log",
+      "sha256": "b446343ff23bace365b1316577227a8740157e256622fb0e6b904ebc2ccb82d4",
+      "durationSeconds": 1877.72
+    },
+    {
+      "name": "api-ts7-composed",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/api-ts7-composed.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "durationSeconds": 3.94
+    },
+    {
+      "name": "api-ts7",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "typecheck"
+      ],
+      "exitCode": 1,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/api-ts7.log",
+      "sha256": "2e99b5ebb5fe286c0646fbead84d855fde1811e942862307e75230faef73cab1",
+      "durationSeconds": 928.24
+    },
+    {
+      "name": "api-unit",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "test:unit"
+      ],
+      "exitCode": 1,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/api-unit.log",
+      "sha256": "a5b0ec8e811cc70bf8cce21a87758b4a2c2b361dac1647114ab53dc56c6ba7b3",
+      "durationSeconds": 1873.27
+    },
+    {
+      "name": "db-build-corrected",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/db",
+        "build"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/db-build-corrected.log",
+      "sha256": "7e50eb2fa56946cea195a587c36f1fce1ff042e5a41fe5aa200a10cfd9a8bde6",
+      "durationSeconds": 1.53
+    },
+    {
+      "name": "db-build",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/db",
+        "build"
+      ],
+      "exitCode": 1,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/db-build.log",
+      "sha256": "3b56074182d4d808520bf08fee5d3175d995c9a8e4aa1a19fe5f04c2ea9336d0",
+      "durationSeconds": 3.49
+    },
+    {
+      "name": "observer",
+      "command": [
+        "node",
+        "--test",
+        "apps/worker/test/b5-observation.check.mjs"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/observer.log",
+      "sha256": "e59381727251120c45b8a0fab914f8d92fd62d5f4e4d002455168de4c89d4d29",
+      "durationSeconds": 0.15
+    },
+    {
+      "name": "read-prefix-green",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "vitest",
+        "run",
+        "src/modules/diagnostics/infrastructure/DiagnosticPreparedIntake.spec.ts",
+        "src/modules/service-messaging/infrastructure/ServiceHistoryPrepared.spec.ts",
+        "--maxWorkers=1",
+        "--no-file-parallelism",
+        "--retry=0"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/read-prefix-green.log",
+      "sha256": "897601f07f9af54d5650469fd8cfc39ca4c8eaa540372318c2dfeecb372fd477",
+      "durationSeconds": 0.78
+    },
+    {
+      "name": "read-prefix-lint",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "lint"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/read-prefix-lint.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "durationSeconds": 6.99
+    },
+    {
+      "name": "read-prefix-red",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "vitest",
+        "run",
+        "src/modules/diagnostics/infrastructure/DiagnosticPreparedIntake.spec.ts",
+        "src/modules/service-messaging/infrastructure/ServiceHistoryPrepared.spec.ts",
+        "--maxWorkers=1",
+        "--no-file-parallelism",
+        "--retry=0"
+      ],
+      "exitCode": 1,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/read-prefix-red.log",
+      "sha256": "f61ba2db214257bebfbfd313e2cf27e1ded1f76755105926a34bebfaa50270b0",
+      "durationSeconds": 1.03
+    },
+    {
+      "name": "read-prefix-ts7",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/read-prefix-ts7.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "durationSeconds": 3.12
+    },
+    {
+      "name": "schema-static",
+      "command": [
+        "node",
+        "--test",
+        "scripts/*schema.test.mjs",
+        "scripts/diagnostic-runtime-profile-validation.test.mjs"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/schema-static.log",
+      "sha256": "96d9ce5769fcc16b90e3d5f40d1794f794e2c4c5e3f9e4ee7ec2ab35cc870735",
+      "durationSeconds": 0.31
+    },
+    {
+      "name": "service-session-green",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "vitest",
+        "run",
+        "src/modules/service-messaging/infrastructure/ServiceHistoryPrepared.spec.ts",
+        "--maxWorkers=1",
+        "--no-file-parallelism",
+        "--retry=0"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/service-session-green.log",
+      "sha256": "e8d4e75084992d9c383544578444c79f830a05312e360b44fe6ccae8fd5d7184",
+      "durationSeconds": 0.73
+    },
+    {
+      "name": "service-session-lint",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "lint"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/service-session-lint.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "durationSeconds": 10.61
+    },
+    {
+      "name": "service-session-red",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "vitest",
+        "run",
+        "src/modules/service-messaging/infrastructure/ServiceHistoryPrepared.spec.ts",
+        "--maxWorkers=1",
+        "--no-file-parallelism",
+        "--retry=0"
+      ],
+      "exitCode": 1,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/service-session-red.log",
+      "sha256": "3f88a9d1a71328ad826c98e51b3c157a9f21740056e13152ca408bcef830c1e9",
+      "durationSeconds": 0.82
+    },
+    {
+      "name": "service-session-ts6",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "tsc6",
+        "--noEmit"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/service-session-ts6.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "durationSeconds": 13.07
+    },
+    {
+      "name": "service-session-ts7",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/service-session-ts7.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "durationSeconds": 5.86
+    },
+    {
+      "name": "source-checks",
+      "command": [
+        "pnpm",
+        "check:runtime-imports"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/source-checks.log",
+      "sha256": "2920e5c9967fdaf4eb831dfb48e054ff0bd4262a1ef314658ceca54821fa5d97",
+      "durationSeconds": 0.56
+    },
+    {
+      "name": "worker-build",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/worker",
+        "build"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/worker-build.log",
+      "sha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538",
+      "durationSeconds": 4.77
+    },
+    {
+      "name": "worker-lint",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/worker",
+        "lint"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/worker-lint.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "durationSeconds": 4.9
+    },
+    {
+      "name": "worker-ts6",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/worker",
+        "exec",
+        "tsc6",
+        "--noEmit"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/worker-ts6.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "durationSeconds": 932.17
+    },
+    {
+      "name": "worker-ts7",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/worker",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/worker-ts7.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "durationSeconds": 1.62
+    },
+    {
+      "name": "worker-unit",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/worker",
+        "test:unit"
+      ],
+      "exitCode": 1,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/worker-unit.log",
+      "sha256": "90d8b4c95e425eca11a13e1e842135cdf08628524d141e5ca80ffea64e879797",
+      "durationSeconds": 928.24
+    }
+  ],
+  "sql": {
+    "identity": {
+      "preexecution": {
+        "at": "2026-10-26T02:11:56.254757+00:00",
+        "head": "a152a06d6975ed3e1624c88d636158caab61d965",
+        "tree": "7b2993b5cf754096a933087f46ced3851e5085d4",
+        "project": "auto_tm_ci_coherent897_identity_20261026021155",
+        "environment": {
+          "APP_ENV": "test",
+          "NODE_ENV": "test",
+          "AUTO_TM_TEST_DATABASES": "off",
+          "PG": "own fresh postgres16-alpine loopback random port; no Redis/MinIO required by selectedsuite"
+        },
+        "suite": {
+          "path": "apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.e2e.spec.ts",
+          "blob": "414a0a3ec42af405d145b7ae06116044be91aa65",
+          "sha256": "65b08870ca0cbf38d75ccf6299729401741217aedff55654d98b979f697c2b08",
+          "namespace": "identity-authority-prepared-r2",
+          "externalSeed": false,
+          "expectedCases": 22,
+          "expectCalls": 55
+        },
+        "schema": "ab369beff6cda4e67243ec90a8f6b1c8c35692bab6c053500f4977a822f09c9d",
+        "profile": "48f25b1243acc0752d520c3308f874392fd3d05cd7b72af501f4a0bf334a0dcc",
+        "migrations": {
+          "packages/db/prisma/migrations/20260513201407_init/migration.sql": "8047c0ad646e98e1302c158d32d9d1dc6f54a05024ae29ed1e7ffaee4791a860",
+          "packages/db/prisma/migrations/20260514090000_multi_device_sessions_and_role_split/migration.sql": "f2b6b1d0d655ece5dfd64d9d800bcad4a05c91550969f4a3ce08de3da4d5a3c0",
+          "packages/db/prisma/migrations/20260514100000_otp_request_ip/migration.sql": "70ab10afbc02ab9d9296d2e9c452ba0dc44c92b3a0b8ad32b0f2b4a0776dd8cc",
+          "packages/db/prisma/migrations/20260514104615_delete_me_cascades/migration.sql": "af24a05134219508e15794874c252d8a1bc6780850d7388eeccdcad56553e193",
+          "packages/db/prisma/migrations/20260518081943_add_engine_type_transmission_drive_type/migration.sql": "8a7068c700f352714f558bf46492484770b8e9ea6a5c2293566256dc290c2841",
+          "packages/db/prisma/migrations/20260518083234_s4_listings_crud/migration.sql": "ab90ddaf05f5034928eb5ffacd871b20538c5d33b97201918411e8d17a612010",
+          "packages/db/prisma/migrations/20260518180741_add_seller_terms_to_listing/migration.sql": "10ec9bdf271645b46d08e9d017da0ba78257d8a82b02516db52b7eb6d612c454",
+          "packages/db/prisma/migrations/20260608010000_s7_admin_moderation/migration.sql": "7faad97bf4fc734a9bc519e6dd8019ba0aeac17810c5b5bd564a0cce0e8c0a8a",
+          "packages/db/prisma/migrations/20260609000000_account_deletion_grace/migration.sql": "e91fe7bbaa26c63d26c95c637cbd3f6c22bf9bd5ec7e0b544c06124a9c244698",
+          "packages/db/prisma/migrations/20260711000000_add_condition_disclosure_to_listing/migration.sql": "69f549c0121aa415cf3cc9afdc0c8a26ae8d1de235c921991f73cb5dbf61c846",
+          "packages/db/prisma/migrations/20260711100000_add_inspection_interest/migration.sql": "2aa118ed29b0fe321feab0a95325d66e083059ea4cae581464da0934f0aa5176",
+          "packages/db/prisma/migrations/20260713000000_s10_rich_chat_foundation/migration.sql": "ddd8437876b5cf1653f00bcec6138aff653ddb53bf1d64a3eabfd7190048fe2e",
+          "packages/db/prisma/migrations/20260713170000_add_notification_history_status/migration.sql": "8de22e29cb7ee0345155ef82c7343054b57ce6190e971937788a42fadd792b61",
+          "packages/db/prisma/migrations/20260719010000_align_prisma_schema_with_existing_database/migration.sql": "45e4e3d6acc26ca5275af153fbcc1163e3d832c695c39f1bd28c052db6aef2c8",
+          "packages/db/prisma/migrations/20260922000000_add_user_sign_in_methods/migration.sql": "485f470dc45b4f84ded7032d1a6fda31993103f44bb2d686a433bac0af6e2016",
+          "packages/db/prisma/migrations/20260923000000_add_sign_in_code_channel/migration.sql": "d8e3acc864e098b19a15c1cbaa1adc1d4478a9231b9cc6c925d8d5d897c1fe97",
+          "packages/db/prisma/migrations/20260928000000_add_listing_price_tmt/migration.sql": "65aee1669e4df2e004117e3168de4b15f978b1e305eaea73b2f8639dbac76009",
+          "packages/db/prisma/migrations/20260929000000_add_listing_public_number/migration.sql": "99e90be6eed8715ace3136cfd97a4f1f2131efb9804af52f5693bc3d706206c8",
+          "packages/db/prisma/migrations/20260929120000_add_brand_logo_key/migration.sql": "b1943a5457351d9b63c7f1ea9f103ed3e1a5dc3a402764f4ef1f44c4d30a9488",
+          "packages/db/prisma/migrations/20260929130000_damaged_condition_disclosure/migration.sql": "9c861900135a09861e9a44b522e69bb6ab56908619a77c3132766d39da5467f0",
+          "packages/db/prisma/migrations/20261002000000_remove_reported_listing_status/migration.sql": "e9252f91ba28c9910151804a83db02daa236df12967fbd81c15d37fb41190bc0",
+          "packages/db/prisma/migrations/20261002120000_add_media_uploads/migration.sql": "bdc2a56e53a0670be0bcd44240b5ab015eb49f1616877f678a85d758c388ab6a",
+          "packages/db/prisma/migrations/20261003120000_add_otp_request_purpose/migration.sql": "a53f8d07762d19e8fa86715cfefa4686e69ba0396dacbcd2e5ef6535338aea40",
+          "packages/db/prisma/migrations/20261003180000_add_verified_contact_phones/migration.sql": "5733060102f2bcc56d0adf2815814e8b78b56d0e8afb14b98611a5a624e13d41",
+          "packages/db/prisma/migrations/20261003180100_clear_unverified_listing_contact_phones/migration.sql": "c9b70d53087dbc84f6967f41b8a2e84ea85a5266912732f52f8e36a06a4e155e",
+          "packages/db/prisma/migrations/20261005120000_add_user_name_number_and_avatar_index/migration.sql": "4edee95c37b5645feaddc75290dd6b2f742964cb932b3d563ff6451337c82085",
+          "packages/db/prisma/migrations/20261007120000_conditional_upload_protocol/migration.sql": "0ea7b599545fa4e6c05d259670dbd00349be352fef8b690660f1bbb0c5b3b481",
+          "packages/db/prisma/migrations/20261007130000_exclusive_upload_adoption/migration.sql": "6842d1028b6aadac98fcd4a1f081b8e7dcf752913edcfbf34f6a436d0aa0f451",
+          "packages/db/prisma/migrations/20261007130100_backfill_upload_adoption_state/migration.sql": "076017f1538827f2d906d8cfc4dcfbcd799f1103e194f28c2cc0bdff77329249",
+          "packages/db/prisma/migrations/20261011130000_correct_lugong_liugong_models/migration.sql": "2fb2cbdcce9c65e385c4ff539c1d822d8181fad75651df8284f24c285373e74b",
+          "packages/db/prisma/migrations/20261011140000_add_listing_media_thumb_hash/migration.sql": "b364a381237d9eeca4e29480443510304b4117118366249cad9bf7fa9c0a352d",
+          "packages/db/prisma/migrations/20261011150000_expand_conditional_media_manifest/migration.sql": "31c4af84bf9be9353c930e399366428b79266988043342ef61680ea6af584490",
+          "packages/db/prisma/migrations/20261014120000_restore_relisted_listings_published_at/migration.sql": "327290525e35afc76031dd46e820400478060d08dd9780202683b91b6bbcf718",
+          "packages/db/prisma/migrations/20261015003500_listing_view_counts/migration.sql": "bdb25bde750cd12de85ca3a4bf4201ac927681539f1b1b70105a633f4dc26d5d",
+          "packages/db/prisma/migrations/20261015010000_staff_capabilities/migration.sql": "88f7b84d80a31ee2918ea4a8e2ce9c578f8de766ca2d1317fe1f2713d6fd0c43",
+          "packages/db/prisma/migrations/20261015020000_business_membership/migration.sql": "7a60b7b21b212c9bf38a14522eb937eb9762044039d05e6e16b7e76d1093c00a",
+          "packages/db/prisma/migrations/20261015030000_business_inventory/migration.sql": "49143ea7a21fe5c6031a966794aedba44d69e3a3f9d6b6195dfbe57915ee93e8",
+          "packages/db/prisma/migrations/20261015040000_first_party_measurement/migration.sql": "5da46ac7211e658eb1b1e96374c8be796ffad03c5ecb789a7692c4fc0dca384c",
+          "packages/db/prisma/migrations/20261015050000_service_foundations/migration.sql": "66c9eec07c4c715624d42c30a00202a0727cb36b05f5ca850fed38a9901f9c9a",
+          "packages/db/prisma/migrations/20261015060000_business_enquiries/migration.sql": "4d491f64ae7601fce337591a4fed5e14fc717fe5c1234aa83e4b3b2f1e5c36d8",
+          "packages/db/prisma/migrations/20261015070000_diagnostic_intake/migration.sql": "9f5ce216f2dd4cbbcb75c9ce78d058244f5262170e51815c111c66563b32ebc6",
+          "packages/db/prisma/migrations/20261015080000_service_push_subscriptions/migration.sql": "e2b04ea8e7f1c33924261fb2fcc0669c1c99dcfe628b8b0e8f0c7007ee47cf3b",
+          "packages/db/prisma/migrations/20261015120000_listing_video_foundation/migration.sql": "8b1b907dbeb942c840330ca3a8f3ef9264ec0008c393f3d51d7961bd7305687b",
+          "packages/db/prisma/migrations/20261015130000_support_operations/migration.sql": "57389de2321c518efe4f1a96adf7ae5bbf7df6b7224ff97c6a854f2708c88163",
+          "packages/db/prisma/migrations/20261015140000_video_playback_authority/migration.sql": "019b9ea21c459d9e4e5df313f97957eba80a043ada053d8bd80fd13515b86eae",
+          "packages/db/prisma/migrations/20261015150000_history_orders/migration.sql": "1eb35867354f2d8fcf9d15fdff2ce584eeeb4cdb252e4a5d47ce6c2a298a19b2",
+          "packages/db/prisma/migrations/20261015160000_showroom_public_fields/migration.sql": "2d38d6d7960fc66078dcf46444ffbbd85b6deedb9f51145e21304d7dff52c02b",
+          "packages/db/prisma/migrations/20261015170000_video_processing_fences/migration.sql": "ff8a5579df352a389385aeb47f78caed985301995c569c3a5b21db2e022f779b",
+          "packages/db/prisma/migrations/20261015180000_history_delivery/migration.sql": "2d08ccc88142214fe0f22c29a1dd5ecf84239bc730f6076cab2e1104e724248d",
+          "packages/db/prisma/migrations/20261015190000_diagnostic_reports/migration.sql": "4be9efc71ddd57f2b6b32efef199576d81d432d193580d8db41dcc44155ff3fd",
+          "packages/db/prisma/migrations/20261015200000_measurement_insights/migration.sql": "dd412d0bc61628e4333dfb9b607b022f23742c17c9c59529acea91d9e3f325e0",
+          "packages/db/prisma/migrations/20261015210000_history_recovery_offers/migration.sql": "8da84698db0e7f080a865daf5fceda3a43892e5454f86981855d597b678094e2",
+          "packages/db/prisma/migrations/20261015220000_diagnostic_evidence_leases/migration.sql": "497b8aab18f382eefd0d68f7be0f7ad8622b1c9975e31488ec324811b5b1f61a",
+          "packages/db/prisma/migrations/20261015230000_video_claim_target/migration.sql": "39d9c56041a02cf6d74f3a967adc37c37dbbc05f4a5487876a9abf4fbb5647d8",
+          "packages/db/prisma/migrations/20261015240000_history_source_facts/migration.sql": "593a00d00ee4f0c686c05e07cbdeae60996b50252e0d350b341ad502c7bde8bd",
+          "packages/db/prisma/migrations/20261015250000_video_source_manifest/migration.sql": "da45934af2bd21968d582661738ee13a1394320d442e0847abc53db01c01194d",
+          "packages/db/prisma/migrations/20261015260000_video_write_protocol/migration.sql": "8c79eec4d6e7b465a6599f9d9e2224a327c3715cc8d95179c4c69ff9341c7708",
+          "packages/db/prisma/migrations/20261015270000_history_mileage_not_null/migration.sql": "1081bd33f8c08b353ce4c0fa163ecf17d97eaee1d1a1ac7871c5e9f3d23add92",
+          "packages/db/prisma/migrations/20261015280000_diagnostic_association_invalidation/migration.sql": "565854648750b86cceff78a86cff7693c9210510a3835b26f195928ed765baee",
+          "packages/db/prisma/migrations/20261015290000_conversation_measurement_cohorts/migration.sql": "350160257c66c5fb3a3dcd7b3681ceeefec89f35748de452a9599ee955675540",
+          "packages/db/prisma/migrations/20261021100000_diagnostic_reinspection_lineage/migration.sql": "d0f4aa1d73192bfffe468458f977c853483d8e2a43efca29e7a8f6aa83dc37d2",
+          "packages/db/prisma/migrations/20261021110000_diagnostic_identity_records/migration.sql": "b5919c3d4d5fd9f52a14c8a4f973fe7caa3e3e4c6611ff08e188579397ad1d70",
+          "packages/db/prisma/migrations/20261021120000_diagnostic_report_identity_pin/migration.sql": "1d299c923af088efc1b49d9e2b8124bef6c4a0476fc300ed78ab8e63d4a1e83c",
+          "packages/db/prisma/migrations/20261021130000_diagnostic_identity_evidence/migration.sql": "5351553647b355dc59eadf25a02e84aa7916e1b33da2117b00e40f47d49ecb82",
+          "packages/db/prisma/migrations/20261021140000_diagnostic_continuity_proofs/migration.sql": "77c6cab3b6731e9203556bcfa78a4ff2661d3a71db597a7b3c6150db925e5cb0",
+          "packages/db/prisma/migrations/20261021150000_diagnostic_continuity_proof_consumption/migration.sql": "f25d566779839d76749f9320ba102d6e282fbba365468c68e0d49eeed460a222",
+          "packages/db/prisma/migrations/20261021160000_diagnostic_automatic_vin_proof/migration.sql": "83176fd55e353ef02de460a42dd41471c3f07120c228a6df80ff71f829502acd",
+          "packages/db/prisma/migrations/20261022180000_diagnostic_public_continuity/migration.sql": "32fe0a8cb64aaaf187390b5c6a2fa72fe6a260547602ffdf572959409ea68a3f",
+          "packages/db/prisma/migrations/20261023090000_diagnostic_ownership_components/migration.sql": "f43b2c04ef6ed9f447acfc0e5ebf326a577b3cd1d96539439c43f05f537cad01",
+          "packages/db/prisma/migrations/20261023100000_diagnostic_ownership_disposal_same_graph/migration.sql": "cdb43cc361fd783c1e6d66d5eccef118861ef3e9ac4a75b233fc8b527b8ec547",
+          "packages/db/prisma/migrations/20261023110000_diagnostic_continuity_requests/migration.sql": "83188077748f02bf96d74d9588805f173129199333a8d4e9c160547e38fb52a2",
+          "packages/db/prisma/migrations/20261023120000_diagnostic_ownership_grants/migration.sql": "3696e93cfc56f13a95d8e38fd72e3e985d43105ce17ffdf7d5f7ce273efac3df",
+          "packages/db/prisma/migrations/20261023130000_diagnostic_source_kernel/migration.sql": "b9b2d465c04cc34693e5774d12910a33bb29b39d8452f5a2862dc24b667f4fbf",
+          "packages/db/prisma/migrations/20261024010000_diagnostic_source_guard_repair/migration.sql": "786aa19839002c915cf00038f888c85e0b27a4d20b0905a1aac4edf5db5a1be3",
+          "packages/db/prisma/migrations/20261024020000_campaign_preparation/migration.sql": "cceb9c0d75c8d1f3a9302548d7791ac752635c3775e7b5ca3ec3c516b7db9429",
+          "packages/db/prisma/migrations/20261024030000_diagnostic_purge_effects/migration.sql": "23d894c79c5927d7d976c79e4cbe958af83725ccf172208b7f4d6132e0d3d4ba",
+          "packages/db/prisma/migrations/20261024040000_diagnostic_intake_effects/migration.sql": "9d9155637143e152ac63baf255d074fe768ff0c4bcb4ec041dd75b32404903a5",
+          "packages/db/prisma/migrations/20261024050000_diagnostic_kernel_invariants/migration.sql": "6fdb70cd2364b0125080293a1602f78788c1db450d82859613c04b0020b732f8",
+          "packages/db/prisma/migrations/20261024060000_diagnostic_source_correction/migration.sql": "55fa19d86c4f30d6c6abab96985dfbfb7bc30b0e6d928da1f63ba8fdbd13b7f6",
+          "packages/db/prisma/migrations/20261024070000_diagnostic_user_eligibility/migration.sql": "f5fabb22e4e6e5a2dace529e5bcb4de5e56a6daf18ebbff02351e9407430893e",
+          "packages/db/prisma/migrations/20261024080000_diagnostic_moderation_complete_effects/migration.sql": "a82144b10637924c522188c2511fab6f906ee7ecc803875189155c3e8289e6c0",
+          "packages/db/prisma/migrations/20261024090000_diagnostic_message_enquiry_fences/migration.sql": "19316d8fbab4d425af191477a997c49d0e518332b89dc9a39779c9a21d72995c",
+          "packages/db/prisma/migrations/20261024100000_diagnostic_signin_intake_object_owners/migration.sql": "802bc18c5b98074046422b4e99b6e46877395166afe7f25fa80d37e53416fda6",
+          "packages/db/prisma/migrations/20261024110000_diagnostic_user_insert_fence/migration.sql": "bad49d6a7a1329f7a5d7e63b4780a1edd53bb466693ab9605920b54641f3f271",
+          "packages/db/prisma/migrations/20261024120000_diagnostic_account_noop_enquiry/migration.sql": "aa41c4e37f8bb267f10bf3d55e70abd0e3d4b87ce8260ba6e882bd8635959d0f",
+          "packages/db/prisma/migrations/20261024130000_diagnostic_intake_campaign_composition/migration.sql": "974217c5ec0f68426429e2a37120b0e9b419817dbea16ffd5cb8362ca3e118ed",
+          "packages/db/prisma/migrations/20261025010000_diagnostic_report_source_effects/migration.sql": "a21407fdf8025b6672656cb678ff34bbd3e05c97594c95e971fb801e66811fb9",
+          "packages/db/prisma/migrations/20261025015000_diagnostic_runtime_transport_corrections/migration.sql": "520c94deedd51c039f82b396b6bf08acd551838bc37698ca0a345aa92a165424",
+          "packages/db/prisma/migrations/20261025017500_diagnostic_effect_scope_alias_correction/migration.sql": "1fd74d6824c2e7ba47cf311d455c38ce51cbab074a7b16c53cc5b4fb3fbf328f",
+          "packages/db/prisma/migrations/20261025019000_diagnostic_user_insert_error_transport/migration.sql": "a6b7b46c95fd74f8e6f7b962bcb899b2575df7ec1db1f26962bc5853305d0e74",
+          "packages/db/prisma/migrations/20261025020000_diagnostic_listing_publication_effects/migration.sql": "6923b8e4869928d942d909d305a3ef7eebfe166ea82628f313baf665759d0d39"
+        },
+        "command": [
+          "pnpm",
+          "--filter",
+          "@auto-tm/api",
+          "exec",
+          "vitest",
+          "run",
+          "src/modules/identity/infrastructure/IdentityAuthorityPrepared.e2e.spec.ts",
+          "--maxWorkers=1",
+          "--no-file-parallelism",
+          "--retry=0",
+          "--passWithNoTests=false",
+          "--reporter=default",
+          "--reporter=json",
+          "--reporter=junit",
+          "--outputFile.json=/tmp/897-coherent-intermediate-assembly-20261025/identity/vitest.json",
+          "--outputFile.junit=/tmp/897-coherent-intermediate-assembly-20261025/identity/junit.xml"
+        ],
+        "cleanup": "finally compose down --volumes --remove-orphans only exact project; label-filtered survivors inspected",
+        "B5": "not enabled narrow slice; independent obligation remains",
+        "loopbackDatabaseURL": "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:52929/auto_tm_ci"
+      },
+      "result": {
+        "numTotalTests": 22,
+        "numPassedTests": 22,
+        "numFailedTests": 0,
+        "numPendingTests": 0,
+        "cases": [
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition refresh CAS has one winner and false loser, left begins first",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 777.1812909999999
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition refresh CAS has one winner and false loser, right begins first",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 728.2162919999996
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition first verification is atomic and the loser retains its pending error, left first",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 785.91075
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition first verification is atomic and the loser retains its pending error, right first",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 802.306458
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition backup reuse cannot burn or elevate twice, left first",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 753.4153329999999
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition backup reuse cannot burn or elevate twice, right first",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 901.5046670000002
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition backup elevation opposes staff revocation in both orders, left",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 891.459041000001
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition backup elevation opposes staff revocation in both orders, right",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 853.8626250000016
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition logout and Session creation never delete the incoming Session, left",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 333.5090830000008
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition logout and Session creation never delete the incoming Session, right",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 351.9833750000016
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition User INSERT and verified replacement fence the same destination, left",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 390.2827079999988
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition User INSERT and verified replacement fence the same destination, right",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 352.1242089999996
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition OTP reservation prepares before destination/IP locks, left",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 36.15462500000103
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition OTP reservation prepares before destination/IP locks, right",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 26.547875000000204
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition actual logout and enrollment deletion complete their exact FK cascades",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 955.5332080000007
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition real staff no-ops emit no audit, while revoke and regrant each audit once",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 1947.087958
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition expired pruning rechecks the selector and retains new and foreign live Sessions",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 665.8451249999998
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition rollback after successful real caller work leaves no grant, audit, code burn or elevation",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 911.2029160000002
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition refused missing Session does not verify enrollment or create backup codes",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 488.9496249999993
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition refused foreign Session does not verify enrollment or create backup codes",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 877.5779999999995
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition refused expired Session does not verify enrollment or create backup codes",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 1182.2283749999988
+          },
+          {
+            "name": "Identity caller-owned preparation under PostgreSQL opposition refused inactive Session does not verify enrollment or create backup codes",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 745.8477079999975
+          }
+        ]
+      },
+      "status": {
+        "error": null,
+        "cleanupSuccess": true,
+        "head": "a152a06d6975ed3e1624c88d636158caab61d965",
+        "tree": "7b2993b5cf754096a933087f46ced3851e5085d4"
+      },
+      "cleanup": {
+        "project": "auto_tm_ci_coherent897_identity_20261026021155",
+        "downExitCode": 0,
+        "survivors": {
+          "container": {
+            "exitCode": 0,
+            "ids": [],
+            "stderr": ""
+          },
+          "network": {
+            "exitCode": 0,
+            "ids": [],
+            "stderr": ""
+          },
+          "volume": {
+            "exitCode": 0,
+            "ids": [],
+            "stderr": ""
+          }
+        },
+        "success": true
+      }
+    },
+    "publication": {
+      "preexecution": {
+        "at": "2026-10-26T03:24:37.183826+00:00",
+        "head": "38dc76896344125ce9258a9f26b4f8b1598e91fd",
+        "tree": "4ff0146ea5c1f43249b6572b969ae365a7d62d92",
+        "project": "auto_tm_ci_coherent897_publication_20261026032437",
+        "environment": {
+          "APP_ENV": "test",
+          "NODE_ENV": "test",
+          "AUTO_TM_TEST_DATABASES": "off",
+          "PG": "own fresh postgres16-alpine loopback random port; no Redis/MinIO required by selectedsuite"
+        },
+        "suite": {
+          "path": "apps/api/src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts",
+          "blob": "6009dcb95da3439039985a01dec162e7ff980b06",
+          "sha256": "1a16ca7c9a8d67a4806d94272485ae17789b2caa8a4bdf6fa0d95c95dddb105a",
+          "namespace": "r7b-publication",
+          "externalSeed": false,
+          "expectedCases": 25,
+          "expectCalls": 117,
+          "roleBoundary": "accepted publication owner fixture"
+        },
+        "schema": "ab369beff6cda4e67243ec90a8f6b1c8c35692bab6c053500f4977a822f09c9d",
+        "profile": "48f25b1243acc0752d520c3308f874392fd3d05cd7b72af501f4a0bf334a0dcc",
+        "migrations": {
+          "packages/db/prisma/migrations/20260513201407_init/migration.sql": "8047c0ad646e98e1302c158d32d9d1dc6f54a05024ae29ed1e7ffaee4791a860",
+          "packages/db/prisma/migrations/20260514090000_multi_device_sessions_and_role_split/migration.sql": "f2b6b1d0d655ece5dfd64d9d800bcad4a05c91550969f4a3ce08de3da4d5a3c0",
+          "packages/db/prisma/migrations/20260514100000_otp_request_ip/migration.sql": "70ab10afbc02ab9d9296d2e9c452ba0dc44c92b3a0b8ad32b0f2b4a0776dd8cc",
+          "packages/db/prisma/migrations/20260514104615_delete_me_cascades/migration.sql": "af24a05134219508e15794874c252d8a1bc6780850d7388eeccdcad56553e193",
+          "packages/db/prisma/migrations/20260518081943_add_engine_type_transmission_drive_type/migration.sql": "8a7068c700f352714f558bf46492484770b8e9ea6a5c2293566256dc290c2841",
+          "packages/db/prisma/migrations/20260518083234_s4_listings_crud/migration.sql": "ab90ddaf05f5034928eb5ffacd871b20538c5d33b97201918411e8d17a612010",
+          "packages/db/prisma/migrations/20260518180741_add_seller_terms_to_listing/migration.sql": "10ec9bdf271645b46d08e9d017da0ba78257d8a82b02516db52b7eb6d612c454",
+          "packages/db/prisma/migrations/20260608010000_s7_admin_moderation/migration.sql": "7faad97bf4fc734a9bc519e6dd8019ba0aeac17810c5b5bd564a0cce0e8c0a8a",
+          "packages/db/prisma/migrations/20260609000000_account_deletion_grace/migration.sql": "e91fe7bbaa26c63d26c95c637cbd3f6c22bf9bd5ec7e0b544c06124a9c244698",
+          "packages/db/prisma/migrations/20260711000000_add_condition_disclosure_to_listing/migration.sql": "69f549c0121aa415cf3cc9afdc0c8a26ae8d1de235c921991f73cb5dbf61c846",
+          "packages/db/prisma/migrations/20260711100000_add_inspection_interest/migration.sql": "2aa118ed29b0fe321feab0a95325d66e083059ea4cae581464da0934f0aa5176",
+          "packages/db/prisma/migrations/20260713000000_s10_rich_chat_foundation/migration.sql": "ddd8437876b5cf1653f00bcec6138aff653ddb53bf1d64a3eabfd7190048fe2e",
+          "packages/db/prisma/migrations/20260713170000_add_notification_history_status/migration.sql": "8de22e29cb7ee0345155ef82c7343054b57ce6190e971937788a42fadd792b61",
+          "packages/db/prisma/migrations/20260719010000_align_prisma_schema_with_existing_database/migration.sql": "45e4e3d6acc26ca5275af153fbcc1163e3d832c695c39f1bd28c052db6aef2c8",
+          "packages/db/prisma/migrations/20260922000000_add_user_sign_in_methods/migration.sql": "485f470dc45b4f84ded7032d1a6fda31993103f44bb2d686a433bac0af6e2016",
+          "packages/db/prisma/migrations/20260923000000_add_sign_in_code_channel/migration.sql": "d8e3acc864e098b19a15c1cbaa1adc1d4478a9231b9cc6c925d8d5d897c1fe97",
+          "packages/db/prisma/migrations/20260928000000_add_listing_price_tmt/migration.sql": "65aee1669e4df2e004117e3168de4b15f978b1e305eaea73b2f8639dbac76009",
+          "packages/db/prisma/migrations/20260929000000_add_listing_public_number/migration.sql": "99e90be6eed8715ace3136cfd97a4f1f2131efb9804af52f5693bc3d706206c8",
+          "packages/db/prisma/migrations/20260929120000_add_brand_logo_key/migration.sql": "b1943a5457351d9b63c7f1ea9f103ed3e1a5dc3a402764f4ef1f44c4d30a9488",
+          "packages/db/prisma/migrations/20260929130000_damaged_condition_disclosure/migration.sql": "9c861900135a09861e9a44b522e69bb6ab56908619a77c3132766d39da5467f0",
+          "packages/db/prisma/migrations/20261002000000_remove_reported_listing_status/migration.sql": "e9252f91ba28c9910151804a83db02daa236df12967fbd81c15d37fb41190bc0",
+          "packages/db/prisma/migrations/20261002120000_add_media_uploads/migration.sql": "bdc2a56e53a0670be0bcd44240b5ab015eb49f1616877f678a85d758c388ab6a",
+          "packages/db/prisma/migrations/20261003120000_add_otp_request_purpose/migration.sql": "a53f8d07762d19e8fa86715cfefa4686e69ba0396dacbcd2e5ef6535338aea40",
+          "packages/db/prisma/migrations/20261003180000_add_verified_contact_phones/migration.sql": "5733060102f2bcc56d0adf2815814e8b78b56d0e8afb14b98611a5a624e13d41",
+          "packages/db/prisma/migrations/20261003180100_clear_unverified_listing_contact_phones/migration.sql": "c9b70d53087dbc84f6967f41b8a2e84ea85a5266912732f52f8e36a06a4e155e",
+          "packages/db/prisma/migrations/20261005120000_add_user_name_number_and_avatar_index/migration.sql": "4edee95c37b5645feaddc75290dd6b2f742964cb932b3d563ff6451337c82085",
+          "packages/db/prisma/migrations/20261007120000_conditional_upload_protocol/migration.sql": "0ea7b599545fa4e6c05d259670dbd00349be352fef8b690660f1bbb0c5b3b481",
+          "packages/db/prisma/migrations/20261007130000_exclusive_upload_adoption/migration.sql": "6842d1028b6aadac98fcd4a1f081b8e7dcf752913edcfbf34f6a436d0aa0f451",
+          "packages/db/prisma/migrations/20261007130100_backfill_upload_adoption_state/migration.sql": "076017f1538827f2d906d8cfc4dcfbcd799f1103e194f28c2cc0bdff77329249",
+          "packages/db/prisma/migrations/20261011130000_correct_lugong_liugong_models/migration.sql": "2fb2cbdcce9c65e385c4ff539c1d822d8181fad75651df8284f24c285373e74b",
+          "packages/db/prisma/migrations/20261011140000_add_listing_media_thumb_hash/migration.sql": "b364a381237d9eeca4e29480443510304b4117118366249cad9bf7fa9c0a352d",
+          "packages/db/prisma/migrations/20261011150000_expand_conditional_media_manifest/migration.sql": "31c4af84bf9be9353c930e399366428b79266988043342ef61680ea6af584490",
+          "packages/db/prisma/migrations/20261014120000_restore_relisted_listings_published_at/migration.sql": "327290525e35afc76031dd46e820400478060d08dd9780202683b91b6bbcf718",
+          "packages/db/prisma/migrations/20261015003500_listing_view_counts/migration.sql": "bdb25bde750cd12de85ca3a4bf4201ac927681539f1b1b70105a633f4dc26d5d",
+          "packages/db/prisma/migrations/20261015010000_staff_capabilities/migration.sql": "88f7b84d80a31ee2918ea4a8e2ce9c578f8de766ca2d1317fe1f2713d6fd0c43",
+          "packages/db/prisma/migrations/20261015020000_business_membership/migration.sql": "7a60b7b21b212c9bf38a14522eb937eb9762044039d05e6e16b7e76d1093c00a",
+          "packages/db/prisma/migrations/20261015030000_business_inventory/migration.sql": "49143ea7a21fe5c6031a966794aedba44d69e3a3f9d6b6195dfbe57915ee93e8",
+          "packages/db/prisma/migrations/20261015040000_first_party_measurement/migration.sql": "5da46ac7211e658eb1b1e96374c8be796ffad03c5ecb789a7692c4fc0dca384c",
+          "packages/db/prisma/migrations/20261015050000_service_foundations/migration.sql": "66c9eec07c4c715624d42c30a00202a0727cb36b05f5ca850fed38a9901f9c9a",
+          "packages/db/prisma/migrations/20261015060000_business_enquiries/migration.sql": "4d491f64ae7601fce337591a4fed5e14fc717fe5c1234aa83e4b3b2f1e5c36d8",
+          "packages/db/prisma/migrations/20261015070000_diagnostic_intake/migration.sql": "9f5ce216f2dd4cbbcb75c9ce78d058244f5262170e51815c111c66563b32ebc6",
+          "packages/db/prisma/migrations/20261015080000_service_push_subscriptions/migration.sql": "e2b04ea8e7f1c33924261fb2fcc0669c1c99dcfe628b8b0e8f0c7007ee47cf3b",
+          "packages/db/prisma/migrations/20261015120000_listing_video_foundation/migration.sql": "8b1b907dbeb942c840330ca3a8f3ef9264ec0008c393f3d51d7961bd7305687b",
+          "packages/db/prisma/migrations/20261015130000_support_operations/migration.sql": "57389de2321c518efe4f1a96adf7ae5bbf7df6b7224ff97c6a854f2708c88163",
+          "packages/db/prisma/migrations/20261015140000_video_playback_authority/migration.sql": "019b9ea21c459d9e4e5df313f97957eba80a043ada053d8bd80fd13515b86eae",
+          "packages/db/prisma/migrations/20261015150000_history_orders/migration.sql": "1eb35867354f2d8fcf9d15fdff2ce584eeeb4cdb252e4a5d47ce6c2a298a19b2",
+          "packages/db/prisma/migrations/20261015160000_showroom_public_fields/migration.sql": "2d38d6d7960fc66078dcf46444ffbbd85b6deedb9f51145e21304d7dff52c02b",
+          "packages/db/prisma/migrations/20261015170000_video_processing_fences/migration.sql": "ff8a5579df352a389385aeb47f78caed985301995c569c3a5b21db2e022f779b",
+          "packages/db/prisma/migrations/20261015180000_history_delivery/migration.sql": "2d08ccc88142214fe0f22c29a1dd5ecf84239bc730f6076cab2e1104e724248d",
+          "packages/db/prisma/migrations/20261015190000_diagnostic_reports/migration.sql": "4be9efc71ddd57f2b6b32efef199576d81d432d193580d8db41dcc44155ff3fd",
+          "packages/db/prisma/migrations/20261015200000_measurement_insights/migration.sql": "dd412d0bc61628e4333dfb9b607b022f23742c17c9c59529acea91d9e3f325e0",
+          "packages/db/prisma/migrations/20261015210000_history_recovery_offers/migration.sql": "8da84698db0e7f080a865daf5fceda3a43892e5454f86981855d597b678094e2",
+          "packages/db/prisma/migrations/20261015220000_diagnostic_evidence_leases/migration.sql": "497b8aab18f382eefd0d68f7be0f7ad8622b1c9975e31488ec324811b5b1f61a",
+          "packages/db/prisma/migrations/20261015230000_video_claim_target/migration.sql": "39d9c56041a02cf6d74f3a967adc37c37dbbc05f4a5487876a9abf4fbb5647d8",
+          "packages/db/prisma/migrations/20261015240000_history_source_facts/migration.sql": "593a00d00ee4f0c686c05e07cbdeae60996b50252e0d350b341ad502c7bde8bd",
+          "packages/db/prisma/migrations/20261015250000_video_source_manifest/migration.sql": "da45934af2bd21968d582661738ee13a1394320d442e0847abc53db01c01194d",
+          "packages/db/prisma/migrations/20261015260000_video_write_protocol/migration.sql": "8c79eec4d6e7b465a6599f9d9e2224a327c3715cc8d95179c4c69ff9341c7708",
+          "packages/db/prisma/migrations/20261015270000_history_mileage_not_null/migration.sql": "1081bd33f8c08b353ce4c0fa163ecf17d97eaee1d1a1ac7871c5e9f3d23add92",
+          "packages/db/prisma/migrations/20261015280000_diagnostic_association_invalidation/migration.sql": "565854648750b86cceff78a86cff7693c9210510a3835b26f195928ed765baee",
+          "packages/db/prisma/migrations/20261015290000_conversation_measurement_cohorts/migration.sql": "350160257c66c5fb3a3dcd7b3681ceeefec89f35748de452a9599ee955675540",
+          "packages/db/prisma/migrations/20261021100000_diagnostic_reinspection_lineage/migration.sql": "d0f4aa1d73192bfffe468458f977c853483d8e2a43efca29e7a8f6aa83dc37d2",
+          "packages/db/prisma/migrations/20261021110000_diagnostic_identity_records/migration.sql": "b5919c3d4d5fd9f52a14c8a4f973fe7caa3e3e4c6611ff08e188579397ad1d70",
+          "packages/db/prisma/migrations/20261021120000_diagnostic_report_identity_pin/migration.sql": "1d299c923af088efc1b49d9e2b8124bef6c4a0476fc300ed78ab8e63d4a1e83c",
+          "packages/db/prisma/migrations/20261021130000_diagnostic_identity_evidence/migration.sql": "5351553647b355dc59eadf25a02e84aa7916e1b33da2117b00e40f47d49ecb82",
+          "packages/db/prisma/migrations/20261021140000_diagnostic_continuity_proofs/migration.sql": "77c6cab3b6731e9203556bcfa78a4ff2661d3a71db597a7b3c6150db925e5cb0",
+          "packages/db/prisma/migrations/20261021150000_diagnostic_continuity_proof_consumption/migration.sql": "f25d566779839d76749f9320ba102d6e282fbba365468c68e0d49eeed460a222",
+          "packages/db/prisma/migrations/20261021160000_diagnostic_automatic_vin_proof/migration.sql": "83176fd55e353ef02de460a42dd41471c3f07120c228a6df80ff71f829502acd",
+          "packages/db/prisma/migrations/20261022180000_diagnostic_public_continuity/migration.sql": "32fe0a8cb64aaaf187390b5c6a2fa72fe6a260547602ffdf572959409ea68a3f",
+          "packages/db/prisma/migrations/20261023090000_diagnostic_ownership_components/migration.sql": "f43b2c04ef6ed9f447acfc0e5ebf326a577b3cd1d96539439c43f05f537cad01",
+          "packages/db/prisma/migrations/20261023100000_diagnostic_ownership_disposal_same_graph/migration.sql": "cdb43cc361fd783c1e6d66d5eccef118861ef3e9ac4a75b233fc8b527b8ec547",
+          "packages/db/prisma/migrations/20261023110000_diagnostic_continuity_requests/migration.sql": "83188077748f02bf96d74d9588805f173129199333a8d4e9c160547e38fb52a2",
+          "packages/db/prisma/migrations/20261023120000_diagnostic_ownership_grants/migration.sql": "3696e93cfc56f13a95d8e38fd72e3e985d43105ce17ffdf7d5f7ce273efac3df",
+          "packages/db/prisma/migrations/20261023130000_diagnostic_source_kernel/migration.sql": "b9b2d465c04cc34693e5774d12910a33bb29b39d8452f5a2862dc24b667f4fbf",
+          "packages/db/prisma/migrations/20261024010000_diagnostic_source_guard_repair/migration.sql": "786aa19839002c915cf00038f888c85e0b27a4d20b0905a1aac4edf5db5a1be3",
+          "packages/db/prisma/migrations/20261024020000_campaign_preparation/migration.sql": "cceb9c0d75c8d1f3a9302548d7791ac752635c3775e7b5ca3ec3c516b7db9429",
+          "packages/db/prisma/migrations/20261024030000_diagnostic_purge_effects/migration.sql": "23d894c79c5927d7d976c79e4cbe958af83725ccf172208b7f4d6132e0d3d4ba",
+          "packages/db/prisma/migrations/20261024040000_diagnostic_intake_effects/migration.sql": "9d9155637143e152ac63baf255d074fe768ff0c4bcb4ec041dd75b32404903a5",
+          "packages/db/prisma/migrations/20261024050000_diagnostic_kernel_invariants/migration.sql": "6fdb70cd2364b0125080293a1602f78788c1db450d82859613c04b0020b732f8",
+          "packages/db/prisma/migrations/20261024060000_diagnostic_source_correction/migration.sql": "55fa19d86c4f30d6c6abab96985dfbfb7bc30b0e6d928da1f63ba8fdbd13b7f6",
+          "packages/db/prisma/migrations/20261024070000_diagnostic_user_eligibility/migration.sql": "f5fabb22e4e6e5a2dace529e5bcb4de5e56a6daf18ebbff02351e9407430893e",
+          "packages/db/prisma/migrations/20261024080000_diagnostic_moderation_complete_effects/migration.sql": "a82144b10637924c522188c2511fab6f906ee7ecc803875189155c3e8289e6c0",
+          "packages/db/prisma/migrations/20261024090000_diagnostic_message_enquiry_fences/migration.sql": "19316d8fbab4d425af191477a997c49d0e518332b89dc9a39779c9a21d72995c",
+          "packages/db/prisma/migrations/20261024100000_diagnostic_signin_intake_object_owners/migration.sql": "802bc18c5b98074046422b4e99b6e46877395166afe7f25fa80d37e53416fda6",
+          "packages/db/prisma/migrations/20261024110000_diagnostic_user_insert_fence/migration.sql": "bad49d6a7a1329f7a5d7e63b4780a1edd53bb466693ab9605920b54641f3f271",
+          "packages/db/prisma/migrations/20261024120000_diagnostic_account_noop_enquiry/migration.sql": "aa41c4e37f8bb267f10bf3d55e70abd0e3d4b87ce8260ba6e882bd8635959d0f",
+          "packages/db/prisma/migrations/20261024130000_diagnostic_intake_campaign_composition/migration.sql": "974217c5ec0f68426429e2a37120b0e9b419817dbea16ffd5cb8362ca3e118ed",
+          "packages/db/prisma/migrations/20261025010000_diagnostic_report_source_effects/migration.sql": "a21407fdf8025b6672656cb678ff34bbd3e05c97594c95e971fb801e66811fb9",
+          "packages/db/prisma/migrations/20261025015000_diagnostic_runtime_transport_corrections/migration.sql": "520c94deedd51c039f82b396b6bf08acd551838bc37698ca0a345aa92a165424",
+          "packages/db/prisma/migrations/20261025017500_diagnostic_effect_scope_alias_correction/migration.sql": "1fd74d6824c2e7ba47cf311d455c38ce51cbab074a7b16c53cc5b4fb3fbf328f",
+          "packages/db/prisma/migrations/20261025019000_diagnostic_user_insert_error_transport/migration.sql": "a6b7b46c95fd74f8e6f7b962bcb899b2575df7ec1db1f26962bc5853305d0e74",
+          "packages/db/prisma/migrations/20261025020000_diagnostic_listing_publication_effects/migration.sql": "6923b8e4869928d942d909d305a3ef7eebfe166ea82628f313baf665759d0d39"
+        },
+        "command": [
+          "pnpm",
+          "--filter",
+          "@auto-tm/api",
+          "exec",
+          "vitest",
+          "run",
+          "src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts",
+          "--maxWorkers=1",
+          "--no-file-parallelism",
+          "--retry=0",
+          "--passWithNoTests=false",
+          "--reporter=default",
+          "--reporter=json",
+          "--reporter=junit",
+          "--outputFile.json=/tmp/897-coherent-intermediate-assembly-20261025/publication/vitest.json",
+          "--outputFile.junit=/tmp/897-coherent-intermediate-assembly-20261025/publication/junit.xml"
+        ],
+        "cleanup": "finally compose down --volumes --remove-orphans only exact project; label-filtered survivors inspected",
+        "B5": "not enabled narrow slice; independent obligation remains",
+        "loopbackDatabaseURL": "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:60577/auto_tm_ci"
+      },
+      "result": {
+        "numTotalTests": 25,
+        "numPassedTests": 25,
+        "numFailedTests": 0,
+        "numPendingTests": 0,
+        "cases": [
+          {
+            "name": "R7b real publication finite transaction closure publishes exact photos/audit/capture with absent, READY, pending or invalid video graph 1",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 1369.813666
+          },
+          {
+            "name": "R7b real publication finite transaction closure publishes exact photos/audit/capture with absent, READY, pending or invalid video graph 2",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 1764.712958
+          },
+          {
+            "name": "R7b real publication finite transaction closure publishes exact photos/audit/capture with absent, READY, pending or invalid video graph 3",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 1715.1689170000004
+          },
+          {
+            "name": "R7b real publication finite transaction closure publishes exact photos/audit/capture with absent, READY, pending or invalid video graph 4",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 1462.605375
+          },
+          {
+            "name": "R7b real publication finite transaction closure publishes exact photos/audit/capture with absent, READY, pending or invalid video graph 5",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 1483.2597500000002
+          },
+          {
+            "name": "R7b real publication finite transaction closure commits publication when optional capture is disabled after planning",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 1086.6198750000003
+          },
+          {
+            "name": "R7b real publication finite transaction closure preserves optional absence when capture activation changes after the source receipt",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 1426.6275409999998
+          },
+          {
+            "name": "R7b real publication finite transaction closure commits core publication after the actual capture savepoint rolls an outbox failure back",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 1278.859625000001
+          },
+          {
+            "name": "R7b real publication finite transaction closure retains ordinary nonpublication listing_create and listing_change",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 476.80975000000035
+          },
+          {
+            "name": "R7b real publication finite transaction closure rolls back publication on the omit-audit source completion attack",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 1332.0837090000005
+          },
+          {
+            "name": "R7b real publication finite transaction closure rolls back publication on the corrupt-photo source completion attack",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 1295.1327500000007
+          },
+          {
+            "name": "R7b real publication finite transaction closure serializes the real publish and draft update in publication-first=true order",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 2876.1825839999983
+          },
+          {
+            "name": "R7b real publication finite transaction closure serializes the real publish and draft update in publication-first=false order",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 1188.7773749999978
+          },
+          {
+            "name": "R7b real publication finite transaction closure permits only one real publication adopter in original-draft-first=true order",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 1478.479833999998
+          },
+          {
+            "name": "R7b real publication finite transaction closure permits only one real publication adopter in original-draft-first=false order",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 1465.7842920000003
+          },
+          {
+            "name": "R7b real publication finite transaction closure serializes actual video cancellation with publication-first=true",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 2085.2137909999983
+          },
+          {
+            "name": "R7b real publication finite transaction closure serializes actual video cancellation with publication-first=false",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 1483.0296659999985
+          },
+          {
+            "name": "R7b real publication finite transaction closure serializes account scheduling with publication-first=true",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 2528.350333999999
+          },
+          {
+            "name": "R7b real publication finite transaction closure serializes account scheduling with publication-first=false",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 613.580915999999
+          },
+          {
+            "name": "R7b real publication finite transaction closure commits optional capture around actual principal bootstrap publication-first=true",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 1124.3707090000025
+          },
+          {
+            "name": "R7b real publication finite transaction closure commits optional capture around actual principal bootstrap publication-first=false",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 1378.6153750000012
+          },
+          {
+            "name": "R7b real publication finite transaction closure serializes actual due account purge with publication-first=true",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 2965.3715840000004
+          },
+          {
+            "name": "R7b real publication finite transaction closure serializes actual due account purge with publication-first=false",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 1228.551333000003
+          },
+          {
+            "name": "R7b real publication finite transaction closure serializes collector epoch rotation with publication-first=true",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 1343.986791999996
+          },
+          {
+            "name": "R7b real publication finite transaction closure serializes collector epoch rotation with publication-first=false",
+            "status": "passed",
+            "failureMessages": [],
+            "duration": 888.7648749999935
+          }
+        ]
+      },
+      "status": {
+        "error": null,
+        "cleanupSuccess": true,
+        "head": "38dc76896344125ce9258a9f26b4f8b1598e91fd",
+        "tree": "4ff0146ea5c1f43249b6572b969ae365a7d62d92"
+      },
+      "cleanup": {
+        "project": "auto_tm_ci_coherent897_publication_20261026032437",
+        "downExitCode": 0,
+        "survivors": {
+          "container": {
+            "exitCode": 0,
+            "ids": [],
+            "stderr": ""
+          },
+          "network": {
+            "exitCode": 0,
+            "ids": [],
+            "stderr": ""
+          },
+          "volume": {
+            "exitCode": 0,
+            "ids": [],
+            "stderr": ""
+          }
+        },
+        "success": true
+      }
+    }
+  },
+  "serviceSession": {
+    "source": "cee68122b4aa0e505dbbc066b8a0f0e651dcd767",
+    "tree": "86e84468edfc9806d96ae95f3df530907b4b87fc",
+    "path": "apps/api/src/modules/service-messaging/infrastructure/ServicePreparation.ts",
+    "blob": "548723986bbb6c05960a18fa1b57429766778d42",
+    "sha256": "013089fa4ec0d2bee0fe29e53c20b3283a3c966ab2e35b1a2cd18b61d97ca022",
+    "parent": "38dc7689",
+    "delta": "Only subject.sessionId::text in retainedSelection; separate prior authorized blocking advisory result casts retained",
+    "direct": {
+      "name": "service-session-green",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "vitest",
+        "run",
+        "src/modules/service-messaging/infrastructure/ServiceHistoryPrepared.spec.ts",
+        "--maxWorkers=1",
+        "--no-file-parallelism",
+        "--retry=0"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/897-coherent-intermediate-assembly-20261025/service-session-green.log",
+      "sha256": "e8d4e75084992d9c383544578444c79f830a05312e360b44fe6ccae8fd5d7184",
+      "durationSeconds": 0.73
+    },
+    "actual": {
+      "red": {
+        "code": "P2010",
+        "meta": {
+          "driverAdapterError": {
+            "name": "DriverAdapterError",
+            "cause": {
+              "originalCode": "42P18",
+              "originalMessage": "could not determine data type of parameter $1",
+              "kind": "postgres",
+              "code": "42P18",
+              "severity": "ERROR",
+              "message": "could not determine data type of parameter $1"
+            }
+          }
+        },
+        "message": "\nInvalid `prisma.$queryRaw()` invocation:\n\n\nRaw query failed. Code: `42P18`. Message: `could not determine data type of parameter $1`"
+      },
+      "green": [
+        {
+          "value": {
+            "id": "same-session-input"
+          }
+        }
+      ]
+    },
+    "actualLimit": "Minimal exact variadic expression with same installed Prisma and PG16; full original service expiry eight remain owner verification",
+    "cleanup": {
+      "project": "auto_tm_ci_coherent897_service_session_20261026032619",
+      "downExitCode": 0,
+      "survivors": {
+        "container": {
+          "exitCode": 0,
+          "ids": [],
+          "stderr": ""
+        },
+        "network": {
+          "exitCode": 0,
+          "ids": [],
+          "stderr": ""
+        },
+        "volume": {
+          "exitCode": 0,
+          "ids": [],
+          "stderr": ""
+        }
+      },
+      "success": true
+    }
+  },
+  "openIssues": {
+    "sourceCopyCorrection": "Accepted publication intent type initially omitted; exact34ede dependency now copied; db-build-corrected passes",
+    "mechanical": "R7d uuid factory ctor arguments composed in R1 and publication fixture; configured isolated globalSetup path accepted alongside original local marker",
+    "offlineRun": {
+      "api": "280files pass12fail,2959tests pass97fail6skip,2worker errors",
+      "worker": "42files pass2fail,319pass4fail",
+      "failures": [
+        "AvatarContactDatabase cannot interpret accepted633f/5b supplied-claim discovery shape;21 affected cases",
+        "Publication media/upload adapters issue raw SELECT pg_advisory_xact_lock without ::text; strict accepted5b fake refuses unsupported_void_result,24 affected cases",
+        "Other Identity/diagnostic readers retain403/500 failures outside assembly ownership; no gate activation",
+        "API hook/worker timeouts and SMTP deadline failure retained; no timeout increase",
+        "Local B5 all3 deadlines with accepted observer retained; no production inference or repeat"
+      ]
+    },
+    "boundary": "No generic fake escape, no assertion or production change to hide failures. Parent routes remaining owners; coherent diagnostic intermediate not final acceptance."
+  },
+  "boundaries": [
+    "sole owned worktree and /tmp writes only; parent ledger not written",
+    "no activation/admission/merge/new PR/dispatch/arm",
+    "retired scalarlease and serviceexpiry implementation not consumed or edited",
+    "observer must be removed for final uninstrumented verification",
+    "read-prefix direct guards do not close diagnostic/service SQL matrices"
+  ],
+  "whitespaceException": "Exact accepted docs/evidence/issue-897/r7b-runtime-matrix-20261025/full25.txt blank EOF retained; only this path excluded from combined diff check"
+}

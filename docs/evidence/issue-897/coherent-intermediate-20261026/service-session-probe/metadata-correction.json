@@ -1,0 +1,13 @@
+{
+  "originalPreexecutionPreserved": true,
+  "correction": "Copied SQL runner preexecution incorrectly labels identity suite and command. Actual test.result.json command is node /tmp/897-service-session-probe.cjs, actual-parameter-red-green.json is authoritative; no identity tests executed in this probe. Probe started with source changes dirty, committed unchanged as cee68122 during probe.",
+  "actualSource": "cee68122b4aa0e505dbbc066b8a0f0e651dcd767",
+  "actualTree": "86e84468edfc9806d96ae95f3df530907b4b87fc",
+  "serviceSHA256": "013089fa4ec0d2bee0fe29e53c20b3283a3c966ab2e35b1a2cd18b61d97ca022",
+  "command": [
+    "node",
+    "/tmp/897-service-session-probe.cjs"
+  ],
+  "probeSHA256": "750f1c8ba5cd22ec98bf670e2fdf9f6c8be26905c3cd59e64d937e33f8a9a3c4",
+  "seed": "same-session-input; no persisted rows"
+}

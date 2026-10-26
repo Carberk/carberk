@@ -1,0 +1,25 @@
+{
+  "name": "test",
+  "command": [
+    "pnpm",
+    "--filter",
+    "@auto-tm/api",
+    "exec",
+    "vitest",
+    "run",
+    "src/modules/identity/infrastructure/IdentityAuthorityPrepared.e2e.spec.ts",
+    "--maxWorkers=1",
+    "--no-file-parallelism",
+    "--retry=0",
+    "--passWithNoTests=false",
+    "--reporter=default",
+    "--reporter=json",
+    "--reporter=junit",
+    "--outputFile.json=/tmp/897-coherent-intermediate-assembly-20261025/identity/vitest.json",
+    "--outputFile.junit=/tmp/897-coherent-intermediate-assembly-20261025/identity/junit.xml"
+  ],
+  "exitCode": 0,
+  "log": "/tmp/897-coherent-intermediate-assembly-20261025/identity/test.log",
+  "sha256": "bcfe20ccf5b09401d6386277f7981892dc2e24d41d4e305f8b6f67685f93e8fa",
+  "durationSeconds": 19.74
+}

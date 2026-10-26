@@ -1,0 +1,22 @@
+{
+  "project": "auto_tm_ci_coherent897_publication_20261026032437",
+  "downExitCode": 0,
+  "survivors": {
+    "container": {
+      "exitCode": 0,
+      "ids": [],
+      "stderr": ""
+    },
+    "network": {
+      "exitCode": 0,
+      "ids": [],
+      "stderr": ""
+    },
+    "volume": {
+      "exitCode": 0,
+      "ids": [],
+      "stderr": ""
+    }
+  },
+  "success": true
+}
