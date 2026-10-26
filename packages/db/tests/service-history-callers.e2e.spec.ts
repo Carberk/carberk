@@ -8,7 +8,7 @@ import type { ServiceMessagingSchemas as S } from "@auto-tm/contracts";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { Pool, type PoolClient } from "pg";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { PrismaClient } from "../generated/prisma/client/client";
 import { withCampaignPreparation, type Prisma } from "../src/index";
@@ -187,7 +187,8 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   expect(triggerState.filter(row => row.guard).length).toBeGreaterThan(0);
   console.info("R6a inherited triggers", JSON.stringify({ database: scenarioDatabase, triggers: triggerState }));
   for (const row of triggerState.filter(row => row.guard)) await pool.query(`ALTER TABLE public.${quoted(row.table)} DISABLE TRIGGER ${quoted(row.name)}`);
-  vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(now);
+  // Production Prisma defaults use the real wall clock. Service/authority
+  // decisions retain their explicitly injected deterministic clock.
  });
  afterEach(async context => {
   for (const release of releases.splice(0)) release();
@@ -195,7 +196,6 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   // Drain even if a barrier, assertion or rollback failed. Preserve the test's
   // original error; cleanup failures are additional evidence, never its replacement.
   await Promise.allSettled(pending.splice(0));
-  vi.useRealTimers();
   for (const client of clients.splice(0)) {
    try { client.release(); } catch (error) { cleanup.push({ status: "rejected", reason: error }); }
   }
@@ -758,7 +758,12 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   const reportsBefore = await db.contentReport.findMany({ orderBy: { id: "asc" } });
   const reason = "R6a original M2 actual suspension";
   const a = caller({ hold: first === "service" }), b = caller({ hold: first === "writer" });
-  const suspend = () => suspensionWriter(b.database).execute({ userId: subject.userId, adminUserId: admin.userId, reason });
+  let suspensionInterval: { started: Date; completed: Date } | undefined;
+  const suspend = async () => {
+   const started = new Date();
+   try { return await suspensionWriter(b.database).execute({ userId: subject.userId, adminUserId: admin.userId, reason }); }
+   finally { suspensionInterval = { started, completed: new Date() }; }
+  };
   const read = () => a.service.read(subject, f.id, 0, 20);
   // Register both outcomes immediately. afterEach releases every latch and
   // drains both even when ready/barrier/assertions fail, preserving that error.
@@ -779,15 +784,23 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   const write = first === "writer" ? leading : trailing, readResult = first === "writer" ? trailing : leading;
   expect(write.ok, "actual SuspendUser outer transaction commits").toBe(true);
   if (!write.ok) throw write.error;
-  expect(write.value).toEqual({ targetId: subject.userId, targetState: { suspendedAt: now, suspendedById: admin.userId, suspensionReason: reason }, reportId: undefined, reportStatus: undefined, auditLogId: expect.any(String) });
+  const suspendedAt = (write.value as Awaited<ReturnType<SuspensionWriter["execute"]>>).targetState.suspendedAt;
+  const interval = present(suspensionInterval);
+  expect(suspendedAt).toBeInstanceOf(Date);
+  expect(suspendedAt.getTime(), "reviewedAt is inside independently observed real execution").toBeGreaterThanOrEqual(interval.started.getTime());
+  expect(suspendedAt.getTime()).toBeLessThanOrEqual(interval.completed.getTime());
+  expect(write.value).toEqual({ targetId: subject.userId, targetState: { suspendedAt, suspendedById: admin.userId, suspensionReason: reason }, reportId: undefined, reportStatus: undefined, auditLogId: expect.any(String) });
   expect(readResult.ok, "one read decision at the real suspension barrier").toBe(first === "service");
   if (!readResult.ok) expect(readResult.error).toMatchObject({ code: "NO_ACCESS" });
   else expect(readResult.value).toMatchObject({ id: f.id, resourceId: f.resource, assignmentVersion: 1, messages: [], lastSequence: 8, readThrough: 0, unread: 0, hasMore: false });
-  expect(await db.user.findUniqueOrThrow({ where: { id: subject.userId } })).toEqual({ ...beforeUser, suspendedAt: now, suspendedById: admin.userId, suspensionReason: reason });
+  const suspendedUser = await db.user.findUniqueOrThrow({ where: { id: subject.userId } });
+  expect(suspendedUser.updatedAt.getTime(), "native User updatedAt belongs to the same real execution").toBeGreaterThanOrEqual(suspendedAt.getTime());
+  expect(suspendedUser.updatedAt.getTime()).toBeLessThanOrEqual(interval.completed.getTime());
+  expect(suspendedUser).toEqual({ ...beforeUser, updatedAt: suspendedUser.updatedAt, suspendedAt, suspendedById: admin.userId, suspensionReason: reason });
   expect(await db.session.findMany({ where: { userId: subject.userId } }), "all target Sessions revoked").toEqual([]);
   expect(await db.session.findUnique({ where: { id: admin.sessionId } }), "admin Session survives target suspension").not.toBeNull();
   const moderation = await db.auditLog.findMany({ orderBy: { id: "asc" }, select: { id: true, actorId: true, action: true, targetType: true, targetId: true, details: true } });
-  expect(moderation, "exact owner-written moderation audit").toEqual([{ id: (write.value as { auditLogId: string }).auditLogId, actorId: admin.userId, action: "USER_SUSPEND", targetType: "user", targetId: subject.userId, details: { reason, before: { suspendedAt: null, suspendedById: null, suspensionReason: null }, after: { suspendedAt: now.toISOString(), suspendedById: admin.userId, suspensionReason: reason } } }]);
+  expect(moderation, "exact owner-written moderation audit").toEqual([{ id: (write.value as { auditLogId: string }).auditLogId, actorId: admin.userId, action: "USER_SUSPEND", targetType: "user", targetId: subject.userId, details: { reason, before: { suspendedAt: null, suspendedById: null, suspensionReason: null }, after: { suspendedAt: suspendedAt.toISOString(), suspendedById: admin.userId, suspensionReason: reason } } }]);
   expect(await db.contentReport.findMany({ orderBy: { id: "asc" } }), "direct suspension leaves reports unchanged").toEqual(reportsBefore);
   expect(await audit(f.resource), "only successful staff read emits SERVICE_READ").toEqual(first === "service" && audience === "staff" ? [{ action: "SERVICE_READ", actorId: subject.userId, assignmentVersion: 1 }] : []);
   expect(await effects(f.id), "refused read leaves no service residue").toEqual({ messages: 0, outbox: 0, reads: 0, subscriptions: 0 });
