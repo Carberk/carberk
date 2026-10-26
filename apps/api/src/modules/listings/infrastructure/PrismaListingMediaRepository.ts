@@ -12,6 +12,7 @@ const mediaTables = ["users", "dealerships", "dealership_members", "sessions", "
 type MediaTable = typeof mediaTables[number];
 type MediaRow = Record<string, Prisma.InputJsonValue | null>;
 interface MediaSlot { table: MediaTable; key: Record<string, string>; row: MediaRow | null; uniqueOnly?: boolean }
+interface MediaScope { slots: MediaSlot[]; mutations: CampaignMutation[] }
 interface MediaSelection {
   mediaIds: string[]; listingIds: string[]; uploadIds?: string[]; referencedUploadIds?: string[];
   retiringUploadIds?: string[]; floorListingId?: string; actor?: ListingActor | undefined;
@@ -78,6 +79,46 @@ export class PrismaListingMediaRepository implements ListingMediaRepository {
         );
       }
       return this.toDomain(await tx.listingMedia.create({ data }));
+      }, async (before, after) => {
+        // A joined reservation can finish while this caller waits. Only that
+        // exact committed adoption is a read-only result, never fresh write
+        // authority or permission to extend the initial lock/receipt scope.
+        const refuse = () => { throw new Error("media_caller_scope_changed"); };
+        if (!uploadId || !claim) return refuse();
+        const oldUpload = before.slots.find(slot => !slot.uniqueOnly && slot.table === "media_uploads" && slot.key["id"] === uploadId)?.row;
+        const newUpload = after.slots.find(slot => !slot.uniqueOnly && slot.table === "media_uploads" && slot.key["id"] === uploadId)?.row;
+        if (!oldUpload || oldUpload["state"] !== "PREPARING" || oldUpload["claimToken"] !== claim.token
+          || oldUpload["claimTargetType"] !== "listing" || oldUpload["claimTargetId"] !== media.listingId
+          || canonical(newUpload) !== canonical({ ...oldUpload, state: "ADOPTED", claimToken: null, claimDeadline: null })) return refuse();
+        const adopters = after.slots.filter(slot => !slot.uniqueOnly && slot.table === "listing_media" && slot.row?.["uploadId"] === uploadId);
+        const winner = adopters[0];
+        if (adopters.length !== 1 || !winner?.row || typeof winner.row["id"] !== "string" || typeof winner.row["createdAt"] !== "string") return refuse();
+        const committedAt = new Date(String(winner.row["createdAt"]));
+        if (!Number.isFinite(committedAt.getTime()) || canonical(winner.row) !== canonical({ ...data,
+          id: winner.row["id"], createdAt: winner.row["createdAt"] })) return refuse();
+        // Remove only the newly committed adopter and reverse the three exact
+        // adoption fields. Any other slot, authority/PII, bytes, poster, cleanup
+        // or final-state change still refuses. The upload unique key already
+        // protects this association; its new PK is never locked or mutated.
+        if (before.slots.some(slot => !slot.uniqueOnly && (
+          slot.table === "listing_media" && (slot.row?.["uploadId"] === uploadId || slot.key["id"] === media.id && slot.row !== null)
+          || slot.table === "users" && slot.row?.["avatarUploadId"] === uploadId))) return refuse();
+        const normalized = after.slots.flatMap(slot => {
+          if (slot === winner) {
+            const initial = before.slots.find(old => !old.uniqueOnly && old.table === slot.table && canonical(old.key) === canonical(slot.key));
+            return initial ? [{ ...slot, row: null }] : [];
+          }
+          return [{ ...slot, ...(slot.table === "media_uploads" && !slot.uniqueOnly && slot.key["id"] === uploadId ? { row: oldUpload } : {}) }];
+        });
+        const ordered = (slots: MediaSlot[]) => [...slots].sort((a,b) => canonical([a.table,a.key,a.uniqueOnly]).localeCompare(canonical([b.table,b.key,b.uniqueOnly])));
+        if (canonical({ ...after, slots: ordered(normalized) }) !== canonical({ ...before, slots: ordered(before.slots) })) return refuse();
+        const listing = await tx.listing.findUnique({ where: { id: media.listingId } });
+        if (listing?.businessId) {
+          if (!claim.actor) return refuse();
+          await assertListingOwnership(this.ownership, claim.actor, { sellerId: listing.sellerId, businessId: listing.businessId }, tx);
+          await lockEditableBusinessStock(tx, listing.id);
+        }
+        return this.toDomain({ ...data, id: winner.row["id"], createdAt: committedAt });
       });
     });
   }
@@ -256,7 +297,7 @@ export class PrismaListingMediaRepository implements ListingMediaRepository {
   }
 
   /** Ordinary media only. Source publication retains its source-command owner. */
-  private async preparedMedia<T>(tx: Prisma.TransactionClient, selection: MediaSelection, writes: CampaignMutation[], work: () => Promise<T>, changed?: () => Promise<T>): Promise<T> {
+  private async preparedMedia<T>(tx: Prisma.TransactionClient, selection: MediaSelection, writes: CampaignMutation[], work: () => Promise<T>, changed?: (before: MediaScope, after: MediaScope) => Promise<T>): Promise<T> {
     const before = await this.mediaScope(tx, selection);
     const mutations = [...writes, ...before.mutations];
     const coverage = mutations.map(mutation => {
@@ -297,8 +338,9 @@ export class PrismaListingMediaRepository implements ListingMediaRepository {
             SELECT 1 FROM public.${Prisma.raw(slot.table)} s WHERE to_jsonb(s) @> ${JSON.stringify(slot.key)}::jsonb FOR UPDATE`);
         }
       }
-      if (canonical(before) !== canonical(await this.mediaScope(tx, selection))) {
-        if (changed) return changed();
+      const after = await this.mediaScope(tx, selection);
+      if (canonical(before) !== canonical(after)) {
+        if (changed) return changed(before, after);
         throw new Error("media_caller_scope_changed");
       }
       return work();
