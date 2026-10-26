@@ -2142,3 +2142,4 @@ model CampaignPreparation {
 // Snapshot: 20261026014000_diagnostic_source_registry_evaluation.
 
 // Snapshot: 20261026015000_diagnostic_component_expiry_representation.
+// Snapshot: 20261026016000_diagnostic_provenance_invalidation_parity.
