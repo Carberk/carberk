@@ -2,6 +2,7 @@
 export const retainedSchemaProfile = {
   baseline: '7af49d4c1474b2c3d841b14736c4ef59ce155a4e',
   schemaHashes: [
+    '21cdc52efb2fb1a9cabdfe0955cfe8d75e60147f9e6dd14f83f9e45bf3df4c45',
     'e383b1f888a0c9003bd4a7c0fc5c362a4a934b7798e2c24513f327fe5bb26904',
     '84935c26f5e11609663fdb87dbc796836c60f6360de2a30832aa6177a931819d',
     'a36ddd1c544eb4c507e706d2737b663a93f4aa5e91837f0f53471bc6fffab702',
