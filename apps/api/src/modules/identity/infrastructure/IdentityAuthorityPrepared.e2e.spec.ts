@@ -172,12 +172,48 @@ describe("Identity caller-owned preparation under PostgreSQL opposition", { conc
     await db.$executeRawUnsafe(`GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO "${role}"`);
     await db.$executeRawUnsafe(`GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO "${role}"`);
     await db.$executeRawUnsafe(`GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO "${role}"`);
+    // Files on one worker share retained campaign fixtures. The invoker-side
+    // preparation classifier and tracker need read-only provenance even for
+    // unrelated ordinary Users. Grant no campaign mutation or schema ownership.
+    const namespaces = await db.$queryRaw<{ name: string }[]>`
+      SELECT DISTINCT n.nspname AS name FROM pg_trigger t
+      JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_proc p ON p.oid=t.tgfoid
+      JOIN pg_namespace n ON n.oid=p.pronamespace
+      WHERE c.relnamespace='public'::regnamespace AND t.tgenabled='O'
+        AND n.nspname ~ '^cf_[a-f0-9]{32}$' AND p.proname IN ('track_auth','track_business')
+      ORDER BY name`;
+    const campaignTables = new Map<string, string[]>();
+    for (const { name } of namespaces) {
+      const tables = ["campaign_manifest", "campaign_records", "campaign_entities"];
+      const [objects] = await db.$queryRaw<{ present: boolean }[]>`
+        SELECT to_regclass(${`"${name}".campaign_object_ledger`}) IS NOT NULL AS present`;
+      // Full-v3 classification also checks foreign media references on every
+      // source row. V1 namespaces do not have this ledger.
+      if (objects?.present) tables.push("campaign_object_ledger");
+      campaignTables.set(name, tables);
+      // Catalog-selected and regex-bounded identifiers; never caller SQL.
+      await db.$executeRawUnsafe(`GRANT USAGE ON SCHEMA "${name}" TO "${role}"`);
+      await db.$executeRawUnsafe(`GRANT SELECT ON ${tables.map(table => `"${name}"."${table}"`).join(",")} TO "${role}"`);
+    }
     await guards(true);
     const [ready] = await db.$queryRaw<{ ready: boolean }[]>`SELECT diagnostic_source_guards_ready() AND campaign_preparation_ready() AS ready`;
     expect(ready?.ready).toBe(true);
     await runtime().$transaction(async tx => {
       const [actual] = await tx.$queryRaw<{ name: string; superuser: boolean; owns: boolean }[]>`SELECT current_user AS name,r.rolsuper AS superuser,pg_has_role(current_user,c.relowner,'USAGE') AS owns FROM pg_roles r JOIN pg_class c ON c.oid='public.sessions'::regclass WHERE r.rolname=current_user`;
       expect(actual).toEqual({ name: role, superuser: false, owns: false });
+      for (const { name } of namespaces) {
+        const [schema] = await tx.$queryRaw<{ usage: boolean; create: boolean }[]>`
+          SELECT has_schema_privilege(current_user,${name},'USAGE') AS usage,
+            has_schema_privilege(current_user,${name},'CREATE') AS create`;
+        expect(schema).toEqual({ usage: true, create: false });
+        for (const table of campaignTables.get(name) ?? []) {
+          const relation = `"${name}".${table}`;
+          const [access] = await tx.$queryRaw<{ read: boolean; write: boolean }[]>`
+            SELECT has_table_privilege(current_user,${relation},'SELECT') AS read,
+              has_table_privilege(current_user,${relation},'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') AS write`;
+          expect(access).toEqual({ read: true, write: false });
+        }
+      }
     });
   });
   afterAll(async () => {
