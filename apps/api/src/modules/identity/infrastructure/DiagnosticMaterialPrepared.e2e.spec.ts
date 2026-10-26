@@ -6,11 +6,12 @@ import { ConfigService } from "@nestjs/config";
 import { DiagnosticSchemas as D } from "@auto-tm/contracts";
 import { PrismaService, Prisma, withDiagnosticSourceCommand } from "@auto-tm/db";
 import { Pool } from "pg";
-import { CreateBucketCommand, DeleteBucketCommand, S3Client } from "@aws-sdk/client-s3";
+import { CreateBucketCommand, S3Client } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 import { S3DiagnosticObjects } from "../../diagnostics/infrastructure/S3DiagnosticObjects";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from "vitest";
 import { defineE2eSuite } from "../../../../test/helpers/e2eSuite";
+import { workerUrls } from "../../../../test/helpers/testDatabases";
 import { CheckBusinessAuthority } from "../application/CheckBusinessAuthority";
 import { CheckStaffAuthority } from "../application/CheckStaffAuthority";
 import { PrismaBusinessAuthority } from "./PrismaBusinessAuthority";
@@ -44,6 +45,8 @@ describe("real prepared diagnostic material adapters", () => {
   const objectKeys = new Set<string>();
   let bytes: Uint8Array, storage: S3DiagnosticObjects, s3: S3Client;
   let guardState: { table: string; name: string; enabled: string }[] = [];
+  const runtimeRole = `r4_${randomUUID().replaceAll("-", "")}`;
+  let roleCreated = false, completedReads = 0;
   const id = (name: string) => suite.id(`${runId}-${sequence}-${name}`);
   const subject = () => ({ userId: id("technician"), sessionId: id("session") });
   const rights = (): D.DiagnosticIdentityRights => ({ category: "vehicle_observation", purpose: "Restricted visit comparison", basis: "Synthetic fixture declaration", provenance: "Synthetic fixture only",
@@ -63,23 +66,52 @@ describe("real prepared diagnostic material adapters", () => {
   const objects: DiagnosticObjects = {
     sanitize: (input, mime) => storage.sanitize(input, mime),
     put: async (key, input, mime) => { await storage.put(key, input, mime); objectKeys.add(key); stored.set(key, input); if (afterPut) await afterPut(); if (putFailure) throw new Error("r4_lost_put_reply"); },
-    read: async (key, size, hash) => { if (afterRead) await afterRead(); return storage.read(key, size, hash); },
+    read: async (key, size, hash) => { if (afterRead) await afterRead(); const content = await storage.read(key, size, hash); completedReads++; return content; },
     remove: async key => { await storage.remove(key); stored.delete(key); },
   };
   beforeAll(async () => {
-    const adminUrl = process.env["R4_FIXTURE_ADMIN_URL"];
-    if (!adminUrl || !/^r4_[a-z0-9_]+$/.test(new URL(adminUrl).pathname.slice(1))) throw new Error("r4_disposable_database_required");
+    const configured = inject("apiTestDatabases");
+    const adminUrl = process.env["DATABASE_URL"];
+    if (!configured || !adminUrl) throw new Error("r4_configured_disposable_database_required");
+    const expected = workerUrls(configured, Number(process.env["VITEST_POOL_ID"])).databaseUrl;
+    if (adminUrl !== expected) throw new Error("r4_worker_database_mismatch");
     pool = new Pool({ connectionString: adminUrl });
+    expect((await pool.query<{ name: string }>("SELECT current_database() AS name")).rows).toEqual([{ name: new URL(expected).pathname.slice(1) }]);
     guardState = (await pool.query<(typeof guardState)[number]>(guardQuery)).rows;
     expect(guardState.length).toBeGreaterThan(0);
-    db = new PrismaService();
+    const password = randomUUID();
+    await pool.query(`CREATE ROLE "${runtimeRole}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT`);
+    roleCreated = true;
+    await pool.query(`GRANT USAGE ON SCHEMA public TO "${runtimeRole}"`);
+    // The invoker-security discovery function reads every registry relation,
+    // even when its scoped inventory is empty. Grant that exact registry read
+    // surface, plus its receipt tables, rather than all public tables.
+    const registry = (await pool.query<{ table: string }>("SELECT value->>'table' AS table FROM jsonb_array_elements(diagnostic_source_registry())")).rows.map(row => row.table);
+    const readable = [...new Set([...registry, "diagnostic_source_commands", "campaign_preparations"])];
+    for (const table of readable) {
+      if (!/^[a-z_]+$/.test(table)) throw new Error("r4_invalid_registry_table");
+      await pool.query(`GRANT SELECT ON public."${table}" TO "${runtimeRole}"`);
+    }
+    // Explicit fixture/source mutations and SELECT FOR UPDATE authority locks.
+    const writable = ["users", "sessions", "staff_grants", "audit_logs", "diagnostic_centers", "diagnostic_center_assignments",
+      "diagnostic_template_versions", "inspection_orders", "diagnostic_order_assignments", "diagnostic_identity_records",
+      "diagnostic_reports", "diagnostic_identity_provenance", "diagnostic_identity_evidence", "diagnostic_evidence", "diagnostic_audits",
+      "diagnostic_source_anchors", "diagnostic_source_commands", "campaign_preparations"];
+    // Staff/source integrity triggers invalidate retained proofs, including an
+    // empty relation. That UPDATE is a real required trigger effect.
+    await pool.query(`GRANT UPDATE ON public.diagnostic_continuity_proofs TO "${runtimeRole}"`);
+    for (const table of writable) await pool.query(`GRANT INSERT,UPDATE,DELETE ON public."${table}" TO "${runtimeRole}"`);
+    const runtimeUrl = new URL(adminUrl); runtimeUrl.username = runtimeRole; runtimeUrl.password = password;
+    process.env["DATABASE_URL"] = runtimeUrl.toString();
+    try { db = new PrismaService(); } finally { process.env["DATABASE_URL"] = adminUrl; }
     const [role] = await db.$queryRaw<{ superuser: boolean; owns: boolean }[]>`SELECT r.rolsuper AS superuser,pg_has_role(current_user,c.relowner,'USAGE') AS owns FROM pg_roles r JOIN pg_class c ON c.oid='public.diagnostic_identity_provenance'::regclass WHERE r.rolname=current_user`;
     expect(role).toEqual({ superuser: false, owns: false });
     console.info("r4_runtime_role", role, "matched_guards", guardState.length);
     const config = new ConfigService({ DIAGNOSTIC_PRIVATE_BUCKET: "diagnostic-test-private" });
     storage = new S3DiagnosticObjects(config);
     s3 = new S3Client({ endpoint: process.env["MINIO_ENDPOINT"]!, region: "us-east-1", forcePathStyle: true, credentials: { accessKeyId: "minioadmin", secretAccessKey: "minioadmin" } });
-    await s3.send(new CreateBucketCommand({ Bucket: "diagnostic-test-private" }));
+    try { await s3.send(new CreateBucketCommand({ Bucket: "diagnostic-test-private" })); }
+    catch (error) { if ((error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode !== 409) throw error; }
     bytes = await sharp({ create: { width: 2, height: 2, channels: 3, background: "red" } }).png().toBuffer();
     const runtime = { now: () => new Date(clock), id: randomUUID, syntheticAllowed: () => true };
     const business = new CheckBusinessAuthority(new PrismaBusinessAuthority(db), runtime);
@@ -118,11 +150,15 @@ describe("real prepared diagnostic material adapters", () => {
     if (pool) {
       await guards();
       expect((await pool.query(guardQuery)).rows).toEqual(guardState);
-      await pool.end();
+
     }
     if (storage) { for (const key of objectKeys) await storage.remove(key); storage.onModuleDestroy(); }
-    if (s3) { await s3.send(new DeleteBucketCommand({ Bucket: "diagnostic-test-private" })); s3.destroy(); }
+    s3?.destroy();
     await db?.onModuleDestroy();
+    if (pool) {
+      if (roleCreated) { await pool.query(`DROP OWNED BY "${runtimeRole}"`); await pool.query(`DROP ROLE "${runtimeRole}"`); }
+      await pool.end();
+    }
   });
   async function verified(name = "provenance", version = 1) {
     const input = stage(name, version); await identity.stage(subject(), orderId, input);
@@ -279,7 +315,8 @@ describe("real prepared diagnostic material adapters", () => {
     expect(await db.diagnosticIdentityEvidence.count({ where: { orderId } })).toBe(0);
   });
   it("delivery rechecks material after the asynchronous read", async () => {
-    const p = await verified(); afterRead = () => material({ epoch: id("replacement-epoch") }, p);
+    const p = await verified(), readsBefore = completedReads;
+    afterRead = () => { expect(completedReads).toBe(readsBefore + 1); return material({ epoch: id("replacement-epoch") }, p); };
     await expect(identity.read(subject(), orderId, p)).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
   });
   async function blockedBy(pid: number, query: string) {
@@ -373,7 +410,9 @@ describe("real prepared diagnostic material adapters", () => {
     const p = await verified();
     const raw = await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: rawId } });
     const report = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: reportId } });
+    const readsBefore = completedReads;
     afterRead = async () => {
+      expect(completedReads).toBe(readsBefore + 1);
       afterRead = undefined;
       if (defect === "permission") {
         await db.$transaction(async tx => {
