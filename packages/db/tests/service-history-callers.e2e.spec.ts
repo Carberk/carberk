@@ -381,9 +381,48 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   expect(await db.serviceOutbox.findMany({ where: { conversationId: f.id }, orderBy: { sequence: "asc" }, select: { eventType: true, sequence: true } })).toEqual([{ eventType: "handover", sequence: 9 }, { eventType: "handover", sequence: 10 }]);
  });
  it("refuses handover when the new peer loses its grant during the actor wait", async () => {
-  const f = await fixture();
-  await refusalAfter(f.staff, b => b.query('UPDATE staff_grants SET "revokedAt"=$1 WHERE "userId"=$2', [now, f.peer.userId]), service => service.assign(f.staff, f.id, 1, f.peer.userId));
-  expect(await audit(f.resource)).toEqual([]); expect((await db.supportCase.findUniqueOrThrow({ where: { id: f.resource } })).assignmentVersion).toBe(1);
+  const f = await fixture(), manager = await principal(true);
+  await db.staffGrant.create({ data: { userId: manager.userId, capability: "staff.manage", grantedAt: now } });
+  const grantsBefore = await db.staffGrant.findMany({ orderBy: [{ userId: "asc" }, { capability: "asc" }] });
+  const sessionsBefore = await db.session.findMany({ orderBy: { id: "asc" } });
+  const usersBefore = await db.user.findMany({ orderBy: { id: "asc" } });
+  const resourceBefore = await db.supportCase.findUniqueOrThrow({ where: { id: f.resource } });
+  const conversationBefore = await db.serviceConversation.findUniqueOrThrow({ where: { id: f.id } });
+  const revoker = caller({ hold: true }), handover = caller();
+  const started = new Date();
+  const revoke = observe(grantWriter(revoker.database).change({ ...manager, targetUserId: f.peer.userId,
+   capability: "support.operations", grant: false, reason: "R6a peer authority opposition" }, now));
+  let assign: ReturnType<typeof observe> | undefined;
+  try {
+   await Promise.race([revoker.ready, revoke.then(result => { if (!result.ok) throw result.error; })]);
+   assign = observe(handover.service.assign(f.staff, f.id, 1, f.peer.userId));
+   await handover.started;
+   await blocked(handover.pid(), revoker.pid());
+  } finally {
+   revoker.release(); handover.release();
+   await Promise.allSettled([revoke, ...(assign ? [assign] : [])]);
+  }
+  const completed = new Date(), revoked = await revoke, assigned = await present(assign);
+  expect(revoked.ok, "actual staff authority revoker commits").toBe(true);
+  if (!revoked.ok) throw revoked.error;
+  expect(assigned.ok).toBe(false);
+  if (!assigned.ok) expect(assigned.error).toMatchObject({ code: "NO_ACCESS" });
+  expect(await db.staffGrant.findMany({ orderBy: [{ userId: "asc" }, { capability: "asc" }] })).toEqual(
+   grantsBefore.map(row => row.userId === f.peer.userId && row.capability === "support.operations" ? { ...row, revokedAt: now } : row));
+  expect(await db.session.findMany({ orderBy: { id: "asc" } })).toEqual(sessionsBefore);
+  expect(await db.user.findMany({ orderBy: { id: "asc" } })).toEqual(usersBefore);
+  const moderation = await db.auditLog.findMany();
+  expect(moderation).toHaveLength(1);
+  const auditRow = present(moderation[0]);
+  expect(auditRow.createdAt.getTime()).toBeGreaterThanOrEqual(started.getTime());
+  expect(auditRow.createdAt.getTime()).toBeLessThanOrEqual(completed.getTime());
+  expect(auditRow).toEqual({ id: auditRow.id, createdAt: auditRow.createdAt, actorId: manager.userId,
+   action: "STAFF_CAPABILITY_REVOKED", targetType: "User", targetId: f.peer.userId,
+   details: { capability: "support.operations", reason: "R6a peer authority opposition", previouslyActive: true } });
+  expect(await audit(f.resource)).toEqual([]);
+  expect(await db.supportCase.findUniqueOrThrow({ where: { id: f.resource } })).toEqual(resourceBefore);
+  expect(await db.serviceConversation.findUniqueOrThrow({ where: { id: f.id } })).toEqual(conversationBefore);
+  expect(await effects(f.id)).toEqual({ messages: 0, outbox: 0, reads: 0, subscriptions: 0 });
  });
  it("rolls back support command and all audits at the outer transaction boundary", async () => {
   const f = await fixture(), a = caller({ rollback: true });
