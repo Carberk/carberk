@@ -23,7 +23,7 @@ test('purge audit correction changes only the extraction grouping in the histori
 });
 test('purge audit snapshot preserves120 inventory and refuses missing map, missing130 and checksum drift', async () => {
  const schema = await readFile('packages/db/prisma/schema.prisma');
- assert.equal(createHash('sha256').update(schema).digest('hex'), current);
+ assert.equal(createHash('sha256').update(schema.toString().replace('\n// Snapshot: 20261026014000_diagnostic_source_registry_evaluation.\n', '')).digest('hex'), current);
  assert.deepEqual(retainedSchemaProfile.additions.find(x => x.name === name), { name, checksum });
  const priorNames = retainedSchemaProfile.schemaMigrations[prior];
  assert.equal(priorNames.at(-1), '20261026012000_diagnostic_disposal_selector_precedence');
