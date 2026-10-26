@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
@@ -8,6 +9,7 @@ import { expect, it } from "vitest";
 import { DiagnosticSchemas as D } from "@auto-tm/contracts";
 
 import { renderDiagnosticPdf } from "./DiagnosticPdfRenderer";
+import { readDiagnosticPdfText } from "./testing/readDiagnosticPdfText";
 const id = (n: number) => `11111111-1111-4111-8111-${String(n).padStart(12, "0")}`;
 const now = new Date("2026-10-18T00:00:00.000Z");
 const glyphs = "äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin";
@@ -59,3 +61,26 @@ it("renders representative complete files for page/text inspection when explicit
     if (variant === "draft") expect(text).toContain(locale === "en" ? "DRAFT" : locale === "ru" ? "ЧЕРНОВИК" : "TASLAMA");
   }
 }, 60_000);
+
+// Captured from the original renderer with default font positioning. These hashes
+// lock line breaks, glyph subsets, drawing operators and embedded font bytes.
+it.each([
+  ["tk", "858e29b3df9bdb6f888971605ac1a4243e1c59dd3b9725c46817e795601b57b5"],
+  ["ru", "59b988d5ca4a51c1c7f408a777be78ae40b54997cfeff6672ff5752eea610c53"],
+  ["en", "ef01ff5ef09ab09765338fea96062fb95a53d84873d0b9d96718c4134c722e27"],
+] as const)("preserves issued %s bytes with combining glyphs and wrapped paragraphs", async (locale, sha256) => {
+  const current = snapshot(2);
+  const explanation = "AVATAR office affinity e\u0301 a\u0308 n\u0303 Й Ё äçňöşüýž\n\n" + "Long localized observation remains intact. ".repeat(10) + "\n" + "W".repeat(140) + "\nLast paragraph";
+  const first = current.report.findings[0];
+  if (!first) throw new Error("Missing fixture finding");
+  first.explanation = explanation;
+  const bytes = await renderDiagnosticPdf({ snapshot: current, locale, generatedAt: now, verificationReference: "/private/diagnostics/record", photos: [] }, await fonts());
+  expect(createHash("sha256").update(bytes).digest("hex")).toBe(sha256);
+  const text = await readDiagnosticPdfText(bytes);
+  expect(text.replace(/\s/g, "")).toContain(explanation.replace(/\s/g, ""));
+  expect(text).toContain("123456 km");
+  expect(text).toContain("2026-10-17T00:00:00.000Z");
+  for (const finding of current.report.findings) expect(text).toContain(finding.id);
+  const loaded = await PDFDocument.load(bytes);
+  expect(loaded.getPageCount()).toBe(3);
+});

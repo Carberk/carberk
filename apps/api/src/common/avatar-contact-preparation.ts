@@ -77,7 +77,7 @@ async function run<T>(tx: Tx, discover: () => Promise<Plan>, work: (plan: Plan) 
     const namespaces = [...new Set(derived.keys.map(k => k.namespace))].sort((a, b) => a - b);
     for (const namespace of namespaces) {
       for (const key of derived.keys.filter(k => k.namespace === namespace).sort((a, b) => a.key - b.key)) {
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(${namespace}::int,${key.key}::int)`;
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(${namespace}::int,${key.key}::int)::text`;
       }
       // Metadata determines the same row class order used by the source kernel.
       for (const slot of [...before.slots].sort((a, b) => JSON.stringify(a.key).localeCompare(JSON.stringify(b.key)))) {
