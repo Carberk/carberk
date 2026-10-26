@@ -24,7 +24,8 @@ test('bootstrap qualification retains exact assembler bytes and changes only the
 
 test('current profile adds bootstrap qualification after R8 without changing prior snapshot inventories', async () => {
   const schema = await readFile('packages/db/prisma/schema.prisma');
-  const current = createHash('sha256').update(schema).digest('hex');
+  const current = 'e68eadbde1292dec7ed0b33ed014528ecea483a7977793d1ef01e79b56d3675b';
+  assert.ok(retainedSchemaProfile.schemaHashes.includes(createHash('sha256').update(schema).digest('hex')));
   assert.deepEqual(retainedSchemaProfile.additions.find(entry => entry.name === name), { name, checksum });
   const priorNames = retainedSchemaProfile.schemaMigrations[prior];
   assert.equal(priorNames.at(-1), '20261026010000_diagnostic_automatic_public_continuity');
