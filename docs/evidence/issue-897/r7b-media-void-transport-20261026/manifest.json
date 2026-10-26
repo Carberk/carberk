@@ -1,0 +1,86 @@
+{
+  "status": "NARROW_SOURCE_CORRECTION_PARENT_ACCEPTANCE_PENDING",
+  "base": "0faf63520e119064539da8318dd90178d14862c2",
+  "baseTree": "24c399f72886da8fe0a094604237e2eb55d3e3af",
+  "head": "c33e79708e8da4df78158e2cf72647620a41bc73",
+  "tree": "c9557f7c53e846d6fba1f635c2a9c3ff91a14b11",
+  "sourcePath": "apps/api/src/modules/listings/infrastructure/PrismaListingMediaRepository.ts",
+  "sourceSha256": "6cc9770feccb57bfb206e18eb824dec9fd9fe5dad06eb4a2ab67a4c1066f833c",
+  "exactDiff": "one existing advisory result ::text; no lock argument/order/keys/bounds/receipt/public-error changes",
+  "fakeGuard": "Existing UploadClaimsDatabase.ts:19 unchanged from integrated base; focused caller tests fail before correction and pass after it.",
+  "checks": [
+    {
+      "path": "/tmp/897-r7b-media-void-transport-20261026/red.log",
+      "sha256": "cfd5c004f9fba2f93e306076702441b96643de318fedd30f6011affac11f05e1",
+      "exitCode": 1,
+      "selected": 3,
+      "passed": 0,
+      "failed": 3,
+      "deselected": 17
+    },
+    {
+      "path": "/tmp/897-r7b-media-void-transport-20261026/green-focused.log",
+      "sha256": "ddabf8cbeb6c9f9c23addb63455810c3ab0b105e8d5042bb92c1cf07844b841b",
+      "exitCode": 0,
+      "selected": 3,
+      "passed": 3,
+      "failed": 0,
+      "deselected": 17
+    },
+    {
+      "path": "/tmp/897-r7b-media-void-transport-20261026/green-affected.log",
+      "sha256": "55426d4b5aa16a8652de94d76dadc256848bed97742e205d51ff50ede5355a31",
+      "exitCode": 0,
+      "selected": 44,
+      "passed": 44,
+      "failed": 0,
+      "deselected": 0
+    },
+    {
+      "path": "/tmp/897-r7b-media-void-transport-20261026/ts7.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0,
+      "selected": null,
+      "passed": null,
+      "failed": null,
+      "deselected": null
+    },
+    {
+      "path": "/tmp/897-r7b-media-void-transport-20261026/ts6.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0,
+      "selected": null,
+      "passed": null,
+      "failed": null,
+      "deselected": null
+    },
+    {
+      "path": "/tmp/897-r7b-media-void-transport-20261026/lint.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0,
+      "selected": null,
+      "passed": null,
+      "failed": null,
+      "deselected": null
+    }
+  ],
+  "SQL": 0,
+  "E2E": 0,
+  "HTTP": 0,
+  "servicesStarted": 0,
+  "rolesChanged": 0,
+  "kernelChanged": false,
+  "sharedClaimsChanged": false,
+  "avatarChanged": false,
+  "preservedPublicationCheckpoint": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+  "remaining": [
+    "Parent source inspection and affected real PostgreSQL R7c matrix rerun.",
+    "Adjacent PrismaMediaUploadRepository.record line57 has an uncast advisory result, outside the exact assigned preparedMedia correction; no runtime observation or correction claimed."
+  ],
+  "readPrefixAudit": {
+    "video": "API video preparation already matches accepted b7ac ::text; ledger row locks return supported id fields. Worker video helper is absent from this composition and remains original video-owner scope.",
+    "collectorPrincipal": "Measurement store reads row fields; capture reads text settings and rows. No direct void result found.",
+    "deletion": "Purge diagnostic_dispose_ownership returns integer and CTE outer SELECT returns only users.id. Source assert/finish and erasure helper calls already cast to text.",
+    "media": "Assigned preparedMedia advisory result corrected at line292; findByKeys used by publication is ordinary Prisma read, not registration record prefix."
+  }
+}

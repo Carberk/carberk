@@ -1,0 +1,78 @@
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-8c41fd9a/apps/api
+
+ ❯ src/modules/listings/infrastructure/PrismaListingMediaRepository.preparation.spec.ts (20 tests | 3 failed | 17 skipped) 7ms
+   ❯ media caller preparation (20)
+     × attaches a reserved upload and media atomically under one preparation 3ms
+     × rolls back the full reorder when an ID belongs to another Listing 3ms
+     × releases media and records exact cleanup with the unchanged helper's later instant 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/modules/listings/infrastructure/PrismaListingMediaRepository.preparation.spec.ts > media caller preparation > attaches a reserved upload and media atomically under one preparation
+Error: unsupported_void_result
+ ❯ $queryRaw src/modules/listings/application/testing/UploadClaimsDatabase.ts:19:132
+     17|       const sql = "strings" in query ? query.strings.join("?") : query…
+     18|       const values = "strings" in query ? query.values : args;
+     19|       if ((sql.includes("pg_advisory_xact_lock(") || sql.includes("cam…
+       |                                                                                                                                    ^
+     20|       if (sql.includes("campaign_prepare(")) {
+     21|         if (this.receipt) throw new Error("nested_preparation");
+ ❯ Object.db.tx.$queryRaw src/modules/listings/infrastructure/PrismaListingMediaRepository.preparation.spec.ts:34:12
+ ❯ src/modules/listings/infrastructure/PrismaListingMediaRepository.ts:292:94
+ ❯ withCampaignPreparation ../../packages/db/src/campaign-preparation.ts:23:18
+ ❯ Object.$transaction src/modules/listings/application/testing/UploadClaimsDatabase.ts:86:18
+ ❯ src/modules/listings/infrastructure/PrismaListingMediaRepository.preparation.spec.ts:74:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/modules/listings/infrastructure/PrismaListingMediaRepository.preparation.spec.ts > media caller preparation > rolls back the full reorder when an ID belongs to another Listing
+AssertionError: expected Error: unsupported_void_result to match object { code: 'P2025' }
+
+- Expected
++ Received
+
+- {
+-   "code": "P2025",
++ Error {
++   "message": "unsupported_void_result",
+  }
+
+ ❯ src/modules/listings/infrastructure/PrismaListingMediaRepository.preparation.spec.ts:107:132
+    105|     const { db, repository } = setup();
+    106|     db.tables["listing_media"] = [{ id: "photo", listingId: "listing",…
+    107|     await expect(repository.updateSortOrder("listing", [{ mediaId: "ph…
+       |                                                                                                                                    ^
+    108|     expect(db.tables["listing_media"]?.map(row => row["sortOrder"])).t…
+    109|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/modules/listings/infrastructure/PrismaListingMediaRepository.preparation.spec.ts > media caller preparation > releases media and records exact cleanup with the unchanged helper's later instant
+Error: unsupported_void_result
+ ❯ $queryRaw src/modules/listings/application/testing/UploadClaimsDatabase.ts:19:132
+     17|       const sql = "strings" in query ? query.strings.join("?") : query…
+     18|       const values = "strings" in query ? query.values : args;
+     19|       if ((sql.includes("pg_advisory_xact_lock(") || sql.includes("cam…
+       |                                                                                                                                    ^
+     20|       if (sql.includes("campaign_prepare(")) {
+     21|         if (this.receipt) throw new Error("nested_preparation");
+ ❯ Object.db.tx.$queryRaw src/modules/listings/infrastructure/PrismaListingMediaRepository.preparation.spec.ts:34:12
+ ❯ src/modules/listings/infrastructure/PrismaListingMediaRepository.ts:292:94
+ ❯ withCampaignPreparation ../../packages/db/src/campaign-preparation.ts:23:18
+ ❯ Object.$transaction src/modules/listings/application/testing/UploadClaimsDatabase.ts:86:18
+ ❯ src/modules/listings/infrastructure/PrismaListingMediaRepository.preparation.spec.ts:115:12
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 17 skipped (20)
+   Start at  13:52:13
+   Duration  727ms (import 71%, transform 26%, tests 1%, setup 1%, worker 1%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /Users/bagtyyar/.t3/worktrees/carberk/t3-
+  │ 8c41fd9a/apps/api
+
