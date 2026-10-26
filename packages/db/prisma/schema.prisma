@@ -2140,3 +2140,5 @@ model CampaignPreparation {
 // Snapshot: 20261026013000_diagnostic_purge_audit_details_precedence.
 
 // Snapshot: 20261026014000_diagnostic_source_registry_evaluation.
+
+// Snapshot: 20261026015000_diagnostic_component_expiry_representation.

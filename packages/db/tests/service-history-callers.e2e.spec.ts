@@ -11,7 +11,7 @@ import { Pool, type PoolClient } from "pg";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { PrismaClient } from "../generated/prisma/client/client";
-import { withCampaignPreparation, type Prisma } from "../src/index";
+import type { Prisma } from "../src/index";
 
 // R6a original matrix continuation, attempt 2. Authored source only.
 // Parent owns source disposition and separately authorized disposable execution.
@@ -381,9 +381,48 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   expect(await db.serviceOutbox.findMany({ where: { conversationId: f.id }, orderBy: { sequence: "asc" }, select: { eventType: true, sequence: true } })).toEqual([{ eventType: "handover", sequence: 9 }, { eventType: "handover", sequence: 10 }]);
  });
  it("refuses handover when the new peer loses its grant during the actor wait", async () => {
-  const f = await fixture();
-  await refusalAfter(f.staff, b => b.query('UPDATE staff_grants SET "revokedAt"=$1 WHERE "userId"=$2', [now, f.peer.userId]), service => service.assign(f.staff, f.id, 1, f.peer.userId));
-  expect(await audit(f.resource)).toEqual([]); expect((await db.supportCase.findUniqueOrThrow({ where: { id: f.resource } })).assignmentVersion).toBe(1);
+  const f = await fixture(), manager = await principal(true);
+  await db.staffGrant.create({ data: { userId: manager.userId, capability: "staff.manage", grantedAt: now } });
+  const grantsBefore = await db.staffGrant.findMany({ orderBy: [{ userId: "asc" }, { capability: "asc" }] });
+  const sessionsBefore = await db.session.findMany({ orderBy: { id: "asc" } });
+  const usersBefore = await db.user.findMany({ orderBy: { id: "asc" } });
+  const resourceBefore = await db.supportCase.findUniqueOrThrow({ where: { id: f.resource } });
+  const conversationBefore = await db.serviceConversation.findUniqueOrThrow({ where: { id: f.id } });
+  const revoker = caller({ hold: true }), handover = caller();
+  const started = new Date();
+  const revoke = observe(grantWriter(revoker.database).change({ ...manager, targetUserId: f.peer.userId,
+   capability: "support.operations", grant: false, reason: "R6a peer authority opposition" }, now));
+  let assign: ReturnType<typeof observe> | undefined;
+  try {
+   await Promise.race([revoker.ready, revoke.then(result => { if (!result.ok) throw result.error; })]);
+   assign = observe(handover.service.assign(f.staff, f.id, 1, f.peer.userId));
+   await handover.started;
+   await blocked(handover.pid(), revoker.pid());
+  } finally {
+   revoker.release(); handover.release();
+   await Promise.allSettled([revoke, ...(assign ? [assign] : [])]);
+  }
+  const completed = new Date(), revoked = await revoke, assigned = await present(assign);
+  expect(revoked.ok, "actual staff authority revoker commits").toBe(true);
+  if (!revoked.ok) throw revoked.error;
+  expect(assigned.ok).toBe(false);
+  if (!assigned.ok) expect(assigned.error).toMatchObject({ code: "NO_ACCESS" });
+  expect(await db.staffGrant.findMany({ orderBy: [{ userId: "asc" }, { capability: "asc" }] })).toEqual(
+   grantsBefore.map(row => row.userId === f.peer.userId && row.capability === "support.operations" ? { ...row, revokedAt: now } : row));
+  expect(await db.session.findMany({ orderBy: { id: "asc" } })).toEqual(sessionsBefore);
+  expect(await db.user.findMany({ orderBy: { id: "asc" } })).toEqual(usersBefore);
+  const moderation = await db.auditLog.findMany();
+  expect(moderation).toHaveLength(1);
+  const auditRow = present(moderation[0]);
+  expect(auditRow.createdAt.getTime()).toBeGreaterThanOrEqual(started.getTime());
+  expect(auditRow.createdAt.getTime()).toBeLessThanOrEqual(completed.getTime());
+  expect(auditRow).toEqual({ id: auditRow.id, createdAt: auditRow.createdAt, actorId: manager.userId,
+   action: "STAFF_CAPABILITY_REVOKED", targetType: "User", targetId: f.peer.userId,
+   details: { capability: "support.operations", reason: "R6a peer authority opposition", previouslyActive: true } });
+  expect(await audit(f.resource)).toEqual([]);
+  expect(await db.supportCase.findUniqueOrThrow({ where: { id: f.resource } })).toEqual(resourceBefore);
+  expect(await db.serviceConversation.findUniqueOrThrow({ where: { id: f.id } })).toEqual(conversationBefore);
+  expect(await effects(f.id)).toEqual({ messages: 0, outbox: 0, reads: 0, subscriptions: 0 });
  });
  it("rolls back support command and all audits at the outer transaction boundary", async () => {
   const f = await fixture(), a = caller({ rollback: true });
@@ -1151,12 +1190,23 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   // This executes only inside a separately authorized disposable E2E run.
   const setup = execFileSync(process.execPath, ["scripts/testing/campaign-preparation-fixture.mjs", "campaign897-full-v3", reservation, candidate], { cwd: fileURLToPath(new URL("../../..", import.meta.url)), encoding: "utf8" });
   await pool.query(setup);
+  // The accepted generator installs reservation-specific public triggers. Keep
+  // every inherited mode exact and include those new triggers in restoration.
+  const generatedTriggers = await snapshotTriggers();
+  expect(generatedTriggers.filter(row => triggerState.some(before => before.table === row.table && before.name === row.name))).toEqual(triggerState);
+  const addedTriggers = generatedTriggers.filter(row => !triggerState.some(before => before.table === row.table && before.name === row.name));
+  expect(addedTriggers.length).toBeGreaterThan(0);
+  expect(addedTriggers.every(row => row.name.startsWith(`${namespace}_`) && !row.guard)).toBe(true);
+  triggerState = generatedTriggers;
+  console.info("R6a campaign fixture trigger baseline", JSON.stringify({ database: scenarioDatabase, triggers: triggerState }));
   await pool.query(`GRANT USAGE ON SCHEMA "${namespace}" TO ${role}`);
   await pool.query(`GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA "${namespace}" TO ${role}`);
   await pool.query(`GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA "${namespace}" TO ${role}`);
   const user = await db.user.findUniqueOrThrow({ where: { email: `buyer-a.${reservation}.${candidate.slice(0, 12)}@campaign897.invalid` } });
   const sessionId = fixtureId();
-  await db.$transaction(tx => withCampaignPreparation(tx, [{ table: "sessions", key: { id: sessionId }, verb: "insert", next: { id: sessionId, userId: user.id, expiresAt: future.toISOString() } }], () => tx.session.create({ data: { id: sessionId, userId: user.id, refreshTokenHash: fixtureId(), createdAt: now, expiresAt: future } })));
+  // Ordinary task-owned Session fixture precedes complete matched activation.
+  const sessionValidUntil = new Date(Math.max(future.getTime(), Date.now() + 24 * 60 * 60 * 1000));
+  await db.session.create({ data: { id: sessionId, userId: user.id, refreshTokenHash: fixtureId(), createdAt: now, expiresAt: sessionValidUntil } });
   const hash = await pool.query<{ matched: boolean }>(`SELECT service_contract_hash=md5(pg_get_functiondef('"${namespace}".campaign_service_authority(text,text,text,text,text)'::regprocedure)) AS matched FROM "${namespace}".campaign_manifest WHERE candidate=$1 AND state='identities' AND profile='campaign897-full-v3'`, [candidate]);
   expect(hash.rows).toEqual([{ matched: true }]);
   return { namespace, subject: { userId: user.id, sessionId } };
