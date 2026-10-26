@@ -8,6 +8,7 @@ import { PrismaService, type Prisma } from "@auto-tm/db";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { ExpireServiceContent } from "./ExpireServiceContent";
+import { AdvanceHistoryOrders } from "./AdvanceHistoryOrders";
 import { S3RetiredObjectStore } from "./S3RetiredObjectStore";
 import { PurgeExpiredAccounts } from "./PurgeExpiredAccounts";
 
@@ -297,6 +298,7 @@ describe.skipIf(process.env["R6C_EXPIRY_DISPOSABLE"] !== "1")("ordinary expiry p
  // mutation. This proves exact selection bounds/order and zero overflow effects;
  // it deliberately does not claim a100/200-transaction sweep completed.
  for (const proof of ["selection", "finish"] as const) for (const kind of ["support100", "attachments200", "artifacts100", "fences100"] as const) it.skipIf(proof === "finish" && process.env["R6C_EXPIRY_SATURATION_FINISH"] !== "1")(`saturation ${kind} ${proof} preserves the exact finite oldest page and overflow`, async () => {
+  const timingStart = performance.now();
   const limit = kind === "attachments200" ? 200 : 100;
   const ids = Array.from({ length: limit + 1 }, () => randomUUID());
   const date = (index: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, index));
@@ -325,7 +327,15 @@ describe.skipIf(process.env["R6C_EXPIRY_DISPOSABLE"] !== "1")("ordinary expiry p
     : kind === "artifacts100" ? { artifact: await db.historyArtifact.findUniqueOrThrow({ where: { id: overflowId } }), cleanup: await db.historyArtifactCleanup.findUniqueOrThrow({ where: { artifactId: overflowId } }) }
     : await db.serviceErasureFence.findUniqueOrThrow({ where: { conversationId: overflowId } });
    const beforeOverflow = await overflow();
-   const result = await new ExpireServiceContent(transaction().database, objects).execute(now);
+   const executeStart = performance.now();
+   let finished = 0;
+   const measured = transaction({ beforeFinish: async () => { finished++; } });
+   const report = () => console.info("R6c saturation timing", { kind, fixtureMs: executeStart - timingStart, executeMs: performance.now() - executeStart, finished });
+   const timer = setTimeout(report, 4000);
+   const execution = new ExpireServiceContent(measured.database, objects).execute(now);
+   pending.push(execution.catch(() => undefined));
+   let result: Awaited<typeof execution>;
+   try { result = await execution; } finally { clearTimeout(timer); report(); }
    expect(result).toEqual(kind === "support100" ? { supportPurged: 100, attachmentsRetired: 0, cleanupsCompleted: 100 }
     : kind === "attachments200" ? { supportPurged: 0, attachmentsRetired: 200, cleanupsCompleted: 1 }
     : kind === "fences100" ? { supportPurged: 0, attachmentsRetired: 0, cleanupsCompleted: 100 }
@@ -411,6 +421,49 @@ describe.skipIf(process.env["R6C_EXPIRY_DISPOSABLE"] !== "1")("ordinary expiry p
   await db.historyArtifactCleanup.create({ data: { artifactId: id, objectKey, sha256, epoch: 1 } });
   return { id, sha256, objectKey };
  }
+ for (const count of [1, 10]) it(`timed minimal History cleanup completes ${count} real transactions`, async () => {
+  const start = performance.now();
+  for (let index = 0; index < count; index++) await artifact();
+  const executeStart = performance.now();
+  await new ExpireServiceContent(transaction().database, objects).execute(now);
+  console.info("R6c minimal timing", { count, fixtureMs: executeStart - start, executeMs: performance.now() - executeStart });
+  expect(await db.historyArtifactCleanup.count({ where: { completedAt: now } })).toBe(count);
+  expect(await db.historyArtifact.count({ where: { state: "removed", removedAt: now } })).toBe(count);
+  expect(await db.campaignPreparation.count()).toBe(0);
+ });
+ for (const kind of ["support", "attachments"] as const) it(`timed minimal ${kind} separates fixture from production sweep`, async () => {
+  const start = performance.now(), f = await fixture(kind === "support" ? "support" : "history");
+  if (kind === "attachments") await attachment(f, "staged");
+  const executeStart = performance.now();
+  const result = await new ExpireServiceContent(transaction().database, objects).execute(now);
+  console.info("R6c minimal timing", { kind, count: 1, fixtureMs: executeStart - start, executeMs: performance.now() - executeStart });
+  expect(result).toEqual(kind === "support" ? { supportPurged: 1, attachmentsRetired: 0, cleanupsCompleted: 1 } : { supportPurged: 0, attachmentsRetired: 1, cleanupsCompleted: 1 });
+  expect(await db.campaignPreparation.count()).toBe(0);
+ });
+ for (const order of ["producer-first", "expiry-first"] as const) it(`actual rights expiry producer versus cleanup preserves removed bytes, ${order}`, async () => {
+  const file = await artifact(), first = transaction({ hold: true }), second = transaction();
+  const produce = (database: PrismaService) => database.$transaction(async tx => new AdvanceHistoryOrders(tx as unknown as PrismaService).execute(now));
+  const a = observe<unknown>(order === "producer-first" ? produce(first.database) : new ExpireServiceContent(first.database, objects).execute(now));
+  await Promise.race([first.ready, a.then(result => { if (!result.ok) throw result.error; })]);
+  const b = observe<unknown>(order === "producer-first" ? new ExpireServiceContent(second.database, objects).execute(now) : produce(second.database));
+  await second.started;
+  await Promise.race([blocked(second.pid(), first.pid()), b.then(result => { if (!result.ok) throw result.error; })]);
+  first.release(); expect((await a).ok).toBe(true); expect((await b).ok).toBe(true);
+  expect(await db.historyArtifact.findUniqueOrThrow({ where: { id: file.id } })).toMatchObject({ state: "removed", removedAt: now, vin: null, provenance: null });
+  expect(await db.historyArtifactCleanup.findUniqueOrThrow({ where: { artifactId: file.id } })).toMatchObject({ epoch: 1, objectKey: file.objectKey, sha256: file.sha256, completedAt: now });
+  await gone(file.objectKey); expect(await db.campaignPreparation.count()).toBe(0);
+ });
+ it("actual rights expiry producer queues exact original before expiry consumes it", async () => {
+  const file = await artifact();
+  await db.historyArtifactCleanup.delete({ where: { artifactId: file.id } });
+  await db.historyArtifact.update({ where: { id: file.id }, data: { state: "verified", restrictedAt: null, verifiedPages: 1, verifiedAt: now } });
+  await transaction().database.$transaction(async tx => new AdvanceHistoryOrders(tx as unknown as PrismaService).execute(now));
+  expect(await db.historyArtifact.findUniqueOrThrow({ where: { id: file.id } })).toMatchObject({ state: "restricted", restrictedAt: now });
+  expect(await db.historyArtifactCleanup.findUniqueOrThrow({ where: { artifactId: file.id } })).toMatchObject({ epoch: 1, objectKey: file.objectKey, sha256: file.sha256, completedAt: null });
+  await new ExpireServiceContent(transaction().database, objects).execute(now);
+  expect(await db.historyArtifactCleanup.findUniqueOrThrow({ where: { artifactId: file.id } })).toMatchObject({ completedAt: now });
+  await gone(file.objectKey);
+ });
  it("cleans the exact restricted History original and scrubs all personal metadata after a durable external failure", async () => {
   const file = await artifact(), before = await snapshot();
   await expect(new ExpireServiceContent(transaction().database, { deleteAndVerify: async () => { throw new Error("Synthetic History outage"); } }).execute(now)).rejects.toThrow("Synthetic History outage");
