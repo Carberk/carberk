@@ -272,7 +272,10 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
  }
  async function principal(staff = false) {
   const user = await db.user.create({ data: { id: fixtureId(), email: `${fixtureId()}@example.invalid`, emailVerifiedAt: now, nameNumber: 1234, avatarIndex: 0, createdAt: now } });
-  const session = await db.session.create({ data: { id: fixtureId(), createdAt: now, userId: user.id, refreshTokenHash: fixtureId(), expiresAt: future, adminTotpExpiresAt: future } });
+  // Native Session rotation samples wall time; injected service authority uses
+  // now. Start valid for both, while expiry-opponent commands still write now.
+  const sessionValidUntil = new Date(Math.max(future.getTime(), Date.now() + 24 * 60 * 60 * 1000));
+  const session = await db.session.create({ data: { id: fixtureId(), createdAt: now, userId: user.id, refreshTokenHash: fixtureId(), expiresAt: sessionValidUntil, adminTotpExpiresAt: sessionValidUntil } });
   if (staff) for (const capability of ["support.operations", "history.fulfilment"]) await db.staffGrant.create({ data: { userId: user.id, capability, grantedAt: now } });
   return { userId: user.id, sessionId: session.id };
  }
