@@ -71,7 +71,9 @@ it.each([
 ] as const)("preserves issued %s bytes with combining glyphs and wrapped paragraphs", async (locale, sha256) => {
   const current = snapshot(2);
   const explanation = "AVATAR office affinity e\u0301 a\u0308 n\u0303 Й Ё äçňöşüýž\n\n" + "Long localized observation remains intact. ".repeat(10) + "\n" + "W".repeat(140) + "\nLast paragraph";
-  current.report.findings[0]!.explanation = explanation;
+  const first = current.report.findings[0];
+  if (!first) throw new Error("Missing fixture finding");
+  first.explanation = explanation;
   const bytes = await renderDiagnosticPdf({ snapshot: current, locale, generatedAt: now, verificationReference: "/private/diagnostics/record", photos: [] }, await fonts());
   expect(createHash("sha256").update(bytes).digest("hex")).toBe(sha256);
   const text = await readDiagnosticPdfText(bytes);
