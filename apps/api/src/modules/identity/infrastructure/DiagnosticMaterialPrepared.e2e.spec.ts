@@ -66,7 +66,7 @@ describe("real prepared diagnostic material adapters", () => {
   const objects: DiagnosticObjects = {
     sanitize: (input, mime) => storage.sanitize(input, mime),
     put: async (key, input, mime) => { await storage.put(key, input, mime); objectKeys.add(key); stored.set(key, input); if (afterPut) await afterPut(); if (putFailure) throw new Error("r4_lost_put_reply"); },
-    read: async (key, size, hash) => { if (afterRead) await afterRead(); const content = await storage.read(key, size, hash); completedReads++; return content; },
+    read: async (key, size, hash) => { const content = await storage.read(key, size, hash); completedReads++; if (afterRead) await afterRead(); return content; },
     remove: async key => { await storage.remove(key); stored.delete(key); },
   };
   beforeAll(async () => {
@@ -98,8 +98,8 @@ describe("real prepared diagnostic material adapters", () => {
       "diagnostic_reports", "diagnostic_identity_provenance", "diagnostic_identity_evidence", "diagnostic_evidence", "diagnostic_audits",
       "diagnostic_source_anchors", "diagnostic_source_commands", "campaign_preparations"];
     // Staff/source integrity triggers invalidate retained proofs, including an
-    // empty relation. That UPDATE is a real required trigger effect.
-    await pool.query(`GRANT UPDATE ON public.diagnostic_continuity_proofs TO "${runtimeRole}"`);
+    // empty relation. Erasure deletes those proofs. Both are required trigger effects.
+    await pool.query(`GRANT UPDATE,DELETE ON public.diagnostic_continuity_proofs TO "${runtimeRole}"`);
     for (const table of writable) await pool.query(`GRANT INSERT,UPDATE,DELETE ON public."${table}" TO "${runtimeRole}"`);
     const runtimeUrl = new URL(adminUrl); runtimeUrl.username = runtimeRole; runtimeUrl.password = password;
     process.env["DATABASE_URL"] = runtimeUrl.toString();
@@ -127,6 +127,10 @@ describe("real prepared diagnostic material adapters", () => {
     await db.user.create({ data: { id: userId } });
     await db.session.create({ data: { id: subject().sessionId, userId, refreshTokenHash: id("refresh"), expiresAt: new Date(clock.getTime() + 86400_000), adminTotpExpiresAt: new Date(clock.getTime() + 86400_000) } });
     await db.staffGrant.create({ data: { userId, capability: "diagnostics.technician" } });
+    const managerId = id("manager");
+    await db.user.create({ data: { id: managerId } });
+    await db.session.create({ data: { id: id("manager-session"), userId: managerId, refreshTokenHash: id("manager-refresh"), expiresAt: new Date(clock.getTime() + 86400_000), adminTotpExpiresAt: new Date(clock.getTime() + 86400_000) } });
+    await db.staffGrant.create({ data: { userId: managerId, capability: "staff.manage" } });
     await db.diagnosticCenter.create({ data: { id: centerId, code: centerId, names: text } });
     await db.diagnosticCenterAssignment.create({ data: { id: id("qualification"), centerId, userId, capability: "diagnostics.technician", qualifiedUntil: new Date(clock.getTime() + 86400_000) } });
     await db.staffGrant.create({ data: { userId, capability: "diagnostics.reception" } });
@@ -411,31 +415,41 @@ describe("real prepared diagnostic material adapters", () => {
     const raw = await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: rawId } });
     const report = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: reportId } });
     const readsBefore = completedReads;
+    const provenance = await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: p } });
+    const order = await db.inspectionOrder.findUniqueOrThrow({ where: { id: orderId } });
+    const grants = await db.staffGrant.findMany({ where: { userId: subject().userId }, orderBy: { capability: "asc" } });
     afterRead = async () => {
       expect(completedReads).toBe(readsBefore + 1);
       afterRead = undefined;
       if (defect === "permission") {
-        await db.$transaction(async tx => {
-          const root = { table: "staff_grants" as const, key: { userId: subject().userId, capability: "diagnostics.technician" } };
-          const row = await diagnosticPlannedRow(tx, root, { revokedAt: clock });
-          await withDiagnosticSourceCommand(tx, { operation: "staff_eligibility", roots: [root], rows: [row], actorUserId: null, sessionId: null, cutoff: null, campaign: null },
-            () => tx.staffGrant.update({ where: { userId_capability: root.key }, data: { revokedAt: clock } }));
-        });
-        // The same subject has reception authority too. Revoke that real grant
-        // with the same production preparation contract before post-read checks.
-        await db.$transaction(async tx => {
-          const root = { table: "staff_grants" as const, key: { userId: subject().userId, capability: "diagnostics.reception" } };
-          const row = await diagnosticPlannedRow(tx, root, { revokedAt: clock });
-          await withDiagnosticSourceCommand(tx, { operation: "staff_eligibility", roots: [root], rows: [row], actorUserId: null, sessionId: null, cutoff: null, campaign: null },
-            () => tx.staffGrant.update({ where: { userId_capability: root.key }, data: { revokedAt: clock } }));
-        });
+        // Lawful distinct elevated manager invokes the unchanged authority writer.
+        // It owns preparation, sorted locks, policy checks, mutation and audit.
+        const staff = new PrismaStaffAuthority(db);
+        for (const capability of ["diagnostics.technician", "diagnostics.reception"]) {
+          await staff.change({ userId: id("manager"), sessionId: id("manager-session"), targetUserId: subject().userId,
+            capability, grant: false, reason: "Synthetic post-GET authority revocation" }, clock);
+        }
       } else if (defect === "rights") clock = new Date(rights().schedule.until);
+      // Explicit erasure fault through the existing prepared helper. This is
+      // not accepted actual purge opposition; NEW130 remains external.
       else await material({ state: "cleanup_pending", rights: null, createdById: null, erasedAt: clock, cleanupRequestedAt: clock, epoch: randomUUID() }, p);
     };
     await expect(identity.read(subject(), orderId, p)).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
     expect(await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: rawId } })).toEqual(raw);
     expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: reportId } })).toEqual(report);
     expect(await db.diagnosticAudit.count({ where: { orderId } })).toBe(0);
+    expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: orderId } })).toEqual(order);
+    expect(completedReads).toBe(readsBefore + 1);
+    if (defect === "permission") {
+      expect(await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: p } })).toEqual(provenance);
+      expect(await db.staffGrant.findMany({ where: { userId: subject().userId }, orderBy: { capability: "asc" } })).toEqual(grants.map(grant => ({ ...grant, revokedAt: clock })));
+      const audits = await db.auditLog.findMany({ where: { actorId: id("manager"), targetId: subject().userId }, orderBy: { createdAt: "asc" } });
+      expect(audits).toHaveLength(2);
+      expect(audits.map(audit => ({ actorId: audit.actorId, action: audit.action, targetType: audit.targetType, targetId: audit.targetId, details: audit.details }))).toEqual(
+        ["diagnostics.technician", "diagnostics.reception"].map(capability => ({ actorId: id("manager"), action: "STAFF_CAPABILITY_REVOKED", targetType: "User", targetId: subject().userId,
+          details: { capability, reason: "Synthetic post-GET authority revocation", previouslyActive: true } })));
+    } else if (defect === "rights") expect(await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: p } })).toEqual(provenance);
+    else expect(await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: p } })).toMatchObject({ state: "cleanup_pending", rights: null, createdById: null, erasedAt: clock, cleanupRequestedAt: clock });
   });
   it.each(["size", "hash"] as const)("R4 remaining real storage refuses wrong %s", async defect => {
     const p = await verified();
@@ -491,6 +505,49 @@ describe("real prepared diagnostic material adapters", () => {
     }
     expect(await db.diagnosticIdentityEvidence.count({ where: { orderId } })).toBe(0);
     expect(await db.diagnosticAudit.count({ where: { orderId } })).toBe(0);
+  });
+  it("R4 observation: identity-first collision refuses after read-prefix rediscovery", async () => {
+    const input = stage();
+    const order = await db.inspectionOrder.findUniqueOrThrow({ where: { id: orderId } });
+    const raw = await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: rawId } });
+    const report = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: reportId } });
+    const assignments = await db.diagnosticOrderAssignment.findMany({ where: { orderId }, orderBy: { id: "asc" } });
+    const gate = await pool.connect();
+    const gatePid = (await gate.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]!.pid;
+    await gate.query("SELECT pg_advisory_lock(18976,hashtext($1))", [input.id]);
+    await pool.query(`CREATE FUNCTION diagnostic_r4_prefix_gate() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_advisory_xact_lock(18976,hashtext(NEW.id)); RETURN NEW; END $$;
+      CREATE TRIGGER diagnostic_r4_prefix_gate BEFORE INSERT ON diagnostic_identity_provenance FOR EACH ROW EXECUTE FUNCTION diagnostic_r4_prefix_gate()`);
+    let owner: ReturnType<typeof outcome<unknown>> | undefined, rival: ReturnType<typeof outcome<unknown>> | undefined;
+    try {
+      owner = outcome(identity.stage(subject(), orderId, input));
+      await blockedBy(gatePid, "%INSERT%diagnostic_identity_provenance%");
+      const held = await pool.query<{ pid: number }>("SELECT pid FROM pg_stat_activity WHERE $1::int=ANY(pg_blocking_pids(pid)) AND query LIKE '%INSERT%diagnostic_identity_provenance%'", [gatePid]);
+      rival = outcome(evidence.upload(subject(), { reportId, evidenceId: input.id, findingId: id("finding"), expectedVersion: 0, mime: "image/png", bytes }));
+      // A separate observation, not a replacement for the stricter retained
+      // prepare-wait case. The actual finding caller enters a read prefix first.
+      await blockedBy(held.rows[0]!.pid, "%pg_advisory_xact_lock%");
+      const waiting = await pool.query<{ pid: number; query: string }>("SELECT pid,query FROM pg_stat_activity WHERE $1::int=ANY(pg_blocking_pids(pid)) AND query LIKE '%pg_advisory_xact_lock%'", [held.rows[0]!.pid]);
+      expect(waiting.rows).toHaveLength(1);
+      expect(waiting.rows[0]!.query).not.toContain("diagnostic_prepare_source");
+      console.info("r4_identity_first_read_prefix_wait", { holderPid: held.rows[0]!.pid, waiter: waiting.rows[0] });
+    } finally {
+      await gate.query("SELECT pg_advisory_unlock(18976,hashtext($1))", [input.id]); gate.release();
+      await Promise.all([owner, rival]);
+      await pool.query("DROP TRIGGER diagnostic_r4_prefix_gate ON diagnostic_identity_provenance; DROP FUNCTION diagnostic_r4_prefix_gate()");
+    }
+    expect(await owner!).toEqual({ ok: true, value: { id: input.id, state: "staged" } });
+    const refused = await rival!;
+    expect(refused?.ok).toBe(false);
+    if (refused && !refused.ok) expect(() => { throw refused.error; }).toThrow("DIAGNOSTIC_NO_ACCESS");
+    expect(await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: input.id } })).toMatchObject({ orderId, state: "staged", cleanupRequestedAt: null, objectKey: null });
+    expect(await db.diagnosticEvidence.findUnique({ where: { id: input.id } })).toBeNull();
+    expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: orderId } })).toEqual(order);
+    expect(await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: rawId } })).toEqual(raw);
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: reportId } })).toEqual(report);
+    expect(await db.diagnosticOrderAssignment.findMany({ where: { orderId }, orderBy: { id: "asc" } })).toEqual(assignments);
+    expect(await db.diagnosticIdentityEvidence.count({ where: { orderId } })).toBe(0);
+    expect(await db.diagnosticAudit.count({ where: { orderId } })).toBe(0);
+    expect(stored.size).toBe(0);
   });
   it("R4 remaining actual purge fences retained material and raw/report pins atomically", async () => {
     const p = await verified();
