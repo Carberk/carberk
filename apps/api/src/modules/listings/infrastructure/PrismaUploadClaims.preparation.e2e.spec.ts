@@ -1,9 +1,12 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { PrismaService, type Prisma, withCampaignPreparation } from "@auto-tm/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaUploadClaims } from "./PrismaUploadClaims";
+import { claimPostgresFixture } from "./testing/UploadClaimsPostgresFixture";
 
-// AUTHORED ONLY. Not imported/collected/executed by this writer. Parent installs
-// testing/upload-claims-r7c-20261025.sql before its matching guard activation.
+// Isolated worker fixture seeds before matching guard activation and restores
+// every original trigger mode after all real callers have drained.
 // Real production claim callers oppose each other; the proxy only pauses a
 // completed DB statement or injects a driver failure. No handwritten adopter.
 const prefix = (n: number) => `r7c-20261025-${n}`;
@@ -70,8 +73,10 @@ function token(value: Awaited<ReturnType<typeof reserve>>) {
 }
 
 describe("R7c parent activated disposable claim transactions", { concurrent: false }, () => {
-  const db = new PrismaService(), a = new PrismaService(), b = new PrismaService();
+  const fixture = claimPostgresFixture(readFileSync(resolve(__dirname, "testing/upload-claims-r7c-20261025.sql"), "utf8"), "r7c-20261025-");
+  let db: PrismaService, a: PrismaService, b: PrismaService;
   beforeAll(async () => {
+    db = a = b = await fixture.start();
     const [ready] = await db.$queryRaw<{ source: boolean; campaign: boolean }[]>`
       SELECT public.diagnostic_source_guards_ready() AS source,public.campaign_preparation_ready() AS campaign`;
     expect(ready).toEqual({ source: true, campaign: true });
@@ -82,7 +87,7 @@ describe("R7c parent activated disposable claim transactions", { concurrent: fal
       expect(before.uploads.every(u => u.state === "AVAILABLE" && u.claimToken === null && u.objectKeys.length === 5 && u.objectKeys.includes(u.key))).toBe(true);
     }
   });
-  afterAll(async () => { await Promise.all([db.onModuleDestroy(),a.onModuleDestroy(),b.onModuleDestroy()]); });
+  afterAll(() => fixture.stop());
 
   it.each([true,false])("opposes real reserve and retireUnclaimed in both orders, reserveFirst=%s", async reserveFirst => {
     const n=reserveFirst?1:2, before=await state(db,n);
@@ -176,7 +181,7 @@ describe("R7c parent activated disposable claim transactions", { concurrent: fal
         const [derived]=await tx.$queryRaw<{keys:{namespace:number;key:number}[]}[]>`
           SELECT public.diagnostic_source_lock_keys_before_intake(${JSON.stringify(slots)}::jsonb,${JSON.stringify({rows:[mutation]})}::jsonb) AS keys`;
         if(!derived)throw new Error("r7c_reuse_keys_missing");
-        for(const key of derived.keys)await tx.$queryRaw`SELECT pg_advisory_xact_lock(${key.namespace}::int,${key.key}::int)`;
+        for(const key of derived.keys)await tx.$queryRaw`SELECT pg_advisory_xact_lock(${key.namespace}::int,${key.key}::int)::text`;
         await tx.$queryRaw`SELECT id FROM public.users WHERE id=${`${prefix(n)}-owner`} FOR UPDATE`;
         await tx.$queryRaw`SELECT id FROM public.media_uploads WHERE id=${`${prefix(n)}-one`} FOR UPDATE`;
         expect(await claims.finalize(tx,{token:token(reservation),uploadIds:[`${prefix(n)}-one`],target:{type:"profile",id:`${prefix(n)}-owner`}})).toBe("adopted");

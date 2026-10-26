@@ -12,11 +12,11 @@ import { imageUploadObjectKeys } from "../domain/imageUploadObjectKeys";
 import type { UploadClaimTarget } from "../domain/ports/UploadClaimPort";
 import { PrismaListingMediaRepository } from "./PrismaListingMediaRepository";
 import { PrismaUploadClaims } from "./PrismaUploadClaims";
+import { claimPostgresFixture } from "./testing/UploadClaimsPostgresFixture";
+import { retireWithFixturePreparation } from "./testing/UploadClaimsRetireFixture";
 
-// AUTHORED ONLY: parent installs upload-claims-existing-r7c-20261025.sql
-// before matching activation on its disposable candidate. No seed/cleanup writes
-// run under active guards. Parent owns fixture teardown with that database.
-// Production633f/677ea remain read-only; media caller compatibility is R7b-owned.
+// Task-owned disposable worker database only. Snapshot and restore every guard
+// mode; seed before activation and run actual caller transactions as a nonowner.
 const fixture = (n: number) => `r7c-existing-20261025-${n}`;
 let OWNER: string, STRANGER: string, LISTING: string, OTHER_LISTING: string;
 let listingTarget: UploadClaimTarget, profileTarget: UploadClaimTarget;
@@ -53,6 +53,7 @@ const fixtureCaseNames = [
 
 describe("common upload claim on Postgres (#721)", { concurrent: false }, () => {
   let prisma: PrismaService;
+  const databaseFixture = claimPostgresFixture(readFileSync(resolve(__dirname, "testing/upload-claims-existing-r7c-20261025.sql"), "utf8"), "r7c-existing-20261025-", true);
   let claims: PrismaUploadClaims;
   let mediaRepo: PrismaListingMediaRepository;
   let profileLink: PrismaProfilePhotoLink;
@@ -60,7 +61,7 @@ describe("common upload claim on Postgres (#721)", { concurrent: false }, () => 
   const allocated = new Map<string, number>();
 
   beforeAll(async () => {
-    prisma = new PrismaService();
+    prisma = await databaseFixture.start();
     const [ready] = await prisma.$queryRaw<{ source: boolean; campaign: boolean }[]>`
       SELECT public.diagnostic_source_guards_ready() AS source, public.campaign_preparation_ready() AS campaign`;
     expect(ready).toEqual({ source: true, campaign: true });
@@ -78,7 +79,7 @@ describe("common upload claim on Postgres (#721)", { concurrent: false }, () => 
     }
   });
 
-  afterAll(async () => { if (prisma) await prisma.onModuleDestroy(); });
+  afterAll(() => databaseFixture.stop());
 
   beforeEach(({ task }) => {
     graph = fixtureCaseNames.findIndex(name => name === task.name) + 1;
@@ -93,6 +94,9 @@ describe("common upload claim on Postgres (#721)", { concurrent: false }, () => 
     mediaRepo = new PrismaListingMediaRepository(prisma, claims);
     profileLink = new PrismaProfilePhotoLink(prisma, claims);
   });
+
+  const suppliedRetire = (caller: PrismaUploadClaims, id: string, at: Date) =>
+    prisma.$transaction(tx => retireWithFixturePreparation(tx, id, at, () => caller.retire(tx, id)));
 
   async function presigned(protocol: "legacy" | "conditional-v1" = "legacy", userId = OWNER) {
     const alias = userId === OWNER ? "owner" : userId === STRANGER ? "stranger" : undefined;
@@ -317,9 +321,7 @@ describe("common upload claim on Postgres (#721)", { concurrent: false }, () => 
       const reserved = await prisma.mediaUpload.findUniqueOrThrow({ where: { id: upload.id } });
       expect(reserved.claimDeadline?.getTime()).toBe(at.getTime() + 10 * 60 * 1000);
 
-      // Original supplied-retire contract retained: exact upfront fixture
-      // preparation needs parent disposition; do not replace it with abandon.
-      await prisma.$transaction((tx) => timed.retire(tx, upload.id));
+      await suppliedRetire(timed, upload.id, at);
       const retired = await prisma.mediaUpload.findUniqueOrThrow({ where: { id: upload.id } });
       expect(retired.retiredAt?.getTime()).toBe(at.getTime());
     });
@@ -406,15 +408,14 @@ describe("common upload claim on Postgres (#721)", { concurrent: false }, () => 
     it("records one piece of work when the same upload is retired concurrently", async () => {
       const { upload } = await adopted("conditional-v1");
 
-      // Original supplied concurrent-retirement outcomes remain literal. The
-      // parent must disposition their enclosing complete initial union.
+      // Each caller owns its live upfront receipt; the supplied helper reuses it.
       const settled = await Promise.allSettled([1, 2, 3].map(() =>
-        prisma.$transaction((tx) => claims.retire(tx, upload.id))));
+        suppliedRetire(claims, upload.id, new Date())));
       const outcomes = settled.map(result => { if (result.status === "rejected") throw result.reason; return result.value; });
 
       expect(outcomes.filter(Boolean)).toHaveLength(1);
       expect(await prisma.mediaUploadCleanup.count({ where: { uploadId: upload.id } })).toBe(1);
-      expect(await prisma.$transaction((tx) => claims.retire(tx, upload.id))).toBe(false);
+      expect(await suppliedRetire(claims, upload.id, new Date())).toBe(false);
     });
 
     it("retires an abandoned preparation and refuses its late finalization", async () => {

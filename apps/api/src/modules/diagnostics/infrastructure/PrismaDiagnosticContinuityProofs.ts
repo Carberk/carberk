@@ -8,13 +8,16 @@ import { STAFF_BINDING_PORT, StaffAuthorityDenied, type StaffBinding, type Staff
 import type { DiagnosticContinuityProofsPort } from "../application/ports/DiagnosticContinuityProofsPort";
 import { DiagnosticRuleError } from "../domain/InspectionOrder";
 import { DiagnosticReport, type DiagnosticReportState } from "../domain/DiagnosticReport";
-import { continuityPair } from "../domain/ContinuityPair";
+import { continuityPair, type ContinuityVisit } from "../domain/ContinuityPair";
+import type { PublicOwnershipFact, PublicOwnershipVisit } from "../domain/PublicAutomaticOwnership";
 import { DiagnosticPublicBindings } from "./DiagnosticPublicBindings";
 import { privateContinuityAttestation } from "../domain/PrivateContinuityAttestation";
 import { DIAGNOSTIC_RUNTIME, type DiagnosticRuntime, type DiagnosticSubject } from "../domain/ports/DiagnosticIntakePort";
 import { DiagnosticAuthority } from "./DiagnosticAuthority";
 import { canonical, PrismaDiagnosticIdentityEvidence } from "./PrismaDiagnosticIdentityEvidence";
 import { PrismaDiagnosticReports } from "./PrismaDiagnosticReports";
+import { diagnosticObservationHash } from "./PrismaDiagnosticIntake";
+import { diagnosticListingDigest } from "./diagnosticListingDigest";
 
 import { diagnosticMutation, diagnosticPlannedRow, diagnosticReadPrefix, diagnosticRoots, diagnosticReceiptPrefix } from "./DiagnosticPreparedIntake";
 
@@ -25,6 +28,25 @@ type Tx = Prisma.TransactionClient;
 type Order = Prisma.InspectionOrderGetPayload<object>;
 type ConsumptionPlan = { receipt: PreparedDiagnosticSource; report: Awaited<ReturnType<PrismaDiagnosticReports["reinspectionProposal"]>>; consumedAt: Date; audit: Prisma.DiagnosticAuditUncheckedCreateInput };
 type Pair = Awaited<ReturnType<PrismaDiagnosticReports["compared"]>>;
+type OwnershipPair = { predecessor: PublicOwnershipAdmission; candidate: PublicOwnershipAdmission };
+type PublicOwnershipAdmission = {
+  visit: PublicOwnershipVisit;
+  binding: {
+    state: string;
+    originalRecordId: string | null;
+    selectedRecordId: string;
+    currentRecordId: string;
+    records: readonly {
+      id: string;
+      orderVersion: number;
+      observationHash: string | null;
+      ownership: PublicOwnershipFact;
+      grantId: string | null;
+      rights: unknown;
+      rightsUntil: string | null;
+    }[];
+  };
+};
 
 /** Pair-bound private/public issuance and consumption transactions. Neither issuance nor a read creates a report or successor. */
 @Injectable()
@@ -90,7 +112,7 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
   }
   /** Bound evidence/provenance and the visit, authority and staffing digests. Issuance stores
    * these; consumption requires them unchanged. */
-  private async facts(tx: Tx, pair: Pair, staffing: Awaited<ReturnType<PrismaDiagnosticContinuityProofs["staffing"]>>, provenanceRecordIds: string[], authority: StaffBinding[], locked: PublisherParticipants, proposedPublic?: Awaited<ReturnType<DiagnosticPublicBindings["candidate"]>>) {
+  private async facts(tx: Tx, pair: Pair, staffing: Awaited<ReturnType<PrismaDiagnosticContinuityProofs["staffing"]>>, provenanceRecordIds: string[], authority: StaffBinding[], locked: PublisherParticipants, proposedPublic?: Awaited<ReturnType<DiagnosticPublicBindings["candidate"]>>, ownership?: OwnershipPair) {
     const { order: b, priorOrder: ao, comparison } = pair;
     const sides = [comparison.predecessor, comparison.candidate];
     const records = sides.flatMap(side => {
@@ -112,13 +134,76 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
       assignmentsHash: hash(staffing.assignments), qualificationsHash: hash(staffing.qualifications),
       evidence: records.map(record => ({ id: record.id, recordHash: record.recordHash, identityRecordId: record.identityRecordId,
         observationHash: record.observationHash, rightsHash: hash(record.rights) })),
-      provenance: provenance.map(row => ({ id: row.id, sha256: row.sha256, epoch: row.epoch, rightsHash: hash(row.rights) })) };
+      provenance: provenance.map(row => ({ id: row.id, sha256: row.sha256, epoch: row.epoch, rightsHash: hash(row.rights) })),
+      ...(ownership ? { ownership: [ownership.predecessor.binding, ownership.candidate.binding] } : {}) };
     return { provenance, bindings };
   }
-  private pair(pair: Pair, method: D.DiagnosticContinuityProof["method"]) {
-    const visit = (order: Order) => ({ audience: order.audience, commissionerId: order.commissionerId, physicalAuthorized: !!order.physicalAuthorization });
-    continuityPair(visit(pair.priorOrder), visit(pair.order), method);
+  /** Authenticate public automatic ownership from the source anchor, every retained raw
+   * row, and its exact grant/component bindings. The source anchor owns the first slot;
+   * orderVersion ordering is used only to identify the persisted current raw, never the
+   * original. Current Listing data is intentionally absent from this mapping. */
+  private async publicOwnership(tx: Tx, order: Order, selectedRecordId: string): Promise<PublicOwnershipAdmission> {
+    const anchor = await tx.diagnosticSourceAnchor.findUnique({ where: { orderId: order.id } });
+    const records = await tx.diagnosticIdentityRecord.findMany({ where: { orderId: order.id }, orderBy: { orderVersion: "asc" }, include: { ownership: true } });
+    if (!anchor || !records.length || !order.commissionerId) throw denied();
+    const grantIds = records.flatMap(record => record.ownership?.grantId ? [record.ownership.grantId] : []);
+    const grants = grantIds.length ? await tx.diagnosticOwnershipGrant.findMany({ where: { id: { in: [...new Set(grantIds)] } } }) : [];
+    const grantById = new Map(grants.map(grant => [grant.id, grant]));
+    const now = this.runtime.now();
+    const sourceResult = z.object({ listingId: z.string(), commissionerId: z.string(), memberId: z.string().nullable(), audience: z.literal("listing_public"),
+      listing: z.object({ id: z.string(), sellerId: z.string(), businessId: z.string().nullable(), vin: z.string().nullable(),
+        brandId: z.string(), modelId: z.string(), year: z.number().nullable() }),
+    }).safeParse(anchor.source);
+    if (!sourceResult.success) throw denied();
+    const source = sourceResult.data, sourceDigest = diagnosticListingDigest(source.listing);
+    const factRows = records.map(record => {
+      const component = record.ownership;
+      const erased = record.erasedAt !== null || component?.state === "erased";
+      if (erased) return { record, component, grant: null, fact: { state: "erased" } as PublicOwnershipFact };
+      if (!component || component.state !== "available") return { record, component, grant: null, fact: { state: "legacy_unavailable" } as PublicOwnershipFact };
+      if (!component.grantId) throw denied();
+      const grant = grantById.get(component.grantId);
+      const componentRights = D.DiagnosticIdentityRightsSchema.safeParse(component.rights);
+      const grantRights = grant && D.DiagnosticIdentityRightsSchema.safeParse(grant.rights);
+      const observed = D.DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true }).safeParse(record.observation);
+      if (!observed.success || !record.observationHash || diagnosticObservationHash(order.id, record.orderVersion, observed.data) !== record.observationHash) throw denied();
+      if (!grant || grant.state !== "available" || grant.erasedAt || grant.orderId !== order.id || !grant.rightsUntil || grant.rightsUntil <= now ||
+        !grant.listingId || !grant.identityDigest || !grant.sellerId || !grant.commissionerId || grant.commissionerId !== order.commissionerId ||
+        component.erasedAt || component.scope !== "diagnostic_ownership_continuity" || component.orderId !== order.id || component.orderVersion !== record.orderVersion || component.sourceListingId !== grant.listingId ||
+        component.identityDigest !== grant.identityDigest || component.sellerId !== grant.sellerId || component.commissionerId !== grant.commissionerId ||
+        component.businessId !== grant.businessId || component.membershipId !== grant.membershipId || !component.rightsUntil || component.rightsUntil <= now ||
+        component.rightsUntil > grant.rightsUntil || !componentRights.success || !grantRights?.success ||
+        canonical({ ...componentRights.data, schedule: null }) !== canonical({ ...grantRights.data, schedule: null }) ||
+        new Date(componentRights.data.schedule.until).valueOf() !== component.rightsUntil.valueOf() ||
+        new Date(grantRights.data.schedule.until).valueOf() !== grant.rightsUntil.valueOf() ||
+        sourceDigest !== grant.identityDigest || source?.listingId !== grant.listingId || source?.listing?.id !== grant.listingId ||
+        source?.listing?.sellerId !== grant.sellerId || source?.listing?.businessId !== grant.businessId || source?.commissionerId !== grant.commissionerId ||
+        source?.memberId !== grant.membershipId) throw denied();
+      return { record, component, grant, fact: { state: "available", listingId: grant.listingId, listingIdentityDigest: grant.identityDigest,
+        sellerId: grant.sellerId, commissionerId: grant.commissionerId, businessId: grant.businessId, membershipId: grant.membershipId } as PublicOwnershipFact };
+    });
+    const current = factRows.at(-1)?.record;
+    if (!current || !selectedRecordId) throw denied();
+    const transition = anchor.state === "unchanged" ? "unchanged" : anchor.state === "changed" ? "changed" : "unavailable";
+    const visit: PublicOwnershipVisit = { orderId: order.id, originalRecordId: anchor.firstRecordId ?? "", selectedRecordId, currentRecordId: current.id, transition,
+      records: factRows.map(({ record, fact }) => ({ id: record.id, orderId: record.orderId, orderVersion: record.orderVersion, fact })) };
+    const binding = { state: anchor.state, originalRecordId: anchor.firstRecordId, selectedRecordId, currentRecordId: current.id,
+      records: factRows.map(({ record, component, fact }) => ({ id: record.id, orderVersion: record.orderVersion, observationHash: record.observationHash,
+        ownership: fact, grantId: component?.grantId ?? null, rights: component?.rights ?? null, rightsUntil: component?.rightsUntil?.toISOString() ?? null })) };
+    return { visit, binding };
+  }
+  private async pair(tx: Tx, pair: Pair, method: D.DiagnosticContinuityProof["method"]) {
+    const base = (order: Order): ContinuityVisit => ({ audience: order.audience, commissionerId: order.commissionerId, physicalAuthorized: !!order.physicalAuthorization });
+    let predecessor = base(pair.priorOrder), candidate = base(pair.order);
+    let ownership: OwnershipPair | undefined;
+    if (method === "automatic_normalized_vin" && predecessor.audience === "listing_public" && candidate.audience === "listing_public") {
+      ownership = { predecessor: await this.publicOwnership(tx, pair.priorOrder, pair.comparison.predecessor.identityRecordId), candidate: await this.publicOwnership(tx, pair.order, pair.comparison.candidate.identityRecordId) };
+      predecessor = { ...predecessor, ownership: ownership.predecessor.visit };
+      candidate = { ...candidate, ownership: ownership.candidate.visit };
+    }
+    continuityPair(predecessor, candidate, method);
     if (pair.prior.audience !== pair.priorOrder.audience || pair.order.status !== "arrived") throw denied();
+    return ownership;
   }
   private async linked(tx: Tx, { order: b, prior: a }: Pair) {
     return !!(await tx.diagnosticReportRecord.count({ where: { predecessorId: a.id } }) || await tx.diagnosticReportRecord.count({ where: { orderId: b.id } }));
@@ -126,7 +211,7 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
 
   /** Raw history is inspected under the same order locks as comparison. A restored VIN
    * cannot hide a prior different vehicle; visit date/mileage changes do not change identity. */
-  private async comparisonRights(tx: Tx, pair: Pair, method: D.DiagnosticContinuityProof["method"], provenance: { rightsUntil: Date }[], now: Date) {
+  private async comparisonRights(tx: Tx, pair: Pair, method: D.DiagnosticContinuityProof["method"], provenance: { rightsUntil: Date }[], now: Date, ownership?: OwnershipPair) {
     const identities = [pair.comparison.predecessor.identity, pair.comparison.candidate.identity];
     const vinPair = method === "comparative_attestation" && identities.every(identity => identity.observation.method === "vin");
     const manualCorrection = method === "comparative_attestation" && identities.every(identity => identity.observation.method === "manual") &&
@@ -171,8 +256,13 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
         corrected: !!identity.evidence.correction || !!identity.corrections.length || !!identity.correctionHeadHash,
         identifiers: chain.flatMap(record => record.identifiers), rightsUntil: chain.map(record => record.rights.schedule.until) };
     };
-    return privateContinuityAttestation(await side(pair.priorOrder, pair.comparison.predecessor.identity),
+    const evidenceUntil = privateContinuityAttestation(await side(pair.priorOrder, pair.comparison.predecessor.identity),
       await side(pair.order, pair.comparison.candidate.identity), provenance.map(row => row.rightsUntil.toISOString()), now, method);
+    return ownership ? new Date(Math.min(evidenceUntil.valueOf(), ...[ownership.predecessor, ownership.candidate]
+      .flatMap(side => side.binding.records.map(record => {
+        if (!record.rightsUntil) throw denied();
+        return new Date(record.rightsUntil).valueOf();
+      })))) : evidenceUntil;
   }
 
   /** Read-only discovery uses the same complete retained graph/rights policy as comparative
@@ -181,7 +271,7 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
     const pair = await this.reports.compared(tx, subject, orderId, predecessorId);
     await this.authority.order(tx, subject, pair.priorOrder.id, "diagnostics.reviewer");
     await this.authority.order(tx, subject, orderId, "diagnostics.reviewer");
-    this.pair(pair, "comparative_attestation");
+    await this.pair(tx, pair, "comparative_attestation");
     const provenance = await tx.diagnosticIdentityProvenance.findMany({ where: { id: { in: [...pair.provenance] } } });
     if (provenance.length !== pair.provenance.size) throw denied();
     await this.comparisonRights(tx, pair, "comparative_attestation", provenance, this.runtime.now());
@@ -419,8 +509,9 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
       const pair = await this.reports.comparisonProposal(tx, orderId, input.predecessorId);
       const staffing = await this.staffing(tx, subject.userId, input.linkingTechnicianId, pair, false);
       const authority = await this.bindingProposal(tx, subject, input.linkingTechnicianId);
-      const { provenance, bindings } = await this.facts(tx, pair, staffing, input.provenanceRecordIds, authority, { userIds: [], businessIds: [] }, await this.publicationProposal(tx, pair.order));
-      const rightsUntil = await this.comparisonRights(tx, pair, input.method, provenance, issuedAt);
+      const ownership = await this.pair(tx, pair, input.method);
+      const { provenance, bindings } = await this.facts(tx, pair, staffing, input.provenanceRecordIds, authority, { userIds: [], businessIds: [] }, await this.publicationProposal(tx, pair.order), ownership ?? undefined);
+      const rightsUntil = await this.comparisonRights(tx, pair, input.method, provenance, issuedAt, ownership);
       const content = this.proofContent(subject, pair, input, proofId, issuedAt);
       const data = { id: proofId, requestId: requestId ?? null, predecessorReportId: pair.prior.id, predecessorOrderId: pair.priorOrder.id, candidateOrderId: orderId,
         issuerId: subject.userId, issuerSessionId: subject.sessionId, linkingTechnicianId: input.linkingTechnicianId, issuedAt, rightsUntil,
@@ -486,13 +577,13 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
           return { proofId: existing.id };
         }
       }
-      this.pair(pair, input.method);
+      const ownership = await this.pair(tx, pair, input.method);
       if (await this.linked(tx, pair)) throw denied();
       if (a.version !== input.expectedPredecessorVersion || b.version !== input.expectedOrderVersion ||
         comparison.predecessor.identityRecordId !== input.predecessorIdentityRecordId || comparison.candidate.identityRecordId !== input.candidateIdentityRecordId) throw new DiagnosticRuleError("DIAGNOSTIC_STALE_VERSION");
-      const { provenance, bindings } = await this.facts(tx, pair, staffing, input.provenanceRecordIds, staffBindings, participants);
+      const { provenance, bindings } = await this.facts(tx, pair, staffing, input.provenanceRecordIds, staffBindings, participants, undefined, ownership ?? undefined);
       const now = this.runtime.now();
-      const rightsUntil = await this.comparisonRights(tx, pair, input.method, provenance, now);
+      const rightsUntil = await this.comparisonRights(tx, pair, input.method, provenance, now, ownership);
       if (!proposal || !(proposal.data.issuedAt instanceof Date)) throw denied();
       const proofId = proposal.data.id;
       const content = this.proofContent(subject, pair, input, proofId, proposal.data.issuedAt);
@@ -568,7 +659,7 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
     if (b.audience === "listing_public" && await tx.diagnosticReportRecord.count({ where: { predecessorId: a.id } })) throw new DiagnosticRuleError("DIAGNOSTIC_REINSPECTION_CONFLICT");
     // Invalidation is permanent; reverting a source value never revives the proof.
     if (proof.invalidatedAt || proof.rightsUntil <= now) throw denied();
-    this.pair(current, content.data.method);
+    const ownership = await this.pair(tx, current, content.data.method);
     // A successor elsewhere is a protected predecessor fact; B's own first report is not.
     if (await tx.diagnosticReportRecord.count({ where: { predecessorId: a.id } })) throw denied();
     if (await tx.diagnosticReportRecord.count({ where: { orderId: b.id } })) throw new DiagnosticRuleError("DIAGNOSTIC_REPORT_EXISTS");
@@ -577,8 +668,8 @@ export class PrismaDiagnosticContinuityProofs implements DiagnosticContinuityPro
     if (b.version !== bound.candidate.orderVersion) throw denied();
     if (hash(bound.predecessor) !== hash({ reportId: a.id, reportVersion: a.version, snapshotHash: a.snapshotHash, identityRecordId: comparison.predecessor.identityRecordId, identityRecordHash: comparison.predecessor.identityRecordHash }) ||
       hash(bound.candidate) !== hash({ orderId: b.id, orderVersion: b.version, identityRecordId: comparison.candidate.identityRecordId, identityRecordHash: comparison.candidate.identityRecordHash })) throw denied();
-    const { bindings, provenance } = await this.facts(tx, current, staffing, bound.provenanceRecordIds, staffBindings, participants);
-    const rightsUntil = await this.comparisonRights(tx, current, bound.method, provenance, now);
+    const { bindings, provenance } = await this.facts(tx, current, staffing, bound.provenanceRecordIds, staffBindings, participants, undefined, ownership ?? undefined);
+    const rightsUntil = await this.comparisonRights(tx, current, bound.method, provenance, now, ownership);
     if (rightsUntil.valueOf() !== proof.rightsUntil.valueOf()) throw denied();
     if (hash(bindings) !== hash(proof.bindings)) throw denied();
     // Usable also means the same domain transition can open B's own empty draft.

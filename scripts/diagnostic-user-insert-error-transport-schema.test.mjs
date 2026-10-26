@@ -26,7 +26,9 @@ test('new snapshot adds only error transport to the exact prior migration mappin
   const current = await readFile('packages/db/prisma/schema.prisma', 'utf8');
   const later = '\n// Snapshot: 20261025020000_diagnostic_listing_publication_effects.\n';
   assert.equal(current.split(later).length, 2);
-  const schema = current.replace(later, '');
+  // The exact transport snapshot precedes the publication marker. Subsequent
+  // registered snapshots must not become part of its historical hash.
+  const schema = current.slice(0, current.indexOf(later));
   const marker = `\n// User INSERT refusal error transport: ${name}.\n`;
   assert.ok(schema.endsWith(marker));
   assert.equal(hash(schema.slice(0, -marker.length)), prior);

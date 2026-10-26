@@ -12,12 +12,19 @@ const publish = '20261025020000_diagnostic_listing_publication_effects';
 
 test('combined91 inventory reaches real validator from both retained90 snapshots', async () => {
   const names = (await readdir('packages/db/prisma/migrations', { withFileTypes: true })).filter(x => x.isDirectory()).map(x => x.name).sort();
-  const actual = await Promise.all(names.map(async name => ({ name, checksum: hash(await readFile(`packages/db/prisma/migrations/${name}/migration.sql`)) })));
+  const all = await Promise.all(names.map(async name => ({ name, checksum: hash(await readFile(`packages/db/prisma/migrations/${name}/migration.sql`)) })));
+  const schema = await readFile('packages/db/prisma/schema.prisma', 'utf8');
+  const later = '\n// Snapshot: 20261026010000_diagnostic_automatic_public_continuity, activation remains gated.\n';
+  assert.equal(schema.split(later).length, 2);
+  const current = hash(schema.slice(0, schema.indexOf(later)));
+  assert.equal(current, 'ab369beff6cda4e67243ec90a8f6b1c8c35692bab6c053500f4977a822f09c9d');
+  const additions = new Set(profile.additions.map(row => row.name));
+  // Verify the retained91 candidate against actual bytes, without importing
+  // later additions into either immutable90/91 snapshot.
+  const actual = all.filter(row => !additions.has(row.name) || profile.schemaMigrations[current].includes(row.name));
   assert.equal(actual.length, 91);
-  const current = hash(await readFile('packages/db/prisma/schema.prisma'));
   assert.deepEqual(profile.schemaMigrations[current], [...profile.schemaMigrations[identity], publish]);
   assert.deepEqual([...profile.schemaMigrations[publication], transport].sort(), [...profile.schemaMigrations[current]].sort());
-  const additions = new Set(profile.additions.map(row => row.name));
   const baseline = actual.filter(row => !additions.has(row.name));
   for (const prior of [identity, publication]) {
     const main = actual.filter(row => baseline.includes(row) || profile.schemaMigrations[prior].includes(row.name));
