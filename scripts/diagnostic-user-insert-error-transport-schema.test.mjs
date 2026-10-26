@@ -23,10 +23,14 @@ test('User INSERT transport changes only the refusal SQLSTATE in the historical 
 
 test('new snapshot adds only error transport to the exact prior migration mapping', async () => {
   const prior = '1ceb4d0f3cf7deca417721eb2fa2bbc3e36c18adb1b9f2ed8404fc7fa78930c8';
-  const schema = await readFile('packages/db/prisma/schema.prisma', 'utf8');
+  const current = await readFile('packages/db/prisma/schema.prisma', 'utf8');
+  const later = '\n// Snapshot: 20261025020000_diagnostic_listing_publication_effects.\n';
+  assert.equal(current.split(later).length, 2);
+  const schema = current.replace(later, '');
   const marker = `\n// User INSERT refusal error transport: ${name}.\n`;
   assert.ok(schema.endsWith(marker));
   assert.equal(hash(schema.slice(0, -marker.length)), prior);
+  assert.equal(hash(schema), 'add89ebf10b233e9d85ef5369e9fd426dbe885001bd3efe4bc4ddd6f1c38405d');
   assert.ok(profile.schemaHashes.includes(hash(schema)));
   assert.deepEqual(profile.schemaMigrations[hash(schema)], [...profile.schemaMigrations[prior], name]);
   assert.ok(!profile.schemaMigrations[prior].includes(name));

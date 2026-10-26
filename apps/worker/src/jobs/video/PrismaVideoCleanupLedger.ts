@@ -1,6 +1,7 @@
 import type { PrismaService, Prisma } from "@auto-tm/db";
 import { z } from "zod";
 
+import { preparedVideo, type VideoSelection } from "./VideoTransactionPreparation";
 import type { VideoCleanupLease, VideoCleanupLedger } from "./VideoCleanupPorts";
 const leaseMs = 20 * 60_000;
 const activeStates = ["PENDING", "VERIFYING", "CLEANING", "VERIFYING_LEASED"];
@@ -20,7 +21,7 @@ export class PrismaVideoCleanupLedger implements VideoCleanupLedger {
         const verifying = ["VERIFYING", "VERIFYING_LEASED"].includes(work.state);
         await tx.videoCleanupWork.update({ where: { id: work.id }, data: { state: verifying ? "VERIFYING_LEASED" : "CLEANING", attempts: { increment: 1 }, leaseToken: token, leaseExpiresAt: new Date(now.getTime() + leaseMs) } });
         return { id: work.id, uploadId: work.uploadId, sessionId: work.sessionId, generationId: work.generationId, sourceKey: work.sourceKey, objectKeys: work.objectKeys, token, verifying };
-      });
+      }, { cleanupId: candidate.id, generationId: candidate.generationId ?? undefined, uploadId: candidate.uploadId });
       if (leased) return leased;
     }
     return null;
@@ -55,7 +56,7 @@ export class PrismaVideoCleanupLedger implements VideoCleanupLedger {
       await tx.videoGrant.updateMany({ where: { generationId: generation.id, revokedAt: null }, data: { revokedAt: now } });
       await tx.listing.updateMany({ where: { pendingVideoGenerationId: generation.id }, data: { pendingVideoGenerationId: null } });
       await tx.videoCleanupWork.upsert({ where: { id: `session:${session.id}` }, create: { id: `session:${session.id}`, uploadId: upload.id, sessionId: session.id, generationId: generation.id, sourceKey: session.sourceKey, storageUploadId: session.storageUploadId, objectKeys, nextAttemptAt }, update: { state: "PENDING", objectKeys, nextAttemptAt } });
-    });
+    }, { videoSessionId: candidate.id, uploadId: candidate.uploadId, generationId: candidate.id, target: candidate.targetKind && candidate.targetId ? { kind: candidate.targetKind, id: candidate.targetId } : undefined, retiring: true });
   }
   async recordAbsence(lease: VideoCleanupLease, now: Date): Promise<void> {
     await this.finish(lease, now, async (tx, work) => {
@@ -79,10 +80,10 @@ export class PrismaVideoCleanupLedger implements VideoCleanupLedger {
       const work = await this.lock(tx, lease);
       if (!work || work.state !== (lease.verifying ? "VERIFYING_LEASED" : "CLEANING") || work.leaseToken !== lease.token || !work.leaseExpiresAt || work.leaseExpiresAt <= now || work.uploadId !== lease.uploadId || work.sessionId !== lease.sessionId || work.generationId !== lease.generationId || work.sourceKey !== lease.sourceKey || JSON.stringify([...work.objectKeys].sort()) !== JSON.stringify([...lease.objectKeys].sort())) return;
       await apply(tx, work);
-    });
+    }, { cleanupId: lease.id, uploadId: lease.uploadId, videoSessionId: lease.sessionId, generationId: lease.generationId });
   }
-  private transaction<T>(run: (tx: Prisma.TransactionClient) => Promise<T>) {
-    return this.prisma.$transaction(async tx => { await tx.$executeRaw`SET LOCAL statement_timeout = '2000ms'`; return run(tx); }, { timeout: 5000, maxWait: 1500 });
+  private transaction<T>(run: (tx: Prisma.TransactionClient) => Promise<T>, selection: VideoSelection) {
+    return this.prisma.$transaction(async tx => { await tx.$executeRaw`SET LOCAL statement_timeout = '2000ms'`; return preparedVideo(tx, selection, () => run(tx)); }, { timeout: 5000, maxWait: 1500 });
   }
   private async lock(tx: Prisma.TransactionClient, candidate: { id: string; uploadId: string; generationId: string | null }) {
     await tx.$queryRaw`SELECT "id" FROM "media_uploads" WHERE "id" = ${candidate.uploadId} FOR UPDATE`;

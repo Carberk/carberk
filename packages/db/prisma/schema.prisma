@@ -2128,3 +2128,5 @@ model CampaignPreparation {
 // Effect scope alias correction: 20261025017500_diagnostic_effect_scope_alias_correction.
 
 // User INSERT refusal error transport: 20261025019000_diagnostic_user_insert_error_transport.
+
+// Snapshot: 20261025020000_diagnostic_listing_publication_effects.

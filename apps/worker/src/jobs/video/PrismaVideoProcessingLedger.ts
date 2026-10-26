@@ -2,6 +2,7 @@ import type { MeasurementSchemas } from "@auto-tm/contracts";
 import type { PrismaService, Prisma } from "@auto-tm/db";
 import { z } from "zod";
 
+import { preparedVideo, type VideoSelection } from "./VideoTransactionPreparation";
 import type { VideoProcessingLedger, VideoProcessingLease, VideoProcessingFacts, VideoPublishedAsset } from "./VideoProcessingPorts";
 
 export interface VideoProcessingMeasurement {
@@ -34,7 +35,7 @@ export class PrismaVideoProcessingLedger implements VideoProcessingLedger {
       if (!session.completionFence || !session.sizeBytes || !session.sha256 || session.posterMs === null) return null;
       await tx.videoProcessWork.update({ where: { generationId: id }, data: { state: "PROCESSING", attempts: { increment: 1 }, leaseToken: token, leaseExpiresAt: new Date(now.getTime() + leaseMs) } });
       return { generationId: id, uploadId: work.uploadId, sessionId: session.id, completionFence: session.completionFence, targetRevision: work.targetRevision, leaseToken: token, sourceKey: session.sourceKey, sizeBytes: session.sizeBytes, sha256: session.sha256, posterMs: session.posterMs };
-    });
+    }, { generationId: id, retiring: true });
   }
   async plan(lease: VideoProcessingLease, assets: VideoPublishedAsset[], now: Date): Promise<boolean> {
     const manifest = this.manifest(lease, assets);
@@ -56,7 +57,7 @@ export class PrismaVideoProcessingLedger implements VideoProcessingLedger {
         update: { objectKeys: manifest.assets.map(asset => asset.key) },
       });
       return true;
-    });
+    }, { generationId: lease.generationId, retiring: false });
   }
   async adopt(lease: VideoProcessingLease, facts: VideoProcessingFacts, now: Date): Promise<boolean> {
     const manifest = this.manifest(lease, facts.assets);
@@ -81,7 +82,7 @@ export class PrismaVideoProcessingLedger implements VideoProcessingLedger {
       await tx.videoProcessWork.update({ where: { generationId: lease.generationId }, data: { state: "COMPLETED", completedAt: now, leaseToken: null, leaseExpiresAt: null, lastError: null } });
       await this.outcome(tx, context, lease, now, "success");
       return true;
-    });
+    }, { generationId: lease.generationId, retiring: true, measurementEventId: this.measurement ? lease.leaseToken : undefined });
   }
   async fail(lease: VideoProcessingLease, reason: string, now: Date): Promise<void> {
     await this.transaction(async tx => {
@@ -91,7 +92,7 @@ export class PrismaVideoProcessingLedger implements VideoProcessingLedger {
       if (!this.current(context) || context.work.attempts >= 3) { await this.retire(tx, context, now, lastError); await this.outcome(tx, context, lease, now, context.session.cancelledAt ? "cancelled" : "technical_failure", lastError === "VIDEO_PROCESSING_TIMEOUT" ? "timeout" : "unknown"); return; }
       await tx.videoProcessWork.update({ where: { generationId: lease.generationId }, data: { state: "PENDING", leaseToken: null, leaseExpiresAt: null, lastError, nextAttemptAt: new Date(now.getTime() + 60_000 * 2 ** (context.work.attempts - 1)) } });
       await this.outcome(tx, context, lease, now, "technical_failure", lastError === "VIDEO_PROCESSING_TIMEOUT" ? "timeout" : "unknown");
-    });
+    }, { generationId: lease.generationId, retiring: true, measurementEventId: this.measurement ? lease.leaseToken : undefined });
   }
   private async outcome(tx: Prisma.TransactionClient, context: Current, lease: VideoProcessingLease, now: Date, result: "success" | "technical_failure" | "expected_rejection" | "cancelled", category?: "timeout" | "permission" | "unknown") {
     if (!this.measurement) return;
@@ -102,8 +103,8 @@ export class PrismaVideoProcessingLedger implements VideoProcessingLedger {
         eventName: "video_processing_result", purpose: "product_reliability", payload: { ...target, jobId: lease.generationId, attemptId: lease.leaseToken, result, durationMs: Math.max(0, Math.min(86_400_000, now.getTime() - startedAt)), ...(category ? { category } : {}) } });
     } catch { /* Source writes survive best-effort measurement failure. */ }
   }
-  private transaction<T>(run: (tx: Prisma.TransactionClient) => Promise<T>) {
-    return this.prisma.$transaction(async tx => { await tx.$executeRaw`SET LOCAL statement_timeout = '2000ms'`; return run(tx); }, { timeout: 5000, maxWait: 1500 });
+  private transaction<T>(run: (tx: Prisma.TransactionClient) => Promise<T>, selection: VideoSelection) {
+    return this.prisma.$transaction(async tx => { await tx.$executeRaw`SET LOCAL statement_timeout = '2000ms'`; return preparedVideo(tx, selection, () => run(tx)); }, { timeout: 5000, maxWait: 1500 });
   }
   private async locked(tx: Prisma.TransactionClient, id: string) {
     const candidate = await tx.videoProcessWork.findUnique({ where: { generationId: id } });

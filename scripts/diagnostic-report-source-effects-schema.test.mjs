@@ -10,7 +10,9 @@ const prior = JSON.parse(read('../docs/evidence/issue-897/r5-report-source-effec
 const name = '20261025010000_diagnostic_report_source_effects';
 const sql = read(`../packages/db/prisma/migrations/${name}/migration.sql`);
 const oldSchema = '7ce808a1af40f4f85c340526ca8ea3bced18e99155282d41b610aca9e85cfc72';
-const schema = hash(read('../packages/db/prisma/schema.prisma'));
+// This test owns the report100 snapshot, not the latest assembled snapshot.
+const retainedSchema = Buffer.concat([read('../docs/evidence/issue-897/r5-report-source-effects-20261025/original/packages/db/prisma/schema.prisma'), Buffer.from('\n// Snapshot: 20261025010000_diagnostic_report_source_effects.\n')]);
+const schema = '65fa18b9cc593e87fde12c2bf78e3013a0cc58d5d3b4755068d21479d2e6d658';
 test('report effects add exactly the two finite table/verb pairs and delegate every old predicate', () => {
   assert.equal(sql.toString(), read(`./testing/retained-schema/${name}.sql`).toString());
   assert.equal(hash(sql), retainedSchemaProfile.additions.find(row => row.name === name)?.checksum);
@@ -20,15 +22,15 @@ test('report effects add exactly the two finite table/verb pairs and delegate ev
 });
 test('all historical SQL, mirrors, 52 snapshots and exact prior additions retain their bytes and order', () => {
   for (const [path, expected] of Object.entries(prior.sha256)) assert.equal(hash(read(`../${path}`)), expected, path);
-  assert.deepEqual(retainedSchemaProfile.schemaHashes, [schema, ...prior.profile.schemaHashes]);
-  assert.deepEqual(Object.fromEntries(Object.entries(retainedSchemaProfile.schemaMigrations).filter(([key]) => key !== schema)), prior.profile.schemaMigrations);
-  assert.deepEqual(retainedSchemaProfile.additions.filter(row => row.name !== name), prior.profile.additions);
+  assert.equal(hash(retainedSchema), schema);
+  assert.deepEqual(retainedSchemaProfile.schemaHashes.filter(key => [schema, ...prior.profile.schemaHashes].includes(key)), [schema, ...prior.profile.schemaHashes]);
+  for (const [key, inventory] of Object.entries(prior.profile.schemaMigrations)) assert.deepEqual(retainedSchemaProfile.schemaMigrations[key], inventory);
+  assert.deepEqual(retainedSchemaProfile.additions.filter(row => prior.profile.additions.some(old => old.name === row.name)), prior.profile.additions);
   assert.equal(prior.profile.schemaHashes.length, 52);
   for (const file of ['staging-schema.mjs','diagnostic-intake-campaign-composition-schema.test.mjs','diagnostic-kernel-physical-columns-schema.test.mjs']) {
     assert.equal(hash(read(`../docs/evidence/issue-897/r5-report-source-effects-20261025/original/scripts/${file}`)), prior.inputs[`scripts/${file}`]);
   }
-  const current = read('../packages/db/prisma/schema.prisma').toString();
-  assert.equal(hash(Buffer.from(current.replace('\n// Snapshot: 20261025010000_diagnostic_report_source_effects.\n', ''))), prior.inputs['packages/db/prisma/schema.prisma']);
+  assert.equal(hash(Buffer.from(retainedSchema.toString().replace('\n// Snapshot: 20261025010000_diagnostic_report_source_effects.\n', ''))), prior.inputs['packages/db/prisma/schema.prisma']);
 });
 test('the new snapshot adds just its migration and rejects missing or drifting inventories', () => {
   assert.deepEqual(retainedSchemaProfile.schemaMigrations[schema], [...prior.profile.schemaMigrations[oldSchema], name]);
