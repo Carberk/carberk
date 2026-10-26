@@ -2130,3 +2130,9 @@ model CampaignPreparation {
 // User INSERT refusal error transport: 20261025019000_diagnostic_user_insert_error_transport.
 
 // Snapshot: 20261025020000_diagnostic_listing_publication_effects.
+
+// Snapshot: 20261026010000_diagnostic_automatic_public_continuity, activation remains gated.
+
+// Snapshot: 20261026011000_diagnostic_bootstrap_capability_qualification.
+
+// Snapshot: 20261026012000_diagnostic_disposal_selector_precedence.

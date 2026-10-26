@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import {
@@ -228,16 +229,69 @@ test('the table manifest maps every Prisma table exactly once and retains refere
   for (const name of ['blog_posts', 'market_knowledge_sources', 'market_knowledge_datasets', 'market_knowledge_dataset_sources'])
     assert.equal(manifest.tables[name], 'refuse-if-nonempty', name);
   assert.equal(manifest.tables.diagnostic_centers, 'refuse-if-approved');
+  for (const name of ['diagnostic_source_commands', 'campaign_preparations']) assert.equal(manifest.tables[name], 'refuse-if-nonempty', name);
+  for (const name of ['diagnostic_source_anchors', 'diagnostic_ownership_grants']) assert.equal(manifest.tables[name], 'delete', name);
 });
 
-test('migration-owned triggers in the manifest are exactly those the migrations create', () => {
-  const created = [];
-  for (const dir of readdirSync(join(root, 'packages/db/prisma/migrations'))) {
-    let sql; try { sql = read(`packages/db/prisma/migrations/${dir}/migration.sql`); } catch { continue; }
-    for (const m of sql.matchAll(/CREATE (?:CONSTRAINT )?TRIGGER "?([a-z_]+)"?[\s\S]*?\bON "?([a-z_]+)"?/g)) created.push(`${m[2]}.${m[1]}`);
-    assert.doesNotMatch(sql, /DROP TRIGGER/i, `${dir} drops a trigger; extend the pin`);
+// Dynamic installs/replacements are interpreted only for these exact historical
+// bytes. Unknown DROP or dynamic CREATE still requires an explicit reviewed pin.
+const dynamicTriggerPins = {
+  "20261023130000_diagnostic_source_kernel": "b9b2d465c04cc34693e5774d12910a33bb29b39d8452f5a2862dc24b667f4fbf",
+  "20261024010000_diagnostic_source_guard_repair": "786aa19839002c915cf00038f888c85e0b27a4d20b0905a1aac4edf5db5a1be3",
+  "20261024020000_campaign_preparation": "cceb9c0d75c8d1f3a9302548d7791ac752635c3775e7b5ca3ec3c516b7db9429",
+  "20261024030000_diagnostic_purge_effects": "23d894c79c5927d7d976c79e4cbe958af83725ccf172208b7f4d6132e0d3d4ba",
+  "20261024050000_diagnostic_kernel_invariants": "6fdb70cd2364b0125080293a1602f78788c1db450d82859613c04b0020b732f8",
+  "20261024070000_diagnostic_user_eligibility": "f5fabb22e4e6e5a2dace529e5bcb4de5e56a6daf18ebbff02351e9407430893e",
+  "20261025020000_diagnostic_listing_publication_effects": "6923b8e4869928d942d909d305a3ef7eebfe166ea82628f313baf665759d0d39"
+};
+function migrationTriggers(readSql = dir => read(`packages/db/prisma/migrations/${dir}/migration.sql`)) {
+  const created = new Set(); let registry = [], specs = [];
+  const jsonLiteral = sql => JSON.parse(sql.match(/SELECT '(\[[\s\S]*?\])'::jsonb/)[1]);
+  const add = (table, name) => { const key = `${table}.${name}`; assert.ok(!created.has(key), `Duplicate trigger ${key}`); created.add(key); };
+  const drop = (table, name) => assert.ok(created.delete(`${table}.${name}`), `Unknown trigger removal ${table}.${name}`);
+  const each = (tables, names, effect = add) => { for (const table of tables) for (const name of names) effect(table, name); };
+  for (const dir of readdirSync(join(root, 'packages/db/prisma/migrations')).sort()) {
+    if (dir === 'migration_lock.toml') continue;
+    const sql = readSql(dir);
+    if (Object.hasOwn(dynamicTriggerPins, dir)) assert.equal(createHash('sha256').update(sql).digest('hex'), dynamicTriggerPins[dir], `${dir} trigger pin changed`);
+    else {
+      assert.doesNotMatch(sql, /DROP TRIGGER/i, `${dir} drops a trigger; extend the pin`);
+      assert.doesNotMatch(sql, /EXECUTE\s+format\([^;]*CREATE\s+(?:CONSTRAINT\s+)?TRIGGER/is, `${dir} dynamically installs a trigger; extend the pin`);
+    }
+    // Replacements remove only exact existing names, then recreate them below.
+    if (dir === '20261024010000_diagnostic_source_guard_repair') each(registry.filter(t => t !== 'diagnostic_source_anchors'), ['diagnostic_source_presence', 'diagnostic_source_effective'], drop);
+    for (const m of sql.matchAll(/DROP TRIGGER "?([a-z_]+)"? ON (?:public\.)?"?([a-z_]+)"?(?=[\s;])/g)) drop(m[2], m[1]);
+    for (const m of sql.matchAll(/CREATE (?:CONSTRAINT )?TRIGGER "?([a-z_]+)"?[^;]*?\bON (?:public\.)?"?([a-z_]+)"?(?=[\s;(])/g)) add(m[2], m[1]);
+    if (dir === '20261023130000_diagnostic_source_kernel') {
+      registry = jsonLiteral(sql).map(m => m.table);
+      each(registry.filter(t => t !== 'diagnostic_source_anchors'), ['diagnostic_source_presence', 'diagnostic_source_effective', 'diagnostic_source_no_truncate']);
+    } else if (dir === '20261024010000_diagnostic_source_guard_repair') {
+      specs = jsonLiteral(sql).map(m => m.table);
+      each(specs, ['zz_diagnostic_source_presence', 'zz_diagnostic_source_effective', 'zz_diagnostic_source_target']);
+    } else if (dir === '20261024020000_campaign_preparation') {
+      each(jsonLiteral(sql), ['zzzz_campaign_preparation', 'zzzz_campaign_preparation_truncate']);
+    } else if (dir === '20261024030000_diagnostic_purge_effects') {
+      registry = jsonLiteral(sql).map(m => m.table);
+      each(registry.filter(t => !specs.includes(t)), ['zz_diagnostic_source_purge']);
+    } else if (dir === '20261025020000_diagnostic_listing_publication_effects') {
+      each(['listing_drafts', 'listing_media', 'media_uploads', 'video_upload_sessions', 'video_generations', 'measurement_outbox', 'audit_logs', 'media_upload_cleanups'], ['zz_diagnostic_source_publication']);
+    }
   }
-  assert.deepEqual([...manifest.migrationTriggers].sort(), created.sort());
+  return [...created].sort();
+}
+
+test('migration-owned triggers in the manifest are exactly the effective migration-created triggers', () => {
+  assert.deepEqual([...manifest.migrationTriggers].sort(), migrationTriggers());
+  assert.equal(new Set(manifest.migrationTriggers).size, manifest.migrationTriggers.length);
+});
+
+test('changed pinned replacements and unknown trigger drops or dynamic installs still refuse', () => {
+  const original = dir => read(`packages/db/prisma/migrations/${dir}/migration.sql`);
+  const pin = '20261024010000_diagnostic_source_guard_repair';
+  assert.throws(() => migrationTriggers(dir => original(dir) + (dir === pin ? '\nDROP TRIGGER other ON users;' : '')), /trigger pin changed/);
+  const unpinned = '20261026010000_diagnostic_automatic_public_continuity';
+  assert.throws(() => migrationTriggers(dir => original(dir) + (dir === unpinned ? '\nDROP TRIGGER other ON users;' : '')), /drops a trigger; extend the pin/);
+  assert.throws(() => migrationTriggers(dir => original(dir) + (dir === unpinned ? "\nEXECUTE format('CREATE TRIGGER other BEFORE INSERT ON public.%I', t);" : '')), /dynamically installs a trigger; extend the pin/);
 });
 
 test('the plan names exact truncate, retain, detach and tombstone identities with no wildcard or cascade', () => {

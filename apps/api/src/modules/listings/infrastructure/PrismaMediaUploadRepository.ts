@@ -54,7 +54,7 @@ export class PrismaMediaUploadRepository implements MediaUploadRepository {
           .sort((a, b) => a.namespace - b.namespace || a.key - b.key);
         for (const namespace of [...new Set(keys.map(key => key.namespace))]) {
           for (const key of keys.filter(key => key.namespace === namespace)) {
-            await tx.$queryRaw`SELECT pg_advisory_xact_lock(${namespace}::int,${key.key}::int)`;
+            await tx.$queryRaw`SELECT pg_advisory_xact_lock(${namespace}::int,${key.key}::int)::text`;
           }
           for (const slot of before.slots.filter(slot => slot.row).sort((a, b) => canonical(a.key).localeCompare(canonical(b.key)))) {
             const [meta] = await tx.$queryRaw<{ namespace: number }[]>`
