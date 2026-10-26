@@ -11,7 +11,7 @@ import { Pool, type PoolClient } from "pg";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { PrismaClient } from "../generated/prisma/client/client";
-import { withCampaignPreparation, type Prisma } from "../src/index";
+import type { Prisma } from "../src/index";
 
 // R6a original matrix continuation, attempt 2. Authored source only.
 // Parent owns source disposition and separately authorized disposable execution.
@@ -1190,12 +1190,23 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   // This executes only inside a separately authorized disposable E2E run.
   const setup = execFileSync(process.execPath, ["scripts/testing/campaign-preparation-fixture.mjs", "campaign897-full-v3", reservation, candidate], { cwd: fileURLToPath(new URL("../../..", import.meta.url)), encoding: "utf8" });
   await pool.query(setup);
+  // The accepted generator installs reservation-specific public triggers. Keep
+  // every inherited mode exact and include those new triggers in restoration.
+  const generatedTriggers = await snapshotTriggers();
+  expect(generatedTriggers.filter(row => triggerState.some(before => before.table === row.table && before.name === row.name))).toEqual(triggerState);
+  const addedTriggers = generatedTriggers.filter(row => !triggerState.some(before => before.table === row.table && before.name === row.name));
+  expect(addedTriggers.length).toBeGreaterThan(0);
+  expect(addedTriggers.every(row => row.name.startsWith(`${namespace}_`) && !row.guard)).toBe(true);
+  triggerState = generatedTriggers;
+  console.info("R6a campaign fixture trigger baseline", JSON.stringify({ database: scenarioDatabase, triggers: triggerState }));
   await pool.query(`GRANT USAGE ON SCHEMA "${namespace}" TO ${role}`);
   await pool.query(`GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA "${namespace}" TO ${role}`);
   await pool.query(`GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA "${namespace}" TO ${role}`);
   const user = await db.user.findUniqueOrThrow({ where: { email: `buyer-a.${reservation}.${candidate.slice(0, 12)}@campaign897.invalid` } });
   const sessionId = fixtureId();
-  await db.$transaction(tx => withCampaignPreparation(tx, [{ table: "sessions", key: { id: sessionId }, verb: "insert", next: { id: sessionId, userId: user.id, expiresAt: future.toISOString() } }], () => tx.session.create({ data: { id: sessionId, userId: user.id, refreshTokenHash: fixtureId(), createdAt: now, expiresAt: future } })));
+  // Ordinary task-owned Session fixture precedes complete matched activation.
+  const sessionValidUntil = new Date(Math.max(future.getTime(), Date.now() + 24 * 60 * 60 * 1000));
+  await db.session.create({ data: { id: sessionId, userId: user.id, refreshTokenHash: fixtureId(), createdAt: now, expiresAt: sessionValidUntil } });
   const hash = await pool.query<{ matched: boolean }>(`SELECT service_contract_hash=md5(pg_get_functiondef('"${namespace}".campaign_service_authority(text,text,text,text,text)'::regprocedure)) AS matched FROM "${namespace}".campaign_manifest WHERE candidate=$1 AND state='identities' AND profile='campaign897-full-v3'`, [candidate]);
   expect(hash.rows).toEqual([{ matched: true }]);
   return { namespace, subject: { userId: user.id, sessionId } };
