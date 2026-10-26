@@ -265,6 +265,111 @@ describe.skipIf(process.env["R6C_EXPIRY_DISPOSABLE"] !== "1")("ordinary expiry p
   else { expect(result.ok).toBe(false); expect(String("error" in result ? result.error : "")).toContain("Service expiry preparation changed"); }
   expect(await db.campaignPreparation.count()).toBe(0);
  });
+ for (const order of ["adoption-first", "expiry-first"] as const) it(`actual attachment adoption versus expiry keeps exact private bytes and lifecycle authority, ${order}`, async () => {
+  const f = await fixture("history");
+  const file = await attachment(f, "staged", { ...rights, schedule: { kind: "until", until: "2026-10-25T08:30:00Z", reason: "Synthetic retention" } });
+  await db.serviceAttachment.update({ where: { id: file.id }, data: { expiresAt: new Date("2026-10-25T10:00:00Z") } });
+  const later = new Date("2026-10-25T09:00:00Z"), first = transaction({ hold: true }), second = transaction();
+  const adopt = (database: PrismaService) => construct(database).send(f.owner, f.id, { clientMessageId: randomUUID(), attachmentId: file.id, visibility: "customer" });
+  const a = observe(order === "adoption-first" ? adopt(first.database) : new ExpireServiceContent(first.database, objects).execute(later));
+  await Promise.race([first.ready, a.then(result => { if (!result.ok) throw result.error; })]);
+  const b = observe(order === "adoption-first" ? new ExpireServiceContent(second.database, objects).execute(later) : adopt(second.database));
+  await second.started;
+  await Promise.race([blocked(second.pid(), first.pid()), b.then(result => { if (!result.ok) throw result.error; })]);
+  first.release(); expect((await a).ok).toBe(true);
+  const result = await b; expect(result.ok).toBe(false);
+  if (order === "adoption-first") {
+   expect(String("error" in result ? result.error : "")).toContain("Service expiry preparation changed");
+   expect(await db.serviceAttachment.findUniqueOrThrow({ where: { id: file.id } })).toMatchObject({ state: "adopted", removedAt: null, uploaderId: f.owner.userId });
+   expect(await db.serviceMessage.count({ where: { conversationId: f.id, attachmentId: file.id } })).toBe(1);
+   await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: file.key }));
+   expect(await new ExpireServiceContent(transaction().database, objects).execute(later)).toEqual({ supportPurged: 0, attachmentsRetired: 1, cleanupsCompleted: 1 });
+  } else {
+   expect(await db.serviceMessage.count({ where: { conversationId: f.id } })).toBe(0);
+   expect(await db.serviceOutbox.count({ where: { conversationId: f.id } })).toBe(0);
+  }
+  expect(await db.serviceAttachment.findUniqueOrThrow({ where: { id: file.id } })).toMatchObject({ state: "removed", removedAt: later, uploaderId: null });
+  expect(await db.serviceErasureFence.findUniqueOrThrow({ where: { conversationId: f.id } })).toMatchObject({ epoch: 0, objectKeys: [file.key], cleanupCompletedAt: later });
+  await gone(file.key); expect(await db.campaignPreparation.count()).toBe(0);
+ });
+ // Saturate the real production selector with one overflow row. A database
+ // boundary sentinel stops immediately AFTER its real result, before domain
+ // mutation. This proves exact selection bounds/order and zero overflow effects;
+ // it deliberately does not claim a100/200-transaction sweep completed.
+ for (const kind of ["support100", "attachments200", "artifacts100", "fences100"] as const) it(`saturation ${kind} selects its exact finite oldest page and preserves the overflow snapshot`, async () => {
+  const limit = kind === "attachments200" ? 200 : 100;
+  const ids = Array.from({ length: limit + 1 }, () => randomUUID());
+  const date = (index: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, index));
+  const expected = ids.slice(0, limit);
+  if (kind === "support100") {
+   await db.supportCase.createMany({ data: ids.map((id, index) => ({ id, status: "closed", closedAt: date(index) })) });
+   await db.serviceConversation.createMany({ data: ids.map(id => ({ id: randomUUID(), purpose: "support", supportCaseId: id })) });
+  } else if (kind === "attachments200") {
+   const f = await fixture("history");
+   await db.serviceAttachment.createMany({ data: ids.map((id, index) => ({ id, conversationId: f.id, lifecycleEpoch: 0, category: "history_communication", visibility: "customer", state: "staged", stagingKey: `stage/${id}`, contentType: "image/jpeg", expectedBytes: 1, filename: "synthetic.jpg", rights, expiresAt: date(index), createdAt: date(index) })) });
+  } else if (kind === "artifacts100") {
+   await db.historyArtifact.createMany({ data: ids.map(id => ({ id, provider: "carfax", originalDate: now, objectKey: `history-artifacts/${id}/${"b".repeat(64)}`, sha256: "b".repeat(64), sizeBytes: 1, expectedPages: 1, state: "restricted", restrictedAt: now, rights: {} })) });
+   await db.historyArtifactCleanup.createMany({ data: ids.map((id, index) => ({ artifactId: id, objectKey: `history-artifacts/${id}/${"b".repeat(64)}`, sha256: "b".repeat(64), requestedAt: date(index) })) });
+  } else {
+   await db.vehicleHistoryRequest.createMany({ data: ids.map(id => ({ id })) });
+   await db.serviceConversation.createMany({ data: ids.map(id => ({ id, purpose: "history", historyRequestId: id })) });
+   await db.serviceErasureFence.createMany({ data: ids.map((id, index) => ({ conversationId: id, epoch: 0, objectKeys: [], erasedAt: date(index) })) });
+  }
+  const before = await snapshot(), selected: string[] = [];
+  const sentinel = new Error("Observed actual saturated production selector");
+  const database = new Proxy(db, { get(target, property) {
+   if (kind === "attachments200" && property === "$queryRaw") return async (parts: TemplateStringsArray, ...values: unknown[]) => {
+    const rows = await target.$queryRaw<{ id: string }[]>(parts, ...values);
+    if (parts.join("?").includes("ORDER BY \"createdAt\", id LIMIT 200")) { selected.push(...rows.map(row => row.id)); throw sentinel; }
+    return rows;
+   };
+   const delegate = kind === "support100" ? "supportCase" : kind === "artifacts100" ? "historyArtifactCleanup" : "serviceErasureFence";
+   if (kind !== "attachments200" && property === delegate) return new Proxy(Reflect.get(target, property), { get(inner, key) {
+    if (key === "findMany") return async (args: unknown) => {
+     const read = inner.findMany as (args: unknown) => Promise<{ id?: string; artifactId?: string; conversationId?: string }[]>;
+     const rows = await read.call(inner, args);
+     selected.push(...rows.map(row => present(row.id ?? row.artifactId ?? row.conversationId))); throw sentinel;
+    };
+    return Reflect.get(inner, key);
+   } });
+   return Reflect.get(target, property);
+  } });
+  await expect(new ExpireServiceContent(database, { deleteAndVerify: async () => { throw new Error("Saturation selector reached unexpected storage"); } }).execute(now)).rejects.toBe(sentinel);
+  // Attachment selection has the explicit createdAt/id order; all fixture dates
+  // are distinct. Other selectors retain their production oldest timestamp order.
+  expect(selected).toEqual(expected);
+  expect(selected).toHaveLength(limit);
+  expect(selected).not.toContain(ids[limit]);
+  expect(await snapshot()).toEqual(before);
+ });
+ for (const order of ["mutation-first", "cleanup-first"] as const) it(`storage-fence mutation uses two real expiry callers and exact durable bytes, ${order}`, async () => {
+  const f = await fixture("history"), old = await attachment(f, "removed", { ...rights, schedule: { kind: "permitted_knowledge" } });
+  await db.serviceAttachment.update({ where: { id: old.id }, data: { removedAt: now, uploaderId: null } });
+  const later = new Date("2026-10-25T09:00:00Z");
+  const added = await attachment(f, "adopted", { ...rights, schedule: { kind: "until", until: later.toISOString() } });
+  await db.serviceErasureFence.create({ data: { conversationId: f.id, epoch: 0, objectKeys: [old.key], erasedAt: now } });
+  const first = transaction({ hold: true }), second = transaction();
+  const a = observe(new ExpireServiceContent(first.database, objects).execute(order === "mutation-first" ? later : now));
+  await Promise.race([first.ready, a.then(result => { if (!result.ok) throw result.error; })]);
+  const b = observe(new ExpireServiceContent(second.database, objects).execute(order === "mutation-first" ? now : later));
+  await second.started;
+  await Promise.race([blocked(second.pid(), first.pid()), b.then(result => { if (!result.ok) throw result.error; })]);
+  first.release(); expect((await a).ok).toBe(true);
+  const result = await b;
+  expect(result.ok).toBe(false);
+  expect(String("error" in result ? result.error : "")).toContain("Service expiry preparation changed");
+  if (order === "mutation-first") {
+   await gone(old.key); await gone(added.key);
+   expect(await db.serviceErasureFence.findUniqueOrThrow({ where: { conversationId: f.id } })).toMatchObject({ epoch: 0, objectKeys: [old.key, added.key], cleanupCompletedAt: later });
+  } else {
+   await gone(old.key);
+   await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: added.key }));
+   expect(await db.serviceAttachment.findUniqueOrThrow({ where: { id: added.id } })).toMatchObject({ state: "adopted", removedAt: null });
+   expect(await new ExpireServiceContent(transaction().database, objects).execute(later)).toEqual({ supportPurged: 0, attachmentsRetired: 1, cleanupsCompleted: 1 });
+   await gone(added.key);
+  }
+  expect(await db.campaignPreparation.count()).toBe(0);
+ });
  async function artifact(held = false) {
   const id = randomUUID(), sha256 = "b".repeat(64), objectKey = `history-artifacts/${id}/${sha256}`;
   await s3.send(new PutObjectCommand({ Bucket: bucket, Key: objectKey, Body: "Synthetic original" })); keys.push(objectKey);
