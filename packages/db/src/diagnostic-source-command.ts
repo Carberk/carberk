@@ -13,6 +13,13 @@ export type DiagnosticSourceOperation =
   | "report_change" | "proof_issue" | "proof_consume" | "proof_expire"
   | "identity_material_change" | "staff_eligibility" | "session_change";
 export type DiagnosticSourceTuple = Readonly<Record<string, Prisma.InputJsonValue | null>>;
+export type ListingPublicationIntent = Readonly<{
+  draftId: string;
+  photos: readonly Readonly<{ photoId: string; uploadId: string; key: string; sortOrder: number; thumbHash: string | null }>[];
+  auditId: string;
+  at: string;
+  measurement?: Readonly<{ events: readonly Prisma.InputJsonValue[]; principalId: string; generation: string; epoch: string; environment: "test" | "staging" | "production"; createdAt: Readonly<Record<string, string>>; expiresAt: Readonly<Record<string, string>> }>;
+}>;
 export type DiagnosticSourceRoot = {
   [T in DiagnosticSourceTable]: { readonly table: T; readonly key: Readonly<DiagnosticSourceKeys[T]> }
 }[DiagnosticSourceTable];
@@ -39,7 +46,7 @@ export type DiagnosticSourceCommand = DiagnosticSourceCommandFields & (
     auditId: string; reason: string; report?: Readonly<{ id: string; reviewedAt: string }>;
   }> }
   | { readonly operation: Exclude<DiagnosticSourceOperation, "user_eligibility">;
-    readonly intent?: Readonly<{ receptionQualificationIds: readonly string[]; campaignAdmission?: true }> | Readonly<{ campaignAdmission: true }> | Readonly<{ code: string; userId: string; capability: string; qualificationId: string }> | Readonly<{ reason: string }> | Readonly<Record<string, never>> }
+    readonly intent?: Readonly<{ receptionQualificationIds: readonly string[]; campaignAdmission?: true }> | Readonly<{ campaignAdmission: true }> | Readonly<{ code: string; userId: string; capability: string; qualificationId: string }> | Readonly<{ reason: string }> | Readonly<{ publication: ListingPublicationIntent }> | Readonly<Record<string, never>> }
 );
 
 declare const prepared: unique symbol;
@@ -61,7 +68,7 @@ export async function withDiagnosticSourceCommand<T>(
   if (!row?.receipt) throw new Error("diagnostic_source_receipt");
   const receipt = Object.freeze({ receiptId: row.receipt }) as PreparedDiagnosticSource;
   const result = await work(receipt);
-  await tx.$queryRaw`SELECT public.diagnostic_finish_source(${receipt.receiptId}::uuid)`;
+  await tx.$queryRaw`SELECT public.diagnostic_finish_source(${receipt.receiptId}::uuid)::text`;
   return result;
 }
 
@@ -71,7 +78,7 @@ export async function assertDiagnosticSourceCommand(
   receipt: PreparedDiagnosticSource,
   operation: DiagnosticSourceOperation,
 ): Promise<void> {
-  await tx.$queryRaw`SELECT public.diagnostic_assert_source(${receipt.receiptId}::uuid,${operation})`;
+  await tx.$queryRaw`SELECT public.diagnostic_assert_source(${receipt.receiptId}::uuid,${operation})::text`;
 }
 
 export async function sealDiagnosticFirstObservation(
@@ -80,5 +87,5 @@ export async function sealDiagnosticFirstObservation(
   orderId: string,
   rawId: string,
 ): Promise<void> {
-  await tx.$queryRaw`SELECT public.diagnostic_seal_first_observation(${receipt.receiptId}::uuid,${orderId},${rawId})`;
+  await tx.$queryRaw`SELECT public.diagnostic_seal_first_observation(${receipt.receiptId}::uuid,${orderId},${rawId})::text`;
 }

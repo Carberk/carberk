@@ -327,6 +327,14 @@ export class PublishListing {
       // The Listing, its media, the draft removal, the audit entry and the
       // adoption of every upload commit together or not at all.
       const auditId = randomUUID(), publishedEventId = randomUUID(), visibilityEventId = randomUUID();
+      const publicationEvents = [
+        { version: 1 as const, eventId: publishedEventId, occurredAt: now.toISOString(), purpose: "product_improvement" as const,
+          eventName: "listing_published" as const, context: { platform: "server" as const, release: "server", build: "server", locale: "ru" as const }, payload: { listingId, cityId: payload.cityId, draftId: input.draftId } },
+        { version: 1 as const, eventId: visibilityEventId, occurredAt: now.toISOString(), purpose: "product_improvement" as const,
+          eventName: "listing_visibility_changed" as const, context: { platform: "server" as const, release: "server", build: "server", locale: "ru" as const }, payload: { listingId, visibility: "public" as const, reason: "published" as const } },
+      ];
+      const [publicationEvent, visibilityEvent] = publicationEvents;
+      if (!publicationEvent || !visibilityEvent) throw new Error("listing_publication_events");
       const listingRow = await this.prisma.$transaction(async (tx) => {
         const initialDraft = await tx.listingDraft.findUnique({ where: { id: draft.id } });
         if (!initialDraft || initialDraft.userId !== draft.userId || (initialDraft.businessId ?? null) !== (draft.businessId ?? null)
@@ -334,12 +342,15 @@ export class PublishListing {
           || JSON.stringify(initialDraft.payload) !== JSON.stringify(draft.payload)) throw new Error("diagnostic_source_graph_changed");
         const initialVideo = await this.discoverDraftVideo(tx, draft.id);
         const plannedVideo = this.draftVideoBinding(initialVideo, draft.id, draft.businessId ?? null, now);
+        const measurementPlan = await this.measurement?.preparePublication?.(tx, input.userId, publicationEvents);
         const roots: DiagnosticSourceRoot[] = [
           { table: "users", key: { id: input.userId } },
           { table: "listing_drafts", key: { id: draft.id } },
           { table: "audit_logs", key: { id: auditId } },
-          { table: "measurement_outbox", key: { id: publishedEventId } },
-          { table: "measurement_outbox", key: { id: visibilityEventId } },
+          ...(measurementPlan ? [
+            { table: "measurement_outbox" as const, key: { id: publishedEventId } },
+            { table: "measurement_outbox" as const, key: { id: visibilityEventId } },
+          ] : []),
           ...attachedPhotos.map(photo => ({ table: "listing_media" as const, key: { id: photo.photoId } })),
           ...uploads.map(upload => ({ table: "media_uploads" as const, key: { id: upload.id } })),
           ...(initialVideo ? [
@@ -349,6 +360,10 @@ export class PublishListing {
           ] : []),
         ];
         const command = await listingSourceCommand(tx, { operation: "listing_create", listingId, actorUserId: input.userId, sessionId: input.sessionId,
+          publication: { draftId: draft.id, at: now.toISOString(), auditId,
+            photos: attachedPhotos.map(photo => ({ photoId: photo.photoId as string, key: photo.key as string,
+              uploadId: uploadIdByKey.get(photo.key as string) as string, sortOrder: photo.sortOrder, thumbHash: thumbHashByKey.get(photo.key as string) ?? null })),
+            ...(measurementPlan ? { measurement: { ...measurementPlan, events: publicationEvents } } : {}) },
           roots, changes: { id: listingId, sellerId: input.userId, businessId: draft.businessId ?? null, vin: payload.vin ?? null,
             brandId: payload.brandId, modelId: payload.modelId, year: payload.year ?? null, deletedAt: null, status: "active", contactPhone: payload.contactPhone ?? null,
             activeVideoGenerationId: plannedVideo.activeVideoGenerationId ?? null, pendingVideoGenerationId: plannedVideo.pendingVideoGenerationId ?? null,
@@ -411,6 +426,7 @@ export class PublishListing {
               kind: "image",
               key: photo.key as string,
               sortOrder: photo.sortOrder,
+              createdAt: now,
               uploadId: uploadIdByKey.get(photo.key as string) as string,
               thumbHash: thumbHashByKey.get(photo.key as string) ?? null,
             },
@@ -420,6 +436,7 @@ export class PublishListing {
         await tx.auditLog.create({
           data: {
             id: auditId,
+            createdAt: now,
             actorId: input.userId,
             action: "listing.published",
             targetType: "Listing",
@@ -434,10 +451,8 @@ export class PublishListing {
           },
         });
         try {
-          if (captureEligible) await this.measurement?.capture(tx, input.userId, { version: 1, eventId: publishedEventId, occurredAt: now.toISOString(), purpose: "product_improvement",
-            eventName: "listing_published", context: { platform: "server", release: "server", build: "server", locale: "ru" }, payload: { listingId, cityId: payload.cityId, draftId: input.draftId },
-          });
-          if (captureEligible) await this.measurement?.capture(tx,input.userId,{version:1,eventId:visibilityEventId,occurredAt:now.toISOString(),purpose:"product_improvement",eventName:"listing_visibility_changed",context:{platform:"server",release:"server",build:"server",locale:"ru"},payload:{listingId,visibility:"public",reason:"published"}});
+          if (captureEligible && measurementPlan) await this.measurement?.capture(tx, input.userId, publicationEvent, { conversionEligible: true }, measurementPlan);
+          if (captureEligible && measurementPlan) await this.measurement?.capture(tx, input.userId, visibilityEvent, { conversionEligible: true }, measurementPlan);
         } catch { /* Measurement outage never rolls back the core publication. */ }
         return created;
         });
@@ -563,7 +578,7 @@ export class PublishListing {
     if (!binding.activeVideoGenerationId && !binding.pendingVideoGenerationId) return {};
     if (!session || !upload || !generation) throw new Error("diagnostic_source_graph_changed");
     const ready = !!binding.activeVideoGenerationId;
-    await tx.videoUploadSession.update({ where: { id: session.id }, data: { targetKind: "listing", targetId: listingId, listingId } });
+    await tx.videoUploadSession.update({ where: { id: session.id }, data: { targetKind: "listing", targetId: listingId, listingId, updatedAt: now } });
     await tx.videoGeneration.update({ where: { id: generation.id }, data: { listingId } });
     if (ready) await tx.mediaUpload.update({ where: { id: upload.id }, data: { state: "ADOPTED", claimTargetType: "listing", claimTargetId: listingId, claimToken: null, claimDeadline: null } });
     return binding;

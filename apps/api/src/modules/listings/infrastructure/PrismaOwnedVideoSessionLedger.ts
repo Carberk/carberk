@@ -9,6 +9,7 @@ import { ListingOwnership, type ListingActor } from "../application/ListingOwner
 import type { OwnedVideoSession, OwnedVideoSessionLedger, VideoSessionCreate } from "../application/OwnedVideoUploadProtocol";
 import { VideoEligibility } from "../application/VideoEligibility";
 import { PrismaUploadClaims } from "./PrismaUploadClaims";
+import { preparedVideo, type VideoSelection } from "./VideoTransactionPreparation";
 
 export const VIDEO_ID_FACTORY = Symbol("VideoIdFactory");
 const unavailable = () => new Error("VIDEO_SESSION_UNAVAILABLE");
@@ -32,6 +33,8 @@ export class PrismaOwnedVideoSessionLedger implements OwnedVideoSessionLedger {
     @Inject(VIDEO_ID_FACTORY) private readonly id: () => string,
   ) {}
   async reserve(actor: ListingActor, input: VideoSessionCreate) {
+    const sessionId = this.id(), uploadId = this.id();
+    const sourceKey = `video/v1/${uploadId}/${sessionId}/source.mp4`;
     return this.transaction(async tx => {
       await this.actor(tx, actor, true);
       const target = await this.target(tx, actor, input.target.kind, input.target.id);
@@ -41,8 +44,7 @@ export class PrismaOwnedVideoSessionLedger implements OwnedVideoSessionLedger {
         if (existing.idempotencyHash !== inputHash || existing.protocolVersion !== 1) throw new Error("VIDEO_IDEMPOTENCY_CONFLICT");
         return { session: snapshot(existing), initialize: false };
       }
-      const now = this.clock.now(), sessionId = this.id(), uploadId = this.id();
-      const sourceKey = `video/v1/${uploadId}/${sessionId}/source.mp4`;
+      const now = this.clock.now();
       let revision: number;
       if (target.kind === "listing") {
         if (target.row.pendingVideoGenerationId) await this.retire(tx, target.row.pendingVideoGenerationId, now);
@@ -58,7 +60,11 @@ export class PrismaOwnedVideoSessionLedger implements OwnedVideoSessionLedger {
       await tx.videoGeneration.create({ data: { id: sessionId, sessionId, listingId: target.row.id, uploadId, state: "UPLOADING", targetRevision: revision, processingVersion: "ffmpeg-debian-5.1.9-v1" } });
       if (target.kind === "listing") await tx.listing.update({ where: { id: target.row.id }, data: { pendingVideoGenerationId: sessionId, activeVideoRevision: revision } });
       return { session: snapshot(session), initialize: true };
-    });
+    }, { userId: actor.userId, sessionId: actor.sessionId, businessId: actor.businessId, target: input.target, retiring: true, inserts: [
+      { table: "media_uploads", key: { id: uploadId }, verb: "insert", next: { id: uploadId, userId: actor.userId, businessId: actor.businessId ?? null, key: sourceKey, claimTargetType: "video_session", claimTargetId: sessionId } },
+      { table: "video_upload_sessions", key: { id: sessionId }, verb: "insert", next: { id: sessionId, uploadId, userId: actor.userId, listingId: input.target.kind === "listing" ? input.target.id : null, targetKind: input.target.kind, targetId: input.target.id, idempotencyKey: input.idempotencyKey } },
+      { table: "video_generations", key: { id: sessionId }, verb: "insert", next: { id: sessionId, sessionId, uploadId, listingId: input.target.id } },
+    ] });
   }
   async removeListing(actor: ListingActor, listingId: string) {
     await this.transaction(async tx => {
@@ -69,7 +75,7 @@ export class PrismaOwnedVideoSessionLedger implements OwnedVideoSessionLedger {
       const now = this.clock.now();
       await tx.listing.update({ where: { id: listingId }, data: { activeVideoGenerationId: null, pendingVideoGenerationId: null, activeVideoRevision: { increment: 1 } } });
       for (const id of generations) await this.retire(tx, id, now);
-    });
+    }, { userId: actor.userId, sessionId: actor.sessionId, businessId: actor.businessId, target: { kind: "listing", id: listingId }, retiring: true });
   }
   async targetState(actor: ListingActor, kind: "draft" | "listing", id: string) {
     return this.transaction(async tx => {
@@ -81,7 +87,7 @@ export class PrismaOwnedVideoSessionLedger implements OwnedVideoSessionLedger {
         ? target.row.pendingVideoGenerationId ? await tx.videoUploadSession.findUnique({ where: { id: target.row.pendingVideoGenerationId } }) : null
         : await tx.videoUploadSession.findFirst({ where: { targetKind: "draft", targetId: id, protocolVersion: 1, cancelledAt: null, state: { notIn: ["CLEANUP_PENDING", "DELETED", "CANCELLED"] } }, orderBy: { targetRevision: "desc" } });
       return { active: active?.state === "READY" && active.durationMs ? { generationId: active.id, durationMs: active.durationMs } : null, pending: pending ? { sessionId: pending.id, state: pending.state } : null };
-    });
+    }, { userId: actor.userId, sessionId: actor.sessionId, businessId: actor.businessId, target: { kind, id } });
   }
   async cancelPending(actor: ListingActor, listingId: string) {
     await this.transaction(async tx => {
@@ -89,9 +95,9 @@ export class PrismaOwnedVideoSessionLedger implements OwnedVideoSessionLedger {
       const target = await this.target(tx, actor, "listing", listingId);
       if (target.kind !== "listing") throw unavailable();
       if (target.row.pendingVideoGenerationId) await this.retire(tx, target.row.pendingVideoGenerationId, this.clock.now());
-    });
+    }, { userId: actor.userId, sessionId: actor.sessionId, businessId: actor.businessId, target: { kind: "listing", id: listingId }, retiring: true });
   }
-  async read(actor: ListingActor, id: string) { return this.transaction(async tx => snapshot(await this.current(tx, actor, id))); }
+  async read(actor: ListingActor, id: string) { return this.transaction(async tx => snapshot(await this.current(tx, actor, id)), { userId: actor.userId, sessionId: actor.sessionId, businessId: actor.businessId, videoSessionId: id }); }
   async bindInitialization(actor: ListingActor, id: string, storageUploadId: string) {
     if (!storageUploadId || storageUploadId.length > 2048) throw unavailable();
     return this.transaction(async tx => {
@@ -99,7 +105,7 @@ export class PrismaOwnedVideoSessionLedger implements OwnedVideoSessionLedger {
       if (row.storageUploadId && row.storageUploadId !== storageUploadId) throw unavailable();
       if (!["INITIALIZING", "UPLOADING"].includes(row.state)) throw unavailable();
       return snapshot(await tx.videoUploadSession.update({ where: { id }, data: { storageUploadId, state: "UPLOADING" } }));
-    });
+    }, { userId: actor.userId, sessionId: actor.sessionId, businessId: actor.businessId, videoSessionId: id });
   }
   async beginCompletion(actor: ListingActor, id: string) {
     return this.transaction(async tx => {
@@ -109,7 +115,7 @@ export class PrismaOwnedVideoSessionLedger implements OwnedVideoSessionLedger {
       const fence = row.completionFence ?? this.id();
       await tx.videoGeneration.update({ where: { id }, data: { completionFence: fence } });
       return snapshot(await tx.videoUploadSession.update({ where: { id }, data: { state: "COMPLETING", completionFence: fence } }));
-    });
+    }, { userId: actor.userId, sessionId: actor.sessionId, businessId: actor.businessId, videoSessionId: id });
   }
   async commitCompletion(actor: ListingActor, id: string, fence: string) {
     return this.transaction(async tx => {
@@ -120,7 +126,7 @@ export class PrismaOwnedVideoSessionLedger implements OwnedVideoSessionLedger {
       await tx.videoGeneration.update({ where: { id }, data: { state: "PROCESSING", completionFence: fence } });
       await tx.videoProcessWork.create({ data: { generationId: id, uploadId: row.uploadId, sessionId: id, completionFence: fence, targetRevision: row.targetRevision, processingVersion: "ffmpeg-debian-5.1.9-v1" } });
       return snapshot(await tx.videoUploadSession.update({ where: { id }, data: { state: "PROCESSING", completedAt: now } }));
-    });
+    }, { userId: actor.userId, sessionId: actor.sessionId, businessId: actor.businessId, videoSessionId: id });
   }
   async change(actor: ListingActor, id: string, action: "pause" | "resume" | "cancel") {
     return this.transaction(async tx => {
@@ -139,10 +145,14 @@ export class PrismaOwnedVideoSessionLedger implements OwnedVideoSessionLedger {
       if (row.state === state) return snapshot(row);
       if (row.state !== expected) throw unavailable();
       return snapshot(await tx.videoUploadSession.update({ where: { id }, data: { state } }));
-    });
+    }, { userId: actor.userId, sessionId: actor.sessionId, businessId: actor.businessId, videoSessionId: id, retiring: action === "cancel" });
   }
-  private transaction<T>(run: (tx: Prisma.TransactionClient) => Promise<T>) {
-    return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => { await tx.$executeRaw`SET LOCAL statement_timeout = '1500ms'`; return run(tx); }, { timeout: 5000, maxWait: 1500 });
+  private transaction<T>(run: (tx: Prisma.TransactionClient) => Promise<T>, selection: VideoSelection) {
+    return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => { await tx.$executeRaw`SET LOCAL statement_timeout = '1500ms'`; try { return await preparedVideo(tx, selection, () => run(tx)); }
+      catch (error) {
+        if (error instanceof Error && /^(?:VIDEO_PREPARATION_|campaign_preparation_|upload_claim_preparation_)/.test(error.message)) throw unavailable();
+        throw error;
+      } }, { timeout: 5000, maxWait: 1500 });
   }
   private async actor(tx: Prisma.TransactionClient, actor: ListingActor, uploading = false) {
     if (!actor.sessionId) throw unavailable();
