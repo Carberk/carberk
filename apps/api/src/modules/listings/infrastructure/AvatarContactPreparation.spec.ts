@@ -130,7 +130,7 @@ describe("real profile link and upload claim integration at the database boundar
     const db = avatarDatabase(); const before = structuredClone(db.tables);
     await expect(db.$transaction(async tx => {
       await tx.$queryRaw`SELECT public.campaign_prepare(${JSON.stringify([{ table: "users", key: { id: "seller" }, verb: "update", next: { avatarUploadId: null, avatarKey: null } }])}::jsonb)::text AS receipt`;
-      await tx.$queryRaw`SELECT public.campaign_finish(${'receipt'}::uuid)`;
+      await tx.$queryRaw`SELECT public.campaign_finish(${'receipt'}::uuid)::text`;
       return linkFor(db).unbind("seller", tx);
     })).rejects.toThrow("avatar_release_preparation_missing");
     expect(db.tables).toEqual(before);
