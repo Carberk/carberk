@@ -127,7 +127,7 @@ export async function withServicePreparation<T>(tx: Tx, subject: ServiceSubject,
     const locks = await tx.$queryRaw<{ acquired: boolean }[]>`SELECT pg_try_advisory_xact_lock((k->>'namespace')::int,(k->>'key')::int) AS acquired
      FROM jsonb_array_elements(${JSON.stringify(before.source.keys)}::jsonb) k WHERE (k->>'namespace')::int=${table.namespace} ORDER BY (k->>'key')::int`;
     if (locks.some(lock => !lock.acquired)) throw deny();
-   } else await tx.$queryRaw`SELECT pg_advisory_xact_lock((k->>'namespace')::int,(k->>'key')::int)
+   } else await tx.$queryRaw`SELECT pg_advisory_xact_lock((k->>'namespace')::int,(k->>'key')::int)::text
     FROM jsonb_array_elements(${JSON.stringify(before.source.keys)}::jsonb) k WHERE (k->>'namespace')::int=${table.namespace} ORDER BY (k->>'key')::int`;
    for (const row of before.source.scope.filter(row => row.table === table.table).sort((a,b) => JSON.stringify(a.key) < JSON.stringify(b.key) ? -1 : JSON.stringify(a.key) > JSON.stringify(b.key) ? 1 : 0)) {
     await tx.$queryRawUnsafe(`SELECT 1 FROM public.${table.table} s WHERE to_jsonb(s) @> $1::jsonb FOR UPDATE`, JSON.stringify(row.key));

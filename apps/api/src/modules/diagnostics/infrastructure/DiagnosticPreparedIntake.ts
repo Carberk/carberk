@@ -46,7 +46,7 @@ export async function diagnosticReadPrefix(tx: Tx, roots: readonly DiagnosticSou
           FROM jsonb_array_elements(${JSON.stringify(discovered.keys)}::jsonb) k
           WHERE (k->>'namespace')::int=${table.namespace} ORDER BY (k->>'key')::int`;
         if (locks.some(lock => !lock.acquired)) throw denied();
-      } else await tx.$queryRaw`SELECT pg_advisory_xact_lock((k->>'namespace')::int,(k->>'key')::int)
+      } else await tx.$queryRaw`SELECT pg_advisory_xact_lock((k->>'namespace')::int,(k->>'key')::int)::text
         FROM jsonb_array_elements(${JSON.stringify(discovered.keys)}::jsonb) k
         WHERE (k->>'namespace')::int=${table.namespace} ORDER BY (k->>'key')::int`;
       for (const row of discovered.scope.filter(row => row.table === table.table).sort((a, b) => JSON.stringify(a.key) < JSON.stringify(b.key) ? -1 : JSON.stringify(a.key) > JSON.stringify(b.key) ? 1 : 0)) {

@@ -6,6 +6,12 @@ import { diagnosticProtocol } from "../application/testing/ownershipGrantHarness
 
 function database(changed = false) {
   const protocol = diagnosticProtocol({ changed, scope: () => [{ table: "inspection_orders", key: { id: "visit" } }] });
+  const queryRaw = protocol.$queryRaw.bind(protocol);
+  protocol.$queryRaw = async (strings: TemplateStringsArray, ...values: unknown[]) => {
+    const sql = strings.join("?");
+    if (sql.includes("pg_advisory_xact_lock(") && !sql.includes("::int)::text")) throw new Error("unsupported_void_result");
+    return queryRaw(strings, ...values);
+  };
   return { tx: protocol as unknown as Prisma.TransactionClient, events: protocol.events };
 }
 const roots = [{ table: "inspection_orders" as const, key: { id: "visit" } }];

@@ -18,6 +18,7 @@ function database() {
   const draft = structuredClone(state); let prepared = false;
   const query = async (strings: TemplateStringsArray | string, ...values: unknown[]) => {
    const sql = typeof strings === "string" ? strings : strings.join("?");
+   if (sql.includes("pg_advisory_xact_lock(") && !sql.includes("::int)::text")) throw new Error("unsupported_void_result");
    if (sql.includes("service retained selection") && control.discovery === "missing-selection") return [];
    if (sql.includes("service retained selection")) return [{ roots: [], fingerprint: { assignmentVersion: owner.assignmentVersion, assigneeId: owner.assigneeId, epoch: conversation.lifecycleEpoch } }];
    if (sql.includes("diagnostic_source_scope")) {
