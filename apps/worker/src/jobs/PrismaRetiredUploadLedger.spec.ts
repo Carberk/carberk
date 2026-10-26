@@ -177,6 +177,34 @@ describe("retired upload transaction preparation", () => {
     expect(db.coverage).toHaveLength(pool);
     expect(db.rows["media_upload_cleanups"].filter(r => r["attempts"] === 1)).toHaveLength(limit);
   });
+  it.each([
+    ["manifest", { objectKeys: [KEY, "pending/changed/detail.webp"] }],
+    ["attempts", { attempts: 2 }],
+    ["retry deadline", { nextAttemptAt: "2000-01-01T01:00:00Z" }],
+  ])("refuses a selected cleanup whose %s changed after discovery", async (_field, patch) => {
+    const db = new CleanupDatabase(); db.scalarOnly = true;
+    Object.assign(db.row("media_upload_cleanups", { uploadId: "upload" }) ?? {}, { nextAttemptAt: "2000-01-01T00:00:00Z", attempts: 0 });
+    const before = structuredClone(db.rows);
+    db.afterPrepare = () => { Object.assign(db.row("media_upload_cleanups", { uploadId: "upload" }) ?? {}, patch); };
+    await expect(db.ledger().lease(NOW, 1)).rejects.toThrow("retired_upload_scope_changed");
+    expect(db.rows).toEqual(before);
+  });
+  it.each([
+    ["status", { status: "DONE" }],
+    ["retry deadline", { nextAttemptAt: "2000-01-03T00:00:00Z" }],
+  ])("allows an unselected candidate's changed %s without extending the fixed pool", async (_field, patch) => {
+    const db = new CleanupDatabase(); db.scalarOnly = true;
+    Object.assign(db.row("media_upload_cleanups", { uploadId: "upload" }) ?? {}, { nextAttemptAt: "2000-01-01T00:00:00Z", attempts: 0 });
+    db.rows["media_upload_cleanups"]?.push({ uploadId: "second", status: "PENDING", attempts: 0, nextAttemptAt: "2000-01-01T00:00:00Z" });
+    db.afterPrepare = () => {
+      Object.assign(db.row("media_upload_cleanups", { uploadId: "upload" }) ?? {}, patch, { objectKeys: ["changed-but-unselected"] });
+      db.rows["media_upload_cleanups"]?.unshift({ uploadId: "new-earlier", status: "PENDING", attempts: 0, nextAttemptAt: "1999-01-01T00:00:00Z" });
+    };
+    expect(await db.ledger().lease(NOW, 1)).toMatchObject([{ uploadId: "second", attempts: 1 }]);
+    expect(db.coverage.map(m => m["key"])).toEqual([{ uploadId: "upload" }, { uploadId: "second" }]);
+    expect(db.row("media_upload_cleanups", { uploadId: "upload" })).toMatchObject({ ...patch, attempts: 0, objectKeys: ["changed-but-unselected"] });
+    expect(db.row("media_upload_cleanups", { uploadId: "new-earlier" })?.["attempts"]).toBe(0);
+  });
   it("rolls back scalar lease backoff if receipt finish refuses", async () => {
     const db = new CleanupDatabase(); db.refuseFinish = true;
     Object.assign(db.row("media_upload_cleanups", { uploadId: "upload" }) ?? {}, { nextAttemptAt: "2000-01-01T00:00:00Z", attempts: 0 });
