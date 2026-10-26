@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
+import { performance } from "node:perf_hooks";
 import { S3Client, DeleteObjectCommand, HeadBucketCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { ConfigModule } from "@nestjs/config";
 import { Reflector } from "@nestjs/core";
@@ -13,6 +14,9 @@ import { Test } from "@nestjs/testing";
 import { PrismaService } from "@auto-tm/db";
 import { PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream, decodePDFRawStream } from "pdf-lib";
 import supertest from "supertest";
+import { Pool } from "pg";
+import { Listing } from "../../listings/domain/Listing";
+import { PrismaListingRepository } from "../../listings/infrastructure/PrismaListingRepository";
 import { afterAll, beforeAll, describe, expect, inject, it, vi } from "vitest";
 import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
 import { defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
@@ -112,6 +116,50 @@ describe("public continuity across different sellers and Listings", { concurrent
   let app: NestFastifyApplication; let db: PrismaService; let jwt: JwtService;
   let request: ReturnType<typeof supertest>; let objects: S3Client;
   let templateId: string;
+  let fixtureOwner: Pool;
+  const fixtureRole = `r8_${randomUUID().replaceAll("-", "")}`;
+  type TriggerMode = { schema: string; table: string; name: string; mode: "D" | "O" | "A" | "R"; definition: string };
+  let triggerSnapshot: TriggerMode[] = [];
+  const identifier = (value: string) => `"${value.replaceAll('"', '""')}"`;
+  async function triggerModes() {
+    return (await fixtureOwner.query<TriggerMode>(`SELECT n.nspname AS schema,c.relname AS table,t.tgname AS name,t.tgenabled AS mode,
+      pg_get_triggerdef(t.oid) AS definition FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
+      JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND NOT t.tgisinternal ORDER BY c.relname,t.tgname`)).rows;
+  }
+  const matchedGuard = (name: string) => name.startsWith("diagnostic_source_") || name.startsWith("zz_diagnostic_source_") || name.startsWith("zzzz_campaign_preparation");
+  async function activateFixture() {
+    // Only the owned per-worker database. No environment-wide or production activation.
+    const databases = inject("apiTestDatabases");
+    if (!databases || new URL(process.env["DATABASE_URL"]!).pathname.slice(1) !== workerDatabaseName(databases.prefix, Number(process.env["VITEST_POOL_ID"]))) {
+      throw new Error("R8 requires the task-owned disposable per-worker database");
+    }
+    triggerSnapshot = await triggerModes();
+    const client = await fixtureOwner.connect();
+    try {
+      await client.query("BEGIN");
+      for (const row of triggerSnapshot.filter(row => matchedGuard(row.name))) {
+        await client.query(`ALTER TABLE ${identifier(row.schema)}.${identifier(row.table)} ENABLE TRIGGER ${identifier(row.name)}`);
+      }
+      const result = await client.query<{ source: boolean; campaign: boolean }>("SELECT diagnostic_source_guards_ready() AS source,campaign_preparation_ready() AS campaign");
+      expect(result.rows).toEqual([{ source: true, campaign: true }]);
+      await client.query("COMMIT");
+      console.info("R8 disposable activation", { guards: triggerSnapshot.filter(row => matchedGuard(row.name)).length, readiness: result.rows });
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+  }
+  async function restoreFixture() {
+    if (!fixtureOwner) return;
+    const client = await fixtureOwner.connect();
+    const mode = { D: "DISABLE", O: "ENABLE", A: "ENABLE ALWAYS", R: "ENABLE REPLICA" };
+    try {
+      await client.query("BEGIN");
+      for (const row of triggerSnapshot) await client.query(`ALTER TABLE ${identifier(row.schema)}.${identifier(row.table)} ${mode[row.mode]} TRIGGER ${identifier(row.name)}`);
+      await client.query("COMMIT");
+      if (triggerSnapshot.length) expect(await triggerModes()).toEqual(triggerSnapshot);
+      const receipts = await client.query("SELECT (SELECT count(*)::int FROM diagnostic_source_commands) AS source,(SELECT count(*)::int FROM campaign_preparations) AS campaign");
+      expect(receipts.rows).toEqual([{ source: 0, campaign: 0 }]);
+      console.info("R8 exact trigger restoration", { triggers: triggerSnapshot.length, receipts: receipts.rows });
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+  }
   const now = initialTime;
   const owned = { orders: [] as string[], reports: [] as string[], pdfs: [] as string[],
     raw: [] as string[], evidence: [] as string[], provenance: [] as string[], proofs: [] as string[], keys: new Set<string>(), users: [] as string[],
@@ -124,8 +172,13 @@ describe("public continuity across different sellers and Listings", { concurrent
   const listings: { id: string; sellerId: string }[] = [];
   let catalogRegistered = false;
   const headers = (who: Person) => ({ authorization: `Bearer ${jwt.sign({ sub: suite.id(who), sid: suite.id(`${who}-session`), role: "buyer" })}` });
-  const post = (who: Person, path: string, body: object) => request.post(`/api/v1/diagnostics/${path}`).set(headers(who)).send(body);
-  const get = (who: Person, path: string) => request.get(`/api/v1/diagnostics/${path}`).set(headers(who));
+  const runtimeStarted = performance.now();
+  let lastResponse: { verb: string; path: string; status: number; elapsedMs: number } | undefined;
+  const observeResponse = (verb: string, path: string) => (response: { status: number }) => {
+    lastResponse = { verb, path, status: response.status, elapsedMs: Math.round(performance.now() - runtimeStarted) };
+  };
+  const post = (who: Person, path: string, body: object) => request.post(`/api/v1/diagnostics/${path}`).set(headers(who)).send(body).on("response", observeResponse("POST", path));
+  const get = (who: Person, path: string) => request.get(`/api/v1/diagnostics/${path}`).set(headers(who)).on("response", observeResponse("GET", path));
   const evidencePath = (o: Order) => `orders/${o.id}/identity-evidence`;
   const provenancePath = (o: Order, id?: string) => `orders/${o.id}/identity-provenance${id ? `/${id}` : ""}`;
   const comparisonPath = (b: Order, reportId: string) => `orders/${b.id}/reinspection-comparison?predecessorId=${reportId}`;
@@ -257,6 +310,17 @@ describe("public continuity across different sellers and Listings", { concurrent
         } catch (error) { failures.push(new Error(`Teardown failed for registered object ${objectKey}`, { cause: error })); }
       }
       if (failures.length) throw new AggregateError(failures, "Exact object cleanup failed; database rows preserved");
+      // The isolated database owner drops the whole worker database in globalSetup's
+      // finally. Keep all original attribution assertions and exact object cleanup;
+      // never bypass a source guard to manufacture row-by-row fixture teardown.
+      if (triggerSnapshot.length) {
+        console.info("R8 disposable fixture outcomes", { lastResponse, orders: orders.length, reports: reports.length,
+          raw: await db.diagnosticIdentityRecord.count({ where: { orderId: { in: owned.orders } } }),
+          components: await db.diagnosticOwnershipComponent.count({ where: { orderId: { in: owned.orders } } }),
+          grants: await db.diagnosticOwnershipGrant.count({ where: { orderId: { in: owned.orders } } }),
+          proofs: await db.diagnosticContinuityProof.count({ where: { candidateOrderId: { in: owned.orders } } }), audits: audits.length });
+        return;
+      }
       await db.diagnosticContinuityProof.deleteMany({ where: { id: { in: owned.proofs } } });
       await db.diagnosticPdfArtifact.deleteMany({ where: { id: { in: owned.pdfs } } });
       for (const id of [...owned.reports].reverse()) await db.diagnosticReportRecord.deleteMany({ where: { id } });
@@ -300,8 +364,25 @@ describe("public continuity across different sellers and Listings", { concurrent
     // Existing erasure/lifecycle pattern: deterministic Date, with real timers still active.
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(initialTime);
+    const ownerUrl = process.env["DATABASE_URL"]!;
+    fixtureOwner = new Pool({ connectionString: ownerUrl });
+    const login = randomUUID();
+    await fixtureOwner.query(`CREATE ROLE ${identifier(fixtureRole)} LOGIN PASSWORD '${login}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`);
+    await fixtureOwner.query(`GRANT USAGE ON SCHEMA public TO ${identifier(fixtureRole)}`);
+    await fixtureOwner.query(`GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO ${identifier(fixtureRole)}`);
+    await fixtureOwner.query(`GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO ${identifier(fixtureRole)}`);
+    await fixtureOwner.query(`GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO ${identifier(fixtureRole)}`);
+    const applicationUrl = new URL(ownerUrl); applicationUrl.username = fixtureRole; applicationUrl.password = login;
+    try { process.env["DATABASE_URL"] = applicationUrl.toString(); db = new PrismaService(); } finally { process.env["DATABASE_URL"] = ownerUrl; }
+    const role = await db.$queryRaw<{ current_user: string; session_user: string; privileged: boolean; owns: boolean }[]>`SELECT current_user,session_user,
+      (rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls) AS privileged,
+      EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relowner=r.oid) AS owns
+      FROM pg_roles r WHERE rolname=current_user`;
+    expect(role).toEqual([{ current_user: fixtureRole, session_user: fixtureRole, privileged: false, owns: false }]);
+    console.info("R8 restricted application role", role);
     const testing = await Test.createTestingModule({ imports: [ConfigModule.forRoot({ isGlobal: true, load: [() => ({ DIAGNOSTIC_PRIVATE_BUCKET: "diagnostic-test-private" })] }),
       EventEmitterModule.forRoot(), bullTestRoot(), DiagnosticsModule, JwtModule.register({ global: true, secret: "synthetic-diagnostic-test" })] })
+      .overrideProvider(PrismaService).useValue(db)
       .overrideProvider(IDENTITY_CLOCK_PORT).useValue({ now: () => now })
       .overrideProvider(DIAGNOSTIC_RUNTIME).useValue({ now: () => now, id: randomUUID, publicSyntheticAllowed: () => true,
         syntheticAllowed: ({ userId }: { userId: string }) => people.some(who => suite.id(who) === userId) }).compile();
@@ -357,12 +438,24 @@ describe("public continuity across different sellers and Listings", { concurrent
     await db.staffGrant.create({ data: templateGrant });
     owned.qualifications.push(suite.id("template-qualification"));
     await db.diagnosticCenterAssignment.create({ data: { id: suite.id("template-qualification"), centerId, userId: suite.id("reception"), capability: "diagnostics.templates", qualifiedUntil: future } });
+    await activateFixture();
     const published = await post("reception", `centers/${centerId}/templates`, { expectedVersion: 0, definition, synthetic: true });
     if (typeof published.body.id === "string") templateId = published.body.id;
     expect(published.status, JSON.stringify(published.body)).toBe(201);
   });
   afterAll(async () => {
-    try { await teardownOwnedFixtures(); } finally { try { objects?.destroy(); await app?.close(); } finally { vi.useRealTimers(); } }
+    try { await teardownOwnedFixtures(); } finally {
+      try { objects?.destroy(); await app?.close(); } finally {
+        try { await restoreFixture(); } finally {
+          if (fixtureOwner) {
+            await fixtureOwner.query(`DROP OWNED BY ${identifier(fixtureRole)}`);
+            await fixtureOwner.query(`DROP ROLE ${identifier(fixtureRole)}`);
+            await fixtureOwner.end();
+          }
+          vi.useRealTimers();
+        }
+      }
+    }
   });
   async function visit(observation: Observation, visitName: "A" | "B", seller: "sellerA" | "sellerB"): Promise<Order> {
     const requestKey = randomUUID(); owned.requestKeys.push(requestKey);
@@ -1614,8 +1707,9 @@ describe("public continuity across different sellers and Listings", { concurrent
   async function isolatedListing(seller: "sellerA" | "sellerB", year: number | null = null) {
     const id = randomUUID(); const sellerId = suite.id(seller);
     listings.push({ id, sellerId });
-    await db.listing.create({ data: { id, sellerId, brandId: suite.catalog.brandId, modelId: suite.catalog.modelId,
-      cityId: suite.catalog.cityId, status: "active", vin: "SYN-VIN-041", year, priceAmount: 100000, priceTmt: 100000, priceCurrency: "TMT" } });
+    await new PrismaListingRepository(db).save(Listing.create({ id, publicNumber: 0, sellerId, brandId: suite.catalog.brandId, modelId: suite.catalog.modelId,
+      cityId: suite.catalog.cityId, status: "active", vin: "SYN-VIN-041", ...(year === null ? {} : { year }), priceAmount: 100000, priceCurrency: "TMT",
+      allowCalls: true, allowChat: true, publishedAt: now }));
     return id;
   }
   it("admits changed Listing identity and id through B's fresh ordinary authorization and association", async () => {
