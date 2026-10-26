@@ -83,7 +83,7 @@ async function retainedSelection(tx: Tx, subject: ServiceSubject, ids: string[],
    UNION SELECT jsonb_build_object('table','listings','key',jsonb_build_object('id',v.value))
     FROM resources r CROSS JOIN LATERAL jsonb_each(r.r) v WHERE v.key='sourceListingId' AND v.value<>'null'
    UNION SELECT jsonb_build_object('table','history_orders','key',jsonb_build_object('id',"acquiredForOrderId")) FROM artifacts WHERE "acquiredForOrderId" IS NOT NULL
-   UNION SELECT jsonb_build_object('table','sessions','key',jsonb_build_object('id',${subject.sessionId}))
+   UNION SELECT jsonb_build_object('table','sessions','key',jsonb_build_object('id',${subject.sessionId}::text))
   ) SELECT coalesce((SELECT jsonb_agg(root ORDER BY root::text) FROM roots),'[]') AS roots,
    coalesce((SELECT jsonb_agg(jsonb_build_object('table',t,'row',r) ORDER BY t,r::text) FROM resources),'[]') AS fingerprint
  `;
