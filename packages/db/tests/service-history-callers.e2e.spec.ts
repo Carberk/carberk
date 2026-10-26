@@ -521,7 +521,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
    }
    expect(selections[1]).toEqual(selections[0]);
    expect(await db.historyOrder.findMany()).toEqual([]); // first order still uncommitted
-   console.info("R6a M6 exact business wait and persisted retained selection", { waiter: b.pid(), blocker: a.pid(), phase, waitingLocks, selections });
+   console.info("R6a M6 exact business wait and persisted retained selection", JSON.stringify({ waiter: b.pid(), blocker: a.pid(), phase, waitingLocks, selections }));
   } finally { a.release(); b.release(); await Promise.allSettled([first, ...(second ? [second] : [])]); }
   expect(await first).toEqual({ ok: true, value: undefined }); expect(await present(second)).toEqual({ ok: true, value: undefined });
   const orders = await db.historyOrder.findMany({ orderBy: { requestId: "asc" } }), completed = new Date();
@@ -568,7 +568,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   expect(await db.historyOrder.findUnique({ where: { requestId: other.resource } })).toBeNull(); expect(await audit(other.resource)).toEqual([]);
   expect(await audit(f.resource)).toEqual([{ action: "HISTORY_ACCEPT", actorId: f.owner.userId, assignmentVersion: 1 }]);
   expect((await transactionalState()).filter(entry => !["history_orders", "history_quotes", "service_audits"].includes(entry.table))).toEqual(before.filter(entry => !["history_orders", "history_quotes", "service_audits"].includes(entry.table)));
-  console.info("R6a M6 actual retained-set refusal", { selectedOrders, firstOrder: order.id });
+  console.info("R6a M6 actual retained-set refusal", JSON.stringify({ selectedOrders, firstOrder: order.id }));
  });
  async function pair(bytes?: Uint8Array) {
   const f = await history(), donor = await history();
