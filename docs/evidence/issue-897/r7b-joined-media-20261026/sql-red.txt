@@ -1,0 +1,59 @@
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-8c41fd9a/apps/api
+
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > one adopter across Listing media and Profile Photos > Listing first: the overlapping Profile Photo claim is refused and adopts nothing
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > one adopter across Listing media and Profile Photos > Profile Photo first: the overlapping Listing claim is refused and writes no media row
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > one adopter across Listing media and Profile Photos > lets one of two Listings adopt when both hold the same upload
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > one adopter across Listing media and Profile Photos > reserves all of a publication's uploads or none
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > one adopter across Listing media and Profile Photos > keeps provenance checks: another User's upload and an unknown upload are not available
+ × src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retrying the same target > joins the in-flight reservation and returns the one committed row to both 258ms
+   → media_caller_scope_changed
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retrying the same target > rolls the adoption back with the transaction that carried it
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retrying the same target > writes the claim deadline and retirement time from the injected UTC clock
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retirement > releases the Listing row, closes adoption and records the exact manifest in one transaction
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retirement > keeps a legacy upload's physical cleanup explicitly pending
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retirement > never lets a RETIRED upload be adopted again
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retirement > never lets a DELETED upload be adopted again
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retirement > keeps the adopter and records no work when the releasing transaction fails
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retirement > records one piece of work when the same upload is retired concurrently
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retirement > retires an abandoned preparation and refuses its late finalization
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retirement > refuses a new row whose poster upload was retired
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > release and settle for a transient publish failure (#735) > release returns every held upload to AVAILABLE without recording work, and a retry can reserve them again
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > release and settle for a transient publish failure (#735) > release touches nothing a committed attempt holds
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > release and settle for a transient publish failure (#735) > settle retires exactly one held upload with its manifest and releases the rest
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > release and settle for a transient publish failure (#735) > settle is false and retires nothing once the attempt no longer holds the upload
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > release and settle for a transient publish failure (#735) > pre-reserve retirement refuses another User's upload and existing Listing/Profile adopters under the lock
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > release and settle for a transient publish failure (#735) > keeps the row locked during reinspection and refuses retirement when the object is now valid
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > release and settle for a transient publish failure (#735) > retireUnclaimed retires an AVAILABLE upload but never an adopted or held one
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > replaces the real profile, preserves foreign bytes and makes an adopted retry unchanged
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > unbinds a real legacy profile with the exact manifest and leaves foreign rows unchanged
+ ↓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > the migration backfill marks an existing Listing claim adopted and leaves unclaimed uploads alone
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retrying the same target > joins the in-flight reservation and returns the one committed row to both
+Error: media_caller_scope_changed
+ ❯ src/modules/listings/infrastructure/PrismaListingMediaRepository.ts:302:15
+    300|       if (canonical(before) !== canonical(await this.mediaScope(tx, se…
+    301|         if (changed) return changed();
+    302|         throw new Error("media_caller_scope_changed");
+       |               ^
+    303|       }
+    304|       return work();
+ ❯ withCampaignPreparation ../../packages/db/src/campaign-preparation.ts:23:18
+ ❯ Proxy._transactionWithCallback ../../node_modules/.pnpm/@prisma+client@7.8.0_@typescript+typescript6@6.0.2_prisma@7.8.0_@types+react-dom@19.2.3_a6da919609b3601a640c20f26e6ab73b/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:810:18
+ ❯ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts:285:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 25 skipped (26)
+   Start at  14:57:10
+   Duration  1.21s (tests 84%, import 10%, transform 5%, setup 1%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /Users/bagtyyar/.t3/worktrees/carberk/t3-
+  │ 8c41fd9a/apps/api
+

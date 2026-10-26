@@ -1,0 +1,19 @@
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-8c41fd9a/apps/api
+
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.preparation.e2e.spec.ts > R7c parent activated disposable claim transactions > opposes real reserve and retireUnclaimed in both orders, reserveFirst=true 111ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.preparation.e2e.spec.ts > R7c parent activated disposable claim transactions > opposes real reserve and retireUnclaimed in both orders, reserveFirst=false 85ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.preparation.e2e.spec.ts > R7c parent activated disposable claim transactions > rolls back a completed first cleanup and its claim on driver failure 103ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.preparation.e2e.spec.ts > R7c parent activated disposable claim transactions > release and settle preserve the foreign upload and exact inventory 187ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.preparation.e2e.spec.ts > R7c parent activated disposable claim transactions > refuses a missing receipt before supplied writes 13ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.preparation.e2e.spec.ts > R7c parent activated disposable claim transactions > refuses a finished receipt before supplied writes 15ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.preparation.e2e.spec.ts > R7c parent activated disposable claim transactions > refuses another backend's live receipt even with copied marker fields 56ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.preparation.e2e.spec.ts > R7c parent activated disposable claim transactions > refuses ordinary namespace preparation with uncovered resource keys 18ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.preparation.e2e.spec.ts > R7c parent activated disposable claim transactions > reuses an exact live ordinary preparation without a nested finish 81ms
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Start at  15:00:55
+   Duration  1.41s (tests 90%, import 8%, transform 2%)
+
+JSON report written to /tmp/897-r7b-joined-media-20261026/preparation9.json

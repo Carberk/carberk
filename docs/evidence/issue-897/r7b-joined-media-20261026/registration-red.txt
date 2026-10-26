@@ -1,0 +1,110 @@
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-8c41fd9a/apps/api
+
+ ❯ src/modules/listings/infrastructure/PrismaMediaUploadRepository.preparation.spec.ts (5 tests | 5 failed) 6ms
+   ❯ upload registration preparation (5)
+     × records the exact provenance and manifest under one finished preparation 2ms
+     × covers the retained owner's recursive avatar and suspender endpoints 0ms
+     × refuses an owner graph that changes while waiting before inserting provenance 2ms
+     × rolls the provenance back on an injected campaign finish failure 0ms
+     × keeps Business registration closed without a current actor 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/modules/listings/infrastructure/PrismaMediaUploadRepository.preparation.spec.ts > upload registration preparation > records the exact provenance and manifest under one finished preparation
+Error: unsupported_void_result
+ ❯ $queryRaw src/modules/listings/application/testing/UploadClaimsDatabase.ts:19:132
+     17|       const sql = "strings" in query ? query.strings.join("?") : query…
+     18|       const values = "strings" in query ? query.values : args;
+     19|       if ((sql.includes("pg_advisory_xact_lock(") || sql.includes("cam…
+       |                                                                                                                                    ^
+     20|       if (sql.includes("campaign_prepare(")) {
+     21|         if (this.receipt) throw new Error("nested_preparation");
+ ❯ Object.db.tx.$queryRaw src/modules/listings/infrastructure/PrismaMediaUploadRepository.preparation.spec.ts:23:12
+ ❯ src/modules/listings/infrastructure/PrismaMediaUploadRepository.ts:57:31
+ ❯ withCampaignPreparation ../../packages/db/src/campaign-preparation.ts:23:18
+ ❯ src/modules/listings/infrastructure/PrismaMediaUploadRepository.ts:36:7
+ ❯ Object.$transaction src/modules/listings/application/testing/UploadClaimsDatabase.ts:86:18
+ ❯ PrismaMediaUploadRepository.record src/modules/listings/infrastructure/PrismaMediaUploadRepository.ts:28:5
+ ❯ src/modules/listings/infrastructure/PrismaMediaUploadRepository.preparation.spec.ts:38:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/modules/listings/infrastructure/PrismaMediaUploadRepository.preparation.spec.ts > upload registration preparation > covers the retained owner's recursive avatar and suspender endpoints
+Error: unsupported_void_result
+ ❯ $queryRaw src/modules/listings/application/testing/UploadClaimsDatabase.ts:19:132
+     17|       const sql = "strings" in query ? query.strings.join("?") : query…
+     18|       const values = "strings" in query ? query.values : args;
+     19|       if ((sql.includes("pg_advisory_xact_lock(") || sql.includes("cam…
+       |                                                                                                                                    ^
+     20|       if (sql.includes("campaign_prepare(")) {
+     21|         if (this.receipt) throw new Error("nested_preparation");
+ ❯ Object.db.tx.$queryRaw src/modules/listings/infrastructure/PrismaMediaUploadRepository.preparation.spec.ts:23:12
+ ❯ src/modules/listings/infrastructure/PrismaMediaUploadRepository.ts:57:31
+ ❯ withCampaignPreparation ../../packages/db/src/campaign-preparation.ts:23:18
+ ❯ src/modules/listings/infrastructure/PrismaMediaUploadRepository.ts:36:7
+ ❯ Object.$transaction src/modules/listings/application/testing/UploadClaimsDatabase.ts:86:18
+ ❯ PrismaMediaUploadRepository.record src/modules/listings/infrastructure/PrismaMediaUploadRepository.ts:28:5
+ ❯ src/modules/listings/infrastructure/PrismaMediaUploadRepository.preparation.spec.ts:49:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/modules/listings/infrastructure/PrismaMediaUploadRepository.preparation.spec.ts > upload registration preparation > refuses an owner graph that changes while waiting before inserting provenance
+AssertionError: expected [Function] to throw error including 'media_registration_scope_changed' but got 'unsupported_void_result'
+
+Expected: "media_registration_scope_changed"
+Received: "unsupported_void_result"
+
+ ❯ src/modules/listings/infrastructure/PrismaMediaUploadRepository.preparation.spec.ts:57:44
+     55|     const { db, repository } = setup();
+     56|     db.afterWait = () => { db.tables["users"] = [{ id: "owner", avatar…
+     57|     await expect(repository.record(upload)).rejects.toThrow("media_reg…
+       |                                            ^
+     58|     expect(db.tables["media_uploads"]).toEqual([]);
+     59|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/modules/listings/infrastructure/PrismaMediaUploadRepository.preparation.spec.ts > upload registration preparation > rolls the provenance back on an injected campaign finish failure
+AssertionError: expected [Function] to throw error including 'registration_finish_fault' but got 'unsupported_void_result'
+
+Expected: "registration_finish_fault"
+Received: "unsupported_void_result"
+
+ ❯ src/modules/listings/infrastructure/PrismaMediaUploadRepository.preparation.spec.ts:63:44
+     61|   it("rolls the provenance back on an injected campaign finish failure…
+     62|     const { db, repository, failFinish } = setup(); failFinish();
+     63|     await expect(repository.record(upload)).rejects.toThrow("registrat…
+       |                                            ^
+     64|     expect(db.tables["media_uploads"]).toEqual([]);
+     65|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  src/modules/listings/infrastructure/PrismaMediaUploadRepository.preparation.spec.ts > upload registration preparation > keeps Business registration closed without a current actor
+AssertionError: expected [Function] to throw error including 'Business upload requires current actor' but got 'unsupported_void_result'
+
+Expected: "Business upload requires current actor"
+Received: "unsupported_void_result"
+
+ ❯ src/modules/listings/infrastructure/PrismaMediaUploadRepository.preparation.spec.ts:69:75
+     67|   it("keeps Business registration closed without a current actor", asy…
+     68|     const { db, repository } = setup();
+     69|     await expect(repository.record({ ...upload, businessId: "business"…
+       |                                                                           ^
+     70|     expect(db.tables["media_uploads"]).toEqual([]);
+     71|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed (5)
+   Start at  15:00:04
+   Duration  312ms (import 70%, transform 17%, tests 6%, setup 5%, worker 2%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /Users/bagtyyar/.t3/worktrees/carberk/t3-
+  │ 8c41fd9a/apps/api
+

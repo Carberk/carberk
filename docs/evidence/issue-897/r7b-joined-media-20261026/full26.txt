@@ -1,0 +1,36 @@
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-8c41fd9a/apps/api
+
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > one adopter across Listing media and Profile Photos > Listing first: the overlapping Profile Photo claim is refused and adopts nothing 305ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > one adopter across Listing media and Profile Photos > Profile Photo first: the overlapping Listing claim is refused and writes no media row 306ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > one adopter across Listing media and Profile Photos > lets one of two Listings adopt when both hold the same upload 255ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > one adopter across Listing media and Profile Photos > reserves all of a publication's uploads or none 133ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > one adopter across Listing media and Profile Photos > keeps provenance checks: another User's upload and an unknown upload are not available 120ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retrying the same target > joins the in-flight reservation and returns the one committed row to both 332ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retrying the same target > rolls the adoption back with the transaction that carried it 128ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retrying the same target > writes the claim deadline and retirement time from the injected UTC clock 121ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retirement > releases the Listing row, closes adoption and records the exact manifest in one transaction 298ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retirement > keeps a legacy upload's physical cleanup explicitly pending 230ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retirement > never lets a RETIRED upload be adopted again 417ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retirement > never lets a DELETED upload be adopted again 462ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retirement > keeps the adopter and records no work when the releasing transaction fails 238ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retirement > records one piece of work when the same upload is retired concurrently 290ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retirement > retires an abandoned preparation and refuses its late finalization 245ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > retirement > refuses a new row whose poster upload was retired 471ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > release and settle for a transient publish failure (#735) > release returns every held upload to AVAILABLE without recording work, and a retry can reserve them again 283ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > release and settle for a transient publish failure (#735) > release touches nothing a committed attempt holds 152ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > release and settle for a transient publish failure (#735) > settle retires exactly one held upload with its manifest and releases the rest 183ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > release and settle for a transient publish failure (#735) > settle is false and retires nothing once the attempt no longer holds the upload 149ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > release and settle for a transient publish failure (#735) > pre-reserve retirement refuses another User's upload and existing Listing/Profile adopters under the lock 230ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > release and settle for a transient publish failure (#735) > keeps the row locked during reinspection and refuses retirement when the object is now valid 57ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > release and settle for a transient publish failure (#735) > retireUnclaimed retires an AVAILABLE upload but never an adopted or held one 283ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > replaces the real profile, preserves foreign bytes and makes an adopted retry unchanged 580ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > unbinds a real legacy profile with the exact manifest and leaves foreign rows unchanged 222ms
+ ✓ src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts > common upload claim on Postgres (#721) > the migration backfill marks an existing Listing claim adopted and leaves unclaimed uploads alone 82ms
+
+ Test Files  1 passed (1)
+      Tests  26 passed (26)
+   Start at  15:00:47
+   Duration  7.47s (tests 98%, import 2%)
+
+JSON report written to /tmp/897-r7b-joined-media-20261026/full26.json
