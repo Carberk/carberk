@@ -227,7 +227,7 @@ describe.skipIf(!database)("retired upload prepared PostgreSQL callers", () => {
     });
     const before = await snapshot();
     try {
-      const held = pause(first === "purge" ? "diagnostic_prepare_source" : "pg_try_advisory_xact_lock");
+      const held = pause(first === "purge" ? "diagnostic_prepare_source" : 'AS selected');
       const a = outcome<unknown>(first === "purge" ? new PurgeExpiredAccounts(held.client).execute({ now: NOW }) : new PrismaRetiredUploadLedger(held.client).lease(NOW, 1));
       let b: Promise<unknown> | undefined;
       try {
@@ -413,6 +413,36 @@ describe.skipIf(!database)("retired upload prepared PostgreSQL callers", () => {
       expect(await db.mediaUploadCleanup.findUnique({ where: { uploadId: heldRow.id } })).toMatchObject({ attempts: 0, nextAttemptAt: DUE });
     } finally { release(); await owner; }
     expect(await ledger.lease(NOW, 2)).toMatchObject([{ uploadId: heldRow.id, attempts: 1 }]);
+  });
+  it("leases two ordered same-owner roots from its fixed pool while a third cleanup is locked", async () => {
+    const rows = [await upload({ retired: true }), await upload({ retired: true }), await upload({ retired: true })];
+    for (const [i, row] of rows.entries()) await work(row.id, new Date(DUE.getTime() + i * 1000));
+    let release = () => {}; let ready = () => {};
+    const held = new Promise<void>(resolve => { ready = resolve; });
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const first = rows[0]; if (!first) throw new Error("missing fixture root");
+    const owner = runtime().$transaction(tx => withCampaignPreparation(tx, [{ table: "media_upload_cleanups", key: { uploadId: first.id }, verb: "update", next: {} }], async () => {
+      await tx.$queryRaw`SELECT 1 FROM media_upload_cleanups WHERE "uploadId"=${first.id} FOR UPDATE`;
+      ready(); await gate;
+    }));
+    try {
+      await Promise.race([held, owner.then(() => { throw new Error("Lock owner ended before barrier"); })]);
+      const result = await ledger.lease(NOW, 2);
+      expect(result.map(row => row.uploadId).sort()).toEqual(rows.slice(1).map(row => row.id).sort());
+      expect(result.every(row => row.attempts === 1)).toBe(true);
+      expect(await db.mediaUploadCleanup.findUnique({ where: { uploadId: first.id } })).toMatchObject({ attempts: 0, nextAttemptAt: DUE });
+    } finally { release(); await owner; }
+    expect(await ledger.lease(NOW, 2)).toMatchObject([{ uploadId: first.id, attempts: 1 }]);
+  });
+  it("rolls back scalar lease attempts and deadline when commit refuses", async () => {
+    const row = await upload({ retired: true }); await work(row.id);
+    const before = await db.mediaUploadCleanup.findUniqueOrThrow({ where: { uploadId: row.id } });
+    const rollback = new Proxy(runtime(), { get(target, property) {
+      if (property === "$transaction") return (run: (tx: Prisma.TransactionClient) => Promise<unknown>, options?: Parameters<PrismaService["$transaction"]>[1]) => target.$transaction(async tx => { await run(tx); throw new Error("test_commit_refusal"); }, options);
+      const value: unknown = Reflect.get(target, property); return typeof value === "function" ? value.bind(target) : value;
+    } });
+    await expect(new PrismaRetiredUploadLedger(rollback).lease(NOW, 1)).rejects.toThrow("test_commit_refusal");
+    expect(await db.mediaUploadCleanup.findUniqueOrThrow({ where: { uploadId: row.id } })).toEqual(before);
   });
   it("rolls back retirement and cleanup when the transaction cannot commit", async () => {
     const row = await upload({ target: { type: "profile", id: userId } });

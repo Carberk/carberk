@@ -64,23 +64,50 @@ export class PrismaRetiredUploadLedger implements RetiredUploadLedger {
   }
 
   async lease(now: Date, limit: number): Promise<CleanupWork[]> {
-    // Taking work and scheduling its next attempt are one statement, so the
+    // Taking work and scheduling its next attempt are one transaction, so the
     // backoff is saved before any deletion starts. SKIP LOCKED keeps two
     // overlapping sweeps from taking the same work.
-    return this.prisma.$transaction(tx => this.prepared(tx, { kind: "lease", now, limit }, [], async plan => tx.$queryRaw<CleanupWork[]>`
-      UPDATE media_upload_cleanups AS work
-      SET "attempts" = work."attempts" + 1,
-        "nextAttemptAt" = ${now}::timestamp + LEAST(
-          ${BACKOFF_BASE_SECONDS}::float8 * power(2::float8, LEAST(work."attempts", 30)),
-          ${BACKOFF_CAP_SECONDS}::float8) * interval '1 second'
-      FROM (
-        SELECT "uploadId" FROM media_upload_cleanups
-        WHERE "uploadId" = ANY(${plan.ids}::text[])
-          AND "status" = 'PENDING' AND "nextAttemptAt" <= ${now}
-        ORDER BY "nextAttemptAt", "uploadId" LIMIT ${limit}::int FOR UPDATE SKIP LOCKED
-      ) AS due
-      WHERE work."uploadId" = due."uploadId"
-      RETURNING work."uploadId", work."key", work."objectKeys", work."writeProtocol", work."attempts"`));
+    return this.prisma.$transaction(async tx => {
+      // This ordinary scalar update has no physical FK/source/unique effects.
+      // Fix the entire bounded pool before preparation; never lock its owners
+      // or monopolize candidates with advisory locks. Terminal paths retain
+      // their full reference graph and storage protection.
+      const candidates = await tx.$queryRaw<{ row: Row }[]>`
+        SELECT to_jsonb(work) AS row FROM media_upload_cleanups work
+        WHERE status='PENDING' AND "nextAttemptAt" <= ${now}
+        ORDER BY "nextAttemptAt","uploadId" LIMIT ${Math.min(2 * limit, 1000)}::int`;
+      if (!candidates.length) return [];
+      const ids = candidates.map(({ row }) => String(row["uploadId"]));
+      const mutations: CampaignMutation[] = candidates.map(({ row }) => ({
+        table: "media_upload_cleanups", key: { uploadId: String(row["uploadId"]) }, verb: "update", next: {
+          attempts: Number(row["attempts"]) + 1,
+          nextAttemptAt: new Date(now.getTime() + Math.min(BACKOFF_BASE_SECONDS * 2 ** Math.min(Number(row["attempts"]), 30), BACKOFF_CAP_SECONDS) * 1000).toISOString(),
+        },
+      }));
+      return withCampaignPreparation(tx, mutations, async () => {
+        const selected = await tx.$queryRaw<{ selected: string }[]>`
+          SELECT "uploadId" AS selected FROM media_upload_cleanups
+          WHERE "uploadId" = ANY(${ids}::text[]) AND status='PENDING' AND "nextAttemptAt" <= ${now}
+          ORDER BY "nextAttemptAt","uploadId" LIMIT ${limit}::int FOR UPDATE SKIP LOCKED`;
+        if (!selected.length) return [];
+        const lockedIds = selected.map(row => row.selected);
+        // A separate READ COMMITTED statement checks complete selected rows.
+        // Skipped candidates may change; they can never add IDs to this pool.
+        const fresh = await tx.$queryRaw<{ row: Row }[]>`
+          SELECT to_jsonb(work) AS row FROM media_upload_cleanups work WHERE "uploadId" = ANY(${lockedIds}::text[])`;
+        if (fresh.length !== lockedIds.length || fresh.some(({ row }) => !same(row, candidates.find(c => c.row["uploadId"] === row["uploadId"])?.row))) {
+          throw new Error("retired_upload_scope_changed");
+        }
+        return tx.$queryRaw<CleanupWork[]>`
+          UPDATE media_upload_cleanups AS work
+          SET "attempts" = work."attempts" + 1,
+            "nextAttemptAt" = ${now}::timestamp + LEAST(
+              ${BACKOFF_BASE_SECONDS}::float8 * power(2::float8, LEAST(work."attempts", 30)),
+              ${BACKOFF_CAP_SECONDS}::float8) * interval '1 second'
+          WHERE "uploadId" = ANY(${lockedIds}::text[])
+          RETURNING work."uploadId", work."key", work."objectKeys", work."writeProtocol", work."attempts"`;
+      });
+    });
   }
 
   async blockingReference(work: CleanupWork, directory: string): Promise<string | null> {
