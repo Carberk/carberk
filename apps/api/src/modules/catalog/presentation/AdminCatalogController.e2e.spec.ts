@@ -12,7 +12,7 @@ import {
 } from "@nestjs/platform-fastify";
 import supertest from "supertest";
 import sharp from "sharp";
-import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { PrismaService } from "@auto-tm/db";
 
 import { CatalogModule } from "../catalog.module";
@@ -29,6 +29,43 @@ describe("AdminCatalogController e2e", () => {
   let request: ReturnType<typeof supertest>;
   let prisma: PrismaService;
   let now = new Date();
+
+  const userIds = new Set<string>();
+  const sessionIds = new Set<string>();
+  const brandIds = new Set<string>();
+  const modelIds = new Set<string>();
+  const objectKeys = new Set<string>();
+  const s3 = new S3Client({
+    endpoint: process.env["MINIO_ENDPOINT"] ?? "http://localhost:9000",
+    region: process.env["MINIO_REGION"] ?? "us-east-1",
+    credentials: {
+      accessKeyId: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin",
+      secretAccessKey: process.env["MINIO_SECRET_KEY"] ?? "minioadmin",
+    },
+    forcePathStyle: true,
+  });
+
+  async function cleanupOwnedFixture() {
+    // Actor IDs belong only to users created by this suite. Retained campaign
+    // audits and unrelated catalog/Listing graphs must never enter this cleanup.
+    await prisma.auditLog.deleteMany({ where: { actorId: { in: [...userIds] } } });
+    await prisma.totpBackupCode.deleteMany({
+      where: { totpEnrollment: { userId: { in: [...userIds] } } },
+    });
+    await prisma.totpEnrollment.deleteMany({ where: { userId: { in: [...userIds] } } });
+    await prisma.session.deleteMany({ where: { id: { in: [...sessionIds] } } });
+    await prisma.model.deleteMany({ where: { id: { in: [...modelIds] } } });
+    await prisma.brand.deleteMany({ where: { id: { in: [...brandIds] } } });
+    await prisma.user.deleteMany({ where: { id: { in: [...userIds] } } });
+    for (const key of objectKeys) {
+      await s3.send(new DeleteObjectCommand({ Bucket: "catalog-assets", Key: key }));
+    }
+    userIds.clear();
+    sessionIds.clear();
+    brandIds.clear();
+    modelIds.clear();
+    objectKeys.clear();
+  }
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -64,31 +101,29 @@ describe("AdminCatalogController e2e", () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    try {
+      await cleanupOwnedFixture();
+    } finally {
+      await app.close();
+      s3.destroy();
+    }
   });
 
   beforeEach(async () => {
     now = new Date();
-    await prisma.auditLog.deleteMany();
-    await prisma.totpBackupCode.deleteMany();
-    await prisma.totpEnrollment.deleteMany();
-    await prisma.session.deleteMany();
-    await prisma.listingMedia.deleteMany();
-    await prisma.listing.deleteMany();
-    await prisma.model.deleteMany();
-    await prisma.brand.deleteMany();
-    await prisma.user.deleteMany();
+    await cleanupOwnedFixture();
   });
 
   async function createAdminUser(): Promise<{ userId: string; sessionId: string; token: string }> {
     const user = await prisma.user.create({
       data: {
-        id: `admin-${Date.now()}`,
+        id: `admin-${randomUUID()}`,
         phone: "+99361111111",
         phoneVerifiedAt: new Date(),
         role: "admin",
       },
     });
+    userIds.add(user.id);
     const session = await prisma.session.create({
       data: {
         userId: user.id,
@@ -97,18 +132,20 @@ describe("AdminCatalogController e2e", () => {
         adminTotpExpiresAt: new Date(Date.now() + 12 * 60 * 60 * 1000),
       },
     });
+    sessionIds.add(session.id);
     return { userId: user.id, sessionId: session.id, token: mintAdminJwt(user.id, session.id) };
   }
 
   async function createNonAdminUser(): Promise<{ userId: string; token: string }> {
     const user = await prisma.user.create({
       data: {
-        id: `user-${Date.now()}`,
+        id: `user-${randomUUID()}`,
         phone: "+99362222222",
         phoneVerifiedAt: new Date(),
         role: "buyer",
       },
     });
+    userIds.add(user.id);
     const { sign } = await import("jsonwebtoken");
     const nonAdminToken = sign(
       { sub: user.id, role: "buyer" },
@@ -119,35 +156,52 @@ describe("AdminCatalogController e2e", () => {
   }
 
   async function createBrand() {
-    return prisma.brand.create({
+    const brand = await prisma.brand.create({
       data: {
         id: randomUUID(),
-        slug: `slug-${Date.now()}`,
+        slug: `slug-${randomUUID()}`,
         nameRu: "Тест",
         nameTk: "Test",
         nameEn: "Test",
       },
     });
+
+    brandIds.add(brand.id);
+    return brand;
   }
 
   async function createModel(brandId: string) {
-    return prisma.model.create({
+    const model = await prisma.model.create({
       data: {
         id: randomUUID(),
         brandId,
-        slug: `model-slug-${Date.now()}`,
+        slug: `model-slug-${randomUUID()}`,
         nameRu: "Модель",
         nameTk: "Model",
         nameEn: "Model",
       },
     });
+    modelIds.add(model.id);
+    return model;
+  }
+
+  async function getAuditLogs(action: string) {
+    const audits = await prisma.auditLog.findMany({
+      where: { action, actorId: { in: [...userIds] } },
+    });
+    for (const audit of audits) {
+      expect(audit.action).toBe(action);
+      expect(userIds.has(audit.actorId!)).toBe(true);
+      expect(audit.targetType).toBe(action.startsWith("CATALOG_MODEL_") ? "Model" : "Brand");
+      expect((audit.targetType === "Model" ? modelIds : brandIds).has(audit.targetId)).toBe(true);
+    }
+    return audits;
   }
 
   async function getAuditLog(action: string) {
-    return prisma.auditLog.findFirst({
-      where: { action },
-      orderBy: { createdAt: "desc" },
-    });
+    const audits = await getAuditLogs(action);
+    expect(audits).toHaveLength(1);
+    return audits[0]!;
   }
 
   function unwrapAuditLog<T>(auditLog: T | null): T {
@@ -159,7 +213,11 @@ describe("AdminCatalogController e2e", () => {
     function createRequest(token?: string) {
       const pending = request.post("/api/v1/admin/catalog/brands");
       if (token) pending.set("Authorization", `Bearer ${token}`);
-      return pending.send({ slug: `elevation-${randomUUID()}`, nameRu: "Тест", nameTk: "Test", nameEn: "Test" });
+      return pending
+        .send({ slug: `elevation-${randomUUID()}`, nameRu: "Тест", nameTk: "Test", nameEn: "Test" })
+        .expect((response) => {
+          if (response.status === 201) brandIds.add(response.body.id as string);
+        });
     }
 
     function expectError(body: unknown, statusCode: number, code: string, message: string) {
@@ -207,6 +265,7 @@ describe("AdminCatalogController e2e", () => {
       }
 
       const other = await prisma.user.create({ data: { id: randomUUID(), role: "admin" } });
+      userIds.add(other.id);
       await prisma.session.update({
         where: { id: sessionId },
         data: { userId: other.id, expiresAt: now, adminTotpExpiresAt: null },
@@ -291,6 +350,7 @@ describe("AdminCatalogController e2e", () => {
         .send({ slug: "toyota", nameRu: "Тойота", nameTk: "Toýota", nameEn: "Toyota" })
         .expect(201);
 
+      brandIds.add(res.body.id as string);
       expect(res.body.slug).toBe("toyota");
       expect(res.body.nameRu).toBe("Тойота");
 
@@ -399,6 +459,7 @@ describe("AdminCatalogController e2e", () => {
         .send({ slug: "camry", nameRu: "Камри", nameTk: "Kamri", nameEn: "Camry" })
         .expect(201);
 
+      modelIds.add(res.body.id as string);
       expect(res.body.slug).toBe("camry");
       expect(res.body.brandId).toBe(brand.id);
 
@@ -485,16 +546,6 @@ describe("AdminCatalogController e2e", () => {
   });
 
   describe("brand logo endpoints", () => {
-    const s3 = new S3Client({
-      endpoint: process.env["MINIO_ENDPOINT"] ?? "http://localhost:9000",
-      region: process.env["MINIO_REGION"] ?? "us-east-1",
-      credentials: {
-        accessKeyId: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin",
-        secretAccessKey: process.env["MINIO_SECRET_KEY"] ?? "minioadmin",
-      },
-      forcePathStyle: true,
-    });
-
     async function head(key: string) {
       try {
         return await s3.send(new HeadObjectCommand({ Bucket: "catalog-assets", Key: key }));
@@ -517,10 +568,12 @@ describe("AdminCatalogController e2e", () => {
       );
 
     async function presign(brandId: string, token: string, contentType: string, sizeBytes: number) {
-      return request
+      const response = await request
         .post(`/api/v1/admin/catalog/brands/${brandId}/logo/presign`)
         .set("Authorization", `Bearer ${token}`)
         .send({ contentType, sizeBytes });
+      if (response.status === 201) objectKeys.add(response.body.key as string);
+      return response;
     }
 
     /** Presign, PUT the bytes to MinIO the way the admin app does, and return the key. */
@@ -542,10 +595,13 @@ describe("AdminCatalogController e2e", () => {
     }
 
     async function confirm(brandId: string, token: string, key: string) {
-      return request
+      const response = await request
         .put(`/api/v1/admin/catalog/brands/${brandId}/logo`)
         .set("Authorization", `Bearer ${token}`)
         .send({ key });
+      const brand = await prisma.brand.findUnique({ where: { id: brandId } });
+      if (brand?.logoKey) objectKeys.add(brand.logoKey);
+      return response;
     }
 
     it("returns 401 without bearer token and 403 for a non-admin", async () => {
@@ -600,7 +656,13 @@ describe("AdminCatalogController e2e", () => {
       expect([meta.format, meta.width, meta.height]).toEqual(["png", 256, 256]);
       expect(await head(firstKey as string)).toBeNull();
       expect(await head(secondPending)).toBeNull();
-      expect(unwrapAuditLog(await getAuditLog("CATALOG_BRAND_LOGO_SET")).targetId).toBe(brand.id);
+      const logoAudits = await getAuditLogs("CATALOG_BRAND_LOGO_SET");
+      expect(logoAudits).toHaveLength(2);
+      expect(logoAudits.map((audit) => audit.targetId)).toEqual([brand.id, brand.id]);
+      expect(logoAudits.map((audit) => audit.details)).toEqual(expect.arrayContaining([
+        { slug: brand.slug, logoKey: firstKey, previousLogoKey: null },
+        { slug: brand.slug, logoKey: secondKey, previousLogoKey: firstKey },
+      ]));
 
       await request
         .delete(`/api/v1/admin/catalog/brands/${brand.id}/logo`)
@@ -697,6 +759,7 @@ describe("AdminCatalogController e2e", () => {
       async function importedLogo(slug: string, version: string): Promise<string> {
         const body = await png(30, 30);
         for (const file of files) {
+          objectKeys.add(`brands/${slug}/${version}/${file}`);
           await s3.send(
             new PutObjectCommand({
               Bucket: "catalog-assets",
