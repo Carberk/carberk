@@ -76,6 +76,35 @@ describe("media caller preparation", () => {
     expect(db.tables["listing_media"]?.[0]).toMatchObject({ id: "photo", uploadId: "upload-1", listingId: "listing" });
     expect(db.finished).toBe(1);
   });
+  it("returns the exact committed association when the same reservation finishes during its wait", async () => {
+    const { db, repository } = setup(); db.upload("upload-1", reserve);
+    db.afterWait = () => {
+      Object.assign(db.tables["media_uploads"]![0]!, { state: "ADOPTED", claimToken: null, claimDeadline: null });
+      db.tables["listing_media"]!.push({ id: "winner", listingId: "listing", kind: "image", key: "pending/upload-1/original.webp", sortOrder: 0, width: null, height: null, durationMs: null, posterKey: null, thumbHash: null, uploadId: "upload-1", createdAt: now.toISOString() });
+    };
+    expect((await repository.save(media(), {token:"token"})).id).toBe("winner");
+    expect(db.tables["listing_media"]).toHaveLength(1); expect(db.finished).toBe(1);
+  });
+  it.each(["token", "owner", "business", "PII", "poster", "source", "final state", "target", "media bytes", "extra adopter"])("refuses an unrelated %s change beside a committed adoption", async change => {
+    const { db, repository } = setup(); db.upload("upload-1", {...reserve,...(change==="token"?{claimToken:"different"}:{})});
+    db.afterWait = () => {
+      const upload=db.tables["media_uploads"]![0]!;
+      Object.assign(upload,{state:"ADOPTED",claimToken:null,claimDeadline:null});
+      const row:Row={id:"winner",listingId:"listing",kind:"image",key:"pending/upload-1/original.webp",sortOrder:0,width:null,height:null,durationMs:null,posterKey:null,thumbHash:null,uploadId:"upload-1",createdAt:now.toISOString()};
+      db.tables["listing_media"]!.push(row);
+      if(change==="owner")upload["userId"]="foreign";
+      if(change==="business")upload["businessId"]="foreign";
+      if(change==="PII")db.tables["users"]![0]!["phone"]="changed";
+      if(change==="poster")row["posterKey"]="foreign/poster";
+      if(change==="source")upload["objectKeys"]=["foreign/object"];
+      if(change==="final state")upload["state"]="RETIRED";
+      if(change==="target")upload["claimTargetId"]="other";
+      if(change==="media bytes")row["thumbHash"]="changed";
+      if(change==="extra adopter")db.tables["listing_media"]!.push({...row,id:"extra"});
+    };
+    await expect(repository.save(media(),{token:"token"})).rejects.toThrow("media_caller_scope_changed");
+    expect(db.tables["listing_media"]).toEqual([]);expect(db.finished).toBe(0);
+  });
   it("prepares a media insert without provenance", async () => {
     const { db, repository } = setup();
     expect((await repository.save(media("legacy", null))).id).toBe("legacy");
