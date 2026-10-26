@@ -1,6 +1,6 @@
 import { withAvatarPreparation } from "../../../common/avatar-contact-preparation";
 import { describe, expect, it } from "vitest";
-import { withCampaignPreparation, type Prisma } from "@auto-tm/db";
+import { withCampaignPreparation, Prisma } from "@auto-tm/db";
 import { PrismaVerifiedContactPhoneRepository } from "./PrismaVerifiedContactPhoneRepository";
 import { VerifiedContactPhone } from "../domain/VerifiedContactPhone";
 
@@ -256,5 +256,62 @@ describe("real contact repositories at the database boundary", () => {
     const { db, repo } = business(); const before = structuredClone(db.tables); db.failAt = failAt;
     await expect(repo.record(businessConfirmation, actor)).rejects.toThrow(`refused:${failAt}`);
     expect(db.tables).toEqual(before);
+  });
+});
+
+// Exercise the original single database fake through the precise SQL shapes
+// emitted by the accepted claims consumer. No PostgreSQL behavior is claimed.
+describe("avatar database boundary query compatibility", () => {
+  it("returns the complete detached JSON row for the exact matching predicate and none for an absent or mismatched row", async () => {
+    const db = avatarDatabase();
+    const read = (predicate: Record<string, unknown>) => db.$queryRaw(Prisma.sql`
+      SELECT to_jsonb(s) AS row FROM public.${Prisma.raw("media_uploads")} s WHERE to_jsonb(s) @> ${JSON.stringify(predicate)}::jsonb`);
+    const before = structuredClone(db.tables);
+    const result = await read({ id: "old", userId: "seller", businessId: null });
+    expect(result).toEqual([{ row: { id: "old", userId: "seller", businessId: null, key: "old.webp", state: "ADOPTED",
+      claimToken: null, claimTargetType: "profile", claimTargetId: "seller", writeProtocol: "conditional-v1", objectKeys: ["old.webp", "old-thumb.webp"] } }]);
+    (result[0] as { row: { objectKeys: string[] } }).row.objectKeys.push("changed");
+    expect(await read({ id: "missing" })).toEqual([]);
+    expect(await read({ id: "old", userId: "foreign" })).toEqual([]);
+    expect(await read({ id: "old", missingField: null })).toEqual([]);
+    expect(db.tables).toEqual(before);
+  });
+  it("reads cleanup by its actual uploadId key and serializes source instants", async () => {
+    const db = avatarDatabase();
+    db.seed("media_upload_cleanups", { uploadId: "old", key: "retained", completedAt: NOW });
+    expect(await db.$queryRaw(Prisma.sql`SELECT to_jsonb(s) AS row FROM public.${Prisma.raw("media_upload_cleanups")} s WHERE to_jsonb(s) @> ${JSON.stringify({ uploadId: "old" })}::jsonb`))
+      .toEqual([{ row: { uploadId: "old", key: "retained", completedAt: "2026-10-25T00:00:00.000Z" } }]);
+  });
+  it("selects reverse adopters for both scalar avatar and array claims predicates without foreign rows", async () => {
+    const db = avatarDatabase();
+    db.seed("listing_media", { id: "media", uploadId: "new", listingId: "listing" });
+    db.seed("listing_media", { id: "foreign-media", uploadId: "foreign-upload", listingId: "foreign-listing" });
+    const read = (ids: string[] | string) => db.$queryRaw`
+      SELECT 'users' AS table, id, NULL::text AS "listingId" FROM users WHERE "avatarUploadId" = ANY(${ids}::text[])
+      UNION ALL SELECT 'listing_media', id, "listingId" FROM listing_media WHERE "uploadId" = ANY(${ids}::text[]) ORDER BY 1,2`;
+    expect(await read(["old", "new"])).toEqual([{ table: "users", id: "seller", listingId: null }, { table: "listing_media", id: "media", listingId: "listing" }]);
+    expect(await db.$queryRaw`SELECT 'users' AS table, id, NULL::text AS "listingId" FROM users WHERE "avatarUploadId"=${"old"}
+      UNION ALL SELECT 'listing_media', id, "listingId" FROM listing_media WHERE "uploadId"=${"old"} ORDER BY 1,2`)
+      .toEqual([{ table: "users", id: "seller", listingId: null }]);
+    expect(await read(["absent"])).toEqual([]);
+  });
+  it("refuses supplied real claims without required advisory locks despite a live campaign receipt", async () => {
+    const db = avatarDatabase(); const before = structuredClone(db.tables);
+    await expect(db.$transaction(tx => withCampaignPreparation(tx as unknown as Prisma.TransactionClient,
+      [{ table: "media_uploads", key: { id: "new" }, verb: "update", next: { state: "ADOPTED", claimToken: null, claimDeadline: null } }],
+      () => new PrismaUploadClaims(db.service, clock).finalize(tx, { token: "token", uploadIds: ["new"], target: { type: "profile", id: "seller" } }))))
+      .rejects.toThrow("upload_claim_preparation_uncovered");
+    expect(db.tables).toEqual(before);
+  });
+  it("refuses supplied real claims without a live receipt", async () => {
+    const db = avatarDatabase(); const before = structuredClone(db.tables);
+    await expect(new PrismaUploadClaims(db.service, clock).retire(db, "old")).rejects.toThrow("upload_claim_preparation_missing");
+    expect(db.tables).toEqual(before);
+  });
+  it("rejects unsupported query projections and uncast void transport", async () => {
+    const db = avatarDatabase();
+    await expect(db.$queryRaw(Prisma.sql`SELECT to_jsonb(s) AS wrong FROM public.${Prisma.raw("media_uploads")} s WHERE to_jsonb(s) @> ${JSON.stringify({ id: "old" })}::jsonb`)).rejects.toThrow("Unhandled database query");
+    await expect(db.$queryRaw`SELECT pg_advisory_xact_lock(${897100}::int,${1}::int)`).rejects.toThrow("unsupported_void_result");
+    await expect(db.$queryRaw`SELECT public.campaign_finish(${"receipt"}::uuid)`).rejects.toThrow("unsupported_void_result");
   });
 });

@@ -17,6 +17,7 @@ export class AvatarContactDatabase {
   failAt: string | undefined;
   afterPreparation: (() => void) | undefined;
   private prepared = false;
+  private readonly advisoryKeys = new Set<string>();
   readonly service = this as unknown as PrismaService;
   rows(table: string): Row[] { return this.tables[table] ?? []; }
   seed(table: string, row: Row): void { this.rows(table).push(copy(row)); }
@@ -34,11 +35,12 @@ export class AvatarContactDatabase {
     const before = copy(this.tables);
     try { return await work(this); }
     catch (error) { this.tables = before; throw error; }
-    finally { this.prepared = false; this.mutations = undefined; }
+    finally { this.prepared = false; this.mutations = undefined; this.advisoryKeys.clear(); }
   }
   async $queryRaw(sql: TemplateStringsArray | { sql: string; values: unknown[] }, ...tagValues: unknown[]): Promise<unknown[]> {
     const text = Array.isArray(sql) ? sql.join("?") : (sql as { sql: string }).sql;
     const values = Array.isArray(sql) ? tagValues : (sql as { values: unknown[] }).values;
+    if ((text.includes("pg_advisory_xact_lock(") || text.includes("campaign_finish(")) && !text.trimEnd().endsWith("::text")) throw new Error("unsupported_void_result");
     if (text.includes("campaign_prepare(")) {
       if (this.failAt === "prepare") throw new Error("refused:prepare");
       if (this.prepared) throw new Error("campaign_preparation_nested");
@@ -54,16 +56,35 @@ export class AvatarContactDatabase {
       return [{ receipt: "receipt" }];
     }
     if (text.includes("campaign_finish(")) { this.boundary("finish"); this.prepared = false; return []; }
+    if (text.includes("WITH live AS (") && text.includes("AS covered FROM live CROSS JOIN required") &&
+      text.includes("public.campaign_preparation_scope(") && text.includes("FROM pg_locks")) {
+      if (!this.prepared) return [];
+      // This offline fixture has no installed campaign namespaces or tracking
+      // triggers. Both SQL scopes are empty; test the actual required key subset
+      // against locks acquired on this fake transaction, not a blanket success.
+      const keys = JSON.parse(String(values[2])) as { namespace: number; key: number }[];
+      return [{ covered: keys.every(k => this.advisoryKeys.has(`${k.namespace}:${k.key}`)) }];
+    }
     if (text.includes("FROM public.campaign_preparations")) return this.prepared ? [{ ...this.receiptIdentity, mutations: this.mutations }] : [];
     if (text.includes("diagnostic_source_read")) {
       const key = JSON.parse(String(values[1])) as Row;
       return [{ row: json(this.rows(String(values[0])).find(r => Object.entries(key).every(([k, v]) => r[k] === v)) ?? null) }];
     }
-    if (text.includes("pg_advisory_xact_lock(") && !text.trimEnd().endsWith("::text")) throw new Error("unsupported_void_result");
+    const rowRead = text.trim().match(/^SELECT to_jsonb\(s\) AS row FROM public\.(\w+) s WHERE to_jsonb\(s\) @> \?::jsonb$/);
+    if (rowRead && Object.hasOwn(this.tables, rowRead[1] ?? "")) {
+      const predicate = JSON.parse(String(values[0])) as Row;
+      return this.rows(rowRead[1] ?? "").filter(row => Object.entries(predicate).every(([key, value]) =>
+        JSON.stringify(row[key] === undefined ? undefined : json(row[key])) === JSON.stringify(value))).map(row => ({ row: json(row) }));
+    }
     if (text.includes("diagnostic_source_lock_keys(")) throw new Error("diagnostic_intake_reception_selection");
     if (text.includes("diagnostic_source_lock_keys_before_intake(")) {
       const slots = JSON.parse(String(values[0])) as { table: string; key: { id?: string } }[];
-      for (const id of this.requiredInitialUsers) {
+      // The accepted claims query appends metadata unique-only slots. Keep the
+      // fake's existing namespace/key abstraction consistent on both call paths.
+      if (values[2]) slots.push(...JSON.parse(String(values[2])) as typeof slots);
+      // This assertion concerns the outer initial union. Later supplied claims
+      // verify a sub-union, which need not contain the removing admin.
+      for (const id of this.advisoryKeys.size ? [] : this.requiredInitialUsers) {
         if (!slots.some(s => s.table === "users" && s.key.id === id)) throw new Error(`missing initial User dependency:${id}`);
       }
       return [{ keys: [...new Set(slots.map(s => namespaces[s.table]))].map(namespace => ({ namespace, key: 1 })) }];
@@ -77,11 +98,15 @@ export class AvatarContactDatabase {
       return [{ namespace: namespaces[String(values[0])], refs: refs[String(values[0])] ?? [] }];
     }
     if (text.includes("FOR UPDATE") || text.includes("pg_advisory_xact_lock")) this.boundary("lock");
+    if (text.includes("pg_advisory_xact_lock(")) this.advisoryKeys.add(`${String(values[0])}:${String(values[1])}`);
     if (text.includes("SELECT 1 FROM public.") || text.includes("pg_advisory_xact_lock")) return [];
-    if (text.includes("UNION ALL SELECT 'listing_media'")) return [
-      ...this.rows("users").filter(r => r["avatarUploadId"] === values[0]).map(r => ({ table: "users", id: r["id"], listingId: null })),
-      ...this.rows("listing_media").filter(r => r["uploadId"] === values[1]).map(r => ({ table: "listing_media", id: r["id"], listingId: r["listingId"] })),
-    ];
+    if (text.includes("UNION ALL SELECT 'listing_media'")) {
+      const selected = (value: unknown, id: unknown) => Array.isArray(value) ? value.includes(id) : value === id;
+      return [
+        ...this.rows("users").filter(r => selected(values[0], r["avatarUploadId"])).map(r => ({ table: "users", id: r["id"], listingId: null })),
+        ...this.rows("listing_media").filter(r => selected(values[1], r["uploadId"])).map(r => ({ table: "listing_media", id: r["id"], listingId: r["listingId"] })),
+      ];
+    }
     if (text.includes("AS total")) {
       const ids = values[0] as string[];
       return [{ total: BigInt(this.rows("users").filter(r => ids.includes(String(r["avatarUploadId"]))).length +
